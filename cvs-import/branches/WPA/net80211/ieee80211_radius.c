@@ -1089,8 +1089,8 @@ radius_make_response(struct radiuscom *rc, struct eapol_auth_radius_node *ern)
 	eap->eap_len = htons(len);
 	for (cp = (u_int8_t *)eap; len > 0; cp += cc, len -= cc) {
 		cc = len;
-		if (len > RAD_MAX_ATTR_LEN)
-			len = RAD_MAX_ATTR_LEN;
+		if (cc > RAD_MAX_ATTR_LEN)
+			cc = RAD_MAX_ATTR_LEN;
 		dp = radius_add_bytes(dp, RAD_ATTR_EAP_MESSAGE, cp, cc);
 	}
 	eap->eap_len = ntohs(eap->eap_len);
