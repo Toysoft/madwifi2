@@ -23,8 +23,10 @@ are building.  If you installed your kernel sources as the super-user
 then this may fail because of permission problems.  In that case
 you either need to change the permission/ownership of the kernel
 sources or build the driver as the super-user.
+You MUST do a "make clean" before compiling for a different
+version of Linux; e.g. building for 2.6 after building for 2.4.
 
-Otherwise, if this does not work or if you want to cross-compile
+If this does not work or if you want to cross-compile
 the code for a different system then you will need to explicitly
 specify the location where the kernel sources are located, e.g.:
 
@@ -33,22 +35,32 @@ trouble% make KERNELPATH=/usr/src/linux-2.6.3
 Note that you can also specify this path by setting an environment
 variable; e.g.
 
-trouble% export KERNELPATH=/usr/src/linux-2.6.3
+trouble% KERNELPATH=/usr/src/linux-2.6.3
 trouble% make
 
 You can also just specify a kernel version using the KERNELRELEASE
 variable.  In that case the kernel sources are automatically searched
 for in /lib/modules/$KERNELRELEASE/build.
 
+If you want to build for a machine different of i386 you will have
+to specifiy the Target. A complete example for building on a AMD 
+Athlon64 (x86_64) machine could look like:
 
-Madwifi currently provides two different rate control algorithms,
-ONOE and AMRR. ONOE is used by default. In order to make madwifi
+trouble% make TARGET="x86_64-elf" TOOLPREFIX="" LINUX_DIR=/usr/src/linux
+
+
+Madwifi currently provides three different rate control algorithms,
+ONOE, AMRR and SAMPLE. ONOE is used by default. In order to make madwifi
 use AMRR instead, you have to specify that via the ATH_RATE
 environment variable; e.g.
 
 trouble% export ATH_RATE=ath_rate/amrr
 trouble% make
 
+Note:
+Changing the rate control is only required (and recomended) for users 
+which want to setup an accesspoint using madwifi in difficult 
+(e.g. lossy) environments and if he knows what he is doing.
 
 This distribution includes support for a variety of target platforms.
 Because of the binary nature of the HAL not all platforms are
@@ -147,6 +159,7 @@ Linux 2.6
 
     ath_rate/onoe/ath_rate_onoe.ko (ONOE rate control)
     ath_rate/amrr/ath_rate_amrr.ko (AMRR rate control)
+    ath_rate/amrr/ath_rate_sample.ko (SAMPLE rate control)
     
 
 Linux 2.4
@@ -166,6 +179,7 @@ Linux 2.4
 
     ath_rate/onoe/ath_rate_onoe.o (ONOE rate control)
     ath_rate/amrr/ath_rate_amrr.o (AMRR rate control)
+    ath_rate/amrr/ath_rate_sample.o (SAMPLE rate control)
 
 
 The first three files must be loaded either manually or by the
@@ -181,7 +195,14 @@ configuration files so the necessary modules are loaded when an
 Atheros device is recognized.  The exact procedure varies from
 system to system.
 
+There are module parameters available to fit your needs, e.g. you can
+set the countrycode manually if your cards eeprom does not contain the 
+correct one for your location. See http://www.unicode.org/onlinedat/countries.html
+to find your code. To active German frequencies you would specify:
 
-Note that you MUST do a "make clean" before compiling for a different
-version of Linux; e.g. building for 2.6 after building for 2.4.
+    modprobe ath_pci countrycode=276
+
+To see available parameters type:
+
+    modinfo ath_pci
 
