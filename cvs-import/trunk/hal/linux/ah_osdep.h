@@ -100,7 +100,9 @@ extern void __ahdecl ath_hal_memzero(void *, size_t);
 #define	OS_MEMCPY(_d, _s, _n)	ath_hal_memcpy(_d,_s,_n)
 extern void * __ahdecl ath_hal_memcpy(void *, const void *, size_t);
 
+#ifndef abs
 #define	abs(_a)		__builtin_abs(_a)
+#endif
 
 struct ath_hal;
 extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
@@ -147,7 +149,27 @@ __bswap32(u_int32_t _x)
  * Most of this code is collapsed at compile time because the
  * register values are constants.
  */
-#if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
+#if AH_BYTE_ORDER == AH_BIG_ENDIAN
+#define _OS_REG_WRITE(_ah, _reg, _val) do {				    \
+	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
+			__bswap32((_val));				    \
+	else								    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
+} while (0)
+#define _OS_REG_READ(_ah, _reg) \
+	(((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
+		__bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
+#else /* AH_LITTLE_ENDIAN */
+#define _OS_REG_WRITE(_ah, _reg, _val) do { \
+	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val); \
+} while (0)
+#define _OS_REG_READ(_ah, _reg) \
+	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))
+#endif /* AH_BYTE_ORDER */
+
+#if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC) || defined(AH_DEBUG_ALQ)
 /* use functions to do register operations */
 #define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
 #define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
@@ -157,27 +179,15 @@ extern	void __ahdecl ath_hal_reg_write(struct ath_hal *ah,
 extern	u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 #else
 /* inline register operations */
-#if AH_BYTE_ORDER == AH_BIG_ENDIAN
-#define OS_REG_WRITE(_ah, _reg, _val) do {				    \
-	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
-		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
-			__bswap32((_val));				    \
-	else								    \
-		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
-} while (0)
-#define OS_REG_READ(_ah, _reg) \
-	(((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
-		__bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
-		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
-#else /* AH_LITTLE_ENDIAN */
-#define OS_REG_WRITE(_ah, _reg, _val) do { \
-	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val); \
-} while (0)
-#define OS_REG_READ(_ah, _reg) \
-	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))
-#endif /* AH_BYTE_ORDER */
-#endif /* AH_DEBUG || AH_REGFUNC */
+#define OS_REG_WRITE(_ah, _reg, _val)	_OS_REG_WRITE(_ah, _reg, _val)
+#define OS_REG_READ(_ah, _reg)		_OS_REG_READ(_ah, _reg)
+#endif /* AH_DEBUG || AH_REGFUNC || AH_DEBUG_ALQ */
+
+#ifdef AH_DEBUG_ALQ
+extern	void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
+#else
 #define	OS_MARK(_ah, _id, _v)
+#endif
 
 /*
  * Linux-specific attach/detach methods needed for module reference counting.
