@@ -75,7 +75,7 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	struct ieee80211_channel *c;
 	int i;
 
-	__MOD_INC_USE_COUNT(THIS_MODULE);
+	_MOD_INC_USE(THIS_MODULE, return ENODEV);
 
 	ieee80211_crypto_attach(ic);
 
@@ -159,7 +159,7 @@ ieee80211_ifdetach(struct ieee80211com *ic)
 	ieee80211_sysctl_unregister(ic);
 #endif
 
-	__MOD_DEC_USE_COUNT(THIS_MODULE);
+	_MOD_DEC_USE(THIS_MODULE);
 }
 EXPORT_SYMBOL(ieee80211_ifdetach);
 
@@ -381,6 +381,7 @@ ieee80211_find_vap(const u_int8_t mac[IEEE80211_ADDR_LEN])
 			return ic;
 	return NULL;
 }
+EXPORT_SYMBOL(ieee80211_find_vap);
 
 static struct ieee80211com *
 ieee80211_find_instance(struct net_device *dev)
