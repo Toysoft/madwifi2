@@ -46,11 +46,6 @@
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
 
-#define	ATH_SCHEDTASK(_tq) do {						\
-	if (queue_task(_tq, &tq_immediate))				\
-		mark_bh(IMMEDIATE_BH);					\
-} while (0);
-
 #define	TXBUF_DEQUEUE(_sc, _bf) do {					\
 	spin_lock(&(_sc)->sc_txbuflock);				\
 	_bf = TAILQ_FIRST(&(_sc)->sc_txbuf);				\
@@ -78,7 +73,6 @@ static void	ath_fatal_tasklet(void *);
 static void	ath_rxorn_tasklet(void *);
 static void	ath_bmiss_tasklet(void *);
 static int	ath_stop(struct net_device *);
-static void	ath_start(struct net_device *);
 static void	ath_watchdog(struct net_device *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
@@ -90,6 +84,7 @@ static void	ath_node_free(struct ieee80211com *, struct ieee80211_node *);
 static int	ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
 static void	ath_rx_tasklet(void *);
 static int	ath_hardstart(struct sk_buff *, struct net_device *);
+static int	ath_mgtstart(struct sk_buff *, struct net_device *);
 static int	ath_tx_start(struct ath_softc *, struct ieee80211_node *,
 			     struct ath_buf *, struct sk_buff *);
 static void	ath_tx_tasklet(void *);
@@ -144,7 +139,6 @@ ath_attach(uint16_t devid, struct net_device *dev)
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
-	skb_queue_head_init(&sc->sc_sndq);
 	spin_lock_init(&sc->sc_txbuflock);
 	spin_lock_init(&sc->sc_txqlock);
 
@@ -228,7 +222,7 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	dev->set_multicast_list = ath_mode_init;
 
 	ic->ic_watchdog = ath_watchdog;
-	ic->ic_start = ath_start;
+	ic->ic_mgtstart = ath_mgtstart;
 	ic->ic_init = ath_init;
 
 	ic->ic_newstate = ath_newstate;
@@ -323,25 +317,30 @@ ath_shutdown(struct net_device *dev)
 	ath_stop(dev);
 }
 
+/*
+ * Interrupt handler.  All the actual processing is
+ * deferred to tasklets.
+ */
 void
 ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
-	HAL_INT status;
-	int i;
+	int i, needmark;
 
+	needmark = 0;
 	for (i = 0; i < 10 && ath_hal_intrpend(ah); i++) {
+		HAL_INT status;
+
 		ath_hal_getisr(ah, &status);
-		DPRINTF(("%s: interrupt, status 0x%x\n",
-			dev->name, status));
+		DPRINTF(("%s: interrupt, status 0x%x\n", dev->name, status));
 		if (status & HAL_INT_FATAL) {
-			ATH_SCHEDTASK(&sc->sc_fataltq);
+			needmark |= queue_task(&sc->sc_fataltq, &tq_immediate);
 			break;		/* XXX??? */
 		}
 		if (status & HAL_INT_RXORN) {
-			ATH_SCHEDTASK(&sc->sc_rxorntq);
+			needmark |= queue_task(&sc->sc_rxorntq, &tq_immediate);
 			break;		/* XXX??? */
 		}
 		if (status & HAL_INT_RXEOL) {
@@ -355,20 +354,22 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		if (status & HAL_INT_RX)
-			ATH_SCHEDTASK(&sc->sc_rxtq);
+			needmark |= queue_task(&sc->sc_rxtq, &tq_immediate);
 		if (status & HAL_INT_TX)
-			ATH_SCHEDTASK(&sc->sc_txtq);
+			needmark |= queue_task(&sc->sc_txtq, &tq_immediate);
 		if (status & HAL_INT_SWBA)
-			ATH_SCHEDTASK(&sc->sc_swbatq);
+			needmark |= queue_task(&sc->sc_swbatq, &tq_immediate);
 #if 0
 		if (status & (HAL_INT_BMISS | HAL_INT_RXNOFRM)) {
 DPRINTF(("ath_intr: beacon miss | rxnofrm: status 0x%x\n", status));
-			ATH_SCHEDTASK(&sc->sc_bmisstq);
+			needmark |= queue_task(&sc->sc_bmisstq, &tq_immediate);
 		}
 #endif
 	}
 	if (i == 10)
 		printk("%s: intr processing stopped prematurely\n", dev->name);
+	if (needmark)
+		mark_bh(IMMEDIATE_BH);
 }
 
 static void
@@ -481,8 +482,6 @@ ath_init(struct net_device *dev)
 		val |= HAL_INT_SWBA;			/* beacon prepare */
 	ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
 
-	netif_start_queue(dev);
-
 	/*
 	 * The hardware should be ready to go now so it's safe
 	 * to kick the 802.11 state machine as it's likely to
@@ -541,10 +540,8 @@ ath_stop(struct net_device *dev)
 
 	ath_beacon_free(sc);
 	sc->sc_txlink = sc->sc_rxlink = NULL;
-	sc->sc_oactive = 0;
 	sc->sc_ic.ic_timer = 0;
 	sc->sc_tx_timer = 0;
-	skb_queue_purge(&sc->sc_sndq);
 
 	/* free transmit queue */
 	while ((bf = TAILQ_FIRST(&sc->sc_txq)) != NULL) {
@@ -561,130 +558,178 @@ ath_stop(struct net_device *dev)
 }
 
 /*
- * Accept packets from above; we queue them and kick the common
- * start code.  This is very un-Linux like but insures any management
- * frames get priority w/o totally mangling the existing logic.
+ * Transmit a data packet.  On failure caller is
+ * assumed to reclaim the resources.
  */
 static int
 ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211_node *ni;
+	struct ath_buf *bf = NULL;
+	struct ieee80211_frame *wh;
+	int error;
 
-	skb_queue_tail(&sc->sc_sndq, skb);
-	if (!sc->sc_oactive)
-		ath_start(dev);
-	return 0;
+	if (sc->sc_invalid) {
+		DPRINTF(("ath_hardstart: discard, invalid\n"));
+		error = -ENETDOWN;
+		goto bad;
+	}
+	/*
+	 * No data frames go out unless we're associated; this
+	 * should not happen as the 802.11 layer does not enable
+	 * the xmit queue until we enter the RUN state.
+	 */
+	if (ic->ic_state != IEEE80211_S_RUN) {
+		DPRINTF(("ath_hardstart: discard, state %u\n", ic->ic_state));
+		sc->sc_stats.ast_tx_discard++;
+		error = -ENETDOWN;
+		goto bad;
+	}
+	/*
+	 * Grab a TX buffer and associated resources.
+	 */
+	TXBUF_DEQUEUE(sc, bf);
+	if (bf == NULL) {
+		DPRINTF(("ath_hardstart: discard, no xmit buf\n"));
+		sc->sc_stats.ast_tx_nobuf++;
+		error = -ENOBUFS;
+		goto bad;
+	}
+	/*
+	 * Encapsulate the packet for transmission.
+	 */
+	skb = ieee80211_encap(dev, skb);
+	if (skb == NULL) {
+		DPRINTF(("ath_hardstart: discard, encapsulation failure\n"));
+		sc->sc_stats.ast_tx_encap++;
+#ifdef notdef
+		error = -ENOMEM;
+#else
+		/*
+		 * Can't return an error code here because the caller
+		 * reclaims the skbuff on error and it's already gone.
+		 */
+		error = 0;
+#endif
+		goto bad;
+	}
+	wh = (struct ieee80211_frame *) skb->data;
+	if (ic->ic_flags & IEEE80211_F_WEPON)
+		wh->i_fc[1] |= IEEE80211_FC1_WEP;
+
+	ni = ieee80211_find_node(ic, wh->i_addr1);
+	if (ni == NULL &&
+	    !IEEE80211_IS_MULTICAST(wh->i_addr1) &&
+	    ic->ic_opmode != IEEE80211_M_STA) {
+		DPRINTF(("ath_hardstart: discard, no destination state\n"));
+		sc->sc_stats.ast_tx_nonode++;
+		error = -EHOSTUNREACH;
+		goto bad;
+	}
+	if (ni == NULL)
+		ni = &ic->ic_bss;
+
+	/*
+	 * TODO:
+	 * The duration field of 802.11 header should be filled.
+	 * XXX This may be done in the ieee80211 layer, but the upper 
+	 *     doesn't know the detail of parameters such as IFS
+	 *     for now..
+	 */
+
+	if (IFF_DUMPPKTS(ic))
+		ieee80211_dump_pkt(skb->data, skb->len,
+		    ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
+
+	error = ath_tx_start(sc, ni, bf, skb);
+	if (error == 0) {
+		sc->sc_tx_timer = 5;
+		ic->ic_timer = 1;
+		return 0;
+	}
+	/* fall thru... */
+bad:
+	if (bf != NULL)
+		TXBUF_QUEUE_TAIL(sc, bf);
+	ic->ic_stats.tx_errors++;
+	return error;
 }
 
-static void
-ath_start(struct net_device *dev)
+/*
+ * Transmit a management frame.  On failure we reclaim the skbuff.
+ */
+static int
+ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
-	struct ath_buf *bf;
-	struct sk_buff *skb;
+	struct ath_buf *bf = NULL;
 	struct ieee80211_frame *wh;
+	int error;
 
-	if (sc->sc_invalid)
-		return;
-	for (;;) {
-		/*
-		 * Grab a TX buffer and associated resources.
-		 */
-		TXBUF_DEQUEUE(sc, bf);
-		if (bf == NULL) {
-			sc->sc_oactive = 0;
-			DPRINTF(("ath_start: out of xmit buffers\n"));
-			break;
-		}
-		/*
-		 * Poll the management queue for frames; they
-		 * have priority over normal data frames.
-		 */
-		skb = skb_dequeue(&ic->ic_mgtq);
-		if (skb != NULL) {
-			wh = (struct ieee80211_frame *) skb->data;
-			if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
-			    IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
-				/* fill time stamp */
-				u_int64_t tsf;
-				u_int32_t *tstamp;
+	if (sc->sc_invalid) {
+		DPRINTF(("ath_mgtstart: discard, invalid\n"));
+		error = -ENETDOWN;
+		goto bad;
+	}
+	/*
+	 * Grab a TX buffer and associated resources.
+	 */
+	TXBUF_DEQUEUE(sc, bf);
+	if (bf == NULL) {
+		DPRINTF(("ath_mgtstart: discard, no xmit buf\n"));
+		sc->sc_stats.ast_tx_nobuf++;
+		error = -ENOBUFS;
+		goto bad;
+	}
+	wh = (struct ieee80211_frame *) skb->data;
+	if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
+	    IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
+		/* fill time stamp */
+		u_int64_t tsf;
+		u_int32_t *tstamp;
 
-				tsf = ath_hal_gettsf(ah);
-				/* XXX: adjust 100us delay to xmit */
-				tsf += 100;
-				tstamp = (u_int32_t *)&wh[1];
-				tstamp[0] = cpu_to_le32(tsf & 0xffffffff);
-				tstamp[1] = cpu_to_le32(tsf >> 32);
-			}
-		} else {
-			/*
-			 * No data frames go out unless we're associated.
-			 */
-			if (ic->ic_state != IEEE80211_S_RUN) {
-				DPRINTF(("ath_start: discard data packet, "
-					"state %u\n", ic->ic_state));
-				TXBUF_QUEUE_TAIL(sc, bf);
-				break;
-			}
-			skb = skb_dequeue(&sc->sc_sndq);
-			if (skb == NULL) {
-				TXBUF_QUEUE_TAIL(sc, bf);
-				break;
-			}
-			ic->ic_stats.tx_packets++;
-			/*
-			 * Encapsulate the packet in prep for transmission.
-			 */
-			skb = ieee80211_encap(dev, skb);
-			if (skb == NULL) {
-				DPRINTF(("ath_start: encapsulation failure\n"));
-				sc->sc_stats.ast_tx_encap++;
-				goto txerror;
-			}
-			wh = (struct ieee80211_frame *) skb->data;
-			if (ic->ic_flags & IEEE80211_F_WEPON)
-				wh->i_fc[1] |= IEEE80211_FC1_WEP;
-		}
+		tsf = ath_hal_gettsf(ah);
+		/* XXX: adjust 100us delay to xmit */
+		tsf += 100;
+		tstamp = (u_int32_t *)&wh[1];
+		tstamp[0] = cpu_to_le32(tsf & 0xffffffff);
+		tstamp[1] = cpu_to_le32(tsf >> 32);
+	}
+	ni = ieee80211_find_node(ic, wh->i_addr1);
+	if (ni == NULL)
+		ni = &ic->ic_bss;
 
-		ni = ieee80211_find_node(ic, wh->i_addr1);
-		if (ni == NULL &&
-		    !IEEE80211_IS_MULTICAST(wh->i_addr1) &&
-		    ic->ic_opmode != IEEE80211_M_STA &&
-		    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
-		    IEEE80211_FC0_TYPE_DATA) {
-			dev_kfree_skb(skb);
-			sc->sc_stats.ast_tx_nonode++;
-			goto txerror;
-		}
-		if (ni == NULL)
-			ni = &ic->ic_bss;
+	/*
+	 * TODO:
+	 * The duration field of 802.11 header should be filled.
+	 * XXX This may be done in the ieee80211 layer, but the upper 
+	 *     doesn't know the detail of parameters such as IFS
+	 *     for now..
+	 */
 
-		/*
-		 * TODO:
-		 * The duration field of 802.11 header should be filled.
-		 * XXX This may be done in the ieee80211 layer, but the upper 
-		 *     doesn't know the detail of parameters such as IFS
-		 *     for now..
-		 */
+	if (IFF_DUMPPKTS(ic))
+		ieee80211_dump_pkt(skb->data, skb->len,
+		    ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
 
-		if (IFF_DUMPPKTS(ic))
-			ieee80211_dump_pkt(skb->data, skb->len,
-			    ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL,
-			    -1);
-
-		if (ath_tx_start(sc, ni, bf, skb)) {
-	txerror:
-			ic->ic_stats.tx_errors++;
-			TXBUF_QUEUE_TAIL(sc, bf);
-			continue;
-		}
-
+	error = ath_tx_start(sc, ni, bf, skb);
+	if (error == 0) {
+		sc->sc_stats.ast_tx_mgmt++;
 		sc->sc_tx_timer = 5;
 		ic->ic_timer = 1;
+		return 0;
 	}
+	/* fall thru... */
+bad:
+	if (bf != NULL)
+		TXBUF_QUEUE_TAIL(sc, bf);
+	dev_kfree_skb(skb);
+	ic->ic_stats.tx_errors++;
+	return error;
 }
 
 static void
@@ -695,8 +740,6 @@ ath_watchdog(struct net_device *dev)
 	struct ieee80211_node *ni;
 
 	ic->ic_timer = 0;
-	if (sc->sc_invalid)
-		return;
 	if (sc->sc_tx_timer) {
 		if (--sc->sc_tx_timer == 0) {
 			printk("%s: device timeout\n", dev->name);
@@ -1308,6 +1351,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	spin_unlock(&sc->sc_txqlock);
 
 	ath_hal_txstart(ah);
+	sc->sc_ic.ic_stats.tx_packets++;
 
 	return 0;
 }
@@ -1367,9 +1411,7 @@ ath_tx_tasklet(void *data)
 
 		TXBUF_QUEUE_TAIL(sc, bf);
 	}
-	sc->sc_oactive = 0;
 	sc->sc_tx_timer = 0;
-	ath_start(dev);
 }
 
 /*
@@ -1411,7 +1453,6 @@ ath_draintxq(struct ath_softc *sc)
 		TXBUF_QUEUE_TAIL(sc, bf);
 	}
 
-	sc->sc_oactive = 0;
 	sc->sc_tx_timer = 0;
 }
 
@@ -1827,9 +1868,9 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 		return 0;
 	}
 #define	STAT(x)		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x)
-	STAT(watchdog); STAT(tx_encap); STAT(tx_nonode);
-	STAT(tx_nombuf); STAT(tx_nomcl); STAT(tx_linear);
-	STAT(tx_nodata); STAT(tx_busdma); STAT(tx_descerr);
+	STAT(watchdog); STAT(tx_mgmt); STAT(tx_discard);
+	STAT(tx_encap); STAT(tx_nonode); STAT(tx_nobuf);
+	STAT(tx_nodata); STAT(tx_descerr);
 	STAT(rx_crcerr); STAT(rx_fifoerr); STAT(rx_badcrypt);
 	STAT(rx_phyerr); STAT(rx_phy_tim); STAT(rx_phy_par);
 	STAT(rx_phy_rate); STAT(rx_phy_len); STAT(rx_phy_qam);

@@ -51,13 +51,12 @@ struct ath_nodestat {
 
 struct ath_stats {
 	u_int32_t	ast_watchdog;	/* device reset by watchdog */
+	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
+	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
 	u_int32_t	ast_tx_encap;	/* tx encapsulation failed */
 	u_int32_t	ast_tx_nonode;	/* tx failed 'cuz no node */
-	u_int32_t	ast_tx_nombuf;	/* tx failed 'cuz no mbuf */
-	u_int32_t	ast_tx_nomcl;	/* tx failed 'cuz no cluster */
-	u_int32_t	ast_tx_linear;	/* tx linearized to cluster */
+	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer */
 	u_int32_t	ast_tx_nodata;	/* tx discarded empty frame */
-	u_int32_t	ast_tx_busdma;	/* tx failed for dma resrcs */
 	u_int32_t	ast_tx_descerr;	/* tx failure reported in desc*/
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
@@ -89,10 +88,7 @@ struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	struct pci_dev		*sc_pdev;	/* associated pci device */
-	int			(*sc_enable)(struct ath_softc *);
-	void			(*sc_disable)(struct ath_softc *);
-	unsigned int		sc_invalid  : 1,/* being detached */
-				sc_oactive  : 1;/* output processing active */
+	volatile int		sc_invalid;	/* being detached */
 	int			sc_cachelsz;	/* system cache line size */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
 	size_t			sc_desc_len;	/* size of TX/RX descriptors */
@@ -108,7 +104,6 @@ struct ath_softc {
 
 	u_int32_t		*sc_txlink;	/* link ptr in last TX desc */
 	int			sc_tx_timer;	/* tx timeout */
-	struct sk_buff_head	sc_sndq;	/* data packet queue */
 	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
 	TAILQ_HEAD(, ath_buf)	sc_txq;		/* transmit queue */
