@@ -1771,7 +1771,7 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 	} else
 		error = -ENXIO;
 	ieee80211_key_update_end(ic);
-	if (ni != NULL && ni != ic->ic_bss)
+	if (ni != NULL)
 		ieee80211_free_node(ni);
 	return error;
 }
