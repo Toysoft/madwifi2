@@ -317,9 +317,7 @@ ccmp_init_blocks(struct crypto_tfm *tfm, struct ieee80211_frame *wh,
 {
 #define	IS_4ADDRESS(wh) \
 	((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS)
-#define	IS_QOS_DATA(wh) \
-	((wh->i_fc[0] & (IEEE80211_FC0_TYPE_MASK|IEEE80211_FC0_SUBTYPE_QOS)) ==\
-		(IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_QOS))
+#define	IS_QOS_DATA(wh)	IEEE80211_QOS_HAS_SEQ(wh)
 
 	/* CCM Initial Block:
 	 * Flag (Include authentication header, M=3 (8-octet MIC),
