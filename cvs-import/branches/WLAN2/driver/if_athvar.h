@@ -50,7 +50,7 @@
 #define mark_bh(a)
 #endif
 
-#include "if_ieee80211.h"
+#include "ieee80211_var.h"
 #include "ah.h"
 
 #define	ATH_TIMEOUT		1000
@@ -67,13 +67,27 @@
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
 
-/* statistics for node */
-struct ath_nodestat {
-	u_int		st_tx_ok;	/* tx ok pkt */
-	u_int		st_tx_err;	/* tx !ok pkt */
-	u_int		st_tx_retr;	/* tx retry count */
-	int		st_tx_upper;	/* tx upper rate req cnt */
-	u_int		st_tx_antenna;	/* antenna for last good frame */
+struct ath_recv_hist {
+        int             arh_jiffies;    /* sample time by system clock */
+        u_int8_t        arh_rssi;       /* rssi */
+        u_int8_t        arh_antenna;    /* antenna */
+};
+
+
+#define ATH_RHIST_SIZE          16      /* number of samples */
+#define ATH_RHIST_NOTIME        (~0)
+                                                                                                                                                                    
+/* driver-specific node */
+struct ath_node {
+        struct ieee80211_node an_node;  /* base class */
+        u_int           an_tx_ok;       /* tx ok pkt */
+        u_int           an_tx_err;      /* tx !ok pkt */
+        u_int           an_tx_retr;     /* tx retry count */
+        int             an_tx_upper;    /* tx upper rate req cnt */
+        u_int           an_tx_antenna;  /* antenna for last good frame */
+        u_int           an_rx_antenna;  /* antenna for last rcvd frame */
+        struct ath_recv_hist an_rx_hist[ATH_RHIST_SIZE];
+        u_int           an_rx_hist_next;/* index of next ``free entry'' */
 };
 
 struct ath_stats {
@@ -179,17 +193,27 @@ struct ath_softc {
 	struct timer_list	sc_rate_ctl;	/* tx rate control timer */
 	struct timer_list	sc_cal_ch;	/* calibration timer */
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
-	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
+	struct timer_list       sc_ieee80211_watchdog; /* watchdog for ieee80211 state machine. */
 	struct ath_stats	sc_stats;	/* interface statistics */
+
+	int			(*sc_newstate)(struct ieee80211com *,enum ieee80211_state, int);
+	char			sc_procname[12];/* e.g. ath%d */
+	struct proc_dir_entry  *sc_proc;	/* /proc/net/wlan%d */
 };
 
+#define AR_DEBUG 1
+
 #ifdef AR_DEBUG
-extern	int ath_debug;
-#define	DPRINTF(X)	if (ath_debug) printk X
-#define	DPRINTF2(X)	if (ath_debug > 1) printk X
+#define AR_DEBUG_LEVEL1 (1<<0)
+#define AR_DEBUG_LEVEL2 (1<<1)
+#define AR_DEBUG_DUMP   (1<<2)
+#define	DPRINTF(X)	if (ath_debug & AR_DEBUG_LEVEL1) printk X
+#define	DPRINTF2(X)	if (ath_debug & AR_DEBUG_LEVEL2) printk X
+#define	DPRINTF_DUMP(X)	if (ath_debug & AR_DEBUG_DUMP) printk X
 #else
 #define	DPRINTF(X)
 #define	DPRINTF2(X)
+#define	DPRINTF_DUMP(X)
 #endif
 
 int	ath_attach(u_int16_t, struct net_device *);

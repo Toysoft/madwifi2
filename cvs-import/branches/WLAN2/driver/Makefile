@@ -46,8 +46,8 @@ KMODNAME=	ath_pci
 include ${DEPTH}/Makefile.inc
 
 ifdef CONFIG_MODVERSIONS
-MODOPTS+=	-include ${WLAN}/if_ieee80211.ver
-ALL_VER+=	${WLAN}/if_ieee80211.ver
+MODOPTS+=	-include ${WLAN}/ieee80211.ver
+ALL_VER+=	${WLAN}/ieee80211.ver
 MODOPTS+=	-include ${WLAN}/if_media.ver
 ALL_VER+=	${WLAN}/if_media.ver
 endif
@@ -56,7 +56,7 @@ SRCS=	if_ath.c if_ath_pci.c
 OBJS=	if_ath.o if_ath_pci.o
 
 INCS+=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} \
-	-I${WLAN} ${KERNEL_INCS} -I${DEPTH}
+	-I${WLAN} ${KERNEL_INCS} -I${DEPTH} -I${LINUX} -I${WLAN_LINUX}
 
 
 ALL=	${KMODNAME}.${KMODSUF}
