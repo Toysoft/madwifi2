@@ -492,7 +492,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		ic->ic_devstats->rx_packets++;
 		ic->ic_devstats->rx_bytes += skb->len;
 		IEEE80211_NODE_STAT(ni, rx_data);
-		IEEE80211_NODE_STAT_ADD(ni, rx_bytes, skb->len);
+		IEEE80211_NODE_STAT_ADD(ni, rx_bytes, skb->len); // TODO: skb->len - 802.11 header ?
 
 		/* perform as a bridge within the AP */
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
