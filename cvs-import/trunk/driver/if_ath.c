@@ -233,8 +233,9 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	printk("%s: 802.11 address: %s\n",
 		dev->name, ether_sprintf(dev->dev_addr));
 
+#ifdef CONFIG_PROC_FS
 	ath_proc_init(sc);
-
+#endif
 	sc->sc_attached = 1;
 
 	return 0;
@@ -256,7 +257,9 @@ ath_detach(struct net_device *dev)
 		ath_stop(dev);
 		ath_desc_free(sc);
 		ath_hal_detach(sc->sc_ah);
+#ifdef CONFIG_PROC_FS
 		ath_proc_remove(sc);
+#endif
 		ieee80211_ifdetach(dev);
 	}
 	return 0;
