@@ -112,6 +112,9 @@ static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
 static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
 static	int ath_bmisshack = 1;			/* XXX */
+static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
+static	int ath_regdomain = 0;			/* regulatory domain */
+static	int ath_outdoor = AH_TRUE;		/* enable outdoor use */
 
 #ifdef AR_DEBUG
 int	ath_debug = 0;
@@ -167,9 +170,10 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * is resposible for filtering this list to a set of
 	 * channels that it considers ok to use.
 	 */
-	error = ath_getchannels(dev, CTRY_DEFAULT, AH_TRUE);
+	error = ath_getchannels(dev, ath_countrycode, ath_outdoor);
 	if (error != 0)
 		goto bad;
+	ath_regdomain = ath_hal_getregdomain(ah);	/* for users */
 
 	/*
 	 * Setup rate tables for all potential media types.
@@ -2124,9 +2128,8 @@ ath_getchannels(struct net_device *dev, u_int cc, HAL_BOOL outdoor)
 		printk("%s: unable to allocate channel table\n", dev->name);
 		return ENOMEM;
 	}
-	/* XXX where does the country code, et. al. come from? */
 	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
-	    CTRY_DEFAULT, HAL_MODE_ALL, AH_TRUE)) {
+	    cc, HAL_MODE_ALL, outdoor)) {
 		printk("%s: unable to collect channel list from hal\n",
 			dev->name);
 		kfree(chans);
@@ -2413,6 +2416,9 @@ enum {
 	ATH_RATEINTERVAL= 5,
 	ATH_BMISSHACK	= 6,
 	ATH_DUMP	= 8,
+	ATH_CC		= 9,
+	ATH_OUTDOOR	= 10,
+	ATH_REGDOMAIN	= 11,
 };
 static	char ath_info[512];
 static	char ath_dump[10];
@@ -2567,6 +2573,12 @@ static ctl_table ath_sysctls[] = {
 	  sizeof(ath_bmisshack),0644,	NULL,	ath_sysctl_handler },
 	{ ATH_DUMP,		"dump",		ath_dump,
 	  sizeof(ath_dump),	0200,	NULL,	ath_sysctl_dump },
+	{ ATH_CC,		"countrycode",	&ath_countrycode,
+	  sizeof(ath_countrycode),0444,	NULL,	ath_sysctl_handler },
+	{ ATH_OUTDOOR,		"outdoor",	&ath_outdoor,
+	  sizeof(ath_outdoor),	0444,	NULL,	ath_sysctl_handler },
+	{ ATH_REGDOMAIN,	"regdomain",	&ath_regdomain,
+	  sizeof(ath_regdomain),0444,	NULL,	ath_sysctl_handler },
 	{ 0 }
 };
 static ctl_table ath_ath_table[] = {
@@ -2588,11 +2600,6 @@ ath_sysctl_register(void)
 
 	if (!initialized) {
 		ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
-
-		ath_dwelltime = 200;		/* 5 channels/second */
-		ath_calinterval = 30;		/* calibrate every 30 secs */
-		ath_rateinterval = 1000;	/* rate ctl interval (ms)  */
-		ath_bmisshack = 1;		/* XXX */
 		initialized = 1;
 	}
 }
