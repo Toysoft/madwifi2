@@ -289,7 +289,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		     struct ath_node *an, const struct ath_desc *ds)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
-	int rate = sc->sc_hwmap[ds->ds_txstat.ts_rate & IEEE80211_RATE_VAL];
+	int rate = sc->sc_hwmap[ds->ds_txstat.ts_rate & IEEE80211_RATE_VAL].ieeerate;
 	int used_alt_rate = ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE;
 	int retries = ds->ds_txstat.ts_longretry;
 	int tt = calc_usecs_wifi_packet(1500, rate, MIN(retries, 4));
