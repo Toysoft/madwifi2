@@ -370,6 +370,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		ath_hal_dumpstate(ah);
 	}
 #endif /* AR_DEBUG */
+	status &= sc->sc_imask;			/* discard unasked for bits */
 	if (status & HAL_INT_FATAL) {
 		sc->sc_stats.ast_hardware++;
 		needmark |= queue_task(&sc->sc_fataltq, &tq_immediate);
