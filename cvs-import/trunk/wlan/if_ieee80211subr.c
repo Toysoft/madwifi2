@@ -1,12 +1,6 @@
-/*	$NetBSD: if_ieee80211subr.c,v 1.22 2002/10/16 11:29:30 onoe Exp $	*/
-/*	$FreeBSD: src/sys/net/if_ieee80211subr.c,v 1.4 2003/01/21 08:55:59 alfred Exp $	*/
-
-/*-
- * Copyright (c) 2001 The NetBSD Foundation, Inc.
+/*
+ * Copyright (c) 2003 Sam Leffler, Errno Consulting
  * All rights reserved.
- *
- * This code is derived from software contributed to The NetBSD Foundation
- * by Atsushi Onoe.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -16,29 +10,27 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *        This product includes software developed by the NetBSD
- *        Foundation, Inc. and its contributors.
- * 4. Neither the name of The NetBSD Foundation nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
- * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
- * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $P4$
  */
 
 /*
  * IEEE 802.11 generic handler
+ *
+ * This code is derived from NetBSD code; their copyright notice
+ * is included intact at the bottom of this file.
  */
 
 #ifndef EXPORT_SYMTAB
@@ -51,6 +43,7 @@
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/wireless.h>
 #include <linux/random.h>
 
 #include "rc4.h"
@@ -59,9 +52,18 @@
 #define	arc4_encrypt(_c,_d,_s,_l)	rc4_crypt(_c,_s,_d,_l)
 
 #include "if_ieee80211.h"
-#include "if_media.h"
 #include "if_llc.h"
 #include "if_ethersubr.h"
+
+#ifdef NEW_MODULE_CODE
+#define	__MOD_INC_USE_COUNT(_m)						\
+	if (!try_module_get(_m)) {					\
+		printk(KERN_WARNING "%s: try_module_get failed\n",	\
+			ic->ic_dev.name);				\
+		return (ENODEV);					\
+	}
+#define	__MOD_DEC_USE_COUNT(_m)		module_put(_m)
+#endif
 
 #define	IEEE80211_DEBUG
 #ifdef IEEE80211_DEBUG
@@ -103,9 +105,19 @@ static void ieee80211_recv_disassoc(struct ieee80211com *,
 static void ieee80211_recv_deauth(struct ieee80211com *,
     struct sk_buff *, int, u_int32_t);
 
+static int ieee80211_media_change(struct net_device *);
+static void ieee80211_media_status(struct net_device *, struct ifmediareq *);
 static void ieee80211_crc_init(void);
 static u_int32_t ieee80211_crc_update(u_int32_t, u_int8_t *, int);
 static struct net_device_stats *ieee80211_getstats(struct net_device *);
+static void ieee80211_slowtimo(unsigned long);
+
+extern	int ieee80211_cfgget(struct net_device *, u_long, caddr_t);
+extern	int ieee80211_cfgset(struct net_device *, u_long, caddr_t);
+#ifdef WIRELESS_EXT
+extern	struct iw_statistics *ieee80211_iw_getstats(struct net_device *);
+extern	const struct iw_handler_def ieee80211_iw_handler_def;
+#endif
 
 static const char *ieee80211_mgt_subtype_name[] = {
 	"assoc_req",	"assoc_resp",	"reassoc_req",	"reassoc_resp",
@@ -114,57 +126,29 @@ static const char *ieee80211_mgt_subtype_name[] = {
 	"deauth",	"reserved#13",	"reserved#14",	"reserved#15"
 };
 
-/*
- * Format an Ethernet MAC for printing.
- */
-const char*
-ether_sprintf(const u_int8_t *mac)
-{
-	static char etherbuf[18];
-	snprintf(etherbuf, sizeof(etherbuf), "%02x:%02x:%02x:%02x:%02x:%02x",
-		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-	return etherbuf;
-}
-
-static void
-ieee80211_slowtimo(unsigned long arg)
-{
-	struct ieee80211com *ic = (struct ieee80211com *) arg;
-
-	IEEE80211_LOCK(ic);
-	if (ic->ic_timer && --ic->ic_timer == 0)
-		if (ic->ic_watchdog)
-			(*ic->ic_watchdog)(&ic->ic_dev);
-	ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
-	add_timer(&ic->ic_slowtimo);
-	IEEE80211_UNLOCK(ic);
-}
-
 int
 ieee80211_ifattach(struct net_device *dev)
 {
 	struct ieee80211com *ic = (void *)dev;
-	int i;
-#ifdef notdef
-	int rate;
-#endif
+	struct ifmediareq imr;
+	int i, rate, mword;
 
-#ifdef NEW_MODULE_CODE
-	if (!try_module_get(THIS_MODULE)) {
-		printk(KERN_WARNING "%s: try_module_get failed\n",
-			ic->ic_dev.name);
-		return (ENODEV);
-	}
-#else
 	__MOD_INC_USE_COUNT(THIS_MODULE);
-#endif
 
+	/*
+	 * Register the netdevice early so the device
+	 * name is filled in for any msgs.
+	 *
+	 * NB: The driver is expected to fill in anything
+	 *     else of interest.
+	 */
 	dev->get_stats = ieee80211_getstats;
-#ifdef notyet
-	dev->get_wireless_stats = ieee80211_getwireles;
-	dev->wireless_handlers = ieee80211_wireless_handlers;
-#endif
-
+	dev->do_ioctl = ieee80211_ioctl;
+#ifdef WIRELESS_EXT
+	dev->get_wireless_stats = ieee80211_iw_getstats;
+	dev->wireless_handlers = 
+		(struct iw_handler_def *) &ieee80211_iw_handler_def;
+#endif /* WIRELESS_EXT */
 	if (register_netdev(&ic->ic_dev)) {
 		printk(KERN_WARNING "%s: unable to register device\n",
 			ic->ic_dev.name);
@@ -174,42 +158,96 @@ ieee80211_ifattach(struct net_device *dev)
 	spin_lock_init(&ic->ic_lock);
 ic->msg_enable = NETIF_MSG_DEBUG|NETIF_MSG_LINK2;/*XXX*/
 
+	/*
+	 * Emulate the BSD ifnet timer ourselves.
+	 */
 	init_timer(&ic->ic_slowtimo);
 	ic->ic_slowtimo.data = (unsigned long) ic;
 	ic->ic_slowtimo.function = ieee80211_slowtimo;
 	ieee80211_slowtimo((unsigned long) ic);		/* prime timer */
 
+	/*
+	 * Setup crypto support.
+	 */
 	ieee80211_crc_init();
 	get_random_bytes(&ic->ic_iv, sizeof(ic->ic_iv));
+
+	/*
+	 * Fill in 802.11 available channel set, mark
+	 * all available channels as active, and pick
+	 * a default channel if not already specified.
+	 */
+	memset(ic->ic_chan_avail, 0, sizeof(ic->ic_chan_avail));
+	for (i = 0; i <= IEEE80211_CHAN_MAX; i++) {
+		struct ieee80211channel *c = &ic->ic_channels[i];
+		if (c->ic_flags) {
+			/*
+			 * Verify driver passed us valid data.
+			 */
+			if (i != ieee80211_chan2ieee(ic, c)) {
+				printk(KERN_WARNING "%s: bad channel ignored; "
+					"freq %u flags %x number %u\n",
+					dev->name, c->ic_freq, c->ic_flags, i);
+				continue;
+			}
+			setbit(ic->ic_chan_avail, i);
+		}
+	}
 	memcpy(ic->ic_chan_active, ic->ic_chan_avail,
 	    sizeof(ic->ic_chan_active));
-	if (isclr(ic->ic_chan_active, ic->ic_ibss_chan)) {
+	if (ic->ic_ibss_chan == NULL) {
+		/*
+		 * Pick the first active channel for default.
+		 * XXX probably not right.
+		 */
 		for (i = 0; i <= IEEE80211_CHAN_MAX; i++) {
 			if (isset(ic->ic_chan_active, i)) {
-				ic->ic_ibss_chan = i;
+				ic->ic_ibss_chan = &ic->ic_channels[i];
 				break;
 			}
 		}
 	}
-	ic->ic_des_chan = IEEE80211_CHAN_ANY;
-	ic->ic_fixed_rate = -1;
+
+	/*
+	 * Fill in media characteristics.
+	 */
+#define	ADD(_ic, _s, _o) \
+	ifmedia_add(&(_ic)->ic_media, \
+		IFM_MAKEWORD(IFM_IEEE80211, (_s), (_o), 0), 0, NULL)
+	ifmedia_init(&ic->ic_media, 0,
+		ieee80211_media_change, ieee80211_media_status);
+	ADD(ic, IFM_AUTO, 0);
+	if (ic->ic_caps & IEEE80211_C_IBSS)
+		ADD(ic, IFM_AUTO, IFM_IEEE80211_ADHOC);
+	if (ic->ic_caps & IEEE80211_C_HOSTAP)
+		ADD(ic, IFM_AUTO, IFM_IEEE80211_HOSTAP);
+	if (ic->ic_caps & IEEE80211_C_AHDEMO)
+		ADD(ic, IFM_AUTO, IFM_IEEE80211_ADHOC | IFM_FLAG0);
+	for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
+		rate = ic->ic_sup_rates[i];
+		mword = ieee80211_rate2media(rate, ic->ic_phytype);
+		ADD(ic, mword, 0);
+		if (ic->ic_caps & IEEE80211_C_IBSS)
+			ADD(ic, mword, IFM_IEEE80211_ADHOC);
+		if (ic->ic_caps & IEEE80211_C_HOSTAP)
+			ADD(ic, mword, IFM_IEEE80211_HOSTAP);
+		if (ic->ic_caps & IEEE80211_C_AHDEMO)
+			ADD(ic, mword, IFM_IEEE80211_ADHOC | IFM_FLAG0);
+	}
+	ieee80211_media_status(dev, &imr);
+	ifmedia_set(&ic->ic_media, imr.ifm_active);
+#undef ADD
+
+	ic->ic_rtsthreshold = 2347;		/* XXX not used yet */
+	ic->ic_fragthreshold = 2346;		/* XXX not used yet */
+	ic->ic_des_chan = IEEE80211_CHAN_ANY;	/* any channel is ok */
+	ic->ic_fixed_rate = -1;			/* no fixed rate */
 	if (ic->ic_lintval == 0)
-		ic->ic_lintval = 100;	/* default sleep */
+		ic->ic_lintval = 100;		/* default sleep */
 	TAILQ_INIT(&ic->ic_node);
 	skb_queue_head_init(&ic->ic_mgtq);
 
-#ifdef notdef
-	rate = 0;
-	for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
-		if (ic->ic_sup_rates[i] != 0)
-			rate = (ic->ic_sup_rates[i] & IEEE80211_RATE_VAL) / 2;
-	}
-	if (rate)
-		ifp->if_baudrate = IF_Mbps(rate);
-	ifp->if_hdrlen = sizeof(struct ieee80211_frame);
-#endif
-
-	/* initialize management frame handler */
+	/* initialize management frame handlers */
 	ic->ic_recv_mgmt[IEEE80211_FC0_SUBTYPE_PROBE_RESP
 	    >> IEEE80211_FC0_SUBTYPE_SHIFT] = ieee80211_recv_beacon;
 	ic->ic_recv_mgmt[IEEE80211_FC0_SUBTYPE_BEACON
@@ -266,14 +304,217 @@ ieee80211_ifdetach(struct net_device *dev)
 		ic->ic_wep_ctx = NULL;
 	}
 	ieee80211_free_allnodes(ic);
+	ifmedia_removeall(&ic->ic_media);
 	unregister_netdev(&ic->ic_dev);
 	IEEE80211_UNLOCK(ic);
 
-#ifdef NEW_MODULE_CODE
-	module_put(THIS_MODULE);
-#else
 	__MOD_DEC_USE_COUNT(THIS_MODULE);
-#endif
+}
+
+/*
+ * Once a second "slow timeout" a la the BSD ifnet timer.
+ */
+static void
+ieee80211_slowtimo(unsigned long arg)
+{
+	struct ieee80211com *ic = (struct ieee80211com *) arg;
+
+	IEEE80211_LOCK(ic);
+	if (ic->ic_timer && --ic->ic_timer == 0)
+		if (ic->ic_watchdog)
+			(*ic->ic_watchdog)(&ic->ic_dev);
+	ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
+	add_timer(&ic->ic_slowtimo);
+	IEEE80211_UNLOCK(ic);
+}
+
+/*
+ * Locate the channel for the specified frequency.
+ */
+struct ieee80211channel *
+ieee80211_chan_find(struct ieee80211com *ic, u_int freq)
+{
+	struct ieee80211channel *c;
+
+	/* XXX use available channel bitmask??? */
+	c = ic->ic_ibss_chan+1;
+	for (; c <= &ic->ic_channels[IEEE80211_CHAN_MAX]; c++)
+		if (c->ic_freq == freq)
+			return c;
+	for (c = &ic->ic_channels[0]; c < ic->ic_ibss_chan; c++)
+		if (c->ic_freq == freq)
+			return c;
+	return NULL;
+}
+
+/*
+ * Convert GHz frequency to IEEE channel number.
+ */
+u_int
+ieee80211_ghz2ieee(u_int freq, u_int flags)
+{
+	if (flags & IEEE80211_CHAN_2GHZ) {	/* 2GHz band */
+		if (freq == 2484)
+			return 14;
+		if (freq < 2484)
+			return (freq - 2407) / 5;
+		else
+			return 15 + ((freq - 2512) / 20);
+	} else if (IEEE80211_CHAN_5GHZ) {/* 5Ghz band */
+		return (freq - 5000) / 5;
+	} else {			/* either, guess */
+		if (freq == 2484)
+			return 14;
+		if (freq < 2484)
+			return (freq - 2407) / 5;
+		if (freq < 5000)
+			return 15 + ((freq - 2512) / 20);
+		return (freq - 5000) / 5;
+	}
+}
+
+/*
+ * Convert channel to IEEE channel number.
+ */
+u_int
+ieee80211_chan2ieee(struct ieee80211com *ic, struct ieee80211channel *c)
+{
+	if (ic->ic_channels <= c && c <= &ic->ic_channels[IEEE80211_CHAN_MAX])
+		return c - ic->ic_channels;
+	else {
+		printk(KERN_ERR "wlan: invalid channel freq %u flags %x\n",
+			c->ic_freq, c->ic_flags);
+		return 0;		/* XXX */
+	}
+}
+
+/*
+ * Convert IEEE channel number to GHz frequency.
+ */
+u_int
+ieee80211_ieee2ghz(u_int chan, u_int flags)
+{
+	if (flags & IEEE80211_CHAN_2GHZ) {	/* 2GHz band */
+		if (chan == 14)
+			return 2484;
+		if (chan < 14)
+			return 2407 + chan*5;
+		else
+			return 2512 + ((chan-15)*20);
+	} else if (flags & IEEE80211_CHAN_5GHZ) {/* 5Ghz band */
+		return 5000 + (chan*5);
+	} else {			/* either, guess */
+		if (chan == 14)
+			return 2484;
+		if (chan < 14)		/* 0-13 */
+			return 2407 + chan*5;
+		if (chan < 27)		/* 15-26 */
+			return 2512 + ((chan-15)*20);
+		return 5000 + (chan*5);
+	}
+}
+
+static int
+ieee80211_media_change(struct net_device *dev)
+{
+	struct ieee80211com *ic = (void *)dev;
+	struct ifmedia_entry *ime;
+	int error;
+
+	error = 0;
+	ime = ic->ic_media.ifm_cur;
+	switch (IFM_SUBTYPE(ime->ifm_media)) {
+	case IFM_AUTO:
+		break;
+	default:
+		error = EIO;
+		break;		/* XXX ??? */
+	}
+	if (ime->ifm_media & IFM_IEEE80211_ADHOC) {
+		ic->ic_opmode = IEEE80211_M_IBSS;
+		ic->ic_flags |= IEEE80211_F_IBSSON;
+	} else if (ime->ifm_media & IFM_IEEE80211_HOSTAP) {
+		ic->ic_opmode = IEEE80211_M_HOSTAP;
+		ic->ic_flags &= ~IEEE80211_F_IBSSON;
+	} else {
+		ic->ic_opmode = IEEE80211_M_STA;
+		ic->ic_flags &= ~IEEE80211_F_IBSSON;
+	}
+	return (*ic->ic_init)(dev);
+}
+
+static void
+ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
+{
+	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211_node *ni = NULL;
+
+	imr->ifm_status = IFM_AVALID;
+	imr->ifm_active = IFM_IEEE80211;
+	if (ic->ic_state == IEEE80211_S_RUN)
+		imr->ifm_status |= IFM_ACTIVE;
+	imr->ifm_active |= IFM_AUTO;
+	switch (ic->ic_opmode) {
+	case IEEE80211_M_STA:
+		ni = &ic->ic_bss;
+		break;
+	case IEEE80211_M_IBSS:
+		imr->ifm_active |= IFM_IEEE80211_ADHOC;
+		break;
+	case IEEE80211_M_AHDEMO:
+		/* should not come here */
+		break;
+	case IEEE80211_M_HOSTAP:
+		imr->ifm_active |= IFM_IEEE80211_HOSTAP;
+		break;			/* NB: skip media line rate */
+	}
+	if (ni == NULL)
+		return;
+	/* XXX long/short preamble??? */
+	switch (ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) {
+	case 0:
+		imr->ifm_active |= IFM_AUTO;
+		break;
+	case 2:
+		imr->ifm_active |= IFM_IEEE80211_DS1;
+		break;
+	case 4:
+		imr->ifm_active |= IFM_IEEE80211_DS2;
+		break;
+	case 11:
+		imr->ifm_active |= IFM_IEEE80211_DS5;
+		break;
+	case 12:
+		imr->ifm_active |= IFM_IEEE80211_ODFM6;
+		break;
+	case 18:
+		imr->ifm_active |= IFM_IEEE80211_ODFM9;
+		break;
+	case 22:
+		imr->ifm_active |= IFM_IEEE80211_DS11;
+		break;
+	case 24:
+		imr->ifm_active |= IFM_IEEE80211_ODFM12;
+		break;
+	case 36:
+		imr->ifm_active |= IFM_IEEE80211_ODFM18;
+		break;
+	case 44:
+		imr->ifm_active |= IFM_IEEE80211_DS22;
+		break;
+	case 48:
+		imr->ifm_active |= IFM_IEEE80211_ODFM24;
+		break;
+	case 72:
+		imr->ifm_active |= IFM_IEEE80211_ODFM36;
+		break;
+	case 108:
+		imr->ifm_active |= IFM_IEEE80211_ODFM54;
+		break;
+	case 144:
+		imr->ifm_active |= IFM_IEEE80211_ODFM72;
+		break;
+	}
 }
 
 void
@@ -804,12 +1045,13 @@ void
 ieee80211_next_scan(struct net_device *dev)
 {
 	struct ieee80211com *ic = (void *)dev;
-	int chan;
+	struct ieee80211channel *chan;
 
 	chan = ic->ic_bss.ni_chan;
 	for (;;) {
-		chan = (chan + 1) % (IEEE80211_CHAN_MAX + 1);
-		if (isset(ic->ic_chan_active, chan))
+		if (++chan > &ic->ic_channels[IEEE80211_CHAN_MAX])
+			chan = &ic->ic_channels[0];
+		if (isset(ic->ic_chan_active, ieee80211_chan2ieee(ic, chan)))
 			break;
 		if (chan == ic->ic_bss.ni_chan) {
 			DPRINTF(("ieee80211_next_scan: no chan available\n"));
@@ -817,7 +1059,8 @@ ieee80211_next_scan(struct net_device *dev)
 		}
 	}
 	DPRINTF(("ieee80211_next_scan: chan %d->%d\n",
-	    ic->ic_bss.ni_chan, chan));
+	    ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan),
+	    ieee80211_chan2ieee(ic, chan)));
 	ic->ic_bss.ni_chan = chan;
 	ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
@@ -893,7 +1136,7 @@ ieee80211_end_scan(struct net_device *dev)
 			continue;
 		}
 		fail = 0;
-		if (isclr(ic->ic_chan_active, ni->ni_chan))
+		if (isclr(ic->ic_chan_active, ieee80211_chan2ieee(ic, ni->ni_chan)))
 			fail |= 0x01;
 		if (ic->ic_des_chan != IEEE80211_CHAN_ANY &&
 		    ni->ni_chan != ic->ic_des_chan)
@@ -928,7 +1171,8 @@ ieee80211_end_scan(struct net_device *dev)
 			    ether_sprintf(ni->ni_macaddr));
 			printk(" %s%c", ether_sprintf(ni->ni_bssid),
 			    fail & 0x20 ? '!' : ' ');
-			printk(" %3d%c", ni->ni_chan, fail & 0x01 ? '!' : ' ');
+			printk(" %3d%c", ieee80211_chan2ieee(ic, ni->ni_chan),
+				fail & 0x01 ? '!' : ' ');
 			printk(" %+4d", ni->ni_rssi);
 			printk(" %2dM%c", (rate & IEEE80211_RATE_VAL) / 2,
 			    fail & 0x08 ? '!' : ' ');
@@ -1435,7 +1679,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	bintval = frm;	frm += 2;
 	capinfo = frm;	frm += 2;
 	ssid = rates = NULL;
-	chan = ic->ic_bss.ni_chan;
+	chan = ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan);
 	fhdwell = 0;
 	fhindex = 0;
 	while (frm < efrm) {
@@ -1476,7 +1720,8 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	    (ieee80211_debug > 1 || ni == NULL ||
 	    ic->ic_state == IEEE80211_S_SCAN)) {
 		printk("ieee80211_recv_prreq: %sbeacon on chan %u (bss chan %u) ",
-		    (ni == NULL ? "new " : ""), chan, ic->ic_bss.ni_chan);
+		    (ni == NULL ? "new " : ""), chan,
+		    ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan));
 		ieee80211_print_essid(ssid + 2, ssid[1]);
 		printk(" from %s\n", ether_sprintf(wh->i_addr2));
 	}
@@ -1511,7 +1756,8 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	memcpy(ni->ni_tstamp, tstamp, sizeof(ni->ni_tstamp));
 	ni->ni_intval = le16_to_cpu(*(u_int16_t *)bintval);
 	ni->ni_capinfo = le16_to_cpu(*(u_int16_t *)capinfo);
-	ni->ni_chan = chan;
+	/* XXX validate channel # */
+	ni->ni_chan = &ic->ic_channels[chan];
 	ni->ni_fhdwell = fhdwell;
 	ni->ni_fhindex = fhindex;
 	if (ic->ic_state == IEEE80211_S_SCAN && ic->ic_scan_timer == 0)
@@ -2179,7 +2425,8 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 				    ether_sprintf(ic->ic_bss.ni_bssid));
 				ieee80211_print_essid(ic->ic_bss.ni_essid,
 				    ic->ic_bss.ni_esslen);
-				printk(" channel %d\n", ic->ic_bss.ni_chan);
+				printk(" channel %d\n",
+					ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan));
 			}
 			/* start with highest negotiated rate */
 			ic->ic_bss.ni_txrate = ic->ic_bss.ni_nrate - 1;
@@ -2298,6 +2545,9 @@ ieee80211_wep_crypt(struct net_device *dev, struct sk_buff *skb0, int txflag)
 	return NULL;
 }
 
+/*
+ * Return netdevice statistics.
+ */
 static struct net_device_stats *
 ieee80211_getstats(struct net_device *dev)
 {
@@ -2336,7 +2586,6 @@ ieee80211_crc_init(void)
  * should be initialized to all 1's, and the transmitted value
  * is the 1's complement of the final running CRC
  */
-
 static u_int32_t
 ieee80211_crc_update(u_int32_t crc, u_int8_t *buf, int len)
 {
@@ -2351,7 +2600,6 @@ ieee80211_crc_update(u_int32_t crc, u_int8_t *buf, int len)
  * convert IEEE80211 rate value to ifmedia subtype.
  * ieee80211 rate is in unit of 0.5Mbps.
  */
-
 int
 ieee80211_rate2media(int rate, enum ieee80211_phytype phytype)
 {
@@ -2483,6 +2731,19 @@ ieee80211_media2rate(int mword, enum ieee80211_phytype phytype)
 }
 
 /*
+ * Format an Ethernet MAC for printing.
+ */
+const char*
+ether_sprintf(const u_int8_t *mac)
+{
+	static char etherbuf[18];
+	snprintf(etherbuf, sizeof(etherbuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+	return etherbuf;
+}
+EXPORT_SYMBOL(ether_sprintf);		/* XXX */
+
+/*
  * Module glue.
  */
 static	char *version = "802.11 Wireless Support (Sam Leffler <sam@errno.com>)";
@@ -2494,28 +2755,24 @@ MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
 MODULE_LICENSE("Dual BSD/GPL");		/* XXX really BSD only */
 #endif
 
-EXPORT_SYMBOL(ether_sprintf);		/* XXX */
-
+EXPORT_SYMBOL(ieee80211_chan_find);
+EXPORT_SYMBOL(ieee80211_decap);
+EXPORT_SYMBOL(ieee80211_dump_pkt);
+EXPORT_SYMBOL(ieee80211_encap);
+EXPORT_SYMBOL(ieee80211_end_scan);
+EXPORT_SYMBOL(ieee80211_find_node);
+EXPORT_SYMBOL(ieee80211_free_node);
+EXPORT_SYMBOL(ieee80211_ghz2ieee);
+EXPORT_SYMBOL(ieee80211_chan2ieee);
+EXPORT_SYMBOL(ieee80211_ieee2ghz);
 EXPORT_SYMBOL(ieee80211_ifattach);
 EXPORT_SYMBOL(ieee80211_ifdetach);
 EXPORT_SYMBOL(ieee80211_input);
-EXPORT_SYMBOL(ieee80211_mgmt_output);
-EXPORT_SYMBOL(ieee80211_encap);
-EXPORT_SYMBOL(ieee80211_decap);
-EXPORT_SYMBOL(ieee80211_print_essid);
-EXPORT_SYMBOL(ieee80211_dump_pkt);
-EXPORT_SYMBOL(ieee80211_watchdog);
-EXPORT_SYMBOL(ieee80211_next_scan);
-EXPORT_SYMBOL(ieee80211_end_scan);
-EXPORT_SYMBOL(ieee80211_alloc_node);
-EXPORT_SYMBOL(ieee80211_find_node);
-EXPORT_SYMBOL(ieee80211_free_node);
-EXPORT_SYMBOL(ieee80211_free_allnodes);
-EXPORT_SYMBOL(ieee80211_fix_rate);
-EXPORT_SYMBOL(ieee80211_new_state);
-EXPORT_SYMBOL(ieee80211_wep_crypt);
-EXPORT_SYMBOL(ieee80211_rate2media);
 EXPORT_SYMBOL(ieee80211_media2rate);
+EXPORT_SYMBOL(ieee80211_new_state);
+EXPORT_SYMBOL(ieee80211_next_scan);
+EXPORT_SYMBOL(ieee80211_rate2media);
+EXPORT_SYMBOL(ieee80211_watchdog);
 
 static int __init
 init_wlan(void)
@@ -2531,3 +2788,39 @@ exit_wlan(void)
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_wlan);
+
+/*-
+ * Copyright (c) 2001 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Atsushi Onoe.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *        This product includes software developed by the NetBSD
+ *        Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */

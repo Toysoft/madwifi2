@@ -38,6 +38,7 @@
 #define _NET_IF_IEEE80211_H_
 
 #include <sys/queue.h>
+#include "if_media.h"
 
 #define	IEEE80211_ADDR_LEN			6
 
@@ -415,7 +416,7 @@ struct ieee80211req {
  * Structure for IEEE 802.11 drivers.
  */
 
-#define	IEEE80211_CHAN_MAX	255
+#define	IEEE80211_CHAN_MAX	64
 #define	IEEE80211_RATE_SIZE	12
 #define	IEEE80211_KEYBUF_SIZE	16
 #define	IEEE80211_NODE_HASHSIZE	32
@@ -446,6 +447,41 @@ enum ieee80211_state {
 };
 
 /*
+ * Channels are specified by frequency and attributes.
+ */
+/* XXX should be ieee80211_channel but NetBSD took that */
+struct ieee80211channel {
+	u_int16_t	ic_freq;	/* setting in Mhz */
+	u_int16_t	ic_flags;	/* see below */
+};
+
+#define	IEEE80211_CHAN_PASSIVE	0x0001	/* Only passive scan allowed on channel */
+/* bits 4-7 are for private use by drivers */
+#define	IEEE80211_CHAN_PRIV3	0x0010
+#define	IEEE80211_CHAN_PRIV2	0x0020
+#define	IEEE80211_CHAN_PRIV1	0x0040
+#define	IEEE80211_CHAN_PRIV0	0x0080
+/* channel attributes */
+#define	IEEE80211_CHAN_TURBO	0x0100	/* Turbo channel */
+#define	IEEE80211_CHAN_CCK	0x0200	/* CCK channel */
+#define	IEEE80211_CHAN_OFDM	0x0400	/* OFDM channel */
+#define	IEEE80211_CHAN_2GHZ	0x0800	/* 2 GHz spectrum channel. */
+#define	IEEE80211_CHAN_5GHZ	0x1000	/* 5 GHz spectrum channel */
+/* bits 13-15 are reserved for future use and should not be used */
+
+/*
+ * Useful combinations of channel characteristics.
+ */
+#define	IEEE80211_CHAN_A \
+	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM)
+#define	IEEE80211_CHAN_B \
+	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_CCK)
+#define	IEEE80211_CHAN_PUREG \
+	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_OFDM)
+#define	IEEE80211_CHAN_T \
+	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_TURBO)
+
+/*
  * Node specific information.
  */
 struct ieee80211_node {
@@ -468,7 +504,7 @@ struct ieee80211_node {
 	u_int8_t		ni_essid[IEEE80211_NWID_LEN];
 	int			ni_nrate;
 	u_int8_t		ni_rates[IEEE80211_RATE_SIZE];
-	u_int8_t		ni_chan;
+	struct ieee80211channel	*ni_chan;
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
 
@@ -506,6 +542,7 @@ struct ieee80211com {
 	struct timer_list	ic_slowtimo;	/* if watchdog timer */
 	void			(*ic_watchdog)(struct net_device *);
 	void			(*ic_start)(struct net_device *);
+	int			(*ic_init)(struct net_device *);
 	void			(*ic_recv_mgmt[16])(struct ieee80211com *,
 				    struct sk_buff *, int, u_int32_t);
 	spinlock_t		ic_lock;
@@ -516,34 +553,46 @@ struct ieee80211com {
 	int			(*ic_newstate)(void *, enum ieee80211_state);
 	int			(*ic_chancheck)(void *, u_char *);
 	u_int8_t		ic_sup_rates[IEEE80211_RATE_SIZE];
+	struct ieee80211channel ic_channels[IEEE80211_CHAN_MAX+1];
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
-	struct sk_buff_head	ic_mgtq;
-	int			ic_flags;
+	struct sk_buff_head	ic_mgtq;	/* management frame tx q */
+	u_int32_t		ic_flags;	/* state flags */
+	u_int32_t		ic_caps;	/* capabilities */
 	enum ieee80211_phytype	ic_phytype;
-	enum ieee80211_opmode	ic_opmode;
-	enum ieee80211_state	ic_state;
-	struct bpf_if		*ic_rawbpf;	/* packet filter structure */
+	enum ieee80211_opmode	ic_opmode;	/* operation mode */
+	enum ieee80211_state	ic_state;	/* 802.11 state */
+	struct ifmedia		ic_media;	/* interface media config */
 	struct ieee80211_node	ic_bss;		/* information for this node */
 	int			ic_node_privlen;/* size for ni_private */
 	void			(*ic_node_free)(struct ieee80211com *,
 				    struct ieee80211_node *);	/* callback */
-	u_int8_t		ic_ibss_chan;
+	struct ieee80211channel	*ic_ibss_chan;
 	int			ic_fixed_rate;	/* index to ic_sup_rates[] */
+	u_int16_t		ic_rtsthreshold;
+	u_int16_t		ic_fragthreshold;
 	TAILQ_HEAD(, ieee80211_node) ic_node;	/* information of all nodes */
 	LIST_HEAD(, ieee80211_node) ic_hash[IEEE80211_NODE_HASHSIZE];
 	u_int16_t		ic_lintval;	/* listen interval */
+	u_int16_t		ic_holdover;	/* PM hold over duration */
+	u_int16_t		ic_txmin;	/* min tx retry count */
+	u_int16_t		ic_txmax;	/* max tx retry count */
+	u_int16_t		ic_txlifetime;	/* tx lifetime */
+	u_int16_t		ic_txpower;	/* tx power setting (dbM) */
 	int			ic_mgt_timer;	/* mgmt timeout */
 	int			ic_scan_timer;	/* scant wait */
 	int			ic_inact_timer;	/* inactivity timer wait */
 	int			ic_des_esslen;
 	u_int8_t		ic_des_essid[IEEE80211_NWID_LEN];
-	int			ic_des_chan;	/* desired channel */
+	struct ieee80211channel	*ic_des_chan;	/* desired channel */
 	u_int8_t		ic_des_bssid[IEEE80211_ADDR_LEN];
 	struct ieee80211_wepkey	ic_nw_keys[IEEE80211_WEP_NKID];
 	int			ic_wep_txkey;	/* default tx key index */
 	void			*ic_wep_ctx;	/* wep crypt context */
 	u_int32_t		ic_iv;		/* initial vector for wep */
+#ifdef WIRELESS_EXT
+	struct iw_statistics	ic_iwstats;	/* wireless statistics block */
+#endif
 };
 #define	IEEE80211_LOCK(_ic)	spin_lock(&(_ic)->ic_lock)
 #define	IEEE80211_UNLOCK(_ic)	spin_unlock(&(_ic)->ic_lock)
@@ -567,11 +616,21 @@ struct ieee80211com {
 #define	IEEE80211_F_PMGTON	0x00000400	/* CONF: Power mgmt enable */
 #define	IEEE80211_F_DESBSSID	0x00000800	/* CONF: des_bssid is set */
 #define	IEEE80211_F_SCANAP	0x00001000	/* CONF: Scanning AP */
-#define	IEEE80211_F_HASWEP	0x00010000	/* CAPABILITY: WEP available */
-#define	IEEE80211_F_HASIBSS	0x00020000	/* CAPABILITY: IBSS available */
-#define	IEEE80211_F_HASPMGT	0x00040000	/* CAPABILITY: Power mgmt */
-#define	IEEE80211_F_HASHOSTAP	0x00080000	/* CAPABILITY: HOSTAP avail */
-#define	IEEE80211_F_HASAHDEMO	0x00100000	/* CAPABILITY: Old Adhoc Demo */
+#define	IEEE80211_F_ROAMING	0x00002000	/* CONF: roaming enabled */
+#define	IEEE80211_F_SWRETRY	0x00004000	/* CONF: sw tx retry enabled */
+#define	IEEE80211_F_TXPMGT	0x00018000	/* STATUS: tx power */
+#define IEEE80211_F_TXPOW_OFF	0x00000000	/* TX Power: radio disabled */
+#define IEEE80211_F_TXPOW_FIXED	0x00008000	/* TX Power: fixed rate */
+#define IEEE80211_F_TXPOW_AUTO	0x00010000	/* TX Power: undefined */
+
+/* ic_capabilities */
+#define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
+#define	IEEE80211_C_IBSS	0x00000002	/* CAPABILITY: IBSS available */
+#define	IEEE80211_C_PMGT	0x00000004	/* CAPABILITY: Power mgmt */
+#define	IEEE80211_C_HOSTAP	0x00000008	/* CAPABILITY: HOSTAP avail */
+#define	IEEE80211_C_AHDEMO	0x00000010	/* CAPABILITY: Old Adhoc Demo */
+#define	IEEE80211_C_SWRETRY	0x00000020	/* CAPABILITY: sw tx retry */
+#define	IEEE80211_C_TXPMGT	0x00000040	/* CAPABILITY: tx power mgmt */
 
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
@@ -587,8 +646,6 @@ struct ieee80211com {
 	(((p)->msg_enable & (NETIF_MSG_DEBUG|NETIF_MSG_LINK2)) == \
 		(NETIF_MSG_DEBUG|NETIF_MSG_LINK2))
 
-const char *ether_sprintf(const u_int8_t *);		/* XXX */
-
 int	ieee80211_ifattach(struct net_device *);
 void	ieee80211_ifdetach(struct net_device *);
 void	ieee80211_input(struct net_device *, struct sk_buff *, int, u_int32_t);
@@ -596,7 +653,6 @@ int	ieee80211_mgmt_output(struct net_device *, struct ieee80211_node *,
 		struct sk_buff *, int);
 struct sk_buff *ieee80211_encap(struct net_device *, struct sk_buff *);
 struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
-int	ieee80211_ioctl(struct net_device *, u_long, caddr_t);
 void	ieee80211_print_essid(u_int8_t *, int);
 void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
 void	ieee80211_watchdog(struct net_device *);
@@ -612,9 +668,14 @@ int	ieee80211_new_state(struct net_device *, enum ieee80211_state, int);
 struct sk_buff *ieee80211_wep_crypt(struct net_device *, struct sk_buff *, int);
 int	ieee80211_rate2media(int, enum ieee80211_phytype);
 int	ieee80211_media2rate(int, enum ieee80211_phytype);
+u_int	ieee80211_ghz2ieee(u_int, u_int);
+u_int	ieee80211_chan2ieee(struct ieee80211com *, struct ieee80211channel *);
+u_int	ieee80211_ieee2ghz(u_int, u_int);
+struct ieee80211channel *ieee80211_chan_find(struct ieee80211com *, u_int);
 
-int	ieee80211_cfgget(struct net_device *, u_long, caddr_t);
-int	ieee80211_cfgset(struct net_device *, u_long, caddr_t);
+extern	int ieee80211_ioctl(struct net_device *, struct ifreq *, int);
+
+extern	const char *ether_sprintf(const u_int8_t *);		/* XXX */
 
 #endif /* __KERNEL__ */
 

@@ -59,9 +59,6 @@ static int	ath_init(struct net_device *);
 static int	ath_stop(struct net_device *);
 static void	ath_start(struct net_device *);
 static void	ath_watchdog(struct net_device *);
-static int	ath_ioctl(struct net_device *, struct ifreq *, int);
-static int	ath_media_change(struct net_device *);
-static void	ath_media_status(struct net_device *, struct ifmediareq *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
 static void	ath_beacon_int(struct net_device *);
@@ -75,8 +72,7 @@ static int	ath_hardstart(struct sk_buff *, struct net_device *);
 static int	ath_tx_start(struct ath_softc *, struct ieee80211_node *,
 			     struct ath_buf *, struct sk_buff *);
 static void	ath_tx_int(struct net_device *);
-static HAL_CHANNEL *ath_chan_find(struct ath_softc *, u_int);
-static int	ath_chan_set(struct ath_softc *, u_int8_t);
+static int	ath_chan_set(struct ath_softc *, struct ieee80211channel *);
 static void	ath_draintxq(struct ath_softc *);
 static void	ath_stoprecv(struct ath_softc *);
 static int	ath_startrecv(struct ath_softc *);
@@ -113,9 +109,9 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah;
-	int i, error = 0;
+	int i, error = 0, ix;
 	u_int8_t *r;
-	struct ifmediareq imr;
+	HAL_CHANNEL chans[ATH_MAXCHAN];		/* XXX get off stack */
 	HAL_STATUS status;
 
 	DPRINTF(("ath_attach: unit %d devid 0x%x\n", sc->sc_unit, devid));
@@ -133,7 +129,8 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	sc->sc_ah = ah;
 
 	/* XXX where does the country code, et. al. come from? */
-	if (!ath_hal_init_channels(ah, sc->sc_channels, ATH_MAXCHAN,
+	memset(chans, 0, sizeof(chans));
+	if (!ath_hal_init_channels(ah, chans, ATH_MAXCHAN,
 #ifdef notdef
 		CTRY_DEFAULT, MODE_SELECT_11A|MODE_SELECT_11B, 1)) {
 #else
@@ -144,8 +141,29 @@ ath_attach(uint16_t devid, struct net_device *dev)
 		error = EINVAL;
 		goto bad;
 	}
-	/* start scanning from first channel */
-	sc->sc_cur_chan = &sc->sc_channels[0];
+	/*
+	 * Convert HAL channels to ieee80211 ones and insert
+	 * them the table according to their channel number.
+	 */
+	for (i = 0; i < ATH_MAXCHAN; i++) {
+		if (chans[i].channelFlags == 0)
+			continue;
+		ix = ath_hal_ghz2ieee(chans[i].channel, chans[i].channelFlags);
+		if (ix > IEEE80211_CHAN_MAX) {
+			printk(KERN_ERR "%s: bad HAL channel %u/%x ignored\n",
+				dev->name, chans[i].channel,
+				chans[i].channelFlags);
+			continue;
+		}
+		if (ic->ic_channels[ix].ic_freq != 0) {
+			printk(KERN_ERR "%s: chan %u already (freq %u)\n",
+				dev->name, ix, ic->ic_channels[ix].ic_freq);
+			continue;
+		}
+		ic->ic_channels[ix].ic_freq = chans[i].channel;
+		/* NB: flags are known to be compatible */
+		ic->ic_channels[ix].ic_flags = chans[i].channelFlags;
+	}
 
 	error = ath_desc_alloc(sc);
 	if (error != 0) {
@@ -164,16 +182,15 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	dev->open = ath_init;
 	dev->hard_start_xmit = ath_hardstart;
 	dev->set_multicast_list = ath_mode_init;
-	dev->do_ioctl = ath_ioctl;
 
 	ic->ic_watchdog = ath_watchdog;
 	ic->ic_start = ath_start;
+	ic->ic_init = ath_init;
 
 	ic->ic_newstate = ath_newstate;
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
-	ic->ic_flags =
-	    IEEE80211_F_HASWEP | IEEE80211_F_HASIBSS | IEEE80211_F_HASHOSTAP;
+	ic->ic_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS | IEEE80211_C_HOSTAP;
 	ic->ic_node_privlen = sizeof(struct ath_nodestat);
 	ic->ic_node_free = ath_node_free;
 	ic->ic_bss.ni_private = &sc->sc_bss_stat;
@@ -182,15 +199,8 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	ath_hal_getmac(ah, dev->dev_addr);
 
 	/*
-	 * Fill in 802.11 available channel set.
+	 * Fill in supported rates.
 	 */
-	memset(ic->ic_chan_avail, 0, sizeof(ic->ic_chan_avail));
-	for (i = 0; i < ATH_MAXCHAN; i++) {
-		HAL_CHANNEL *c = &sc->sc_channels[i];
-		if (c->channelFlags)
-			setbit(ic->ic_chan_avail,
-				ath_hal_ghz2ieee(c->channel, c->channelFlags));
-	}
 	r = ic->ic_sup_rates;
 	for (i = 0; i < sizeof(ath_rate_tbl); i++) {
 		if (r == ic->ic_sup_rates + IEEE80211_RATE_SIZE)
@@ -215,20 +225,8 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	/* call MI attach routine. */
 	ieee80211_ifattach(dev);
 
-	printk("%s: 802.11 address: %s\n", dev->name, ether_sprintf(dev->dev_addr));
-
-	ifmedia_init(&sc->sc_media, 0, ath_media_change, ath_media_status);
-	ifmedia_add(&sc->sc_media,
-	    IFM_MAKEWORD(IFM_IEEE80211, IFM_AUTO, 0, 0),
-	    0, NULL);
-	ifmedia_add(&sc->sc_media,
-	    IFM_MAKEWORD(IFM_IEEE80211, IFM_AUTO, IFM_IEEE80211_ADHOC, 0),
-	    0, NULL);
-	ifmedia_add(&sc->sc_media,
-	    IFM_MAKEWORD(IFM_IEEE80211, IFM_AUTO, IFM_IEEE80211_HOSTAP, 0),
-	    0, NULL);
-	ath_media_status(dev, &imr);
-	ifmedia_set(&sc->sc_media, imr.ifm_active);
+	printk("%s: 802.11 address: %s\n",
+		dev->name, ether_sprintf(dev->dev_addr));
 
 	sc->sc_attached = 1;
 
@@ -251,7 +249,6 @@ ath_detach(struct net_device *dev)
 		ath_stop(dev);
 		ath_desc_free(sc);
 		ath_hal_detach(sc->sc_ah);
-		ifmedia_removeall(&sc->sc_media);
 		ieee80211_ifdetach(dev);
 	}
 	return 0;
@@ -384,7 +381,8 @@ ath_init(struct net_device *dev)
 	 * be followed by initialization of the appropriate bits
 	 * and then setup of the interrupt mask.
 	 */
-	if (!ath_hal_reset(ah, ic->ic_opmode, sc->sc_cur_chan, AH_FALSE, &status)) {
+	if (!ath_hal_reset(ah, ic->ic_opmode, (HAL_CHANNEL *) ic->ic_ibss_chan,
+	     AH_FALSE, &status)) {
 		printk("%s: unable to reset hardware; HAL status %u\n",
 			dev->name, status);
 		return EIO;
@@ -444,8 +442,7 @@ ath_init(struct net_device *dev)
 		ic->ic_state = IEEE80211_S_SCAN;	/*XXX*/
 		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
 	} else {
-		HAL_CHANNEL *c = sc->sc_cur_chan;
-		ni->ni_chan = ath_hal_ghz2ieee(c->channel, c->channelFlags);
+		ni->ni_chan = ic->ic_ibss_chan;
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 	}
 
@@ -659,134 +656,6 @@ ath_watchdog(struct net_device *dev)
 		}
 	}
 	ieee80211_watchdog(dev);
-}
-
-static int
-ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
-{
-	struct ath_softc *sc = dev->priv;
-	int error = 0;
-
-	switch (cmd) {
-	case SIOCSIFMEDIA:
-	case SIOCGIFMEDIA:
-		error = ifmedia_ioctl(dev, ifr, &sc->sc_media, cmd);
-		break;
-	default:
-		/* XXX ifr vs data */
-		error = ieee80211_ioctl(dev, cmd, (caddr_t) ifr);
-		break;
-	}
-	if (error == ENETRESET) {
-		ath_init(dev);			/* XXX lose error */
-		error = 0;
-	}
-	return error;
-}
-
-static int
-ath_media_change(struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ifmedia_entry *ime;
-	int error;
-
-	error = 0;
-	ime = sc->sc_media.ifm_cur;
-	switch (IFM_SUBTYPE(ime->ifm_media)) {
-	case IFM_AUTO:
-		break;
-	default:
-		error = EIO;
-		break;		/* XXX ??? */
-	}
-	if (ime->ifm_media & IFM_IEEE80211_ADHOC) {
-		ic->ic_opmode = IEEE80211_M_IBSS;
-		ic->ic_flags |= IEEE80211_F_IBSSON;
-	} else if (ime->ifm_media & IFM_IEEE80211_HOSTAP) {
-		ic->ic_opmode = IEEE80211_M_HOSTAP;
-		ic->ic_flags &= ~IEEE80211_F_IBSSON;
-	} else {
-		ic->ic_opmode = IEEE80211_M_STA;
-		ic->ic_flags &= ~IEEE80211_F_IBSSON;
-	}
-	ath_init(dev);			/* XXX lose error */
-	return error;
-}
-
-static void
-ath_media_status(struct net_device *dev, struct ifmediareq *imr)
-{
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211_node *ni = NULL;
-
-	imr->ifm_status = IFM_AVALID;
-	imr->ifm_active = IFM_IEEE80211;
-	if (sc->sc_ic.ic_state == IEEE80211_S_RUN)
-		imr->ifm_status |= IFM_ACTIVE;
-	imr->ifm_active |= IFM_AUTO;
-	switch (sc->sc_ic.ic_opmode) {
-	case IEEE80211_M_STA:
-		ni = &sc->sc_ic.ic_bss;
-		break;
-	case IEEE80211_M_IBSS:
-		imr->ifm_active |= IFM_IEEE80211_ADHOC;
-		break;
-	case IEEE80211_M_AHDEMO:
-		/* should not come here */
-		break;
-	case IEEE80211_M_HOSTAP:
-		imr->ifm_active |= IFM_IEEE80211_HOSTAP;
-		break;			/* NB: skip media line rate */
-	}
-	if (ni == NULL)
-		return;
-	/* XXX long/short preamble??? */
-	switch (ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) {
-	case 0:
-		imr->ifm_active |= IFM_AUTO;
-		break;
-	case 2:
-		imr->ifm_active |= IFM_IEEE80211_DS1;
-		break;
-	case 4:
-		imr->ifm_active |= IFM_IEEE80211_DS2;
-		break;
-	case 11:
-		imr->ifm_active |= IFM_IEEE80211_DS5;
-		break;
-	case 12:
-		imr->ifm_active |= IFM_IEEE80211_ODFM6;
-		break;
-	case 18:
-		imr->ifm_active |= IFM_IEEE80211_ODFM9;
-		break;
-	case 22:
-		imr->ifm_active |= IFM_IEEE80211_DS11;
-		break;
-	case 24:
-		imr->ifm_active |= IFM_IEEE80211_ODFM12;
-		break;
-	case 36:
-		imr->ifm_active |= IFM_IEEE80211_ODFM18;
-		break;
-	case 44:
-		imr->ifm_active |= IFM_IEEE80211_DS22;
-		break;
-	case 48:
-		imr->ifm_active |= IFM_IEEE80211_ODFM24;
-		break;
-	case 72:
-		imr->ifm_active |= IFM_IEEE80211_ODFM36;
-		break;
-	case 108:
-		imr->ifm_active |= IFM_IEEE80211_ODFM54;
-		break;
-	case 144:
-		imr->ifm_active |= IFM_IEEE80211_ODFM72;
-		break;
-	}
 }
 
 static void
@@ -1418,23 +1287,6 @@ ath_tx_int(struct net_device *dev)
 }
 
 /*
- * Locate the channel for the specified frequency.
- */
-static HAL_CHANNEL *
-ath_chan_find(struct ath_softc *sc, u_int freq)
-{
-	HAL_CHANNEL *c;
-
-	for (c = sc->sc_cur_chan+1; c < &sc->sc_channels[64]; c++)
-		if (c->channel == freq)
-			return c;
-	for (c = &sc->sc_channels[0]; c < sc->sc_cur_chan; c++)
-		if (c->channel == freq)
-			return c;
-	return NULL;
-}
-
-/*
  * Drain the transmit queue and reclaim resources.
  */
 static void
@@ -1530,31 +1382,19 @@ ath_startrecv(struct ath_softc *sc)
  * ath_init.
  */
 static int
-ath_chan_set(struct ath_softc *sc, u_int8_t chan)
+ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = &ic->ic_dev;
-	u_int freq = ath_hal_ieee2ghz(chan, 0);
-	HAL_CHANNEL *cc = sc->sc_cur_chan;
 
 	DPRINTF(("ath_chan_set: %u %uMHz -> %u %uMHz\n",
-	    ath_hal_ghz2ieee(cc->channel, cc->channelFlags), cc->channel,
-	    chan, freq));
-	if (freq != cc->channel) {
-		HAL_CHANNEL *nchan;
+	    ieee80211_chan2ieee(ic, ic->ic_ibss_chan),
+	    	ic->ic_ibss_chan->ic_freq,
+	    ieee80211_chan2ieee(ic, chan), chan->ic_freq));
+	if (chan != ic->ic_ibss_chan) {
 		HAL_STATUS status;
 		int val;
-
-		/*
-		 * Locate the channel for the specified frequency.
-		 */
-		nchan = ath_chan_find(sc, freq);
-		if (nchan == NULL) {
-			printk("%s: ath_chan_find: channel %u not found!\n",
-				dev->name, freq);
-			return EINVAL;
-		}
 
 		/*
 		 * To switch channels clear any pending DMA operations;
@@ -1565,9 +1405,11 @@ ath_chan_set(struct ath_softc *sc, u_int8_t chan)
 		ath_hal_intrset(ah, 0);		/* disable interrupts */
 		ath_draintxq(sc);		/* clear pending tx frames */
 		ath_stoprecv(sc);		/* turn off frame recv */
-		if (!ath_hal_reset(ah, ic->ic_opmode, nchan, AH_TRUE, &status)) {
+		if (!ath_hal_reset(ah, ic->ic_opmode,
+		     (HAL_CHANNEL *) chan, AH_TRUE, &status)) {
 			printk("%s: ath_chan_set: unable to reset "
-				"channel %u (%uMhz)\n", dev->name, chan, freq);
+				"channel %u (%uMhz)\n", dev->name,
+				ieee80211_chan2ieee(ic, chan), chan->ic_freq);
 			return EIO;
 		}
 
@@ -1604,7 +1446,7 @@ ath_chan_set(struct ath_softc *sc, u_int8_t chan)
 			val |= HAL_INT_SWBA;		/* beacon prepare */
 		ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
 
-		sc->sc_cur_chan = nchan;
+		ic->ic_ibss_chan = chan;
 	}
 	return 0;
 }
@@ -1628,12 +1470,13 @@ ath_calibrate(unsigned long arg)
 {
 	struct ath_softc *sc = (struct ath_softc *) arg;
 	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211channel *c = ic->ic_ibss_chan;
 
-	DPRINTF(("ath_calibrate: channel %u/%x\n",
-		sc->sc_cur_chan->channel, sc->sc_cur_chan->channelFlags));
-	if (!ath_hal_calibrate(ah, sc->sc_cur_chan))
+	DPRINTF(("ath_calibrate: channel %u/%x\n", c->ic_freq, c->ic_flags));
+	if (!ath_hal_calibrate(ah, (HAL_CHANNEL *) c))
 		printk("%s: ath_calibrate: calibration of channel %u failed\n",
-			sc->sc_ic.ic_dev.name, sc->sc_cur_chan->channel);
+			ic->ic_dev.name, c->ic_freq);
 
 	sc->sc_scan_ch.expires = jiffies + HZ;
 	add_timer(&sc->sc_scan_ch);
@@ -1711,7 +1554,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 			 , ni->ni_intval
 			 , ether_sprintf(ni->ni_bssid)
 			 , ni->ni_capinfo
-			 , ni->ni_chan));
+			 , ieee80211_chan2ieee(ic, ni->ni_chan)));
 		if (ic->ic_opmode != IEEE80211_M_STA) {
 			error = ath_beacon_alloc(sc, ni);
 			if (error != 0)

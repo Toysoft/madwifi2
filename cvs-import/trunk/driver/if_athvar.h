@@ -33,7 +33,6 @@
 #define _DEV_ATH_ATHVAR_H
 
 #include "if_ieee80211.h"
-#include "if_media.h"
 #include "ah.h"
 
 #define	ATH_TIMEOUT		1000
@@ -98,7 +97,6 @@ struct ath_softc {
 	unsigned int		sc_attached : 1,/* device is attached */
 				sc_invalid  : 1,/* ??? deactivated */
 				sc_oactive  : 1;/* output processing active */
-	struct ifmedia		sc_media;
 	TAILQ_HEAD(, ath_buf)	sc_rxbuf,	/* receive buffer */
 				sc_txbuf,	/* transmit buffer */
 				sc_txq;		/* transmitting queue */
@@ -111,9 +109,6 @@ struct ath_softc {
 	size_t			sc_desc_len;	/* size of TX descriptors */
 	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
 
-	HAL_CHANNEL		sc_channels[ATH_MAXCHAN];
-						/* HAL channel descriptors */
-	HAL_CHANNEL		*sc_cur_chan;	/* current hardware setting */
 	struct timer_list	sc_cal_ch;	/* timer for calibrations */
 	struct timer_list	sc_scan_ch;	/* timer for scans */
 	int			sc_tx_timer;	/* transmit timeout */
