@@ -1388,6 +1388,7 @@ ieee80211_parse_rsn(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 			("%s: length %u too short\n", __func__, len));
 		return IEEE80211_REASON_IE_INVALID;
 	}
+	frm += 2;		/* skip id+len */
 	w = LE_READ_2(frm);
 	if (w != RSN_VERSION) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
