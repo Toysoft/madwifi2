@@ -53,7 +53,7 @@ all:
 
 install:
 	for i in ${DIRS}; do \
-		(cd $$i; make install); \
+		(cd $$i; make install) || exit 1; \
 	done
 ifeq ($(DESTDIR),)
 	/sbin/depmod -ae
