@@ -1183,7 +1183,7 @@ ath_keyprint(const char *tag, u_int ix,
 	int i, n;
 
 	printk("%s: [%02u] %-7s ", tag, ix, ciphers[hk->kv_type]);
-	for (i = 0, n = hk->kv_len / NBBY; i < n; i++)
+	for (i = 0, n = hk->kv_len; i < n; i++)
 		printk("%02x", hk->kv_val[i]);
 	printk(" mac %s", ether_sprintf(mac));
 	if (hk->kv_type == HAL_CIPHER_TKIP) {
@@ -1275,7 +1275,7 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
 		KASSERT(cip->ic_cipher < N(ciphermap),
 			("invalid cipher type %u", cip->ic_cipher));
 		hk.kv_type = ciphermap[cip->ic_cipher];
-		hk.kv_len = k->wk_keylen * NBBY;
+		hk.kv_len = k->wk_keylen;
 		memcpy(hk.kv_val, k->wk_key, k->wk_keylen);
 	} else
 		hk.kv_type = HAL_CIPHER_CLR;
