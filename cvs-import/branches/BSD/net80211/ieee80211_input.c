@@ -518,14 +518,25 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				struct ieee80211_node *ni1 =
 				    ieee80211_find_node(&ic->ic_sta,
 							eh->ether_dhost);
-				if (ni1 != NULL) {
+				if (ni1 != NULL && ni1 != ic->ic_bss) {
 					if (ni1->ni_associd != 0 &&
 					   ieee80211_node_is_authorized(ni1)) {
 						skb1 = skb;
 						skb = NULL;
+					} else {
+						IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
+							eh->ether_shost, "data",
+							"node %s (aid: %d) not authorized",
+							ether_sprintf(ni1->ni_macaddr), 
+							ni1->ni_associd);
 					}
 					/* XXX statistic? */
 					ieee80211_free_node(ni1);
+				} else if (ni1 != ic->ic_bss) {
+					IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
+						eh->ether_shost, "data",
+						"node %s not found", 
+						ether_sprintf(ni1->ni_macaddr));
 				}
 			}
 			if (skb1 != NULL) {
