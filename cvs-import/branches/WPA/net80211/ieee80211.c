@@ -367,7 +367,22 @@ findrate(struct ieee80211com *ic, enum ieee80211_phymode mode, int rate)
 #undef IEEERATE
 }
 
+/*
+ * Find an instance by it's mac address.
+ */
 struct ieee80211com *
+ieee80211_find_vap(const u_int8_t mac[IEEE80211_ADDR_LEN])
+{
+	struct ieee80211com *ic;
+
+	/* XXX lock */
+	SLIST_FOREACH(ic, &ieee80211_list, ic_next)
+		if (IEEE80211_ADDR_EQ(mac, ic->ic_myaddr))
+			return ic;
+	return NULL;
+}
+
+static struct ieee80211com *
 ieee80211_find_instance(struct net_device *dev)
 {
 	struct ieee80211com *ic;

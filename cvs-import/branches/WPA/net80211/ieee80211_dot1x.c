@@ -280,7 +280,7 @@ eapol_input(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	 * Find session based on sender's MAC address.
 	 */
 	/* NB: must release reference */
-	ic = ieee80211_find_instance(skb->dev);
+	ic = ieee80211_find_vap(skb->mac.ethernet->h_dest);
 	if (ic == NULL) {
 		eapolstats.eps_noinstance++;
 		goto out;
@@ -1417,6 +1417,7 @@ eapol_send_raw(struct eapol_node *en, struct sk_buff *skb)
 	 */
 	skb->dev = dev;
 	skb->protocol = __constant_htons(ETH_P_EAPOL);
+	skb->mac.raw = skb->nh.raw = skb->data;
 	if (dev->hard_header &&
 	    dev->hard_header(skb, dev, ETH_P_EAPOL, en->en_node->ni_macaddr, dev->dev_addr, skb->len) < 0)
 		goto out;

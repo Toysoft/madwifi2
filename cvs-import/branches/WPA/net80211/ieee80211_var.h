@@ -322,7 +322,7 @@ struct ieee80211com {
 int	ieee80211_ifattach(struct ieee80211com *);
 void	ieee80211_ifdetach(struct ieee80211com *);
 void	ieee80211_media_init(struct ieee80211com *, ifm_change_cb_t, ifm_stat_cb_t);
-struct ieee80211com *ieee80211_find_instance(struct net_device *);
+struct ieee80211com *ieee80211_find_vap(const u_int8_t mac[IEEE80211_ADDR_LEN]);
 int	ieee80211_media_change(struct net_device *);
 void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
 int	ieee80211_ioctl(struct ieee80211com *, struct ifreq *, int);
