@@ -33,7 +33,7 @@ DEPTH=	..
 include ${DEPTH}/Makefile.inc
 
 SRCS=	ah_osdep.c if_ath.c if_ath_pci.c
-OBJS=	ah_osdep.o if_ath.o if_ath_pci.o ${ATH_HAL}/hal.o
+OBJS=	ah_osdep.o if_ath.o if_ath_pci.o
 
 CFLAGS=	-I. -I${ATH_HAL} -I${WLAN} -I${LINUX} \
 	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
@@ -49,8 +49,8 @@ install: all
 		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
 	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
 
-ath_pci.o: ${OBJS} Makefile
-	${LD} -o $@ -r ${LDFLAGS} ${OBJS}
+ath_pci.o: ${OBJS} ${ATH_HAL}/hal.o Makefile
+	${LD} -o $@ -r ${LDFLAGS} ${OBJS} ${ATH_HAL}/hal.o
 if_ath_pci.o:	version.h
 ifdef CONFIG_MODVERSIONS
 if_ath.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
