@@ -1598,9 +1598,8 @@ ath_mode_init(struct net_device *dev)
 	rfilt = ath_calcrxfilter(sc);
 	ath_hal_setrxfilter(ah, rfilt);
 
-	/* configure operational mode and slot time */
+	/* configure operational mode */
 	ath_hal_setopmode(ah);
-	ath_setslottime(sc);
 
 	/* calculate and install multicast filter */
 	if ((dev->flags & IFF_ALLMULTI) == 0) {
