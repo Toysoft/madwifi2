@@ -88,6 +88,8 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_ssidmismatch,	"rx frame ssid mismatch");
 	STAT(rx_auth_unsupported,"rx w/ unsupported auth alg");
 	STAT(rx_auth_fail,	"rx sta auth failure");
+	STAT(rx_auth_countermeasures,
+		"rx sta auth failure 'cuz of TKIP countermeasures");
 	STAT(rx_assoc_bss,	"rx assoc from wrong bssid");
 	STAT(rx_assoc_notauth,	"rx assoc w/o auth");
 	STAT(rx_assoc_capmismatch,"rx assoc w/ cap mismatch");
@@ -126,6 +128,7 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(crypto_tkip,	"tkip crypto done in s/w");
 	STAT(crypto_tkipenmic,	"tkip tx MIC done in s/w");
 	STAT(crypto_tkipdemic,	"tkip rx MIC done in s/w");
+	STAT(crypto_tkipcm,	"tkip dropped frames 'cuz of countermeasures");
 	STAT(crypto_ccmp,	"ccmp crypto done in s/w");
 	STAT(crypto_wep,	"wep crypto done in s/w");
 	STAT(crypto_setkey_cipher,"setkey failed 'cuz cipher rejected data");
