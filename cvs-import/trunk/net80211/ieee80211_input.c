@@ -105,14 +105,6 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int16_t rxseq;
 
 	KASSERT(ni != NULL, ("null node"));
-
-#ifndef __linux__
-	/* trim CRC here so WEP can find its own CRC at the end of packet. */
-	if (m->m_flags & M_HASFCS) {
-		m_adj(m, -IEEE80211_CRC_LEN);
-		m->m_flags &= ~M_HASFCS;
-	}
-#endif
 	KASSERT(skb->len >= sizeof(struct ieee80211_frame_min),
 		("frame length too short: %u", skb->len));
 
