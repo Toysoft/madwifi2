@@ -1395,7 +1395,7 @@ ath_rx_tasklet(void *data)
 			goto rx_next;
 		}
 		pci_unmap_single(sc->sc_pdev,
-			bf->bf_skbaddr, skb->len, PCI_DMA_FROMDEVICE);
+			bf->bf_skbaddr, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
 		bf->bf_skb = NULL;
 		skb_put(skb, len);
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
