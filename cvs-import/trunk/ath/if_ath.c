@@ -2119,12 +2119,8 @@ ath_node_alloc(struct ieee80211com *ic)
 	struct ath_node *an = kmalloc(sizeof(struct ath_node), GFP_ATOMIC);
 	if (an) {
 		struct ath_softc *sc = ic->ic_dev->priv;
-		int i;
 
 		memset(an, 0, sizeof(struct ath_node));
-		for (i = 0; i < ATH_RHIST_SIZE; i++)
-			an->an_rx_hist[i].arh_ticks = ATH_RHIST_NOTIME;
-		an->an_rx_hist_next = ATH_RHIST_SIZE-1;
 		ath_rate_update(sc, &an->an_node, 0);
 		return &an->an_node;
 	} else
@@ -2177,48 +2173,15 @@ ath_node_copy(struct ieee80211com *ic,
 static u_int8_t
 ath_node_getrssi(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-	struct ath_node *an = ATH_NODE(ni);
-	int i, now, nsamples, rssi;
+#define	HAL_EP_RND(x, mul) \
+	((((x)%(mul)) >= ((mul)/2)) ? ((x) + ((mul) - 1)) / (mul) : (x)/(mul))
+	int32_t rssi;
 
-	/*
-	 * Calculate the average over the last second of sampled data.
-	 */
-	now = jiffies;
-	nsamples = 0;
-	rssi = 0;
-	i = an->an_rx_hist_next;
-	do {
-		struct ath_recv_hist *rh = &an->an_rx_hist[i];
-		if (rh->arh_ticks == ATH_RHIST_NOTIME)
-			goto done;
-		if (now - rh->arh_ticks > 1*HZ)
-			goto done;
-		rssi += rh->arh_rssi;
-		nsamples++;
-		if (i == 0)
-			i = ATH_RHIST_SIZE-1;
-		else
-			i--;
-	} while (i != an->an_rx_hist_next);
-done:
-	/*
-	 * Return either the average or the last known
-	 * value if there is no recent data.
-	 */
-	if (nsamples)
-		rssi /= nsamples;
-	else {
-		rssi = an->an_rx_hist[i].arh_rssi;
-		/*
-		 * XXX Nodes created during scans may only have one
-		 * sample and this isn't entered into the history
-		 * buffer so we need to get it directly from the node
-		 * structure.
-		 */
-		if (rssi == 0)
-			rssi = ni->ni_rssi;
-	}
-	return rssi;
+	rssi = HAL_EP_RND(ATH_NODE(ni)->an_halstats.ns_avgrssi,
+		HAL_RSSI_EP_MULTIPLIER);
+	/* NB: theoretically we shouldn't need this, but be paranoid */
+	return rssi < 0 ? 0 : rssi > 127 ? 127 : rssi;
+#undef HAL_EP_RND
 }
 
 /*
@@ -2513,7 +2476,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct sk_buff *skb;
 	struct ieee80211_node *ni;
 	struct ath_node *an;
-	struct ath_recv_hist *rh;
 	int len, opackets;
 	u_int phyerr;
 	HAL_STATUS status;
@@ -2718,12 +2680,7 @@ rx_accept:
 		 * Record driver-specific state.
 		 */
 		an = ATH_NODE(ni);
-		if (++(an->an_rx_hist_next) == ATH_RHIST_SIZE)
-			an->an_rx_hist_next = 0;
-		rh = &an->an_rx_hist[an->an_rx_hist_next];
-		rh->arh_ticks = jiffies;
-		rh->arh_rssi = ds->ds_rxstat.rs_rssi;
-		rh->arh_antenna = ds->ds_rxstat.rs_antenna;
+		an->an_rx_antenna = ds->ds_rxstat.rs_antenna;
 
 		/* XXX monitor stats to identify packet type */
 		opackets = sc->sc_devstats.rx_packets;
@@ -3076,7 +3033,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if (an->an_tx_antenna)
 		antenna = an->an_tx_antenna;
 	else
-		antenna = an->an_rx_hist[an->an_rx_hist_next].arh_antenna;
+		antenna = an->an_rx_antenna;
 
 	if (IFF_DUMPPKTS(ic, ATH_DEBUG_XMIT))
 		ieee80211_dump_pkt(skb->data, skb->len,
