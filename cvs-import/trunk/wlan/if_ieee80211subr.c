@@ -156,8 +156,6 @@ static void ieee80211_recv_deauth(struct ieee80211com *,
 
 static void ieee80211_set11gbasicrates(struct ieee80211_rateset *,
 		enum ieee80211_phymode);
-static void ieee80211_crc_init(void);
-static u_int32_t ieee80211_crc_update(u_int32_t, u_int8_t *, int);
 static struct net_device_stats *ieee80211_getstats(struct net_device *);
 static void ieee80211_free_allnodes(struct ieee80211com *);
 static void ieee80211_watchdog(unsigned long);
@@ -229,7 +227,6 @@ ieee80211_ifattach(struct net_device *dev)
 	/*
 	 * Setup crypto support.
 	 */
-	ieee80211_crc_init();
 	get_random_bytes(&ic->ic_iv, sizeof(ic->ic_iv));
 
 	/*
@@ -908,15 +905,6 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			}
 			ieee80211_unref_node(&ni);
 			break;
-		}
-		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
-			if (ic->ic_flags & IEEE80211_F_WEPON) {
-				skb = ieee80211_wep_crypt(dev, skb, 0);
-				if (skb == NULL)
-					goto err;
-				wh = (struct ieee80211_frame *) skb->data;
-			} else
-				goto out;
 		}
 		/* copy to listener after decrypt */
 		skb = ieee80211_decap(dev, skb);
@@ -3244,110 +3232,6 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 	return 0;
 }
 
-struct sk_buff *
-ieee80211_wep_crypt(struct net_device *dev, struct sk_buff *skb0, int txflag)
-{
-	struct ieee80211com *ic = (void *)dev;
-	struct sk_buff *skb, *n, *n0;
-	struct ieee80211_frame *wh;
-	int i, left, len, moff, noff, kid;
-	u_int32_t iv, crc;
-	u_int8_t *ivp;
-	void *ctx;
-	u_int8_t keybuf[IEEE80211_WEP_IVLEN + IEEE80211_KEYBUF_SIZE];
-	u_int8_t crcbuf[IEEE80211_WEP_CRCLEN];
-
-	n0 = NULL;
-	if ((ctx = ic->ic_wep_ctx) == NULL) {
-		ctx = kmalloc(arc4_ctxlen(), GFP_ATOMIC);
-		if (ctx == NULL)
-			goto fail;
-		ic->ic_wep_ctx = ctx;
-	}
-	skb = skb0;
-	left = skb->len;
-	len = IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + IEEE80211_WEP_CRCLEN;
-	if (txflag) {
-		n = dev_alloc_skb(skb->len + len);
-	} else {
-		n = dev_alloc_skb(skb->len - len);
-		left -= len;
-	}
-	if (n == NULL)
-		goto fail;
-	n0 = n;
-	memcpy(n->data, skb->data, sizeof(struct ieee80211_frame));
-	wh = (struct ieee80211_frame *) n->data;
-	left -= sizeof(struct ieee80211_frame);
-	moff = sizeof(struct ieee80211_frame);
-	noff = sizeof(struct ieee80211_frame);
-	if (txflag) {
-		kid = ic->ic_wep_txkey;
-		wh->i_fc[1] |= IEEE80211_FC1_WEP;
-                iv = ic->ic_iv;
-		/*
-		 * Skip 'bad' IVs from Fluhrer/Mantin/Shamir:
-		 * (B, 255, N) with 3 <= B < 8
-		 */
-		if (iv >= 0x03ff00 &&
-		    (iv & 0xf8ff00) == 0x00ff00)
-			iv += 0x000100;
-		ic->ic_iv = iv + 1;
-		/* put iv in little endian to prepare 802.11i */
-		ivp = n->data + noff;
-		for (i = 0; i < IEEE80211_WEP_IVLEN; i++) {
-			ivp[i] = iv & 0xff;
-			iv >>= 8;
-		}
-		ivp[IEEE80211_WEP_IVLEN] = kid << 6;	/* pad and keyid */
-		noff += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
-	} else {
-		wh->i_fc[1] &= ~IEEE80211_FC1_WEP;
-		ivp = skb->data + moff;
-		kid = ivp[IEEE80211_WEP_IVLEN] >> 6;
-		moff += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
-	}
-	memcpy(keybuf, ivp, IEEE80211_WEP_IVLEN);
-	memcpy(keybuf + IEEE80211_WEP_IVLEN, ic->ic_nw_keys[kid].wk_key,
-	    ic->ic_nw_keys[kid].wk_len);
-	arc4_setkey(ctx, keybuf,
-	    IEEE80211_WEP_IVLEN + ic->ic_nw_keys[kid].wk_len);
-
-	/* encrypt with calculating CRC */
-	crc = ~0;
-	arc4_encrypt(ctx, n->data + noff, skb->data + moff, left);
-	if (txflag) {
-		crc = ieee80211_crc_update(crc, skb->data + moff, left);
-		moff += left;
-	} else {
-		crc = ieee80211_crc_update(crc, n->data + noff, left);
-		noff += left;
-	}
-	crc = ~crc;
-	if (txflag) {
-		*(u_int32_t *)crcbuf = cpu_to_le32(crc);
-		arc4_encrypt(ctx, n->data + noff, crcbuf, sizeof(crcbuf));
-	} else {
-		arc4_encrypt(ctx, crcbuf, skb->data + moff, sizeof(crcbuf));
-		if (crc != le32_to_cpu(*(u_int32_t *)crcbuf)) {
-			if (netif_msg_debug(ic)) {
-				printk("%s: decrypt CRC error\n", dev->name);
-				if (ieee80211_debug > 1)
-					ieee80211_dump_pkt(n0->data,
-					    n0->len, -1, -1);
-			}
-			goto fail;
-		}
-	}
-	dev_kfree_skb(skb0);
-	return n0;
-
-  fail:
-	dev_kfree_skb(skb0);
-	dev_kfree_skb(n0);
-	return NULL;
-}
-
 /*
  * Return netdevice statistics.
  */
@@ -3424,47 +3308,6 @@ ieee80211_proc_remove(struct ieee80211com *ic)
 	}
 }
 #endif /* CONFIG_PROC_FS */
-
-/*
- * CRC 32 -- routine from RFC 2083
- */
-
-/* Table of CRCs of all 8-bit messages */
-static u_int32_t ieee80211_crc_table[256];
-
-/* Make the table for a fast CRC. */
-static void
-ieee80211_crc_init(void)
-{
-	u_int32_t c;
-	int n, k;
-
-	for (n = 0; n < 256; n++) {
-		c = (u_int32_t)n;
-		for (k = 0; k < 8; k++) {
-			if (c & 1)
-				c = 0xedb88320UL ^ (c >> 1);
-			else
-				c = c >> 1;
-		}
-		ieee80211_crc_table[n] = c;
-	}
-}
-
-/*
- * Update a running CRC with the bytes buf[0..len-1]--the CRC
- * should be initialized to all 1's, and the transmitted value
- * is the 1's complement of the final running CRC
- */
-static u_int32_t
-ieee80211_crc_update(u_int32_t crc, u_int8_t *buf, int len)
-{
-	u_int8_t *endbuf;
-
-	for (endbuf = buf + len; buf < endbuf; buf++)
-		crc = ieee80211_crc_table[(crc ^ *buf) & 0xff] ^ (crc >> 8);
-	return crc;
-}
 
 /*
  * Return the phy mode for with the specified channel so the
