@@ -112,7 +112,8 @@ static void	ath_beacon_config(struct ath_softc *);
 static int	ath_desc_alloc(struct ath_softc *);
 static void	ath_desc_free(struct ath_softc *);
 static struct ieee80211_node *ath_node_alloc(struct ieee80211com *);
-static void	ath_node_free(struct ieee80211com *, struct ieee80211_node *);
+static void	ath_node_cleanup(struct ieee80211com *,
+			struct ieee80211_node *);
 static void	ath_node_copy(struct ieee80211com *,
 			struct ieee80211_node *, const struct ieee80211_node *);
 static u_int8_t	ath_node_getrssi(struct ieee80211com *,
@@ -205,7 +206,7 @@ enum {
 	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
 	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
 	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
-	ATH_DEBUG_MIB		= 0x00080000,	/* MIB processing */
+	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
@@ -515,8 +516,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ieee80211_ifattach(ic);
 	/* override default methods */
 	ic->ic_node_alloc = ath_node_alloc;
-	sc->sc_node_free = ic->ic_node_free;
-	ic->ic_node_free = ath_node_free;
+	sc->sc_node_cleanup = ic->ic_node_cleanup;
+	ic->ic_node_cleanup = ath_node_cleanup;
 	sc->sc_node_copy = ic->ic_node_copy;
 	ic->ic_node_copy = ath_node_copy;
 	ic->ic_node_getrssi = ath_node_getrssi;
@@ -2133,7 +2134,7 @@ ath_tx_cleanq(struct ath_txq *txq, struct ieee80211_node *ni)
 }
 
 static void
-ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
+ath_node_cleanup(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
         struct ath_softc *sc = ic->ic_dev->priv;
 	int i;
@@ -2142,7 +2143,7 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_cleanq(&sc->sc_txq[i], ni);
 	ath_rate_node_cleanup(sc, ATH_NODE(ni));
-	sc->sc_node_free(ic, ni);
+	sc->sc_node_cleanup(ic, ni);
 }
 
 static void
@@ -2152,10 +2153,14 @@ ath_node_copy(struct ieee80211com *ic,
         struct ath_softc *sc = ic->ic_dev->priv;
 	const struct ath_node *an = (const struct ath_node *)src;
 
+	/*
+	 * NB: Must copy first so the cleanup done by node_copy is
+	 *     done before we copy bits around below.
+	 */
+	sc->sc_node_copy(ic, dst, src);
 	memcpy(&dst[1], &src[1],
 		sizeof(struct ath_node) - sizeof(struct ieee80211_node));
 	ath_rate_node_copy(sc, ATH_NODE(dst), an);
-	sc->sc_node_copy(ic, dst, src);
 }
 
 static u_int8_t
