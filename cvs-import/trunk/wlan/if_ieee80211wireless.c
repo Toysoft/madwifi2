@@ -97,8 +97,11 @@ ieee80211_iw_getstats(struct net_device *dev)
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
 		/* use stats from associated ap */
-		set_quality(&ic->ic_iwstats.qual,
-			ieee80211_get_rssi(ic->ic_bss));
+		if (ic->ic_bss)
+			set_quality(&ic->ic_iwstats.qual,
+				ieee80211_get_rssi(ic->ic_bss));
+		else
+			set_quality(&ic->ic_iwstats.qual, 0);
 		break;
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
