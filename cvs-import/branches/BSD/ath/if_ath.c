@@ -2840,7 +2840,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct sk_buff *skb;
 	struct ieee80211_node *ni;
 	struct ath_node *an;
-	int len;
+	int len, type;
 	u_int phyerr;
 	HAL_STATUS status;
 
@@ -3052,7 +3052,7 @@ rx_accept:
 		/*
 		 * Send frame up for processing.
 		 */
-		ieee80211_input(ic, skb, ni,
+		type = ieee80211_input(ic, skb, ni,
 			ds->ds_rxstat.rs_rssi, ds->ds_rxstat.rs_tstamp);
 
 		if (sc->sc_softled) {
@@ -3062,7 +3062,7 @@ rx_accept:
 			 * is mainly for station mode where we depend on
 			 * periodic beacon frames to trigger the poll event.
 			 */
-			if (sc->sc_ipackets != ic->ic_devstats->rx_packets) {
+			if (type == IEEE80211_FC0_TYPE_DATA) {
 				sc->sc_ipackets = ic->ic_devstats->rx_packets;
 				sc->sc_rxrate = ds->ds_rxstat.rs_rate;
 				ath_led_event(sc, ATH_LED_RX);
@@ -3283,7 +3283,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * pad bytes; deduct them here.
 	 */
 	//TODO: ??? pktlen = m0->m_pkthdr.len - (hdrlen & 3);
-	pktlen = skb->len;
+	pktlen = skb->len - (hdrlen & 3);
 	
 	if (iswep) {
 		const struct ieee80211_cipher *cip;
