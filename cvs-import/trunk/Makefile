@@ -59,7 +59,7 @@ install:
 
 FILES=	ath_hal COPYRIGHT driver include Makefile Makefile.inc \
 	README release.h share wlan
-HAL_TAG=ATH_HAL_20030801
+HAL_TAG=ATH_HAL_20030802
 release:
 	DATE=`date +'%Y%m%d'`; TAG="MADWIFI_$${DATE}"; DIR="madwifi-$${DATE}"; \
 	cvs tag -F $${TAG} ${FILES}; \
