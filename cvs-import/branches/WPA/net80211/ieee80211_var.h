@@ -314,7 +314,7 @@ struct ieee80211com {
 #define	IEEE80211_F_SHSLOT	0x00000400	/* STATUS: use short slot time*/
 #define	IEEE80211_F_PMGTON	0x00000800	/* CONF: Power mgmt enable */
 #define	IEEE80211_F_DESBSSID	0x00001000	/* CONF: des_bssid is set */
-/* 0x00002000 is unused */
+#define	IEEE80211_F_WME		0x00002000	/* CONF: enable WME use */
 #define	IEEE80211_F_ROAMING	0x00004000	/* CONF: roaming enabled */
 #define	IEEE80211_F_SWRETRY	0x00008000	/* CONF: sw tx retry enabled */
 #define IEEE80211_F_TXPOW_FIXED	0x00010000	/* TX Power: fixed rate */
