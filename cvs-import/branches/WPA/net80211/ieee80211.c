@@ -136,9 +136,10 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	ic->ic_slowtimo.data = (unsigned long) ic;
 	ic->ic_slowtimo.function = ieee80211_watchdog;
 	ieee80211_watchdog((unsigned long) ic);		/* prime timer */
-#ifdef CONFIG_SYSCTL
-	ieee80211_sysctl_register(ic);
-#endif
+	/*
+	 * NB: ieee80211_sysctl_register is called by the driver
+	 *     since dev->name isn't setup at this point; yech!
+	 */
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ifattach);
@@ -291,16 +292,12 @@ ieee80211_media_init(struct ieee80211com *ic,
 			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_MONITOR);
 		if (mode == IEEE80211_MODE_AUTO)
 			continue;
-		if_printf(dev, "%s rates: ", ieee80211_phymode_name[mode]);
 		rs = &ic->ic_sup_rates[mode];
 		for (i = 0; i < rs->rs_nrates; i++) {
 			rate = rs->rs_rates[i];
 			mword = ieee80211_rate2media(ic, rate, mode);
 			if (mword == 0)
 				continue;
-			printf("%s%d%sMbps", (i != 0 ? " " : ""),
-			    (rate & IEEE80211_RATE_VAL) / 2,
-			    ((rate & 0x1) != 0 ? ".5" : ""));
 			ADD(ic, mword, mopt);
 			if (ic->ic_caps & IEEE80211_C_IBSS)
 				ADD(ic, mword, mopt | IFM_IEEE80211_ADHOC);
@@ -326,7 +323,6 @@ ieee80211_media_init(struct ieee80211com *ic,
 			if (rate > maxrate)
 				maxrate = rate;
 		}
-		printf("\n");
 	}
 	for (i = 0; i < allrates.rs_nrates; i++) {
 		mword = ieee80211_rate2media(ic, allrates.rs_rates[i],
@@ -353,6 +349,32 @@ ieee80211_media_init(struct ieee80211com *ic,
 #undef ADD
 }
 EXPORT_SYMBOL(ieee80211_media_init);
+
+void
+ieee80211_announce(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	int i, mode, rate, mword;
+	struct ieee80211_rateset *rs;
+
+	for (mode = IEEE80211_MODE_11A; mode < IEEE80211_MODE_MAX; mode++) {
+		if ((ic->ic_modecaps & (1<<mode)) == 0)
+			continue;
+		if_printf(dev, "%s rates: ", ieee80211_phymode_name[mode]);
+		rs = &ic->ic_sup_rates[mode];
+		for (i = 0; i < rs->rs_nrates; i++) {
+			rate = rs->rs_rates[i];
+			mword = ieee80211_rate2media(ic, rate, mode);
+			if (mword == 0)
+				continue;
+			printf("%s%d%sMbps", (i != 0 ? " " : ""),
+			    (rate & IEEE80211_RATE_VAL) / 2,
+			    ((rate & 0x1) != 0 ? ".5" : ""));
+		}
+		printf("\n");
+	}
+}
+EXPORT_SYMBOL(ieee80211_announce);
 
 static int
 findrate(struct ieee80211com *ic, enum ieee80211_phymode mode, int rate)
@@ -625,7 +647,7 @@ ieee80211_watchdog(unsigned long data)
 	struct ieee80211com *ic = (struct ieee80211com *) data;
 
 	if (ic->ic_mgt_timer && --ic->ic_mgt_timer == 0)
-		ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+		ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 	if (ic->ic_inact_timer && --ic->ic_inact_timer == 0)
 		ieee80211_timeout_nodes(ic);
 
@@ -806,12 +828,10 @@ ieee80211_reset_erp(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	 * the driver is capable of doing it.
 	 */
 	/* XXX what about auto? */
-	if (mode == IEEE80211_MODE_11G &&
-	    ic->ic_opmode != IEEE80211_M_IBSS &&
-	    (ic->ic_caps & IEEE80211_C_SHSLOT))
-		ic->ic_flags |= IEEE80211_F_SHSLOT;
-	else
-		ic->ic_flags &= ~IEEE80211_F_SHSLOT;
+	ieee80211_set_shortslottime(ic,
+		mode == IEEE80211_MODE_11G &&
+		ic->ic_opmode != IEEE80211_M_IBSS &&
+		(ic->ic_caps & IEEE80211_C_SHSLOT));
 	/*
 	 * Set short preamble and ERP barker-preamble flags.
 	 */
@@ -828,8 +848,6 @@ ieee80211_reset_erp(struct ieee80211com *ic, enum ieee80211_phymode mode)
  * Return the phy mode for with the specified channel so the
  * caller can select a rate set.  This is problematic and the
  * work here assumes how things work elsewhere in this code.
- *
- * XXX never returns turbo modes -dcy
  */
 enum ieee80211_phymode
 ieee80211_chan2mode(struct ieee80211com *ic, struct ieee80211_channel *chan)
