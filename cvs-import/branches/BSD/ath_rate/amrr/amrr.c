@@ -572,7 +572,7 @@ MODULE_DESCRIPTION("AMRR Rate control algorithm");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static char *version = "0.1";
+static char *version = "0.1-BSD";
 static char *dev_info = "ath_rate_amrr";
 
 static int __init
