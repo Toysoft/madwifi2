@@ -458,7 +458,7 @@ ath_ratectl(unsigned long data)
 		if (ic->ic_opmode == IEEE80211_M_STA)
 			ath_rate_ctl(sc, ic->ic_bss);	/* NB: no reference */
 		else
-			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
+			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_ctl, sc);
 	}
 	interval = ath_rateinterval;
 	if (ic->ic_opmode == IEEE80211_M_STA)
