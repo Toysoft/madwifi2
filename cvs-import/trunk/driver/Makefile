@@ -24,6 +24,8 @@ ALL=	ath_pci.o
 all:	${ALL}
 
 install: all
+	test -d ${DESTDIR}/lib/modules/${VERSION}/net || \
+		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
 	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
 
 ath_cs.o: ${OBJS_CS} Makefile
