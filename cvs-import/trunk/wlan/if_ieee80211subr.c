@@ -1181,7 +1181,7 @@ ieee80211_decap(struct net_device *dev, struct sk_buff *skb)
 		eh = (struct ether_header *) skb->data;
 	}
 	if (llc != NULL)
-		eh->ether_type = cpu_to_le16(skb->len - sizeof(*eh));
+		eh->ether_type = htons(skb->len - sizeof(*eh));
 	return skb;
 }
 
