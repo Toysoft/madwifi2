@@ -93,6 +93,7 @@ typedef enum {
 	HAL_CAP_CIPHER		= 1,	/* hardware supports cipher */
 	HAL_CAP_TKIP_MIC	= 2,	/* handle TKIP MIC in hardware */
 	HAL_CAP_TKIP_SPLIT	= 3,	/* hardware TKIP uses split keys */
+	HAL_CAP_PHYCOUNTERS	= 4,	/* hardware PHY error counters */
 } HAL_CAPABILITY_TYPE;
 
 /* 
@@ -382,6 +383,8 @@ enum {
  * Per-station beacon timer state.  Note that the specified
  * beacon interval (given in TU's) can also include flags
  * to force a TSF reset and to enable the beacon xmit logic.
+ * If bs_cfpmaxduration is non-zero the hardware is setup to
+ * coexist with a PCF-capable AP.
  */
 typedef struct {
 	u_int32_t	bs_nexttbtt;		/* next beacon in TU */
@@ -390,14 +393,26 @@ typedef struct {
 #define	HAL_BEACON_PERIOD	0x0000ffff	/* beacon interval period */
 #define	HAL_BEACON_ENA		0x00800000	/* beacon xmit enable */
 #define	HAL_BEACON_RESET_TSF	0x01000000	/* clear TSF */
-	u_int8_t	bs_dtimperiod;
-	u_int8_t	bs_cfpperiod;		/* # of DTIMs between CFPs */
+	u_int32_t	bs_dtimperiod;
+	u_int16_t	bs_cfpperiod;		/* CFP period in TU */
 	u_int16_t	bs_cfpmaxduration;	/* max CFP duration in TU */
-	u_int16_t	bs_cfpduremain;		/* remaining CFP duration */
-	u_int16_t	bs_timoffset;
-	u_int16_t	bs_sleepduration;	/* max sleep duration */
+	u_int32_t	bs_cfpnext;		/* next CFP in TU */
+	u_int16_t	bs_timoffset;		/* byte offset to TIM bitmap */
 	u_int16_t	bs_bmissthreshold;	/* beacon miss threshold */
+	u_int32_t	bs_sleepduration;	/* max sleep duration */
 } HAL_BEACON_STATE;
+
+/*
+ * Per-node statistics maintained by the driver for use in
+ * optimizing signal quality and other operational aspects.
+ */
+typedef struct {
+	u_int32_t	ns_avgbrssi;	/* average beacon rssi */
+	u_int32_t	ns_avgrssi;	/* average data rssi */
+	u_int32_t	ns_avgtxrssi;	/* average tx rssi */
+} HAL_NODE_STATS;
+
+#define	HAL_RSSI_EP_MULTIPLIER	(1<<7)	/* pow2 to optimize out * and / */
 
 struct ath_desc;
 
@@ -468,12 +483,6 @@ struct ath_hal {
 				HAL_BOOL lastSeg);
 	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc *);
 	HAL_BOOL  __ahdecl(*ah_hasVEOL)(struct ath_hal *);
-	/* NB: experimental, may go away */
-	HAL_BOOL  __ahdecl(*ah_updateTxDesc)(struct ath_hal *, struct ath_desc *,
-				u_int txRate0, u_int txTries0,
-				u_int txRate1, u_int txTries1,
-				u_int txRate2, u_int txTries2,
-				u_int txRate3, u_int txTries3);
 
 	/* Receive Functions */
 	u_int32_t __ahdecl(*ah_getRxDP)(struct ath_hal*);
@@ -494,7 +503,10 @@ struct ath_hal {
 				u_int32_t size, u_int flags);
 	HAL_STATUS __ahdecl(*ah_procRxDesc)(struct ath_hal *, struct ath_desc *,
 				u_int32_t phyAddr, struct ath_desc *next);
-	void	  __ahdecl(*ah_rxMonitor)(struct ath_hal *);
+	void	  __ahdecl(*ah_rxMonitor)(struct ath_hal *,
+				const HAL_NODE_STATS *);
+	void	  __ahdecl(*ah_procMibEvent)(struct ath_hal *,
+				const HAL_NODE_STATS *);
 
 	/* Misc Functions */
 	HAL_STATUS __ahdecl (*ah_getCapability)(struct ath_hal *,
@@ -512,8 +524,7 @@ struct ath_hal {
 				u_int16_t, HAL_STATUS *);
 	void	  __ahdecl(*ah_setLedState)(struct ath_hal*, HAL_LED_STATE);
 	void	  __ahdecl(*ah_writeAssocid)(struct ath_hal*,
-				const u_int8_t *bssid, u_int16_t assocId,
-				u_int16_t timOffset);
+				const u_int8_t *bssid, u_int16_t assocId);
 	HAL_BOOL  __ahdecl(*ah_gpioCfgOutput)(struct ath_hal *, u_int32_t gpio);
 	HAL_BOOL  __ahdecl(*ah_gpioCfgInput)(struct ath_hal *, u_int32_t gpio);
 	u_int32_t __ahdecl(*ah_gpioGet)(struct ath_hal *, u_int32_t gpio);
@@ -563,8 +574,7 @@ struct ath_hal {
 	void	  __ahdecl(*ah_beaconInit)(struct ath_hal *,
 				u_int32_t nexttbtt, u_int32_t intval);
 	void	  __ahdecl(*ah_setStationBeaconTimers)(struct ath_hal*,
-				const HAL_BEACON_STATE *, u_int32_t tsf,
-				u_int32_t dtimCount, u_int32_t cfpCcount);
+				const HAL_BEACON_STATE *);
 	void	  __ahdecl(*ah_resetStationBeaconTimers)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_waitForBeaconDone)(struct ath_hal *,
 				HAL_BUS_ADDR);

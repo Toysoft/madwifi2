@@ -160,6 +160,7 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
  	else
  		*((volatile u_int32_t *)(ah->ah_sh + reg)) = val;
 }
+EXPORT_SYMBOL(ath_hal_reg_write);
 
 u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
@@ -175,6 +176,7 @@ ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 #endif
 	return val;
 }
+EXPORT_SYMBOL(ath_hal_reg_read);
 #endif /* AH_DEBUG || AH_REGOPS_FUNC */
 
 #ifdef AH_DEBUG
