@@ -55,7 +55,7 @@
 
 #include <asm/uaccess.h>
 
-/*#define	AR_DEBUG*/
+#define	AR_DEBUG
 #include "if_athvar.h"
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
