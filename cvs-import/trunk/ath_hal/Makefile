@@ -57,20 +57,19 @@ endif
 
 all:	${ALL}
 
+#
+# When we have source code; just use the HAL makefile smarts.
+# Otherwise, use the existing hal.o and be careful it doesn't
+# get removed.
+#
 ifdef HAL_SRC
-#
-# Got source code; just use the HAL makefile smarts.
-#
 include ${DEPTH}/hal/Makefile.inc
 else
-#
-# No HAL source code; just use the hal.o to generate a module.
-#
-.PRECIOUS: hal.o opt_ah.h
+.PRECIOUS: ${HALO} opt_ah.h
 endif
 
-ath_hal.o: ah_osdep.o hal.o version.h Makefile
-	${LD} -o $@ -r -x ah_osdep.o hal.o
+ath_hal.o: ah_osdep.o ${HALO} version.h Makefile
+	${LD} -o $@ -r -x ah_osdep.o ${HALO}
 
 ifdef CONFIG_MODVERSIONS
 ath_hal.ver: ah_osdep.c
