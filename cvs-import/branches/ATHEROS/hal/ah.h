@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -337,7 +337,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x03112500	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x04010701	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -358,7 +358,7 @@ struct ath_hal {
 	HAL_BOOL	(*ah_reset)(struct ath_hal *, HAL_OPMODE,
 				HAL_CHANNEL *, HAL_BOOL bChannelChange,
 				HAL_STATUS *status);
-	HAL_BOOL	(*ah_setPCUConfig)(struct ath_hal *, HAL_OPMODE);
+	void		(*ah_setPCUConfig)(struct ath_hal *);
 	HAL_BOOL	(*ah_perCalibration)(struct ath_hal*, HAL_CHANNEL *);
 
 	/* Transmit functions */
@@ -379,7 +379,6 @@ struct ath_hal {
 				u_int keyIx, u_int antMode, u_int flags,
 				u_int rtsctsRate, u_int rtsctsDuration);
 	HAL_BOOL	(*ah_setupXTxDesc)(struct ath_hal *, struct ath_desc *,
-				HAL_BOOL shortPreamble,
 				u_int txRate1, u_int txTries1,
 				u_int txRate2, u_int txTries2,
 				u_int txRate3, u_int txTries3);
@@ -422,7 +421,11 @@ struct ath_hal {
 	void		(*ah_writeAssocid)(struct ath_hal*,
 				const u_int8_t *bssid, u_int16_t assocId,
 				u_int16_t timOffset);
-	u_int32_t	(*ah_gpioGet)(struct ath_hal*, u_int32_t gpio);
+	HAL_BOOL	(*ah_gpioCfgOutput)(struct ath_hal *, u_int32_t gpio);
+	HAL_BOOL	(*ah_gpioCfgInput)(struct ath_hal *, u_int32_t gpio);
+	u_int32_t	(*ah_gpioGet)(struct ath_hal *, u_int32_t gpio);
+	HAL_BOOL	(*ah_gpioSet)(struct ath_hal *,
+				u_int32_t gpio, u_int32_t val);
 	void		(*ah_gpioSetIntr)(struct ath_hal*, u_int, u_int32_t);
 	u_int32_t	(*ah_getTsf32)(struct ath_hal*);
 	u_int64_t	(*ah_getTsf64)(struct ath_hal*);
@@ -461,7 +464,7 @@ struct ath_hal {
 	HAL_BOOL	(*ah_disablePSPoll)(struct ath_hal *);
 
 	/* Beacon Management Functions */
-	void		(*ah_beaconInit)(struct ath_hal *, HAL_OPMODE,
+	void		(*ah_beaconInit)(struct ath_hal *,
 				u_int32_t, u_int32_t);
 	void		(*ah_setStationBeaconTimers)(struct ath_hal*,
 				const HAL_BEACON_STATE *, u_int32_t tsf,
@@ -513,7 +516,8 @@ extern	struct ath_hal *ath_hal_attach(u_int16_t devid, HAL_SOFTC,
  */
 extern	HAL_BOOL ath_hal_init_channels(struct ath_hal *,
 		HAL_CHANNEL *chans, u_int maxchans, u_int *nchans,
-		HAL_CTRY_CODE cc, u_int16_t modeSelect, int enableOutdoor);
+		HAL_CTRY_CODE cc, u_int16_t modeSelect,
+		HAL_BOOL enableOutdoor, HAL_BOOL enableExtendedChannels);
 
 /*
  * Return bit mask of wireless modes supported by the hardware.
