@@ -2910,8 +2910,6 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		ni->ni_rstamp = 0;
 		switch (ostate) {
 		case IEEE80211_S_INIT:
-			/* use lowest rate */
-			ni->ni_txrate = 0;
 			ieee80211_begin_scan(dev, ni);
 			break;
 		case IEEE80211_S_SCAN:
@@ -3007,10 +3005,9 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 			break;
 		case IEEE80211_S_SCAN:		/* adhoc mode */
 		case IEEE80211_S_ASSOC:		/* infra mode */
-			/* start with highest negotiated rate */
-			KASSERT(ni->ni_rates.rs_nrates > 0,
-				("transition to RUN state w/ no rates!"));
-			ni->ni_txrate = ni->ni_rates.rs_nrates - 1;
+			KASSERT(ni->ni_txrate < ni->ni_rates.rs_nrates,
+				("%s: bogus xmit rate %u setup\n", __func__,
+					ni->ni_txrate));
 			if (netif_msg_debug(ic)) {
 				printk("%s: ", dev->name);
 				if (ic->ic_opmode == IEEE80211_M_STA)
