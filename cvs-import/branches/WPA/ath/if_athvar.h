@@ -49,23 +49,40 @@
 #include <linux/wireless.h>
 #endif
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
+/*
+ * Deduce if tasklets are available.  If not then
+ * fall back to using the immediate work queue.
+ */
 #include <linux/interrupt.h>
+#ifdef DECLARE_TASKLET			/* native tasklets */
 #define tq_struct tasklet_struct
-#define INIT_TQUEUE(a,b,c) tasklet_init((a),(b),(unsigned long)(c))
-#define SCHEDULE_TQUEUE(a,b) tasklet_schedule((a))
+#define ATH_INIT_TQUEUE(a,b,c)		tasklet_init((a),(b),(unsigned long)(c))
+#define ATH_SCHEDULE_TQUEUE(a,b)	tasklet_schedule((a))
 typedef unsigned long TQUEUE_ARG;
 #define mark_bh(a)
-#else
-#define SCHEDULE_TQUEUE(a,b) do {		\
+#else					/* immediate work queue */
+#define ATH_INIT_TQUEUE(a,b,c)		INIT_TQUEUE(a,b,c)
+#define ATH_SCHEDULE_TQUEUE(a,b) do {		\
 	*(b) |= queue_task((a), &tq_immediate);	\
 } while(0)
 typedef void *TQUEUE_ARG;
+#define	tasklet_disable(t)	do { (void) t; local_bh_disable(); } while (0)
+#define	tasklet_enable(t)	do { (void) t; local_bh_enable(); } while (0)
+#endif /* !DECLARE_TASKLET */
+
+/*
+ * Guess how the interrupt handler should work.
+ */
 #if !defined(IRQ_NONE)
 typedef void irqreturn_t;
 #define	IRQ_NONE
 #define	IRQ_HANDLED
-#endif
+#endif /* !defined(IRQ_NONE) */
+
+#ifndef SET_MODULE_OWNER
+#define	SET_MODULE_OWNER(dev) do {		\
+	dev->owner = THIS_MODULE;		\
+} while (0)
 #endif
 
 #define	ATH_TIMEOUT		1000
@@ -129,8 +146,34 @@ struct ath_hal;
 struct ath_desc;
 struct proc_dir_entry;
 
+/*
+ * Data transmit queue state.  One of these exists for each
+ * hardware transmit queue.  Packets sent to us from above
+ * are assigned to queues based on their priority.  Not all
+ * devices support a complete set of hardware transmit queues.
+ * For those devices the array sc_ac2q will map multiple
+ * priorities to fewer hardware queues (typically all to one
+ * hardware queue).
+ */
+struct ath_txq {
+	u_int			axq_qnum;	/* hardware q number */
+	u_int32_t		*axq_link;	/* link ptr in last TX desc */
+	TAILQ_HEAD(, ath_buf)	axq_q;		/* transmit queue */
+	spinlock_t		axq_lock;	/* lock on q and link */
+};
+
+#define	ATH_TXQ_LOCK_INIT(_tq)		spin_lock_init(&(_tq)->axq_lock)
+#define	ATH_TXQ_LOCK_DESTROY(_tq)	
+#define	ATH_TXQ_LOCK(_tq)		spin_lock(&(_tq)->axq_lock)
+#define	ATH_TXQ_UNLOCK(_tq)		spin_unlock(&(_tq)->axq_lock)
+#define	ATH_TXQ_LOCK_BH(_tq)		spin_lock_bh(&(_tq)->axq_lock)
+#define	ATH_TXQ_UNLOCK_BH(_tq)		spin_unlock_bh(&(_tq)->axq_lock)
+#define	ATH_TXQ_LOCK_ASSERT(_tq) \
+	KASSERT(spin_is_locked(&(_tq)->axq_lock), ("txq not locked!"))
+
 struct ath_softc {
 	struct net_device	sc_dev;		/* NB: must be first */
+	struct semaphore	sc_lock;	/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats	sc_stats;	/* private statistics */
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
@@ -143,7 +186,9 @@ struct ath_softc {
 					const struct ieee80211_node *);
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	unsigned int		sc_invalid : 1,	/* being detached */
-				sc_mrretry : 1;	/* multi-rate retry support */
+				sc_mrretry : 1,	/* multi-rate retry support */
+				sc_softled : 1,	/* enable LED gpio status */
+				sc_splitmic: 1;	/* split TKIP MIC keys */
 						/* rate tables */
 	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
@@ -153,9 +198,12 @@ struct ath_softc {
 	u_int8_t		sc_hwmap[32];	/* h/w rate ix to IEEE table */
 	u_int8_t		sc_protrix;	/* protection rate index */
 	HAL_INT			sc_imask;	/* interrupt mask copy */
-	u_int32_t		sc_icflags;	/* shadow of ic_flags */
 	u_int			sc_keymax;	/* size of key cache */
 	u_int8_t		sc_keymap[16];	/* bit map of key cache use */
+
+	u_int32_t		sc_beacons;
+	u_int16_t		sc_ledstate;
+	u_int16_t		sc_ledpin;	/* GPIO pin for LED */
 
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
@@ -171,12 +219,11 @@ struct ath_softc {
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 
-	u_int			sc_txhalq;	/* HAL q for outgoing frames */
-	u_int32_t		*sc_txlink;	/* link ptr in last TX desc */
 	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
-	TAILQ_HEAD(, ath_buf)	sc_txq;		/* transmit queue */
-	spinlock_t		sc_txqlock;	/* lock on txq and txlink */
+	u_int			sc_txqsetup;	/* h/w queues setup */
+	struct ath_txq		sc_txq[HAL_NUM_TX_QUEUES];
+	struct ath_txq		*sc_ac2q[5];	/* WME AC -> h/w qnum */ 
 	struct tq_struct	sc_txtq;	/* tx intr tasklet */
 
 	u_int			sc_bhalq;	/* HAL q for outgoing beacons */
@@ -184,6 +231,11 @@ struct ath_softc {
 	struct ath_buf		*sc_bufptr;	/* allocated buffer ptr */
 	struct ieee80211_beacon_offsets sc_boff;/* dynamic update state */
 	struct tq_struct	sc_bmisstq;	/* bmiss intr tasklet */
+	enum {
+		OK,				/* no change needed */
+		UPDATE,				/* update pending */
+		COMMIT				/* beacon sent, commit change */
+	} sc_updateslot;			/* slot time update fsm */
 
 	struct timer_list	sc_rate_ctl;	/* tx rate control timer */
 	struct timer_list	sc_cal_ch;	/* calibration timer */
@@ -197,20 +249,21 @@ struct ath_softc {
 #endif
 };
 
-/* NB: locks always block the bottom half; this isn't strictly necessary  */
+#define	ATH_TXQ_SETUP(sc, i)	((sc)->sc_txqsetup & (1<<i))
+
 #define	ATH_TXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_DESTROY(_sc)
-#define	ATH_TXBUF_LOCK(_sc)		spin_lock_bh(&(_sc)->sc_txbuflock)
-#define	ATH_TXBUF_UNLOCK(_sc)		spin_unlock_bh(&(_sc)->sc_txbuflock)
+#define	ATH_TXBUF_LOCK(_sc)		spin_lock(&(_sc)->sc_txbuflock)
+#define	ATH_TXBUF_UNLOCK(_sc)		spin_unlock(&(_sc)->sc_txbuflock)
+#define	ATH_TXBUF_LOCK_BH(_sc)		spin_lock_bh(&(_sc)->sc_txbuflock)
+#define	ATH_TXBUF_UNLOCK_BH(_sc)	spin_unlock_bh(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_ASSERT(_sc) \
 	KASSERT(spin_is_locked(&(_sc)->sc_txbuflock), ("txbuf not locked!"))
 
-#define	ATH_TXQ_LOCK_INIT(_sc)		spin_lock_init(&(_sc)->sc_txqlock)
-#define	ATH_TXQ_LOCK_DESTROY(_sc)	
-#define	ATH_TXQ_LOCK(_sc)		spin_lock_bh(&(_sc)->sc_txqlock)
-#define	ATH_TXQ_UNLOCK(_sc)		spin_unlock_bh(&(_sc)->sc_txqlock)
-#define	ATH_TXQ_LOCK_ASSERT(_sc) \
-	KASSERT(spin_is_locked(&(_sc)->sc_txqlock), ("txq not locked!"))
+#define	ATH_LOCK_INIT(_sc)		init_MUTEX(&(_sc)->sc_lock)
+#define	ATH_LOCK_DESTROY(_sc)
+#define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
+#define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
 
 int	ath_attach(u_int16_t, struct net_device *);
 int	ath_detach(struct net_device *);
@@ -230,9 +283,6 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
 #define	ath_hal_getratetable(_ah, _mode) \
 	((*(_ah)->ah_getRateTable)((_ah), (_mode)))
-#define	ath_hal_getregdomain(_ah) \
-	((*(_ah)->ah_getRegDomain)((_ah)))
-#define	ath_hal_getcountrycode(_ah)	(_ah)->ah_countryCode
 #define	ath_hal_getmac(_ah, _mac) \
 	((*(_ah)->ah_getMacAddress)((_ah), (_mac)))
 #define	ath_hal_setmac(_ah, _mac) \
@@ -300,6 +350,8 @@ void	ath_sysctl_unregister(void);
 		(_dc), (_cc)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
 	((*(_ah)->ah_writeAssocid)((_ah), (_bss), (_associd), 0))
+#define	ath_hal_phydisable(_ah) \
+	((*(_ah)->ah_phyDisable)((_ah)))
 #define	ath_hal_setopmode(_ah) \
 	((*(_ah)->ah_setPCUConfig)((_ah)))
 #define	ath_hal_stoptxdma(_ah, _qnum) \
@@ -310,10 +362,9 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_startPcuReceive)((_ah)))
 #define	ath_hal_stopdmarecv(_ah) \
 	((*(_ah)->ah_stopDmaReceive)((_ah)))
-#define	ath_hal_dumpstate(_ah) \
-	((*(_ah)->ah_dumpState)((_ah)))
-#define	ath_hal_getdiagstate(_ah, _id, _data, _size) \
-	((*(_ah)->ah_getDiagState)((_ah), (_id), (_data), (_size)))
+#define	ath_hal_getdiagstate(_ah, _id, _indata, _insize, _outdata, _outsize) \
+	((*(_ah)->ah_getDiagState)((_ah), (_id), \
+		(_indata), (_insize), (_outdata), (_outsize)))
 #define	ath_hal_setuptxqueue(_ah, _type, _irq) \
 	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
 #define	ath_hal_resettxqueue(_ah, _q) \
@@ -338,8 +389,18 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_setCTSTimeout)((_ah), (_us)))
 #define	ath_hal_getctstimeout(_ah) \
 	((*(_ah)->ah_getCTSTimeout)((_ah)))
+#define	ath_hal_getcapability(_ah, _cap, _param, _result) \
+	((*(_ah)->ah_getCapability)((_ah), (_cap), (_param), (_result)))
+#define	ath_hal_setcapability(_ah, _cap, _param, _v, _status) \
+	((*(_ah)->ah_setCapability)((_ah), (_cap), (_param), (_v), (_status)))
 #define	ath_hal_ciphersupported(_ah, _cipher) \
-	(((*(_ah)->ah_isHwCipherSupported)((_ah), (_cipher))))
+	(ath_hal_getcapability(_ah, HAL_CAP_CIPHER, _cipher, NULL) == HAL_OK)
+#define	ath_hal_getregdomain(_ah, _prd) \
+	ath_hal_getcapability(_ah, HAL_CAP_REG_DMN, 0, (_prd))
+#define	ath_hal_getcountrycode(_ah, _pcc) \
+	(*(_pcc) = (_ah)->ah_countryCode)
+#define	ath_hal_tkipsplit(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TKIP_SPLIT, 0, NULL) == HAL_OK)
 
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
@@ -359,5 +420,10 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last)))
 #define	ath_hal_txprocdesc(_ah, _ds) \
 	((*(_ah)->ah_procTxDesc)((_ah), (_ds)))
+
+#define ath_hal_gpioCfgOutput(_ah, _gpio) \
+        ((*(_ah)->ah_gpioCfgOutput)((_ah), (_gpio)))
+#define ath_hal_gpioset(_ah, _gpio, _b) \
+        ((*(_ah)->ah_gpioSet)((_ah), (_gpio), (_b)))
 
 #endif /* _DEV_ATH_ATHVAR_H */
