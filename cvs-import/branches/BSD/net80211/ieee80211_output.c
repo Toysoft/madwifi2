@@ -554,7 +554,8 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		 */
 		if (eh.ether_type != __constant_htons(ETHERTYPE_PAE) ||
 		    ((ic->ic_flags & IEEE80211_F_WPA) &&
-		     !KEY_UNDEFINED(ni->ni_ucastkey))) {
+		    (ic->ic_opmode == IEEE80211_M_STA ?
+		    !KEY_UNDEFINED(*key) : !KEY_UNDEFINED(ni->ni_ucastkey)))) {
 			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 			/* XXX do fragmentation */
 			if (!ieee80211_crypto_enmic(ic, key, skb)) {
