@@ -340,7 +340,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	needmark = 0;
 	ath_hal_getisr(ah, &status);
 	DPRINTF2(("%s: interrupt, status 0x%x\n", dev->name, status));
-status &= ~HAL_INT_BMISS;	/* XXX*/
 #ifdef AR_DEBUG
 	if (ath_debug &&
 	    (status & (HAL_INT_FATAL|HAL_INT_RXORN|HAL_INT_BMISS))) {
@@ -430,7 +429,6 @@ ath_init(struct net_device *dev)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = &ic->ic_bss;
 	struct ath_hal *ah = sc->sc_ah;
-	u_int32_t val;
 	HAL_STATUS status;
 	HAL_CHANNEL hchan;
 
@@ -452,10 +450,11 @@ ath_init(struct net_device *dev)
 	hchan.channelFlags =
 		ic->ic_ibss_chan->ic_flags & modeflags[ic->ic_curmode];
 	if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_FALSE, &status)) {
-		printk("%s: unable to reset hardware; HAL status %u\n",
+		printk("%s: unable to reset hardware; hal status %u\n",
 			dev->name, status);
 		return EIO;
 	}
+
 	/*
 	 * Setup the hardware after reset: the key cache
 	 * is filled as needed and the receive engine is
@@ -469,18 +468,18 @@ ath_init(struct net_device *dev)
 		printk("%s: unable to start recv logic\n", dev->name);
 		return EIO;
 	}
+
 	/*
 	 * Enable interrupts.
 	 */
-	val = HAL_INT_RX | HAL_INT_TX |
-	      HAL_INT_RXEOL | HAL_INT_RXORN | HAL_INT_FATAL;
-#if 0
+	sc->sc_imask = HAL_INT_RX | HAL_INT_TX
+		  | HAL_INT_RXEOL | HAL_INT_RXORN
+		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
 	if (ic->ic_opmode == IEEE80211_M_STA)		/* beacon miss */
-		val |= HAL_INT_BMISS;
+		sc->sc_imask |= HAL_INT_BMISS;
 	else
-		val |= HAL_INT_SWBA;			/* beacon prepare */
-#endif
-	ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
+		sc->sc_imask |= HAL_INT_SWBA;		/* beacon prepare */
+	ath_hal_intrset(ah, sc->sc_imask);
 
 	/*
 	 * Setup the mapping table from IEEE rates to h/w rates.
@@ -504,8 +503,8 @@ ath_init(struct net_device *dev)
 		ni->ni_rstamp = 0;
 		memset(ni->ni_tstamp, 0, sizeof(ni->ni_tstamp));
 		ni->ni_rates = ic->ic_sup_rates[ic->ic_curmode];
-		memcpy(ni->ni_macaddr, dev->dev_addr, IEEE80211_ADDR_LEN);
-		memcpy(ni->ni_bssid, dev->dev_addr, IEEE80211_ADDR_LEN);
+		IEEE80211_ADDR_COPY(ni->ni_macaddr, dev->dev_addr);
+		IEEE80211_ADDR_COPY(ni->ni_bssid, dev->dev_addr);
 		ni->ni_esslen = ic->ic_des_esslen;
 		memcpy(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen);
 		ni->ni_capinfo = IEEE80211_CAPINFO_ESS;
@@ -875,6 +874,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	u_int8_t *frm, rate;
 	u_int16_t capinfo;
 	const HAL_RATE_TABLE *rt;
+	u_int flags;
 
 	bf = sc->sc_bcbuf;
 	if (bf->bf_skb != NULL) {
@@ -973,7 +973,20 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	/* setup descriptors */
 	ds = bf->bf_desc;
 
-	ds->ds_link = 0;
+	flags = HAL_TXDESC_NOACK;		/* no ack for beacons */
+	if (ath_hal_hasveol(ah)) {
+		/*
+		 * If the part supports the ``virtual EOL'' mechanism
+		 * in the xmit descriptor; use it to periodically send
+		 * the beacon frame w/o having to do setup.  Otherwise
+		 * we have to explicitly submit the beacon frame at
+		 * each SWBA interrupt.
+		 */
+		flags |= HAL_TXDESC_VEOL;
+		ds->ds_link = bf->bf_daddr;	/* loop descriptor back */
+	} else {
+		ds->ds_link = 0;
+	}
 	ds->ds_data = bf->bf_skbaddr;
 	/* XXX verify mbuf data area covers this roundup */
 	/* XXX compression processing */
@@ -994,8 +1007,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		, rate, 1			/* series 0 rate/tries */
 		, HAL_TXKEYIX_INVALID		/* no encryption */
 		, 0				/* antenna mode */
-		, HAL_TXDESC_NOACK		/* no ack for beacons */
-		| HAL_TXDESC_VEOL		/* veol-style re-xmit */
+		, flags				/* no ack + veol (maybe) */
 		, 0				/* rts/cts rate */
 		, 0				/* rts/cts duration */
 	);
@@ -1018,33 +1030,42 @@ ath_beacon_tasklet(void *data)
 	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(("ath_beacon_tasklet\n"));
-	if (!ath_hal_waitforbeacon(ah, bf)) {
-		DPRINTF(("ath_beacon_int: TXQ1F busy"));
-		return;				/* busy */
-	}
-	if (ic->ic_opmode == IEEE80211_M_STA ||
-	    bf == NULL || bf->bf_skb == NULL) {
+	if (ic->ic_opmode == IEEE80211_M_STA || bf == NULL || bf->bf_skb == NULL) {
 		DPRINTF(("ath_beacon_int: ic_flags=%x bf=%p bf_m=%p\n",
 		    ic->ic_flags, bf, bf ? bf->bf_skb : NULL));
 		return;
 	}
+	if (!ath_hal_waitforbeacon(ah, bf)) {
+		DPRINTF(("ath_beacon_int: TXQ1F busy"));
+		return;				/* busy */
+	}
 	pci_dma_sync_single(sc->sc_pdev,
 		bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 
-	/*
-	 * NB: For parts other than the 5210 this will happen
-	 * only once.  Because the descriptor is marked with
-	 * VEOL the frame will be retransmitted automatically
-	 * at the next beacon time interval w/o interrupting
-	 * the host.  The 5210 doesn't have VEOL support so for
-	 * that part we take a real interrupt and re-submit the
-	 * beacon frame here.
-	 */
-	ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
-	ath_hal_txstart(ah, sc->sc_bhalq);
-	DPRINTF2(("%s: TXDP%u = %p (%p)\n", __func__,
-		sc->sc_bhalq, (caddr_t)bf->bf_daddr, bf->bf_desc));
-	/* TODO power management */
+	/* update beacon to reflect PS poll state */
+	if (!ath_hal_hasveol(ah)) {
+		if (!ath_hal_stoptxdma(ah, sc->sc_bhalq)) {
+			DPRINTF(("%s: beacon queue %u did not stop?",
+				__func__, sc->sc_bhalq));
+			return;			/* busy, XXX is this right? */
+		}
+		pci_dma_sync_single(sc->sc_pdev,
+			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+
+		/*
+		 * NB: For parts other than the 5210 this will happen
+		 * only once.  Because the descriptor is marked with
+		 * VEOL the frame will be retransmitted automatically
+		 * at the next beacon time interval w/o interrupting
+		 * the host.  The 5210 doesn't have VEOL support so for
+		 * that part we take a real interrupt and re-submit the
+		 * beacon frame here.
+		 */
+		ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
+		ath_hal_txstart(ah, sc->sc_bhalq);
+		DPRINTF2(("%s: TXDP%u = %p (%p)\n", __func__,
+			sc->sc_bhalq, (caddr_t)bf->bf_daddr, bf->bf_desc));
+	}
 }
 
 static void
@@ -1459,7 +1480,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast)) {
 		flags |= HAL_TXDESC_NOACK;	/* no ack on broadcast frames */
 		sc->sc_stats.ast_tx_noack++;
-	} else if (pktlen > ni->ni_rtsthresh) {
+	} else if (pktlen > ic->ic_rtsthreshold) {
 		flags |= HAL_TXDESC_RTSENA;	/* RTS based on frame length */
 		sc->sc_stats.ast_tx_rts++;
 	}
@@ -1776,7 +1797,6 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 	if (chan != ic->ic_ibss_chan) {
 		HAL_STATUS status;
 		HAL_CHANNEL hchan;
-		int val;
 
 		/*
 		 * To switch channels clear any pending DMA operations;
@@ -1825,17 +1845,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 		}
 
 		/*
-		 * Enable interrupts.
+		 * Re-enable interrupts.
 		 */
-		val = HAL_INT_RX | HAL_INT_TX |
-		      HAL_INT_RXEOL | HAL_INT_RXORN | HAL_INT_FATAL;
-#if 0
-		if (ic->ic_opmode == IEEE80211_M_STA)
-			val |= HAL_INT_BMISS;		/* beacon miss */
-		else
-			val |= HAL_INT_SWBA;		/* beacon prepare */
-#endif
-		ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
+		ath_hal_intrset(ah, sc->sc_imask);
 
 		ic->ic_ibss_chan = chan;
 	}
@@ -1911,8 +1923,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	ostate = ic->ic_state;
 	now = (ath_hal_gettsf32(ah) >> 10) & 0xffff;
 
-	DPRINTF(("ath_newstate: %s -> %s (%u)\n",
-	    stname[ostate], stname[nstate], now));
+	DPRINTF(("%s: %s -> %s (%u)\n",
+		__func__, stname[ostate], stname[nstate], now));
 
 	ath_hal_setledstate(ah, leds[nstate]);	/* set LED */
 	netif_stop_queue(dev);			/* before we do anything else */
@@ -1939,8 +1951,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		bssid = ni->ni_bssid;
 	}
 	ath_hal_setrxfilter(ah, rfilt);
-	DPRINTF(("ath_newstate: RX filter 0x%x bssid %s\n",
-		 rfilt, ether_sprintf(bssid)));
+	DPRINTF(("%s: RX filter 0x%x bssid %s\n",
+		__func__, rfilt, ether_sprintf(bssid)));
 
 	if (nstate == IEEE80211_S_RUN && ic->ic_opmode != IEEE80211_M_IBSS)
 		ath_hal_setassocid(ah, bssid, ni->ni_associd);
@@ -1953,17 +1965,28 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	}
 
 	if (nstate == IEEE80211_S_RUN) {
-		DPRINTF(("ath_newstate(RUN): ic_flags=0x%08x iv=%d bssid=%s "
+		DPRINTF(("%s(RUN): ic_flags=0x%08x iv=%d bssid=%s "
 			 "capinfo=0x%04x chan=%d\n"
+			 , __func__
 			 , ic->ic_flags
 			 , ni->ni_intval
 			 , ether_sprintf(ni->ni_bssid)
 			 , ni->ni_capinfo
 			 , ieee80211_chan2ieee(ic, ni->ni_chan)));
+
+		/* allocate and setup the beacon frame */
 		if (ic->ic_opmode != IEEE80211_M_STA) {
+			struct ath_buf *bf = sc->sc_bcbuf;
+
 			error = ath_beacon_alloc(sc, ni);
 			if (error != 0)
 				goto bad;
+			/* kick off beacon transmission */
+			ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
+			ath_hal_txstart(ah, sc->sc_bhalq);
+			DPRINTF2(("%s: TXDP%u = %p (%p)\n", __func__,
+				sc->sc_bhalq, (caddr_t)bf->bf_daddr,
+				bf->bf_desc));
 		}
 
 		/* set beacon timers */
@@ -1974,9 +1997,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		if (val != 0)
 			val += roundup(now - ni->ni_rstamp, ni->ni_intval);
 		val += ni->ni_intval;
-		ath_hal_beaconinit(ah, ic->ic_opmode, val, ni->ni_intval,
-			ic->ic_opmode != IEEE80211_M_STA ?
-				sc->sc_bcbuf : NULL);
+		ath_hal_beaconinit(ah, ic->ic_opmode, val, ni->ni_intval);
 
 		/* start periodic recalibration timer */
 		/* XXX make timer configurable */
@@ -2747,21 +2768,27 @@ ath_proc_ani(char *page, char **start, off_t off, int count, int *eof, void *dat
 		*eof = 1;
 		return 0;
 	}
-	cp += sprintf(cp, "ANI status:\n");
-	cp += sprintf(cp, "Noise Immunity Level %d\n", c->noiseImmunityLevel);
-	cp += sprintf(cp, "Spur Immunity Level %d\n", c->spurImmunityLevel);
-	cp += sprintf(cp, "OFDM Weak Signal Detection %s\n",
-		c->ofdmWeakSigDetectionOff ? "OFF" : "ON");
-	cp += sprintf(cp, "CCK Weak Signal Threshold %s\n",
-		c->cckWeakSigThresholdHigh ? "HIGH" : "LOW");
-	cp += sprintf(cp, "Firstep Level %d\n", c->firstepLevel);
-	cp += sprintf(cp, "Phy Error stats collection is %s\n",
-		c->phyErrStatsDisabled ? "DISABLED" : "ENABLED");
-	if (!c->phyErrStatsDisabled) {
-		cp = ath_proc_ani_phyerr(cp, "OFDM",
-			sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING]);
-		cp = ath_proc_ani_phyerr(cp, "CCK",
-			sc->sc_phyerr[HAL_PHYERR_CCK_TIMING]);
+	if (sc->sc_doani) {
+		cp += sprintf(cp, "ANI status:\n");
+		cp += sprintf(cp, "Noise Immunity Level %d\n",
+			c->noiseImmunityLevel);
+		cp += sprintf(cp, "Spur Immunity Level %d\n",
+			c->spurImmunityLevel);
+		cp += sprintf(cp, "OFDM Weak Signal Detection %s\n",
+			c->ofdmWeakSigDetectionOff ? "OFF" : "ON");
+		cp += sprintf(cp, "CCK Weak Signal Threshold %s\n",
+			c->cckWeakSigThresholdHigh ? "HIGH" : "LOW");
+		cp += sprintf(cp, "Firstep Level %d\n", c->firstepLevel);
+		cp += sprintf(cp, "Phy Error stats collection is %s\n",
+			c->phyErrStatsDisabled ? "DISABLED" : "ENABLED");
+		if (!c->phyErrStatsDisabled) {
+			cp = ath_proc_ani_phyerr(cp, "OFDM",
+				sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING]);
+			cp = ath_proc_ani_phyerr(cp, "CCK",
+				sc->sc_phyerr[HAL_PHYERR_CCK_TIMING]);
+		}
+	} else {
+		cp += sprintf(cp, "ANI not supported\n");
 	}
 	return cp - page;
 }

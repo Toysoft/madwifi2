@@ -157,6 +157,7 @@ struct ath_softc {
 				sc_probing  : 1;/* probing AP on beacon miss */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
+	HAL_INT			sc_imask;	/* interrupt mask copy */
 
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	volatile int		sc_invalid;	/* being detached */
@@ -280,9 +281,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_perCalibration)((_ah), (_chan)))
 #define	ath_hal_setledstate(_ah, _state) \
 	((*(_ah)->ah_setLedState)((_ah), (_state)))
-#define	ath_hal_beaconinit(_ah, _opmode, _nextb, _bperiod, _bf) \
-	((*(_ah)->ah_beaconInit)((_ah), (_opmode), (_nextb), (_bperiod), \
-		(_bf) ? (_bf)->bf_daddr : 0))
+#define	ath_hal_beaconinit(_ah, _opmode, _nextb, _bperiod) \
+	((*(_ah)->ah_beaconInit)((_ah), (_opmode), (_nextb), (_bperiod)))
 #define	ath_hal_beaconreset(_ah) \
 	((*(_ah)->ah_resetStationBeaconTimers)((_ah)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
@@ -309,6 +309,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_releaseTxQueue)((_ah), (_q)))
 #define	ath_hal_anicontrol(_ah, _op, _param) \
 	((*(_ah)->ah_aniControl)((_ah), (_op), (_param)))
+#define	ath_hal_hasveol(_ah) \
+	((*(_ah)->ah_hasVEOL)((_ah)))
 
 #define	ath_hal_setupbeacondesc(_ah, _ds, _opmode, _flen, _hlen, \
 		_rate, _antmode) \
