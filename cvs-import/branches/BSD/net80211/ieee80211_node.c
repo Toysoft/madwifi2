@@ -1029,7 +1029,11 @@ ieee80211_find_node(struct ieee80211_node_table *nt, const u_int8_t *macaddr)
 	IEEE80211_NODE_UNLOCK(nt);
 	return ni;
 }
+#ifdef IEEE80211_DEBUG_REFCNT
+EXPORT_SYMBOL(ieee80211_find_node_debug);
+#else
 EXPORT_SYMBOL(ieee80211_find_node);
+#endif
 
 /*
  * Fake up a node; this handles node discovery in adhoc mode.
@@ -1100,7 +1104,11 @@ ieee80211_find_rxnode(struct ieee80211com *ic,
 #undef IS_PSPOLL
 #undef IS_CTL
 }
+#ifdef IEEE80211_DEBUG_REFCNT
+EXPORT_SYMBOL(ieee80211_find_rxnode_debug);
+#else
 EXPORT_SYMBOL(ieee80211_find_rxnode);
+#endif
 
 /*
  * Return a reference to the appropriate node for sending
@@ -1153,7 +1161,11 @@ ieee80211_find_txnode(struct ieee80211com *ic, const u_int8_t *macaddr)
 	}
 	return ni;
 }
+#ifdef IEEE80211_DEBUG_REFCNT
+EXPORT_SYMBOL(ieee80211_find_txnode_debug);
+#else
 EXPORT_SYMBOL(ieee80211_find_txnode);
+#endif
 
 /*
  * Like find but search based on the channel too.
@@ -1287,7 +1299,11 @@ ieee80211_free_node(struct ieee80211_node *ni)
 			_ieee80211_free_node(ni);
 	}
 }
+#ifdef IEEE80211_DEBUG_REFCNT
+EXPORT_SYMBOL(ieee80211_free_node_debug);
+#else
 EXPORT_SYMBOL(ieee80211_free_node);
+#endif
 
 /*
  * Reclaim a node.  If this is the last reference count then
