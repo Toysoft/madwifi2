@@ -151,8 +151,6 @@ struct ieee80211com {
 	void			(*ic_node_free)(struct ieee80211_node *);
 	void			(*ic_node_cleanup)(struct ieee80211_node *);
 	u_int8_t		(*ic_node_getrssi)(const struct ieee80211_node*);
-	TAILQ_HEAD(, ieee80211_node) ic_node;	/* information of all nodes */
-	ATH_LIST_HEAD(, ieee80211_node) ic_hash[IEEE80211_NODE_HASHSIZE];
 	u_int16_t		ic_lintval;	/* listen interval */
 	u_int16_t		ic_holdover;	/* PM hold over duration */
 	u_int16_t		ic_txmin;	/* min tx retry count */
