@@ -2966,8 +2966,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 	if (IFF_DUMPPKTS(ic, ATH_DEBUG_XMIT))
 		ieee80211_dump_pkt(skb->data, skb->len,
-		    ni->ni_rates.rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL,
-		    -1);
+			sc->sc_hwmap[txrate] & IEEE80211_RATE_VAL, -1);
 
 	/*
 	 * Formulate first tx descriptor with tx controls.
