@@ -1272,7 +1272,7 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 	int param = i[0];		/* parameter id is 1st */
 	int value = i[1];		/* NB: most values are TYPE_INT */
 	struct ifreq ifr;
-	int retv = EOPNOTSUPP;
+	int retv = 0;
 	int j, caps;
 	const struct ieee80211_authenticator *auth;
 	const struct ieee80211_aclator *acl;
@@ -1342,21 +1342,24 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			return -EINVAL;
 		ic->ic_protmode = value;
 		/* NB: if not operating in 11g this can wait */
-		retv = (ic->ic_curmode == IEEE80211_MODE_11G ? ENETRESET : 0);
+		if (ic->ic_curmode == IEEE80211_MODE_11G)
+			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_MCASTCIPHER:
 		/* XXX s/w implementations */
 		if ((ic->ic_caps & cipher2cap(value)) == 0)
 			return -EINVAL;
 		rsn->rsn_mcastcipher = value;
-		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_MCASTKEYLEN:
 		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_mcastkeylen = value;
-		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHERS:
 		/*
@@ -1374,36 +1377,31 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		/* XXX verify ciphers ok for unicast use? */
 		/* XXX disallow if running as it'll have no effect */
 		rsn->rsn_ucastcipherset = caps;
-		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHER:
 		if ((rsn->rsn_ucastcipherset & cipher2cap(value)) == 0)
 			return -EINVAL;
 		rsn->rsn_ucastcipher = value;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
 		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_ucastkeylen = value;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_KEYMGTALGS:
 		/* XXX check */
 		rsn->rsn_keymgmtset = value;
 		if (ic->ic_flags & IEEE80211_F_WPA)
 			retv = ENETRESET;
-		else
-			retv = 0;
 		break;
 	case IEEE80211_PARAM_RSNCAPS:
 		/* XXX check */
 		rsn->rsn_caps = value;
 		if (ic->ic_flags & IEEE80211_F_WPA)
 			retv = ENETRESET;
-		else
-			retv = 0;
 		break;
 	case IEEE80211_PARAM_WPA:
 		if (value > 3)
@@ -1428,7 +1426,6 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		    value <= IEEE80211_ROAMING_MANUAL))
 			return -EINVAL;
 		ic->ic_roaming = value;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_PRIVACY:
 		if (ic->ic_opmode != IEEE80211_M_STA)
@@ -1438,14 +1435,12 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			ic->ic_flags |= IEEE80211_F_PRIVACY;
 		} else
 			ic->ic_flags &= ~IEEE80211_F_PRIVACY;
-		retv = 0;			/* XXX? */
 		break;
 	case IEEE80211_PARAM_DROPUNENCRYPTED:
 		if (value)
 			ic->ic_flags |= IEEE80211_F_DROPUNENC;
 		else
 			ic->ic_flags &= ~IEEE80211_F_DROPUNENC;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_COUNTERMEASURES:
 		if (value) {
@@ -1454,11 +1449,9 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			ic->ic_flags |= IEEE80211_F_COUNTERM;
 		} else
 			ic->ic_flags &= ~IEEE80211_F_COUNTERM;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_DRIVER_CAPS:
 		ic->ic_caps = value;		/* NB: for testing */
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_MACCMD:
 		acl = ic->ic_acl;
@@ -1486,7 +1479,6 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			}
 			break;
 		}
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_WME:
 		if (ic->ic_opmode != IEEE80211_M_STA)
@@ -1495,7 +1487,6 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			ic->ic_flags |= IEEE80211_F_WME;
 		else
 			ic->ic_flags &= ~IEEE80211_F_WME;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_HIDESSID:
 		if (value)
@@ -1509,19 +1500,18 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			ic->ic_flags |= IEEE80211_F_NOBRIDGE;
 		else
 			ic->ic_flags &= ~IEEE80211_F_NOBRIDGE;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_INACT:
 		ic->ic_inact_run = value / IEEE80211_INACT_WAIT;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_INACT_AUTH:
 		ic->ic_inact_auth = value / IEEE80211_INACT_WAIT;
-		retv = 0;
 		break;
 	case IEEE80211_PARAM_INACT_INIT:
 		ic->ic_inact_init = value / IEEE80211_INACT_WAIT;
-		retv = 0;
+		break;
+	default:
+		retv = EOPNOTSUPP;
 		break;
 	}
 	if (retv == ENETRESET)
