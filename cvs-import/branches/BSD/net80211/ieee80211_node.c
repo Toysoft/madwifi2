@@ -1177,15 +1177,18 @@ ieee80211_find_node_with_channel(struct ieee80211_node_table *nt,
 		if (IEEE80211_ADDR_EQ(ni->ni_macaddr, macaddr) &&
 		    ni->ni_chan == chan) {
 			ieee80211_ref_node(ni);		/* mark referenced */
-			IEEE80211_DPRINTF(nt->nt_ic, IEEE80211_MSG_NODE,
 #ifdef IEEE80211_DEBUG_REFCNT
+			IEEE80211_DPRINTF(nt->nt_ic, IEEE80211_MSG_NODE,
 			    "%s (%s:%u) %p<%s> refcnt %d\n", __func__,
 			    func, line,
-#else
-			    "%s %p<%s> refcnt %d\n", __func__,
-#endif
 			    ni, ether_sprintf(ni->ni_macaddr),
 			    ieee80211_node_refcnt(ni));
+#else
+			IEEE80211_DPRINTF(nt->nt_ic, IEEE80211_MSG_NODE,
+			    "%s %p<%s> refcnt %d\n", __func__,
+			    ni, ether_sprintf(ni->ni_macaddr),
+			    ieee80211_node_refcnt(ni));
+#endif
 			break;
 		}
 	}
@@ -1217,15 +1220,18 @@ ieee80211_find_node_with_ssid(struct ieee80211_node_table *nt,
 		    ni->ni_esslen == ic->ic_des_esslen &&
 		    memcmp(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen) == 0) {
 			ieee80211_ref_node(ni);		/* mark referenced */
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
 #ifdef IEEE80211_DEBUG_REFCNT
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
 			    "%s (%s:%u) %p<%s> refcnt %d\n", __func__,
 			    func, line,
-#else
-			    "%s %p<%s> refcnt %d\n", __func__,
-#endif
 			     ni, ether_sprintf(ni->ni_macaddr),
 			     ieee80211_node_refcnt(ni));
+#else
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
+			    "%s %p<%s> refcnt %d\n", __func__,
+			     ni, ether_sprintf(ni->ni_macaddr),
+			     ieee80211_node_refcnt(ni));
+#endif
 			break;
 		}
 	}
