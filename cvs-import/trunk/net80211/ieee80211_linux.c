@@ -344,7 +344,8 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_stations, ctl, write, filp, buffer,
 	struct ieee80211com *ic = ctl->extra1;
 	int len = *lenp;
 
-	if (ic->ic_opmode != IEEE80211_M_HOSTAP)
+	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
+	    ic->ic_opmode != IEEE80211_M_IBSS)
 		return -EINVAL;
 	if (len && filp->f_pos == 0) {
 		*lenp = proc_read_node(buffer, len, ic, &ic->ic_node);
