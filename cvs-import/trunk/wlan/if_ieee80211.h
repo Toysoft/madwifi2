@@ -513,6 +513,7 @@ struct ieee80211_wepkey {
 struct ieee80211com {
 	struct net_device	ic_dev;		/* NB: this must be first */
 	int			ic_timer;	/* equivalent of if_timer */
+	struct timer_list	ic_slowtimo;	/* if watchdog timer */
 	void			(*ic_watchdog)(struct net_device *);
 	void			(*ic_start)(struct net_device *);
 	void			(*ic_recv_mgmt[16])(struct ieee80211com *,
@@ -524,7 +525,6 @@ struct ieee80211com {
 				    struct ieee80211_node *, int, int);
 	int			(*ic_newstate)(void *, enum ieee80211_state);
 	int			(*ic_chancheck)(void *, u_char *);
-	u_int8_t		ic_myaddr[IEEE80211_ADDR_LEN];
 	u_int8_t		ic_sup_rates[IEEE80211_RATE_SIZE];
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
