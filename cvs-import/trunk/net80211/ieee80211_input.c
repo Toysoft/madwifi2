@@ -1170,7 +1170,7 @@ wpa_keymgmt(u_int8_t *sel)
 	case WPA_SEL(WPA_ASE_NONE):
 		return WPA_ASE_NONE;
 	}
-	return 32;		/* NB: so 1<< is discarded */
+	return 0;		/* NB: so is discarded */
 #undef WPA_SEL
 }
 
@@ -1254,7 +1254,7 @@ ieee80211_parse_wpa(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 	}
 	w = 0;
 	for (; n > 0; n--) {
-		w |= 1<<wpa_keymgmt(frm);
+		w |= wpa_keymgmt(frm);
 		frm += 4, len -= 4;
 	}
 	w &= rsn->rsn_keymgmtset;
@@ -1263,7 +1263,7 @@ ieee80211_parse_wpa(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 			("%s: no acceptable key mgmt algorithms\n", __func__));
 		return IEEE80211_REASON_IE_INVALID;
 	}
-	if (w & (1<<WPA_ASE_8021X_UNSPEC))
+	if (w & WPA_ASE_8021X_UNSPEC)
 		rsn->rsn_keymgmt = WPA_ASE_8021X_UNSPEC;
 	else
 		rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
@@ -1325,7 +1325,7 @@ rsn_keymgmt(u_int8_t *sel)
 	case RSN_SEL(RSN_ASE_NONE):
 		return RSN_ASE_NONE;
 	}
-	return 32;		/* NB: so 1<< is discarded */
+	return 0;		/* NB: so is discarded */
 #undef RSN_SEL
 }
 
@@ -1407,7 +1407,7 @@ ieee80211_parse_rsn(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 	}
 	w = 0;
 	for (; n > 0; n--) {
-		w |= 1<<rsn_keymgmt(frm);
+		w |= rsn_keymgmt(frm);
 		frm += 4, len -= 4;
 	}
 	w &= rsn->rsn_keymgmtset;
@@ -1416,7 +1416,7 @@ ieee80211_parse_rsn(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 			("%s: no acceptable key mgmt algorithms\n", __func__));
 		return IEEE80211_REASON_IE_INVALID;
 	}
-	if (w & (1<<RSN_ASE_8021X_UNSPEC))
+	if (w & RSN_ASE_8021X_UNSPEC)
 		rsn->rsn_keymgmt = RSN_ASE_8021X_UNSPEC;
 	else
 		rsn->rsn_keymgmt = RSN_ASE_8021X_PSK;
