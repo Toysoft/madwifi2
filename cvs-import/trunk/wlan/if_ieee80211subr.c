@@ -67,7 +67,7 @@
 
 #define	IEEE80211_DEBUG
 #ifdef IEEE80211_DEBUG
-static	int ieee80211_debug = 2;
+static	int ieee80211_debug = 0;
 #define	DPRINTF(X)	if (ieee80211_debug) printk X
 #define	DPRINTF2(X)	if (ieee80211_debug>1) printk X
 #else
@@ -114,6 +114,10 @@ static void ieee80211_slowtimo(unsigned long);
 
 extern	int ieee80211_cfgget(struct net_device *, u_long, caddr_t);
 extern	int ieee80211_cfgset(struct net_device *, u_long, caddr_t);
+#ifdef CONFIG_PROC_FS
+static	void ieee80211_proc_init(struct ieee80211com *);
+static	void ieee80211_proc_remove(struct ieee80211com *);
+#endif /* CONFIG_PROC_FS */
 #ifdef WIRELESS_EXT
 extern	struct iw_statistics *ieee80211_iw_getstats(struct net_device *);
 extern	const struct iw_handler_def ieee80211_iw_handler_def;
@@ -289,6 +293,10 @@ ic->msg_enable = NETIF_MSG_INTR|NETIF_MSG_DEBUG|NETIF_MSG_LINK2;/*XXX*/
 	ic->ic_send_mgmt[IEEE80211_FC0_SUBTYPE_DISASSOC
 	    >> IEEE80211_FC0_SUBTYPE_SHIFT] = ieee80211_send_disassoc;
 
+#ifdef CONFIG_PROC_FS
+	ieee80211_proc_init(ic);
+#endif
+
 	return (0);
 }
 
@@ -307,6 +315,9 @@ ieee80211_ifdetach(struct net_device *dev)
 	ieee80211_free_allnodes(ic);
 	ifmedia_removeall(&ic->ic_media);
 	unregister_netdev(&ic->ic_dev);
+#ifdef CONFIG_PROC_FS
+	ieee80211_proc_remove(ic);
+#endif
 	IEEE80211_UNLOCK(ic);
 
 	__MOD_DEC_USE_COUNT(THIS_MODULE);
@@ -1066,9 +1077,9 @@ ieee80211_next_scan(struct net_device *dev)
 		}
 	}
 	clrbit(ic->ic_chan_scan, ieee80211_chan2ieee(ic, chan));
-	DPRINTF(("ieee80211_next_scan: chan %d->%d jiffies %lu\n",
+	DPRINTF(("ieee80211_next_scan: chan %d->%d\n",
 	    ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan),
-	    ieee80211_chan2ieee(ic, chan), jiffies));
+	    ieee80211_chan2ieee(ic, chan)));
 	ic->ic_bss.ni_chan = chan;
 	ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
@@ -2553,6 +2564,68 @@ ieee80211_getstats(struct net_device *dev)
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	return &ic->ic_stats;
 }
+
+#ifdef CONFIG_PROC_FS
+#include <linux/proc_fs.h>
+#include <linux/ctype.h>
+
+static int
+ieee80211_proc_debug_read(char *page, char **start, off_t off,
+	int count, int *eof, void *data)
+{
+	if (off != 0) {
+		*eof = 1;
+		return 0;
+	}
+	return sprintf(page, "%d\n", ieee80211_debug);
+}
+
+static int
+ieee80211_proc_debug_write(struct file *file, const char *buf,
+	unsigned long count, void *data)
+{
+	int v;
+	
+	if (sscanf(buf, "%d", &v) == 1) {
+		ieee80211_debug = v;
+		return count;
+	} else
+		return -EINVAL;
+}
+
+static void
+ieee80211_proc_init(struct ieee80211com *ic)
+{
+	struct proc_dir_entry *dp;
+	const char *cp;
+
+	for (cp = ic->ic_dev.name; *cp && !isdigit(*cp); cp++)
+		;
+	snprintf(ic->ic_procname, sizeof(ic->ic_procname), "wlan%s", cp);
+	ic->ic_proc = proc_mkdir(ic->ic_procname, proc_net);
+	if (ic->ic_proc == NULL) {
+		printk(KERN_INFO "/proc/net/%s: failed to create\n",
+			ic->ic_procname);
+		return;
+	}
+	dp = create_proc_entry("debug", 0644, ic->ic_proc);
+	if (dp) {
+		dp->read_proc = ieee80211_proc_debug_read;
+		dp->write_proc = ieee80211_proc_debug_write;
+		dp->data = ic;
+	}
+}
+
+static void
+ieee80211_proc_remove(struct ieee80211com *ic)
+{
+	if (ic->ic_proc != NULL) {
+		remove_proc_entry("debug", ic->ic_proc);
+		remove_proc_entry(ic->ic_procname, proc_net);
+		ic->ic_proc = NULL;
+	}
+}
+#endif /* CONFIG_PROC_FS */
 
 /*
  * CRC 32 -- routine from RFC 2083

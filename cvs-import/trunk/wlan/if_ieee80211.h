@@ -535,6 +535,8 @@ struct ieee80211_wepkey {
 	u_int8_t		wk_key[IEEE80211_KEYBUF_SIZE];
 };
 
+struct proc_dir_entry;
+
 struct ieee80211com {
 	struct net_device	ic_dev;		/* NB: this must be first */
 	int			ic_timer;	/* equivalent of if_timer */
@@ -589,6 +591,10 @@ struct ieee80211com {
 	int			ic_wep_txkey;	/* default tx key index */
 	void			*ic_wep_ctx;	/* wep crypt context */
 	u_int32_t		ic_iv;		/* initial vector for wep */
+#ifdef CONFIG_PROC_FS
+	char			ic_procname[12];/* e.g. wlan%d */
+	struct proc_dir_entry	*ic_proc;	/* /proc/net/wlan%d */
+#endif
 #ifdef WIRELESS_EXT
 	struct iw_statistics	ic_iwstats;	/* wireless statistics block */
 #endif
