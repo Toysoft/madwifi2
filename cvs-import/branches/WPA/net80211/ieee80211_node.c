@@ -138,7 +138,7 @@ ieee80211_node_lateattach(struct ieee80211com *ic)
 	ni->ni_chan = IEEE80211_CHAN_ANYC;
 	ni->ni_authmode = IEEE80211_AUTH_OPEN;
 	ni->ni_txpower = IEEE80211_TXPOWER_MAX;
-	ni->ni_ucastkeyix = IEEE80211_KEYIX_NONE;
+	ieee80211_crypto_resetkey(ic, &ni->ni_ucastkey, IEEE80211_KEYIX_NONE);
 	ic->ic_bss = ni;
 	ic->ic_auth = ieee80211_authenticator_get(ni->ni_authmode);
 }
@@ -147,8 +147,10 @@ void
 ieee80211_node_detach(struct ieee80211com *ic)
 {
 
-	if (ic->ic_bss != NULL)
+	if (ic->ic_bss != NULL) {
 		(*ic->ic_node_free)(ic, ic->ic_bss);
+		ic->ic_bss = NULL;
+	}
 	ieee80211_free_allnodes(ic);
 	IEEE80211_NODE_LOCK_DESTROY(ic);
 	if (ic->ic_aid_bitmap != NULL)
@@ -174,72 +176,6 @@ ieee80211_node_unauthorize(struct ieee80211com *ic, struct ieee80211_node *ni)
 EXPORT_SYMBOL(ieee80211_node_unauthorize);
 
 /*
- * Construct and a unicast key for the node and allocate
- * a key index from the driver if needed.  This is typically
- * called by the 802.1x authenticator as part of arranging
- * key state after a station has been authorized.
- */
-int
-ieee80211_node_newkey(struct ieee80211com *ic, struct ieee80211_node *ni)
-{
-	/*
-	 * Construct a key.  We create a maximally-sized key;
-	 * the caller can shrink as desired.
-	 *
-	 * XXX just use random data for now; probably want something better
-	 * XXX cipher suites
-	 */
-	ni->ni_ucastkey.wk_len = sizeof(ni->ni_ucastkey.wk_key);
-	get_random_bytes(ni->ni_ucastkey.wk_key, ni->ni_ucastkey.wk_len);
-	/*
-	 * Ask the driver for a key index if we don't have one.
-	 */
-	if (ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
-		ni->ni_ucastkeyix = (*ic->ic_key_alloc)(ic);
-		if (ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
-			 /*
-			 * Driver has no room or support for this algorithm;
-			 * fallback to doing crypto in the host.
-			 */
-			/* XXX */
-			return 0;
-		}
-	}
-	return 1;
-}
-EXPORT_SYMBOL(ieee80211_node_newkey);
-
-/*
- * Remove the unicast key for the specified node.
- */
-int
-ieee80211_node_delkey(struct ieee80211com *ic, struct ieee80211_node *ni)
-{
-	if (ni->ni_ucastkeyix != IEEE80211_KEYIX_NONE) {
-		if (!(*ic->ic_key_delete)(ic, ni->ni_ucastkeyix))
-			return 0;
-		ni->ni_ucastkeyix = IEEE80211_KEYIX_NONE;
-	}
-	return 1;
-}
-EXPORT_SYMBOL(ieee80211_node_delkey);
-
-/*
- * Install the unicast key as ready for use.
- */
-int
-ieee80211_node_setkey(struct ieee80211com *ic, struct ieee80211_node *ni)
-{
-	if (ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
-		/* XXX nothing allocated */
-		return 0;
-	}
-	return (*ic->ic_key_set)(ic, ni->ni_ucastkeyix,
-		&ni->ni_ucastkey, ni->ni_macaddr);
-}
-EXPORT_SYMBOL(ieee80211_node_setkey);
-
-/*
  * AP scanning support.
  */
 
@@ -262,7 +198,7 @@ ieee80211_reset_scan(struct ieee80211com *ic)
  * Begin an active scan.
  */
 void
-ieee80211_begin_scan(struct ieee80211com *ic)
+ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 {
 
 	/*
@@ -284,7 +220,8 @@ ieee80211_begin_scan(struct ieee80211com *ic)
 	 * with us.
 	 */
 	ieee80211_reset_scan(ic);
-	ieee80211_free_allnodes(ic);
+	if (reset)
+		ieee80211_free_allnodes(ic);
 
 	/* Scan the next channel. */
 	ieee80211_next_scan(ic);
@@ -361,6 +298,7 @@ ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 		ni->ni_fhdwell = 200;	/* XXX */
 		ni->ni_fhindex = 1;
 	}
+	ni->ni_erp = 0;
 	ieee80211_new_state(ic, IEEE80211_S_RUN, -1);
 }
 
@@ -402,7 +340,7 @@ ieee80211_match_bss(struct ieee80211com *ic, struct ieee80211_node *ni)
 	    !IEEE80211_ADDR_EQ(ic->ic_des_bssid, ni->ni_bssid))
 		fail |= 0x20;
 #ifdef IEEE80211_DEBUG
-	if (ieee80211_msg_debug(ic)) {
+	if (ieee80211_msg_scan(ic)) {
 		printf(" %c %s", fail ? '-' : '+',
 		    ether_sprintf(ni->ni_macaddr));
 		printf(" %s%c", ether_sprintf(ni->ni_bssid),
@@ -505,7 +443,7 @@ ieee80211_end_scan(struct ieee80211com *ic)
 		return;
 	}
 	selbs = NULL;
-	IEEE80211_DPRINTF(ic, IEEE80211_MSG_DEBUG,
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
 		("\tmacaddr          bssid         chan  rssi rate flag  wep  essid\n"));
 	for (; ni != NULL; ni = nextbs) {
 		ieee80211_ref_node(ni);
@@ -516,6 +454,10 @@ ieee80211_end_scan(struct ieee80211com *ic)
 			 * during my scan.  So delete the entry for the AP
 			 * and retry to associate if there is another beacon.
 			 */
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
+				("%s: skip scan candidate %s, fails %u\n",
+				__func__, ether_sprintf(ni->ni_macaddr),
+				ni->ni_fails));
 			if (ni->ni_fails++ > 2)
 				ieee80211_free_node(ic, ni);
 			continue;
@@ -564,6 +506,14 @@ ieee80211_sta_join(struct ieee80211com *ic, struct ieee80211_node *selbs)
 			return 0;
 		}
 		ieee80211_unref_node(&selbs);
+		/*
+		 * Discard scan set; the nodes have a refcnt of zero
+		 * and have not asked the driver to setup private
+		 * node state.  Let them be repopulated on demand either
+		 * through transmission (ieee80211_find_txnode) or receipt
+		 * of a probe response (to be added).
+		 */
+		ieee80211_free_allnodes(ic);
 		ieee80211_new_state(ic, IEEE80211_S_RUN, -1);
 	} else {
 		ieee80211_unref_node(&selbs);
@@ -594,7 +544,7 @@ node_cleanup(struct ieee80211com *ic, struct ieee80211_node *ni)
 	for (i = 0; i < N(ni->ni_rxfrag); i++)
 		if (ni->ni_rxfrag[i] != NULL)
 			kfree_skb(ni->ni_rxfrag[i]);
-	ieee80211_node_delkey(ic, ni);
+	ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
 #undef N
 }
 
@@ -642,15 +592,13 @@ ieee80211_setup_node(struct ieee80211com *ic,
 {
 	int hash;
 
-	IEEE80211_NODE_LOCK_ASSERT(ic);
-
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
 		("%s %s\n", __func__, ether_sprintf(macaddr)));
 	IEEE80211_ADDR_COPY(ni->ni_macaddr, macaddr);
 	hash = IEEE80211_NODE_HASH(macaddr);
 	skb_queue_head_init(&ni->ni_savedq);
 	ieee80211_node_initref(ni);		/* mark referenced */
-	ni->ni_ucastkeyix = IEEE80211_KEYIX_NONE;
+	ieee80211_crypto_resetkey(ic, &ni->ni_ucastkey, IEEE80211_KEYIX_NONE);
 	ni->ni_inact = IEEE80211_INACT_INIT;
 
 	IEEE80211_NODE_LOCK_BH(ic);
@@ -756,12 +704,23 @@ ieee80211_find_txnode(struct ieee80211com *ic, u_int8_t *macaddr)
 	    (ic->ic_opmode == IEEE80211_M_IBSS ||
 	     ic->ic_opmode == IEEE80211_M_AHDEMO)) {
 		/*
-		 * Fake up a node; this handles node
-		 * discovery in adhoc mode.
+		 * Fake up a node; this handles node discovery in
+		 * adhoc mode.  Note that for the driver's benefit
+		 * we we treat this like an association so the driver
+		 * has an opportunity to setup it's private state.
+		 *
+		 * XXX need better way to handle this; issue probe
+		 *     request so we can deduce rate set, etc.
 		 */
 		ni = ieee80211_dup_bss(ic, macaddr);
-		/* XXX not sure how 802.1x works w/ IBSS */
-		ieee80211_node_authorize(ic, ni);
+		if (ni != NULL) {
+			/* XXX no rate negotiation; just dup */
+			ni->ni_rates = ic->ic_bss->ni_rates;
+			if (ic->ic_newassoc)
+				(*ic->ic_newassoc)(ic, ni, 1);
+			/* XXX not sure how 802.1x works w/ IBSS */
+			ieee80211_node_authorize(ic, ni);
+		}
 	}
 	return ni;
 }
@@ -871,7 +830,8 @@ ieee80211_free_allnodes(struct ieee80211com *ic)
 	ieee80211_reset_erp(ic, ic->ic_curmode);
 	IEEE80211_NODE_UNLOCK_BH(ic);
 
-	node_cleanup(ic, ic->ic_bss);		/* for station mode */
+	if (ic->ic_bss != NULL)
+		node_cleanup(ic, ic->ic_bss);	/* for station mode */
 }
 
 /*
@@ -977,6 +937,65 @@ ieee80211_dump_nodes(struct ieee80211com *ic)
 	IEEE80211_NODE_UNLOCK(ic);
 }
 
+/*
+ * Handle a station joining an 11g network.
+ */
+static void
+ieee80211_node_join_11g(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+
+	/*
+	 * Station isn't capable of short slot time.  Bump
+	 * the count of long slot time stations and disable
+	 * use of short slot time.  Note that the actual switch
+	 * over to long slot time use may not occur until the
+	 * next beacon transmission (per sec. 7.3.1.4 of 11g).
+	 */
+	if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) == 0) {
+		ic->ic_longslotsta++;
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+			("station %s needs long slot time, "
+			"count %d\n",
+			ether_sprintf(ni->ni_macaddr),
+			ic->ic_longslotsta));
+		/* XXX vap's w/ conflicting needs won't work */
+		ieee80211_set_shortslottime(ic, 0);
+	}
+	/*
+	 * If the new station is not an ERP station
+	 * then bump the counter and enable protection
+	 * if configured.
+	 */
+	if (!ieee80211_iserp_rateset(ic, &ni->ni_rates)) {
+		ic->ic_nonerpsta++;
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+			("station %s is !ERP, %d non-ERP stations "
+			"associated\n",
+			ether_sprintf(ni->ni_macaddr),
+			ic->ic_nonerpsta));
+		/*
+		 * If protection is configured, enable it.
+		 */
+		if (ic->ic_protmode != IEEE80211_PROT_NONE) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+			    ("enable use of protection\n"));
+			ic->ic_flags |= IEEE80211_F_USEPROT;
+		}
+		/*
+		 * If station does not support short preamble
+		 * then we must enable use of Barker preamble.
+		 */
+		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) == 0) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+			    ("station %s needs long preamble\n",
+			    ether_sprintf(ni->ni_macaddr)));
+			ic->ic_flags |= IEEE80211_F_USEBARKER;
+			ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
+		}
+	} else
+		ni->ni_flags |= IEEE80211_NODE_ERP;
+}
+
 void
 ieee80211_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, int resp)
 {
@@ -1003,59 +1022,15 @@ ieee80211_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, int resp
 		ni->ni_associd = aid | 0xc000;
 		IEEE80211_AID_SET(ni->ni_associd, ic->ic_aid_bitmap);
 		newassoc = 1;
-		/*
-		 * Station isn't capable of short slot time.  Bump
-		 * the count of long slot time stations and disable
-		 * use of short slot time.  Note that the actual switch
-		 * over to long slot time use will not occur until the
-		 * next beacon transmission (per sec. 7.3.1.4 of 11g).
-		 */
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) == 0) {
-			ic->ic_longslotsta++;
-			ic->ic_flags &= ~IEEE80211_F_SHSLOT;
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-				("station %s needs long slot time, "
-				"count %d\n",
-				ether_sprintf(ni->ni_macaddr),
-				ic->ic_longslotsta));
-		}
-		/*
-		 * If the new station is not an ERP station
-		 * then bump the counter and enable protection
-		 * if configured.
-		 */
-		if (!ieee80211_iserp_rateset(ic, &ni->ni_rates)) {
-			ic->ic_nonerpsta++;
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-				("station %s is !erp, count %d\n",
-				ether_sprintf(ni->ni_macaddr),
-				ic->ic_nonerpsta));
-			/*
-			 * If protection is configured, enable it.
-			 */
-			if (ic->ic_protmode != IEEE80211_PROT_NONE)
-				ic->ic_flags |= IEEE80211_F_USEPROT;
-			/*
-			 * If station does not support short preamble
-			 * then we must enable use of Barker preamble.
-			 */
-			if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) == 0) {
-				IEEE80211_DPRINTF(ic,
-				    IEEE80211_MSG_ASSOC,
-				    ("station %s needs long preamble\n",
-				    ether_sprintf(ni->ni_macaddr)));
-				ic->ic_flags |= IEEE80211_F_USEBARKER;
-				ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
-			}
-		} else
-			ni->ni_flags |= IEEE80211_NODE_ERP;
+		if (ic->ic_curmode == IEEE80211_MODE_11G)
+			ieee80211_node_join_11g(ic, ni);
 	} else
 		newassoc = 0;
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC | IEEE80211_MSG_DEBUG,
 		("station %s %s associated at aid %d\n",
-		(newassoc ? "newly" : "already"),
 		ether_sprintf(ni->ni_macaddr),
+		newassoc ? "newly" : "already",
 		IEEE80211_NODE_AID(ni)));
 
 	/* give driver a chance to setup state like ni_txrate */
@@ -1069,30 +1044,14 @@ ieee80211_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, int resp
 }
 
 /*
- * Handle bookkeeping for station deauthentication/disassociation
- * when operating as an ap.
+ * Handle a station leaving an 11g network.
  */
-void
-ieee80211_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
+static void
+ieee80211_node_leave_11g(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-	KASSERT(ic->ic_opmode == IEEE80211_M_HOSTAP,
-		("not in ap mode, mode %u", ic->ic_opmode));
-	/*
-	 * If node wasn't previously associated all
-	 * we need to do is reclaim the reference.
-	 */
-	if (ni->ni_associd == 0)
-		goto done;
-	/*
-	 * Tell the authenticator the station is leaving.
-	 * Note that we must do this before yanking the
-	 * association id as the authenticator uses the
-	 * associd to locate it's state block.
-	 */
-	if (ic->ic_auth->ia_node_leave != NULL)
-		(*ic->ic_auth->ia_node_leave)(ic, ni);
-	IEEE80211_AID_CLR(ni->ni_associd, ic->ic_aid_bitmap);
-	ni->ni_associd = 0;
+
+	KASSERT(ic->ic_curmode == IEEE80211_MODE_11G,
+		("not in 11g, curmode %x", ic->ic_curmode));
 
 	/*
 	 * If a long slot station do the slot time bookkeeping.
@@ -1104,8 +1063,7 @@ ieee80211_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 			("long slot time station %s leaves, count now %d\n",
 			ether_sprintf(ni->ni_macaddr), ic->ic_longslotsta));
-		if (ic->ic_longslotsta == 0 &&
-		    ic->ic_curmode == IEEE80211_MODE_11G) {
+		if (ic->ic_longslotsta == 0) {
 			/*
 			 * Re-enable use of short slot time if supported
 			 * and not operating in IBSS mode (per spec).
@@ -1114,7 +1072,7 @@ ieee80211_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 			    ic->ic_opmode != IEEE80211_M_IBSS) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 					("re-enable use of short slot time\n"));
-				ic->ic_flags |= IEEE80211_F_SHSLOT;
+				ieee80211_set_shortslottime(ic, 1);
 			}
 		}
 	}
@@ -1141,8 +1099,53 @@ ieee80211_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 			}
 		}
 	}
+}
+
+/*
+ * Handle bookkeeping for station deauthentication/disassociation
+ * when operating as an ap.
+ */
+void
+ieee80211_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+
+	KASSERT(ic->ic_opmode == IEEE80211_M_HOSTAP,
+		("not in ap mode, mode %u", ic->ic_opmode));
+	/*
+	 * If node wasn't previously associated all
+	 * we need to do is reclaim the reference.
+	 */
+	if (ni->ni_associd == 0)
+		goto done;
+	/*
+	 * Tell the authenticator the station is leaving.
+	 * Note that we must do this before yanking the
+	 * association id as the authenticator uses the
+	 * associd to locate it's state block.
+	 */
+	if (ic->ic_auth->ia_node_leave != NULL)
+		(*ic->ic_auth->ia_node_leave)(ic, ni);
+	IEEE80211_AID_CLR(ni->ni_associd, ic->ic_aid_bitmap);
+	ni->ni_associd = 0;
+
+	if (ic->ic_curmode == IEEE80211_MODE_11G)
+		ieee80211_node_leave_11g(ic, ni);
 	ieee80211_notify_node_leave(ic, ni);
 done:
 	ieee80211_free_node(ic, ni);
 }
 EXPORT_SYMBOL(ieee80211_node_leave);
+
+/*
+ * Set the short slot time state and notify the driver.
+ */
+void
+ieee80211_set_shortslottime(struct ieee80211com *ic, int onoff)
+{
+	if (onoff)
+		ic->ic_flags |= IEEE80211_F_SHSLOT;
+	else
+		ic->ic_flags &= ~IEEE80211_F_SHSLOT;
+	/* notify driver */
+	(*ic->ic_updateslot)(ic->ic_dev);
+}
