@@ -163,6 +163,29 @@ ieee80211_ioctl_giwname(struct net_device *dev,
 	return 0;
 }
 
+/*
+ * Get a key index from a request.  If nothing is
+ * specified in the request we use the current xmit
+ * key index.  Otherwise we just convert the index
+ * to be base zero.
+ */
+static int
+getiwkeyix(struct ieee80211com *ic, const struct iw_point* erq, int *kix)
+{
+	int kid;
+
+	kid = erq->flags & IW_ENCODE_INDEX;
+	if (kid < 1 || kid > IEEE80211_WEP_NKID)
+		kid = ic->ic_wep_txkey;
+	else
+		--kid;
+	if (0 <= kid && kid < IEEE80211_WEP_NKID) {
+		*kix = kid;
+		return 0;
+	} else
+		return EINVAL;
+}
+
 int
 ieee80211_ioctl_siwencode(struct net_device *dev,
 			  struct iw_request_info *info,
@@ -180,21 +203,24 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 		error = EOPNOTSUPP;
 		goto done;
 	}
-
-	kid = erq->flags & IW_ENCODE_INDEX;
-	if (kid >= IEEE80211_WEP_NKID) {
+	error = getiwkeyix(ic, erq, &kid);
+	if (error)
+		goto done;
+	if (erq->length > IEEE80211_KEYBUF_SIZE) {
 		error = EINVAL;
 		goto done;
 	}
-	if (erq->length > 0) {
-		if (erq->length > IEEE80211_KEYBUF_SIZE) {
-			error = EINVAL;
-			goto done;
-		}
+	if (erq->length > 0) {		/* XXX no way to install 0-length key */
 		memcpy(ic->ic_nw_keys[kid].wk_key, keybuf, erq->length);
 		memset(ic->ic_nw_keys[kid].wk_key + erq->length, 0,
 			IEEE80211_KEYBUF_SIZE - erq->length);
 		ic->ic_nw_keys[kid].wk_len = erq->length;
+	} else {
+		/* verify the key to be installed is non-zero length */
+		if (ic->ic_nw_keys[kid].wk_len == 0) {
+			error = EINVAL;
+			goto done;
+		}
 	}
 	ic->ic_wep_txkey = kid;
 	ic->ic_flags |= IEEE80211_F_WEPON;
@@ -211,22 +237,21 @@ ieee80211_ioctl_giwencode(struct net_device *dev,
 			  struct iw_point *erq, char *key)
 {
 	struct ieee80211com *ic = dev->priv;
+	int error, kid;
 
 	if ((ic->ic_flags & IEEE80211_F_WEPON) == 0) {
 		erq->length = 0;
 		erq->flags = IW_ENCODE_DISABLED;
-	} else {
-		int kid = erq->flags & IW_ENCODE_INDEX;
-		if (kid >= IEEE80211_WEP_NKID)
-			return -EINVAL;
-		erq->flags = kid + 1;
+		error = 0;
+	} else if ((error = getiwkeyix(ic, erq, &kid)) == 0) {
+		erq->flags = kid + 1;			/* NB: base 1 */
 		if (erq->length > ic->ic_nw_keys[kid].wk_len)
 			erq->length = ic->ic_nw_keys[kid].wk_len;
 		memcpy(key, ic->ic_nw_keys[kid].wk_key, erq->length);
 		erq->flags |= IW_ENCODE_ENABLED;	/* XXX */
 		erq->flags |= IW_ENCODE_OPEN;		/* XXX */
 	}
-	return 0;
+	return -error;
 }
 
 #ifndef ifr_media
