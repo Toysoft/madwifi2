@@ -213,8 +213,8 @@ ieee80211_crypto_getkey(struct ieee80211com *ic,
 	if (IEEE80211_IS_MULTICAST(mac) || KEY_UNDEFINED(ni->ni_ucastkey)) {
 		if (ic->ic_def_txkey == IEEE80211_KEYIX_NONE ||
 		    KEY_UNDEFINED(ic->ic_nw_keys[ic->ic_def_txkey])) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			    ("%s: No transmit key, def_txkey %u\n",
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
+			    ("%s: no transmit key, def_txkey %u\n",
 			    __func__, ic->ic_def_txkey));
 			/* XXX statistic */
 			return NULL;
@@ -341,7 +341,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 			/* XXX do fragmentation */
 			if (!ieee80211_crypto_enmic(ic, key, skb)) {
-				IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
 				    ("[%s] enmic failed, discard frame\n",
 				    ether_sprintf(eh.ether_dhost)));
 				/* XXX statistic */
