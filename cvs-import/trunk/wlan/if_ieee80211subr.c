@@ -906,7 +906,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 			eh = (struct ether_header *) skb->data;
 			if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
-				skb1 = skb_copy(skb, 0);
+				skb1 = skb_copy(skb, GFP_ATOMIC);
 			} else {
 				ni = ieee80211_find_node(ic, eh->ether_dhost);
 				if (ni != NULL) {
@@ -1146,7 +1146,7 @@ ieee80211_decap(struct net_device *dev, struct sk_buff *skb)
 		struct sk_buff *n;
 
 		/* XXX does this always work? */
-		n = skb_copy(skb, 0);
+		n = skb_copy(skb, GFP_ATOMIC);
 		dev_kfree_skb(skb);
 		if (n == NULL)
 			return NULL;
@@ -1706,7 +1706,7 @@ ieee80211_alloc_node(struct ieee80211com *ic, u_int8_t *macaddr)
 	struct ieee80211_node *ni;
 
 	ni = kmalloc(sizeof(struct ieee80211_node) + ic->ic_node_privlen,
-		GFP_KERNEL);
+		GFP_ATOMIC);
 	if (ni != NULL) {
 		memset(ni, 0, sizeof(struct ieee80211_node));
 		ieee80211_setup_node(ic, ni, macaddr);
@@ -1720,7 +1720,7 @@ ieee80211_dup_bss(struct ieee80211com *ic, u_int8_t *macaddr)
 	struct ieee80211_node *ni;
 
 	ni = kmalloc(sizeof(struct ieee80211_node) + ic->ic_node_privlen,
-		GFP_KERNEL);
+		GFP_ATOMIC);
 	if (ni != NULL) {
 		memcpy(ni, &ic->ic_bss, sizeof(struct ieee80211_node));
 		ieee80211_setup_node(ic, ni, macaddr);
@@ -3208,7 +3208,7 @@ ieee80211_wep_crypt(struct net_device *dev, struct sk_buff *skb0, int txflag)
 
 	n0 = NULL;
 	if ((ctx = ic->ic_wep_ctx) == NULL) {
-		ctx = kmalloc(arc4_ctxlen(), GFP_KERNEL);
+		ctx = kmalloc(arc4_ctxlen(), GFP_ATOMIC);
 		if (ctx == NULL)
 			goto fail;
 		ic->ic_wep_ctx = ctx;
