@@ -119,12 +119,13 @@ configcheck: dotconfig
 	@echo -n "Checking if all requirements are met... "
 	
 	@# check version of kernel and wireless.h
-	@if [ "$(_KVER)" -ne 2 -o "$(_KPL)" -lt 4 ]; then \
+	@echo $(KERNELRELEASE) | grep -q -i '^[2-9]\.[4-9]\.' || { \
 	    echo "FAILED"; \
 	    echo "Only kernel versions 2.4.x and above are supported."; \
 	    echo "You have $(KERNELRELEASE)."; \
 	    exit 1; \
-	fi
+	}
+	
 	@if [ "$(WIRELESSEXT)" -lt 14 ]; then \
 	    echo "FAILED"; \
 	    echo "Wireless extensions v14 or better is needed."; \
