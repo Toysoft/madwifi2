@@ -40,16 +40,19 @@ in NetBSD and then FreeBSD.
 The ath_hal module contains the Atheros Hardware Access Layer (HAL).
 This code manages much of the chip-specific operation of the driver.
 The HAL is provided in a binary-only form in order to comply with FCC
-regulations.  In particular, a radio transmitter can only be operated
-at power levels and on frequency channels for which it is approved.
-The FCC requires that a software-defined radio cannot be configured
-by a user to operate outside the approved power levels and frequency
-channels.  This makes it difficult to open-source code that enforces
-limits on the power levels, frequency channels and other parameters
-of the radio transmitter.  See <http://xxxx.fcc.gov/somewhere.pdf>
-for the specific FCC regulation.  Because the module is provided in
-a binary-only form it is marked "Proprietary"; this means when you
-load it you will see messages that your system is now "tainted".
+regulations.  In particular, a radio transmitter can only be operated at
+power levels and on frequency channels for which it is approved.  The FCC
+requires that a software-defined radio cannot be configured by a user
+to operate outside the approved power levels and frequency channels.
+This makes it difficult to open-source code that enforces limits on
+the power levels, frequency channels and other parameters of the radio
+transmitter.  See
+
+http://ftp.fcc.gov/Bureaus/Engineering_Technology/Orders/2001/fcc01264.pdf
+
+for the specific FCC regulation.  Because the module is provided in a
+binary-only form it is marked "Proprietary"; this means when you load
+it you will see messages that your system is now "tainted".
 
 If you wish to use this driver on a platform for which an ath_hal
 module is not already provided please contact the author.  Note that
