@@ -154,6 +154,8 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
 	dev->owner = THIS_MODULE;
+#else
+	SET_MODULE_OWNER(dev);
 #endif
 
 	sc->aps_sc.sc_pdev = pdev;
