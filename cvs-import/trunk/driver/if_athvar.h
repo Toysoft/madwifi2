@@ -266,8 +266,8 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_dumpState)((_ah)))
 #define	ath_hal_getdiagstate(_ah, _id, _data, _size) \
 	((*(_ah)->ah_getDiagState)((_ah), (_id), (_data), (_size)))
-#define	ath_hal_setuptxqueue(_ah, _type, _irq) \
-	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
+#define	ath_hal_setuptxqueue(_ah, _type, _qinfo) \
+	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_qinfo)))
 #define	ath_hal_resettxqueue(_ah, _q) \
 	((*(_ah)->ah_resetTxQueue)((_ah), (_q)))
 #define	ath_hal_releasetxqueue(_ah, _q) \

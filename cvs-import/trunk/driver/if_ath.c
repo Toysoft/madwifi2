@@ -238,18 +238,12 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * allocate more tx queues for splitting management
 	 * frames and for QOS support.
 	 */
-	sc->sc_txhalq = ath_hal_setuptxqueue(ah,
-		HAL_TX_QUEUE_DATA,
-		AH_TRUE			/* enable interrupts */
-	);
+	sc->sc_txhalq = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, NULL);
 	if (sc->sc_txhalq == (u_int) -1) {
 		printk("%s: unable to setup a data xmit queue!\n", dev->name);
 		goto bad2;
 	}
-	sc->sc_bhalq = ath_hal_setuptxqueue(ah,
-		HAL_TX_QUEUE_BEACON,
-		AH_TRUE			/* enable interrupts */
-	);
+	sc->sc_bhalq = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_BEACON, NULL);
 	if (sc->sc_bhalq == (u_int) -1) {
 		printk("%s: unable to setup a beacon xmit queue!\n", dev->name);
 		goto bad2;
@@ -1271,19 +1265,25 @@ ath_beacon_config(struct ath_softc *sc)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = ic->ic_bss;
-	u_int32_t nexttbtt;
+	u_int32_t nexttbtt, intval;
 	
 	nexttbtt = (LE_READ_4(ni->ni_tstamp + 4) << 22) |
 	    (LE_READ_4(ni->ni_tstamp) >> 10);
 	DPRINTF(("%s: nexttbtt=%u\n", __func__, nexttbtt));
 	nexttbtt += ni->ni_intval;
+	intval = ni->ni_intval & HAL_BEACON_PERIOD;
 	if (ic->ic_opmode == IEEE80211_M_STA) {
 		HAL_BEACON_STATE bs;
 		u_int32_t bmisstime;
 
 		/* NB: no PCF support right now */
 		memset(&bs, 0, sizeof(bs));
-		bs.bs_intval = ni->ni_intval;
+		/*
+		 * Reset our tsf so the hardware will update the
+		 * tsf register to reflect timestamps found in
+		 * received beacons.
+		 */
+		bs.bs_intval = intval | HAL_BEACON_RESET_TSF;
 		bs.bs_nexttbtt = nexttbtt;
 		bs.bs_dtimperiod = bs.bs_intval;
 		bs.bs_nextdtim = nexttbtt;
@@ -1325,12 +1325,6 @@ ath_beacon_config(struct ath_softc *sc)
 			, bs.bs_sleepduration
 		));
 		ath_hal_intrset(ah, 0);
-		/*
-		 * Reset our tsf so the hardware will update the
-		 * tsf register to reflect timestamps found in
-		 * received beacons.
-		 */
-		ath_hal_resettsf(ah);
 		ath_hal_beacontimers(ah, &bs, 0/*XXX*/, 0, 0);
 		sc->sc_imask |= HAL_INT_BMISS;
 		ath_hal_intrset(ah, sc->sc_imask);
@@ -1338,9 +1332,13 @@ ath_beacon_config(struct ath_softc *sc)
 		DPRINTF(("%s: intval %u nexttbtt %u\n",
 			__func__, ni->ni_intval, nexttbtt));
 		ath_hal_intrset(ah, 0);
-		ath_hal_beaconinit(ah, nexttbtt, ni->ni_intval);
-		if (ic->ic_opmode != IEEE80211_M_MONITOR)
+		if (nexttbtt == ni->ni_intval)
+			intval |= HAL_BEACON_RESET_TSF;
+		if (ic->ic_opmode != IEEE80211_M_MONITOR) {
+			intval |= HAL_BEACON_ENA;
 			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
+		}
+		ath_hal_beaconinit(ah, nexttbtt, intval);
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 }
