@@ -495,7 +495,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		ic->ic_devstats->rx_packets++;
 		ic->ic_devstats->rx_bytes += skb->len;
 		IEEE80211_NODE_STAT(ni, rx_data);
-		IEEE80211_NODE_STAT_ADD(ni, rx_bytes, skb->len); // TODO: skb->len - 802.11 header ?
+		IEEE80211_NODE_STAT_ADD(ni, rx_bytes, skb->len);
 
 		/* perform as a bridge within the AP */
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
@@ -513,8 +513,8 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				    ieee80211_find_node(&ic->ic_sta,
 							eh->ether_dhost);
 				if (ni1 != NULL) {
-					/* XXX check if authorized */
-					if (ni1->ni_associd != 0) {
+					if (ni1->ni_associd != 0 &&
+					   ieee80211_node_is_authorized(ni1)) {
 						skb1 = skb;
 						skb = NULL;
 					}
@@ -529,12 +529,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				skb1->nh.raw = skb1->data + 
 					sizeof(struct ether_header);
 				skb1->protocol = __constant_htons(ETH_P_802_2);
-				dev_queue_xmit(skb1);			// send directly to iface queue
-				//IF_ENQUEUE(&dev->if_dev, skb1);		// TODO: too slow???
-                                //if (skb1 != NULL)
-				//	sc->sc_devstats.multicast++;	// stats needed?
-                                //sc->sc_devstats.tx_bytes += len;
-
+				dev_queue_xmit(skb1);			// NB: send directly to iface
 			}
 		}
 		if (skb != NULL) {
@@ -542,8 +537,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			skb->protocol = eth_type_trans(skb, dev);
 			if (ni->ni_vlan != 0 && ic->ic_vlgrp != NULL) {
 				/* attach vlan tag */
-				vlan_hwaccel_receive_skb(skb, ic->ic_vlgrp,
-					ni->ni_vlan);
+				vlan_hwaccel_receive_skb(skb, ic->ic_vlgrp, ni->ni_vlan);
 			} else {
 				netif_rx(skb);
 			}
@@ -577,7 +571,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			if (subtype != IEEE80211_FC0_SUBTYPE_AUTH) {
 				/*
 				 * Only shared key auth frames with a challenge
-				 * should be encrypted, discard all others.
+				 * should be decrypted, discard all others.
 				 */
 				IEEE80211_DISCARD(ic, IEEE80211_MSG_INPUT,
 				    wh, ieee80211_mgt_subtype_name[subtype >>
@@ -771,7 +765,8 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 	struct ether_header *eh;
 	struct llc *llc;
 	u_short ether_type = 0;
-
+	
+	// TODO: why not using linux llc.h ..., same for ieee80211_encap()
 	memcpy(&wh, skb->data, sizeof(struct ieee80211_frame));
 	llc = (struct llc *) skb_pull(skb, sizeof(struct ieee80211_frame));
 	if (skb->len >= sizeof(struct llc) &&
@@ -803,13 +798,16 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 		dev_kfree_skb(skb);
 		return NULL;
 	}
-	//TODO: this is never executed, do we need it?
+	/*
+	 *  TODO: we should ensure alignment on specific arch like amd64, alpha 
+	 *  and ia64 at least. BSD uses ALIGNED_POINTER macro for this.
+	 *  If anyone gets problems on one of the mentioned archs, modify compat.h
+	 */
 #ifdef ALIGNED_POINTER
 	if (!ALIGNED_POINTER(skb->data + sizeof(*eh), u_int32_t)) {
 		struct sk_buff *n;
 
 		/* XXX does this always work? */
-		/* TODO BSD code seems more reliable! */
 		n = skb_copy(skb, GFP_ATOMIC);
 		dev_kfree_skb(skb);
 		if (n == NULL)
@@ -891,8 +889,7 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
 				return;
 		} else
 			(void) ieee80211_ref_node(ni);
-		IEEE80211_SEND_MGMT(ic, ni,
-			IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
+		IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_DEBUG | IEEE80211_MSG_AUTH,
 		    "[%s] station authenticated (open)\n",
 		    ether_sprintf(ni->ni_macaddr));
@@ -1027,7 +1024,7 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 			IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_AUTH,
 			    ni->ni_macaddr, "shared key auth",
 			    "bad state %u", ic->ic_state);
-			estatus = IEEE80211_STATUS_ALG;	/* XXX */
+			estatus = IEEE80211_STATUS_OTHER;
 			goto bad;
 		}
 		switch (seq) {
@@ -1095,8 +1092,7 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 			estatus = IEEE80211_STATUS_SEQUENCE;
 			goto bad;
 		}
-		IEEE80211_SEND_MGMT(ic, ni,
-			IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
+		IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
 		break;
 
 	case IEEE80211_M_STA:
@@ -1128,8 +1124,7 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 				return;
 			/* XXX could optimize by passing recvd challenge */
 			memcpy(ni->ni_challenge, &challenge[2], challenge[1]);
-			IEEE80211_SEND_MGMT(ic, ni,
-				IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
+			IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
 			break;
 		default:
 			IEEE80211_DISCARD(ic, IEEE80211_MSG_AUTH,
@@ -2044,8 +2039,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				IEEE80211_FC0_SUBTYPE_SHIFT],
 			    "%s", "recv'd rate set invalid");
 		} else {
-			IEEE80211_SEND_MGMT(ic, ni,
-				IEEE80211_FC0_SUBTYPE_PROBE_RESP, 0);
+			IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_PROBE_RESP, 0);
 		}
 		if (allocbs && ic->ic_opmode != IEEE80211_M_IBSS) {
 			/* reclaim immediately */
@@ -2096,8 +2090,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ieee80211_auth_shared(ic, wh, frm + 6, efrm, ni, rssi,
 			    rstamp, seq, status);
 		else if (algo == IEEE80211_AUTH_ALG_OPEN)
-			ieee80211_auth_open(ic, wh, ni, rssi, rstamp, seq,
-			    status);
+			ieee80211_auth_open(ic, wh, ni, rssi, rstamp, seq, status);
 		else {
 			IEEE80211_DISCARD(ic, IEEE80211_MSG_ANY,
 			    wh, "auth", "unsupported alg %d", algo);
@@ -2201,6 +2194,20 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ic->ic_stats.is_rx_assoc_notauth++;
 			return;
 		}
+		/* assert right association security credentials */
+		if (wpa == NULL && (ic->ic_flags & IEEE80211_F_WPA)) {
+			IEEE80211_DPRINTF(ic,
+				IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
+				"[%s] no WPA/RSN IE in association request\n",
+				ether_sprintf(wh->i_addr2));
+			IEEE80211_SEND_MGMT(ic, ni,
+				IEEE80211_FC0_SUBTYPE_DEAUTH,
+				IEEE80211_REASON_RSN_REQUIRED);
+			ieee80211_node_leave(ic, ni);
+			/* XXX distinguish WPA/RSN? */
+			ic->ic_stats.is_rx_assoc_badwpaie++;
+			return;
+		}		
 		if (wpa != NULL) {
 			/*
 			 * Parse WPA information element.  Note that
@@ -2246,8 +2253,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			    "[%s] deny %s request, capability mismatch 0x%x\n",
 			    ether_sprintf(wh->i_addr2),
 			    reassoc ? "reassoc" : "assoc", capinfo);
-			IEEE80211_SEND_MGMT(ic, ni, resp,
-				IEEE80211_STATUS_CAPINFO);
+			IEEE80211_SEND_MGMT(ic, ni, resp, IEEE80211_STATUS_CAPINFO);
 			ieee80211_node_leave(ic, ni);
 			ic->ic_stats.is_rx_assoc_capmismatch++;
 			return;
@@ -2260,8 +2266,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			    "[%s] deny %s request, rate set mismatch\n",
 			    ether_sprintf(wh->i_addr2),
 			    reassoc ? "reassoc" : "assoc");
-			IEEE80211_SEND_MGMT(ic, ni, resp,
-				IEEE80211_STATUS_BASIC_RATE);
+			IEEE80211_SEND_MGMT(ic, ni, resp, IEEE80211_STATUS_BASIC_RATE);
 			ieee80211_node_leave(ic, ni);
 			ic->ic_stats.is_rx_assoc_norate++;
 			return;
@@ -2432,6 +2437,9 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 
 		if (ic->ic_state == IEEE80211_S_SCAN) {
 			ic->ic_stats.is_rx_mgtdiscard++;
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_AUTH,
+			    "[%s] station DEAUTH in bad state.\n",
+			    ether_sprintf(ni->ni_macaddr));
 			return;
 		}
 		/*
@@ -2467,8 +2475,11 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		u_int16_t reason;
 
 		if (ic->ic_state != IEEE80211_S_RUN &&
-		    ic->ic_state != IEEE80211_S_AUTH) {
+		    ic->ic_state != IEEE80211_S_AUTH) {		// TODO: IEEE80211_S_ASSOC?
 			ic->ic_stats.is_rx_mgtdiscard++;
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+			    "[%s] station DISASSOC in bad state.\n",
+			    ether_sprintf(ni->ni_macaddr));
 			return;
 		}
 		/*
