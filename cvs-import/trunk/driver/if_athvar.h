@@ -84,6 +84,7 @@ struct ath_buf {
 
 struct ath_hal;
 struct ath_desc;
+struct proc_dir_entry;
 
 struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
@@ -115,6 +116,7 @@ struct ath_softc {
 	struct sk_buff_head	sc_sndq;	/* transmit queue */
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
+	struct proc_dir_entry	*sc_proc;	/* /proc/net/drivers/ath%d */
 };
 
 #define	ATH_BITVAL(val, name)	(((val) & name) >> name##_S)

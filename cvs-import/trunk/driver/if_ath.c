@@ -81,8 +81,13 @@ static void	ath_calibrate(unsigned long);
 static int	ath_newstate(void *, enum ieee80211_state);
 static void	ath_rate_ctl(struct ath_softc *, struct ieee80211_node *);
 
+#ifdef CONFIG_PROC_FS
+static void	ath_proc_init(struct ath_softc *sc);
+static void	ath_proc_remove(struct ath_softc *sc);
+#endif /* CONFIG_PROC_FS */
+
 #ifdef AR_DEBUG
-int	ath_debug = 2;		/*XXX*/
+int	ath_debug = 0;
 #define	IFF_DUMPPKTS(_ic)	(ath_debug || netif_msg_dumppkts(_ic))
 static	void ath_printrxbuf(struct ath_buf *bf);
 static	void ath_printtxbuf(struct ath_buf *bf);
@@ -228,6 +233,8 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	printk("%s: 802.11 address: %s\n",
 		dev->name, ether_sprintf(dev->dev_addr));
 
+	ath_proc_init(sc);
+
 	sc->sc_attached = 1;
 
 	return 0;
@@ -249,6 +256,7 @@ ath_detach(struct net_device *dev)
 		ath_stop(dev);
 		ath_desc_free(sc);
 		ath_hal_detach(sc->sc_ah);
+		ath_proc_remove(sc);
 		ieee80211_ifdetach(dev);
 	}
 	return 0;
@@ -295,21 +303,22 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_INT status;
 
+	if (!sc->sc_attached)
+		return;
 	spin_lock_irq(&sc->sc_lock);
 	while (ath_hal_intrpend(ah)) {
 		ath_hal_getisr(ah, &status);
-		if (netif_msg_intr(&sc->sc_ic))
-			printk(KERN_DEBUG "%s: interrupt, status 0x%x\n",
-				dev->name, status);
+		DPRINTF(("%s: interrupt, status 0x%x\n",
+			dev->name, status));
 		if (status & HAL_INT_FATAL) {
-			printk("%s: hardware error (0x%x); resetting\n",
+			printk("%s: hardware error 0x%x; resetting\n",
 				dev->name, status);
 			ath_hal_dumpstate(ah);	/*XXX*/
 			ath_init(dev);
 			continue;
 		}
 		if (status & HAL_INT_RXORN) {
-			printk("%s: rx FIFO overrun (0x%x); resetting\n",
+			printk("%s: rx FIFO overrun 0x%x; resetting\n",
 				dev->name, status);
 			ath_hal_dumpstate(ah);	/*XXX*/
 			ath_init(dev);
@@ -317,9 +326,10 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
-			 * XXX The hardware should re-read the link when
-			 * RXE bit is written, but it doesn't work at least
-			 * on older revision of the hardware.
+			 * XXX The hardware should re-read the link
+			 * when the RXE bit is written, but it doesn't
+			 * work at least on older revision of the
+			 * hardware.
 			 */
 			sc->sc_rxlink = NULL;
 		}
@@ -411,6 +421,7 @@ ath_init(struct net_device *dev)
 		val |= HAL_INT_BMISS;
 	else
 		val |= HAL_INT_SWBA;			/* beacon prepare */
+val |= HAL_INT_TXDESC|HAL_INT_RXDESC;
 	ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
 
 	netif_start_queue(dev);
@@ -469,7 +480,7 @@ ath_stop(struct net_device *dev)
 		ath_hal_intrset(ah, 0);
 		ath_draintxq(sc);		/* clear pending tx frames */
 		ath_stoprecv(sc);		/* turn off frame recv */
-		ath_hal_setpower(ah, PM_FULL_SLEEP, 0);
+		ath_hal_setpower(ah, HAL_PM_FULL_SLEEP, 0);
 	}
 	ath_beacon_free(sc);
 	sc->sc_txlink = sc->sc_rxlink = NULL;
@@ -984,7 +995,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
 	ds->ds_ctl0 = 0;
-	ds->ds_ctl1 = skb->len;
+	ds->ds_ctl1 = skb_tailroom(skb);
 	ds->ds_status0 = ds->ds_status1 = 0;
 
 	if (sc->sc_rxlink != NULL)
@@ -1685,3 +1696,85 @@ ath_printtxbuf(struct ath_buf *bf)
 	    (ds->ds_status0 & AR_FrmXmitOK) ? '*' : '!');
 }
 #endif /* AR_DEBUG */
+
+#ifdef CONFIG_PROC_FS
+#include <linux/proc_fs.h>
+
+static int
+ath_proc_debug_read(char *page, char **start, off_t off,
+	int count, int *eof, void *data)
+{
+	if (off != 0) {
+		*eof = 1;
+		return 0;
+	}
+	return sprintf(page, "%d\n", ath_debug);
+}
+
+static int
+ath_proc_debug_write(struct file *file, const char *buf,
+	unsigned long count, void *data)
+{
+	int v;
+	
+	if (sscanf(buf, "%d", &v) == 1) {
+		ath_debug = v;
+		return count;
+	} else
+		return -EINVAL;
+}
+
+static int
+ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	struct ath_softc *sc = (struct ath_softc *) data;
+	char *cp = page;
+
+	if (off != 0) {
+		*eof = 1;
+		return 0;
+	}
+#define	STAT(x)		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x)
+	STAT(watchdog); STAT(tx_encap); STAT(tx_nonode);
+	STAT(tx_nombuf); STAT(tx_nomcl); STAT(tx_linear);
+	STAT(tx_nodata); STAT(tx_busdma); STAT(tx_descerr);
+	STAT(rx_crcerr); STAT(rx_fifoerr); STAT(rx_badcrypt);
+	STAT(rx_phyerr); STAT(rx_phy_tim); STAT(rx_phy_par);
+	STAT(rx_phy_rate); STAT(rx_phy_len); STAT(rx_phy_qam);
+	STAT(rx_phy_srv); STAT(rx_phy_tor);
+	return cp - page;
+#undef STAT
+}
+
+static void
+ath_proc_init(struct ath_softc *sc)
+{
+	struct proc_dir_entry *dp;
+
+	/* XXX this uses /proc/net, but we want /proc/net/drivers */
+	sc->sc_proc = proc_mkdir(sc->sc_ic.ic_dev.name, proc_net);
+	if (sc->sc_proc == NULL) {
+		printk(KERN_INFO "/proc/net/drivers/%s: failed to create\n",
+			sc->sc_ic.ic_dev.name);
+		return;
+	}
+	dp = create_proc_entry("debug", 0644, sc->sc_proc);
+	if (dp) {
+		dp->read_proc = ath_proc_debug_read;
+		dp->write_proc = ath_proc_debug_write;
+		dp->data = sc;
+	}
+	create_proc_read_entry("stats", 0644, sc->sc_proc, ath_proc_stats, sc);
+}
+
+static void
+ath_proc_remove(struct ath_softc *sc)
+{
+	if (sc->sc_proc != NULL) {
+		remove_proc_entry("stats", sc->sc_proc);
+		remove_proc_entry("debug", sc->sc_proc);
+		remove_proc_entry(sc->sc_ic.ic_dev.name, proc_net);
+		sc->sc_proc = NULL;
+	}
+}
+#endif /* CONFIG_PROC_FS */
