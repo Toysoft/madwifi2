@@ -68,6 +68,13 @@ struct ath_pci_softc {
 #endif
 };
 
+#ifdef AR_DEBUG
+static int	ath_initialdebug = 0;
+MODULE_PARM(ath_initialdebug, "i");
+MODULE_PARM_DESC(ath_initialdebug, "ORed debugging flags:\n - 0x1: DPRINTF debug\n - 0x2: DPRINTF2 debug\n - 0x4: DPRINTF_DUMP debug");
+#endif
+
+
 /*
  * User a static table of PCI id's for now.  While this is the
  * "new way" to do things, we may want to switch back to having
@@ -145,6 +152,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bad2;
 	}
 	memset(sc, 0, sizeof(struct ath_pci_softc));
+	sc->aps_sc.ath_debug = ath_initialdebug;
 
 	/* mark the device as detached to avoid processing interrupts until setup is complete */
 	sc->aps_sc.sc_invalid = 1;

@@ -495,7 +495,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 				("%s: bogus xmit rate %u setup\n", __func__,
 					ni->ni_txrate));
 #ifdef IEEE80211_DEBUG
-			if (ieee80211_debug & IEEE80211_DEBUG_IFF) {
+			if (ic->ieee80211_debug & IEEE80211_DEBUG_IFF) {
 				if_printf(ic, " ");
 				if (ic->ic_opmode == IEEE80211_M_STA)
 					printf("associated ");

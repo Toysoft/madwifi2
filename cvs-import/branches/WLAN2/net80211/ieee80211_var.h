@@ -203,6 +203,7 @@ struct ieee80211com {
 	void			*ic_wep_ctx;	/* wep crypt context */
 	u_int32_t		ic_iv;		/* initial vector for wep */
 	struct ieee80211_stats  ic_stats;
+	int                     ieee80211_debug;
 };
 
 #define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
@@ -270,11 +271,10 @@ enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 
 #define	IEEE80211_DEBUG 1
 #ifdef IEEE80211_DEBUG
-extern	int ieee80211_debug;
-#define	IEEE80211_DPRINTF(X)	 if (ieee80211_debug & (IEEE80211_DEBUG_LEVEL1)) printf X
-#define	IEEE80211_DPRINTF2(X)	 if (ieee80211_debug & (IEEE80211_DEBUG_LEVEL2) ) printf X
-#define	IEEE80211_DPRINTF_IFF(X) if (ieee80211_debug & (IEEE80211_DEBUG_IFF)) printf X
-#define	IEEE80211_DPRINTF_MSG(X) if (ieee80211_debug & (IEEE80211_DEBUG_MSG)) printf X
+#define	IEEE80211_DPRINTF(X)	 if (ic->ieee80211_debug & (IEEE80211_DEBUG_LEVEL1)) printf X
+#define	IEEE80211_DPRINTF2(X)	 if (ic->ieee80211_debug & (IEEE80211_DEBUG_LEVEL2) ) printf X
+#define	IEEE80211_DPRINTF_IFF(X) if (ic->ieee80211_debug & (IEEE80211_DEBUG_IFF)) printf X
+#define	IEEE80211_DPRINTF_MSG(X) if (ic->ieee80211_debug & (IEEE80211_DEBUG_MSG)) printf X
 #else
 #define	IEEE80211_DPRINTF(X)
 #define	IEEE80211_DPRINTF2(X)

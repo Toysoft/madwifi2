@@ -77,7 +77,6 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211.c,v 1.8 2003/09/14 22:32:18 sam E
 #endif /* 0 */
 
 #ifdef IEEE80211_DEBUG
-int	ieee80211_debug = 0;
 /*
 SYSCTL_INT(_debug, OID_AUTO, ieee80211, CTLFLAG_RW, &ieee80211_debug,
 	    0, "IEEE 802.11 media debugging printfs");
@@ -95,11 +94,15 @@ static const char *ieee80211_phymode_name[] = {
 	"turbo",	/* IEEE80211_MODE_TURBO	*/
 };
 
+extern int ieee80211_initialdebug;
+
 void
 ieee80211_ifattach(struct ieee80211com *ic)
 {
 	struct ieee80211_channel *c;
 	int i;
+
+	ic->ieee80211_debug = ieee80211_initialdebug;
 
 	/* corresponding feature moved to caller. */
 	/*ether_ifattach(ifp);*/
