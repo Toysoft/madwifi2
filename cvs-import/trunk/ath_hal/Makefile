@@ -47,23 +47,15 @@ ifneq (${LINUX_VERSION}, 204)
 OBJS+=		ah_osdep.mod.o
 endif
 
-ifndef HAL_OBJDIR
-CLEANFILES+=	hal.o
-else
-HALINCS+=	-I${HAL_OBJDIR}		# for opt_ah.h
-endif
-
 ALL=	${KMODNAME}.${KMODSUF}
 CFLAGS=	${INCS} ${MODOPTS} ${COPTS}
-
-CLEANFILES+=	opt_ah.h
 
 all:	${ALL}
 
 ${KMODNAME}.${KMODSUF}: ${OBJS} ${HAL_OBJDIR}hal.o ${HAL}/version.h Makefile
 	${LD} -o $@ -r -x ${OBJS} ${HAL_OBJDIR}hal.o
 
-ifndef ${HAL_OBJDIR}
+ifndef HAL_OBJDIR
 #
 # Use release version of HAL.
 #
@@ -72,11 +64,19 @@ ifndef ${HAL_OBJDIR}
 #     specially install it from the sharutils package.
 #
 UUDECODE?=uudecode
+OPT_AH_H=	opt_ah.h
+CLEANFILES+=	hal.o opt_ah.h
 
 hal.o:	${HAL}/${OS}/${TARGET}.hal.o.uu
 	${UUDECODE} < $<
 opt_ah.h: ${HAL}/${OS}/${TARGET}.opt_ah.h
 	cp ${HAL}/${OS}/${TARGET}.opt_ah.h opt_ah.h
+else
+#
+# Use private version of HAL.
+#
+OPT_AH_H=	${HAL_OBJDIR}/opt_ah.h
+HALINCS+=	-I${HAL_OBJDIR}		# for opt_ah.h
 endif
 
 ah_osdep.o: ${HAL}/${OS}/ah_osdep.c
@@ -97,7 +97,7 @@ clean:
 	rm -f ${ALL} ${OBJS} ${CLEANFILES}
 
 depend: beforedepend .depend afterdepend
-.depend: ${SRCS} opt_ah.h
+.depend: ${SRCS} ${OPT_AH_H}
 	rm -f .depend
 	${CC} -M ${CFLAGS} ${SRCS} > .depend
 beforedepend:
