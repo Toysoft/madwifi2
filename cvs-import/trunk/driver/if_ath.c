@@ -475,8 +475,8 @@ ath_init(struct net_device *dev)
 	/*
 	 * Resize receive skb's if changing to or from monitor mode
 	 */
-	if ((dev->type == ARPHRD_ETHER && (ic->ic_opmode == IEEE80211_M_MONITOR))
-		|| (dev->type == ARPHRD_IEEE80211_PRISM && (ic->ic_opmode != IEEE80211_M_MONITOR))) {
+	if ((dev->type == ARPHRD_ETHER && ic->ic_opmode == IEEE80211_M_MONITOR) ||
+	    (dev->type == ARPHRD_IEEE80211_PRISM && ic->ic_opmode != IEEE80211_M_MONITOR)) {
 		struct ath_buf *bf;
 		TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
 			if (bf->bf_skb != NULL) {
@@ -491,7 +491,8 @@ ath_init(struct net_device *dev)
 	/*
 	 * Change our interface type if we are in monitor mode.
 	 */
-	dev->type = (ic->ic_opmode == IEEE80211_M_MONITOR) ? ARPHRD_IEEE80211_PRISM : ARPHRD_ETHER;
+	dev->type = (ic->ic_opmode == IEEE80211_M_MONITOR) ?
+		ARPHRD_IEEE80211_PRISM : ARPHRD_ETHER;
 
 	/*
 	 * The basic interface to setting the hardware in a good
@@ -788,8 +789,7 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 	wh = (struct ieee80211_frame *) skb->data;
-	if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
-	    IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
+	if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) == IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
 		/* fill time stamp */
 		u_int64_t tsf;
 		u_int32_t *tstamp;
@@ -1342,17 +1342,19 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 
 	skb = bf->bf_skb;
 	if (skb == NULL) {
-		
  		if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
  			/*
  			 * Allocate buffer for monitor mode with space for the wlan-ng style
  			 * physical layer header at the start
  			 */
  			u_int off;
- 			skb = dev_alloc_skb(sc->sc_rxbufsize + sizeof(wlan_ng_prism2_header) + sc->sc_cachelsz - 1);
+ 			skb = dev_alloc_skb(sc->sc_rxbufsize +
+					    sizeof(wlan_ng_prism2_header) +
+					    sc->sc_cachelsz - 1);
  			if (skb == NULL) {
  				DPRINTF(("ath_rxbuf_init: skbuff allocation failed; "
- 					"size %u\n", sc->sc_rxbufsize + sizeof(wlan_ng_prism2_header)));
+ 					"size %u\n",
+					sc->sc_rxbufsize + sizeof(wlan_ng_prism2_header)));
  				sc->sc_stats.ast_rx_nobuf++;
  				return ENOMEM;
  			}
@@ -1367,8 +1369,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
  
  			if (off != 0)
  				skb_reserve(skb, sc->sc_cachelsz - off);
-		}
-		else {
+		} else {
 			/*
 			 * Cache-line-align.  This is important (for the 5210 at
 			 * least) as not doing so causes bogus data in rx'd frames.
@@ -1381,7 +1382,6 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 				return ENOMEM;
 			}
 		}
-		
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
 		bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
@@ -1415,7 +1415,6 @@ ath_rx_tasklet(void *data)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
-
 	struct ieee80211_frame *wh, whbuf;
 	int len;
 	u_int8_t phyerr;
@@ -1468,10 +1467,11 @@ ath_rx_tasklet(void *data)
 				}
 
 				/*
-				 * In monitor mode, allow through packets that cannot be decrypted
+				 * In monitor mode, allow through packets that
+				 * cannot be decrypted
 				 */
-				if ((ds->ds_rxstat.rs_status & ~HAL_RXERR_DECRYPT)
-				    || (sc->sc_ic.ic_opmode != IEEE80211_M_MONITOR))
+				if ((ds->ds_rxstat.rs_status & ~HAL_RXERR_DECRYPT) ||
+				    sc->sc_ic.ic_opmode != IEEE80211_M_MONITOR)
 					goto rx_next;
 			}
 
@@ -1481,32 +1481,29 @@ ath_rx_tasklet(void *data)
 		}
 
 		len = ds->ds_rxstat.rs_datalen;
-
 		if (len < sizeof(struct ieee80211_frame)) {
 			DPRINTF(("%s: ath_rx_tasklet: short packet %d\n",
 			    dev->name, len));
 			sc->sc_stats.ast_rx_tooshort++;
 			goto rx_next;
 		}
-
 		pci_dma_sync_single(sc->sc_pdev,
 			bf->bf_skbaddr, len, PCI_DMA_FROMDEVICE);
 
-
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			const HAL_RATE_TABLE *rt = sc->sc_currates;
-			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
+			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
+					sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
 			bf->bf_skb = NULL;
 
 			ath_rx_capture(dev, skb, len, ds->ds_rxstat.rs_rssi,
-				       (rt != NULL)
-				       ? (rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2);
+					(rt != NULL ?
+					(rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2));
 		} else {
 			if (ds->ds_rxstat.rs_more) {
 				/* Ignore packets > MTU */
 				goto rx_next;
 			}
-
 			/*
 			 * normal receive
 			 */
@@ -1520,17 +1517,16 @@ ath_rx_tasklet(void *data)
 					 "fc %x\n", dev->name, wh->i_fc[0]));
 				goto rx_next;
 			}
-			pci_unmap_single(sc->sc_pdev,
-					 bf->bf_skbaddr, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
+			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
+				sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
 			bf->bf_skb = NULL;
 			skb_put(skb, len);
 			skb->protocol = ETH_P_CONTROL;		/* XXX */
 			if (IFF_DUMPPKTS(&sc->sc_ic)) {
 				const HAL_RATE_TABLE *rt = sc->sc_currates;
-	
-			ieee80211_dump_pkt(skb->data, len,
-						   rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
-						   ds->ds_rxstat.rs_rssi);
+				ieee80211_dump_pkt(skb->data, len,
+					   rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
+					   ds->ds_rxstat.rs_rssi);
 			}
 			skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 			if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
@@ -1556,7 +1552,6 @@ ath_rx_tasklet(void *data)
 
 		stats->rx_packets++;
 		stats->rx_bytes += len;
-		
   rx_next:
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	} while (ath_rxbuf_init(sc, bf) == 0);
@@ -1772,7 +1767,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * use short preamble based on the current mode and
 	 * negotiated parameters.
 	 */
-	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) && (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)) {
+	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
+	    (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)) {
 		txrate = rt->info[rix].rateCode | rt->info[rix].shortPreamble;
 		shortPreamble = AH_TRUE;
 		sc->sc_stats.ast_tx_shortpre++;
@@ -2301,7 +2297,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	DPRINTF(("%s: RX filter 0x%x bssid %s\n",
 		 __func__, rfilt, ether_sprintf(bssid)));
 
-	if (nstate == IEEE80211_S_RUN && ic->ic_opmode != IEEE80211_M_IBSS && ic->ic_opmode != IEEE80211_M_MONITOR)
+	if (nstate == IEEE80211_S_RUN &&
+	    ic->ic_opmode != IEEE80211_M_IBSS && ic->ic_opmode != IEEE80211_M_MONITOR)
 		ath_hal_setassocid(ah, bssid, ni->ni_associd);
 	else
 		ath_hal_setassocid(ah, bssid, 0);
@@ -2315,8 +2312,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		/* start periodic recalibration timer */
 		mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
 		netif_start_queue(dev);
-	}
-	else if (nstate == IEEE80211_S_RUN) {
+	} else if (nstate == IEEE80211_S_RUN) {
 		DPRINTF(("%s(RUN): ic_flags=0x%08x iv=%d bssid=%s "
 			"capinfo=0x%04x chan=%d\n"
 			 , __func__
