@@ -2,3 +2,4 @@
 #define AH_SUPPORT_AR5211	1
 #define AH_SUPPORT_AR5212	1
 #define AH_REGOPS_FUNC 1
+#define AH_ENABLE_TX_TPC 1
