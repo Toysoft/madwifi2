@@ -114,11 +114,11 @@ ATH_HAL=${DEPTH}/ath_hal
 #
 # Path to the 802.11 include files
 #
-WLAN=	${DEPTH}/wlan
+WLAN=	${DEPTH}/net80211
 #
-# Path to the device driver.
+# Path to the drivers.
 #
-DRIVER=	${DEPTH}/driver
+DRIVERS=${DEPTH}/ath
 
 #
 # Basic build components.
