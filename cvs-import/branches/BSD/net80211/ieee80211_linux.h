@@ -129,7 +129,8 @@ typedef spinlock_t eapol_lock_t;
 	skb_queue_tail(&(_ni)->ni_savedq, (_skb));		\
 	(_age) -= M_AGE_GET(&(_ni)->ni_savedq.next);		\
 	M_AGE_SET((_skb), (_age));				\
-	(_qlen) = ++((_ni)->ni_savedq.qlen);			\
+	/* N.B.: qlen is incremented in skb_queue_tail() */	\
+	(_qlen) = ((_ni)->ni_savedq.qlen);			\
 } while (0)
 
 // TODO: check NODE_SAVEQ_ENQUEUE regarding age
