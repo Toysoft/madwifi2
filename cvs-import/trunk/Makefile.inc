@@ -48,8 +48,11 @@ DESTDIR=
 #CC=		/export/tools/bin/mips-linux-gcc
 #LD=		/export/tools/bin/mips-linux-ld
 #STRIP=		/export/tools/bin/mips-linux-strip
+#TARGET_OPTS=	-g -O -G 0 -mno-abicalls -fno-pic -mcpu=r4600 -mips2 -Wa,--trap
+#
 STRIP=		strip
-TARGET_OPTS=
+TARGET_OPTS=	-g -O
+
 #
 #
 # Path to the Linux kernel and kernel include files.
@@ -70,7 +73,7 @@ WLAN=	${DEPTH}/wlan
 #
 DRIVER=	${DEPTH}/driver
 
-COPTS=	-g -O -Wall ${TARGET_OPTS} \
+COPTS=	-Wall ${TARGET_OPTS} \
 	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
 
 include ${KERNEL_PATH}/.config
