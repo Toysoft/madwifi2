@@ -17,6 +17,7 @@ Changes since -9:
      these macros have been removed from the HAL (patch from Mike Hudson)
    - port skb room adjusting patch from cvs HEAD (me)
    - fix HAL_FATAL/RXORN conflict issues (me)
+   - disable watchdog during passive scan (me)
 
 Changes since -8:
    - fix oops upon driver insertion: memset memory to zero in ath_node_alloc
