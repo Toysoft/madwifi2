@@ -998,7 +998,7 @@ ath_initkeytable(struct net_device *dev)
 
 			memset(&hk, 0, sizeof(hk));
 			hk.kv_type = HAL_CIPHER_WEP;
-			hk.kv_len = k->wk_len * NBBY;
+			hk.kv_len = k->wk_len;
 			memcpy(hk.kv_val, k->wk_key, k->wk_len);
 			/* XXX return value */
 			ath_hal_keyset(ah, i, &hk);
