@@ -56,9 +56,13 @@ install:
 	for i in ${DIRS}; do \
 		(cd $$i; make install) || exit 1; \
 	done
-ifeq ($(DESTDIR),)
-	/sbin/depmod -ae
-endif
+	@if [ -z $(DESTDIR) ]; then \
+	    /sbin/depmod -ae ; \
+	elif [ -f $(SYSTEMMAP) ]; then \
+	    /sbin/depmod -ae -b $(DESTDIR) -F $(SYSTEMMAP) $(KERNELRELEASE) ; \
+	else \
+	    echo "Don't forget to run \"depmod -ae\" on the target system."; \
+	fi
 
 FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
 	README release.h share net80211 ath_rate
@@ -82,14 +86,21 @@ clean:
 info:
 	@echo "The following settings will be used for compilation:"
 	@echo "TARGET       : $(TARGET)"
+	@echo "OS           : $(OS)"
 	@echo "BUS          : $(BUS)"
-	@echo "TOOLPATH     : $(TOOLPATH)"
+	@if [ ! -z "$(TOOLPATH)" ]; then \
+	    @echo "TOOLPATH     : $(TOOLPATH)"; \
+	fi	
 	@echo "KERNELRELEASE: $(KERNELRELEASE)"
 	@echo "KERNELPATH   : $(KERNELPATH)"
 	@echo "KERNELCONF   : $(KERNELCONF)"
 	@echo "MODULEPATH   : $(MODULEPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
-	@echo "DESTDIR      : $(DESTDIR)"
+	@if [ ! -z "$(DESTDIR)" ]; then \
+	    echo "DESTDIR      : $(DESTDIR)"; \
+	    echo "SYSTEMMAP    : $(SYSTEMMAP)"; \
+	fi
+	@echo "WIRELESSEXT  : $(WIRELESSEXT)"
 
 dotconfig:
 	@#
@@ -105,11 +116,23 @@ dotconfig:
 include $(KERNELCONF)
 
 configcheck: dotconfig
-	@#
-	@# check if kernel configuration meets all requirements
-	@#
-	@echo -n "Checking kernel configuration... "
+	@echo -n "Checking if all requirements are met... "
 	
+	@# check version of kernel and wireless.h
+	@if [ "$(_KVER)" -ne 2 -o "$(_KPL)" -lt 4 ]; then \
+	    echo "FAILED"; \
+	    echo "Only kernel versions 2.4.x and above are supported."; \
+	    echo "You have $(KERNELRELEASE)."; \
+	    exit 1; \
+	fi
+	@if [ "$(WIRELESSEXT)" -lt 14 ]; then \
+	    echo "FAILED"; \
+	    echo "Wireless extensions v14 or better is needed."; \
+	    echo "You have v$(WIRELESSEXT)."; \
+	    exit 1; \
+	fi
+	
+	@# check kernel configuration
 	@if [ -z "$(CONFIG_SYSCTL)" ]; then \
 	    echo "FAILED"; \
 	    echo "Please enable sysctl support."; \
@@ -126,10 +149,11 @@ configcheck: dotconfig
 	    exit 1; \
 	fi
 	
-	@#
-	@# room for future improvements:
-	@# * check for correct version of wireless.h
-	@# * check for kernel version 2.4.x/2.6.x
-	@#
-	
-	@echo "passed."
+	@# some other sanity checks
+	@if [ ! -d $(ATH_RATE) ]; then \
+	    echo "FAILED"; \
+	    echo "Selected rate control $(ATH_RATE) not available."; \
+	    exit 1; \
+	fi
+		
+	@echo "ok."

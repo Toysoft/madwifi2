@@ -57,11 +57,14 @@ TARGET=		i386-elf
 endif
 
 # BUS defines the bus type to which the wireless devices is attached.
-# Currently, the valid BUS types are PCI and LBUS.  If BUS is not
+# Currently, the valid BUS types are PCI and AHB.  If BUS is not
 # defined, then, we assume the bus type is PCI
 ifndef BUS
 BUS=		PCI
 endif
+
+# DESTDIR is used as path prefix during installation.
+DESTDIR ?=
 
 # KERNELPATH is the path to the target kernel's build/source area.
 # This is used to obtain the kernel configuration and include files.
@@ -85,7 +88,7 @@ endif
 
 else
 
-KERNELPATH ?= $(firstword $(wildcard /lib/modules/$(shell uname -r)/build /usr/src/linux))
+KERNELPATH ?= $(firstword $(wildcard $(DESTDIR)/lib/modules/$(shell uname -r)/build /usr/src/linux))
 
 ifeq ($(KERNELPATH),)
 $(error KERNELPATH must be defined.)
@@ -109,8 +112,10 @@ endif
 # of the target kernel.
 KERNELCONF ?=	${KERNELPATH}/.config
 
-# DESTDIR is used as path prefix during installation.
-DESTDIR ?=
+# SYSTEMMAP is the name of the System.map file for the target
+# kernel. This will be needed when DESTDIR is defined in order
+# to run depmod properly.
+SYSTEMMAP ?= 	${KERNELPATH}/System.map
 
 # MODULEPATH nominates the directory where the modules will be
 # installed to
@@ -119,6 +124,10 @@ MODULEPATH := 	${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERN
 else
 MODULEPATH ?=	/lib/modules/${KERNELRELEASE}/net
 endif
+
+# WIRELESSEXT contains information about the version of the wireless
+# extensions that are available in the target kernel
+WIRELESSEXT =	$(shell cat $(KERNELPATH)/include/linux/wireless.h | grep "\#define WIRELESS_EXT" | cut -f2)
 
 # Some settings that depend on actual kernel release
 ifneq ($(findstring 2.6,$(KERNELRELEASE)),)
