@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2004 Atheros Communications, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,4 +36,17 @@
  *
  * $Id$
  */
-#define	ATH_PCI_VERSION	"0.9.4.0"
+ 
+#ifndef _DEV_ATH_PCI_H_
+#define _DEV_ATH_PCI_H_
+
+#include <linux/pci.h>
+#define bus_map_single        pci_map_single
+#define bus_unmap_single      pci_unmap_single
+#define bus_dma_sync_single   pci_dma_sync_single
+#define bus_alloc_consistent  pci_alloc_consistent
+#define bus_free_consistent   pci_free_consistent
+#define BUS_DMA_FROMDEVICE    PCI_DMA_FROMDEVICE
+#define BUS_DMA_TODEVICE      PCI_DMA_TODEVICE
+
+#endif   /* _DEV_ATH_PCI_H_ */
