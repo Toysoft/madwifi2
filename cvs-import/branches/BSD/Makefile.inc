@@ -53,7 +53,8 @@ OS=		linux
 # to override the default setting.
 #
 ifeq ($(TARGET),)
-TARGET=		i386-elf
+TARGET=		$(shell uname -m)-elf
+TOOLPREFIX=	""
 endif
 
 # BUS defines the bus type to which the wireless devices is attached.
@@ -170,8 +171,9 @@ ATH=	${DEPTH}/ath
 #
 # Path to the rate control algorithm.
 #
+#ATH_RATE=$(shell find ath_rate/ -maxdepth 1 ! -name CVS ! -name ath_rate/ -type d)
 ifeq ($(ATH_RATE),)
-ATH_RATE=	ath_rate/onoe
+ATH_RATE=ath_rate/sample
 endif
 
 INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
