@@ -572,7 +572,7 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 		/* NB: this is the default */
 		break;
 	case IW_MODE_ADHOC:
-		ifr.ifr_media |= IFM_IEEE80211_IBSS;
+		ifr.ifr_media |= IFM_IEEE80211_ADHOC;
 		break;
 	case IW_MODE_MASTER:
 		ifr.ifr_media |= IFM_IEEE80211_HOSTAP;
@@ -601,7 +601,7 @@ ieee80211_ioctl_giwmode(struct net_device *dev,
 		*mode = IW_MODE_MASTER;
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		*mode = IW_MODE_MONITOR;
-	else if (imr.ifm_active & IFM_IEEE80211_IBSS)
+	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		*mode = IW_MODE_ADHOC;
 	else
 		*mode = IW_MODE_INFRA;
