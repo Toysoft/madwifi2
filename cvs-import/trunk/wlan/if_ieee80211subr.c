@@ -549,7 +549,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	if ((wh->i_fc[0] & IEEE80211_FC0_VERSION_MASK) !=
 	    IEEE80211_FC0_VERSION_0) {
 		if (netif_msg_debug(ic))
-			printk("%s: receive packet with wrong version: %x\n",
+			printk("%s: discard packet with wrong version: %x\n",
 			    dev->name, wh->i_fc[0]);
 		goto err;
 	}
@@ -561,8 +561,10 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		case IEEE80211_M_STA:
 			ni = &ic->ic_bss;
 			if (!IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_bssid)) {
-				DPRINTF2(("ieee80211_input: other bss %s\n",
-				    ether_sprintf(wh->i_addr2)));
+				if (netif_msg_debug(ic))
+					printk("%s: discard frame from bss %s\n",
+					    dev->name,
+					    ether_sprintf(wh->i_addr2));
 				/* not interested in */
 				goto out;
 			}
@@ -607,8 +609,12 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	case IEEE80211_FC0_TYPE_DATA:
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
-			if (dir != IEEE80211_FC1_DIR_FROMDS)
+			if (dir != IEEE80211_FC1_DIR_FROMDS) {
+				if (netif_msg_debug(ic))
+					printk("%s:discard frame with invalid direction %x\n",
+						dev->name, dir);
 				goto out;
+			}
 #ifdef IFF_SIMPLEX
 			if ((ifp->if_flags & IFF_SIMPLEX) &&
 			    IEEE80211_IS_MULTICAST(wh->i_addr1) &&
@@ -619,6 +625,9 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				 * It should be silently discarded for
 				 * SIMPLEX interface.
 				 */
+				if (netif_msg_debug(ic))
+					printk("%s: discard multicast echo\n",
+						dev->name);
 				goto out;
 			}
 #endif
@@ -668,8 +677,11 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		}
 		/* copy to listener after decrypt */
 		skb = ieee80211_decap(dev, skb);
-		if (skb == NULL)
+		if (skb == NULL) {
+			if (netif_msg_debug(ic))
+				printk("%s: decapsulation failed\n", dev->name);
 			goto err;
+		}
 
 		/* perform as a bridge within the AP */
 		skb1 = NULL;
