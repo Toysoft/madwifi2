@@ -3406,9 +3406,10 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		ath_draintxq(sc);		/* clear pending tx frames */
 		ath_stoprecv(sc);		/* turn off frame recv */
 		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status)) {
-			printk("%s: %s: unable to reset channel %u (%uMhz)\n",
-				dev->name, __func__,
-				ieee80211_chan2ieee(ic, chan), chan->ic_freq);
+			printk("%s: %s: unable to reset channel %u (%uMhz) "
+				"hal status %u\n", dev->name, __func__,
+				ieee80211_chan2ieee(ic, chan), chan->ic_freq,
+				status);
 			return EIO;
 		}
 		sc->sc_curchan = hchan;
