@@ -310,7 +310,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_INT status;
 
@@ -405,7 +404,7 @@ ath_init(struct net_device *dev)
 		printk("%s: unable to reset hardware; HAL status %u\n",
 			dev->name, status);
 		ATH_UNLOCK(sc);
-		return;
+		return EIO;
 	}
 	/*
 	 * Setup the hardware after reset: the key cache
@@ -419,7 +418,7 @@ ath_init(struct net_device *dev)
 	if (ath_startrecv(sc) != 0) {
 		printk("%s: unable to start recv logic\n", dev->name);
 		ATH_UNLOCK(sc);
-		return;
+		return EIO;
 	}
 	/*
 	 * Enable interrupts.
@@ -531,6 +530,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (!sc->sc_oactive)
 		ath_start(dev);
 	ATH_UNLOCK(sc);
+
+	return 0;
 }
 
 static void
@@ -871,7 +872,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
-	int error, arate;
+	int arate;
 	u_int8_t *frm;
 	u_int16_t capinfo;
 
@@ -1272,7 +1273,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
     struct sk_buff *skb)
 {
 	struct ath_hal *ah = sc->sc_ah;
-	int i, error, iswep, more, hdrlen, pktlen;
+	int i, iswep, hdrlen, pktlen;
 	u_int8_t rate, arate;
 	struct ath_desc *ds;
 	struct ieee80211_frame *wh;
@@ -1364,7 +1365,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_daddr;
-	ds->ds_ctl1 |= skb->len | more;
+	ds->ds_ctl1 |= skb->len | 0;
 	ds->ds_status0 = ds->ds_status1 = 0;
 	DPRINTF2(("ath_tx_start: %08x %08x %08x %08x\n",
 	    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1));
@@ -1462,7 +1463,6 @@ static void
 ath_draintxq(struct ath_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
-	struct net_device *dev = &sc->sc_ic.ic_dev;
 	struct ath_buf *bf;
 
 	/* XXX return value */
