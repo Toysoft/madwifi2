@@ -594,7 +594,7 @@ struct ieee80211com {
 #define	NETIF_MSG_LINK2		0x40000000	/* IFF_LINK2 equivalant */
 #define	netif_msg_debug(p)	((p)->msg_enable & NETIF_MSG_DEBUG)
 #define	netif_msg_dumppkts(p) \
-	((p)->msg_enable & (NETIF_MSG_DEBUG|NETIF_MSG_LINK2) == \
+	(((p)->msg_enable & (NETIF_MSG_DEBUG|NETIF_MSG_LINK2)) == \
 		(NETIF_MSG_DEBUG|NETIF_MSG_LINK2))
 
 const char *ether_sprintf(const u_int8_t *);		/* XXX */
