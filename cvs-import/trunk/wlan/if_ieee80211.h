@@ -586,6 +586,8 @@ struct ieee80211com {
 	u_int16_t		ic_txpower;	/* tx power setting (dbM) */
 	int			ic_mgt_timer;	/* mgmt timeout */
 	int			ic_inact_timer;	/* inactivity timer wait */
+	int			ic_nicknamelen;
+	u_int8_t		ic_nickname[IEEE80211_NWID_LEN];
 	int			ic_des_esslen;
 	u_int8_t		ic_des_essid[IEEE80211_NWID_LEN];
 	struct ieee80211channel	*ic_des_chan;	/* desired channel */
@@ -681,8 +683,6 @@ u_int	ieee80211_ghz2ieee(u_int, u_int);
 u_int	ieee80211_chan2ieee(struct ieee80211com *, struct ieee80211channel *);
 u_int	ieee80211_ieee2ghz(u_int, u_int);
 struct ieee80211channel *ieee80211_chan_find(struct ieee80211com *, u_int);
-
-extern	int ieee80211_ioctl(struct net_device *, struct ifreq *, int);
 
 extern	const char *ether_sprintf(const u_int8_t *);		/* XXX */
 

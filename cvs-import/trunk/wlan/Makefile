@@ -6,8 +6,8 @@ DEPTH=	..
 
 include ${DEPTH}/Makefile.inc
 
-SRCS_80211=	if_ieee80211subr.c if_ieee80211ioctl.c if_ieee80211wireless.c
-OBJS_80211=	if_ieee80211subr.o if_ieee80211ioctl.o if_ieee80211wireless.o
+SRCS_80211=	if_ieee80211subr.c if_ieee80211wireless.c
+OBJS_80211=	if_ieee80211subr.o if_ieee80211wireless.o
 SRCS=	${SRCS_80211} if_media.c rc4.c
 OBJS=	${OBJS_80211} if_media.o rc4.o
 

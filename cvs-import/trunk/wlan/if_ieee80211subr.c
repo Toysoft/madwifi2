@@ -147,8 +147,6 @@ ieee80211_ifattach(struct net_device *dev)
 	 */
 	if (dev->get_stats == NULL)
 		dev->get_stats = ieee80211_getstats;
-	if (dev->do_ioctl == NULL)
-		dev->do_ioctl = ieee80211_ioctl;
 #ifdef CONFIG_NET_WIRELESS
 	if (dev->get_wireless_stats == NULL)
 		dev->get_wireless_stats = ieee80211_iw_getstats;
