@@ -46,6 +46,8 @@ ${OBJS}: if_ieee80211.ver if_media.ver
 endif
 
 install: all
+	test -d ${DESTDIR}/lib/modules/${VERSION}/net || \
+		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
 	cp wlan.o ${DESTDIR}/lib/modules/${VERSION}/net
 
 clean:
