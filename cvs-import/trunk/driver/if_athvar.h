@@ -38,7 +38,7 @@
 #define	ATH_TIMEOUT		1000
 
 #define	ATH_RXBUF	40		/* number of RX buffers */
-#define	ATH_TXBUF	10		/* number of TX buffers */
+#define	ATH_TXBUF	40		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
 
 /* statistics for node */
@@ -53,11 +53,16 @@ struct ath_stats {
 	u_int32_t	ast_watchdog;	/* device reset by watchdog */
 	u_int32_t	ast_hardware;	/* fatal hardware error interrupt */
 	u_int32_t	ast_bmiss;	/* beacon miss interrupt */
+	u_int32_t	ast_rxorn;	/* rxorn interrupts */
+	u_int32_t	ast_rxeol;	/* rxeol interrupts */
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
+	u_int32_t	ast_tx_invalid;	/* frames discarded 'cuz device gone */
+	u_int32_t	ast_tx_qstop;	/* tx queue stopped 'cuz full */
 	u_int32_t	ast_tx_encap;	/* tx encapsulation failed */
 	u_int32_t	ast_tx_nonode;	/* tx failed 'cuz no node */
-	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer */
+	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer (data) */
+	u_int32_t	ast_tx_nobufmgt;/* tx failed 'cuz no tx buffer (mgmt)*/
 	u_int32_t	ast_tx_descerr;	/* tx failure reported in desc*/
 	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
 	u_int32_t	ast_rx_tooshort;/* rx failed 'cuz frame too short */
@@ -105,7 +110,6 @@ struct ath_softc {
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 
 	u_int32_t		*sc_txlink;	/* link ptr in last TX desc */
-	int			sc_tx_timer;	/* tx timeout */
 	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
 	TAILQ_HEAD(, ath_buf)	sc_txq;		/* transmit queue */
