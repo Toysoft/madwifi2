@@ -1176,5 +1176,6 @@ ieee80211_set_shortslottime(struct ieee80211com *ic, int onoff)
 	else
 		ic->ic_flags &= ~IEEE80211_F_SHSLOT;
 	/* notify driver */
-	(*ic->ic_updateslot)(ic->ic_dev);
+	if (ic->ic_updateslot != NULL)
+		(*ic->ic_updateslot)(ic->ic_dev);
 }
