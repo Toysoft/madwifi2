@@ -946,6 +946,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	int pktlen;
 	u_int8_t *frm, rate;
 	u_int16_t capinfo;
+	struct ieee80211_rateset *rs;
 	const HAL_RATE_TABLE *rt;
 
 	bf = sc->sc_bcbuf;
@@ -956,13 +957,15 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 	}
+	rs = &ni->ni_rates;
 	pktlen = + 8
 		  + sizeof(u_int16_t)
 		  + sizeof(u_int16_t)
 		  + 2 + ni->ni_esslen
-		  + 2 + IEEE80211_RATE_SIZE
-		  + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+		  + 2 + rs->rs_nrates
 		  + 6;
+	if (rs->rs_nrates > IEEE80211_RATE_SIZE)
+		pktlen += 2;
 	/*
 	 * Beacon frames must be aligned to a 32-bit boundary and
 	 * the buffer length must be a multiple of 4 bytes.  Allocate
@@ -1020,7 +1023,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	*frm++ = ni->ni_esslen;
 	memcpy(frm, ni->ni_essid, ni->ni_esslen);
 	frm += ni->ni_esslen;
-	frm = ieee80211_add_rates(frm, &ni->ni_rates);
+	frm = ieee80211_add_rates(frm, rs);
 	if (ic->ic_opmode == IEEE80211_M_IBSS) {
 		*frm++ = IEEE80211_ELEMID_IBSSPARMS;
 		*frm++ = 2;
