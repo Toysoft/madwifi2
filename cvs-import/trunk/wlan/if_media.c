@@ -83,11 +83,11 @@ static	void ifmedia_printword(int);
  * Initialize if_media struct for a specific interface instance.
  */
 void
-ifmedia_init(ifm, dontcare_mask, change_callback, status_callback)
-	struct ifmedia *ifm;
-	int dontcare_mask;
-	ifm_change_cb_t change_callback;
-	ifm_stat_cb_t status_callback;
+ifmedia_init(
+	struct ifmedia *ifm,
+	int dontcare_mask,
+	ifm_change_cb_t change_callback,
+	ifm_stat_cb_t status_callback)
 {
 
 	LIST_INIT(&ifm->ifm_list);
@@ -99,8 +99,7 @@ ifmedia_init(ifm, dontcare_mask, change_callback, status_callback)
 }
 
 void
-ifmedia_removeall(ifm)
-	struct ifmedia *ifm;
+ifmedia_removeall(struct ifmedia *ifm)
 {
 	struct ifmedia_entry *entry;
 
@@ -116,11 +115,7 @@ ifmedia_removeall(ifm)
  * for a specific interface instance.
  */
 void
-ifmedia_add(ifm, mword, data, aux)
-	struct ifmedia *ifm;
-	int mword;
-	int data;
-	void *aux;
+ifmedia_add(struct ifmedia *ifm, int mword, int data, void *aux)
 {
 	register struct ifmedia_entry *entry;
 
@@ -151,10 +146,7 @@ ifmedia_add(ifm, mword, data, aux)
  * supported media for a specific interface instance.
  */
 void
-ifmedia_list_add(ifm, lp, count)
-	struct ifmedia *ifm;
-	struct ifmedia_entry *lp;
-	int count;
+ifmedia_list_add(struct ifmedia *ifm, struct ifmedia_entry *lp, int count)
 {
 	int i;
 
@@ -171,9 +163,7 @@ ifmedia_list_add(ifm, lp, count)
  * media-change callback.
  */
 void
-ifmedia_set(ifm, target)
-	struct ifmedia *ifm; 
-	int target;
+ifmedia_set(struct ifmedia *ifm, int target)
 
 {
 	struct ifmedia_entry *match;
@@ -201,11 +191,8 @@ ifmedia_set(ifm, target)
  * Device-independent media ioctl support function.
  */
 int
-ifmedia_ioctl(dev, ifr, ifm, cmd)
-	struct net_device *dev;
-	struct ifreq *ifr;
-	struct ifmedia *ifm;
-	u_long cmd;
+ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
+	struct ifmedia *ifm, u_long cmd)
 {
 	struct ifmedia_entry *match;
 	struct ifmediareq *ifmr = (struct ifmediareq *) ifr;
@@ -363,10 +350,7 @@ ifmedia_ioctl(dev, ifr, ifm, cmd)
  *
  */
 static struct ifmedia_entry *
-ifmedia_match(ifm, target, mask)
-	struct ifmedia *ifm; 
-	int target;
-	int mask;
+ifmedia_match(struct ifmedia *ifm, int target, int mask)
 {
 	struct ifmedia_entry *match, *next;
 
@@ -451,8 +435,7 @@ struct ifmedia_type_to_subtype ifmedia_types_to_subtypes[] = {
  * print a media word.
  */
 static void
-ifmedia_printword(ifmw)
-	int ifmw;
+ifmedia_printword(int ifmw)
 {
 	struct ifmedia_description *desc;
 	struct ifmedia_type_to_subtype *ttos;
