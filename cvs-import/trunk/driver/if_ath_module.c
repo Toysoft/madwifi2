@@ -58,8 +58,8 @@
  */
 #include "release.h"
 #include "version.h"
-static char *version = ATH_PCI_VERSION " " RELEASE_TYPE;
-static char *dev_info = "ath_pci";
+char *version = ATH_PCI_VERSION " " RELEASE_TYPE;
+char *dev_info = "ath_pci";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
@@ -68,8 +68,8 @@ MODULE_SUPPORTED_DEVICE("Atheros WLAN cards");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-extern int __init init_ath(void);
-extern void __exit exit_ath(void);
+extern int init_ath(void);
+extern void exit_ath(void);
 
 static int __init
 init_module_func(void)
