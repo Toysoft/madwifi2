@@ -1427,7 +1427,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		rix = 0;			/* XXX lowest rate */
 		break;
 	default:
-		rix = sc->sc_rixmap[ni->ni_rates.rs_rates[ni->ni_txrate]];
+		rix = sc->sc_rixmap[ni->ni_rates.rs_rates[ni->ni_txrate] &
+				IEEE80211_RATE_VAL];
 		if (rix == 0xff) {
 			printk("%s: %s: bogus xmit rate 0x%x\n",
 				dev->name, __func__,
@@ -2112,17 +2113,8 @@ ath_rate_mapsetup(struct net_device *dev)
 	memset(sc->sc_rixmap, 0xff, sizeof(sc->sc_rixmap));
 	rt = sc->sc_rates[ic->ic_curmode];
 	KASSERT(rt != NULL, ("no h/w rate set for current phy mode"));
-	for (i = 0; i < rt->rateCount; i++) {
-		u_int8_t r = rt->info[i].dot11Rate;
-		/*
-		 * NB: setup the 802.11 rate both w/ and w/o
-		 *     the basic rate flag to guard against
-		 *     bogus 11g AP's that send rate sets with
-		 *     basic rates not marked as basic.
-		 */
-		sc->sc_rixmap[r] = i;
-		sc->sc_rixmap[r & IEEE80211_RATE_VAL] = i;
-	}
+	for (i = 0; i < rt->rateCount; i++)
+		sc->sc_rixmap[rt->info[i].dot11Rate & IEEE80211_RATE_VAL] = i;
 }
 
 static void
