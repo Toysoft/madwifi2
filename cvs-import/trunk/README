@@ -84,13 +84,12 @@ This driver requires the following support in your kernel:
 
 o Wireless Extensions versions 14 or later (version 16 preferred)
 o Sysctl support
-o Crypto API support including the HMAC algorithm and the MD5 algorithm
-  if you want the 802.1x authenticator (AES support is used if present,
-  otherwise the AES-CCMP cipher module falls back to a private implementation)
+o Crypto API support (AES support is used if present, otherwise the
+  AES-CCMP cipher module falls back to a private implementation)
 
-Most testing has been done with kernel versions 2.6.0 and later and
-versions 2.4.25 and 2.4.26.  Expect some rough edges if you
-deviate from that combo.  
+Testing has been done with kernels from 2.4.2x to 2.6.10.  Early
+2.4 kernels may require patches; e.g. for crypto support and/or
+updated wireless extensions.
 
 Atheros Hardware
 ================
@@ -265,29 +264,15 @@ Linux 2.4
 
 The first three files must be loaded either manually or by the
 system, e.g. through the hotplug or card manager support.  The
-remaining modules are loaded by the wlan module as needed.  To
-manually load the modules you can use insmod or modprobe; e.g.
+remaining modules are loaded by the wlan module as needed.  Typically
+manuals are automatically loaded via dependencies, so after doing a
+make install you only need to do:
 
-Linux 2.6
-    insmod wlan/wlan.ko
-    insmod ath_hal/ath_hal.ko
-    insmod driver/ath_pci.ko
+    modprobe ath_pci
 
-Linux 2.4
-    insmod wlan/wlan.o
-    insmod ath_hal/ath_hal.o
-    insmod driver/ath_pci.o
-
-(note you must load the wlan and ath_hal modules first as the driver
-depends on them).  More likely though you will want to install the
-modules so the system will load them for you as needed:
-
-    make install
-
-(doing this is also necessary for the wlan module to locate those modules
-it loads on demand).  To complete installation you may need to modify
-your system's configuration files so the necessary modules are loaded
-when an Atheros device is recognized.  The exact procedure varies from
+For automatic module loading you may need to modify your system's
+configuration files so the necessary modules are loaded when an
+Atheros device is recognized.  The exact procedure varies from
 system to system.
 
 
@@ -337,12 +322,17 @@ There are some debugging mechanisms for the curious/masochistic:
 sysctl -w dev.ath.debug=0xXXX	enable console msgs from the driver
 sysctl -w net.wlan0.debug=0xYYY	enable console msgs from the wlan module
 
-The values specified for 0XXX and 0xYYY are bit masks that enable debugging
-in various parts of each module.  For the wlan module these values are
-found in the file net80211/ieee80211_var.h (search for MSG_).  For the
-ath driver look in ath/if_ath.c (search for ATH_DEBUG).  Beware that
-enabling some debugging msgs can affect the operation of the software
-by slowing it down too much.
+The values specified for 0XXX and 0xYYY are bit masks that enable
+debugging in various parts of each module.  For the wlan module
+these values are found in the file net80211/ieee80211_var.h (search
+for MSG_).  For the ath driver look in ath/if_ath.c (search for
+ATH_DEBUG).  Beware that enabling some debugging msgs can affect
+the operation of the software by slowing it down too much.  The
+programs tools/athdebug and tools/80211debug allow you to do the
+above using symbol names; e.g.
+
+athdebug +xmit
+80211debug scan+assoc
 
 In addition the programs tools/athstats and tools/80211stats can
 be very useful in understanding what is going on.  In particular,
@@ -375,36 +365,17 @@ for an up to date list.
 NOTE: the in-kernel authenticator is being replaced; to use it you need
       to follow the directions in net80211/Makefile.
 
-When operating as an AP you can use fixed/shared key ciphers and/or
-802.1x authentication.  The authentication mode is specified using
+When operating as an AP you can use fixed/shared key ciphers, 802.1x,
+and/or WPA authentication.  The authentication mode is specified using
 iwpriv:
 
 iwpriv ath0 authmode 1		# open authenticatoin
 iwpriv ath0 authmode 2		# shared key authentication
 iwpriv ath0 authmode 3		# 802.1x authentication
 
-To use the 802.1x authenticator you must configure the RADIUS client
-support for communication with the backend server.  This is done
-using sysctl's; e.g.
-
-sysctl -w net.8021x.radius.clientaddr=10.3.0.177
-sysctl -w net.8021x.radius.serveraddr=10.3.0.251
-# XXX sysctl appends a '\n' to the string so avoid it!
-#sysctl -w net.8021x.radius.secret=radius123
-echo -n radius123 > /proc/sys/net/8021x/radius/secret
-
-For the moment you must also specify a master WEP key for the
-authenticator to use in constructing the group transmit key; e.g.
-
-iwconfig ath0 key aabbccddee0011223344aabbcc556677 [2]
-
-The length of this key is also used for the length of generated
-keys.  This mechanism will change when WPA authenticator support
-is added.
-
-Note that the 802.1x authenticator is lightly tested and has been
-somewhat neglected while the WPA supplicant support has been
-developed.  Consider it experimental.
+To use the 802.1x authenticator you must install and configure the hostapd
+program from the same place you got wpa_supplicant.  Consult the hostapd
+documentation for its' setup.
 
 
 Known Problems
@@ -433,8 +404,9 @@ Vivien Chappelier Eric Lammerts	    Mark Rakes	      Stephen Walton
 Tong Chia	  Stephane Laroche  Michael Renzmann  Dale Whitfield
 Joachim Gleissner Georg Lukas	    Paul Stewart      Alexander Wirtz
 Guy Erb		  Tom Marshall	    D. Stolte	      Kevin Yu
-Kristian Hoffmann Nick Moss	    Bindu Therthala
-William S. Kish	  Nick Petroni	    Carl Thompson
+Kristian Hoffmann Nick Moss	    Bindu Therthala   Thorsten von Eicken
+William S. Kish	  Nick Petroni	    Carl Thompson     Jouni Malinen
+Satish Balay
 
 (Apologies to anyone whose name was unintentionally left off.)
 
