@@ -80,6 +80,44 @@ extern	void ieee80211_pwrsave(struct ieee80211com *, struct ieee80211_node *,
 extern	struct sk_buff *ieee80211_encap(struct ieee80211com *, struct sk_buff *,
 		struct ieee80211_node **);
 
+/*
+ * Template for an in-kernel authenticator.  Authenticators
+ * register with the protocol code and are typically loaded
+ * as separate modules as needed.
+ */
+struct ieee80211_authenticator {
+	const char *ia_name;		/* printable name */
+	int	(*ia_attach)(struct ieee80211com *);
+	void	(*ia_detach)(struct ieee80211com *);
+	void	(*ia_node_join)(struct ieee80211com *,
+				struct ieee80211_node *);
+	void	(*ia_node_leave)(struct ieee80211com *,
+				struct ieee80211_node *);
+};
+extern	void ieee80211_authenticator_register(int type,
+		const struct ieee80211_authenticator *);
+extern	void ieee80211_authenticator_unregister(int type);
+extern	const struct ieee80211_authenticator *
+		ieee80211_authenticator_get(int auth);
+
+struct eapolcom;
+/*
+ * Template for an in-kernel authenticator backend.  Backends
+ * register with the protocol code and are typically loaded
+ * as separate modules as needed.
+ */
+struct ieee80211_authenticator_backend {
+	const char *iab_name;		/* printable name */
+	int	(*iab_attach)(struct eapolcom *);
+	void	(*iab_detach)(struct eapolcom *);
+};
+extern	void ieee80211_authenticator_backend_register(
+		const struct ieee80211_authenticator_backend *);
+extern	void ieee80211_authenticator_backend_unregister(
+		const struct ieee80211_authenticator_backend *);
+extern	const struct ieee80211_authenticator_backend *
+	ieee80211_authenticator_backend_get(const char *name);
+
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
 #define	IEEE80211_F_DOFRATE	0x00000002	/* use fixed rate */
@@ -105,13 +143,24 @@ extern	const char *ieee80211_state_name[IEEE80211_S_MAX];
 struct ieee80211_beacon_offsets {
 	u_int16_t	*bo_caps;	/* capabilities */
 	u_int8_t	*bo_tim;	/* start of atim/dtim */
-	u_int8_t	*bo_xrates;	/* start of extended rates */
+	u_int8_t	*bo_trailer;	/* start of fixed-size trailer */
 	u_int16_t	bo_tim_len;	/* atim/dtim length in bytes */
-	u_int16_t	bo_xrates_len;	/* xrates length in bytes */
+	u_int16_t	bo_trailer_len;	/* trailer length in bytes */
 };
 extern	struct sk_buff *ieee80211_beacon_alloc(struct ieee80211com *,
 		struct ieee80211_node *, struct ieee80211_beacon_offsets *);
 extern	int ieee80211_beacon_update(struct ieee80211com *,
 		struct ieee80211_node *, struct ieee80211_beacon_offsets *,
 		struct sk_buff **);
+
+/*
+ * Notification methods called from the 802.11 state machine.
+ * Note that while these are defined here, their implementation
+ * is OS-specific.
+ */
+extern	void ieee80211_notify_node_join(struct ieee80211com *,
+		struct ieee80211_node *, int newassoc);
+extern	void ieee80211_notify_node_leave(struct ieee80211com *,
+		struct ieee80211_node *);
+extern	void ieee80211_notify_scan_done(struct ieee80211com *);
 #endif /* _NET80211_IEEE80211_PROTO_H_ */
