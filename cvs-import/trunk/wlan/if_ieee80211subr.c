@@ -2466,7 +2466,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		}
 		frm += frm[1] + 2;
 	}
-	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE, wh);
 	IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN, wh);
 	if (chan > IEEE80211_CHAN_MAX || isclr(ic->ic_chan_active, chan)) {
 		DPRINTF(ic, ("%s: ignore %s with invalid channel %u\n",
@@ -2591,7 +2591,7 @@ ieee80211_recv_prreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		}
 		frm += frm[1] + 2;
 	}
-	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE, wh);
 	IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN, wh);
 	if (ssid[1] != 0 &&
 	    (ssid[1] != ic->ic_bss.ni_esslen ||
@@ -2793,7 +2793,7 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		}
 		frm += frm[1] + 2;
 	}
-	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE, wh);
 	IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN, wh);
 	if (ssid[1] != ic->ic_bss.ni_esslen ||
 	    memcmp(ssid + 2, ic->ic_bss.ni_essid, ssid[1]) != 0) {
@@ -2927,7 +2927,7 @@ ieee80211_recv_asresp(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		frm += frm[1] + 2;
 	}
 
-	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE, wh);
 	ieee80211_setup_rates(ic, ni, rates, xrates,
 			IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
 			IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
