@@ -225,8 +225,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * Copy these back; they are set as a side effect
 	 * of constructing the channel list.
 	 */
-	ath_regdomain = ath_hal_getregdomain(ah);
-	ath_countrycode = ath_hal_getcountrycode(ah);
+	ath_hal_getregdomain(ah, &ath_regdomain);
+	ath_hal_getcountrycode(ah, &ath_countrycode);
 
 	/*
 	 * Setup rate tables for all potential media types.
@@ -449,13 +449,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	needmark = 0;
 	ath_hal_getisr(ah, &status);
 	DPRINTF2(("%s: interrupt, status 0x%x\n", dev->name, status));
-#ifdef AR_DEBUG
-	if (ath_debug &&
-	    (status & (HAL_INT_FATAL|HAL_INT_RXORN|HAL_INT_BMISS))) {
-		printk("%s: ath_intr: status 0x%x\n", dev->name, status);
-		ath_hal_dumpstate(ah);
-	}
-#endif /* AR_DEBUG */
 	status &= sc->sc_imask;			/* discard unasked for bits */
 	if (status & HAL_INT_FATAL) {
 		sc->sc_stats.ast_hardware++;
@@ -1000,9 +993,16 @@ ath_initkeytable(struct net_device *dev)
 		struct ieee80211_wepkey *k = &ic->ic_nw_keys[i];
 		if (k->wk_len == 0)
 			ath_hal_keyreset(ah, i);
-		else
+		else {
+			HAL_KEYVAL hk;
+
+			memset(&hk, 0, sizeof(hk));
+			hk.kv_type = HAL_CIPHER_WEP;
+			hk.kv_len = k->wk_len * NBBY;
+			memcpy(hk.kv_val, k->wk_key, k->wk_len);
 			/* XXX return value */
-			ath_hal_keyset(ah, i, (const HAL_KEYVAL *) k);
+			ath_hal_keyset(ah, i, &hk);
+		}
 	}
 }
 
@@ -2439,10 +2439,6 @@ ath_tx_timeout(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 	sc->sc_stats.ast_watchdog++;
-#ifdef AR_DEBUG
-	if (ath_debug)
-		ath_hal_dumpstate(sc->sc_ah);
-#endif
 	ath_init(dev);
 }
 
@@ -3286,6 +3282,68 @@ ath_change_mtu(struct net_device *dev, int mtu)
 	return -ath_reset(dev);
 }
 
+/*
+ * Diagnostic interface to the HAL.  This is used by various
+ * tools to do things like retrieve register contents for
+ * debugging.  The mechanism is intentionally opaque so that
+ * it can change frequently w/o concern for compatiblity.
+ */
+static int
+ath_ioctl_diag(struct ath_softc *sc, struct ath_diag *ad)
+{
+	struct ath_hal *ah = sc->sc_ah;
+	u_int id = ad->ad_id & ATH_DIAG_ID;
+	void *indata = NULL;
+	void *outdata = NULL;
+	u_int32_t insize = ad->ad_in_size;
+	u_int32_t outsize = ad->ad_out_size;
+	int error = 0;
+
+	if (ad->ad_id & ATH_DIAG_IN) {
+		/*
+		 * Copy in data.
+		 */
+		indata = kmalloc(insize, GFP_KERNEL);
+		if (indata == NULL) {
+			error = -ENOMEM;
+			goto bad;
+		}
+		if (copy_from_user(indata, ad->ad_in_data, insize)) {
+			error = -EFAULT;
+			goto bad;
+		}
+	}
+	if (ad->ad_id & ATH_DIAG_DYN) {
+		/*
+		 * Allocate a buffer for the results (otherwise the HAL
+		 * returns a pointer to a buffer where we can read the
+		 * results).  Note that we depend on the HAL leaving this
+		 * pointer for us to use below in reclaiming the buffer;
+		 * may want to be more defensive.
+		 */
+		outdata = kmalloc(outsize, GFP_KERNEL);
+		if (outdata == NULL) {
+			error = -ENOMEM;
+			goto bad;
+		}
+	}
+	if (ath_hal_getdiagstate(ah, id, indata, insize, &outdata, &outsize)) {
+		if (outsize < ad->ad_out_size)
+			ad->ad_out_size = outsize;
+		if (outdata &&
+		     copy_to_user(ad->ad_out_data, outdata, ad->ad_out_size))
+			error = -EFAULT;
+	} else {
+		error = -EINVAL;
+	}
+bad:
+	if ((ad->ad_id & ATH_DIAG_IN) && indata != NULL)
+		kfree(indata);
+	if ((ad->ad_id & ATH_DIAG_DYN) && outdata != NULL)
+		kfree(outdata);
+	return error;
+}
+
 static int
 ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -3299,20 +3357,10 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		    sizeof (sc->sc_stats)))
 			return -EFAULT;
 		return 0;
-	case SIOCGATHDIAG: {
-		struct ath_diag *ad = (struct ath_diag *)ifr;
-		struct ath_hal *ah = sc->sc_ah;
-		void *data;
-		u_int size;
-                
-		if (!ath_hal_getdiagstate(ah, ad->ad_id, &data, &size))
-			return -EINVAL;
-		if (size < ad->ad_size)
-			ad->ad_size = size;
-		if (data && copy_to_user(ad->ad_data, data, ad->ad_size))
-			return -EFAULT;
-		return 0;
-	}
+	case SIOCGATHDIAG:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		return ath_ioctl_diag(sc, (struct ath_diag *) ifr);
         }
         return -EOPNOTSUPP;
 }
@@ -3323,14 +3371,13 @@ enum {
 	ATH_DWELLTIME	= 2,
 	ATH_CALIBRATE	= 3,
 	ATH_RATEINTERVAL= 4,
-	ATH_DUMP	= 5,
+	ATH_DUMP	= 5,		/* NB: no longer used */
 	ATH_CC		= 6,
 	ATH_OUTDOOR	= 7,
 	ATH_REGDOMAIN	= 8,
 	ATH_XCHANMODE	= 9,
 	ATH_CTLPKT	= 10,
 };
-static	char ath_dump[12];
 
 static int
 ath_sysctl_handler(ctl_table *ctl, int write, struct file *filp,
@@ -3359,34 +3406,6 @@ ath_sysctl_handler(ctl_table *ctl, int write, struct file *filp,
 	return ret;
 }
 
-static int
-ath_sysctl_dump(ctl_table *ctl, int write, struct file *filp,
-	void *buffer, size_t *lenp)
-{
-	int ret = proc_dostring(ctl, write, filp, buffer, lenp);
-	/* NB: should always be a write */
-	if (ret == 0) {
-		struct net_device *dev;
-		struct ath_softc *sc;
-
-		dev = dev_get_by_name("ath0");		/* XXX */
-		if (!dev) {
-			printk("%s: no ath0 device\n", __func__);
-			return EINVAL;
-		}
-		sc = dev->priv;
-		if (*lenp >= 3 && strncmp(buffer, "hal", 3) == 0)
-			ath_hal_dumpstate(sc->sc_ah);
-		else {
-			printk("%s: don't grok \"%.*s\"\n",
-				__func__, *lenp, (char*) buffer);
-			ret = -EINVAL;
-		}
-		dev_put(dev);
-	}
-	return ret;
-}
-
 enum {
 	DEV_ATH		= 9,			/* XXX */
 };
@@ -3402,8 +3421,6 @@ static ctl_table ath_sysctls[] = {
 	  sizeof(ath_calinterval),0644,	NULL,	ath_sysctl_handler },
 	{ ATH_RATEINTERVAL,	"rateinterval",	&ath_rateinterval,
 	  sizeof(ath_rateinterval),0644,NULL,	ath_sysctl_handler },
-	{ ATH_DUMP,		"dump",		ath_dump,
-	  sizeof(ath_dump),	0200,	NULL,	ath_sysctl_dump },
 	{ ATH_CC,		"countrycode",	&ath_countrycode,
 	  sizeof(ath_countrycode),0444,	NULL,	ath_sysctl_handler },
 	{ ATH_OUTDOOR,		"outdoor",	&ath_outdoor,

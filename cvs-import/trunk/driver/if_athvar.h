@@ -184,9 +184,6 @@ void	ath_sysctl_unregister(void);
  */
 #define	ath_hal_reset(_ah, _opmode, _chan, _outdoor, _pstatus) \
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
-#define	ath_hal_getregdomain(_ah) \
-	((*(_ah)->ah_getRegDomain)((_ah)))
-#define	ath_hal_getcountrycode(_ah)	(_ah)->ah_countryCode
 #define	ath_hal_getratetable(_ah, _mode) \
 	((*(_ah)->ah_getRateTable)((_ah), (_mode)))
 #define	ath_hal_getmac(_ah, _mac) \
@@ -254,6 +251,12 @@ void	ath_sysctl_unregister(void);
 		(_dc), (_cc)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
 	((*(_ah)->ah_writeAssocid)((_ah), (_bss), (_associd), 0))
+#define	ath_hal_getcapability(_ah, _cap, _param, _result) \
+	((*(_ah)->ah_getCapability)((_ah), (_cap), (_param), (_result)))
+#define	ath_hal_getregdomain(_ah, _prd) \
+	ath_hal_getcapability(_ah, HAL_CAP_REG_DMN, 0, (_prd))
+#define	ath_hal_getcountrycode(_ah, _pcc) \
+	(*(_pcc) = (_ah)->ah_countryCode)
 
 #ifdef SOFTLED
 #define ath_hal_gpioCfgOutput(_ah, _gpio) \
@@ -278,10 +281,14 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_startPcuReceive)((_ah)))
 #define	ath_hal_stopdmarecv(_ah) \
 	((*(_ah)->ah_stopDmaReceive)((_ah)))
-#define	ath_hal_dumpstate(_ah) \
-	((*(_ah)->ah_dumpState)((_ah)))
-#define	ath_hal_getdiagstate(_ah, _id, _data, _size) \
-	((*(_ah)->ah_getDiagState)((_ah), (_id), (_data), (_size)))
+#define	ath_hal_getdiagstate(_ah, _id, _indata, _insize, _outdata, _outsize) \
+	((*(_ah)->ah_getDiagState)((_ah), (_id), \
+		(_indata), (_insize), (_outdata), (_outsize)))
+#define	ath_hal_getregdomain(_ah, _prd) \
+	ath_hal_getcapability(_ah, HAL_CAP_REG_DMN, 0, (_prd))
+#define	ath_hal_getcountrycode(_ah, _pcc) \
+	(*(_pcc) = (_ah)->ah_countryCode)
+
 #define	ath_hal_setuptxqueue(_ah, _type, _qinfo) \
 	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_qinfo)))
 #define	ath_hal_resettxqueue(_ah, _q) \
