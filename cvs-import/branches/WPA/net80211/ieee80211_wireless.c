@@ -39,6 +39,7 @@
 #define	EXPORT_SYMTAB
 #endif
 
+#ifdef CONFIG_NET_WIRELESS
 /*
  * Wireless extensions support for 802.11 common code.
  */
@@ -46,7 +47,6 @@
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
-
 #include <linux/utsname.h>
 #include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
 
@@ -58,11 +58,10 @@
 
 #include <net80211/ieee80211_var.h>
 
-#ifdef CONFIG_NET_WIRELESS
-#include <linux/wireless.h>
-
 #define	IS_UP(_dev) \
 	(((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
+#define	IS_UP_AUTO(_ic) \
+	(IS_UP((_ic)->ic_dev) && (_ic)->ic_roaming == IEEE80211_ROAMING_AUTO)
 
 /*
  * Units are in db above the noise floor. That means the
@@ -226,15 +225,12 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 				return -EINVAL;
 		}
 		ic->ic_wep_txkey = kid;
-		wepchange = (ic->ic_flags & IEEE80211_F_WEPON) == 0;
-		ic->ic_flags |= IEEE80211_F_WEPON | IEEE80211_F_PRIVACY;
+		wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) == 0;
+		ic->ic_flags |= IEEE80211_F_PRIVACY;
 	} else {
-		if ((ic->ic_flags & IEEE80211_F_WEPON) == 0)
+		if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0)
 			return 0;
-		ic->ic_flags &= ~IEEE80211_F_WEPON;
-		/* turn off privacy if no crypto algorithms in use */
-		if ((ic->ic_flags & IEEE80211_F_CRYPTON) == 0)
-			ic->ic_flags &= ~IEEE80211_F_PRIVACY;
+		ic->ic_flags &= ~IEEE80211_F_PRIVACY;
 		wepchange = 1;
 		error = 0;
 	}
@@ -245,15 +241,10 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		 * effect the change.  If we're enabling/disabling
 		 * crypto use then we must re-initialize the device
 		 * so the 802.11 state machine is reset.  Otherwise
-		 * we only need to reset the hardware state.  By
-		 * differentiating the two we allow key changes to
-		 * be done w/o changing the 802.11 state machine
-		 * which is important for applications like 802.1x.
+		 * the key state should have been updated above.
 		 */
-		if (wepchange)
+		if (wepchange && ic->ic_roaming == IEEE80211_ROAMING_AUTO)
 			error = (*ic->ic_init)(ic->ic_dev);
-		else
-			error = (*ic->ic_reset)(ic->ic_dev);
 	}
 	return -error;
 }
@@ -266,7 +257,8 @@ ieee80211_ioctl_giwencode(struct ieee80211com *ic,
 {
 	int error, kid;
 
-	if ((ic->ic_flags & IEEE80211_F_WEPON) == 0) {
+	if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0) {
+		/* XXX no way to return cipher/key type */
 		erq->length = 0;
 		erq->flags = IW_ENCODE_DISABLED;
 		error = 0;
@@ -442,7 +434,7 @@ ieee80211_ioctl_siwap(struct ieee80211com *ic,
 		ic->ic_flags &= ~IEEE80211_F_DESBSSID;
 	else
 		ic->ic_flags |= IEEE80211_F_DESBSSID;
-	return IS_UP(ic->ic_dev) ? -(*ic->ic_init)(ic->ic_dev) : 0;
+	return IS_UP_AUTO(ic) ? -(*ic->ic_init)(ic->ic_dev) : 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwap);
 
@@ -536,7 +528,7 @@ ieee80211_ioctl_siwfreq(struct ieee80211com *ic,
 	if (ic->ic_opmode == IEEE80211_M_MONITOR)
 		return IS_UP(ic->ic_dev) ? -(*ic->ic_reset)(ic->ic_dev) : 0;
 	else
-		return IS_UP(ic->ic_dev) ? -(*ic->ic_init)(ic->ic_dev) : 0;
+		return IS_UP_AUTO(ic) ? -(*ic->ic_init)(ic->ic_dev) : 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwfreq);
 
@@ -566,18 +558,12 @@ ieee80211_ioctl_siwessid(struct ieee80211com *ic,
 		memset(ic->ic_des_essid, 0, IEEE80211_NWID_LEN);
 		ic->ic_des_esslen = 0;
 	} else {
-		int i, len;
-
-		len = IW_ESSID_MAX_SIZE;
-		if (len > IEEE80211_NWID_LEN)
-			len = IEEE80211_NWID_LEN;
-		memcpy(ic->ic_des_essid, ssid, len);
-		/* XXX: scan for \0 to calculate the length */
-		for (i = 0; i < len && ic->ic_des_essid[i] != '\0'; i++)
-			;
-		ic->ic_des_esslen = i;
+		if (data->length > sizeof(ic->ic_des_essid))
+			data->length = sizeof(ic->ic_des_essid);
+		memcpy(ic->ic_des_essid, ssid, data->length);
+		ic->ic_des_esslen = data->length;
 	}
-	return IS_UP(ic->ic_dev) ? -(*ic->ic_init)(ic->ic_dev) : 0;
+	return IS_UP_AUTO(ic) ? -(*ic->ic_init)(ic->ic_dev) : 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwessid);
 
@@ -593,7 +579,7 @@ ieee80211_ioctl_giwessid(struct ieee80211com *ic,
 			data->length = ic->ic_des_esslen;
 		memcpy(essid, ic->ic_des_essid, data->length);
 	} else {
-		if (strlen(ic->ic_des_essid) == 0) {
+		if (ic->ic_des_esslen == 0) {
 			if (data->length > ic->ic_bss->ni_esslen)
 				data->length = ic->ic_bss->ni_esslen;
 			memcpy(essid, ic->ic_bss->ni_essid, data->length);
@@ -674,9 +660,11 @@ ieee80211_ioctl_giwrange(struct ieee80211com *ic,
 	range->sensitivity = 3;
 
 	range->max_encoding_tokens = IEEE80211_WEP_NKID;
-	range->num_encoding_sizes = 2;
-	range->encoding_size[0] = 5;
-	range->encoding_size[1] = 13;
+	/* XXX query driver to find out supported key sizes */
+	range->num_encoding_sizes = 3;
+	range->encoding_size[0] = 5;		/* 40-bit */
+	range->encoding_size[1] = 13;		/* 104-bit */
+	range->encoding_size[2] = 16;		/* 128-bit */
 
 	/* XXX this only works for station mode */
 	rs = &ni->ni_rates;
@@ -685,7 +673,7 @@ ieee80211_ioctl_giwrange(struct ieee80211com *ic,
 		range->num_bitrates = IW_MAX_BITRATES;
 	for (i = 0; i < range->num_bitrates; i++) {
 		r = rs->rs_rates[i] & IEEE80211_RATE_VAL;
-		range->bitrate[i] = (r / 2) * 1000000;
+		range->bitrate[i] = (r * 1000000) / 2;
 	}
 
 	/* estimated maximum TCP throughput values (bps) */
@@ -975,21 +963,86 @@ ieee80211_ioctl_siwscan(struct ieee80211com *ic,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
+	u_char *chanlist = ic->ic_chan_active;
+	int i;
 
-	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
-		/* just return existing station tables */
-		data->length = 0;
-	} else {
-#ifdef notyet
-		/* XXX honor scan request flags */
-		HAL_CHANNEL *c = sc->sc_cur_chan;
-		ni->ni_chan = ath_hal_ghz2ieee(c->channel, c->channelFlags);
-		ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
-#endif
+	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+		return -EINVAL;
+	/*
+	 * XXX don't permit a scan to be started unless we
+	 * know the device is ready.  For the moment this means
+	 * the device is marked up as this is the required to
+	 * initialize the hardware.  It would be better to permit
+	 * scanning prior to being up but that'll require some
+	 * changes to the infrastructure.
+	 */
+	if (!IS_UP(ic->ic_dev))
+		return -EINVAL;		/* XXX */
+	if (ic->ic_state == IEEE80211_S_SCAN && (ic->ic_flags & IEEE80211_F_ASCAN))
+		return -EINPROGRESS;
+	if (ic->ic_ibss_chan == NULL ||
+	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_ibss_chan))) {
+		for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
+			if (isset(chanlist, i)) {
+				ic->ic_ibss_chan = &ic->ic_channels[i];
+				goto found;
+			}
+		return -EINVAL;			/* no active channels */
+found:
+		;
 	}
+	if (ic->ic_bss->ni_chan == IEEE80211_CHAN_ANYC ||
+	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan)))
+		ic->ic_bss->ni_chan = ic->ic_ibss_chan;
+	/*
+	 * We force the state to INIT before calling ieee80211_new_state
+	 * to get ieee80211_begin_scan called.  We really want to scan w/o
+	 * alterating the current state but that's not possible right now.
+	 */
+	/* XXX handle proberequest case */
+	if (ic->ic_state != IEEE80211_S_INIT)
+		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwscan);
+
+#if WIRELESS_EXT > 14
+/*
+ * Encode a WPA or RSN information element as a custom
+ * element using the hostap format.
+ */
+static u_int
+encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen)
+{
+	u_int8_t *p;
+	int i;
+
+	p = buf;
+	if (ie[0] == IEEE80211_ELEMID_RSN) {
+		const char rsn_leader[] = "rsn_ie=";
+		const int rsn_leader_len = sizeof(rsn_leader)-1;
+
+		if (bufsize < rsn_leader_len)
+			return 0;
+		memcpy(p, rsn_leader, rsn_leader_len);
+		bufsize -= rsn_leader_len;
+		p += rsn_leader_len;
+	} else {
+		const char wpa_leader[] = "wpa_ie=";
+		const int wpa_leader_len = sizeof(wpa_leader)-1;
+
+		if (bufsize < wpa_leader_len)
+			return 0;
+		memcpy(p, wpa_leader, wpa_leader_len);
+		bufsize -= wpa_leader_len;
+		p += wpa_leader_len;
+	}
+	for (i = 0; i < ielen && bufsize > 2; i++)
+		p += sprintf(p, "%02x", ie[i]);
+	return (i == ielen ? p - (u_int8_t *)buf : 0);
+}
+#endif /* WIRELESS_EXT > 14 */
 
 int
 ieee80211_ioctl_giwscan(struct ieee80211com *ic,
@@ -1001,10 +1054,12 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 	char *end_buf = extra + IW_SCAN_MAX_DATA;
 	char *current_val;
 	struct iw_event iwe;
+#if WIRELESS_EXT > 14
+	char buf[64*2 + 30];
+#endif
 	int j;
 
-	if (ic->ic_state == IEEE80211_S_SCAN &&
-	    (ic->ic_flags & (IEEE80211_F_SCANAP | IEEE80211_F_ASCAN))) {
+	if (ic->ic_state == IEEE80211_S_SCAN && (ic->ic_flags & IEEE80211_F_ASCAN)) {
 		/*
 		 * Still scanning, indicate the caller should try again.
 		 */
@@ -1017,54 +1072,29 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 	TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
 		if (current_ev >= end_buf)
 			break;
+
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWAP;
 		iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
-		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-			IEEE80211_ADDR_COPY(iwe.u.ap_addr.sa_data,
-				ni->ni_macaddr);
-			current_ev = iwe_stream_add_event(current_ev,
-				end_buf, &iwe, IW_EV_ADDR_LEN);
-
-			memset(&iwe, 0, sizeof(iwe));
-			iwe.cmd = SIOCGIWMODE;
-			iwe.u.mode = IW_MODE_INFRA;
-			current_ev = iwe_stream_add_event(current_ev,
-				end_buf, &iwe, IW_EV_UINT_LEN);
-
-			memset(&iwe, 0, sizeof(iwe));
-			iwe.cmd = SIOCGIWESSID;
-			iwe.u.data.length = ic->ic_des_esslen;
-			iwe.u.data.flags = 1;
-			current_ev = iwe_stream_add_point(current_ev,
-				end_buf, &iwe, ic->ic_des_essid);
-		} else {
-			IEEE80211_ADDR_COPY(iwe.u.ap_addr.sa_data,
-				ni->ni_bssid);
-			current_ev = iwe_stream_add_event(current_ev,
-				end_buf, &iwe, IW_EV_ADDR_LEN);
-
-			memset(&iwe, 0, sizeof(iwe));
-			iwe.cmd = SIOCGIWMODE;
-			iwe.u.mode = IW_MODE_MASTER;
-			current_ev = iwe_stream_add_event(current_ev,
-				end_buf, &iwe, IW_EV_UINT_LEN);
-
-			memset(&iwe, 0, sizeof(iwe));
-			iwe.cmd = SIOCGIWENCODE;
-			iwe.u.data.length = ni->ni_esslen;
-			if (ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY)
-				iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
-			else
-				iwe.u.data.flags = IW_ENCODE_DISABLED;
-			current_ev = iwe_stream_add_point(current_ev,
-				end_buf, &iwe, ni->ni_essid);
-		}
-		memset(&iwe, 0, sizeof(iwe));
-		iwe.cmd = IWEVQUAL;
-		set_quality(&iwe.u.qual, (*ic->ic_node_getrssi)(ic, ni));
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+			IEEE80211_ADDR_COPY(iwe.u.ap_addr.sa_data, ni->ni_macaddr);
+		else
+			IEEE80211_ADDR_COPY(iwe.u.ap_addr.sa_data, ni->ni_bssid);
 		current_ev = iwe_stream_add_event(current_ev,
-			end_buf, &iwe, IW_EV_QUAL_LEN);
+			end_buf, &iwe, IW_EV_ADDR_LEN);
+
+		memset(&iwe, 0, sizeof(iwe));
+		iwe.cmd = SIOCGIWESSID;
+		iwe.u.data.flags = 1;
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+			iwe.u.data.length = ic->ic_des_esslen;
+			current_ev = iwe_stream_add_point(current_ev,
+					end_buf, &iwe, ic->ic_des_essid);
+		} else {
+			iwe.u.data.length = ni->ni_esslen;
+			current_ev = iwe_stream_add_point(current_ev,
+					end_buf, &iwe, ni->ni_essid);
+		}
 
 		if (ni->ni_capinfo & (IEEE80211_CAPINFO_ESS|IEEE80211_CAPINFO_IBSS)) {
 			memset(&iwe, 0, sizeof(iwe));
@@ -1075,25 +1105,28 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 					end_buf, &iwe, IW_EV_UINT_LEN);
 		}
 
-		/* return essid if present */
-		if (ni->ni_essid[0]) {	
-			memset(&iwe, 0, sizeof(iwe));
-			iwe.cmd = SIOCGIWESSID;
-			iwe.u.data.length = strlen(ni->ni_essid);
-			iwe.u.data.flags = 1;
-			current_ev = iwe_stream_add_point(current_ev,
-					end_buf, &iwe, ni->ni_essid);
-		}
-
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWFREQ;
 		iwe.u.freq.m = ni->ni_chan->ic_freq * 100000;
 		iwe.u.freq.e = 1;
 		current_ev = iwe_stream_add_event(current_ev,
 				end_buf, &iwe, IW_EV_FREQ_LEN);
-#ifdef notdef
-		ap->interval = ni->ni_intval;
-#endif
+
+		memset(&iwe, 0, sizeof(iwe));
+		iwe.cmd = IWEVQUAL;
+		set_quality(&iwe.u.qual, (*ic->ic_node_getrssi)(ic, ni));
+		current_ev = iwe_stream_add_event(current_ev,
+			end_buf, &iwe, IW_EV_QUAL_LEN);
+
+		memset(&iwe, 0, sizeof(iwe));
+		iwe.cmd = SIOCGIWENCODE;
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY)
+			iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
+		else
+			iwe.u.data.flags = IW_ENCODE_DISABLED;
+		iwe.u.data.length = 0;
+		current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, "");
+
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWRATE;
 		current_val = current_ev + IW_EV_LCP_LEN;
@@ -1106,8 +1139,28 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 					IW_EV_PARAM_LEN);
 			}
 		}
+		/* remove fixed header if no rates were added */
 		if ((current_val - current_ev) > IW_EV_LCP_LEN)
 			current_ev = current_val;
+
+#if WIRELESS_EXT > 14
+		memset(&iwe, 0, sizeof(iwe));
+		iwe.cmd = IWEVCUSTOM;
+		snprintf(buf, sizeof(buf), "bcn_int=%d", ni->ni_intval);
+		iwe.u.data.length = strlen(buf);
+		current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, buf);
+
+
+		if (ni->ni_wpa_ie != NULL) {
+			memset(&iwe, 0, sizeof(iwe));
+			iwe.cmd = IWEVCUSTOM;
+			iwe.u.data.length = encode_ie(buf, sizeof(buf),
+				ni->ni_wpa_ie, ni->ni_wpa_ie[1]+2);
+			if (iwe.u.data.length != 0)
+				current_ev = iwe_stream_add_point(current_ev, end_buf,
+					&iwe, buf);
+		}
+#endif /* WIRELESS_EXT > 14 */
 	}
 	data->length = current_ev - extra;
 	return 0;
@@ -1115,15 +1168,31 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 EXPORT_SYMBOL(ieee80211_ioctl_giwscan);
 #endif /* SIOCGIWSCAN */
 
+static int
+cipher2cap(int cipher)
+{
+	switch (cipher) {
+	case IEEE80211_CIPHER_WEP:	return IEEE80211_C_WEP;
+	case IEEE80211_CIPHER_AES_OCB:	return IEEE80211_C_AES;
+	case IEEE80211_CIPHER_AES_CCM:	return IEEE80211_C_AES_CCM;
+	case IEEE80211_CIPHER_CKIP:	return IEEE80211_C_CKIP;
+	case IEEE80211_CIPHER_TKIP:	return IEEE80211_C_TKIP;
+	}
+	return 0;
+}
+
 int
 ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		   	 void *w, char *extra)
 {
+	struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;;
 	int *i = (int *) extra;
 	int param = i[0];		/* parameter id is 1st */
-	int value = i[1];		/* NB: all values are TYPE_INT */
+	int value = i[1];		/* NB: most values are TYPE_INT */
 	struct ifreq ifr;
 	int retv = EOPNOTSUPP;
+	int j, caps;
+	const struct ieee80211_authenticator *auth;
 
 	switch (param) {
 	case IEEE80211_PARAM_TURBO:
@@ -1146,25 +1215,64 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
 	case IEEE80211_PARAM_AUTHMODE:
-		if (value > IEEE80211_AUTH_AUTO)
+		switch (value) {
+		case IEEE80211_AUTH_WPA:	/* WPA w/ 802.1x */
+		case IEEE80211_AUTH_WPA2:	/* WPA2 w/ 802.1x */
+		case IEEE80211_AUTH_WPA_PSK:	/* WPA w/ preshared key */
+		case IEEE80211_AUTH_WPA2_PSK:	/* WPA2 w/ preshared key */
+		case IEEE80211_AUTH_8021X:	/* 802.1x */
+		case IEEE80211_AUTH_OPEN:	/* open */
+		case IEEE80211_AUTH_SHARED:	/* shared-key */
+		case IEEE80211_AUTH_AUTO:	/* auto */
+			auth = ieee80211_authenticator_get(value);
+			if (auth == NULL)
+				return -EINVAL;
+			break;
+		default:
 			return -EINVAL;
-		/* shared key authentication requires WEP support */
-		if (value == IEEE80211_AUTH_SHARED &&
-		    (ic->ic_caps & IEEE80211_C_WEP) == 0)
-			return -EINVAL;
-		/* 802.1x authentication requires crypto support */
-		if (value == IEEE80211_AUTH_8021X &&
-		    (ic->ic_caps & IEEE80211_C_CRYPTO) == 0)
-			return -EINVAL;
-		/* NB: authenticator attach/detach happens on state change */
-		if (value == IEEE80211_AUTH_8021X) {
-			ic->ic_flags |= IEEE80211_F_PRIVACY;
-		} else {
-			/* turn off privacy if no crypto algorithms in use */
-			if ((ic->ic_flags & IEEE80211_F_CRYPTON) == 0)
-				ic->ic_flags &= ~IEEE80211_F_PRIVACY;
 		}
+		switch (value) {
+		case IEEE80211_AUTH_WPA:	/* WPA w/ 802.1x */
+		case IEEE80211_AUTH_WPA2:	/* WPA2 w/ 802.1x */
+			rsn->rsn_keymgmt = WPA_ASE_8021X_UNSPEC;
+			ic->ic_flags &= ~IEEE80211_F_WPA;
+			if (value == IEEE80211_AUTH_WPA)
+				ic->ic_flags |= IEEE80211_F_WPA1;
+			else
+				ic->ic_flags |= IEEE80211_F_WPA2;
+			ic->ic_flags |= IEEE80211_F_PRIVACY;
+			value = IEEE80211_AUTH_OPEN;
+			break;
+		case IEEE80211_AUTH_WPA_PSK:	/* WPA w/ preshared key */
+		case IEEE80211_AUTH_WPA2_PSK:	/* WPA2 w/ preshared key */
+			rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
+			ic->ic_flags &= ~IEEE80211_F_WPA;
+			if (value == IEEE80211_AUTH_WPA)
+				ic->ic_flags |= IEEE80211_F_WPA1;
+			else
+				ic->ic_flags |= IEEE80211_F_WPA2;
+			ic->ic_flags |= IEEE80211_F_PRIVACY;
+			value = IEEE80211_AUTH_OPEN;
+			break;
+		case IEEE80211_AUTH_OPEN:	/* open */
+			ic->ic_flags &= ~(IEEE80211_F_WPA|IEEE80211_F_PRIVACY);
+			break;
+		case IEEE80211_AUTH_SHARED:	/* shared-key */
+		case IEEE80211_AUTH_8021X:	/* 802.1x */
+			ic->ic_flags &= ~IEEE80211_F_WPA;
+			/* both require a key so mark the PRIVACY capability */
+			ic->ic_flags |= IEEE80211_F_PRIVACY;
+			break;
+		case IEEE80211_AUTH_AUTO:	/* auto */
+			ic->ic_flags &= ~IEEE80211_F_WPA;
+			/* XXX PRIVACY handling? */
+			/* XXX what's the right way to do this? */
+			break;
+		}
+		/* NB: authenticator attach/detach happens on state change */
 		ic->ic_bss->ni_authmode = value;
+		/* XXX mixed/mode/usage? */
+		ic->ic_auth = auth;
 		retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_PROTMODE:
@@ -1174,6 +1282,102 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		/* NB: if not operating in 11g this can wait */
 		retv = (ic->ic_curmode == IEEE80211_MODE_11G ? ENETRESET : 0);
 		break;
+	case IEEE80211_PARAM_MCASTCIPHER:
+		/* XXX s/w implementations */
+		if ((ic->ic_caps & cipher2cap(value)) == 0)
+			return -EINVAL;
+		rsn->rsn_mcastcipher = value;
+		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		break;
+	case IEEE80211_PARAM_MCASTKEYLEN:
+		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
+			return -EINVAL;
+		/* XXX no way to verify driver capability */
+		rsn->rsn_mcastkeylen = value;
+		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		break;
+	case IEEE80211_PARAM_UCASTCIPHERS:
+		/*
+		 * Convert cipher set to equivalent capabilities.
+		 * NB: this logic intentionally ignores unknown and
+		 * unsupported ciphers so folks can specify 0xff or
+		 * similar and get all available ciphers.
+		 */
+		caps = 0;
+		for (j = 1; j < 32; j++)	/* NB: skip WEP */
+			if (value & (1<<j))
+				caps |= cipher2cap(j);
+		/* XXX s/w implementations */
+		caps &= ic->ic_caps;	/* restrict to supported ciphers */
+		/* XXX verify ciphers ok for unicast use? */
+		/* XXX disallow if running as it'll have no effect */
+		rsn->rsn_ucastcipherset = caps;
+		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		break;
+	case IEEE80211_PARAM_UCASTCIPHER:
+		if ((rsn->rsn_ucastcipherset & cipher2cap(value)) == 0)
+			return -EINVAL;
+		rsn->rsn_ucastcipher = value;
+		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		break;
+	case IEEE80211_PARAM_UCASTKEYLEN:
+		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
+			return -EINVAL;
+		/* XXX no way to verify driver capability */
+		rsn->rsn_ucastkeylen = value;
+		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		break;
+	case IEEE80211_PARAM_WPA:
+		if (value > 2)
+			return -EINVAL;
+		/* XXX verify ciphers available */
+		ic->ic_flags &= ~IEEE80211_F_WPA;
+		switch (value) {
+		case 1:
+			ic->ic_flags |= IEEE80211_F_WPA1;
+			break;
+		case 2:
+			ic->ic_flags |= IEEE80211_F_WPA2;
+			break;
+		}
+		retv = ENETRESET;		/* XXX? */
+		break;
+	case IEEE80211_PARAM_ROAMING:
+		if (!(IEEE80211_ROAMING_DEVICE <= value &&
+		    value <= IEEE80211_ROAMING_MANUAL))
+			return -EINVAL;
+		ic->ic_roaming = value;
+		retv = 0;
+		break;
+	case IEEE80211_PARAM_PRIVACY:
+		if (ic->ic_opmode != IEEE80211_M_STA)
+			return -EINVAL;
+		if (value) {
+			/* XXX check for key state? */
+			ic->ic_flags |= IEEE80211_F_PRIVACY;
+		} else
+			ic->ic_flags &= ~IEEE80211_F_PRIVACY;
+		retv = 0;			/* XXX? */
+		break;
+	case IEEE80211_PARAM_DROPUNENCRYPTED:
+		if (value)
+			ic->ic_flags |= IEEE80211_F_DROPUNENC;
+		else
+			ic->ic_flags &= ~IEEE80211_F_DROPUNENC;
+		retv = 0;
+		break;
+	case IEEE80211_PARAM_COUNTERMEASURES:
+		if (value) {
+			if (ic->ic_flags & IEEE80211_F_WPA)
+				return -EINVAL;
+			ic->ic_flags |= IEEE80211_F_COUNTERM;
+		} else
+			ic->ic_flags &= ~IEEE80211_F_COUNTERM;
+		retv = 0;
+		break;
+	case IEEE80211_PARAM_DRIVER_CAPS:
+		ic->ic_caps = value;		/* NB: for testing */
+		break;
 	}
 	if (retv == ENETRESET)
 		retv = IS_UP(ic->ic_dev) ? (*ic->ic_init)(ic->ic_dev) : 0;
@@ -1181,12 +1385,27 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 }
 EXPORT_SYMBOL(ieee80211_ioctl_setparam);
 
+static int
+cap2cipher(int flag)
+{
+	switch (flag) {
+	case IEEE80211_C_WEP:		return IEEE80211_CIPHER_WEP;
+	case IEEE80211_C_AES:		return IEEE80211_CIPHER_AES_OCB;
+	case IEEE80211_C_AES_CCM:	return IEEE80211_CIPHER_AES_CCM;
+	case IEEE80211_C_CKIP:		return IEEE80211_CIPHER_CKIP;
+	case IEEE80211_C_TKIP:		return IEEE80211_CIPHER_TKIP;
+	}
+	return -1;
+}
+
 int
 ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 			void *w, char *extra)
 {
+	struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;;
 	struct ifmediareq imr;
 	int *param = (int *) extra;
+	u_int m;
 
 	switch (param[0]) {
 	case IEEE80211_PARAM_TURBO:
@@ -1216,10 +1435,64 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		}
 		break;
 	case IEEE80211_PARAM_AUTHMODE:
-		param[0] = ic->ic_bss->ni_authmode;
+		if (ic->ic_flags & IEEE80211_F_WPA) {
+			if (ic->ic_flags & IEEE80211_F_WPA1)
+				param[0] = IEEE80211_AUTH_WPA;
+			else
+				param[0] = IEEE80211_AUTH_WPA2;
+			if (rsn->rsn_keymgmt == WPA_ASE_8021X_PSK)
+				param[0]++;
+		} else
+			param[0] = ic->ic_bss->ni_authmode;
 		break;
 	case IEEE80211_PARAM_PROTMODE:
 		param[0] = ic->ic_protmode;
+		break;
+	case IEEE80211_PARAM_MCASTCIPHER:
+		param[0] = rsn->rsn_mcastcipher;
+		break;
+	case IEEE80211_PARAM_MCASTKEYLEN:
+		param[0] = rsn->rsn_mcastkeylen;
+		break;
+	case IEEE80211_PARAM_UCASTCIPHERS:
+		param[0] = 0;
+		for (m = 0x1; m != 0; m <<= 1)
+			if (rsn->rsn_ucastcipherset & m)
+				param[0] |= 1<<cap2cipher(m);
+		break;
+	case IEEE80211_PARAM_UCASTCIPHER:
+		param[0] = rsn->rsn_ucastcipher;
+		break;
+	case IEEE80211_PARAM_UCASTKEYLEN:
+		param[0] = rsn->rsn_ucastkeylen;
+		break;
+	case IEEE80211_PARAM_WPA:
+		switch (ic->ic_flags & IEEE80211_F_WPA) {
+		case IEEE80211_F_WPA1:
+			param[0] = 1;
+			break;
+		case IEEE80211_F_WPA2:
+			param[0] = 2;
+			break;
+		default:
+			param[0] = 0;
+			break;
+		}
+		break;
+	case IEEE80211_PARAM_ROAMING:
+		param[0] = ic->ic_roaming;
+		break;
+	case IEEE80211_PARAM_PRIVACY:
+		param[0] = (ic->ic_flags & IEEE80211_F_PRIVACY) != 0;
+		break;
+	case IEEE80211_PARAM_DROPUNENCRYPTED:
+		param[0] = (ic->ic_flags & IEEE80211_F_DROPUNENC) != 0;
+		break;
+	case IEEE80211_PARAM_COUNTERMEASURES:
+		param[0] = (ic->ic_flags & IEEE80211_F_COUNTERM) != 0;
+		break;
+	case IEEE80211_PARAM_DRIVER_CAPS:
+		param[0] = ic->ic_caps;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1228,16 +1501,113 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 }
 EXPORT_SYMBOL(ieee80211_ioctl_getparam);
 
+int
+ieee80211_ioctl_setoptie(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	union iwreq_data *u = w;
+	void *ie;
+
+	if (ic->ic_opmode != IEEE80211_M_STA)
+		return -EINVAL;
+	/* NB: data.length is validated by the wireless extensions code */
+	MALLOC(ie, void *, u->data.length, M_DEVBUF, M_WAITOK);
+	if (ie == NULL)
+		return -ENOMEM;
+	memcpy(ie, extra, u->data.length);
+	/* XXX sanity check data? */
+	if (ic->ic_opt_ie != NULL)
+		FREE(ic->ic_opt_ie, M_DEVBUF);
+	ic->ic_opt_ie = ie;
+	ic->ic_opt_ie_len = u->data.length;
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_setoptie);
+
+int
+ieee80211_ioctl_getoptie(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	union iwreq_data *u = w;
+
+	if (ic->ic_opt_ie == NULL)
+		return -EINVAL;
+	if (u->data.length < ic->ic_opt_ie_len)
+		return -EINVAL;
+	u->data.length = ic->ic_opt_ie_len;
+	memcpy(extra, ic->ic_opt_ie, u->data.length);
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_getoptie);
+
+int
+ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct ieee80211req_mlme *mlme = (struct ieee80211req_mlme *)extra;
+	struct ieee80211_node *ni;
+
+	switch (mlme->im_op) {
+	case IEEE80211_MLME_ASSOC:
+		if (ic->ic_opmode != IEEE80211_M_STA)
+			return -EINVAL;
+		/* XXX must be in S_SCAN state? */
+
+		if (ic->ic_des_esslen != 0) {
+			/*
+			 * Desired ssid specified; must match both bssid and
+			 * ssid to distinguish ap advertising multiple ssid's.
+			 */
+			ni = ieee80211_find_node_with_ssid(ic, mlme->im_macaddr,
+				ic->ic_des_esslen, ic->ic_des_essid);;
+		} else {
+			/*
+			 * Normal case; just match bssid.
+			 */
+			ni = ieee80211_find_node(ic, mlme->im_macaddr);
+		}
+		if (ni == NULL)
+			return -EINVAL;
+		if (!ieee80211_sta_join(ic, ni)) {
+			/* NB: from AP scan; don't free, just unref */
+			ieee80211_unref_node(&ni);
+			return -EINVAL;
+		}
+		break;
+	case IEEE80211_MLME_DISASSOC:
+	case IEEE80211_MLME_DEAUTH:
+		/* XXX not quite right */
+		ieee80211_new_state(ic, IEEE80211_S_INIT, mlme->im_reason);
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_setmlme);
+
+#define	IW_PRIV_TYPE_OPTIE	IW_PRIV_TYPE_BYTE | IEEE80211_MAX_OPT_IE
+#define	IW_PRIV_TYPE_MLME \
+	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_mlme)
+
 static const struct iw_priv_args ieee80211_priv_args[] = {
+	/* NB: setoptie & getoptie are !IW_PRIV_SIZE_FIXED */
+	{ IEEE80211_IOCTL_SETOPTIE,
+	  IW_PRIV_TYPE_OPTIE, 0,			"setoptie" },
+	{ IEEE80211_IOCTL_GETOPTIE,
+	  0, IW_PRIV_TYPE_OPTIE,			"getoptie" },
+	{ IEEE80211_IOCTL_SETMLME,
+	  IW_PRIV_TYPE_MLME | IW_PRIV_SIZE_FIXED, 0,	"setmlme" },
+#if WIRELESS_EXT >= 12
 	{ IEEE80211_IOCTL_SETPARAM,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "setparam" },
-#if WIRELESS_EXT >= 12
 	/*
 	 * These depends on sub-ioctl support which added in version 12.
 	 */
 	{ IEEE80211_IOCTL_GETPARAM,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
-	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getparam" },
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,	"getparam" },
+
 	/* sub-ioctl handlers */
 	{ IEEE80211_IOCTL_SETPARAM,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "" },
@@ -1260,6 +1630,54 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "protmode" },
 	{ IEEE80211_PARAM_PROTMODE,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_protmode" },
+	{ IEEE80211_PARAM_MCASTCIPHER,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "mcastcipher" },
+	{ IEEE80211_PARAM_MCASTCIPHER,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_mcastcipher" },
+	{ IEEE80211_PARAM_MCASTKEYLEN,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "mcastkeylen" },
+	{ IEEE80211_PARAM_MCASTKEYLEN,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_mcastkeylen" },
+	{ IEEE80211_PARAM_UCASTCIPHERS,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ucastciphers" },
+	{ IEEE80211_PARAM_UCASTCIPHERS,
+	/*
+	 * NB: can't use "get_ucastciphers" 'cuz iwpriv command names
+	 *     must be <IFNAMESIZ which is 16.
+	 */
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_uciphers" },
+	{ IEEE80211_PARAM_UCASTCIPHER,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ucastcipher" },
+	{ IEEE80211_PARAM_UCASTCIPHER,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ucastcipher" },
+	{ IEEE80211_PARAM_UCASTKEYLEN,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ucastkeylen" },
+	{ IEEE80211_PARAM_UCASTKEYLEN,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ucastkeylen" },
+	{ IEEE80211_PARAM_ROAMING,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "roaming" },
+	{ IEEE80211_PARAM_ROAMING,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_roaming" },
+	{ IEEE80211_PARAM_PRIVACY,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "privacy" },
+	{ IEEE80211_PARAM_PRIVACY,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_privacy" },
+	{ IEEE80211_PARAM_COUNTERMEASURES,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "countermeasures" },
+	{ IEEE80211_PARAM_COUNTERMEASURES,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_countermeasu" },
+	{ IEEE80211_PARAM_DROPUNENCRYPTED,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dropunencrypted" },
+	{ IEEE80211_PARAM_DROPUNENCRYPTED,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_dropunencryp" },
+	{ IEEE80211_PARAM_WPA,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wpa" },
+	{ IEEE80211_PARAM_WPA,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_wpa" },
+	{ IEEE80211_PARAM_DRIVER_CAPS,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "driver_caps" },
+	{ IEEE80211_PARAM_DRIVER_CAPS,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_driver_caps" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
@@ -1272,4 +1690,20 @@ ieee80211_ioctl_iwsetup(struct iw_handler_def *def)
 #undef N
 }
 EXPORT_SYMBOL(ieee80211_ioctl_iwsetup);
+
+/*
+ * Handle private ioctl requests.
+ */
+int
+ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
+{
+
+	switch (cmd) {
+	case SIOCG80211STATS:
+		return copy_to_user(ifr->ifr_data, &ic->ic_stats,
+				sizeof (ic->ic_stats)) ? -EFAULT : 0;
+	}
+	return -EOPNOTSUPP;
+}
+EXPORT_SYMBOL(ieee80211_ioctl);
 #endif /* CONFIG_NET_WIRELESS */
