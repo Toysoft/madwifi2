@@ -402,6 +402,7 @@ ieee80211_key_update_end(struct ieee80211com *ic)
 #define	IEEE80211_MSG_RADDUMP	0x00004000	/* dump 802.1x radius packets */
 #define	IEEE80211_MSG_RADKEYS	0x00002000	/* dump 802.1x keys */
 #define	IEEE80211_MSG_WPA	0x00001000	/* WPA/RSN protocol */
+#define	IEEE80211_MSG_ACL	0x00000800	/* ACL handling */
 
 #define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
 

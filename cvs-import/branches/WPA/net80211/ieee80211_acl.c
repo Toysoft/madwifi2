@@ -164,8 +164,13 @@ acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 	int hash;
 
 	MALLOC(acl, struct acl *, sizeof(struct acl), M_80211_ACL, M_NOWAIT | M_ZERO);
-	if (acl == NULL)
+	if (acl == NULL) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
+			("ACL: add %s failed, no memory\n",
+			ether_sprintf(mac)));
+		/* XXX statistic */
 		return ENOMEM;
+	}
 
 	ACL_LOCK(as);
 	hash = ACL_HASH(mac);
@@ -173,6 +178,9 @@ acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 		if (IEEE80211_ADDR_EQ(acl->acl_macaddr, mac)) {
 			ACL_UNLOCK(as);
 			FREE(acl, M_80211_ACL);
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
+				("ACL: add %s failed, already present\n",
+				ether_sprintf(mac)));
 			return EEXIST;
 		}
 	}
@@ -180,6 +188,9 @@ acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 	TAILQ_INSERT_TAIL(&as->as_list, acl, acl_list);
 	LIST_INSERT_HEAD(&as->as_hash[hash], acl, acl_hash);
 	ACL_UNLOCK(as);
+
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
+		("ACL: add %s\n", ether_sprintf(mac)));
 	return 0;
 }
 
@@ -195,6 +206,10 @@ acl_remove(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 		_acl_free(as, acl);
 	ACL_UNLOCK(as);
 
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
+		("ACL: remove %s%s\n", ether_sprintf(mac),
+		acl == NULL ? ", not present" : ""));
+
 	return (acl == NULL ? ENOENT : 0);
 }
 
@@ -203,6 +218,8 @@ acl_free_all(struct ieee80211com *ic)
 {
 	struct aclstate *as = ic->ic_as;
 	struct acl *acl;
+
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL, ("ACL: free all\n"));
 
 	ACL_LOCK(as);
 	while ((acl = TAILQ_FIRST(&as->as_list)) != NULL)
@@ -216,6 +233,9 @@ static int
 acl_setpolicy(struct ieee80211com *ic, int policy)
 {
 	struct aclstate *as = ic->ic_as;
+
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
+		("ACL: set policy to %u\n", policy));
 
 	switch (policy) {
 	case IEEE80211_MACCMD_POLICY_OPEN:
