@@ -2571,6 +2571,10 @@ ath_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		ath_hal_intrset(ah, sc->sc_imask);
 		error =  (*sc->sc_newstate)(ic, nstate, arg);
 		goto bad;
+        } else if (nstate == IEEE80211_S_SCAN &&
+                   !(ic->ic_flags & IEEE80211_F_ASCAN)) {
+		/* Disable the watchdog during passive (non-active) scan. */
+                dev->trans_start = jiffies;
 	}
 	ni = ic->ic_bss;
 	error = ath_chan_set(sc, ni->ni_chan);
