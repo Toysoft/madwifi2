@@ -18,7 +18,7 @@ MKDIR()
 
 PATCH()
 {
-	cmp -s $1 $2 || patch $1 < $2.patch
+	cmp -s $1 $2 || patch -N $1 < $2.patch
 }
 
 INSTALL()
