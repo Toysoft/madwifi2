@@ -46,7 +46,7 @@ endif
 ALL=	ath_hal.o
 # NB: add to SRCS so we get dependency info, but don't add to OBJS
 SRCS=	ah_osdep.c
-INCS=	-I. ${HALINCS} -I${LINUX}
+INCS=	${HALINCS} -I${LINUX}
 COPTS+= -D_BUILD_STANDALONE_
 CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
