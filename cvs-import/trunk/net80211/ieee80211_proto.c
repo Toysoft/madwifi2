@@ -488,7 +488,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_DISASSOC,
 				    IEEE80211_REASON_ASSOC_LEAVE);
-				ieee80211_notify_node_leave(ic, ni);
+				ieee80211_sta_leave(ic, ni);
 				break;
 			case IEEE80211_M_HOSTAP:
 				IEEE80211_NODE_LOCK(ic);
@@ -578,7 +578,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_STATE,
 				("no recent beacons from %s; rescanning\n",
 				ether_sprintf(ic->ic_bss->ni_bssid)));
-			ieee80211_notify_node_leave(ic, ni);
+			ieee80211_sta_leave(ic, ni);
 			/* XXX this clears the scan set */
 			ieee80211_free_allnodes(ic);
 			/* FALLTHRU */
@@ -626,7 +626,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 				/* try to reauth */
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_AUTH, 1);
-				ieee80211_notify_node_leave(ic, ni);
+				ieee80211_sta_leave(ic, ni);
 				break;
 			}
 			break;
@@ -647,7 +647,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 		case IEEE80211_S_RUN:
 			IEEE80211_SEND_MGMT(ic, ni,
 			    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 1);
-			ieee80211_notify_node_leave(ic, ni);
+			ieee80211_sta_leave(ic, ni);
 			break;
 		}
 		break;
