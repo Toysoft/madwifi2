@@ -35,4 +35,4 @@
  *
  * $Id$
  */
-#define	ATH_HAL_VERSION	"0.9.5.11"
+#define	ATH_HAL_VERSION	"0.9.5.18"
