@@ -47,6 +47,7 @@ include Makefile.inc
 DIRS=	${ATH_HAL} ${ATH_RATE} ${WLAN} ${ATH}
 
 all:
+	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS}; do \
 		(cd $$i; make) || exit 1; \
 	done
@@ -76,3 +77,4 @@ clean:
 	for i in ${DIRS}; do \
 		(cd $$i; make clean); \
 	done
+	rm -rf ${SYMBOLSDIR}

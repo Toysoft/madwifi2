@@ -53,7 +53,7 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 -include $(TOPDIR)/Rules.make
 
 all:	ah_osdep.c hal.o opt_ah.h
-	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
 ah_osdep.c:
 	cp ${HAL}/${OS}/ah_osdep.c ah_osdep.c
