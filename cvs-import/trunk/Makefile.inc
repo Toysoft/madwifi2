@@ -36,7 +36,9 @@
 # $Id$
 #
 
+ifndef DESTDIR
 DESTDIR=
+endif
 #
 OS=		linux
 #
@@ -102,7 +104,9 @@ LINUX_VERSION=	$(shell echo $(KERNEL_VERSION) | \
 #
 # Path to the HAL source code.
 #
+ifndef HAL
 HAL=	${DEPTH}/hal
+endif
 #
 # Path to the HAL build area.
 #
@@ -119,7 +123,7 @@ DRIVER=	${DEPTH}/driver
 #
 # Basic build components.
 #
-COPTS=	-Wall -O2 -D__KERNEL__ -DMODULE
+COPTS=	-Wall -Wno-trigraphs -O2 -D__KERNEL__ -DMODULE
 #
 # Define this for some cross-build environments
 #
