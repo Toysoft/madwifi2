@@ -59,6 +59,9 @@
 
 #ifdef CONFIG_NET_WIRELESS
 
+#define	IS_UP(_dev) \
+	(((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
+
 /*
  * Units are in db above the noise floor. That means the
  * rssi values reported in the tx/rx descriptors in the
@@ -230,7 +233,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 	error = ENETRESET;
 done:
 	if (error == ENETRESET)
-		error = (*ic->ic_init)(dev);	/* reset mode */
+		error = IS_UP(dev) ? (*ic->ic_init)(dev) : 0;
 	return -error;
 }
 
@@ -343,10 +346,10 @@ ieee80211_ioctl_siwrts(struct net_device *dev,
 		val = rts->value;
 	if (val != ic->ic_rtsthreshold) {
 		ic->ic_rtsthreshold = val;
-		return -(*ic->ic_init)(dev);
-	} else {
-		return 0;
+		if (IS_UP(dev))
+			return -(*ic->ic_init)(dev);
 	}
+	return 0;
 }
 
 int
@@ -380,7 +383,8 @@ ieee80211_ioctl_siwfrag(struct net_device *dev,
 		val = __cpu_to_le16(rts->value & ~0x1); /* even numbers only */
 	if (val != ic->ic_fragthreshold) {
 		ic->ic_fragthreshold = val;
-		return -(*ic->ic_init)(dev);
+		if (IS_UP(dev))
+			return -(*ic->ic_init)(dev);
 	}
 	return 0;
 }
@@ -408,16 +412,15 @@ ieee80211_ioctl_siwap(struct net_device *dev,
 	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
 
 	/* NB: should only be set when in STA mode */
-	if (ic->ic_opmode == IEEE80211_M_STA) {
-		IEEE80211_ADDR_COPY(ic->ic_des_bssid, &ap_addr->sa_data);
-		/* looks like a zero address disables */
-		if (IEEE80211_ADDR_EQ(ic->ic_des_bssid, zero_bssid))
-			ic->ic_flags &= ~IEEE80211_F_DESBSSID;
-		else
-			ic->ic_flags |= IEEE80211_F_DESBSSID;
-		return -(*ic->ic_init)(dev);
-	} else
+	if (ic->ic_opmode != IEEE80211_M_STA)
 		return -EINVAL;
+	IEEE80211_ADDR_COPY(ic->ic_des_bssid, &ap_addr->sa_data);
+	/* looks like a zero address disables */
+	if (IEEE80211_ADDR_EQ(ic->ic_des_bssid, zero_bssid))
+		ic->ic_flags &= ~IEEE80211_F_DESBSSID;
+	else
+		ic->ic_flags |= IEEE80211_F_DESBSSID;
+	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
 }
 
 int
@@ -491,7 +494,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 	if (c == ic->ic_ibss_chan)	/* no change, just return */
 		return 0;
 	ic->ic_ibss_chan = ic->ic_des_chan = c;
-	return -(*ic->ic_init)(dev);
+	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
 }
 
 int
@@ -532,7 +535,7 @@ ieee80211_ioctl_siwessid(struct net_device *dev,
 			;
 		ic->ic_des_esslen = i;
 	}
-	return -(*ic->ic_init)(dev);
+	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
 }
 
 int
@@ -749,7 +752,7 @@ ieee80211_ioctl_siwpower(struct net_device *dev,
 		ic->ic_flags |= IEEE80211_F_PMGTON;
 	}
 done:
-	return -(*ic->ic_init)(dev);
+	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
 }
 
 int
@@ -805,7 +808,7 @@ ieee80211_ioctl_siwretry(struct net_device *dev,
 		return 0;
 	}
 done:
-	return -(*ic->ic_init)(dev);
+	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
 }
 
 int
@@ -878,7 +881,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev,
 		ic->ic_flags |= IEEE80211_F_TXPOW_AUTO;
 	}
 done:
-	return -(*ic->ic_init)(dev);
+	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
 }
 
 int
@@ -1108,7 +1111,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	}
 	if (retv == ENETRESET)
-		retv = (*ic->ic_init)(dev);
+		retv = IS_UP(dev) ? (*ic->ic_init)(dev) : 0;
 	return -retv;
 }
 
