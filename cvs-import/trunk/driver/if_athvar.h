@@ -68,6 +68,8 @@ typedef void irqreturn_t;
 #define ATH_MAX_MTU     2290
 #define ATH_MIN_MTU     32  
 
+#define	ATH_TPC_MAX	63		/* 6 bits */
+
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
