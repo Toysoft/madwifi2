@@ -1299,10 +1299,7 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_AUTHMODE:
 		switch (value) {
-		case IEEE80211_AUTH_WPA:	/* WPA w/ 802.1x */
-		case IEEE80211_AUTH_WPA2:	/* WPA2 w/ 802.1x */
-		case IEEE80211_AUTH_WPA_PSK:	/* WPA w/ preshared key */
-		case IEEE80211_AUTH_WPA2_PSK:	/* WPA2 w/ preshared key */
+		case IEEE80211_AUTH_WPA:	/* WPA */
 		case IEEE80211_AUTH_8021X:	/* 802.1x */
 		case IEEE80211_AUTH_OPEN:	/* open */
 		case IEEE80211_AUTH_SHARED:	/* shared-key */
@@ -1316,26 +1313,8 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		}
 		switch (value) {
 		case IEEE80211_AUTH_WPA:	/* WPA w/ 802.1x */
-		case IEEE80211_AUTH_WPA2:	/* WPA2 w/ 802.1x */
-			rsn->rsn_keymgmt = WPA_ASE_8021X_UNSPEC;
-			ic->ic_flags &= ~IEEE80211_F_WPA;
-			if (value == IEEE80211_AUTH_WPA)
-				ic->ic_flags |= IEEE80211_F_WPA1;
-			else
-				ic->ic_flags |= IEEE80211_F_WPA2;
 			ic->ic_flags |= IEEE80211_F_PRIVACY;
-			value = IEEE80211_AUTH_OPEN;
-			break;
-		case IEEE80211_AUTH_WPA_PSK:	/* WPA w/ preshared key */
-		case IEEE80211_AUTH_WPA2_PSK:	/* WPA2 w/ preshared key */
-			rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
-			ic->ic_flags &= ~IEEE80211_F_WPA;
-			if (value == IEEE80211_AUTH_WPA)
-				ic->ic_flags |= IEEE80211_F_WPA1;
-			else
-				ic->ic_flags |= IEEE80211_F_WPA2;
-			ic->ic_flags |= IEEE80211_F_PRIVACY;
-			value = IEEE80211_AUTH_OPEN;
+			value = IEEE80211_AUTH_8021X;
 			break;
 		case IEEE80211_AUTH_OPEN:	/* open */
 			ic->ic_flags &= ~(IEEE80211_F_WPA|IEEE80211_F_PRIVACY);
@@ -1585,14 +1564,9 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		}
 		break;
 	case IEEE80211_PARAM_AUTHMODE:
-		if (ic->ic_flags & IEEE80211_F_WPA) {
-			if (ic->ic_flags & IEEE80211_F_WPA1)
-				param[0] = IEEE80211_AUTH_WPA;
-			else
-				param[0] = IEEE80211_AUTH_WPA2;
-			if (rsn->rsn_keymgmt == WPA_ASE_8021X_PSK)
-				param[0]++;
-		} else
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			param[0] = IEEE80211_AUTH_WPA;
+		else
 			param[0] = ic->ic_bss->ni_authmode;
 		break;
 	case IEEE80211_PARAM_PROTMODE:
