@@ -300,20 +300,19 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 */
 	ah = _ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
-		if_printf(dev, "unable to attach hardware; HAL status %u\n",
-			status);
+		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
+			__func__, hal_status_desc[status], status);
 		error = ENXIO;
 		goto bad;
 	}
 	if (ah->ah_abi != HAL_ABI_VERSION) {
-		if_printf(dev, "HAL ABI mismatch detected "
-			"(HAL:0x%x != driver:0x%x)\n",
-			ah->ah_abi, HAL_ABI_VERSION);
-		error = ENXIO;		/* XXX */
+		printk(KERN_ERR "%s: HAL ABI mismatch; "
+			"driver expects 0x%x, HAL reports 0x%x\n",
+			__func__, HAL_ABI_VERSION, ah->ah_abi);
+		error = ENXIO;          /* XXX */
 		goto bad;
 	}
 	sc->sc_ah = ah;
-	sc->sc_invalid = 0;	// TODO: here for testing
 
 	/*
 	 * Check if the MAC has multi-rate retry support.
@@ -397,8 +396,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		if_printf(dev, "failed to allocate descriptors: %d\n", error);
 		goto bad;
 	}
-
-	// TODO: scan here?
 
 	/*
 	 * Allocate hardware transmit queues: one queue for
@@ -496,8 +493,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * 5211 minipci cards.  Users can also manually enable/disable
 	 * support with a sysctl.
 	 */
-	//sc->sc_softled = (devid == AR5212_DEVID_IBM || devid == AR5211_DEVID);
-	sc->sc_softled = 0;
+	sc->sc_softled = (devid == AR5212_DEVID_IBM || devid == AR5211_DEVID);
 	if (sc->sc_softled) {
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
@@ -1171,6 +1167,8 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		ATH_TXBUF_UNLOCK_BH(sc); \
 		if (ni != NULL)	\
 			ieee80211_free_node(ni);	\
+		if(skb)					\
+		    dev_kfree_skb(skb);			\
 	} while (0)
 
 	struct ath_softc *sc = dev->priv;
@@ -1348,8 +1346,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		if (skb0 == skb)
 			break; 
 		sc->sc_tx_timer = 5;
-		//mod_timer(&ic->ic_slowtimo, jiffies + HZ);
-		//ifp->if_timer = 1;	// TODO: ???
+		mod_timer(&ic->ic_slowtimo, jiffies + HZ);
 	}
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
 #undef CLEANUP
@@ -1804,7 +1801,7 @@ ath_mode_init(struct net_device *dev)
 	 *
 	 * XXX should get from lladdr instead of arpcom but that's more work
 	 */
-	IEEE80211_ADDR_COPY(ic->ic_myaddr, dev->dev_addr); // TODO: needed ???
+	IEEE80211_ADDR_COPY(ic->ic_myaddr, dev->dev_addr);
 	ath_hal_setmac(ah, ic->ic_myaddr);
 
 	/* calculate and install multicast filter */
@@ -2144,9 +2141,8 @@ ath_beacon_tasklet(struct net_device *dev)
 	 * NB: only at DTIM
 	 */
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
-	    ncabq > 0 && sc->sc_boff.bo_tim[4] & 1) 
+	    ncabq > 0 && sc->sc_boff.bo_tim[4] & 1)
 		ath_hal_txstart(ah, sc->sc_cabq->axq_qnum);
-	
 	ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
 	ath_hal_txstart(ah, sc->sc_bhalq);
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
@@ -3234,9 +3230,10 @@ ath_tx_cleanup(struct ath_softc *sc)
 
 	ATH_LOCK_DESTROY(sc);
 	ATH_TXBUF_LOCK_DESTROY(sc);
-	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
+	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_cleanupq(sc, &sc->sc_txq[i]);
+	}
 }
 
 static int
@@ -3830,9 +3827,10 @@ ath_tx_tasklet(TQUEUE_ARG data)
 	 * Process each active queue.
 	 */
 	/* XXX faster to read ISR_S0_S and ISR_S1_S to determine q's? */
-	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
+	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_processq(sc, &sc->sc_txq[i]);
+	}
 
 	sc->sc_tx_timer = 0;
 
@@ -3929,15 +3927,17 @@ ath_draintxq(struct ath_softc *sc)
 		DPRINTF(sc, ATH_DEBUG_RESET,
 		    "%s: beacon queue %p\n", __func__,
 		    (caddr_t)(uintptr_t) ath_hal_gettxbuf(ah, sc->sc_bhalq));
-		for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
+		for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
 			if (ATH_TXQ_SETUP(sc, i))
 				ath_tx_stopdma(sc, &sc->sc_txq[i]);
+		}
 	}
 	sc->sc_dev.trans_start = jiffies;
 	netif_start_queue(&sc->sc_dev);		// TODO: needed here?
-	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
+	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_draintxq(sc, &sc->sc_txq[i]);
+	}
 	sc->sc_tx_timer = 0;
 }
 
