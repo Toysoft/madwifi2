@@ -85,7 +85,7 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
 
 	KASSERT(ni != NULL, ("null node"));
-	ni->ni_inact = IEEE80211_INACT_AUTH;
+	ni->ni_inact = ic->ic_inact_auth;
 
 	/*
 	 * Yech, hack alert!  We want to pass the node down to the
@@ -359,7 +359,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		 * station will be timed out for inactivity, but our
 		 * retransmits will reset the inactivity timer.
 		 */ 
-		ni->ni_inact = IEEE80211_INACT_RUN;
+		ni->ni_inact = ic->ic_inact_run;
 	}
 	*pni = ni;
 	return skb;

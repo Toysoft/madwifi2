@@ -1516,6 +1516,18 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			ic->ic_flags &= ~IEEE80211_F_NOBRIDGE;
 		retv = 0;
 		break;
+	case IEEE80211_PARAM_INACT:
+		ic->ic_inact_run = value / IEEE80211_INACT_WAIT;
+		retv = 0;
+		break;
+	case IEEE80211_PARAM_INACT_AUTH:
+		ic->ic_inact_auth = value / IEEE80211_INACT_WAIT;
+		retv = 0;
+		break;
+	case IEEE80211_PARAM_INACT_INIT:
+		ic->ic_inact_init = value / IEEE80211_INACT_WAIT;
+		retv = 0;
+		break;
 	}
 	if (retv == ENETRESET)
 		retv = IS_UP_AUTO(ic) ? (*ic->ic_init)(ic->ic_dev) : 0;
@@ -1643,6 +1655,15 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_APBRIDGE:
 		param[0] = (ic->ic_flags & IEEE80211_F_NOBRIDGE) == 0;
+		break;
+	case IEEE80211_PARAM_INACT:
+		param[0] = ic->ic_inact_run * IEEE80211_INACT_WAIT;
+		break;
+	case IEEE80211_PARAM_INACT_AUTH:
+		param[0] = ic->ic_inact_auth * IEEE80211_INACT_WAIT;
+		break;
+	case IEEE80211_PARAM_INACT_INIT:
+		param[0] = ic->ic_inact_init * IEEE80211_INACT_WAIT;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -2081,6 +2102,18 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ap_bridge" },
 	{ IEEE80211_PARAM_APBRIDGE,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ap_bridge" },
+	{ IEEE80211_PARAM_INACT,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "inact" },
+	{ IEEE80211_PARAM_INACT,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_inact" },
+	{ IEEE80211_PARAM_INACT_AUTH,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "inact_auth" },
+	{ IEEE80211_PARAM_INACT_AUTH,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_inact_auth" },
+	{ IEEE80211_PARAM_INACT_INIT,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "inact_init" },
+	{ IEEE80211_PARAM_INACT_INIT,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_inact_init" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
