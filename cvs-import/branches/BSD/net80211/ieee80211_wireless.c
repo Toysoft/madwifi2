@@ -1114,7 +1114,10 @@ found:
 	 * altering the current state but that's not possible right now.
 	 */
 	/* XXX handle proberequest case */
-	ic->ic_state = IEEE80211_S_INIT;	/* XXX bypass state machine */
+	if (ic->ic_state != IEEE80211_S_INIT)
+		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+
+	ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwscan);
