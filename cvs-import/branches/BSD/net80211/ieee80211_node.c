@@ -635,7 +635,6 @@ ieee80211_end_scan(struct ieee80211com *ic)
 					bestchan = i;
 					break;
 				}
-				if (maxrssi[i] < maxrssi[bestchan])
 				if (bestchan == -1 || 
 				  maxrssi[i] < maxrssi[bestchan])
 				    bestchan = i;
