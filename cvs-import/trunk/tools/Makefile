@@ -30,7 +30,7 @@ BINDIR=	/usr/local/bin
 
 include ${DEPTH}/Makefile.inc
 
-ALL=	athstats 80211stats athkey athchans
+ALL=	athstats 80211stats athkey athchans athctrl
 
 all:	${ALL}
 
@@ -46,6 +46,8 @@ athstats: athstats.c
 	${CC} -o 80211stats ${CFLAGS} ${LDFLAGS} 80211stats.c
 athkey: athkey.c
 	${CC} -o athkey ${CFLAGS} ${LDFLAGS} athkey.c
+athctrl: athctrl.c
+	${CC} -o athctrl ${CFLAGS} ${LDFLAGS} athctrl.c
 install: ${ALL}
 	cp athstats ${DESTDIR}${BINDIR}
 	cp 80211stats ${DESTDIR}${BINDIR}
