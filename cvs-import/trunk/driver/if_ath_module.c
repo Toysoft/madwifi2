@@ -58,8 +58,15 @@
  */
 #include "release.h"
 #include "version.h"
+
 char *version = ATH_PCI_VERSION " " RELEASE_TYPE;
+#ifdef ATH_PCI     /* PCI BUS */
 char *dev_info = "ath_pci";
+#else
+#ifdef ATH_LBUS       /* LBUS */
+char *dev_info = "ath_lbus";
+#endif             /* LBUS */
+#endif             /* PCI BUS */
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
