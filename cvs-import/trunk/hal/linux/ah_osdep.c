@@ -240,6 +240,12 @@ ath_hal_free(void* p)
 	kfree(p);
 }
 
+void __ahdecl
+ath_hal_memzero(void *dst, size_t n)
+{
+	memset(dst, 0, n);
+}
+
 void * __ahdecl
 ath_hal_memcpy(void *dst, const void *src, size_t n)
 {

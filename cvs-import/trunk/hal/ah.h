@@ -321,7 +321,7 @@ enum {
 };
 
 typedef struct {
-	u_int16_t	rateCount;
+	int		rateCount;		/* NB: for proper padding */
 	u_int8_t	rateCodeToIndex[32];	/* back mapping */
 	struct {
 		u_int8_t	valid;		/* valid for rate control use */
@@ -334,6 +334,8 @@ typedef struct {
 						 * info element of MLME */
 		u_int8_t	controlRate;	/* index of next lower basic
 						 * rate; used for dur. calcs */
+		u_int16_t	lpAckDuration;	/* long preamble ACK duration */
+		u_int16_t	spAckDuration;	/* short preamble ACK duration*/
 	} info[32];
 } HAL_RATE_TABLE;
 
@@ -429,7 +431,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x04050400	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x04091300	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
