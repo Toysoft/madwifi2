@@ -939,7 +939,7 @@ radius_make_response(struct radiuscom *rc, struct eapol_auth_radius_node *ern)
 		ean->ean_id, ean->ean_idlen);
 	/* NB: use Ethernet MTU rather than 802.11 MTU */
 	dp = radius_add_integer(dp, RAD_ATTR_FRAMED_MTU,
-		ETHER_MAX_LEN - LLC_SNAPFRAMELEN - sizeof(struct eapol_hdr));
+		ETHERMTU - LLC_SNAPFRAMELEN - sizeof(struct eapol_hdr));
 	if (ern->ern_statelen != 0)
 		dp = radius_add_bytes(dp, RAD_ATTR_STATE,
 			ern->ern_state, ern->ern_statelen);

@@ -40,7 +40,12 @@
 #define _NET_IF_ETHERSUBR_H_
 
 #define	ETHER_ADDR_LEN		6	/* length of an Ethernet address */
+#define	ETHER_TYPE_LEN		2	/* length of the Ethernet type field */
+#define	ETHER_CRC_LEN		4	/* length of the Ethernet CRC */
+#define	ETHER_HDR_LEN		(ETHER_ADDR_LEN*2+ETHER_TYPE_LEN)
 #define	ETHER_MAX_LEN		1518
+
+#define	ETHERMTU	(ETHER_MAX_LEN-ETHER_HDR_LEN-ETHER_CRC_LEN)
 
 /*
  * Structure of a 10Mb/s Ethernet header.
