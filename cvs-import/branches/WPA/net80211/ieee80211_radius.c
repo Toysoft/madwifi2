@@ -61,17 +61,11 @@
 #include <linux/sysctl.h>
 #include <linux/in.h>
 #include <linux/utsname.h>
-#include <linux/smp_lock.h>		/* for lock_kernel */
 
-#include <asm/uaccess.h>		/* for KERNEL_DS, et al */
+#include <asm/uaccess.h>
 
-#ifdef CONFIG_CRYPTO
 #include <linux/crypto.h>
 #include <asm/scatterlist.h>
-#else
-#include "md5.h"
-#define	crypto_tfm			MD5Context
-#endif
 #include <linux/random.h>
 
 #include "if_media.h"
@@ -171,6 +165,42 @@ radius_get_integer(u_int8_t *ap)
 	return ntohl(v);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+
+#include <linux/smp_lock.h>
+
+static void
+_daemonize(const char *procname)
+{
+	lock_kernel();
+
+	daemonize();
+	current->tty = NULL;
+	strcpy(current->comm, procname);
+
+	unlock_kernel();
+}
+
+static int
+allow_signal(int sig)
+{
+	if (sig < 1 || sig > _NSIG)
+		return -EINVAL;
+
+	/* XXX punt until someone supplies the know-how */
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,20)
+	spin_lock_irq(&current->sigmask_lock);
+	sigdelset(&current->blocked, sig);
+	/* XXX current->mm? */
+	recalc_sigpending(current);
+	spin_unlock_irq(&current->sigmask_lock);
+#endif
+	return 0;
+}
+#else
+#define	_daemonize(s)	daemonize(s)
+#endif /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) */
+
 /*
  * Thread to handle responses from the radius server.
  * This just listens for packets, decodes them, and
@@ -192,15 +222,11 @@ radiusd(void *arg)
 	u_int8_t *ap;
 	int len;
 
-	lock_kernel();
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	daemonize("kradiusd");
+	/* XXX return what */
+	_MOD_INC_USE(THIS_MODULE, return -1);
+
+	_daemonize("kradiusd");
 	allow_signal(SIGKILL);
-#else
-	daemonize();
-	sprintf(current->comm, "kradiusd");
-	/* XXX equivalent for allow_signal */
-#endif
 
 	for (;;) {
 		msg.msg_name = &sin;
@@ -445,7 +471,6 @@ radiusd(void *arg)
 #endif
 }
 
-#ifdef CONFIG_CRYPTO
 /*
  * Write-around for bogus crypto API; requiring the address
  * address be specified twice can easily cause mistakes.
@@ -473,27 +498,6 @@ radius_hmac(struct radiuscom *rc, void *data, u_int len,
 
 	crypto_hmac(rc->rc_md5, key, &keylen, &sg, 1, hash);
 }
-#else /* !CONFIG_CRYPTO */
-/*
- * Backwards compatibility shims to Jouni's md5 code
- * for systems that lack the kernel crypto support.
- */
-#define	crypto_digest_init(x)		MD5Init(x)
-#define	crypto_digest_final(x,h)	MD5Final(h,x)
-
-static __inline void
-digest_update(struct radiuscom *rc, void *data, u_int len)
-{
-	MD5Update(rc->rc_md5, data, len);
-}
-
-static void
-radius_hmac(struct radiuscom *rc, void *data, u_int len,
-	void *key, u_int keylen, u_int8_t hash[16])
-{
-	hmac_md5(key, keylen, data, len, hash);
-}
-#endif
 
 /*
  * Verify the authenticator hash in each reply using
@@ -1464,23 +1468,75 @@ radius_node_reset(struct eapol_auth_node *ean)
 }
 
 /*
+ * Cleanup radius client state.
+ */
+static void
+radius_cleanup(struct radiuscom *rc)
+{
+	if (rc->rc_sock != NULL)
+		sock_release(rc->rc_sock);
+	if (rc->rc_md5 != NULL)
+		crypto_free_tfm(rc->rc_md5);
+	if (rc->rc_secret != NULL)
+		FREE(rc->rc_secret, M_DEVBUF);
+	FREE(rc, M_DEVBUF);
+
+	printk(KERN_INFO "802.1x radius client stopped\n");
+}
+
+/*
+ * Detach a radius client from an authenticator.
+ */
+static void
+ieee80211_radius_detach(struct eapolcom *ec)
+{
+	struct radiuscom *rc = ec->ec_radius;
+
+	if (rc != NULL) {
+		printk(KERN_INFO "802.1x radius client stopping\n");
+		ec->ec_radius = NULL;
+		/* restore original methods */
+		rc->rc_ec->ec_node_alloc = rc->rc_node_alloc;
+		rc->rc_ec->ec_node_free = rc->rc_node_free;
+		rc->rc_ec->ec_node_reset = rc->rc_node_reset;
+		/*
+		 * If we started the receiver thread then just signal
+		 * it and let it complete the cleanup work when it's
+		 * dropped out of the receive loop.  Otherwise we must
+		 * do the cleanup directly.
+		 *
+		 * XXX wrong, must wait to remove module reference
+		 */
+		if (rc->rc_pid != -1)
+			kill_proc(rc->rc_pid, SIGKILL, 1);
+		else
+			radius_cleanup(rc);
+
+		_MOD_DEC_USE(THIS_MODULE);
+	}
+}
+
+/*
  * Attach a radius client to an authenticator.  We setup
  * private state, override the node allocation alloc/free
  * methods, and start a thread to receive messages from
  * the radius server.  We also setup callsbacks used by
  * the 802.1x backend state machine.
  */
-int
+static int
 ieee80211_radius_attach(struct eapolcom *ec)
 {
 	struct radiuscom *rc;
 	int error, secretlen;
+
+	_MOD_INC_USE(THIS_MODULE, return FALSE);
 
 	/* XXX require master key be setup? */
 	secretlen = strlen(radius_secret);
 	if (secretlen == 0) {
 		printf("%s: no radius server shared secret setup", __func__);
 		eapolstats.rs_nosecret++;
+		_MOD_DEC_USE(THIS_MODULE);
 		return FALSE;
 	}
 	MALLOC(rc, struct radiuscom *, sizeof(struct radiuscom),
@@ -1489,6 +1545,7 @@ ieee80211_radius_attach(struct eapolcom *ec)
 		printf("%s: unable to allocate memory for client state\n",
 			__func__);
 		eapolstats.rs_nomem++;
+		_MOD_DEC_USE(THIS_MODULE);
 		return FALSE;
 	}
 	LIST_INIT(&rc->rc_replies);
@@ -1503,12 +1560,7 @@ ieee80211_radius_attach(struct eapolcom *ec)
 	memcpy(rc->rc_secret, radius_secret, radius_secretlen);
 	rc->rc_secretlen = radius_secretlen;
 
-#ifdef CONFIG_CRYPTO
 	rc->rc_md5 = crypto_alloc_tfm("md5", 0);
-#else
-	MALLOC(rc->rc_md5, struct crypto_tfm *, sizeof(struct crypto_tfm),
-		M_DEVBUF, M_NOWAIT | M_ZERO);
-#endif
 	if (rc->rc_md5 == NULL) {
 		printf("%s: unable to allocate md5 crypto state\n", __func__);
 		eapolstats.rs_nocrypto++;
@@ -1564,59 +1616,8 @@ ieee80211_radius_attach(struct eapolcom *ec)
 	printk(KERN_INFO "802.1x radius client started\n");
 	return TRUE;
 bad:
-	ieee80211_radius_detach(ec);
+	ieee80211_radius_detach(ec);		/* NB: does _MOD_DEC_USE */
 	return FALSE;
-}
-
-/*
- * Cleanup radius client state.
- */
-static void
-radius_cleanup(struct radiuscom *rc)
-{
-	if (rc->rc_sock != NULL)
-		sock_release(rc->rc_sock);
-	if (rc->rc_md5 != NULL)
-#ifdef CONFIG_CRYPTO
-		crypto_free_tfm(rc->rc_md5);
-#else
-		FREE(rc->rc_md5, M_DEVBUF);
-#endif
-	if (rc->rc_secret != NULL)
-		FREE(rc->rc_secret, M_DEVBUF);
-	FREE(rc, M_DEVBUF);
-
-	printk(KERN_INFO "802.1x radius client stopped\n");
-}
-
-/*
- * Detach a radius client from an authenticator.
- */
-void
-ieee80211_radius_detach(struct eapolcom *ec)
-{
-	struct radiuscom *rc = ec->ec_radius;
-
-	if (rc == NULL)
-		return;
-	printk(KERN_INFO "802.1x radius client stopping\n");
-	ec->ec_radius = NULL;
-	/* restore original methods */
-	rc->rc_ec->ec_node_alloc = rc->rc_node_alloc;
-	rc->rc_ec->ec_node_free = rc->rc_node_free;
-	rc->rc_ec->ec_node_reset = rc->rc_node_reset;
-	/*
-	 * If we started the receiver thread then just signal
-	 * it and let it complete the cleanup work when it's
-	 * dropped out of the receive loop.  Otherwise we must
-	 * do the cleanup directly.
-	 *
-	 * XXX wrong, must wait to remove module reference
-	 */
-	if (rc->rc_pid != -1)
-		kill_proc(rc->rc_pid, SIGKILL, 1);
-	else
-		radius_cleanup(rc);
 }
 
 /*
@@ -1702,25 +1703,25 @@ radius_sysctl_secret(ctl_table *ctl, int write, struct file *filp,
 
 static ctl_table radius_sysctls[] = {
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "serveraddr",
+	  .procname	= "serveraddr",
 	  .data		= &radius_serveraddr,
 	  .mode		= 0644,
 	  .proc_handler	= radius_sysctl_ipaddr
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "serverport",
+	  .procname	= "serverport",
 	  .data		= &radius_serveraddr,
 	  .mode		= 0644,
 	  .proc_handler	= radius_sysctl_ipport
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "clientaddr",
+	  .procname	= "clientaddr",
 	  .data		= &radius_clientaddr,
 	  .mode		= 0644,
 	  .proc_handler	= radius_sysctl_ipaddr
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "secret",
+	  .procname	= "secret",
 	  .maxlen	= RAD_MAX_SECRET,
 	  .mode		= 0600,
 	  .proc_handler	= radius_sysctl_secret
@@ -1729,7 +1730,7 @@ static ctl_table radius_sysctls[] = {
 };
 static ctl_table radius_table[] = {
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "radius",
+	  .procname	= "radius",
 	  .mode		= 0555,
 	  .child	= radius_sysctls
 	}, { 0 }
@@ -1755,9 +1756,22 @@ static ctl_table net_table[] = {
 static struct ctl_table_header *radius_sys;
 
 /*
- * Called once on startup.
+ * Module glue.
  */
-int
+
+MODULE_AUTHOR("Errno Consulting, Sam Leffler");
+MODULE_DESCRIPTION("802.11 wireless support: radius backend ");
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual BSD/GPL");
+#endif
+
+static const struct ieee80211_authenticator_backend radius = {
+	.iab_name	= "radius",
+	.iab_attach	= ieee80211_radius_attach,
+	.iab_detach	= ieee80211_radius_detach,
+};
+
+static int __init
 init_ieee80211_radius(void)
 {
 #ifndef __linux__
@@ -1770,17 +1784,18 @@ init_ieee80211_radius(void)
 	radius_serveraddr.sin_family = AF_INET;
 	radius_serveraddr.sin_port = htons(1812);	/* default port */
 	radius_sys = register_sysctl_table(net_table, 0);
-	printk(KERN_INFO "802.1x radius support loaded\n");
+
+	ieee80211_authenticator_backend_register(&radius);
 	return 0;
 }
+module_init(init_ieee80211_radius);
 
-/*
- * Called once at shutdown/unload.
- */
-void
+static void __exit
 exit_ieee80211_radius(void)
 {
 	if (radius_sys)
 		unregister_sysctl_table(radius_sys);
-	printk(KERN_INFO "802.1x radius support unloaded!\n");
+
+	ieee80211_authenticator_backend_unregister(&radius);
 }
+module_exit(exit_ieee80211_radius);
