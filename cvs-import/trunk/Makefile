@@ -57,6 +57,12 @@ install:
 	done
 	depmod -a
 
+release:
+	cd ${WLAN}; ${MAKE} clean
+	cd ${DRIVER}; ${MAKE} clean
+	cd ${ATH_HAL}; ${MAKE} clobber
+	${MAKE} all
+
 clean:
 	for i in ${DIRS}; do \
 		(cd $$i; make clean); \
