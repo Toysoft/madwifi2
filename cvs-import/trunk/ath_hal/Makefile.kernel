@@ -2,8 +2,23 @@
 # Makefile for the Atheros HAL Module.
 #
 
-# XXX use ${ARCH}
+##2.4##src=.
+##2.4##obj=.
+
+#
+# Use ARCH to guess the target platform.
+# XXX use .config contents in addition?
+#
+ifeq ($(strip ${ARCH}),i386)
 TARGET=	i386-elf
+endif
+ifeq ($(strip ${ARCH}),mips)
+TARGET=	mipsisa32-be-elf
+endif
+ifeq ($(strip ${ARCH}),x86_64)
+TARGET=	x86_64-elf
+endif
+
 EXTRA_CFLAGS+=	-I. -I${HAL}/.. -I${HAL}
 
 ifndef HAL_OBJDIR
@@ -18,30 +33,35 @@ UUDECODE?=	uudecode
 
 HAL=		$(src)/../hal/linux
 OPT_AH_H=	${HAL}/${TARGET}.opt_ah.h
-
-$(obj)/hal.o:	${HAL}/${TARGET}.hal.o.uu
-	${UUDECODE} -o $(obj)/hal.o < $<
 else
 #
 # Use private version of HAL.
 #
 HAL=		$(shell dirname `dirname ${HAL_OBJDIR}`)
 OPT_AH_H=	${HAL_OBJDIR}/opt_ah.h
+endif
 
+##2.6##obj-$(CONFIG_ATHEROS_HAL) += ath_hal.o
+##2.6##ath_hal-objs	:= ah_osdep.o hal.o
+
+##2.4##obj-$(CONFIG_ATHEROS_HAL) := ah_osdep.o hal.o
+
+##2.4##export-objs	:= ah_osdep.o
+##2.4##list-multi	:= ath_hal.o
+
+##2.4##O_TARGET	:= ath_hal.o
+##2.4##include $(TOPDIR)/Rules.make
+
+ifndef HAL_OBJDIR
+$(obj)/hal.o:	${HAL}/${TARGET}.hal.o.uu
+	${UUDECODE} -o $(obj)/hal.o < $<
+else
 $(obj)/hal.o:	${HAL_OBJDIR}/hal.o
 	cp ${HAL_OBJDIR}/hal.o $(obj)/hal.o
 endif
 
-obj-$(CONFIG_ATHEROS_HAL) += ath_hal.o
-
-ath_hal-objs	:= ah_osdep.o hal.o
-##2.4##export-objs	:= ah_osdep.o
-##2.4##list-multi	:= ath_hal.o
-
-#ath_hal.o: ${ath_hal-objs}
-#	$(LD) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)
-
-$(obj)/ah_osdep.c: ${HAL}/ah_osdep.c
+# XXX need opt_ah.h to do dependencies so give this bogus dependency
+$(obj)/ah_osdep.c: ${HAL}/ah_osdep.c $(obj)/opt_ah.h
 	cp ${HAL}/ah_osdep.c $(obj)/ah_osdep.c
 $(obj)/opt_ah.h: ${OPT_AH_H}
 	cp ${OPT_AH_H} $(obj)/opt_ah.h
