@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -114,17 +114,6 @@ ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 {
 }
 EXPORT_SYMBOL(ath_rate_node_cleanup);
-
-void
-ath_rate_node_copy(struct ath_softc *sc,
-	struct ath_node *dst, const struct ath_node *src)
-{
-	struct onoe_node *odst = ATH_NODE_ONOE(dst);
-	const struct onoe_node *osrc = (const struct onoe_node *)&src[1];
-
-	memcpy(odst, osrc, sizeof(struct onoe_node));
-}
-EXPORT_SYMBOL(ath_rate_node_copy);
 
 void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
@@ -308,6 +297,12 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 #undef RATE
 }
 
+static void
+ath_rate_cb(void *arg, struct ieee80211_node *ni)
+{
+	ath_rate_update(ni->ni_ic->ic_dev->priv, ni, (int)(uintptr_t) arg);
+}
+
 /*
  * Reset the rate control state for each 802.11 state transition.
  */
@@ -340,8 +335,7 @@ ath_rate_newstate(struct ath_softc *sc, enum ieee80211_state state)
 		 * For any other operating mode we want to reset the
 		 * tx rate state of each node.
 		 */
-		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
-			ath_rate_update(sc, ni, 0);	/* use lowest rate */
+		ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, 0);
 		ath_rate_update(sc, ic->ic_bss, 0);
 	}
 	if (ic->ic_fixed_rate == -1 && state == IEEE80211_S_RUN) {
@@ -444,7 +438,7 @@ ath_ratectl(unsigned long data)
 		if (ic->ic_opmode == IEEE80211_M_STA)
 			ath_rate_ctl(sc, ic->ic_bss);	/* NB: no reference */
 		else
-			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
+			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_ctl, sc);
 	}
 	interval = ath_rateinterval;
 	if (ic->ic_opmode == IEEE80211_M_STA)
@@ -551,7 +545,7 @@ MODULE_DESCRIPTION("Atsushi Onoe's rate control algorithm for Atheros devices");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static char *version = "1.0-BSD";
+static char *version = "1.0";
 static char *dev_info = "ath_rate_onoe";
 
 static int __init
