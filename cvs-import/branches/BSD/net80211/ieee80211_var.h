@@ -98,8 +98,6 @@ struct ieee80211com {
 
 	int			(*ic_init)(struct net_device *);
 	int			(*ic_reset)(struct net_device *);
-	int			(*ic_mgtstart)(struct ieee80211com *,
-					struct sk_buff *);
 	void			(*ic_recv_mgmt)(struct ieee80211com *,
 				    struct sk_buff *, struct ieee80211_node *,
 				    int, int, u_int32_t);
