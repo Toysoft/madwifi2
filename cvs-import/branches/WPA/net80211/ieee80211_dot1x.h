@@ -295,7 +295,9 @@ struct eapolstats {
 	u_int32_t	rs_request;
 	u_int32_t	rs_tooshort;
 	u_int32_t	rs_vkeybadsalt;
+	u_int32_t	rs_vkeydupsalt;
 	u_int32_t	rs_vkeybadvid;
+	u_int32_t	rs_vkeybadlen;
 	u_int32_t	rs_vkeytooshort;
 	u_int32_t	rs_vkeytoolong;
 };
