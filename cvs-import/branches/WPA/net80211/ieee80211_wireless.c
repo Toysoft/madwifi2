@@ -1846,11 +1846,12 @@ ieee80211_ioctl_chanlist(struct ieee80211com *ic, struct iw_request_info *info,
 	else
 		i = 0;
 	for (j = 0; i <= IEEE80211_CHAN_MAX; i++, j++) {
-		if (isclr(list->ic_channels, j))
-			continue;
-		if (isclr(ic->ic_chan_avail, i))
-			return EPERM;
-		setbit(chanlist, i);
+		/*
+		 * NB: silently discard unavailable channels so users
+		 *     can specify 1-255 to get all available channels.
+		 */
+		if (isset(list->ic_channels, j) && isset(ic->ic_chan_avail, i))
+			setbit(chanlist, i);
 	}
 	if (ic->ic_ibss_chan == NULL ||
 	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_ibss_chan))) {
