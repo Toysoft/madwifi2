@@ -1431,6 +1431,22 @@ ieee80211_parse_rsn(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 	return 0;
 }
 
+static void
+ieee80211_saveie(u_int8_t **iep, const u_int8_t *ie)
+{
+	u_int ielen = ie[1]+2;
+	/*
+	 * Record information element for later use.
+	 */
+	if (*iep == NULL || (*iep)[1] != ie[1]) {
+		if (*iep != NULL)
+			FREE(*iep, M_DEVBUF);
+		MALLOC(*iep, void*, ielen, M_DEVBUF, M_NOWAIT);
+	}
+	if (*iep != NULL)
+		memcpy(*iep, ie, ielen);
+}
+
 #ifdef IEEE80211_DEBUG
 static void
 dump_probe_beacon(u_int8_t subtype, int isnew,
@@ -1715,18 +1731,11 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ni->ni_fhindex = fhindex;
 		ni->ni_erp = erp;
 		if (wpa != NULL) {
-			u_int ielen = wpa[1]+2;
 			/*
 			 * Record WPA/RSN information element for use by
 			 * applications like wpa_supplicant.
 			 */
-			if (ni->ni_wpa_ie == NULL || ni->ni_wpa_ie[1] != wpa[1]) {
-				if (ni->ni_wpa_ie != NULL)
-					FREE(ni->ni_wpa_ie, M_DEVBUF);
-				MALLOC(ni->ni_wpa_ie, void*, ielen, M_DEVBUF, M_NOWAIT);
-			}
-			if (ni->ni_wpa_ie != NULL)
-				memcpy(ni->ni_wpa_ie, wpa, ielen);
+			ieee80211_saveie(&ni->ni_wpa_ie, wpa);
 		}
 		/* NB: must be after ni_chan is setup */
 		ieee80211_setup_rates(ic, ni, rates, xrates, IEEE80211_F_DOSORT);
