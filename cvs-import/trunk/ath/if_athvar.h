@@ -90,6 +90,23 @@ typedef void irqreturn_t;
 #define	SET_NETDEV_DEV(ndev, pdev)
 #endif
 
+/*
+ * Deal with the sysctl handler api changing.
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
+#define	ATH_SYSCTL_DECL(f, ctl, write, filp, buffer, lenp, ppos) \
+	f(ctl_table *ctl, int write, struct file *filp, void *buffer, \
+		size_t *lenp)
+#define	ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos) \
+	proc_dointvec(ctl, write, filp, buffer, lenp)
+#else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8) */
+#define	ATH_SYSCTL_DECL(f, ctl, write, filp, buffer, lenp, ppos) \
+	f(ctl_table *ctl, int write, struct file *filp, void *buffer,\
+		size_t *lenp, loff_t *ppos)
+#define	ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos) \
+	proc_dointvec(ctl, write, filp, buffer, lenp, ppos)
+#endif
+
 #define	ATH_TIMEOUT		1000
 
 /*
