@@ -948,8 +948,7 @@ ath_stop_locked(struct net_device *dev)
 		if (!sc->sc_invalid) {
 			ath_stoprecv(sc);
 			ath_hal_phydisable(ah);
-		}
-		else
+		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);
 		if (!sc->sc_invalid) {
