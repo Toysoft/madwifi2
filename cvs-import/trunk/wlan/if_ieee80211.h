@@ -672,7 +672,7 @@ struct ieee80211com {
 	int			(*ic_mgtstart)(struct sk_buff *,
 					struct net_device *);
 	int			(*ic_init)(struct net_device *);
-	void			(*ic_reset)(struct net_device *);
+	int			(*ic_reset)(struct net_device *);
 	void			(*ic_recv_mgmt[16])(struct ieee80211com *,
 				    struct sk_buff *, int, u_int32_t, u_int);
 	struct net_device_stats	ic_stats;	/* interface statistics */

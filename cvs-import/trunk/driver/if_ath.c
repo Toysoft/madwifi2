@@ -71,14 +71,14 @@
 	  (((u_int8_t *)(p))[2] << 16) | (((u_int8_t *)(p))[3] << 24)))
 
 static int	ath_init(struct net_device *);
-static void	ath_reset(struct net_device *);
+static int	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(void *);
 static void	ath_rxorn_tasklet(void *);
 static void	ath_bmiss_tasklet(void *);
 static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
 static void	ath_ratectl(unsigned long);
-static void	ath_initkeytable(struct ath_softc *);
+static void	ath_initkeytable(struct net_device *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
 static void	ath_beacon_tasklet(void *);
@@ -378,8 +378,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 		mac->sa_data[3], mac->sa_data[4], mac->sa_data[5]));
 	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
 	ath_hal_setmac(ah, dev->dev_addr);
-	ath_reset(dev);
-	return 0;
+	return -ath_reset(dev);
 }
 
 static int      
@@ -392,8 +391,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
 	}
 	DPRINTF(("%s: %d\n", __func__, mtu));
 	dev->mtu = mtu;
-	ath_reset(dev);
-	return 0;
+	return -ath_reset(dev);
 }
 
 /*
@@ -580,7 +578,7 @@ ath_init(struct net_device *dev)
 	 * here except setup the interrupt mask.
 	 */
 	if (ic->ic_flags & IEEE80211_F_WEPON)
-		ath_initkeytable(sc);
+		ath_initkeytable(dev);
 	if (ath_startrecv(dev) != 0) {
 		printk("%s: unable to start recv logic\n", dev->name);
 		return EIO;
@@ -665,7 +663,7 @@ ath_stop(struct net_device *dev)
  * operational state.  Used to recover from errors rx overrun
  * and to reset the hardware when rf gain settings must be reset.
  */
-static void
+static int
 ath_reset(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
@@ -690,6 +688,12 @@ ath_reset(struct net_device *dev)
 	if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware; hal status %u\n",
 			dev->name, __func__, status);
+	/*
+	 * NB: key state is preserved across resets but since we
+	 *     may be called after an ioctl call to update the
+	 *     hardware state we do this regardless.
+	 */
+	ath_initkeytable(dev);
 	ath_hal_intrset(ah, sc->sc_imask);
 	if (ath_startrecv(dev) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
@@ -698,6 +702,7 @@ ath_reset(struct net_device *dev)
 		ath_beacon_config(sc);	/* restart beacons */
 		netif_wake_queue(dev);	/* restart xmit */
 	}
+	return 0;
 }
 
 /*
@@ -942,8 +947,9 @@ ath_media_change(struct net_device *dev)
  * Fill the hardware key cache with key entries.
  */
 static void
-ath_initkeytable(struct ath_softc *sc)
+ath_initkeytable(struct net_device *dev)
 {
+	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	int i;

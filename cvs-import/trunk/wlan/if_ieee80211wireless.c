@@ -198,42 +198,58 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 			  struct iw_point *erq, char *keybuf)
 {
 	struct ieee80211com *ic = dev->priv;
-	int kid, error;
+	int kid, error, wepchange;
 
-	if (erq->flags & IW_ENCODE_DISABLED) {
-		ic->ic_flags &= ~IEEE80211_F_WEPON;
-		error = ENETRESET;
-		goto done;
-	}
-	if ((ic->ic_caps & IEEE80211_C_WEP) == 0) {
-		error = EOPNOTSUPP;
-		goto done;
-	}
-	error = getiwkeyix(ic, erq, &kid);
-	if (error)
-		goto done;
-	if (erq->length > IEEE80211_KEYBUF_SIZE) {
-		error = EINVAL;
-		goto done;
-	}
-	if (erq->length > 0) {		/* XXX no way to install 0-length key */
-		memcpy(ic->ic_nw_keys[kid].wk_key, keybuf, erq->length);
-		memset(ic->ic_nw_keys[kid].wk_key + erq->length, 0,
-			IEEE80211_KEYBUF_SIZE - erq->length);
-		ic->ic_nw_keys[kid].wk_len = erq->length;
-	} else {
-		/* verify the key to be installed is non-zero length */
-		if (ic->ic_nw_keys[kid].wk_len == 0) {
-			error = EINVAL;
-			goto done;
+	if ((erq->flags & IW_ENCODE_DISABLED) == 0) {
+		/*
+		 * Enable crypto.  The device must support
+		 * it and any specified key must be valid.
+		 */
+		if ((ic->ic_caps & IEEE80211_C_WEP) == 0)
+			return -EOPNOTSUPP;
+		error = getiwkeyix(ic, erq, &kid);
+		if (error)
+			return -error;
+		if (erq->length > IEEE80211_KEYBUF_SIZE)
+			return -EINVAL;
+		/* XXX no way to install 0-length key */
+		if (erq->length > 0) {
+			memcpy(ic->ic_nw_keys[kid].wk_key, keybuf, erq->length);
+			memset(ic->ic_nw_keys[kid].wk_key + erq->length, 0,
+				IEEE80211_KEYBUF_SIZE - erq->length);
+			ic->ic_nw_keys[kid].wk_len = erq->length;
+		} else {
+			/* verify the key to be installed is non-zero length */
+			if (ic->ic_nw_keys[kid].wk_len == 0)
+				return -EINVAL;
 		}
+		ic->ic_wep_txkey = kid;
+		wepchange = (ic->ic_flags & IEEE80211_F_WEPON) == 0;
+		ic->ic_flags |= IEEE80211_F_WEPON;
+	} else {
+		if ((ic->ic_flags & IEEE80211_F_WEPON) == 0)
+			return 0;
+		ic->ic_flags &= ~IEEE80211_F_WEPON;
+		wepchange = 1;
+		error = 0;
 	}
-	ic->ic_wep_txkey = kid;
-	ic->ic_flags |= IEEE80211_F_WEPON;
-	error = ENETRESET;
-done:
-	if (error == ENETRESET)
-		error = IS_UP(dev) ? (*ic->ic_init)(dev) : 0;
+	KASSERT(error == 0, ("something wrong, error %d", error));
+	if (IS_UP(dev)) {
+		/*
+		 * Device is up and running; we must kick it to
+		 * effect the change.  If we're enabling/disabling
+		 * crypto use then we must re-initialize the device
+		 * so the 802.11 state machine is reset.  Otherwise
+		 * we only need to reset the hardware state.  By
+		 * differentiating the two we allow key changes to
+		 * be done w/o changing the 802.11 state machine
+		 * which is important for applications like 802.1x.
+		 */
+		if (wepchange)
+			error = (*ic->ic_init)(dev);
+		else
+			error = (*ic->ic_reset)(dev);
+	}
 	return -error;
 }
 
@@ -347,7 +363,7 @@ ieee80211_ioctl_siwrts(struct net_device *dev,
 	if (val != ic->ic_rtsthreshold) {
 		ic->ic_rtsthreshold = val;
 		if (IS_UP(dev))
-			return -(*ic->ic_init)(dev);
+			return -(*ic->ic_reset)(dev);
 	}
 	return 0;
 }
@@ -384,7 +400,7 @@ ieee80211_ioctl_siwfrag(struct net_device *dev,
 	if (val != ic->ic_fragthreshold) {
 		ic->ic_fragthreshold = val;
 		if (IS_UP(dev))
-			return -(*ic->ic_init)(dev);
+			return -(*ic->ic_reset)(dev);
 	}
 	return 0;
 }
@@ -752,7 +768,7 @@ ieee80211_ioctl_siwpower(struct net_device *dev,
 		ic->ic_flags |= IEEE80211_F_PMGTON;
 	}
 done:
-	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
+	return IS_UP(dev) ? -(*ic->ic_reset)(dev) : 0;
 }
 
 int
@@ -808,7 +824,7 @@ ieee80211_ioctl_siwretry(struct net_device *dev,
 		return 0;
 	}
 done:
-	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
+	return IS_UP(dev) ? -(*ic->ic_reset)(dev) : 0;
 }
 
 int
@@ -881,7 +897,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev,
 		ic->ic_flags |= IEEE80211_F_TXPOW_AUTO;
 	}
 done:
-	return IS_UP(dev) ? -(*ic->ic_init)(dev) : 0;
+	return IS_UP(dev) ? -(*ic->ic_reset)(dev) : 0;
 }
 
 int
