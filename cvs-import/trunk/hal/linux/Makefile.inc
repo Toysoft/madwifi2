@@ -18,6 +18,7 @@ HAL=	..
 # AH_SUPPORT_AR5210	802.11a only MAC
 # AH_SUPPORT_AR5211	802.11a+802.11b MAC (also pure g, but not yet supported)
 # AH_SUPPORT_AR5212	802.11a+802.11b+802.11g MAC
+# AH_SUPPORT_AR5312     5212 MAC WiSoC (requires AH_SUPPORT_AR5212)
 #
 # and numerous optional debugging facilities (typically named AH_DEBUG_*):
 #
@@ -42,6 +43,7 @@ HAL=	..
 AH_SUPPORT_AR5210=1		# 5210 support
 AH_SUPPORT_AR5211=1		# 5211 support
 AH_SUPPORT_AR5212=1		# 5212 support
+AH_SUPPORT_AR5312=0             # 5312 support
 AH_DEBUG=0			# debugging (e.g. hw.ath.hal.debug)
 AH_ASSERT=0			# assertions (pretty lame)
 AH_REGOPS_FUNC=0		# use inline memory references
@@ -50,6 +52,55 @@ AH_DEBUG_COUNTRY=0		# accept CTR_DEBUG country code
 AH_ENABLE_TX_TPC=1		# enable per-tx tpc for 5212
 AH_DISABLE_WME=0		# disable HAL_TXQ_USE_LOCKOUT_BKOFF_DIS
 AH_ENABLE_AP_SUPPORT=0		# enable AP-specific support
+
+ifeq ($(strip ${AH_SUPPORT_AR5312}),1)
+	AH_SUPPORT_AR5212=1     # 5312 support requires 5212 support
+	ifndef KERNELPATH
+		$(error KERNELPATH must be defined for 5312 support)
+	else
+		KERNEL_PATH = ${KERNELPATH}
+	endif	
+	ifndef KERNEL_VERSION
+		VERSION = `head -n 1 ${KERNEL_PATH}/Makefile | cut -f 2 -d'='`
+		PATCHLEVEL = `head -n 2 ${KERNEL_PATH}/Makefile | tail -1 | cut -f 2 -d'='`
+		SUBVERSION = `head -n 3 ${KERNEL_PATH}/Makefile | tail -1 | cut -f 2 -d'='`
+		KERNEL_VERSION=${VERSION}.${PATCHLEVEL}.${SUBVERSION}   #default 5312 kernel version
+	endif
+endif
+
+#
+# Path to the Linux kernel, include files, and where to install the modules.
+#
+# KERNEL_VERSION is the target kernel's version; it's used to enable
+# build techniques and some code.  If KERNEL_VERSION is not set in the
+# environment then it is taken from the running system.
+#
+# KERNEL_PATH is the path to the target kernel's build/source area.
+# This is used to obtain the kernel configuration and include files.
+# If KERNEL_PATH is not set in the environment then it is derived from
+# KERNEL_VERSION.
+#
+# KERNEL_CONF is the filename of the target kernel's make configuration
+# file.  If this is not set in the environment then it is derived from
+# KERNEL_PATH.
+#
+ifndef KERNEL_VERSION
+KERNEL_VERSION= $(shell uname -r)
+endif
+ifndef KERNEL_PATH
+KERNEL_PATH=    /lib/modules/${KERNEL_VERSION}/build
+endif
+ifndef KERNEL_CONF
+KERNEL_CONF=    ${KERNEL_PATH}/.config
+endif
+MODULE_PATH=    /lib/modules/${KERNEL_VERSION}/net
+
+#
+# A numeric version of the target system's version string, suitable
+# for doing if checks in make files.
+#
+LINUX_VERSION=  $(shell echo $(KERNEL_VERSION) | \
+                awk '{ split($$0,a,"."); print a[1]*100+a[2]; }')
 
 #
 # Basic build components.
@@ -104,6 +155,16 @@ HAL_OBJS+=${OBJDIR}/ar5212_attach.o ${OBJDIR}/ar5212_beacon.o \
 	${OBJDIR}/ar5212_phy.o ${OBJDIR}/ar5212_recv.o \
 	${OBJDIR}/ar5212_reset.o ${OBJDIR}/ar5212_xmit.o \
 	${OBJDIR}/ar5212_ani.o
+
+AR5312=	${HAL}/ar5312
+HAL_SRCS+=${AR5312}/ar5312_attach.c ${AR5312}/ar5312_interrupts.c \
+	${AR5312}/ar5312_misc.c ${AR5312}/ar5312_power.c \
+	${AR5312}/ar5312_reset.c \
+	${AR5312}/ar5312_bsp.c
+HAL_OBJS+=${OBJDIR}/ar5312_attach.o ${OBJDIR}/ar5312_interrupts.o \
+	${OBJDIR}/ar5312_misc.o ${OBJDIR}/ar5312_power.o \
+	${OBJDIR}/ar5312_reset.o \
+	${OBJDIR}/ar5312_bsp.o
 
 SRCS+=	${HAL_SRCS}
 CLEANFILES+= ${OBJDIR}/opt_ah.h ${HAL_OBJS} \
@@ -162,6 +223,7 @@ ${OBJDIR}/hal-release.o: ${OBJDIR}/hal.o ${OBJDIR}/hal.mangle
 release: ${OBJDIR}/hal-release.o
 	rm -f ${HAL}/${OS}/${TARGET}.hal.o.uu
 	(${SED} -e '1,/^$$/d' ${HAL}/COPYRIGHT; \
+	 ${SED} -n -e '/ATH_HAL_VERSION/p' ${HAL}/version.h; \
 	 ${UUENCODE} ${OBJDIR}/hal-release.o hal.o) > ${HAL}/${OS}/${TARGET}.hal.o.uu
 	cp ${OBJDIR}/opt_ah.h ${HAL}/${OS}/${TARGET}.opt_ah.h
 
@@ -248,6 +310,19 @@ ${OBJDIR}/ar5212_reset.o:	${AR5212}/ar5212_reset.c
 ${OBJDIR}/ar5212_xmit.o:	${AR5212}/ar5212_xmit.c
 	${CC} -c -o $@ ${CFLAGS} $<
 
+${OBJDIR}/ar5312_attach.o: ${AR5312}/ar5312_attach.c
+	${CC} -c -o $@ ${CFLAGS} $<
+${OBJDIR}/ar5312_bsp.o: ${AR5312}/ar5312_bsp.c
+	${CC} -c -o $@ ${CFLAGS} $<
+${OBJDIR}/ar5312_interrupts.o: ${AR5312}/ar5312_interrupts.c
+	${CC} -c -o $@ ${CFLAGS} $<
+${OBJDIR}/ar5312_misc.o:	${AR5312}/ar5312_misc.c
+	${CC} -c -o $@ ${CFLAGS} $<
+${OBJDIR}/ar5312_power.o: ${AR5312}/ar5312_power.c
+	${CC} -c -o $@ ${CFLAGS} $<
+${OBJDIR}/ar5312_reset.o:	${AR5312}/ar5312_reset.c
+	${CC} -c -o $@ ${CFLAGS} $<
+
 ${OBJDIR}/opt_ah.h:
 	test -d ${OBJDIR} || mkdir -p ${OBJDIR}
 ifeq ($(strip ${AH_SUPPORT_AR5210}),1)
@@ -258,6 +333,9 @@ ifeq ($(strip ${AH_SUPPORT_AR5211}),1)
 endif
 ifeq ($(strip ${AH_SUPPORT_AR5212}),1)
 	echo "#define AH_SUPPORT_AR5212	1"	>> ${OBJDIR}/opt_ah.h
+endif
+ifeq ($(strip ${AH_SUPPORT_AR5312}),1)
+	echo "#define AH_SUPPORT_AR5312	1"	>> ${OBJDIR}/opt_ah.h
 endif
 ifeq ($(strip ${AH_ASSERT}),1)
 	echo "#define AH_ASSERT	1"		>> ${OBJDIR}/opt_ah.h
