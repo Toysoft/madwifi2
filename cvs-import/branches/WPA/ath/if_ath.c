@@ -2314,6 +2314,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	    (rt->info[rt->rateCodeToIndex[
 	    	ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2);
  	wlan_ng_prism2_header *ph;
+	u_int32_t tsf;
 
 	skb->protocol = ETH_P_CONTROL;
 	skb->pkt_type = PACKET_OTHERHOST;
@@ -2359,11 +2360,17 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 
 	/* Pass up tsf clock in mactime */
 	ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
-//	ph->mactime.status = P80211ENUM_msgitem_status_no_value;
 	ph->mactime.status = 0;
 	ph->mactime.len = 4;
-//	ph->mactime.data = 0;
-	ph->mactime.data = ath_hal_gettsf32(sc->sc_ah);
+	/*
+	 * Rx descriptor has the low 15 bits of the tsf at
+	 * the time the frame was received.  Use the current
+	 * tsf to extend this to 32 bits.
+	 */
+	tsf = ath_hal_gettsf32(sc->sc_ah);
+	if ((tsf & 0x7fff) < ds->ds_rxstat.rs_tstamp)
+		tsf -= 0x8000;
+	ph->mactime.data = ds->ds_rxstat.rs_tstamp | (tsf &~ 0x7fff);
 
 	ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
 	ph->istx.status = 0;
