@@ -420,7 +420,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		DPRINTF(("ath_intr: flags 0x%x\n", dev->flags));
 		ath_hal_getisr(ah, &status);	/* clear ISR */
 		ath_hal_intrset(ah, 0);		/* disable further intr's */
-		return IRQ_NONE;
+		return IRQ_HANDLED;
 	}
 	needmark = 0;
 	ath_hal_getisr(ah, &status);
