@@ -46,13 +46,9 @@
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
 
-#define	ATH_TASKINIT(_tq, _arg, _func) do {	\
-	(_tq)->routine = _func;			\
-	(_tq)->data = _arg;			\
-} while (0)
-#define	ATH_SCHEDTASK(_tq) do {			\
-	queue_task(_tq, &tq_immediate);		\
-	mark_bh(IMMEDIATE_BH);			\
+#define	ATH_SCHEDTASK(_tq) do {						\
+	if (queue_task(_tq, &tq_immediate))				\
+		mark_bh(IMMEDIATE_BH);					\
 } while (0);
 
 #define	TXBUF_DEQUEUE(_sc, _bf) do {					\
@@ -152,12 +148,12 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	spin_lock_init(&sc->sc_txbuflock);
 	spin_lock_init(&sc->sc_txqlock);
 
-	ATH_TASKINIT(&sc->sc_rxtq,	dev, ath_rx_tasklet);
-	ATH_TASKINIT(&sc->sc_txtq,	dev, ath_tx_tasklet);
-	ATH_TASKINIT(&sc->sc_swbatq,	dev, ath_beacon_tasklet);
-	ATH_TASKINIT(&sc->sc_bmisstq,	dev, ath_bmiss_tasklet);
-	ATH_TASKINIT(&sc->sc_rxorntq,	dev, ath_rxorn_tasklet);
-	ATH_TASKINIT(&sc->sc_fataltq,	dev, ath_fatal_tasklet);
+	INIT_TQUEUE(&sc->sc_rxtq,	ath_rx_tasklet,		dev);
+	INIT_TQUEUE(&sc->sc_txtq,	ath_tx_tasklet,		dev);
+	INIT_TQUEUE(&sc->sc_swbatq,	ath_beacon_tasklet,	dev);
+	INIT_TQUEUE(&sc->sc_bmisstq,	ath_bmiss_tasklet,	dev);
+	INIT_TQUEUE(&sc->sc_rxorntq,	ath_rxorn_tasklet,	dev);
+	INIT_TQUEUE(&sc->sc_fataltq,	ath_fatal_tasklet,	dev);
 
 	/*
 	 * NB: cache line size is used to size rx buffers and align
@@ -221,10 +217,10 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	}
 	init_timer(&sc->sc_scan_ch);
 	sc->sc_scan_ch.function = ath_next_scan;
-	sc->sc_scan_ch.data = (unsigned long) sc;
+	sc->sc_scan_ch.data = (unsigned long) dev;
 	init_timer(&sc->sc_cal_ch);
 	sc->sc_cal_ch.function = ath_calibrate;
-	sc->sc_cal_ch.data = (unsigned long) sc;
+	sc->sc_cal_ch.data = (unsigned long) dev;
 
 	ether_setup(dev);
 	dev->open = ath_init;
@@ -1560,11 +1556,12 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 static void
 ath_next_scan(unsigned long arg)
 {
-	struct ath_softc *sc = (struct ath_softc *) arg;
+	struct net_device *dev = (struct net_device *) arg;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
 
-	if (sc->sc_ic.ic_state != IEEE80211_S_SCAN)
-		return;
-	ieee80211_next_scan(&sc->sc_ic.ic_dev);
+	if (ic->ic_state == IEEE80211_S_SCAN)
+		ieee80211_next_scan(dev);
 }
 
 /*
@@ -1574,7 +1571,8 @@ ath_next_scan(unsigned long arg)
 static void
 ath_calibrate(unsigned long arg)
 {
-	struct ath_softc *sc = (struct ath_softc *) arg;
+	struct net_device *dev = (struct net_device *) arg;
+	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211channel *c;
@@ -1583,7 +1581,7 @@ ath_calibrate(unsigned long arg)
 	DPRINTF(("ath_calibrate: channel %u/%x\n", c->ic_freq, c->ic_flags));
 	if (!ath_hal_calibrate(ah, (HAL_CHANNEL *) c))
 		printk("%s: ath_calibrate: calibration of channel %u failed\n",
-			ic->ic_dev.name, c->ic_freq);
+			dev->name, c->ic_freq);
 
 	sc->sc_cal_ch.expires = jiffies + HZ;
 	add_timer(&sc->sc_cal_ch);
