@@ -1932,7 +1932,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		"%s: skb %p [data %p len %u] skbaddr %p\n",
 		__func__, skb, skb->data, skb->len, (caddr_t) bf->bf_skbaddr);
 	if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
-		if_printf(&sc->sc_dev, "s: DMA mapping failed\n", __func__);
+		if_printf(&sc->sc_dev, "%s: DMA mapping failed\n", __func__);
 		return;
 	}
 	
@@ -2053,7 +2053,7 @@ ath_beacon_tasklet(struct net_device *dev)
                 bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
                     skb->data, skb->len, BUS_DMA_TODEVICE);
                 if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
-			if_printf(dev, "s: DMA mapping failed\n", __func__);
+			if_printf(dev, "%s: DMA mapping failed\n", __func__);
 			return;
 		}
 	}
@@ -2550,7 +2550,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 			skb->data, sc->sc_rxbufsize, BUS_DMA_FROMDEVICE);
 		if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
-			if_printf(&sc->sc_dev, "s: DMA mapping failed\n", __func__);
+			if_printf(&sc->sc_dev, "%s: DMA mapping failed\n", __func__);
 			dev_kfree_skb(skb);
 			bf->bf_skb = NULL;
 			sc->sc_stats.ast_rx_busdma++;
@@ -3275,7 +3275,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %x\n",
 		__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
 	if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
-		if_printf(dev, "s: DMA mapping failed\n", __func__);
+		if_printf(dev, "%s: DMA mapping failed\n", __func__);
 		dev_kfree_skb(skb);
 		bf->bf_skb = NULL;
 		sc->sc_stats.ast_tx_busdma++;
