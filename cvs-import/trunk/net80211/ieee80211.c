@@ -574,6 +574,12 @@ ieee80211_media_change(struct net_device *dev)
 			ic->ic_flags |= IEEE80211_F_IBSSON;
 			break;
 		}
+		/*
+		 * Yech, slot time may change depending on the
+		 * operating mode so reset it to be sure everything
+		 * is setup appropriately.
+		 */
+		ieee80211_reset_erp(ic);
 		error = ENETRESET;
 	}
 #ifdef notdef
