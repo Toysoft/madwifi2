@@ -262,6 +262,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 	struct ieee80211_node_table *nt = &ic->ic_sta;
 	struct ieee80211_rateset *rs;
 	int i;
+	u_int16_t temp;
 
 	IEEE80211_NODE_LOCK_BH(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
@@ -269,8 +270,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 		if (p - page > space - 300)
 			break;
 		p += sprintf(p, "\nmacaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
-		p += sprintf(p, "  rssi: %d dBm ; ",
-			(*ic->ic_node_getrssi)(ni));
+		p += sprintf(p, "  rssi: %d dBm ;", ic->ic_node_getrssi(ni));
 		p += sprintf(p, "refcnt: %d\n", ieee80211_node_refcnt(ni));
 
 		p += sprintf(p, "  capinfo:");
@@ -292,6 +292,8 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 			p += sprintf(p, " shortpreamble");
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME)
 			p += sprintf(p, " shortslot");
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_RSN)
+			p += sprintf(p, " rsn");
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_DSSSOFDM)
 			p += sprintf(p, " dsssofdm");
 		p += sprintf(p, "\n");
@@ -337,8 +339,16 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 				ni->ni_rxseqs[0] >> IEEE80211_SEQ_SEQ_SHIFT,
 				ni->ni_rxseqs[0] & IEEE80211_SEQ_FRAG_MASK,
 				ni->ni_rxfragstamp);
+
+		if (ic->ic_opmode == IEEE80211_M_IBSS || ni->ni_associd != 0)
+			temp = ic->ic_inact_run;
+		else if (ieee80211_node_is_authorized(ni))
+			temp = ic->ic_inact_auth;
+		else
+			temp = ic->ic_inact_init;
+		temp = (temp - ni->ni_inact) * IEEE80211_INACT_WAIT;
 		p += sprintf(p, "  fails: %d  inact: %d\n",
-				ni->ni_fails, ni->ni_inact);
+				ni->ni_fails, temp);
 	}
 	IEEE80211_NODE_UNLOCK_BH(nt);
 	return (p - page);
