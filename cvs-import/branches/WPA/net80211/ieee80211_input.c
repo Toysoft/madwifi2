@@ -1690,7 +1690,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			memset(ni->ni_essid, 0, sizeof(ni->ni_essid));
 			memcpy(ni->ni_essid, ssid + 2, ssid[1]);
 		} else if (ssid[1] != 0 &&
-		    (ISPROBE(subtype) == ni->ni_esslen == 0)) {
+		    (ISPROBE(subtype) || ni->ni_esslen == 0)) {
 			/*
 			 * Update ESSID at probe response to adopt hidden AP by
 			 * Lucent/Cisco, which announces null ESSID in beacon.
