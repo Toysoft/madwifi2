@@ -847,30 +847,32 @@ ieee80211_reset_erp(struct ieee80211com *ic)
 
 /*
  * Return the phy mode for with the specified channel so the
- * caller can select a rate set.  This is problematic and the
- * work here assumes how things work elsewhere in this code.
+ * caller can select a rate set.  This is problematic for channels
+ * where multiple operating modes are possible (e.g. 11g+11b).
+ * In those cases we defer to the current operating mode when set.
  */
 enum ieee80211_phymode
 ieee80211_chan2mode(struct ieee80211com *ic, struct ieee80211_channel *chan)
 {
-	/*
-	 * NB: this assumes the channel would not be supplied to us
-	 *     unless it was already compatible with the current mode.
-	 */
-	if (ic->ic_curmode != IEEE80211_MODE_AUTO)
-		return ic->ic_curmode;
-	/*
-	 * In autoselect mode; deduce a mode based on the channel
-	 * characteristics.  We assume that turbo-only channels
-	 * are not considered when the channel set is constructed.
-	 */
-	if (IEEE80211_IS_CHAN_5GHZ(chan))
+	if (IEEE80211_IS_CHAN_5GHZ(chan)) {
+		/*
+		 * This assumes all 11a turbo channels are also
+		 * usable withut turbo, which is currently true.
+		 */
+		if (ic->ic_curmode == IEEE80211_MODE_TURBO)
+			return IEEE80211_MODE_TURBO;
 		return IEEE80211_MODE_11A;
-	else if (IEEE80211_IS_CHAN_FHSS(chan))
+	} else if (IEEE80211_IS_CHAN_FHSS(chan))
 		return IEEE80211_MODE_FH;
-	else if (chan->ic_flags & (IEEE80211_CHAN_OFDM|IEEE80211_CHAN_DYN))
+	else if (chan->ic_flags & (IEEE80211_CHAN_OFDM|IEEE80211_CHAN_DYN)) {
+		/*
+		 * This assumes all 11g channels are also usable
+		 * for 11b, which is currently true.
+		 */
+		if (ic->ic_curmode == IEEE80211_MODE_11B)
+			return IEEE80211_MODE_11B;
 		return IEEE80211_MODE_11G;
-	else
+	} else
 		return IEEE80211_MODE_11B;
 }
 EXPORT_SYMBOL(ieee80211_chan2mode);
