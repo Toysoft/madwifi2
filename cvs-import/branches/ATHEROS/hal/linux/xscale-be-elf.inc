@@ -39,6 +39,13 @@
 #
 # Compilation configuration for building big-endian XScale/arm-elf.
 #
+# NB: built with AH_REGOPS_FUNC to so that register accesses
+#     can be done using the Linux readl/writel functions on
+#     systems that need it.
+#
+# Reported to work on:
+#	IXP425
+#
 
 #
 # Built with GNU cross-devel tools:
@@ -64,6 +71,6 @@ OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
 LDOPTS=	-EB
-COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
+COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN -DAH_REGOPS_FUNC
 COPTS+= -march=armv4 -mbig-endian -fno-strict-aliasing -fno-common -mapcs-32 \
-	-mtune=xscale  -mshort-load-bytes -msoft-float
+	-mtune=xscale  -mshort-load-bytes -msoft-float -mfp=2
