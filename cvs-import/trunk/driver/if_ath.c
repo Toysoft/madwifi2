@@ -2807,12 +2807,6 @@ ath_sysctl_dump(ctl_table *ctl, int write, struct file *filp,
 		sc = dev->priv;
 		if (*lenp >= 3 && strncmp(buffer, "hal", 3) == 0)
 			ath_hal_dumpstate(sc->sc_ah);
-		else if (*lenp >= 6 && strncmp(buffer, "eeprom", 6) == 0)
-			ath_hal_dumpeeprom(sc->sc_ah);
-		else if (*lenp >= 6 && strncmp(buffer, "rfgain", 6) == 0)
-			ath_hal_dumprfgain(sc->sc_ah);
-		else if (*lenp >= 3 && strncmp(buffer, "ani", 3) == 0)
-			ath_hal_dumpani(sc->sc_ah);
 		else {
 			printk("%s: don't grok \"%.*s\"\n",
 				__func__, *lenp, (char*) buffer);

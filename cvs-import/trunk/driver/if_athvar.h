@@ -352,12 +352,6 @@ typedef struct {
 	((*(_ah)->ah_stopDmaReceive)((_ah)))
 #define	ath_hal_dumpstate(_ah) \
 	((*(_ah)->ah_dumpState)((_ah)))
-#define	ath_hal_dumpeeprom(_ah) \
-	((*(_ah)->ah_dumpEeprom)((_ah)))
-#define	ath_hal_dumprfgain(_ah) \
-	((*(_ah)->ah_dumpRfGain)((_ah)))
-#define	ath_hal_dumpani(_ah) \
-	((*(_ah)->ah_dumpAni)((_ah)))
 #define	ath_hal_setuptxqueue(_ah, _type, _irq) \
 	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
 #define	ath_hal_resettxqueue(_ah, _q) \
