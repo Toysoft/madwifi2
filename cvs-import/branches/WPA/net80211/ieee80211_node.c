@@ -385,7 +385,7 @@ ieee80211_end_scan(struct ieee80211com *ic)
 
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/* XXX off stack? */
-		u_char occupied[roundup(IEEE80211_CHAN_MAX, NBBY)];
+		u_char occupied[IEEE80211_CHAN_BYTES];
 		/*
 		 * The passive scan to look for existing AP's completed,
 		 * select a channel to camp on.  Identify the channels
