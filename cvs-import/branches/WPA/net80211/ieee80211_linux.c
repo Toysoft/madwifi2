@@ -198,6 +198,59 @@ ieee80211_notify_scan_done(struct ieee80211com *ic)
 	wireless_send_event(ic->ic_dev, SIOCGIWSCAN, &wreq, NULL);
 }
 
+void
+ieee80211_notify_replay_failure(struct ieee80211com *ic,
+	const struct ieee80211_frame *wh, const struct ieee80211_key *k,
+	u_int64_t rsc)
+{
+	static const char * tag = "MLME-REPLAYFAILURE.indication";
+	union iwreq_data wrqu;
+	char buf[128];
+
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+		("[%s] %s replay detected <rsc %llu, csc %llu>\n",
+		ether_sprintf(wh->i_addr2), k->wk_cipher->ic_name,
+		rsc, k->wk_keyrsc));
+
+	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
+		return;
+
+	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
+	snprintf(buf, sizeof(buf), "%s(keyid=%d %scast addr=%s)", tag,
+	    k->wk_keyix, IEEE80211_IS_MULTICAST(wh->i_addr1) ?  "broad" : "uni",
+	    ether_sprintf(wh->i_addr1));
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+EXPORT_SYMBOL(ieee80211_notify_replay_failure);
+
+void
+ieee80211_notify_michael_failure(struct ieee80211com *ic,
+	const struct ieee80211_frame *wh, u_int keyix)
+{
+	static const char * tag = "MLME-MICHAELMICFAILURE.indication";
+	union iwreq_data wrqu;
+	char buf[128];
+
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+		("[%s] Michael MIC verification failed <keyidx %d>\n",
+	       ether_sprintf(wh->i_addr2), keyix));
+	ic->ic_stats.is_rx_tkipmic++;
+
+	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
+		return;
+
+	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
+	snprintf(buf, sizeof(buf), "%s(keyid=%d %scast addr=%s)", tag,
+	    keyix, IEEE80211_IS_MULTICAST(wh->i_addr1) ?  "broad" : "uni",
+	    ether_sprintf(wh->i_addr1));
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+EXPORT_SYMBOL(ieee80211_notify_michael_failure);
+
 #ifdef CONFIG_SYSCTL
 #include <linux/ctype.h>
 
@@ -394,6 +447,7 @@ ieee80211_sysctl_register(struct ieee80211com *ic)
 		ic->ic_sysctls = NULL;
 	}
 }
+EXPORT_SYMBOL(ieee80211_sysctl_register);
 
 void
 ieee80211_sysctl_unregister(struct ieee80211com *ic)
@@ -407,6 +461,7 @@ ieee80211_sysctl_unregister(struct ieee80211com *ic)
 		ic->ic_sysctls = NULL;
 	}
 }
+EXPORT_SYMBOL(ieee80211_sysctl_unregister);
 #endif /* CONFIG_SYSCTL */
 
 /*
