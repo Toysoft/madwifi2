@@ -2442,8 +2442,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	DPRINTF(("%s: RX filter 0x%x bssid %s\n",
 		 __func__, rfilt, ether_sprintf(bssid)));
 
-	if (nstate == IEEE80211_S_RUN &&
-	    ic->ic_opmode != IEEE80211_M_IBSS && ic->ic_opmode != IEEE80211_M_MONITOR)
+	if (nstate == IEEE80211_S_RUN && ic->ic_opmode == IEEE80211_M_STA)
 		ath_hal_setassocid(ah, bssid, ni->ni_associd);
 	else
 		ath_hal_setassocid(ah, bssid, 0);
@@ -2470,7 +2469,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		/*
 		 * Allocate and setup the beacon frame for AP or adhoc mode.
 		 */
-		if (ic->ic_opmode != IEEE80211_M_STA) {
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP ||
+		    ic->ic_opmode == IEEE80211_M_IBSS) {
 			error = ath_beacon_alloc(sc, ni);
 			if (error != 0)
 				goto bad;
@@ -2644,12 +2644,15 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 		}
 	}
 	if (state == IEEE80211_S_RUN) {
+		int interval;
 		/*
 		 * Start the background rate control thread if we
 		 * are not configured to use a fixed xmit rate.
 		 */
-		mod_timer(&sc->sc_rate_ctl,
-			jiffies + ((HZ * ath_rateinterval) / 1000));
+		interval = ath_rateinterval;
+		if (ic->ic_opmode == IEEE80211_M_STA)
+			interval /= 2;
+		mod_timer(&sc->sc_rate_ctl, jiffies + ((HZ * interval) / 1000));
 	}
 }
 
@@ -2725,6 +2728,7 @@ ath_ratectl(unsigned long data)
 	struct net_device *dev = (struct net_device *)data;
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
+	int interval;
 
 	if (dev->flags & IFF_RUNNING) {
 		if (ic->ic_opmode == IEEE80211_M_STA)
@@ -2732,10 +2736,10 @@ ath_ratectl(unsigned long data)
 		else
 			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
 	}
+	interval = ath_rateinterval;
 	if (ic->ic_opmode == IEEE80211_M_STA)
-		sc->sc_rate_ctl.expires = jiffies + ((HZ * ath_rateinterval/2) / 1000);
-	else
-		sc->sc_rate_ctl.expires = jiffies + ((HZ * ath_rateinterval) / 1000);
+		interval /= 2;
+	sc->sc_rate_ctl.expires = jiffies + ((HZ * interval) / 1000);
 	add_timer(&sc->sc_rate_ctl);
 }
 
