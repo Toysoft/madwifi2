@@ -94,8 +94,7 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 	 * cause a lock order reversal if, for example, this frame
 	 * is being sent because the station is being timedout and
 	 * the frame being sent is a DEAUTH message. We stuff it in 
-	 * the secpath field since outbound frames do hopefully 
-	 * (TODO) not use this.
+	 * the cb structure.
 	 */
 	cb->ni = ni;
 
@@ -146,9 +145,8 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 #endif
 	IEEE80211_NODE_STAT(ni, tx_mgmt);
 	IF_ENQUEUE(&ic->ic_mgtq, skb);
-	mod_timer(&ic->ic_slowtimo, jiffies + HZ);
-	(*dev->hard_start_xmit)(skb, dev);
-	// removed from ieee80211com: (void) (*ic->ic_mgtstart)(ic, skb);
+	mod_timer(&ic->ic_slowtimo, jiffies + HZ); // also done in ath_start
+	(*dev->hard_start_xmit)(skb, dev);	// TODO: needed?
 	return 0;
 }
 
@@ -174,7 +172,8 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 	}
 	cb->ni = ieee80211_ref_node(ni);
 
-	wh = (struct ieee80211_frame *) skb->data;
+	wh = (struct ieee80211_frame *) 
+	    skb_push(skb, sizeof(struct ieee80211_frame));
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
 		IEEE80211_FC0_SUBTYPE_NODATA;
 	*(u_int16_t *)wh->i_dur = 0;
@@ -412,10 +411,10 @@ ieee80211_crypto_getmcastkey(struct ieee80211com *ic, struct ieee80211_node *ni)
 }
 
 /*
- * Encapsulate an outbound data frame.  The mbuf chain is updated.
+ * Encapsulate an outbound data frame.  The sk_buff chain is updated.
  * If an error is encountered NULL is returned.  The caller is required
  * to provide a node reference and pullup the ethernet header in the
- * first mbuf.
+ * first sk_buff.
  */
 struct sk_buff *
 ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
@@ -1089,7 +1088,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 			    IEEE80211_ELEMID_CHALLENGE);
 			memcpy(&((u_int16_t *)frm)[4], ni->ni_challenge,
 			    IEEE80211_CHALLENGE_LEN);
-			skb_trim(skb, 4 * sizeof(u_int16_t) + IEEE80211_CHALLENGE_LEN); // TODO: unsure
+			skb_trim(skb, 4 * sizeof(u_int16_t) + IEEE80211_CHALLENGE_LEN);
 			if (arg == IEEE80211_AUTH_SHARED_RESPONSE) {
 				struct ieee80211_cb *cb =
 					(struct ieee80211_cb *)skb->cb;
@@ -1099,7 +1098,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 				cb->flags |= M_LINK0; /* WEP-encrypt, please */
 			}
 		} else
-			skb_trim(skb, 3 * sizeof(u_int16_t));	// TODO: unsure
+			skb_trim(skb, 3 * sizeof(u_int16_t));
 
 		/* XXX not right for shared key */
 		if (status == IEEE80211_STATUS_SUCCESS)
