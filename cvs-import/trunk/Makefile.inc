@@ -36,9 +36,13 @@
 # $Id$
 #
 
-ifndef DESTDIR
-DESTDIR=
+ifeq ($(obj),)
+obj=	.
 endif
+
+# other locales sometimes cause trouble
+export LC_ALL = POSIX
+
 #
 OS=		linux
 #
@@ -48,71 +52,58 @@ OS=		linux
 # hal/linux/*.inc.  You can set this in the environment
 # to override the default setting.
 #
-ifndef TARGET
+ifeq ($(TARGET),)
 TARGET=		i386-elf
 endif
-#
-# ARCH defines the target platform architecture.  We derive
-# it from TARGET unless it is explicitly set in the environment.
-# The rules for deriving it are taken from the Linux kernel for
-# consistency.
-#
-ifndef ARCH
-ARCH=		$(shell echo ${TARGET} | sed \
-		-e s/i.86-.*/i386/ \
-		-e s/sun4u-.*/sparc64/ \
-		-e s/powerpc-.*/ppc/ \
-		-e s/arm.-.**/arm/ \
-		-e s/sa110-.*/arm/)
-endif
+
 #
 NM=		nm
 AWK=		awk
 
+# Path to the Linux kernel, include files, etc.
 #
-# Path to the Linux kernel, include files, and where to install the modules.
+# KERNELRELEASE is the target kernel's version.  If KERNELRELEASE
+# is not set in the environment then it is taken from the running
+# system.
 #
-# KERNEL_VERSION is the target kernel's version; it's used to enable
-# build techniques and some code.  If KERNEL_VERSIO is not set in the
-# environment then it is taken from the running system.
-#
-# KERNEL_PATH is the path to the target kernel's build/source area.
+# KERNELPATH is the path to the target kernel's build/source area.
 # This is used to obtain the kernel configuration and include files.
-# If KERNEL_PATH is not set in the environment then it is derived from
-# KERNEL_VERSION.
+# If KERNELPATH is not set in the environment then it is derived
+# from KERNELRELEASE.
 #
-# KERNEL_CONF is the filename of the target kernel's make configuration
-# file.  If this is not set in the environment then it is derived from
-# KERNEL_PATH.
-#
-ifndef KERNEL_VERSION
-KERNEL_VERSION=	$(shell uname -r)
+ifeq ($(KERNELRELEASE),)
+KERNELRELEASE =	$(shell uname -r)
 endif
-ifndef KERNEL_PATH
-KERNEL_PATH=	/lib/modules/${KERNEL_VERSION}/build
+
+ifneq ($(findstring 2.6,$(KERNELRELEASE)),)
+export-objs	:=
+list-multi	:=
+KMODSUF		:= ko
+else
+KMODSUF		:= o
 endif
-ifndef KERNEL_CONF
-KERNEL_CONF=	${KERNEL_PATH}/.config
+
+ifeq ($(KERNELPATH),)
+KERNELPATH=	/lib/modules/${KERNELRELEASE}/build
 endif
-MODULE_PATH=	/lib/modules/${KERNEL_VERSION}/net
-#
-# A numeric version of the target system's version string, suitable
-# for doing if checks in make files.
-#
-LINUX_VERSION=	$(shell echo $(KERNEL_VERSION) | \
-		awk '{ split($$0,a,"."); print a[1]*100+a[2]; }')
+
+ifeq ($(DESTDIR),)
+DESTDIR=
+endif
+MODULEPATH=	/lib/modules/${KERNELRELEASE}/net
+
 #
 # Path to the HAL source code.
 #
-ifndef HAL
-HAL=	${DEPTH}/hal
+ifeq ($(HAL),)
+HAL=	${obj}/${DEPTH}/hal
 endif
 #
 # Path to the HAL build area.
 #
 ATH_HAL=${DEPTH}/ath_hal
 #
-# Path to the 802.11 include files
+# Path to the 802.11 include files.
 #
 WLAN=	${DEPTH}/wlan
 #
@@ -120,60 +111,6 @@ WLAN=	${DEPTH}/wlan
 #
 DRIVER=	${DEPTH}/driver
 
-#
-# Basic build components.
-#
-COPTS=	-Wall -Wno-trigraphs -O2 -D__KERNEL__ -DMODULE
-#
-# Define this for some cross-build environments
-#
-COPTS+=	-D__linux__
-#
-INCS=	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
-#
-# NB: some architectures include platform/foo.h files,
-#     so add a special include search path
-#
-KERNEL_INCS=	-I${KERNEL_PATH}/include \
-		-I${KERNEL_PATH}/arch/${ARCH}
-CLEANFILES=	.depend
+INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
 
-include ${KERNEL_CONF}
-
-ifdef CONFIG_SMP
-COPTS+=	-D__SMP__ -DSMP
-endif
-
-ifndef CONFIG_FRAME_POINTER
-COPTS+=	-fomit-frame-pointer
-endif
-
-ifdef CONFIG_MODVERSIONS
-GENKSYMS=	/sbin/genksyms
-ifdef CONFIG_SMP
-GENKSYMS+=	-p smp_
-endif
-endif
-
-#
-# 2.4, 2.5, 2.6 handling.
-# Wish we had proper conditionals to use here..
-#
-ifneq (${LINUX_VERSION}, 204)
-MODOPTS=	-DKBUILD_BASENAME=${KMODNAME} -DKBUILD_MODNAME=${KMODNAME}
-ifdef CONFIG_MODVERSIONS
-MODOPTS+=	-DMODVERSIONS \
-		-include $(KERNEL_PATH)/include/linux/modsetver.h
-endif
-KMODSUF=	ko
-KERNEL_INCS+=	-I${KERNEL_PATH}/include/asm/mach-default
-CLEANFILES+=	*.mod.c
-else
-ifdef CONFIG_MODVERSIONS
-MODOPTS=	-DMODVERSIONS \
-		-include $(KERNEL_PATH)/include/linux/modversions.h
-endif
-KMODSUF=	o
-endif
-#
 include ${HAL}/${OS}/${TARGET}.inc

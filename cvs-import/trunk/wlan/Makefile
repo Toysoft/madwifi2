@@ -39,75 +39,37 @@
 #
 # Makefile for the 802.11 WLAN module.
 #
+ifeq ($(obj),)
+obj=	.
+endif
+
 DEPTH=	..
 
-KMODNAME=	wlan
+obj-m		+= wlan.o
+wlan-objs	:= if_media.o rc4.o if_ieee80211subr.o if_ieee80211wireless.o
+export-objs	:= if_media.o if_ieee80211subr.o if_ieee80211wireless.o
+list-multi	:= wlan.o
 
-include ${DEPTH}/Makefile.inc
+include $(obj)/${DEPTH}/Makefile.inc
 
-ifdef CONFIG_MODVERSIONS
-MODOPTS+=	-include ${WLAN}/if_ieee80211.ver
-ALL_VER+=	if_ieee80211.ver
-MODOPTS+=	-include ${WLAN}/if_media.ver
-ALL_VER+=	if_media.ver
-endif
+INCS+=	-I${HAL} -I${HAL}/${OS} -I$(obj)/${ATH_HAL} -I$(obj)/${WLAN} \
+	-I${obj}/${DEPTH}
 
-SRCS_80211=	if_ieee80211subr.c if_ieee80211wireless.c
-OBJS_80211=	if_ieee80211subr.o if_ieee80211wireless.o
-SRCS=	${SRCS_80211} if_media.c rc4.c
-OBJS=	${OBJS_80211} if_media.o rc4.o
+EXTRA_CFLAGS+= $(INCS) $(COPTS)
 
-INCS+=	-I. ${KERNEL_INCS} -I${DEPTH}
+-include $(TOPDIR)/Rules.make
 
-CLEANFILES=	.depend
-
-ifneq (${LINUX_VERSION}, 204)
-OBJS+=		if_ieee80211subr.mod.o
-CLEANFILES+=	if_ieee80211subr.mod.c
-endif
-
-ALL=	${KMODNAME}.${KMODSUF}
-CFLAGS=	${INCS} ${MODOPTS} ${COPTS}
-
-all:	${ALL}
-
-${KMODNAME}.${KMODSUF}: ${OBJS}
-	${LD} -o $@ -r -x ${OBJS}
-
-if_ieee80211subr.o: version.h
-
-ifneq (${LINUX_VERSION}, 204)
-if_ieee80211subr.mod.c: if_ieee80211subr.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux if_ieee80211subr.o
-if_ieee80211subr.mod.o: if_ieee80211subr.mod.c
-endif
-
-ifdef CONFIG_MODVERSIONS
-GEN_VERSION=	$(shell echo $(KERNEL_VERSION) | sed -e "s/-.*//")
-if_ieee80211.ver: ${SRCS_80211}
-	rm -f $@
-	for i in ${SRCS_80211}; do \
-		${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $$i | \
-			${GENKSYMS} -k ${GEN_VERSION} >> $@; \
-	done
-if_media.ver: if_media.c
-	${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $< | \
-		${GENKSYMS} -k ${GEN_VERSION} > $@
-
-${OBJS}: if_ieee80211.ver if_media.ver
-endif
+all:
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
 install: all
-	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
-	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
+	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	strip -S wlan.$(KMODSUF)
+	cp wlan.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	rm -f ${OBJS} ${ALL} ${ALL_VER} ${CLEANFILES}
+	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 
-depend: beforedepend .depend afterdepend
-.depend: ${SRCS} ${ALL_VER}
-	rm -f .depend
-	${CC} -M ${CFLAGS} ${SRCS} > .depend
-beforedepend:
-afterdepend:
--include .depend
+wlan.o:	$(wlan-objs)
+	$(LD) -o wlan.$(KMODSUF) -r $(wlan-objs)
