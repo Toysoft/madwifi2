@@ -299,6 +299,20 @@ typedef u_int8_t *ieee80211_mgt_beacon_t;
 /* bits 14-15 are reserved */
 
 /*
+ * 802.11i/WPA information element (maximally sized).
+ */
+struct ieee80211_ie_wpa {
+	u_int8_t	wpa_oui[3];	/* 0x00, 0x50, 0xf2 */
+	u_int8_t	wpa_type;	/* OUI type */
+	u_int16_t	wpa_version;	/* spec revision */
+	u_int32_t	wpa_mcipher[1];	/* multicast/group key cipher */
+	u_int16_t	wpa_uciphercnt;	/* # pairwise key ciphers */
+	u_int32_t	wpa_uciphers[8];/* ciphers */
+	u_int16_t	wpa_authselcnt;	/* authentication selector cnt*/
+	u_int32_t	wpa_authsels[8];/* selectors */
+} __attribute__((__packed__));
+
+/*
  * Management information elements
  */
 struct ieee80211_information {
@@ -348,14 +362,7 @@ struct ieee80211_information {
 	struct ath {
 		u_int8_t	flags;
 	} ath;
-	struct rsn {
-		u_int16_t	version;	/* spec revision */
-		u_int32_t	mcipher[1];	/* multicast/group key cipher */
-		u_int16_t	uciphercnt;	/* # pairwise key ciphers */
-		u_int32_t	uciphers[8];	/* ciphers */
-		u_int16_t	authselcnt;	/* authentication selector cnt*/
-		u_int32_t	authsels[8];	/* selectors */
-	} rsn __attribute__((__packed__));
+	struct ieee80211_ie_wpa	wpa;
 };
 
 enum {
@@ -399,16 +406,18 @@ enum {
 
 #define	WPA_OUI			0xf25000
 #define	WPA_OUI_TYPE		0x01
+#define	WPA_VERSION		1		/* current supported version */
 
-#define	WPA_OUI_CSE_NULL	((0x00<<24)|WPA_OUI)
-#define	WPA_OUI_CSE_WEP40	((0x01<<24)|WPA_OUI)
-#define	WPA_OUI_CSE_TKIP	((0x02<<24)|WPA_OUI)
-#define	WPA_OUI_CSE_AES_CCMP	((0x04<<24)|WPA_OUI)
-#define	WPA_OUI_CSE_WEP104	((0x05<<24)|WPA_OUI)
+#define	WPA_CSE_NULL		0x00
+#define	WPA_CSE_WEP40		0x01
+#define	WPA_CSE_TKIP		0x02
+#define	WPA_CSE_WRAP		0x03		/* WPA2/802.11i */
+#define	WPA_CSE_CCMP		0x04
+#define	WPA_CSE_WEP104		0x05
 
-#define	WPA_OUI_ASE_NONE	((0x00<<24)|WPA_OUI)
-#define	WPA_OUI_ASE_8021X_UNSPEC	((0x01<<24)|WPA_OUI)
-#define	WPA_OUI_ASE_8021X_PSK	((0x02<<24)|WPA_OUI)
+#define	WPA_ASE_NONE		0x00
+#define	WPA_ASE_8021X_UNSPEC	0x01
+#define	WPA_ASE_8021X_PSK	0x02
 
 /*
  * AUTH management packets
