@@ -229,8 +229,6 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_getMacAddress)((_ah), (_mac)))
 #define	ath_hal_detach(_ah) \
 	((*(_ah)->ah_detach)((_ah)))
-#define	ath_hal_disable(_ah) \
-	((*(_ah)->ah_disable)((_ah)))
 #define	ath_hal_intrset(_ah, _mask) \
 	((*(_ah)->ah_setInterrupts)((_ah), (_mask)))
 #define	ath_hal_intrget(_ah) \
@@ -265,6 +263,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_getTsf32)((_ah)))
 #define	ath_hal_gettsf64(_ah) \
 	((*(_ah)->ah_getTsf64)((_ah)))
+#define	ath_hal_resettsf(_ah) \
+	((*(_ah)->ah_resetTsf)((_ah)))
 #define	ath_hal_rxena(_ah) \
 	((*(_ah)->ah_enableReceive)((_ah)))
 #define	ath_hal_puttxbuf(_ah, _q, _bufaddr) \
@@ -285,6 +285,9 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_beaconInit)((_ah), (_opmode), (_nextb), (_bperiod)))
 #define	ath_hal_beaconreset(_ah) \
 	((*(_ah)->ah_resetStationBeaconTimers)((_ah)))
+#define	ath_hal_beacontimers(_ah, _bs, _tsf, _dc, _cc) \
+	((*(_ah)->ah_setStationBeaconTimers)((_ah), (_bs), (_tsf), \
+		(_dc), (_cc)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
 	((*(_ah)->ah_writeAssocid)((_ah), (_bss), (_associd), 0))
 #define	ath_hal_setopmode(_ah, _opmode) \
@@ -301,6 +304,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_dumpState)((_ah)))
 #define	ath_hal_dumpeeprom(_ah) \
 	((*(_ah)->ah_dumpEeprom)((_ah)))
+#define	ath_hal_dumprfgain(_ah) \
+	((*(_ah)->ah_dumpRfGain)((_ah)))
 #define	ath_hal_setuptxqueue(_ah, _type, _irq) \
 	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
 #define	ath_hal_resettxqueue(_ah, _q) \
@@ -311,6 +316,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_aniControl)((_ah), (_op), (_param)))
 #define	ath_hal_hasveol(_ah) \
 	((*(_ah)->ah_hasVEOL)((_ah)))
+#define	ath_hal_getrfgain(_ah) \
+	((*(_ah)->ah_getRfGain)((_ah)))
 
 #define	ath_hal_setupbeacondesc(_ah, _ds, _opmode, _flen, _hlen, \
 		_rate, _antmode) \
