@@ -1611,6 +1611,8 @@ ieee80211_node_join_11g(struct ieee80211com *ic, struct ieee80211_node *ni)
 	 * If the new station is not an ERP station
 	 * then bump the counter and enable protection
 	 * if configured.
+	 * TODO: adopt for turbo (11g) mode, ieee80211_iserp_rateset
+	 * is always false for turbo stations
 	 */
 	if (!ieee80211_iserp_rateset(ic, &ni->ni_rates)) {
 		ic->ic_nonerpsta++;

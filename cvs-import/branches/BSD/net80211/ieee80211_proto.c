@@ -446,14 +446,17 @@ ieee80211_reset_erp(struct ieee80211com *ic)
 	 * the driver is capable of doing it.
 	 */
 	ieee80211_set_shortslottime(ic,
-		ic->ic_curmode == IEEE80211_MODE_11A ||
-		(ic->ic_curmode == IEEE80211_MODE_11G &&
+		(ic->ic_curmode == IEEE80211_MODE_11A ||
+		ic->ic_curmode == IEEE80211_MODE_TURBO_A) ||
+		((ic->ic_curmode == IEEE80211_MODE_11G ||
+		ic->ic_curmode == IEEE80211_MODE_TURBO_G) &&
 		ic->ic_opmode == IEEE80211_M_HOSTAP &&
 		(ic->ic_caps & IEEE80211_C_SHSLOT)));
 	/*
 	 * Set short preamble and ERP barker-preamble flags.
 	 */
-	if (ic->ic_curmode == IEEE80211_MODE_11A ||
+	if ((ic->ic_curmode == IEEE80211_MODE_11A ||
+	    ic->ic_curmode == IEEE80211_MODE_TURBO_A) ||
 	    (ic->ic_caps & IEEE80211_C_SHPREAMBLE)) {
 		ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
 		ic->ic_flags &= ~IEEE80211_F_USEBARKER;
