@@ -4291,7 +4291,7 @@ enum {
 	ATH_COUNTRYCODE	= 6,
 	ATH_REGDOMAIN	= 7,
 	ATH_DEBUG	= 8,
-	ATH_ANTENNA	= 9,
+	ATH_TXANTENNA	= 9,
 };
 
 static int
@@ -4336,7 +4336,7 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 			case ATH_DEBUG:
 				sc->sc_debug = val;
 				break;
-			case ATH_ANTENNA:
+			case ATH_TXANTENNA:
 				/* XXX validate? force rx antenna too? */
 				sc->sc_txantenna = val;
 				break;
@@ -4370,7 +4370,7 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 		case ATH_DEBUG:
 			val = sc->sc_debug;
 			break;
-		case ATH_ANTENNA:
+		case ATH_TXANTENNA:
 			val = sc->sc_txantenna;
 			break;
 		default:
@@ -4430,8 +4430,8 @@ static const ctl_table ath_sysctl_template[] = {
 	  .proc_handler	= ath_sysctl_halparam
 	},
 #endif
-	{ .ctl_name	= ATH_ANTENNA,
-	  .procname	= "antenna",
+	{ .ctl_name	= ATH_TXANTENNA,
+	  .procname	= "txantenna",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
