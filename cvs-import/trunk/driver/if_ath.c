@@ -1763,7 +1763,8 @@ ath_tx_timeout(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	sc->sc_stats.ast_watchdog++;
-	ath_hal_dumpstate(sc->sc_ah);	/*XXX*/
+	if (ath_debug)
+		ath_hal_dumpstate(sc->sc_ah);
 	ath_init(dev);
 }
 
