@@ -10,7 +10,7 @@
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
+ *    documentation and/or other materials procopvided with the distribution.
  * 3. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
@@ -352,6 +352,17 @@ ieee80211_next_scan(struct ieee80211com *ic)
 }
 EXPORT_SYMBOL(ieee80211_next_scan);
 
+static inline void
+copy_bss(struct ieee80211_node *nbss, const struct ieee80211_node *obss)
+{
+	/* propagate useful state */
+	nbss->ni_authmode = obss->ni_authmode;
+	nbss->ni_txpower = obss->ni_txpower;
+	nbss->ni_vlan = obss->ni_vlan;
+	nbss->ni_rsn = obss->ni_rsn;
+	/* XXX statistics? */
+}
+
 void
 ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 {
@@ -386,6 +397,7 @@ ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 	IEEE80211_ADDR_COPY(ni->ni_bssid, ic->ic_myaddr);
 	ni->ni_esslen = ic->ic_des_esslen;
 	memcpy(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen);
+	copy_bss(ni, ic->ic_bss);
 	ni->ni_intval = ic->ic_lintval;
 	if (ic->ic_flags & IEEE80211_F_PRIVACY)
 		ni->ni_capinfo |= IEEE80211_CAPINFO_PRIVACY;
@@ -433,8 +445,11 @@ ieee80211_reset_bss(struct ieee80211com *ic)
 	KASSERT(ni != NULL, ("unable to setup inital BSS node"));
 	obss = ic->ic_bss;
 	ic->ic_bss = ieee80211_ref_node(ni);
-	if (obss != NULL)
+	if (obss != NULL) {
+		copy_bss(ni, obss);
+		ni->ni_intval = ic->ic_lintval;
 		ieee80211_free_node(obss);
+	}
 }
 
 static int
@@ -502,7 +517,7 @@ ieee80211_match_bss(struct ieee80211com *ic, struct ieee80211_node *ni)
 	return fail;
 }
 
-static inline u_int8_t
+static __inline u_int8_t
 maxrate(const struct ieee80211_node *ni)
 {
 	const struct ieee80211_rateset *rs = &ni->ni_rates;
@@ -695,7 +710,7 @@ ieee80211_end_scan(struct ieee80211com *ic)
 		goto notfound;
 	}
 }
-
+ 
 /*
  * Handle 802.11 ad hoc network merge.  The
  * convention, set by the Wireless Ethernet Compatibility Alliance
@@ -872,7 +887,7 @@ node_free(struct ieee80211_node *ni)
 		FREE(ni->ni_wpa_ie, M_DEVBUF);
 	if (ni->ni_wme_ie != NULL)
 		FREE(ni->ni_wme_ie, M_DEVBUF);
-	IEEE80211_NODE_SAVEQ_DESTROY(ni);
+	IEEE80211_NODE_SAVEQ_DESTROY(ni);	// TODO: should drain?
 	FREE(ni, M_80211_NODE);
 }
 
@@ -1396,7 +1411,7 @@ restart:
 				int discard = 0;
 
 				IEEE80211_NODE_SAVEQ_LOCK(ni);
-				while (_IF_POLL(&ni->ni_savedq, skb) != NULL &&
+				while (IF_POLL(&ni->ni_savedq, skb) != NULL &&
 				     M_AGE_GET(skb) < IEEE80211_INACT_WAIT) {
 IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER, "[%s] discard frame, age %u\n", ether_sprintf(ni->ni_macaddr), M_AGE_GET(skb));/*XXX*/
 					_IEEE80211_NODE_SAVEQ_DEQUEUE_HEAD(ni, skb);
