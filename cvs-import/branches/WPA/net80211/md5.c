@@ -15,7 +15,9 @@
 #include <linux/types.h>
 #include <linux/string.h>
 
-#if AH_BYTE_ORDER == AH_BIG_ENDIAN
+#include <asm/byteorder.h>
+
+#if defined(__BIG_ENDIAN)
 #define WORDS_BIGENDIAN
 #endif
 
