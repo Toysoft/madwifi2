@@ -395,9 +395,12 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 	struct ieee80211channel *c;
 	int i;
 
-	if (freq->e != 1)		/* just lazy... */
+	if (freq->e > 1)
 		return -EINVAL;
-	i = ieee80211_mhz2ieee(freq->m / 100000, 0);
+	if (freq->e == 1)
+		i = ieee80211_mhz2ieee(freq->m / 100000, 0);
+	else
+		i = freq->m;
 	if (i > IEEE80211_CHAN_MAX || isclr(ic->ic_chan_active, i))
 		return -EINVAL;
 	c = &ic->ic_channels[i];
