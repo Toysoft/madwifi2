@@ -566,8 +566,14 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 			}
 			break;
 		case IEEE80211_S_SCAN:
-			/* scan next */
-			if (ic->ic_flags & IEEE80211_F_ASCAN) {
+			/*
+			 * Scan next. If doing an active scan and the
+			 * channel is not marked passive-only then send
+			 * a probe request.  Otherwise just listen for
+			 * beacons on the channel.
+			 */
+			if ((ic->ic_flags & IEEE80211_F_ASCAN) &&
+			    (ni->ni_chan->ic_flags & IEEE80211_CHAN_PASSIVE) == 0) {
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
 			}

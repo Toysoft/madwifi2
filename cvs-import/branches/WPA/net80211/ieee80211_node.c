@@ -179,6 +179,22 @@ EXPORT_SYMBOL(ieee80211_node_unauthorize);
  * AP scanning support.
  */
 
+#ifdef IEEE80211_DEBUG
+static void
+dump_chanlist(const u_char chans[])
+{
+	const char *sep;
+	int i;
+
+	sep = " ";
+	for (i = 0; i < IEEE80211_CHAN_MAX; i++)
+		if (isset(chans, i)) {
+			printf("%s%u", sep, i);
+			sep = ", ";
+		}
+}
+#endif /* IEEE80211_DEBUG */
+
 /*
  * Initialize the active channel set based on the set
  * of available channels and the current PHY mode.
@@ -187,11 +203,25 @@ static void
 ieee80211_reset_scan(struct ieee80211com *ic)
 {
 
-	memcpy(ic->ic_chan_scan, ic->ic_chan_active,
-		sizeof(ic->ic_chan_active));
+	/* XXX ic_des_chan should be handled with ic_chan_active */
+	if (ic->ic_des_chan != IEEE80211_CHAN_ANYC) {
+		memset(ic->ic_chan_scan, 0, sizeof(ic->ic_chan_scan));
+		setbit(ic->ic_chan_scan,
+			ieee80211_chan2ieee(ic, ic->ic_des_chan));
+	} else
+		memcpy(ic->ic_chan_scan, ic->ic_chan_active,
+			sizeof(ic->ic_chan_active));
 	/* NB: hack, setup so next_scan starts with the first channel */
 	if (ic->ic_bss->ni_chan == IEEE80211_CHAN_ANYC)
 		ic->ic_bss->ni_chan = &ic->ic_channels[IEEE80211_CHAN_MAX];
+#ifdef IEEE80211_DEBUG
+	if (ieee80211_msg_scan(ic)) {
+		printf("%s: scan set:", __func__);
+		dump_chanlist(ic->ic_chan_scan);
+		printf(" start chan %u\n",
+			ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan));
+	}
+#endif /* IEEE80211_DEBUG */
 }
 
 /*
@@ -243,31 +273,22 @@ ieee80211_next_scan(struct ieee80211com *ic)
 	ic->ic_mgt_timer = 0;
 
 	chan = ic->ic_bss->ni_chan;
-	for (;;) {
+	do {
 		if (++chan > &ic->ic_channels[IEEE80211_CHAN_MAX])
 			chan = &ic->ic_channels[0];
 		if (isset(ic->ic_chan_scan, ieee80211_chan2ieee(ic, chan))) {
-			/*
-			 * Honor channels marked passive-only
-			 * during an active scan.
-			 */
-			if ((ic->ic_flags & IEEE80211_F_ASCAN) == 0 ||
-			    (chan->ic_flags & IEEE80211_CHAN_PASSIVE) == 0)
-				break;
+			clrbit(ic->ic_chan_scan, ieee80211_chan2ieee(ic, chan));
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
+			    ("%s: chan %d->%d\n", __func__,
+			    ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan),
+			    ieee80211_chan2ieee(ic, chan)));
+			ic->ic_bss->ni_chan = chan;
+			ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+			return 1;
 		}
-		if (chan == ic->ic_bss->ni_chan) {
-			ieee80211_end_scan(ic);
-			return 0;
-		}
-	}
-	clrbit(ic->ic_chan_scan, ieee80211_chan2ieee(ic, chan));
-	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
-	    ("%s: chan %d->%d\n", __func__,
-	    ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan),
-	    ieee80211_chan2ieee(ic, chan)));
-	ic->ic_bss->ni_chan = chan;
-	ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
-	return 1;
+	} while (chan != ic->ic_bss->ni_chan);
+	ieee80211_end_scan(ic);
+	return 0;
 }
 EXPORT_SYMBOL(ieee80211_next_scan);
 
