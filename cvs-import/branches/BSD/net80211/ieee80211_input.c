@@ -487,6 +487,10 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				/*
 				 * Drop unencrypted frames.
 				 */
+				IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
+				    eh->ether_shost, "data",
+				    "unencrypted: ether type 0x%x len %u",
+				    eh->ether_type, skb->len);
 				ic->ic_stats.is_rx_unencrypted++;
 				IEEE80211_NODE_STAT(ni, rx_unencrypted);
 				goto out;
@@ -2681,13 +2685,13 @@ ieee80211_discard_frame(struct ieee80211com *ic,
 
 	printf("[%s] discard ", ether_sprintf(ieee80211_getbssid(ic, wh)));
 	if (type != NULL)
-		printf(" %s frame, ", type);
+		printf("%s frame, ", type);
 	else
-		printf(" frame, ");
+		printf("frame, ");
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printf("\n");
+	printf("%s\n", buf);
 }
 
 static void
@@ -2700,13 +2704,13 @@ ieee80211_discard_ie(struct ieee80211com *ic,
 
 	printf("[%s] discard ", ether_sprintf(ieee80211_getbssid(ic, wh)));
 	if (type != NULL)
-		printf(" %s information element, ", type);
+		printf("%s information element, ", type);
 	else
-		printf(" information element, ");
+		printf("information element, ");
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printf("\n");
+	printf("%s\n", buf);
 }
 
 static void
@@ -2719,12 +2723,12 @@ ieee80211_discard_mac(struct ieee80211com *ic,
 
 	printf("[%s] discard ", ether_sprintf(mac));
 	if (type != NULL)
-		printf(" %s frame, ", type);
+		printf("%s frame, ", type);
 	else
-		printf(" frame, ");
+		printf("frame, ");
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printf("\n");
+	printf("%s\n", buf);
 }
 #endif /* IEEE80211_DEBUG */
