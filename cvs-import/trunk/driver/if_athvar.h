@@ -51,7 +51,7 @@
 #define INIT_TQUEUE INIT_WORK
 #define queue_task(a,b) schedule_work(a)
 #define mark_bh(a)
-#else
+#elif !defined(IRQ_NONE)
 typedef void irqreturn_t;
 #define	IRQ_NONE
 #define	IRQ_HANDLED
