@@ -147,6 +147,12 @@ ieee80211_proto_detach(struct ieee80211com *ic)
 	ieee80211_authenticator_unregister(IEEE80211_AUTH_OPEN);
 	ieee80211_authenticator_unregister(IEEE80211_AUTH_SHARED);
 	ieee80211_authenticator_unregister(IEEE80211_AUTH_AUTO);
+
+	/*
+	 * Detach any ACL'ator.
+	 */
+	if (ic->ic_acl != NULL)
+		ic->ic_acl->iac_detach(ic);
 }
 
 /*
