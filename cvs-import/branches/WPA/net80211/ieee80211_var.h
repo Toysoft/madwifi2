@@ -63,7 +63,7 @@
 #define	IEEE80211_CHAN_ANYC \
 	((struct ieee80211_channel *) IEEE80211_CHAN_ANY)
 
-#define	IEEE80211_TXPOWER_MAX	60	/* .5 dbM (XXX units?) */
+#define	IEEE80211_TXPOWER_MAX	100	/* .5 dbM (XXX units?) */
 #define	IEEE80211_TXPOWER_MIN	0	/* kill radio */
 
 enum ieee80211_phytype {
@@ -100,6 +100,21 @@ enum ieee80211_protmode {
 	IEEE80211_PROT_NONE	= 0,	/* no protection */
 	IEEE80211_PROT_CTSONLY	= 1,	/* CTS to self */
 	IEEE80211_PROT_RTSCTS	= 2,	/* RTS-CTS */
+};
+
+/*
+ * Roaming mode is effectively who controls the operation
+ * of the 802.11 state machine when operating as a station.
+ * State transitions are controlled either by the driver
+ * (typically when management frames are processed by the
+ * hardware/firmware), the host (auto/normal operation of
+ * the 802.11 layer), or explicitly through ioctl requests
+ * when applications like wpa_supplicant want control.
+ */
+enum ieee80211_roamingmode {
+	IEEE80211_ROAMING_DEVICE= 0,	/* driver/hardware control */
+	IEEE80211_ROAMING_AUTO	= 1,	/* 802.11 layer control */
+	IEEE80211_ROAMING_MANUAL= 2,	/* application control */
 };
 
 /*
@@ -216,6 +231,7 @@ struct ieee80211com {
 	enum ieee80211_opmode	ic_opmode;	/* operation mode */
 	enum ieee80211_state	ic_state;	/* 802.11 state */
 	enum ieee80211_protmode	ic_protmode;	/* 802.11g protection mode */
+	enum ieee80211_roamingmode ic_roaming;	/* roaming mode */
 	u_int32_t		*ic_aid_bitmap;
 	u_int16_t		ic_max_aid;
 	struct ifmedia		ic_media;	/* interface media config */
@@ -255,6 +271,13 @@ struct ieee80211com {
 	u_int8_t		ic_des_essid[IEEE80211_NWID_LEN];
 	struct ieee80211_channel *ic_des_chan;	/* desired channel */
 	u_int8_t		ic_des_bssid[IEEE80211_ADDR_LEN];
+	void			*ic_opt_ie;	/* user-specified IE's */
+	u_int16_t		ic_opt_ie_len;	/* length of ni_opt_ie */
+	struct ieee80211_ie_wpa	ic_wpa_ie;	/* WPA information element */
+
+	/*
+	 * Cipher state/configuration.
+	 */
 	struct ieee80211_wepkey	ic_nw_keys[IEEE80211_WEP_NKID];
 	int			ic_wep_txkey;	/* default tx key index */
 	void			*ic_wep_ctx;	/* wep crypt context */
@@ -268,20 +291,14 @@ struct ieee80211com {
 	 * fills in this section.  We assume that when ic_ec
 	 * is setup that the methods are safe to call.
 	 */
+	const struct ieee80211_authenticator *ic_auth;
 	struct eapolcom		*ic_ec;	
-	void			(*ic_node_join)(struct ieee80211com *,
-					struct ieee80211_node *);
-	void			(*ic_node_leave)(struct ieee80211com *,
-					struct ieee80211_node *);
 };
 
 #define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
 #define	IEEE80211_ADDR_COPY(dst,src)	memcpy(dst,src,IEEE80211_ADDR_LEN)
 
 /* ic_flags */
-#define	IEEE80211_F_WEPON	0x00000001	/* CONF: WEP enabled */
-#define	IEEE80211_F_AESON	0x00000002	/* CONF: AES enabled */
-#define	IEEE80211_F_CKIPON	0x00000004	/* CONF: CKIP enabled */
 /* NB: this is intentionally setup to be IEEE80211_CAPINFO_PRIVACY */
 #define	IEEE80211_F_PRIVACY	0x00000010	/* CONF: privacy enabled */
 #define	IEEE80211_F_ASCAN	0x00000100	/* STATUS: active scan */
@@ -289,7 +306,7 @@ struct ieee80211com {
 #define	IEEE80211_F_IBSSON	0x00000400	/* CONF: IBSS creation enable */
 #define	IEEE80211_F_PMGTON	0x00000800	/* CONF: Power mgmt enable */
 #define	IEEE80211_F_DESBSSID	0x00001000	/* CONF: des_bssid is set */
-#define	IEEE80211_F_SCANAP	0x00002000	/* CONF: Scanning AP */
+/* 0x00002000 is unused */
 #define	IEEE80211_F_ROAMING	0x00004000	/* CONF: roaming enabled */
 #define	IEEE80211_F_SWRETRY	0x00008000	/* CONF: sw tx retry enabled */
 #define IEEE80211_F_TXPOW_FIXED	0x00010000	/* TX Power: fixed rate */
@@ -299,13 +316,18 @@ struct ieee80211com {
 #define	IEEE80211_F_USEPROT	0x00100000	/* STATUS: protection enabled */
 #define	IEEE80211_F_USEBARKER	0x00200000	/* STATUS: use barker preamble*/
 #define	IEEE80211_F_TIMUPDATE	0x00400000	/* STATUS: update beacon tim */
-
-#define	IEEE80211_F_CRYPTON	0x0000000f	/* CONF: crypto alg's enabled */
+#define	IEEE80211_F_WPA1	0x00800000	/* CONF: WPA enabled */
+#define	IEEE80211_F_WPA2	0x01000000	/* CONF: WPA2 enabled */
+#define	IEEE80211_F_WPA		0x01800000	/* CONF: WPA/WPA2 enabled */
+#define	IEEE80211_F_DROPUNENC	0x02000000	/* CONF: drop unencrypted */
+#define	IEEE80211_F_COUNTERM	0x04000000	/* CONF: TKIP countermeasures */
 
 /* ic_caps */
 #define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
-#define	IEEE80211_C_AES		0x00000002	/* CAPABILITY: AES available */
-#define	IEEE80211_C_CKIP	0x00000004	/* CAPABILITY: CKIP available */
+#define	IEEE80211_C_TKIP	0x00000002	/* CAPABILITY: TKIP available */
+#define	IEEE80211_C_AES		0x00000004	/* CAPABILITY: AES OCB avail */
+#define	IEEE80211_C_AES_CCM	0x00000008	/* CAPABILITY: AES CCM avail */
+#define	IEEE80211_C_CKIP	0x00000020	/* CAPABILITY: CKIP available */
 #define	IEEE80211_C_IBSS	0x00000100	/* CAPABILITY: IBSS available */
 #define	IEEE80211_C_PMGT	0x00000200	/* CAPABILITY: Power mgmt */
 #define	IEEE80211_C_HOSTAP	0x00000400	/* CAPABILITY: HOSTAP avail */
@@ -315,9 +337,10 @@ struct ieee80211com {
 #define	IEEE80211_C_SHSLOT	0x00004000	/* CAPABILITY: short slottime */
 #define	IEEE80211_C_SHPREAMBLE	0x00008000	/* CAPABILITY: short preamble */
 #define	IEEE80211_C_MONITOR	0x00010000	/* CAPABILITY: monitor mode */
+#define	IEEE80211_C_TKIPMIC	0x00020000	/* CAPABILITY: TKIP MIC avail */
 /* XXX protection/barker? */
 
-#define	IEEE80211_C_CRYPTO	0x0000000f	/* CAPABILITY: crypto alg's */
+#define	IEEE80211_C_CRYPTO	0x0000002f	/* CAPABILITY: crypto alg's */
 
 int	ieee80211_ifattach(struct ieee80211com *);
 void	ieee80211_ifdetach(struct ieee80211com *);
@@ -355,6 +378,7 @@ enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 #define	IEEE80211_MSG_RADIUS	0x00008000	/* 802.1x radius client */
 #define	IEEE80211_MSG_RADDUMP	0x00004000	/* dump 802.1x radius packets */
 #define	IEEE80211_MSG_RADKEYS	0x00002000	/* dump 802.1x keys */
+#define	IEEE80211_MSG_WPA	0x00001000	/* WPA/RSN protocol */
 
 #define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
 
@@ -376,6 +400,8 @@ enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 	((_ic)->msg_enable & IEEE80211_MSG_RADDUMP)
 #define	ieee80211_msg_dumpradkeys(_ic) \
 	((_ic)->msg_enable & IEEE80211_MSG_RADKEYS)
+#define	ieee80211_msg_scan(_ic) \
+	((_ic)->msg_enable & IEEE80211_MSG_SCAN)
 #else
 #define	IEEE80211_DPRINTF(_ic, _fmt, ...)
 #endif
