@@ -2554,9 +2554,9 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
  				DPRINTF(sc, ATH_DEBUG_ANY,
 					"%s: skbuff alloc of size %d failed\n",
 					__func__,
-					sc->sc_rxbufsize
+					(int)(sc->sc_rxbufsize
 					+ sizeof(wlan_ng_prism2_header)
-					+ sc->sc_cachelsz -1);
+					+ sc->sc_cachelsz - 1));
  				sc->sc_stats.ast_rx_nobuf++;
  				return ENOMEM;
  			}
