@@ -811,7 +811,6 @@ ieee80211_ioctl_iwaplist(struct net_device *dev,
 	/* XXX lock node list */
 	TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
 		addr[i].sa_family = ARPHRD_ETHER;
-		memcpy(addr[i].sa_data, ni->
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP)
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
 		else
@@ -832,7 +831,7 @@ ieee80211_ioctl_iwaplist(struct net_device *dev,
 
 }
 
-#ifdef SIOCIWSCAN
+#ifdef SIOCGIWSCAN
 int
 ieee80211_ioctl_siwscan(struct net_device *dev,
 			struct iw_request_info *info,
