@@ -3017,7 +3017,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	STAILQ_INSERT_TAIL(&txq->axq_q, bf, bf_list);
 	if (txq->axq_link == NULL) {
 		ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
-		DPRINTF(ATH_DEBUG_XMIT, "%s: TXDP0[%u] = %p (%p)\n", __func__,
+		DPRINTF(ATH_DEBUG_XMIT, "%s: TXDP[%u] = %p (%p)\n", __func__,
 		    txq->axq_qnum, (caddr_t)bf->bf_daddr, bf->bf_desc);
 	} else {
 		*txq->axq_link = bf->bf_daddr;
