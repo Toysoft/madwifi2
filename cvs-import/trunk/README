@@ -249,7 +249,7 @@ This project is hosted at http://madwifi.sourceforge.net.  Fixes and
 enhancements are encouraged.  Please send all bug reports about this
 driver to:
 
-	madwifi-bugs@lists.sourceforge.net
+	madwifi-users@lists.sourceforge.net
 
 When sending a problem report be sure to include the version of the
 driver and the part identification the driver prints to the console when
