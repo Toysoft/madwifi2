@@ -125,6 +125,10 @@ struct ieee80211_qosframe {
 	/* see below */
 } __attribute__((__packed__));
 
+struct ieee80211_qoscntl {
+	u_int8_t	i_qos[2];
+};
+
 struct ieee80211_frame_addr4 {
 	u_int8_t	i_fc[2];
 	u_int8_t	i_dur[2];
@@ -145,6 +149,47 @@ struct ieee80211_qosframe_addr4 {
 	u_int8_t	i_seq[2];
 	u_int8_t	i_addr4[IEEE80211_ADDR_LEN];
 	u_int8_t	i_qos[2];
+} __attribute__((__packed__));
+
+/*
+ * Management Notification Frame
+ */
+struct ieee80211_mnf {
+	u_int8_t	mnf_category;
+	u_int8_t	mnf_action;
+	u_int8_t	mnf_dialog;
+	u_int8_t	mnf_status;
+} __attribute__((__packed__));
+#define	MNF_SETUP_REQ	0
+#define	MNF_SETUP_RESP	1
+#define	MNF_TEARDOWN	2
+
+/*
+ * WME/802.11e Tspec Element
+ */
+struct ieee80211_wme_tspec {
+	u_int8_t	ts_id;
+	u_int8_t	ts_len;
+	u_int8_t	ts_oui[3];
+	u_int8_t	ts_oui_type;
+	u_int8_t	ts_oui_subtype;
+	u_int8_t	ts_version;
+	u_int8_t	ts_tsinfo[3];
+	u_int8_t	ts_nom_msdu[2];
+	u_int8_t	ts_max_msdu[2];
+	u_int8_t	ts_min_svc[4];
+	u_int8_t	ts_max_svc[4];
+	u_int8_t	ts_inactv_intv[4];
+	u_int8_t	ts_susp_intv[4];
+	u_int8_t	ts_start_svc[4];
+	u_int8_t	ts_min_rate[4];
+	u_int8_t	ts_mean_rate[4];
+	u_int8_t	ts_max_burst[4];
+	u_int8_t	ts_min_phy[4];
+	u_int8_t	ts_peak_rate[4];
+	u_int8_t	ts_delay[4];
+	u_int8_t	ts_surplus[2];
+	u_int8_t	ts_medium_time[2];
 } __attribute__((__packed__));
 
 #define	IEEE80211_FC0_VERSION_MASK		0x03
@@ -170,6 +215,7 @@ struct ieee80211_qosframe_addr4 {
 #define	IEEE80211_FC0_SUBTYPE_DISASSOC		0xa0
 #define	IEEE80211_FC0_SUBTYPE_AUTH		0xb0
 #define	IEEE80211_FC0_SUBTYPE_DEAUTH		0xc0
+#define	IEEE80211_FC0_SUBTYPE_ACTION		0xd0
 /* for TYPE_CTL */
 #define	IEEE80211_FC0_SUBTYPE_PS_POLL		0xa0
 #define	IEEE80211_FC0_SUBTYPE_RTS		0xb0
@@ -186,6 +232,7 @@ struct ieee80211_qosframe_addr4 {
 #define	IEEE80211_FC0_SUBTYPE_CFACK		0x50
 #define	IEEE80211_FC0_SUBTYPE_CFPOLL		0x60
 #define	IEEE80211_FC0_SUBTYPE_CF_ACK_CF_ACK	0x70
+#define	IEEE80211_FC0_SUBTYPE_QOS		0x80
 
 #define	IEEE80211_FC1_DIR_MASK			0x03
 #define	IEEE80211_FC1_DIR_NODS			0x00	/* STA->STA */
@@ -293,6 +340,8 @@ struct ieee80211_information {
 #define	IEEE80211_ELEMID_CHALLENGE		16
 #define	IEEE80211_ELEMID_ERP			42
 #define	IEEE80211_ELEMID_XRATES			50
+#define	IEEE80211_ELEMID_VENDOR			221
+#define	OUI_WME					0x0050f2
 
 #define	IEEE80211_RATE_BASIC			0x80
 #define	IEEE80211_RATE_VAL			0x7f
@@ -452,6 +501,15 @@ enum ieee80211_state {
 };
 
 /*
+ * WME parameters
+ */
+struct wme_param_element {
+	u_int8_t	aifsn;
+	u_int8_t	cwminmax;
+	u_int8_t txoplimit;
+};
+
+/*
  * Channels are specified by frequency and attributes.
  */
 /* XXX should be ieee80211_channel but NetBSD took that for an ioctl param */
@@ -548,6 +606,7 @@ struct ieee80211_node {
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
 	u_int8_t		ni_erp;		/* 11g only */
+	u_int8_t		ni_iswme;	/* wme-capable AP */
 
 	/* DTIM and contention free period (CFP) */
 	u_int8_t		ni_dtimperiod;
@@ -563,13 +622,18 @@ struct ieee80211_node {
 	u_int16_t		ni_associd;	/* assoc response */
 	u_int16_t		ni_txseq;	/* seq to be transmitted */
 	u_int16_t		ni_rxseq;	/* seq previous received */
+	u_int16_t		ni_rxseqs[16];	/* seq previous array for qos frames */
 	int			ni_fails;	/* failure count to associate */
 	int			ni_inact;	/* inactivity mark count */
 	u_int8_t		ni_fragno;	/* frag. number previously received */
 	int			ni_txrate;	/* index to ni_rates[] */
+	u_int8_t		ni_flags;	/* flags */
 	void			*ni_private;	/* driver private */
 	struct proc_dir_entry	*ni_proc;	/* status of associated stations */
 };
+
+/* ni_flags */
+#define	IEEE80211_N_QOSDATA	0x00000001	/* STATUS: qos data frames enabled */
 
 static inline struct ieee80211_node *
 ieee80211_ref_node(struct ieee80211_node *ni)
@@ -692,6 +756,7 @@ struct ieee80211com {
 #define IEEE80211_F_TXPOW_AUTO	0x00010000	/* TX Power: undefined */
 #define	IEEE80211_F_SHSLOT	0x00020000	/* CONF: short slot time */
 #define	IEEE80211_F_SHPREAMBLE	0x00040000	/* CONF: short preamble */
+#define	IEEE80211_F_DATAPAD	0x00080000	/* CONF: needs data alignment pad */
 
 /* ic_capabilities */
 #define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
