@@ -50,8 +50,8 @@ struct	ether_header {
 	u_short	ether_type;
 };
 
-#ifndef ETHERTYPE_EAPOL
-#define	ETHERTYPE_EAPOL	0x888e		/* EAPOL/802.1x */
+#ifndef ETHERTYPE_PAE
+#define	ETHERTYPE_PAE	0x888e		/* EAPOL PAE/802.1x */
 #endif
 
 /*
