@@ -1283,12 +1283,14 @@ ieee80211_decap(struct net_device *dev, struct sk_buff *skb)
 	struct ether_header *eh;
 	struct ieee80211_frame wh;
 	struct llc *llc;
+	u_short ether_type = 0;
 
 	memcpy(&wh, skb->data, sizeof(struct ieee80211_frame));
 	llc = (struct llc *) skb_pull(skb, sizeof(struct ieee80211_frame));
 	if (llc->llc_dsap == LLC_SNAP_LSAP && llc->llc_ssap == LLC_SNAP_LSAP &&
 	    llc->llc_control == LLC_UI && llc->llc_snap.org_code[0] == 0 &&
 	    llc->llc_snap.org_code[1] == 0 && llc->llc_snap.org_code[2] == 0) {
+		ether_type = llc->llc_un.type_snap.ether_type;
 		skb_pull(skb, sizeof(struct llc));
 		llc = NULL;
 	}
@@ -1326,6 +1328,8 @@ ieee80211_decap(struct net_device *dev, struct sk_buff *skb)
 	}
 	if (llc != NULL)
 		eh->ether_type = htons(skb->len - sizeof(*eh));
+	else
+		eh->ether_type = ether_type;
 	return skb;
 }
 
