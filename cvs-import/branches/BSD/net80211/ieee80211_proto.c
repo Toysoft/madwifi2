@@ -1034,9 +1034,9 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 #ifdef IEEE80211_DEBUG
 			if (ieee80211_msg_debug(ic)) {
 				if (ic->ic_opmode == IEEE80211_M_STA)
-					if_printf(ic->ic_dev, "associated ");
+					if_printf(dev, "associated ");
 				else
-					if_printf(ic->ic_dev, "synchronized ");
+					if_printf(dev, "synchronized ");
 				printf("with %s ssid ",
 				    ether_sprintf(ni->ni_bssid));
 				ieee80211_print_essid(ic->ic_bss->ni_essid,
@@ -1050,7 +1050,8 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 			if (ic->ic_opmode == IEEE80211_M_STA)
 				ieee80211_notify_node_join(ic, ni, 
 					arg == IEEE80211_FC0_SUBTYPE_ASSOC_RESP);
-			//if_start(ifp);		/* XXX not authorized yet */ //TODO ?
+			//if_start(ifp);		/* XXX not authorized yet */
+			(*dev->hard_start_xmit)(NULL, dev);
 			break;
 		}
 		/*
