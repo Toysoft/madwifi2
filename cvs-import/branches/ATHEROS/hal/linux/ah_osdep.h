@@ -95,7 +95,8 @@ typedef u_int32_t HAL_BUS_ADDR;			/* XXX architecture dependent */
 extern	void __ahdecl ath_hal_delay(int);
 #define	OS_DELAY(_n)	ath_hal_delay(_n)
 
-#define	OS_MEMZERO(_a, _n)	__builtin_memset((_a), 0, (_n))
+#define	OS_MEMZERO(_a, _n)	ath_hal_memzero((_a), (_n))
+extern void __ahdecl ath_hal_memzero(void *, size_t);
 #define	OS_MEMCPY(_d, _s, _n)	ath_hal_memcpy(_d,_s,_n)
 extern void * __ahdecl ath_hal_memcpy(void *, const void *, size_t);
 
