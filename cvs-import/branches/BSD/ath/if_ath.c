@@ -5095,6 +5095,7 @@ enum {
 	ATH_TPC         = 14,
 	ATH_TXPOWLIMIT  = 15,	
 	ATH_VEOL        = 16,
+	ATH_BINTVAL	= 17,
 };
 
 static int
@@ -5172,6 +5173,17 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
                                 /* XXX validate? */
                                 ath_hal_settxpowlimit(ah, val);
                                 break;
+                        case ATH_BINTVAL:
+				if ((sc->sc_ic).ic_opmode != IEEE80211_M_HOSTAP &&
+    					(sc->sc_ic).ic_opmode != IEEE80211_M_IBSS)
+                    		    return -EINVAL;
+            			if (IEEE80211_BINTVAL_MIN <= val &&
+                			val <= IEEE80211_BINTVAL_MAX) {
+                    		    (sc->sc_ic).ic_lintval = val;
+                    		ret = -ENETRESET;              /* requires restart */
+            			} else
+                    		    ret = -EINVAL;
+                                break;
 			default:
 				return -EINVAL;
 			}
@@ -5225,6 +5237,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			break;
 		case ATH_VEOL:
 			val = sc->sc_hasveol;
+ 			break;
+		case ATH_BINTVAL:
+			val = (sc->sc_ic).ic_lintval;
  			break;
 		default:
 			return -EINVAL;
@@ -5321,6 +5336,11 @@ static const ctl_table ath_sysctl_template[] = {
 	},
 	{ .ctl_name	= ATH_VEOL,
 	  .procname	= "veol",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_BINTVAL,
+	  .procname	= "bintval",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
