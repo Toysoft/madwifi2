@@ -29,11 +29,20 @@ that first appeared in NetBSD and then FreeBSD.
 
 The Atheros drivers depends on a chunk of code termed the Hardware
 Access Layer (HAL).  This code manages much of the hardware-specific
-operation of the driver.  The HAL is provided in a binary-only form in
-order to comply with FCC regulations.  If you wish to use this driver
-on a platform that is not already supported please contact the author.
-Note that this is only necessary for new _architectures_; the HAL is
-not tied to any specific version of Linux.
+operation of the driver.  The HAL is provided in a binary-only form
+in order to comply with FCC regulations.  The file fcc.pdf contains
+these regulations.  If you wish to use this driver on a platform
+that is not already supported please contact the author.  Note that
+this is only necessary for new _architectures_; the HAL is not tied
+to any specific version of Linux.
+
+
+Compatibility
+=============
+Most testing has been done with kernel versions 2.4.20 and wireless
+tools version 25 on x86 machines.  Expect some rough edges if you
+deviate from that combo.  In particular the code does not compile
+with 2.5 versions of the kernel and probably needs modifications.
 
 
 Atheros Hardware
@@ -45,10 +54,14 @@ There are currently 3 generations of Atheros 802.11 wireless devices:
 5212	supports 11a, 11b, and 11g
 
 These parts have been incorporated in a variety of retail products
-including cardbus cards from DLink, Linksys, and Netgear; and
+including cardbus cards from DLink, Linksys, Netgear, and Proxim; and
 mini-pci cards from some of these same vendors.  In addition many
 laptop vendors use Atheros mini-pci cards for their builtin wireless
-support.
+support.  An (incomplete) list of products that use Atheros parts is:
+
+Netgear WAG511		D-Link DWL-AG520	Linksys WPC55AG
+Netgear WAB501		D-Link DWL-AG650	Linksys WMP55AG
+			D-Link DWL-AB650	Linksys WPC51AB
 
 In general, if a device is identified as ``11a only'' it is almost
 certain to contain an Atheros 5210 part in it.  There are several
@@ -83,13 +96,10 @@ You can also use:
 
 to install the drivers where they can be loaded automatically at boot.
 
-[So far this has only been tested with RH 7.3 and 2.4.18, and 2.4.20
- kernels on an x86 machine.]
-
 
 Using the driver
 ================
-The driver should support any Atheros-based cardbus or pci devices.
+The driver should support any Atheros-based cardbus or pci device.
 Management uses the normal Linux tools such as ifconfig.  Support
 is included for versions 12 and later of the Wireless Extensions
 so tools like iwconfig should work too.
@@ -99,7 +109,7 @@ bring the interface up and the driver will scan for all access
 points in all supported frequency bands supported by the hardware.
 Specifically for 5210-based devices scanning will happen in the
 5Ghz (11a) range, for 5211-based devices scanning will happen over
-both 2Ghz (11b) ad 5GHz frequencies (11a).  For 5212-based devices
+both 2Ghz (11b) and 5GHz frequencies (11a).  For 5212-based devices
 the driver will scan both 2Ghz and 5GHz ranges and also look for
 11g devices in the 2Ghz range.  To restrict operation you can either
 select a mode (e.g. 11b) using iwpriv or, more commonly, select the
@@ -114,11 +124,26 @@ bridge frames to a wired LAN or similar.
 
 NOTE: adhoc mode is presently untested and may not work (send fixes).
 
+Wireless tools cribsheet:
+
+iwlist ath0 scan		list the AP's the driver has scanned
+iwconfig ath0 essid "foo"	set the ssid to foo
+iwpriv ath0 mode 1		lock operation to 11a only
+iwpriv ath0 mode 2		lock operation to 11b only
+iwpriv ath0 mode 3		lock operation to 11g only
+iwpriv ath0 mode 0		autoselect from 11a/b/g (default)
+
+There are some debugging mechanisms for the curious/masochistic:
+
+echo 1 > /proc/sys/net/ath/debug	enable console msgs from the driver
+echo 1 > /proc/net/wlan0/debug		enable console msgs from the wlan module
+echo hal > /proc/sys/net/ath/dump	dump h/w register state to the console
+
 
 Security/Crpto Support
 ======================
 The driver supports fixed/shared key WEP using the hardware.  Newer
-Atheros hardware is capable of much more (e.g. TKIP and Michael)
+Atheros hardware is capable of much more (e.g. AES, TKIP and Michael)
 but that work is not yet available.
 
 This distribution does not include support for 802.1x authentication
@@ -129,8 +154,16 @@ Work is planned to provide ``native'' .1x and WPA support.
 
 Known Problems
 ==============
-1. Roaming mode is broken.  If you lose access point by going out of range
-   the driver does not automatically re-associate.
+[All these problems are to be fixed in future revisions.]
+
+0. The driver uses the BSD queue.h macros for managing various data
+   structures.  It has been pointed out that this may conflict with the
+   equivalent Linux definitions in list.h potentially causing problems
+   in future versions of Linux.  The use of BSD macrs will be removed
+   in a future revision.
+
+1. Roaming mode is broken.  If you lose your access point by going out
+   of range the driver does not automatically re-associate.
 2. Adhoc mode is untested and possibly/probably broken.
 3. Performance in lossy environments is suboptimal.  The algorithm used to
    select the rate for transmitted packes is very simplistic.  There is no
@@ -138,19 +171,61 @@ Known Problems
    encouraged to replace the existing rate control algorithm with a better
    one (hint: all the information needed is available in the driver).
 4. 11g support is little tested and may have interoperability problems.
-   The software is known to associate with 11g access points but
+   The software is known to function with an Atheros 11g access point but
    interoperability may be problematic until vendors update firmware in
    existing 11g products.  If you encounter problems using an 11g access
    point you should be able to workaround incompatibilities by locking the
-   driver to 11b mode (iwpriv mode 2).
+   driver to 11b mode (iwpriv mode 2).  Alternatively, most 11g compatibility
+   issues are in the 802.11 layer and you may be able to workaround issues
+   by modifying the wlan module.
+5. General performance is suboptimal. The Atheros hardware is known to be
+   capable of transfer rates of 23-24 Mb/s (or more) in 11a and 11g modes
+   using their NDIS (aka Windows) driver.  Results with this driver are
+   mixed and seem to vary significantly based on the tool used to measure
+   performance.  Specifically netperf seems to perform very poorly while
+   the bw_tcp program from lmbench yield ok results (~21 Mb/s "uplink"
+   from a station with a 5212 card in it to a wired host on the same LAN
+   as the AP--under 11a).
+6. It has been observed that getting a DHCP address sometimes requires
+   multiple tries.  This seems to happen only with 5211 and 5212 parts and
+   mostly in a noisy environment (i.e. one where many AP's are found).
+   This problem is specific to the driver and not the hardware and is
+   believed to be due to not receiving the broadcast frame from the DHCP
+   server.  Forcing the DHCP server to use a unicast response causes this
+   problem to go away (the guess is that the unicast frame is retransmitted
+   by the AP while the broadcast frame is not).
+7. The driver does not fully enable power-save opertion of the chip;
+   consequently power use is suboptimal.
+8. Turbo mode is untested.
+
+
+Acknowledgements
+================
+This work could not have been done without the support of Atheros
+and in particular the efforts of Greg Chesson.  Comments from David
+Miller were helpful in cleaning up some of the rough edges in the driver.
 
 
 Feedback and Contributions
 ==========================
 Please send all correspondence about this driver to:
 
-	atheros-linux@errno.com
+	atheros-linux@errno.com		XXX change this to sourceforge
 
-Fixes and enhancements are encouraged.  I will try to respond in a
-timely manner but understand this software is provided as-is; with
-no support.
+Fixes and enhancements are encouraged.  When sending a problem report be sure
+to include the version of the driver and the part identification the driver
+prints to the console when the module is loaded.  For example,
+
+wlan: 0.7.0.0 (Sam Leffler <sam@errno.com>)
+ath_pci: 0.8.2.0 (Sam Leffler <sam@errno.com>)
+PCI: Found IRQ 11 for device 00:13.0
+ath0: 11a rates: 6Mbps 9Mbps 12Mbps 18Mbps 24Mbps 36Mbps 48Mbps 54Mbps
+ath0: 11b rates: 1Mbps 2Mbps 5.5Mbps 11Mbps
+ath0: 802.11 address: 00:05:5d:6f:99:5f
+ath0: Atheros 5211: mem=0xfebf0000, irq=11
+
+[This says the wlan module is version 0.7, the driver is version 0.8.2 and
+the hardware uses an Atheros 5211 chip.]
+
+I will try to respond in a timely manner but understand this software
+is provided as-is; i.e. with no promise of support.
