@@ -1273,7 +1273,8 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 				 * the frame back when the time is right.
 				 */
 				ieee80211_pwrsave(ic, ni, skb);
-
+				/* don't free this on function exit point */
+				skb = NULL;
 				CLEANUP();
 				break;
 			}
@@ -1334,19 +1335,23 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		}
 
 		if (ath_tx_start(dev, ni, bf, skb0)) {
-			ret = 0; /* TODO: error value */
-			skb = NULL;
+			ret = 0; 	/* TODO: error value */
+			skb = NULL;	/* ath_tx_start() already freed this */
 			CLEANUP();
 			continue;
 		}
 		/*
 		 * the data frame is last
 		 */
-		if (skb0 == skb)
+		if (skb0 == skb) {
+			skb = NULL;	/* will be released by tx_processq */
 			break; 
+		}
 		sc->sc_tx_timer = 5;
 		mod_timer(&ic->ic_slowtimo, jiffies + HZ);
 	}
+	if (skb)
+		dev_kfree_skb(skb);
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
 #undef CLEANUP
 }
