@@ -1726,7 +1726,8 @@ ieee80211_ioctl_delkey(struct ieee80211com *ic, struct iw_request_info *info,
 	int kid;
 
 	kid = dk->idk_keyix;
-	if (dk->idk_keyix == IEEE80211_KEYIX_NONE) {
+	/* XXX u_int8_t -> u_int16_t */
+	if (dk->idk_keyix == (u_int8_t) IEEE80211_KEYIX_NONE) {
 		struct ieee80211_node *ni =
 			ieee80211_find_node(ic, dk->idk_macaddr);
 		if (ni == NULL)
