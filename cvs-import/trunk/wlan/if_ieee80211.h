@@ -419,7 +419,7 @@ struct ieee80211req {
  * Structure for IEEE 802.11 drivers.
  */
 
-#define	IEEE80211_CHAN_MAX	64
+#define	IEEE80211_CHAN_MAX	255
 #define	IEEE80211_RATE_SIZE	12
 #define	IEEE80211_KEYBUF_SIZE	16
 #define	IEEE80211_NODE_HASHSIZE	32
