@@ -260,7 +260,32 @@ SOFTLED option.  This is accomplished by setting an environment variable
 bash% export COPTS="$COPTS -DSOFTLED"
 
 
-2. WME disable
+2. WME
+
+This checkin adds traffic class differentiation for DSCP tagged
+traffic and negotiates a WME association.  A null tspec handshake is
+provided and will be expanded in a subsequent checkin.
+
+For transmitting TCP/IPv4 traffic, the DSCP value can be set via
+calling:
+
+unsigned int dscp;
+r=setsockopt(sd, SOL_IP, IP_TOS, &dscp, sizeof(dscp));
+
+This sets the DSCP value in the kernel socket structure and the value
+will be copied into all transmitted packets on that socket.
+
+The default values mapping DSCP to traffic class are:
+
+DSCP		Traffic Class
+=======		=============
+0x08,0x20	Background
+0x0, 0x18	Best Effort 
+0x28,0xa0	Video
+0x30,0xe0	Voice
+
+Fo TCP/IPv4 traffic with no DSCP value, the data is sent as Best
+Effort traffic.
 
 The default configuration for this driver enables WME association of
 the client to a WME capable AP.  Some legacy AP's may have problems
@@ -269,8 +294,6 @@ of the WME information element in the association request, compile the
 driver with the environment variable (COPTS) set as follows:
 
 bash% export COPTS="$COPTS -DNO_WME"
-
-
 
 Using the driver
 ================
