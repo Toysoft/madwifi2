@@ -68,15 +68,16 @@ wlan.o: ${OBJS}
 if_ieee80211subr.o: version.h
 
 ifdef CONFIG_MODVERSIONS
+GEN_VERSION=	$(shell echo $(VERSION) | sed -e "s/-.*//")
 if_ieee80211.ver: ${SRCS_80211}
 	rm -f $@
 	for i in ${SRCS_80211}; do \
 		${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $$i | \
-			${GENKSYMS} -k ${VERSION} >> $@; \
+			${GENKSYMS} -k ${GEN_VERSION} >> $@; \
 	done
 if_media.ver: if_media.c
 	${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $< | \
-		${GENKSYMS} -k ${VERSION} > $@
+		${GENKSYMS} -k ${GEN_VERSION} > $@
 
 ${OBJS}: if_ieee80211.ver if_media.ver
 endif
