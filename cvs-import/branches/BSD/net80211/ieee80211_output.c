@@ -44,6 +44,7 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211_output.c,v 1.9 2003/11/02 00:17:27 dyoung 
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/ip.h>
 #include <linux/if_vlan.h>
 
 #include "if_llc.h"
@@ -208,11 +209,11 @@ int
 ieee80211_classify(struct ieee80211com *ic, struct sk_buff *skb, struct ieee80211_node *ni)
 {
 	int v_wme_ac, d_wme_ac, ac;
-#ifdef INET
 	struct ether_header *eh;
-#endif
+	const struct iphdr *ip;
 
 	if ((ni->ni_flags & IEEE80211_NODE_QOS) == 0) {
+    		printk("%s (%s): no QOS/WME for this node\n", __func__, ic->ic_dev->name);
 		ac = WME_AC_BE;
 		goto done;
 	}
@@ -252,39 +253,41 @@ ieee80211_classify(struct ieee80211com *ic, struct sk_buff *skb, struct ieee8021
 		}
 	}
 
-#ifdef INET
-	eh = (struct ether_header *) skb->data;
+	//eh = (struct ether_header *) skb->data;
+	eh = (struct ether_header *) skb->mac.ethernet;
 	if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
-		const struct ip *ip = (struct ip *)
-			(skb->data + sizeof (*eh));
+    		ip = skb->nh.iph;
+
 		/*
 		 * IP frame, map the TOS field.
 		 */
-		switch (ip->ip_tos) {
+		printk("%s (%s): src: 0x%x dst: 0x%x paket tos: 0x%x\n", __func__, ic->ic_dev->name, ip->saddr, ip->daddr, ip->tos);
+		switch (ip->tos) {
 		case 0x08:
 		case 0x20:
+    			printk("%s (%s): sorting packet in WME_AC_BK queue\n", __func__, ic->ic_dev->name);
 			d_wme_ac = WME_AC_BK;	/* background */
 			break;
 		case 0x28:
 		case 0xa0:
 			d_wme_ac = WME_AC_VI;	/* video */
+    			printk("%s (%s): sorting packet in WME_AC_VI queue\n", __func__, ic->ic_dev->name);
 			break;
 		case 0x30:			/* voice */
 		case 0xe0:
 		case 0x88:			/* XXX UPSD */
 		case 0xb8:
+    			printk("%s (%s): sorting packet in WME_AC_VO queue\n", __func__, ic->ic_dev->name);
 			d_wme_ac = WME_AC_VO;
 			break;
 		default:
+    			printk("%s (%s): sorting packet in WME_AC_BE queue\n", __func__, ic->ic_dev->name);
 			d_wme_ac = WME_AC_BE;
 			break;
 		}
 	} else {
-#endif /* INET */
 		d_wme_ac = WME_AC_BE;
-#ifdef INET
 	}
-#endif
 	/*
 	 * Use highest priority AC.
 	 */
