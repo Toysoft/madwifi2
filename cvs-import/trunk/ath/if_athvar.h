@@ -194,6 +194,10 @@ struct ath_softc {
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats	sc_stats;	/* private statistics */
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
+	void			(*sc_recv_mgmt)(struct ieee80211com *,
+					struct sk_buff *,
+					struct ieee80211_node *,
+					int, int, u_int32_t);
 	int			(*sc_newstate)(struct ieee80211com *,
 					enum ieee80211_state, int);
 	void 			(*sc_node_free)(struct ieee80211com *,

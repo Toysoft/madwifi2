@@ -120,6 +120,9 @@ static void	ath_node_copy(struct ieee80211com *,
 static u_int8_t	ath_node_getrssi(struct ieee80211com *,
 			struct ieee80211_node *);
 static int	ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
+static void	ath_recv_mgmt(struct ieee80211com *, struct sk_buff *,
+			struct ieee80211_node *,
+			int subtype, int rssi, u_int32_t rstamp);
 static void	ath_rx_tasklet(TQUEUE_ARG data);
 static int	ath_hardstart(struct sk_buff *, struct net_device *);
 static int	ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb);
@@ -538,6 +541,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_node_copy = ic->ic_node_copy;
 	ic->ic_node_copy = ath_node_copy;
 	ic->ic_node_getrssi = ath_node_getrssi;
+	sc->sc_recv_mgmt = ic->ic_recv_mgmt;
+	ic->ic_recv_mgmt = ath_recv_mgmt;
 	sc->sc_newstate = ic->ic_newstate;
 	ic->ic_newstate = ath_newstate;
 	ic->ic_crypto.cs_key_alloc = ath_key_alloc;
@@ -2465,6 +2470,32 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	netif_rx(skb);
 }
 
+/*
+ * Intercept management frames to collect beacon rssi data
+ * and to do ibss merges.
+ */
+static void
+ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
+	struct ieee80211_node *ni,
+	int subtype, int rssi, u_int32_t rstamp)
+{
+	struct ath_softc *sc = ic->ic_dev->priv;
+
+	/*
+	 * Call up first so subsequent work can use information
+	 * potentially stored in the node (e.g. for ibss merge).
+	 */
+	(*sc->sc_recv_mgmt)(ic, skb, ni, subtype, rssi, rstamp);
+	switch (subtype) {
+	case IEEE80211_FC0_SUBTYPE_BEACON:
+		/* update rssi statistics for use by the hal */
+		ATH_RSSI_LPF(ATH_NODE(ni)->an_halstats.ns_avgbrssi, rssi);
+		/* fall thru... */
+	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
+		break;
+	}
+}
+
 static void
 ath_rx_tasklet(TQUEUE_ARG data)
 {
@@ -2483,7 +2514,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct ieee80211_node *ni;
 	struct ath_node *an;
 	struct ath_recv_hist *rh;
-	int len, opackets, obeacons;
+	int len, opackets;
 	u_int phyerr;
 	HAL_STATUS status;
 
@@ -2696,7 +2727,6 @@ rx_accept:
 
 		/* XXX monitor stats to identify packet type */
 		opackets = sc->sc_devstats.rx_packets;
-		obeacons = ic->ic_stats.is_rx_beacon;
 
 		/*
 		 * Send frame up for processing.
@@ -2714,9 +2744,6 @@ rx_accept:
 		 */
 		if (sc->sc_devstats.rx_packets != opackets)
 			ATH_RSSI_LPF(an->an_halstats.ns_avgrssi,
-				ds->ds_rxstat.rs_rssi);
-		else if (ic->ic_stats.is_rx_beacon != obeacons)
-			ATH_RSSI_LPF(an->an_halstats.ns_avgbrssi,
 				ds->ds_rxstat.rs_rssi);
 		/*
 		 * Reclaim node reference.
