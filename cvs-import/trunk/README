@@ -1,7 +1,74 @@
-To build the driver at the top level do:
+Atheros Driver For Linux
+=========================
+
+* Copyright (c) 2002, 2003 Sam Leffler.  All rights reserved.
+
+Read the file COPYRIGHT; this is not GPL code.
+
+This software contains a kernel driver for Atheros-based Wireless LAN
+devices.  The driver supports both station and AP modes of operation.
+The driver is actually a port of the BSD Atheros driver and includes
+a port of the 802.11 link layer code originally found in NetBSD.
+You may/will also find other BSD-ish glue code.  As much as possible
+I've tried to make this driver a "native Linux" driver that conforms to
+Linux style and operation but in some areas of operation you may still
+see elements of BSD design/operation.
+
+The driver functions as a normal network device and uses the Wireless
+Extensions API.  As such normal Linux tools can and should be used
+with it.
+
+There are two drivers included here:
+
+ath_pci for PCI devices, and
+ath_cs for Cardbus devices
+
+These drivers are built as modules that are loaded with insmod or
+modprobe.  Both drivers depend on a wlan module that includes the 802.11
+state protocol support and other glue code.
+
+The Atheros drivers depends on a chunk of code termed the Hardware
+Access Layer (HAL).  This code manages much of the hardware-specific
+operation of the driver.  The HAL is provided in a binary-only form in
+order to comply with FCC regulations.  If you wish to use this driver
+on a platform that is not already supported please contact the author
+to arrange compilation of the HAL.  Note that this is only necessary for
+new _architectures_; the HAL is not tied to any specific version of Linux.
+
+
+Building the driver
+===================
+To build the driver at the top level edit Makefile.inc and set the
+pathname to your Linux kernel distribution.  By default this is set to
+/usr/src/linux.
+
+Then do:
 
 make depend
 make
 
-This will generate driver/ath_pci.o that you can insmod.  Eventually
-the wlan support will be split out into a separate wlan.o module.
+This will generate two files:
+
+driver/ath_pci.o (for PCI devices), and
+driver/ath_cs.o (for Cardbus devices)
+
+These files can be loaded with insmod or modprobe.  You can also use:
+
+make install
+
+to install the drivers where they can be loaded automatically at boot.
+
+[Eventually the wlan support will be split out into a separate wlan.o
+ module.]
+
+[So far this has only been tested with RH 7.3 and a 2.4.20 kernel on an
+ x86 machine.]
+
+Feedback
+========
+Please send all correspondence about this driver to:
+
+	atheros-linux@errno.com
+
+I will try to respond in a timely manner but understand this software
+is provided as-is; with no support.
