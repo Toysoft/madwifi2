@@ -58,6 +58,7 @@
 #include <net80211/ieee80211_var.h>
 
 #include "if_athvar.h"
+#include "if_ath_pci.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
 /*
@@ -239,10 +240,10 @@ static int
 ath_pci_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct ath_pci_softc *sc = dev->priv;
 
 	ath_suspend(dev);
-	pci_save_state(pdev, sc->aps_pmstate);
+	PCI_SAVE_STATE(pdev,
+		((struct ath_pci_softc *)dev->priv)->aps_pmstate);
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, 3);
 
@@ -253,11 +254,11 @@ static int
 ath_pci_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct ath_pci_softc *sc = dev->priv;
 	u32 val;
 
 	pci_enable_device(pdev);
-	pci_restore_state(pdev, sc->aps_pmstate);
+	PCI_RESTORE_STATE(pdev,
+		((struct ath_pci_softc *)dev->priv)->aps_pmstate);
 	/*
 	 * Suspend/Resume resets the PCI configuration space, so we have to
 	 * re-disable the RETRY_TIMEOUT register (0x41) to keep
@@ -328,7 +329,7 @@ init_ath_pci(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
-	if (pci_register_driver(&ath_pci_drv_id) <= 0) {
+	if (pci_register_driver(&ath_pci_drv_id) < 0) {
 		printk("ath_pci: No devices found, driver not installed.\n");
 		pci_unregister_driver(&ath_pci_drv_id);
 		return (-ENODEV);
