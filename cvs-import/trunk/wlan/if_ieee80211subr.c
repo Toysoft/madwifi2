@@ -2195,14 +2195,13 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 				ni->ni_txrate = i;
 				break;
 			}
+			if ((i == ni->ni_rates.rs_nrates) && (ni->ni_rates.rs_nrates > 0))
+				ni->ni_txrate =  ni->ni_rates.rs_nrates - 1;
 		}
+	} else {
+		if (ni->ni_rates.rs_nrates > 0)
+			ni->ni_txrate =  ni->ni_rates.rs_nrates - 1;
 	}
-	else if (ni->ni_txrate >= ni->ni_rates.rs_nrates) {
-		/* we made ni_txrate invalid -- fixup
-		 */
-		ni->ni_txrate =  ni->ni_rates.rs_nrates-1;
-	}
-
 	if (okrate == 0 || error != 0)
 		return badrate | IEEE80211_RATE_BASIC;
 	else
