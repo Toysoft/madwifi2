@@ -198,7 +198,7 @@ static const char *ieee80211_phymode_name[] = {
 int
 ieee80211_ifattach(struct net_device *dev)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211channel *c;
 	int i;
 
@@ -345,7 +345,7 @@ ieee80211_ifattach(struct net_device *dev)
 void
 ieee80211_ifdetach(struct net_device *dev)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 
 	del_timer(&ic->ic_slowtimo);
 	if (ic->ic_wep_ctx != NULL) {
@@ -443,7 +443,7 @@ ieee80211_media_init(struct net_device *dev,
 #define	ADD(_ic, _s, _o) \
 	ifmedia_add(&(_ic)->ic_media, \
 		IFM_MAKEWORD(IFM_IEEE80211, (_s), (_o), 0), 0, NULL)
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ifmediareq imr;
 	int i, j, mode, rate, maxrate, mword, mopt, r;
 	struct ieee80211_rateset *rs;
@@ -556,7 +556,7 @@ findrate(struct ieee80211com *ic, enum ieee80211_phymode mode, int rate)
 int
 ieee80211_media_change(struct net_device *dev)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ifmedia_entry *ime;
 	enum ieee80211_opmode newopmode;
 	enum ieee80211_phymode newphymode;
@@ -720,7 +720,7 @@ ieee80211_media_change(struct net_device *dev)
 void
 ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni = NULL;
 
 	imr->ifm_status = IFM_AVALID;
@@ -880,7 +880,7 @@ void
 ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	int rssi, u_int32_t rstamp, u_int rantenna)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni = NULL;
 	struct ieee80211_frame *wh;
 	struct ether_header *eh;
@@ -1165,7 +1165,7 @@ int
 ieee80211_mgmt_output(struct net_device *dev, struct ieee80211_node *ni,
     struct sk_buff *skb, int type)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_frame *wh;
 
 	/* XXX this probably shouldn't be permitted */
@@ -1206,7 +1206,7 @@ ieee80211_mgmt_output(struct net_device *dev, struct ieee80211_node *ni,
 struct sk_buff *
 ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ether_header eh;
 	struct ieee80211_frame *wh;
 	struct llc *llc;
@@ -1295,7 +1295,7 @@ ieee80211_decap(struct net_device *dev, struct sk_buff *skb)
 		break;
 	case IEEE80211_FC1_DIR_DSTODS:
 		/* not yet supported */
-		DPRINTF((struct ieee80211com*) dev,
+		DPRINTF((struct ieee80211com*) dev->priv,
 			("%s: DS to DS\n", __func__));
 		dev_kfree_skb(skb);
 		return NULL;
@@ -1410,7 +1410,7 @@ void
 ieee80211_watchdog(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (ic->ic_mgt_timer && --ic->ic_mgt_timer == 0)
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
@@ -1563,7 +1563,7 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 void
 ieee80211_reset_scan(struct net_device *dev)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 
 	memcpy(ic->ic_chan_scan, ic->ic_chan_active,
 		sizeof(ic->ic_chan_active));
@@ -1575,7 +1575,7 @@ ieee80211_reset_scan(struct net_device *dev)
 void
 ieee80211_begin_scan(struct net_device *dev, struct ieee80211_node *ni)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 
 	DPRINTF(ic, ("%s: begin %s scan\n", dev->name,
 			ic->ic_opmode != IEEE80211_M_HOSTAP ?
@@ -1603,7 +1603,7 @@ ieee80211_begin_scan(struct net_device *dev, struct ieee80211_node *ni)
 void
 ieee80211_next_scan(struct net_device *dev)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211channel *chan;
 
 	chan = ic->ic_bss.ni_chan;
@@ -1635,7 +1635,7 @@ ieee80211_next_scan(struct net_device *dev)
 static void
 ieee80211_create_ibss(struct net_device* dev, struct ieee80211channel *chan)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni;
 
 	ni = &ic->ic_bss;
@@ -1668,7 +1668,7 @@ ieee80211_create_ibss(struct net_device* dev, struct ieee80211channel *chan)
 void
 ieee80211_end_scan(struct net_device *dev)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni, *nextbs, *selbs;
 	void *p;
 	u_int8_t rate;
@@ -3222,7 +3222,7 @@ ieee80211_recv_deauth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 int
 ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni;
 	int error, ostate;
 #ifdef IEEE80211_DEBUG
@@ -3448,7 +3448,7 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 struct sk_buff *
 ieee80211_wep_crypt(struct net_device *dev, struct sk_buff *skb0, int txflag)
 {
-	struct ieee80211com *ic = (void *)dev;
+	struct ieee80211com *ic = dev->priv;
 	struct sk_buff *skb, *n, *n0;
 	struct ieee80211_frame *wh;
 	int i, left, len, moff, noff, kid;
@@ -3555,7 +3555,7 @@ ieee80211_wep_crypt(struct net_device *dev, struct sk_buff *skb0, int txflag)
 static struct net_device_stats *
 ieee80211_getstats(struct net_device *dev)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	return &ic->ic_stats;
 }
 
