@@ -149,7 +149,7 @@ WLAN=	${DEPTH}/net80211
 #
 # Path to the device Atheros driver.
 #
-DRIVER=	${DEPTH}/ath
+ATH=	${DEPTH}/ath
 
 INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
 
