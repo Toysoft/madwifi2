@@ -1883,6 +1883,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	stats->tx_packets++;
 	stats->tx_bytes += pktlen;
 
+	dev->trans_start = jiffies;
+
 	return 0;
 }
 
