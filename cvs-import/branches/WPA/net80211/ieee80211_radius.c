@@ -190,14 +190,26 @@ allow_signal(int sig)
 	if (sig < 1 || sig > _NSIG)
 		return -EINVAL;
 
-	/* XXX punt until someone supplies the know-how */
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,4,20)
+#ifdef INIT_SIGHAND
+	/*
+	 * "The test on INIT_SIGHAND is not perfect but will at
+	 *  least allow this to compile on RedHat kernels."
+	 *
+	 * http://www.mail-archive.com/jfs-discussion@www-124.ibm.com/msg00803.html
+	 */
+	spin_lock_irq(&current->sighand->siglock);
+	sigdelset(&current->blocked, sig);
+	/* XXX current->mm? */
+	recalc_sigpending();
+	spin_unlock_irq(&current->sighand->siglock);
+#else
 	spin_lock_irq(&current->sigmask_lock);
 	sigdelset(&current->blocked, sig);
 	/* XXX current->mm? */
 	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 #endif
+
 	return 0;
 }
 #else
