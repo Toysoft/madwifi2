@@ -2633,10 +2633,6 @@ rx_next:
 	} while (ath_rxbuf_init(sc, bf) == 0);
 
 	ath_hal_rxmonitor(ah);			/* rx signal state monitoring */
-#if 0
-	/* XXX with the final descriptor self-linked this is unneeded */
-	ath_hal_rxena(ah);			/* in case of RXEOL */
-#endif
 #undef PA2DESC
 }
 
