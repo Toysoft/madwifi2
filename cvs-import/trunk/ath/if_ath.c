@@ -91,7 +91,6 @@ static int	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(TQUEUE_ARG);
 static void	ath_rxorn_tasklet(TQUEUE_ARG);
 static void	ath_bmiss_tasklet(TQUEUE_ARG);
-static void	ath_mib_tasklet(TQUEUE_ARG);
 static int	ath_stop_locked(struct net_device *);
 static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
@@ -286,7 +285,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq,ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq,ath_fatal_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_mibtq,	ath_mib_tasklet,	dev);
 
 	/*
 	 * Attach the hal and verify ABI compatibility by checking
@@ -749,12 +747,17 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		if (status & HAL_INT_MIB) {
 			sc->sc_stats.ast_mib++;
 			/*
-			 * Disable the MIB interrupt until we service it in the
-			 * tasklet; otherwise it will continue to be delivered.
+			 * Disable interrupts until we service the MIB
+			 * interrupt; otherwise it will continue to fire.
 			 */
-			sc->sc_imask &= ~HAL_INT_MIB;
+			ath_hal_intrset(ah, 0);
+			/*
+			 * Let the hal handle the event.  We assume it will
+			 * clear whatever condition caused the interrupt.
+			 */
+			ath_hal_mibevent(ah,
+				&ATH_NODE(sc->sc_ic.ic_bss)->an_halstats);
 			ath_hal_intrset(ah, sc->sc_imask);
-			ATH_SCHEDULE_TQUEUE(&sc->sc_mibtq, &needmark);
 		}
 	}
 	if (needmark)
@@ -800,26 +803,6 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 		 */
 		ieee80211_new_state(ic, IEEE80211_S_ASSOC, -1);
 	}
-}
-
-static void
-ath_mib_tasklet(TQUEUE_ARG data)
-{
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ath_hal *ah = sc->sc_ah;
-
-	DPRINTF(ATH_DEBUG_MIB, "%s\n", __func__);
-	/*
-	 * Let the hal handle the event.  We assume it will
-	 * clear whatever condition caused the interrupt so
-	 * it's safe to re-enable the MIB interrupt before
-	 * returning.
-	 */
-	ath_hal_mibevent(ah, &ATH_NODE(ic->ic_bss)->an_halstats);
-	sc->sc_imask |= HAL_INT_MIB;
-	ath_hal_intrset(ah, sc->sc_imask);
 }
 
 static u_int
@@ -3705,8 +3688,9 @@ ath_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		 */
 		ath_beacon_config(sc);
 	} else {
+		ath_hal_intrset(ah,
+			sc->sc_imask &~ (HAL_INT_SWBA | HAL_INT_BMISS));
 		sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
-		ath_hal_intrset(ah, sc->sc_imask);
 	}
 
 	/*

@@ -230,7 +230,6 @@ struct ath_softc {
 	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
 
 	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */
-	struct tq_struct	sc_mibtq;	/* MIB intr tasklet */
 
 	int			sc_rxbufsize;	/* rx size based on mtu */
 	STAILQ_HEAD(, ath_buf)	sc_rxbuf;	/* receive buffer */
