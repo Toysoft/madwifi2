@@ -599,7 +599,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	int error;
 
 	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
-		DPRINTF(("ath_hardstart: discard, invalid %d flags %x\n",
+		DPRINTF(("%s: discard, invalid %d flags %x\n", __func__,
 			sc->sc_invalid, dev->flags));
 		sc->sc_stats.ast_tx_invalid++;
 		return -ENETDOWN;
@@ -610,7 +610,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	 * the xmit queue until we enter the RUN state.
 	 */
 	if (ic->ic_state != IEEE80211_S_RUN) {
-		DPRINTF(("ath_hardstart: discard, state %u\n", ic->ic_state));
+		DPRINTF(("%s: discard, state %u\n", __func__, ic->ic_state));
 		sc->sc_stats.ast_tx_discard++;
 		/*
 		 * Someone outside the driver started the queue;
@@ -628,13 +628,13 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
 	/* XXX use a counter and leave at least one for mgmt frames */
 	if (TAILQ_EMPTY(&sc->sc_txbuf)) {
-		DPRINTF(("ath_hardstart: stop queue\n"));
+		DPRINTF(("%s: stop queue\n", __func__));
 		sc->sc_stats.ast_tx_qstop++;
 		netif_stop_queue(dev);
 	}
 	spin_unlock_bh(&sc->sc_txbuflock);
 	if (bf == NULL) {		/* NB: should not happen */
-		printk("ath_hardstart: discard, no xmit buf\n");
+		printk("%s: discard, no xmit buf\n", __func__);
 		sc->sc_stats.ast_tx_nobuf++;
 		goto bad;
 	}
@@ -643,25 +643,29 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	 */
 	skb = ieee80211_encap(dev, skb);
 	if (skb == NULL) {
-		DPRINTF(("ath_hardstart: discard, encapsulation failure\n"));
+		DPRINTF(("%s: discard, encapsulation failure\n", __func__));
 		sc->sc_stats.ast_tx_encap++;
 		goto bad;
 	}
 	wh = (struct ieee80211_frame *) skb->data;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
-
-	ni = ieee80211_find_node(ic, wh->i_addr1);
-	if (ni == NULL &&
-	    !IEEE80211_IS_MULTICAST(wh->i_addr1) &&
-	    ic->ic_opmode != IEEE80211_M_STA) {
-		DPRINTF(("ath_hardstart: discard, no destination state\n"));
-		sc->sc_stats.ast_tx_nonode++;
-		goto bad;
-	}
-	if (ni == NULL)
+	/*
+	 *  Locate node state.  When operating
+	 *  in station mode we always use ic_bss.
+	 */
+	if (ic->ic_opmode != IEEE80211_M_STA) {
+		ni = ieee80211_find_node(ic, wh->i_addr1);
+		if (ni == NULL && !IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+			DPRINTF(("%s: discard, no destination state\n",
+				__func__));
+			sc->sc_stats.ast_tx_nonode++;
+			goto bad;
+		}
+		if (ni == NULL)
+			ni = ieee80211_ref_node(&ic->ic_bss);
+	} else
 		ni = ieee80211_ref_node(&ic->ic_bss);
-
 	/*
 	 * TODO:
 	 * The duration field of 802.11 header should be filled.
