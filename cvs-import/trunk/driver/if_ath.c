@@ -368,38 +368,6 @@ ath_shutdown(struct net_device *dev)
 	ath_stop(dev);
 }
 
-static int
-ath_set_mac_address(struct net_device *dev, void *addr)
-{
-	struct ath_softc *sc = dev->priv;
-	struct ath_hal *ah = sc->sc_ah;
-	struct sockaddr *mac = addr;
-
-	if (netif_running(dev)) {
-		DPRINTF(("%s: cannot set address; device running\n", __func__));
-		return -EBUSY;
-	}
-	DPRINTF(("%s: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", __func__,
-		mac->sa_data[0], mac->sa_data[1], mac->sa_data[2],
-		mac->sa_data[3], mac->sa_data[4], mac->sa_data[5]));
-	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
-	ath_hal_setmac(ah, dev->dev_addr);
-	return -ath_reset(dev);
-}
-
-static int      
-ath_change_mtu(struct net_device *dev, int mtu) 
-{
-	if (!(ATH_MIN_MTU < mtu && mtu <= ATH_MAX_MTU)) {
-		DPRINTF(("%s: invalid %d, min %u, max %u\n",
-			__func__, mtu, ATH_MIN_MTU, ATH_MAX_MTU));
-		return -EINVAL;
-	}
-	DPRINTF(("%s: %d\n", __func__, mtu));
-	dev->mtu = mtu;
-	return -ath_reset(dev);
-}
-
 /*
  * Interrupt handler.  All the actual processing is
  * deferred to tasklets.
@@ -3110,6 +3078,38 @@ ath_getstats(struct net_device *dev)
 	stats->rx_crc_errors = sc->sc_stats.ast_rx_crcerr;
 
 	return stats;
+}
+
+static int
+ath_set_mac_address(struct net_device *dev, void *addr)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+	struct sockaddr *mac = addr;
+
+	if (netif_running(dev)) {
+		DPRINTF(("%s: cannot set address; device running\n", __func__));
+		return -EBUSY;
+	}
+	DPRINTF(("%s: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", __func__,
+		mac->sa_data[0], mac->sa_data[1], mac->sa_data[2],
+		mac->sa_data[3], mac->sa_data[4], mac->sa_data[5]));
+	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
+	ath_hal_setmac(ah, dev->dev_addr);
+	return -ath_reset(dev);
+}
+
+static int      
+ath_change_mtu(struct net_device *dev, int mtu) 
+{
+	if (!(ATH_MIN_MTU < mtu && mtu <= ATH_MAX_MTU)) {
+		DPRINTF(("%s: invalid %d, min %u, max %u\n",
+			__func__, mtu, ATH_MIN_MTU, ATH_MAX_MTU));
+		return -EINVAL;
+	}
+	DPRINTF(("%s: %d\n", __func__, mtu));
+	dev->mtu = mtu;
+	return -ath_reset(dev);
 }
 
 static int
