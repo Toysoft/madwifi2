@@ -521,7 +521,8 @@ ieee80211_sta_join(struct ieee80211com *ic, struct ieee80211_node *selbs)
 	 * the auto-select case; this should be redundant if the
 	 * mode is locked.
 	 */ 
-	ieee80211_reset_erp(ic, ieee80211_chan2mode(ic, ic->ic_bss->ni_chan));
+	ic->ic_curmode = ieee80211_chan2mode(ic, ic->ic_bss->ni_chan);
+	ieee80211_reset_erp(ic);
 	if (ic->ic_opmode == IEEE80211_M_IBSS) {
 		ieee80211_fix_rate(ic, ic->ic_bss, IEEE80211_F_DOFRATE |
 		    IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
@@ -857,7 +858,7 @@ ieee80211_free_allnodes(struct ieee80211com *ic)
 		}
 		_ieee80211_free_node(ic, ni);
 	}
-	ieee80211_reset_erp(ic, ic->ic_curmode);
+	ieee80211_reset_erp(ic);
 	IEEE80211_NODE_UNLOCK_BH(ic);
 
 	if (ic->ic_bss != NULL)

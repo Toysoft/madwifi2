@@ -1671,7 +1671,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				 *     change dynamically
 				 */
 				ieee80211_set_shortslottime(ic,
-					ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME);
+					ic->ic_curmode == IEEE80211_MODE_11A ||
+					(ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME));
 				ni->ni_capinfo = capinfo;
 				/* XXX statistic */
 			}
@@ -2115,7 +2116,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 *
 		 * XXX may need different/additional driver callbacks?
 		 */
-		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) {
+		if (ic->ic_curmode == IEEE80211_MODE_11A ||
+		    (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)) {
 			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
 			ic->ic_flags &= ~IEEE80211_F_USEBARKER;
 		} else {

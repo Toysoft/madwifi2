@@ -796,8 +796,6 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 		ieee80211_set11gbasicrates(&ic->ic_sup_rates[mode],
 			IEEE80211_MODE_11B);
 	}
-	ieee80211_reset_erp(ic, mode);		/* reset ERP state */
-
 	/*
 	 * Setup an initial rate set according to the
 	 * current/default channel selected above.  This
@@ -808,6 +806,8 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 		ic->ic_bss->ni_rates = ic->ic_sup_rates[mode];
 
 	ic->ic_curmode = mode;
+	ieee80211_reset_erp(ic);	/* reset ERP state */
+
 	return 0;
 #undef N
 }
@@ -817,7 +817,7 @@ EXPORT_SYMBOL(ieee80211_setmode);
  * Reset 11g-related state.
  */
 void
-ieee80211_reset_erp(struct ieee80211com *ic, enum ieee80211_phymode mode)
+ieee80211_reset_erp(struct ieee80211com *ic)
 {
 	ic->ic_flags &= ~IEEE80211_F_USEPROT;
 	ic->ic_nonerpsta = 0;
@@ -827,16 +827,16 @@ ieee80211_reset_erp(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	 * and not in an IBSS.  We must also honor whether or not
 	 * the driver is capable of doing it.
 	 */
-	/* XXX what about auto? */
 	ieee80211_set_shortslottime(ic,
-		mode == IEEE80211_MODE_11A ||
-		(mode == IEEE80211_MODE_11G &&
-		ic->ic_opmode != IEEE80211_M_IBSS &&
+		ic->ic_curmode == IEEE80211_MODE_11A ||
+		(ic->ic_curmode == IEEE80211_MODE_11G &&
+		ic->ic_opmode == IEEE80211_M_HOSTAP &&
 		(ic->ic_caps & IEEE80211_C_SHSLOT)));
 	/*
 	 * Set short preamble and ERP barker-preamble flags.
 	 */
-	if (ic->ic_caps & IEEE80211_C_SHPREAMBLE) {
+	if (ic->ic_curmode == IEEE80211_MODE_11A ||
+	    (ic->ic_caps & IEEE80211_C_SHPREAMBLE)) {
 		ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
 		ic->ic_flags &= ~IEEE80211_F_USEBARKER;
 	} else {
