@@ -39,7 +39,6 @@
 #include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/utsname.h>
-#include <linux/wireless.h>
 #include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
 
 #include <net/iw_handler.h>
@@ -48,7 +47,7 @@
 
 #include "if_ieee80211.h"
 
-#ifdef WIRELESS_EXT
+#ifdef CONFIG_NET_WIRELESS
 
 struct iw_statistics *
 ieee80211_iw_getstats(struct net_device *dev)
@@ -72,8 +71,8 @@ ieee80211_iw_getstats(struct net_device *dev)
 	return &ic->ic_iwstats;
 }
 
-static int
-ieee80211_get_name(struct net_device *dev,
+int
+ieee80211_ioctl_giwname(struct net_device *dev,
 		   struct iw_request_info *info,
 		   char *name, char *extra)
 {
@@ -87,14 +86,14 @@ ieee80211_get_name(struct net_device *dev,
 		switch (IFM_SUBTYPE(imr.ifm_active)) {
 		case IFM_IEEE80211_FH1:
 		case IFM_IEEE80211_FH2:
-			strncat(name, "-FH", IFNAMSIZ);
+			strncpy(name, "IEEE 802.11-FH", IFNAMSIZ);
 			break;
 		case IFM_IEEE80211_DS1:
 		case IFM_IEEE80211_DS2:
 		case IFM_IEEE80211_DS5:
 		case IFM_IEEE80211_DS11:
 		case IFM_IEEE80211_DS22:
-			strncat(name, "-DS", IFNAMSIZ);
+			strncpy(name, "IEEE 802.11-DS", IFNAMSIZ);
 			break;
 		case IFM_IEEE80211_ODFM6:
 		case IFM_IEEE80211_ODFM9:
@@ -105,14 +104,14 @@ ieee80211_get_name(struct net_device *dev,
 		case IFM_IEEE80211_ODFM48:
 		case IFM_IEEE80211_ODFM54:
 		case IFM_IEEE80211_ODFM72:
-			strncat(name, "-ODFM", IFNAMSIZ);
+			strncpy(name, "IEEE 802.11-ODFM", IFNAMSIZ);
 			break;
 		}
 	}
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwencode(struct net_device *dev,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *keybuf)
@@ -154,7 +153,7 @@ done:
 	return -error;
 }
 
-static int
+int
 ieee80211_ioctl_giwencode(struct net_device *dev,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *key)
@@ -169,7 +168,8 @@ ieee80211_ioctl_giwencode(struct net_device *dev,
 		if (kid >= IEEE80211_WEP_NKID)
 			return -EINVAL;
 		erq->flags = kid + 1;
-		erq->length = ic->ic_nw_keys[kid].wk_len;
+		if (erq->length > ic->ic_nw_keys[kid].wk_len)
+			erq->length = ic->ic_nw_keys[kid].wk_len;
 		memcpy(key, ic->ic_nw_keys[kid].wk_key, erq->length);
 		erq->flags |= IW_ENCODE_ENABLED;	/* XXX */
 		erq->flags |= IW_ENCODE_OPEN;		/* XXX */
@@ -180,7 +180,7 @@ ieee80211_ioctl_giwencode(struct net_device *dev,
 extern	struct ifmedia_entry * ifmedia_match(struct ifmedia *,
 					int target, int mask);
 
-static int
+int
 ieee80211_ioctl_siwrate(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rrq, char *extra)
@@ -243,7 +243,7 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 	return -error;
 }
 
-static int
+int
 ieee80211_ioctl_giwrate(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rrq, char *extra)
@@ -270,7 +270,7 @@ ieee80211_ioctl_giwrate(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwsens(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *sens, char *extra)
@@ -278,7 +278,7 @@ ieee80211_ioctl_siwsens(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwsens(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *sens, char *extra)
@@ -289,7 +289,7 @@ ieee80211_ioctl_giwsens(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwrts(struct net_device *dev,
 		       struct iw_request_info *info,
 		       struct iw_param *rts, char *extra)
@@ -307,7 +307,7 @@ ieee80211_ioctl_siwrts(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwrts(struct net_device *dev,
 		       struct iw_request_info *info,
 		       struct iw_param *rts, char *extra)
@@ -322,7 +322,7 @@ ieee80211_ioctl_giwrts(struct net_device *dev,
 }
 
 
-static int
+int
 ieee80211_ioctl_siwfrag(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rts, char *extra)
@@ -340,7 +340,7 @@ ieee80211_ioctl_siwfrag(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwfrag(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rts, char *extra)
@@ -354,7 +354,7 @@ ieee80211_ioctl_giwfrag(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwap(struct net_device *dev,
 		      struct iw_request_info *info,
 		      struct sockaddr *ap_addr, char *extra)
@@ -370,7 +370,7 @@ ieee80211_ioctl_siwap(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwap(struct net_device *dev,
 		      struct iw_request_info *info,
 		      struct sockaddr *ap_addr, char *extra)
@@ -383,7 +383,7 @@ ieee80211_ioctl_giwap(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwnickn(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *nickname)
@@ -400,21 +400,22 @@ ieee80211_ioctl_siwnickn(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwnickn(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *nickname)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	memcpy(nickname, ic->ic_des_essid, ic->ic_des_esslen);
-	nickname[ic->ic_des_esslen + 2] = '\0';
-	data->length = ic->ic_des_esslen + 1;
+	if (data->length > ic->ic_des_esslen + 1)
+		data->length = ic->ic_des_esslen + 1;
+	memcpy(nickname, ic->ic_des_essid, data->length-1);
+	nickname[data->length-1] = '\0';
 
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwfreq(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_freq *freq, char *extra)
@@ -433,12 +434,15 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 		return -EINVAL;
 }
 
-static int
+int
 ieee80211_ioctl_giwfreq(struct net_device *dev,
 				struct iw_request_info *info,
 				struct iw_freq *freq, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
+
+	if (!ic->ic_ibss_chan)
+		return -EINVAL;
 
 	freq->m = ic->ic_ibss_chan->ic_freq * 100000;
 	freq->e = 1;
@@ -446,7 +450,7 @@ ieee80211_ioctl_giwfreq(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwessid(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *ssid)
@@ -465,7 +469,7 @@ ieee80211_ioctl_siwessid(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwessid(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *essid)
@@ -474,16 +478,18 @@ ieee80211_ioctl_giwessid(struct net_device *dev,
 
 	data->flags = 1;		/* active */
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-		data->length = ic->ic_des_esslen;
-		memcpy(essid, ic->ic_des_essid, ic->ic_des_esslen);
+		if (data->length > ic->ic_des_esslen)
+			data->length = ic->ic_des_esslen;
+		memcpy(essid, ic->ic_des_essid, data->length);
 	} else {
-		data->length = ic->ic_bss.ni_esslen;
-		memcpy(essid, ic->ic_bss.ni_essid, ic->ic_bss.ni_esslen);
+		if (data->length > ic->ic_bss.ni_esslen)
+			data->length = ic->ic_bss.ni_esslen;
+		memcpy(essid, ic->ic_bss.ni_essid, data->length);
 	}
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwrange(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *extra)
@@ -562,7 +568,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwmode(struct net_device *dev,
 			struct iw_request_info *info,
 			__u32 *mode, char *extra)
@@ -571,7 +577,7 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwmode(struct net_device *dev,
 			struct iw_request_info *info,
 			__u32 *mode, char *extra)
@@ -589,7 +595,7 @@ ieee80211_ioctl_giwmode(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwpower(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_param *wrq, char *extra)
@@ -628,7 +634,7 @@ done:
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwpower(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rrq, char *extra)
@@ -652,7 +658,7 @@ ieee80211_ioctl_giwpower(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwretry(struct net_device *dev,
 				 struct iw_request_info *info,
 				 struct iw_param *rrq, char *extra)
@@ -685,7 +691,7 @@ done:
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwretry(struct net_device *dev,
 				 struct iw_request_info *info,
 				 struct iw_param *rrq, char *extra)
@@ -717,7 +723,7 @@ ieee80211_ioctl_giwretry(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwtxpow(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_param *rrq, char *extra)
@@ -759,7 +765,7 @@ done:
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwtxpow(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_param *rrq, char *extra)
@@ -774,7 +780,7 @@ ieee80211_ioctl_giwtxpow(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_siwscan(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
@@ -795,7 +801,7 @@ ieee80211_ioctl_siwscan(struct net_device *dev,
 	return 0;
 }
 
-static int
+int
 ieee80211_ioctl_giwscan(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
@@ -912,7 +918,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 /* Structures to export the Wireless Handlers */
 static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) NULL,				/* SIOCSIWCOMMIT */
-	(iw_handler) ieee80211_get_name,		/* SIOCGIWNAME */
+	(iw_handler) ieee80211_ioctl_giwname,		/* SIOCGIWNAME */
 	(iw_handler) NULL,				/* SIOCSIWNWID */
 	(iw_handler) NULL,				/* SIOCGIWNWID */
 	(iw_handler) ieee80211_ioctl_siwfreq,		/* SIOCSIWFREQ */
@@ -967,4 +973,4 @@ const struct iw_handler_def ieee80211_iw_handler_def = {
 	.standard		= (iw_handler *) ieee80211_handlers,
 #undef N
 };
-#endif /* WIRELESS_EXT */
+#endif /* CONFIG_NET_WIRELESS */
