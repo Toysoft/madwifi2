@@ -2032,7 +2032,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct net_device_stats *stats = &ic->ic_stats;
-	int i, iswep, hdrlen, pktlen, try0,isqos=0;
+	int iswep, hdrlen, pktlen, try0,isqos=0;
 	u_int8_t rix, cix, txrate, ctsrate;
 	struct ath_desc *ds;
 	struct ieee80211_frame *wh, *whWep;
@@ -2063,30 +2063,48 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		whWep = (struct ieee80211_frame *) skb_push(skb,IEEE80211_WEP_IVLEN+IEEE80211_WEP_KIDLEN);
 		ivp = ((u_int8_t *) whWep)+hdrlen+padbytes;
 		memmove(whWep, wh, hdrlen);
+
 		/*
 		 * XXX
 		 * IV must not duplicate during the lifetime of the key.
 		 * But no mechanism to renew keys is defined in IEEE 802.11
-		 * WEP.  And IV may be duplicated between other stations
-		 * because of the session key itself is shared.
-		 * So we use pseudo random IV for now, though it is not the
-		 * right way.
+		 * for WEP.  And the IV may be duplicated at other stations
+		 * because the session key itself is shared.  So we use a
+		 * pseudo random IV for now, though it is not the right way.
+		 *
+		 * NB: Rather than use a strictly random IV we select a
+		 * random one to start and then increment the value for
+		 * each frame.  This is an explicit tradeoff between
+		 * overhead and security.  Given the basic insecurity of
+		 * WEP this seems worthwhile.
 		 */
-                iv = ic->ic_iv;
 
 		/*
 		 * Skip 'bad' IVs from Fluhrer/Mantin/Shamir:
-		 * (B, 255, N) with 3 <= B < 8
+		 * (B, 255, N) with 3 <= B < 16 and 0 <= N <= 255
 		 */
-		if (iv >= 0x03ff00 && (iv & 0xf8ff00) == 0x00ff00)
-			iv += 0x000100;
+		iv = ic->ic_iv;
+		if ((iv & 0xff00) == 0xff00) {
+			int B = (iv & 0xff0000) >> 16;
+			if (3 <= B && B < 16)
+				iv = (B+1) << 16;
+		}
 		ic->ic_iv = iv + 1;
 
-		for (i = 0; i < IEEE80211_WEP_IVLEN; i++) {
-			ivp[i] = iv;
-			iv >>= 8;
-		}
-		ivp[i] = ic->ic_wep_txkey << 6; /* Key ID and pad */
+		/*
+		 * NB: Preserve byte order of IV for packet
+		 *     sniffers; it doesn't matter otherwise.
+		 */
+#if AH_BYTE_ORDER == AH_BIG_ENDIAN
+		ivp[0] = iv >> 0;
+		ivp[1] = iv >> 8;
+		ivp[2] = iv >> 16;
+#else
+		ivp[2] = iv >> 0;
+		ivp[1] = iv >> 8;
+		ivp[0] = iv >> 16;
+#endif
+		ivp[3] = ic->ic_wep_txkey << 6; /* Key ID and pad */
 		/*
 		 * The ICV length must be included into hdrlen and pktlen.
 		 */
