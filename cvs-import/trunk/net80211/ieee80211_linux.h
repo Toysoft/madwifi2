@@ -163,8 +163,8 @@ extern	struct net_device_stats *ieee80211_getstats(struct net_device *);
 	}
 #define	_MOD_DEC_USE(_m)		module_put(_m)
 #else
-#define	_MOD_INC_USE(_m, _err)	__MOD_INC_USE_COUNT(_m)
-#define	_MOD_DEC_USE(_m)	__MOD_DEC_USE_COUNT(_m)
+#define	_MOD_INC_USE(_m, _err)	MOD_INC_USE_COUNT
+#define	_MOD_DEC_USE(_m)	MOD_DEC_USE_COUNT
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
