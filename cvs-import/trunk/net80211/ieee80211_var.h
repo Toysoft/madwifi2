@@ -276,7 +276,6 @@ struct ieee80211com {
 	u_int8_t		ic_des_bssid[IEEE80211_ADDR_LEN];
 	void			*ic_opt_ie;	/* user-specified IE's */
 	u_int16_t		ic_opt_ie_len;	/* length of ni_opt_ie */
-	struct ieee80211_ie_wpa	ic_wpa_ie;	/* WPA information element */
 	/*
 	 * Inactivity timer settings for nodes.
 	 */

@@ -442,8 +442,8 @@ ieee80211_add_erp(u_int8_t *frm, struct ieee80211com *ic)
 	return frm;
 }
 
-static void
-ieee80211_setup_wpa_ie(struct ieee80211com *ic)
+static u_int8_t *
+ieee80211_setup_wpa_ie(struct ieee80211com *ic, u_int8_t *ie)
 {
 #define	WPA_OUI_BYTES		0x00, 0x50, 0xf2
 #define	ADDSHORT(frm, v) do {			\
@@ -470,9 +470,8 @@ ieee80211_setup_wpa_ie(struct ieee80211com *ic)
 		{ WPA_OUI_BYTES, WPA_ASE_8021X_UNSPEC };
 	static const u_int8_t key_mgt_psk[4] =
 		{ WPA_OUI_BYTES, WPA_ASE_8021X_PSK };
-	struct ieee80211_ie_wpa *ie = &ic->ic_wpa_ie;
 	const struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;
-	u_int8_t *frm = (u_int8_t *)ie;
+	u_int8_t *frm = ie;
 	u_int8_t *selcnt;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
@@ -505,15 +504,13 @@ ieee80211_setup_wpa_ie(struct ieee80211com *ic)
 	/* authenticator selector list */
 	selcnt = frm;
 	ADDSHORT(frm, 0);			/* selector count */
-	switch (rsn->rsn_keymgmt) {		/* NB: only one right now */
-	case WPA_ASE_8021X_UNSPEC:
+	if (rsn->rsn_keymgmtset & WPA_ASE_8021X_UNSPEC) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, key_mgt_unspec);
-		break;
-	case WPA_ASE_8021X_PSK:
+	}
+	if (rsn->rsn_keymgmtset & WPA_ASE_8021X_PSK) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, key_mgt_psk);
-		break;
 	}
 
 	/* optional capabilities */
@@ -521,16 +518,18 @@ ieee80211_setup_wpa_ie(struct ieee80211com *ic)
 		ADDSHORT(frm, rsn->rsn_caps);
 
 	/* calculate element length */
-	ie->wpa_len = frm - &ie->wpa_oui[0];
-	KASSERT(ie->wpa_len <= sizeof(*ie), ("WPA IE too big, %u > %u",
-		ie->wpa_len, sizeof(*ie)));
+	ie[1] = frm - ie - 2;
+	KASSERT(ie[1]+2 <= sizeof(struct ieee80211_ie_wpa),
+		("WPA IE too big, %u > %u",
+		ie[1]+2, sizeof(struct ieee80211_ie_wpa)));
+	return frm;
 #undef ADDSHORT
 #undef ADDSELECTOR
 #undef WPA_OUI_BYTES
 }
 
-static void
-ieee80211_setup_rsn_ie(struct ieee80211com *ic)
+static u_int8_t *
+ieee80211_setup_rsn_ie(struct ieee80211com *ic, u_int8_t *ie)
 {
 #define	RSN_OUI_BYTES		0x00, 0x0f, 0xac
 #define	ADDSHORT(frm, v) do {			\
@@ -556,9 +555,8 @@ ieee80211_setup_rsn_ie(struct ieee80211com *ic)
 		{ RSN_OUI_BYTES, RSN_ASE_8021X_UNSPEC };
 	static const u_int8_t key_mgt_psk[4] =
 		{ RSN_OUI_BYTES, RSN_ASE_8021X_PSK };
-	struct ieee80211_ie_wpa *ie = &ic->ic_wpa_ie;
 	const struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;
-	u_int8_t *frm = (u_int8_t *)ie;
+	u_int8_t *frm = ie;
 	u_int8_t *selcnt;
 
 	*frm++ = IEEE80211_ELEMID_RSN;
@@ -589,15 +587,13 @@ ieee80211_setup_rsn_ie(struct ieee80211com *ic)
 	/* authenticator selector list */
 	selcnt = frm;
 	ADDSHORT(frm, 0);			/* selector count */
-	switch (rsn->rsn_keymgmt) {		/* NB: only one right now */
-	case WPA_ASE_8021X_UNSPEC:
+	if (rsn->rsn_keymgmtset & WPA_ASE_8021X_UNSPEC) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, key_mgt_unspec);
-		break;
-	case WPA_ASE_8021X_PSK:
+	}
+	if (rsn->rsn_keymgmtset & WPA_ASE_8021X_PSK) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, key_mgt_psk);
-		break;
 	}
 
 	/* optional capabilities */
@@ -606,9 +602,11 @@ ieee80211_setup_rsn_ie(struct ieee80211com *ic)
 	/* XXX PMKID */
 
 	/* calculate element length */
-	ie->wpa_len = frm - &ie->wpa_oui[0];
-	KASSERT(ie->wpa_len <= sizeof(*ie), ("RSN IE too big, %u > %u",
-		ie->wpa_len, sizeof(*ie)));
+	ie[1] = frm - ie - 2;
+	KASSERT(ie[1]+2 <= sizeof(struct ieee80211_ie_wpa),
+		("RSN IE too big, %u > %u",
+		ie[1]+2, sizeof(struct ieee80211_ie_wpa)));
+	return frm;
 #undef ADDSELECTOR
 #undef ADDSHORT
 #undef RSN_OUI_BYTES
@@ -620,15 +618,13 @@ ieee80211_setup_rsn_ie(struct ieee80211com *ic)
 static u_int8_t *
 ieee80211_add_wpa(u_int8_t *frm, struct ieee80211com *ic)
 {
-	if (ic->ic_wpa_ie.wpa_len == 0) {
-		KASSERT(ic->ic_flags & IEEE80211_F_WPA, ("no WPA/RSN!"));
-		if (ic->ic_flags & IEEE80211_F_WPA1)
-			ieee80211_setup_wpa_ie(ic);
-		else
-			ieee80211_setup_rsn_ie(ic);
-	}
-	memcpy(frm, &ic->ic_wpa_ie, 2+ic->ic_wpa_ie.wpa_len);
-	return frm + 2+ic->ic_wpa_ie.wpa_len;
+
+	KASSERT(ic->ic_flags & IEEE80211_F_WPA, ("no WPA/RSN!"));
+	if (ic->ic_flags & IEEE80211_F_WPA1)
+		frm = ieee80211_setup_wpa_ie(ic, frm);
+	if (ic->ic_flags & IEEE80211_F_WPA2)
+		frm = ieee80211_setup_rsn_ie(ic, frm);
+	return frm;
 }
 
 /*
@@ -710,7 +706,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		       + (ic->ic_curmode == IEEE80211_MODE_11G ? 3 : 0)
 		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
 		       + (ic->ic_flags & IEEE80211_F_WPA ?
-				sizeof(struct ieee80211_ie_wpa) : 0)
+				2*sizeof(struct ieee80211_ie_wpa) : 0)
 		);
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
@@ -1009,7 +1005,7 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 + 2 + 4				/* DTIM/IBSSPARMS */
 		 + 2 + 1				/* ERP */
 	         + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
-		 + sizeof(struct ieee80211_ie_wpa)	/* WPA */
+		 + 2*sizeof(struct ieee80211_ie_wpa)	/* WPA 1+2 */
 		 ;
 	skb = ieee80211_getmgtframe(&frm, pktlen);
 	if (skb == NULL) {
@@ -1018,17 +1014,6 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 		ic->ic_stats.is_tx_nobuf++;
 		return NULL;
 	}
-
-	wh = (struct ieee80211_frame *)
-		skb_push(skb, sizeof(struct ieee80211_frame));
-	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
-	    IEEE80211_FC0_SUBTYPE_BEACON;
-	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
-	*(u_int16_t *)wh->i_dur = 0;
-	IEEE80211_ADDR_COPY(wh->i_addr1, dev->broadcast);
-	IEEE80211_ADDR_COPY(wh->i_addr2, ic->ic_myaddr);
-	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
-	*(u_int16_t *)wh->i_seq = 0;
 
 	memset(frm, 0, 8);	/* XXX timestamp is set by hardware */
 	frm += 8;
@@ -1085,6 +1070,18 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	efrm = ieee80211_add_xrates(frm, rs);
 	bo->bo_trailer_len = efrm - bo->bo_trailer;
 	skb_trim(skb, efrm - skb->data);
+
+	wh = (struct ieee80211_frame *)
+		skb_push(skb, sizeof(struct ieee80211_frame));
+	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
+	    IEEE80211_FC0_SUBTYPE_BEACON;
+	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
+	*(u_int16_t *)wh->i_dur = 0;
+	IEEE80211_ADDR_COPY(wh->i_addr1, dev->broadcast);
+	IEEE80211_ADDR_COPY(wh->i_addr2, ic->ic_myaddr);
+	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
+	*(u_int16_t *)wh->i_seq = 0;
+
 	return skb;
 }
 EXPORT_SYMBOL(ieee80211_beacon_alloc);
