@@ -1167,8 +1167,6 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		ATH_TXBUF_UNLOCK_BH(sc); \
 		if (ni != NULL)	\
 			ieee80211_free_node(ni);	\
-		if(skb)					\
-		    dev_kfree_skb(skb);			\
 	} while (0)
 
 	struct ath_softc *sc = dev->priv;
@@ -1337,6 +1335,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 
 		if (ath_tx_start(dev, ni, bf, skb0)) {
 			ret = 0; /* TODO: error value */
+			skb = NULL;
 			CLEANUP();
 			continue;
 		}
