@@ -340,6 +340,25 @@ sysctl -w dev.ath.debug=1	enable console msgs from the driver
 sysctl -w dev.ath.dump="hal"	dump h/w register state to the console
 echo 1>/proc/net/wlan0/debug	enable console msgs from the wlan module
 
+In monitor mode, control packets which are normally not passed up from
+the driver can be enabled by using:
+
+sysctl -w dev.ath.ctlpkt=<pkt subtype>
+
+where <pkt subtype> is the decimal equivalent of the packet subtype
+field taken from the 802.11 1999 specifications.  For example, to see
+Acknowledgment packets in Monitor mode, one uses:
+
+sysctl -w dev.ath.ctlpkt=13
+
+To pass up all control packets, use
+
+sysctl -w dev.ath.ctlpkt=-2
+
+and to pass up no control packets, use
+
+sysctl -w dev.ath.ctlpkt=-1
+
 In addition the program tools/athstats can be very useful in understanding
 what is going on.  In particular, something like:
 

@@ -266,7 +266,7 @@ struct ieee80211_wme_tspec {
  *		octet information[length]
  */
 
-typedef uint8_t *ieee80211_mgt_beacon_t;
+typedef u_int8_t *ieee80211_mgt_beacon_t;
 
 #define	IEEE80211_BEACON_INTERVAL(beacon) \
 	((beacon)[8] | ((beacon)[9] << 8))
