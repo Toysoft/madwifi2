@@ -445,12 +445,14 @@ ieee80211_media_change(struct net_device *dev)
 	if (ime->ifm_media & IFM_IEEE80211_ADHOC) {
 		ic->ic_opmode = IEEE80211_M_IBSS;
 		ic->ic_flags |= IEEE80211_F_IBSSON;
+		ic->ic_flags &= ~IEEE80211_F_ROAMING;
 	} else if (ime->ifm_media & IFM_IEEE80211_HOSTAP) {
 		ic->ic_opmode = IEEE80211_M_HOSTAP;
-		ic->ic_flags &= ~IEEE80211_F_IBSSON;
+		ic->ic_flags &= ~(IEEE80211_F_IBSSON | IEEE80211_F_ROAMING);
 	} else {
 		ic->ic_opmode = IEEE80211_M_STA;
 		ic->ic_flags &= ~IEEE80211_F_IBSSON;
+		ic->ic_flags |= IEEE80211_F_ROAMING;
 	}
 	return (*ic->ic_init)(dev);
 }
