@@ -28,6 +28,9 @@
 #
 # Makefile for the Atheros HAL Module.
 #
+# NB: we can't support MODVERSIONS because it requires building
+#     from source which may not be available
+#
 DEPTH=	..
 
 include ${DEPTH}/Makefile.inc
@@ -48,12 +51,7 @@ ALL=	ath_hal.o
 SRCS=	ah_osdep.c
 INCS=	${HALINCS} -I${LINUX} -I${DEPTH}
 COPTS+= -D_BUILD_STANDALONE_
-CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
-
-ifdef CONFIG_MODVERSIONS
-MODOPTS+=	-include ${ATH_HAL}/ath_hal.ver
-ALL_VER=	ath_hal.ver
-endif
+CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${COPTS}
 
 all:	${ALL}
 
@@ -71,23 +69,15 @@ endif
 ath_hal.o: ah_osdep.o ${HALO} version.h Makefile
 	${LD} -o $@ -r -x ah_osdep.o ${HALO}
 
-ifdef CONFIG_MODVERSIONS
-ath_hal.ver: ah_osdep.c
-	rm -f $@
-	${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ ah_osdep.c | \
-			${GENKSYMS} -k ${VERSION} >> $@
-ah_osdep.o: ath_hal.ver
-endif
-
 install: all
 	test -d ${DESTDIR}/lib/modules/${VERSION}/net || \
 		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
 	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
 clean:
-	rm -f ${ALL} ${OBJS} ah_osdep.o .depend ${ALL_VER}
+	rm -f ${ALL} ${OBJS} ah_osdep.o .depend
 
 depend: beforedepend .depend afterdepend
-.depend: ${SRCS} ${ALL_VER} opt_ah.h
+.depend: ${SRCS} opt_ah.h
 	rm -f .depend
 	${CC} -M ${CFLAGS} ${SRCS} > .depend
 beforedepend:
