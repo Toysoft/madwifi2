@@ -863,6 +863,8 @@ bad:
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 		spin_unlock_bh(&sc->sc_txbuflock);
 	}
+	if (skb)
+		dev_kfree_skb(skb);
 	return 0;	/* NB: return !0 only in a ``hard error condition'' */
 }
 
