@@ -135,7 +135,7 @@ install: all
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
 	for i in ${MOD_INSTALL}; do \
 		f=`basename $$i .o`; \
-		strip -S $$f.$(KMODSUF); \
+		${TOOLPREFIX}strip -S $$f.$(KMODSUF); \
 		cp $$f.${KMODSUF} ${DESTDIR}/${MODULEPATH}; \
 	done
 

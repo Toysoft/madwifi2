@@ -7,7 +7,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer,
- *    without modification.
+    without modification.
  * 2. Redistributions in binary form must reproduce at minimum a disclaimer
  *    similar to the "NO WARRANTY" disclaimer below ("Disclaimer") and any
  *    redistribution must be conditioned upon including a substantially
@@ -135,6 +135,7 @@ struct ath_node {
 	struct ath_recv_hist an_rx_hist[ATH_RHIST_SIZE];
 	u_int		an_rx_hist_next;/* index of next ``free entry'' */
 	HAL_NODE_STATS	an_halstats;	/* rssi statistics used by hal */
+
 };
 #define	ATH_NODE(_n)	((struct ath_node *)(_n))
 
@@ -222,7 +223,7 @@ struct ath_softc {
 	u_int16_t		sc_ledstate;
 	u_int16_t		sc_ledpin;	/* GPIO pin for LED */
 
-	struct pci_dev		*sc_pdev;	/* associated pci device */
+	void			*sc_bdev;	/* associated bus device */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
 	size_t			sc_desc_len;	/* size of TX/RX descriptors */
 	u_int16_t		sc_cachelsz;	/* cache line size */

@@ -1065,7 +1065,7 @@ found:
 	 * altering the current state but that's not possible right now.
 	 */
 	/* XXX handle proberequest case */
-	if (ic->ic_state != IEEE80211_S_INIT)
+	if (ic->ic_state != IEEE80211_S_INIT) 
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 	ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 	return 0;
