@@ -185,7 +185,7 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	 */
 	for (i = 0; i < nchan; i++) {
 		HAL_CHANNEL *c = &chans[i];
-		ix = ath_hal_ghz2ieee(c->channel, c->channelFlags);
+		ix = ath_hal_mhz2ieee(c->channel, c->channelFlags);
 		if (ix > IEEE80211_CHAN_MAX) {
 			printk(KERN_ERR "%s: bad HAL channel %u/%x ignored\n",
 				dev->name, c->channel, c->channelFlags);
@@ -924,6 +924,7 @@ ath_beacon_tasklet(void *data)
 {
 	struct net_device *dev = data;
 	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_buf *bf = sc->sc_bcbuf;
 	struct ath_hal *ah = sc->sc_ah;
 
@@ -931,22 +932,17 @@ ath_beacon_tasklet(void *data)
 		DPRINTF(("ath_beacon_int: TXQ1F busy"));
 		return;				/* busy */
 	}
-	if (sc->sc_ic.ic_opmode == IEEE80211_M_STA ||
+	if (ic->ic_opmode == IEEE80211_M_STA ||
 	    bf == NULL || bf->bf_skb == NULL) {
 		DPRINTF(("ath_beacon_int: ic_flags=%x bf=%p bf_m=%p\n",
-		    sc->sc_ic.ic_flags, bf, bf ? bf->bf_skb : NULL));
+		    ic->ic_flags, bf, bf ? bf->bf_skb : NULL));
 		return;
 	}
 	pci_dma_sync_single(sc->sc_pdev,
 		bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
-	ath_hal_qbeacon(ah, bf);
+	ath_hal_qbeacon(ah, ic->ic_opmode, bf);
 	DPRINTF2(("ath_beacon_int: TXDP1 = %p (%p)\n",
 	    (caddr_t)bf->bf_daddr, bf->bf_desc));
-#if 0
-	ATH_REG_WRITE(sc, AR_DMA_BCR,
-	    (sc->sc_ic.ic_opmode == IEEE80211_M_IBSS ? AR_BCR_BCMD : 0) |
-	    AR_BCR_BDMAE | AR_BCR_TQ1V);
-#endif
 	/* TODO power management */
 }
 
