@@ -246,15 +246,16 @@ static struct pci_driver ath_pci_drv_id = {
 /*
  * Module glue.
  */
+#include "release.h"
 #include "version.h"
-static char *version = ATH_PCI_VERSION " (Sam Leffler <sam@errno.com>)";
+static char *version = ATH_PCI_VERSION " " RELEASE_TYPE " (Sam Leffler <sam@errno.com>)";
 static char *dev_info = "ath_pci";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
 MODULE_SUPPORTED_DEVICE("Atheros WLAN cards");
 #ifdef MODULE_LICENSE
-MODULE_LICENSE("Dual BSD/GPL");		/* XXX really BSD only */
+MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
 static int __init

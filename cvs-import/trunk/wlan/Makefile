@@ -55,7 +55,7 @@ OBJS_80211=	if_ieee80211subr.o if_ieee80211wireless.o
 SRCS=	${SRCS_80211} if_media.c rc4.c
 OBJS=	${OBJS_80211} if_media.o rc4.o
 
-INCS=	-I. -I${LINUX}
+INCS=	-I. -I${LINUX} -I${DEPTH}
 CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
 ALL=	wlan.o
