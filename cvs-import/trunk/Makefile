@@ -55,7 +55,7 @@ install:
 	for i in ${DIRS}; do \
 		(cd $$i; make install); \
 	done
-	depmod -a
+	/sbin/depmod -ae
 
 FILES=	ath_hal COPYRIGHT driver include Makefile Makefile.inc \
 	README release.h share wlan
