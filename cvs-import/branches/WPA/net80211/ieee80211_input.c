@@ -408,7 +408,6 @@ ieee80211_dump_nodes(ic);/*XXX*/
 		}
 		if (skb != NULL) {
 			skb->dev = dev;
-			/* XXX setup mac+nh as above? */
 			skb->protocol = eth_type_trans(skb, dev);
 			if (ni->ni_vlan != 0 && ic->ic_vlgrp != NULL) {
 				/* attach vlan tag */
