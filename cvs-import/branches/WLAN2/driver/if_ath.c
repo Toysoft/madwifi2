@@ -297,6 +297,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/* override class methods. */
 	ic->ic_mgtstart = ath_mgtstart;
 	ic->ic_init = ath_init;
+	ic->ic_reset = (void (*) (struct ieee80211com *)) ath_reset;
 	ic->ic_node_alloc = ath_node_alloc;
 	ic->ic_node_copy = ath_node_copy;
 	ic->ic_node_free = ath_node_free;
@@ -518,10 +519,8 @@ ath_bmiss_tasklet(void *data)
 	DPRINTF(("ath_bmiss_tasklet\n"));
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
 		("unexpect operating mode %u", ic->ic_opmode));
-#if 0
 	if (ic->ic_state == IEEE80211_S_RUN)
-	  //ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
-#endif
+	  ieee80211_new_state(ic, IEEE80211_S_ASSOC, 0);
 }
 
 static u_int
@@ -1152,10 +1151,23 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		skb, skb->data, skb->len, (caddr_t) bf->bf_skbaddr));
 	bf->bf_skb = skb;
 
-	/* setup descriptors */
+	/*
+  	* Setup descriptors.  For receive we always terminate
+  	* the descriptor list with a self-linked entry so we'll
+  	* not get overrun under high load (as can happen with a
+  	* 5212 when ANI processing enables PHY errors).
+  	*
+  	* To insure the last descriptor is self-linked we create
+  	* each descriptor as self-linked and add it to the end.  As
+  	* each additional descriptor is added the previous self-linked
+  	* entry is ``fixed'' naturally.  This should be safe even
+ 	* if DMA is happening.  When processing RX interrupts we
+  	* never remove/process the last, self-linked, entry on the
+  	* descriptor list.  This insures the hardware always has
+  	* someplace to write a new frame.
+  	*/
 	ds = bf->bf_desc;
-
-	ds->ds_link = 0;
+	ds->ds_link = bf->bf_daddr;             /* link to self */
 	ds->ds_data = bf->bf_skbaddr;
 	/* XXX verify mbuf data area covers this roundup */
 	/*
@@ -1574,6 +1586,9 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 static void
 ath_rx_tasklet(void *data)
 {
+#define PA2DESC(_sc, _pa) \
+        ((struct ath_desc *)((caddr_t)(_sc)->sc_desc + \
+        ((_pa) - (_sc)->sc_desc_daddr)))
 	struct net_device *dev = data;
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
@@ -1597,13 +1612,31 @@ ath_rx_tasklet(void *data)
 			printk("ath_rx_tasklet: no buffer\n");
 			break;
 		}
+		ds = bf->bf_desc;
+		if (ds->ds_link == bf->bf_daddr) {
+			/* NB: never process the self-linked entry at the end */
+			break;
+		}
 		skb = bf->bf_skb;
 		if (skb == NULL) {		/* XXX ??? can this happen */
 			printk("ath_rx_tasklet: no skbuff\n");
 			continue;
 		}
-		ds = bf->bf_desc;
-		status = ath_hal_rxprocdesc(ah, ds);
+		/* XXX sync descriptor memory */
+		/*
+		 * Must provide the virtual address of the current
+		 * descriptor, the physical address, and the virtual
+		 * address of the next descriptor in the h/w chain.
+		 * This allows the HAL to look ahead to see if the
+		 * hardware is done with a descriptor by checking the
+		 * done bit in the following descriptor and the address
+		 * of the current descriptor the DMA engine is working
+		 * on.  All this is necessary because of our use of
+		 * a self-linked list to avoid rx overruns.
+		 */
+		status = ath_hal_rxprocdesc(ah, ds,
+					    bf->bf_daddr, 
+					    PA2DESC(sc, ds->ds_link));
 #ifdef AR_DEBUG
 		if (ath_debug & AR_DEBUG_LEVEL2)
 			ath_printrxbuf(bf, status == HAL_OK); 
@@ -1753,6 +1786,7 @@ ath_rx_tasklet(void *data)
 
 	ath_hal_rxmonitor(ah);			/* rx signal state monitoring */
 	ath_hal_rxena(ah);			/* in case of RXEOL */
+#undef PA2DESC
 }
 
 
@@ -2261,6 +2295,10 @@ ath_draintxq(struct ath_softc *sc)
 static void
 ath_stoprecv(struct ath_softc *sc)
 {
+#define PA2DESC(_sc, _pa) \
+        ((struct ath_desc *)((caddr_t)(_sc)->sc_desc + \
+  	    ((_pa) - (_sc)->sc_desc_daddr))) 
+
 	struct ath_hal *ah = sc->sc_ah;
 
 	ath_hal_stoppcurecv(ah);	/* disable PCU */
@@ -2274,7 +2312,9 @@ ath_stoprecv(struct ath_softc *sc)
 		printk("ath_stoprecv: rx queue %p, link %p\n",
 		    (caddr_t) ath_hal_getrxbuf(ah), sc->sc_rxlink);
 		TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
-			if (ath_hal_rxprocdesc(ah, bf->bf_desc) == HAL_OK)
+			struct ath_desc *ds = bf->bf_desc;
+			if (ath_hal_rxprocdesc(ah, ds, bf->bf_daddr,
+					       PA2DESC(sc, ds->ds_link)) == HAL_OK) 
 				ath_printrxbuf(bf, 1);
 		}
 	}
@@ -2790,11 +2830,11 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
         }
                                                                                                                                                                     
         if (ni->ni_txrate != orate) {
-                printf("%s: %dM -> %dM (%d ok, %d err, %d retr)\n",
-		       __func__,
-		       (rs->rs_rates[orate] & IEEE80211_RATE_VAL) / 2,
-		       (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) / 2,
-		       an->an_tx_ok, an->an_tx_err, an->an_tx_retr);
+                DPRINTF(("%s: %dM -> %dM (%d ok, %d err, %d retr)\n",
+			 __func__,
+			 (rs->rs_rates[orate] & IEEE80211_RATE_VAL) / 2,
+			 (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) / 2,
+			 an->an_tx_ok, an->an_tx_err, an->an_tx_retr));
         }
         if (ni->ni_txrate != orate || enough)
                 an->an_tx_ok = an->an_tx_err = an->an_tx_retr = 0;
@@ -3022,12 +3062,6 @@ ath_sysctl_dump(ctl_table *ctl, int write, struct file *filp,
 		sc = dev->priv;
 		if (*lenp >= 3 && strncmp(buffer, "hal", 3) == 0)
 			ath_hal_dumpstate(sc->sc_ah);
-		else if (*lenp >= 6 && strncmp(buffer, "eeprom", 6) == 0)
-			ath_hal_dumpeeprom(sc->sc_ah);
-		else if (*lenp >= 6 && strncmp(buffer, "rfgain", 6) == 0)
-			ath_hal_dumprfgain(sc->sc_ah);
-		else if (*lenp >= 3 && strncmp(buffer, "ani", 3) == 0)
-			ath_hal_dumpani(sc->sc_ah);
 		else {
 			printk("%s: don't grok \"%.*s\"\n",
 				__func__, *lenp, (char*) buffer);

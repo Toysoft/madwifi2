@@ -6,7 +6,15 @@ Changes since -9:
    - change /proc/net/ device names (patch from Mike Hudson): 
      create /proc/net/wlan-device_name and /proc/net/ath-device-name
    - move around calls to proc_attach and stats_attach (patch from Mike Hudson)
-
+   - add ic_reset function pointer to struct ieee80211com, initialize it and 
+     use it (patch from Mike hudson)
+   - switch to ASSOC state upon beacon miss (patch from Mike Hudson)
+   - use end-of-linked-list marker in rx descriptor linked list, use new HAL for this
+     (patch from Mike Hudson)
+   - fix a bit of debugging output to use DPRINTF rather than printf (patch from 
+     Mike Hudson)
+   - remove calls to ath_hal_dumpeeprom, ath_hal_dumprfgain, ath_hal_dumpani since 
+     these macros have been removed from the HAL (patch from Mike Hudson)
 Changes since -8:
    - fix oops upon driver insertion: memset memory to zero in ath_node_alloc
    - add ieee80211_decap function and use it in ieee80211_input to convert the

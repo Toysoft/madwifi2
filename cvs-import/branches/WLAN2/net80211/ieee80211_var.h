@@ -153,6 +153,7 @@ struct ieee80211com {
 	int			(*ic_mgtstart)(struct ieee80211com *,
 					       struct sk_buff *);
 	int                     (*ic_init) (struct ieee80211com *);
+	void                    (*ic_reset) (struct ieee80211com *);
 
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211_channel ic_channels[IEEE80211_CHAN_MAX+1];

@@ -23,7 +23,7 @@ EXPORT_SYMBOL(ether_sprintf);		/* XXX */
  */
 #include "release.h"
 #include "version.h"
-static	char *version = WLAN_VERSION " " RELEASE_TYPE " (Sam Leffler <sam@errno.com>)";
+static	char *version = WLAN_VERSION " " RELEASE_TYPE;
 static	char *dev_info = "wlan";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
