@@ -152,7 +152,7 @@ __bswap32(u_int32_t _x)
  * Most of this code is collapsed at compile time because the
  * register values are constants.
  */
-#if AH_BYTE_ORDER == AH_BIG_ENDIAN
+#if (AH_BYTE_ORDER == AH_BIG_ENDIAN) && ( ! defined(CONFIG_ARCH_IXP425) || ! defined(CONFIG_ARCH_IXP4XX))
 #define _OS_REG_WRITE(_ah, _reg, _val) do {				    \
 	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
 		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
@@ -164,6 +164,17 @@ __bswap32(u_int32_t _x)
 	(((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
 		__bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
 		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
+#elseif (AH_BYTE_ORDER == AH_BIG_ENDIAN) && ( defined(CONFIG_ARCH_IXP425) || defined(CONFIG_ARCH_IXP4XX))
+#define _OS_REG_WRITE(_ah, _reg, _val) do {				    \
+	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
+	    writel((_val), (volatile unsigned long)((_ah)->ah_sh + (_reg)));\
+	else								    \
+	    writel(__bswap32(_val), (volatile unsigned long)((_ah)->ah_sh + (_reg))); \
+} while (0)
+#define _OS_REG_READ(_ah, _reg) \
+	(((_reg) >= 0x4000 && (_reg) < 0x5000) ?			    \
+	    readl((volatile unsigned long)((_ah)->ah_sh + (_reg))) :	    \
+	    __bswap32(readl((volatile unsigned long)((_ah)->ah_sh + (_reg)))))
 #else /* AH_LITTLE_ENDIAN */
 #define _OS_REG_WRITE(_ah, _reg, _val) do { \
 	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val); \
