@@ -48,7 +48,7 @@ DIRS=	${ATH_HAL} ${WLAN} ${DRIVER}
 
 all:
 	for i in ${DIRS}; do \
-		(cd $$i; make); \
+		(cd $$i; make) || exit 1; \
 	done
 
 install:
