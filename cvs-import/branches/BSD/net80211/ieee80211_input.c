@@ -238,6 +238,10 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				 * Fake up a node for this newly
 				 * discovered member of the IBSS.
 				 */
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+				    "[%s] creating adhoc node for data frame\n",
+				    ether_sprintf(type == IEEE80211_FC0_TYPE_CTL ?
+						    wh->i_addr1 : wh->i_addr2));
 				ni = ieee80211_fakeup_adhoc_node(&ic->ic_sta,
 						type == IEEE80211_FC0_TYPE_CTL ?
 						    wh->i_addr1 : wh->i_addr2);
@@ -1895,6 +1899,9 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
 				if ((capinfo & IEEE80211_CAPINFO_IBSS) == 0)
 					return;
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+				    "[%s] creating adhoc node from beacon/probe response\n",
+				    ether_sprintf(wh->i_addr2));
 				ni = ieee80211_fakeup_adhoc_node(&ic->ic_sta,
 						wh->i_addr2);
 			} else
@@ -2008,6 +2015,9 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				 * send the response so blindly add them to the
 				 * neighbor table.
 				 */
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+				    "[%s] creating adhoc node from probe request\n",
+				    ether_sprintf(wh->i_addr2));
 				ni = ieee80211_fakeup_adhoc_node(&ic->ic_sta,
 					wh->i_addr2);
 			} else

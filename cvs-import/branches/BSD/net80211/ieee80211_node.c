@@ -429,7 +429,9 @@ ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 		 */
 		ieee80211_set11gbasicrates(&ni->ni_rates, IEEE80211_MODE_11B);
 	}
-
+	
+	printk("%s: creating bss %s\n", ic->ic_dev->name, ether_sprintf(ni->ni_bssid));
+	
 	(void) ieee80211_sta_join(ic, ieee80211_ref_node(ni));
 }
 
@@ -745,6 +747,11 @@ ieee80211_ibss_merge(struct ieee80211com *ic, struct ieee80211_node *ni)
 		ic->ic_flags&IEEE80211_F_SHSLOT ? "short" : "long",
 		ic->ic_flags&IEEE80211_F_USEPROT ? ", protection" : ""
 	);
+	
+	printk("%s: ibss merge: %s", ic->ic_dev->name,
+		ether_sprintf(ic->ic_bss->ni_bssid));
+	printk(" -> %s\n", ether_sprintf(ni->ni_bssid));
+
 	return ieee80211_sta_join(ic, ieee80211_ref_node(ni));
 }
 EXPORT_SYMBOL(ieee80211_ibss_merge);
@@ -1124,6 +1131,9 @@ ieee80211_find_txnode(struct ieee80211com *ic, const u_int8_t *macaddr)
 			 * Note that we need an additional reference for the
 			 * caller to be consistent with _ieee80211_find_node.
 			 */
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
+				"%s faking txnode: %s\n", __func__,
+				ether_sprintf(macaddr));
 			ni = ieee80211_fakeup_adhoc_node(nt, macaddr);
 			if (ni != NULL)
 				(void) ieee80211_ref_node(ni);

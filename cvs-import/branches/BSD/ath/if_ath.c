@@ -2679,6 +2679,24 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 #undef IS_QOS_DATA
 }
 
+static uint64_t
+ath_tsf_extend(struct ath_hal *ah, uint32_t rstamp)
+{
+	uint64_t tsf;
+
+	/* rstamp is assigned from ath_rx_status.rs_tstamp which is 16bit */
+	KASSERT((rstamp & 0xffff0000) == 0,
+		("rx timestamp > 16 bits wide, %u", rstamp));
+        
+	tsf = ath_hal_gettsf64(ah);
+
+	/* Compensate for rollover. */
+	if ((tsf & 0xffff) <= rstamp)
+		tsf -= 0x10000;
+
+	return (tsf & ~(uint64_t)0xffff) | rstamp;
+}
+
 /*
  * Intercept management frames to collect beacon rssi data
  * and to do ibss merges.
@@ -2703,10 +2721,8 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 		if (ic->ic_opmode == IEEE80211_M_IBSS &&
 		    ic->ic_state == IEEE80211_S_RUN) {
-			struct ath_hal *ah = sc->sc_ah;
-			/* XXX extend rstamp */
-			u_int64_t tsf = ath_hal_gettsf64(ah);
-
+			/* Extend rstamp with the current tsf to 64 bit */
+			u_int64_t tsf = ath_tsf_extend(sc->sc_ah, rstamp);
 			/*
 			 * Handle ibss merge as needed; check the tsf on the
 			 * frame before attempting the merge.  The 802.11 spec
@@ -2718,7 +2734,7 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			 * from RUN -> RUN when this happens.
 			 */
 			if (le64toh(ni->ni_tstamp.tsf) >= tsf)
-				(void) ieee80211_ibss_merge(ic, ni);
+				ieee80211_ibss_merge(ic, ni);
 		}
 		break;
 	}
