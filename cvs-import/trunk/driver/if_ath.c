@@ -131,7 +131,7 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah;
-	int i, error = 0, ix;
+	int i, error = 0, ix, nchan;
 	u_int8_t *r;
 #define	ATH_MAXCHAN	32		/* number of potential channels */
 	HAL_CHANNEL chans[ATH_MAXCHAN];		/* XXX get off stack */
@@ -168,8 +168,7 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	sc->sc_ah = ah;
 
 	/* XXX where does the country code, et. al. come from? */
-	memset(chans, 0, sizeof(chans));
-	if (!ath_hal_init_channels(ah, chans, ATH_MAXCHAN,
+	if (!ath_hal_init_channels(ah, chans, ATH_MAXCHAN, &nchan,
 #ifdef notdef
 		CTRY_DEFAULT, MODE_SELECT_11A|MODE_SELECT_11B, 1)) {
 #else
@@ -184,14 +183,12 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	 * Convert HAL channels to ieee80211 ones and insert
 	 * them the table according to their channel number.
 	 */
-	for (i = 0; i < ATH_MAXCHAN; i++) {
-		if (chans[i].channelFlags == 0)
-			continue;
-		ix = ath_hal_ghz2ieee(chans[i].channel, chans[i].channelFlags);
+	for (i = 0; i < nchan; i++) {
+		HAL_CHANNEL *c = &chans[i];
+		ix = ath_hal_ghz2ieee(c->channel, c->channelFlags);
 		if (ix > IEEE80211_CHAN_MAX) {
 			printk(KERN_ERR "%s: bad HAL channel %u/%x ignored\n",
-				dev->name, chans[i].channel,
-				chans[i].channelFlags);
+				dev->name, c->channel, c->channelFlags);
 			continue;
 		}
 		if (ic->ic_channels[ix].ic_freq != 0) {
@@ -199,9 +196,9 @@ ath_attach(uint16_t devid, struct net_device *dev)
 				dev->name, ix, ic->ic_channels[ix].ic_freq);
 			continue;
 		}
-		ic->ic_channels[ix].ic_freq = chans[i].channel;
+		ic->ic_channels[ix].ic_freq = c->channel;
 		/* NB: flags are known to be compatible */
-		ic->ic_channels[ix].ic_flags = chans[i].channelFlags;
+		ic->ic_channels[ix].ic_flags = c->channelFlags;
 	}
 
 	error = ath_desc_alloc(sc);
@@ -740,7 +737,6 @@ ath_watchdog(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni;
 
 	ic->ic_timer = 0;
 	if (sc->sc_tx_timer) {
@@ -754,12 +750,12 @@ ath_watchdog(struct net_device *dev)
 		}
 		ic->ic_timer = 1;
 	}
-	if (sc->sc_ic.ic_opmode == IEEE80211_M_STA)
-		ath_rate_ctl(sc, &sc->sc_ic.ic_bss);
+	if (ic->ic_opmode == IEEE80211_M_STA)
+		ath_rate_ctl(sc, &ic->ic_bss);
 	else {
-		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+		struct ieee80211_node *ni;
+		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
 			ath_rate_ctl(sc, ni);
-		}
 	}
 	ieee80211_watchdog(dev);
 }
