@@ -30,6 +30,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/dev/wi/if_wavelan_ieee.h,v 1.17 2003/01/15 20:11:31 sam Exp $
+ * $Id$
  */
 
 #ifndef _IF_WAVELAN_IEEE_H

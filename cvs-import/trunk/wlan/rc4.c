@@ -1,4 +1,3 @@
-
 /*
  * rc4.c
  *
@@ -35,6 +34,7 @@
  * OF SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/crypto/rc4/rc4.c,v 1.4 2003/01/15 19:55:16 sam Exp $
+ * $Id$
  */
 
 #include <linux/types.h>

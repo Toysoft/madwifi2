@@ -1,5 +1,5 @@
-/*
- * Copyright (c) 2003 Sam Leffler
+/*-
+ * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $P4$
+ * $Id$
  */
 
 /*

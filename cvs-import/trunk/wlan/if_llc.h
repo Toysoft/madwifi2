@@ -1,4 +1,5 @@
 /*	$NetBSD: if_llc.h,v 1.12 1999/11/19 20:41:19 thorpej Exp $	*/
+/*	$Id$	*/
 
 /*
  * Copyright (c) 1988, 1993
