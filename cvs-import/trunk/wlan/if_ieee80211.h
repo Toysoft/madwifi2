@@ -112,6 +112,19 @@ struct ieee80211_frame {
 	/* see below */
 } __attribute__((__packed__));
 
+
+struct ieee80211_qosframe {
+	u_int8_t	i_fc[2];
+	u_int8_t	i_dur[2];
+	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t	i_addr3[IEEE80211_ADDR_LEN];
+	u_int8_t	i_seq[2];
+	u_int8_t	i_qos[2];
+	/* possibly followed by addr4[IEEE80211_ADDR_LEN]; */
+	/* see below */
+} __attribute__((__packed__));
+
 struct ieee80211_frame_addr4 {
 	u_int8_t	i_fc[2];
 	u_int8_t	i_dur[2];
@@ -120,6 +133,18 @@ struct ieee80211_frame_addr4 {
 	u_int8_t	i_addr3[IEEE80211_ADDR_LEN];
 	u_int8_t	i_seq[2];
 	u_int8_t	i_addr4[IEEE80211_ADDR_LEN];
+} __attribute__((__packed__));
+
+
+struct ieee80211_qosframe_addr4 {
+	u_int8_t	i_fc[2];
+	u_int8_t	i_dur[2];
+	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t	i_addr3[IEEE80211_ADDR_LEN];
+	u_int8_t	i_seq[2];
+	u_int8_t	i_addr4[IEEE80211_ADDR_LEN];
+	u_int8_t	i_qos[2];
 } __attribute__((__packed__));
 
 #define	IEEE80211_FC0_VERSION_MASK		0x03
