@@ -123,7 +123,10 @@ struct ieee80211_node {
 	u_int8_t		ni_bssid[IEEE80211_ADDR_LEN];
 
 	/* beacon, probe response */
-	u_int8_t		ni_tstamp[8];	/* from last rcv'd beacon */
+	union {
+		u_int8_t	data[8];
+		u_int64_t	tsf;
+	} ni_tstamp;				/* from last rcv'd beacon */
 	u_int16_t		ni_intval;	/* beacon interval */
 	u_int16_t		ni_capinfo;	/* capabilities */
 	u_int8_t		ni_esslen;

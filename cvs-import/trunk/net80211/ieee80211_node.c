@@ -328,7 +328,7 @@ ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 	memcpy(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen);
 	ni->ni_rssi = 0;
 	ni->ni_rstamp = 0;
-	memset(ni->ni_tstamp, 0, sizeof(ni->ni_tstamp));
+	ni->ni_tstamp.tsf = 0;
 	ni->ni_intval = ic->ic_lintval;
 	ni->ni_capinfo = IEEE80211_CAPINFO_IBSS;
 	if (ic->ic_flags & IEEE80211_F_PRIVACY)

@@ -1924,8 +1924,8 @@ ath_beacon_config(struct ath_softc *sc)
 	struct ieee80211_node *ni = ic->ic_bss;
 	u_int32_t nexttbtt, intval;
 	
-	nexttbtt = (LE_READ_4(ni->ni_tstamp + 4) << 22) |
-	    (LE_READ_4(ni->ni_tstamp) >> 10);
+	nexttbtt = (LE_READ_4(ni->ni_tstamp.data + 4) << 22) |
+	    (LE_READ_4(ni->ni_tstamp.data) >> 10);
 	DPRINTF(ATH_DEBUG_BEACON, "%s: nexttbtt=%u\n", __func__, nexttbtt);
 	nexttbtt += ni->ni_intval;
 	intval = ni->ni_intval & HAL_BEACON_PERIOD;

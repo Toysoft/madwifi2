@@ -1727,7 +1727,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
-		memcpy(ni->ni_tstamp, tstamp, sizeof(ni->ni_tstamp));
+		memcpy(ni->ni_tstamp.data, tstamp, sizeof(ni->ni_tstamp));
 		ni->ni_intval = bintval;
 		ni->ni_capinfo = capinfo;
 		/* XXX validate channel # */
