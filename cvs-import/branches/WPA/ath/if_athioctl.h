@@ -80,8 +80,8 @@ struct ath_stats {
 	u_int32_t	ast_rx_tooshort;/* rx discarded 'cuz frame too short */
 	u_int32_t	ast_rx_toobig;	/* rx discarded 'cuz frame too large */
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
-	u_int8_t	ast_rx_mgt;	/* management frames received */
-	u_int8_t	ast_rx_ctl;	/* control frames received */
+	u_int32_t	ast_rx_mgt;	/* management frames received */
+	u_int32_t	ast_rx_ctl;	/* control frames received */
 	u_int8_t	ast_rx_rssi;	/* rx rssi from histogram */
 	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
 	u_int32_t	ast_per_cal;	/* periodic calibration calls */
