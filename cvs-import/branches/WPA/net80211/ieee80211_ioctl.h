@@ -51,7 +51,7 @@ struct ieee80211_nodestats {
 	u_int64_t	ns_rx_bytes;		/* rx data count (bytes) */
 
 	u_int32_t	ns_rx_dup;		/* rx discard 'cuz dup */
-	u_int32_t	ns_rx_nowep;		/* rx w/ wep but wep !config */
+	u_int32_t	ns_rx_noprivacy;	/* rx w/ wep but privacy off */
 	u_int32_t	ns_rx_wepfail;		/* rx wep processing failed */
 	u_int32_t	ns_rx_decap;		/* rx decapsulation failed */
 	u_int32_t	ns_rx_disassoc;		/* rx disassociation */
@@ -90,11 +90,13 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_wrongdir;		/* rx w/ wrong direction */
 	u_int32_t	is_rx_mcastecho;	/* rx discard 'cuz mcast echo */
 	u_int32_t	is_rx_notassoc;		/* rx discard 'cuz sta !assoc */
-	u_int32_t	is_rx_nowep;		/* rx w/ wep but wep !config */
+	u_int32_t	is_rx_noprivacy;	/* rx w/ wep but privacy off */
+	u_int32_t	is_rx_unencrypted;	/* rx w/o wep and privacy on */
 	u_int32_t	is_rx_wepfail;		/* rx wep processing failed */
 	u_int32_t	is_rx_decap;		/* rx decapsulation failed */
 	u_int32_t	is_rx_mgtdiscard;	/* rx discard mgt frames */
 	u_int32_t	is_rx_ctl;		/* rx discard ctrl frames */
+	u_int32_t	is_rx_beacon;		/* rx beacon frames */
 	u_int32_t	is_rx_rstoobig;		/* rx rate set truncated */
 	u_int32_t	is_rx_elem_missing;	/* rx required element missing*/
 	u_int32_t	is_rx_elem_toobig;	/* rx element too big */
@@ -110,6 +112,7 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_assoc_notauth;	/* rx assoc w/o auth */
 	u_int32_t	is_rx_assoc_capmismatch;/* rx assoc w/ cap mismatch */
 	u_int32_t	is_rx_assoc_norate;	/* rx assoc w/ no rate match */
+	u_int32_t	is_rx_assoc_badwpaie;	/* rx assoc w/ bad WPA IE */
 	u_int32_t	is_rx_deauth;		/* rx deauthentication */
 	u_int32_t	is_rx_disassoc;		/* rx disassociation */
 	u_int32_t	is_rx_badsubtype;	/* rx frame w/ unknown subtype*/
@@ -118,13 +121,48 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_ahdemo_mgt;	/* rx discard ahdemo mgt frame*/
 	u_int32_t	is_rx_bad_auth;		/* rx bad auth request */
 	u_int32_t	is_rx_unauth;		/* rx on unauthorized port */
+	u_int32_t	is_rx_badkeyid;		/* rx w/ incorrect keyid */
+	u_int32_t	is_rx_ccmpreplay;	/* rx seq# violation (CCMP) */
+	u_int32_t	is_rx_ccmpformat;	/* rx format bad (CCMP) */
+	u_int32_t	is_rx_ccmpmic;		/* rx MIC check failed (CCMP) */
+	u_int32_t	is_rx_tkipreplay;	/* rx seq# violation (TKIP) */
+	u_int32_t	is_rx_tkipformat;	/* rx format bad (TKIP) */
+	u_int32_t	is_rx_tkipmic;		/* rx MIC check failed (TKIP) */
+	u_int32_t	is_rx_tkipicv;		/* rx ICV check failed (TKIP) */
+	u_int32_t	is_rx_badcipher;	/* rx failed 'cuz key type */
+	u_int32_t	is_rx_nocipherctx;	/* rx failed 'cuz key !setup */
 	u_int32_t	is_tx_nobuf;		/* tx failed for lack of buf */
 	u_int32_t	is_tx_nonode;		/* tx failed for no node */
 	u_int32_t	is_tx_unknownmgt;	/* tx of unknown mgt frame */
+	u_int32_t	is_tx_badcipher;	/* tx failed 'cuz key type */
+	u_int32_t	is_tx_nocipherctx;	/* tx failed 'cuz key !setup */
+	u_int32_t	is_tx_wepfail;		/* tx wep processing failed */
 	u_int32_t	is_scan_active;		/* active scans started */
 	u_int32_t	is_scan_passive;	/* passive scans started */
 	u_int32_t	is_node_timeout;	/* nodes timed out inactivity */
 	u_int32_t	is_crypto_nomem;	/* no memory for crypto ctx */
+};
+
+/*
+ * Max size of optional information elements.  We artificially
+ * constrain this; it's limited only by the max frame size (and
+ * the max parameter size of the wireless extensions).
+ */
+#define	IEEE80211_MAX_OPT_IE	256
+
+/*
+ * MLME state manipulation request.  IEEE80211_MLME_ASSOC
+ * only makes sense when operating as a station.  The other
+ * requests can be used when operating as a station or an
+ * ap (to effect a station).
+ */
+struct ieee80211req_mlme {
+	u_int8_t	im_op;		/* operation to perform */
+#define	IEEE80211_MLME_ASSOC		1	/* associate station */
+#define	IEEE80211_MLME_DISASSOC		2	/* disassociate station */
+#define	IEEE80211_MLME_DEAUTH		3	/* deauthenticate station */
+	u_int16_t	im_reason;	/* 802.11 reason code */
+	u_int8_t	im_macaddr[IEEE80211_ADDR_LEN];
 };
 
 #ifdef __FreeBSD__
@@ -169,10 +207,41 @@ struct ieee80211req {
 #define 	IEEE80211_PROTMODE_CTS		1
 #define 	IEEE80211_PROTMODE_RTSCTS	2
 #define	IEEE80211_IOC_TXPOWER		14
+#define	IEEE80211_IOC_BSSID		15
+#define	IEEE80211_IOC_ROAMING		16
+#define	IEEE80211_IOC_PRIVACY		17
+#define	IEEE80211_IOC_DROP_UNENCRYPTED	18
+#define	IEEE80211_IOC_MLME		21
+#define	IEEE80211_IOC_OPTIE		22
+#define	IEEE80211_IOC_SCAN_REQ		23
+#define	IEEE80211_IOC_SCAN_RESULTS	24
+#define	IEEE80211_IOC_COUNTERMEASURES	25
+#define	IEEE80211_IOC_WPA		26
 
 #ifndef IEEE80211_CHAN_ANY
 #define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
 #endif
+
+struct ieee80211req_scan_req {
+	u_int8_t	isq_ssid_len;			/* SSID length */
+	u_int8_t	isq_ssid[IEEE80211_NWID_LEN];
+};
+
+struct ieee80211req_scan_result {
+	u_int16_t	isr_len;			/* length (mult of 4) */
+	u_int16_t	isr_freq;			/* MHz */
+	u_int16_t	isr_flags;			/* channel flags */
+	u_int8_t	isr_noise;
+	u_int8_t	isr_rssi;
+	u_int8_t	isr_intval;			/* beacon interval */
+	u_int8_t	isr_capinfo;			/* capabilities */
+	u_int8_t	isr_bssid[IEEE80211_ADDR_LEN];
+	u_int8_t	isr_nrates;
+	u_int8_t	isr_rates[15];			/* XXX */
+	u_int8_t	isr_ssid_len;			/* SSID length */
+	u_int8_t	isr_ie_len;			/* IE length */
+	/* variable length SSID followed by IE data */
+};
 
 #define	SIOCG80211STATS		_IOWR('i', 236, struct ifreq)
 #endif /* __FreeBSD__ */
@@ -181,16 +250,31 @@ struct ieee80211req {
 /*
  * Wireless Extensions API, private ioctl interfaces.
  *
- * NB: Even ioctl numbers are privileged!
+ * NB: Even-numbered ioctl numbers have set semantics and are privileged!
+ *     (regardless of the incorrect comment in wireless.h!)
  */
 #define	IEEE80211_IOCTL_SETPARAM	(SIOCIWFIRSTPRIV+0)
 #define	IEEE80211_IOCTL_GETPARAM	(SIOCIWFIRSTPRIV+1)
+#define	IEEE80211_IOCTL_SETMLME		(SIOCIWFIRSTPRIV+6)
+#define	IEEE80211_IOCTL_SETOPTIE	(SIOCIWFIRSTPRIV+8)
+#define	IEEE80211_IOCTL_GETOPTIE	(SIOCIWFIRSTPRIV+9)
 
 enum {
-	IEEE80211_PARAM_TURBO	= 1,	/* turbo mode */
-	IEEE80211_PARAM_MODE	= 2,	/* phy mode (11a, 11b, etc.) */
-	IEEE80211_PARAM_AUTHMODE= 3,	/* authentication mode */
-	IEEE80211_PARAM_PROTMODE= 4	/* 802.11g protection */
+	IEEE80211_PARAM_TURBO		= 1,	/* turbo mode */
+	IEEE80211_PARAM_MODE		= 2,	/* phy mode (11a, 11b, etc.) */
+	IEEE80211_PARAM_AUTHMODE	= 3,	/* authentication mode */
+	IEEE80211_PARAM_PROTMODE	= 4,	/* 802.11g protection */
+	IEEE80211_PARAM_MCASTCIPHER	= 5,	/* multicast/default cipher */
+	IEEE80211_PARAM_MCASTKEYLEN	= 6,	/* multicast key length */
+	IEEE80211_PARAM_UCASTCIPHERS	= 7,	/* unicast cipher suites */
+	IEEE80211_PARAM_UCASTCIPHER	= 8,	/* unicast cipher */
+	IEEE80211_PARAM_UCASTKEYLEN	= 9,	/* unicast key length */
+	IEEE80211_PARAM_WPA		= 10,	/* WPA mode (0,1,2) */
+	IEEE80211_PARAM_ROAMING		= 12,	/* roaming mode */
+	IEEE80211_PARAM_PRIVACY		= 13,	/* privacy invoked */
+	IEEE80211_PARAM_COUNTERMEASURES	= 14,	/* WPA/TKIP countermeasures */
+	IEEE80211_PARAM_DROPUNENCRYPTED	= 15,	/* discard unencrypted frames */
+	IEEE80211_PARAM_DRIVER_CAPS	= 16,	/* driver capabilities */
 };
 
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)
