@@ -55,11 +55,10 @@ static int
 setsysctrl(const char *dev, const char *control , u_long value)
 {
 	char buffer[256];
-	memset(buffer,0,256);
-	
-	sprintf(buffer,"/proc/sys/dev/%s/%s",dev,control);
-	
-	FILE * fd = fopen(buffer, "w");
+	FILE * fd;
+
+	snprintf(buffer, sizeof(buffer),"/proc/sys/dev/%s/%s",dev,control);
+	fd = fopen(buffer, "w");
 	if (fd != NULL) {
 		fprintf(fd,"%i",value);
 	}
