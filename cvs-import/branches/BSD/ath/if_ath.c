@@ -2271,29 +2271,6 @@ ath_beacon_config(struct ath_softc *sc)
 	}
 }
 
-
-static int
-ath_descdma_setup(struct ath_softc *sc, ath_bufhead *head, 
-        struct ath_buf **bfptr, int nbuf, int ndesc)
-{
-#define	DS2PHYS(_sc, _ds) \
-	((_sc)->sc_desc_daddr + ((caddr_t)(_ds) - (caddr_t)(_sc)->sc_desc))
-	struct ath_desc *ds = sc->sc_desc;
-	//struct ath_buf *bf = sc->sc_bufptr;
-	int i;
-
-	STAILQ_INIT(head);
-	for (i = 0; i < nbuf; i++, (*bfptr)++, ds+=ndesc) {
-		(*bfptr)->bf_desc = ds;
-		(*bfptr)->bf_daddr = DS2PHYS(sc, ds);
-		STAILQ_INSERT_TAIL(head, *bfptr, bf_list);
-	}
-
-        return 0;
-
-#undef DS2PHYS
-}
-
 static void
 ath_descdma_cleanup(struct ath_softc *sc, ath_bufhead *head)
 {
@@ -2329,6 +2306,7 @@ ath_desc_alloc(struct ath_softc *sc)
 	int bsize;
 	struct ath_desc *ds;
 	struct ath_buf *bf;
+	int i;
 
 	/* allocate descriptors */
 	sc->sc_desc_len = sizeof(struct ath_desc) *
@@ -2349,9 +2327,26 @@ ath_desc_alloc(struct ath_softc *sc)
 	memset(bf, 0, bsize);
 	sc->sc_bufptr = bf;
 
-        ath_descdma_setup(sc, &sc->sc_rxbuf, &bf, ATH_RXBUF, 1);
-        ath_descdma_setup(sc, &sc->sc_txbuf, &bf, ATH_TXBUF, ATH_TXDESC);
-        ath_descdma_setup(sc, &sc->sc_bbuf, &bf, 1, 1);
+	STAILQ_INIT(&sc->sc_rxbuf);
+	for (i = 0; i < ATH_RXBUF; i++, bf++, ds++) {
+		bf->bf_desc = ds;
+		bf->bf_daddr = DS2PHYS(sc, ds);
+		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
+	}
+
+	STAILQ_INIT(&sc->sc_txbuf);
+	for (i = 0; i < ATH_TXBUF; i++, bf++, ds += ATH_TXDESC) {
+		bf->bf_desc = ds;
+		bf->bf_daddr = DS2PHYS(sc, ds);
+		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+	}
+
+	STAILQ_INIT(&sc->sc_bbuf);
+	for (i = 0; i < ATH_BCBUF; i++, bf++, ds++) {
+		bf->bf_desc = ds;
+		bf->bf_daddr = DS2PHYS(sc, ds);
+		STAILQ_INSERT_TAIL(&sc->sc_bbuf, bf, bf_list);
+	}
 
 	return 0;
 bad:
