@@ -153,7 +153,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * structures used to communicate with the hardware.
 	 */
 	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, &csz);
-	/* XXX assert csz is non-zero */
 	KASSERT (csz != 0, ("bad things happen if the cache line size is set to zero."));
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
@@ -422,7 +421,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 * The hardware is gone, or HAL isn't yet initialized.
 		 * Don't touch anything.
 		 */
-	  printk ("invalid\n");
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
 		return;
 #else
@@ -450,14 +448,14 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	}
 #endif /* AR_DEBUG */
 	status &= sc->sc_imask;			/* discard unasked for bits */
-	if (status & HAL_INT_FATAL) {
-		sc->sc_stats.ast_hardware++;
-		ath_hal_intrset(ah, 0);		/* disable intr's until reset */
-		needmark |= queue_task(&sc->sc_fataltq, &tq_immediate);
-	} else if (status & HAL_INT_RXORN) {
+	if (status & HAL_INT_RXORN) {
 		sc->sc_stats.ast_rxorn++;
 		ath_hal_intrset(ah, 0);		/* disable intr's until reset */
 		needmark |= queue_task(&sc->sc_rxorntq, &tq_immediate);
+	} else if (status & HAL_INT_FATAL) {
+		sc->sc_stats.ast_hardware++;
+		ath_hal_intrset(ah, 0);		/* disable intr's until reset */
+		needmark |= queue_task(&sc->sc_fataltq, &tq_immediate);
 	} else {
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -520,7 +518,7 @@ ath_bmiss_tasklet(void *data)
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
 		("unexpect operating mode %u", ic->ic_opmode));
 	if (ic->ic_state == IEEE80211_S_RUN)
-	  ieee80211_new_state(ic, IEEE80211_S_ASSOC, 0);
+		ieee80211_new_state(ic, IEEE80211_S_ASSOC, 0);
 }
 
 static u_int
@@ -735,6 +733,29 @@ ath_reset(struct net_device *dev)
 }
 
 /*
+ * XXX System may not be
+ * configured to leave enough headroom for us to push the
+ * 802.11 frame.  In that case fallback on reallocating
+ * the frame with enough space.  Alternatively we can carry
+ * the frame separately and use s/g support in the hardware.
+ */
+static int ieee80211_skbhdr_adjust(struct sk_buff *skb, struct net_device *dev)
+{
+       struct ieee80211com *ic = (void*)dev->priv;
+       int len = sizeof(struct ieee80211_frame) + sizeof(struct llc) -
+                               sizeof(struct ether_header);
+       if (ic->ic_flags & IEEE80211_F_WEPON)
+               len += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
+       if ((skb_headroom(skb) < len) &&
+           pskb_expand_head(skb, len - skb_headroom(skb), 0, GFP_ATOMIC)) {
+               dev_kfree_skb(skb);
+               return -ENOMEM;
+       }
+       return 0;
+}
+
+
+/*
  * Transmit a data packet.  On failure caller is
  * assumed to reclaim the resources.
  */
@@ -755,6 +776,10 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_stats.ast_tx_invalid++;
 		return -ENETDOWN;
 	}
+
+       error = ieee80211_skbhdr_adjust(skb, dev);
+       if (error != 0)
+               return error;
 	
 	/*
 	 * No data frames go out unless we're associated; this
@@ -801,6 +826,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		skb->data[6], skb->data[7], skb->data[8], skb->data[9], skb->data[10], skb->data[11], 
 		skb->data[12], skb->data[13], skb->data[14]);
 #endif
+				
 	skb = ieee80211_encap(ic, skb, &ni);
 	if (skb == NULL) {
 		DPRINTF(("%s: discard, encapsulation failure\n", __func__));
@@ -1568,9 +1594,24 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 			skb->data, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
 	}
 
-	/* setup descriptors */
+
+       /*
+        * Setup descriptors.  For receive we always terminate
+        * the descriptor list with a self-linked entry so we'll
+        * not get overrun under high load (as can happen with a
+        * 5212 when ANI processing enables PHY errors).
+        *
+        * To insure the last descriptor is self-linked we create
+        * each descriptor as self-linked and add it to the end.  As
+        * each additional descriptor is added the previous self-linked
+        * entry is ``fixed'' naturally.  This should be safe even
+        * if DMA is happening.  When processing RX interrupts we
+        * never remove/process the last, self-linked, entry on the
+        * descriptor list.  This insures the hardware always has
+        * someplace to write a new frame.
+        */
 	ds = bf->bf_desc;
-	ds->ds_link = 0;
+	ds->ds_link = bf->bf_daddr;             /* link to self */
 	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_setuprxdesc(ah, ds
 		, skb_tailroom(skb)		/* buffer size */
@@ -2484,7 +2525,6 @@ ath_calibrate(unsigned long arg)
 		 * to load new gain values.
 		 */
 		sc->sc_stats.ast_per_rfgain++;
-		printk ("call to ath_reset from calibrate\n");
 		ath_reset(dev);
 	}
 	if (!ath_hal_calibrate(ah, &hchan)) {
