@@ -968,9 +968,12 @@ ieee80211_ioctl_siwtxpow(struct ieee80211com *ic,
 	if (rrq->fixed) {
 		if ((ic->ic_caps & IEEE80211_C_TXPMGT) == 0)
 			return -EOPNOTSUPP;
-		if (rrq->flags != IW_TXPOW_DBM)
+		if (rrq->flags != IW_TXPOW_MWATT)
 			return -EOPNOTSUPP;
-		ic->ic_bss->ni_txpower = 2*rrq->value;
+                if (!(IEEE80211_TXPOWER_MIN < rrq->value &&
+                      rrq->value < IEEE80211_TXPOWER_MAX))
+                        return -EOPNOTSUPP;
+		ic->ic_bss->ni_txpower = rrq->value;
 		ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
 	} else {
 		if (!fixed)		/* no change */
@@ -988,10 +991,10 @@ ieee80211_ioctl_giwtxpow(struct ieee80211com *ic,
 			 struct iw_param *rrq, char *extra)
 {
 
-	rrq->value = ic->ic_bss->ni_txpower/2;
+	rrq->value = ic->ic_bss->ni_txpower;
 	rrq->fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED) != 0;
 	rrq->disabled = (rrq->fixed && rrq->value == 0);
-	rrq->flags = IW_TXPOW_DBM;
+	rrq->flags = IW_TXPOW_MWATT;
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_giwtxpow);
