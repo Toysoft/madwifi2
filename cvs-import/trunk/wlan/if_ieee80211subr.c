@@ -1230,19 +1230,6 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 	llc->llc_snap.org_code[2] = 0;
 	llc->llc_snap.ether_type = eh.ether_type;
 
-	/*
-	 * XXX If we're loaded as a module the system may not be
-	 * configured to leave enough headroom for us to push the
-	 * 802.11 frame.  In that case fallback on reallocating
-	 * the frame with enough space.  Alternatively we can carry
-	 * the frame separately and use s/g support in the hardware.
-	 */
-	if (skb_headroom(skb) < sizeof(struct ieee80211_frame) &&
-	    pskb_expand_head(skb, sizeof(*wh), 0, GFP_ATOMIC)) {
-		dev_kfree_skb(skb);
-		ieee80211_unref_node(&ni);
-		return NULL;
-	}
 	wh = (struct ieee80211_frame *) skb_push(skb, sizeof(struct ieee80211_frame));
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
 	*(u_int16_t *)wh->i_dur = 0;
