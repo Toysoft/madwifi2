@@ -15,7 +15,9 @@ all:
 	done
 
 install:
+	cd ${WLAN}; make install
 	cd ${DRIVER}; make install
+	depmod -a
 
 clean:
 	for i in ${DIRS}; do \
