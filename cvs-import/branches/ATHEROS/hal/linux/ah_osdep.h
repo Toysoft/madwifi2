@@ -53,6 +53,9 @@
 #else
 #define	__ahdecl
 #endif
+#ifndef __packed
+#define	__packed	__attribute__((__packed__))
+#endif
 
 /*
  * When building the HAL proper we use no GPL-contaminated include
