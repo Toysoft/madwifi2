@@ -1890,8 +1890,10 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			if (ni == NULL)
 				return -EINVAL;
 			IEEE80211_SEND_MGMT(ic, ni,
-			    IEEE80211_FC0_SUBTYPE_DEAUTH,
-			    mlme->im_reason);
+				mlme->im_op == IEEE80211_MLME_DEAUTH ?
+					  IEEE80211_FC0_SUBTYPE_DEAUTH
+					: IEEE80211_FC0_SUBTYPE_DISASSOC,
+				mlme->im_reason);
 			ieee80211_node_leave(ic, ni);
 			break;
 		default:
