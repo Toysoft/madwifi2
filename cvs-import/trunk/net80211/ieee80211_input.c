@@ -333,8 +333,9 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				 * Discard encrypted frames when privacy is off.
 				 */
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-					("[%s] discard WEP frame 'cuz PRIVACY "
-					"off\n", ether_sprintf(wh->i_addr2)));
+					("[%s] discard WEP data frame 'cuz "
+					"PRIVACY off\n",
+					ether_sprintf(wh->i_addr2)));
 				ic->ic_stats.is_rx_noprivacy++;
 				goto out;
 			}
@@ -479,10 +480,10 @@ ieee80211_dump_nodes(ic);/*XXX*/
 #ifdef IEEE80211_DEBUG
 		if ((ieee80211_msg_debug(ic) && doprint(ic, subtype)) ||
 		    ieee80211_msg_dumppkts(ic)) {
-			if_printf(ic->ic_dev, "received %s from %s rssi %d\n",
-			    ieee80211_mgt_subtype_name[subtype
-			    >> IEEE80211_FC0_SUBTYPE_SHIFT],
-			    ether_sprintf(wh->i_addr2), rssi);
+			if_printf(ic->ic_dev, "[%s] received %s rssi %d\n",
+			    ether_sprintf(wh->i_addr2),
+			    ieee80211_mgt_subtype_name[subtype >>
+				IEEE80211_FC0_SUBTYPE_SHIFT], rssi);
 		}
 #endif
 		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
