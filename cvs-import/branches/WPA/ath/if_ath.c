@@ -2418,7 +2418,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
-	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
 	struct ath_node *an;
 	struct ath_recv_hist *rh;
@@ -2538,14 +2537,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				goto rx_next;
 		}
 rx_accept:
-		len = ds->ds_rxstat.rs_datalen;
-		if (len < IEEE80211_MIN_LEN) {
-			DPRINTF(ATH_DEBUG_RECV, "%s: short packet %d\n",
-				__func__, len);
-			sc->sc_stats.ast_rx_tooshort++;
-			goto rx_next;
-		}
-
 		/*
 		 * Sync and unmap the frame.  At this point we're
 		 * committed to passing the sk_buff somewhere so
@@ -2562,13 +2553,34 @@ rx_accept:
 		if (sc->sc_softled)
 			ath_update_led(sc);
 
+		len = ds->ds_rxstat.rs_datalen;
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
-			 * Monitor mode: clean the skbuff, fabricate
+			 * Monitor mode: discard anything shorter than
+			 * an ack or cts, clean the skbuff, fabricate
 			 * the Prism header existing tools expect,
 			 * and dispatch.
 			 */
+			if (len < IEEE80211_ACK_LEN) {
+				DPRINTF(ATH_DEBUG_RECV, "%s: runt packet %d\n",
+					__func__, len);
+				sc->sc_stats.ast_rx_tooshort++;
+				dev_kfree_skb(skb);
+				goto rx_next;
+			}
 			ath_rx_capture(dev, ds, skb);
+			goto rx_next;
+		}
+
+		/*
+		 * From this point on we assume the frame is at least
+		 * as large as ieee80211_frame_min; verify that.
+		 */
+		if (len < IEEE80211_MIN_LEN) {
+			DPRINTF(ATH_DEBUG_RECV, "%s: short packet %d\n",
+				__func__, len);
+			sc->sc_stats.ast_rx_tooshort++;
+			dev_kfree_skb(skb);
 			goto rx_next;
 		}
 
@@ -2586,8 +2598,6 @@ rx_accept:
 		}
 
 		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
-		/* XXX move up to ieee80211_input */
-		wh = (struct ieee80211_frame *) skb->data;
 
 		/*
 		 * Locate the node for sender, track state, and then
@@ -2600,6 +2610,8 @@ rx_accept:
 		 * count ic_bss, only other nodes (ic_bss is never free'd).
 		 */
 		if (ic->ic_opmode != IEEE80211_M_STA) {
+			struct ieee80211_frame_min *wh =
+				(struct ieee80211_frame_min *) skb->data;
 			ni = ieee80211_find_node(ic, wh->i_addr2);
 			if (ni == NULL)
 				ni = ic->ic_bss;
