@@ -3249,9 +3249,17 @@ static int
 ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *bf,
     struct sk_buff *skb)
 {
+#define	CTS_DURATION \
+	ath_hal_computetxtime(ah, rt, IEEE80211_ACK_LEN, cix, AH_TRUE)
+#define	updateCTSForBursting(_ah, _ds, _txq) \
+	ath_hal_updateCTSForBursting(_ah, _ds, \
+	    _txq->axq_linkbuf != NULL ? _txq->axq_linkbuf->bf_desc : NULL, \
+	    _txq->axq_lastdsWithCTS, _txq->axq_gatingds, \
+	    txopLimit, CTS_DURATION)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
+	const struct chanAccParams *cap = &ic->ic_wme.wme_chanParams;
 	int iswep, ismcast, keyix, hdrlen, pktlen, try0;
 	u_int8_t rix, txrate, ctsrate;
 	u_int8_t cix = 0xff;		/* NB: silence compiler */
@@ -3263,13 +3271,19 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
 	struct ath_node *an;
+	u_int pri;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 	hdrlen = ieee80211_anyhdrsize(wh);
+	/*
+	 * Packet length must not include any
+	 * pad bytes; deduct them here.
+	 */
+	//TODO: ??? pktlen = m0->m_pkthdr.len - (hdrlen & 3);
 	pktlen = skb->len;
-
+	
 	if (iswep) {
 		const struct ieee80211_cipher *cip;
 		struct ieee80211_key *k;
@@ -3374,9 +3388,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		/* NB: force all management frames to highest queue */
 		if (ni->ni_flags & IEEE80211_NODE_QOS) {
 			/* NB: force all management frames to highest queue */
-			txq = sc->sc_ac2q[WME_AC_VO];
+			pri = WME_AC_VO;
 		} else
-			txq = sc->sc_ac2q[WME_AC_BE];
+			pri = WME_AC_BE;
 		flags |= HAL_TXDESC_INTREQ;	/* force interrupt */
 		break;
 	case IEEE80211_FC0_TYPE_CTL:
@@ -3390,9 +3404,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		/* NB: force all ctl frames to highest queue */
 		if (ni->ni_flags & IEEE80211_NODE_QOS) {
 			/* NB: force all ctl frames to highest queue */
-			txq = sc->sc_ac2q[WME_AC_VO];
+			pri = WME_AC_VO;
 		} else
-			txq = sc->sc_ac2q[WME_AC_BE];
+			pri = WME_AC_BE;
 		flags |= HAL_TXDESC_INTREQ;	/* force interrupt */
 		break;
 	case IEEE80211_FC0_TYPE_DATA:
@@ -3407,14 +3421,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 * Default all non-QoS traffic to the background queue.
 		 */
 		if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
-			u_int pri = M_WME_GETAC(skb);
-			txq = sc->sc_ac2q[pri];
-			if (ic->ic_wme.wme_wmeChanParams.cap_wmeParams[pri].wmep_noackPolicy) {
+			pri = M_WME_GETAC(skb);
+			if (cap->cap_wmeParams[pri].wmep_noackPolicy) {
 				flags |= HAL_TXDESC_NOACK;
 				sc->sc_stats.ast_tx_noack++;
 			}
 		} else
-			txq = sc->sc_ac2q[WME_AC_BE];
+			pri = WME_AC_BE;
 		break;
 	default:
 		if_printf(dev, "bogus frame type 0x%x (%s)\n",
@@ -3426,6 +3439,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		bf->bf_skb = NULL;
 		return -EIO;
 	}
+	txq = sc->sc_ac2q[pri];
 
 	/*
 	 * When servicing one or more stations in power-save mode
@@ -3593,6 +3607,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if (try0 != ATH_TXMAXTRY)
 		ath_rate_setupxtxdesc(sc, an, ds, shortPreamble, rix);
 
+	/*
+	 * Fillin the remainder of the descriptor info.
+	 */
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_filltxdesc(ah, ds
@@ -3604,28 +3621,44 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
 	    __func__, txq->axq_qnum, ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1, ds->ds_hw[0], ds->ds_hw[1]);
-
-#if 0
-	if ((flags & (HAL_TXDESC_RTSENA | HAL_TXDESC_CTSENA)) &&
-  	    !ath_hal_updateCTSForBursting(ah, ds 
-		     , txq->axq_linkbuf != NULL ?
-			txq->axq_linkbuf->bf_desc : NULL
-		     , txq->axq_lastdsWithCTS
-		     , txq->axq_gatingds
-		     , IEEE80211_TXOP_TO_US(ic->ic_chanParams.cap_wmeParams[skb->priority].wmep_txopLimit)
-		     , ath_hal_computetxtime(ah, rt, IEEE80211_ACK_LEN, cix, AH_TRUE))) {
-		ATH_TXQ_LOCK(txq);		     
-		txq->axq_lastdsWithCTS = ds;
-		/* set gating Desc to final desc */
-		txq->axq_gatingds = (struct ath_desc *)txq->axq_link;
-		ATH_TXQ_UNLOCK(txq);
-	}
-#endif
 	/*
 	 * Insert the frame on the outbound list and
 	 * pass it on to the hardware.
 	 */
 	ATH_TXQ_LOCK_BH(txq);
+	if (flags & (HAL_TXDESC_RTSENA | HAL_TXDESC_CTSENA)) {
+		u_int32_t txopLimit = IEEE80211_TXOP_TO_US(
+			cap->cap_wmeParams[pri].wmep_txopLimit);
+		/*
+		 * When bursting, potentially extend the CTS duration
+		 * of a previously queued frame to cover this frame
+		 * and not exceed the txopLimit.  If that can be done
+		 * then disable RTS/CTS on this frame since it's now
+		 * covered (burst extension).  Otherwise we must terminate
+		 * the burst before this frame goes out so as not to
+		 * violate the WME parameters.  All this is complicated
+		 * as we need to update the state of packets on the
+		 * (live) hardware queue.  The logic is buried in the hal
+		 * because it's highly chip-specific.
+		 */
+		if (txopLimit != 0) {
+			sc->sc_stats.ast_tx_ctsburst++;
+			if (updateCTSForBursting(ah, ds, txq) == 0) {
+				/*
+				 * This frame was not covered by RTS/CTS from
+				 * the previous frame in the burst; update the
+				 * descriptor pointers so this frame is now
+				 * treated as the last frame for extending a
+				 * burst.
+				 */
+				txq->axq_lastdsWithCTS = ds;
+				/* set gating Desc to final desc */
+				txq->axq_gatingds =
+					(struct ath_desc *)txq->axq_link;
+			} else
+				sc->sc_stats.ast_tx_ctsext++;
+		}
+	}
 	ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
 	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n",
 		__func__, txq->axq_depth);
@@ -3643,7 +3676,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			(caddr_t)bf->bf_daddr, bf->bf_desc, txq->axq_depth);
 	}
 	txq->axq_link = &bf->bf_desc->ds_link;
-
 	/*
 	 * The CAB queue is started from the SWBA handler since
 	 * frames only go out on DTIM and to avoid possible races.
@@ -3651,9 +3683,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if (txq != sc->sc_cabq)
 		ath_hal_txstart(ah, txq->axq_qnum);
 	ATH_TXQ_UNLOCK_BH(txq);
-	
+
 	dev->trans_start = jiffies;
 	return 0;
+#undef updateCTSForBursting
+#undef CTS_DURATION
 }
 
 /*
@@ -3694,12 +3728,10 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			ATH_TXQ_UNLOCK(txq);
 			break;
 		}
-#if 0
-		if (bf->bf_desc == txq->axq_lastdsWithCTS)
+		if (ds == txq->axq_lastdsWithCTS)
 			txq->axq_lastdsWithCTS = NULL;
 		if (ds == txq->axq_gatingds)
 			txq->axq_gatingds = NULL;
-#endif
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
 		ATH_TXQ_UNLOCK(txq);
 
