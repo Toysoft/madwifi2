@@ -147,6 +147,7 @@ struct ieee80211_qosframe_addr4 {
 #define	IEEE80211_FC0_SUBTYPE_CFPOLL		0x60
 #define	IEEE80211_FC0_SUBTYPE_CF_ACK_CF_ACK	0x70
 #define	IEEE80211_FC0_SUBTYPE_QOS		0x80
+#define	IEEE80211_FC0_SUBTYPE_QOS_NULL		0xc0
 
 #define	IEEE80211_FC1_DIR_MASK			0x03
 #define	IEEE80211_FC1_DIR_NODS			0x00	/* STA->STA */
@@ -173,6 +174,12 @@ struct ieee80211_qosframe_addr4 {
 #define	IEEE80211_QOS_ACKPOLICY			0x0600
 #define	IEEE80211_QOS_ESOP			0x0800
 #define	IEEE80211_QOS_TID			0xf000
+
+/* does frame have QoS sequence control data */
+#define	IEEE80211_QOS_HAS_SEQ(wh) \
+	(((wh)->i_fc[0] & \
+	  (IEEE80211_FC0_TYPE_MASK | IEEE80211_FC0_SUBTYPE_QOS)) == \
+	  (IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_QOS))
 
 /*
  * WME/802.11e information element.
