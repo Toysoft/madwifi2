@@ -62,6 +62,7 @@ enum {
 struct eapol_key {
 	u_int8_t	ek_type;	/* key type */
 #define	EAPOL_KEY_TYPE_RC4	0x01	/* for WEP */
+#define	EAPOL_KEY_TYPE_RSN	0x02	/* for 802.11i */
 #define	EAPOL_KEY_TYPE_WPA	0xfe	/* different struct, see below */
 	u_int16_t	ek_length;	/* frame length */
 	u_int64_t	ek_replay;	/* replay counter */
@@ -74,24 +75,25 @@ struct eapol_key {
 } __attribute__((__packed__));
 
 /*
- * EAPOL WPA key message.
+ * EAPOL WPA/RSN key message.
  */
 struct eapol_wpa_key {
 	u_int8_t	ewk_type;	/* EAPOL_KEY_TYPE_WPA */
 	u_int16_t	ewk_info;	/* key info */
-#define	EAPOL_WKEY_INFO_TYPE	0x0003
-#define	EAPOL_WKEY_INFO_MD5	1	/* hmac-md5 */
-#define	EAPOL_WKEY_INFO_AES	2	/* aes-keywrap */
-#define	EAPOL_WKEY_INFO_PW	0x0004
+#define	EAPOL_WKEY_INFO_TYPE	0x0007
+#define	EAPOL_WKEY_INFO_MD5	1	/* hmac-md5 & rc4 */
+#define	EAPOL_WKEY_INFO_AES	2	/* hmac-sha1 & aes-keywrap */
+#define	EAPOL_WKEY_INFO_PW	0x0008
 #define	EAPOL_WKEY_INFO_GROUP	0x0000
-#define	EAPOL_WKEY_INFO_INDEX	0x0018	/* key index */
-#define	EAPOL_WKEY_INFO_USAGE	0x0020	/* install or tx/rx */
-#define	EAPOL_WKEY_INFO_ACK	0x0040	/* STA/AP handshake bit */
-#define	EAPOL_WKEY_INFO_MIC	0x0080	/* msg is MIC'd */
-#define	EAPOL_WKEY_INFO_SECURE	0x0100	/* pw keys in use */
-#define	EAPOL_WKEY_INFO_ERROR	0x0200	/* STA found invalid MIC */
-#define	EAPOL_WKEY_INFO_REQUEST	0x0400	/* STA requests new key */
-	u_int16_t	ewk_length;	/* frame length */
+#define	EAPOL_WKEY_INFO_INDEX	0x0030	/* key index (WPA only) */
+#define	EAPOL_WKEY_INFO_INSTALL	0x0040	/* install or tx/rx */
+#define	EAPOL_WKEY_INFO_ACK	0x0080	/* STA/AP handshake bit */
+#define	EAPOL_WKEY_INFO_MIC	0x0100	/* msg is MIC'd */
+#define	EAPOL_WKEY_INFO_SECURE	0x0200	/* pw keys in use */
+#define	EAPOL_WKEY_INFO_ERROR	0x0400	/* STA found invalid MIC */
+#define	EAPOL_WKEY_INFO_REQUEST	0x0800	/* STA requests new key */
+#define	EAPOL_WKEY_INFO_ENCRYPT	0x1000	/* encrypted key data (WPA2 only) */
+	u_int16_t	ewk_keylen;	/* key length */
 	u_int64_t	ewk_replay;	/* replay counter */
 	u_int8_t	ewk_nonce[32];
 	u_int8_t	ewk_iv[16];	/* initialization vector */
