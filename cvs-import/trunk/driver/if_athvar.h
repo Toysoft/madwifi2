@@ -371,8 +371,8 @@ typedef struct {
 		(_flen), (_hlen), (_rate), (_antmode)))
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
-#define	ath_hal_rxprocdesc(_ah, _ds) \
-	((*(_ah)->ah_procRxDesc)((_ah), (_ds)))
+#define	ath_hal_rxprocdesc(_ah, _ds, _dspa, _dsnext) \
+	((*(_ah)->ah_procRxDesc)((_ah), (_ds), (_dspa), (_dsnext)))
 #define	ath_hal_setuptxdesc(_ah, _ds, _plen, _hlen, _atype, _txpow, \
 		_txr0, _txtr0, _keyix, _ant, _flags, \
 		_rtsrate, _rtsdura) \

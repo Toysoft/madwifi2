@@ -1418,6 +1418,9 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 static void
 ath_rx_tasklet(void *data)
 {
+#define	PA2DESC(_sc, _pa) \
+	((struct ath_desc *)((caddr_t)(_sc)->sc_desc + \
+		((_pa) - (_sc)->sc_desc_daddr)))
 	struct net_device *dev = data;
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
@@ -1444,7 +1447,20 @@ ath_rx_tasklet(void *data)
 			continue;
 		}
 		ds = bf->bf_desc;
-		status = ath_hal_rxprocdesc(ah, ds);
+		/* XXX sync descriptor memory */
+		/*
+		 * Must provide the virtual address of the current
+		 * descriptor, the physical address, and the virtual
+		 * address of the next descriptor in the h/w chain.
+		 * This allows the HAL to look ahead to see if the
+		 * hardware is done with a descriptor by checking the
+		 * done bit in the following descriptor and the address
+		 * of the current descriptor the DMA engine is working
+		 * on.  All this is necessary because of our use of
+		 * a self-linked list to avoid rx overruns.
+		 */
+		status = ath_hal_rxprocdesc(ah, ds,
+				bf->bf_daddr, PA2DESC(sc, ds->ds_link));
 #ifdef AR_DEBUG
 		if (ath_debug > 1)
 			ath_printrxbuf(bf, status == HAL_OK); 
@@ -1567,6 +1583,7 @@ ath_rx_tasklet(void *data)
 
 	ath_hal_rxmonitor(ah);			/* rx signal state monitoring */
 	ath_hal_rxena(ah);			/* in case of RXEOL */
+#undef PA2DESC
 }
 
 
@@ -2064,6 +2081,9 @@ ath_draintxq(struct ath_softc *sc)
 static void
 ath_stoprecv(struct ath_softc *sc)
 {
+#define	PA2DESC(_sc, _pa) \
+	((struct ath_desc *)((caddr_t)(_sc)->sc_desc + \
+		((_pa) - (_sc)->sc_desc_daddr)))
 	struct ath_hal *ah = sc->sc_ah;
 
 	ath_hal_stoppcurecv(ah);	/* disable PCU */
@@ -2077,12 +2097,15 @@ ath_stoprecv(struct ath_softc *sc)
 		printk("ath_stoprecv: rx queue %p, link %p\n",
 		    (caddr_t) ath_hal_getrxbuf(ah), sc->sc_rxlink);
 		TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
-			if (ath_hal_rxprocdesc(ah, bf->bf_desc) == HAL_OK)
+			struct ath_desc *ds = bf->bf_desc;
+			if (ath_hal_rxprocdesc(ah, ds, bf->bf_daddr,
+			    PA2DESC(sc, ds->ds_link)) == HAL_OK)
 				ath_printrxbuf(bf, 1);
 		}
 	}
 #endif
 	sc->sc_rxlink = NULL;		/* just in case */
+#undef PA2DESC
 }
 
 /*
