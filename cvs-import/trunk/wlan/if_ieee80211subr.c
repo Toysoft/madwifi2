@@ -972,8 +972,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 					"direction %x\n", dev->name, dir));
 				goto out;
 			}
-#ifdef IFF_SIMPLEX
-			if ((ifp->if_flags & IFF_SIMPLEX) &&
+			if ((dev->flags & IFF_MULTICAST) &&
 			    IEEE80211_IS_MULTICAST(wh->i_addr1) &&
 			    IEEE80211_ADDR_EQ(wh->i_addr3, dev->dev_addr)) {
 				/*
@@ -981,12 +980,15 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				 * sent from me is broadcasted from AP.
 				 * It should be silently discarded for
 				 * SIMPLEX interface.
+				 *
+				 * NB: Linux has no IFF_ flag to indicate
+				 *     if an interface is SIMPLEX or not;
+				 *     so we always assume it to be true.
 				 */
 				DPRINTF(ic, ("%s: discard multicast echo\n",
 						dev->name));
 				goto out;
 			}
-#endif
 			break;
 		case IEEE80211_M_MONITOR:
 			goto out;
