@@ -242,6 +242,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	ic->ic_mgtstart = ath_mgtstart;
 	ic->ic_init = ath_init;
+	ic->ic_reset = ath_reset;
 
 	ic->ic_newstate = ath_newstate;
 	/* XXX not right but it's not used anywhere important */
@@ -825,7 +826,6 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 		 * stuff, but we need to timeout the xmit.
 		 */
 		dev->trans_start = jiffies;
-		__netdev_watchdog_up(dev);
 		return 0;
 	}
 	/* fall thru... */
