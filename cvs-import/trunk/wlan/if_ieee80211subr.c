@@ -1342,10 +1342,11 @@ _ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 void
 ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-	write_lock_bh(&ic->ic_nodelock);
-	if (atomic_dec_and_test(&ni->ni_refcnt))
+	if (atomic_dec_and_test(&ni->ni_refcnt)) {
+		write_lock_bh(&ic->ic_nodelock);
 		_ieee80211_free_node(ic, ni);
-	write_unlock_bh(&ic->ic_nodelock);
+		write_unlock_bh(&ic->ic_nodelock);
+	}
 }
 
 void
@@ -1381,7 +1382,6 @@ ieee80211_timeout_nodes(struct ieee80211com *ic)
 		IEEE80211_SEND_MGMT(ic, ni,
 		    IEEE80211_FC0_SUBTYPE_DEAUTH,
 		    IEEE80211_REASON_AUTH_EXPIRE);
-		atomic_dec(&ni->ni_refcnt);
 		_ieee80211_free_node(ic, ni);
 		ni = nextbs;
 	}
@@ -2331,7 +2331,7 @@ ieee80211_recv_deauth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 				    " by peer (reason %d)\n",
 				    dev->name,
 				    ether_sprintf(ni->ni_macaddr), reason));
-			ieee80211_unref_node(&ni);
+			ieee80211_free_node(&ni);
 		}
 		break;
 	default:
@@ -2465,7 +2465,6 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 			if (ni != NULL) {
 				ni->ni_fails++;
 				ieee80211_unref_node(&ni);
-				ni = NULL;		/* guard against use */
 			}
 			ieee80211_begin_scan(dev, &ic->ic_bss);
 			break;
