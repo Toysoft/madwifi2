@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -50,6 +50,9 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 
+#include <linux/sysctl.h>
+#include <linux/proc_fs.h>
+
 #include <asm/io.h>
 
 #include "ah.h"
@@ -65,7 +68,7 @@
 
 #ifdef AH_DEBUG
 static	int ath_hal_debug = 0;
-#endif /* AH_DEBUG */
+#endif
 
 int	ath_hal_dma_beacon_response_time = 2;	/* in TU's */
 int	ath_hal_sw_beacon_response_time = 10;	/* in TU's */
@@ -153,7 +156,7 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 		ath_hal_printf(ah, "WRITE 0x%x <= 0x%x\n", reg, val);
 #endif
  	if (reg >= 0x4000 && reg < 0x5000)
- 		writel(val, ah->ah_sh + reg);
+ 		*((volatile u_int32_t *)(ah->ah_sh + reg)) = __bswap32(val);
  	else
  		*((volatile u_int32_t *)(ah->ah_sh + reg)) = val;
 }
@@ -163,10 +166,12 @@ ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
  	u_int32_t val;
 
- 	if (reg >= 0x4000 && reg < 0x5000)
+ 	if (reg >= 0x4000 && reg < 0x5000) {
  		val = readl(ah->ah_sh + reg);
- 	else
+		val = __bswap32(val);
+	} else {
  		val = *((volatile u_int32_t *)(ah->ah_sh + reg));
+	}
 #ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
 		ath_hal_printf(ah, "READ 0x%x => 0x%x\n", reg, val);
@@ -236,6 +241,64 @@ ath_hal_free(void* p)
 	kfree(p);
 }
 
+#ifdef CONFIG_SYSCTL
+enum {
+	DEV_ATH		= 9,			/* XXX must match driver */
+
+	ATH_HAL_DEBUG	= 1,
+	ATH_HAL_DBRT	= 2,			/* DMA beacon response time */
+	ATH_HAL_SBRT	= 3,			/* s/w beacon response time */
+	ATH_HAL_SWBA_BO	= 4,			/* additional swba backoff */
+};
+
+static ctl_table ath_hal_sysctls[] = {
+#ifdef AH_DEBUG
+	{ ATH_HAL_DEBUG,	"debug",	&ath_hal_debug,
+	  sizeof(ath_hal_debug),0644,	NULL,	proc_dointvec },
+#endif
+	{ ATH_HAL_DBRT,		"dma_beacon_response_time",
+	  &ath_hal_dma_beacon_response_time,
+	  sizeof(ath_hal_dma_beacon_response_time), 0644, NULL, proc_dointvec },
+	{ ATH_HAL_SBRT,		"sw_beacon_response_time",
+	  &ath_hal_sw_beacon_response_time,
+	  sizeof(ath_hal_sw_beacon_response_time), 0644, NULL, proc_dointvec },
+	{ ATH_HAL_SWBA_BO,	"swba_backoff",
+	  &ath_hal_additional_swba_backoff,
+	  sizeof(ath_hal_additional_swba_backoff), 0644, NULL, proc_dointvec },
+	{ 0 }
+};
+static ctl_table ath_hal_table[] = {
+	{ 1, "hal", NULL, 0, 0555, ath_hal_sysctls }, { 0 }
+};
+static ctl_table ath_ath_table[] = {
+	{ DEV_ATH, "ath", NULL, 0, 0555, ath_hal_table }, { 0 }
+};
+static ctl_table ath_root_table[] = {
+	{ CTL_DEV, "dev", NULL, 0, 0555, ath_ath_table },
+	{ 0 }
+};
+static struct ctl_table_header *ath_hal_sysctl_header;
+
+void
+ath_hal_sysctl_register(void)
+{
+	static int initialized = 0;
+
+	if (!initialized) {
+		ath_hal_sysctl_header =
+			register_sysctl_table(ath_root_table, 1);
+		initialized = 1;
+	}
+}
+
+void
+ath_hal_sysctl_unregister(void)
+{
+	if (ath_hal_sysctl_header)
+		unregister_sysctl_table(ath_hal_sysctl_header);
+}
+#endif /* CONFIG_SYSCTL */
+
 /*
  * Module glue.
  */
@@ -261,6 +324,9 @@ static int __init
 init_ath_hal(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, ath_hal_version);
+#ifdef CONFIG_SYSCTL
+	ath_hal_sysctl_register();
+#endif
 	return (0);
 }
 module_init(init_ath_hal);
@@ -268,6 +334,9 @@ module_init(init_ath_hal);
 static void __exit
 exit_ath_hal(void)
 {
+#ifdef CONFIG_SYSCTL
+	ath_hal_sysctl_unregister();
+#endif
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_ath_hal);

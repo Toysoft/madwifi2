@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -45,7 +45,8 @@
  *     of 0x168c, but some vendors, in their infinite wisdom
  *     do not follow this so we must handle them specially.
  */
-#define	ATHEROS_3COM_VENDOR_ID	0xa727		/* 3Com PCI vendor ID */
+#define	ATHEROS_3COM_VENDOR_ID	0xa727		/* 3Com 3CRPAG175 vendor ID */
+#define	ATHEROS_3COM2_VENDOR_ID	0x10b7		/* 3Com 3CRDAG675 vendor ID */
 
 /* AR5210 (for reference) */
 #define AR5210_DEFAULT          0x1107          /* No eeprom HW default */

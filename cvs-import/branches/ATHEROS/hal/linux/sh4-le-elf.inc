@@ -37,26 +37,18 @@
 #
 
 #
-# Compilation configuration for building big-endian PowerPC/powerpc-eabi.
+# Compilation configuration for building little-endian SuperH/ELF.
 #
-# Known to work on:
-#	IBM 450EP
 
 #
-# Built with GNU cross-devel tools:
+# Built with pre-packaged tools for RedHat 7.3:
 #
-# PREFIX=/pub/gnu
-# BINUTILS=binutils-2.14
-# GCC=gcc-3.3.2
-# target=powerpc-eabi
-#
-# ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
-# ${GCC}/configure --target=$target   --prefix=${PREFIX} \
-#	--enable-languages=c   --with-gnu-as --with-gnu-ld \
-#	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
+# http://mirror.sh-linux.org/rpm-index-2003/i386/ByName.html`
+# binutils-sh-linux-2.13.90.0.18-1
+# gcc-sh-linux-3.2.3-3
 #
 ifndef TOOLPREFIX
-TOOLPREFIX=	/pub/gnu/bin/powerpc-eabi-
+TOOLPREFIX=	/pub/gnu/bin/sh-linux-
 endif
 #
 CC=	${TOOLPREFIX}gcc
@@ -65,7 +57,6 @@ STRIP=	${TOOLPREFIX}strip
 OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
-LDOPTS=	-EB
-COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+= -mbig-endian
-COPTS+= -msoft-float -ffixed-r2
+LDOPTS=	-EL
+COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
+COPTS+= -ml -m4 -mno-implicit-fp

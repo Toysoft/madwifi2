@@ -37,10 +37,8 @@
 #
 
 #
-# Compilation configuration for building big-endian PowerPC/powerpc-eabi.
+# Compilation configuration for building big-endian mipsisa32-elf.
 #
-# Known to work on:
-#	IBM 450EP
 
 #
 # Built with GNU cross-devel tools:
@@ -48,7 +46,7 @@
 # PREFIX=/pub/gnu
 # BINUTILS=binutils-2.14
 # GCC=gcc-3.3.2
-# target=powerpc-eabi
+# target=mipsisa32-elf
 #
 # ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
 # ${GCC}/configure --target=$target   --prefix=${PREFIX} \
@@ -56,7 +54,7 @@
 #	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
 #
 ifndef TOOLPREFIX
-TOOLPREFIX=	/pub/gnu/bin/powerpc-eabi-
+TOOLPREFIX=	/pub/gnu/bin/mipsisa32-elf-
 endif
 #
 CC=	${TOOLPREFIX}gcc
@@ -67,5 +65,5 @@ NM=	${TOOLPREFIX}nm
 
 LDOPTS=	-EB
 COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+= -mbig-endian
-COPTS+= -msoft-float -ffixed-r2
+COPTS+=	-G 0 -EB -mno-abicalls -fno-pic -march=r4600 -Wa,--trap \
+	-fno-strict-aliasing -fno-common -fomit-frame-pointer -mlong-calls
