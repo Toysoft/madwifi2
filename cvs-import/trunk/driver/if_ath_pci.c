@@ -42,10 +42,6 @@
 
 #include "if_athvar.h"
 
-/*
- * Much of this code is cribbed from Jouni Malinens hostap driver.
- */
-
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
 /*
  * PCI initialization uses Linux 2.4.x version and
@@ -217,8 +213,8 @@ static char *version = ATH_PCI_VERSION " (Sam Leffler <sam@errno.com>)";
 static char *dev_info = "ath_pci";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
-MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN PCI cards.");
-MODULE_SUPPORTED_DEVICE("Atheros WLAN PCI cards");
+MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
+MODULE_SUPPORTED_DEVICE("Atheros WLAN cards");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");		/* XXX really BSD only */
 #endif
