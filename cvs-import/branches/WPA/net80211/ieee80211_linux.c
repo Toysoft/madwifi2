@@ -41,9 +41,14 @@
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
 
+#include <net/iw_handler.h>
+#include <linux/wireless.h>
+#include <linux/if_arp.h>		/* XXX for ARPHRD_* */
+
 #include <asm/uaccess.h>
 
 #include "if_media.h"
+#include "if_ethersubr.h"
 
 #include <net80211/ieee80211_var.h>
 
@@ -112,21 +117,6 @@ skb_queue_drain(struct sk_buff_head *q)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
-/*
- * Handle ioctl requests.
- */
-int
-ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
-{
-	switch (cmd) {
-	case SIOCG80211STATS:
-		return copy_to_user(ifr->ifr_data, &ic->ic_stats,
-				sizeof (ic->ic_stats)) ? -EFAULT : 0;
-	}
-	return -EOPNOTSUPP;
-}
-EXPORT_SYMBOL(ieee80211_ioctl);
-
 #if IEEE80211_VLAN_TAG_USED
 /*
  * VLAN support.
@@ -153,6 +143,60 @@ ieee80211_vlan_kill_vid(struct ieee80211com *ic, unsigned short vid)
 }
 EXPORT_SYMBOL(ieee80211_vlan_kill_vid);
 #endif /* IEEE80211_VLAN_TAG_USED */
+
+void
+ieee80211_notify_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, int newassoc)
+{
+	union iwreq_data wreq;
+
+	if (ni == ic->ic_bss) {
+		if (newassoc)
+			netif_carrier_on(ic->ic_dev);
+		memset(&wreq, 0, sizeof(wreq));
+		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
+		wreq.addr.sa_family = ARPHRD_ETHER;
+		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
+	} else if (newassoc) {
+		/* fire off wireless event only for new station */
+		memset(&wreq, 0, sizeof(wreq));
+		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
+		wreq.addr.sa_family = ARPHRD_ETHER;
+		wireless_send_event(ic->ic_dev, IWEVREGISTERED, &wreq, NULL);
+	}
+}
+
+void
+ieee80211_notify_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	union iwreq_data wreq;
+
+	if (ni == ic->ic_bss) {
+		netif_carrier_off(ic->ic_dev);
+		memset(wreq.ap_addr.sa_data, 0, ETHER_ADDR_LEN);
+		wreq.ap_addr.sa_family = ARPHRD_ETHER;
+		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
+	} else {
+		/* fire off wireless event station leaving */
+		memset(&wreq, 0, sizeof(wreq));
+		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
+		wreq.addr.sa_family = ARPHRD_ETHER;
+		wireless_send_event(ic->ic_dev, IWEVEXPIRED, &wreq, NULL);
+	}
+}
+
+void
+ieee80211_notify_scan_done(struct ieee80211com *ic)
+{
+	union iwreq_data wreq;
+
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
+		("%s: notify scan done\n", ic->ic_dev->name));
+
+	/* dispatch wireless event indicating scan completed */
+	wreq.data.length = 0;
+	wreq.data.flags = 0;
+	wireless_send_event(ic->ic_dev, SIOCGIWSCAN, &wreq, NULL);
+}
 
 #ifdef CONFIG_SYSCTL
 #include <linux/ctype.h>
@@ -391,15 +435,10 @@ MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-/* XXX hide after module restructuring */
-extern	int init_ieee80211_auth(void);
-extern	void exit_ieee80211_auth(void);
-
 static int __init
 init_wlan(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
-	init_ieee80211_auth();
 	return 0;
 }
 module_init(init_wlan);
@@ -407,7 +446,6 @@ module_init(init_wlan);
 static void __exit
 exit_wlan(void)
 {
-	exit_ieee80211_auth();
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_wlan);
