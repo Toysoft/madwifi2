@@ -141,29 +141,36 @@ ieee80211_node_unauthorize(struct ieee80211com *ic, struct ieee80211_node *ni)
 EXPORT_SYMBOL(ieee80211_node_unauthorize);
 
 /*
- * Construct and install a unicast key for the node.
- * This is typically called by the 802.1x authenticator
- * as part of arranging key state after a station has
- * been authorized.
+ * Construct and a unicast key for the node and allocate
+ * a key index from the driver if needed.  This is typically
+ * called by the 802.1x authenticator as part of arranging
+ * key state after a station has been authorized.
  */
 int
 ieee80211_node_newkey(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-	/* XXX use maximally-sized keys; may want to match mcast key length */
+	/*
+	 * Construct a key.  We create a maximally-sized key;
+	 * the caller can shrink as desired.
+	 *
+	 * XXX just use random data for now; probably want something better
+	 * XXX cipher suites
+	 */
 	ni->ni_ucastkey.wk_len = sizeof(ni->ni_ucastkey.wk_key);
-	/* XXX just use random data for now; probably want something better */
 	get_random_bytes(ni->ni_ucastkey.wk_key, ni->ni_ucastkey.wk_len);
 	/*
-	 * Ask the driver for a key index.
+	 * Ask the driver for a key index if we don't have one.
 	 */
-	ni->ni_ucastkeyix = (*ic->ic_key_alloc)(ic);
 	if (ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
-		 /*
-		 * Driver has no room or support for this algorithm;
-		 * fallback to doing crypto in the host.
-		 */
-		/* XXX */
-		return 0;
+		ni->ni_ucastkeyix = (*ic->ic_key_alloc)(ic);
+		if (ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
+			 /*
+			 * Driver has no room or support for this algorithm;
+			 * fallback to doing crypto in the host.
+			 */
+			/* XXX */
+			return 0;
+		}
 	}
 	return 1;
 }
