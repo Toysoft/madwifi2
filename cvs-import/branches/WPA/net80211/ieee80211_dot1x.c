@@ -1585,7 +1585,7 @@ eapol_authenticator_attach(struct ieee80211com *ic)
 	ec->ec_maxaid = ic->ic_max_aid;
 	MALLOC(ec->ec_table, struct eapol_auth_node **,
 		sizeof(struct eapol_auth_node *) * ic->ic_max_aid,
-		M_DEVBUF, M_WAITOK | M_ZERO);
+		M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (ec->ec_table == NULL) {
 		printk("%s: no memory for aid table!\n", __func__);
 		_MOD_DEC_USE(THIS_MODULE);
