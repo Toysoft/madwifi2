@@ -153,11 +153,9 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(rate_raise, "rate control raised xmit rate");
 	STAT(rate_drop, "rate control dropped xmit rate");
 	if (stats->ast_tx_rssi)
-		fprintf(fd, "rssi of last ack: %u (%+d)\n",
-			stats->ast_tx_rssi, stats->ast_tx_rssidelta);
+		fprintf(fd, "rssi of last ack: %u\n", stats->ast_tx_rssi);
 	if (stats->ast_rx_rssi)
-		fprintf(fd, "rssi of last recvd frame: %u\n",
-			stats->ast_rx_rssi);
+		fprintf(fd, "rssi of last rcv: %u\n", stats->ast_rx_rssi);
 #undef STAT
 #undef STATI
 #undef N

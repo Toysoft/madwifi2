@@ -3066,9 +3066,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 				an->an_tx_antenna = ds->ds_txstat.ts_antenna;
 				if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
 					sc->sc_stats.ast_tx_altrate++;
-				sc->sc_stats.ast_tx_rssidelta =
-					ds->ds_txstat.ts_rssi -
-					sc->sc_stats.ast_tx_rssi;
 				sc->sc_stats.ast_tx_rssi =
 					ds->ds_txstat.ts_rssi;
 			} else {
