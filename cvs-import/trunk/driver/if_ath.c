@@ -544,10 +544,10 @@ ath_init(struct net_device *dev)
 	mode = ieee80211_chan2mode(ic, ni->ni_chan);
 	if (mode != sc->sc_curmode)
 		ath_setcurmode(sc, mode);
-	if (ic->ic_opmode == IEEE80211_M_MONITOR)
-		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
-	else
+	if (ic->ic_opmode != IEEE80211_M_MONITOR)
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
+	else
+		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
 	return 0;
 }
 
@@ -1652,7 +1652,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
 	struct ath_nodestat *st;
-	int set_dur = 1;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
@@ -1740,7 +1739,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		if (subtype == IEEE80211_FC0_SUBTYPE_PS_POLL)
 			atype = HAL_PKT_TYPE_PSPOLL;
 		rix = 0;			/* XXX lowest rate */
-		set_dur = 0;   /* Do not set duration for this type of frame */
 		break;
 	default:
 		rix = sc->sc_rixmap[ni->ni_rates.rs_rates[ni->ni_txrate] &
@@ -1781,7 +1779,12 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		sc->sc_stats.ast_tx_rts++;
 	}
 
-	if (set_dur && (flags & HAL_TXDESC_NOACK) == 0) {
+	/*
+	 * Calculate duration.  This logically belongs in the 802.11
+	 * layer but it lacks sufficient information to calculate it.
+	 */
+	if ((flags & HAL_TXDESC_NOACK) == 0 &&
+	    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_CTL) {
 		u_int16_t dur;
 		/*
 		 * XXX not right with fragmentation.
