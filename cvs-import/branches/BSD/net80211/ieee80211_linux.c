@@ -378,7 +378,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 				ni->ni_fails, temp);
 	}
 	IEEE80211_NODE_UNLOCK(nt);
-	return copy_to_user(page, buf, p - buf);
+	return copy_to_user(page, buf, p - buf) ? 0 : (p - buf);
 }
 
 static int
