@@ -1403,7 +1403,8 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	 * XXX what if we have stations already associated???
 	 * XXX probably not right for autoselect?
 	 */
-	if (ic->ic_caps & IEEE80211_C_SHPREAMBLE)
+	if ((ic->ic_caps & IEEE80211_C_SHPREAMBLE)
+	    && mode != IEEE80211_MODE_11A)
 		ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
 	if (mode == IEEE80211_MODE_11G) {
 		if (ic->ic_caps & IEEE80211_C_SHSLOT)
