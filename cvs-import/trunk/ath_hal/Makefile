@@ -131,7 +131,8 @@ opt_ah.h:
 	echo "#define AH_ASSERT	1" >> opt_ah.h
 	echo "#define AH_DEBUG	1" >> opt_ah.h
 
-depend:	opt_ah.h
+depend: beforedepend .depend afterdepend
+.depend: ${SRCS} opt_ah.h
+	rm -f .depend
 	gcc -M ${CFLAGS} ${SRCS} > .depend
-
 sinclude .depend

@@ -33,10 +33,7 @@ DEPTH=	..
 include ${DEPTH}/Makefile.inc
 
 SRCS=	ah_osdep.c if_ath.c if_ath_pci.c
-
-OBJS_COMMON=	ah_osdep.o if_ath.o
-OBJS_PCI=	${OBJS_COMMON} ${ATH_HAL}/hal.o if_ath_pci.o
-OBJS=		${OBJS_COMMON} if_ath_pci.o
+OBJS=	ah_osdep.o if_ath.o if_ath_pci.o ${ATH_HAL}/hal.o
 
 CFLAGS=	-I. -I${ATH_HAL} -I${HAL} -I${WLAN} -I${LINUX} \
 	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
@@ -52,8 +49,8 @@ install: all
 		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
 	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
 
-ath_pci.o: ${OBJS_PCI} Makefile
-	${LD} -o $@ -r ${LDFLAGS} ${OBJS_PCI}
+ath_pci.o: ${OBJS} Makefile
+	${LD} -o $@ -r ${LDFLAGS} ${OBJS}
 if_ath_pci.o:	version.h
 ifdef CONFIG_MODVERSIONS
 if_ath.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
@@ -61,9 +58,15 @@ if_ath_pci.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
 endif
 
 clean:
-	rm -f ${OBJS} ath_pci.o .depend
+	rm -f ${OBJS} ${ALL} .depend
 
-depend:	${ATH_HAL}/opt_ah.h
+depend: beforedepend .depend afterdepend
+ifdef CONFIG_MODVERSIONS
+.depend: ${SRCS} ${ATH_HAL}/opt_ah.h \
+	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
+else
+.depend: ${SRCS} ${ATH_HAL}/opt_ah.h
+endif
+	rm -f .depend
 	gcc -M ${CFLAGS} ${SRCS} > .depend
-
-sinclude .depend
+-include .depend

@@ -44,7 +44,7 @@ ifdef CONFIG_MODVERSIONS
 ALL_VER=if_ieee80211.ver if_media.ver
 endif
 
-all:	${ALL} ${ALL_VER}
+all:	${ALL}
 
 wlan.o: ${OBJS}
 	${LD} -o $@ -r -x ${OBJS}
@@ -78,7 +78,8 @@ install: all
 clean:
 	rm -f ${OBJS} ${ALL} ${ALL_VER} .depend
 
-depend:	${ALL_VER}
+depend: beforedepend .depend afterdepend
+.depend: ${SRCS} ${ALL_VER}
+	rm -f .depend
 	gcc -M ${CFLAGS} ${SRCS} > .depend
-
 sinclude .depend
