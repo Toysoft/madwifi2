@@ -651,8 +651,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
 	/*
-	 *  Locate node state.  When operating
-	 *  in station mode we always use ic_bss.
+	 * Locate node state.  When operating
+	 * in station mode we always use ic_bss.
 	 */
 	if (ic->ic_opmode != IEEE80211_M_STA) {
 		ni = ieee80211_find_node(ic, wh->i_addr1);
@@ -749,8 +749,15 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 		tstamp[0] = cpu_to_le32(tsf & 0xffffffff);
 		tstamp[1] = cpu_to_le32(tsf >> 32);
 	}
-	ni = ieee80211_find_node(ic, wh->i_addr1);
-	if (ni == NULL)
+	/*
+	 * Locate node state.  When operating
+	 * in station mode we always use ic_bss.
+	 */
+	if (ic->ic_opmode != IEEE80211_M_STA) {
+		ni = ieee80211_find_node(ic, wh->i_addr1);
+		if (ni == NULL)
+			ni = ieee80211_ref_node(&ic->ic_bss);
+	} else
 		ni = ieee80211_ref_node(&ic->ic_bss);
 
 	/*
