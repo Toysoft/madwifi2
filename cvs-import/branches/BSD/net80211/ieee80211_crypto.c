@@ -375,7 +375,7 @@ _ieee80211_crypto_delkey(struct ieee80211com *ic, struct ieee80211_key *key)
 	KASSERT(key->wk_cipher != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-	    "%s: %s keyix %u flags 0x%x rsc %ju tsc %ju len %u\n",
+	    "%s: %s keyix %u flags 0x%x rsc %llx tsc %llx len %u\n",
 	    __func__, key->wk_cipher->ic_name,
 	    key->wk_keyix, key->wk_flags,
 	    key->wk_keyrsc, key->wk_keytsc, key->wk_keylen);
@@ -453,7 +453,7 @@ ieee80211_crypto_setkey(struct ieee80211com *ic, struct ieee80211_key *key,
 	KASSERT(cip != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-	    "%s: %s keyix %u flags 0x%x mac %s rsc %ju tsc %ju len %u\n",
+	    "%s: %s keyix %u flags 0x%x mac %s rsc %llx tsc %llx len %u\n",
 	    __func__, cip->ic_name, key->wk_keyix,
 	    key->wk_flags, ether_sprintf(macaddr),
 	    key->wk_keyrsc, key->wk_keytsc, key->wk_keylen);
@@ -546,7 +546,6 @@ ieee80211_crypto_decap(struct ieee80211com *ic,
 	IEEE80211_WEP_HDRLEN + IEEE80211_WEP_CRCLEN)
 	struct ieee80211_key *k;
 	struct ieee80211_frame *wh;
-	const struct ieee80211_cipher *cip;
 	const u_int8_t *ivp;
 	u_int8_t keyid;
 	int hdrlen;
