@@ -2613,9 +2613,13 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		if (padbytes > 0) {
 			memmove(skb->data + padbytes, skb->data, headersize);
 			skb_pull(skb, padbytes);
+			len -= padbytes;
 		}
 	}
 
+	/*
+	 * enough headroom ist assured by ath_rxbuf_init
+	 */
 	ph = (wlan_ng_prism2_header *)
 		skb_push(skb, sizeof(wlan_ng_prism2_header));
 	memset(ph, 0, sizeof(wlan_ng_prism2_header));
@@ -2651,7 +2655,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
 	ph->frmlen.status = 0;
 	ph->frmlen.len = 4;
-	ph->frmlen.data = len;
+	ph->frmlen.data = len - IEEE80211_CRC_LEN ;
 
 	ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
 	ph->channel.status = 0;
@@ -2659,9 +2663,9 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->channel.data = ieee80211_mhz2ieee(ic->ic_ibss_chan->ic_freq,0);
 
 	ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
-	ph->rssi.status = P80211ENUM_msgitem_status_no_value;
+	ph->rssi.status = 0;
 	ph->rssi.len = 4;
-	ph->rssi.data = 0;
+	ph->rssi.data = ds->ds_rxstat.rs_rssi;
 
 	ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
 	ph->noise.status = 0;
@@ -2680,6 +2684,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 
 	skb->dev = dev;
 	skb->mac.raw = skb->data;
+	skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 	skb->ip_summed = CHECKSUM_NONE;
 	skb->pkt_type = PACKET_OTHERHOST;
 	skb->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
@@ -2688,7 +2693,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 #undef IS_QOS_DATA
 }
 
-static uint64_t
+static inline uint64_t
 ath_tsf_extend(struct ath_hal *ah, uint32_t rstamp)
 {
 	uint64_t tsf;
