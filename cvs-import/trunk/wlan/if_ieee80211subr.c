@@ -3285,7 +3285,8 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 			if (ic->ic_flags & IEEE80211_F_ASCAN) {
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
-			}
+			} else
+				dev->trans_start = jiffies;
 			break;
 		case IEEE80211_S_RUN:
 			/* beacon miss */
