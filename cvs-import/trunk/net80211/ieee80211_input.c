@@ -354,22 +354,17 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			/* Fragment dropped or frame not complete yet */
 			goto out;
 		}
-		/* NB: wh may now be invalid, reset */
-		wh = (struct ieee80211_frame *)skb->data;
+		wh = NULL;		/* no longer valid, catch any uses */
 
 		/*
 		 * Next strip any MSDU crypto bits.
 		 */
-		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
-			KASSERT(key != NULL, ("null key for demic!"));
-			if (!ieee80211_crypto_demic(ic, key, skb)) {
-				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-					("%s: discard frame on demic error\n",
-					__func__));
-				/* XXX statistic? */
-				goto out;
-			}
-			/* NB: MIC is at end so no need to reset wh */
+		if (key != NULL && !ieee80211_crypto_demic(ic, key, skb)) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+				("%s: discard frame on demic error\n",
+				__func__));
+			/* XXX statistic? */
+			goto out;
 		}
 
 		/*
