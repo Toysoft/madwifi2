@@ -1490,6 +1490,13 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			ic->ic_flags &= ~IEEE80211_F_WME;
 		retv = 0;
 		break;
+	case IEEE80211_PARAM_HIDESSID:
+		if (value)
+			ic->ic_flags |= IEEE80211_F_HIDESSID;
+		else
+			ic->ic_flags &= ~IEEE80211_F_HIDESSID;
+		retv = ENETRESET;
+		break;
 	}
 	if (retv == ENETRESET)
 		retv = IS_UP_AUTO(ic) ? (*ic->ic_init)(ic->ic_dev) : 0;
@@ -1608,6 +1615,9 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_WME:
 		param[0] = (ic->ic_flags & IEEE80211_F_WME) != 0;
+		break;
+	case IEEE80211_PARAM_HIDESSID:
+		param[0] = (ic->ic_flags & IEEE80211_F_HIDESSID) != 0;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -2038,6 +2048,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wme" },
 	{ IEEE80211_PARAM_WME,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_wme" },
+	{ IEEE80211_PARAM_HIDESSID,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "hide_ssid" },
+	{ IEEE80211_PARAM_HIDESSID,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_hide_ssid" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
