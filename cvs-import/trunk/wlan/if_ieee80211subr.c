@@ -43,6 +43,7 @@
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/random.h>
 
 #include "rc4.h"
@@ -693,10 +694,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		}
 		if (skb != NULL) {
 			skb->dev = dev;
-			skb->mac.raw = skb->data;
-			skb_pull(skb, sizeof(struct ether_header));
-			skb->pkt_type = PACKET_OTHERHOST;
-			skb->protocol = __constant_htons(ETH_P_802_2);
+			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
 		}
 		return;
@@ -846,13 +844,10 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 	 * the frame with enough space.  Alternatively we can carry
 	 * the frame separately and use s/g support in the hardware.
 	 */
-	if (skb_headroom(skb) < sizeof(struct ieee80211_frame)) {
-		struct sk_buff *skb2;
-		skb2 = skb_realloc_headroom(skb, sizeof(struct ieee80211_frame));
+	if (skb_headroom(skb) < sizeof(struct ieee80211_frame) &&
+	    pskb_expand_head(skb, sizeof(*wh), 0, GFP_ATOMIC)) {
 		dev_kfree_skb(skb);
-		if (skb2 == NULL)
-			return skb2;
-		skb = skb2;
+		return NULL;
 	}
 	wh = (struct ieee80211_frame *) skb_push(skb, sizeof(struct ieee80211_frame));
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
