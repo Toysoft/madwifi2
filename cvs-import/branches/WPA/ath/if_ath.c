@@ -1727,7 +1727,7 @@ ath_updateslot(struct net_device *dev)
 	 * For other operation we defer the change until beacon
 	 * updates have propagated to the stations.
 	 */
-	if (ic->ic_curmode == IEEE80211_M_STA)
+	if (ic->ic_opmode == IEEE80211_M_STA)
 		ath_setslottime(sc);
 	else
 		sc->sc_updateslot = UPDATE;
