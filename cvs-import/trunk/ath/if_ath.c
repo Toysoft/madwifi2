@@ -4295,8 +4295,7 @@ enum {
 };
 
 static int
-ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
-	void *buffer, size_t *lenp)
+ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 {
 	struct ath_softc *sc = ctl->extra1;
 	struct ath_hal *ah = sc->sc_ah;
@@ -4306,7 +4305,8 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
 	if (write) {
-		ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+				lenp, ppos);
 		if (ret == 0) {
 			switch (ctl->ctl_name) {
 			case ATH_SLOTTIME:
@@ -4376,7 +4376,8 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 		default:
 			return -EINVAL;
 		}
-		ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+				lenp, ppos);
 	}
 	return ret;
 }

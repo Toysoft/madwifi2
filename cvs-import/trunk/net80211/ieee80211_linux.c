@@ -338,8 +338,8 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 }
 
 static int
-ieee80211_sysctl_stations(ctl_table *ctl, int write, struct file *filp,
-	void *buffer, size_t *lenp)
+IEEE80211_SYSCTL_DECL(ieee80211_sysctl_stations, ctl, write, filp, buffer,
+		lenp, ppos)
 {
 	struct ieee80211com *ic = ctl->extra1;
 	int len = *lenp;
@@ -355,9 +355,10 @@ ieee80211_sysctl_stations(ctl_table *ctl, int write, struct file *filp,
 	return 0;
 }
 
+
 static int
-ieee80211_sysctl_debug(ctl_table *ctl, int write, struct file *filp,
-	void *buffer, size_t *lenp)
+IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
+		lenp, ppos)
 {
 	struct ieee80211com *ic = ctl->extra1;
 	u_int val;
@@ -366,12 +367,14 @@ ieee80211_sysctl_debug(ctl_table *ctl, int write, struct file *filp,
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
 	if (write) {
-		ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+				lenp, ppos);
 		if (ret == 0)
 			ic->msg_enable = val;
 	} else {
 		val = ic->msg_enable;
-		ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+				lenp, ppos);
 	}
 	return ret;
 }
