@@ -91,13 +91,13 @@ ieee80211_ioctl_giwname(struct net_device *dev,
 	/* XXX should use media status but IFM_AUTO case gets tricky */
 	switch (ic->ic_curmode) {
 	case IEEE80211_MODE_11A:
-		strncpy(name, "IEEE 802.11-OFDM", IFNAMSIZ);
+		strncpy(name, "IEEE 802.11a", IFNAMSIZ);
 		break;
 	case IEEE80211_MODE_11B:
-		strncpy(name, "IEEE 802.11-DS", IFNAMSIZ);
+		strncpy(name, "IEEE 802.11b", IFNAMSIZ);
 		break;
 	case IEEE80211_MODE_11G:
-		strncpy(name, "IEEE 802.11-OFDM/DS", IFNAMSIZ);
+		strncpy(name, "IEEE 802.11g", IFNAMSIZ);
 		break;
 	case IEEE80211_MODE_TURBO:
 		strncpy(name, "IEEE 802.11-TURBO", IFNAMSIZ);
@@ -158,7 +158,7 @@ ieee80211_ioctl_giwencode(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	if ((ic->ic_caps & IEEE80211_C_WEP) == 0) {
+	if ((ic->ic_flags & IEEE80211_F_WEPON) == 0) {
 		erq->length = 0;
 		erq->flags = IW_ENCODE_DISABLED;
 	} else {
@@ -395,6 +395,8 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 	struct ieee80211channel *c;
 	int i;
 	
+	if (ic->ic_opmode == IEEE80211_M_STA)
+		return 0;
 	if (freq->e > 1)
 		return -EINVAL;
 	if (freq->e == 1)
@@ -464,9 +466,15 @@ ieee80211_ioctl_giwessid(struct net_device *dev,
 			data->length = ic->ic_des_esslen;
 		memcpy(essid, ic->ic_des_essid, data->length);
 	} else {
-		if (data->length > ic->ic_bss.ni_esslen)
-			data->length = ic->ic_bss.ni_esslen;
-		memcpy(essid, ic->ic_bss.ni_essid, data->length);
+		if (strlen(ic->ic_des_essid) == 0) {
+			if (data->length > ic->ic_bss.ni_esslen)
+				data->length = ic->ic_bss.ni_esslen;
+			memcpy(essid, ic->ic_bss.ni_essid, data->length);
+		} else {
+			if (data->length > ic->ic_des_esslen)
+				data->length = ic->ic_des_esslen;
+			memcpy(essid, ic->ic_des_essid, data->length);
+		}
 	}
 	return 0;
 }
@@ -570,6 +578,7 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 	switch (*mode) {
 	case IW_MODE_INFRA:
 		/* NB: this is the default */
+		ic->ic_des_chan = IEEE80211_CHAN_ANYC;
 		break;
 	case IW_MODE_ADHOC:
 		ifr.ifr_media |= IFM_IEEE80211_ADHOC;
@@ -986,31 +995,50 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	int value = i[1];		/* NB: all values are TYPE_INT */
 	struct ifmediareq imr;
 	struct ifreq ifr;
-
-	memset(&imr, 0, sizeof(imr));
-	(*ic->ic_media.ifm_status)(dev, &imr);
-
-	memset(&ifr, 0, sizeof(ifr));
+	int retv = EOPNOTSUPP;
 
 	switch (param) {
 	case IEEE80211_PARAM_TURBO:
+		memset(&imr, 0, sizeof(imr));
+		(*ic->ic_media.ifm_status)(dev, &imr);
+		memset(&ifr, 0, sizeof(ifr));
 		if (value)
 			imr.ifm_active |= IFM_IEEE80211_TURBO;
 		else
 			imr.ifm_active &= ~IFM_IEEE80211_TURBO;
 		ifr.ifr_media = imr.ifm_active;
+		retv =  ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
 	case IEEE80211_PARAM_MODE:
-		ifr.ifr_media = (imr.ifm_active &~ IFM_MMASK)
-			      | IFM_MAKEMODE(value);
+		memset(&imr, 0, sizeof(imr));
+		(*ic->ic_media.ifm_status)(dev, &imr);
+		memset(&ifr, 0, sizeof(ifr));
+
+		switch (value) {
+		case IFM_IEEE80211_11A:
+		case IFM_IEEE80211_11G:
+			ifr.ifr_media = IFM_IEEE80211 | IFM_IEEE80211_OFDM54 |
+				IFM_MAKEMODE(value);
+			break;
+		default:
+			ifr.ifr_media = IFM_IEEE80211 | IFM_IEEE80211_DS11 |
+				IFM_MAKEMODE(value);
+			break;
+		}
+		retv =  ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
-	default:
-		return -EOPNOTSUPP;
+	case    IEEE80211_PARAM_RESET:
+		switch (value) {
+		case IEEE80211_PARAM_RESET_INIT:
+			retv = (*ic->ic_init)(dev);
+			break;
+		case IEEE80211_PARAM_RESET_RESET:
+			(*ic->ic_reset)(dev);
+			retv = 0;
+			break;
+		}
 	}
-
-	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
-
-	return 0;
+	return -retv;
 }
 
 static int
@@ -1117,6 +1145,8 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "mode" },
 	{ IEEE80211_PARAM_MODE,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_mode" },
+	{ IEEE80211_PARAM_RESET,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
