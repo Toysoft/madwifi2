@@ -91,26 +91,34 @@ else
 KERNELPATH ?= $(firstword $(wildcard $(DESTDIR)/lib/modules/$(shell uname -r)/build /usr/src/linux))
 
 ifeq ($(KERNELPATH),)
-$(error KERNELPATH must be defined.)
+$(error KERNELPATH must be defined)
 endif
 
+endif
+
+# sanity check: does KERNELPATH exist?
+ifeq ($(wildcard $(KERNELPATH)),)
+$(error KERNELPATH: $(KERNELPATH) does not exist)
 endif
 
 # KERNELRELEASE is the target kernel's version.  If KERNELRELEASE
 # is not set in the environment then it is taken from the running
 # system.
-# KERNELRELEASE is determined from Makefile in KERNELPATH
-ifndef $(KERNELRELEASE)
-_KVER = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^VERSION' | cut -d"=" -f2))
-_KPL = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^PATCHLEVEL' | cut -d"=" -f2))
-_KSUB = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^SUBLEVEL' | cut -d"=" -f2))
-_KEXT = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^EXTRAVERSION' | cut -d"=" -f2))
-KERNELRELEASE=$(_KVER).$(_KPL).$(_KSUB)$(_KEXT)
-endif
+# KERNELRELEASE is determined from include/linux/version.h in
+# KERNELPATH
+#
+# Note: '\044' used instead of '$' in order to avoid make complaining like
+# "Recursive variable `KERNELRELEASE' references itself (eventually)."
+KERNELRELEASE ?= $(shell echo -e 'foo:\n\t@echo \044(KERNELRELEASE)\ninclude Makefile' | make -C $(KERNELPATH) -s -f-)
 
 # KERNELCONF is the name of the file that holds the configuration
 # of the target kernel.
 KERNELCONF ?=	${KERNELPATH}/.config
+
+# sanity check: does KERNELCONF exist?
+ifeq ($(wildcard $(KERNELCONF)),)
+$(error KERNELCONF: $(KERNELCONF) does not exist.)
+endif
 
 # SYSTEMMAP is the name of the System.map file for the target
 # kernel. This will be needed when DESTDIR is defined in order
@@ -127,7 +135,7 @@ endif
 
 # WIRELESSEXT contains information about the version of the wireless
 # extensions that are available in the target kernel
-WIRELESSEXT =	$(shell cat $(KERNELPATH)/include/linux/wireless.h | grep "\#define WIRELESS_EXT" | cut -f2)
+WIRELESSEXT ?=	$(shell cat $(KERNELPATH)/include/linux/wireless.h | grep "\#define WIRELESS_EXT" | cut -f2)
 
 # Some settings that depend on actual kernel release
 ifneq ($(findstring 2.6,$(KERNELRELEASE)),)
