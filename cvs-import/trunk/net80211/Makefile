@@ -103,7 +103,7 @@ EXTRA_CFLAGS+=$(INCS) ${COPTS}
 -include $(TOPDIR)/Rules.make
 
 all:
-	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR}  modules
 
 wlan.o:	$(wlan-objs)
 	$(LD) $(LDOPTS) -o wlan.$(KMODSUF) -r $(wlan-objs)

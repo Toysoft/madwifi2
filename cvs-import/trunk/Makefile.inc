@@ -164,3 +164,5 @@ INCS+= -isystem ${TOOLPATH}/include
 endif
 
 include ${HAL}/${OS}/${TARGET}.inc
+
+SYMBOLSDIR=${DEPTH}/symbols
