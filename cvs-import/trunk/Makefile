@@ -49,8 +49,3 @@ clean:
 	for i in ${DIRS}; do \
 		(cd $$i; make clean); \
 	done
-
-depend:
-	for i in ${DIRS}; do \
-		(cd $$i; make depend); \
-	done
