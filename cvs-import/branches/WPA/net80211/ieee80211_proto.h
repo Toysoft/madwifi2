@@ -65,6 +65,7 @@ struct ieee80211_cb {
 };
 
 extern	const char *ieee80211_mgt_subtype_name[];
+extern	const char *ieee80211_ctl_subtype_name[];
 
 extern	void ieee80211_proto_attach(struct ieee80211com *);
 extern	void ieee80211_proto_detach(struct ieee80211com *);
