@@ -38,6 +38,20 @@
 
 DESTDIR=
 #
+# Define this to build the HAL from source code
+#
+#HAL_SRC=	true
+#
+#
+# Define these for cross-compilation:
+#
+#CC=		/export/tools/bin/mips-linux-gcc
+#LD=		/export/tools/bin/mips-linux-ld
+#STRIP=		/export/tools/bin/mips-linux-strip
+STRIP=		strip
+TARGET_OPTS=
+#
+#
 # Path to the Linux kernel and kernel include files.
 #
 VERSION=	2.4.20
@@ -56,7 +70,8 @@ WLAN=	${DEPTH}/wlan
 #
 DRIVER=	${DEPTH}/driver
 
-COPTS=	-g -O -Wall -include ${DEPTH}/include/compat.h -I${DEPTH}/include
+COPTS=	-g -O -Wall ${TARGET_OPTS} \
+	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
 
 include ${KERNEL_PATH}/.config
 
