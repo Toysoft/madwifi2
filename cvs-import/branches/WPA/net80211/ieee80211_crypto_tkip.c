@@ -41,6 +41,7 @@
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/init.h>
 
 #ifdef CONFIG_USE_CRYPTO_API
 #include <linux/crypto.h>
