@@ -145,8 +145,6 @@ COPTS+=	-fomit-frame-pointer
 endif
 
 ifdef CONFIG_MODVERSIONS
-MODOPTS=-DMODVERSIONS -include $(KERNEL_PATH)/include/linux/modversions.h
-
 GENKSYMS=	/sbin/genksyms
 ifdef CONFIG_SMP
 GENKSYMS+=	-p smp_
@@ -158,11 +156,19 @@ endif
 # Wish we had proper conditionals to use here..
 #
 ifneq (${LINUX_VERSION}, 204)
+ifdef CONFIG_MODVERSIONS
+MODOPTS=	-DMODVERSIONS \
+		-include $(KERNEL_PATH)/include/linux/modsetver.h \
+		-DKBUILD_BASENAME=${KMODNAME} -DKBUILD_MODNAME=${KMODNAME}
+endif
 KMODSUF=	ko
 KERNEL_INCS+=	-I${KERNEL_PATH}/include/asm/mach-default
-MODOPTS+=	-DKBUILD_BASENAME=${KMODNAME} -DKBUILD_MODNAME=${KMODNAME}
 CLEANFILES+=	*.mod.c
 else
+ifdef CONFIG_MODVERSIONS
+MODOPTS=	-DMODVERSIONS \
+		-include $(KERNEL_PATH)/include/linux/modversions.h
+endif
 KMODSUF=	o
 endif
 #
