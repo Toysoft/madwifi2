@@ -523,7 +523,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		     struct ath_node *an, const struct ath_desc *ds)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
-	const struct ar5212_desc *ads = (const struct ar5212_desc *)ds;
+	const struct ar5212_desc *ads = (const struct ar5212_desc *)&ds->ds_ctl0;
 	int final_rate = 0;
 	int short_tries = 0;
 	int long_tries = 0;
@@ -676,9 +676,8 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct ath_node *an = ATH_NODE(ni);
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
-
-	int x = 0;
-	int y = 0;
+	const struct ieee80211_rateset *rs;
+	int r, x, y;
 	int srate;
 
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
@@ -722,9 +721,8 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * the node.  We know the rate is there because the
 		 * rate set is checked when the station associates.
 		 */
-		const struct ieee80211_rateset *rs =
-			&ic->ic_sup_rates[ic->ic_curmode];
-		int r = rs->rs_rates[ic->ic_fixed_rate] & IEEE80211_RATE_VAL;
+		rs = &ic->ic_sup_rates[ic->ic_curmode];
+		r = rs->rs_rates[ic->ic_fixed_rate] & IEEE80211_RATE_VAL;
 		/* NB: the rate set is assumed sorted */
 		for (; srate >= 0 && sn->rates[srate].rate != r; srate--)
 			;
