@@ -34,6 +34,7 @@
 #define	NBBY	8			/* number of bits/byte */
 
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
+#define	howmany(x, y)	(((x)+((y)-1))/(y))
 
 /* Bit map related macros. */
 #define	setbit(a,i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
