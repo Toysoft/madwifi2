@@ -49,9 +49,10 @@ struct ieee80211_wepkey {
 #define	IEEE80211_KEYIX_NONE	((u_int16_t) -1)
 
 struct ieee80211com;
+struct ieee80211_node;
 struct sk_buff;
 extern	void ieee80211_crypto_attach(struct ieee80211com *);
 extern	void ieee80211_crypto_detach(struct ieee80211com *);
 extern	struct sk_buff * ieee80211_wep_crypt(struct ieee80211com *,
-				struct sk_buff *skb0, int txflag);
+		struct ieee80211_node *, struct sk_buff *skb0, int txflag);
 #endif /* _NET80211_IEEE80211_CRYPTO_H_ */
