@@ -83,7 +83,7 @@ extern	struct sk_buff *ieee80211_encap(struct ieee80211com *, struct sk_buff *,
 		struct ieee80211_node **);
 
 /*
- * Return the size of the 802.11 header for a data frame.
+ * Return the size of the 802.11 header for a management or data frame.
  */
 static inline int
 ieee80211_hdrsize(const void *data)
@@ -91,11 +91,35 @@ ieee80211_hdrsize(const void *data)
 	const struct ieee80211_frame *wh = data;
 	int size = sizeof(struct ieee80211_frame);
 
+	/* NB: we don't handle control frames */
+	KASSERT((wh->i_fc[0]&IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_CTL,
+		("%s: control frame", __func__));
 	if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS)
 		size += IEEE80211_ADDR_LEN;
-	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS)
+	if ((wh->i_fc[0] &
+	    (IEEE80211_FC0_TYPE_MASK | IEEE80211_FC0_SUBTYPE_MASK)) ==
+	    (IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_QOS))
 		size += sizeof(u_int16_t);
 	return size;
+}
+
+/*
+ * Return the size of the 802.11 header; handles any type of frame.
+ */
+static inline int
+ieee80211_anyhdrsize(const void *data)
+{
+	const struct ieee80211_frame *wh = data;
+
+	if ((wh->i_fc[0]&IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) {
+		switch (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) {
+		case IEEE80211_FC0_SUBTYPE_CTS:
+		case IEEE80211_FC0_SUBTYPE_ACK:
+			return sizeof(struct ieee80211_frame_ack);
+		}
+		return sizeof(struct ieee80211_frame_min);
+	} else
+		return ieee80211_hdrsize(data);
 }
 
 /*
