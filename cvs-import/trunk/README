@@ -8,8 +8,8 @@ WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
 WARNING: USE AT YOUR OWN RISK!
 
 
-Atheros Driver For Linux
-=========================
+MADWIFI: Multimode Atheros Driver for WiFi on Linux
+===================================================
 
 * Copyright (c) 2002, 2003 Sam Leffler.  All rights reserved.
 
@@ -40,10 +40,16 @@ in NetBSD and then FreeBSD.
 The ath_hal module contains the Atheros Hardware Access Layer (HAL).
 This code manages much of the chip-specific operation of the driver.
 The HAL is provided in a binary-only form in order to comply with FCC
-regulations.  The file fcc.pdf contains these regulations.  Because the
-module is provided in a binary-only form it is marked "Proprietary"; this
-means when you load it you will see messages that your system is now
-"tainted".
+regulations.  In particular, a radio transmitter can only be operated
+at power levels and on frequency channels for which it is approved.
+The FCC requires that a software-defined radio cannot be configured
+by a user to operate outside the approved power levels and frequency
+channels.  This makes it difficult to open-source code that enforces
+limits on the power levels, frequency channels and other parameters
+of the radio transmitter.  See <http://xxxx.fcc.gov/somewhere.pdf>
+for the specific FCC regulation.  Because the module is provided in
+a binary-only form it is marked "Proprietary"; this means when you
+load it you will see messages that your system is now "tainted".
 
 If you wish to use this driver on a platform for which an ath_hal
 module is not already provided please contact the author.  Note that
@@ -78,10 +84,10 @@ Netgear WAB501		D-Link DWL-AG650	Linksys WMP55AG
 			D-Link DWL-AB650	Linksys WPC51AB
 
 In general, if a device is identified as ``11a only'' it is almost
-certain to contain an Atheros 5210 part in it.  There are several a+b
-combo parts but many retail products use the 5211.  Likewise for the
-latest generation of a+b+g combo products.  When in doubt check the PCI
-vendor id with a tool like lspci, the Atheros vendor id is 0x168c; e.g.
+certain to contain an Atheros 5210 part in it.  All retail a+b
+products use the 5211.  The latest generation of universal a+b+g
+combo products use the 5212.  When in doubt check the PCI vendor
+id with a tool like lspci, the Atheros vendor id is 0x168c; e.g.
 
    00:13.0 Ethernet controller: Unknown device 168c:0012 (rev 01)
 
@@ -186,14 +192,14 @@ Known Problems
 0. The driver uses the BSD queue.h macros for managing various data
    structures.  It has been pointed out that this may conflict with the
    equivalent Linux definitions in list.h potentially causing problems
-   in future versions of Linux.  The use of BSD macrs will be removed
+   in future versions of Linux.  The use of BSD macros will be removed
    in a future revision.
 
 1. Roaming mode is broken.  If you lose your access point by going out
    of range the driver does not automatically re-associate.
 2. Adhoc mode is untested and possibly/probably broken.
 3. Performance in lossy environments is suboptimal.  The algorithm used to
-   select the rate for transmitted packes is very simplistic.  There is no
+   select the rate for transmitted packets is very simplistic.  There is no
    software retransmit; only hardware retransmit is used.  Contributors are
    encouraged to replace the existing rate control algorithm with a better
    one (hint: all the information needed is available in the driver).
@@ -221,7 +227,7 @@ Known Problems
    server.  Forcing the DHCP server to use a unicast response causes this
    problem to go away (the guess is that the unicast frame is retransmitted
    by the AP while the broadcast frame is not).
-7. The driver does not fully enable power-save opertion of the chip;
+7. The driver does not fully enable power-save operation of the chip;
    consequently power use is suboptimal.
 8. Turbo mode is untested.
 
@@ -230,16 +236,17 @@ Acknowledgements
 ================
 This work could not have been done without the support of Atheros
 and in particular the efforts of Greg Chesson.  Comments from David
-Miller were helpful in cleaning up some of the rough edges in the driver.
+Miller were helpful in cleaning up some of the roughest edges in
+the driver.
 
 
 Feedback and Contributions
 ==========================
-This project is hosted at http://madwifi.sourceforge.  Fixes and
+This project is hosted at http://madwifi.sourceforge.net.  Fixes and
 enhancements are encouraged.  Please send all bug reports about this
 driver to:
 
-	madwifi-bugs@sourceforge.net
+	madwifi-bugs@lists.sourceforge.net
 
 When sending a problem report be sure to include the version of the
 driver and the part identification the driver prints to the console when
