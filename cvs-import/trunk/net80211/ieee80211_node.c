@@ -133,9 +133,7 @@ ieee80211_node_lateattach(struct ieee80211com *ic)
 	 * is determined by the authentication mode and the
 	 * setting of the PSK state.
 	 */
-	rsn->rsn_keymgmtset = (1<<WPA_ASE_8021X_UNSPEC)
-			    | (1<<WPA_ASE_8021X_PSK)
-			    ;
+	rsn->rsn_keymgmtset = WPA_ASE_8021X_UNSPEC | WPA_ASE_8021X_PSK;
 	rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
 
 	ni->ni_chan = IEEE80211_CHAN_ANYC;
