@@ -60,9 +60,18 @@
 #include <linux/etherdevice.h>
 #include <linux/sysctl.h>
 #include <linux/in.h>
+#include <linux/utsname.h>
+#include <linux/smp_lock.h>		/* for lock_kernel */
 
+#include <asm/uaccess.h>		/* for KERNEL_DS, et al */
+
+#ifdef CONFIG_CRYPTO
 #include <linux/crypto.h>
 #include <asm/scatterlist.h>
+#else
+#include "md5.h"
+#define	crypto_tfm			MD5Context
+#endif
 #include <linux/random.h>
 
 #include "if_media.h"
@@ -183,8 +192,15 @@ radiusd(void *arg)
 	u_int8_t *ap;
 	int len;
 
+	lock_kernel();
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	daemonize("kradiusd");
 	allow_signal(SIGKILL);
+#else
+	daemonize();
+	sprintf(current->comm, "kradiusd");
+	/* XXX equivalent for allow_signal */
+#endif
 
 	for (;;) {
 		msg.msg_name = &sin;
@@ -422,9 +438,14 @@ radiusd(void *arg)
 	 * cleanup work to us to avoid race conditions.
 	 */
 	radius_cleanup(rc);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	module_put_and_exit(0);
+#else
+	return 0;
+#endif
 }
 
+#ifdef CONFIG_CRYPTO
 /*
  * Write-around for bogus crypto API; requiring the address
  * address be specified twice can easily cause mistakes.
@@ -439,6 +460,40 @@ digest_update(struct radiuscom *rc, void *data, u_int len)
 	sg.length = len;
 	crypto_digest_update(rc->rc_md5, &sg, 1);
 }
+
+static void
+radius_hmac(struct radiuscom *rc, void *data, u_int len,
+	void *key, u_int keylen, u_int8_t hash[16])
+{
+	struct scatterlist sg;
+
+	sg.page = virt_to_page(data);
+	sg.offset = offset_in_page(data);
+	sg.length = len;
+
+	crypto_hmac(rc->rc_md5, key, &keylen, &sg, 1, hash);
+}
+#else /* !CONFIG_CRYPTO */
+/*
+ * Backwards compatibility shims to Jouni's md5 code
+ * for systems that lack the kernel crypto support.
+ */
+#define	crypto_digest_init(x)		MD5Init(x)
+#define	crypto_digest_final(x,h)	MD5Final(h,x)
+
+static __inline void
+digest_update(struct radiuscom *rc, void *data, u_int len)
+{
+	MD5Update(rc->rc_md5, data, len);
+}
+
+static void
+radius_hmac(struct radiuscom *rc, void *data, u_int len,
+	void *key, u_int keylen, u_int8_t hash[16])
+{
+	hmac_md5(key, keylen, data, len, hash);
+}
+#endif
 
 /*
  * Verify the authenticator hash in each reply using
@@ -464,19 +519,6 @@ radius_check_auth(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 
 	memcpy(ahp->ah_auth, orighash, sizeof(ahp->ah_auth));
 	return (memcmp(ahp->ah_auth, hash, sizeof(hash)) == 0);
-}
-
-static void
-radius_hmac(struct radiuscom *rc, void *data, u_int len,
-	void *key, u_int keylen, u_int8_t hash[16])
-{
-	struct scatterlist sg;
-
-	sg.page = virt_to_page(data);
-	sg.offset = offset_in_page(data);
-	sg.length = len;
-
-	crypto_hmac(rc->rc_md5, key, &keylen, &sg, 1, hash);
 }
 
 /*
@@ -1461,9 +1503,13 @@ ieee80211_radius_attach(struct eapolcom *ec)
 	memcpy(rc->rc_secret, radius_secret, radius_secretlen);
 	rc->rc_secretlen = radius_secretlen;
 
+#ifdef CONFIG_CRYPTO
 	rc->rc_md5 = crypto_alloc_tfm("md5", 0);
+#else
+	MALLOC(rc->rc_md5, struct crypto_tfm *, sizeof(struct crypto_tfm),
+		M_DEVBUF, M_NOWAIT | M_ZERO);
+#endif
 	if (rc->rc_md5 == NULL) {
-		/* XXX fallback on internal implementation? */
 		printf("%s: unable to allocate md5 crypto state\n", __func__);
 		eapolstats.rs_nocrypto++;
 		goto bad;
@@ -1531,7 +1577,11 @@ radius_cleanup(struct radiuscom *rc)
 	if (rc->rc_sock != NULL)
 		sock_release(rc->rc_sock);
 	if (rc->rc_md5 != NULL)
+#ifdef CONFIG_CRYPTO
 		crypto_free_tfm(rc->rc_md5);
+#else
+		FREE(rc->rc_md5, M_DEVBUF);
+#endif
 	if (rc->rc_secret != NULL)
 		FREE(rc->rc_secret, M_DEVBUF);
 	FREE(rc, M_DEVBUF);
@@ -1707,7 +1757,7 @@ static struct ctl_table_header *radius_sys;
 /*
  * Called once on startup.
  */
-int __init
+int
 init_ieee80211_radius(void)
 {
 #ifndef __linux__
@@ -1727,7 +1777,7 @@ init_ieee80211_radius(void)
 /*
  * Called once at shutdown/unload.
  */
-void __exit
+void
 exit_ieee80211_radius(void)
 {
 	if (radius_sys)
