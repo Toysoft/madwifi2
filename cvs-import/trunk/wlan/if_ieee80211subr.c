@@ -3327,11 +3327,13 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		ieee80211_reset_recvhist(ni);
 		switch (ostate) {
 		case IEEE80211_S_INIT:
-			if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
+			if ((ic->ic_opmode == IEEE80211_M_HOSTAP ||
+			    ic->ic_opmode == IEEE80211_M_IBSS) &&
 			    ic->ic_des_chan != IEEE80211_CHAN_ANYC) {
 				/*
 				 * AP operation and we already have a channel;
 				 * bypass the scan and startup immediately.
+				 * Same applies to ad-hoc mode.
 				 */
 				ieee80211_create_ibss(dev, ic->ic_des_chan);
 			} else {
