@@ -35,4 +35,4 @@
  *
  * $Id$
  */
-#define	WLAN_VERSION	"0.8.2.3-WPA"
+#define	WLAN_VERSION	"0.8.2.4-WPA"
