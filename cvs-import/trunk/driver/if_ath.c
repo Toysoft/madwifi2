@@ -399,6 +399,7 @@ ath_init(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t val;
 	HAL_STATUS status;
+	int i;
 
 	DPRINTF(("ath_init\n"));
 	/*
@@ -454,12 +455,14 @@ ath_init(struct net_device *dev)
 	 * to kick the 802.11 state machine as it's likely to
 	 * immediately call back to us to send mgmt frames.
 	 */
+	ni = &ic->ic_bss;
+	ieee80211_set_node(ic, ni, ic->ic_ibss_chan);
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-		int i;
 		ni->ni_chan = ic->ic_ibss_chan;
 		ni->ni_intval = ic->ic_lintval;
 		ni->ni_rssi = 0;
 		ni->ni_rstamp = 0;
+		ni->ni_rantenna = 0;
 		memset(ni->ni_tstamp, 0, sizeof(ni->ni_tstamp));
 		ni->ni_nrate = 0;
 		for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
@@ -478,7 +481,6 @@ ath_init(struct net_device *dev)
 		ic->ic_state = IEEE80211_S_SCAN;	/*XXX*/
 		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
 	} else {
-		ni->ni_chan = ic->ic_ibss_chan;
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 	}
 
@@ -697,7 +699,7 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 		u_int64_t tsf;
 		u_int32_t *tstamp;
 
-		tsf = ath_hal_gettsf(ah);
+		tsf = ath_hal_gettsf64(ah);
 		/* XXX: adjust 100us delay to xmit */
 		tsf += 100;
 		tstamp = (u_int32_t *)&wh[1];
@@ -1264,8 +1266,10 @@ ath_rx_tasklet(void *data)
 		}
 		stats->rx_packets++;
 		stats->rx_bytes += len;
-		ieee80211_input(dev, skb, ds->ds_rxstat.rs_rssi,
-			ds->ds_rxstat.rs_tstamp);
+		ieee80211_input(dev, skb,
+			ds->ds_rxstat.rs_rssi,
+			ds->ds_rxstat.rs_tstamp,
+			ds->ds_rxstat.rs_antenna);
   rx_next:
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	} while (ath_rxbuf_init(sc, bf) == 0);
@@ -1293,9 +1297,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	u_int8_t *ivp;
 	u_int8_t hdrbuf[sizeof(struct ieee80211_frame) +
 	    IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN];
-	u_int subtype, flags, ctsduration;
+	u_int subtype, flags, ctsduration, antenna;
 	HAL_PKT_TYPE atype;
 	const HAL_RATE_TABLE *rt;
+	HAL_BOOL shortPreamble;
+	struct ath_nodestat *st;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
@@ -1342,6 +1348,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	bf->bf_skb = skb;
 	bf->bf_node = ni;
 
+	/* setup descriptors */
 	ds = bf->bf_desc;
 	rt = sc->sc_rates[ni->ni_mode];
 
@@ -1372,19 +1379,25 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 * XXX insert rate control work here.
 		 */
 		txrate = ni->ni_rates[ni->ni_txrate];
+		/* XXX use table lookup */
 		for (rix = 0; rix < rt->rateCount; rix++)
 			if (txrate == rt->info[rix].dot11Rate)
 				break;
+		/* XXX verify valid rate */
 		break;
 	}
 	if (IEEE80211_IS_CHAN_PUREG(ni->ni_chan)) {
 		/* 11g always uses long preamble */
 		txrate = rt->info[rix].rateCode;
-		flags &= ~HAL_TXDESC_SHORTPRE;
+		shortPreamble = AH_FALSE;
+	} else if (IEEE80211_IS_CHAN_B(ni->ni_chan)) {
+		/* long preamble XXX is this right? */
+		txrate = rt->info[rix].rateCode;
+		shortPreamble = AH_FALSE;
 	} else {
 		/* XXX no control over long/short preamble */
 		txrate = rt->info[rix].rateCode | rt->info[rix].shortPreamble;
-		flags |= HAL_TXDESC_SHORTPRE;
+		shortPreamble = AH_TRUE;
 	}
 
 	/*
@@ -1402,19 +1415,29 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		ctsrate = rt->info[rix].rateCode;
 		if (flags & HAL_TXDESC_RTSENA) {	/* SIFS + CTS */
 			ctsduration += ath_hal_computetxtime(ah,
-				rt, IEEE80211_ACK_SIZE,
-				ctsrate, (flags & HAL_TXDESC_SHORTPRE) != 0);
+				rt, IEEE80211_ACK_SIZE, ctsrate, shortPreamble);
 		}
 		/* SIFS + data */
 		ctsduration += ath_hal_computetxtime(ah, rt, pktlen,
-			txrate, (flags & HAL_TXDESC_SHORTPRE) != 0);
+			txrate, shortPreamble);
 		if ((flags & HAL_TXDESC_NOACK) == 0) {	/* SIFS + ACK */
 			ctsduration += ath_hal_computetxtime(ah,
-				rt, IEEE80211_ACK_SIZE,
-				ctsrate, (flags & HAL_TXDESC_SHORTPRE) != 0);
+				rt, IEEE80211_ACK_SIZE, ctsrate, shortPreamble);
 		}
 	} else
 		ctsrate = 0;
+
+	/*
+	 * For now use the antenna on which the last good
+	 * frame was received on.  We assume this field is
+	 * initialized to 0 which gives us ``auto'' or the
+	 * ``default'' antenna.
+	 */
+	st = ni->ni_private;
+	if (st->st_tx_antenna)
+		antenna = st->st_tx_antenna;
+	else
+		antenna = ni->ni_rantenna;
 
 	/*
 	 * Formulate first tx descriptor with tx controls.
@@ -1426,7 +1449,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		, 60			/* txpower XXX */
 		, txrate, 1+10		/* series 0 rate/tries */
 		, iswep ? sc->sc_ic.ic_wep_txkey : HAL_TXKEYIX_INVALID
-		, 0			/* antenna mode */
+		, antenna		/* antenna mode */
 		, flags			/* flags */
 		, ctsrate		/* rts/cts rate */
 		, ctsduration		/* rts/cts duration */
@@ -1481,6 +1504,7 @@ ath_tx_tasklet(void *data)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 	struct ath_desc *ds;
+	struct ieee80211_node *ni;
 	struct ath_nodestat *st;
 	int sr, lr;
 	HAL_STATUS status;
@@ -1509,11 +1533,13 @@ ath_tx_tasklet(void *data)
 		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
 		spin_unlock(&sc->sc_txqlock);
 
-		if (bf->bf_node != NULL) {
-			st = bf->bf_node->ni_private;
-			if (ds->ds_txstat.ts_status == 0)
+		ni = bf->bf_node;
+		if (ni != NULL) {
+			st = ni->ni_private;
+			if (ds->ds_txstat.ts_status == 0) {
 				st->st_tx_ok++;
-			else {
+				st->st_tx_antenna = ds->ds_txstat.ts_antenna;
+			} else {
 				st->st_tx_err++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
 					sc->sc_stats.ast_tx_xretries++;
@@ -1521,12 +1547,14 @@ ath_tx_tasklet(void *data)
 					sc->sc_stats.ast_tx_fifoerr++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
 					sc->sc_stats.ast_tx_filtered++;
+				st->st_tx_antenna = 0;	/* invalidate */
 			}
 			sr = ds->ds_txstat.ts_shortretry;
 			lr = ds->ds_txstat.ts_longretry;
 			sc->sc_stats.ast_tx_shortretry += sr;
 			sc->sc_stats.ast_tx_longretry += lr;
-			st->st_tx_retr += sr + lr;
+			if (sr + lr)
+				st->st_tx_retr++;
 		}
 		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
@@ -1775,7 +1803,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni = &ic->ic_bss;	/* NB: no reference */
+	struct ieee80211_node *ni;
 	struct ath_nodestat *st;
 	int i, error;
 	u_int8_t *bssid;
@@ -1794,7 +1822,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	};
 
 	ostate = ic->ic_state;
-	now = (ath_hal_gettsf(ah) >> 10) & 0xffff;
+	now = (ath_hal_gettsf32(ah) >> 10) & 0xffff;
 
 	DPRINTF(("ath_newstate: %s -> %s (%u)\n",
 	    stname[ostate], stname[nstate], now));
@@ -1806,6 +1834,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		error = 0;			/* cheat + use error return */
 		goto bad;
 	}
+	ni = &ic->ic_bss;
 	error = ath_chan_set(sc, ni->ni_chan);
 	if (error != 0)
 		goto bad;
@@ -1886,6 +1915,57 @@ bad:
 }
 
 static int
+ath_getchannels(struct net_device *dev, u_int cc, HAL_BOOL outdoor)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_hal *ah = sc->sc_ah;
+	HAL_CHANNEL *chans;
+	int i, ix, nchan;
+
+	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
+	if (chans == NULL) {
+		printk("%s: unable to allocate channel table\n", dev->name);
+		return ENOMEM;
+	}
+	/* XXX where does the country code, et. al. come from? */
+	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
+	    CTRY_DEFAULT, HAL_MODE_ALL, AH_TRUE)) {
+		printk("%s: unable to collect channel list from hal\n",
+			dev->name);
+		kfree(chans);
+		return EINVAL;
+	}
+
+	/*
+	 * Convert HAL channels to ieee80211 ones and insert
+	 * them in the table according to their channel number.
+	 */
+	for (i = 0; i < nchan; i++) {
+		HAL_CHANNEL *c = &chans[i];
+		ix = ath_hal_mhz2ieee(c->channel, c->channelFlags);
+		if (ix > IEEE80211_CHAN_MAX) {
+			printk("%s: bad hal channel %u (%u/%x) ignored\n",
+				dev->name, ix, c->channel, c->channelFlags);
+			continue;
+		}
+		/* NB: flags are known to be compatible */
+		if (ic->ic_channels[ix].ic_freq == 0) {
+			ic->ic_channels[ix].ic_freq = c->channel;
+			ic->ic_channels[ix].ic_flags = c->channelFlags;
+		} else {
+#ifdef notdef
+			/* XXX 802.11 code can't handle this right now */
+			/* channels overlap; e.g. 11g and 11a/b */
+			ic->ic_channels[ix].ic_flags |= c->channelFlags;
+#endif
+		}
+	}
+	kfree(chans);
+	return 0;
+}
+
+static int
 ath_rate_setup(struct net_device *dev, u_int mode)
 {
 	struct ath_softc *sc = dev->priv;
@@ -1912,14 +1992,16 @@ ath_rate_setup(struct net_device *dev, u_int mode)
 		DPRINTF(("%s: invalid mode %u\n", __func__, mode));
 		return 0;
 	}
-	r = ic->ic_sup_rates[mode];
 	rt = sc->sc_rates[mode];
+	if (rt == NULL)
+		return 0;
 	if (rt->rateCount > IEEE80211_RATE_SIZE) {
 		DPRINTF(("%s: rate table too small (%u > %u)\n",
 			__func__, rt->rateCount, IEEE80211_RATE_SIZE));
 		maxrates = IEEE80211_RATE_SIZE;
 	} else
 		maxrates = rt->rateCount;
+	r = ic->ic_sup_rates[mode];
 	/* XXX must mark basic rates for 11g */
 	for (i = 0; i < maxrates; i++)
 		*r++ = rt->info[i].dot11Rate;
@@ -2060,51 +2142,6 @@ ath_getstats(struct net_device *dev)
 	stats->rx_missed_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TOR];
 
 	return stats;
-}
-
-static int
-ath_getchannels(struct net_device *dev, u_int cc, HAL_BOOL outdoor)
-{
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ath_hal *ah = sc->sc_ah;
-#define	ATH_MAXCHAN	32		/* number of potential channels */
-	HAL_CHANNEL chans[ATH_MAXCHAN];	/* XXX get off stack */
-	int i, ix, nchan;
-
-	/* XXX where does the country code, et. al. come from? */
-	if (!ath_hal_init_channels(ah, chans, ATH_MAXCHAN, &nchan,
-	    CTRY_DEFAULT, HAL_MODE_ALL, AH_TRUE)) {
-		printk("%s: unable to collect channel list from hal\n",
-			dev->name);
-		return EINVAL;
-	}
-
-	/*
-	 * Convert HAL channels to ieee80211 ones and insert
-	 * them in the table according to their channel number.
-	 */
-	for (i = 0; i < nchan; i++) {
-		HAL_CHANNEL *c = &chans[i];
-		ix = ath_hal_mhz2ieee(c->channel, c->channelFlags);
-		if (ix > IEEE80211_CHAN_MAX) {
-			printk("%s: bad hal channel %u (%u/%x) ignored\n",
-				dev->name, ix, c->channel, c->channelFlags);
-			continue;
-		}
-		/* NB: flags are known to be compatible */
-		if (ic->ic_channels[ix].ic_freq == 0) {
-			ic->ic_channels[ix].ic_freq = c->channel;
-			ic->ic_channels[ix].ic_flags = c->channelFlags;
-		} else {
-#ifdef notdef
-			/* XXX 802.11 code can't handle this right now */
-			/* channels overlap; e.g. 11g and 11a/b */
-			ic->ic_channels[ix].ic_flags |= c->channelFlags;
-#endif
-		}
-	}
-	return 0;
 }
 
 #ifdef CONFIG_PROC_FS

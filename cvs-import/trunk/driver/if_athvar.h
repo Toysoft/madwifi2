@@ -47,6 +47,7 @@ struct ath_nodestat {
 	u_int		st_tx_err;	/* tx ok pkt */
 	u_int		st_tx_retr;	/* tx retry count */
 	int		st_tx_upper;	/* tx upper rate req cnt */
+	u_int		st_tx_antenna;	/* antenna for last good frame */
 };
 
 struct ath_stats {
@@ -159,6 +160,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
  */
 #define	ath_hal_reset(_ah, _opmode, _chan, _outdoor, _pstatus) \
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
+#define	ath_hal_getratetable(_ah, _mode) \
+	((*(_ah)->ah_getRateTable)((_ah), (_mode)))
 #define	ath_hal_getmac(_ah, _mac) \
 	((*(_ah)->ah_getMacAddress)((_ah), (_mac)))
 #define	ath_hal_detach(_ah) \
@@ -193,8 +196,10 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_waitForBeaconDone)((_ah), (_bf)->bf_daddr))
 #define	ath_hal_putrxbuf(_ah, _bufaddr) \
 	((*(_ah)->ah_setRxDP)((_ah), (_bufaddr)))
-#define	ath_hal_gettsf(_ah) \
-	((*(_ah)->ah_getTsf)((_ah)))
+#define	ath_hal_gettsf32(_ah) \
+	((*(_ah)->ah_getTsf32)((_ah)))
+#define	ath_hal_gettsf64(_ah) \
+	((*(_ah)->ah_getTsf64)((_ah)))
 #define	ath_hal_rxena(_ah) \
 	((*(_ah)->ah_enableReceive)((_ah)))
 #define	ath_hal_puttxbuf(_ah, _q, _bufaddr) \
