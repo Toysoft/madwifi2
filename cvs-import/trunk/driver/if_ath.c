@@ -61,7 +61,7 @@ static void	ath_fatal_tasklet(void *);
 static void	ath_rxorn_tasklet(void *);
 static void	ath_bmiss_tasklet(void *);
 static int	ath_stop(struct net_device *);
-static void	ath_watchdog(struct net_device *);
+static void	ath_ratectl(unsigned long);
 static void	ath_initkeytable(struct ath_softc *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
@@ -196,9 +196,15 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 			dev->name, error);
 		goto bad;
 	}
+
+	init_timer(&sc->sc_rate_ctl);
+	sc->sc_rate_ctl.data = (unsigned long) dev;
+	sc->sc_rate_ctl.function = ath_ratectl;
+
 	init_timer(&sc->sc_scan_ch);
 	sc->sc_scan_ch.function = ath_next_scan;
 	sc->sc_scan_ch.data = (unsigned long) dev;
+
 	init_timer(&sc->sc_cal_ch);
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) dev;
@@ -212,7 +218,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	dev->get_stats = ath_getstats;
 	dev->tx_queue_len = ATH_TXBUF-1;		/* 1 for mgmt frame */
 
-	ic->ic_watchdog = ath_watchdog;
 	ic->ic_mgtstart = ath_mgtstart;
 	ic->ic_init = ath_init;
 
@@ -498,6 +503,11 @@ ath_init(struct net_device *dev)
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 	}
 
+	/*
+	 * Start the background rate control thread.
+	 */
+	mod_timer(&sc->sc_rate_ctl, jiffies + HZ);
+
 	return 0;
 }
 
@@ -528,7 +538,7 @@ ath_stop(struct net_device *dev)
 		 */
 		netif_stop_queue(dev);
 		dev->flags &= ~IFF_RUNNING;
-		sc->sc_ic.ic_timer = 0;
+		/* XXX how/when to stop ieee80211 timer? */
 		if (!sc->sc_invalid)
 			ath_hal_intrset(ah, 0);
 		ath_draintxq(sc);
@@ -538,6 +548,7 @@ ath_stop(struct net_device *dev)
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);
 		ieee80211_new_state(dev, IEEE80211_S_INIT, -1);
+		del_timer(&sc->sc_rate_ctl);
 		if (!sc->sc_invalid)
 			ath_hal_setpower(ah, HAL_PM_FULL_SLEEP, 0);
 	}
@@ -749,25 +760,6 @@ bad:
 	}
 	dev_kfree_skb(skb);
 	return error;
-}
-
-static void
-ath_watchdog(struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
-
-	ic->ic_timer = 0;
-	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid)
-		return;
-	if (ic->ic_opmode == IEEE80211_M_STA)
-		ath_rate_ctl(sc, &ic->ic_bss);
-	else {
-		struct ieee80211_node *ni;
-		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
-			ath_rate_ctl(sc, ni);
-	}
-	ieee80211_watchdog(dev);
 }
 
 /*
@@ -1113,10 +1105,13 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
         struct ath_softc *sc = ic->ic_dev.priv;
 	struct ath_buf *bf;
 
+	/* XXX do we need to block bh? */
+	spin_lock_bh(&sc->sc_txqlock);
 	TAILQ_FOREACH(bf, &sc->sc_txq, bf_list) {
 		if (bf->bf_node == ni)
 			bf->bf_node = NULL;
 	}
+	spin_unlock_bh(&sc->sc_txqlock);
 }
 
 static int
@@ -1879,6 +1874,26 @@ ath_rate_ctl(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 	if (ni->ni_txrate != orate || enough)
 		st->st_tx_ok = st->st_tx_err = st->st_tx_retr = 0;
+}
+
+static void
+ath_ratectl(unsigned long data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+
+	if (dev->flags & IFF_RUNNING) {
+		if (ic->ic_opmode == IEEE80211_M_STA)
+			ath_rate_ctl(sc, &ic->ic_bss);
+		else {
+			struct ieee80211_node *ni;
+			TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
+				ath_rate_ctl(sc, ni);
+		}
+	}
+	sc->sc_rate_ctl.expires = jiffies + HZ;		/* once a second */
+	add_timer(&sc->sc_rate_ctl);
 }
 
 #ifdef AR_DEBUG

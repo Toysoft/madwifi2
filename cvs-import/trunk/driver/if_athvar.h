@@ -128,6 +128,7 @@ struct ath_softc {
 	struct tq_struct	sc_swbatq;	/* swba intr tasklet */
 	struct tq_struct	sc_bmisstq;	/* bmiss intr tasklet */
 
+	struct timer_list	sc_rate_ctl;	/* tx rate control timer */
 	struct timer_list	sc_cal_ch;	/* calibration timer */
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
