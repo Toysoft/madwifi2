@@ -593,6 +593,9 @@ eapol_auth_step(struct eapol_auth_node *ean)
 			 * longer associated at this point so we do
 			 * not maintain state.
 			 */
+			IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1XSM,
+				("[%s] reauth limit reached, deauth station\n",
+				ether_sprintf(ean->ean_node->ni_macaddr)));
 			IEEE80211_SEND_MGMT(ean->ean_ic, ean->ean_node,
 				IEEE80211_FC0_SUBTYPE_DEAUTH,
 				IEEE80211_REASON_AUTH_EXPIRE);
@@ -1192,9 +1195,9 @@ eapol_reauth_setperiod(struct eapol_auth_node *ean, int timeout)
 	else
 		ean->ean_reAuthPeriod = timeout;
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1X,
-		("[%s] reauthentication period set to %u, timeout %u\n",
+		("[%s] reauthentication period set to %u secs\n",
 		ether_sprintf(ean->ean_node->ni_macaddr),
-		ean->ean_reAuthPeriod, timeout));
+		ean->ean_reAuthPeriod));
 }
 
 /*
