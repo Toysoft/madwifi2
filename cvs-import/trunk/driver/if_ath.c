@@ -2870,25 +2870,45 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 {
 #define	RATE(_ix)	(ni->ni_rates.rs_rates[(_ix)] & IEEE80211_RATE_VAL)
 	struct ieee80211com *ic = &sc->sc_ic;
+	int srate;
 
 	KASSERT(ni->ni_rates.rs_nrates > 0, ("no rates"));
 	if (ic->ic_fixed_rate == -1) {
-		/* start with highest negotiated rate */
-		int srate = ni->ni_rates.rs_nrates - 1;
+		/*
+		 * No fixed rate is requested. For 11b start with
+		 * the highest negotiated rate; otherwise, for 11g
+		 * and 11a, we start "in the middle" at 24Mb or 36Mb.
+		 */
+		srate = ni->ni_rates.rs_nrates - 1;
 		if (sc->sc_curmode != IEEE80211_MODE_11B) {
 			/*
-			 * 11a and 11g work better if you start at 24Mb
-			 * or 36Mb and raise the rate.  Scan the negotiated
-			 * rate set to find the closest rate.
+			 * Scan the negotiated rate set to find the
+			 * closest rate.
 			 */
-			/* NB: rate set assumed sorted */
+			/* NB: the rate set is assumed sorted */
 			for (; srate >= 0 && RATE(srate) > 72; srate--)
 				;
 			KASSERT(srate >= 0, ("bogus rate set"));
 		}
-		ath_rate_update(sc, ni, srate);
-	} else
-		ath_rate_update(sc, ni, ic->ic_fixed_rate);
+	} else {
+		/*
+		 * A fixed rate is to be used; ic_fixed_rate is an
+		 * index into the supported rate set.  Convert this
+		 * to the index into the negotiated rate set for
+		 * the node.  We know the rate is there because the
+		 * rate set is checked when the station associates.
+		 */
+		const struct ieee80211_rateset *rs =
+			&ic->ic_sup_rates[ic->ic_curmode];
+		int r = rs->rs_rates[ic->ic_fixed_rate] & IEEE80211_RATE_VAL;
+		/* NB: the rate set is assumed sorted */
+		srate = ni->ni_rates.rs_nrates - 1;
+		for (; srate >= 0 && RATE(srate) != r; srate--)
+			;
+		KASSERT(srate >= 0,
+			("fixed rate %d not in rate set", ic->ic_fixed_rate));
+	}
+	ath_rate_update(sc, ni, srate);
 #undef RATE
 }
 
