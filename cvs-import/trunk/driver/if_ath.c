@@ -241,7 +241,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	);
 	if (sc->sc_txhalq == (u_int) -1) {
 		printk("%s: unable to setup a data xmit queue!\n", dev->name);
-		goto bad;
+		goto bad2;
 	}
 	sc->sc_bhalq = ath_hal_setuptxqueue(ah,
 		HAL_TX_QUEUE_BEACON,
@@ -249,7 +249,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	);
 	if (sc->sc_bhalq == (u_int) -1) {
 		printk("%s: unable to setup a beacon xmit queue!\n", dev->name);
-		goto bad;
+		goto bad2;
 	}
 
 	init_timer(&sc->sc_rate_ctl);
@@ -323,6 +323,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	printk("%s: 802.11 address: %s\n",
 		dev->name, ether_sprintf(dev->dev_addr));
 	return 0;
+bad2:
+	ath_desc_free(sc);
 bad:
 	if (ah)
 		ath_hal_detach(ah);
