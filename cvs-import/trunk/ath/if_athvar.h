@@ -195,7 +195,7 @@ struct ath_softc {
 					int, int, u_int32_t);
 	int			(*sc_newstate)(struct ieee80211com *,
 					enum ieee80211_state, int);
-	void 			(*sc_node_free)(struct ieee80211com *,
+	void 			(*sc_node_cleanup)(struct ieee80211com *,
 					struct ieee80211_node *);
 	void			(*sc_node_copy)(struct ieee80211com *,
 					struct ieee80211_node *,

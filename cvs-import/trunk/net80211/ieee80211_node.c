@@ -53,7 +53,7 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211_node.c,v 1.8 2003/11/02 01:29:05 dyoung Ex
 
 static struct ieee80211_node *ieee80211_node_alloc(struct ieee80211com *);
 static void node_cleanup(struct ieee80211com *, struct ieee80211_node *);
-static void ieee80211_node_free(struct ieee80211com *, struct ieee80211_node *);
+static void node_free(struct ieee80211com *, struct ieee80211_node *);
 static void ieee80211_node_copy(struct ieee80211com *,
 		struct ieee80211_node *, const struct ieee80211_node *);
 static u_int8_t ieee80211_node_getrssi(struct ieee80211com *,
@@ -74,7 +74,8 @@ ieee80211_node_attach(struct ieee80211com *ic)
 	IEEE80211_NODE_LOCK_INIT(ic, ic->ic_ifp->if_xname);
 	TAILQ_INIT(&ic->ic_node);
 	ic->ic_node_alloc = ieee80211_node_alloc;
-	ic->ic_node_free = ieee80211_node_free;
+	ic->ic_node_free = node_free;
+	ic->ic_node_cleanup = node_cleanup;
 	ic->ic_node_copy = ieee80211_node_copy;
 	ic->ic_node_getrssi = ieee80211_node_getrssi;
 	ic->ic_scangen = 1;
@@ -103,7 +104,7 @@ ieee80211_node_lateattach(struct ieee80211com *ic)
 	struct ieee80211_node *ni;
 	struct ieee80211_rsnparms *rsn;
 
-	ni = (*ic->ic_node_alloc)(ic);
+	ni = ic->ic_node_alloc(ic);
 	KASSERT(ni != NULL, ("unable to setup inital BSS node"));
 	/*
 	 * Setup "global settings" in the bss node so that
@@ -154,7 +155,7 @@ ieee80211_node_detach(struct ieee80211com *ic)
 {
 
 	if (ic->ic_bss != NULL) {
-		(*ic->ic_node_free)(ic, ic->ic_bss);
+		ic->ic_node_free(ic, ic->ic_bss);
 		ic->ic_bss = NULL;
 	}
 	ieee80211_free_allnodes(ic);
@@ -530,7 +531,7 @@ ieee80211_sta_join(struct ieee80211com *ic, struct ieee80211_node *selbs)
 {
 
 	/* XXX leak existing state in ic_bss? */
-	(*ic->ic_node_copy)(ic, ic->ic_bss, selbs);
+	ic->ic_node_copy(ic, ic->ic_bss, selbs);
 	/*
 	 * Set the erp state (mostly the slot time) to deal with
 	 * the auto-select case; this should be redundant if the
@@ -570,7 +571,7 @@ void
 ieee80211_sta_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
 
-	node_cleanup(ic, ni);
+	ic->ic_node_cleanup(ic, ni);
 	ieee80211_notify_node_leave(ic, ni);
 }
 
@@ -617,9 +618,9 @@ node_cleanup(struct ieee80211com *ic, struct ieee80211_node *ni)
 }
 
 static void
-ieee80211_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
+node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-	node_cleanup(ic, ni);
+	ic->ic_node_cleanup(ic, ni);
 	FREE(ni, M_80211_NODE);
 }
 
@@ -638,7 +639,7 @@ ieee80211_node_copy(struct ieee80211com *ic,
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 	int i;
 
-	node_cleanup(ic, dst);
+	ic->ic_node_cleanup(ic, dst);
 	*dst = *src;
 	dst->ni_challenge = NULL;
 	dst->ni_wpa_ie = NULL;
@@ -689,7 +690,7 @@ ieee80211_setup_node(struct ieee80211com *ic,
 struct ieee80211_node *
 ieee80211_alloc_node(struct ieee80211com *ic, u_int8_t *macaddr)
 {
-	struct ieee80211_node *ni = (*ic->ic_node_alloc)(ic);
+	struct ieee80211_node *ni = ic->ic_node_alloc(ic);
 	if (ni != NULL)
 		ieee80211_setup_node(ic, ni, macaddr);
 	else
@@ -700,7 +701,7 @@ ieee80211_alloc_node(struct ieee80211com *ic, u_int8_t *macaddr)
 struct ieee80211_node *
 ieee80211_dup_bss(struct ieee80211com *ic, u_int8_t *macaddr)
 {
-	struct ieee80211_node *ni = (*ic->ic_node_alloc)(ic);
+	struct ieee80211_node *ni = ic->ic_node_alloc(ic);
 	if (ni != NULL) {
 		ieee80211_setup_node(ic, ni, macaddr);
 		/*
@@ -861,7 +862,7 @@ _ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 		if (ic->ic_set_tim)
 			(*ic->ic_set_tim)(ic, ni->ni_associd, 0);
 	}
-	(*ic->ic_node_free)(ic, ni);
+	ic->ic_node_free(ic, ni);
 }
 
 void
@@ -899,7 +900,7 @@ ieee80211_free_allnodes(struct ieee80211com *ic)
 	IEEE80211_NODE_UNLOCK_BH(ic);
 
 	if (ic->ic_bss != NULL)
-		node_cleanup(ic, ic->ic_bss);	/* for station mode */
+		ic->ic_node_cleanup(ic, ic->ic_bss);	/* for station mode */
 }
 
 /*
@@ -1222,5 +1223,5 @@ ieee80211_set_shortslottime(struct ieee80211com *ic, int onoff)
 		ic->ic_flags &= ~IEEE80211_F_SHSLOT;
 	/* notify driver */
 	if (ic->ic_updateslot != NULL)
-		(*ic->ic_updateslot)(ic->ic_dev);
+		ic->ic_updateslot(ic->ic_dev);
 }

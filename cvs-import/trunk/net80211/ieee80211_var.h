@@ -251,6 +251,8 @@ struct ieee80211com {
 	struct ieee80211_node	*(*ic_node_alloc)(struct ieee80211com *);
 	void			(*ic_node_free)(struct ieee80211com *,
 					struct ieee80211_node *);
+	void			(*ic_node_cleanup)(struct ieee80211com *,
+					struct ieee80211_node *);
 	void			(*ic_node_copy)(struct ieee80211com *,
 					struct ieee80211_node *,
 					const struct ieee80211_node *);
