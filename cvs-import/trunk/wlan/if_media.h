@@ -126,8 +126,8 @@ int	ifmedia_ioctl(struct net_device *, struct ifreq *ifr,
  *	----	-------
  *	0-4	Media variant
  *	5-7	Media type
- *	8-15	Type specific options
- *	16-19	RFU
+ *	8-17	Type specific options
+ *	18-19	RFU
  *	20-27	Shared (global) options
  *	28-31	Instance
  */
@@ -185,26 +185,35 @@ int	ifmedia_ioctl(struct net_device *, struct ifreq *ifr,
  * IEEE 802.11 Wireless
  */
 #define	IFM_IEEE80211	0x00000080
-#define	IFM_IEEE80211_FH1	3	/* Frequency Hopping 1Mbps */
-#define	IFM_IEEE80211_FH2	4	/* Frequency Hopping 2Mbps */
-#define	IFM_IEEE80211_DS1	5	/* Direct Sequence 1Mbps */
-#define	IFM_IEEE80211_DS2	6	/* Direct Sequence 2Mbps */
-#define	IFM_IEEE80211_DS5	7	/* Direct Sequence 5.5Mbps */
-#define	IFM_IEEE80211_DS11	8	/* Direct Sequence 11Mbps */
-#define	IFM_IEEE80211_DS22	9	/* Direct Sequence 22Mbps */
-#define IFM_IEEE80211_ODFM6	10	/* ODFM 6Mbps */
-#define IFM_IEEE80211_ODFM9	11	/* ODFM 9Mbps */
-#define IFM_IEEE80211_ODFM12	12	/* ODFM 12Mbps */
-#define IFM_IEEE80211_ODFM18	13	/* ODFM 18Mbps */
-#define IFM_IEEE80211_ODFM24	14	/* ODFM 24Mbps */
-#define IFM_IEEE80211_ODFM36	15	/* ODFM 36Mbps */
-#define IFM_IEEE80211_ODFM48	16	/* ODFM 48Mbps */
-#define IFM_IEEE80211_ODFM54	17	/* ODFM 54Mbps */
-#define IFM_IEEE80211_ODFM72	18	/* ODFM 72Mbps */
+/* NB: 0,1,2 are auto, manual, none defined below */
+#define	IFM_IEEE80211_1		3	/* 1Mbps */
+#define	IFM_IEEE80211_2		4	/* 2Mbps */
+#define	IFM_IEEE80211_5		5	/* 5.5Mbps */
+#define	IFM_IEEE80211_6		6	/* 6Mbps */
+#define	IFM_IEEE80211_9		7	/* 9Mbps */
+#define	IFM_IEEE80211_11	8	/* 11Mbps */
+#define	IFM_IEEE80211_12	9	/* 12Mbps */
+#define	IFM_IEEE80211_18	10	/* 18Mbps */
+#define	IFM_IEEE80211_22	11	/* 22Mbps */
+#define	IFM_IEEE80211_24	12	/* 24Mbps */
+#define	IFM_IEEE80211_36	13	/* 36Mbps */
+#define	IFM_IEEE80211_48	14	/* 48Mbps */
+#define	IFM_IEEE80211_54	15	/* 54Mbps */
+#define	IFM_IEEE80211_72	16	/* 72Mbps */
+#define	IFM_IEEE80211_96	17	/* 96Mbps */
+#define	IFM_IEEE80211_108	18	/* 108Mbps */
 #define	IFM_IEEE80211_ADHOC	0x00000100	/* Operate in Adhoc mode */
 #define	IFM_IEEE80211_HOSTAP	0x00000200	/* Operate in Host AP mode */
 #define	IFM_IEEE80211_IBSS	0x00000400	/* Operate in IBSS mode */
 #define	IFM_IEEE80211_IBSSMASTER 0x00000800	/* Operate as an IBSS master */
+#define	IFM_IEEE80211_ANY	0x00000000	/* Any mode */
+#define	IFM_IEEE80211_11A	0x00001000	/* 5Ghz, OFDM mode */
+#define	IFM_IEEE80211_TURBO	0x00002000	/* 5GHz, OFDM, 2x clock mode */
+#define	IFM_IEEE80211_11B	0x00004000	/* Direct Sequence mode */
+#define	IFM_IEEE80211_11G	0x00008000	/* 2Ghz, CCK mode */
+#define	IFM_IEEE80211_FH	0x00010000	/* Frequency Hopping mode */
+#define	IFM_IEEE80211_MODE	0x0003f000	/* Mode mask */
+#define	IFM_IEEE80211_MSHIFT	12		/* Mode shift */
 
 /*
  * Shared media sub-types
@@ -230,7 +239,7 @@ int	ifmedia_ioctl(struct net_device *, struct ifreq *ifr,
 #define	IFM_TMASK	0x0000001f	/* Media sub-type */
 #define	IFM_IMASK	0xf0000000	/* Instance */
 #define	IFM_ISHIFT	28		/* Instance shift */
-#define	IFM_OMASK	0x0000ff00	/* Type specific options */
+#define	IFM_OMASK	0x0003ff00	/* Type specific options */
 #define	IFM_GMASK	0x0ff00000	/* Global options */
 
 /*
@@ -371,49 +380,26 @@ struct ifmedia_description {
 }
 
 #define	IFM_SUBTYPE_IEEE80211_DESCRIPTIONS {				\
-	{ IFM_IEEE80211_FH1, "FH/1Mbps" },				\
-	{ IFM_IEEE80211_FH2, "FH/2Mbps" },				\
-	{ IFM_IEEE80211_DS1, "DS/1Mbps" },				\
-	{ IFM_IEEE80211_DS2, "DS/2Mbps" },				\
-	{ IFM_IEEE80211_DS5, "DS/5.5Mbps" },				\
-	{ IFM_IEEE80211_DS11, "DS/11Mbps" },				\
-	{ IFM_IEEE80211_DS22, "DS/22Mbps" },				\
-	{ IFM_IEEE80211_ODFM6, "ODFM/6Mbps" },				\
-	{ IFM_IEEE80211_ODFM9, "ODFM/9Mbps" },				\
-	{ IFM_IEEE80211_ODFM12, "ODFM/12Mbps" },			\
-	{ IFM_IEEE80211_ODFM18, "ODFM/18Mbps" },			\
-	{ IFM_IEEE80211_ODFM24, "ODFM/24Mbps" },			\
-	{ IFM_IEEE80211_ODFM36, "ODFM/36Mbps" },			\
-	{ IFM_IEEE80211_ODFM48, "ODFM/48Mbps" },			\
-	{ IFM_IEEE80211_ODFM54, "ODFM/54Mbps" },			\
-	{ IFM_IEEE80211_ODFM72, "ODFM/72Mbps" },			\
+	{ IFM_IEEE80211_1, "1Mbps" },					\
+	{ IFM_IEEE80211_2, "2Mbps" },					\
+	{ IFM_IEEE80211_5, "5.5Mbps" },					\
+	{ IFM_IEEE80211_11, "11Mbps" },					\
+	{ IFM_IEEE80211_22, "22Mbps" },					\
+	{ IFM_IEEE80211_6, "6Mbps" },					\
+	{ IFM_IEEE80211_9, "9Mbps" },					\
+	{ IFM_IEEE80211_12, "12Mbps" },					\
+	{ IFM_IEEE80211_18, "18Mbps" },					\
+	{ IFM_IEEE80211_24, "24Mbps" },					\
+	{ IFM_IEEE80211_36, "36Mbps" },					\
+	{ IFM_IEEE80211_48, "48Mbps" },					\
+	{ IFM_IEEE80211_54, "54Mbps" },					\
+	{ IFM_IEEE80211_72, "72Mbps" },					\
+	{ IFM_IEEE80211_96, "96Mbps" },					\
+	{ IFM_IEEE80211_108,"108Mbps" },				\
 	{ 0, NULL },							\
 }
 
 #define	IFM_SUBTYPE_IEEE80211_ALIASES {					\
-	{ IFM_IEEE80211_FH1, "FH1" },					\
-	{ IFM_IEEE80211_FH2, "FH2" },					\
-	{ IFM_IEEE80211_FH1, "FrequencyHopping/1Mbps" },		\
-	{ IFM_IEEE80211_FH2, "FrequencyHopping/2Mbps" },		\
-	{ IFM_IEEE80211_DS1, "DS1" },					\
-	{ IFM_IEEE80211_DS2, "DS2" },					\
-	{ IFM_IEEE80211_DS5, "DS5.5" },					\
-	{ IFM_IEEE80211_DS11, "DS11" },					\
-	{ IFM_IEEE80211_DS22, "DS22" },					\
-	{ IFM_IEEE80211_DS1, "DirectSequence/1Mbps" },			\
-	{ IFM_IEEE80211_DS2, "DirectSequence/2Mbps" },			\
-	{ IFM_IEEE80211_DS5, "DirectSequence/5.5Mbps" },		\
-	{ IFM_IEEE80211_DS11, "DirectSequence/11Mbps" },		\
-	{ IFM_IEEE80211_DS22, "DirectSequence/22Mbps" },		\
-	{ IFM_IEEE80211_ODFM6, "ODFM6" },				\
-	{ IFM_IEEE80211_ODFM9, "ODFM9" },				\
-	{ IFM_IEEE80211_ODFM12, "ODFM12" },				\
-	{ IFM_IEEE80211_ODFM18, "ODFM18" },				\
-	{ IFM_IEEE80211_ODFM24, "ODFM24" },				\
-	{ IFM_IEEE80211_ODFM36, "ODFM36" },				\
-	{ IFM_IEEE80211_ODFM48, "ODFM48" },				\
-	{ IFM_IEEE80211_ODFM54, "ODFM54" },				\
-	{ IFM_IEEE80211_ODFM72, "ODFM72" },				\
 	{ 0, NULL },							\
 }
 
@@ -422,6 +408,11 @@ struct ifmedia_description {
 	{ IFM_IEEE80211_HOSTAP, "hostap" },				\
 	{ IFM_IEEE80211_IBSS, "ibss" },					\
 	{ IFM_IEEE80211_IBSSMASTER, "ibss-master" },			\
+	{ IFM_IEEE80211_11A, "11a" },					\
+	{ IFM_IEEE80211_TURBO, "turbo" },				\
+	{ IFM_IEEE80211_11B, "11b" },					\
+	{ IFM_IEEE80211_11G, "11g" },					\
+	{ IFM_IEEE80211_FH, "FH" },					\
 	{ 0, NULL },							\
 }
 

@@ -83,30 +83,12 @@ ieee80211_ioctl_giwname(struct net_device *dev,
 		struct ifmediareq imr;
 
 		ieee80211_media_status(dev, &imr);
-		switch (IFM_SUBTYPE(imr.ifm_active)) {
-		case IFM_IEEE80211_FH1:
-		case IFM_IEEE80211_FH2:
-			strncpy(name, "IEEE 802.11-FH", IFNAMSIZ);
-			break;
-		case IFM_IEEE80211_DS1:
-		case IFM_IEEE80211_DS2:
-		case IFM_IEEE80211_DS5:
-		case IFM_IEEE80211_DS11:
-		case IFM_IEEE80211_DS22:
+		if (imr.ifm_active & (IFM_IEEE80211_11A | IFM_IEEE80211_TURBO))
+			strncpy(name, "IEEE 802.11-OFDM", IFNAMSIZ);
+		else if (imr.ifm_active & (IFM_IEEE80211_11B | IFM_IEEE80211_11G))
 			strncpy(name, "IEEE 802.11-DS", IFNAMSIZ);
-			break;
-		case IFM_IEEE80211_ODFM6:
-		case IFM_IEEE80211_ODFM9:
-		case IFM_IEEE80211_ODFM12:
-		case IFM_IEEE80211_ODFM18:
-		case IFM_IEEE80211_ODFM24:
-		case IFM_IEEE80211_ODFM36:
-		case IFM_IEEE80211_ODFM48:
-		case IFM_IEEE80211_ODFM54:
-		case IFM_IEEE80211_ODFM72:
-			strncpy(name, "IEEE 802.11-ODFM", IFNAMSIZ);
-			break;
-		}
+		else if (imr.ifm_active & IFM_IEEE80211_FH)
+			strncpy(name, "IEEE 802.11-FH", IFNAMSIZ);
 	}
 	return 0;
 }
@@ -194,27 +176,12 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 	memset(&ifmr, 0, sizeof(ifmr));
 	(*ic->ic_media.ifm_status)(dev, &ifmr);
 
-	rate = IFM_AUTO;
 	if (rrq->fixed) {
 		/* XXX fudge checking rates */
-		switch (rrq->value / 1000000) {
-		case 6:		rate = IFM_IEEE80211_ODFM6; break;
-		case 9:		rate = IFM_IEEE80211_ODFM9; break;
-		case 12:	rate = IFM_IEEE80211_ODFM12; break;
-		case 18:	rate = IFM_IEEE80211_ODFM18; break;
-		case 24:	rate = IFM_IEEE80211_ODFM24; break;
-		case 36:	rate = IFM_IEEE80211_ODFM36; break;
-		case 48:	rate = IFM_IEEE80211_ODFM48; break;
-		case 54:	rate = IFM_IEEE80211_ODFM54; break;
-		case 72:	rate = IFM_IEEE80211_ODFM72; break;
-
-		case 11:	rate = IFM_IEEE80211_DS11; break;
-		case 5:		rate = IFM_IEEE80211_DS5; break;
-		case 2:		rate = IFM_IEEE80211_DS2; break;
-		case 1:		rate = IFM_IEEE80211_DS1; break;
-		}
-	}
-
+		rate = ieee80211_rate2media(2 * (rrq->value / 1000000),
+				ic->ic_curmode);
+	} else
+		rate = IFM_AUTO;
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_media = (ifmr.ifm_active & ~IFM_TMASK) | IFM_SUBTYPE(rate);
 
@@ -240,7 +207,7 @@ ieee80211_ioctl_giwrate(struct net_device *dev,
 	} else {
 		/* use last known transmit rate */
 		if (ic->ic_fixed_rate != -1)
-			rate = ic->ic_sup_rates[ic->ic_fixed_rate];
+			rate = ic->ic_sup_rates[ic->ic_curmode][ic->ic_fixed_rate];
 		else
 			rate = 0;		/* unknown */
 	}
@@ -500,7 +467,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	struct ieee80211_node *ni = &ic->ic_bss;
 	struct iw_range *range = (struct iw_range *) extra;
-	int i;
+	int i, r;
 
 	data->length = sizeof(struct iw_range);
 	memset(range, 0, sizeof(struct iw_range));
@@ -533,7 +500,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 
 	range->num_frequency = 0;
 	for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
-		if (isset(ic->ic_chan_active, i)) {
+		if (ieee80211_chanavail(ic, i)) {
 			range->freq[range->num_frequency].i = i;
 			range->freq[range->num_frequency].m =
 				ic->ic_channels[i].ic_freq * 100000;
@@ -553,13 +520,14 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 	range->encoding_size[1] = 13;
 
 	range->num_bitrates = 0;
-	for (i = 0; i < ni->ni_nrate; i++)
-		if (ic->ic_sup_rates[i] & IEEE80211_RATE_BASIC) {
+	for (i = 0; i < ni->ni_nrate; i++) {
+		r = ic->ic_sup_rates[ic->ic_curmode][i] & IEEE80211_RATE_BASIC;
+		if (r) {
 			/* XXX */
-			range->bitrate[range->num_bitrates] =
-				(ic->ic_sup_rates[i] & IEEE80211_RATE_VAL) * 5;
+			range->bitrate[range->num_bitrates] = r * 5;
 			range->num_bitrates++;
 		}
+	}
 	/* estimated maximum TCP throughput values (bps) */
 	range->throughput = 5500000;
 

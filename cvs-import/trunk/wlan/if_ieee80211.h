@@ -45,7 +45,16 @@
 #endif
 #include "if_ieee80211ioctl.h"
 
-#define	IEEE80211_ADDR_LEN			6
+#define	IEEE80211_ADDR_LEN	6		/* size of 802.11 address */
+
+/* IEEE 802.11 PLCP header */
+struct ieee80211_plcp_hdr {
+	u_int16_t	i_sfd;
+	u_int8_t	i_signal;
+	u_int8_t	i_service;
+	u_int16_t	i_length;
+	u_int16_t	i_crc;
+} __attribute__((__packed__));
 
 /*
  * generic definitions for IEEE 802.11 frames
@@ -288,6 +297,10 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
 
 #define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
 
+#define	IEEE80211_AUTH_NONE	0
+#define	IEEE80211_AUTH_OPEN	1
+#define	IEEE80211_AUTH_SHARED	2
+
 #ifdef __KERNEL__
 
 #define	IEEE80211_PSCAN_WAIT 	5		/* passive scan wait */
@@ -311,14 +324,25 @@ enum ieee80211_phytype {
 	IEEE80211_T_DS,			/* direct sequence spread spectrum */
 	IEEE80211_T_FH,			/* frequency hopping */
 	IEEE80211_T_OFDM,		/* frequency division multiplexing */
-	IEEE80211_T_HRDS		/* high rate DS */
+	IEEE80211_T_HRDS,		/* high rate DS, aka turbo mode */
 };
+#define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
+
+/* XXX not really a mode; there are really multiple PHY's */
+enum ieee80211_phymode {
+	IEEE80211_MODE_11A	= 0,	/* 5GHz, OFDM */
+	IEEE80211_MODE_TURBO	= 1,	/* 5GHz, OFDM, 2x clocking */
+	IEEE80211_MODE_11B	= 2,	/* 2GHz, CCK */
+	IEEE80211_MODE_11G	= 3,	/* 2GHz, OFDM */
+};
+#define	IEEE80211_MODE_FH	IEEE80211_MODE_11B	/* cheat, overlay */
+#define	IEEE80211_MODE_MAX	(IEEE80211_MODE_11G+1)
 
 enum ieee80211_opmode {
-	IEEE80211_M_STA = 1,		/* infrastructure station */
-	IEEE80211_M_IBSS = 0,		/* IBSS (adhoc) station */
-	IEEE80211_M_AHDEMO = 3,		/* Old lucent compatible adhoc demo */
-	IEEE80211_M_HOSTAP = 6		/* Software Access Point */
+	IEEE80211_M_STA		= 1,	/* infrastructure station */
+	IEEE80211_M_IBSS 	= 0,	/* IBSS (adhoc) station */
+	IEEE80211_M_AHDEMO	= 3,	/* Old lucent compatible adhoc demo */
+	IEEE80211_M_HOSTAP	= 6	/* Software Access Point */
 };
 
 enum ieee80211_state {
@@ -332,25 +356,21 @@ enum ieee80211_state {
 /*
  * Channels are specified by frequency and attributes.
  */
-/* XXX should be ieee80211_channel but NetBSD took that */
+/* XXX should be ieee80211_channel but NetBSD took that for an ioctl param */
 struct ieee80211channel {
 	u_int16_t	ic_freq;	/* setting in Mhz */
 	u_int16_t	ic_flags;	/* see below */
 };
 
-#define	IEEE80211_CHAN_PASSIVE	0x0001	/* Only passive scan allowed on channel */
-/* bits 4-7 are for private use by drivers */
-#define	IEEE80211_CHAN_PRIV3	0x0010
-#define	IEEE80211_CHAN_PRIV2	0x0020
-#define	IEEE80211_CHAN_PRIV1	0x0040
-#define	IEEE80211_CHAN_PRIV0	0x0080
+/* bits 0-3 are for private use by drivers */
 /* channel attributes */
-#define	IEEE80211_CHAN_TURBO	0x0100	/* Turbo channel */
-#define	IEEE80211_CHAN_CCK	0x0200	/* CCK channel */
-#define	IEEE80211_CHAN_OFDM	0x0400	/* OFDM channel */
-#define	IEEE80211_CHAN_2GHZ	0x0800	/* 2 GHz spectrum channel. */
-#define	IEEE80211_CHAN_5GHZ	0x1000	/* 5 GHz spectrum channel */
-/* bits 13-15 are reserved for future use and should not be used */
+#define	IEEE80211_CHAN_TURBO	0x0010	/* Turbo channel */
+#define	IEEE80211_CHAN_CCK	0x0020	/* CCK channel */
+#define	IEEE80211_CHAN_OFDM	0x0040	/* OFDM channel */
+#define	IEEE80211_CHAN_2GHZ	0x0080	/* 2 GHz spectrum channel. */
+#define	IEEE80211_CHAN_5GHZ	0x0100	/* 5 GHz spectrum channel */
+#define	IEEE80211_CHAN_PASSIVE	0x0200	/* Only passive scan allowed */
+#define	IEEE80211_CHAN_DYN	0x0400	/* Dynamic CCK-OFDM channel */
 
 /*
  * Useful combinations of channel characteristics.
@@ -363,6 +383,15 @@ struct ieee80211channel {
 	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_OFDM)
 #define	IEEE80211_CHAN_T \
 	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_TURBO)
+
+#define	IEEE80211_IS_CHAN_A(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_A) == IEEE80211_CHAN_A)
+#define	IEEE80211_IS_CHAN_B(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_B) == IEEE80211_CHAN_B)
+#define	IEEE80211_IS_CHAN_PUREG(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_PUREG) == IEEE80211_CHAN_PUREG)
+#define	IEEE80211_IS_CHAN_T(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_T) == IEEE80211_CHAN_T)
 
 /*
  * Node specific information.
@@ -391,12 +420,14 @@ struct ieee80211_node {
 	struct ieee80211channel	*ni_chan;
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
+	u_int8_t		ni_mode;	/* operating mode */
 
 	/* DTIM and contention free period (CFP) */
 	u_int8_t		ni_dtimperiod;
 	u_int8_t		ni_cfpperiod;	/* # of DTIMs between CFPs */
 	u_int16_t		ni_cfpmaxduration;/* max CFP duration in TU */
-	u_int16_t		ni_cfpduremain;	/* remaining duration */
+	u_int16_t		ni_cfpduremain;	/* remaining cfp duration */
+	u_int16_t		ni_nextdtim;	/* time to next DTIM */
 	u_int16_t		ni_timoffset;
 
 	/* others */
@@ -452,14 +483,15 @@ struct ieee80211com {
 				    struct ieee80211_node *, int, int);
 	int			(*ic_newstate)(void *, enum ieee80211_state);
 	int			(*ic_chancheck)(void *, u_char *);
-	u_int8_t		ic_sup_rates[IEEE80211_RATE_SIZE];
+	u_int8_t		ic_sup_rates[IEEE80211_MODE_MAX][IEEE80211_RATE_SIZE];
 	struct ieee80211channel ic_channels[IEEE80211_CHAN_MAX+1];
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
-	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
 	u_char			ic_chan_scan[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_int32_t		ic_flags;	/* state flags */
 	u_int32_t		ic_caps;	/* capabilities */
-	enum ieee80211_phytype	ic_phytype;
+	u_int16_t		ic_modecaps;	/* set of mode capabilities */
+	u_int16_t		ic_curmode;	/* current mode */
+	enum ieee80211_phytype	ic_phytype;	/* XXX not very useful */
 	enum ieee80211_opmode	ic_opmode;	/* operation mode */
 	enum ieee80211_state	ic_state;	/* 802.11 state */
 	struct ifmedia		ic_media;	/* interface media config */
@@ -560,6 +592,7 @@ struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
 void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
 void	ieee80211_print_essid(u_int8_t *, int);
 void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
+void	ieee80211_reset_scan(struct net_device *);
 void	ieee80211_next_scan(struct net_device *);
 void	ieee80211_end_scan(struct net_device *);
 struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *, u_int8_t *);
@@ -569,15 +602,18 @@ void	ieee80211_free_node(struct ieee80211com *, struct ieee80211_node *);
 typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
 void	ieee80211_iterate_nodes(struct ieee80211com *ic,
 		ieee80211_iter_func *, void *);
+void	ieee80211_set_node(struct ieee80211com *, struct ieee80211_node *,
+		struct ieee80211channel *);
 int	ieee80211_fix_rate(struct ieee80211com *, struct ieee80211_node *, int);
 int	ieee80211_new_state(struct net_device *, enum ieee80211_state, int);
 struct sk_buff *ieee80211_wep_crypt(struct net_device *, struct sk_buff *, int);
 int	ieee80211_rate2media(int, enum ieee80211_phytype);
-int	ieee80211_media2rate(int, enum ieee80211_phytype);
-u_int	ieee80211_ghz2ieee(u_int, u_int);
+int	ieee80211_media2rate(int);
+u_int	ieee80211_mhz2ieee(u_int, u_int);
 u_int	ieee80211_chan2ieee(struct ieee80211com *, struct ieee80211channel *);
-u_int	ieee80211_ieee2ghz(u_int, u_int);
-struct ieee80211channel *ieee80211_chan_find(struct ieee80211com *, u_int);
+u_int	ieee80211_ieee2mhz(u_int, u_int);
+int	ieee80211_chanavail(struct ieee80211com *, u_int);
+struct ieee80211channel *ieee80211_chan_find(struct ieee80211com *, u_int freq);
 
 extern	const char *ether_sprintf(const u_int8_t *);		/* XXX */
 

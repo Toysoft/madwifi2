@@ -143,6 +143,7 @@ static void ieee80211_recv_deauth(struct ieee80211com *,
 static int ieee80211_media_change(struct net_device *);
 static void ieee80211_crc_init(void);
 static u_int32_t ieee80211_crc_update(u_int32_t, u_int8_t *, int);
+static enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211channel *);
 static struct net_device_stats *ieee80211_getstats(struct net_device *);
 static void ieee80211_free_allnodes(struct ieee80211com *);
 static void ieee80211_watchdog(unsigned long);
@@ -165,13 +166,20 @@ static const char *ieee80211_mgt_subtype_name[] = {
 	"beacon",	"atim",		"disassoc",	"auth",
 	"deauth",	"reserved#13",	"reserved#14",	"reserved#15"
 };
+static const char *ieee80211_phymode_name[] = {
+	"11a",		/* IEEE80211_MODE_11A */
+	"11a turbo",	/* IEEE80211_MODE_TURBO	 */
+	"11b",		/* IEEE80211_MODE_11B */
+	"11g",		/* IEEE80211_MODE_11G */
+};
 
 int
 ieee80211_ifattach(struct net_device *dev)
 {
 	struct ieee80211com *ic = (void *)dev;
 	struct ifmediareq imr;
-	int i, rate, mword;
+	struct ieee80211channel *c;
+	int i, mode, rate, maxrate, mword, mopt;
 
 	__MOD_INC_USE_COUNT(THIS_MODULE);
 
@@ -219,7 +227,7 @@ ieee80211_ifattach(struct net_device *dev)
 	 */
 	memset(ic->ic_chan_avail, 0, sizeof(ic->ic_chan_avail));
 	for (i = 0; i <= IEEE80211_CHAN_MAX; i++) {
-		struct ieee80211channel *c = &ic->ic_channels[i];
+		c = &ic->ic_channels[i];
 		if (c->ic_flags) {
 			/*
 			 * Verify driver passed us valid data.
@@ -228,24 +236,51 @@ ieee80211_ifattach(struct net_device *dev)
 				printk(KERN_WARNING "%s: bad channel ignored; "
 					"freq %u flags %x number %u\n",
 					dev->name, c->ic_freq, c->ic_flags, i);
+				c->ic_flags = 0;	/* NB: remove */
 				continue;
 			}
 			setbit(ic->ic_chan_avail, i);
-		}
-	}
-	memcpy(ic->ic_chan_active, ic->ic_chan_avail,
-	    sizeof(ic->ic_chan_active));
-	if (ic->ic_ibss_chan == NULL) {
-		/*
-		 * Pick the first active channel for default.
-		 * XXX probably not right.
-		 */
-		for (i = 0; i <= IEEE80211_CHAN_MAX; i++) {
-			if (isset(ic->ic_chan_active, i)) {
-				ic->ic_ibss_chan = &ic->ic_channels[i];
+			/*
+			 * Identify mode capabilities.
+			 */
+			switch (c->ic_flags &~ IEEE80211_CHAN_PASSIVE) {
+			case IEEE80211_CHAN_A:
+				ic->ic_modecaps |= 1<<IEEE80211_MODE_11A;
+				break;
+			case IEEE80211_CHAN_T:
+				ic->ic_modecaps |= 1<<IEEE80211_MODE_TURBO;
+				break;
+			case IEEE80211_CHAN_B:
+				ic->ic_modecaps |= 1<<IEEE80211_MODE_11B;
+				break;
+			case IEEE80211_CHAN_PUREG:
+				ic->ic_modecaps |= 1<<IEEE80211_MODE_11G;
 				break;
 			}
 		}
+	}
+	/* validate ic->ic_curmode */
+	if ((ic->ic_modecaps & (1<<ic->ic_curmode)) == 0) {
+		/* XXX could bitch about an invalid mode */
+		/* XXX pick the first available mode */
+		for (i = IEEE80211_MODE_11A; i < IEEE80211_MODE_MAX; i++)
+			if (ic->ic_modecaps & (1<<i)) {
+				ic->ic_curmode = i;
+				break;
+			}
+	}
+	/* XXX verify some mode is available */
+	if (ic->ic_ibss_chan == NULL) {
+		/*
+		 * Pick the first active channel with the
+		 * right mode to use for the default.
+		 * XXX probably not right.
+		 */
+		for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
+			if (ieee80211_chanavail(ic, i)) {
+				ic->ic_ibss_chan = &ic->ic_channels[i];
+				break;
+			}
 	}
 
 	/*
@@ -263,16 +298,47 @@ ieee80211_ifattach(struct net_device *dev)
 		ADD(ic, IFM_AUTO, IFM_IEEE80211_HOSTAP);
 	if (ic->ic_caps & IEEE80211_C_AHDEMO)
 		ADD(ic, IFM_AUTO, IFM_IEEE80211_ADHOC | IFM_FLAG0);
-	for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
-		rate = ic->ic_sup_rates[i];
-		mword = ieee80211_rate2media(rate, ic->ic_phytype);
-		ADD(ic, mword, 0);
+	maxrate = 0;
+	for (mode = IEEE80211_MODE_11A; mode < IEEE80211_MODE_MAX; mode++) {
+		static const u_int mopts[] = { 
+			IFM_IEEE80211_11A,
+			IFM_IEEE80211_TURBO,
+			IFM_IEEE80211_11B,
+			IFM_IEEE80211_11G,
+			IFM_IEEE80211_FH,
+		};
+		if ((ic->ic_modecaps & (1<<mode)) == 0)
+			continue;
+		mopt = mopts[mode];
+		ADD(ic, IFM_AUTO, mopt);	/* e.g. 11a auto */
 		if (ic->ic_caps & IEEE80211_C_IBSS)
-			ADD(ic, mword, IFM_IEEE80211_ADHOC);
+			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_ADHOC);
 		if (ic->ic_caps & IEEE80211_C_HOSTAP)
-			ADD(ic, mword, IFM_IEEE80211_HOSTAP);
+			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_HOSTAP);
 		if (ic->ic_caps & IEEE80211_C_AHDEMO)
-			ADD(ic, mword, IFM_IEEE80211_ADHOC | IFM_FLAG0);
+			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_ADHOC | IFM_FLAG0);
+		printk("%s: %s rates: ", dev->name,
+			ieee80211_phymode_name[mode]);
+		for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
+			rate = ic->ic_sup_rates[mode][i];
+			mword = ieee80211_rate2media(rate, mode);
+			if (mword == 0)
+				continue;
+			printk("%s%d%sMbps", (i != 0 ? " " : ""),
+			    (rate & IEEE80211_RATE_VAL) / 2,
+			    ((rate & 0x1) != 0 ? ".5" : ""));
+			ADD(ic, mword, mopt);
+			if (ic->ic_caps & IEEE80211_C_IBSS)
+				ADD(ic, mword, mopt | IFM_IEEE80211_ADHOC);
+			if (ic->ic_caps & IEEE80211_C_HOSTAP)
+				ADD(ic, mword, mopt | IFM_IEEE80211_HOSTAP);
+			if (ic->ic_caps & IEEE80211_C_AHDEMO)
+				ADD(ic, mword, mopt | IFM_IEEE80211_ADHOC | IFM_FLAG0);
+			rate = (rate & IEEE80211_RATE_VAL) / 2;
+			if (rate > maxrate)
+				maxrate = rate;
+		}
+		printk("\n");
 	}
 	ieee80211_media_status(dev, &imr);
 	ifmedia_set(&ic->ic_media, imr.ifm_active);
@@ -374,10 +440,10 @@ ieee80211_chan_find(struct ieee80211com *ic, u_int freq)
 }
 
 /*
- * Convert GHz frequency to IEEE channel number.
+ * Convert MHz frequency to IEEE channel number.
  */
 u_int
-ieee80211_ghz2ieee(u_int freq, u_int flags)
+ieee80211_mhz2ieee(u_int freq, u_int flags)
 {
 	if (flags & IEEE80211_CHAN_2GHZ) {	/* 2GHz band */
 		if (freq == 2484)
@@ -386,9 +452,9 @@ ieee80211_ghz2ieee(u_int freq, u_int flags)
 			return (freq - 2407) / 5;
 		else
 			return 15 + ((freq - 2512) / 20);
-	} else if (IEEE80211_CHAN_5GHZ) {/* 5Ghz band */
+	} else if (IEEE80211_CHAN_5GHZ) {	/* 5Ghz band */
 		return (freq - 5000) / 5;
-	} else {			/* either, guess */
+	} else {				/* either, guess */
 		if (freq == 2484)
 			return 14;
 		if (freq < 2484)
@@ -407,6 +473,8 @@ ieee80211_chan2ieee(struct ieee80211com *ic, struct ieee80211channel *c)
 {
 	if (ic->ic_channels <= c && c <= &ic->ic_channels[IEEE80211_CHAN_MAX])
 		return c - ic->ic_channels;
+	else if (c == (struct ieee80211channel *)IEEE80211_CHAN_ANY)
+		return IEEE80211_CHAN_ANY;
 	else {
 		printk(KERN_ERR "wlan: invalid channel freq %u flags %x\n",
 			c->ic_freq, c->ic_flags);
@@ -415,10 +483,24 @@ ieee80211_chan2ieee(struct ieee80211com *ic, struct ieee80211channel *c)
 }
 
 /*
- * Convert IEEE channel number to GHz frequency.
+ * Is channel available for use in the current mode.
+ */
+int
+ieee80211_chanavail(struct ieee80211com *ic, u_int i)
+{
+	struct ieee80211channel *c;
+
+	if (i >= IEEE80211_CHAN_MAX)
+		return 0;
+	c = &ic->ic_channels[i];
+	return (c->ic_flags != 0 && ieee80211_chan2mode(c) == ic->ic_curmode);
+}
+
+/*
+ * Convert IEEE channel number to MHz frequency.
  */
 u_int
-ieee80211_ieee2ghz(u_int chan, u_int flags)
+ieee80211_ieee2mhz(u_int chan, u_int flags)
 {
 	if (flags & IEEE80211_CHAN_2GHZ) {	/* 2GHz band */
 		if (chan == 14)
@@ -429,12 +511,12 @@ ieee80211_ieee2ghz(u_int chan, u_int flags)
 			return 2512 + ((chan-15)*20);
 	} else if (flags & IEEE80211_CHAN_5GHZ) {/* 5Ghz band */
 		return 5000 + (chan*5);
-	} else {			/* either, guess */
+	} else {				/* either, guess */
 		if (chan == 14)
 			return 2484;
-		if (chan < 14)		/* 0-13 */
+		if (chan < 14)			/* 0-13 */
 			return 2407 + chan*5;
-		if (chan < 27)		/* 15-26 */
+		if (chan < 27)			/* 15-26 */
 			return 2512 + ((chan-15)*20);
 		return 5000 + (chan*5);
 	}
@@ -443,32 +525,140 @@ ieee80211_ieee2ghz(u_int chan, u_int flags)
 static int
 ieee80211_media_change(struct net_device *dev)
 {
+#define	N(a)	(sizeof(a) / sizeof(a[0]))
+#define	IEEERATE(_ic,_m,_i) \
+	((_ic)->ic_sup_rates[_m][_i] & IEEE80211_RATE_VAL)
+	static const int ieeerates[] = {
+		-1,		/* IFM_AUTO */
+		0,		/* IFM_MANUAL */
+		0,		/* IFM_NONE */
+		2,		/* IFM_IEEE80211_1 */
+		4,		/* IFM_IEEE80211_2 */
+		11,		/* IFM_IEEE80211_5 */
+		12,		/* IFM_IEEE80211_6 */
+		18,		/* IFM_IEEE80211_9 */
+		22,		/* IFM_IEEE80211_11 */
+		24,		/* IFM_IEEE80211_12 */
+		36,		/* IFM_IEEE80211_18 */
+		44,		/* IFM_IEEE80211_22 */
+		48,		/* IFM_IEEE80211_24 */
+		72,		/* IFM_IEEE80211_36 */
+		96,		/* IFM_IEEE80211_48 */
+		108,		/* IFM_IEEE80211_54 */
+		144,		/* IFM_IEEE80211_72 */
+		192,		/* IFM_IEEE80211_96 */
+		216,		/* IFM_IEEE80211_108 */
+	};
 	struct ieee80211com *ic = (void *)dev;
 	struct ifmedia_entry *ime;
-	int error;
+	enum ieee80211_opmode newopmode;
+	enum ieee80211_phymode newphymode;
+	int i, newrate, error = 0;
 
-	error = 0;
 	ime = ic->ic_media.ifm_cur;
-	switch (IFM_SUBTYPE(ime->ifm_media)) {
-	case IFM_AUTO:
+	/*
+	 * First, identify the mode and fixed/variable rate.
+	 */
+	switch (ime->ifm_media & IFM_IEEE80211_MODE) {
+	case IFM_IEEE80211_FH:
+		newphymode = IEEE80211_MODE_FH;
+		break;
+	case IFM_IEEE80211_11A:
+		newphymode = IEEE80211_MODE_11A;
+		break;
+	case IFM_IEEE80211_11B:
+		newphymode = IEEE80211_MODE_11B;
+		break;
+	case IFM_IEEE80211_11G:
+		newphymode = IEEE80211_MODE_11G;
+		break;
+	case IFM_IEEE80211_TURBO:
+		newphymode = IEEE80211_MODE_TURBO;
+		break;
+	case IFM_IEEE80211_ANY:
+		newphymode = ic->ic_curmode;
 		break;
 	default:
-		error = EIO;
-		break;		/* XXX ??? */
+		return EINVAL;
 	}
-	if (ime->ifm_media & IFM_IEEE80211_ADHOC) {
-		ic->ic_opmode = IEEE80211_M_IBSS;
-		ic->ic_flags |= IEEE80211_F_IBSSON;
-		ic->ic_flags &= ~IEEE80211_F_ROAMING;
-	} else if (ime->ifm_media & IFM_IEEE80211_HOSTAP) {
-		ic->ic_opmode = IEEE80211_M_HOSTAP;
-		ic->ic_flags &= ~(IEEE80211_F_IBSSON | IEEE80211_F_ROAMING);
+	if ((ic->ic_modecaps & (1<<newphymode)) == 0)
+		return EINVAL;				/* no mode capability */
+	if (IFM_SUBTYPE(ime->ifm_media) != IFM_AUTO) {
+		if (IFM_SUBTYPE(ime->ifm_media) >= N(ieeerates))
+			return EINVAL;			/* invalid rate index */
+		newrate = ieeerates[IFM_SUBTYPE(ime->ifm_media)];
+		if (newrate == 0)
+			return EINVAL;			/* rate not supported */
+	} else if (newphymode != ic->ic_curmode) {
+		/* changing mode, reverify rate setting */
+		if (ic->ic_fixed_rate != -1)
+			newrate = IEEERATE(ic, ic->ic_curmode,
+				ic->ic_fixed_rate);
+		else
+			newrate = -1;
 	} else {
-		ic->ic_opmode = IEEE80211_M_STA;
-		ic->ic_flags &= ~IEEE80211_F_IBSSON;
-		ic->ic_flags |= IEEE80211_F_ROAMING;
+		newrate = -1;
 	}
-	return (*ic->ic_init)(dev);
+	/*
+	 * If a fixed rate was specified, check it against
+	 * the rate table for the specified/current phy.
+	 */
+	if (newrate != -1) {
+		for (i = 0; i < IEEE80211_RATE_SIZE; i++)
+			if (IEEERATE(ic, newphymode, i) == newrate)
+				break;
+		if (i == IEEE80211_RATE_SIZE)
+			return EINVAL;
+	} else {
+		i = -1;
+	}
+	/*
+	 * Install the rate/mode settings.
+	 */
+	if (ic->ic_fixed_rate != i) {			/* change fixed rate */
+		ic->ic_fixed_rate = i;
+		error = ENETRESET;
+	}
+	if (ic->ic_curmode != newphymode) {		/* change phy mode */
+		ic->ic_curmode = newphymode;
+		error = ENETRESET;
+	}
+	/*
+	 * Handle mode changes.
+	 */
+	if ((ime->ifm_media & (IFM_IEEE80211_ADHOC|IFM_FLAG0)) ==
+	    (IFM_IEEE80211_ADHOC|IFM_FLAG0))
+		newopmode = IEEE80211_M_AHDEMO;
+	else if (ime->ifm_media & IFM_IEEE80211_HOSTAP)
+		newopmode = IEEE80211_M_HOSTAP;
+	else if (ime->ifm_media & IFM_IEEE80211_ADHOC)
+		newopmode = IEEE80211_M_IBSS;
+	else
+		newopmode = IEEE80211_M_STA;
+	if (ic->ic_opmode != newopmode) {
+		ic->ic_opmode = newopmode;
+		switch (newopmode) {
+		case IEEE80211_M_AHDEMO:
+		case IEEE80211_M_HOSTAP:
+		case IEEE80211_M_STA:
+			ic->ic_flags &= ~IEEE80211_F_IBSSON;
+			break;
+		case IEEE80211_M_IBSS:
+			ic->ic_flags |= IEEE80211_F_IBSSON;
+			break;
+		}
+		error = ENETRESET;
+	}
+	if (error == ENETRESET) {
+		error = (*ic->ic_init)(dev);
+	}
+#ifdef notdef
+	if (error == 0)
+		ifp->if_baudrate = ifmedia_baudrate(ime->ifm_media);
+#endif
+	return error;
+#undef	IEEERATE
+#undef N
 }
 
 void
@@ -499,52 +689,75 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 		imr->ifm_active |= IFM_IEEE80211_HOSTAP;
 		break;			/* NB: skip media line rate */
 	}
+	switch (ic->ic_curmode) {
+	case IEEE80211_MODE_11A:
+		imr->ifm_active |= IFM_IEEE80211_11A;
+		break;
+	case IEEE80211_MODE_11B:
+		imr->ifm_active |= IFM_IEEE80211_11B;
+		break;
+	case IEEE80211_MODE_11G:
+		imr->ifm_active |= IFM_IEEE80211_11G;
+		break;
+	case IEEE80211_MODE_TURBO:
+		imr->ifm_active |= IFM_IEEE80211_TURBO;
+		break;
+	}
 	if (ni == NULL)
 		return;
-	/* XXX long/short preamble??? */
 	switch (ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) {
 	case 0:
 		imr->ifm_active |= IFM_AUTO;
 		break;
 	case 2:
-		imr->ifm_active |= IFM_IEEE80211_DS1;
+		imr->ifm_active |= IFM_IEEE80211_1;
 		break;
 	case 4:
-		imr->ifm_active |= IFM_IEEE80211_DS2;
+		imr->ifm_active |= IFM_IEEE80211_2;
 		break;
 	case 11:
-		imr->ifm_active |= IFM_IEEE80211_DS5;
+		imr->ifm_active |= IFM_IEEE80211_5;
 		break;
 	case 12:
-		imr->ifm_active |= IFM_IEEE80211_ODFM6;
+		imr->ifm_active |= IFM_IEEE80211_6;
 		break;
 	case 18:
-		imr->ifm_active |= IFM_IEEE80211_ODFM9;
+		imr->ifm_active |= IFM_IEEE80211_9;
 		break;
 	case 22:
-		imr->ifm_active |= IFM_IEEE80211_DS11;
+		imr->ifm_active |= IFM_IEEE80211_11;
 		break;
 	case 24:
-		imr->ifm_active |= IFM_IEEE80211_ODFM12;
+		imr->ifm_active |= IFM_IEEE80211_12;
 		break;
 	case 36:
-		imr->ifm_active |= IFM_IEEE80211_ODFM18;
+		imr->ifm_active |= IFM_IEEE80211_18;
 		break;
 	case 44:
-		imr->ifm_active |= IFM_IEEE80211_DS22;
+		imr->ifm_active |= IFM_IEEE80211_22;
 		break;
 	case 48:
-		imr->ifm_active |= IFM_IEEE80211_ODFM24;
+		imr->ifm_active |= IFM_IEEE80211_24;
 		break;
 	case 72:
-		imr->ifm_active |= IFM_IEEE80211_ODFM36;
+		imr->ifm_active |= IFM_IEEE80211_36;
+		break;
+	case 96:
+		imr->ifm_active |= IFM_IEEE80211_48;
 		break;
 	case 108:
-		imr->ifm_active |= IFM_IEEE80211_ODFM54;
+		imr->ifm_active |= IFM_IEEE80211_54;
 		break;
 	case 144:
-		imr->ifm_active |= IFM_IEEE80211_ODFM72;
+		imr->ifm_active |= IFM_IEEE80211_72;
 		break;
+	case 192:
+		imr->ifm_active |= IFM_IEEE80211_96;
+		break;
+	case 216:
+		imr->ifm_active |= IFM_IEEE80211_108;
+		break;
+	/* XXX catch bad values */
 	}
 	ieee80211_unref_node(&ni);
 }
@@ -1067,16 +1280,51 @@ ieee80211_watchdog(unsigned long data)
 	add_timer(&ic->ic_slowtimo);
 }
 
+/*
+ * AP scanning support.
+ */
+
+/*
+ * Initialize the active channel set based on the set
+ * of available channels and the current PHY mode.
+ */
+void
+ieee80211_reset_scan(struct net_device *dev)
+{
+	struct ieee80211com *ic = (void *)dev;
+	int i;
+
+	memset(ic->ic_chan_scan, 0, sizeof(ic->ic_chan_scan));
+	for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
+		if (ieee80211_chanavail(ic, i))
+			setbit(ic->ic_chan_scan, i);
+}
+
 void
 ieee80211_begin_scan(struct net_device *dev, struct ieee80211_node *ni)
 {
 	struct ieee80211com *ic = (void *)dev;
 
-	memcpy(ic->ic_chan_scan, ic->ic_chan_active,
-			sizeof(ic->ic_chan_active));
+	ieee80211_reset_scan(dev);
 	clrbit(ic->ic_chan_scan, ieee80211_chan2ieee(ic, ni->ni_chan));
 	ic->ic_flags |= IEEE80211_F_ASCAN;
 	IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
+}
+
+static enum ieee80211_phymode
+ieee80211_chan2mode(struct ieee80211channel *chan)
+{
+	switch (chan->ic_flags &~ IEEE80211_CHAN_PASSIVE) {
+	case IEEE80211_CHAN_A:
+		return IEEE80211_MODE_11A;
+	case IEEE80211_CHAN_B:
+		return IEEE80211_MODE_11B;
+	case IEEE80211_CHAN_PUREG:
+		return IEEE80211_MODE_11G;
+	case IEEE80211_CHAN_T:
+		return IEEE80211_MODE_TURBO;
+	}
+	return IEEE80211_MODE_FH;
 }
 
 void
@@ -1101,6 +1349,7 @@ ieee80211_next_scan(struct net_device *dev)
 	    ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan),
 	    ieee80211_chan2ieee(ic, chan)));
 	ic->ic_bss.ni_chan = chan;
+	ic->ic_curmode = ic->ic_bss.ni_mode;
 	ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
 
@@ -1125,9 +1374,9 @@ ieee80211_end_scan(struct net_device *dev)
 			ic->ic_flags |= IEEE80211_F_SIBSS;
 			ni->ni_nrate = 0;
 			for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
-				if (ic->ic_sup_rates[i])
+				if (ic->ic_sup_rates[ic->ic_curmode][i])
 					ni->ni_rates[ni->ni_nrate++] =
-					    ic->ic_sup_rates[i];
+					    ic->ic_sup_rates[ic->ic_curmode][i];
 			}
 			IEEE80211_ADDR_COPY(ni->ni_macaddr, dev->dev_addr);
 			IEEE80211_ADDR_COPY(ni->ni_bssid, dev->dev_addr);
@@ -1141,7 +1390,7 @@ ieee80211_end_scan(struct net_device *dev)
 			ni->ni_capinfo = IEEE80211_CAPINFO_IBSS;
 			if (ic->ic_flags & IEEE80211_F_WEPON)
 				ni->ni_capinfo |= IEEE80211_CAPINFO_PRIVACY;
-			ni->ni_chan = ic->ic_ibss_chan;
+			ieee80211_set_node(ic, ni, ic->ic_ibss_chan);
 			if (ic->ic_phytype == IEEE80211_T_FH) {
 				ni->ni_fhdwell = 200;	/* XXX */
 				ni->ni_fhindex = 1;
@@ -1157,8 +1406,7 @@ ieee80211_end_scan(struct net_device *dev)
 		/*
 		 * Reset the list of channels to scan and start again.
 		 */
-		memcpy(ic->ic_chan_scan, ic->ic_chan_active,
-			sizeof(ic->ic_chan_active));
+		ieee80211_reset_scan(dev);
 		ieee80211_next_scan(dev);
 		return;
 	}
@@ -1177,7 +1425,8 @@ ieee80211_end_scan(struct net_device *dev)
 			continue;
 		}
 		fail = 0;
-		if (isclr(ic->ic_chan_active, ieee80211_chan2ieee(ic, ni->ni_chan)))
+		if (ni->ni_chan == NULL || ni->ni_chan->ic_flags == 0 ||
+		    ieee80211_chan2mode(ni->ni_chan) != ic->ic_curmode)
 			fail |= 0x01;
 		if (ic->ic_des_chan != (struct ieee80211channel *) IEEE80211_CHAN_ANY &&
 		    ni->ni_chan != ic->ic_des_chan)
@@ -1238,6 +1487,7 @@ ieee80211_end_scan(struct net_device *dev)
 		goto notfound;
 	p = ic->ic_bss.ni_private;
 	ic->ic_bss = *selbs;
+	ic->ic_curmode = selbs->ni_mode;	/* lock current mode */
 	ic->ic_bss.ni_private = p;
 	if (p != NULL && ic->ic_node_privlen)
 		memcpy(p, selbs->ni_private, ic->ic_node_privlen);
@@ -1401,6 +1651,14 @@ ieee80211_iterate_nodes(struct ieee80211com *ic, ieee80211_iter_func *f, void *a
 	read_unlock_bh(&ic->ic_nodelock);
 }
 
+void
+ieee80211_set_node(struct ieee80211com *ic, struct ieee80211_node *ni,
+	struct ieee80211channel *c)
+{
+	ni->ni_chan = c;
+	ni->ni_mode = ieee80211_chan2mode(c);
+}
+
 int
 ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags)
 {
@@ -1426,14 +1684,14 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 		badrate = r;
 		if (flags & IEEE80211_F_DOFRATE) {
 			if (ic->ic_fixed_rate >= 0 &&
-			    r != (ic->ic_sup_rates[ic->ic_fixed_rate] &
+			    r != (ic->ic_sup_rates[ni->ni_mode][ic->ic_fixed_rate] &
 			    IEEE80211_RATE_VAL))
 				ignore++;
 		}
 		if (flags & IEEE80211_F_DONEGO) {
 			for (j = 0; j < IEEE80211_RATE_SIZE; j++) {
 				if (r ==
-				    (ic->ic_sup_rates[j] & IEEE80211_RATE_VAL))
+				    (ic->ic_sup_rates[ni->ni_mode][j] & IEEE80211_RATE_VAL))
 					break;
 			}
 			if (j == IEEE80211_RATE_SIZE) {
@@ -1509,7 +1767,7 @@ ieee80211_send_prreq(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	frm = skb_put(skb, pktlen);
 	frm = ieee80211_add_ssid(frm, ic->ic_des_essid, ic->ic_des_esslen);
-	frm = ieee80211_add_rates(frm, ic->ic_sup_rates);
+	frm = ieee80211_add_rates(frm, ic->ic_sup_rates[ni->ni_mode]);
 	skb_trim(skb, frm - skb->data);
 
 	ret = ieee80211_mgmt_output(&ic->ic_dev, ni, skb, type);
@@ -1681,7 +1939,7 @@ ieee80211_send_asreq(struct ieee80211com *ic, struct ieee80211_node *ni,
 	}
 
 	frm = ieee80211_add_ssid(frm, ni->ni_essid, ni->ni_esslen);
-	frm = ieee80211_add_rates(frm, ic->ic_sup_rates);
+	frm = ieee80211_add_rates(frm, ic->ic_sup_rates[ni->ni_mode]);
 	skb_trim(skb, frm - skb->data);
 
 	ret = ieee80211_mgmt_output(&ic->ic_dev, ni, skb, type);
@@ -1765,10 +2023,27 @@ ieee80211_send_disassoc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	    IEEE80211_FC0_SUBTYPE_DISASSOC);
 }
 
+/* Verify the existence and length of __elem or get out. */
+#define IEEE80211_VERIFY_ELEMENT(__elem, __maxlen, __wh) do {		\
+	if ((__elem) == NULL) {						\
+		DPRINTF(ic, ("%s: no " #__elem "\n", __func__));	\
+		return;							\
+	}								\
+	if ((__elem)[1] > (__maxlen)) {					\
+		DPRINTF(ic, ("%s: bad " #__elem " len %d from %s\n",	\
+		    __func__, (__elem)[1],				\
+		    ether_sprintf((__wh)->i_addr2)));			\
+		return;							\
+	}								\
+} while (0)
+
 static void
 ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
     u_int32_t rstamp)
 {
+#define	ISPROBE(_wh) \
+    (((_wh)->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) == \
+	IEEE80211_FC0_SUBTYPE_PROBE_RESP)
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
 	u_int8_t *frm, *efrm, *tstamp, *bintval, *capinfo, *ssid, *rates;
@@ -1822,17 +2097,8 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		}
 		frm += frm[1] + 2;
 	}
-	if (ssid == NULL || rates == NULL) {
-		DPRINTF(ic,
-		    ("ieee80211_recv_beacon: ssid=%p, rates=%p, chan=%d\n",
-		    ssid, rates, chan));
-		return;
-	}
-	if (ssid[1] > IEEE80211_NWID_LEN) {
-		DPRINTF(ic, ("ieee80211_recv_beacon: bad ssid len %d from %s\n",
-		    ssid[1], ether_sprintf(wh->i_addr2)));
-		return;
-	}
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
+	IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN, wh);
 	ni = ieee80211_find_node(ic, wh->i_addr2);
 #ifdef IEEE80211_DEBUG
 	if (netif_msg_debug(ic) &&
@@ -1877,7 +2143,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	ni->ni_intval = le16_to_cpu(*(u_int16_t *)bintval);
 	ni->ni_capinfo = le16_to_cpu(*(u_int16_t *)capinfo);
 	/* XXX validate channel # */
-	ni->ni_chan = &ic->ic_channels[chan];
+	ieee80211_set_node(ic, ni, &ic->ic_channels[chan]);
 	ni->ni_fhdwell = fhdwell;
 	ni->ni_fhindex = fhindex;
 	ieee80211_unref_node(&ni);
@@ -1885,6 +2151,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	if (ic->ic_state == IEEE80211_S_SCAN &&
 	    (ic->ic_flags & IEEE80211_F_ASCAN) == 0)
 		ieee80211_end_scan(&ic->ic_dev);
+#undef	ISPROBE
 }
 
 static void
@@ -1922,11 +2189,8 @@ ieee80211_recv_prreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		}
 		frm += frm[1] + 2;
 	}
-	if (ssid == NULL || rates == NULL) {
-		DPRINTF(ic, ("ieee80211_recv_prreq: ssid=%p, rates=%p\n",
-		    ssid, rates));
-		return;
-	}
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
+	IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN, wh);
 	if (ssid[1] != 0 &&
 	    (ssid[1] != ic->ic_bss.ni_esslen ||
 	    memcmp(ssid + 2, ic->ic_bss.ni_essid, ic->ic_bss.ni_esslen) != 0)) {
@@ -2118,16 +2382,8 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		}
 		frm += frm[1] + 2;
 	}
-	if (ssid == NULL || rates == NULL) {
-		DPRINTF(ic, ("ieee80211_recv_asreq: ssid=%p, rates=%p\n",
-		    ssid, rates));
-		return;
-	}
-	if (ssid[1] > IEEE80211_NWID_LEN) {
-		DPRINTF(ic, ("ieee80211_recv_asreq: bad ssid len %d from %s\n",
-		    ssid[1], ether_sprintf(wh->i_addr2)));
-		return;
-	}
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
+	IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN, wh);
 	if (ssid[1] != ic->ic_bss.ni_esslen ||
 	    memcmp(ssid + 2, ic->ic_bss.ni_essid, ssid[1]) != 0) {
 		if (netif_msg_debug(ic)) {
@@ -2178,7 +2434,7 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	ni->ni_rstamp = rstamp;
 	ni->ni_intval = bintval;
 	ni->ni_capinfo = capinfo;
-	ni->ni_chan = ic->ic_bss.ni_chan;
+	ieee80211_set_node(ic, ni, ic->ic_bss.ni_chan);
 	ni->ni_fhdwell = ic->ic_bss.ni_fhdwell;
 	ni->ni_fhindex = ic->ic_bss.ni_fhindex;
 	if (ni->ni_associd == 0) {
@@ -2243,6 +2499,7 @@ ieee80211_recv_asresp(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	frm += 2;
 	rates = frm;
 
+	IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_SIZE, wh);
 	memset(ni->ni_rates, 0, IEEE80211_RATE_SIZE);
 	ni->ni_nrate = rates[1];
 	memcpy(ni->ni_rates, rates + 2, ni->ni_nrate);
@@ -2430,9 +2687,9 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		ni->ni_nrate = 0;
 		memset(ni->ni_rates, 0, IEEE80211_RATE_SIZE);
 		for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
-			if (ic->ic_sup_rates[i] != 0)
+			if (ic->ic_sup_rates[ic->ic_curmode][i] != 0)
 				ni->ni_rates[ni->ni_nrate++] =
-				    ic->ic_sup_rates[i];
+				    ic->ic_sup_rates[ic->ic_curmode][i];
 		}
 		ni->ni_associd = 0;
 		ni->ni_rstamp = 0;
@@ -2784,133 +3041,130 @@ ieee80211_crc_update(u_int32_t crc, u_int8_t *buf, int len)
  * ieee80211 rate is in unit of 0.5Mbps.
  */
 int
-ieee80211_rate2media(int rate, enum ieee80211_phytype phytype)
+ieee80211_rate2media(int rate, enum ieee80211_phymode mode)
 {
 	int mword;
 
-	mword = 0;
-	switch (phytype) {
-	case IEEE80211_T_FH:
-		switch (rate & IEEE80211_RATE_VAL) {
-		case 0:
-			mword = IFM_AUTO;
-			break;
+	rate &= IEEE80211_RATE_VAL;
+	if (rate == 0)
+		return IFM_AUTO;
+	mword = IFM_NONE;
+	if (mode == IEEE80211_MODE_FH || mode == IEEE80211_MODE_11B ||
+	    mode == IEEE80211_MODE_11G) {
+		switch (rate) {
 		case 2:
-			mword = IFM_IEEE80211_FH1;
+			mword = IFM_IEEE80211_1;
 			break;
 		case 4:
-			mword = IFM_IEEE80211_FH2;
-			break;
-		default:
-			mword = IFM_NONE;
+			mword = IFM_IEEE80211_2;
 			break;
 		}
-		break;
-
-	case IEEE80211_T_DS:
-		switch (rate & IEEE80211_RATE_VAL) {
-		case 0:
-			mword = IFM_AUTO;
-			break;
+	}
+	if (mode == IEEE80211_MODE_11B || mode == IEEE80211_MODE_11G) {
+		switch (rate) {
 		case 2:
-			mword = IFM_IEEE80211_DS1;
+			mword = IFM_IEEE80211_1;
 			break;
 		case 4:
-			mword = IFM_IEEE80211_DS2;
+			mword = IFM_IEEE80211_2;
 			break;
 		case 11:
-			mword = IFM_IEEE80211_DS5;
+			mword = IFM_IEEE80211_5;
 			break;
 		case 22:
-			mword = IFM_IEEE80211_DS11;
-			break;
-		default:
-			mword = IFM_NONE;
+			mword = IFM_IEEE80211_11;
 			break;
 		}
-		break;
-
-	case IEEE80211_T_OFDM:
-		switch (rate & IEEE80211_RATE_VAL) {
-		case 0:
-			mword = IFM_AUTO;
-			break;
+	}
+	if (mode == IEEE80211_MODE_11A || mode == IEEE80211_MODE_11G) {
+		switch (rate) {
 		case 12:
-			mword = IFM_IEEE80211_ODFM6;
+			mword = IFM_IEEE80211_6;
 			break;
 		case 18:
-			mword = IFM_IEEE80211_ODFM9;
+			mword = IFM_IEEE80211_9;
 			break;
 		case 24:
-			mword = IFM_IEEE80211_ODFM12;
+			mword = IFM_IEEE80211_12;
 			break;
 		case 36:
-			mword = IFM_IEEE80211_ODFM18;
+			mword = IFM_IEEE80211_18;
 			break;
 		case 48:
-			mword = IFM_IEEE80211_ODFM24;
+			mword = IFM_IEEE80211_24;
 			break;
 		case 72:
-			mword = IFM_IEEE80211_ODFM36;
+			mword = IFM_IEEE80211_36;
 			break;
 		case 108:
-			mword = IFM_IEEE80211_ODFM54;
-			break;
-		case 144:
-			mword = IFM_IEEE80211_ODFM72;
-			break;
-		default:
-			mword = IFM_NONE;
+			mword = IFM_IEEE80211_54;
 			break;
 		}
-		break;
-
-	default:
-		mword = IFM_MANUAL;
-		break;
+	}
+	if (mode == IEEE80211_MODE_TURBO) {
+		switch (rate) {
+		case 24:
+			mword = IFM_IEEE80211_12;
+			break;
+		case 36:
+			mword = IFM_IEEE80211_18;
+			break;
+		case 48:
+			mword = IFM_IEEE80211_24;
+			break;
+		case 72:
+			mword = IFM_IEEE80211_36;
+			break;
+		case 108:
+			mword = IFM_IEEE80211_54;
+			break;
+		case 144:
+			mword = IFM_IEEE80211_72;
+			break;
+		case 192:
+			mword = IFM_IEEE80211_96;
+			break;
+		case 216:
+			mword = IFM_IEEE80211_108;
+			break;
+		}
 	}
 	return mword;
 }
 
 int
-ieee80211_media2rate(int mword, enum ieee80211_phytype phytype)
+ieee80211_media2rate(int mword)
 {
+#define	N(a)	(sizeof(a) / sizeof(a[0]))
+	static const u_int8_t ieeerates[] = {
+		0,	/* IFM_AUTO */
+		0,	/* IFM_MANUAL */
+		0,	/* IFM_NONE */
+		2,	/* IFM_IEEE80211_1 */
+		4,	/* IFM_IEEE80211_2 */
+		10,	/* IFM_IEEE80211_5 */
+		12,	/* IFM_IEEE80211_6 */
+		18,	/* IFM_IEEE80211_9 */
+		22,	/* IFM_IEEE80211_11 */
+		24,	/* IFM_IEEE80211_12 */
+		36,	/* IFM_IEEE80211_18 */
+		44,	/* IFM_IEEE80211_22 */
+		48,	/* IFM_IEEE80211_24 */
+		72,	/* IFM_IEEE80211_36 */
+		96,	/* IFM_IEEE80211_48 */
+		108,	/* IFM_IEEE80211_54 */
+		144,	/* IFM_IEEE80211_72 */
+		192,	/* IFM_IEEE80211_96 */
+		216,	/* IFM_IEEE80211_108 */
+	};
 	int rate;
 
-	rate = 0;
-	switch (phytype) {
-	case IEEE80211_T_FH:
-		switch (IFM_SUBTYPE(mword)) {
-		case IFM_IEEE80211_FH1:
-			rate = 2;
-			break;
-		case IFM_IEEE80211_FH2:
-			rate = 4;
-			break;
-		}
-		break;
-
-	case IEEE80211_T_DS:
-		switch (IFM_SUBTYPE(mword)) {
-		case IFM_IEEE80211_DS1:
-			rate = 2;
-			break;
-		case IFM_IEEE80211_DS2:
-			rate = 4;
-			break;
-		case IFM_IEEE80211_DS5:
-			rate = 11;
-			break;
-		case IFM_IEEE80211_DS11:
-			rate = 22;
-			break;
-		}
-		break;
-
-	default:
-		break;
-	}
+	if (IFM_SUBTYPE(mword) < N(ieeerates))
+		rate = ieeerates[IFM_SUBTYPE(mword)];
+	else
+		rate = 0;
 	return rate;
+#undef N
 }
 
 /*
@@ -2946,9 +3200,9 @@ EXPORT_SYMBOL(ieee80211_encap);
 EXPORT_SYMBOL(ieee80211_end_scan);
 EXPORT_SYMBOL(ieee80211_find_node);
 EXPORT_SYMBOL(ieee80211_iterate_nodes);
-EXPORT_SYMBOL(ieee80211_ghz2ieee);
+EXPORT_SYMBOL(ieee80211_mhz2ieee);
 EXPORT_SYMBOL(ieee80211_chan2ieee);
-EXPORT_SYMBOL(ieee80211_ieee2ghz);
+EXPORT_SYMBOL(ieee80211_ieee2mhz);
 EXPORT_SYMBOL(ieee80211_ifattach);
 EXPORT_SYMBOL(ieee80211_ifdetach);
 EXPORT_SYMBOL(ieee80211_input);
