@@ -1475,6 +1475,15 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		}
 		retv = 0;
 		break;
+	case IEEE80211_PARAM_WME:
+		if (ic->ic_opmode != IEEE80211_M_STA)
+			return -EINVAL;
+		if (value)
+			ic->ic_flags |= IEEE80211_F_WME;
+		else
+			ic->ic_flags &= ~IEEE80211_F_WME;
+		retv = 0;
+		break;
 	}
 	if (retv == ENETRESET)
 		retv = IS_UP_AUTO(ic) ? (*ic->ic_init)(ic->ic_dev) : 0;
@@ -1590,6 +1599,9 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_DRIVER_CAPS:
 		param[0] = ic->ic_caps;
+		break;
+	case IEEE80211_PARAM_WME:
+		param[0] = (ic->ic_flags & IEEE80211_F_WME) != 0;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -2016,6 +2028,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_driver_caps" },
 	{ IEEE80211_PARAM_MACCMD,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "maccmd" },
+	{ IEEE80211_PARAM_WME,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wme" },
+	{ IEEE80211_PARAM_WME,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_wme" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
