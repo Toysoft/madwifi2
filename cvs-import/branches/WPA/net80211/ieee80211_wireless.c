@@ -539,16 +539,27 @@ ieee80211_ioctl_siwfreq(struct ieee80211com *ic,
 		i = ieee80211_mhz2ieee(freq->m / 100000, 0);
 	else
 		i = freq->m;
-	if (i > IEEE80211_CHAN_MAX || isclr(ic->ic_chan_active, i))
-		return -EINVAL;
-	c = &ic->ic_channels[i];
-	if (c == getcurchan(ic)) {	/* no change, just return */
-		ic->ic_des_chan = c;	/* XXX */
-		return 0;
+	if (i != 0) {
+		if (i > IEEE80211_CHAN_MAX || isclr(ic->ic_chan_active, i))
+			return -EINVAL;
+		c = &ic->ic_channels[i];
+		if (c == getcurchan(ic)) {	/* no change, just return */
+			ic->ic_des_chan = c;	/* XXX */
+			return 0;
+		}
+		ic->ic_des_chan = c;
+		if (c != IEEE80211_CHAN_ANYC)
+			ic->ic_ibss_chan = c;
+	} else {
+		/*
+		 * Intepret channel 0 to mean "no desired channel";
+		 * otherwise there's no way to undo fixing the desired
+		 * channel.
+		 */
+		if (ic->ic_des_chan == IEEE80211_CHAN_ANYC)
+			return 0;
+		ic->ic_des_chan = IEEE80211_CHAN_ANYC;
 	}
-	ic->ic_des_chan = c;
-	if (c != IEEE80211_CHAN_ANYC)
-		ic->ic_ibss_chan = c;
 	if (ic->ic_opmode == IEEE80211_M_MONITOR)
 		return IS_UP(ic->ic_dev) ? -(*ic->ic_reset)(ic->ic_dev) : 0;
 	else
