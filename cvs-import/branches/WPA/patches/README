@@ -1,0 +1,25 @@
+This directory contains the bit needed to integrate the madwifi
+source distribution into a Linux kernel source tree.  To do this
+unpack the kernel distribution and run the install.sh script.  If you
+want to patch the currently running system you can do
+
+sh install.sh
+
+otherwise you can specify the source tree location on the command line:
+
+sh install.sh /usr/src/linux
+
+The following directories will be created and populated:
+
+net/net80211
+drivers/net/wireless/ath
+drivers/net/wireless/ath_hal
+drivers/net/wireless/hal
+
+The appropriate kernel build files will be patched so that you can
+run "make menuconfig" or similar and configure the driver using the
+normal mechanisms.
+
+Note that this has been done only for the 2.6.0 kernel.  You may need
+to generate some additional patch files for your kernel sources to
+automate this procedure.  Use the supplied files for guidance.
