@@ -692,6 +692,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			}
 		}
 		if (skb != NULL) {
+			dev->last_rx = jiffies;
 			skb->dev = dev;
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
