@@ -2217,14 +2217,11 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 		/*
 		 * make ni_txrate point to right index
 		 */
-		for (i = 0; i < ni->ni_rates.rs_nrates; i++ ) {
+		for (i = 0; i < ni->ni_rates.rs_nrates; i++ )
 			if (RV(srs->rs_rates[ic->ic_fixed_rate]) == RV(nrs->rs_rates[i])) {
 				ni->ni_txrate = i;
 				break;
 			}
-			if ((i == ni->ni_rates.rs_nrates) && (ni->ni_rates.rs_nrates > 0))
-				ni->ni_txrate =  ni->ni_rates.rs_nrates - 1;
-		}
 	} else {
 		if (ni->ni_rates.rs_nrates > 0)
 			ni->ni_txrate =  ni->ni_rates.rs_nrates - 1;
