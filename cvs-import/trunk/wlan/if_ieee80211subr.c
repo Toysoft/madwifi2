@@ -711,10 +711,12 @@ ieee80211_media_change(struct net_device *dev)
 	 */
 	if (ic->ic_opmode != newopmode) {
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
-			/* forget channel assignment in transition from monitor mode
-			 * since it is essentially random and will prevent us from associating
+			/*
+			 * Forget channel assignment in transition from
+			 * monitor mode since it is essentially random
+			 * and will prevent us from associating.
 			 */
-			ic->ic_des_chan = (struct ieee80211channel *) IEEE80211_CHAN_ANY;
+			ic->ic_des_chan = IEEE80211_CHAN_ANYC;
 		}
 		ic->ic_opmode = newopmode;
 		switch (newopmode) {
