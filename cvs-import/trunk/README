@@ -247,6 +247,16 @@ to install the drivers where they can be loaded automatically, i.e.
 Note that you MUST do a "make clean" before compiling for a different
 version of Linux; e.g. building for 2.6 after building for 2.4.
 
+Optional Features
+=================
+Users with IBM ThinkPad systems that have a panel LED wired to a GPIO
+output pin on the miniPCI card may wish to compile the driver with the
+SOFTLED option.  This is accomplished by setting an environment variable
+(COPTS) as follows:
+
+bash% export COPTS=-DSOFTLED
+
+
 Using the driver
 ================
 The driver should support any Atheros-based cardbus or pci device.
@@ -356,6 +366,7 @@ Henry Qian
 Carl Thompson
 giova+mwfdev@faglioni.it
 D. Stolte
+Kevin Yu
 
 (Apologies to anyone whose name was unintentionally left off.)
 
