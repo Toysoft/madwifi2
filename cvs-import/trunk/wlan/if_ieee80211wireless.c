@@ -356,7 +356,7 @@ ieee80211_ioctl_siwrts(struct net_device *dev,
 
 	if (rts->disabled)
 		val = IEEE80211_RTS_MAX;
-	else if (IEEE80211_RTS_MIN > rts->value && rts->value > IEEE80211_RTS_MAX)
+	else if (IEEE80211_RTS_MIN > rts->value || rts->value > IEEE80211_RTS_MAX)
 		return -EINVAL;
 	else
 		val = rts->value;
