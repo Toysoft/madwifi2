@@ -386,8 +386,9 @@ ath_bmiss_tasklet(void *data)
 	struct ieee80211com *ic = &sc->sc_ic;
 			
 	DPRINTF(("ath_bmiss_tasklet\n"));
-	/* XXX probably better to send a probe before rescanning */
-	if (ic->ic_opmode == IEEE80211_M_STA && ic->ic_state == IEEE80211_S_RUN)
+	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
+		("unexpect operating mode %u", ic->ic_opmode));
+	if (ic->ic_state == IEEE80211_S_RUN)
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
 
