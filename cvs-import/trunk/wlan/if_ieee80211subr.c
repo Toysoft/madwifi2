@@ -1403,8 +1403,7 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	 * XXX what if we have stations already associated???
 	 * XXX probably not right for autoselect?
 	 */
-	if ((ic->ic_caps & IEEE80211_C_SHPREAMBLE)
-	    && mode != IEEE80211_MODE_11A)
+	if (ic->ic_caps & IEEE80211_C_SHPREAMBLE)
 		ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
 	if (mode == IEEE80211_MODE_11G) {
 		if (ic->ic_caps & IEEE80211_C_SHSLOT)
@@ -2140,7 +2139,8 @@ ieee80211_send_prresp(struct ieee80211com *ic, struct ieee80211_node *bs0,
 		capinfo = IEEE80211_CAPINFO_ESS;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		capinfo |= IEEE80211_CAPINFO_PRIVACY;
-	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
+	    IEEE80211_IS_CHAN_2GHZ(ni->ni_chan))
 		capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
 	*(u_int16_t *)frm = cpu_to_le16(capinfo);
 	frm += 2;
@@ -2256,7 +2256,8 @@ ieee80211_send_asreq(struct ieee80211com *ic, struct ieee80211_node *ni,
 		capinfo |= IEEE80211_CAPINFO_ESS;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		capinfo |= IEEE80211_CAPINFO_PRIVACY;
-	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
+	    IEEE80211_IS_CHAN_2GHZ(ni->ni_chan))
 		capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
 	if (ic->ic_flags & IEEE80211_F_SHSLOT)
 		capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
@@ -2314,9 +2315,9 @@ ieee80211_send_asresp(struct ieee80211com *ic, struct ieee80211_node *ni,
 	capinfo = IEEE80211_CAPINFO_ESS;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		capinfo |= IEEE80211_CAPINFO_PRIVACY;
-	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE) {
+	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
+	    IEEE80211_IS_CHAN_2GHZ(ni->ni_chan))
 		capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
-	}
 	*(u_int16_t *)frm = cpu_to_le16(capinfo);
 	frm += 2;
 
