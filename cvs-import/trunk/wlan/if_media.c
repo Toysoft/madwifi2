@@ -71,8 +71,7 @@
  * 	Useful for debugging newly-ported  drivers.
  */
 
-static struct ifmedia_entry *ifmedia_match(struct ifmedia *ifm,
-    int flags, int mask);
+struct ifmedia_entry *ifmedia_match(struct ifmedia *ifm, int flags, int mask);
 
 #ifdef IFMEDIA_DEBUG
 int	ifmedia_debug = 0;
@@ -349,7 +348,7 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
  * Find media entry matching a given ifm word.
  *
  */
-static struct ifmedia_entry *
+struct ifmedia_entry *
 ifmedia_match(struct ifmedia *ifm, int target, int mask)
 {
 	struct ifmedia_entry *match, *next;
@@ -500,9 +499,4 @@ ifmedia_printword(int ifmw)
 }
 #endif /* IFMEDIA_DEBUG */
 
-EXPORT_SYMBOL(ifmedia_init);
-EXPORT_SYMBOL(ifmedia_removeall);
-EXPORT_SYMBOL(ifmedia_add);
-EXPORT_SYMBOL(ifmedia_list_add);
-EXPORT_SYMBOL(ifmedia_set);
 EXPORT_SYMBOL(ifmedia_ioctl);
