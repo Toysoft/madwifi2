@@ -1079,7 +1079,7 @@ ieee80211_ioctl_siwscan(struct ieee80211com *ic,
 	 * changes to the infrastructure.
 	 */
 	if (!IS_UP(ic->ic_dev))
-		return -EINVAL;		/* XXX */
+		return -EOPNOTSUPP;
 	if (ic->ic_state == IEEE80211_S_SCAN && (ic->ic_flags & IEEE80211_F_ASCAN))
 		return -EINPROGRESS;
 	if (ic->ic_ibss_chan == NULL ||
