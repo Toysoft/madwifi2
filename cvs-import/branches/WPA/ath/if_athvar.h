@@ -138,7 +138,7 @@ struct ath_node {
 #define	ATH_NODE(_n)	((struct ath_node *)(_n))
 
 struct ath_buf {
-	TAILQ_ENTRY(ath_buf)	bf_list;
+	STAILQ_ENTRY(ath_buf)	bf_list;
 	struct ath_desc		*bf_desc;	/* virtual addr of desc */
 	dma_addr_t		bf_daddr;	/* physical addr of desc */
 	struct sk_buff		*bf_skb;	/* skbuff for buf */
@@ -162,7 +162,7 @@ struct proc_dir_entry;
 struct ath_txq {
 	u_int			axq_qnum;	/* hardware q number */
 	u_int32_t		*axq_link;	/* link ptr in last TX desc */
-	TAILQ_HEAD(, ath_buf)	axq_q;		/* transmit queue */
+	STAILQ_HEAD(, ath_buf)	axq_q;		/* transmit queue */
 	spinlock_t		axq_lock;	/* lock on q and link */
 };
 
@@ -218,12 +218,12 @@ struct ath_softc {
 	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */
 
 	int			sc_rxbufsize;	/* rx size based on mtu */
-	TAILQ_HEAD(, ath_buf)	sc_rxbuf;	/* receive buffer */
+	STAILQ_HEAD(, ath_buf)	sc_rxbuf;	/* receive buffer */
 	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 
-	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
+	STAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
 	u_int			sc_txqsetup;	/* h/w queues setup */
 	struct ath_txq		sc_txq[HAL_NUM_TX_QUEUES];
