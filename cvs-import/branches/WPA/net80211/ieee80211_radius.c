@@ -50,9 +50,8 @@
  * enabling 802.1x authentication.  Specifically you must set the radius
  * server's IP address and port and the shared secret used to communicate.
  * These are all set using sysctl's (or through /proc).  To change any
- * of these settings while the client is running the device must either
- * be removed or the authentication mode temporarily changed to something
- * other than 802.1x.
+ * of these settings while the client is running the device must be marked
+ * down and up again, or similar (e.g. change authentication mode).
  */
 #include <linux/config.h>
 #include <linux/version.h>
@@ -584,18 +583,48 @@ bad:
  * MPPE key with an MD5 hash of the shared secret, RA,
  * salt, and MPPE key contents.
  */
-static void
+static int
 radius_make_key(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 	struct vendor_key *vk, u_int8_t *key)
 {
+#define	MAXKEYSIZE	(64 - sizeof(struct vendor_key))
 	struct scatterlist sg;
 	u_int8_t hash[16];
 	u_int8_t *vkey;
 	int keylen, total, i, j;
 
-	keylen = vk->vk_len - 4;
+	/*
+	 * vk_len is the vendor attribute payload size, so deduct
+	 * the header (including salt) to get the key length.  We
+	 * round this up to a multiple of the md5 hash size, but
+	 * it should always be a multiple (perhaps should reject
+	 * bad lengths rather than being lenient).
+	 */
+	keylen = vk->vk_len - (sizeof(vk->vk_type) +
+		sizeof(vk->vk_len) + sizeof(vk->vk_salt));
 	total = roundup(keylen, 16);
+	/*
+	 * Verify the result will fit in the storage we have.
+	 */
+	if (total > MAXKEYSIZE) {
+		struct eapol_auth_node *ean = &ern->ern_base;
 
+		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_ANY,
+		    ("[%s] MPPE key too large, total %u (%s)\n",
+		    ether_sprintf(ean->ean_node->ni_macaddr),
+		    total, __func__));
+		eapolstats.rs_vkeytoolong++;
+		return FALSE;
+	}
+
+	/*
+	 * The first 16 bytes are xor'd with a hash constructed
+	 * from (shared secret | req-authenticator | salt).
+	 * Subsequent 16-byte chunks of the key are xor'd with
+	 * the hash of (shared secret | key).  Note the salt has
+	 * already be byte-swapped but this should not alter the
+	 * MD5 hash calculation.
+	 */
 	crypto_digest_init(rc->rc_md5);
 
 	sg.page = virt_to_page(rc->rc_secret);
@@ -626,8 +655,8 @@ radius_make_key(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 		sg.length = rc->rc_secretlen;
 		crypto_digest_update(rc->rc_md5, &sg, 1);
 
-		sg.page = virt_to_page(&key[i]);
-		sg.offset = offset_in_page(&key[i]);
+		sg.page = virt_to_page(&vkey[i]);
+		sg.offset = offset_in_page(&vkey[i]);
 		sg.length = 16;
 		crypto_digest_update(rc->rc_md5, &sg, 1);
 
@@ -636,6 +665,8 @@ radius_make_key(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 		for (j = 0; j < 16; j++)
 			key[i] = vkey[i] ^ hash[j];
 	}
+	return TRUE;
+#undef MAXKEYSIZE
 }
 
 /*
@@ -680,20 +711,16 @@ radius_extract_key(struct radiuscom *rc,
 			eapolstats.rs_vkeybadsalt++;
 			continue;
 		}
-		if (vk->vk_len > sizeof(ern->ern_txu)) {
-			eapolstats.rs_vkeytoolong++;
-			continue;
-		}
 		switch (vk->vk_type) {
 		case RAD_KEYTYPE_SEND:
 			*txkey = *vk;
-			radius_make_key(rc, ern, vk, (u_int8_t *)&txkey[1]);
-			found += RAD_KEYTYPE_SEND;
+			if (radius_make_key(rc, ern, vk, (u_int8_t *)&txkey[1]))
+				found += RAD_KEYTYPE_SEND;
 			break;
 		case RAD_KEYTYPE_RECV:
 			*rxkey = *vk;
-			radius_make_key(rc, ern, vk, (u_int8_t *)&rxkey[1]);
-			found += RAD_KEYTYPE_RECV;
+			if (radius_make_key(rc, ern, vk, (u_int8_t *)&rxkey[1]))
+				found += RAD_KEYTYPE_RECV;
 			break;
 		}
 	}
@@ -1120,19 +1147,17 @@ radius_txkey(struct eapol_auth_radius_node *ern,
 	struct eapol_hdr *eapol;
 	struct scatterlist sg;
 	struct rc4_state ctx;
+	u_int8_t *keydata, rc4key[128];
 	u_int keylen;
-	u_int8_t *keydata;
 
 	KASSERT(keyix != IEEE80211_KEYIX_NONE, ("no key index"));
 	if (key->wk_len != 16 && key->wk_len != 13 && key->wk_len != 5) {
-		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_RADIUS,
+		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_ANY,
 		    ("[%s] bad key length %u\n",
 		    ether_sprintf(ean->ean_node->ni_macaddr), key->wk_len));
 		return;
 	}
-	skb = eapol_alloc_skb(sizeof(struct eapol_key)
-			    + sizeof(kp->ek_iv)
-			    + rxkey->vk_len);
+	skb = eapol_alloc_skb(sizeof(struct eapol_key) + key->wk_len);
 	if (skb == NULL) {
 		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_ANY,
 		    ("[%s] could not alloc sk_buff (%s)\n",
@@ -1140,10 +1165,10 @@ radius_txkey(struct eapol_auth_radius_node *ern,
 		return;
 	}
 	kp = (struct eapol_key *)skb_put(skb, sizeof(struct eapol_key));
-	memset(kp, 0, sizeof(*kp));
+	memset(kp, 0, sizeof(struct eapol_key));
 	kp->ek_type = EAPOL_KEY_TYPE_RC4;
 	kp->ek_length = htons(key->wk_len);
-	kp->ek_replay = 0x83aa7e80UL + (u_int64_t)jiffies * TICK_NSEC;
+	kp->ek_replay = get_jiffies_64();;
 
 	get_random_bytes(kp->ek_iv, sizeof(kp->ek_iv));
 	crypto_digest_init(rc->rc_md5);
@@ -1155,12 +1180,23 @@ radius_txkey(struct eapol_auth_radius_node *ern,
 
 	kp->ek_index = keyix | keytype;
 
-	/* encrypt the station key */
-	keydata = (u_int8_t *)skb_put(skb, sizeof(kp->ek_iv) + rxkey->vk_len);
-	rc4_init(&ctx, key->wk_key, key->wk_len);
-	rc4_crypt(&ctx, kp->ek_iv, keydata, sizeof(kp->ek_iv));
-	rc4_crypt(&ctx, (const u_int8_t *)&rxkey[1],
-		keydata+sizeof(kp->ek_iv), rxkey->vk_len);
+	if (sizeof(kp->ek_iv)+rxkey->vk_len > sizeof(rc4key)) {
+		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_ANY,
+		    ("[%s] intermediate key buf too small, key len %u (%s)\n",
+		    ether_sprintf(ean->ean_node->ni_macaddr),
+		    rxkey->vk_len, __func__));
+		/* XXX statistic */
+		return;
+	}
+
+	/* encrypt the station key with rc4 key of (iv | rxkey) */
+	memcpy(rc4key, kp->ek_iv, sizeof(kp->ek_iv));
+	memcpy(rc4key+sizeof(kp->ek_iv), &rxkey[1], rxkey->vk_len);
+
+	keydata = (u_int8_t *)skb_put(skb, key->wk_len);
+	arc4_setkey(&ctx, rc4key, sizeof(kp->ek_iv) + rxkey->vk_len);
+	arc4_encrypt(&ctx, keydata, key->wk_key, key->wk_len);
+	memset(rc4key, 0, sizeof(rc4key));
 
 	/*
 	 * Finally, sign the message.  To do this we must
@@ -1180,11 +1216,10 @@ radius_txkey(struct eapol_auth_radius_node *ern,
 	sg.offset = offset_in_page(eapol);
 	sg.length = skb->len;
 	crypto_hmac_update(rc->rc_md5, &sg, 1);
-	crypto_hmac_final(rc->rc_md5, (u_int8_t *)&txkey[1], &keylen,
-		kp->ek_sig);
+	crypto_hmac_final(rc->rc_md5, (u_int8_t *)&txkey[1], &keylen, kp->ek_sig);
 
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_RADIUS,
-	    ("[%s] SEND %s key ix %u len %u bits\n",
+	    ("[%s] SEND %s EAPOL-Key ix %u len %u bits\n",
 	    ether_sprintf(ean->ean_node->ni_macaddr),
 	    keytype == EAPOL_KEY_BCAST ? "bcast" : "ucast",
 	    keyix, key->wk_len * NBBY));
@@ -1210,7 +1245,7 @@ txKey(struct eapol_auth_node *ean)
 	KASSERT(ean->ean_keyAvailable == TRUE, ("no keys!"));
 
 	/*
-	 * Send multicast key.
+	 * Send multicast key with index > 0.
 	 */
 	if (ic->ic_wep_txkey == IEEE80211_KEYIX_NONE) {
 		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_RADIUS,
@@ -1221,7 +1256,7 @@ txKey(struct eapol_auth_node *ean)
 	radius_txkey(ern, EAPOL_KEY_BCAST,
 		ic->ic_wep_txkey, &ic->ic_nw_keys[ic->ic_wep_txkey]);
 	/*
-	 * Construct unicast key for station and send it.
+	 * Construct unicast key for station and send it with index 0.
 	 */
 	if (!ieee80211_node_makekey(ic, ni)) {
 		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_RADIUS,
@@ -1229,7 +1264,9 @@ txKey(struct eapol_auth_node *ean)
 		    ether_sprintf(ni->ni_macaddr)));
 		return;
 	}
-	radius_txkey(ern, EAPOL_KEY_UCAST, ni->ni_ucastkeyix, &ni->ni_ucastkey);
+	/* force unicast key to have the same length as the multicast key */
+	ni->ni_ucastkey.wk_len = ic->ic_nw_keys[ic->ic_wep_txkey].wk_len;
+	radius_txkey(ern, EAPOL_KEY_UCAST, 0, &ni->ni_ucastkey);
 }
 
 /*
