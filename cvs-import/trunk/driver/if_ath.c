@@ -165,6 +165,13 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		error = ENXIO;
 		goto bad;
 	}
+	if (ah->ah_abi != HAL_ABI_VERSION) {
+		printk(KERN_ERR "%s: HAL ABI msmatch; "
+			"driver expects 0x%x, HAL reports 0x%x\n",
+			dev->name, HAL_ABI_VERSION, ah->ah_abi);
+		error = ENXIO;		/* XXX */
+		goto bad;
+	}
 	sc->sc_ah = ah;
 
 	/*
@@ -963,6 +970,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		  + sizeof(u_int16_t)
 		  + 2 + ni->ni_esslen
 		  + 2 + rs->rs_nrates
+		  + 3
 		  + 6;
 	if (rs->rs_nrates > IEEE80211_RATE_SIZE)
 		pktlen += 2;
