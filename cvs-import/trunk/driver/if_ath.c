@@ -1159,12 +1159,15 @@ ath_rx_tasklet(void *data)
 			/*
 			 * Ignore control frame received in promisc mode.
 			 */
+			if (ath_debug)
+				printk("%s: ath_rx_proc: discard ctl frame, "
+					"fc %x\n", dev->name, wh->i_fc[0]);
 			goto rx_next;
 		}
 		if (len < sizeof(struct ieee80211_frame)) {
 #ifdef AR_DEBUG
 			if (ath_debug) {
-				printk("%s: ath_rx_int: short packet %d\n",
+				printk("%s: ath_rx_proc: short packet %d\n",
 					dev->name, len);
 				ieee80211_dump_pkt(skb->data, len, rate*2, rssi);
 			}
