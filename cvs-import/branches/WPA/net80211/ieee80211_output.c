@@ -132,6 +132,98 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 }
 
 /*
+ * Insure there is sufficient headroom and tailroom to
+ * encapsulate the 802.11 data frame.  If room isn't
+ * already there, reallocate so there is enough space.
+ * Drivers and cipher modules assume we have done the
+ * necessary work and fail rudely if they don't find
+ * the space they need.
+ */
+static struct sk_buff *
+ieee80211_skbhdr_adjust(struct ieee80211com *ic, struct ieee80211_key *key,
+	struct sk_buff *skb)
+{
+	/* XXX too conservative, e.g. qos frame */
+	/* XXX pre-calculate per node? */
+	int need_headroom = sizeof(struct ieee80211_qosframe)
+		 + sizeof(struct llc)
+		 + IEEE80211_ADDR_LEN
+		 ;
+	int need_tailroom = 0;
+
+	if (key != NULL) {
+		const struct ieee80211_cipher *cip = key->wk_cipher;
+		/*
+		 * Adjust for crypto needs.  When hardware crypto is
+		 * being used we assume the hardware/driver will deal
+		 * with any padding (on the fly, without needing to
+		 * expand the frame contents).  When software crypto
+		 * is used we need to insure room is available at the
+		 * front and back and also for any per-MSDU additions.
+		 */
+		/* XXX belongs in crypto code? */
+		need_headroom += cip->ic_header;
+		/* XXX pre-calculate per key */
+		if (key->wk_flags & IEEE80211_KEY_SWCRYPT)
+			need_tailroom += cip->ic_trailer;
+		/* XXX frags */
+		if (key->wk_flags & IEEE80211_KEY_SWMIC)
+			need_tailroom += cip->ic_miclen;
+	}
+
+	skb = skb_unshare(skb, GFP_ATOMIC);
+	if (skb == NULL) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
+		    ("%s: cannot unshare for encapsulation\n", __func__));
+		ic->ic_stats.is_tx_nobuf++;
+	} else if (skb_tailroom(skb) < need_tailroom) {
+		if (pskb_expand_head(skb, need_headroom - skb_headroom(skb),
+			need_tailroom - skb_tailroom(skb), GFP_ATOMIC)) {
+			dev_kfree_skb(skb);
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
+			    ("%s: cannot expand storage (tail)\n", __func__));
+			ic->ic_stats.is_tx_nobuf++;
+			skb = NULL;
+		}
+	} else if (skb_headroom(skb) < need_headroom) {
+		struct sk_buff *tmp = skb;
+		skb = skb_realloc_headroom(skb, need_headroom);
+		dev_kfree_skb(tmp);
+		if (skb == NULL) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
+			    ("%s: cannot expand storage (head)\n", __func__));
+			ic->ic_stats.is_tx_nobuf++;
+		}
+	}
+	return skb;
+}
+
+/*
+ * Return the transmit key to use in sending a frame to
+ * the specified destination. Multicast traffic always
+ * uses the group key.  Otherwise if a unicast key is
+ * set we use that.  When no unicast key is set we fall
+ * back to the default transmit key.
+ */ 
+static inline struct ieee80211_key *
+ieee80211_crypto_getkey(struct ieee80211com *ic,
+	const u_int8_t mac[IEEE80211_ADDR_LEN], struct ieee80211_node *ni)
+{
+	if (IEEE80211_IS_MULTICAST(mac) ||
+	    ni->ni_ucastkey.wk_cipher == &ieee80211_cipher_none) {
+		if (ic->ic_def_txkey == IEEE80211_KEYIX_NONE) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+			    ("%s: No default transmit key\n", __func__));
+			/* XXX statistic */
+			return NULL;
+		}
+		return &ic->ic_nw_keys[ic->ic_def_txkey];
+	} else {
+		return &ni->ni_ucastkey;
+	}
+}
+
+/*
  * Encapsulate an outbound data frame.  The mbuf chain is updated and
  * a reference to the destination node is returned.  If an error is
  * encountered NULL is returned and the node reference will also be NULL.
@@ -147,6 +239,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ether_header eh;
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
+	struct ieee80211_key *key;
 	struct llc *llc;
 
 	memcpy(&eh, skb->data, sizeof(struct ether_header));
@@ -174,6 +267,27 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 			ni->ni_stats.ns_tx_vlanmismatch++;
 			goto bad;
 		}
+	}
+
+	/*
+	 * Insure space for additional headers.  First
+	 * identify transmit key to use in calculating any
+	 * buffer adjustments required.  This is also used
+	 * below to do privacy encapsulation work.
+	 *
+	 * Note key may be NULL if we fall back to the default
+	 * transmit key and that is not set.  In that case the
+	 * buffer may not be expanded as needed by the cipher
+	 * routines, but they will/should discard it.
+	 */
+	if (ic->ic_flags & IEEE80211_F_PRIVACY)
+		key = ieee80211_crypto_getkey(ic, eh.ether_dhost, ni);
+	else
+		key = NULL;
+	skb = ieee80211_skbhdr_adjust(ic, key, skb);
+	if (skb == NULL) {
+		/* NB: ieee80211_skbhdr_adjust handles msgs+statistics */
+		goto bad;
 	}
 
 	llc = (struct llc *) skb_push(skb, sizeof(struct llc));
@@ -215,6 +329,18 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		goto bad;
 	}
 	if (eh.ether_type != __constant_htons(ETHERTYPE_PAE)) {
+		/* NB: PAE frames have their own encryption policy */
+		if (key != NULL) {
+			wh->i_fc[1] |= IEEE80211_FC1_WEP;
+			/* XXX do fragmentation */
+			if (!ieee80211_crypto_enmic(ic, key, skb)) {
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
+				    ("[%s] enmic failed, discard frame\n",
+				    ether_sprintf(eh.ether_dhost)));
+				/* XXX statistic */
+				goto bad;
+			}
+		}
 		/*
 		 * Reset the inactivity timer only for non-PAE traffic
 		 * to avoid a problem where the station leaves w/o
@@ -225,14 +351,12 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		 * retransmits will reset the inactivity timer.
 		 */ 
 		ni->ni_inact = IEEE80211_INACT_RUN;
-		/* NB: PAE frames have their own encryption policy */
-		if (ic->ic_flags & IEEE80211_F_PRIVACY)
-			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 	}
 	*pni = ni;
 	return skb;
 bad:
-	dev_kfree_skb(skb);
+	if (skb != NULL)
+		dev_kfree_skb(skb);
 	if (ni && ni != ic->ic_bss)
 		ieee80211_free_node(ic, ni);
 	*pni = NULL;
@@ -693,7 +817,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	case IEEE80211_FC0_SUBTYPE_DEAUTH:
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_AUTH,
-			("station %s deauthenticate (reason %d)\n",
+			("send station %s deauthenticate (reason %d)\n",
 			ether_sprintf(ni->ni_macaddr), arg));
 		skb = ieee80211_getmgtframe(&frm, sizeof(u_int16_t));
 		if (skb == NULL)
@@ -808,7 +932,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	case IEEE80211_FC0_SUBTYPE_DISASSOC:
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-			("station %s disassociate (reason %d)\n",
+			("send station %s disassociate (reason %d)\n",
 			ether_sprintf(ni->ni_macaddr), arg));
 		skb = ieee80211_getmgtframe(&frm, sizeof(u_int16_t));
 		if (skb == NULL)
