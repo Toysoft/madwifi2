@@ -1426,7 +1426,7 @@ EXPORT_SYMBOL(ieee80211_beacon_alloc);
  */
 int
 ieee80211_beacon_update(struct ieee80211com *ic, struct ieee80211_node *ni,
-	struct ieee80211_beacon_offsets *bo, struct sk_buff **skb0, int mcast)
+	struct ieee80211_beacon_offsets *bo, struct sk_buff *skb0, int mcast)
 {
 	int len_changed = 0;
 	u_int16_t capinfo;
