@@ -71,6 +71,7 @@ static void	ath_fatal_tasklet(void *);
 static void	ath_rxorn_tasklet(void *);
 static void	ath_bmiss_tasklet(void *);
 static int	ath_stop(struct net_device *);
+static int	ath_media_change(struct net_device *);
 static void	ath_ratectl(unsigned long);
 static void	ath_initkeytable(struct ath_softc *);
 static void	ath_mode_init(struct net_device *);
@@ -100,6 +101,7 @@ static int	ath_getchannels(struct net_device *, u_int cc, HAL_BOOL outdoor);
 
 static int	ath_rate_setup(struct net_device *, u_int mode);
 static void	ath_rate_mapsetup(struct net_device *);
+static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
 
@@ -252,6 +254,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	/* call MI attach routine. */
 	ieee80211_ifattach(dev);
+	ieee80211_media_init(dev, ath_media_change, ieee80211_media_status);
 
 	/* don't accept xmit's until we are associated */
 	netif_stop_queue(dev);
@@ -414,19 +417,26 @@ ath_bmiss_tasklet(void *data)
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
 
-static const u_int modeflags[] = {
-	CHANNEL_A,		/* IEEE80211_MODE_11A */
-	CHANNEL_B,		/* IEEE80211_MODE_11B */
-	CHANNEL_PUREG,		/* IEEE80211_MODE_11G */
-	CHANNEL_T		/* IEEE80211_MODE_TURBO */
-};
+static u_int
+ath_chan2flags(struct ieee80211com *ic, struct ieee80211channel *chan)
+{
+	static const u_int modeflags[] = {
+		0,			/* IEEE80211_MODE_AUTO */
+		CHANNEL_A,		/* IEEE80211_MODE_11A */
+		CHANNEL_B,		/* IEEE80211_MODE_11B */
+		CHANNEL_PUREG,		/* IEEE80211_MODE_11G */
+		CHANNEL_T		/* IEEE80211_MODE_TURBO */
+	};
+	return modeflags[ieee80211_chan2mode(ic, chan)];
+}
 
 static int
 ath_init(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni = &ic->ic_bss;
+	struct ieee80211_node *ni;
+	enum ieee80211_phymode mode;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_STATUS status;
 	HAL_CHANNEL hchan;
@@ -446,8 +456,7 @@ ath_init(struct net_device *dev)
 	 * and then setup of the interrupt mask.
 	 */
 	hchan.channel = ic->ic_ibss_chan->ic_freq;
-	hchan.channelFlags =
-		ic->ic_ibss_chan->ic_flags & modeflags[ic->ic_curmode];
+	hchan.channelFlags = ath_chan2flags(ic, ic->ic_ibss_chan);
 	if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_FALSE, &status)) {
 		printk("%s: unable to reset hardware; hal status %u\n",
 			dev->name, status);
@@ -476,11 +485,6 @@ ath_init(struct net_device *dev)
 		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
 	ath_hal_intrset(ah, sc->sc_imask);
 
-	/*
-	 * Setup the mapping table from IEEE rates to h/w rates.
-	 */
-	ath_rate_mapsetup(dev);
-
 	dev->flags |= IFF_RUNNING;
 	ic->ic_state = IEEE80211_S_INIT;
 
@@ -491,31 +495,10 @@ ath_init(struct net_device *dev)
 	 */
 	ni = &ic->ic_bss;
 	ni->ni_chan = ic->ic_ibss_chan;
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-		ni->ni_intval = ic->ic_lintval;
-		ni->ni_rssi = 0;
-		ni->ni_rantenna = 0;
-		ni->ni_rstamp = 0;
-		memset(ni->ni_tstamp, 0, sizeof(ni->ni_tstamp));
-		ni->ni_rates = ic->ic_sup_rates[ic->ic_curmode];
-		IEEE80211_ADDR_COPY(ni->ni_macaddr, dev->dev_addr);
-		IEEE80211_ADDR_COPY(ni->ni_bssid, dev->dev_addr);
-		ni->ni_esslen = ic->ic_des_esslen;
-		memcpy(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen);
-		ni->ni_capinfo = IEEE80211_CAPINFO_ESS;
-		if (ic->ic_flags & IEEE80211_F_WEPON)
-			ni->ni_capinfo |= IEEE80211_CAPINFO_PRIVACY;
-		ic->ic_flags |= IEEE80211_F_SIBSS;
-		ic->ic_state = IEEE80211_S_SCAN;	/*XXX*/
-		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
-	} else {
-		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
-	}
-
-	/*
-	 * Start the background rate control thread.
-	 */
-	mod_timer(&sc->sc_rate_ctl, jiffies + ((HZ * ath_rateinterval) / 1000));
+	mode = ieee80211_chan2mode(ic, ni->ni_chan);
+	if (mode != sc->sc_curmode)
+		ath_setcurmode(sc, mode);
+	ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 
 	return 0;
 }
@@ -778,6 +761,21 @@ bad:
 	return error;
 }
 
+static int
+ath_media_change(struct net_device *dev)
+{
+	int error;
+
+	error = ieee80211_media_change(dev);
+	if (error == ENETRESET) {
+		if ((dev->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
+			error = ath_init(dev);
+		else
+			error = 0;
+	}
+	return error;
+}
+
 /*
  * Fill the hardware key cache with key entries.
  */
@@ -974,7 +972,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	 * Calculate rate code.
 	 * XXX everything at min xmit rate
 	 */
-	rt = sc->sc_rates[ic->ic_curmode];
+	rt = sc->sc_currates;
+	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) == 0)
 		rate = rt->info[0].rateCode | rt->info[0].shortPreamble;
 	else
@@ -1379,7 +1378,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 	/* setup descriptors */
 	ds = bf->bf_desc;
-	rt = sc->sc_rates[ic->ic_curmode];
+	rt = sc->sc_currates;
+	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
 	/*
 	 * Calculate Atheros packet type from IEEE80211 packet header
@@ -1432,9 +1432,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	/*
 	 * Calculate miscellaneous flags.
 	 */
-	flags = 0;
+	flags = HAL_TXDESC_CLRDMASK;		/* XXX needed for wep errors */
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-		flags |= HAL_TXDESC_NOACK;	/* no ack on broadcast frames */
+		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
 		sc->sc_stats.ast_tx_noack++;
 	} else if (pktlen > ic->ic_rtsthreshold) {
 		flags |= HAL_TXDESC_RTSENA;	/* RTS based on frame length */
@@ -1745,13 +1745,14 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = &ic->ic_dev;
 
-	DPRINTF(("ath_chan_set: %u (%u MHz) -> %u (%u MHz)\n",
+	DPRINTF(("%s: %u (%u MHz) -> %u (%u MHz)\n", __func__,
 	    ieee80211_chan2ieee(ic, ic->ic_ibss_chan),
 	    	ic->ic_ibss_chan->ic_freq,
 	    ieee80211_chan2ieee(ic, chan), chan->ic_freq));
 	if (chan != ic->ic_ibss_chan) {
 		HAL_STATUS status;
 		HAL_CHANNEL hchan;
+		enum ieee80211_phymode mode;
 
 		/*
 		 * To switch channels clear any pending DMA operations;
@@ -1768,34 +1769,20 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 		 * operating mode.
 		 */
 		hchan.channel = chan->ic_freq;
-		hchan.channelFlags = chan->ic_flags & modeflags[ic->ic_curmode];
+		hchan.channelFlags = ath_chan2flags(ic, chan);
 		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status)) {
-			printk("%s: ath_chan_set: unable to reset "
-				"channel %u (%uMhz)\n", dev->name,
+			printk("%s: %s: unable to reset channel %u (%uMhz)\n",
+				dev->name, __func__,
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq);
 			return EIO;
-		}
-
-		/* XXX necessary??? doesn't look so */
-		/* initialize WEP key in keytable */
-		if (ic->ic_flags & IEEE80211_F_WEPON) {
-			int i;
-			for (i = 0; i < IEEE80211_WEP_NKID; i++) {
-				struct ieee80211_wepkey *k = &ic->ic_nw_keys[i];
-				if (k->wk_len == 0)
-					ath_hal_keyreset(ah, i);
-				else
-					/* XXX return value */
-					ath_hal_keyset(ah, i, (const HAL_KEYVAL *) k);
-			}
 		}
 
 		/*
 		 * Re-enable rx framework.
 		 */
 		if (ath_startrecv(dev) != 0) {
-			printk("%s: ath_chan_set: unable to restart recv "
-				"logic\n", dev->name);
+			printk("%s: %s: unable to restart recv logic\n",
+				dev->name, __func__);
 			return EIO;
 		}
 
@@ -1804,7 +1791,14 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 		 */
 		ath_hal_intrset(ah, sc->sc_imask);
 
+		/*
+		 * Change channels and update the h/w rate map
+		 * if we're switching; e.g. 11a to 11b/g.
+		 */
 		ic->ic_ibss_chan = chan;
+		mode = ieee80211_chan2mode(ic, chan);
+		if (mode != sc->sc_curmode)
+			ath_setcurmode(sc, mode);
 	}
 	return 0;
 }
@@ -1842,9 +1836,9 @@ ath_calibrate(unsigned long arg)
 	 */
 	c = ic->ic_ibss_chan;
 	hchan.channel = c->ic_freq;
-	hchan.channelFlags = c->ic_flags & modeflags[ic->ic_curmode];
+	hchan.channelFlags = ath_chan2flags(ic, c);
 
-	DPRINTF2(("ath_calibrate: channel %u/%x\n", c->ic_freq, c->ic_flags));
+	DPRINTF2(("%s: channel %u/%x\n", __func__, c->ic_freq, c->ic_flags));
 
 	if (ath_hal_getrfgain(ah) == HAL_RFGAIN_NEED_CHANGE) {
 		HAL_STATUS status;
@@ -1860,17 +1854,19 @@ ath_calibrate(unsigned long arg)
 		ath_stoprecv(sc);		/* stop recv side */
 		/* NB: indicate channel change so we do a full reset */
 		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status))
-			printk("%s: unable to reset hardware; hal status %u\n",
-				dev->name, status);
+			printk("%s: %s: unable to reset hardware; "
+				"hal status %u\n", dev->name, __func__, status);
 		ath_hal_intrset(ah, sc->sc_imask);
 		if (ath_startrecv(dev) != 0)	/* restart recv */
-			printk("%s: unable to start recv logic\n", dev->name);
+			printk("%s: %s: unable to start recv logic\n",
+				dev->name, __func__);
 		netif_start_queue(dev);		/* restart xmit */
 	}
-	if (!ath_hal_calibrate(ah, &hchan))
-		printk("%s: ath_calibrate: calibration of channel %u failed\n",
-			dev->name, c->ic_freq);
-
+	if (!ath_hal_calibrate(ah, &hchan)) {
+		DPRINTF(("%s: %s: calibration of channel %u failed\n",
+			dev->name, __func__, c->ic_freq));
+		sc->sc_stats.ast_per_calfail++;
+	}
 	sc->sc_cal_ch.expires = jiffies + (ath_calinterval * HZ);
 	add_timer(&sc->sc_cal_ch);
 }
@@ -1903,7 +1899,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 
 	DPRINTF(("%s: %s -> %s\n", __func__, stname[ostate], stname[nstate]));
 
-	ath_hal_setledstate(ah, leds[nstate]);		/* set LED */
+	ath_hal_setledstate(ah, leds[nstate]);	/* set LED */
 	netif_stop_queue(dev);			/* before we do anything else */
 
 	if (nstate == IEEE80211_S_INIT) {
@@ -1953,11 +1949,11 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 			 , ni->ni_capinfo
 			 , ieee80211_chan2ieee(ic, ni->ni_chan)));
 
-		/* allocate and setup the beacon frame */
+
+		/*
+		 * Allocate and setup the beacon frame for AP or adhoc mode.
+		 */
 		if (ic->ic_opmode != IEEE80211_M_STA) {
-			/*
-			 * Allocate and setup the beacon frame.
-			 */
 			error = ath_beacon_alloc(sc, ni);
 			if (error != 0)
 				goto bad;
@@ -2165,18 +2161,18 @@ ath_rate_setup(struct net_device *dev, u_int mode)
 }
 
 static void
-ath_rate_mapsetup(struct net_device *dev)
+ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 {
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
 	const HAL_RATE_TABLE *rt;
 	int i;
 
 	memset(sc->sc_rixmap, 0xff, sizeof(sc->sc_rixmap));
-	rt = sc->sc_rates[ic->ic_curmode];
-	KASSERT(rt != NULL, ("no h/w rate set for current phy mode"));
+	rt = sc->sc_rates[mode];
+	KASSERT(rt != NULL, ("no h/w rate set for phy mode %u", mode));
 	for (i = 0; i < rt->rateCount; i++)
 		sc->sc_rixmap[rt->info[i].dot11Rate & IEEE80211_RATE_VAL] = i;
+	sc->sc_currates = rt;
+	sc->sc_curmode = mode;
 }
 
 /*
@@ -2209,6 +2205,13 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 			st->st_tx_ok = st->st_tx_err = st->st_tx_retr =
 			    st->st_tx_upper = 0;
 		}
+	}
+	if (state == IEEE80211_S_RUN) {
+		/*
+		 * Start the background rate control thread.
+		 */
+		mod_timer(&sc->sc_rate_ctl,
+			jiffies + ((HZ * ath_rateinterval) / 1000));
 	}
 }
 
@@ -2435,7 +2438,7 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 
 	STAT(be_nobuf);
 
-	STAT(per_cal);		STAT(per_rfgain);
+	STAT(per_cal);		STAT(per_calfail);	STAT(per_rfgain);
 	STAT(rate_calls);	STAT(rate_raise);	STAT(rate_drop);
 
 	return cp - page;

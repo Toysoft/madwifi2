@@ -95,6 +95,7 @@ struct ath_stats {
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
 	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
 	u_int32_t	ast_per_cal;	/* periodic calibration calls */
+	u_int32_t	ast_per_calfail;/* periodic calibration failed */
 	u_int32_t	ast_per_rfgain;	/* periodic calibration rfgain reset */
 	u_int32_t	ast_rate_calls;	/* rate control checks */
 	u_int32_t	ast_rate_raise;	/* rate control raised xmit rate */
@@ -120,7 +121,9 @@ struct ath_softc {
 						/* rate tables */
 	unsigned int		sc_have11g  : 1,/* have 11g support */
 				sc_probing  : 1;/* probing AP on beacon miss */
-	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
+	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
+	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
+	enum ieee80211_phymode	sc_curmode;	/* current phy mode */
 	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
 	HAL_INT			sc_imask;	/* interrupt mask copy */
 
