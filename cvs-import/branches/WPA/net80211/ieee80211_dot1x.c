@@ -51,6 +51,7 @@
  */
 #include <linux/config.h>
 #include <linux/version.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
@@ -66,6 +67,10 @@
 #include <net80211/ieee80211_dot1x.h>
 #include <net80211/ieee80211_radius.h>
 
+#ifndef TRUE
+enum { TRUE = 1, FALSE = 0 };		/* for consistency with spec */
+#endif
+
 /*
  * Global settings that can be modified with sysctl's.
  */
@@ -79,9 +84,8 @@ u_int	eapol_servtimo = 3;		/* 3 seconds */
 u_int	eapol_suppreqlimit = 2;
 u_int	eapol_servreqlimit = 2;
 
-#ifndef TRUE
-enum { TRUE = 1, FALSE = 0 };		/* for consistency with spec */
-#endif
+u_int	eapol_keytxenabled = TRUE;	/* ena/dis EAPOL key trasmission */
+u_int	eapol_reauthenabled = TRUE;	/* ena/dis reauthentication */
 
 #ifdef IEEE80211_DEBUG
 static const char *eapol_as_states[] = {
@@ -118,6 +122,7 @@ MALLOC_DEFINE(M_EAPOL_NODE, "node", "802.1x node state");
 
 struct eapolcom *eapolcom = NULL;	/* ``the'' authenticator */
 struct eapolstats eapolstats = { 0 };
+EXPORT_SYMBOL(eapolstats);
 
 static	struct eapol_auth_node *eapol_new_node(struct eapolcom *,
 		struct ieee80211com *, struct ieee80211_node *);
@@ -550,7 +555,7 @@ static void
 eapol_auth_step(struct eapol_auth_node *ean)
 {
 
-	EAPOL_LOCK_ASSERT(ec);
+	EAPOL_LOCK_ASSERT(ean->ean_ec);
 
 	/* NB: portEnabled is implicit */
 	if ((ean->ean_portControl == EAPOL_PORTCONTROL_AUTO &&
@@ -1009,6 +1014,7 @@ eapol_fsm_run(struct eapol_auth_node *ean)
 		okstate != ean->ean_keyState ||
 		orstate != ean->ean_reAuthState);
 }
+EXPORT_SYMBOL(eapol_fsm_run);
 
 /*
  * Process timers for an authenticator's nodes.
@@ -1141,6 +1147,7 @@ eapol_alloc_skb(u_int payload)
 		eapolstats.eps_nobuf++;
 	return skb;
 }
+EXPORT_SYMBOL(eapol_alloc_skb);
 
 /*
  * Send an EAP Request/Identity packet to the supplicant.
@@ -1194,6 +1201,7 @@ eapol_reauth_setperiod(struct eapol_auth_node *ean, int timeout)
 		ether_sprintf(ean->ean_node->ni_macaddr),
 		ean->ean_reAuthPeriod));
 }
+EXPORT_SYMBOL(eapol_reauth_setperiod);
 
 /*
  * Node management support.
@@ -1428,6 +1436,7 @@ eapol_send_raw(struct eapol_node *en, struct sk_buff *skb)
 out:
 	kfree_skb(skb);
 }
+EXPORT_SYMBOL(eapol_send_raw);
 
 /*
  * Create and send an EAPOL packet.
@@ -1447,6 +1456,7 @@ eapol_send(struct eapol_node *en, struct sk_buff *skb, u_int8_t type)
 
 	eapol_send_raw(en, skb);
 }
+EXPORT_SYMBOL(eapol_send);
 
 #if 0
 /*
@@ -1493,6 +1503,36 @@ eap_send_simple(struct eapol_node *en, u_int8_t code, u_int8_t id)
 	eapol_send(en, skb, EAPOL_TYPE_EAP);
 }
 
+static void
+eapol_cleanup(struct eapolcom *ec)
+{
+	EAPOL_LOCK_DESTROY(ec);
+	if (ec->ec_table != NULL)
+		FREE(ec->ec_table, M_DEVBUF);
+	FREE(ec, M_DEVBUF);
+	eapolcom = NULL;
+}
+
+static struct eapolcom *
+eapol_setup(void)
+{
+	struct eapolcom *ec;
+
+	/* XXX WAITOK? */
+	MALLOC(ec, struct eapolcom *, sizeof(*ec), M_DEVBUF, M_WAITOK | M_ZERO);
+	if (ec == NULL) {
+		printk("%s: no memory for state block!\n", __func__);
+		return NULL;
+	}
+	EAPOL_LOCK_INIT(ec, "eapol");
+
+	ec->ec_node_alloc = eapol_node_alloc;
+	ec->ec_node_free = eapol_node_free;
+	ec->ec_node_reset = eapol_node_reset;
+
+	return ec;
+}
+
 static struct packet_type eapol_packet_type = {
 	.type =	__constant_htons(ETH_P_EAPOL),
 	.func =	eapol_input,
@@ -1501,23 +1541,21 @@ static struct packet_type eapol_packet_type = {
 /*
  * Attach an authenticator.
  */
-int
-ieee80211_authenticator_attach(struct ieee80211com *ic)
+static int
+eapol_authenticator_attach(struct ieee80211com *ic)
 {
 	struct eapolcom *ec;
 
-	/* XXX locking */
-	if (eapolcom != NULL) {
-		/* XXX */
-		return (ic->ic_ec == eapolcom);
-	}
-	/* XXX WAITOK? */
-	MALLOC(ec, struct eapolcom *, sizeof(*ec), M_DEVBUF, M_WAITOK | M_ZERO);
-	if (ec == NULL) {
-		printk("%s: no memory for state block!\n", __func__);
+	_MOD_INC_USE(THIS_MODULE, return FALSE);
+
+	if (eapolcom == NULL) {
+		/* XXX cannot happen */
+		printk(KERN_ERR "%s: no eapolcom!\n", __func__);
+		_MOD_DEC_USE(THIS_MODULE);
 		return FALSE;
 	}
-	eapolcom = ec;
+	ec = eapolcom;
+
 	MALLOC(ec->ec_table, struct eapol_auth_node **,
 		sizeof(struct eapol_auth_node *) * ic->ic_max_aid,
 		M_DEVBUF, M_WAITOK | M_ZERO);
@@ -1528,82 +1566,68 @@ ieee80211_authenticator_attach(struct ieee80211com *ic)
 		return FALSE;
 	}
 
-	EAPOL_LOCK_INIT(ec, ec->ec_dev->dev_name);
 	ec->ec_maxaid = ic->ic_max_aid;
 	ec->ec_flags = EAPOL_F_TXKEY_ENA;
 	ec->ec_flags |= EAPOL_F_REAUTH_ENA;	/* XXX disable with WPA */
 	ec->ec_flags |= EAPOL_F_GREKEY_ENA;	/* XXX disable with WPA */
 
-	/* 
-	 * Startup/attach the radius support if needed.
-	 * We only need it if we are not using pre-shared
-	 * keys which is only supported with WPA.
+	/*
+	 * Startup radius client.
 	 */
-	ec->ec_node_alloc = eapol_node_alloc;
-	ec->ec_node_free = eapol_node_free;
-	ec->ec_node_reset = eapol_node_reset;
 	/* XXX only startup if !PSK */
-	/* XXX load radius module? */
-	if (!ieee80211_radius_attach(ec)) {
-		eapolcom = NULL;
-		EAPOL_LOCK_DESTROY(ec);
-		FREE(ec->ec_table, M_DEVBUF);
-		FREE(ec, M_DEVBUF);
-		return FALSE;
-	}
+	ec->ec_backend = ieee80211_authenticator_backend_get("radius");
+	if (ec->ec_backend == NULL ||
+	    !ec->ec_backend->iab_attach(ec))
+		goto bad;
 
 	init_timer(&ec->ec_timer);
 	ec->ec_timer.data = (unsigned long) ec;
 	ec->ec_timer.function = eapol_check_timers;
 
 	/*
-	 * Setup the method pointers used by the 802.11
-	 * layer to notify us of stations joining (associating)
-	 * and leaving (deassociating).
+	 * Bind to the 802.11 layer.
 	 */
-	ic->ic_node_join = eapol_node_join;
-	ic->ic_node_leave = eapol_node_leave;
 	ic->ic_ec = ec;
 
 	dev_add_pack(&eapol_packet_type);
 	printk(KERN_INFO "802.1x authenticator started\n");
 	return TRUE;
+bad:
+	FREE(ec->ec_table, M_DEVBUF);
+	ec->ec_table = NULL;
+	_MOD_DEC_USE(THIS_MODULE);
+	return FALSE;
 }
 
 /*
  * Detach an authenticator.
  */
-void
-ieee80211_authenticator_detach(struct ieee80211com *ic)
+static void
+eapol_authenticator_detach(struct ieee80211com *ic)
 {
 	struct eapolcom *ec = ic->ic_ec;
 
-	if (ec == NULL)
-		return;
-	KASSERT(eapolcom == ec, ("not a registered authenticator!"));
+	if (ec != NULL) {
+		dev_remove_pack(&eapol_packet_type);
+		/*
+		 * Detach from 802.11 layer.
+		 */
+		ic->ic_ec = NULL;
 
-	dev_remove_pack(&eapol_packet_type);
-	/*
-	 * Restore 802.11 state.
-	 * XXX locking
-	 */
-	ic->ic_ec = NULL;
-	ic->ic_node_join = NULL;
-	ic->ic_node_leave = NULL;
-
-	/*
-	 * NB: must do this before detaching radius support
-	 *     as node management methods are reset on detach.
-	 */
-	eapol_delete_all_nodes(ec);
-	if (ec->ec_radius != NULL)
-		ieee80211_radius_detach(ec);
-	EAPOL_LOCK_DESTROY(ec);
-	if (ec->ec_table != NULL)
-		FREE(ec->ec_table, M_DEVBUF);
-	FREE(ec, M_DEVBUF);
-	eapolcom = NULL;
-	printk(KERN_INFO "802.1x authenticator stopped\n");
+		/*
+		 * NB: must do this before detaching radius support
+		 *     as node management methods are reset on detach.
+		 */
+		eapol_delete_all_nodes(ec);
+		if (ec->ec_radius != NULL)
+			ec->ec_backend->iab_detach(ec);
+		if (ec->ec_table != NULL) {
+			FREE(ec->ec_table, M_DEVBUF);
+			ec->ec_table = NULL;
+		}
+		printk(KERN_INFO "802.1x/WPA authenticator stopped\n");
+	}
+	_MOD_DEC_USE(THIS_MODULE);
 }
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
@@ -1611,63 +1635,77 @@ ieee80211_authenticator_detach(struct ieee80211com *ic)
 /* XXX validate/minmax settings */
 static ctl_table dot1x_sysctls[] = {
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "idletimo",
+	  .procname	= "reauthenabled",
+	  .data		= &eapol_reauthenabled,
+	  .maxlen	= sizeof(eapol_reauthenabled),
+	  .mode		= 0644,
+	  .proc_handler	= proc_dointvec
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "keytxenabled",
+	  .data		= &eapol_keytxenabled,
+	  .maxlen	= sizeof(eapol_keytxenabled),
+	  .mode		= 0644,
+	  .proc_handler	= proc_dointvec
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "idletimo",
 	  .data		= &eapol_idletimo,
 	  .maxlen	= sizeof(eapol_idletimo),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "reauthlimit",
+	  .procname	= "reauthlimit",
 	  .data		= &eapol_reauthlimit,
 	  .maxlen	= sizeof(eapol_reauthlimit),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "reauthmin",
+	  .procname	= "reauthmin",
 	  .data		= &eapol_reauthmin,
 	  .maxlen	= sizeof(eapol_reauthmin),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "reauthtimo",
+	  .procname	= "reauthtimo",
 	  .data		= &eapol_reauthtimo,
 	  .maxlen	= sizeof(eapol_reauthtimo),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "txtimo",
+	  .procname	= "txtimo",
 	  .data		= &eapol_txtimo,
 	  .maxlen	= sizeof(eapol_txtimo),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "supptimo",
+	  .procname	= "supptimo",
 	  .data		= &eapol_supptimo,
 	  .maxlen	= sizeof(eapol_supptimo),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "servtimo",
+	  .procname	= "servtimo",
 	  .data		= &eapol_servtimo,
 	  .maxlen	= sizeof(eapol_servtimo),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "suppreqlimit",
+	  .procname	= "suppreqlimit",
 	  .data		= &eapol_suppreqlimit,
 	  .maxlen	= sizeof(eapol_suppreqlimit),
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "servreqlimit",
+	  .procname	= "servreqlimit",
 	  .data		= &eapol_servreqlimit,
 	  .maxlen	= sizeof(eapol_servreqlimit),
 	  .mode		= 0644,
@@ -1695,30 +1733,47 @@ static ctl_table net_table[] = {
 
 static struct ctl_table_header *eapol_sysctls;
 
-/* XXX hide after module restructuring */
-extern	int init_ieee80211_radius(void);
-extern	void exit_ieee80211_radius(void);
+/*
+ * Module glue.
+ */
+
+MODULE_AUTHOR("Errno Consulting, Sam Leffler");
+MODULE_DESCRIPTION("802.11 wireless support: 802.1x authenticator");
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual BSD/GPL");
+#endif
 
 /*
- * Called once on startup.
+ * One module handles everything for now.  May want
+ * to split things up for embedded applications.
  */
-int
+static const struct ieee80211_authenticator dot1x = {
+	.ia_name	= "802.1x",
+	.ia_attach	= eapol_authenticator_attach,
+	.ia_detach	= eapol_authenticator_detach,
+	.ia_node_join	= eapol_node_join,
+	.ia_node_leave	= eapol_node_leave,
+};
+
+static int __init
 init_ieee80211_auth(void)
 {
+	eapolcom = eapol_setup();
+	if (eapolcom == NULL)
+		return -1;		/* XXX?? */
 	eapol_sysctls = register_sysctl_table(net_table, 0);
-	printk(KERN_INFO "802.1x authenticator loaded\n");
-	init_ieee80211_radius();
+	ieee80211_authenticator_register(IEEE80211_AUTH_8021X, &dot1x);
 	return 0;
 }
+module_init(init_ieee80211_auth);
 
-/*
- * Called once at shutdown/unload.
- */
-void
+static void __exit
 exit_ieee80211_auth(void)
 {
-	exit_ieee80211_radius();
+	if (eapolcom != NULL)
+		eapol_cleanup(eapolcom);
 	if (eapol_sysctls)
 		unregister_sysctl_table(eapol_sysctls);
-	printk(KERN_INFO "802.1x authenticator unloaded\n");
+	ieee80211_authenticator_unregister(IEEE80211_AUTH_8021X);
 }
+module_exit(exit_ieee80211_auth);
