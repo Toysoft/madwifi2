@@ -1392,14 +1392,14 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		if ((rsn->rsn_ucastcipherset & cipher2cap(value)) == 0)
 			return -EINVAL;
 		rsn->rsn_ucastcipher = value;
-		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		retv = 0;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
 		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_ucastkeylen = value;
-		retv = (ic->ic_flags & IEEE80211_F_WPA) ? ENETRESET : 0;
+		retv = 0;
 		break;
 	case IEEE80211_PARAM_WPA:
 		if (value > 2)
