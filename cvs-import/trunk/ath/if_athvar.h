@@ -133,6 +133,7 @@ struct ath_node {
 	/* variable-length rate control state follows */
 };
 #define	ATH_NODE(_n)	((struct ath_node *)(_n))
+#define ATH_NODE_CONST(_n)	((const struct ath_node *)(_n))
 
 #define ATH_RSSI_LPF_LEN	10
 #define ATH_RSSI_DUMMY_MARKER	0x127
