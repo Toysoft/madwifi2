@@ -117,6 +117,8 @@ ieee80211_proto_attach(struct ieee80211com *ic)
 	/* initialize management frame handlers */
 	ic->ic_recv_mgmt = ieee80211_recv_mgmt;
 	ic->ic_send_mgmt = ieee80211_send_mgmt;
+	
+	ieee80211_auth_setup();
 }
 
 void
@@ -1056,7 +1058,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 		 * Start/stop the authenticator when operating as an
 		 * AP.  We delay until here to allow configuration to
 		 * happen out of order.
-		 */
+		 */		
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP && /* XXX IBSS/AHDEMO */
 		    ic->ic_auth->ia_attach != NULL) {
 			/* XXX check failure */
