@@ -146,7 +146,7 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 #endif
 	IEEE80211_NODE_STAT(ni, tx_mgmt);
 	IF_ENQUEUE(&ic->ic_mgtq, skb);
-	mod_timer(&ic->ic_slowtimo, jiffies + HZ); // also done in ath_start
+	mod_timer(&ic->ic_slowtimo, jiffies + HZ);
 	//if_start(dev);
 	(*dev->hard_start_xmit)(NULL, dev);
 	return 0;
@@ -1563,7 +1563,7 @@ ieee80211_beacon_update(struct ieee80211com *ic, struct ieee80211_node *ni,
 		else
 			tie->tim_count--;
 		/* update state for buffered multicast frames on DTIM */
-		if (mcast && (tie->tim_count == 1 || tie->tim_period == 1))
+		if (mcast && (tie->tim_count == 0 || tie->tim_period == 1))
 			tie->tim_bitctl |= 1;
 		else
 			tie->tim_bitctl &= ~1;
