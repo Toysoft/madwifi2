@@ -597,7 +597,7 @@ struct ieee80211com {
 	u_int16_t		ic_fragthreshold;
 	rwlock_t		ic_nodelock;	/* on node table */
 	TAILQ_HEAD(, ieee80211_node) ic_node;	/* information of all nodes */
-	LIST_HEAD(, ieee80211_node) ic_hash[IEEE80211_NODE_HASHSIZE];
+	ATH_LIST_HEAD(, ieee80211_node) ic_hash[IEEE80211_NODE_HASHSIZE];
 	u_int16_t		ic_lintval;	/* listen interval */
 	u_int16_t		ic_holdover;	/* PM hold over duration */
 	u_int16_t		ic_txmin;	/* min tx retry count */
