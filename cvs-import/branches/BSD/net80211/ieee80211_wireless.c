@@ -2225,7 +2225,6 @@ EXPORT_SYMBOL(ieee80211_ioctl_iwsetup);
 int
 ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
 {
-	return -EOPNOTSUPP;
 	switch (cmd) {
 	case SIOCG80211STATS:
 		return copy_to_user(ifr->ifr_data, &ic->ic_stats,
