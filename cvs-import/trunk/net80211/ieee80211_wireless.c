@@ -1675,6 +1675,12 @@ ieee80211_ioctl_setoptie(struct ieee80211com *ic, struct iw_request_info *info,
 	union iwreq_data *u = w;
 	void *ie;
 
+	/*
+	 * NB: Doing this for ap operation could be useful (e.g. for
+	 *     WPA and/or WME) except that it typically is worthless
+	 *     without being able to intervene when processing
+	 *     association response frames--so disallow it for now.
+	 */
 	if (ic->ic_opmode != IEEE80211_M_STA)
 		return -EINVAL;
 	/* NB: data.length is validated by the wireless extensions code */
