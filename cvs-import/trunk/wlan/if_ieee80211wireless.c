@@ -55,7 +55,7 @@ ieee80211_iw_getstats(struct net_device *dev)
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
 	ic->ic_iwstats.qual.qual = 0;
-	ic->ic_iwstats.qual.level = 0;
+	ic->ic_iwstats.qual.level = ic->ic_bss.ni_rssi;
 	ic->ic_iwstats.qual.noise = 0;
 	ic->ic_iwstats.qual.updated = 0;
 
@@ -177,8 +177,9 @@ ieee80211_ioctl_giwencode(struct net_device *dev,
 	return 0;
 }
 
-extern	struct ifmedia_entry * ifmedia_match(struct ifmedia *,
-					int target, int mask);
+#ifndef ifr_media
+#define	ifr_media	ifr_ifru.ifru_ivalue
+#endif
 
 int
 ieee80211_ioctl_siwrate(struct net_device *dev,
@@ -186,13 +187,15 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 			struct iw_param *rrq, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
-	struct ifmedia *ifm = &ic->ic_media;
-	struct ifmedia_entry *oldentry;
-	struct ifmedia_entry *match;
-	int oldmedia, newmedia, error;
+	struct ifmediareq ifmr;
+	struct ifreq ifr;
+	int rate;
 
+	memset(&ifmr, 0, sizeof(ifmr));
+	(*ic->ic_media.ifm_status)(dev, &ifmr);
+
+	rate = IFM_AUTO;
 	if (rrq->fixed) {
-		int rate = IFM_AUTO;
 		/* XXX fudge checking rates */
 		switch (rrq->value / 1000000) {
 		case 6:		rate = IFM_IEEE80211_ODFM6; break;
@@ -210,37 +213,12 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 		case 2:		rate = IFM_IEEE80211_DS2; break;
 		case 1:		rate = IFM_IEEE80211_DS1; break;
 		}
-		newmedia = IFM_MAKEWORD(IFM_IEEE80211, rate, 0, 0);
-	} else {
-		/* XXX cheat */
-		newmedia = IFM_MAKEWORD(IFM_IEEE80211, IFM_AUTO, 0, 0);
 	}
-	match = ifmedia_match(ifm, newmedia, ifm->ifm_mask);
-	if (match == NULL)
-		return -ENXIO;
-	/*
-	 * If no change, we're done.
-	 */
-	if (IFM_SUBTYPE(newmedia) != IFM_AUTO &&
-	    newmedia == ifm->ifm_media && match == ifm->ifm_cur)
-		return 0;
-	/*
-	 * We found a match, now make the driver switch to it.
-	 * Make sure to preserve our old media type in case the
-	 * driver can't switch.
-	 */
-	oldentry = ifm->ifm_cur;
-	oldmedia = ifm->ifm_media;
-	ifm->ifm_cur = match;
-	ifm->ifm_media = newmedia;
-	error = (*ifm->ifm_change)(dev);
-	if (error) {
-		ifm->ifm_cur = oldentry;
-		ifm->ifm_media = oldmedia;
-	} else {
-		error = (*ic->ic_init)(dev);	/* reset mode */
-	}
-	return -error;
+
+	memset(&ifr, 0, sizeof(ifr));
+	ifr.ifr_media = (ifmr.ifm_active & ~IFM_TMASK) | IFM_SUBTYPE(rate);
+
+	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 }
 
 int
@@ -303,8 +281,12 @@ ieee80211_ioctl_siwrts(struct net_device *dev,
 		return -EINVAL;
 	else
 		val = __cpu_to_le16(rts->value);
-	ic->ic_rtsthreshold = val;
-	return 0;
+	if (val != ic->ic_rtsthreshold) {
+		ic->ic_rtsthreshold = val;
+		return -(*ic->ic_init)(dev);
+	} else {
+		return 0;
+	}
 }
 
 int
@@ -336,7 +318,10 @@ ieee80211_ioctl_siwfrag(struct net_device *dev,
 		return -EINVAL;
 	else
 		val = __cpu_to_le16(rts->value & ~0x1); /* even numbers only */
-	ic->ic_fragthreshold = val;
+	if (val != ic->ic_fragthreshold) {
+		ic->ic_fragthreshold = val;
+		return -(*ic->ic_init)(dev);
+	}
 	return 0;
 }
 
@@ -362,12 +347,13 @@ ieee80211_ioctl_siwap(struct net_device *dev,
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
 	/* NB: should only be set when in STA mode */
-	if ((ic->ic_flags & IEEE80211_F_ROAMING) == 0)
+	/* XXX how is this disabled? */
+	if (ic->ic_opmode == IEEE80211_M_STA) {
+		IEEE80211_ADDR_COPY(ic->ic_des_bssid, &ap_addr->sa_data);
+		ic->ic_flags |= IEEE80211_F_DESBSSID;
+		return -(*ic->ic_init)(dev);
+	} else
 		return -EINVAL;
-
-	IEEE80211_ADDR_COPY(ic->ic_des_essid, &ap_addr->sa_data);
-	/* XXX kick off scan??? */
-	return 0;
 }
 
 int
@@ -377,9 +363,11 @@ ieee80211_ioctl_giwap(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_bss.ni_bssid);
+	if (ic->ic_flags & IEEE80211_F_DESBSSID)
+		IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_des_bssid);
+	else
+		IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_bss.ni_bssid);
 	ap_addr->sa_family = ARPHRD_ETHER;
-
 	return 0;
 }
 
@@ -393,9 +381,9 @@ ieee80211_ioctl_siwnickn(struct net_device *dev,
 	if (data->length > IEEE80211_NWID_LEN)
 		return -EINVAL;
 
-	memset(ic->ic_des_essid, 0, IEEE80211_NWID_LEN);
-	memcpy(ic->ic_des_essid, nickname, data->length);
-	ic->ic_des_esslen = data->length;
+	memset(ic->ic_nickname, 0, IEEE80211_NWID_LEN);
+	memcpy(ic->ic_nickname, nickname, data->length);
+	ic->ic_nicknamelen = data->length;
 
 	return 0;
 }
@@ -407,9 +395,9 @@ ieee80211_ioctl_giwnickn(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	if (data->length > ic->ic_des_esslen + 1)
-		data->length = ic->ic_des_esslen + 1;
-	memcpy(nickname, ic->ic_des_essid, data->length-1);
+	if (data->length > ic->ic_nicknamelen + 1)
+		data->length = ic->ic_nicknamelen + 1;
+	memcpy(nickname, ic->ic_nickname, data->length-1);
 	nickname[data->length-1] = '\0';
 
 	return 0;
@@ -422,16 +410,20 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	struct ieee80211channel *c;
+	int error;
 
 	if (freq->e == 1)
 		c = ieee80211_chan_find(ic, freq->m / 100000);
 	else
 		c = NULL;
-	if (c != NULL) {
+	if (c == NULL)
+		error = EINVAL;
+	else if (c != ic->ic_ibss_chan) {
 		ic->ic_ibss_chan = c;
-		return 0;
+		error = (*ic->ic_init)(dev);
 	} else
-		return -EINVAL;
+		error = 0;
+	return -error;
 }
 
 int
@@ -461,12 +453,18 @@ ieee80211_ioctl_siwessid(struct net_device *dev,
 		memset(ic->ic_des_essid, 0, IEEE80211_NWID_LEN);
 		ic->ic_des_esslen = 0;
 	} else {
-		ic->ic_des_esslen = IW_ESSID_MAX_SIZE;
-		if (ic->ic_des_esslen > IEEE80211_NWID_LEN)
-			ic->ic_des_esslen = IEEE80211_NWID_LEN;
-		memcpy(ic->ic_des_essid, ssid, ic->ic_des_esslen);
+		int i, len;
+
+		len = IW_ESSID_MAX_SIZE;
+		if (len > IEEE80211_NWID_LEN)
+			len = IEEE80211_NWID_LEN;
+		memcpy(ic->ic_des_essid, ssid, len);
+		/* XXX: scan for \0 to calculate the length */
+		for (i = 0; i < len && ic->ic_des_essid[i] != '\0'; i++)
+			;
+		ic->ic_des_esslen = i;
 	}
-	return 0;
+	return -(*ic->ic_init)(dev);
 }
 
 int
@@ -573,8 +571,30 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 			struct iw_request_info *info,
 			__u32 *mode, char *extra)
 {
-	/* XXX nothing to do */
-	return 0;
+	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ifmediareq ifmr;
+	struct ifreq ifr;
+
+	memset(&ifmr, 0, sizeof(ifmr));
+	(*ic->ic_media.ifm_status)(dev, &ifmr);
+
+	memset(&ifr, 0, sizeof(ifr));
+	ifr.ifr_media = ifmr.ifm_active &~ IFM_OMASK;
+	switch (*mode) {
+	case IW_MODE_INFRA:
+		/* NB: this is the default */
+		break;
+	case IW_MODE_ADHOC:
+		ifr.ifr_media |= IFM_TYPE_OPTIONS(IFM_IEEE80211_IBSS);
+		break;
+	case IW_MODE_MASTER:
+		ifr.ifr_media |= IFM_TYPE_OPTIONS(IFM_IEEE80211_HOSTAP);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 }
 
 int
@@ -587,7 +607,6 @@ ieee80211_ioctl_giwmode(struct net_device *dev,
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:	*mode = IW_MODE_INFRA; break;
 	case IEEE80211_M_IBSS:	*mode = IW_MODE_ADHOC; break;
-	case IEEE80211_M_AHDEMO:*mode = IW_MODE_ADHOC; break;	/* XXX */
 	case IEEE80211_M_HOSTAP:*mode = IW_MODE_MASTER; break;
 	default:
 		return -EINVAL;
@@ -630,8 +649,7 @@ ieee80211_ioctl_siwpower(struct net_device *dev,
 		ic->ic_flags |= IEEE80211_F_PMGTON;
 	}
 done:
-	(*ic->ic_init)(dev);
-	return 0;
+	return -(*ic->ic_init)(dev);
 }
 
 int
@@ -687,8 +705,7 @@ ieee80211_ioctl_siwretry(struct net_device *dev,
 		return 0;
 	}
 done:
-	(*ic->ic_init)(dev);
-	return 0;
+	return -(*ic->ic_init)(dev);
 }
 
 int
@@ -761,8 +778,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev,
 		ic->ic_flags |= IEEE80211_F_TXPOW_AUTO;
 	}
 done:
-	(*ic->ic_init)(dev);
-	return 0;
+	return -(*ic->ic_init)(dev);
 }
 
 int
