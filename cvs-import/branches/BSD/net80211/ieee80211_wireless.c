@@ -1928,6 +1928,15 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			ieee80211_node_unauthorize(ic, ni);
 		ieee80211_free_node(ni);
 		break;
+	case IEEE80211_MLME_CLEAR_STATS:
+	        if (ic->ic_opmode != IEEE80211_M_HOSTAP)
+		    return -EINVAL;
+		ni = ieee80211_find_node(ic, mlme->im_macaddr);
+		if (ni == NULL)
+		    return -EINVAL;
+		/* clear statistics */
+		memset(&ni->ni_stats, 0, sizeof(struct ieee80211_nodestats));
+		break;
 	default:
 		return -EINVAL;
 	}

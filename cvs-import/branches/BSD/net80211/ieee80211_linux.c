@@ -166,6 +166,27 @@ ieee80211_notify_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, i
 }
 
 void
+ieee80211_notify_traffic_statistic(struct ieee80211com *ic,
+	struct ieee80211_node *ni)
+{
+	static const char * tag = "STA-TRAFFIC-STAT";
+	union iwreq_data wrqu;
+	char buf[128]; /* max message < 125 byte */
+
+	snprintf(buf, sizeof(buf), "%s\nmac=%s\n"
+		"rx_packets=%u\ntx_packets=%u\n"
+		"rx_bytes=%u\ntx_bytes=%u\n",
+		tag, ether_sprintf(ni->ni_macaddr),
+		ni->ni_stats.ns_rx_data, ni->ni_stats.ns_tx_data,
+		(u_int32_t)ni->ni_stats.ns_rx_bytes,
+		(u_int32_t)ni->ni_stats.ns_tx_bytes);
+ 
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+ 
+void
 ieee80211_notify_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
 	union iwreq_data wreq;
@@ -176,6 +197,8 @@ ieee80211_notify_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 		wreq.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
 	} else {
+		/* sending message about last traffic statistics of station */
+		ieee80211_notify_traffic_statistic(ic, ni);
 		/* fire off wireless event station leaving */
 		memset(&wreq, 0, sizeof(wreq));
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
