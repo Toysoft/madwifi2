@@ -97,6 +97,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct net_device *dev;
 	const char *athname;
 	u_int8_t csz;
+	u32 val;
 
 	if (pci_enable_device(pdev))
 		return (-EIO);
@@ -131,6 +132,16 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0xa8);
 
 	pci_set_master(pdev);
+
+	/*
+	 * Disable the RETRY_TIMEOUT register (0x41) to keep
+	 * PCI Tx retries from interfering with C3 CPU state.
+	 *
+	 * Code taken from ipw2100 driver - jg
+	 */
+	pci_read_config_dword(pdev, 0x40, &val);
+	if ((val & 0x0000ff00) != 0)
+		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
 
 	phymem = pci_resource_start(pdev, 0);
 	if (!request_mem_region(phymem, pci_resource_len(pdev, 0), "ath")) {
@@ -235,9 +246,20 @@ ath_pci_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct ath_pci_softc *sc = dev->priv;
+	u32 val;
 
 	pci_enable_device(pdev);
 	pci_restore_state(pdev, sc->aps_pmstate);
+	/*
+	 * Suspend/Resume resets the PCI configuration space, so we have to
+	 * re-disable the RETRY_TIMEOUT register (0x41) to keep
+	 * PCI Tx retries from interfering with C3 CPU state
+	 *
+	 * Code taken from ipw2100 driver - jg
+	 */
+	pci_read_config_dword(pdev, 0x40, &val);
+	if ((val & 0x0000ff00) != 0)
+		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
 	ath_resume(dev);
 
 	return (0);
