@@ -37,6 +37,7 @@
 #include <linux/init.h>
 #include <linux/if.h>
 #include <linux/netdevice.h>
+#include <linux/cache.h>
 
 #include <linux/pci.h>
 
@@ -77,6 +78,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned long mem;
 	struct ath_pci_softc *sc;
 	struct net_device *dev;
+	u_int8_t csz;
 
 	if (pci_enable_device(pdev))
 		return (-EIO);
@@ -85,6 +87,24 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (pci_set_dma_mask(pdev, 0xffffffff)) {
 		printk(KERN_ERR "ath_pci: 32-bit DMA not available\n");
 		goto bad;
+	}
+
+	/*
+	 * Cache line size is used to size and align various
+	 * structures used to communicate with the hardware.
+	 */
+	pci_read_config_byte(pdev, PCI_CACHE_LINE_SIZE, &csz);
+	if (csz == 0) {
+		/*
+		 * Linux 2.4.18 (at least) writes the cache line size
+		 * register as a 16-bit wide register which is wrong.
+		 * We must have this setup properly for rx buffer
+		 * DMA to work so force a reasonable value here if it
+		 * comes up zero.
+		 */
+		csz = L1_CACHE_BYTES / sizeof(u_int32_t);
+		printk("ath_pci: cache line size not set; forcing %u\n", csz);
+		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE, csz);
 	}
 
 	pci_set_master(pdev);

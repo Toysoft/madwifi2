@@ -1,5 +1,6 @@
-/*
- * Copyright (c) 2002, 2003 Sam Leffler.  All rights reserved.
+/*-
+ * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -9,14 +10,11 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the author nor the names of any co-contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY Sam Leffler ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL John Hay BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -24,6 +22,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 
 /*
@@ -116,7 +116,7 @@ static u_int8_t	ath_rate_tbl[] = {
 };
 
 int
-ath_attach(uint16_t devid, struct net_device *dev)
+ath_attach(u_int16_t devid, struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -134,18 +134,7 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	 * structures used to communicate with the hardware.
 	 */
 	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, &csz);
-	if (csz == 0) {
-		/*
-		 * Linux 2.4.18 at least writes the cache line size
-		 * register as a 16-bit wide register which is wrong.
-		 * We must have this setup properly for rx buffer
-		 * DMA to work so force a reasonable value here if it
-		 * comes up zero.
-		 */
-		csz = L1_CACHE_BYTES / sizeof(u_int32_t);
-		printk("ath_pci: cache line size not set; forcing %u\n", csz);
-		pci_write_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, csz);
-	}
+	/* XXX assert csz is non-zero */
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
 	spin_lock_init(&sc->sc_txbuflock);
@@ -1139,10 +1128,8 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	skb = bf->bf_skb;
 	if (skb == NULL) {
 		/*
-		 * Align on 32-bit boundary.  Atheros suggests rx
-		 * buffers be set on cache line boundaries but doing
-		 * this is typically impractical given the cache
-		 * line size.
+		 * Cache-line-align.  This is important (for the 5210 at
+		 * least) as not doing so causes bogus data in rx'd frames.
 		 */
 		skb = ath_alloc_skb(sc->sc_rxbufsize, sc->sc_cachelsz);
 		if (skb == NULL) {
