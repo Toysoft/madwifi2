@@ -391,12 +391,11 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ATH_TXBUF_LOCK_INIT(sc);
 
 	ATH_INIT_TQUEUE(&sc->sc_rxtq,	ath_rx_tasklet,		dev);
-	ATH_INIT_TQUEUE(&sc->sc_txtq,	ath_tx_tasklet,		dev);
-	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq,ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq,ath_fatal_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bstuckq,ath_bstuck_tasklet,	dev);
-
+	
 	init_timer(&sc->sc_scan_ch);
 	sc->sc_scan_ch.function = ath_next_scan;
 	sc->sc_scan_ch.data = (unsigned long) dev;
