@@ -1,0 +1,10 @@
+- check locking (especially the macros in ieee80211_linux.h)
+    - to strict locking -> lose performance
+    - to soft -> oops
+- ath_pci module unloading issue on linux 2.6.x kernels
+- define commonly used macros global
+- cleanup code
+- generate a Configure script to create a Makefile fitting the build environment
+- write a userspace tool to control all the things wireless_tools do but
+  furthermore also things which are not supported by them
+    - e.g.: wme + parameters, beacon interval, ack/cts timeouts...
