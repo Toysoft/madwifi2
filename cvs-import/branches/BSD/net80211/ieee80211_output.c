@@ -259,8 +259,6 @@ ieee80211_classify(struct ieee80211com *ic, struct sk_buff *skb, struct ieee8021
 		/*
 		 * IP frame, map the DSCP field (corrected version, <<2).
 		 */
-		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "skb=%p, skb->data=%p, skb->mac.ethernet=%p, skb->nh.iph=%p\n",
-			skb, skb->data, skb->mac.ethernet, skb->nh.iph);
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "ip=%p,ip->version=%d, ip->length=%d, &(ip->saddr)=%p, &(ip->daddr)=%p\n",
 			ip, ip->version, ip->ihl, &(ip->saddr), &(ip->daddr));
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] src: 0x%x dst: 0x%x paket tos: 0x%x\n", 
