@@ -280,7 +280,8 @@ EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 static int
 proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 {
-	char *p = page;
+	char buf[1024];
+	char *p = buf;
 	struct ieee80211_node *ni;
 	struct ieee80211_node_table *nt = &ic->ic_sta;
 	struct ieee80211_rateset *rs;
@@ -290,7 +291,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 	IEEE80211_NODE_LOCK(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		/* Assume each node needs 300 bytes */ 
-		if (p - page > space - 300)
+		if (p - buf > space - 300)
 			break;
 		
 		p += sprintf(p, "\nmacaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
@@ -377,7 +378,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 				ni->ni_fails, temp);
 	}
 	IEEE80211_NODE_UNLOCK(nt);
-	return (p - page);
+	return copy_to_user(page, buf, p - buf);
 }
 
 static int
@@ -390,9 +391,17 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_stations, ctl, write, filp, buffer,
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
 	    ic->ic_opmode != IEEE80211_M_IBSS)
 		return -EINVAL;
+#if	LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
 	if (len && filp->f_pos == 0) {
+#else
+	if (len && ppos != NULL && *ppos == 0) {
+#endif
 		*lenp = proc_read_node(buffer, len, ic, &ic->ic_sta);
+#if	LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
 		filp->f_pos += *lenp;
+#else
+		*ppos += *lenp;
+#endif
 	} else {
 		*lenp = 0;
 	}
