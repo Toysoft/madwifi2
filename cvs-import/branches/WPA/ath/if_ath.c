@@ -3649,8 +3649,12 @@ ath_getchannels(struct net_device *dev, u_int cc,
 	}
 	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
 	    cc, HAL_MODE_ALL, outdoor, xchanmode)) {
-		printk("%s: unable to collect channel list from hal\n",
-			dev->name);
+		u_int32_t rd;
+
+		ath_hal_getregdomain(ah, &rd);
+		printk("%s: unable to collect channel list from hal; "
+			"regdomain likely %u country code %u\n",
+			dev->name, rd, cc);
 		kfree(chans);
 		return EINVAL;
 	}
