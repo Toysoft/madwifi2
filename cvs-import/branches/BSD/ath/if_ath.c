@@ -2221,7 +2221,7 @@ ath_beacon_config(struct ath_softc *sc)
 	if (nexttbtt == 0)		/* e.g. for ap mode */
 		nexttbtt = intval;
 	else if (intval)		/* NB: can be 0 for monitor mode */
-		nexttbtt = roundup(nexttbtt, intval);
+		nexttbtt = roundup(nexttbtt, intval); 
 	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: nexttbtt %u intval %u (%u)\n",
 		__func__, nexttbtt, intval, ni->ni_intval);
 	if (ic->ic_opmode == IEEE80211_M_STA) {
@@ -2742,22 +2742,22 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 #undef IS_QOS_DATA
 }
 
+/*
+ * Extend 15-bit time stamp from rx descriptor to
+ * a full 64-bit TSF using the current h/w TSF.
+ */
 static inline uint64_t
 ath_tsf_extend(struct ath_hal *ah, uint32_t rstamp)
 {
 	uint64_t tsf;
 
-	/* rstamp is assigned from ath_rx_status.rs_tstamp which is 16bit */
-	KASSERT((rstamp & 0xffff0000) == 0,
-		("rx timestamp > 16 bits wide, %u", rstamp));
-        
 	tsf = ath_hal_gettsf64(ah);
 
 	/* Compensate for rollover. */
-	if ((tsf & 0xffff) <= rstamp)
-		tsf -= 0x10000;
-
-	return (tsf & ~(uint64_t)0xffff) | rstamp;
+	if ((tsf & 0x7fff) < rstamp)
+		tsf -= 0x8000;
+	
+	return ((tsf & ~(uint64_t)0x7fff) | rstamp);
 }
 
 /*
@@ -2793,11 +2793,16 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			 * the oldest station with the same ssid, where oldest
 			 * is determined by the tsf.  Note that hardware
 			 * reconfiguration happens through callback to
-			 * ath_newstate as the state machine will be go
-			 * from RUN -> RUN when this happens.
+			 * ath_newstate as the state machine will go from
+			 * RUN -> RUN when this happens.
 			 */
-			if (le64toh(ni->ni_tstamp.tsf) >= tsf)
+			if (le64toh(ni->ni_tstamp.tsf) >= tsf) {
+				DPRINTF(sc, ATH_DEBUG_STATE,
+				    "ibss merge, rstamp %u tsf %llx "
+				    "tstamp %llx\n", rstamp, tsf,
+				    ni->ni_tstamp.tsf);
 				ieee80211_ibss_merge(ic, ni);
+			}
 		}
 		break;
 	}
@@ -3638,7 +3643,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			(caddr_t)bf->bf_daddr, bf->bf_desc, txq->axq_depth);
 	}
 	txq->axq_link = &bf->bf_desc->ds_link;
-	ATH_TXQ_UNLOCK_BH(txq);
 
 	/*
 	 * The CAB queue is started from the SWBA handler since
@@ -3646,7 +3650,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 */
 	if (txq != sc->sc_cabq)
 		ath_hal_txstart(ah, txq->axq_qnum);
-
+	ATH_TXQ_UNLOCK_BH(txq);
+	
 	dev->trans_start = jiffies;
 	return 0;
 }
