@@ -51,6 +51,8 @@
 
 #include <linux/pci.h>
 
+#include <asm/uaccess.h>
+
 #include "if_media.h"
 #include <net80211/ieee80211_var.h>
 
@@ -268,6 +270,22 @@ static struct pci_driver ath_pci_drv_id = {
 #include "version.h"
 static char *version = ATH_PCI_VERSION " (EXPERIMENTAL)";
 static char *dev_info = "ath_pci";
+
+#include <linux/ethtool.h>
+
+int
+ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void *addr)
+{
+	struct ethtool_drvinfo info;
+
+	if (cmd != ETHTOOL_GDRVINFO)
+		return -EOPNOTSUPP;
+	memset(&info, 0, sizeof(info));
+	info.cmd = cmd;
+	strncpy(info.driver, dev_info, sizeof(info.driver)-1);
+	strncpy(info.version, version, sizeof(info.version)-1);
+	return copy_to_user(addr, &info, sizeof(info)) ? -EFAULT : 0;
+}
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");

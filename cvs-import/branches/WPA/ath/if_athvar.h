@@ -50,15 +50,22 @@
 #endif
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-#include <linux/workqueue.h>
-#define tq_struct work_struct
-#define INIT_TQUEUE INIT_WORK
-#define queue_task(a,b) schedule_work(a)
+#include <linux/interrupt.h>
+#define tq_struct tasklet_struct
+#define INIT_TQUEUE(a,b,c) tasklet_init((a),(b),(unsigned long)(c))
+#define SCHEDULE_TQUEUE(a,b) tasklet_schedule((a))
+typedef unsigned long TQUEUE_ARG;
 #define mark_bh(a)
-#elif !defined(IRQ_NONE)
+#else
+#define SCHEDULE_TQUEUE(a,b) do {		\
+	*(b) |= queue_task((a), &tq_immediate);	\
+} while(0)
+typedef void *TQUEUE_ARG;
+#if !defined(IRQ_NONE)
 typedef void irqreturn_t;
 #define	IRQ_NONE
 #define	IRQ_HANDLED
+#endif
 #endif
 
 #define	ATH_TIMEOUT		1000
@@ -81,7 +88,7 @@ struct ath_recv_hist {
 	u_int8_t	arh_rssi;	/* rssi */
 	u_int8_t	arh_antenna;	/* antenna */
 };
-#define	ATH_RHIST_SIZE		16	/* number of samples */
+#define	ATH_RHIST_SIZE		16	/* number of samples (must be <256) */
 #define	ATH_RHIST_NOTIME	((ulong)(~0))
 
 /* driver-specific node state */
@@ -148,7 +155,7 @@ struct ath_softc {
 	HAL_INT			sc_imask;	/* interrupt mask copy */
 	u_int32_t		sc_icflags;	/* shadow of ic_flags */
 	u_int			sc_keymax;	/* size of key cache */
-	u_int8_t		sc_keymap[32];	/* bit map of key cache use */
+	u_int8_t		sc_keymap[16];	/* bit map of key cache use */
 
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
@@ -190,7 +197,7 @@ struct ath_softc {
 #endif
 };
 
-/* NB: locks always block the bottom half */
+/* NB: locks always block the bottom half; this isn't strictly necessary  */
 #define	ATH_TXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_DESTROY(_sc)
 #define	ATH_TXBUF_LOCK(_sc)		spin_lock_bh(&(_sc)->sc_txbuflock)
@@ -200,10 +207,8 @@ struct ath_softc {
 
 #define	ATH_TXQ_LOCK_INIT(_sc)		spin_lock_init(&(_sc)->sc_txqlock)
 #define	ATH_TXQ_LOCK_DESTROY(_sc)	
-#define	ATH_TXQ_LOCK(_sc)		spin_lock(&(_sc)->sc_txqlock)
-#define	ATH_TXQ_UNLOCK(_sc)		spin_unlock(&(_sc)->sc_txqlock)
-#define	ATH_TXQ_LOCK_BH(_sc)		spin_lock_bh(&(_sc)->sc_txqlock)
-#define	ATH_TXQ_UNLOCK_BH(_sc)		spin_unlock_bh(&(_sc)->sc_txqlock)
+#define	ATH_TXQ_LOCK(_sc)		spin_lock_bh(&(_sc)->sc_txqlock)
+#define	ATH_TXQ_UNLOCK(_sc)		spin_unlock_bh(&(_sc)->sc_txqlock)
 #define	ATH_TXQ_LOCK_ASSERT(_sc) \
 	KASSERT(spin_is_locked(&(_sc)->sc_txqlock), ("txq not locked!"))
 

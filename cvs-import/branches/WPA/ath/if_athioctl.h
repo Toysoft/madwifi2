@@ -75,6 +75,7 @@ struct ath_stats {
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
 	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
+	u_int32_t	ast_rx_badmic;	/* rx failed 'cuz MIC failure */
 	u_int32_t	ast_rx_phyerr;	/* rx PHY error summary count */
 	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
 	u_int32_t	ast_rx_tooshort;/* rx discarded 'cuz frame too short */
@@ -92,8 +93,6 @@ struct ath_stats {
 	u_int32_t	ast_rate_drop;	/* rate control dropped xmit rate */
 };
 
-#define	SIOCGATHSTATS	(SIOCDEVPRIVATE+0)
-
 struct ath_diag {
 	char	ad_name[IFNAMSIZ];		/* if name, e.g. "ath0" */
 	u_int	ad_id;
@@ -101,6 +100,12 @@ struct ath_diag {
 	u_int	ad_size;
 
 };
-#define	SIOCGATHDIAG	(SIOCDEVPRIVATE+1)
 
+#ifdef __linux__
+#define	SIOCGATHSTATS	(SIOCDEVPRIVATE+0)
+#define	SIOCGATHDIAG	(SIOCDEVPRIVATE+1)
+#else
+#define	SIOCGATHSTATS	_IOWR('i', 137, struct ifreq)
+#define	SIOCGATHDIAG	_IOWR('i', 138, struct ath_diag)
+#endif
 #endif /* _DEV_ATH_ATHIOCTL_H */
