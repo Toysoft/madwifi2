@@ -67,6 +67,7 @@
 #include "if_athvar.h"
 #include "ah_desc.h"
 #include "ah_devid.h"			/* XXX to identify IBM cards */
+#include "ah.h"
 
 #ifdef ATH_PCI		/* PCI BUS */
 #include "if_ath_pci.h"
@@ -176,6 +177,25 @@ static const char *acnames[] = {
 	"WME_UPSD",
 };
 
+static const char *hal_status_desc[] = {
+	"No error",
+	"No hardware present or device not yet supported",
+	"Memory allocation failed",
+	"Hardware didn't respond as expected",
+	"EEPROM magic number invalid",
+	"EEPROM version invalid",
+	"EEPROM unreadable",
+	"EEPROM checksum invalid",
+	"EEPROM read problem",
+	"EEPROM mac address invalid",
+	"EEPROM size not supported",
+	"Attempt to change write-locked EEPROM",
+	"Invalid parameter to function",
+	"Hardware revision not supported",
+	"Hardware self-test failed",
+	"Operation incomplete"
+};
+
 static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
 static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
@@ -272,8 +292,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 */
 	ah = _ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
-		printk(KERN_ERR "%s: unable to attach hardware; HAL status %u\n",
-			dev->name, status);
+		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
+			dev->name, hal_status_desc[status], status);
 		error = ENXIO;
 		goto bad;
 	}
@@ -856,8 +876,8 @@ ath_init(struct net_device *dev)
 	sc->sc_curchan.channel = ic->ic_ibss_chan->ic_freq;
 	sc->sc_curchan.channelFlags = ath_chan2flags(ic, ic->ic_ibss_chan);
 	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_FALSE, &status)) {
-		printk("%s: unable to reset hardware; hal status %u\n",
-			dev->name, status);
+		printk("%s: unable to reset hardware: '%s' (HAL status %u)\n",
+			dev->name, hal_status_desc[status], status);
 		error = -EIO;
 		goto done;
 	}
@@ -1018,8 +1038,8 @@ ath_reset(struct net_device *dev)
 	ath_stoprecv(sc);		/* stop recv side */
 	/* NB: indicate channel change so we do a full reset */
 	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_TRUE, &status))
-		printk("%s: %s: unable to reset hardware; hal status %u\n",
-			dev->name, __func__, status);
+		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
+			dev->name, __func__, hal_status_desc[status], status);
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
 			dev->name, __func__);
@@ -3531,10 +3551,10 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		ath_draintxq(sc);		/* clear pending tx frames */
 		ath_stoprecv(sc);		/* turn off frame recv */
 		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status)) {
-			printk("%s: %s: unable to reset channel %u (%uMhz) "
-				"hal status %u\n", dev->name, __func__,
+			printk("%s: %s: unable to reset channel %u (%uMhz): '%s'"
+				" (HAL status %u)\n", dev->name, __func__,
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq,
-				status);
+				hal_status_desc[status], status);
 			return EIO;
 		}
 		sc->sc_curchan = hchan;
