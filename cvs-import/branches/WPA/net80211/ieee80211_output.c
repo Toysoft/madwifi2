@@ -1006,9 +1006,8 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 + 2 + ni->ni_esslen			/* ssid */
 	         + 2 + IEEE80211_RATE_SIZE		/* supported rates */
 	         + 2 + 1				/* DS parameters */
-		 + 2 + 4				/* CF parameters */
 		 + 2 + 4				/* DTIM/IBSSPARMS */
-		 + 2 + 1					/* ERP */
+		 + 2 + 1				/* ERP */
 	         + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
 		 + sizeof(struct ieee80211_ie_wpa)	/* WPA */
 		 ;
