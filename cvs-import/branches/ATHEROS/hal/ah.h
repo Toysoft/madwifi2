@@ -94,6 +94,7 @@ typedef enum {
 	HAL_CAP_TKIP_MIC	= 2,	/* handle TKIP MIC in hardware */
 	HAL_CAP_TKIP_SPLIT	= 3,	/* hardware TKIP uses split keys */
 	HAL_CAP_PHYCOUNTERS	= 4,	/* hardware PHY error counters */
+	HAL_CAP_DIVERSITY	= 5,	/* hardware supports fast diversity */
 } HAL_CAPABILITY_TYPE;
 
 /* 
@@ -144,13 +145,16 @@ typedef enum {
  * operational parameters.
  */
 typedef enum {
-	TXQ_FLAG_TXINT_ENABLE	    = 0x0001,    /* TXOK,TXERR Interrupts */
-	TXQ_FLAG_TXDESCINT_ENABLE   = 0x0002,    /* TXDESC Interrupts */
-	TXQ_FLAG_BACKOFF_DISABLE    = 0x0004,    /* disable Post Backoff  */
-	TXQ_FLAG_COMPRESSION_ENABLE = 0x0008,    /* compression enabled */
-	TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE = 0x0010, /* enable ready time
+	TXQ_FLAG_TXOKINT_ENABLE	    = 0x0001,    /* enable TXOK interrupt */
+	TXQ_FLAG_TXERRINT_ENABLE    = 0x0001,    /* enable TXERR interrupt */
+	TXQ_FLAG_TXDESCINT_ENABLE   = 0x0002,    /* enable TXDESC interrupt */
+	TXQ_FLAG_TXEOLINT_ENABLE    = 0x0004,    /* enable TXEOL interrupt */
+	TXQ_FLAG_TXURNINT_ENABLE    = 0x0008,    /* enable TXURN interrupt */
+	TXQ_FLAG_BACKOFF_DISABLE    = 0x0010,    /* disable Post Backoff  */
+	TXQ_FLAG_COMPRESSION_ENABLE = 0x0020,    /* compression enabled */
+	TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE = 0x0040, /* enable ready time
 							expiry policy */
-	TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = 0x0020, /* enable backoff while
+	TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = 0x0080, /* enable backoff while
 							sending fragment burst*/
 } HAL_TX_QUEUE_FLAGS;
 
@@ -431,7 +435,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x04091300	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x04093000	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -482,7 +486,7 @@ struct ath_hal {
 				u_int txRate3, u_int txTries3);
 	HAL_BOOL  __ahdecl(*ah_fillTxDesc)(struct ath_hal *, struct ath_desc *,
 				u_int segLen, HAL_BOOL firstSeg,
-				HAL_BOOL lastSeg);
+				HAL_BOOL lastSeg, const struct ath_desc *);
 	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc *);
 	HAL_BOOL  __ahdecl(*ah_hasVEOL)(struct ath_hal *);
 
@@ -539,11 +543,8 @@ struct ath_hal {
 	HAL_BOOL  __ahdecl(*ah_detectCardPresent)(struct ath_hal*);
 	void	  __ahdecl(*ah_updateMibCounters)(struct ath_hal*, HAL_MIB_STATS*);
 	HAL_RFGAIN __ahdecl(*ah_getRfGain)(struct ath_hal*);
-#if 0
-	u_int32_t __ahdecl(*ah_getCurRssi)(struct ath_hal*);
-	u_int32_t __ahdecl(*ah_getDefAntenna)(struct ath_hal*);
-	void	  __ahdecl(*ah_setDefAntenna)(struct ath_hal*, u_int32_t ant);
-#endif
+	u_int	  __ahdecl(*ah_getDefAntenna)(struct ath_hal*);
+	void	  __ahdecl(*ah_setDefAntenna)(struct ath_hal*, u_int);
 	HAL_BOOL  __ahdecl(*ah_setSlotTime)(struct ath_hal*, u_int);
 	u_int	  __ahdecl(*ah_getSlotTime)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_setAckTimeout)(struct ath_hal*, u_int);
@@ -656,4 +657,8 @@ extern	u_int __ahdecl ath_hal_ieee2mhz(u_int ieee, u_int flags);
  * Return a version string for the HAL release.
  */
 extern	char ath_hal_version[];
+/*
+ * Return a NULL-terminated array of build/configuration options.
+ */
+extern	const char* ath_hal_buildopts[];
 #endif /* _ATH_AH_H_ */

@@ -63,7 +63,9 @@ STRIP=	${TOOLPREFIX}strip
 OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
-LDOPTS=	-EB
+LDOPTS+=	-EB
 COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+=	-G 0 -EB -mno-abicalls -fno-pic -march=r4600 -Wa,--trap \
-	-fno-strict-aliasing -fno-common -fomit-frame-pointer -mlong-calls
+COPTS+=	-G 0 -mno-abicalls -fno-pic -march=r4600 -Wa,--trap \
+	-fno-strict-aliasing -fno-common -fomit-frame-pointer -mlong-calls \
+	-isystem ${KERNELPATH}/include
+
