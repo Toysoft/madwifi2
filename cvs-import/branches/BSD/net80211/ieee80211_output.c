@@ -1296,6 +1296,7 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_frame *wh;
 	struct sk_buff *skb;
+	struct ieee80211_cb *cb;
 	int pktlen;
 	u_int8_t *frm, *efrm;
 	u_int16_t capinfo;
@@ -1333,6 +1334,8 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 			2*sizeof(struct ieee80211_ie_wpa) : 0)
 		 ;
 	skb = ieee80211_getmgtframe(&frm, pktlen);
+	cb = (struct ieee80211_cb *) skb->cb;
+
 	if (skb == NULL) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 			"%s: cannot get buf; size %u\n", __func__, pktlen);
@@ -1400,6 +1403,7 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	if (ic->ic_curmode == IEEE80211_MODE_11G)
 		frm = ieee80211_add_erp(frm, ic);
 	efrm = ieee80211_add_xrates(frm, rs);
+	cb->ni = ni;
 	bo->bo_trailer_len = efrm - bo->bo_trailer;
 	skb_trim(skb, efrm - skb->data);
 
