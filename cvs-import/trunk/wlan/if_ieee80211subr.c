@@ -921,6 +921,7 @@ void
 ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	int rssi, u_int32_t rstamp, u_int rantenna)
 {
+#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
 	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni = NULL;
 	struct ieee80211_frame *wh;
@@ -931,8 +932,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	int len;
 	u_int8_t dir, subtype, type;
 	u_int8_t *bssid;
-	u_int16_t lastrxseq;
-	u_int8_t lastfragno;
+	u_int16_t rxseq;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	if ((wh->i_fc[0] & IEEE80211_FC0_VERSION_MASK) !=
@@ -992,19 +992,15 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			break;
 		}
 		ieee80211_add_recvhist(ni, rssi, rstamp, rantenna);
-		lastrxseq = ni->ni_rxseq;
-		lastfragno = ni->ni_fragno;
 		ni->ni_inact = 0;
-		ni->ni_rxseq =
-		    le16_to_cpu(*(u_int16_t *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
-		ni->ni_fragno = le16_to_cpu(*(u_int16_t *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
+		rxseq = le16_to_cpu(*(u_int16_t *)wh->i_seq);
 		if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
 		    !((type==IEEE80211_FC0_TYPE_DATA) && (subtype&IEEE80211_FC0_SUBTYPE_QOS)) &&
-		    lastrxseq == ni->ni_rxseq &&
-		    lastfragno == ni->ni_fragno) {
+		    SEQ_LEQ(rxseq, ni->ni_rxseq)) {
 			/* duplicate, silently discarded */
 			goto out;
 		}
+		ni->ni_rxseq = rxseq;
 		if (ni == ic->ic_bss) {
 			ieee80211_unref_node(&ni);
 			ni = NULL;
@@ -1019,12 +1015,11 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		tid = ((struct ieee80211_qosframe*)wh)->i_qos[0] & 0xf;
 		wh->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
 		if (ni) {
-		    lastrxseq = ni->ni_rxseqs[tid];
-		    
-		    ni->ni_rxseqs[tid] = le16_to_cpu(*(u_int16_t *)wh->i_seq);
-		    if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) && lastrxseq == ni->ni_rxseqs[tid]) {
+		    rxseq = le16_to_cpu(*(u_int16_t *)wh->i_seq);
+		    if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) && SEQ_LEQ(rxseq, ni->ni_rxseqs[tid])) {
 			goto out;
 		    }
+		    ni->ni_rxseqs[tid] = rxseq;
 		}
 		headersize = sizeof(qosframe);
 		if (ic->ic_flags & IEEE80211_F_DATAPAD) {
@@ -1243,6 +1238,7 @@ out:
 		ieee80211_unref_node(&ni);
 	if (skb != NULL)
 		dev_kfree_skb(skb);
+#undef SEQ_LEQ
 }
 
 int
