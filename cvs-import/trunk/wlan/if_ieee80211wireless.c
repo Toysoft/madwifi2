@@ -92,7 +92,7 @@ struct iw_statistics *
 ieee80211_iw_getstats(struct net_device *dev)
 {
 #define	NZ(x)	((x) ? (x) : 1)
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
@@ -140,7 +140,7 @@ ieee80211_ioctl_giwname(struct net_device *dev,
 		   struct iw_request_info *info,
 		   char *name, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	/* XXX should use media status but IFM_AUTO case gets tricky */
 	switch (ic->ic_curmode) {
@@ -168,7 +168,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *keybuf)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	int kid, error;
 
 	if (erq->flags & IW_ENCODE_DISABLED) {
@@ -210,7 +210,7 @@ ieee80211_ioctl_giwencode(struct net_device *dev,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *key)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if ((ic->ic_flags & IEEE80211_F_WEPON) == 0) {
 		erq->length = 0;
@@ -238,7 +238,7 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ifmediareq imr;
 	struct ifreq ifr;
 	int rate;
@@ -263,7 +263,7 @@ ieee80211_ioctl_giwrate(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ifmediareq imr;
 	int rate;
 
@@ -304,7 +304,7 @@ ieee80211_ioctl_siwrts(struct net_device *dev,
 		       struct iw_request_info *info,
 		       struct iw_param *rts, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	u16 val;
 
 	if (rts->disabled)
@@ -326,7 +326,7 @@ ieee80211_ioctl_giwrts(struct net_device *dev,
 		       struct iw_request_info *info,
 		       struct iw_param *rts, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	rts->value = ic->ic_rtsthreshold;
 	rts->disabled = (rts->value == IEEE80211_RTS_MAX);
@@ -341,7 +341,7 @@ ieee80211_ioctl_siwfrag(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rts, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	u16 val;
 
 	if (rts->disabled)
@@ -362,7 +362,7 @@ ieee80211_ioctl_giwfrag(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rts, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	rts->value = ic->ic_fragthreshold;
 	rts->disabled = (rts->value == 2346);
@@ -376,7 +376,7 @@ ieee80211_ioctl_siwap(struct net_device *dev,
 		      struct iw_request_info *info,
 		      struct sockaddr *ap_addr, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
 
 	/* NB: should only be set when in STA mode */
@@ -397,7 +397,7 @@ ieee80211_ioctl_giwap(struct net_device *dev,
 		      struct iw_request_info *info,
 		      struct sockaddr *ap_addr, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (ic->ic_flags & IEEE80211_F_DESBSSID)
 		IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_des_bssid);
@@ -412,7 +412,7 @@ ieee80211_ioctl_siwnickn(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *nickname)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (data->length > IEEE80211_NWID_LEN)
 		return -EINVAL;
@@ -429,7 +429,7 @@ ieee80211_ioctl_giwnickn(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *nickname)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (data->length > ic->ic_nicknamelen + 1)
 		data->length = ic->ic_nicknamelen + 1;
@@ -445,7 +445,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_freq *freq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211channel *c;
 	int i;
 	
@@ -471,7 +471,7 @@ ieee80211_ioctl_giwfreq(struct net_device *dev,
 				struct iw_request_info *info,
 				struct iw_freq *freq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (!ic->ic_ibss_chan)
 		return -EINVAL;
@@ -487,7 +487,7 @@ ieee80211_ioctl_siwessid(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *ssid)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (data->flags == 0) {		/* ANY */
 		memset(ic->ic_des_essid, 0, IEEE80211_NWID_LEN);
@@ -512,7 +512,7 @@ ieee80211_ioctl_giwessid(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *essid)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	data->flags = 1;		/* active */
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
@@ -538,7 +538,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni = &ic->ic_bss;
 	struct iw_range *range = (struct iw_range *) extra;
 	struct ieee80211_rateset *rs;
@@ -631,7 +631,7 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 			struct iw_request_info *info,
 			__u32 *mode, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ifmediareq imr;
 	struct ifreq ifr;
 
@@ -667,7 +667,7 @@ ieee80211_ioctl_giwmode(struct net_device *dev,
 			struct iw_request_info *info,
 			__u32 *mode, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ifmediareq imr;
 
 	memset(&imr, 0, sizeof(imr));
@@ -691,7 +691,7 @@ ieee80211_ioctl_siwpower(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_param *wrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (wrq->disabled) {
 		if (ic->ic_flags & IEEE80211_F_PMGTON) {
@@ -729,7 +729,7 @@ ieee80211_ioctl_giwpower(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *rrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	rrq->disabled = (ic->ic_flags & IEEE80211_F_PMGTON) == 0;
 	if (!rrq->disabled) {
@@ -753,7 +753,7 @@ ieee80211_ioctl_siwretry(struct net_device *dev,
 				 struct iw_request_info *info,
 				 struct iw_param *rrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (rrq->disabled) {
 		if (ic->ic_flags & IEEE80211_F_SWRETRY) {
@@ -785,7 +785,7 @@ ieee80211_ioctl_giwretry(struct net_device *dev,
 				 struct iw_request_info *info,
 				 struct iw_param *rrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	rrq->disabled = (ic->ic_flags & IEEE80211_F_SWRETRY) == 0;
 	if (!rrq->disabled) {
@@ -817,7 +817,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_param *rrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	int curtxpmgt;
 
 	curtxpmgt = ic->ic_flags & IEEE80211_F_TXPMGT;
@@ -858,7 +858,7 @@ ieee80211_ioctl_giwtxpow(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_param *rrq, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	u_int32_t curtxmgt = ic->ic_flags & IEEE80211_F_TXPMGT;
 
 	rrq->disabled = (curtxmgt == IEEE80211_F_TXPOW_OFF);
@@ -873,7 +873,7 @@ ieee80211_ioctl_iwaplist(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni;
 	struct sockaddr addr[IW_MAX_AP];
 	struct iw_quality qual[IW_MAX_AP];
@@ -906,7 +906,7 @@ ieee80211_ioctl_siwscan(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
 		/* just return existing station tables */
@@ -927,7 +927,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ieee80211_node *ni;
 	char *current_ev = extra;
 	char *end_buf = extra + IW_SCAN_MAX_DATA;
@@ -1050,7 +1050,7 @@ static int
 ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		   	 void *w, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	int *i = (int *) extra;
 	int param = i[0];		/* parameter id is 1st */
 	int value = i[1];		/* NB: all values are TYPE_INT */
@@ -1098,7 +1098,7 @@ static int
 ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 			void *w, char *extra)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211com *ic = dev->priv;
 	struct ifmediareq imr;
 	int *param = (int *) extra;
 
