@@ -138,28 +138,46 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
 
 /*
  * Memory-mapped device register read/write.  These are here
- * as routines and not defined in ah_osdep.h to insure the HAL
- * uses no GPL-contaminated files.
+ * as routines when debugging support is enabled and/or when
+ * explicitly configured to use function calls.  The latter is
+ * for architectures that might need to do something before
+ * referencing memory (e.g. remap an i/o window).
+ *
+ * NB: see the comments in ah_osdep.h about byte-swapping register
+ *     reads and writes to understand what's going on below.
  */
-
-#ifdef AH_DEBUG
+#if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
 void
 ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 {
+#ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
 		ath_hal_printf(ah, "WRITE 0x%x <= 0x%x\n", reg, val);
-	writel(val, ah->ah_sh + reg);
+#endif
+ 	if (reg >= 0x4000 && reg < 0x5000)
+ 		writel(val, ah->ah_sh + reg);
+ 	else
+ 		*((volatile u_int32_t *)(ah->ah_sh + reg)) = val;
 }
 
 u_int32_t
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
-	u_int32_t val = readl(ah->ah_sh + reg);
+ 	u_int32_t val;
+
+ 	if (reg >= 0x4000 && reg < 0x5000)
+ 		val = readl(ah->ah_sh + reg);
+ 	else
+ 		val = *((volatile u_int32_t *)(ah->ah_sh + reg));
+#ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
 		ath_hal_printf(ah, "READ 0x%x => 0x%x\n", reg, val);
+#endif
 	return val;
 }
+#endif /* AH_DEBUG || AH_REGOPS_FUNC */
 
+#ifdef AH_DEBUG
 void
 HALDEBUG(struct ath_hal *ah, const char* fmt, ...)
 {

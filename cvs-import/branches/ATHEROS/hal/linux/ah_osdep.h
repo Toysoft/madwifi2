@@ -94,22 +94,67 @@ extern	u_int32_t ath_hal_getuptime(struct ath_hal *);
 #define	OS_GETUPTIME(_ah)	ath_hal_getuptime(_ah)
 
 /*
- * Register read/write; we assume the registers
- * will always be memory-mapped.
+ * Register read/write; we assume the registers will always
+ * be memory-mapped.  Note that register accesses are done
+ * using target-specific functions when debugging is enabled
+ * (AH_DEBUG) or we are explicitly configured this way.  The
+ * latter is used on some platforms where the full i/o space
+ * cannot be directly mapped.
  */
-#ifndef AH_DEBUG
-#define	OS_REG_WRITE(_ah, _reg, _val) do {				\
-	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);	\
-} while (0)
-#define	OS_REG_READ(_ah, _reg) \
-	(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
-#else
+#if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
 #define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
 #define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
 
 extern	void ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val);
 extern	u_int32_t ath_hal_reg_read(struct ath_hal *ah, u_int reg);
-#endif
+#else
+
+/*
+ * The hardware registers are native little-endian byte order.
+ * Big-endian hosts are handled by enabling hardware byte-swap
+ * of register reads and writes at reset.  But the PCI clock
+ * domain registers are not byte swapped!  Thus, on big-endian
+ * platforms we have to byte-swap thoese registers specifically.
+ * Most of this code is collapsed at compile time because the
+ * register values are constants.
+ */
+#define	AH_LITTLE_ENDIAN	1234
+#define	AH_BIG_ENDIAN		4321
+
+#if AH_BYTE_ORDER == AH_BIG_ENDIAN
+/*
+ * This could be optimized but since we only use it for
+ * a few registers there's little reason to do so.
+ */
+static inline u_int32_t
+__bswap32(u_int32_t _x)
+{
+ 	return ((u_int32_t)(
+	      (((const u_int8_t *)(&_x))[0]    ) |
+	      (((const u_int8_t *)(&_x))[1]<< 8) |
+	      (((const u_int8_t *)(&_x))[2]<<16) |
+	      (((const u_int8_t *)(&_x))[3]<<24))
+	);
+}
+#define OS_REG_WRITE(_ah, _reg, _val) do {				    \
+	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
+			__bswap32((_val));				    \
+	else								    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
+} while (0)
+#define OS_REG_READ(_ah, _reg) \
+	(((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
+		__bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
+#else /* AH_LITTLE_ENDIAN */
+#define OS_REG_WRITE(_ah, _reg, _val) do { \
+	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val); \
+} while (0)
+#define OS_REG_READ(_ah, _reg) \
+	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))
+#endif /* AH_BYTE_ORDER */
+#endif /* AH_DEBUG || AH_REGFUNC */
 #define	OS_MARK(_ah, _id, _v)
 
 /*
