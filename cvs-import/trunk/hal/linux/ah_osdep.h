@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -154,7 +154,7 @@ __bswap32(u_int32_t _x)
  */
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
 
-#if ( defined(CONFIG_ARCH_IXP425) || defined(CONFIG_ARCH_IXP4XX)) /* ixp4xx architecture */
+#if ( defined(CONFIG_PPC_MAC) || defined(CONFIG_ARCH_IXP425) || defined(CONFIG_ARCH_IXP4XX)) /* ixp4xx or PowerPC architecture */
 
 #define _OS_REG_WRITE(_ah, _reg, _val) do {				    \
 	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
