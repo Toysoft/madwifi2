@@ -226,4 +226,17 @@ extern	void ieee80211_notify_node_join(struct ieee80211com *,
 extern	void ieee80211_notify_node_leave(struct ieee80211com *,
 		struct ieee80211_node *);
 extern	void ieee80211_notify_scan_done(struct ieee80211com *);
+
+
+/* Added by JOTA */
+
+/* Station mode */
+extern	void ieee80211_notify_assoc (struct ieee80211com *ic);
+extern	void ieee80211_notify_disassoc (struct ieee80211com *ic, int reason);
+
+/* Hostap mode */
+extern	void ieee80211_notify_stajoin (struct ieee80211com *ic, struct ieee80211_node *ni);
+extern	void ieee80211_notify_staleave (struct ieee80211com *ic, struct ieee80211_node *ni, int reason);
+/* ===================== */
+
 #endif /* _NET80211_IEEE80211_PROTO_H_ */

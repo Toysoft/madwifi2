@@ -54,7 +54,7 @@ COPTS+= -DATH_PCI
 endif
 
 obj-m		+= ath_${BUSNAME}.o
-ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
+ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o radar.o
 export-objs	:= if_ath_${BUSNAME}.o
 list-multi	:= ath_${BUSNAME}.o
 

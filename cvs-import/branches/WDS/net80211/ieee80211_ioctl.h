@@ -39,6 +39,32 @@
  * IEEE 802.11 ioctls.
  */
 
+/* Added by JOTA */
+
+/*
+ * Per node per rate statistics available when operating as an AP
+ */
+
+/* XXX: This define is how many rates that are available, it should (and already is)
+	be declared somewhere else */
+
+struct ieee80211_noderatestats {
+	u_int32_t nrs_rateKbps;		/* rx rate value */
+	u_int64_t nrs_rx_bytes;		/* rx data count (bytes) */
+	u_int32_t nrs_rx_data;		/* rx data frames */
+	u_int32_t nrs_rx_generr;	/* General errors */
+
+	u_int64_t nrs_tx_bytes;		/* tx data count (bytes) */
+	u_int32_t nrs_tx_data;		/* tx data frames */
+	u_int32_t nrs_tx_retry;		/* Retries */
+	u_int32_t nrs_tx_altrate;	/* Alternative rate */
+
+	u_int32_t nrs_tx_xretry;	/* Excessive tx retries */
+	u_int32_t nrs_tx_generr;	/* General errors, which xretry is part of */
+};
+
+/*============================*/
+
 /*
  * Per/node (station) statistics available when operating as an AP.
  */
@@ -77,6 +103,14 @@ struct ieee80211_nodestats {
 	u_int32_t	ns_mib_deauth_code;	/* last deauth reason */
 	u_int32_t	ns_mib_disassoc;	/* disassociations */
 	u_int32_t	ns_mib_disassoc_code;	/* last disassociation reason */
+
+	/* Added by JOTA, per rate stats */
+	/* XXX: Size of array */
+	struct ieee80211_noderatestats ns_ratestats[16];
+	u_int8_t ns_tx_currate;
+	u_int8_t ns_rx_currate;
+	/*=================================*/
+
 };
 
 /*
@@ -216,7 +250,7 @@ struct ieee80211req_mlme {
 	u_int8_t	im_macaddr[IEEE80211_ADDR_LEN];
 };
 
-/* 
+/*
  * MAC ACL operations.
  */
 enum {
@@ -352,6 +386,24 @@ struct ieee80211req_scan_result {
 #define	IEEE80211_IOCTL_DELMAC		(SIOCIWFIRSTPRIV+12)
 #define	IEEE80211_IOCTL_CHANLIST	(SIOCIWFIRSTPRIV+14)
 
+
+/* Added by JOTA */
+struct ieee80211_node_info
+{
+	u_int8_t mac[6];
+	u_int16_t associd;
+	u_int32_t assocstamp;
+	u_int32_t rssi;
+	u_int32_t rx_currate; /* Index into ns_ratestats */
+	u_int32_t tx_currate; /* Index into ns_ratestats */
+
+	/* XXX: Size of array */
+	/* Index of this array is shared with ni_rates index in node struct */
+	struct ieee80211_noderatestats ns_ratestats[16];
+};
+/*======================================*/
+
+
 enum {
 	IEEE80211_PARAM_TURBO		= 1,	/* turbo mode */
 	IEEE80211_PARAM_MODE		= 2,	/* phy mode (11a, 11b, etc.) */
@@ -383,6 +435,10 @@ enum {
 /* NB: require in+out parameters so cannot use wireless extensions, yech */
 #define	IEEE80211_IOCTL_GETKEY		(SIOCDEVPRIVATE+3)
 #define	IEEE80211_IOCTL_GETWPAIE	(SIOCDEVPRIVATE+4)
+
+/* Added by JOTA */
+#define IEEE80211_IOCTL_NODEINFO  (SIOCDEVPRIVATE+5)
+#define SIOCGNODEINFO             IEEE80211_IOCTL_NODEINFO
 
 #endif /* __linux__ */
 

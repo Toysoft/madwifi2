@@ -102,6 +102,9 @@ struct ieee80211_node {
 /* NB: this must have the same value as IEEE80211_FC1_PWR_MGT */
 #define	IEEE80211_NODE_PWR_MGT	0x0010		/* power save mode enabled */
 	u_int16_t		ni_associd;	/* assoc response */
+
+	u_int32_t		ni_assocstamp;	/* Timestamp for associaition, ADDED BY JOTA */
+
 	u_int16_t		ni_txpower;	/* current transmit power */
 	u_int16_t		ni_vlan;	/* vlan tag */
 	u_int32_t		*ni_challenge;	/* shared-key challenge */

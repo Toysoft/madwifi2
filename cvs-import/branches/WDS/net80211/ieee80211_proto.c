@@ -276,9 +276,17 @@ void
 ieee80211_dump_pkt(const u_int8_t *buf, int len, int rate, int rssi)
 {
 	struct ieee80211_frame *wh;
+
+	/* Added by JOTA */
+	int hdrlen;
+
 	int i;
 
 	wh = (struct ieee80211_frame *)buf;
+
+	/* Added by JOTA */
+	hdrlen = ieee80211_anyhdrsize (wh);
+
 	switch (wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
 		printf("NODS %s", ether_sprintf(wh->i_addr2));
@@ -318,9 +326,13 @@ ieee80211_dump_pkt(const u_int8_t *buf, int len, int rate, int rssi)
 	if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
 		int i;
 		printf(" WEP [IV");
+
+		/* Modified by JOTA */
 		for (i = 0; i < IEEE80211_WEP_IVLEN; i++)
-			printf(" %.02x", buf[sizeof(*wh)+i]);
-		printf(" KID %u]", buf[sizeof(*wh)+i] >> 6);
+			printf(" %.02x", buf[hdrlen+i]);
+		printf(" KID %u]", buf[hdrlen+i] >> 6);
+
+
 	}
 	if (rate >= 0)
 		printf(" %dM", rate / 2);
@@ -489,6 +501,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 				    IEEE80211_FC0_SUBTYPE_DISASSOC,
 				    IEEE80211_REASON_ASSOC_LEAVE);
 				ieee80211_sta_leave(ic, ni);
+
 				break;
 			case IEEE80211_M_HOSTAP:
 				IEEE80211_NODE_LOCK(ic);

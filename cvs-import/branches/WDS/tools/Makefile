@@ -31,7 +31,7 @@ BINDIR=	/usr/local/bin
 include ${DEPTH}/Makefile.inc
 
 ALL_INSTALL=	athstats 80211stats athdebug 80211debug
-ALL=	${ALL_INSTALL} athkey athchans athctrl
+ALL=	${ALL_INSTALL} athkey athchans athctrl nodeinfo
 
 all:	${ALL}
 
@@ -53,6 +53,8 @@ athdebug: athdebug.c
 	${CC} -o athdebug ${CFLAGS} ${LDFLAGS} athdebug.c
 80211debug: 80211debug.c
 	${CC} -o 80211debug ${CFLAGS} ${LDFLAGS} 80211debug.c
+nodeinfo: nodeinfo.c
+	${CC} -o nodeinfo ${CFLAGS} ${LDFLAGS} nodeinfo.c
 install: ${ALL_INSTALL}
 	for i in ${ALL_INSTALL}; do \
 		cp $$i ${DESTDIR}${BINDIR}; \

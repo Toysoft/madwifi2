@@ -255,11 +255,12 @@ ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 	 * In all but hostap mode scanning starts off in
 	 * an active mode before switching to passive.
 	 */
-	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
-		ic->ic_flags |= IEEE80211_F_ASCAN;
-		ic->ic_stats.is_scan_active++;
-	} else
-		ic->ic_stats.is_scan_passive++;
+
+	/* Modified by JOTA */
+	/* We always scan passive around here */
+
+	ic->ic_stats.is_scan_passive++;
+
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN, ("begin %s scan\n",
 		(ic->ic_flags & IEEE80211_F_ASCAN) ?  "active" : "passive"));
 	/*
@@ -680,7 +681,7 @@ ieee80211_setup_node(struct ieee80211com *ic,
 	 * then several things happen: we can't return the data
 	 * to users to show the list of AP's we encountered, and
 	 * more importantly, we'll incorrectly deauthenticate
-	 * ourself because the inactivity timer will kick us off. 
+	 * ourself because the inactivity timer will kick us off.
 	 */
 	if (ic->ic_opmode != IEEE80211_M_STA)
 		ic->ic_inact_timer = IEEE80211_INACT_WAIT;
@@ -730,6 +731,7 @@ _ieee80211_find_node(struct ieee80211com *ic, u_int8_t *macaddr)
 	LIST_FOREACH(ni, &ic->ic_hash[hash], ni_hash) {
 		if (IEEE80211_ADDR_EQ(ni->ni_macaddr, macaddr)) {
 			ieee80211_node_incref(ni); /* mark referenced */
+
 			return ni;
 		}
 	}
@@ -810,6 +812,7 @@ ieee80211_find_node_with_channel(struct ieee80211com *ic, u_int8_t *macaddr,
 		if (IEEE80211_ADDR_EQ(ni->ni_macaddr, macaddr) &&
 		    ni->ni_chan == chan) {
 			ieee80211_node_incref(ni);/* mark referenced */
+
 			break;
 		}
 	}
@@ -833,7 +836,9 @@ ieee80211_find_node_with_ssid(struct ieee80211com *ic, u_int8_t *macaddr,
 		if (IEEE80211_ADDR_EQ(ni->ni_macaddr, macaddr) &&
 		    ni->ni_esslen == ic->ic_des_esslen &&
 		    memcmp(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen) == 0) {
+
 			ieee80211_node_incref(ni);/* mark referenced */
+
 			break;
 		}
 	}
@@ -873,6 +878,7 @@ ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
 		("%s %s refcnt %d\n", __func__,
 		 ether_sprintf(ni->ni_macaddr), ieee80211_node_refcnt(ni)));
+
 	if (ieee80211_node_dectestref(ni)) {
 		IEEE80211_NODE_LOCK_BH(ic);
 		_ieee80211_free_node(ic, ni);
@@ -941,8 +947,8 @@ restart:
 			 * Send a deauthenticate frame.
 			 *
 			 * Drop the node lock before sending the
-			 * deauthentication frame in case the driver takes     
-			 * a lock, as this will result in a LOR between the     
+			 * deauthentication frame in case the driver takes
+			 * a lock, as this will result in a LOR between the
 			 * node lock and the driver lock.
 			 */
 			IEEE80211_NODE_UNLOCK(ic);

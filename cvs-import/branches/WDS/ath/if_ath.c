@@ -63,6 +63,8 @@
 
 #include <net80211/ieee80211_var.h>
 
+#include "radar.h"
+
 #define	AR_DEBUG
 #include "if_athvar.h"
 #include "ah_desc.h"
@@ -91,6 +93,10 @@ static int	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(TQUEUE_ARG);
 static void	ath_rxorn_tasklet(TQUEUE_ARG);
 static void	ath_bmiss_tasklet(TQUEUE_ARG);
+
+/* Added by JOTA */
+static void ath_radar_tasklet (TQUEUE_ARG);
+
 static int	ath_stop_locked(struct net_device *);
 static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
@@ -140,6 +146,10 @@ static int	ath_startrecv(struct ath_softc *);
 static void	ath_chan_change(struct ath_softc *, struct ieee80211_channel *);
 static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
+
+/* Added by JOTA */
+static void ath_stuck_beacon (unsigned long);
+
 static int	ath_newstate(struct ieee80211com *, enum ieee80211_state, int);
 #if IEEE80211_VLAN_TAG_USED
 static void	ath_vlan_register(struct net_device *, struct vlan_group *);
@@ -244,15 +254,30 @@ enum {
 #define	KEYPRINTF(sc, k, ix, mac)
 #endif
 
-static	int countrycode = -1;
+/* Modified by JOTA */
+static	int countrycode = 208; //-1; //208;
 MODULE_PARM(countrycode, "i");
 MODULE_PARM_DESC(countrycode, "Override default country code");
-static	int outdoor = -1;
+static	int outdoor = 1;
 MODULE_PARM(outdoor, "i");
 MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
-static	int xchanmode = -1;
+static	int xchanmode = 1;
 MODULE_PARM(xchanmode, "i");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
+
+static void
+ath_stuck_beacon (unsigned long arg)
+{
+	struct net_device *dev = (struct net_device *) arg;
+	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+
+	printk ("%s: Re-enabling beacon interrupt \n", __func__);
+	sc->sc_imask |= HAL_INT_SWBA;
+
+	printk ("%s: Resetting hardware\n", __func__);
+	ath_init (dev);
+}
 
 int
 ath_attach(u_int16_t devid, struct net_device *dev)
@@ -282,6 +307,10 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq,ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq,ath_fatal_tasklet,	dev);
+
+	/* Added by JOTA */
+	ATH_INIT_TQUEUE(&sc->sc_radartq, ath_radar_tasklet,	dev);
+
 
 	/*
 	 * Attach the hal and verify ABI compatibility by checking
@@ -351,12 +380,14 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		setbit(sc->sc_keymap, i+32+64);
 	}
 
+
 	/*
 	 * Collect the channel list using the default country
 	 * code and including outdoor channels.  The 802.11 layer
 	 * is resposible for filtering this list based on settings
 	 * like the phy mode.
 	 */
+
 	if (countrycode != -1)
 		ath_countrycode = countrycode;
 	if (outdoor != -1)
@@ -411,7 +442,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		error = EIO;
 		goto bad2;
 	}
-	/* 
+	/*
 	 * Special case certain configurations.
 	 */
 	switch (sc->sc_txqsetup) {
@@ -428,6 +459,10 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		error = EIO;
 		goto bad2;
 	}
+
+	init_timer (&sc->sc_beacontimer);
+	sc->sc_beacontimer.function = ath_stuck_beacon;
+	sc->sc_beacontimer.data = (unsigned long) dev;
 
 	init_timer(&sc->sc_scan_ch);
 	sc->sc_scan_ch.function = ath_next_scan;
@@ -551,6 +586,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ic->ic_crypto.cs_key_update_begin = ath_key_update_begin;
 	ic->ic_crypto.cs_key_update_end = ath_key_update_end;
 
+	/* Added by JOTA */
+	radar_init ();
+
 	/* complete initialization */
 	ieee80211_media_init(ic, ath_media_change, ieee80211_media_status);
 
@@ -568,6 +606,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 #endif /* CONFIG_SYSCTL */
 	ieee80211_announce(ic);
 	ath_announce(dev);
+
 	return 0;
 bad3:
 	ieee80211_ifdetach(ic);
@@ -724,10 +763,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			/* bump tx trigger level */
 			ath_hal_updatetxtriglevel(ah, AH_TRUE);
 		}
-		if (status & HAL_INT_RX)
-			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
-		if (status & HAL_INT_TX)
-			ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, &needmark);
+
 		if (status & HAL_INT_SWBA) {
 			/*
 			 * Software beacon alert--time to send a beacon.
@@ -737,6 +773,11 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 			ath_beacon_tasklet(dev);
 		}
+
+		if (status & HAL_INT_RX)
+			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
+		if (status & HAL_INT_TX)
+			ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, &needmark);
 		if (status & HAL_INT_BMISS) {
 			sc->sc_stats.ast_bmiss++;
 			ATH_SCHEDULE_TQUEUE(&sc->sc_bmisstq, &needmark);
@@ -769,7 +810,35 @@ ath_fatal_tasklet(TQUEUE_ARG data)
 
 	printk("%s: hardware error; reseting\n", dev->name);
 	ath_reset(dev);
+
 }
+
+/* Added by JOTA */
+static void
+ath_radar_tasklet (TQUEUE_ARG data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211_channel *c;
+
+	c = radar_handle_interference (ic);
+
+	if (c == NULL)
+	{
+ 		ath_stop (dev);
+		printk ("FATAL ERROR: All available channels are marked as being interfered by radar. Stopping radio.\n");
+		return;
+	}
+
+	ic->ic_des_chan = c;
+	ic->ic_ibss_chan = c;
+	ieee80211_new_state (ic, IEEE80211_S_INIT, -1);
+	ath_init (dev);
+}
+
+
+/*=========================*/
 
 static void
 ath_rxorn_tasklet(TQUEUE_ARG data)
@@ -791,14 +860,31 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
 		("unexpect operating mode %u", ic->ic_opmode));
 
-	if (ic->ic_state == IEEE80211_S_RUN) {
-		/*
-		 * Rather than go directly to scan state, try to
-		 * reassociate first.  If that fails then the state
-		 * machine will drop us into scanning after timing
-		 * out waiting for a probe response.
-		 */
-		ieee80211_new_state(ic, IEEE80211_S_ASSOC, -1);
+	if (ic->ic_state == IEEE80211_S_RUN) 
+	{
+		int index;
+		u_char *chanlist = ic->ic_chan_active;
+
+		printk ("%s: Missed beacon, scanning for AP...\n", __func__);
+
+	
+		for (index = 0; index < IEEE80211_CHAN_MAX; index ++)
+		{
+			if (isset (chanlist, index))
+			{
+				ic->ic_ibss_chan = &ic->ic_channels[index];
+				break;
+			}
+		}
+
+		ic->ic_bss->ni_chan = ic->ic_ibss_chan;
+
+	        if (ic->ic_state != IEEE80211_S_INIT)
+		{
+	                ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+		}
+
+	        ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 	}
 }
 
@@ -1078,6 +1164,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_stats.ast_tx_invalid++;
 		return -ENETDOWN;
 	}
+
 	/*
 	 * No data frames go out unless we're associated; this
 	 * should not happen as the 802.11 layer does not enable
@@ -1098,15 +1185,19 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (bf != NULL)
 		STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
 	/* XXX use a counter and leave at least one for mgmt frames */
+
 	if (STAILQ_EMPTY(&sc->sc_txbuf)) {
 		DPRINTF(sc, ATH_DEBUG_XMIT, "%s: stop queue\n", __func__);
 		sc->sc_stats.ast_tx_qstop++;
 		netif_stop_queue(dev);
 	}
+
 	ATH_TXBUF_UNLOCK_BH(sc);
 	if (bf == NULL) {		/* NB: should not happen */
+		/*
 		printk("%s: discard, no xmit buf\n", __func__);
 		sc->sc_stats.ast_tx_nobuf++;
+		*/
 		goto bad;
 	}
 
@@ -1120,12 +1211,14 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_stats.ast_tx_encap++;
 		goto bad;
 	}
+
 	pktlen = skb->len;		/* NB: don't reference skb below */
 	if (ath_tx_start(dev, ni, bf, skb) == 0) {
 		sc->sc_devstats.tx_packets++;
 		sc->sc_devstats.tx_bytes += pktlen;
 		return 0;
 	}
+
 	/* fall thru... */
 bad:
 	if (ni && ni != ic->ic_bss)
@@ -1180,7 +1273,9 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	}
 	ATH_TXBUF_UNLOCK_BH(sc);
 	if (bf == NULL) {
+	/*
 		printk("ath_mgtstart: discard, no xmit buf\n");
+	*/
 		sc->sc_stats.ast_tx_nobufmgt++;
 		error = -ENOBUFS;
 		goto bad;
@@ -1627,12 +1722,15 @@ ath_calcrxfilter(struct ath_softc *sc)
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t rfilt;
 
+	/* Added by JOTA, PHYRADAR stuff */
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
-	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
+	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST | HAL_RX_FILTER_PHYRADAR;
 	if (ic->ic_opmode != IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
+
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
+
 	if (ic->ic_opmode == IEEE80211_M_STA ||
 	    ic->ic_opmode == IEEE80211_M_IBSS ||
 	    ic->ic_state == IEEE80211_S_SCAN)
@@ -1829,6 +1927,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	return error;
 }
 
+int g_beaconFailed = 0;
+
 /*
  * Transmit a beacon frame at SWBA.  Dynamic updates to the
  * frame contents are done as needed and the slot time is
@@ -1887,12 +1987,24 @@ ath_beacon_tasklet(struct net_device *dev)
 	/*
 	 * Stop any current dma and put the new frame on the queue.
 	 */
-	if (!ath_hal_stoptxdma(ah, sc->sc_bhalq)) {
-		DPRINTF(sc, ATH_DEBUG_ANY,
-			"%s: beacon queue %u did not stop?\n",
-			__func__, sc->sc_bhalq);
-		/* NB: the HAL still stops DMA, so proceed */
+
+	/* Added by JOTA */
+	/* =========================== */
+	if (!ath_hal_stoptxdma(ah, sc->sc_bhalq))
+	{
+		/* Temporarly disable beacons */
+		sc->sc_imask &= ~HAL_INT_SWBA;
+		ath_hal_intrset(ah, sc->sc_imask);
+
+		printk ("%s: Stuck beacon, disabling interrupt\n", __func__);
+
+		/* Schedule timer to restart them*/
+		sc->sc_beacontimer.expires = jiffies + (2 * HZ);
+		//sc->sc_cal_ch.expires = jiffies + (1 * HZ);
+		add_timer(&sc->sc_beacontimer);
 	}
+	/* =========================== */
+
 	bus_dma_sync_single(sc->sc_bdev,
 		bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 
@@ -1941,7 +2053,7 @@ ath_beacon_config(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = ic->ic_bss;
 	u_int32_t nexttbtt, intval;
-	
+
 	nexttbtt = (LE_READ_4(ni->ni_tstamp.data + 4) << 22) |
 	    (LE_READ_4(ni->ni_tstamp.data) >> 10);
 	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: nexttbtt=%u\n", __func__, nexttbtt);
@@ -1979,8 +2091,8 @@ ath_beacon_config(struct ath_softc *sc)
 		 */
 		bmisstime = (ic->ic_bmisstimeout * 1000) / 1024;
 		bs.bs_bmissthreshold = howmany(bmisstime,ni->ni_intval);
-		if (bs.bs_bmissthreshold > 10)
-			bs.bs_bmissthreshold = 10;
+		if (bs.bs_bmissthreshold > 64)
+			bs.bs_bmissthreshold = 64;
 		else if (bs.bs_bmissthreshold <= 0)
 			bs.bs_bmissthreshold = 1;
 
@@ -2513,6 +2625,13 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct sk_buff *skb;
 	struct ieee80211_node *ni;
 	struct ath_node *an;
+
+	/* Added by JOTA */
+	const HAL_RATE_TABLE *rt = sc->sc_currates;
+	int i;
+	int ri;
+
+
 	int len;
 	u_int phyerr;
 	HAL_STATUS status;
@@ -2550,7 +2669,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				bf->bf_daddr, PA2DESC(sc, ds->ds_link));
 #ifdef AR_DEBUG
 		if (sc->sc_debug & ATH_DEBUG_RECV_DESC)
-			ath_printrxbuf(bf, status == HAL_OK); 
+			ath_printrxbuf(bf, status == HAL_OK);
 #endif
 		if (status == HAL_EINPROGRESS)
 			break;
@@ -2583,6 +2702,16 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				sc->sc_stats.ast_rx_phyerr++;
 				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
 				sc->sc_stats.ast_rx_phy[phyerr]++;
+
+				/* Added by JOTA */
+
+				if (phyerr == HAL_PHYERR_RADAR && ic->ic_opmode == IEEE80211_M_HOSTAP)
+				{
+					ATH_SCHEDULE_TQUEUE (&sc->sc_radartq, &needmark);
+				}
+
+				/* ======================= */
+
 				goto rx_next;
 			}
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT) {
@@ -2707,7 +2836,12 @@ rx_accept:
 			if (IS_CTL(wh))
 				ni = ieee80211_find_node(ic, wh->i_addr1);
 			else
+			{
+				/* Modified by JOTA */
 				ni = ieee80211_find_node(ic, wh->i_addr2);
+
+			}
+
 			if (ni == NULL)
 				ni = ic->ic_bss;
 		} else
@@ -2731,6 +2865,43 @@ rx_accept:
 			} else
 				sc->sc_rxotherant = 0;
 		}
+
+		/* Added by JOTA */
+
+		/*
+		 * Updates per node per rate statistics
+		 * Looks like this is the least dirty way to do it
+		 */
+
+		ri = rt->rateCodeToIndex[ds->ds_rxstat.rs_rate];
+
+		if (ri > 31 )
+		{
+			ri = 0xff;
+		}
+
+		/* NB: We don't want to mix h/w rate index with
+			802.11 rate index here so we do this lookup */
+
+		if (ri != 0xff)
+		{
+			for (i = 0; i < ni->ni_rates.rs_nrates; i ++)
+			{
+				if ( (ni->ni_rates.rs_rates[i] & IEEE80211_RATE_VAL) == (rt->info[ri].dot11Rate & IEEE80211_RATE_VAL))
+				{
+					break;
+				}
+			}
+
+			ni->ni_stats.ns_ratestats[i].nrs_rateKbps = rt->info[ri].rateKbps;
+			ni->ni_stats.ns_ratestats[i].nrs_rx_bytes += skb->len;
+			ni->ni_stats.ns_ratestats[i].nrs_rx_data ++;
+			ni->ni_stats.ns_rx_currate = i;
+
+		}
+
+
+		/* ========================= */
 
 		/*
 		 * Send frame up for processing.
@@ -2790,6 +2961,8 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 	 * due to a lack of tx descriptors.
 	 */
 	qi.tqi_qflags = TXQ_FLAG_TXEOLINT_ENABLE | TXQ_FLAG_TXDESCINT_ENABLE;
+	qi.tqi_burstTime = 6000; //8000 + (jiffies % 10) * 400;
+
 	qnum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qi);
 	if (qnum == -1) {
 		printk("%s: Unable to setup hardware queue for %s traffic!\n",
@@ -2801,6 +2974,8 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 			sc->sc_dev.name, qnum, N(sc->sc_txq));
 		return 0;
 	}
+
+
 	if (!ATH_TXQ_SETUP(sc, qnum)) {
 		struct ath_txq *txq = &sc->sc_txq[qnum];
 
@@ -2812,6 +2987,19 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 		ATH_TXQ_LOCK_INIT(txq);
 		sc->sc_txqsetup |= 1<<qnum;
 	}
+
+	printk (">>>> QUEUE [%d]\n", qnum);
+	printk ("prio: %u\n", qi.tqi_priority);
+	printk ("aifs: %u\n", qi.tqi_aifs);
+	printk ("cwmin: %u\n", qi.tqi_cwmin);
+	printk ("cwmax: %u\n", qi.tqi_cwmax);
+	printk ("cbrPeriod: %u\n", qi.tqi_cbrPeriod);
+	printk ("cbrOverflowLimit: %u\n", qi.tqi_cbrOverflowLimit);
+	printk ("burstTime: %u\n", qi.tqi_burstTime);
+	printk ("readyTime: %u\n", qi.tqi_readyTime);
+	printk ("\n");
+
+
 	sc->sc_ac2q[ac] = &sc->sc_txq[qnum];
 	return 1;
 #undef N
@@ -2837,11 +3025,21 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	HAL_BOOL shortPreamble;
 	struct ath_node *an;
 
+	/* Added by JOTA */
+	int isaddr4 = 0;
+
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 	hdrlen = ieee80211_anyhdrsize(wh);
 	pktlen = skb->len;
+
+	/* Added by JOTA */
+	/* ==================== */
+	if (hdrlen == 30) isaddr4 = 1;
+	/* ==================== */
+
+
 
 	if (iswep) {
 		const struct ieee80211_cipher *cip;
@@ -2883,6 +3081,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		keyix = HAL_TXKEYIX_INVALID;
 
 	pktlen += IEEE80211_CRC_LEN;
+
+	/* Added by JOTA */
+	/* Kill the added padding */
+	if (isaddr4) pktlen -= 2;
+
 
 	/*
 	 * Load the DMA map so any coalescing is done.  This
@@ -2976,10 +3179,14 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * Calculate miscellaneous flags.
 	 */
 	flags = HAL_TXDESC_CLRDMASK;		/* XXX needed for crypto errs */
-	if (ismcast) {
+
+	if (ismcast)
+	{
 		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
 		sc->sc_stats.ast_tx_noack++;
-	} else if (pktlen > ic->ic_rtsthreshold) {
+	}
+	else
+	if (pktlen > ic->ic_rtsthreshold) {
 		flags |= HAL_TXDESC_RTSENA;	/* RTS based on frame length */
 		cix = rt->info[rix].controlRate;
 		sc->sc_stats.ast_tx_rts++;
@@ -3068,7 +3275,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		ieee80211_dump_pkt(skb->data, skb->len,
 			sc->sc_hwmap[txrate], -1);
 
-	/* 
+	/*
 	 * Determine if a tx interrupt should be generated for
 	 * this descriptor.  We take a tx interrupt to reap
 	 * descriptors when the h/w hits an EOL condition or
@@ -3173,6 +3380,11 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	int sr, lr;
 	HAL_STATUS status;
 
+	/* Added by JOTA */
+	int i;
+	int ri;
+	const HAL_RATE_TABLE *rt = sc->sc_currates;
+
 	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %p, link %p\n", __func__,
 		(caddr_t) ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
 		txq->axq_link);
@@ -3201,26 +3413,81 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		ni = bf->bf_node;
 		if (ni != NULL) {
 			an = ATH_NODE(ni);
+
+			/* Added by JOTA */
+
+			/*
+			 * Do per rate per node statistics
+			 */
+
+			ri = rt->rateCodeToIndex[ds->ds_txstat.ts_rate];
+
+			if (ri > 31 )
+			{
+				ri = 0xff;
+			}
+
+
+			if (ri != 0xff)
+			{
+				/* NB: We don't want to mix h/w rate index with
+					802.11 rate index here so we do this lookup */
+
+				for (i = 0; i < ni->ni_rates.rs_nrates; i ++)
+				{
+					if ( (ni->ni_rates.rs_rates[i] & IEEE80211_RATE_VAL) == (rt->info[ri].dot11Rate & IEEE80211_RATE_VAL))
+					{
+						break;
+					}
+				}
+
+				ni->ni_stats.ns_ratestats[i].nrs_rateKbps = rt->info[ri].rateKbps;
+			}
+
 			if (ds->ds_txstat.ts_status == 0) {
 				sc->sc_stats.ast_ant_tx[ds->ds_txstat.ts_antenna]++;
 				if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
+				{
 					sc->sc_stats.ast_tx_altrate++;
+					if (ri != 0xff) ni->ni_stats.ns_ratestats[i].nrs_tx_altrate ++;
+				}
+
 				sc->sc_stats.ast_tx_rssi =
 					ds->ds_txstat.ts_rssi;
 				ATH_RSSI_LPF(an->an_halstats.ns_avgtxrssi,
 					ds->ds_txstat.ts_rssi);
+
+				/* Added by JOTA */
+				if (ri != 0xff)
+				{
+					ni->ni_stats.ns_ratestats[i].nrs_tx_bytes += bf->bf_skb->len;
+					ni->ni_stats.ns_ratestats[i].nrs_tx_data ++;
+					ni->ni_stats.ns_tx_currate = i;
+				}
+
 			} else {
-				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
+				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY){
+
+					/* Added by JOTA */
+					if (ri != 0xff) ni->ni_stats.ns_ratestats[i].nrs_tx_xretry ++;
+
 					sc->sc_stats.ast_tx_xretries++;
+				}
 				if (ds->ds_txstat.ts_status & HAL_TXERR_FIFO)
 					sc->sc_stats.ast_tx_fifoerr++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
 					sc->sc_stats.ast_tx_filtered++;
+
+				if (ri != 0xff) ni->ni_stats.ns_ratestats[i].nrs_tx_generr ++;
 			}
 			sr = ds->ds_txstat.ts_shortretry;
 			lr = ds->ds_txstat.ts_longretry;
 			sc->sc_stats.ast_tx_shortretry += sr;
 			sc->sc_stats.ast_tx_longretry += lr;
+
+			// Added by JOTA
+			if (ri != 0xff) ni->ni_stats.ns_ratestats[i].nrs_tx_retry += lr + sr;
+
 			/*
 			 * Hand the descriptor to the rate control algorithm.
 			 */

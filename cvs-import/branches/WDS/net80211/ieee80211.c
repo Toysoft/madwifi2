@@ -50,6 +50,10 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211.c,v 1.7 2003/10/16 22:25:00 matt Exp $");
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_dot1x.h>
 
+/* Added by JOTA */
+#include "mdb.h"
+
+
 static void ieee80211_watchdog(unsigned long);
 static void ieee80211_set11gbasicrates(struct ieee80211_rateset *,
 		enum ieee80211_phymode);
@@ -76,6 +80,9 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	int i;
 
 	_MOD_INC_USE(THIS_MODULE, return ENODEV);
+
+	/* Added by JOTA */
+	mdb_init (ic);
 
 	ieee80211_crypto_attach(ic);
 
@@ -124,7 +131,9 @@ ieee80211_ifattach(struct ieee80211com *ic)
 
 	if (ic->ic_lintval == 0)
 		ic->ic_lintval = 100;		/* default sleep */
-	ic->ic_bmisstimeout = 7*ic->ic_lintval;	/* default 7 beacons */
+
+	/* Modified by JOTA */
+	ic->ic_bmisstimeout = 32*ic->ic_lintval;	/* default 7 beacons */
 
 	ieee80211_node_attach(ic);
 	ieee80211_proto_attach(ic);
