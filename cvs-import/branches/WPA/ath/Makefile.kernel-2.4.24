@@ -1,0 +1,18 @@
+HAL	:= ../hal
+ATH_HAL	:= ../_ath_hal
+NET	:= $(TOPDIR)/net
+WLAN	:= ${NET}/net80211
+COMPAT	:= ${WLAN}/compat
+
+INCS=	-include ${COMPAT}/compat.h -I${COMPAT}
+EXTRA_CFLAGS+=	${INCS} -I${HAL} -I${HAL}/linux -I${ATH_HAL} -I${WLAN} -I${NET}
+ifdef HAL_OBJDIR
+EXTRA_CFLAGS+=	-I${HAL_OBJDIR}		# for opt_ah.h
+endif
+
+O_TARGET := ath.o
+
+obj-y		:= if_ath.o if_ath_pci.o
+obj-m		:= $(O_TARGET)
+
+include $(TOPDIR)/Rules.make
