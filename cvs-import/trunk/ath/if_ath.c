@@ -2137,6 +2137,10 @@ ath_node_alloc(struct ieee80211com *ic)
 	if (an == NULL)
 		return NULL;
 	memset(an, 0, space);
+	an->an_avgrssi = ATH_RSSI_DUMMY_MARKER;
+	an->an_halstats.ns_avgbrssi = ATH_RSSI_DUMMY_MARKER;
+	an->an_halstats.ns_avgrssi = ATH_RSSI_DUMMY_MARKER;
+	an->an_halstats.ns_avgtxrssi = ATH_RSSI_DUMMY_MARKER;
 	ath_rate_node_init(sc, an);
 	return &an->an_node;
 }
@@ -2196,9 +2200,17 @@ ath_node_getrssi(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
 #define	HAL_EP_RND(x, mul) \
 	((((x)%(mul)) >= ((mul)/2)) ? ((x) + ((mul) - 1)) / (mul) : (x)/(mul))
+	u_int32_t avgrssi = ATH_NODE_CONST(ni)->an_avgrssi;
 	int32_t rssi;
 
-	rssi = HAL_EP_RND(ATH_NODE(ni)->an_avgrssi, HAL_RSSI_EP_MULTIPLIER);
+	/*
+	 * When only one frame is received there will be no state in
+	 * avgrssi so fallback on the value recorded by the 802.11 layer.
+	 */
+	if (avgrssi != ATH_RSSI_DUMMY_MARKER)
+		rssi = HAL_EP_RND(avgrssi, HAL_RSSI_EP_MULTIPLIER);
+	else
+		rssi = ni->ni_rssi;
 	/* NB: theoretically we shouldn't need this, but be paranoid */
 	return rssi < 0 ? 0 : rssi > 127 ? 127 : rssi;
 #undef HAL_EP_RND
@@ -4326,8 +4338,7 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	ATH_LOCK(sc);
 	switch (cmd) {
 	case SIOCGATHSTATS:
-		sc->sc_stats.ast_rx_rssi =
-			(*ic->ic_node_getrssi)(ic, sc->sc_ic.ic_bss);
+		sc->sc_stats.ast_rx_rssi = ieee80211_getrssi(ic);
 		if (copy_to_user(ifr->ifr_data, &sc->sc_stats,
 		    sizeof (sc->sc_stats)))
 			error = -EFAULT;

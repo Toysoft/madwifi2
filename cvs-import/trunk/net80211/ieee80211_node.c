@@ -1211,6 +1211,52 @@ done:
 }
 EXPORT_SYMBOL(ieee80211_node_leave);
 
+u_int8_t
+ieee80211_getrssi(struct ieee80211com *ic)
+{
+#define	NZ(x)	((x) == 0 ? 1 : (x))
+	u_int32_t rssi_samples, rssi_total;
+	struct ieee80211_node *ni;
+
+	rssi_total = 0;
+	rssi_samples = 0;
+	switch (ic->ic_opmode) {
+	case IEEE80211_M_IBSS:		/* average of all ibss neighbors */
+		/* XXX locking */
+		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
+			if (ni->ni_capinfo & IEEE80211_CAPINFO_IBSS) {
+				rssi_samples++;
+				rssi_total += ic->ic_node_getrssi(ic, ni);
+			}
+		break;
+	case IEEE80211_M_AHDEMO:	/* average of all neighbors */
+		/* XXX locking */
+		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+			rssi_samples++;
+			rssi_total += ic->ic_node_getrssi(ic, ni);
+		}
+		break;
+	case IEEE80211_M_HOSTAP:	/* average of all associated stations */
+		/* XXX locking */
+		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
+			if (IEEE80211_AID(ni->ni_associd) != 0) {
+				rssi_samples++;
+				rssi_total += ic->ic_node_getrssi(ic, ni);
+			}
+		break;
+	case IEEE80211_M_MONITOR:	/* XXX */
+	case IEEE80211_M_STA:		/* use stats from associated ap */
+	default:
+		if (ic->ic_bss != NULL)
+			rssi_total = ic->ic_node_getrssi(ic, ic->ic_bss);
+		rssi_samples = 1;
+		break;
+	}
+	return rssi_total / NZ(rssi_samples);
+#undef NZ
+}
+EXPORT_SYMBOL(ieee80211_getrssi);
+
 /*
  * Set the short slot time state and notify the driver.
  */

@@ -215,5 +215,6 @@ extern	void ieee80211_node_join(struct ieee80211com *,
 		struct ieee80211_node *, int);
 extern	void ieee80211_node_leave(struct ieee80211com *,
 		struct ieee80211_node *);
+extern  u_int8_t ieee80211_getrssi(struct ieee80211com *);
 extern	void ieee80211_set_shortslottime(struct ieee80211com *, int onoff);
 #endif /* _NET80211_IEEE80211_NODE_H_ */
