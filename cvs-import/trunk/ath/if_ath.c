@@ -374,12 +374,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 			ath_outdoor, ath_xchanmode);
 	if (error != 0)
 		goto bad;
-	/*
-	 * Copy these back; they are set as a side effect
-	 * of constructing the channel list.
-	 */
-	ath_hal_getregdomain(ah, &ath_regdomain);
-	ath_hal_getcountrycode(ah, &ath_countrycode);
 
 	/*
 	 * Setup rate tables for all potential media types.
@@ -4611,6 +4605,8 @@ enum {
 	ATH_CTSTIMEOUT	= 3,
 	ATH_SOFTLED	= 4,
 	ATH_LEDPIN	= 5,
+	ATH_COUNTRYCODE	= 6,
+	ATH_REGDOMAIN	= 7,
 	ATH_DEBUG	= 8,
 	ATH_ANTENNA	= 9,
 };
@@ -4682,6 +4678,12 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 		case ATH_LEDPIN:
 			val = sc->sc_ledpin;
 			break;
+		case ATH_COUNTRYCODE:
+			ath_hal_getcountrycode(sc->sc_ah, &val);
+			break;
+		case ATH_REGDOMAIN:
+			ath_hal_getregdomain(sc->sc_ah, &val);
+			break;
 		case ATH_DEBUG:
 			val = sc->sc_debug;
 			break;
@@ -4729,6 +4731,16 @@ static const ctl_table ath_sysctl_template[] = {
 	{ .ctl_name	= ATH_LEDPIN,
 	  .procname	= "ledpin",
 	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_COUNTRYCODE,
+	  .procname	= "countrycode",
+	  .mode		= 0444,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_REGDOMAIN,
+	  .procname	= "regdomain",
+	  .mode		= 0444,
 	  .proc_handler	= ath_sysctl_halparam
 	},
 #ifdef AR_DEBUG
