@@ -146,8 +146,9 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 #endif
 	IEEE80211_NODE_STAT(ni, tx_mgmt);
 	IF_ENQUEUE(&ic->ic_mgtq, skb);
+	del_timer(&ic->ic_slowtimo);
 	ic->ic_slowtimo.expires = jiffies + HZ;
-	add_timer(&ic->ic_slowtimo);		// TODO: proper equiv. ifp->if_timer = 1; ?
+	add_timer(&ic->ic_slowtimo);
 	(*dev->hard_start_xmit)(skb, dev);
 	// removed from ieee80211com: (void) (*ic->ic_mgtstart)(ic, skb);
 	return 0;
