@@ -540,13 +540,23 @@ getcurchan(struct ieee80211com *ic)
 	switch (ic->ic_state) {
 	case IEEE80211_S_INIT:
 	case IEEE80211_S_SCAN:
-		if (ic->ic_opmode == IEEE80211_M_STA)
-			return ic->ic_des_chan;
-		break;
+		return ic->ic_des_chan;
 	default:
-		break;
+		return ic->ic_ibss_chan;
 	}
-	return ic->ic_ibss_chan;
+}
+
+static int
+cap2cipher(int flag)
+{
+	switch (flag) {
+	case IEEE80211_C_WEP:		return IEEE80211_CIPHER_WEP;
+	case IEEE80211_C_AES:		return IEEE80211_CIPHER_AES_OCB;
+	case IEEE80211_C_AES_CCM:	return IEEE80211_CIPHER_AES_CCM;
+	case IEEE80211_C_CKIP:		return IEEE80211_CIPHER_CKIP;
+	case IEEE80211_C_TKIP:		return IEEE80211_CIPHER_TKIP;
+	}
+	return -1;
 }
 
 int
@@ -1536,19 +1546,6 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 }
 EXPORT_SYMBOL(ieee80211_ioctl_setparam);
 
-static int
-cap2cipher(int flag)
-{
-	switch (flag) {
-	case IEEE80211_C_WEP:		return IEEE80211_CIPHER_WEP;
-	case IEEE80211_C_AES:		return IEEE80211_CIPHER_AES_OCB;
-	case IEEE80211_C_AES_CCM:	return IEEE80211_CIPHER_AES_CCM;
-	case IEEE80211_C_CKIP:		return IEEE80211_CIPHER_CKIP;
-	case IEEE80211_C_TKIP:		return IEEE80211_CIPHER_TKIP;
-	}
-	return -1;
-}
-
 int
 ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 			void *w, char *extra)
@@ -2044,6 +2041,28 @@ ieee80211_ioctl_getwpaie(struct ieee80211com *ic, struct iwreq *iwr)
 			-EFAULT : 0);
 }
 
+static int
+ieee80211_ioctl_getstastats(struct ieee80211com *ic, struct iwreq *iwr)
+{
+	struct ieee80211_node *ni;
+	u_int8_t macaddr[IEEE80211_ADDR_LEN];
+	const int off = offsetof(struct ieee80211req_sta_stats, is_stats);
+	int error;
+
+	if (iwr->u.data.length < off)
+		return -EINVAL;
+	if (copy_from_user(&macaddr, iwr->u.data.pointer, IEEE80211_ADDR_LEN))
+		return -EFAULT;
+	ni = ieee80211_find_node(&ic->ic_sta, macaddr);
+	if (ni == NULL)
+		return -EINVAL;		/* XXX */
+	/* NB: copy out only the statistics */
+	error = copy_to_user((u_int8_t *) iwr->u.data.pointer + off, &ni->ni_stats,
+			iwr->u.data.length - off);
+	ieee80211_free_node(ni);
+	return (error ? -EFAULT : 0);
+}
+
 #define	IW_PRIV_TYPE_OPTIE	IW_PRIV_TYPE_BYTE | IEEE80211_MAX_OPT_IE
 #define	IW_PRIV_TYPE_KEY \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_key)
@@ -2215,6 +2234,8 @@ ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
 		return ieee80211_ioctl_getkey(ic, (struct iwreq *) ifr);
 	case IEEE80211_IOCTL_GETWPAIE:
 		return ieee80211_ioctl_getwpaie(ic, (struct iwreq *) ifr);
+	case IEEE80211_IOCTL_GETSTASTATS:
+		return ieee80211_ioctl_getstastats(ic, (struct iwreq *) ifr);
 	}
 	return -EOPNOTSUPP;
 }

@@ -496,6 +496,7 @@ enum {
 /* NB: require in+out parameters so cannot use wireless extensions, yech */
 #define	IEEE80211_IOCTL_GETKEY		(SIOCDEVPRIVATE+3)
 #define	IEEE80211_IOCTL_GETWPAIE	(SIOCDEVPRIVATE+4)
+#define	IEEE80211_IOCTL_GETSTASTATS	(SIOCDEVPRIVATE+5)
 
 #endif /* __linux__ */
 
