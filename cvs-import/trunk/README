@@ -372,6 +372,9 @@ wpa_supplicant also supports a wide range of 802.1x EAP methods, either
 together with WPA/WPA2 or without; consult the wpa_supplicant documentation
 for an up to date list.
 
+NOTE: the in-kernel authenticator is being replaced; to use it you need
+      to follow the directions in net80211/Makefile.
+
 When operating as an AP you can use fixed/shared key ciphers and/or
 802.1x authentication.  The authentication mode is specified using
 iwpriv:
