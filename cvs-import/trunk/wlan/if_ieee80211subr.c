@@ -1690,7 +1690,7 @@ ieee80211_end_scan(struct net_device *dev)
 
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/* XXX off stack? */
-		u_char occupied[roundup(IEEE80211_CHAN_MAX, NBBY)];
+		u_char occupied[roundup(IEEE80211_CHAN_MAX/NBBY, NBBY)];
 		/*
 		 * The passive scan to look for existing AP's completed,
 		 * select a channel to camp on.  Identify the channels
@@ -2595,7 +2595,6 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 #define	ISPROBE(_wh)	IEEE80211_IS_SUBTYPE((_wh)->i_fc[0], PROBE_RESP)
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
-	struct net_device *dev = &ic->ic_dev;
 	u_int8_t *frm, *efrm, *tstamp, *bintval, *capinfo, *ssid;
 	u_int8_t *rates, *xrates, *country;
 	u_int8_t chan, bchan, fhindex, erp;

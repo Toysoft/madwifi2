@@ -617,9 +617,9 @@ struct ieee80211com {
 	int			(*ic_chancheck)(void *, u_char *);
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211channel ic_channels[IEEE80211_CHAN_MAX+1];
-	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
-	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
-	u_char			ic_chan_scan[roundup(IEEE80211_CHAN_MAX,NBBY)];
+	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX/NBBY,NBBY)];
+	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX/NBBY, NBBY)];
+	u_char			ic_chan_scan[roundup(IEEE80211_CHAN_MAX/NBBY,NBBY)];
 	u_int32_t		ic_flags;	/* state flags */
 	u_int32_t		ic_caps;	/* capabilities */
 	u_int16_t		ic_modecaps;	/* set of mode capabilities */
