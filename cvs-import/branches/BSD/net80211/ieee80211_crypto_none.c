@@ -92,7 +92,9 @@ static int
 none_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 {
 	struct ieee80211com *ic = k->wk_private;
+#ifdef IEEE80211_DEBUG
 	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
+#endif
 
 	/*
 	 * The specified key is not setup; this can
@@ -109,8 +111,10 @@ static int
 none_decap(struct ieee80211_key *k, struct sk_buff *skb)
 {
 	struct ieee80211com *ic = k->wk_private;
+#ifdef IEEE80211_DEBUG
 	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 	const u_int8_t *ivp = (const u_int8_t *)&wh[1];
+#endif
 
 	/*
 	 * The specified key is not setup; this can

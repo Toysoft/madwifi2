@@ -487,7 +487,7 @@ ieee80211_iserp_rateset(struct ieee80211com *ic, struct ieee80211_rateset *rs)
 {
 #define N(a)	(sizeof(a) / sizeof(a[0]))
 	static const int rates[] = { 2, 4, 11, 22, 12, 24, 48 };
-	u_int i, j;
+	int i, j;
 
 	if (rs->rs_nrates < N(rates))
 		return 0;
@@ -1033,11 +1033,10 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 					ni->ni_txrate));
 #ifdef IEEE80211_DEBUG
 			if (ieee80211_msg_debug(ic)) {
-				if_printf(ic->ic_dev, " ");
 				if (ic->ic_opmode == IEEE80211_M_STA)
-					printf("associated ");
+					if_printf(ic->ic_dev, "associated ");
 				else
-					printf("synchronized ");
+					if_printf(ic->ic_dev, "synchronized ");
 				printf("with %s ssid ",
 				    ether_sprintf(ni->ni_bssid));
 				ieee80211_print_essid(ic->ic_bss->ni_essid,
@@ -1058,7 +1057,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 		 * Start/stop the authenticator when operating as an
 		 * AP.  We delay until here to allow configuration to
 		 * happen out of order.
-		 */		
+		 */
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP && /* XXX IBSS/AHDEMO */
 		    ic->ic_auth->ia_attach != NULL) {
 			/* XXX check failure */
