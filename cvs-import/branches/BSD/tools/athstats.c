@@ -89,17 +89,21 @@ printstats(FILE *fd, const struct ath_stats *stats)
 {
 #define	N(a)	(sizeof(a) / sizeof(a[0]))
 #define	STAT(x,fmt) \
-	if (stats->ast_##x) fprintf(fd, "%u " fmt "\n", stats->ast_##x)
+	if (stats->ast_##x) fprintf(fd, "%u\t" fmt "\n", stats->ast_##x)
 #define	STATI(x,fmt) \
-	if (stats->ast_##x) fprintf(fd, "%d " fmt "\n", stats->ast_##x)
+	if (stats->ast_##x) fprintf(fd, "%d\t" fmt "\n", stats->ast_##x)
 	int i, j;
-
+	
 	STAT(watchdog, "watchdog timeouts");
 	STAT(hardware, "hardware error interrupts");
 	STAT(bmiss, "beacon miss interrupts");
+	STAT(bstuck, "beacon stuck interrupts");
 	STAT(rxorn, "recv overrun interrupts");
 	STAT(rxeol, "recv eol interrupts");
 	STAT(txurn, "txmit underrun interrupts");
+	STAT(mib, "mib interrupts");
+	STAT(intrcoal, "interrupts coalesced");
+	STAT(tx_packets, "packet sent on the interface");
 	STAT(tx_mgmt, "tx management frames");
 	STAT(tx_discard, "tx frames discarded prior to association");
 	STAT(tx_invalid, "tx frames discarded 'cuz device gone");
@@ -108,6 +112,9 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(tx_nonode, "tx failed 'cuz no node");
 	STAT(tx_nobuf, "tx failed 'cuz no tx buffer (data)");
 	STAT(tx_nobufmgt, "tx failed 'cuz no tx buffer (mgt)");
+	STAT(tx_linear, "tx linearized to cluster"); //TODO: valid on linux
+	STAT(tx_nodata, "tx discarded empty frame");
+	STAT(tx_busdma, "tx failed for dma resrcs");
 	STAT(tx_xretries, "tx failed 'cuz too many retries");
 	STAT(tx_fifoerr, "tx failed 'cuz FIFO underrun");
 	STAT(tx_filtered, "tx failed 'cuz xmit filtered");
@@ -120,16 +127,20 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(tx_shortpre, "tx frames with short preamble");
 	STAT(tx_altrate, "tx frames with an alternate rate");
 	STAT(tx_protect, "tx frames with 11g protection");
+	
+	STAT(rx_nobuf, "rx setup failed 'cuz no skb");
+	STAT(rx_busdma, "rx setup failed for dma resrcs");
 	STAT(rx_orn, "rx failed 'cuz of desc overrun");
 	STAT(rx_crcerr, "rx failed 'cuz of bad CRC");
 	STAT(rx_fifoerr, "rx failed 'cuz of FIFO overrun");
 	STAT(rx_badcrypt, "rx failed 'cuz decryption");
 	STAT(rx_badmic, "rx failed 'cuz MIC failure");
 	STAT(rx_tooshort, "rx failed 'cuz frame too short");
-	STAT(rx_nobuf, "rx setup failed 'cuz no skbuff");
+	STAT(rx_toobig, "rx discarded 'cuz frame too large");
+	STAT(rx_packets, "packet recv on the interface");
 	STAT(rx_mgt, "rx management frames");
 	STAT(rx_ctl, "rx control frames");
-	STAT(rx_phyerr, "PHY errors");
+	STAT(rx_phyerr, "rx PHY errors:");
 	if (stats->ast_rx_phyerr != 0) {
 		for (i = 0; i < 32; i++) {
 			if (stats->ast_rx_phy[i] == 0)
@@ -147,17 +158,23 @@ printstats(FILE *fd, const struct ath_stats *stats)
 					phyerrdescriptions[j].desc);
 		}
 	}
+	
+	STAT(be_xmit, "beacons transmitted");
 	STAT(be_nobuf, "no skbuff available for beacon");
+	
 	STAT(per_cal, "periodic calibrations");
 	STAT(per_calfail, "periodic calibration failures");
 	STAT(per_rfgain, "rfgain value change");
+	
 	STAT(rate_calls, "rate control checks");
 	STAT(rate_raise, "rate control raised xmit rate");
 	STAT(rate_drop, "rate control dropped xmit rate");
+	
 	if (stats->ast_tx_rssi)
 		fprintf(fd, "rssi of last ack: %u\n", stats->ast_tx_rssi);
 	if (stats->ast_rx_rssi)
 		fprintf(fd, "rssi of last rcv: %u\n", stats->ast_rx_rssi);
+	
 	STAT(ant_defswitch, "switched default/rx antenna");
 	STAT(ant_txswitch, "tx used alternate antenna");
 	fprintf(fd, "Antenna profile:\n");

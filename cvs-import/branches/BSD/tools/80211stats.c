@@ -140,6 +140,12 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(crypto_attachfail,	"setkey failed 'cuz cipher attach failed");
 	STAT(crypto_swfallback,	"crypto fell back to s/w implementation");
 	STAT(crypto_keyfail,	"setkey faied 'cuz driver key alloc failed");
+	STAT(crypto_enmicfail,	"en-MIC failed");
+	STAT(ibss_capmismatch, "ibss merge failed-cap mismatch");
+	STAT(ibss_norate,	"ibss merge failed-rate mismatch");
+	STAT(ps_unassoc,	"ps-poll for unassoc. sta");
+	STAT(ps_badaid,		"ps-poll w/ incorrect aid");
+	STAT(ps_qempty,		"ps-poll w/ nothing to send");
 #undef STAT
 #undef N
 }
