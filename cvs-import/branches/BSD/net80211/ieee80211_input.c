@@ -526,17 +526,17 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 					} else {
 						IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
 							eh->ether_shost, "data",
-							"node %s (aid: %d) not authorized",
+							"bridge: node %s (aid: %d) not authorized",
 							ether_sprintf(ni1->ni_macaddr), 
 							ni1->ni_associd);
 					}
 					/* XXX statistic? */
 					ieee80211_free_node(ni1);
-				} else if (ni1 != ic->ic_bss) {
+				} else if (!IEEE80211_ADDR_EQ(eh->ether_dhost, ic->ic_bss->ni_bssid)) {
 					IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
 						eh->ether_shost, "data",
-						"node %s not found", 
-						ether_sprintf(ni1->ni_macaddr));
+						"bridge: dest node %s not found", 
+						ether_sprintf(eh->ether_dhost));
 				}
 			}
 			if (skb1 != NULL) {
@@ -2705,14 +2705,21 @@ ieee80211_discard_frame(struct ieee80211com *ic,
 	va_list ap;
 	char buf[512];		// XXX
 
+	/*
+	 * first print variable arguments into buffer, 
+	 * because ether_sprintf may be used there as well
+	 * and we would overwrite its static buffer
+	 */
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	
 	printf("[%s] discard ", ether_sprintf(ieee80211_getbssid(ic, wh)));
 	if (type != NULL)
 		printf("%s frame, ", type);
 	else
 		printf("frame, ");
-	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
-	va_end(ap);
+	
 	printf("%s\n", buf);
 }
 
@@ -2724,14 +2731,21 @@ ieee80211_discard_ie(struct ieee80211com *ic,
 	va_list ap;
 	char buf[512];		// XXX
 
+	/*
+	 * first print variable arguments into buffer, 
+	 * because ether_sprintf may be used there as well
+	 * and we would overwrite its static buffer
+	 */
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	
 	printf("[%s] discard ", ether_sprintf(ieee80211_getbssid(ic, wh)));
 	if (type != NULL)
 		printf("%s information element, ", type);
 	else
 		printf("information element, ");
-	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
-	va_end(ap);
+
 	printf("%s\n", buf);
 }
 
@@ -2742,15 +2756,22 @@ ieee80211_discard_mac(struct ieee80211com *ic,
 {
 	va_list ap;
 	char buf[512];		// XXX
+	
+	/*
+	 * first print variable arguments into buffer, 
+	 * because ether_sprintf may be used there as well
+	 * and we would overwrite its static buffer
+	 */
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
 
 	printf("[%s] discard ", ether_sprintf(mac));
 	if (type != NULL)
 		printf("%s frame, ", type);
 	else
 		printf("frame, ");
-	va_start(ap, fmt);
-	vsnprintf(buf, sizeof(buf), fmt, ap);
-	va_end(ap);
+
 	printf("%s\n", buf);
 }
 #endif /* IEEE80211_DEBUG */
