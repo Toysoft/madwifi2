@@ -1068,8 +1068,8 @@ ieee80211_ioctl_siwscan(struct ieee80211com *ic,
 	int i;
 
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
-		// return stations ?
 		return -EINVAL;
+
 	/*
 	 * XXX don't permit a scan to be started unless we
 	 * know the device is ready.  For the moment this means
