@@ -264,7 +264,7 @@ extern	struct sk_buff *ieee80211_beacon_alloc(struct ieee80211com *,
 		struct ieee80211_node *, struct ieee80211_beacon_offsets *);
 extern	int ieee80211_beacon_update(struct ieee80211com *,
 		struct ieee80211_node *, struct ieee80211_beacon_offsets *,
-		struct sk_buff **, int broadcast);
+		struct sk_buff *, int broadcast);
 
 /*
  * Notification methods called from the 802.11 state machine.
