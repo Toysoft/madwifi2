@@ -148,7 +148,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	memset(sc, 0, sizeof(struct ath_pci_softc));
 	
 	for (i=0;i<4;i++) {
-                sc->aps_sc.sc_AC2qNum[i] = 0;
+                sc->aps_sc.sc_AC2qNum[i] = -1;
 	}
         
 	/* mark the device as detached to avoid processing interrupts until setup is complete */

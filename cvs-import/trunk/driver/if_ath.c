@@ -55,6 +55,8 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/if_arp.h>
+#include <linux/wait.h>
+#include <linux/timer.h>
 
 #include <asm/uaccess.h>
 
@@ -126,13 +128,14 @@ static void	ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
 static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
 
-static	int ath_dwelltime = 200;		/* 5 channels/second */
-static	int ath_calinterval = 30;		/* calibrate every 30 secs */
-static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
-static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
-static	int ath_regdomain = 0;			/* regulatory domain */
-static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
-static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
+static  int     ath_dwelltime = 200;            /* 5 channels/second */
+static  int     ath_calinterval = 30;           /* calibrate every 30 secs */
+static  int     ath_rateinterval = 1000;        /* rate ctl interval (ms)  */
+static  int     ath_countrycode = CTRY_DEFAULT; /* country code */
+static  int     ath_regdomain = 0;              /* regulatory domain */
+static  int     ath_outdoor = AH_FALSE;         /* enable outdoor use */
+static  int     ath_xchanmode = AH_TRUE;        /* enable extended channels */
+static  int     ath_ctlpkt_type=-1;             /* Control pkt type to filter */
 
 #ifdef AR_DEBUG
 int	ath_debug = 0;
@@ -253,7 +256,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/* Enable interrupts */
 	qNum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qInfo);
 	printk ("Setup queue (%d) for WME_AC_BK\n",qNum);
-        //	setACtoQNumTable(sc, WME_AC_BK, qNum);
         sc->sc_AC2qNum[WME_AC_BK] = qNum;
 	if (qNum == (u_int) -1) {
 		printk("%s: unable to setup a data xmit queue!\n", dev->name);
@@ -1790,7 +1792,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 	ph->rate.status = 0;
 	ph->rate.len = 4;
-	ph->rate.data = rate;
+	ph->rate.data = (rate >> 1);  
 
 	skb->dev = dev;
 	skb->mac.raw = skb->data ;
@@ -1907,12 +1909,21 @@ ath_rx_tasklet(void *data)
 
 		len = ds->ds_rxstat.rs_datalen;
 		if (len < sizeof(struct ieee80211_frame)) {
-			DPRINTF(("%s: ath_rx_tasklet: short packet %d\n",
-			    dev->name, len));
-			sc->sc_stats.ast_rx_tooshort++;
-			goto rx_next;
-		}
-
+			u_int8_t type, subtype;
+			wh = (struct ieee80211_frame *) skb->data;
+			type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+			subtype = (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) >>
+				IEEE80211_FC0_SUBTYPE_SHIFT;
+                        if  ((type != IEEE80211_FC0_TYPE_CTL) ||
+                             ((type == IEEE80211_FC0_TYPE_CTL) &&
+                              (ath_ctlpkt_type != -2) &&
+                              (subtype != ath_ctlpkt_type))) {
+                                DPRINTF(("%s: ath_rx_tasklet: short packet %d\n",
+                                         dev->name, len));
+                                sc->sc_stats.ast_rx_tooshort++;
+                                goto rx_next;
+                        }
+                }
 		pci_dma_sync_single(sc->sc_pdev,
 			bf->bf_skbaddr, len, PCI_DMA_FROMDEVICE);
 
@@ -1949,7 +1960,6 @@ ath_rx_tasklet(void *data)
 			goto rx_next;
 		case IEEE80211_FC0_TYPE_MGT:
 			sc->sc_stats.ast_rx_mgt++;
-			break;
 		}
 		pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
 			sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
@@ -3266,7 +3276,7 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		struct ath_hal *ah = sc->sc_ah;
 		void *data;
 		u_int size;
-
+                
 		if (!ath_hal_getdiagstate(ah, ad->ad_id, &data, &size))
 			return -EINVAL;
 		if (size < ad->ad_size)
@@ -3275,8 +3285,8 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			return -EFAULT;
 		return 0;
 	}
-	}
-	return -EOPNOTSUPP;
+        }
+        return -EOPNOTSUPP;
 }
 
 #ifdef CONFIG_SYSCTL
@@ -3290,8 +3300,9 @@ enum {
 	ATH_OUTDOOR	= 7,
 	ATH_REGDOMAIN	= 8,
 	ATH_XCHANMODE	= 9,
+	ATH_CTLPKT	= 10,
 };
-static	char ath_dump[10];
+static	char ath_dump[12];
 
 static int
 ath_sysctl_handler(ctl_table *ctl, int write, struct file *filp,
@@ -3373,6 +3384,8 @@ static ctl_table ath_sysctls[] = {
 	  sizeof(ath_regdomain),0444,	NULL,	ath_sysctl_handler },
 	{ ATH_XCHANMODE,	"xchanmode",	&ath_xchanmode,
 	  sizeof(ath_xchanmode),0444,	NULL,	ath_sysctl_handler },
+	{ ATH_CTLPKT,		"ctlpkt",	&ath_ctlpkt_type,
+	  sizeof(ath_ctlpkt_type),0644, NULL,	ath_sysctl_handler },
 	{ 0 }
 };
 static ctl_table ath_ath_table[] = {
