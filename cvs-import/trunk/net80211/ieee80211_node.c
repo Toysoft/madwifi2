@@ -182,6 +182,18 @@ ieee80211_node_unauthorize(struct ieee80211com *ic, struct ieee80211_node *ni)
 EXPORT_SYMBOL(ieee80211_node_unauthorize);
 
 /*
+ * Set/change the channel.  The rate set is also updated as
+ * to insure a consistent view by drivers.
+ */
+static inline void
+ieee80211_set_chan(struct ieee80211com *ic,
+	struct ieee80211_node *ni, struct ieee80211_channel *chan)
+{
+	ni->ni_chan = chan;
+	ni->ni_rates = ic->ic_sup_rates[ieee80211_chan2mode(ic, chan)];
+}
+
+/*
  * AP scanning support.
  */
 
@@ -219,7 +231,8 @@ ieee80211_reset_scan(struct ieee80211com *ic)
 			sizeof(ic->ic_chan_active));
 	/* NB: hack, setup so next_scan starts with the first channel */
 	if (ic->ic_bss->ni_chan == IEEE80211_CHAN_ANYC)
-		ic->ic_bss->ni_chan = &ic->ic_channels[IEEE80211_CHAN_MAX];
+		ieee80211_set_chan(ic, ic->ic_bss,
+			&ic->ic_channels[IEEE80211_CHAN_MAX]);
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_msg_scan(ic)) {
 		printf("%s: scan set:", __func__);
@@ -288,7 +301,7 @@ ieee80211_next_scan(struct ieee80211com *ic)
 			    ("%s: chan %d->%d\n", __func__,
 			    ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan),
 			    ieee80211_chan2ieee(ic, chan)));
-			ic->ic_bss->ni_chan = chan;
+			ieee80211_set_chan(ic, ic->ic_bss, chan);
 			ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 			return 1;
 		}
@@ -306,8 +319,7 @@ ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 	ni = ic->ic_bss;
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN, ("creating ibss\n"));
 	ic->ic_flags |= IEEE80211_F_SIBSS;
-	ni->ni_chan = chan;
-	ni->ni_rates = ic->ic_sup_rates[ieee80211_chan2mode(ic, ni->ni_chan)];
+	ieee80211_set_chan(ic, ic->ic_bss, chan);
 	IEEE80211_ADDR_COPY(ni->ni_macaddr, ic->ic_myaddr);
 	IEEE80211_ADDR_COPY(ni->ni_bssid, ic->ic_myaddr);
 	if (ic->ic_opmode == IEEE80211_M_IBSS)
@@ -571,6 +583,12 @@ ieee80211_node_alloc(struct ieee80211com *ic)
 	return ni;
 }
 
+/*
+ * Reclaim any resources in a node and reset any critical
+ * state.  Typically nodes are free'd immediately after,
+ * but in some cases the storage may be reused so we need
+ * to insure consistent state (should probably fix that).
+ */
 static void
 node_cleanup(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
@@ -692,7 +710,7 @@ ieee80211_dup_bss(struct ieee80211com *ic, u_int8_t *macaddr)
 		ni->ni_txpower = ic->ic_bss->ni_txpower;
 		ni->ni_vlan = ic->ic_bss->ni_vlan;	/* XXX?? */
 		IEEE80211_ADDR_COPY(ni->ni_bssid, ic->ic_bss->ni_bssid);
-		ni->ni_chan = ic->ic_bss->ni_chan;
+		ieee80211_set_chan(ic, ni, ic->ic_bss->ni_chan);
 		ni->ni_rsn = ic->ic_bss->ni_rsn;
 	} else
 		ic->ic_stats.is_rx_nodealloc++;
