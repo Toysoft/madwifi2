@@ -391,6 +391,10 @@ MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
+/* XXX hide after module restructuring */
+extern	int init_ieee80211_auth(void);
+extern	void exit_ieee80211_auth(void);
+
 static int __init
 init_wlan(void)
 {
