@@ -90,7 +90,7 @@ DRIVER=	${DEPTH}/driver
 #
 # Basic build components.
 #
-COPTS=	-Wall
+COPTS=	-Wall -O2
 INCS=	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
 CLEANFILES=	.depend
 
