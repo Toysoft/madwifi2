@@ -2738,10 +2738,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
-	/* XXX use ieee80211_hdrsize */
-	hdrlen = sizeof(struct ieee80211_frame);
-	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS)
-		hdrlen += sizeof(u_int16_t);
+	hdrlen = ieee80211_anyhdrsize(wh);
 	pktlen = skb->len;
 
 	if (iswep) {
