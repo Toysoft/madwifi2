@@ -334,8 +334,10 @@ ieee80211_ioctl_siwrate(struct ieee80211com *ic,
 	ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media &~ IFM_TMASK;
 	if (rrq->fixed) {
 		/* XXX fudge checking rates */
-		rate = ieee80211_rate2media(ic, 2 * (rrq->value / 1000000),
+		rate = ieee80211_rate2media(ic, 2 * rrq->value / 1000000,
 				ic->ic_curmode);
+		if (rate == IFM_AUTO)		/* NB: unknown rate */
+			return -EINVAL;
 	} else
 		rate = IFM_AUTO;
 	ifr.ifr_media |= IFM_SUBTYPE(rate);
