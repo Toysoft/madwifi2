@@ -58,18 +58,14 @@ install:
 	depmod -a
 
 FILES=	ath_hal COPYRIGHT driver include Makefile Makefile.inc \
-	README release.h share wlan \
-	hal/ah.h hal/ah_desc.h hal/ah_devid.h hal/version.h \
-	hal/linux/ah_osdep.c \
-	hal/linux/ah_osdep.h \
-	hal/linux/i386-elf.hal.o.uu \
-	hal/linux/opt_ah.h
+	README release.h share wlan
+HAL_TAG=ATH_HAL_20030623
 release:
-	DATE=`date +'%Y%m%d'`; TAG="Linux_$${DATE}"; DIR="linux-$${DATE}"; \
-	cvs tag $${TAG} ${FILES}; \
+	DATE=`date +'%Y%m%d'`; TAG="MADWIFI_$${DATE}"; DIR="madwifi-$${DATE}"; \
+	cvs tag -F $${TAG} ${FILES}; \
 	rm -rf $${DIR}; mkdir $${DIR}; \
 	cvs export -d $${DIR} -r $${TAG} linux; \
-	(cd $${DIR}; cvs export -r $${TAG} hal); \
+	(cd $${DIR}; cvs export -r ${HAL_TAG} hal); \
 	tar zcf $${DIR}.tgz --exclude=CVS $${DIR}; \
 	rm -rf $${DIR}
 
