@@ -44,7 +44,6 @@ pathname to your Linux kernel distribution.  By default this is set to
 
 Then do:
 
-	make depend
 	make
 
 This will generate two important files:
