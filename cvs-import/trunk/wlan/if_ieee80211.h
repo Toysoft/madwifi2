@@ -543,15 +543,14 @@ struct proc_dir_entry;
 
 struct ieee80211com {
 	struct net_device	ic_dev;		/* NB: this must be first */
-	int			ic_timer;	/* equivalent of if_timer */
-	struct timer_list	ic_slowtimo;	/* if watchdog timer */
-	void			(*ic_watchdog)(struct net_device *);
+	struct timer_list	ic_slowtimo;	/* mgmt/inactivity timer */
+	int			ic_mgt_timer;	/* mgmt timeout */
+	int			ic_inact_timer;	/* inactivity timer wait */
 	int			(*ic_mgtstart)(struct sk_buff *,
 					struct net_device *);
 	int			(*ic_init)(struct net_device *);
 	void			(*ic_recv_mgmt[16])(struct ieee80211com *,
 				    struct sk_buff *, int, u_int32_t);
-	spinlock_t		ic_lock;
 	struct net_device_stats	ic_stats;	/* interface statistics */
 	u_int32_t		msg_enable;	/* interface message flags */
 	int			(*ic_send_mgmt[16])(struct ieee80211com *,
@@ -577,6 +576,7 @@ struct ieee80211com {
 	int			ic_fixed_rate;	/* index to ic_sup_rates[] */
 	u_int16_t		ic_rtsthreshold;
 	u_int16_t		ic_fragthreshold;
+	spinlock_t		ic_nodelock;	/* on node table */
 	TAILQ_HEAD(, ieee80211_node) ic_node;	/* information of all nodes */
 	LIST_HEAD(, ieee80211_node) ic_hash[IEEE80211_NODE_HASHSIZE];
 	u_int16_t		ic_lintval;	/* listen interval */
@@ -585,8 +585,6 @@ struct ieee80211com {
 	u_int16_t		ic_txmax;	/* max tx retry count */
 	u_int16_t		ic_txlifetime;	/* tx lifetime */
 	u_int16_t		ic_txpower;	/* tx power setting (dbM) */
-	int			ic_mgt_timer;	/* mgmt timeout */
-	int			ic_inact_timer;	/* inactivity timer wait */
 	int			ic_nicknamelen;
 	u_int8_t		ic_nickname[IEEE80211_NWID_LEN];
 	int			ic_des_esslen;
@@ -605,8 +603,6 @@ struct ieee80211com {
 	struct iw_statistics	ic_iwstats;	/* wireless statistics block */
 #endif
 };
-#define	IEEE80211_LOCK(_ic)	spin_lock_irq(&(_ic)->ic_lock)
-#define	IEEE80211_UNLOCK(_ic)	spin_unlock_irq(&(_ic)->ic_lock)
 
 #define	IEEE80211_SEND_MGMT(ic,ni,type,arg)	do {			      \
 	if ((ic)->ic_send_mgmt[(type)>>IEEE80211_FC0_SUBTYPE_SHIFT] != NULL)  \
@@ -667,11 +663,10 @@ struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
 void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
 void	ieee80211_print_essid(u_int8_t *, int);
 void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
-void	ieee80211_watchdog(struct net_device *);
 void	ieee80211_next_scan(struct net_device *);
 void	ieee80211_end_scan(struct net_device *);
-struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *,
-		u_int8_t *, int);
+struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *, u_int8_t *);
+struct ieee80211_node *ieee80211_dup_bss(struct ieee80211com *, u_int8_t *);
 struct ieee80211_node *ieee80211_find_node(struct ieee80211com *, u_int8_t *);
 void	ieee80211_free_node(struct ieee80211com *, struct ieee80211_node *);
 void	ieee80211_free_allnodes(struct ieee80211com *);
