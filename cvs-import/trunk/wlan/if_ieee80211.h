@@ -730,6 +730,11 @@ struct ieee80211com {
 	int			ic_wep_txkey;	/* default tx key index */
 	void			*ic_wep_ctx;	/* wep crypt context */
 	u_int32_t		ic_iv;		/* initial vector for wep */
+#ifdef SOFTLED
+        u_int16_t               ic_beaconCnt;   /* becaon Count for LEDs */
+        u_int16_t               ic_ledPin;      /* GPIO pin for soft LED */
+        u_int16_t               ic_rfKillPin;   /* GPIO pin for RF Kill */
+#endif
 #ifdef CONFIG_PROC_FS
 	char			ic_procname[12];/* e.g. wlan%d */
 	struct proc_dir_entry	*ic_proc;	/* /proc/net/wlan%d */
@@ -779,6 +784,9 @@ struct ieee80211com {
 #define	IEEE80211_C_SHSLOT	0x00000080	/* CAPABILITY: short slottime */
 #define	IEEE80211_C_SHPREAMBLE	0x00000100	/* CAPABILITY: short preamble */
 #define	IEEE80211_C_MONITOR	0x00000200	/* CAPABILITY: Monitor Mode   */
+#ifdef SOFTLED
+#define IEEE80211_C_SOFTLED     0x00100000      /* CAPABILITY: Software LED */
+#endif
 
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
@@ -793,6 +801,12 @@ struct ieee80211com {
 #define	netif_msg_dumppkts(p) \
 	(((p)->msg_enable & (NETIF_MSG_DEBUG|NETIF_MSG_LINK2)) == \
 		(NETIF_MSG_DEBUG|NETIF_MSG_LINK2))
+
+#ifdef SOFTLED
+#define POLL_EVENT 1                            /* Poll event for LED update */
+#define TRANSMIT_EVENT 2                        /* xmit event for LED update */
+#define RECEIVE_EVENT 3                         /* rcv event for LED update */
+#endif
 
 u_int8_t ieee80211_get_rssi(struct ieee80211_node*);
 int	ieee80211_ifattach(struct net_device *);

@@ -252,6 +252,20 @@ void	ath_sysctl_unregister(void);
 		(_dc), (_cc)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
 	((*(_ah)->ah_writeAssocid)((_ah), (_bss), (_associd), 0))
+
+#ifdef SOFTLED
+#define ath_hal_gpioCfgOutput(_ah, _gpio) \
+        ((*(_ah)->ah_gpioCfgOutput)((_ah), (_gpio)));
+#define ath_hal_gpioCfgInput(_ah, _gpio) \
+        ((*(_ah)->ah_gpioCfgInput)((_ah), (_gpio)));
+#define ath_hal_gpioGet(_ah, _gpio) \
+        ((*(_ah)->ah_gpioGet)((_ah), (_gpio)));
+#define ath_hal_gpioSet(_ah, _gpio, _b) \
+        ((*(_ah)->ah_gpioSet)((_ah), (_gpio), (_b)));
+#define ath_hal_gpioSetIntr(_ah, _gpioSel, _b) \
+        ((*(_ah)->ah_gpioSetIntr)((_ah), (_sel), (_b)));
+#endif
+
 #define	ath_hal_setopmode(_ah) \
 	((*(_ah)->ah_setPCUConfig)((_ah)))
 #define	ath_hal_stoptxdma(_ah, _qnum) \

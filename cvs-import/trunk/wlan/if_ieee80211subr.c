@@ -1125,13 +1125,27 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		/* drop uninteresting frames */
 		if (ic->ic_state == IEEE80211_S_SCAN) {
 			if (subtype != IEEE80211_FC0_SUBTYPE_BEACON &&
-			    subtype != IEEE80211_FC0_SUBTYPE_PROBE_RESP)
+			    subtype != IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
+#ifdef SOFTLED
+			    ic->ic_beaconCnt++;
+#endif
 				goto out;
+			}
 		} else {
 #if 0
 			if (ic->ic_opmode != IEEE80211_M_IBSS &&
-			    subtype == IEEE80211_FC0_SUBTYPE_BEACON)
+			    subtype == IEEE80211_FC0_SUBTYPE_BEACON) {
+#ifdef SOFTLED
+			    ic->ic_beaconCnt++;
+#endif
 				goto out;
+			}
+#endif
+#ifdef SOFTLED
+			if (ic->ic_opmode != IEEE80211_M_IBSS &&
+			    subtype == IEEE80211_FC0_SUBTYPE_BEACON) {
+			    ic->ic_beaconCnt++;
+			}
 #endif
 		}
 
@@ -2786,6 +2800,9 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 	ieee80211_add_recvhist(ni, rssi, rstamp, rantenna);
 	memcpy(ni->ni_tstamp, tstamp, sizeof(ni->ni_tstamp));
+#ifdef SOFTLED
+	ic->ic_beaconCnt++;
+#endif
 	ni->ni_intval = le16_to_cpu(*(u_int16_t *)bintval);
 	ni->ni_capinfo = le16_to_cpu(*(u_int16_t *)capinfo);
 	ni->ni_chan = &ic->ic_channels[chan];
