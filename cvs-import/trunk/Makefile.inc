@@ -61,14 +61,14 @@ endif
 # defined, then, we assume the bus type is PCI
 
 ifndef BUS
-BUS=            PCI
+BUS=		PCI
 endif
 
 # If we are AHB bus type, then we need the kernel path for the target
 # kernel sources.
 
 ifeq ($(strip ${BUS}),AHB)
-TARGET=         mipsisa32-be-elf
+TARGET=		mipsisa32-be-elf
 
 ifndef KERNELPATH
 $(error KERNELPATH must be defined for bus type AHB.)
@@ -78,7 +78,7 @@ ifndef TOOLPATH
 $(error TOOLPATH must be defined for bus type AHB.)
 endif
 
-KERNELCONF=     ${KERNELPATH}/.config
+KERNELCONF=	${KERNELPATH}/.config
 
 ifndef KERNELRELEASE
 VERSION := $(strip $(shell head -n 1 ${KERNELPATH}/Makefile | cut -f 2 -d'='))
