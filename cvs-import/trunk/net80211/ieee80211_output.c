@@ -177,7 +177,9 @@ ieee80211_skbhdr_adjust(struct ieee80211com *ic, struct ieee80211_key *key,
 		    ("%s: cannot unshare for encapsulation\n", __func__));
 		ic->ic_stats.is_tx_nobuf++;
 	} else if (skb_tailroom(skb) < need_tailroom) {
-		if (pskb_expand_head(skb, need_headroom - skb_headroom(skb),
+		int headroom = skb_headroom(skb) < need_headroom ?
+			need_headroom - skb_headroom(skb) : 0;
+		if (pskb_expand_head(skb, headroom,
 			need_tailroom - skb_tailroom(skb), GFP_ATOMIC)) {
 			dev_kfree_skb(skb);
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
