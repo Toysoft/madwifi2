@@ -282,6 +282,15 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/* XXX assert csz is non-zero */
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
+	ATH_LOCK_INIT(sc);
+	ATH_TXBUF_LOCK_INIT(sc);
+
+	ATH_INIT_TQUEUE(&sc->sc_rxtq,	ath_rx_tasklet,		dev);
+	ATH_INIT_TQUEUE(&sc->sc_rxorntq,ath_rxorn_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_fataltq,ath_fatal_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_bstuckq,ath_bstuck_tasklet,	dev);
+	
 	/*
 	 * Attach the hal and verify ABI compatibility by checking
 	 * the hal's ABI signature against the one the driver was
@@ -304,6 +313,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		goto bad;
 	}
 	sc->sc_ah = ah;
+	sc->sc_invalid = 0;	// TODO: here for testing
 
 	/*
 	 * Check if the MAC has multi-rate retry support.
@@ -387,22 +397,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		if_printf(dev, "failed to allocate descriptors: %d\n", error);
 		goto bad;
 	}
-	ATH_LOCK_INIT(sc);
-	ATH_TXBUF_LOCK_INIT(sc);
 
-	ATH_INIT_TQUEUE(&sc->sc_rxtq,	ath_rx_tasklet,		dev);
-	ATH_INIT_TQUEUE(&sc->sc_rxorntq,ath_rxorn_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_fataltq,ath_fatal_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_bstuckq,ath_bstuck_tasklet,	dev);
-	
-	init_timer(&sc->sc_scan_ch);
-	sc->sc_scan_ch.function = ath_next_scan;
-	sc->sc_scan_ch.data = (unsigned long) dev;
-
-	init_timer(&sc->sc_cal_ch);
-	sc->sc_cal_ch.function = ath_calibrate;
-	sc->sc_cal_ch.data = (unsigned long) dev;
+	// TODO: scan here?
 
 	/*
 	 * Allocate hardware transmit queues: one queue for
@@ -479,6 +475,14 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		goto bad2;
 	}
 
+	init_timer(&sc->sc_scan_ch);
+	sc->sc_scan_ch.function = ath_next_scan;
+	sc->sc_scan_ch.data = (unsigned long) dev;
+
+	init_timer(&sc->sc_cal_ch);
+	sc->sc_cal_ch.function = ath_calibrate;
+	sc->sc_cal_ch.data = (unsigned long) dev;
+
 	sc->sc_blinking = 0;
 	sc->sc_ledstate = 1;
 	sc->sc_ledon = 0;			/* low true */
@@ -487,7 +491,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	init_timer(&sc->sc_ledtimer);
 	sc->sc_ledtimer.function = ath_led_off;
 	sc->sc_ledtimer.data = (unsigned long) sc;
-
 	/*
 	 * Auto-enable soft led processing for IBM cards and for
 	 * 5211 minipci cards.  Users can also manually enable/disable
@@ -510,7 +513,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	dev->get_stats = ath_getstats;
 	dev->set_mac_address = ath_set_mac_address;
  	dev->change_mtu = &ath_change_mtu;
-	dev->tx_queue_len = ATH_TXBUF-1;		/* 1 for mgmt frame */
+	dev->tx_queue_len = ATH_TXBUF;			/* TODO? 1 for mgmt frame */
 #ifdef CONFIG_NET_WIRELESS
 	dev->get_wireless_stats = ath_iw_getstats;
 	ieee80211_ioctl_iwsetup(&ath_iw_handler_def);
@@ -639,6 +642,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		printk(KERN_ERR "%s: unable to register device\n", dev->name);
 		goto bad3;
 	}
+
 	/*
 	 * Attach dynamic MIB vars and announce support
 	 * now that we have a device name with unit number.
@@ -706,6 +710,7 @@ ath_detach(struct net_device *dev)
 #ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_unregister(sc);
 #endif /* CONFIG_SYSCTL */
+	printk("%s: calling unregister_netdev\n", __func__);
 	unregister_netdev(dev);
 
 	return 0;
@@ -717,7 +722,6 @@ ath_suspend(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-
 	ath_stop(dev);
 }
 
@@ -1048,11 +1052,11 @@ ath_stop_locked(struct net_device *dev)
 		 * hardware is gone (invalid).
 		 */
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-		netif_stop_queue(dev);
 		dev->flags &= ~IFF_RUNNING;
+		// TODO: delete slowtimo here?
 		if (!sc->sc_invalid) {
 			if (sc->sc_softled) {
-				// TODO: stop led timer
+				del_timer(&sc->sc_ledtimer);
 				ath_hal_gpioset(ah, sc->sc_ledpin,
 					!sc->sc_ledon);
 				sc->sc_blinking = 0;
@@ -1066,8 +1070,8 @@ ath_stop_locked(struct net_device *dev)
 		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);
+		netif_stop_queue(dev);		// TODO: correct here?
 	}
-	ATH_UNLOCK(sc);
 	return 0;
 }
 
@@ -1307,6 +1311,9 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		 */
 		if (skb0 == skb)
 			break; 
+		sc->sc_tx_timer = 5;
+		mod_timer(&ic->ic_slowtimo, jiffies + HZ);
+		//ifp->if_timer = 1;	// TODO: ???
 	}
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
 }
@@ -1897,7 +1904,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	(((_ic)->ic_flags & (IEEE80211_F_SHPREAMBLE | IEEE80211_F_USEBARKER))\
 		== IEEE80211_F_SHPREAMBLE)
 	struct ieee80211_node *ni = bf->bf_node;
-	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb = bf->bf_skb;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_node *an = ATH_NODE(ni);
@@ -1992,12 +1999,14 @@ ath_beacon_tasklet(struct net_device *dev)
 	 */
 	if (ath_hal_numtxpending(ah, sc->sc_bhalq) != 0) {
 		sc->sc_bmisscount++;
+		printk("%s: missed %u consequent beacons", __func__, sc->sc_bmisscount); 
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: missed %u consecutive beacons\n",
 			__func__, sc->sc_bmisscount);
 		if (sc->sc_bmisscount > 3){		/* NB: 3 is a guess */
                         //TODO: ???
 			//taskqueue_enqueue(taskqueue_swi, &sc->sc_bstucktask);
+			printk("%s: stuck beacon time (%u missed)", __func__, sc->sc_bmisscount); 
                         ATH_SCHEDULE_TQUEUE(&sc->sc_bstuckq, &needmark);
                 }
 		return;
@@ -2287,7 +2296,7 @@ ath_descdma_cleanup(struct ath_softc *sc, ath_bufhead *head)
 	struct ieee80211_node *ni;
 
 	STAILQ_FOREACH(bf, head, bf_list){
-		if (bf->bf_skb != NULL) {
+		if (bf->bf_skb) {
 			bus_unmap_single(sc->sc_bdev,
 				bf->bf_skbaddr, sc->sc_rxbufsize,
 				BUS_DMA_FROMDEVICE);
@@ -2338,28 +2347,6 @@ ath_desc_alloc(struct ath_softc *sc)
         ath_descdma_setup(sc, &sc->sc_rxbuf, &bf, ATH_RXBUF, 1);
         ath_descdma_setup(sc, &sc->sc_txbuf, &bf, ATH_TXBUF, ATH_TXDESC);
         ath_descdma_setup(sc, &sc->sc_bcbuf, &bf, 1, 1);
-/*
-	STAILQ_INIT(&sc->sc_rxbuf);
-	for (i = 0; i < ATH_RXBUF; i++, bf++, ds++) {
-		bf->bf_desc = ds;
-		bf->bf_daddr = DS2PHYS(sc, ds);
-		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
-	}
-
-	STAILQ_INIT(&sc->sc_txbuf);
-	for (i = 0; i < ATH_TXBUF; i++, bf++, ds += ATH_TXDESC) {
-		bf->bf_desc = ds;
-		bf->bf_daddr = DS2PHYS(sc, ds);
-		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-	}
-
-	STAILQ_INIT(&sc->sc_bcbuf);
-	for (i = 0; i < ATH_BCBUF; i++, bf++, ds += ATH_TXDESC) {
-		bf->bf_desc = ds;
-		bf->bf_daddr = DS2PHYS(sc, ds);
-		STAILQ_INSERT_TAIL(&sc->sc_bcbuf, bf, bf_list);
-	}
-*/
 
 	return 0;
 bad:
@@ -2416,7 +2403,7 @@ ath_node_free(struct ieee80211_node *ni)
         struct ath_softc *sc = ic->ic_dev->priv;
 	DPRINTF(sc, ATH_DEBUG_NODE, "%s: ni %p\n", __func__, ni);
 /* 
-	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
+	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)		// TODO: seems we need this still
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_cleanq(&sc->sc_txq[i], ni);
 */
@@ -2759,8 +2746,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_desc + \
 		((_pa) - (_sc)->sc_desc_daddr)))
-#define	IS_CTL(wh) \
-	((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
 	struct net_device *dev = (struct net_device *)data;
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
@@ -2957,9 +2942,8 @@ rx_accept:
 		 * pass the (referenced) node up to the 802.11 layer
 		 * for its use.
 		 */
-		ni = ieee80211_find_rxnode(ic, 
+		ni = ieee80211_find_rxnode(ic,
                         (struct ieee80211_frame_min *)skb->data);
-
 
 		/*
 		 * Track rx rssi and do any rx antenna management.
@@ -3004,7 +2988,7 @@ rx_accept:
 		/*
 		 * Reclaim node reference.
 		 */
-                ieee80211_free_node(ni);
+		ieee80211_free_node(ni);
 rx_next:
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	} while (ath_rxbuf_init(sc, bf) == 0);
@@ -3012,7 +2996,6 @@ rx_next:
 	/* rx signal state monitoring */
 	ath_hal_rxmonitor(ah, &ATH_NODE(ic->ic_bss)->an_halstats);
 
-#undef IS_CTL
 #undef PA2DESC
 }
 
