@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2003-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,6 +67,7 @@ if_printf(struct net_device *dev, const char *fmt, ...)
 
 	printk("%s: %s", dev->name, buf);
 }
+EXPORT_SYMBOL(if_printf);
 
 /*
  * Allocate and setup a management frame of the specified
@@ -110,7 +111,6 @@ skb_queue_drain(struct sk_buff_head *q)
 {
 	struct sk_buff *skb;
 	unsigned long flags;
-
 	spin_lock_irqsave(&q->lock, flags);
 	while ((skb = __skb_dequeue(q)) != NULL)
 		dev_kfree_skb(skb);
@@ -190,7 +190,7 @@ ieee80211_notify_scan_done(struct ieee80211com *ic)
 	union iwreq_data wreq;
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
-		("%s: notify scan done\n", ic->ic_dev->name));
+		"%s: notify scan done\n", ic->ic_dev->name);
 
 	/* dispatch wireless event indicating scan completed */
 	wreq.data.length = 0;
@@ -208,9 +208,9 @@ ieee80211_notify_replay_failure(struct ieee80211com *ic,
 	char buf[128];
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		("[%s] %s replay detected <rsc %llu, csc %llu>\n",
+		"[%s] %s replay detected <rsc %llu, csc %llu>\n",
 		ether_sprintf(wh->i_addr2), k->wk_cipher->ic_name,
-		rsc, k->wk_keyrsc));
+		rsc, k->wk_keyrsc);
 
 	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
 		return;
@@ -234,8 +234,8 @@ ieee80211_notify_michael_failure(struct ieee80211com *ic,
 	char buf[128];
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		("[%s] Michael MIC verification failed <keyidx %d>\n",
-	       ether_sprintf(wh->i_addr2), keyix));
+		"[%s] Michael MIC verification failed <keyidx %d>\n",
+	       ether_sprintf(wh->i_addr2), keyix);
 	ic->ic_stats.is_rx_tkipmic++;
 
 	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
@@ -257,21 +257,21 @@ EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 static int
 proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 {
-	TAILQ_HEAD(, ieee80211_node) *head = arg;
 	char *p = page;
 	struct ieee80211_node *ni;
+	struct ieee80211_node_table *nt = &ic->ic_sta;
 	struct ieee80211_rateset *rs;
 	int i;
 
-	IEEE80211_NODE_LOCK_BH(ic);
-	TAILQ_FOREACH(ni, head, ni_list) {
+	IEEE80211_NODE_LOCK_BH(nt);
+	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		/* Assume each node needs 300 bytes */ 
 		if (p - page > space - 300)
 			break;
-
 		p += sprintf(p, "\nmacaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
-		p += sprintf(p, "  rssi: %d dBm\n",
-			(*ic->ic_node_getrssi)(ic, ni));
+		p += sprintf(p, "  rssi: %d dBm ; ",
+			(*ic->ic_node_getrssi)(ni));
+		p += sprintf(p, "refcnt: %d\n", ieee80211_node_refcnt(ni));
 
 		p += sprintf(p, "  capinfo:");
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_ESS)
@@ -313,6 +313,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 
 		rs = &ni->ni_rates;
 		if (ni->ni_txrate >= 0 && ni->ni_txrate < rs->rs_nrates) {
+
 			p += sprintf(p, "  txrate: ");
 			for (i = 0; i < rs->rs_nrates; i++) {
 				p += sprintf(p, "%s%d%sMbps",
@@ -327,13 +328,19 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 			p += sprintf(p, "  txrate: %d ? (rs_nrates: %d)\n",
 					ni->ni_txrate, ni->ni_rates.rs_nrates);
 
-		p += sprintf(p, "  txseq: %d  rxseq: %d\n",
-				ni->ni_txseq, ni->ni_rxseq);
+		p += sprintf(p, "  txpower %d vlan %d\n",
+			ni->ni_txpower,
+			ni->ni_vlan);
+
+		p += sprintf(p, "  txseq: %d  rxseq: %d fragno %d rxfragstamp %d\n",
+				ni->ni_txseqs[0],
+				ni->ni_rxseqs[0] >> IEEE80211_SEQ_SEQ_SHIFT,
+				ni->ni_rxseqs[0] & IEEE80211_SEQ_FRAG_MASK,
+				ni->ni_rxfragstamp);
 		p += sprintf(p, "  fails: %d  inact: %d\n",
 				ni->ni_fails, ni->ni_inact);
-
 	}
-	IEEE80211_NODE_UNLOCK_BH(ic);
+	IEEE80211_NODE_UNLOCK_BH(nt);
 	return (p - page);
 }
 
@@ -348,7 +355,7 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_stations, ctl, write, filp, buffer,
 	    ic->ic_opmode != IEEE80211_M_IBSS)
 		return -EINVAL;
 	if (len && filp->f_pos == 0) {
-		*lenp = proc_read_node(buffer, len, ic, &ic->ic_node);
+		*lenp = proc_read_node(buffer, len, ic, &ic->ic_sta);
 		filp->f_pos += *lenp;
 	} else {
 		*lenp = 0;
@@ -371,9 +378,9 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
 				lenp, ppos);
 		if (ret == 0)
-			ic->msg_enable = val;
+			ic->ic_debug = val;
 	} else {
-		val = ic->msg_enable;
+		val = ic->ic_debug;
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
 				lenp, ppos);
 	}

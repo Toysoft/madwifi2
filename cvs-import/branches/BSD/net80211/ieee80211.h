@@ -1,7 +1,6 @@
-/*	$NetBSD: ieee80211.h,v 1.4 2003/10/15 11:43:51 dyoung Exp $	*/
 /*-
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net80211/ieee80211.h,v 1.4 2004/01/13 06:22:55 sam Exp $
+ * $FreeBSD: src/sys/net80211/ieee80211.h,v 1.8 2004/12/31 22:44:26 sam Exp $
  */
 #ifndef _NET80211_IEEE80211_H_
 #define _NET80211_IEEE80211_H_
@@ -171,9 +170,11 @@ struct ieee80211_qosframe_addr4 {
 
 #define	IEEE80211_QOS_TXOP			0x00ff
 /* bit 8 is reserved */
-#define	IEEE80211_QOS_ACKPOLICY			0x0600
-#define	IEEE80211_QOS_ESOP			0x0800
-#define	IEEE80211_QOS_TID			0xf000
+#define	IEEE80211_QOS_ACKPOLICY			0x60
+#define	IEEE80211_QOS_ACKPOLICY_S		5
+#define	IEEE80211_QOS_ESOP			0x10
+#define	IEEE80211_QOS_ESOP_S			4
+#define	IEEE80211_QOS_TID			0x0f
 
 /* does frame have QoS sequence control data */
 #define	IEEE80211_QOS_HAS_SEQ(wh) \
@@ -184,14 +185,14 @@ struct ieee80211_qosframe_addr4 {
 /*
  * WME/802.11e information element.
  */
-struct ieee80211_ie_wme {
+struct ieee80211_wme_info {
 	u_int8_t	wme_id;		/* IEEE80211_ELEMID_VENDOR */
 	u_int8_t	wme_len;	/* length in bytes */
 	u_int8_t	wme_oui[3];	/* 0x00, 0x50, 0xf2 */
 	u_int8_t	wme_type;	/* OUI type */
 	u_int8_t	wme_subtype;	/* OUI subtype */
 	u_int8_t	wme_version;	/* spec revision */
-	u_int8_t	wme_info;	/* AC info */
+	u_int8_t	wme_info;	/* QoS info */
 } __packed;
 
 /*
@@ -220,6 +221,56 @@ struct ieee80211_wme_tspec {
 	u_int8_t	ts_delay[4];
 	u_int8_t	ts_surplus[2];
 	u_int8_t	ts_medium_time[2];
+} __packed;
+
+/*
+ * WME AC parameter field
+ */
+struct ieee80211_wme_acparams {
+	u_int8_t	acp_aci_aifsn;
+	u_int8_t	acp_logcwminmax;
+	u_int16_t	acp_txop;
+} __packed;
+
+#define WME_NUM_AC		4	/* 4 AC categories */
+
+#define WME_PARAM_ACI		0x60	/* Mask for ACI field */
+#define WME_PARAM_ACI_S		5	/* Shift for ACI field */
+#define WME_PARAM_ACM		0x10	/* Mask for ACM bit */
+#define WME_PARAM_ACM_S		4	/* Shift for ACM bit */
+#define WME_PARAM_AIFSN		0x0f	/* Mask for aifsn field */
+#define WME_PARAM_AIFSN_S	0	/* Shift for aifsn field */
+#define WME_PARAM_LOGCWMIN	0x0f	/* Mask for CwMin field (in log) */
+#define WME_PARAM_LOGCWMIN_S	0	/* Shift for CwMin field */
+#define WME_PARAM_LOGCWMAX	0xf0	/* Mask for CwMax field (in log) */
+#define WME_PARAM_LOGCWMAX_S	4	/* Shift for CwMax field */
+
+#define WME_AC_TO_TID(_ac) (       \
+	((_ac) == WME_AC_VO) ? 6 : \
+	((_ac) == WME_AC_VI) ? 5 : \
+	((_ac) == WME_AC_BK) ? 1 : \
+	0)
+
+#define TID_TO_WME_AC(_tid) (      \
+	((_tid) < 1) ? WME_AC_BE : \
+	((_tid) < 3) ? WME_AC_BK : \
+	((_tid) < 6) ? WME_AC_VI : \
+	WME_AC_VO)
+
+/*
+ * WME Parameter Element
+ */
+struct ieee80211_wme_param {
+	u_int8_t	param_id;
+	u_int8_t	param_len;
+	u_int8_t	param_oui[3];
+	u_int8_t	param_oui_type;
+	u_int8_t	param_oui_sybtype;
+	u_int8_t	param_version;
+	u_int8_t	param_qosInfo;
+#define	WME_QOSINFO_COUNT	0x0f	/* Mask for param count field */
+	u_int8_t	param_reserved;
+	struct ieee80211_wme_acparams	params_acParams[WME_NUM_AC];
 } __packed;
 
 /*
@@ -338,56 +389,8 @@ struct ieee80211_ie_wpa {
 } __packed;
 
 /*
- * Management information element payloads
+ * Management information element payloads.
  */
-union ieee80211_information {
-	char	ssid[IEEE80211_NWID_LEN+1];
-	struct rates {
-		u_int8_t	*p;
-	} rates;
-	struct fh {
-		u_int16_t	dwell;
-		u_int8_t	set;
-		u_int8_t	pattern;
-		u_int8_t	index;
-	} fh;
-	struct ds {
-		u_int8_t	channel;
-	} ds;
-	struct cf {
-		u_int8_t	count;
-		u_int8_t	period;
-		u_int8_t	maxdur[2];
-		u_int8_t	dur[2];
-	} cf;
-	struct tim {
-		u_int8_t	count;
-		u_int8_t	period;
-		u_int8_t	bitctl;
-		/* u_int8_t	pvt[251]; The driver needs to use this. */
-	} tim;
-	struct ibss {
-		u_int16_t	atim;
-	} ibss;
-	struct challenge {
-		u_int8_t	*p;
-		u_int8_t	len;
-	} challenge;
-	struct erp {
-		u_int8_t	flags;
-	} erp;
-	struct country {
-		u_int8_t	cc[3];		/* ISO CC+(I)ndoor/(O)utdoor */
-		struct {
-			u_int8_t schan;		/* starting channel */
-			u_int8_t nchan;		/* number channels */
-			u_int8_t maxtxpwr;	
-		} band[4];			/* up to 4 sub bands */
-	} country;
-	struct ath {
-		u_int8_t	flags;
-	} ath;
-};
 
 enum {
 	IEEE80211_ELEMID_SSID		= 0,
@@ -407,6 +410,26 @@ enum {
 	IEEE80211_ELEMID_CCKM		= 156,
 	IEEE80211_ELEMID_VENDOR		= 221,	/* vendor private */
 };
+
+struct ieee80211_tim_ie {
+	u_int8_t	tim_ie;			/* IEEE80211_ELEMID_TIM */
+	u_int8_t	tim_len;
+	u_int8_t	tim_count;		/* DTIM count */
+	u_int8_t	tim_period;		/* DTIM period */
+	u_int8_t	tim_bitctl;		/* bitmap control */
+	u_int8_t	tim_bitmap[1];		/* variable-length bitmap */
+} __packed;
+
+struct ieee80211_country_ie {
+	u_int8_t	ie;			/* IEEE80211_ELEMID_COUNTRY */
+	u_int8_t	len;
+	u_int8_t	cc[3];			/* ISO CC+(I)ndoor/(O)utdoor */
+	struct {
+		u_int8_t schan;			/* starting channel */
+		u_int8_t nchan;			/* number channels */
+		u_int8_t maxtxpwr;		/* tx power cap */
+	} band[4] __packed;			/* up to 4 sub bands */
+} __packed;
 
 #define IEEE80211_CHALLENGE_LEN		128
 
@@ -461,6 +484,8 @@ enum {
 
 #define	WME_OUI			0xf25000
 #define	WME_OUI_TYPE		0x02
+#define	WME_INFO_OUI_SUBTYPE	0x00
+#define	WME_PARAM_OUI_SUBTYPE	0x01
 #define	WME_VERSION		1
 
 /* WME stream classes */
@@ -608,15 +633,5 @@ enum {
 #define	IEEE80211_RTS_DEFAULT		512
 #define	IEEE80211_RTS_MIN		1
 #define	IEEE80211_RTS_MAX		IEEE80211_MAX_LEN
-
-enum {
-	IEEE80211_AUTH_NONE	= 0,
-	IEEE80211_AUTH_OPEN	= 1,		/* open */
-	IEEE80211_AUTH_SHARED	= 2,		/* shared-key */
-	IEEE80211_AUTH_8021X	= 3,		/* 802.1x */
-	IEEE80211_AUTH_AUTO	= 4,		/* auto-select/accept */
-	/* NB: these are used only for ioctls */
-	IEEE80211_AUTH_WPA	= 5,		/* WPA/RSN w/ 802.1x/PSK */
-};
 
 #endif /* _NET80211_IEEE80211_H_ */

@@ -101,21 +101,22 @@ ieee80211_iw_getstats(struct ieee80211com *ic, struct iw_statistics *is)
 		/* use stats from associated ap */
 		if (ic->ic_bss)
 			set_quality(&is->qual,
-				(*ic->ic_node_getrssi)(ic, ic->ic_bss));
+				(*ic->ic_node_getrssi)(ic->ic_bss));
 		else
 			set_quality(&is->qual, 0);
 		break;
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
 	case IEEE80211_M_HOSTAP: {
+		struct ieee80211_node_table *nt = &ic->ic_sta;
 		struct ieee80211_node* ni;
 		u_int32_t rssi_samples = 0;
 		u_int32_t rssi_total = 0;
 
 		/* average stats from all nodes */
-		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+		TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 			rssi_samples++;
-			rssi_total += (*ic->ic_node_getrssi)(ic, ni);
+			rssi_total += (*ic->ic_node_getrssi)(ni);
 		}
 		set_quality(&is->qual, rssi_total / NZ(rssi_samples));
 		break;
@@ -157,8 +158,11 @@ ieee80211_ioctl_giwname(struct ieee80211com *ic,
 	case IEEE80211_MODE_11G:
 		strncpy(name, "IEEE 802.11g", IFNAMSIZ);
 		break;
-	case IEEE80211_MODE_TURBO:
-		strncpy(name, "IEEE 802.11-TURBO", IFNAMSIZ);
+	case IEEE80211_MODE_TURBO_A:
+		strncpy(name, "Turbo-A", IFNAMSIZ);
+		break;
+	case IEEE80211_MODE_TURBO_G:
+		strncpy(name, "Turbo-G", IFNAMSIZ);
 		break;
 	default:
 		strncpy(name, "IEEE 802.11", IFNAMSIZ);
@@ -997,6 +1001,7 @@ ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
+	struct ieee80211_node_table *nt = &ic->ic_sta;
 	struct ieee80211_node *ni;
 	struct sockaddr addr[IW_MAX_AP];
 	struct iw_quality qual[IW_MAX_AP];
@@ -1004,13 +1009,13 @@ ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 
 	i = 0;
 	/* XXX lock node list */
-	TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		addr[i].sa_family = ARPHRD_ETHER;
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP)
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
 		else
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
-		set_quality(&qual[i], (*ic->ic_node_getrssi)(ic, ni));
+		set_quality(&qual[i], (*ic->ic_node_getrssi)(ni));
 		if (++i >= IW_MAX_AP)
 			break;
 	}
@@ -1085,7 +1090,7 @@ encode_ie(void *buf, size_t bufsize,
 	const char *leader, size_t leader_len)
 {
 	u_int8_t *p;
-	int i;
+	u_int i;
 
 	if (bufsize < leader_len)
 		return 0;
@@ -1104,6 +1109,7 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
+    	struct ieee80211_node_table *nt = &ic->ic_sta;
 	struct ieee80211_node *ni;
 	char *current_ev = extra;
 	char *end_buf = extra + IW_SCAN_MAX_DATA;
@@ -1137,7 +1143,7 @@ again:
 	/*
 	 * Translate data to WE format.
 	 */
-	TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		if (current_ev >= end_buf)
 			goto done;
 		/* WPA/!WPA sort criteria */
@@ -1185,7 +1191,7 @@ again:
 
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVQUAL;
-		set_quality(&iwe.u.qual, (*ic->ic_node_getrssi)(ic, ni));
+		set_quality(&iwe.u.qual, (*ic->ic_node_getrssi)(ni));
 		current_ev = iwe_stream_add_event(current_ev,
 			end_buf, &iwe, IW_EV_QUAL_LEN);
 
@@ -1211,7 +1217,7 @@ again:
 			}
 		}
 		/* remove fixed header if no rates were added */
-		if ((current_val - current_ev) > IW_EV_LCP_LEN)
+		if ((u_int)(current_val - current_ev) > IW_EV_LCP_LEN)
 			current_ev = current_val;
 
 #if WIRELESS_EXT > 14
@@ -1727,7 +1733,7 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 			if (!IEEE80211_ADDR_EQ(ik->ik_macaddr, ni->ni_bssid))
 				return -EADDRNOTAVAIL;
 		} else
-			ni = ieee80211_find_node(ic, ik->ik_macaddr);
+			ni = ieee80211_find_node(&ic->ic_sta, ik->ik_macaddr);
 		if (ni == NULL)
 			return -ENOENT;
 		wk = &ni->ni_ucastkey;
@@ -1759,7 +1765,7 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 		error = -ENXIO;
 	ieee80211_key_update_end(ic);
 	if (ni != NULL && ni != ic->ic_bss)
-		ieee80211_free_node(ic, ni);
+		ieee80211_free_node(ni);
 	return error;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_setkey);
@@ -1779,7 +1785,7 @@ ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iwreq *iwr)
 		return -EFAULT;
 	kid = ik.ik_keyix;
 	if (kid == IEEE80211_KEYIX_NONE) {
-		ni = ieee80211_find_node(ic, ik.ik_macaddr);
+		ni = ieee80211_find_node(&ic->ic_sta, ik.ik_macaddr);
 		if (ni == NULL)
 			return -EINVAL;		/* XXX */
 		wk = &ni->ni_ucastkey;
@@ -1813,7 +1819,7 @@ ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iwreq *iwr)
 		memset(ik.ik_keydata, 0, sizeof(ik.ik_keydata));
 	}
 	if (ni != NULL)
-		ieee80211_free_node(ic, ni);
+		ieee80211_free_node(ni);
 	return (copy_to_user(iwr->u.data.pointer, &ik, sizeof(ik)) ?
 			-EFAULT : 0);
 }
@@ -1829,12 +1835,12 @@ ieee80211_ioctl_delkey(struct ieee80211com *ic, struct iw_request_info *info,
 	/* XXX u_int8_t -> u_int16_t */
 	if (dk->idk_keyix == (u_int8_t) IEEE80211_KEYIX_NONE) {
 		struct ieee80211_node *ni =
-			ieee80211_find_node(ic, dk->idk_macaddr);
+			ieee80211_find_node(&ic->ic_sta, dk->idk_macaddr);
 		if (ni == NULL)
 			return -EINVAL;		/* XXX */
 		/* XXX error return */
 		ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
-		ieee80211_free_node(ic, ni);
+		ieee80211_free_node(ni);
 	} else {
 		if (kid >= IEEE80211_WEP_NKID)
 			return -EINVAL;
@@ -1863,13 +1869,13 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			 * Desired ssid specified; must match both bssid and
 			 * ssid to distinguish ap advertising multiple ssid's.
 			 */
-			ni = ieee80211_find_node_with_ssid(ic, mlme->im_macaddr,
-				ic->ic_des_esslen, ic->ic_des_essid);
+			ni = ieee80211_find_node_with_ssid(&ic->ic_scan, mlme->im_macaddr,
+				ic->ic_des_esslen, ic->ic_des_essid);	// TODO
 		} else {
 			/*
 			 * Normal case; just match bssid.
 			 */
-			ni = ieee80211_find_node(ic, mlme->im_macaddr);
+			ni = ieee80211_find_node(&ic->ic_scan, mlme->im_macaddr);
 		}
 		if (ni == NULL)
 			return -EINVAL;
@@ -1888,7 +1894,7 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 				mlme->im_reason);
 			break;
 		case IEEE80211_M_HOSTAP:
-			ni = ieee80211_find_node(ic, mlme->im_macaddr);
+			ni = ieee80211_find_node(&ic->ic_sta, mlme->im_macaddr);
 			if (ni == NULL)
 				return -EINVAL;
 			IEEE80211_SEND_MGMT(ic, ni,
@@ -1906,14 +1912,14 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 	case IEEE80211_MLME_UNAUTHORIZE:
 		if (ic->ic_opmode != IEEE80211_M_HOSTAP)
 			return -EINVAL;
-		ni = ieee80211_find_node(ic, mlme->im_macaddr);
+		ni = ieee80211_find_node(&ic->ic_sta, mlme->im_macaddr);
 		if (ni == NULL)
 			return -EINVAL;
 		if (mlme->im_op == IEEE80211_MLME_AUTHORIZE)
 			ieee80211_node_authorize(ic, ni);
 		else
 			ieee80211_node_unauthorize(ic, ni);
-		ieee80211_free_node(ic, ni);
+		ieee80211_free_node(ni);
 		break;
 	default:
 		return -EINVAL;
@@ -2013,17 +2019,17 @@ ieee80211_ioctl_getwpaie(struct ieee80211com *ic, struct iwreq *iwr)
 		return -EINVAL;
 	if (copy_from_user(&wpaie, iwr->u.data.pointer, IEEE80211_ADDR_LEN))
 		return -EFAULT;
-	ni = ieee80211_find_node(ic, wpaie.wpa_macaddr);
+	ni = ieee80211_find_node(&ic->ic_sta, wpaie.wpa_macaddr);
 	if (ni == NULL)
 		return -EINVAL;		/* XXX */
 	memset(wpaie.wpa_ie, 0, sizeof(wpaie.wpa_ie));
 	if (ni->ni_wpa_ie != NULL) {
 		int ielen = ni->ni_wpa_ie[1] + 2;
-		if (ielen > sizeof(wpaie.wpa_ie))
+		if (ielen > (int)sizeof(wpaie.wpa_ie))
 			ielen = sizeof(wpaie.wpa_ie);
 		memcpy(wpaie.wpa_ie, ni->ni_wpa_ie, ielen);
 	}
-	ieee80211_free_node(ic, ni);
+	ieee80211_free_node(ni);
 	return (copy_to_user(iwr->u.data.pointer, &wpaie, sizeof(wpaie)) ?
 			-EFAULT : 0);
 }
@@ -2190,7 +2196,7 @@ EXPORT_SYMBOL(ieee80211_ioctl_iwsetup);
 int
 ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
 {
-
+	return -EOPNOTSUPP;
 	switch (cmd) {
 	case SIOCG80211STATS:
 		return copy_to_user(ifr->ifr_data, &ic->ic_stats,

@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-__FBSDID("$FreeBSD: src/sys/net80211/ieee80211_crypto.c,v 1.3 2003/10/17 23:15:30 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/net80211/ieee80211_crypto.c,v 1.7 2004/12/31 22:42:38 sam Exp $");
 __KERNEL_RCSID(0, "$NetBSD: ieee80211_crypto.c,v 1.4 2003/09/23 16:03:46 dyoung Exp $");
 
 /*
@@ -195,6 +195,13 @@ ieee80211_crypto_unregister(const struct ieee80211_cipher *cip)
 }
 EXPORT_SYMBOL(ieee80211_crypto_unregister);
 
+int
+ieee80211_crypto_available(u_int cipher)
+{
+	return cipher < IEEE80211_CIPHER_MAX && ciphers[cipher] != NULL;
+}
+EXPORT_SYMBOL(ieee80211_crypto_available);
+
 /* XXX well-known names! */
 static const char *cipher_modnames[] = {
 	"wlan_wep",	/* IEEE80211_CIPHER_WEP */
@@ -232,7 +239,7 @@ ieee80211_crypto_newkey(struct ieee80211com *ic,
 	 */
 	if (cipher >= IEEE80211_CIPHER_MAX) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			("%s: invalid cipher %u\n", __func__, cipher));
+			"%s: invalid cipher %u\n", __func__, cipher);
 		ic->ic_stats.is_crypto_badcipher++;
 		return 0;
 	}
@@ -244,10 +251,10 @@ ieee80211_crypto_newkey(struct ieee80211com *ic,
 		 * than numbers and craft a module name based on the cipher
 		 * name; e.g. wlan_cipher_<cipher-name>.
 		 */
-		if (cipher < N(cipher_modnames)) {
+		if (cipher < (int)N(cipher_modnames)) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-				("%s: unregistered cipher %u, load module %s\n",
-				__func__, cipher, cipher_modnames[cipher]));
+				"%s: unregistered cipher %u, load module %s\n",
+				__func__, cipher, cipher_modnames[cipher]);
 			request_module(cipher_modnames[cipher]);
 			/*
 			 * If cipher module loaded it should immediately
@@ -258,10 +265,10 @@ ieee80211_crypto_newkey(struct ieee80211com *ic,
 		}
 		if (cip == NULL) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-				("%s: unable to load cipher %u, module %s\n",
+				"%s: unable to load cipher %u, module %s\n",
 				__func__, cipher,
-				cipher < N(cipher_modnames) ?
-					cipher_modnames[cipher] : "<unknown>"));
+				cipher < (int)N(cipher_modnames) ?
+					cipher_modnames[cipher] : "<unknown>");
 			ic->ic_stats.is_crypto_nocipher++;
 			return 0;
 		}
@@ -275,8 +282,8 @@ ieee80211_crypto_newkey(struct ieee80211com *ic,
 	key->wk_flags &= ~(IEEE80211_KEY_SWCRYPT|IEEE80211_KEY_SWMIC);
 	if ((ic->ic_caps & (1<<cipher)) == 0) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		    ("%s: no h/w support for cipher %s, falling back to s/w\n",
-		    __func__, cip->ic_name));
+		    "%s: no h/w support for cipher %s, falling back to s/w\n",
+		    __func__, cip->ic_name);
 		key->wk_flags |= IEEE80211_KEY_SWCRYPT;
 	}
 	/*
@@ -287,8 +294,8 @@ ieee80211_crypto_newkey(struct ieee80211com *ic,
 	if (cipher == IEEE80211_CIPHER_TKIP &&
 	    (ic->ic_caps & IEEE80211_C_TKIPMIC) == 0) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		    ("%s: no h/w support for TKIP MIC, falling back to s/w\n",
-		    __func__));
+		    "%s: no h/w support for TKIP MIC, falling back to s/w\n",
+		    __func__);
 		key->wk_flags |= IEEE80211_KEY_SWMIC;
 	}
 
@@ -302,9 +309,9 @@ ieee80211_crypto_newkey(struct ieee80211com *ic,
 again:
 		keyctx = cip->ic_attach(ic, key);
 		if (keyctx == NULL) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-				("%s: unable to attach cipher %s\n",
-				__func__, cip->ic_name));
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+				"%s: unable to attach cipher %s\n",
+				__func__, cip->ic_name);
 			key->wk_flags = oflags;	/* restore old flags */
 			ic->ic_stats.is_crypto_attachfail++;
 			return 0;
@@ -336,9 +343,9 @@ again:
 			if ((key->wk_flags & IEEE80211_KEY_SWCRYPT) == 0) {
 				ic->ic_stats.is_crypto_swfallback++;
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-				    ("%s: no h/w resources for cipher %s, "
+				    "%s: no h/w resources for cipher %s, "
 				    "falling back to s/w\n", __func__,
-				    cip->ic_name));
+				    cip->ic_name);
 				oflags = key->wk_flags;
 				key->wk_flags |= IEEE80211_KEY_SWCRYPT;
 				if (cipher == IEEE80211_CIPHER_TKIP)
@@ -347,8 +354,8 @@ again:
 			}
 			ic->ic_stats.is_crypto_keyfail++;
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			    ("%s: unable to setup cipher %s\n",
-			    __func__, cip->ic_name));
+			    "%s: unable to setup cipher %s\n",
+			    __func__, cip->ic_name);
 			return 0;
 		}
 	}
@@ -367,6 +374,12 @@ _ieee80211_crypto_delkey(struct ieee80211com *ic, struct ieee80211_key *key)
 
 	KASSERT(key->wk_cipher != NULL, ("No cipher!"));
 
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+	    "%s: %s keyix %u flags 0x%x rsc %ju tsc %ju len %u\n",
+	    __func__, key->wk_cipher->ic_name,
+	    key->wk_keyix, key->wk_flags,
+	    key->wk_keyrsc, key->wk_keytsc, key->wk_keylen);
+
 	keyix = key->wk_keyix;
 	if (keyix != IEEE80211_KEYIX_NONE) {
 		/*
@@ -375,8 +388,8 @@ _ieee80211_crypto_delkey(struct ieee80211com *ic, struct ieee80211_key *key)
 		/* XXX key cache */
 		if (!dev_key_delete(ic, key)) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			    ("%s: driver did not delete key index %u\n",
-			    __func__, keyix));
+			    "%s: driver did not delete key index %u\n",
+			    __func__, keyix);
 			ic->ic_stats.is_crypto_delkey++;
 			/* XXX recovery? */
 		}
@@ -439,21 +452,28 @@ ieee80211_crypto_setkey(struct ieee80211com *ic, struct ieee80211_key *key,
 
 	KASSERT(cip != NULL, ("No cipher!"));
 
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+	    "%s: %s keyix %u flags 0x%x mac %s rsc %ju tsc %ju len %u\n",
+	    __func__, cip->ic_name, key->wk_keyix,
+	    key->wk_flags, ether_sprintf(macaddr),
+	    key->wk_keyrsc, key->wk_keytsc, key->wk_keylen);
+
 	/*
 	 * Give cipher a chance to validate key contents.
 	 * XXX should happen before modifying state.
 	 */
 	if (!cip->ic_setkey(key)) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		    ("%s: cipher %s rejected key index %u\n",
-		    __func__, cip->ic_name, key->wk_keyix));
+		    "%s: cipher %s rejected key index %u len %u flags 0x%x\n",
+		    __func__, cip->ic_name, key->wk_keyix,
+		    key->wk_keylen, key->wk_flags);
 		ic->ic_stats.is_crypto_setkey_cipher++;
 		return 0;
 	}
 	if (key->wk_keyix == IEEE80211_KEYIX_NONE) {
 		/* XXX nothing allocated, should not happen */
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		    ("%s: no key index; should not happen!\n", __func__));
+		    "%s: no key index; should not happen!\n", __func__);
 		ic->ic_stats.is_crypto_setkey_nokey++;
 		return 0;
 	}
@@ -484,8 +504,9 @@ ieee80211_crypto_encap(struct ieee80211com *ic,
 	    ni->ni_ucastkey.wk_cipher == &ieee80211_cipher_none) {
 		if (ic->ic_def_txkey == IEEE80211_KEYIX_NONE) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-				("%s: No default xmit key for frame to %s\n",
-				__func__, ether_sprintf(wh->i_addr1)));
+			    "[%s] no default transmit key (%s) deftxkey %u\n",
+			    ether_sprintf(wh->i_addr1), __func__,
+			    ic->ic_def_txkey);
 			ic->ic_stats.is_tx_nodefkey++;
 			return NULL;
 		}
@@ -496,14 +517,14 @@ ieee80211_crypto_encap(struct ieee80211com *ic,
 		k = &ni->ni_ucastkey;
 	}
 	cip = k->wk_cipher;
-	if (skb_headroom(skb) < cip->ic_header) {
+	if (skb_headroom(skb) < (int)cip->ic_header) {
 		/*
 		 * Should not happen; ieee80211_skbhdr_adjust should
 		 * have allocated enough space for all headers.
 		 */
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			("%s: Malformed packet for cipher %s; headroom %u\n",
-			__func__, cip->ic_name, skb_headroom(skb)));
+			"%s: Malformed packet for cipher %s; headroom %u\n",
+			__func__, cip->ic_name, skb_headroom(skb));
 		ic->ic_stats.is_tx_noheadroom++;
 		return NULL;
 	}
@@ -525,14 +546,16 @@ ieee80211_crypto_decap(struct ieee80211com *ic,
 	IEEE80211_WEP_HDRLEN + IEEE80211_WEP_CRCLEN)
 	struct ieee80211_key *k;
 	struct ieee80211_frame *wh;
-	u_int8_t *ivp;
+	const struct ieee80211_cipher *cip;
+	const u_int8_t *ivp;
 	u_int8_t keyid;
+	int hdrlen;
 
 	/* NB: this minimum size data frame could be bigger */
 	if (skb->len < IEEE80211_WEP_MINLEN) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-			("%s: WEP data frame too short, len %u\n",
-			__func__, skb->len));
+			"%s: WEP data frame too short, len %u\n",
+			__func__, skb->len);
 		ic->ic_stats.is_rx_tooshort++;	/* XXX need unique stat? */
 		return NULL;
 	}
@@ -543,7 +566,8 @@ ieee80211_crypto_decap(struct ieee80211com *ic,
 	 * the key id in the header is meaningless (typically 0).
 	 */
 	wh = (struct ieee80211_frame *) skb->data;
-	ivp = skb->data + ieee80211_hdrsize(wh);
+	hdrlen = ieee80211_hdrsize(wh);
+	ivp = skb->data + hdrlen;
 	keyid = ivp[IEEE80211_WEP_IVLEN];
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1) ||
 	    ni->ni_ucastkey.wk_cipher == &ieee80211_cipher_none)

@@ -125,8 +125,8 @@ tkip_attach(struct ieee80211com *ic, struct ieee80211_key *k)
 		ctx->tfm_michael = crypto_alloc_tfm("michael_mic", 0);
 		if (priv->tfm_michael == NULL)
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			    ("%s: Warning, no michael_mic crypto API "
-			    "support, using private version." __func__));
+			    "%s: Warning, no michael_mic crypto API "
+			    "support, using private version." __func__);
 #endif
 	}
 	return ctx;
@@ -153,8 +153,8 @@ tkip_setkey(struct ieee80211_key *k)
 
 	if (k->wk_keylen != (128/NBBY)) {
 		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
-			("%s: Invalid key length %u, expecting %u\n",
-			__func__, k->wk_keylen, 128/NBBY));
+			"%s: Invalid key length %u, expecting %u\n",
+			__func__, k->wk_keylen, 128/NBBY);
 		return 0;
 	}
 	k->wk_keytsc = 1;		/* TSC starts at 1 */
@@ -180,8 +180,8 @@ tkip_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 			(struct ieee80211_frame *) skb->data;
 
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			("[%s] Discard frame due to countermeasures (%s)\n",
-			ether_sprintf(wh->i_addr2), __func__));
+			"[%s] Discard frame due to countermeasures (%s)\n",
+			ether_sprintf(wh->i_addr2), __func__);
 		ic->ic_stats.is_crypto_tkipcm++;
 		return 0;
 	}
@@ -236,8 +236,8 @@ tkip_enmic(struct ieee80211_key *k, struct sk_buff *skb)
 		if (skb_tailroom(skb) < tkip.ic_miclen) {
 			/* NB: should not happen */
 			IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
-				("[%s] No room for Michael MIC, tailroom %u\n",
-				ether_sprintf(wh->i_addr1), skb_tailroom(skb)));
+				"[%s] No room for Michael MIC, tailroom %u\n",
+				ether_sprintf(wh->i_addr1), skb_tailroom(skb));
 			/* XXX statistic */
 			return 0;
 		}
@@ -288,8 +288,8 @@ tkip_decap(struct ieee80211_key *k, struct sk_buff *skb)
 		 * No extended IV; discard frame.
 		 */
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			("[%s] Missing ExtIV for TKIP cipher\n",
-			ether_sprintf(wh->i_addr2)));
+			"[%s] Missing ExtIV for TKIP cipher\n",
+			ether_sprintf(wh->i_addr2));
 		ic->ic_stats.is_rx_tkipformat++;
 		return 0;
 	}
@@ -298,8 +298,8 @@ tkip_decap(struct ieee80211_key *k, struct sk_buff *skb)
 	 */
 	if (ic->ic_flags & IEEE80211_F_COUNTERM) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			("[%s] Discard frame due to countermeasures (%s)\n",
-			ether_sprintf(wh->i_addr2), __func__));
+			"[%s] Discard frame due to countermeasures (%s)\n",
+			ether_sprintf(wh->i_addr2), __func__);
 		ic->ic_stats.is_crypto_tkipcm++;
 		return 0;
 	}
@@ -866,9 +866,9 @@ tkip_encrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 	if (skb_tailroom(skb) < tkip.ic_trailer) {
 		/* NB: should not happen */
 		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] No room for %s ICV, tailroom %u\n",
+			"[%s] No room for %s ICV, tailroom %u\n",
 			ether_sprintf(wh->i_addr1), tkip.ic_name,
-			skb_tailroom(skb)));
+			skb_tailroom(skb));
 		/* XXX statistic */
 		return 0;
 	}
@@ -924,8 +924,8 @@ tkip_decrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 			ctx->rx_phase1_done = 0;
 		}
 		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
-		    ("[%s] TKIP ICV mismatch on decrypt\n",
-		    ether_sprintf(wh->i_addr2)));
+		    "[%s] TKIP ICV mismatch on decrypt\n",
+		    ether_sprintf(wh->i_addr2));
 		ctx->tc_ic->ic_stats.is_rx_tkipicv++;
 		return 0;
 	}

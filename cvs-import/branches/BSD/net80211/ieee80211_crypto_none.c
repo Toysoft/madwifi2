@@ -29,7 +29,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-__FBSDID("$FreeBSD: src/sys/net80211/ieee80211_crypto.c,v 1.3 2003/10/17 23:15:30 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/net80211/ieee80211_crypto_none.c,v 1.3 2004/12/31 22:42:38 sam Exp $");
 __KERNEL_RCSID(0, "$NetBSD: ieee80211_crypto.c,v 1.4 2003/09/23 16:03:46 dyoung Exp $");
 
 /*
@@ -99,8 +99,8 @@ none_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 	 * happen, at least, when changing keys.
 	 */
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		("[%s] key id %u is not set (encap)\n",
-		ether_sprintf(wh->i_addr1), keyid>>6));
+		"[%s] key id %u is not set (encap)\n",
+		ether_sprintf(wh->i_addr1), keyid>>6);
 	ic->ic_stats.is_tx_badcipher++;
 	return 0;
 }
@@ -118,8 +118,8 @@ none_decap(struct ieee80211_key *k, struct sk_buff *skb)
 	 */
 	/* XXX useful to know dst too */
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		("[%s] key id %u is not set (decap)\n",
-		ether_sprintf(wh->i_addr2), ivp[IEEE80211_WEP_IVLEN] >> 6));
+		"[%s] key id %u is not set (decap)\n",
+		ether_sprintf(wh->i_addr2), ivp[IEEE80211_WEP_IVLEN] >> 6);
 	ic->ic_stats.is_rx_badkeyid++;
 	return 0;
 }

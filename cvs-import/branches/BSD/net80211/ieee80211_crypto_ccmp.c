@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -131,8 +131,8 @@ ccmp_setkey(struct ieee80211_key *k)
 
 	if (k->wk_keylen != (128/NBBY)) {
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("%s: Invalid key length %u, expecting %u\n",
-			__func__, k->wk_keylen, 128/NBBY));
+			"%s: Invalid key length %u, expecting %u\n",
+			__func__, k->wk_keylen, 128/NBBY);
 		return 0;
 	}
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
@@ -222,8 +222,8 @@ ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb)
 		 * No extended IV; discard frame.
 		 */
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] Missing ExtIV for AES-CCM cipher\n",
-			ether_sprintf(wh->i_addr2)));
+			"[%s] Missing ExtIV for AES-CCM cipher\n",
+			ether_sprintf(wh->i_addr2));
 		ctx->cc_ic->ic_stats.is_rx_ccmpformat++;
 		return 0;
 	}
@@ -422,9 +422,9 @@ ccmp_encrypt(struct ieee80211_key *key, struct sk_buff *skb, int hdrlen)
 	if (skb_tailroom(skb) < ccmp.ic_trailer) {
 		/* NB: should not happen */
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] No room for %s MIC, tailroom %u\n",
+			"[%s] No room for %s MIC, tailroom %u\n",
 			ether_sprintf(wh->i_addr1), ccmp.ic_name,
-			skb_tailroom(skb)));
+			skb_tailroom(skb));
 		/* XXX statistic */
 		return 0;
 	}
@@ -494,8 +494,8 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct sk_buff *skb, int h
 
 	if (memcmp(mic, a, ccmp.ic_trailer) != 0) {
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] AES-CCM decrypt failed; MIC mismatch\n",
-			ether_sprintf(wh->i_addr2)));
+			"[%s] AES-CCM decrypt failed; MIC mismatch\n",
+			ether_sprintf(wh->i_addr2));
 		ctx->cc_ic->ic_stats.is_rx_ccmpmic++;
 		return 0;
 	}

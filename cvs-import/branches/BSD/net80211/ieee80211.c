@@ -1,6 +1,6 @@
 /*-
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 #define	EXPORT_SYMTAB
 #endif
 
-__FBSDID("$FreeBSD: src/sys/net80211/ieee80211.c,v 1.9 2004/01/15 08:44:27 onoe Exp $");
+__FBSDID("$FreeBSD: src/sys/net80211/ieee80211.c,v 1.19 2005/01/27 17:39:17 sam Exp $");
 __KERNEL_RCSID(0, "$NetBSD: ieee80211.c,v 1.7 2003/10/16 22:25:00 matt Exp $");
 
 /*
@@ -50,30 +50,82 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211.c,v 1.7 2003/10/16 22:25:00 matt Exp $");
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_dot1x.h>
 
-static void ieee80211_watchdog(unsigned long);
-static void ieee80211_set11gbasicrates(struct ieee80211_rateset *,
-		enum ieee80211_phymode);
-
-static const char *ieee80211_phymode_name[] = {
+const char *ieee80211_phymode_name[] = {
 	"auto",		/* IEEE80211_MODE_AUTO */
 	"11a",		/* IEEE80211_MODE_11A */
 	"11b",		/* IEEE80211_MODE_11B */
 	"11g",		/* IEEE80211_MODE_11G */
 	"FH",		/* IEEE80211_MODE_FH */
-	"turbo",	/* IEEE80211_MODE_TURBO */
+	"turboA",	/* IEEE80211_MODE_TURBO_A */
+	"turboG",	/* IEEE80211_MODE_TURBO_G */
 };
 
 /* list of all instances */
 SLIST_HEAD(ieee80211_list, ieee80211com);
 static struct ieee80211_list ieee80211_list =
 	SLIST_HEAD_INITIALIZER(ieee80211_list);
+static u_int8_t ieee80211_vapmap[32];		// enough for 256
+static spinlock_t ieee80211_vap_spinlock;
+
+static void
+ieee80211_add_vap(struct ieee80211com *ic)
+{
+#define	N(a)	(sizeof(a)/sizeof(a[0]))
+	u_int i;
+	u_int8_t b;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ieee80211_vap_spinlock,flags);
+	ic->ic_vap = 0;
+	for (i = 0; i < N(ieee80211_vapmap) && ieee80211_vapmap[i] == 0xff; i++)
+		ic->ic_vap += NBBY;
+	if (i == N(ieee80211_vapmap))
+		panic("vap table full");
+	for (b = ieee80211_vapmap[i]; b & 1; b >>= 1)
+		ic->ic_vap++;
+	setbit(ieee80211_vapmap, ic->ic_vap);
+	SLIST_INSERT_HEAD(&ieee80211_list, ic, ic_next);
+	spin_unlock_irqrestore(&ieee80211_vap_spinlock,flags);
+#undef N
+}
+
+static void
+ieee80211_remove_vap(struct ieee80211com *ic)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&ieee80211_vap_spinlock,flags);
+	SLIST_REMOVE(&ieee80211_list, ic, ieee80211com, ic_next);
+	KASSERT(ic->ic_vap < sizeof(ieee80211_vapmap)*NBBY,
+		("invalid vap id %d", ic->ic_vap));
+	KASSERT(isset(ieee80211_vapmap, ic->ic_vap),
+		("vap id %d not allocated", ic->ic_vap));
+	clrbit(ieee80211_vapmap, ic->ic_vap);
+	spin_unlock_irqrestore(&ieee80211_vap_spinlock,flags);
+}
+
+/*
+ * Default reset method for use with the ioctl support.  This
+ * method is invoked after any state change in the 802.11
+ * layer that should be propagated to the hardware but not
+ * require re-initialization of the 802.11 state machine (e.g
+ * rescanning for an ap).  We always return ENETRESET which
+ * should cause the driver to re-initialize the device. Drivers
+ * can override this method to implement more optimized support.
+ * TODO: unneccessary??
+ */
+static int
+ieee80211_default_reset(struct net_device *dev)
+{
+	return ENETRESET;
+}
 
 int
 ieee80211_ifattach(struct ieee80211com *ic)
 {
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_channel *c;
-	int i;
+	u_int i;
 
 	_MOD_INC_USE(THIS_MODULE, return ENODEV);
 
@@ -112,29 +164,53 @@ ieee80211_ifattach(struct ieee80211com *ic)
 			if (IEEE80211_IS_CHAN_FHSS(c))
 				ic->ic_modecaps |= 1<<IEEE80211_MODE_FH;
 			if (IEEE80211_IS_CHAN_T(c))
-				ic->ic_modecaps |= 1<<IEEE80211_MODE_TURBO;
+				ic->ic_modecaps |= 1<<IEEE80211_MODE_TURBO_A;
+			if (IEEE80211_IS_CHAN_108G(c))
+				ic->ic_modecaps |= 1<<IEEE80211_MODE_TURBO_G;
 		}
 	}
 	/* validate ic->ic_curmode */
 	if ((ic->ic_modecaps & (1<<ic->ic_curmode)) == 0)
 		ic->ic_curmode = IEEE80211_MODE_AUTO;
 	ic->ic_des_chan = IEEE80211_CHAN_ANYC;	/* any channel is ok */
-
+#if 0
+	/*
+	 * Enable WME by default if we're capable.
+	 */
+	if (ic->ic_caps & IEEE80211_C_WME)
+		ic->ic_flags |= IEEE80211_F_WME;
+#endif
 	(void) ieee80211_setmode(ic, ic->ic_curmode);
 
 	if (ic->ic_lintval == 0)
-		ic->ic_lintval = 100;		/* default sleep */
+		ic->ic_lintval = IEEE80211_BINTVAL_DEFAULT;
 	ic->ic_bmisstimeout = 7*ic->ic_lintval;	/* default 7 beacons */
+	ic->ic_dtim_period = IEEE80211_DTIM_DEFAULT;
+	IEEE80211_BEACON_LOCK_INIT(ic, "beacon");
+
+	ic->ic_txpowlimit = IEEE80211_TXPOWER_MAX;
 
 	ieee80211_node_attach(ic);
 	ieee80211_proto_attach(ic);
+
+	/* TODO: not yet
+		ieee80211_add_vap(ic);
+	*/
+
+	/*
+	 * Install a default reset method for the ioctl support.
+	 * The driver is expected to fill this in before calling us.
+	 * TODO: unneccessary?
+	 */
+	if (ic->ic_reset == NULL)
+		ic->ic_reset = ieee80211_default_reset;
 
 	/* XXX lock */
 	SLIST_INSERT_HEAD(&ieee80211_list, ic, ic_next);
 
 	init_timer(&ic->ic_slowtimo);
 	ic->ic_slowtimo.data = (unsigned long) ic;
-	ic->ic_slowtimo.function = ieee80211_watchdog;
+	ic->ic_slowtimo.function = ieee80211_watchdog;	/* TODO ? */
 	ieee80211_watchdog((unsigned long) ic);		/* prime timer */
 	/*
 	 * NB: ieee80211_sysctl_register is called by the driver
@@ -150,7 +226,9 @@ ieee80211_ifdetach(struct ieee80211com *ic)
 
 	/* XXX lock */
 	SLIST_REMOVE(&ieee80211_list, ic, ieee80211com, ic_next);
-
+	/* TODO: not yet
+	ieee80211_remove_vap(ic);
+	*/
 	del_timer(&ic->ic_slowtimo);
 	ieee80211_proto_detach(ic);
 	ieee80211_crypto_detach(ic);
@@ -159,7 +237,7 @@ ieee80211_ifdetach(struct ieee80211com *ic)
 #ifdef CONFIG_SYSCTL
 	ieee80211_sysctl_unregister(ic);
 #endif
-
+	IEEE80211_BEACON_LOCK_DESTROY(ic);
 	_MOD_DEC_USE(THIS_MODULE);
 }
 EXPORT_SYMBOL(ieee80211_ifdetach);
@@ -277,6 +355,7 @@ ieee80211_media_init(struct ieee80211com *ic,
 			IFM_IEEE80211_11G,
 			IFM_IEEE80211_FH,
 			IFM_IEEE80211_11A | IFM_IEEE80211_TURBO,
+			IFM_IEEE80211_11G | IFM_IEEE80211_TURBO,
 		};
 		if ((ic->ic_modecaps & (1<<mode)) == 0)
 			continue;
@@ -459,13 +538,16 @@ ieee80211_media_change(struct net_device *dev)
 		return EINVAL;
 	}
 	/*
-	 * Turbo mode is an ``option''.  Eventually it
-	 * needs to be applied to 11g too.
+	 * Turbo mode is an ``option''.
+	 * XXX does not apply to AUTO
 	 */
 	if (ime->ifm_media & IFM_IEEE80211_TURBO) {
-		if (newphymode != IEEE80211_MODE_11A)
+		if (newphymode == IEEE80211_MODE_11A)
+			newphymode = IEEE80211_MODE_TURBO_A;
+		else if (newphymode == IEEE80211_MODE_11G)
+			newphymode = IEEE80211_MODE_TURBO_G;
+		else
 			return EINVAL;
-		newphymode = IEEE80211_MODE_TURBO;
 	}
 	/*
 	 * Validate requested mode is available.
@@ -580,6 +662,7 @@ ieee80211_media_change(struct net_device *dev)
 		 * is setup appropriately.
 		 */
 		ieee80211_reset_erp(ic);
+		ieee80211_wme_initparams(ic);	/* after opmode change */
 		error = ENETRESET;
 	}
 #ifdef notdef
@@ -653,58 +736,44 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 	case IEEE80211_MODE_FH:
 		imr->ifm_active |= IFM_IEEE80211_FH;
 		break;
-	case IEEE80211_MODE_TURBO:
+	case IEEE80211_MODE_TURBO_A:
 		imr->ifm_active |= IFM_IEEE80211_11A
+				|  IFM_IEEE80211_TURBO;
+		break;
+	case IEEE80211_MODE_TURBO_G:
+		imr->ifm_active |= IFM_IEEE80211_11G
 				|  IFM_IEEE80211_TURBO;
 		break;
 	}
 }
 EXPORT_SYMBOL(ieee80211_media_status);
 
-static void
+void
 ieee80211_watchdog(unsigned long data)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) data;
+	struct ieee80211_node_table *nt;
+	int need_inact_timer = 0;
 
 	if (ic->ic_state != IEEE80211_S_INIT) {
 		if (ic->ic_mgt_timer && --ic->ic_mgt_timer == 0)
 			ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
-		if (ic->ic_inact_timer && --ic->ic_inact_timer == 0)
-			ieee80211_timeout_nodes(ic);
+		nt = &ic->ic_scan;
+		if (nt->nt_inact_timer) {
+			if (--nt->nt_inact_timer == 0)
+				nt->nt_timeout(nt);
+			need_inact_timer += nt->nt_inact_timer;
+		}
+		nt = &ic->ic_sta;
+		if (nt->nt_inact_timer) {
+			if (--nt->nt_inact_timer == 0)
+				nt->nt_timeout(nt);
+			need_inact_timer += nt->nt_inact_timer;
+		}
 	}
-	ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
+	if (ic->ic_mgt_timer != 0 || need_inact_timer);
+		ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
 	add_timer(&ic->ic_slowtimo);
-}
-
-/*
- * Mark the basic rates for the 11g rate table based on the
- * operating mode.  For real 11g we mark all the 11b rates
- * and 6, 12, and 24 OFDM.  For 11b compatibility we mark only
- * 11b rates.  There's also a pseudo 11a-mode used to mark only
- * the basic OFDM rates.
- */
-static void
-ieee80211_set11gbasicrates(struct ieee80211_rateset *rs, enum ieee80211_phymode mode)
-{
-	static const struct ieee80211_rateset basic[] = {
-	    { 0 },			/* IEEE80211_MODE_AUTO */
-	    { 3, { 12, 24, 48 } },	/* IEEE80211_MODE_11A */
-	    { 2, { 2, 4 } },		/* IEEE80211_MODE_11B */
-	    { 4, { 2, 4, 11, 22 } },	/* IEEE80211_MODE_11G (mixed b/g) */
-	    { 0 },			/* IEEE80211_MODE_FH */
-					/* IEEE80211_MODE_PUREG (not yet) */
-	    { 7, { 2, 4, 11, 22, 12, 24, 48 } },
-	};
-	int i, j;
-
-	for (i = 0; i < rs->rs_nrates; i++) {
-		rs->rs_rates[i] &= IEEE80211_RATE_VAL;
-		for (j = 0; j < basic[mode].rs_nrates; j++)
-			if (basic[mode].rs_rates[j] == rs->rs_rates[i]) {
-				rs->rs_rates[i] |= IEEE80211_RATE_BASIC;
-				break;
-			}
-	}
 }
 
 /*
@@ -723,7 +792,8 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 		IEEE80211_CHAN_B,	/* IEEE80211_MODE_11B */
 		IEEE80211_CHAN_PUREG,	/* IEEE80211_MODE_11G */
 		IEEE80211_CHAN_FHSS,	/* IEEE80211_MODE_FH */
-		IEEE80211_CHAN_T,	/* IEEE80211_MODE_TURBO	*/
+		IEEE80211_CHAN_T,	/* IEEE80211_MODE_TURBO_A */
+		IEEE80211_CHAN_108G,	/* IEEE80211_MODE_TURBO_G */
 	};
 	struct ieee80211_channel *c;
 	u_int modeflags;
@@ -732,8 +802,8 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	/* validate new mode */
 	if ((ic->ic_modecaps & (1<<mode)) == 0) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-			("%s: mode %u not supported (caps 0x%x)\n",
-			__func__, mode, ic->ic_modecaps));
+			"%s: mode %u not supported (caps 0x%x)\n",
+			__func__, mode, ic->ic_modecaps);
 		return EINVAL;
 	}
 
@@ -756,7 +826,7 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	}
 	if (i > IEEE80211_CHAN_MAX) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-			("%s: no channels found for mode %u\n", __func__, mode));
+			"%s: no channels found for mode %u\n", __func__, mode);
 		return EINVAL;
 	}
 
@@ -828,43 +898,12 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 
 	ic->ic_curmode = mode;
 	ieee80211_reset_erp(ic);	/* reset ERP state */
+	ieee80211_wme_initparams(ic);	/* reset WME stat */
 
 	return 0;
 #undef N
 }
 EXPORT_SYMBOL(ieee80211_setmode);
-
-/*
- * Reset 11g-related state.
- */
-void
-ieee80211_reset_erp(struct ieee80211com *ic)
-{
-	ic->ic_flags &= ~IEEE80211_F_USEPROT;
-	ic->ic_nonerpsta = 0;
-	ic->ic_longslotsta = 0;
-	/*
-	 * Short slot time is enabled only when operating in 11g
-	 * and not in an IBSS.  We must also honor whether or not
-	 * the driver is capable of doing it.
-	 */
-	ieee80211_set_shortslottime(ic,
-		ic->ic_curmode == IEEE80211_MODE_11A ||
-		(ic->ic_curmode == IEEE80211_MODE_11G &&
-		ic->ic_opmode == IEEE80211_M_HOSTAP &&
-		(ic->ic_caps & IEEE80211_C_SHSLOT)));
-	/*
-	 * Set short preamble and ERP barker-preamble flags.
-	 */
-	if (ic->ic_curmode == IEEE80211_MODE_11A ||
-	    (ic->ic_caps & IEEE80211_C_SHPREAMBLE)) {
-		ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
-		ic->ic_flags &= ~IEEE80211_F_USEBARKER;
-	} else {
-		ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
-		ic->ic_flags |= IEEE80211_F_USEBARKER;
-	}
-}
 
 /*
  * Return the phy mode for with the specified channel so the
@@ -880,8 +919,8 @@ ieee80211_chan2mode(struct ieee80211com *ic, struct ieee80211_channel *chan)
 		 * This assumes all 11a turbo channels are also
 		 * usable withut turbo, which is currently true.
 		 */
-		if (ic->ic_curmode == IEEE80211_MODE_TURBO)
-			return IEEE80211_MODE_TURBO;
+		if (ic->ic_curmode == IEEE80211_MODE_TURBO_A)
+			return IEEE80211_MODE_TURBO_A;
 		return IEEE80211_MODE_11A;
 	} else if (IEEE80211_IS_CHAN_FHSS(chan))
 		return IEEE80211_MODE_FH;
@@ -890,6 +929,8 @@ ieee80211_chan2mode(struct ieee80211com *ic, struct ieee80211_channel *chan)
 		 * This assumes all 11g channels are also usable
 		 * for 11b, which is currently true.
 		 */
+		if (ic->ic_curmode == IEEE80211_MODE_TURBO_G)
+			return IEEE80211_MODE_TURBO_G;
 		if (ic->ic_curmode == IEEE80211_MODE_11B)
 			return IEEE80211_MODE_11B;
 		return IEEE80211_MODE_11G;
@@ -944,7 +985,7 @@ ieee80211_rate2media(struct ieee80211com *ic, int rate, enum ieee80211_phymode m
 	mask = rate & IEEE80211_RATE_VAL;
 	switch (mode) {
 	case IEEE80211_MODE_11A:
-	case IEEE80211_MODE_TURBO:
+	case IEEE80211_MODE_TURBO_A:
 		mask |= IFM_IEEE80211_11A;
 		break;
 	case IEEE80211_MODE_11B:
@@ -962,6 +1003,7 @@ ieee80211_rate2media(struct ieee80211com *ic, int rate, enum ieee80211_phymode m
 		/* NB: hack, 11g matches both 11b+11a rates */
 		/* fall thru... */
 	case IEEE80211_MODE_11G:
+	case IEEE80211_MODE_TURBO_G:
 		mask |= IFM_IEEE80211_11G;
 		break;
 	}
@@ -998,8 +1040,8 @@ ieee80211_media2rate(int mword)
 		108,		/* IFM_IEEE80211_OFDM54 */
 		144,		/* IFM_IEEE80211_OFDM72 */
 	};
-	return IFM_SUBTYPE(mword) < N(ieeerates) ?
-		ieeerates[IFM_SUBTYPE(mword)] : 0;
+	return IFM_SUBTYPE(mword) < (int)N(ieeerates) ?
+		(int)ieeerates[IFM_SUBTYPE(mword)] : 0;
 #undef N
 }
 EXPORT_SYMBOL(ieee80211_media2rate);
