@@ -63,7 +63,6 @@
 
 struct ath_pci_softc {
 	struct ath_softc	aps_sc;
-	struct module		*aps_module;
 #ifdef CONFIG_PM
 	u32			aps_pmstate[16];
 #endif
@@ -144,7 +143,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	memset(sc, 0, sizeof(struct ath_pci_softc));
 
-	sc->aps_module = THIS_MODULE;
 	dev = &sc->aps_sc.sc_ic.ic_dev;	/* XXX blech, violate layering */
 	memcpy(dev->name, "ath%d", sizeof("ath%d"));
 
@@ -152,6 +150,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->mem_start = mem;
 	dev->mem_end = mem + pci_resource_len(pdev, 0);
 	dev->priv = sc;
+	dev->owner = THIS_MODULE;
 
 	sc->aps_sc.sc_pdev = pdev;
 
