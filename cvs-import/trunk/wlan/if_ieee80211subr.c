@@ -43,7 +43,6 @@
 #include <linux/init.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/wireless.h>
 #include <linux/random.h>
 
 #include "rc4.h"
@@ -117,7 +116,7 @@ extern	int ieee80211_cfgset(struct net_device *, u_long, caddr_t);
 static	void ieee80211_proc_init(struct ieee80211com *);
 static	void ieee80211_proc_remove(struct ieee80211com *);
 #endif /* CONFIG_PROC_FS */
-#ifdef WIRELESS_EXT
+#ifdef CONFIG_NET_WIRELESS
 extern	struct iw_statistics *ieee80211_iw_getstats(struct net_device *);
 extern	const struct iw_handler_def ieee80211_iw_handler_def;
 #endif
@@ -147,11 +146,11 @@ ieee80211_ifattach(struct net_device *dev)
 	 */
 	dev->get_stats = ieee80211_getstats;
 	dev->do_ioctl = ieee80211_ioctl;
-#ifdef WIRELESS_EXT
+#ifdef CONFIG_NET_WIRELESS
 	dev->get_wireless_stats = ieee80211_iw_getstats;
 	dev->wireless_handlers = 
 		(struct iw_handler_def *) &ieee80211_iw_handler_def;
-#endif /* WIRELESS_EXT */
+#endif /* CONFIG_NET_WIRELESS */
 	if (register_netdev(&ic->ic_dev)) {
 		printk(KERN_WARNING "%s: unable to register device\n",
 			ic->ic_dev.name);
@@ -249,7 +248,6 @@ ic->msg_enable = NETIF_MSG_INTR|NETIF_MSG_DEBUG|NETIF_MSG_LINK2;/*XXX*/
 	if (ic->ic_lintval == 0)
 		ic->ic_lintval = 100;		/* default sleep */
 	TAILQ_INIT(&ic->ic_node);
-	skb_queue_head_init(&ic->ic_mgtq);
 
 	/* initialize management frame handlers */
 	ic->ic_recv_mgmt[IEEE80211_FC0_SUBTYPE_PROBE_RESP
@@ -306,7 +304,6 @@ ieee80211_ifdetach(struct net_device *dev)
 
 	IEEE80211_LOCK(ic);
 	del_timer(&ic->ic_slowtimo);
-	skb_queue_purge(&ic->ic_mgtq);
 	if (ic->ic_wep_ctx != NULL) {
 		kfree(ic->ic_wep_ctx);
 		ic->ic_wep_ctx = NULL;
@@ -325,18 +322,17 @@ ieee80211_ifdetach(struct net_device *dev)
 /*
  * Once a second "slow timeout" a la the BSD ifnet timer.
  */
-static void
+void
 ieee80211_slowtimo(unsigned long arg)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) arg;
 
-	IEEE80211_LOCK(ic);
 	if (ic->ic_timer && --ic->ic_timer == 0)
 		if (ic->ic_watchdog)
 			(*ic->ic_watchdog)(&ic->ic_dev);
+
 	ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
 	add_timer(&ic->ic_slowtimo);
-	IEEE80211_UNLOCK(ic);
 }
 
 /*
@@ -808,9 +804,8 @@ ieee80211_mgmt_output(struct net_device *dev, struct ieee80211_node *ni,
 			    ether_sprintf(ni->ni_macaddr),
 			    ieee80211_chan2ieee(ic, ni->ni_chan));
 	}
-	skb_queue_tail(&ic->ic_mgtq, skb);
 	ic->ic_timer = 1;
-	(*ic->ic_start)(dev);
+	(void) (*ic->ic_mgtstart)(skb, dev);
 	return 0;
 }
 
@@ -1029,7 +1024,6 @@ void
 ieee80211_watchdog(struct net_device *dev)
 {
 	struct ieee80211com *ic = (void *)dev;
-	struct ieee80211_node *ni, *nextbs;
 
 	if (ic->ic_mgt_timer) {
 		if (--ic->ic_mgt_timer == 0)
@@ -1037,6 +1031,8 @@ ieee80211_watchdog(struct net_device *dev)
 	}
 	if (ic->ic_inact_timer) {
 		if (--ic->ic_inact_timer == 0) {
+			struct ieee80211_node *ni, *nextbs;
+
 			for (ni = TAILQ_FIRST(&ic->ic_node); ni != NULL; ) {
 				if (++ni->ni_inact <= IEEE80211_INACT_MAX) {
 					ni = TAILQ_NEXT(ni, ni_list);
@@ -2319,7 +2315,6 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_SCAN:
 			ic->ic_mgt_timer = 0;
-			skb_queue_purge(&ic->ic_mgtq);
 			if (ic->ic_wep_ctx != NULL) {
 				kfree(ic->ic_wep_ctx);
 				ic->ic_wep_ctx = NULL;
@@ -2457,11 +2452,17 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 			/* start with highest negotiated rate */
 			ic->ic_bss.ni_txrate = ic->ic_bss.ni_nrate - 1;
 			ic->ic_mgt_timer = 0;
-			(*ic->ic_start)(dev);
 			break;
 		}
 		break;
 	}
+	/*
+	 * Start/stop xmit queue.
+	 */
+	if (nstate == IEEE80211_S_RUN)
+		netif_start_queue(dev);		/* XXX netif_wake_queue? */
+	else if (ostate == IEEE80211_S_RUN)
+		netif_stop_queue(dev);
 	return 0;
 }
 

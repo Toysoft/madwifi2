@@ -39,6 +39,9 @@
 
 #include <sys/queue.h>
 #include "if_media.h"
+#ifdef CONFIG_NET_WIRELESS
+#include <linux/wireless.h>
+#endif
 
 #define	IEEE80211_ADDR_LEN			6
 
@@ -542,7 +545,8 @@ struct ieee80211com {
 	int			ic_timer;	/* equivalent of if_timer */
 	struct timer_list	ic_slowtimo;	/* if watchdog timer */
 	void			(*ic_watchdog)(struct net_device *);
-	void			(*ic_start)(struct net_device *);
+	int			(*ic_mgtstart)(struct sk_buff *,
+					struct net_device *);
 	int			(*ic_init)(struct net_device *);
 	void			(*ic_recv_mgmt[16])(struct ieee80211com *,
 				    struct sk_buff *, int, u_int32_t);
@@ -558,7 +562,6 @@ struct ieee80211com {
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
 	u_char			ic_chan_scan[roundup(IEEE80211_CHAN_MAX,NBBY)];
-	struct sk_buff_head	ic_mgtq;	/* management frame tx q */
 	u_int32_t		ic_flags;	/* state flags */
 	u_int32_t		ic_caps;	/* capabilities */
 	enum ieee80211_phytype	ic_phytype;
@@ -595,12 +598,12 @@ struct ieee80211com {
 	char			ic_procname[12];/* e.g. wlan%d */
 	struct proc_dir_entry	*ic_proc;	/* /proc/net/wlan%d */
 #endif
-#ifdef WIRELESS_EXT
+#ifdef CONFIG_NET_WIRELESS
 	struct iw_statistics	ic_iwstats;	/* wireless statistics block */
 #endif
 };
-#define	IEEE80211_LOCK(_ic)	spin_lock(&(_ic)->ic_lock)
-#define	IEEE80211_UNLOCK(_ic)	spin_unlock(&(_ic)->ic_lock)
+#define	IEEE80211_LOCK(_ic)	spin_lock_irq(&(_ic)->ic_lock)
+#define	IEEE80211_UNLOCK(_ic)	spin_unlock_irq(&(_ic)->ic_lock)
 
 #define	IEEE80211_SEND_MGMT(ic,ni,type,arg)	do {			      \
 	if ((ic)->ic_send_mgmt[(type)>>IEEE80211_FC0_SUBTYPE_SHIFT] != NULL)  \
