@@ -295,10 +295,12 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_INT status;
 
-	ATH_LOCK(sc);
+	spin_lock_irq(&sc->sc_lock);
 	while (ath_hal_intrpend(ah)) {
 		ath_hal_getisr(ah, &status);
-		DPRINTF2(("ath_intr: status 0x%x\n", status));
+		if (netif_msg_intr(&sc->sc_ic))
+			printk(KERN_DEBUG "%s: interrupt, status 0x%x\n",
+				dev->name, status);
 		if (status & HAL_INT_FATAL) {
 			printk("%s: hardware error (0x%x); resetting\n",
 				dev->name, status);
@@ -337,7 +339,7 @@ DPRINTF(("ath_intr: beacon miss | rxnofrm: status 0x%x\n", status));
 		}
 #endif
 	}
-	ATH_UNLOCK(sc);
+	spin_unlock_irq(&sc->sc_lock);
 }
 
 /*
@@ -458,7 +460,7 @@ ath_stop(struct net_device *dev)
 
 	DPRINTF(("ath_stop: sc_invalid %u\n", sc->sc_invalid));
 
-	ATH_LOCK(sc);
+	spin_lock_irq(&sc->sc_lock);
 	ieee80211_new_state(dev, IEEE80211_S_INIT, -1);
 	if (!sc->sc_invalid) {
 		/* 
@@ -479,14 +481,14 @@ ath_stop(struct net_device *dev)
 	/* free transmit queue */
 	while ((bf = TAILQ_FIRST(&sc->sc_txq)) != NULL) {
 		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_FROMDEVICE);
+			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_FROMDEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 	}
-	ATH_UNLOCK(sc);
+	spin_unlock_irq(&sc->sc_lock);
 
 	return 0;
 }
@@ -502,9 +504,11 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	skb_queue_tail(&sc->sc_sndq, skb);
-	if (!sc->sc_oactive)
+	if (!sc->sc_oactive) {
+		spin_lock_irq(&sc->sc_lock);
 		ath_start(dev);
-
+		spin_unlock_irq(&sc->sc_lock);
+	}
 	return 0;
 }
 
@@ -519,11 +523,8 @@ ath_start(struct net_device *dev)
 	struct sk_buff *skb;
 	struct ieee80211_frame *wh;
 
-	ATH_LOCK(sc);
-	if (sc->sc_invalid) {
-		ATH_UNLOCK(sc);
+	if (sc->sc_invalid)
 		return;
-	}
 	for (;;) {
 		/*
 		 * Grab a TX buffer and associated resources.
@@ -624,7 +625,6 @@ ath_start(struct net_device *dev)
 		sc->sc_tx_timer = 5;
 		ic->ic_timer = 1;
 	}
-	ATH_UNLOCK(sc);
 }
 
 static void
@@ -718,7 +718,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	bf = sc->sc_bcbuf;
 	if (bf->bf_skb != NULL) {
 		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
@@ -789,9 +789,10 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 	skb_trim(skb, frm - skb->data);
 
-	DPRINTF2(("ath_beacon_alloc: skb %p len %u\n", skb, skb->len));
-	bf->bf_daddr = pci_map_single(sc->sc_pci_dev,
+	bf->bf_skbaddr = pci_map_single(sc->sc_pci_dev,
 		skb->data, skb->len, PCI_DMA_TODEVICE);
+	DPRINTF2(("ath_beacon_alloc: skb %p [data %p len %u] skbaddr %p\n",
+		skb, skb->data, skb->len, (caddr_t) bf->bf_skbaddr));
 	bf->bf_skb = skb;
 
 	/* setup descriptors */
@@ -801,7 +802,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	ds = bf->bf_desc;
 
 	ds->ds_link = 0;
-	ds->ds_data = bf->bf_daddr;
+	ds->ds_data = bf->bf_skbaddr;
 	ds->ds_ctl0 = (skb->len + IEEE80211_CRC_LEN) |
 	    (sizeof(struct ieee80211_frame) << AR_HdrLen_S) |
 	    (arate << AR_XmitRate_S);
@@ -834,7 +835,7 @@ ath_beacon_int(struct net_device *dev)
 		return;
 	}
 	pci_dma_sync_single(sc->sc_pci_dev,
-		bf->bf_daddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+		bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 	ath_hal_qbeacon(ah, bf);
 	DPRINTF2(("ath_beacon_int: TXDP1 = %p (%p)\n",
 	    (caddr_t)bf->bf_daddr, bf->bf_desc));
@@ -853,7 +854,7 @@ ath_beacon_free(struct ath_softc *sc)
 
 	if (bf->bf_skb != NULL) {
 		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
@@ -875,9 +876,8 @@ ath_desc_alloc(struct ath_softc *sc)
 	if (sc->sc_desc == NULL)
 		return ENOMEM;
 	ds = sc->sc_desc;
-	DPRINTF(("ath_desc_alloc: DMA map: %p (%d) -> %p (%lu)\n",
-	    ds, sc->sc_desc_len,
-	    (caddr_t) sc->sc_desc_daddr, /*XXX*/ (u_long) sc->sc_desc_len));
+	DPRINTF(("ath_desc_alloc: DMA map: %p (%d) -> %p\n",
+	    ds, sc->sc_desc_len, (caddr_t) sc->sc_desc_daddr));
 
 	/* allocate buffers */
 	bsize = sizeof(struct ath_buf) * (ATH_TXBUF + ATH_RXBUF + 1);
@@ -921,21 +921,21 @@ ath_desc_free(struct ath_softc *sc)
 
 	TAILQ_FOREACH(bf, &sc->sc_txq, bf_list) {
 		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 	}
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
 		if (bf->bf_skb != NULL) {
 			pci_unmap_single(sc->sc_pci_dev,
-				bf->bf_daddr, bf->bf_skb->len,
+				bf->bf_skbaddr, bf->bf_skb->len,
 				PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(bf->bf_skb);
 			bf->bf_skb = NULL;
 		}
 	if (sc->sc_bcbuf != NULL) {
 		bf = sc->sc_bcbuf;
-		pci_unmap_single(sc->sc_pci_dev, bf->bf_daddr,
+		pci_unmap_single(sc->sc_pci_dev, bf->bf_skbaddr,
 			bf->bf_skb->len, PCI_DMA_TODEVICE);
 		sc->sc_bcbuf = NULL;
 	}
@@ -976,19 +976,19 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
 	}
-	bf->bf_daddr = pci_map_single(sc->sc_pci_dev,
+	bf->bf_skbaddr = pci_map_single(sc->sc_pci_dev,
 		skb->data, skb->len, PCI_DMA_FROMDEVICE);
 
 	/* setup descriptors */
 	ds = bf->bf_desc;
 	ds->ds_link = 0;
-	ds->ds_data = cpu_to_le32(bf->bf_daddr);
+	ds->ds_data = bf->bf_skbaddr;
 	ds->ds_ctl0 = 0;
 	ds->ds_ctl1 = skb->len;
 	ds->ds_status0 = ds->ds_status1 = 0;
 
 	if (sc->sc_rxlink != NULL)
-		*sc->sc_rxlink = cpu_to_le32(bf->bf_daddr);
+		*sc->sc_rxlink = bf->bf_daddr;
 	sc->sc_rxlink = &ds->ds_link;
 	return 0;
 }
@@ -1022,7 +1022,7 @@ ath_rx_int(struct net_device *dev)
 		if (rate == 72)
 			rate = 54;
 		pci_dma_sync_single(sc->sc_pci_dev,
-			bf->bf_daddr, skb->len, PCI_DMA_FROMDEVICE);
+			bf->bf_skbaddr, skb->len, PCI_DMA_FROMDEVICE);
 
 		/* expand AR_RcvTimestamp(13bit) to 16bit */
 		now = (ath_hal_gettsf(ah) >> 10) & 0xffff;
@@ -1082,7 +1082,7 @@ ath_rx_int(struct net_device *dev)
 			goto rx_next;
 		}
 		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, skb->len, PCI_DMA_FROMDEVICE);
+			bf->bf_skbaddr, skb->len, PCI_DMA_FROMDEVICE);
 		bf->bf_skb = NULL;
 		skb_put(skb, len);
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
@@ -1159,7 +1159,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 		 * The ICV length must be included into hdrlen and pktlen.
 		 */
 		hdrlen = sizeof(hdrbuf) + IEEE80211_WEP_CRCLEN;
-		pktlen = skb->len + IEEE80211_WEP_CRCLEN;
+		pktlen += IEEE80211_WEP_CRCLEN;
 	}
 	pktlen += IEEE80211_CRC_LEN;
 
@@ -1167,10 +1167,10 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	 * Load the DMA map so any coalescing is done.  This
 	 * also calculates the number of descriptors we need.
 	 */
-	bf->bf_daddr = pci_map_single(sc->sc_pci_dev,
+	bf->bf_skbaddr = pci_map_single(sc->sc_pci_dev,
 		skb->data, skb->len, PCI_DMA_TODEVICE);
-	DPRINTF2(("ath_tx_start: skb %p len %u daddr %x\n",
-		skb, pktlen, bf->bf_daddr));
+	DPRINTF2(("ath_tx_start: skb %p [data %p len %u] skbaddr %x\n",
+		skb, skb->data, skb->len, bf->bf_skbaddr));
 	bf->bf_skb = skb;
 	bf->bf_node = ni;
 
@@ -1183,7 +1183,8 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	ds = bf->bf_desc;
 	/* first descriptor only */
 	ds->ds_ctl0 = pktlen | (arate << AR_XmitRate_S);
-	ds->ds_ctl1 = 0;
+ds->ds_ctl0 |= AR_TxInterReq;/*XXX*/
+	ds->ds_ctl1 = skb->len;
 	ath_hal_settxdeschdrlen(ah, ds, hdrlen);
 	/*
 	 * Calculate Atheros packet type from IEEE80211 packet header.
@@ -1210,8 +1211,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 		ath_hal_settxdesckey(ah, ds, sc->sc_ic.ic_wep_txkey);
 
 	ds->ds_link = 0;
-	ds->ds_data = bf->bf_daddr;
-	ds->ds_ctl1 |= skb->len | 0;
+	ds->ds_data = bf->bf_skbaddr;
 	ds->ds_status0 = ds->ds_status1 = 0;
 	DPRINTF2(("ath_tx_start: %08x %08x %08x %08x\n",
 	    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1));
@@ -1227,7 +1227,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 		DPRINTF2(("ath_tx_start: link(%p)=%p (%p)\n",
 		    sc->sc_txlink, (caddr_t)bf->bf_daddr, bf->bf_desc));
 	}
-	sc->sc_txlink = &bf->bf_desc[0].ds_link;
+	sc->sc_txlink = &ds->ds_link;
 	ath_hal_txstart(ah);
 
 	return 0;
@@ -1257,7 +1257,7 @@ ath_tx_int(struct net_device *dev)
 			break;
 		}
 		/* only the last descriptor is needed */
-		ds = &bf->bf_desc[0];
+		ds = bf->bf_desc;
 		if ((ds->ds_status1 & AR_Done) == 0)
 			break;
 		if (bf->bf_node != NULL) {
@@ -1274,7 +1274,7 @@ ath_tx_int(struct net_device *dev)
 			    ATH_BITVAL(ds->ds_status0, AR_LongRetryCnt);
 		}
 		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
@@ -1298,8 +1298,9 @@ ath_draintxq(struct ath_softc *sc)
 	/* XXX return value */
 	(void) ath_hal_stoptxdma(ah, HAL_TX_QUEUE_DATA);
 	(void) ath_hal_stoptxdma(ah, HAL_TX_QUEUE_BEACON);
-	DPRINTF(("ath_draintxq: tx queue %p, link %p\n",
-	    (caddr_t) ath_hal_gettxbuf(ah), sc->sc_txlink));
+	DPRINTF(("ath_draintxq: txq %p h/w %p, link %p\n",
+	    TAILQ_FIRST(&sc->sc_txq), (caddr_t) ath_hal_gettxbuf(ah),
+	    sc->sc_txlink));
 	for (;;) {
 		bf = TAILQ_FIRST(&sc->sc_txq);
 		if (bf == NULL) {
@@ -1311,7 +1312,7 @@ ath_draintxq(struct ath_softc *sc)
 			ath_printtxbuf(bf);
 #endif /* AR_DEBUG */
 		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
@@ -1368,7 +1369,8 @@ ath_startrecv(struct ath_softc *sc)
 			return error;
 		}
 	}
-	ath_hal_putrxbuf(ah, TAILQ_FIRST(&sc->sc_rxbuf)->bf_daddr);
+	bf = TAILQ_FIRST(&sc->sc_rxbuf);
+	ath_hal_putrxbuf(ah, bf->bf_daddr);
 	ath_hal_rxena(ah);		/* enable recv descriptors */
 	ath_mode_init(&sc->sc_ic.ic_dev);/* set filters, etc. */
 	ath_hal_startpcurecv(ah);	/* re-enable PCU/DMA engine */
@@ -1478,8 +1480,8 @@ ath_calibrate(unsigned long arg)
 		printk("%s: ath_calibrate: calibration of channel %u failed\n",
 			ic->ic_dev.name, c->ic_freq);
 
-	sc->sc_scan_ch.expires = jiffies + HZ;
-	add_timer(&sc->sc_scan_ch);
+	sc->sc_cal_ch.expires = jiffies + HZ;
+	add_timer(&sc->sc_cal_ch);
 }
 
 static int
@@ -1658,34 +1660,28 @@ ath_rate_ctl(struct ath_softc *sc, struct ieee80211_node *ni)
 static void
 ath_printrxbuf(struct ath_buf *bf)
 {
-	struct ath_desc *ds;
-	int i;
+	struct ath_desc *ds = bf->bf_desc;
 
-	for (i = 0, ds = bf->bf_desc; i < bf->bf_nseg; i++, ds++) {
-		printk("R%d (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
-		    i, ds, (struct ath_desc *)bf->bf_daddr + i,
-		    ds->ds_link, ds->ds_data,
-		    ds->ds_ctl0, ds->ds_ctl1,
-		    ds->ds_status0, ds->ds_status1,
-		    !(ds->ds_status1 & AR_Done) ? ' ' :
-		    (ds->ds_status0 & AR_FrmRcvOK) ? '*' : '!');
-	}
+	printk("R (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
+	    ds, (struct ath_desc *)bf->bf_daddr,
+	    ds->ds_link, ds->ds_data,
+	    ds->ds_ctl0, ds->ds_ctl1,
+	    ds->ds_status0, ds->ds_status1,
+	    !(ds->ds_status1 & AR_Done) ? ' ' :
+	    (ds->ds_status0 & AR_FrmRcvOK) ? '*' : '!');
 }
 
 static void
 ath_printtxbuf(struct ath_buf *bf)
 {
-	struct ath_desc *ds;
-	int i;
+	struct ath_desc *ds = bf->bf_desc;
 
-	for (i = 0, ds = bf->bf_desc; i < bf->bf_nseg; i++, ds++) {
-		printk("T%d (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
-		    i, ds, (struct ath_desc *)bf->bf_daddr + i,
-		    ds->ds_link, ds->ds_data,
-		    ds->ds_ctl0, ds->ds_ctl1,
-		    ds->ds_status0, ds->ds_status1,
-		    !(ds->ds_status1 & AR_Done) ? ' ' :
-		    (ds->ds_status0 & AR_FrmXmitOK) ? '*' : '!');
-	}
+	printk("T (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
+	    ds, (struct ath_desc *)bf->bf_daddr,
+	    ds->ds_link, ds->ds_data,
+	    ds->ds_ctl0, ds->ds_ctl1,
+	    ds->ds_status0, ds->ds_status1,
+	    !(ds->ds_status1 & AR_Done) ? ' ' :
+	    (ds->ds_status0 & AR_FrmXmitOK) ? '*' : '!');
 }
 #endif /* AR_DEBUG */

@@ -211,7 +211,8 @@ static struct pci_driver ath_pci_drv_id = {
 /*
  * Module glue.
  */
-static char *version = "0.0.0.0 (Sam Leffler <sam@errno.com>)";
+#include "version.h"
+static char *version = ATH_PCI_VERSION " (Sam Leffler <sam@errno.com>)";
 static char *dev_info = "ath_pci";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");

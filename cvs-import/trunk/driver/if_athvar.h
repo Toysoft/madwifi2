@@ -75,10 +75,10 @@ struct ath_stats {
 
 struct ath_buf {
 	TAILQ_ENTRY(ath_buf)	bf_list;
-	int			bf_nseg;
 	struct ath_desc		*bf_desc;	/* virtual addr of desc */
 	dma_addr_t		bf_daddr;	/* physical addr of desc */
 	struct sk_buff		*bf_skb;	/* skbuff for buf */
+	dma_addr_t		bf_skbaddr;	/* physical addr of skb data */
 	struct ieee80211_node	*bf_node;	/* pointer to the node */
 };
 
@@ -116,9 +116,6 @@ struct ath_softc {
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
 };
-
-#define	ATH_LOCK(_sc)	spin_lock_irq(&(_sc)->sc_lock);
-#define	ATH_UNLOCK(_sc)	spin_unlock_irq(&(_sc)->sc_lock);
 
 #define	ATH_BITVAL(val, name)	(((val) & name) >> name##_S)
 
