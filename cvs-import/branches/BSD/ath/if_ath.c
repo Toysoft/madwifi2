@@ -711,7 +711,6 @@ ath_detach(struct net_device *dev)
 #ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_unregister(sc);
 #endif /* CONFIG_SYSCTL */
-	printk("%s: calling unregister_netdev (refcnt=%i)\n", __func__, dev->refcnt);
 	unregister_netdev(dev);
 
 	return 0;
@@ -2363,8 +2362,8 @@ ath_desc_alloc(struct ath_softc *sc)
 		return ENOMEM;
 	}
 	ds = sc->sc_desc;
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: DMA map: %p (%d) -> %p\n",
-	    __func__, ds, sc->sc_desc_len, (caddr_t) sc->sc_desc_daddr);
+	DPRINTF(sc, ATH_DEBUG_ANY, "%s: DMA map: %p (%u) -> %p\n",
+	    __func__, ds, (unsigned int) sc->sc_desc_len, (caddr_t) sc->sc_desc_daddr);
 
 	/* allocate buffers */
 	bsize = sizeof(struct ath_buf) * (ATH_TXBUF + ATH_RXBUF + ATH_BCBUF + 1);
@@ -2547,7 +2546,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 					    sc->sc_cachelsz - 1);
  			if (skb == NULL) {
  				DPRINTF(sc, ATH_DEBUG_ANY,
-					"%s: skbuff alloc of size %u failed\n",
+					"%s: skbuff alloc of size %lu failed\n",
 					__func__,
 					sc->sc_rxbufsize
 					+ sizeof(wlan_ng_prism2_header)
@@ -3112,7 +3111,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 	}
 	if (qnum >= N(sc->sc_txq)) {
 		printk("%s: hal qnum %u out of range, max %u!\n",
-			sc->sc_dev.name, qnum, N(sc->sc_txq));
+			sc->sc_dev.name, qnum, (unsigned int) N(sc->sc_txq));
 		ath_hal_releasetxqueue(ah, qnum);
 		return NULL;
 	}
@@ -3148,7 +3147,7 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 
 	if (ac >= N(sc->sc_ac2q)) {
 		printk("%s: AC %u out of range, max %u!\n",
-			sc->sc_dev.name, ac, N(sc->sc_ac2q));
+			sc->sc_dev.name, ac, (unsigned int) N(sc->sc_ac2q));
 		return 0;
 	}
 	txq = ath_txq_setup(sc, HAL_TX_QUEUE_DATA, haltype);
@@ -3307,8 +3306,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 */
 	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 		skb->data, pktlen, BUS_DMA_TODEVICE);
-	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %x\n",
-		__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %lx\n",
+		__func__, skb, skb->data, skb->len, (long unsigned int) bf->bf_skbaddr);
 	if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
 		if_printf(dev, "%s: DMA mapping failed\n", __func__);
 		dev_kfree_skb(skb);
@@ -3409,8 +3408,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		if_printf(dev, "bogus frame type 0x%x (%s)\n",
 			wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK, __func__);
 		/* XXX statistic */
-		DPRINTF(sc, ATH_DEBUG_FATAL, "%s: kfree_skb: skb %p [data %p len %u] skbaddr %x\n",
-			__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
+		DPRINTF(sc, ATH_DEBUG_FATAL, "%s: kfree_skb: skb %p [data %p len %u] skbaddr %lx\n",
+			__func__, skb, skb->data, skb->len, (long unsigned int) bf->bf_skbaddr);
 		dev_kfree_skb(skb);
 		bf->bf_skb = NULL;
 		return -EIO;
