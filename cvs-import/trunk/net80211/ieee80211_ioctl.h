@@ -321,11 +321,13 @@ struct ieee80211req_scan_result {
 	u_int8_t	isr_rssi;
 	u_int8_t	isr_intval;			/* beacon interval */
 	u_int8_t	isr_capinfo;			/* capabilities */
+	u_int8_t	isr_erp;			/* ERP element */
 	u_int8_t	isr_bssid[IEEE80211_ADDR_LEN];
 	u_int8_t	isr_nrates;
 	u_int8_t	isr_rates[15];			/* XXX */
 	u_int8_t	isr_ssid_len;			/* SSID length */
 	u_int8_t	isr_ie_len;			/* IE length */
+	u_int8_t	isr_scangen;			/* scan generation # */
 	/* variable length SSID followed by IE data */
 };
 
