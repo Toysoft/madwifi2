@@ -87,35 +87,46 @@ struct proc_dir_entry;
 
 struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
-	spinlock_t		sc_lock;
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	int			(*sc_enable)(struct ath_softc *);
 	void			(*sc_disable)(struct ath_softc *);
-	unsigned int		sc_attached : 1,/* device is attached */
-				sc_invalid  : 1,/* ??? deactivated */
+	unsigned int		sc_invalid  : 1,/* being detached */
 				sc_oactive  : 1;/* output processing active */
 	int			sc_cachelsz;	/* system cache line size */
-	int			sc_rxbufsize;	/* rx size based on mtu */
-	TAILQ_HEAD(, ath_buf)	sc_rxbuf,	/* receive buffer */
-				sc_txbuf,	/* transmit buffer */
-				sc_txq;		/* transmitting queue */
-	struct ath_buf		*sc_bcbuf;	/* beacon buffer */
-	struct ath_buf		*sc_bufptr;	/* allocated buffer ptr */
-	u_int32_t		*sc_txlink;	/* link ptr in last TX desc */
-	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
-
-	struct ath_desc		*sc_desc;	/* TX descriptors */
-	size_t			sc_desc_len;	/* size of TX descriptors */
+	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
+	size_t			sc_desc_len;	/* size of TX/RX descriptors */
 	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
 
-	struct timer_list	sc_cal_ch;	/* timer for calibrations */
-	struct timer_list	sc_scan_ch;	/* timer for scans */
-	int			sc_tx_timer;	/* transmit timeout */
-	struct sk_buff_head	sc_sndq;	/* transmit queue */
+	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */
+
+	int			sc_rxbufsize;	/* rx size based on mtu */
+	TAILQ_HEAD(, ath_buf)	sc_rxbuf;	/* receive buffer */
+	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
+	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
+	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
+
+	u_int32_t		*sc_txlink;	/* link ptr in last TX desc */
+	int			sc_tx_timer;	/* tx timeout */
+	struct sk_buff_head	sc_sndq;	/* data packet queue */
+	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
+	spinlock_t		sc_txbuflock;	/* txbuf lock */
+	TAILQ_HEAD(, ath_buf)	sc_txq;		/* transmit queue */
+	spinlock_t		sc_txqlock;	/* lock on txq and txlink */
+	struct tq_struct	sc_txtq;	/* tx intr tasklet */
+
+	struct ath_buf		*sc_bcbuf;	/* beacon buffer */
+	struct ath_buf		*sc_bufptr;	/* allocated buffer ptr */
+	struct tq_struct	sc_swbatq;	/* swba intr tasklet */
+	struct tq_struct	sc_bmisstq;	/* bmiss intr tasklet */
+
+	struct timer_list	sc_cal_ch;	/* calibration timer */
+	struct timer_list	sc_scan_ch;	/* AP scan timer */
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
+#ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*sc_proc;	/* /proc/net/drivers/ath%d */
+#endif
 };
 
 #define	ATH_BITVAL(val, name)	(((val) & name) >> name##_S)

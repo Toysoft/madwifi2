@@ -46,6 +46,28 @@
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
 
+#define	ATH_TASKINIT(_tq, _arg, _func) do {	\
+	(_tq)->routine = _func;			\
+	(_tq)->data = _arg;			\
+} while (0)
+#define	ATH_SCHEDTASK(_tq) do {			\
+	queue_task(_tq, &tq_immediate);		\
+	mark_bh(IMMEDIATE_BH);			\
+} while (0);
+
+#define	TXBUF_DEQUEUE(_sc, _bf) do {					\
+	spin_lock(&(_sc)->sc_txbuflock);				\
+	_bf = TAILQ_FIRST(&(_sc)->sc_txbuf);				\
+	if (_bf != NULL)						\
+		TAILQ_REMOVE(&(_sc)->sc_txbuf, _bf, bf_list);		\
+	spin_unlock(&(_sc)->sc_txbuflock);				\
+} while (0);
+#define	TXBUF_QUEUE_TAIL(_sc, _bf) do {					\
+	spin_lock(&(_sc)->sc_txbuflock);				\
+	TAILQ_INSERT_TAIL(&(_sc)->sc_txbuf, _bf, bf_list);		\
+	spin_unlock(&(_sc)->sc_txbuflock);				\
+} while (0);
+
 /* unalligned little endian access */     
 #define LE_READ_2(p)							\
 	((u_int16_t)							\
@@ -56,22 +78,25 @@
 	  (((u_int8_t *)(p))[2] << 16) | (((u_int8_t *)(p))[3] << 24)))
 
 static int	ath_init(struct net_device *);
+static void	ath_fatal_tasklet(void *);
+static void	ath_rxorn_tasklet(void *);
+static void	ath_bmiss_tasklet(void *);
 static int	ath_stop(struct net_device *);
 static void	ath_start(struct net_device *);
 static void	ath_watchdog(struct net_device *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
-static void	ath_beacon_int(struct net_device *);
+static void	ath_beacon_tasklet(void *);
 static void	ath_beacon_free(struct ath_softc *);
 static int	ath_desc_alloc(struct ath_softc *);
 static void	ath_desc_free(struct ath_softc *);
 static void	ath_node_free(struct ieee80211com *, struct ieee80211_node *);
 static int	ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
-static void	ath_rx_int(struct net_device *);
+static void	ath_rx_tasklet(void *);
 static int	ath_hardstart(struct sk_buff *, struct net_device *);
 static int	ath_tx_start(struct ath_softc *, struct ieee80211_node *,
 			     struct ath_buf *, struct sk_buff *);
-static void	ath_tx_int(struct net_device *);
+static void	ath_tx_tasklet(void *);
 static int	ath_chan_set(struct ath_softc *, struct ieee80211channel *);
 static void	ath_draintxq(struct ath_softc *);
 static void	ath_stoprecv(struct ath_softc *);
@@ -123,8 +148,16 @@ ath_attach(uint16_t devid, struct net_device *dev)
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
-	spin_lock_init(&sc->sc_lock);
 	skb_queue_head_init(&sc->sc_sndq);
+	spin_lock_init(&sc->sc_txbuflock);
+	spin_lock_init(&sc->sc_txqlock);
+
+	ATH_TASKINIT(&sc->sc_rxtq,	dev, ath_rx_tasklet);
+	ATH_TASKINIT(&sc->sc_txtq,	dev, ath_tx_tasklet);
+	ATH_TASKINIT(&sc->sc_swbatq,	dev, ath_beacon_tasklet);
+	ATH_TASKINIT(&sc->sc_bmisstq,	dev, ath_bmiss_tasklet);
+	ATH_TASKINIT(&sc->sc_rxorntq,	dev, ath_rxorn_tasklet);
+	ATH_TASKINIT(&sc->sc_fataltq,	dev, ath_fatal_tasklet);
 
 	/*
 	 * NB: cache line size is used to size rx buffers and align
@@ -246,8 +279,6 @@ ath_attach(uint16_t devid, struct net_device *dev)
 #ifdef CONFIG_PROC_FS
 	ath_proc_init(sc);
 #endif
-	sc->sc_attached = 1;
-
 	return 0;
 bad:
 	if (ah)
@@ -261,51 +292,39 @@ ath_detach(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 
-	DPRINTF(("ath_detach: sc_attached %u\n", sc->sc_attached));
-	if (sc->sc_attached) {
-		sc->sc_invalid = 1;
-		ath_stop(dev);
-		ath_desc_free(sc);
-		ath_hal_detach(sc->sc_ah);
+	DPRINTF(("ath_detach\n"));
+	sc->sc_invalid = 1;
+	ath_stop(dev);
+	ath_desc_free(sc);
+	ath_hal_detach(sc->sc_ah);
 #ifdef CONFIG_PROC_FS
-		ath_proc_remove(sc);
+	ath_proc_remove(sc);
 #endif
-		ieee80211_ifdetach(dev);
-	}
+	ieee80211_ifdetach(dev);
+
 	return 0;
 }
 
 void
 ath_suspend(struct net_device *dev)
 {
-	struct ath_softc *sc = dev->priv;
-
-	DPRINTF(("ath_suspend: sc_attached %u\n", sc->sc_attached));
-	if (sc->sc_attached) {
-		ath_stop(dev);
-	}
+	DPRINTF(("ath_suspend\n"));
+	ath_stop(dev);
 }
 
 void
 ath_resume(struct net_device *dev)
 {
-	struct ath_softc *sc = dev->priv;
-
-	DPRINTF(("ath_resume: sc_attached %u\n", sc->sc_attached));
-	if (sc->sc_attached) {
-		if (netif_running(dev))
-			ath_init(dev);
-	}
+	DPRINTF(("ath_resume\n"));
+	if (netif_running(dev))
+		ath_init(dev);
 }
 
 void
 ath_shutdown(struct net_device *dev)
 {
-	struct ath_softc *sc = dev->priv;
-
-	DPRINTF(("ath_shutdown: sc_attached %u\n", sc->sc_attached));
-	if (sc->sc_attached)
-		ath_stop(dev);
+	DPRINTF(("ath_shutdown\n"));
+	ath_stop(dev);
 }
 
 void
@@ -315,27 +334,19 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_INT status;
+	int i;
 
-	if (!sc->sc_attached)
-		return;
-	spin_lock_irq(&sc->sc_lock);
-	while (ath_hal_intrpend(ah)) {
+	for (i = 0; i < 10 && ath_hal_intrpend(ah); i++) {
 		ath_hal_getisr(ah, &status);
 		DPRINTF(("%s: interrupt, status 0x%x\n",
 			dev->name, status));
 		if (status & HAL_INT_FATAL) {
-			printk("%s: hardware error 0x%x; resetting\n",
-				dev->name, status);
-			ath_hal_dumpstate(ah);	/*XXX*/
-			ath_init(dev);
-			continue;
+			ATH_SCHEDTASK(&sc->sc_fataltq);
+			break;		/* XXX??? */
 		}
 		if (status & HAL_INT_RXORN) {
-			printk("%s: rx FIFO overrun 0x%x; resetting\n",
-				dev->name, status);
-			ath_hal_dumpstate(ah);	/*XXX*/
-			ath_init(dev);
-			continue;
+			ATH_SCHEDTASK(&sc->sc_rxorntq);
+			break;		/* XXX??? */
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -348,21 +359,59 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		if (status & HAL_INT_RX)
-			ath_rx_int(dev);
+			ATH_SCHEDTASK(&sc->sc_rxtq);
 		if (status & HAL_INT_TX)
-			ath_tx_int(dev);
+			ATH_SCHEDTASK(&sc->sc_txtq);
 		if (status & HAL_INT_SWBA)
-			ath_beacon_int(dev);
+			ATH_SCHEDTASK(&sc->sc_swbatq);
 #if 0
 		if (status & (HAL_INT_BMISS | HAL_INT_RXNOFRM)) {
 DPRINTF(("ath_intr: beacon miss | rxnofrm: status 0x%x\n", status));
-			if (ic->ic_opmode == IEEE80211_M_STA &&
-			    ic->ic_state == IEEE80211_S_RUN)
-				ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
+			ATH_SCHEDTASK(&sc->sc_bmisstq);
 		}
 #endif
 	}
-	spin_unlock_irq(&sc->sc_lock);
+	if (i == 10)
+		printk("%s: intr processing stopped prematurely\n", dev->name);
+}
+
+static void
+ath_fatal_tasklet(void *data)
+{
+	struct net_device *dev = data;
+	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+
+	printk("%s: hardware error; resetting\n", dev->name);
+
+	ath_hal_dumpstate(ah);	/*XXX*/
+	ath_stop(dev);
+	ath_init(dev);
+}
+
+static void
+ath_rxorn_tasklet(void *data)
+{
+	struct net_device *dev = data;
+	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+
+	printk("%s: rx FIFO overrun; resetting\n", dev->name);
+
+	ath_hal_dumpstate(ah);	/*XXX*/
+	ath_stop(dev);
+	ath_init(dev);
+}
+
+static void
+ath_bmiss_tasklet(void *data)
+{
+	struct net_device *dev = data;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+			
+	if (ic->ic_opmode == IEEE80211_M_STA && ic->ic_state == IEEE80211_S_RUN)
+		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
 
 /*
@@ -483,8 +532,6 @@ ath_stop(struct net_device *dev)
 
 	DPRINTF(("ath_stop: sc_invalid %u\n", sc->sc_invalid));
 
-	spin_lock_irq(&sc->sc_lock);
-	ieee80211_new_state(dev, IEEE80211_S_INIT, -1);
 	if (!sc->sc_invalid) {
 		/* 
 		 * Disable interrupts and stop everything.
@@ -494,6 +541,8 @@ ath_stop(struct net_device *dev)
 		ath_stoprecv(sc);		/* turn off frame recv */
 		ath_hal_setpower(ah, HAL_PM_FULL_SLEEP, 0);
 	}
+	ieee80211_new_state(dev, IEEE80211_S_INIT, -1);
+
 	ath_beacon_free(sc);
 	sc->sc_txlink = sc->sc_rxlink = NULL;
 	sc->sc_oactive = 0;
@@ -511,7 +560,6 @@ ath_stop(struct net_device *dev)
 		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 	}
-	spin_unlock_irq(&sc->sc_lock);
 
 	return 0;
 }
@@ -527,11 +575,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	skb_queue_tail(&sc->sc_sndq, skb);
-	if (!sc->sc_oactive) {
-		spin_lock_irq(&sc->sc_lock);
+	if (!sc->sc_oactive)
 		ath_start(dev);
-		spin_unlock_irq(&sc->sc_lock);
-	}
 	return 0;
 }
 
@@ -552,20 +597,18 @@ ath_start(struct net_device *dev)
 		/*
 		 * Grab a TX buffer and associated resources.
 		 */
-		bf = TAILQ_FIRST(&sc->sc_txbuf);
+		TXBUF_DEQUEUE(sc, bf);
+		if (bf == NULL) {
+			sc->sc_oactive = 0;
+			DPRINTF(("ath_start: out of xmit buffers\n"));
+			break;
+		}
 		/*
 		 * Poll the management queue for frames; they
 		 * have priority over normal data frames.
 		 */
-		skb = skb_peek(&ic->ic_mgtq);
+		skb = skb_dequeue(&ic->ic_mgtq);
 		if (skb != NULL) {
-			if (bf == NULL) {
-				DPRINTF(("ath_start: out of xmit buffers (mgtq)\n"));
-				sc->sc_oactive = 0;
-				break;
-			}
-			TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
-			skb = skb_dequeue(&ic->ic_mgtq);
 			wh = (struct ieee80211_frame *) skb->data;
 			if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
 			    IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
@@ -587,18 +630,14 @@ ath_start(struct net_device *dev)
 			if (ic->ic_state != IEEE80211_S_RUN) {
 				DPRINTF(("ath_start: discard data packet, "
 					"state %u\n", ic->ic_state));
+				TXBUF_QUEUE_TAIL(sc, bf);
 				break;
 			}
-			skb = skb_peek(&sc->sc_sndq);
-			if (skb == NULL)
-				break;
-			if (bf == NULL) {
-				DPRINTF(("ath_start: out of xmit buffers (data)\n"));
-				sc->sc_oactive = 1;
-				break;
-			}
-			TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
 			skb = skb_dequeue(&sc->sc_sndq);
+			if (skb == NULL) {
+				TXBUF_QUEUE_TAIL(sc, bf);
+				break;
+			}
 			ic->ic_stats.tx_packets++;
 			/*
 			 * Encapsulate the packet in prep for transmission.
@@ -607,9 +646,7 @@ ath_start(struct net_device *dev)
 			if (skb == NULL) {
 				DPRINTF(("ath_start: encapsulation failure\n"));
 				sc->sc_stats.ast_tx_encap++;
-				ic->ic_stats.tx_errors++;
-				TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-				continue;
+				goto txerror;
 			}
 			wh = (struct ieee80211_frame *) skb->data;
 			if (ic->ic_flags & IEEE80211_F_WEPON)
@@ -624,9 +661,7 @@ ath_start(struct net_device *dev)
 		    IEEE80211_FC0_TYPE_DATA) {
 			dev_kfree_skb(skb);
 			sc->sc_stats.ast_tx_nonode++;
-			ic->ic_stats.tx_errors++;
-			TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-			continue;
+			goto txerror;
 		}
 		if (ni == NULL)
 			ni = &ic->ic_bss;
@@ -645,8 +680,9 @@ ath_start(struct net_device *dev)
 			    -1);
 
 		if (ath_tx_start(sc, ni, bf, skb)) {
+	txerror:
 			ic->ic_stats.tx_errors++;
-			TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+			TXBUF_QUEUE_TAIL(sc, bf);
 			continue;
 		}
 
@@ -669,6 +705,7 @@ ath_watchdog(struct net_device *dev)
 		if (--sc->sc_tx_timer == 0) {
 			printk("%s: device timeout\n", dev->name);
 			ath_hal_dumpstate(sc->sc_ah);	/*XXX*/
+			ath_stop(dev);
 			ath_init(dev);
 			ic->ic_stats.tx_errors++;
 			sc->sc_stats.ast_watchdog++;
@@ -846,8 +883,9 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 }
 
 static void
-ath_beacon_int(struct net_device *dev)
+ath_beacon_tasklet(void *data)
 {
+	struct net_device *dev = data;
 	struct ath_softc *sc = dev->priv;
 	struct ath_buf *bf = sc->sc_bcbuf;
 	struct ath_hal *ah = sc->sc_ah;
@@ -1031,8 +1069,9 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 }
 
 static void
-ath_rx_int(struct net_device *dev)
+ath_rx_tasklet(void *data)
 {
+	struct net_device *dev = data;
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
@@ -1043,14 +1082,22 @@ ath_rx_int(struct net_device *dev)
 	u_int32_t rstamp, now;
 	u_int8_t arate, rate;
 
-	for (;;) {
+	do {
 		bf = TAILQ_FIRST(&sc->sc_rxbuf);
+		if (bf == NULL) {		/* XXX ??? can this happen */
+			printk("ath_rx_tasklet: no buffer\n");
+			break;
+		}
 		skb = bf->bf_skb;
-		if (skb == NULL)
-			goto rx_next;
+		if (skb == NULL) {		/* XXX ??? can this happen */
+			printk("ath_rx_tasklet: no skbuff\n");
+			continue;
+		}
 		ds = bf->bf_desc;
 		if ((ds->ds_status1 & AR_Done) == 0)
 			break;
+		TAILQ_REMOVE(&sc->sc_rxbuf, bf, bf_list);
+
 		len = ds->ds_status0 & AR_DataLen;
 		rssi = ATH_BITVAL(ds->ds_status0, AR_RcvSigStrength);
 		rstamp = ATH_BITVAL(ds->ds_status1, AR_RcvTimestamp);
@@ -1142,11 +1189,9 @@ ath_rx_int(struct net_device *dev)
 		}
 		ieee80211_input(dev, skb, rssi, rstamp);
   rx_next:
-		TAILQ_REMOVE(&sc->sc_rxbuf, bf, bf_list);
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
-		if (ath_rxbuf_init(sc, bf))
-			break;
-	}
+	} while (ath_rxbuf_init(sc, bf) == 0);
+
 	ath_hal_rxena(ah);			/* in case of RXEOL */
 }
 
@@ -1252,6 +1297,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	DPRINTF2(("ath_tx_start: %08x %08x %08x %08x\n",
 	    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1));
 
+	spin_lock(&sc->sc_txqlock);
 	TAILQ_INSERT_TAIL(&sc->sc_txq, bf, bf_list);
 	if (sc->sc_txlink == NULL) {
 		ath_hal_puttxbuf(ah, bf->bf_daddr);
@@ -1263,14 +1309,17 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 		    sc->sc_txlink, (caddr_t)bf->bf_daddr, bf->bf_desc));
 	}
 	sc->sc_txlink = &ds->ds_link;
+	spin_unlock(&sc->sc_txqlock);
+
 	ath_hal_txstart(ah);
 
 	return 0;
 }
 
 static void
-ath_tx_int(struct net_device *dev)
+ath_tx_tasklet(void *data)
 {
+	struct net_device *dev = data;
 	struct ath_softc *sc = dev->priv;
 	struct ath_buf *bf;
 	struct ath_desc *ds;
@@ -1286,15 +1335,21 @@ ath_tx_int(struct net_device *dev)
 	}
 #endif /* AR_DEBUG */
 	for (;;) {
+		spin_lock(&sc->sc_txqlock);
 		bf = TAILQ_FIRST(&sc->sc_txq);
 		if (bf == NULL) {
 			sc->sc_txlink = NULL;
+			spin_unlock(&sc->sc_txqlock);
 			break;
 		}
-		/* only the last descriptor is needed */
-		ds = bf->bf_desc;
-		if ((ds->ds_status1 & AR_Done) == 0)
+		ds = bf->bf_desc;		/* NB: last decriptor */
+		if ((ds->ds_status1 & AR_Done) == 0) {
+			spin_unlock(&sc->sc_txqlock);
 			break;
+		}
+		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
+		spin_unlock(&sc->sc_txqlock);
+
 		if (bf->bf_node != NULL) {
 			st = bf->bf_node->ni_private;
 			if (ds->ds_status0 & AR_FrmXmitOK)
@@ -1313,8 +1368,8 @@ ath_tx_int(struct net_device *dev)
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
-		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
-		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+
+		TXBUF_QUEUE_TAIL(sc, bf);
 	}
 	sc->sc_oactive = 0;
 	sc->sc_tx_timer = 0;
@@ -1333,15 +1388,20 @@ ath_draintxq(struct ath_softc *sc)
 	/* XXX return value */
 	(void) ath_hal_stoptxdma(ah, HAL_TX_QUEUE_DATA);
 	(void) ath_hal_stoptxdma(ah, HAL_TX_QUEUE_BEACON);
+
 	DPRINTF(("ath_draintxq: txq %p h/w %p, link %p\n",
 	    TAILQ_FIRST(&sc->sc_txq), (caddr_t) ath_hal_gettxbuf(ah),
 	    sc->sc_txlink));
 	for (;;) {
+		spin_lock(&sc->sc_txqlock);
 		bf = TAILQ_FIRST(&sc->sc_txq);
 		if (bf == NULL) {
 			sc->sc_txlink = NULL;
+			spin_unlock(&sc->sc_txqlock);
 			break;
 		}
+		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
+		spin_unlock(&sc->sc_txqlock);
 #ifdef AR_DEBUG
 		if (ath_debug)
 			ath_printtxbuf(bf);
@@ -1351,9 +1411,10 @@ ath_draintxq(struct ath_softc *sc)
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
-		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
-		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+
+		TXBUF_QUEUE_TAIL(sc, bf);
 	}
+
 	sc->sc_oactive = 0;
 	sc->sc_tx_timer = 0;
 }
@@ -1516,8 +1577,9 @@ ath_calibrate(unsigned long arg)
 	struct ath_softc *sc = (struct ath_softc *) arg;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211channel *c = ic->ic_ibss_chan;
+	struct ieee80211channel *c;
 
+	c = ic->ic_ibss_chan;
 	DPRINTF(("ath_calibrate: channel %u/%x\n", c->ic_freq, c->ic_flags));
 	if (!ath_hal_calibrate(ah, (HAL_CHANNEL *) c))
 		printk("%s: ath_calibrate: calibration of channel %u failed\n",
