@@ -38,7 +38,7 @@
 #define	ATH_TIMEOUT		1000
 
 #define	ATH_RXBUF	40		/* number of RX buffers */
-#define	ATH_TXBUF	40		/* number of TX buffers */
+#define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
 
 /* statistics for node */
