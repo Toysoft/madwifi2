@@ -105,26 +105,29 @@ ieee80211_node_lateattach(struct ieee80211com *ic)
 	 * each new station automatically inherits them.
 	 */
 	rsn = &ni->ni_rsn;
+	/* WEP, TKIP, and AES-CCM are always supported */
+	rsn->rsn_ucastcipherset |= 1<<IEEE80211_CIPHER_WEP;
 	rsn->rsn_ucastcipherset |= 1<<IEEE80211_CIPHER_TKIP;
+	rsn->rsn_ucastcipherset |= 1<<IEEE80211_CIPHER_AES_CCM;
 	if (ic->ic_caps & IEEE80211_C_AES)
 		rsn->rsn_ucastcipherset |= 1<<IEEE80211_CIPHER_AES_OCB;
-	rsn->rsn_ucastcipherset |= 1<<IEEE80211_CIPHER_AES_CCM;
 	if (ic->ic_caps & IEEE80211_C_CKIP)
 		rsn->rsn_ucastcipherset |= 1<<IEEE80211_CIPHER_CKIP;
-	/* WPA says the multicast cipher is the lowest unicast cipher supported */
-	if (rsn->rsn_ucastcipherset) {
-		int i;
-		int bits = rsn->rsn_ucastcipherset;
+	/*
+	 * Default unicast cipher to WEP for 802.1x use.  If
+	 * WPA is enabled the management code will set these
+	 * values to reflect.
+	 */
+	rsn->rsn_ucastcipher = IEEE80211_CIPHER_WEP;
+	rsn->rsn_ucastkeylen = 104 / NBBY;
+	/*
+	 * WPA says the multicast cipher is the lowest unicast
+	 * cipher supported.  But we skip WEP which would
+	 * otherwise be used based on this criteria.
+	 */
+	rsn->rsn_mcastcipher = IEEE80211_CIPHER_TKIP;
+	rsn->rsn_mcastkeylen = 128 / NBBY;
 
-		for (i = 0; (bits & 1) == 0; i++, bits >>= 1)
-			;
-		rsn->rsn_mcastcipher = i;
-		rsn->rsn_mcastkeylen = 128 / NBBY;	/* ??? correct for CKIP? */
-	} else {
-		/* WEP is always supported... */
-		rsn->rsn_mcastcipher = IEEE80211_CIPHER_WEP;
-		rsn->rsn_mcastkeylen = 104 / NBBY;	/* max spec'd by WPA */
-	}
 	/*
 	 * We support both WPA-PSK and 802.1x; the one used
 	 * is determined by the authentication mode and the
