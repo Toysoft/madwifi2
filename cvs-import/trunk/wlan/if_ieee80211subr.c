@@ -110,6 +110,10 @@ static	int ieee80211_debug = 0;
 #define	DPRINTF2(_ic, X)
 #endif
 
+#define	IEEE80211_RATE2MBS(r)	(((r) & IEEE80211_RATE_VAL) / 2)
+#define	IEEE80211_IS_SUBTYPE(_fc, _type) \
+	(((_fc) & IEEE80211_FC0_SUBTYPE_MASK) == IEEE80211_FC0_SUBTYPE_##_type)
+
 static int ieee80211_send_prreq(struct ieee80211com *,
     struct ieee80211_node *, int, int);
 static int ieee80211_send_prresp(struct ieee80211com *,
@@ -126,19 +130,19 @@ static int ieee80211_send_disassoc(struct ieee80211com *,
     struct ieee80211_node *, int, int);
 
 static void ieee80211_recv_beacon(struct ieee80211com *,
-    struct sk_buff *, int, u_int32_t);
+    struct sk_buff *, int, u_int32_t, u_int);
 static void ieee80211_recv_prreq(struct ieee80211com *,
-    struct sk_buff *, int, u_int32_t);
+    struct sk_buff *, int, u_int32_t, u_int);
 static void ieee80211_recv_auth(struct ieee80211com *,
-    struct sk_buff *, int, u_int32_t);
+    struct sk_buff *, int, u_int32_t, u_int);
 static void ieee80211_recv_asreq(struct ieee80211com *,
-    struct sk_buff *, int, u_int32_t);
+    struct sk_buff *, int, u_int32_t, u_int);
 static void ieee80211_recv_asresp(struct ieee80211com *,
-    struct sk_buff *, int, u_int32_t);
+    struct sk_buff *, int, u_int32_t, u_int);
 static void ieee80211_recv_disassoc(struct ieee80211com *,
-    struct sk_buff *, int, u_int32_t);
+    struct sk_buff *, int, u_int32_t, u_int);
 static void ieee80211_recv_deauth(struct ieee80211com *,
-    struct sk_buff *, int, u_int32_t);
+    struct sk_buff *, int, u_int32_t, u_int);
 
 static int ieee80211_media_change(struct net_device *);
 static void ieee80211_crc_init(void);
@@ -263,19 +267,8 @@ ieee80211_ifattach(struct net_device *dev)
 				break;
 			}
 	}
-	/* XXX verify some mode is available */
-	if (ic->ic_ibss_chan == NULL) {
-		/*
-		 * Pick the first active channel with the
-		 * right mode to use for the default.
-		 * XXX probably not right.
-		 */
-		for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
-			if (ieee80211_chanavail(ic, i)) {
-				ic->ic_ibss_chan = &ic->ic_channels[i];
-				break;
-			}
-	}
+
+	(void) ieee80211_setmode(ic, ic->ic_curmode);
 
 	/*
 	 * Fill in media characteristics.
@@ -414,25 +407,6 @@ ieee80211_ifdetach(struct net_device *dev)
 }
 
 /*
- * Locate the channel for the specified frequency.
- */
-struct ieee80211channel *
-ieee80211_chan_find(struct ieee80211com *ic, u_int freq)
-{
-	struct ieee80211channel *c;
-
-	/* XXX use available channel bitmask??? */
-	c = ic->ic_ibss_chan+1;
-	for (; c <= &ic->ic_channels[IEEE80211_CHAN_MAX]; c++)
-		if (c->ic_freq == freq)
-			return c;
-	for (c = &ic->ic_channels[0]; c < ic->ic_ibss_chan; c++)
-		if (c->ic_freq == freq)
-			return c;
-	return NULL;
-}
-
-/*
  * Convert MHz frequency to IEEE channel number.
  */
 u_int
@@ -473,20 +447,6 @@ ieee80211_chan2ieee(struct ieee80211com *ic, struct ieee80211channel *c)
 			c->ic_freq, c->ic_flags);
 		return 0;		/* XXX */
 	}
-}
-
-/*
- * Is channel available for use in the current mode.
- */
-int
-ieee80211_chanavail(struct ieee80211com *ic, u_int i)
-{
-	struct ieee80211channel *c;
-
-	if (i >= IEEE80211_CHAN_MAX)
-		return 0;
-	c = &ic->ic_channels[i];
-	return (c->ic_flags != 0 && ieee80211_chan2mode(c) == ic->ic_curmode);
 }
 
 /*
@@ -586,13 +546,16 @@ ieee80211_media_change(struct net_device *dev)
 	}
 	/*
 	 * Install the rate/mode settings.
+	 * XXX stop any scanning going on.
 	 */
 	if (ic->ic_fixed_rate != i) {			/* change fixed rate */
 		ic->ic_fixed_rate = i;
 		error = ENETRESET;
 	}
 	if (ic->ic_curmode != newphymode) {		/* change phy mode */
-		ic->ic_curmode = newphymode;
+		error = ieee80211_setmode(ic, newphymode);
+		if (error != 0)
+			return error;
 		error = ENETRESET;
 	}
 	/*
@@ -645,15 +608,10 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 	imr->ifm_active |= IFM_AUTO;
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
-		/* NB: the current tx rate will be in the node table */
-		ni = ieee80211_find_node(ic, ic->ic_bss.ni_bssid);
-		if (ni == NULL)
-			ni = ieee80211_ref_node(&ic->ic_bss);
-		if (ni != NULL) {		/* calculate rate subtype */
-			imr->ifm_active |= ieee80211_rate2media(
-				ni->ni_rates[ni->ni_txrate], ic->ic_curmode);
-			ieee80211_unref_node(&ni);
-		}
+		ni = &ic->ic_bss;
+		/* calculate rate subtype */
+		imr->ifm_active |= ieee80211_rate2media(
+			ni->ni_rates[ni->ni_txrate], ic->ic_curmode);
 		break;
 	case IEEE80211_M_IBSS:
 		imr->ifm_active |= IFM_IEEE80211_ADHOC;
@@ -684,13 +642,13 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 
 void
 ieee80211_input(struct net_device *dev, struct sk_buff *skb,
-	int rssi, u_int32_t rstamp)
+	int rssi, u_int32_t rstamp, u_int rantenna)
 {
 	struct ieee80211com *ic = (void *)dev;
-	struct ieee80211_node *ni = NULL;
+	struct ieee80211_node *ni;
 	struct ieee80211_frame *wh;
 	struct ether_header *eh;
-	void (*rh)(struct ieee80211com *, struct sk_buff *, int, u_int);
+	void (*rh)(struct ieee80211com *, struct sk_buff *, int, u_int32_t, u_int);
 	struct sk_buff *skb1;
 	int len;
 	u_int8_t dir, subtype;
@@ -710,9 +668,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	if (ic->ic_state != IEEE80211_S_SCAN) {
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
-			ni = ieee80211_find_node(ic, wh->i_addr2);
-			if (ni == NULL)
-				ni = ieee80211_ref_node(&ic->ic_bss);
+			ni = ieee80211_ref_node(&ic->ic_bss);
 			if (!IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_bssid)) {
 				DPRINTF(ic, ("%s: discard frame from bss %s\n",
 					    dev->name,
@@ -738,15 +694,39 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			}
 			ni = ieee80211_find_node(ic, wh->i_addr2);
 			if (ni == NULL) {
-				DPRINTF2(ic,
-				    ("ieee80211_input: unknown src %s\n",
-				    ether_sprintf(wh->i_addr2)));
-				ni = ieee80211_ref_node(&ic->ic_bss);
+				DPRINTF(ic, ("%s: warning, unknown src %s\n",
+				    __func__, ether_sprintf(wh->i_addr2)));
+				/*
+				 * Prism cards (at least) do not present probe
+				 * request frames to the host when in hostap
+				 * mode.  This means authentication request
+				 * frames are the first indication that a new
+				 * station is present that we need to handle.
+				 * So allocate a new node for this unknown
+				 * address and fill in the approprite bits.
+				 * Note that this means we're without much of
+				 * the state that would normally be builtup from
+				 * a probe request frame; this sucks!
+				 */
+				ni = ieee80211_alloc_node(ic, wh->i_addr2);
+				if (ni == NULL) {
+					goto out;
+				}
+				/*
+				 * XXX this seems wrong; when in hostap mode the
+				 * card may be scanning many channels and we
+				 * have no idea which channel this frame came
+				 * in on.  This may not matter so long as the
+				 * bss channel has the same mode as that which
+				 * the frame was received on.
+				 */
+				ieee80211_set_node(ic, ni, ic->ic_bss.ni_chan);
 			}
 			break;
 		}
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
+		ni->ni_rantenna = rantenna;
 		rxseq = ni->ni_rxseq;
 		ni->ni_rxseq =
 		    le16_to_cpu(*(u_int16_t *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
@@ -876,7 +856,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			goto out;
 		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 
-		/* drop frames without interest */
+		/* drop uninteresting frames */
 		if (ic->ic_state == IEEE80211_S_SCAN) {
 			if (subtype != IEEE80211_FC0_SUBTYPE_BEACON &&
 			    subtype != IEEE80211_FC0_SUBTYPE_PROBE_RESP)
@@ -916,7 +896,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		}
 		rh = ic->ic_recv_mgmt[subtype >> IEEE80211_FC0_SUBTYPE_SHIFT];
 		if (rh != NULL)
-			(*rh)(ic, skb, rssi, rstamp);
+			(*rh)(ic, skb, rssi, rstamp, rantenna);
 		goto out;
 
 	case IEEE80211_FC0_TYPE_CTL:
@@ -940,8 +920,7 @@ ieee80211_mgmt_output(struct net_device *dev, struct ieee80211_node *ni,
 	struct ieee80211_frame *wh;
 
 	/* XXX this probably shouldn't be permitted */
-	if (ni == NULL)
-		ni = &ic->ic_bss;
+	KASSERT(ni != NULL, ("%s: null node", __func__));
 	ni->ni_inact = 0;
 
 	wh = (struct ieee80211_frame *)
@@ -962,8 +941,7 @@ ieee80211_mgmt_output(struct net_device *dev, struct ieee80211_node *ni,
 #ifdef IEEE80211_DEBUG
 		    ieee80211_debug > 1 ||
 #endif
-		    (type & IEEE80211_FC0_SUBTYPE_MASK) !=
-		    IEEE80211_FC0_SUBTYPE_PROBE_RESP)
+		    !IEEE80211_IS_SUBTYPE(type, PROBE_RESP))
 			printk("%s: sending %s to %s on channel %u\n",
 			    dev->name,
 			    ieee80211_mgt_subtype_name[
@@ -989,7 +967,7 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 	skb_pull(skb, sizeof(struct ether_header));
 
 	ni = ieee80211_find_node(ic, eh.ether_dhost);
-	if (ni == NULL)			/*ic_opmode?? XXX*/
+	if (ni == NULL)			/* ic_opmode?? XXX*/
 		ni = ieee80211_ref_node(&ic->ic_bss);
 	ni->ni_inact = 0;
 
@@ -1077,7 +1055,7 @@ ieee80211_decap(struct net_device *dev, struct sk_buff *skb)
 	case IEEE80211_FC1_DIR_DSTODS:
 		/* not yet supported */
 		DPRINTF((struct ieee80211com*) dev,
-			("ieee80211_decap: DS to DS\n"));
+			("%s: DS to DS\n", __func__));
 		dev_kfree_skb(skb);
 		return NULL;
 	}
@@ -1201,6 +1179,67 @@ ieee80211_watchdog(unsigned long data)
 }
 
 /*
+ * Set the current phy mode and recalculate the active channel
+ * set based on the available channels for this mode.  Also
+ * select a new default/current channel if the current one is
+ * inappropriate for this mode.
+ */
+int
+ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
+{
+	struct ieee80211channel *c;
+	int i;
+
+	/* validate new mode */
+	if ((ic->ic_modecaps & (1<<mode)) == 0) {
+		DPRINTF(ic, ("%s: mode %u not supported (caps 0x%x)\n",
+			__func__, mode, ic->ic_modecaps));
+		return EINVAL;
+	}
+
+	/*
+	 * Verify at least one channel is present in the available
+	 * channel list before committing to the new mode.
+	 */
+	for (i = 0; i <= IEEE80211_CHAN_MAX; i++) {
+		c = &ic->ic_channels[i];
+		if (c->ic_flags && ieee80211_chan2mode(c) == mode)
+			break;
+	}
+	if (i > IEEE80211_CHAN_MAX) {
+		DPRINTF(ic, ("%s: no channels found for mode %u\n",
+			__func__, mode));
+		return EINVAL;
+	}
+
+	/*
+	 * Calculate the active channel set.
+	 */
+	memset(ic->ic_chan_active, 0, sizeof(ic->ic_chan_active));
+	for (i = 0; i <= IEEE80211_CHAN_MAX; i++) {
+		c = &ic->ic_channels[i];
+		if (c->ic_flags && ieee80211_chan2mode(c) == mode)
+			setbit(ic->ic_chan_active, i);
+	}
+	/*
+	 * If no current/default channel is setup or the current
+	 * channel is wrong for the mode then pick the first
+	 * available channel from the active list.  This is likely
+	 * not the right one.
+	 */
+	if (ic->ic_ibss_chan == NULL ||
+	    isclr(ic->ic_chan_active, ieee80211_chan2ieee(ic, ic->ic_ibss_chan))) {
+		for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
+			if (isset(ic->ic_chan_active, i)) {
+				ic->ic_ibss_chan = &ic->ic_channels[i];
+				break;
+			}
+	}
+	ic->ic_curmode = mode;
+	return 0;
+}
+
+/*
  * AP scanning support.
  */
 
@@ -1212,25 +1251,39 @@ void
 ieee80211_reset_scan(struct net_device *dev)
 {
 	struct ieee80211com *ic = (void *)dev;
-	int i;
 
-	memset(ic->ic_chan_scan, 0, sizeof(ic->ic_chan_scan));
-	for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
-		if (ieee80211_chanavail(ic, i))
-			setbit(ic->ic_chan_scan, i);
+	memcpy(ic->ic_chan_scan, ic->ic_chan_active,
+		sizeof(ic->ic_chan_active));
 }
 
+/*
+ * Begin an active scan.
+ */
 void
 ieee80211_begin_scan(struct net_device *dev, struct ieee80211_node *ni)
 {
 	struct ieee80211com *ic = (void *)dev;
 
 	ieee80211_reset_scan(dev);
+	/*
+	 * Flush any previously seen AP's.  Note that this
+	 * assumes we don't act as both an AP and a station,
+	 * otherwise we'll potentially flush state of stations
+	 * associated with us.
+	 */
+	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
+		("unexpected operating mode %u", ic->ic_opmode));
+	ieee80211_free_allnodes(ic);
+
 	clrbit(ic->ic_chan_scan, ieee80211_chan2ieee(ic, ni->ni_chan));
 	ic->ic_flags |= IEEE80211_F_ASCAN;
 	IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
 }
 
+/*
+ * Return the phy mode associated with the specified channel.
+ * XXX doesn't handle multi-use/overlapping channels (e.g. 11g)
+ */
 static enum ieee80211_phymode
 ieee80211_chan2mode(struct ieee80211channel *chan)
 {
@@ -1247,6 +1300,9 @@ ieee80211_chan2mode(struct ieee80211channel *chan)
 	return 0;		/* XXX FH */
 }
 
+/*
+ * Switch to the next channel marked for scanning.
+ */
 void
 ieee80211_next_scan(struct net_device *dev)
 {
@@ -1265,14 +1321,17 @@ ieee80211_next_scan(struct net_device *dev)
 		}
 	}
 	clrbit(ic->ic_chan_scan, ieee80211_chan2ieee(ic, chan));
-	DPRINTF(ic, ("ieee80211_next_scan: chan %d->%d\n",
+	DPRINTF(ic, ("%s: chan %d->%d\n", __func__,
 	    ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan),
 	    ieee80211_chan2ieee(ic, chan)));
 	ic->ic_bss.ni_chan = chan;
-	ic->ic_curmode = ic->ic_bss.ni_mode;
+	ic->ic_bss.ni_mode = ieee80211_chan2mode(chan);
 	ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
 
+/*
+ * Complete a scan of potential channels.
+ */
 void
 ieee80211_end_scan(struct net_device *dev)
 {
@@ -1284,7 +1343,7 @@ ieee80211_end_scan(struct net_device *dev)
 
 	ni = TAILQ_FIRST(&ic->ic_node);
 	if (ni == NULL) {
-		DPRINTF(ic, ("ieee80211_end_scan: no scan candidate\n"));
+		DPRINTF(ic, ("%s: no scan candidate\n", __func__));
   notfound:
 		if (ic->ic_opmode == IEEE80211_M_IBSS &&
 		    (ic->ic_flags & IEEE80211_F_IBSSON) &&
@@ -1305,6 +1364,7 @@ ieee80211_end_scan(struct net_device *dev)
 			memcpy(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen);
 			ni->ni_rssi = 0;
 			ni->ni_rstamp = 0;
+			ni->ni_rantenna = 0;
 			memset(ni->ni_tstamp, 0, sizeof(ni->ni_tstamp));
 			ni->ni_intval = ic->ic_lintval;
 			ni->ni_capinfo = IEEE80211_CAPINFO_IBSS;
@@ -1331,7 +1391,7 @@ ieee80211_end_scan(struct net_device *dev)
 		return;
 	}
 	selbs = NULL;
-	DPRINTF(ic, ("%s: macaddr          bssid         chan  rssi rate flag  wep  essid\n", dev->name));
+	DPRINTF(ic, ("%s: macaddr          bssid         chan  rssi rate ant flag  wep  essid\n", dev->name));
 	for (; ni != NULL; ni = nextbs) {
 		nextbs = TAILQ_NEXT(ni, ni_list);
 		if (ni->ni_fails) {
@@ -1384,8 +1444,9 @@ ieee80211_end_scan(struct net_device *dev)
 			printk(" %3d%c", ieee80211_chan2ieee(ic, ni->ni_chan),
 				fail & 0x01 ? '!' : ' ');
 			printk(" %+4d", ni->ni_rssi);
-			printk(" %2dM%c", (rate & IEEE80211_RATE_VAL) / 2,
+			printk(" %2dM%c", IEEE80211_RATE2MBS(rate),
 			    fail & 0x08 ? '!' : ' ');
+			printk(" %3d", ni->ni_rantenna);
 			printk(" %4s%c",
 			    (ni->ni_capinfo & IEEE80211_CAPINFO_ESS) ? "ess" :
 			    (ni->ni_capinfo & IEEE80211_CAPINFO_IBSS) ? "ibss" :
@@ -1407,7 +1468,6 @@ ieee80211_end_scan(struct net_device *dev)
 		goto notfound;
 	p = ic->ic_bss.ni_private;
 	ic->ic_bss = *selbs;
-	ic->ic_curmode = selbs->ni_mode;	/* lock current mode */
 	ic->ic_bss.ni_private = p;
 	if (p != NULL && ic->ic_node_privlen)
 		memcpy(p, selbs->ni_private, ic->ic_node_privlen);
@@ -1441,7 +1501,17 @@ ieee80211_setup_node(struct ieee80211com *ic,
 	atomic_set(&ni->ni_refcnt, 1);		/* mark referenced */
 	TAILQ_INSERT_TAIL(&ic->ic_node, ni, ni_list);
 	LIST_INSERT_HEAD(&ic->ic_hash[hash], ni, ni_hash);
-	ic->ic_inact_timer = IEEE80211_INACT_WAIT;
+	/* 
+	 * Note we don't enable the inactive timer when acting
+	 * as a station.  Nodes created in this mode represent
+	 * AP's identified while scanning.  If we time them out
+	 * then several things happen: we can't return the data
+	 * to users to show the list of AP's we encountered, and
+	 * more importantly, we'll incorrectly deauthenticate
+	 * ourself because the inactivity timer will kick us off. 
+	 */
+	if (ic->ic_opmode != IEEE80211_M_STA)
+		ic->ic_inact_timer = IEEE80211_INACT_WAIT;
 	write_unlock_bh(&ic->ic_nodelock);
 }
 
@@ -1635,7 +1705,8 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 	}
 	if (okrate == 0 || error != 0)
 		return badrate | IEEE80211_RATE_BASIC;
-	return okrate & IEEE80211_RATE_VAL;
+	else
+		return okrate & IEEE80211_RATE_VAL;
 }
 
 static u_int8_t *
@@ -1957,13 +2028,14 @@ ieee80211_send_disassoc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	}								\
 } while (0)
 
+/*
+ * NB: This handles both beacon and probe response frames.
+ */
 static void
 ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
-    u_int32_t rstamp)
+    u_int32_t rstamp, u_int rantenna)
 {
-#define	ISPROBE(_wh) \
-    (((_wh)->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) == \
-	IEEE80211_FC0_SUBTYPE_PROBE_RESP)
+#define	ISPROBE(_wh)	IEEE80211_IS_SUBTYPE((_wh)->i_fc[0], PROBE_RESP)
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
 	u_int8_t *frm, *efrm, *tstamp, *bintval, *capinfo, *ssid, *rates;
@@ -2024,9 +2096,10 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	if (netif_msg_debug(ic) &&
 	    (ieee80211_debug > 1 || ni == NULL ||
 	    ic->ic_state == IEEE80211_S_SCAN)) {
-		printk("ieee80211_recv_prreq: %sbeacon on chan %u (bss chan %u) ",
-		    (ni == NULL ? "new " : ""), chan,
-		    ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan));
+		printk("%s: %s%s on chan %u (bss chan %u) ",
+		    __func__, (ni == NULL ? "new " : ""),
+		    ISPROBE(wh) ? "probe response" : "beacon",
+		    chan, ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan));
 		ieee80211_print_essid(ssid + 2, ssid[1]);
 		printk(" from %s\n", ether_sprintf(wh->i_addr2));
 	}
@@ -2038,34 +2111,46 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		ni->ni_esslen = ssid[1];
 		memset(ni->ni_essid, 0, sizeof(ni->ni_essid));
 		memcpy(ni->ni_essid, ssid + 2, ssid[1]);
-	} else {
-		if (ssid[1] != 0) {
-			/*
-			 * Update ESSID at probe response to adopt hidden AP by
-			 * Lucent/Cisco, which announces null ESSID in beacon.
-			 */
-			if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
-			    IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
-				ni->ni_esslen = ssid[1];
-				memset(ni->ni_essid, 0, sizeof(ni->ni_essid));
-				memcpy(ni->ni_essid, ssid + 2, ssid[1]);
-			}
-		}
+	} else if (ssid[1] != 0 && ISPROBE(wh)) {
+		/*
+		 * Update ESSID at probe response to adopt hidden AP by
+		 * Lucent/Cisco, which announces null ESSID in beacon.
+		 */
+		ni->ni_esslen = ssid[1];
+		memset(ni->ni_essid, 0, sizeof(ni->ni_essid));
+		memcpy(ni->ni_essid, ssid + 2, ssid[1]);
 	}
-	IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
-	memset(ni->ni_rates, 0, IEEE80211_RATE_SIZE);
-	ni->ni_nrate = rates[1];
-	memcpy(ni->ni_rates, rates + 2, ni->ni_nrate);
-	ieee80211_fix_rate(ic, ni, IEEE80211_F_DOSORT);
-	ni->ni_rssi = rssi;
-	ni->ni_rstamp = rstamp;
-	memcpy(ni->ni_tstamp, tstamp, sizeof(ni->ni_tstamp));
-	ni->ni_intval = le16_to_cpu(*(u_int16_t *)bintval);
-	ni->ni_capinfo = le16_to_cpu(*(u_int16_t *)capinfo);
-	/* XXX validate channel # */
-	ieee80211_set_node(ic, ni, &ic->ic_channels[chan]);
-	ni->ni_fhdwell = fhdwell;
-	ni->ni_fhindex = fhindex;
+	/*
+	 * If the node was previously seen, update state only if
+	 * this frame looks to have come over the same channel or
+	 * we received it from a channel where the signal is stronger.
+	 *
+	 * XXX verify bssid et. al are the same?
+	 */
+	if (ni->ni_chan == NULL || ni->ni_chan == &ic->ic_channels[chan] ||
+	    rssi > ni->ni_rssi) {
+		IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
+		memset(ni->ni_rates, 0, IEEE80211_RATE_SIZE);
+		ni->ni_nrate = rates[1];
+		memcpy(ni->ni_rates, rates + 2, ni->ni_nrate);
+		ieee80211_fix_rate(ic, ni, IEEE80211_F_DOSORT);
+		ni->ni_rssi = rssi;
+		ni->ni_rstamp = rstamp;
+		ni->ni_rantenna = rantenna;
+		memcpy(ni->ni_tstamp, tstamp, sizeof(ni->ni_tstamp));
+		ni->ni_intval = le16_to_cpu(*(u_int16_t *)bintval);
+		ni->ni_capinfo = le16_to_cpu(*(u_int16_t *)capinfo);
+		/* XXX validate channel # */
+		ieee80211_set_node(ic, ni, &ic->ic_channels[chan]);
+		ni->ni_fhdwell = fhdwell;
+		ni->ni_fhindex = fhindex;
+	} else {
+		DPRINTF(ic, ("%s: discard %s%s from %s in favor of "
+		    "existing (rssi %u > %u)\n",
+		    __func__, (ni == NULL ? "new " : ""),
+		    ISPROBE(wh) ? "probe response" : "beacon",
+		    ether_sprintf(wh->i_addr2), rssi, ni->ni_rssi));
+	}
 	ieee80211_unref_node(&ni);
 
 	if (ic->ic_state == IEEE80211_S_SCAN &&
@@ -2076,7 +2161,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 
 static void
 ieee80211_recv_prreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
-    u_int32_t rstamp)
+    u_int32_t rstamp, u_int rantenna)
 {
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
@@ -2115,7 +2200,7 @@ ieee80211_recv_prreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	    (ssid[1] != ic->ic_bss.ni_esslen ||
 	    memcmp(ssid + 2, ic->ic_bss.ni_essid, ic->ic_bss.ni_esslen) != 0)) {
 		if (netif_msg_debug(ic)) {
-			printk("ieee80211_recv_prreq: ssid unmatch ");
+			printk("%s: ssid unmatch ", __func__);
 			ieee80211_print_essid(ssid + 2, ssid[1]);
 			printk(" from %s\n", ether_sprintf(wh->i_addr2));
 		}
@@ -2127,8 +2212,8 @@ ieee80211_recv_prreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		ni = ieee80211_dup_bss(ic, wh->i_addr2);
 		if (ni == NULL)
 			return;
-		DPRINTF(ic, ("ieee80211_recv_prreq: new req from %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: new req from %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		allocbs = 1;
 	} else
 		allocbs = 0;
@@ -2137,12 +2222,12 @@ ieee80211_recv_prreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	memcpy(ni->ni_rates, rates + 2, ni->ni_nrate);
 	ni->ni_rssi = rssi;
 	ni->ni_rstamp = rstamp;
+	ni->ni_rantenna = rantenna;
 	rate = ieee80211_fix_rate(ic, ni, IEEE80211_F_DOSORT |
 	    IEEE80211_F_DOFRATE | IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
 	if (rate & IEEE80211_RATE_BASIC) {
-		DPRINTF(ic,
-		    ("ieee80211_recv_prreq: rate negotiation failed: %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: rate negotiation failed: %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 	} else {
 		IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_PROBE_RESP,
 		    0);
@@ -2155,7 +2240,7 @@ ieee80211_recv_prreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 
 static void
 ieee80211_recv_auth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
-    u_int32_t rstamp)
+    u_int32_t rstamp, u_int rantenna)
 {
 	struct net_device *dev = &ic->ic_dev;
 	struct ieee80211_frame *wh;
@@ -2175,8 +2260,8 @@ ieee80211_recv_auth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	 *	[tlv*] challenge
 	 */
 	if (frm + 6 > efrm) {
-		DPRINTF(ic, ("ieee80211_recv_auth: too short from %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: too short from %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		return;
 	}
 	algo   = le16_to_cpu(*(u_int16_t *)frm);
@@ -2184,9 +2269,8 @@ ieee80211_recv_auth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	status = le16_to_cpu(*(u_int16_t *)(frm + 4));
 	if (algo != IEEE80211_AUTH_ALG_OPEN) {
 		/* TODO: shared key auth */
-		DPRINTF(ic,
-		    ("ieee80211_recv_auth: unsupported auth %d from %s\n",
-		    algo, ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: unsupported auth %d from %s\n",
+			__func__, algo, ether_sprintf(wh->i_addr2)));
 		return;
 	}
 	switch (ic->ic_opmode) {
@@ -2243,7 +2327,7 @@ ieee80211_recv_auth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 
 static void
 ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
-    u_int32_t rstamp)
+    u_int32_t rstamp, u_int rantenna)
 {
 	struct net_device *dev = &ic->ic_dev;
 	struct ieee80211_frame *wh;
@@ -2276,14 +2360,14 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	 *	[tlv] supported rates
 	 */
 	if (frm + (reassoc ? 10 : 4) > efrm) {
-		DPRINTF(ic, ("ieee80211_recv_asreq: too short from %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: too short from %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		return;
 	}
 
 	if (!IEEE80211_ADDR_EQ(wh->i_addr3, ic->ic_bss.ni_bssid)) {
-		DPRINTF(ic, ("ieee80211_recv_asreq: ignore other bss from %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: ignore other bss from %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		return;
 	}
 	capinfo = le16_to_cpu(*(u_int16_t *)frm);	frm += 2;
@@ -2307,7 +2391,7 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	if (ssid[1] != ic->ic_bss.ni_esslen ||
 	    memcmp(ssid + 2, ic->ic_bss.ni_essid, ssid[1]) != 0) {
 		if (netif_msg_debug(ic)) {
-			printk("ieee80211_recv_asreq: ssid unmatch ");
+			printk("%s: ssid unmatch ", __func__);
 			ieee80211_print_essid(ssid + 2, ssid[1]);
 			printk(" from %s\n", ether_sprintf(wh->i_addr2));
 		}
@@ -2315,8 +2399,8 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	}
 	ni = ieee80211_find_node(ic, wh->i_addr2);
 	if (ni == NULL) {
-		DPRINTF(ic, ("ieee80211_recv_asreq: not authenticated for %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: not authenticated for %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		ni = ieee80211_dup_bss(ic, wh->i_addr2);
 		if (ni == NULL)
 			return;
@@ -2325,26 +2409,30 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		ieee80211_free_node(ic, ni);
 		return;
 	}
+	/* XXX per-node cipher suite */
+	/* XXX some stations use the privacy bit for handling APs
+	       that suport both encrypted and unencrypted traffic */
 	if ((capinfo & IEEE80211_CAPINFO_ESS) == 0 ||
 	    (capinfo & IEEE80211_CAPINFO_PRIVACY) !=
 	    ((ic->ic_flags & IEEE80211_F_WEPON) ?
 	     IEEE80211_CAPINFO_PRIVACY : 0)) {
-		DPRINTF(ic,
-		    ("ieee80211_recv_asreq: capability unmatch %x for %s\n",
-		    capinfo, ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: capability unmatch %x for %s\n",
+			__func__, capinfo, ether_sprintf(wh->i_addr2)));
 		ni->ni_associd = 0;
 		IEEE80211_SEND_MGMT(ic, ni, resp, IEEE80211_STATUS_CAPINFO);
 		ieee80211_unref_node(&ni);
 		return;
 	}
+	/* XXX check current basic rate set to determine assoc eligibility */
+	/* XXX must setup per-station rate set */
 	memset(ni->ni_rates, 0, IEEE80211_RATE_SIZE);
 	ni->ni_nrate = rates[1];
 	memcpy(ni->ni_rates, rates + 2, ni->ni_nrate);
 	ieee80211_fix_rate(ic, ni, IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
 	    IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
 	if (ni->ni_nrate == 0) {
-		DPRINTF(ic, ("ieee80211_recv_asreq: rate unmatch for %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: rate unmatch for %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		ni->ni_associd = 0;
 		IEEE80211_SEND_MGMT(ic, ni, resp, IEEE80211_STATUS_BASIC_RATE);
 		ieee80211_unref_node(&ni);
@@ -2352,6 +2440,7 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	}
 	ni->ni_rssi = rssi;
 	ni->ni_rstamp = rstamp;
+	ni->ni_rantenna = rantenna;
 	ni->ni_intval = bintval;
 	ni->ni_capinfo = capinfo;
 	ieee80211_set_node(ic, ni, ic->ic_bss.ni_chan);
@@ -2362,6 +2451,8 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		newassoc = 1;
 	} else
 		newassoc = 0;
+	/* XXX for 11g must turn off short slot time if long
+	       slot time sta associates */
 	IEEE80211_SEND_MGMT(ic, ni, resp, IEEE80211_STATUS_SUCCESS);
 	DPRINTF(ic, ("%s: station %s %s associated\n",
 		    dev->name,
@@ -2372,7 +2463,7 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 
 static void
 ieee80211_recv_asresp(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
-    u_int32_t rstamp)
+    u_int32_t rstamp, u_int rantenna)
 {
 	struct net_device *dev = &ic->ic_dev;
 	struct ieee80211_frame *wh;
@@ -2433,7 +2524,7 @@ ieee80211_recv_asresp(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 
 static void
 ieee80211_recv_disassoc(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
-    u_int32_t rstamp)
+    u_int32_t rstamp, u_int rantenna)
 {
 	struct net_device *dev = &ic->ic_dev;
 	struct ieee80211_frame *wh;
@@ -2449,8 +2540,8 @@ ieee80211_recv_disassoc(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	 *	[2] reason
 	 */
 	if (frm + 2 > efrm) {
-		DPRINTF(ic, ("ieee80211_recv_disassoc: too short from %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: too short from %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		return;
 	}
 	reason = le16_to_cpu(*(u_int16_t *)frm);
@@ -2476,7 +2567,7 @@ ieee80211_recv_disassoc(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 
 static void
 ieee80211_recv_deauth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
-    u_int32_t rstamp)
+    u_int32_t rstamp, u_int rantenna)
 {
 	struct net_device *dev = &ic->ic_dev;
 	struct ieee80211_frame *wh;
@@ -2492,8 +2583,8 @@ ieee80211_recv_deauth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	 *	[2] reason
 	 */
 	if (frm + 2 > efrm) {
-		DPRINTF(ic, ("ieee80211_recv_deauth: too short from %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: too short from %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		return;
 	}
 	reason = le16_to_cpu(*(u_int16_t *)frm);
@@ -2528,8 +2619,8 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 #endif
 
 	ostate = ic->ic_state;
-	DPRINTF(ic, ("ieee80211_new_state: %s -> %s\n",
-	    stname[ostate], stname[nstate]));
+	DPRINTF(ic, ("%s: %s -> %s\n",
+		__func__, stname[ostate], stname[nstate]));
 	if (ic->ic_newstate) {
 		error = (*ic->ic_newstate)(dev, nstate);
 		if (error == EINPROGRESS)
@@ -2621,6 +2712,7 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 			break;
 		case IEEE80211_S_SCAN:
 			/* scan next */
+			/* XXX check if channel marked passive only */
 			if (ic->ic_flags & IEEE80211_F_ASCAN) {
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
@@ -2650,7 +2742,7 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 	case IEEE80211_S_AUTH:
 		switch (ostate) {
 		case IEEE80211_S_INIT:
-			DPRINTF(ic, ("ieee80211_new_state: invalid transition\n"));
+			DPRINTF(ic, ("%s: invalid transition\n", __func__));
 			break;
 		case IEEE80211_S_SCAN:
 			IEEE80211_SEND_MGMT(ic, ni,
@@ -2690,7 +2782,7 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		case IEEE80211_S_INIT:
 		case IEEE80211_S_SCAN:
 		case IEEE80211_S_ASSOC:
-			DPRINTF(ic, ("ieee80211_new_state: invalid transition\n"));
+			DPRINTF(ic, ("%s: invalid transition\n", __func__));
 			break;
 		case IEEE80211_S_AUTH:
 			IEEE80211_SEND_MGMT(ic, ni,
@@ -2707,10 +2799,13 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		case IEEE80211_S_INIT:
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_RUN:
-			DPRINTF(ic, ("ieee80211_new_state: invalid transition\n"));
+			DPRINTF(ic, ("%s: invalid transition\n", __func__));
 			break;
 		case IEEE80211_S_SCAN:		/* adhoc mode */
 		case IEEE80211_S_ASSOC:		/* infra mode */
+			/* start with highest negotiated rate */
+			/* XXX validate ni_nrate > 0? */
+			ni->ni_txrate = ni->ni_nrate - 1;
 			if (netif_msg_debug(ic)) {
 				printk("%s: ", dev->name);
 				if (ic->ic_opmode == IEEE80211_M_STA)
@@ -2721,11 +2816,10 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 				    ether_sprintf(ni->ni_bssid));
 				ieee80211_print_essid(ni->ni_essid,
 				    ni->ni_esslen);
-				printk(" channel %d\n",
-					ieee80211_chan2ieee(ic, ni->ni_chan));
+				printk(" channel %d start %uMb\n",
+					ieee80211_chan2ieee(ic, ni->ni_chan),
+					IEEE80211_RATE2MBS(ni->ni_rates[ni->ni_txrate]));
 			}
-			/* start with highest negotiated rate */
-			ni->ni_txrate = ni->ni_nrate - 1;
 			ic->ic_mgt_timer = 0;
 			break;
 		}
@@ -2983,14 +3077,19 @@ ieee80211_rate2media(int rate, enum ieee80211_phymode mode)
 		{  72 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM36 },
 		{  96 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM48 },
 		{ 108 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM54 },
-		{  12 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK6 },
-		{  18 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK9 },
-		{  24 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK12 },
-		{  36 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK18 },
-		{  48 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK24 },
-		{  72 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK36 },
-		{  96 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK48 },
-		{ 108 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK54 },
+		{   2 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_DS1 },
+		{   4 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_DS2 },
+		{  11 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_DS5 },
+		{  22 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_DS11 },
+		{  12 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM6 },
+		{  18 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM9 },
+		{  24 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM12 },
+		{  36 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM18 },
+		{  48 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM24 },
+		{  72 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM36 },
+		{  96 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM48 },
+		{ 108 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_OFDM54 },
+		/* NB: OFDM72 doesn't realy exist so we don't handle it */
 	};
 	u_int mask, i;
 
@@ -3037,14 +3136,7 @@ ieee80211_media2rate(int mword)
 		72,		/* IFM_IEEE80211_OFDM36 */
 		96,		/* IFM_IEEE80211_OFDM48 */
 		108,		/* IFM_IEEE80211_OFDM54 */
-		12,		/* IFM_IEEE80211_CCK6 */
-		18,		/* IFM_IEEE80211_CCK9 */
-		24,		/* IFM_IEEE80211_CCK12 */
-		36,		/* IFM_IEEE80211_CCK18 */
-		48,		/* IFM_IEEE80211_CCK24 */
-		72,		/* IFM_IEEE80211_CCK36 */
-		96,		/* IFM_IEEE80211_CCK48 */
-		108,		/* IFM_IEEE80211_CCK54 */
+		144,		/* IFM_IEEE80211_OFDM72 */
 	};
 	return IFM_SUBTYPE(mword) < N(ieeerates) ?
 		ieeerates[IFM_SUBTYPE(mword)] : 0;
@@ -3077,13 +3169,13 @@ MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
 MODULE_LICENSE("Dual BSD/GPL");		/* XXX really BSD only */
 #endif
 
-EXPORT_SYMBOL(ieee80211_chan_find);
 EXPORT_SYMBOL(ieee80211_decap);
 EXPORT_SYMBOL(ieee80211_dump_pkt);
 EXPORT_SYMBOL(ieee80211_encap);
 EXPORT_SYMBOL(ieee80211_end_scan);
 EXPORT_SYMBOL(ieee80211_find_node);
 EXPORT_SYMBOL(ieee80211_iterate_nodes);
+EXPORT_SYMBOL(ieee80211_set_node);
 EXPORT_SYMBOL(ieee80211_mhz2ieee);
 EXPORT_SYMBOL(ieee80211_chan2ieee);
 EXPORT_SYMBOL(ieee80211_ieee2mhz);
@@ -3094,6 +3186,7 @@ EXPORT_SYMBOL(ieee80211_media2rate);
 EXPORT_SYMBOL(ieee80211_new_state);
 EXPORT_SYMBOL(ieee80211_next_scan);
 EXPORT_SYMBOL(ieee80211_rate2media);
+EXPORT_SYMBOL(ieee80211_setmode);
 
 static int __init
 init_wlan(void)

@@ -401,8 +401,9 @@ struct ieee80211_node {
 	atomic_t		ni_refcnt;
 
 	/* hardware */
-	u_int8_t		ni_rssi;
-	u_int32_t		ni_rstamp;
+	u_int8_t		ni_rssi;	/* recv ssi */
+	u_int32_t		ni_rstamp;	/* recv timestamp */
+	u_int8_t		ni_rantenna;	/* recv antenna */
 
 	/* header */
 	u_int8_t		ni_macaddr[IEEE80211_ADDR_LEN];
@@ -475,7 +476,7 @@ struct ieee80211com {
 					struct net_device *);
 	int			(*ic_init)(struct net_device *);
 	void			(*ic_recv_mgmt[16])(struct ieee80211com *,
-				    struct sk_buff *, int, u_int32_t);
+				    struct sk_buff *, int, u_int32_t, u_int);
 	struct net_device_stats	ic_stats;	/* interface statistics */
 	u_int32_t		msg_enable;	/* interface message flags */
 	int			(*ic_send_mgmt[16])(struct ieee80211com *,
@@ -485,12 +486,13 @@ struct ieee80211com {
 	u_int8_t		ic_sup_rates[IEEE80211_MODE_MAX][IEEE80211_RATE_SIZE];
 	struct ieee80211channel ic_channels[IEEE80211_CHAN_MAX+1];
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
+	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
 	u_char			ic_chan_scan[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_int32_t		ic_flags;	/* state flags */
 	u_int32_t		ic_caps;	/* capabilities */
 	u_int16_t		ic_modecaps;	/* set of mode capabilities */
 	u_int16_t		ic_curmode;	/* current mode */
-	enum ieee80211_phytype	ic_phytype;	/* XXX not very useful */
+	enum ieee80211_phytype	ic_phytype;	/* XXX wrong for multi-mode */
 	enum ieee80211_opmode	ic_opmode;	/* operation mode */
 	enum ieee80211_state	ic_state;	/* 802.11 state */
 	struct ifmedia		ic_media;	/* interface media config */
@@ -555,7 +557,6 @@ struct ieee80211com {
 #define IEEE80211_F_TXPOW_OFF	0x00000000	/* TX Power: radio disabled */
 #define IEEE80211_F_TXPOW_FIXED	0x00008000	/* TX Power: fixed rate */
 #define IEEE80211_F_TXPOW_AUTO	0x00010000	/* TX Power: undefined */
-#define IEEE80211_F_TURBO	0x00020000	/* CONF: turbo mode enabled */
 
 /* ic_capabilities */
 #define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
@@ -565,7 +566,6 @@ struct ieee80211com {
 #define	IEEE80211_C_AHDEMO	0x00000010	/* CAPABILITY: Old Adhoc Demo */
 #define	IEEE80211_C_SWRETRY	0x00000020	/* CAPABILITY: sw tx retry */
 #define	IEEE80211_C_TXPMGT	0x00000040	/* CAPABILITY: tx power mgmt */
-#define	IEEE80211_C_TURBO	0x00000080	/* CAPABILITY: turbo mode */
 
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
@@ -583,7 +583,8 @@ struct ieee80211com {
 
 int	ieee80211_ifattach(struct net_device *);
 void	ieee80211_ifdetach(struct net_device *);
-void	ieee80211_input(struct net_device *, struct sk_buff *, int, u_int32_t);
+void	ieee80211_input(struct net_device *, struct sk_buff *,
+		int, u_int32_t, u_int);
 int	ieee80211_mgmt_output(struct net_device *, struct ieee80211_node *,
 		struct sk_buff *, int);
 struct sk_buff *ieee80211_encap(struct net_device *, struct sk_buff *);
@@ -611,8 +612,7 @@ int	ieee80211_media2rate(int);
 u_int	ieee80211_mhz2ieee(u_int, u_int);
 u_int	ieee80211_chan2ieee(struct ieee80211com *, struct ieee80211channel *);
 u_int	ieee80211_ieee2mhz(u_int, u_int);
-int	ieee80211_chanavail(struct ieee80211com *, u_int);
-struct ieee80211channel *ieee80211_chan_find(struct ieee80211com *, u_int freq);
+int	ieee80211_setmode(struct ieee80211com *, enum ieee80211_phymode);
 
 extern	const char *ether_sprintf(const u_int8_t *);		/* XXX */
 

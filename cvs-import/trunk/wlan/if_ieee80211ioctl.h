@@ -38,6 +38,7 @@
 
 enum {
 	IEEE80211_PARAM_TURBO	= 1,	/* turbo mode */
+	IEEE80211_PARAM_MODE	= 2,	/* phy mode (11a, 11b, etc.) */
 };
 
 #endif /* _NET_IF_IEEE80211_H_ */

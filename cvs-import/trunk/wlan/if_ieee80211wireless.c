@@ -169,12 +169,12 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 			struct iw_param *rrq, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
-	struct ifmediareq ifmr;
+	struct ifmediareq imr;
 	struct ifreq ifr;
 	int rate;
 
-	memset(&ifmr, 0, sizeof(ifmr));
-	(*ic->ic_media.ifm_status)(dev, &ifmr);
+	memset(&imr, 0, sizeof(imr));
+	(*ic->ic_media.ifm_status)(dev, &imr);
 
 	if (rrq->fixed) {
 		/* XXX fudge checking rates */
@@ -183,7 +183,7 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 	} else
 		rate = IFM_AUTO;
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_media = (ifmr.ifm_active & ~IFM_TMASK) | IFM_SUBTYPE(rate);
+	ifr.ifr_media = (imr.ifm_active & ~IFM_TMASK) | IFM_SUBTYPE(rate);
 
 	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 }
@@ -194,24 +194,19 @@ ieee80211_ioctl_giwrate(struct net_device *dev,
 			struct iw_param *rrq, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
-	struct ifmedia *ifm = &ic->ic_media;
+	struct ifmediareq imr;
 	int rate;
 
-	rrq->fixed = IFM_SUBTYPE(ifm->ifm_media) != IFM_AUTO;
-	if (ic->ic_opmode == IEEE80211_M_STA) {
-		struct ieee80211_node *ni = &ic->ic_bss;
-		if (ni->ni_txrate != -1)
-			rate = ni->ni_rates[ni->ni_txrate];
-		else
-			rate = 0;		/* unknown */
-	} else {
-		/* use last known transmit rate */
-		if (ic->ic_fixed_rate != -1)
-			rate = ic->ic_sup_rates[ic->ic_curmode][ic->ic_fixed_rate];
-		else
-			rate = 0;		/* unknown */
-	}
-	rrq->value = 1000000 * ((rate & IEEE80211_RATE_VAL) / 2);
+	memset(&imr, 0, sizeof(imr));
+	(*ic->ic_media.ifm_status)(dev, &imr);
+
+	rrq->fixed = IFM_SUBTYPE(ic->ic_media.ifm_media) != IFM_AUTO;
+	/* media status will have the current xmit rate if available */
+	rate = ieee80211_media2rate(imr.ifm_active);
+	if (rate == -1)		/* IFM_AUTO */
+		rate = 0;
+	rrq->value = 1000000 * (rate / 2);
+
 	return 0;
 }
 
@@ -382,20 +377,18 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	struct ieee80211channel *c;
-	int error;
+	int i;
 
-	if (freq->e == 1)
-		c = ieee80211_chan_find(ic, freq->m / 100000);
-	else
-		c = NULL;
-	if (c == NULL)
-		error = EINVAL;
-	else if (c != ic->ic_ibss_chan) {
-		ic->ic_ibss_chan = c;
-		error = (*ic->ic_init)(dev);
-	} else
-		error = 0;
-	return -error;
+	if (freq->e != 1)		/* just lazy... */
+		return -EINVAL;
+	i = ieee80211_mhz2ieee(freq->m / 100000, 0);
+	if (i > IEEE80211_CHAN_MAX || isclr(ic->ic_chan_active, i))
+		return -EINVAL;
+	c = &ic->ic_channels[i];
+	if (c == ic->ic_ibss_chan)	/* no change, just return */
+		return 0;
+	ic->ic_ibss_chan = ic->ic_des_chan = c;
+	return -(*ic->ic_init)(dev);
 }
 
 int
@@ -500,7 +493,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 
 	range->num_frequency = 0;
 	for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
-		if (ieee80211_chanavail(ic, i)) {
+		if (isset(ic->ic_chan_active, i)) {
 			range->freq[range->num_frequency].i = i;
 			range->freq[range->num_frequency].m =
 				ic->ic_channels[i].ic_freq * 100000;
@@ -519,6 +512,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 	range->encoding_size[0] = 5;
 	range->encoding_size[1] = 13;
 
+	/* XXX this should come through if_media */
 	range->num_bitrates = 0;
 	for (i = 0; i < ni->ni_nrate; i++) {
 		r = ic->ic_sup_rates[ic->ic_curmode][i] & IEEE80211_RATE_BASIC;
@@ -545,28 +539,27 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 			__u32 *mode, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
-	struct ifmediareq ifmr;
+	struct ifmediareq imr;
 	struct ifreq ifr;
 
-	memset(&ifmr, 0, sizeof(ifmr));
-	(*ic->ic_media.ifm_status)(dev, &ifmr);
+	memset(&imr, 0, sizeof(imr));
+	(*ic->ic_media.ifm_status)(dev, &imr);
 
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_media = ifmr.ifm_active &~ IFM_OMASK;
+	ifr.ifr_media = imr.ifm_active &~ IFM_OMASK;
 	switch (*mode) {
 	case IW_MODE_INFRA:
 		/* NB: this is the default */
 		break;
 	case IW_MODE_ADHOC:
-		ifr.ifr_media |= IFM_TYPE_OPTIONS(IFM_IEEE80211_IBSS);
+		ifr.ifr_media |= IFM_IEEE80211_IBSS;
 		break;
 	case IW_MODE_MASTER:
-		ifr.ifr_media |= IFM_TYPE_OPTIONS(IFM_IEEE80211_HOSTAP);
+		ifr.ifr_media |= IFM_IEEE80211_HOSTAP;
 		break;
 	default:
 		return -EINVAL;
 	}
-
 	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 }
 
@@ -576,14 +569,17 @@ ieee80211_ioctl_giwmode(struct net_device *dev,
 			__u32 *mode, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ifmediareq imr;
 
-	switch (ic->ic_opmode) {
-	case IEEE80211_M_STA:	*mode = IW_MODE_INFRA; break;
-	case IEEE80211_M_IBSS:	*mode = IW_MODE_ADHOC; break;
-	case IEEE80211_M_HOSTAP:*mode = IW_MODE_MASTER; break;
-	default:
-		return -EINVAL;
-	}
+	memset(&imr, 0, sizeof(imr));
+	(*ic->ic_media.ifm_status)(dev, &imr);
+
+	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
+		*mode = IW_MODE_MASTER;
+	else if (imr.ifm_active & IFM_IEEE80211_IBSS)
+		*mode = IW_MODE_ADHOC;
+	else
+		*mode = IW_MODE_INFRA;
 	return 0;
 }
 
@@ -949,20 +945,30 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	int *i = (int *) extra;
 	int param = i[0];		/* parameter id is 1st */
 	int value = i[1];		/* NB: all values are TYPE_INT */
+	struct ifmediareq imr;
+	struct ifreq ifr;
 
+	memset(&imr, 0, sizeof(imr));
+	(*ic->ic_media.ifm_status)(dev, &imr);
+
+	memset(&ifr, 0, sizeof(ifr));
 	switch (param) {
 	case IEEE80211_PARAM_TURBO:
-		if (value) {
-			if ((ic->ic_caps & IEEE80211_C_TURBO) == 0)
-				return -EOPNOTSUPP;
-			ic->ic_flags |= IEEE80211_F_TURBO;
-		} else
-			ic->ic_flags &= ~IEEE80211_F_TURBO;
+		if (value)
+			imr.ifm_active |= IFM_IEEE80211_TURBO;
+		else
+			imr.ifm_active &= ~IFM_IEEE80211_TURBO;
+		ifr.ifr_media = imr.ifm_active;
+		break;
+	case IEEE80211_PARAM_MODE:
+		/* NB: hack, when setting modes remove any speed */
+		ifr.ifr_media = (imr.ifm_active &~ (IFM_MMASK|IFM_TMASK))
+			      | (IFM_MAKEMODE(value) | IFM_AUTO);
 		break;
 	default:
 		return -EOPNOTSUPP;
 	}
-	return -(*ic->ic_init)(dev);	/* kick driver to set param */
+	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 }
 
 static int
@@ -970,11 +976,16 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 		   	void *w, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ifmediareq imr;
 	int *param = (int *) extra;
 
+	(*ic->ic_media.ifm_status)(dev, &imr);
 	switch (param[0]) {
 	case IEEE80211_PARAM_TURBO:
-		param[0] = (ic->ic_flags & IEEE80211_F_TURBO) != 0;
+		param[0] = (imr.ifm_active & IFM_IEEE80211_TURBO) != 0;
+		break;
+	case IEEE80211_PARAM_MODE:
+		param[0] = IFM_MODE(imr.ifm_active);
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1060,6 +1071,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "turbo" },
 	{ IEEE80211_PARAM_TURBO,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_turbo" },
+	{ IEEE80211_PARAM_MODE,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "mode" },
+	{ IEEE80211_PARAM_MODE,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_mode" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
