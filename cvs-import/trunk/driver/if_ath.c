@@ -894,6 +894,8 @@ ath_mode_init(struct net_device *dev)
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
+	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+		rfilt |= HAL_RX_FILTER_PROBEREQ;
 
 	ath_hal_setrxfilter(ah, rfilt);
 
@@ -2275,6 +2277,9 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
+
+	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+		rfilt |= HAL_RX_FILTER_PROBEREQ;
 
 	if (nstate == IEEE80211_S_SCAN) {
 		mod_timer(&sc->sc_scan_ch,
