@@ -259,12 +259,10 @@ struct ieee80211com {
 	int			ic_wep_txkey;	/* default tx key index */
 	void			*ic_wep_ctx;	/* wep crypt context */
 	u_int32_t		ic_iv;		/* initial vector for wep */
-	int			(*ic_key_add)(struct ieee80211com *,
-					struct ieee80211_wepkey *);
-	int			(*ic_key_delete)(struct ieee80211com *,
-					u_int keyix);
-	int			(*ic_key_set)(struct ieee80211com *,
-					u_int keyix, struct ieee80211_wepkey *);
+	int			(*ic_key_alloc)(struct ieee80211com *);
+	int			(*ic_key_delete)(struct ieee80211com *, u_int);
+	int			(*ic_key_set)(struct ieee80211com *, u_int kix,
+					struct ieee80211_wepkey *, u_int8_t *);
 	/*
 	 * 802.1x glue.  When an authenticator attaches it
 	 * fills in this section.  We assume that when ic_ec
@@ -353,9 +351,10 @@ enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 #define	IEEE80211_MSG_STATE	0x00080000	/* state machine */
 #define	IEEE80211_MSG_POWER	0x00040000	/* power save handling */
 #define	IEEE80211_MSG_DOT1X	0x00020000	/* 802.1x authenticator */
-#define	IEEE80211_MSG_RADIUS	0x00010000	/* 802.1x radius client */
-#define	IEEE80211_MSG_RADDUMP	0x00008000	/* dump 802.1x radius packets */
-#define	IEEE80211_MSG_DOT1XSM	0x00004000	/* 802.1x state machine */
+#define	IEEE80211_MSG_DOT1XSM	0x00010000	/* 802.1x state machine */
+#define	IEEE80211_MSG_RADIUS	0x00008000	/* 802.1x radius client */
+#define	IEEE80211_MSG_RADDUMP	0x00004000	/* dump 802.1x radius packets */
+#define	IEEE80211_MSG_RADKEYS	0x00002000	/* dump 802.1x keys */
 
 #define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
 
@@ -375,6 +374,8 @@ enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 	((_ic)->msg_enable & IEEE80211_MSG_RADIUS)
 #define	ieee80211_msg_dumpradius(_ic) \
 	((_ic)->msg_enable & IEEE80211_MSG_RADDUMP)
+#define	ieee80211_msg_dumpradkeys(_ic) \
+	((_ic)->msg_enable & IEEE80211_MSG_RADKEYS)
 #else
 #define	IEEE80211_DPRINTF(_ic, _fmt, ...)
 #endif

@@ -147,17 +147,16 @@ EXPORT_SYMBOL(ieee80211_node_unauthorize);
  * been authorized.
  */
 int
-ieee80211_node_makekey(struct ieee80211com *ic, struct ieee80211_node *ni)
+ieee80211_node_newkey(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
 	/* XXX use maximally-sized keys; may want to match mcast key length */
 	ni->ni_ucastkey.wk_len = sizeof(ni->ni_ucastkey.wk_key);
 	/* XXX just use random data for now; probably want something better */
 	get_random_bytes(ni->ni_ucastkey.wk_key, ni->ni_ucastkey.wk_len);
 	/*
-	 * Hand the new key to the driver so it can be installed
-	 * and so it can allocate a hardware key index.
+	 * Ask the driver for a key index.
 	 */
-	ni->ni_ucastkeyix = (*ic->ic_key_add)(ic, &ni->ni_ucastkey);
+	ni->ni_ucastkeyix = (*ic->ic_key_alloc)(ic);
 	if (ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
 		 /*
 		 * Driver has no room or support for this algorithm;
@@ -168,7 +167,37 @@ ieee80211_node_makekey(struct ieee80211com *ic, struct ieee80211_node *ni)
 	}
 	return 1;
 }
-EXPORT_SYMBOL(ieee80211_node_makekey);
+EXPORT_SYMBOL(ieee80211_node_newkey);
+
+/*
+ * Remove the unicast key for the specified node.
+ */
+int
+ieee80211_node_delkey(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	if (ni->ni_ucastkeyix != IEEE80211_KEYIX_NONE) {
+		if (!(*ic->ic_key_delete)(ic, ni->ni_ucastkeyix))
+			return 0;
+		ni->ni_ucastkeyix = IEEE80211_KEYIX_NONE;
+	}
+	return 1;
+}
+EXPORT_SYMBOL(ieee80211_node_delkey);
+
+/*
+ * Install the unicast key as ready for use.
+ */
+int
+ieee80211_node_setkey(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	if (ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
+		/* XXX nothing allocated */
+		return 0;
+	}
+	return (*ic->ic_key_set)(ic, ni->ni_ucastkeyix,
+		&ni->ni_ucastkey, ni->ni_macaddr);
+}
+EXPORT_SYMBOL(ieee80211_node_setkey);
 
 /*
  * AP scanning support.
