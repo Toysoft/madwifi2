@@ -150,9 +150,8 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			if (!IEEE80211_ADDR_EQ(bssid, ni->ni_bssid)) {
 				/* not interested in */
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-					("[%s] discard frame from bss %s\n",
-					ieee80211_state_name[ic->ic_state],
-					ether_sprintf(wh->i_addr2)));
+					("[%s] discard frame not to bss\n",
+					ether_sprintf(bssid)));
 				ic->ic_stats.is_rx_wrongbss++;
 				goto out;
 			}
@@ -179,8 +178,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-				    ("[%s] discard data frame from bss %s\n",
-				    ieee80211_state_name[ic->ic_state],
+				    ("[%s] discard data frame not to bss\n",
 				    ether_sprintf(bssid)));
 				ic->ic_stats.is_rx_wrongbss++;
 				goto out;
@@ -198,9 +196,8 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			    SEQ_LEQ(rxseq, ni->ni_rxseq)) {
 				/* duplicate, discard */
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-				    ("[%s] discard duplicate frame from %s, "
+				    ("[%s] discard duplicate frame, "
 				    "seqno <%u,%u> fragno <%u,%u>\n",
-				    ieee80211_state_name[ic->ic_state],
 				    ether_sprintf(bssid),
 				    rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
 				    ni->ni_rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
@@ -224,9 +221,9 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	    (ni->ni_flags & IEEE80211_NODE_PWR_MGT))) {
 		/* XXX statistics? */
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER,
-			("power save mode %s for %s\n",
-			(wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "on" : "off"),
-			ether_sprintf(wh->i_addr2)));
+			("[%s] power save mode %s\n",
+			ether_sprintf(wh->i_addr2),
+			(wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "on" : "off")));
 		if ((wh->i_fc[1] & IEEE80211_FC1_PWR_MGT) == 0) {
 			/* turn off power save mode, dequeue stored packets */
 			ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
@@ -292,8 +289,8 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			/* check if source STA is associated */
 			if (ni == ic->ic_bss) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-					("%s: data from unknown src %s\n",
-					__func__, ether_sprintf(wh->i_addr2)));
+					("[%s] discard data from unknown src\n",
+					ether_sprintf(wh->i_addr2)));
 ieee80211_dump_nodes(ic);/*XXX*/
 				/* NB: caller deals with reference to ic_bss */
 				ni = ieee80211_dup_bss(ic, wh->i_addr2);
@@ -308,8 +305,8 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			}
 			if (ni->ni_associd == 0) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-					("%s: data from unassoc src %s\n",
-					__func__, ether_sprintf(wh->i_addr2)));
+					("[%s] discard data from unassoc src\n",
+					ether_sprintf(wh->i_addr2)));
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_DISASSOC,
 				    IEEE80211_REASON_NOT_ASSOCED);
@@ -335,6 +332,9 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				/*
 				 * Discard encrypted frames when privacy is off.
 				 */
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+					("[%s] discard WEP frame 'cuz PRIVACY "
+					"off\n", ether_sprintf(wh->i_addr2)));
 				ic->ic_stats.is_rx_noprivacy++;
 				goto out;
 			}
@@ -363,6 +363,9 @@ ieee80211_dump_nodes(ic);/*XXX*/
 		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
 			KASSERT(key != NULL, ("null key for demic!"));
 			if (!ieee80211_crypto_demic(ic, key, skb)) {
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+					("%s: discard frame on demic error\n",
+					__func__));
 				/* XXX statistic? */
 				goto out;
 			}
@@ -375,8 +378,7 @@ ieee80211_dump_nodes(ic);/*XXX*/
 		skb = ieee80211_decap(ic, skb);
 		if (skb == NULL) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-				("%s: decapsulation error for src %s\n",
-				__func__, ether_sprintf(wh->i_addr2)));
+				("%s: decapsulation error\n", __func__));
 			ic->ic_stats.is_rx_decap++;
 			goto err;
 		}
@@ -392,8 +394,10 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			 */
 			if (eh->ether_type != __constant_htons(ETHERTYPE_PAE)) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-				    ("%s: discard data from %s on unauthorized port\n",
-				    __func__, ether_sprintf(wh->i_addr2)));
+				    ("[%s] discard data (ether type 0x%x len %u)"
+				    " on unauthorized port\n",
+				    ether_sprintf(eh->ether_shost),
+				    eh->ether_type, skb->len));
 				ic->ic_stats.is_rx_unauth++;
 				/* XXX node statistic */
 				goto err;
@@ -1954,9 +1958,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 
 		if (ni == ic->ic_bss) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-			    ("%s: deny %sassoc from %s, not authenticated\n",
-			    __func__, reassoc ? "reassoc" : "assoc",
-			    ether_sprintf(wh->i_addr2)));
+			    ("[%s] deny %sassoc, not authenticated\n",
+			    ether_sprintf(wh->i_addr2), reassoc ? "re" : ""));
 			ni = ieee80211_dup_bss(ic, wh->i_addr2);
 			if (ni != NULL) {
 				IEEE80211_SEND_MGMT(ic, ni,
