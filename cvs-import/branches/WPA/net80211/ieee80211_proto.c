@@ -218,6 +218,40 @@ ieee80211_authenticator_backend_get(const char *name)
 }
 EXPORT_SYMBOL(ieee80211_authenticator_backend_get);
 
+/*
+ * Very simple-minded ACL module support.
+ */
+/* XXX just one for now */
+static	const struct ieee80211_aclator *acl = NULL;
+
+void
+ieee80211_aclator_register(const struct ieee80211_aclator *iac)
+{
+	printk(KERN_INFO "802.1x wlan: %s acl policy registered\n",
+		iac->iac_name);
+	acl = iac;
+}
+EXPORT_SYMBOL(ieee80211_aclator_register);
+
+void
+ieee80211_aclator_unregister(const struct ieee80211_aclator *iac)
+{
+	if (acl == iac)
+		acl = NULL;
+	printk(KERN_INFO "802.1x wlan: %s acl policy unregistered\n",
+		iac->iac_name);
+}
+EXPORT_SYMBOL(ieee80211_aclator_unregister);
+
+const struct ieee80211_aclator *
+ieee80211_aclator_get(const char *name)
+{
+	if (acl == NULL)
+		request_module("wlan_acl");
+	return acl && strcmp(acl->iac_name, name) == 0 ? acl : NULL;
+}
+EXPORT_SYMBOL(ieee80211_aclator_get);
+
 void
 ieee80211_print_essid(u_int8_t *essid, int len)
 {
@@ -437,7 +471,7 @@ ieee80211_iserp_rateset(struct ieee80211com *ic, struct ieee80211_rateset *rs)
 }
 
 static int
-ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt)
+ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 {
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_node *ni;
@@ -475,7 +509,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 			default:
 				break;
 			}
-			/* FALLTHRU */
+			goto reset;
 		case IEEE80211_S_ASSOC:
 			switch (ic->ic_opmode) {
 			case IEEE80211_M_STA:
@@ -495,12 +529,13 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 			default:
 				break;
 			}
-			/* FALLTHRU */
+			goto reset;
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_SCAN:
+		reset:
 			ic->ic_mgt_timer = 0;
+			ic->ic_inact_timer = 0;
 			ieee80211_free_allnodes(ic);
-			ieee80211_crypto_detach(ic);
 			break;
 		}
 		if (ic->ic_auth->ia_detach != NULL)
@@ -527,7 +562,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 				 */
 				ieee80211_create_ibss(ic, ic->ic_des_chan);
 			} else {
-				ieee80211_begin_scan(ic);
+				ieee80211_begin_scan(ic, arg);
 			}
 			break;
 		case IEEE80211_S_SCAN:
@@ -543,17 +578,19 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 				("no recent beacons from %s; rescanning\n",
 				ether_sprintf(ic->ic_bss->ni_bssid)));
 			ieee80211_notify_node_leave(ic, ni);
+			/* XXX this clears the scan set */
 			ieee80211_free_allnodes(ic);
 			/* FALLTHRU */
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_ASSOC:
+			/* XXX doesn't work, ni_macaddr rewritten above */
 			/* timeout restart scan */
 			ni = ieee80211_find_node(ic, ic->ic_bss->ni_macaddr);
 			if (ni != NULL) {
 				ni->ni_fails++;
 				ieee80211_unref_node(&ni);
 			}
-			ieee80211_begin_scan(ic);
+			ieee80211_begin_scan(ic, arg);
 			break;
 		}
 		break;
@@ -566,7 +603,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 			break;
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_ASSOC:
-			switch (mgt) {
+			switch (arg) {
 			case IEEE80211_FC0_SUBTYPE_AUTH:
 				/* ??? */
 				IEEE80211_SEND_MGMT(ic, ni,
@@ -578,7 +615,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 			}
 			break;
 		case IEEE80211_S_RUN:
-			switch (mgt) {
+			switch (arg) {
 			case IEEE80211_FC0_SUBTYPE_AUTH:
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_AUTH, 2);
@@ -609,6 +646,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 		case IEEE80211_S_RUN:
 			IEEE80211_SEND_MGMT(ic, ni,
 			    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 1);
+			ieee80211_notify_node_leave(ic, ni);
 			break;
 		}
 		break;
@@ -648,7 +686,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 			ic->ic_mgt_timer = 0;
 			if (ic->ic_opmode == IEEE80211_M_STA)
 				ieee80211_notify_node_join(ic, ni, 
-					mgt == IEEE80211_FC0_SUBTYPE_ASSOC_RESP);
+					arg == IEEE80211_FC0_SUBTYPE_ASSOC_RESP);
 			break;
 		}
 		/*
