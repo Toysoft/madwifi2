@@ -2,7 +2,9 @@
 #
 # Makefile for the Atheros WLAN driver.
 #
-include ../Makefile.inc
+DEPTH=	..
+
+include ${DEPTH}/Makefile.inc
 
 SRCS=	ah_osdep.c if_ath.c if_ath_cs.c if_ath_pci.c
 

@@ -2,26 +2,24 @@
 #
 # Makefile for the HAL-based Atheros driver.
 #
+DEPTH=	.
+
 include Makefile.inc
 
-all:	driver/ath_pci.o
+all:
+	cd ath_hal; make
+	cd ${WLAN}; make
+	cd ${DRIVER}; make
 
-driver/ath_pci.o:	wlan/wlan.o ath_hal/hal.o
-	cd driver; make ath_pci.o
-wlan/wlan.o:
-	cd wlan; make wlan.o
-ath_hal/hal.o:
-	cd ath_hal; make hal.o
-
-install: all
-	cd driver; make install
+install:
+	cd ${DRIVER}; make install
 
 clean:
-	cd driver; make clean
-	cd wlan; make clean
-	cd ath_hal; make clean
+	cd ${DRIVER}; make clean
+	cd ${WLAN}; make clean
+	cd ${ATH_HAL}; make clean
 
 depend:
-	cd ath_hal; make depend
-	cd driver; make depend
-	cd wlan; make depend
+	cd ${ATH_HAL}; make depend
+	cd ${DRIVER}; make depend
+	cd ${WLAN}; make depend

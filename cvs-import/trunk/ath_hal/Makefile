@@ -9,8 +9,9 @@
 # required symbols stripped from it and is the intended form for
 # distribution.  The hal_syms.o file is intended for debugging.
 #
+DEPTH=	..
 
-include ../Makefile.inc
+include ${DEPTH}/Makefile.inc
 
 AH_SRCS=${HAL}/ah.c ${HAL}/ah_regdomain.c
 AH_OBJS=ah.o ah_regdomain.o

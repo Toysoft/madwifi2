@@ -2,7 +2,9 @@
 #
 # Makefile for the 802.11 WLAN module.
 #
-include ../Makefile.inc
+DEPTH=	..
+
+include ${DEPTH}/Makefile.inc
 
 SRCS=	if_ieee80211subr.c if_media.c rc4.c
 OBJS=	if_ieee80211subr.o if_media.o rc4.o
