@@ -80,26 +80,17 @@ EXPORT_SYMBOL(ieee80211_state_name);
 /* XXX well-known names */
 static const char *auth_modnames[IEEE80211_AUTH_MAX] = {
 	/* NB: for now we have one module */
-#if 0
-	"wlan_auth_none",	/* IEEE80211_AUTH_NONE */
-	"wlan_auth_open",	/* IEEE80211_AUTH_OPEN */
-	"wlan_auth_shared",	/* IEEE80211_AUTH_SHARED */
-	"wlan_auth_8021x",	/* IEEE80211_AUTH_8021X	 */
-	"wlan_auth_auto",	/* IEEE80211_AUTH_AUTO */
-	"wlan_auth_wpa",	/* IEEE80211_AUTH_WPA */
-#else
-	"wlan_auth",		/* IEEE80211_AUTH_NONE */
-	"wlan_auth",		/* IEEE80211_AUTH_OPEN */
-	"wlan_auth",		/* IEEE80211_AUTH_SHARED */
+	"wlan_internal",	/* IEEE80211_AUTH_NONE */
+	"wlan_internal",	/* IEEE80211_AUTH_OPEN */
+	"wlan_internal",	/* IEEE80211_AUTH_SHARED */
 	"wlan_auth",		/* IEEE80211_AUTH_8021X	 */
-	"wlan_auth",		/* IEEE80211_AUTH_AUTO */
+	"wlan_internal",	/* IEEE80211_AUTH_AUTO */
 	"wlan_auth",		/* IEEE80211_AUTH_WPA */
-#endif
 };
 static const struct ieee80211_authenticator *authenticators[IEEE80211_AUTH_MAX];
 
 static const struct ieee80211_authenticator auth_internal = {
-	.ia_name		= "internal",
+	.ia_name		= "wlan_internal",
 	.ia_attach		= NULL,
 	.ia_detach		= NULL,
 	.ia_node_join		= NULL,
