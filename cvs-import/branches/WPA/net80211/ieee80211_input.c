@@ -939,8 +939,8 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 			IEEE80211_DPRINTF(ic,
 				IEEE80211_MSG_DEBUG | IEEE80211_MSG_AUTH,
 				("shared key %sauth request from station %s\n",
-				ether_sprintf(ni->ni_macaddr),
-				allocbs ? "" : "re"));
+				(allocbs ? "" : "re"),
+				ether_sprintf(ni->ni_macaddr)));
 			break;
 		case IEEE80211_AUTH_SHARED_RESPONSE:
 			if (ni == ic->ic_bss) {
