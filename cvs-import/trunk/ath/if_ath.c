@@ -379,16 +379,17 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	if (sc->sc_bhalq == (u_int) -1) {
 		printk(KERN_ERR "%s: unable to setup a beacon xmit queue!\n",
 			dev->name);
+		error = EIO;
 		goto bad2;
 	}
-	if (!ath_tx_setup(sc, WME_AC_BE, HAL_WME_AC_BE))
+	/* NB: insure BK queue is h/w queue 0 */
+	if (!ath_tx_setup(sc, WME_AC_BE, HAL_WME_AC_BK) ||
+	    !ath_tx_setup(sc, WME_AC_BK, HAL_WME_AC_BE) ||
+	    !ath_tx_setup(sc, WME_AC_VI, HAL_WME_AC_VI) ||
+	    !ath_tx_setup(sc, WME_AC_VO, HAL_WME_AC_VO)) {
+		error = EIO;
 		goto bad2;
-	if (!ath_tx_setup(sc, WME_AC_BK, HAL_WME_AC_BK))
-		goto bad2;
-	if (!ath_tx_setup(sc, WME_AC_VI, HAL_WME_AC_VI))
-		goto bad2;
-	if (!ath_tx_setup(sc, WME_AC_VO, HAL_WME_AC_VO))
-		goto bad2;
+	}
 	/* 
 	 * Special case certain configurations.
 	 */
@@ -402,8 +403,10 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	}
 
 	sc->sc_rc = ath_rate_attach(sc);
-	if (sc->sc_rc == NULL)
+	if (sc->sc_rc == NULL) {
+		error = EIO;
 		goto bad2;
+	}
 
 	init_timer(&sc->sc_scan_ch);
 	sc->sc_scan_ch.function = ath_next_scan;
