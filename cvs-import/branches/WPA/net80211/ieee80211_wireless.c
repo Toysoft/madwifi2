@@ -1703,7 +1703,7 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 	/* NB: cipher support is verified by ieee80211_crypt_newkey */
 	/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
 	if (ik->ik_keylen > sizeof(ik->ik_keydata))
-		return -EINVAL;
+		return -E2BIG;
 	kid = ik->ik_keyix;
 	if (kid == IEEE80211_KEYIX_NONE) {
 		/* XXX unicast keys currently must be tx/rx */
@@ -1712,11 +1712,11 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 		if (ic->ic_opmode == IEEE80211_M_STA) {
 			ni = ic->ic_bss;
 			if (!IEEE80211_ADDR_EQ(ik->ik_macaddr, ni->ni_bssid))
-				return -EINVAL;	/* XXX */
+				return -EADDRNOTAVAIL;
 		} else
 			ni = ieee80211_find_node(ic, ik->ik_macaddr);
 		if (ni == NULL)
-			return -EINVAL;		/* XXX */
+			return -ENOENT;
 		wk = &ni->ni_ucastkey;
 	} else {
 		if (kid >= IEEE80211_WEP_NKID)
@@ -1739,11 +1739,11 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 		memcpy(wk->wk_key, ik->ik_keydata, ik->ik_keylen);
 		if (!ieee80211_crypto_setkey(ic, wk,
 		    ni != NULL ? ni->ni_macaddr : ik->ik_macaddr))
-			error = -ENOENT;		/* XXX */
+			error = -EIO;
 		else if ((ik->ik_flags & IEEE80211_KEY_DEFAULT))
 			ic->ic_def_txkey = kid;
 	} else
-		error = -EINVAL;		/* XXX */
+		error = -ENXIO;
 	ieee80211_key_update_end(ic);
 	if (ni != NULL && ni != ic->ic_bss)
 		ieee80211_free_node(ic, ni);
