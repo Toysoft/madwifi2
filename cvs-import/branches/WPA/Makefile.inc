@@ -53,7 +53,7 @@ OS=		linux
 # to override the default setting.
 #
 ifeq ($(TARGET),)
-TARGET=		i386-elf
+TARGET=		$(shell uname -i)-elf
 endif
 
 #
