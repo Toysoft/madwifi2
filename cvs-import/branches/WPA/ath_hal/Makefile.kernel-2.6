@@ -19,7 +19,7 @@ EXTRA_CFLAGS+=	-I.			# for opt_ah.h
 $(obj)/hal.o:	${HAL}/linux/${TARGET}.hal.o.uu
 	${UUDECODE} -o $(obj)/hal.o < $<
 opt_ah.h: ${HAL}/linux/${TARGET}.opt_ah.h
-	cp ${HAL}/linux/${TARGET}.opt_ah.h opt_ah.h
+	cp ${HAL}/linux/${TARGET}.opt_ah.h ${HAL}/opt_ah.h
 else
 #
 # Use private version of HAL.
