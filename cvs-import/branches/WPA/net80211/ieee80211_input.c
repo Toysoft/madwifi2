@@ -61,7 +61,7 @@ static void ieee80211_recv_pspoll(struct ieee80211com *,
 
 #ifdef IEEE80211_DEBUG
 /*
- * Decide if a received frame management frame should
+ * Decide if a received management frame should be
  * printed when debugging is enabled.  This filters some
  * of the less interesting frames that come frequently
  * (e.g. beacons).
@@ -93,13 +93,14 @@ void
 ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211_node *ni, int rssi, u_int32_t rstamp)
 {
+#define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_frame *wh;
 	struct ether_header *eh;
 	int len;
 	u_int8_t dir, type, subtype;
 	u_int8_t *bssid;
-	u_int16_t rxseq, fragno;
+	u_int16_t rxseq;
 
 	KASSERT(ni != NULL, ("null node"));
 
@@ -198,23 +199,23 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
-		rxseq = ni->ni_rxseq;
-		fragno = ni->ni_fragno;
-		ni->ni_rxseq =
-		    le16toh(*(u_int16_t *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
-		ni->ni_fragno =
-		    le16toh(*(u_int16_t *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
+		rxseq = le16toh(*(u_int16_t *)wh->i_seq);
 		if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
-		    rxseq == ni->ni_rxseq && fragno == ni->ni_fragno) {
+		    SEQ_LEQ(rxseq, ni->ni_rxseq)) {
 		    	/* duplicate, discard */
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
 				("[%s] discard duplicate frame from %s, "
-				"seqno %u, fragno %u\n",
+				"seqno <%u,%u> fragno <%u,%u>\n",
 				ieee80211_state_name[ic->ic_state],
-				ether_sprintf(bssid), rxseq, fragno));
+				ether_sprintf(bssid),
+				rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
+				ni->ni_rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
+				rxseq & IEEE80211_SEQ_FRAG_MASK,
+				ni->ni_rxseq & IEEE80211_SEQ_FRAG_MASK));
 			ic->ic_stats.is_rx_dup++; /* XXX per-station stat */
 			goto out;
 		}
+		ni->ni_rxseq = rxseq;
 	}
 
 	/*
@@ -328,7 +329,7 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			/*
 			 * Device didn't handle WEP; do it in software.
 			 */
-			if (ic->ic_flags & IEEE80211_F_WEPON) {
+			if (ic->ic_flags & IEEE80211_F_PRIVACY) {
 				skb = ieee80211_wep_crypt(ic, ni, skb, 0);
 				if (skb == NULL) {
 					ic->ic_stats.is_rx_wepfail++;
@@ -336,7 +337,7 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				}
 				wh = (struct ieee80211_frame *) skb->data;
 			} else {
-				ic->ic_stats.is_rx_nowep++;
+				ic->ic_stats.is_rx_noprivacy++;
 				goto out;
 			}
 		}
@@ -425,21 +426,16 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			ic->ic_stats.is_rx_wrongdir++;
 			goto err;
 		}
-		if (ic->ic_opmode == IEEE80211_M_AHDEMO) {
-			ic->ic_stats.is_rx_ahdemo_mgt++;
-			goto out;
-		}
-
-		/* drop frames without interest */
-		if (ic->ic_state == IEEE80211_S_SCAN) {
-			if (subtype != IEEE80211_FC0_SUBTYPE_BEACON &&
-			    subtype != IEEE80211_FC0_SUBTYPE_PROBE_RESP) {
-				ic->ic_stats.is_rx_mgtdiscard++;
-				goto out;
-			}
-		} else {
-			if (ic->ic_opmode != IEEE80211_M_IBSS &&
-			    subtype == IEEE80211_FC0_SUBTYPE_BEACON) {
+		if (subtype == IEEE80211_FC0_SUBTYPE_BEACON) {
+			/*
+			 * Count beacon frames specially, some drivers
+			 * use this info to do things like update LED's.
+			 * Then discard them unless we're scanning or
+			 * operating in IBSS mode.
+			 */
+			ic->ic_stats.is_rx_beacon++;
+			if (!(ic->ic_state == IEEE80211_S_SCAN ||
+			      ic->ic_opmode == IEEE80211_M_IBSS)) {
 				ic->ic_stats.is_rx_mgtdiscard++;
 				goto out;
 			}
@@ -488,6 +484,7 @@ err:
 out:
 	if (skb != NULL)
 		dev_kfree_skb(skb);
+#undef SEQ_LEQ
 }
 EXPORT_SYMBOL(ieee80211_input);
 
@@ -817,7 +814,7 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 	 * ordering in which case this check would just be
 	 * for sanity/consistency.
 	 */
-	if ((ic->ic_flags & IEEE80211_F_WEPON) == 0) {
+	if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_AUTH,
 			("%s: WEP is off\n", __func__));
 		estatus = IEEE80211_STATUS_ALG;
@@ -1072,6 +1069,367 @@ ieee80211_ssid_mismatch(struct ieee80211com *ic, const char *tag,
 } while (0)
 #endif /* !IEEE80211_DEBUG */
 
+/* unalligned little endian access */     
+#define LE_READ_2(p)							\
+	((u_int16_t)							\
+	 ((((u_int8_t *)(p))[0]      ) | (((u_int8_t *)(p))[1] <<  8)))
+#define LE_READ_4(p)							\
+	((u_int32_t)							\
+	 ((((u_int8_t *)(p))[0]      ) | (((u_int8_t *)(p))[1] <<  8) |	\
+	  (((u_int8_t *)(p))[2] << 16) | (((u_int8_t *)(p))[3] << 24)))
+
+static int __inline
+iswpaoui(const u_int8_t *frm)
+{
+	return frm[1] > 3 && LE_READ_4(frm+2) == ((WPA_OUI_TYPE<<24)|WPA_OUI);
+}
+
+static int __inline
+isatherosoui(const u_int8_t *frm)
+{
+	return frm[1] > 3 && LE_READ_4(frm+2) == ((ATH_OUI_TYPE<<24)|ATH_OUI);
+}
+
+/*
+ * Convert a WPA cipher selector OUI to an internal
+ * cipher algorithm.  Where appropriate we also
+ * record any key length.
+ */
+static int
+wpa_cipher(u_int8_t *sel, u_int8_t *keylen)
+{
+#define	WPA_SEL(x)	(((x)<<24)|WPA_OUI)
+	u_int32_t w = LE_READ_4(sel);
+
+	switch (w) {
+	case WPA_SEL(WPA_CSE_NULL):
+		return IEEE80211_CIPHER_NONE;
+	case WPA_SEL(WPA_CSE_WEP40):
+		if (keylen)
+			*keylen = 40 / NBBY;
+		return IEEE80211_CIPHER_WEP;
+	case WPA_SEL(WPA_CSE_WEP104):
+		if (keylen)
+			*keylen = 104 / NBBY;
+		return IEEE80211_CIPHER_WEP;
+	case WPA_SEL(WPA_CSE_TKIP):
+		return IEEE80211_CIPHER_TKIP;
+	case WPA_SEL(WPA_CSE_CCMP):
+		return IEEE80211_CIPHER_AES_CCM;
+	}
+	return 32;		/* NB: so 1<< is discarded */
+#undef WPA_SEL
+}
+
+/*
+ * Convert a WPA key management/authentication algorithm
+ * to an internal code.
+ */
+static int
+wpa_keymgmt(u_int8_t *sel)
+{
+#define	WPA_SEL(x)	(((x)<<24)|WPA_OUI)
+	u_int32_t w = LE_READ_4(sel);
+
+	switch (w) {
+	case WPA_SEL(WPA_ASE_8021X_UNSPEC):
+		return WPA_ASE_8021X_UNSPEC;
+	case WPA_SEL(WPA_ASE_8021X_PSK):
+		return WPA_ASE_8021X_PSK;
+	case WPA_SEL(WPA_ASE_NONE):
+		return WPA_ASE_NONE;
+	}
+	return 32;		/* NB: so 1<< is discarded */
+#undef WPA_SEL
+}
+
+/*
+ * Parse a WPA information element to collect parameters
+ * and validate the parameters against what has been
+ * configured for the system.
+ */
+static int
+ieee80211_parse_wpa(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsnparms *rsn)
+{
+	u_int8_t len = frm[1];
+	u_int32_t w;
+	int n;
+
+	/*
+	 * Check the length once for fixed parts: OUI, type,
+	 * version, mcast cipher, and 2 selector counts.
+	 * Other, variable-length data, must be checked separately.
+	 */
+	KASSERT((ic->ic_flags & IEEE80211_F_WPA) == IEEE80211_F_WPA1,
+		("not WPA, flags 0x%x", ic->ic_flags));
+	if (len < 14) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: length %u too short\n", __func__, len));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	frm += 6, len -= 4;		/* NB: len is payload only */
+	/* NB: iswapoui already validated the OUI and type */
+	w = LE_READ_2(frm);
+	if (w != WPA_VERSION) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: bad version %u\n", __func__, w));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	frm += 2, len -= 2;
+
+	/* multicast/group cipher */
+	w = wpa_cipher(frm, &rsn->rsn_mcastkeylen);
+	if (w != rsn->rsn_mcastcipher) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: mcast cipher mismatch; got %u, expected %u\n",
+				__func__, w, rsn->rsn_mcastcipher));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	frm += 4, len -= 4;
+
+	/* unicast ciphers */
+	n = LE_READ_2(frm);
+	frm += 2, len -= 2;
+	if (len < n*4+2) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: not enough data for ucast ciphers; len %u, n %u\n",
+				__func__, len, n));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	w = 0;
+	for (; n > 0; n--) {
+		w |= 1<<wpa_cipher(frm, &rsn->rsn_ucastkeylen);
+		frm += 4, len -= 4;
+	}
+	w &= rsn->rsn_ucastcipherset;
+	if (w == 0) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: ucast cipher set empty\n", __func__));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	if (w & (1<<IEEE80211_CIPHER_TKIP))
+		rsn->rsn_ucastcipher = IEEE80211_CIPHER_TKIP;
+	else
+		rsn->rsn_ucastcipher = IEEE80211_CIPHER_AES_CCM;
+
+	/* key management algorithms */
+	n = LE_READ_2(frm);
+	frm += 2, len -= 2;
+	if (len < n*4) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: not enough data for key mgmt algorithms; len %u, n %u\n",
+				__func__, len, n));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	w = 0;
+	for (; n > 0; n--) {
+		w |= 1<<wpa_keymgmt(frm);
+		frm += 4, len -= 4;
+	}
+	w &= rsn->rsn_keymgmtset;
+	if (w == 0) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: no acceptable key mgmt algorithms\n", __func__));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	if (w & (1<<WPA_ASE_8021X_UNSPEC))
+		rsn->rsn_keymgmt = WPA_ASE_8021X_UNSPEC;
+	else
+		rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
+
+	if (len > 2)		/* optional capabilities */
+		rsn->rsn_caps = LE_READ_2(frm);
+
+	return 0;
+}
+
+/*
+ * Convert an RSN cipher selector OUI to an internal
+ * cipher algorithm.  Where appropriate we also
+ * record any key length.
+ */
+static int
+rsn_cipher(u_int8_t *sel, u_int8_t *keylen)
+{
+#define	RSN_SEL(x)	(((x)<<24)|RSN_OUI)
+	u_int32_t w = LE_READ_4(sel);
+
+	switch (w) {
+	case RSN_SEL(RSN_CSE_NULL):
+		return IEEE80211_CIPHER_NONE;
+	case RSN_SEL(RSN_CSE_WEP40):
+		if (keylen)
+			*keylen = 40 / NBBY;
+		return IEEE80211_CIPHER_WEP;
+	case RSN_SEL(RSN_CSE_WEP104):
+		if (keylen)
+			*keylen = 104 / NBBY;
+		return IEEE80211_CIPHER_WEP;
+	case RSN_SEL(RSN_CSE_TKIP):
+		return IEEE80211_CIPHER_TKIP;
+	case RSN_SEL(RSN_CSE_CCMP):
+		return IEEE80211_CIPHER_AES_CCM;
+	case RSN_SEL(RSN_CSE_WRAP):
+		return IEEE80211_CIPHER_AES_OCB;
+	}
+	return 32;		/* NB: so 1<< is discarded */
+#undef WPA_SEL
+}
+
+/*
+ * Convert an RSN key management/authentication algorithm
+ * to an internal code.
+ */
+static int
+rsn_keymgmt(u_int8_t *sel)
+{
+#define	RSN_SEL(x)	(((x)<<24)|RSN_OUI)
+	u_int32_t w = LE_READ_4(sel);
+
+	switch (w) {
+	case RSN_SEL(RSN_ASE_8021X_UNSPEC):
+		return RSN_ASE_8021X_UNSPEC;
+	case RSN_SEL(RSN_ASE_8021X_PSK):
+		return RSN_ASE_8021X_PSK;
+	case RSN_SEL(RSN_ASE_NONE):
+		return RSN_ASE_NONE;
+	}
+	return 32;		/* NB: so 1<< is discarded */
+#undef RSN_SEL
+}
+
+/*
+ * Parse a WPA/RSN information element to collect parameters
+ * and validate the parameters against what has been
+ * configured for the system.
+ */
+static int
+ieee80211_parse_rsn(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsnparms *rsn)
+{
+	u_int8_t len = frm[1];
+	u_int32_t w;
+	int n;
+
+	/*
+	 * Check the length once for fixed parts: 
+	 * version, mcast cipher, and 2 selector counts.
+	 * Other, variable-length data, must be checked separately.
+	 */
+	KASSERT((ic->ic_flags & IEEE80211_F_WPA) == IEEE80211_F_WPA2,
+		("not RSN, flags 0x%x", ic->ic_flags));
+	if (len < 10) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: length %u too short\n", __func__, len));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	w = LE_READ_2(frm);
+	if (w != RSN_VERSION) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: bad version %u\n", __func__, w));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	frm += 2, len -= 2;
+
+	/* multicast/group cipher */
+	w = rsn_cipher(frm, &rsn->rsn_mcastkeylen);
+	if (w != rsn->rsn_mcastcipher) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: mcast cipher mismatch; got %u, expected %u\n",
+				__func__, w, rsn->rsn_mcastcipher));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	frm += 4, len -= 4;
+
+	/* unicast ciphers */
+	n = LE_READ_2(frm);
+	frm += 2, len -= 2;
+	if (len < n*4+2) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: not enough data for ucast ciphers; len %u, n %u\n",
+				__func__, len, n));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	w = 0;
+	for (; n > 0; n--) {
+		w |= 1<<rsn_cipher(frm, &rsn->rsn_ucastkeylen);
+		frm += 4, len -= 4;
+	}
+	w &= rsn->rsn_ucastcipherset;
+	if (w == 0) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: ucast cipher set empty\n", __func__));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	if (w & (1<<IEEE80211_CIPHER_TKIP))
+		rsn->rsn_ucastcipher = IEEE80211_CIPHER_TKIP;
+	else
+		rsn->rsn_ucastcipher = IEEE80211_CIPHER_AES_CCM;
+
+	/* key management algorithms */
+	n = LE_READ_2(frm);
+	frm += 2, len -= 2;
+	if (len < n*4) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: not enough data for key mgmt algorithms; len %u, n %u\n",
+				__func__, len, n));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	w = 0;
+	for (; n > 0; n--) {
+		w |= 1<<rsn_keymgmt(frm);
+		frm += 4, len -= 4;
+	}
+	w &= rsn->rsn_keymgmtset;
+	if (w == 0) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
+			("%s: no acceptable key mgmt algorithms\n", __func__));
+		return IEEE80211_REASON_IE_INVALID;
+	}
+	if (w & (1<<RSN_ASE_8021X_UNSPEC))
+		rsn->rsn_keymgmt = RSN_ASE_8021X_UNSPEC;
+	else
+		rsn->rsn_keymgmt = RSN_ASE_8021X_PSK;
+
+	/* optional RSN capabilities */
+	if (len > 2)
+		rsn->rsn_caps = LE_READ_2(frm);
+	/* XXXPMKID */
+
+	return 0;
+}
+
+#ifdef IEEE80211_DEBUG
+static void
+dump_probe_beacon(u_int8_t subtype, int isnew,
+	const u_int8_t mac[IEEE80211_ADDR_LEN],
+	u_int8_t chan, u_int8_t bchan, u_int16_t capinfo, u_int16_t bintval,
+	u_int8_t erp, u_int8_t *ssid, u_int8_t *country)
+{
+	printf("[%s] %s%s on chan %u (bss chan %u) ",
+	    ether_sprintf(mac), isnew ? "new " : "",
+	    (subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP) ? "probe response" : "beacon",
+	    chan, bchan);
+	ieee80211_print_essid(ssid + 2, ssid[1]);
+	printf("\n");
+
+	if (isnew) {
+		printf("[%s] caps 0x%x bintval %u erp 0x%x", 
+			ether_sprintf(mac), capinfo, bintval, erp);
+		if (country) {
+#ifdef __FreeBSD__
+			printf(" country info %*D", country[1], country+2, " ");
+#else
+			int i;
+			printf(" country info");
+			for (i = 0; i < country[1]; i++)
+				printf(" %02x", country[i+2]);
+#endif
+		}
+		printf("\n");
+	}
+}
+#endif /* IEEE80211_DEBUG */
+
 void
 ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211_node *ni,
@@ -1080,8 +1438,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 #define	ISPROBE(_st)	((_st) == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
 	struct ieee80211_frame *wh;
 	u_int8_t *frm, *efrm;
-	u_int8_t *ssid, *rates, *xrates;
-	int reassoc, resp, newassoc, allocbs;
+	u_int8_t *ssid, *rates, *xrates, *wpa;
+	int reassoc, resp, allocbs;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	frm = (u_int8_t *)&wh[1];
@@ -1089,13 +1447,15 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 	case IEEE80211_FC0_SUBTYPE_BEACON: {
-		u_int8_t *tstamp, *bintval, *capinfo, *country;
+		u_int8_t *tstamp, *country, *wpa;
 		u_int8_t chan, bchan, fhindex, erp;
+		u_int16_t capinfo, bintval;
 		u_int16_t fhdwell;
 
 		if (ic->ic_opmode != IEEE80211_M_IBSS &&
 		    ic->ic_state != IEEE80211_S_SCAN) {
 			/* XXX: may be useful for background scan */
+			ic->ic_stats.is_rx_mgtdiscard++;
 			return;
 		}
 
@@ -1110,12 +1470,13 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 *	[tlv] parameter set (FH/DS)
 		 *	[tlv] erp information
 		 *	[tlv] extended supported rates
+		 *	[tlv] WPA or RSN
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 12);
-		tstamp  = frm;	frm += 8;
-		bintval = frm;	frm += 2;
-		capinfo = frm;	frm += 2;
-		ssid = rates = xrates = country = NULL;
+		tstamp  = frm;				frm += 8;
+		bintval = le16toh(*(u_int16_t *)frm);	frm += 2;
+		capinfo = le16toh(*(u_int16_t *)frm);	frm += 2;
+		ssid = rates = xrates = country = wpa = NULL;
 		bchan = ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan);
 		chan = bchan;
 		fhdwell = 0;
@@ -1149,6 +1510,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				break;
 			case IEEE80211_ELEMID_TIM:
 				break;
+			case IEEE80211_ELEMID_IBSSPARMS:
+				break;
 			case IEEE80211_ELEMID_XRATES:
 				xrates = frm;
 				break;
@@ -1163,6 +1526,17 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 					break;
 				}
 				erp = frm[2];
+				break;
+			case IEEE80211_ELEMID_RSN:
+				if (ic->ic_flags & IEEE80211_F_WPA2)
+					wpa = frm;
+				break;
+			case IEEE80211_ELEMID_VENDOR:
+				if (iswpaoui(frm)) {
+					if (ic->ic_flags & IEEE80211_F_WPA1)
+						wpa = frm;
+				}
+				/* XXX Atheros OUI support */
 				break;
 			default:
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID,
@@ -1218,34 +1592,16 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 * This may result in a bloat of the scanned AP list but
 		 * it shouldn't be too much.
 		 */
-		ni = ieee80211_lookup_node(ic, wh->i_addr2,
+		ni = ieee80211_find_node_with_channel(ic, wh->i_addr2,
 				&ic->ic_channels[chan]);
-#ifdef IEEE80211_DEBUG
-		if (ieee80211_msg_debug(ic) && doprint(ic, subtype)) {
-			printf("%s: %s%s on chan %u (bss chan %u) ",
-			    __func__, (ni == NULL ? "new " : ""),
-			    ISPROBE(subtype) ? "probe response" : "beacon",
-			    chan, bchan);
-			ieee80211_print_essid(ssid + 2, ssid[1]);
-			printf(" from %s\n", ether_sprintf(wh->i_addr2));
-			printf("%s: caps 0x%x bintval %u erp 0x%x\n",
-				__func__, le16toh(*(u_int16_t *)capinfo),
-				le16toh(*(u_int16_t *)bintval), erp);
-			if (country) {
-#ifdef __FreeBSD__
-				printf("%s: country info %*D\n",
-					__func__, country[1], country+2, " ");
-#else
-				int i;
-				printf("%s: country info", __func__);
-				for (i = 0; i < country[1]; i++)
-					printf(" %02x", country[i+2]);
-#endif
-			}
-		}
-#endif
 		if (ni == NULL) {
-			ni = ieee80211_alloc_node(ic, wh->i_addr2);
+#ifdef IEEE80211_DEBUG
+			if (ieee80211_msg_scan(ic))
+				dump_probe_beacon(subtype, 1,
+				    wh->i_addr2, chan, bchan, capinfo,
+				    bintval, erp, ssid, country);
+#endif
+			ni = ieee80211_dup_bss(ic, wh->i_addr2);
 			if (ni == NULL)
 				return;
 			ni->ni_esslen = ssid[1];
@@ -1259,13 +1615,19 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ni->ni_esslen = ssid[1];
 			memset(ni->ni_essid, 0, sizeof(ni->ni_essid));
 			memcpy(ni->ni_essid, ssid + 2, ssid[1]);
+#ifdef IEEE80211_DEBUG
+			if (ieee80211_msg_scan(ic) || ieee80211_msg_debug(ic))
+				dump_probe_beacon(subtype, 0,
+				    wh->i_addr2, chan, bchan, capinfo,
+				    bintval, erp, ssid, country);
+#endif
 		}
 		IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
 		memcpy(ni->ni_tstamp, tstamp, sizeof(ni->ni_tstamp));
-		ni->ni_intval = le16toh(*(u_int16_t *)bintval);
-		ni->ni_capinfo = le16toh(*(u_int16_t *)capinfo);
+		ni->ni_intval = bintval;
+		ni->ni_capinfo = capinfo;
 		/* XXX validate channel # */
 		ni->ni_chan = &ic->ic_channels[chan];
 		ni->ni_fhdwell = fhdwell;
@@ -1286,6 +1648,20 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				ether_sprintf(wh->i_addr2)));
 			ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
 		}
+		if (wpa != NULL) {
+			u_int ielen = wpa[1]+2;
+			/*
+			 * Record WPA/RSN information element for use by
+			 * applications like wpa_supplicant.
+			 */
+			if (ni->ni_wpa_ie == NULL || ni->ni_wpa_ie[1] != wpa[1]) {
+				if (ni->ni_wpa_ie != NULL)
+					FREE(ni->ni_wpa_ie, M_DEVBUF);
+				MALLOC(ni->ni_wpa_ie, void*, ielen, M_DEVBUF, M_NOWAIT);
+			}
+			if (ni->ni_wpa_ie != NULL)
+				memcpy(ni->ni_wpa_ie, wpa, ielen);
+		}
 		/* NB: must be after ni_chan is setup */
 		ieee80211_setup_rates(ic, ni, rates, xrates, IEEE80211_F_DOSORT);
 		ieee80211_unref_node(&ni);	/* NB: do not free */
@@ -1295,10 +1671,11 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_PROBE_REQ: {
 		u_int8_t rate;
 
-		if (ic->ic_opmode == IEEE80211_M_STA)
+		if (ic->ic_opmode == IEEE80211_M_STA ||
+		    ic->ic_state != IEEE80211_S_RUN) {
+			ic->ic_stats.is_rx_mgtdiscard++;
 			return;
-		if (ic->ic_state != IEEE80211_S_RUN)
-			return;
+		}
 
 		/*
 		 * prreq frame format
@@ -1411,10 +1788,14 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
 	case IEEE80211_FC0_SUBTYPE_REASSOC_REQ: {
 		u_int16_t capinfo, bintval;
+		struct ieee80211_rsnparms rsn;
+		u_int8_t reason;
 
 		if (ic->ic_opmode != IEEE80211_M_HOSTAP ||
-		    ic->ic_state != IEEE80211_S_RUN)
+		    ic->ic_state != IEEE80211_S_RUN) {
+			ic->ic_stats.is_rx_mgtdiscard++;
 			return;
+		}
 
 		if (subtype == IEEE80211_FC0_SUBTYPE_REASSOC_REQ) {
 			reassoc = 1;
@@ -1431,6 +1812,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
+		 *	[tlv] WPA or RSN
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, (reassoc ? 10 : 4));
 		if (!IEEE80211_ADDR_EQ(wh->i_addr3, ic->ic_bss->ni_bssid)) {
@@ -1445,7 +1827,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		bintval = le16toh(*(u_int16_t *)frm);	frm += 2;
 		if (reassoc)
 			frm += 6;	/* ignore current AP info */
-		ssid = rates = xrates = NULL;
+		ssid = rates = xrates = wpa = NULL;
 		while (frm < efrm) {
 			switch (*frm) {
 			case IEEE80211_ELEMID_SSID:
@@ -1456,6 +1838,17 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				break;
 			case IEEE80211_ELEMID_XRATES:
 				xrates = frm;
+				break;
+			/* XXX verify only one of RSN and WPA ie's? */
+			case IEEE80211_ELEMID_RSN:
+				wpa = frm;
+				break;
+			case IEEE80211_ELEMID_VENDOR:
+				if (iswpaoui(frm)) {
+					if (ic->ic_flags & IEEE80211_F_WPA1)
+						wpa = frm;
+				}
+				/* XXX Atheros OUI support */
 				break;
 			}
 			frm += frm[1] + 2;
@@ -1479,12 +1872,47 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ic->ic_stats.is_rx_assoc_notauth++;
 			return;
 		}
+		if (wpa != NULL) {
+			/*
+			 * Parse WPA information element.  Note that
+			 * we initialize the param block from the node
+			 * state so that informaiton in the IE overrides
+			 * our defaults.  The resulting parameters are
+			 * installed below after the association is assured.
+			 */
+			rsn = ni->ni_rsn;
+			if (ic->ic_flags & IEEE80211_F_WPA1)
+				reason = ieee80211_parse_wpa(ic, wpa, &rsn);
+			else
+				reason = ieee80211_parse_rsn(ic, wpa, &rsn);
+			if (reason != 0) {
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
+					("%s: bad %s ie from %s, reason %u\n",
+					__func__, ic->ic_flags & IEEE80211_F_WPA1 ?
+						"WPA" : "RSN",
+					ether_sprintf(wh->i_addr2), reason));
+				IEEE80211_SEND_MGMT(ic, ni,
+				    IEEE80211_FC0_SUBTYPE_DEAUTH, reason);
+				ieee80211_node_leave(ic, ni);
+				/* XXX distinguish WPA/RSN? */
+				ic->ic_stats.is_rx_assoc_badwpaie++;
+				return;
+			}
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
+				("%s: %s ie from %s, "
+				"mc %u/%u uc %u/%u key %u caps 0x%x\n",
+				__func__, ic->ic_flags & IEEE80211_F_WPA1 ?
+					"WPA" : "RSN",
+				ether_sprintf(wh->i_addr2),
+				rsn.rsn_mcastcipher, rsn.rsn_mcastkeylen,
+				rsn.rsn_ucastcipher, rsn.rsn_ucastkeylen,
+				rsn.rsn_keymgmt, rsn.rsn_caps));
+		}
 		/* discard challenge after association */
 		if (ni->ni_challenge != NULL) {
 			FREE(ni->ni_challenge, M_DEVBUF);
 			ni->ni_challenge = NULL;
 		}
-		/* XXX per-node cipher suite */
 		/* XXX some stations use the privacy bit for handling APs
 		       that suport both encrypted and unencrypted traffic */
 		/* NB: PRIVACY flag bits are assumed to match */
@@ -1520,87 +1948,9 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ni->ni_chan = ic->ic_bss->ni_chan;
 		ni->ni_fhdwell = ic->ic_bss->ni_fhdwell;
 		ni->ni_fhindex = ic->ic_bss->ni_fhindex;
-		if (ni->ni_associd == 0) {
-			u_int16_t aid;
-
-			/*
-			 * It would be good to search the bitmap
-			 * more efficiently, but this will do for now.
-			 */
-			for (aid = 1; aid < ic->ic_max_aid; aid++) {
-				if (!IEEE80211_AID_ISSET(aid,
-				    ic->ic_aid_bitmap))
-					break;
-			}
-			if (aid >= ic->ic_max_aid) {
-				IEEE80211_SEND_MGMT(ic, ni, resp,
-				    IEEE80211_REASON_ASSOC_TOOMANY);
-				ieee80211_node_leave(ic, ni);
-				return;
-			}
-			ni->ni_associd = aid | 0xc000;
-			IEEE80211_AID_SET(ni->ni_associd, ic->ic_aid_bitmap);
-			newassoc = 1;
-			/*
-			 * Station isn't capable of short slot time.  Bump
-			 * the count of long slot time stations and disable
-			 * use of short slot time.  Note that the actual switch
-			 * over to long slot time use will not occur until the
-			 * next beacon transmission (per sec. 7.3.1.4 of 11g).
-			 */
-			if ((capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) == 0) {
-				ic->ic_longslotsta++;
-				ic->ic_flags &= ~IEEE80211_F_SHSLOT;
-				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-					("station %s needs long slot time, "
-					"count %d\n",
-					ether_sprintf(ni->ni_macaddr),
-					ic->ic_longslotsta));
-			}
-			/*
-			 * If the new station is not an ERP station
-			 * then bump the counter and enable protection
-			 * if configured.
-			 */
-			if (!ieee80211_iserp_rateset(ic, &ni->ni_rates)) {
-				ic->ic_nonerpsta++;
-				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-					("station %s is !erp, count %d\n",
-					ether_sprintf(ni->ni_macaddr),
-					ic->ic_nonerpsta));
-				/*
-				 * If protection is configured, enable it.
-				 */
-				if (ic->ic_protmode != IEEE80211_PROT_NONE)
-					ic->ic_flags |= IEEE80211_F_USEPROT;
-				/*
-				 * If station does not support short preamble
-				 * then we must enable use of Barker preamble.
-				 */
-				if ((capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) == 0) {
-					IEEE80211_DPRINTF(ic,
-					    IEEE80211_MSG_ASSOC,
-					    ("station %s needs long preamble\n",
-					    ether_sprintf(ni->ni_macaddr)));
-					ic->ic_flags |= IEEE80211_F_USEBARKER;
-					ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
-				}
-			} else
-				ni->ni_flags |= IEEE80211_NODE_ERP;
-		} else
-			newassoc = 0;
-		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC | IEEE80211_MSG_DEBUG,
-			("station %s %s associated at aid %d\n",
-			(newassoc ? "newly" : "already"),
-			ether_sprintf(ni->ni_macaddr),
-			IEEE80211_NODE_AID(ni)));
-		/* give driver a chance to setup state like ni_txrate */
-		if (ic->ic_newassoc)
-			(*ic->ic_newassoc)(ic, ni, newassoc);
-		IEEE80211_SEND_MGMT(ic, ni, resp, IEEE80211_STATUS_SUCCESS);
-		/* tell the authenticator about new station */
-		if (ic->ic_ec != NULL)
-			(*ic->ic_node_join)(ic, ni);
+		if (wpa != NULL)		/* NB: override defaults */
+			ni->ni_rsn = rsn;
+		ieee80211_node_join(ic, ni, resp);
 		break;
 	}
 
@@ -1609,8 +1959,10 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		u_int16_t status;
 
 		if (ic->ic_opmode != IEEE80211_M_STA ||
-		    ic->ic_state != IEEE80211_S_ASSOC)
+		    ic->ic_state != IEEE80211_S_ASSOC) {
+			ic->ic_stats.is_rx_mgtdiscard++;
 			return;
+		}
 
 		/*
 		 * asresp frame format
@@ -1637,7 +1989,9 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		frm += 2;
 		if (status != 0) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-				("association failed (reason %d) for %s\n",
+				("%sassociation failed (reason %d) for %s\n",
+				(subtype == IEEE80211_FC0_SUBTYPE_REASSOC_RESP ?
+					"re" : ""),
 				status, ether_sprintf(wh->i_addr3)));
 			if (ni != ic->ic_bss)
 				ni->ni_fails++;
@@ -1665,13 +2019,17 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
 				IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
 		if (ni->ni_rates.rs_nrates != 0)
-			ieee80211_new_state(ic, IEEE80211_S_RUN,
-				wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK);
+			ieee80211_new_state(ic, IEEE80211_S_RUN, subtype);
 		break;
 	}
 
 	case IEEE80211_FC0_SUBTYPE_DEAUTH: {
 		u_int16_t reason;
+
+		if (ic->ic_state == IEEE80211_S_SCAN) {
+			ic->ic_stats.is_rx_mgtdiscard++;
+			return;
+		}
 		/*
 		 * deauth frame format
 		 *	[2] reason
@@ -1694,6 +2052,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			break;
 		default:
+			ic->ic_stats.is_rx_mgtdiscard++;
 			break;
 		}
 		break;
@@ -1701,6 +2060,12 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 
 	case IEEE80211_FC0_SUBTYPE_DISASSOC: {
 		u_int16_t reason;
+
+		if (ic->ic_state != IEEE80211_S_RUN &&
+		    ic->ic_state != IEEE80211_S_AUTH) {
+			ic->ic_stats.is_rx_mgtdiscard++;
+			return;
+		}
 		/*
 		 * disassoc frame format
 		 *	[2] reason
@@ -1723,6 +2088,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			break;
 		default:
+			ic->ic_stats.is_rx_mgtdiscard++;
 			break;
 		}
 		break;
