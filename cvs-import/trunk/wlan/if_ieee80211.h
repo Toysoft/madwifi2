@@ -389,7 +389,6 @@ enum ieee80211_state {
 struct ieee80211channel {
 	u_int16_t	ic_freq;	/* setting in Mhz */
 	u_int16_t	ic_flags;	/* see below */
-	void		*ic_private;	/* driver private */
 };
 
 /* bits 0-3 are for private use by drivers */
