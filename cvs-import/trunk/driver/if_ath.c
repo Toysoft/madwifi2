@@ -373,9 +373,11 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	status &= sc->sc_imask;			/* discard unasked for bits */
 	if (status & HAL_INT_FATAL) {
 		sc->sc_stats.ast_hardware++;
+		ath_hal_intrset(ah, 0);		/* disable intr's until reset */
 		needmark |= queue_task(&sc->sc_fataltq, &tq_immediate);
 	} else if (status & HAL_INT_RXORN) {
 		sc->sc_stats.ast_rxorn++;
+		ath_hal_intrset(ah, 0);		/* disable intr's until reset */
 		needmark |= queue_task(&sc->sc_rxorntq, &tq_immediate);
 	} else {
 		if (status & HAL_INT_RXEOL) {
@@ -2160,11 +2162,6 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 		}
 
 		/*
-		 * Re-enable interrupts.
-		 */
-		ath_hal_intrset(ah, sc->sc_imask);
-
-		/*
 		 * Change channels and update the h/w rate map
 		 * if we're switching; e.g. 11a to 11b/g.
 		 */
@@ -2172,6 +2169,11 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 		mode = ieee80211_chan2mode(ic, chan);
 		if (mode != sc->sc_curmode)
 			ath_setcurmode(sc, mode);
+
+		/*
+		 * Re-enable interrupts.
+		 */
+		ath_hal_intrset(ah, sc->sc_imask);
 	}
 	return 0;
 }
