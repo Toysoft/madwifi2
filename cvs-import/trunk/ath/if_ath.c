@@ -955,10 +955,6 @@ ath_stop_locked(struct net_device *dev)
 		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);
-		if (!sc->sc_invalid) {
-
-			ath_hal_setpower(ah, HAL_PM_FULL_SLEEP, 0);
-		}
 	}
 	return 0;
 }
@@ -977,6 +973,18 @@ ath_stop(struct net_device *dev)
 
 	ATH_LOCK(sc);
 	error = ath_stop_locked(dev);
+	if (error == 0 && !sc->sc_invalid) {
+		/*
+		 * Set the chip in full sleep mode.  Note that we are
+		 * careful to do this only when bringing the interface
+		 * completely to a stop.  When the chip is in this state
+		 * it must be carefully woken up or references to
+		 * registers in the PCI clock domain may freeze the bus
+		 * (and system).  This varies by chip and is mostly an
+		 * issue with newer parts that go to sleep more quickly.
+		 */
+		ath_hal_setpower(sc->sc_ah, HAL_PM_FULL_SLEEP, 0);
+	}
 	ATH_UNLOCK(sc);
 	return error;
 }
