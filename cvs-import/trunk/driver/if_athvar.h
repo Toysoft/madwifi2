@@ -32,6 +32,8 @@
 #ifndef _DEV_ATH_ATHVAR_H
 #define _DEV_ATH_ATHVAR_H
 
+#include "if_ieee80211.h"
+#include "if_media.h"
 #include "ah.h"
 
 #define	ATH_TIMEOUT		1000
@@ -72,22 +74,30 @@ struct ath_stats {
 	u_int32_t	ast_rx_phy_tor;	/* rx PHY: transmit voerride receive */
 };
 
-#define	SIOCGATHSTATS	_IOWR('i', 137, struct ifreq)
+struct ath_buf {
+	TAILQ_ENTRY(ath_buf)	bf_list;
+	int			bf_nseg;
+	struct ath_desc		*bf_desc;	/* virtual addr of desc */
+	dma_addr_t		bf_daddr;	/* physical addr of desc */
+	struct sk_buff		*bf_skb;	/* skbuff for buf */
+	struct ieee80211_node	*bf_node;	/* pointer to the node */
+};
+
+struct ath_hal;
+struct ath_desc;
 
 struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
-	device_t		sc_dev;
-	struct mtx		sc_mtx;
+	spinlock_t		sc_lock;
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
-	bus_space_tag_t		sc_st;		/* bus space tag */
-	bus_space_handle_t	sc_sh;		/* bus space handle */
-	bus_dma_tag_t		sc_dmat;	/* bus DMA tag */
+	struct pci_dev		*sc_pci_dev;	/* associated pci device */
+	int			sc_unit;	/* logical card number */
 	int			sc_devno;	/* PCI device # */
 	int			(*sc_enable)(struct ath_softc *);
 	void			(*sc_disable)(struct ath_softc *);
 	unsigned int		sc_attached : 1,/* device is attached */
-				sc_enabled  : 1,/* can talk to hardware */
-				sc_invalid  : 1;/* ??? deactivated */
+				sc_invalid  : 1,/* ??? deactivated */
+				sc_oactive  : 1;/* output processing active */
 	struct ifmedia		sc_media;
 	TAILQ_HEAD(, ath_buf)	sc_rxbuf,	/* receive buffer */
 				sc_txbuf,	/* transmit buffer */
@@ -98,43 +108,39 @@ struct ath_softc {
 	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
 
 	struct ath_desc		*sc_desc;	/* TX descriptors */
-	bus_dma_segment_t	sc_dseg;
-	bus_dmamap_t		sc_ddmamap;	/* DMA map for descriptors */
-	bus_addr_t		sc_desc_paddr;	/* physical addr of sc_desc */
-	bus_addr_t		sc_desc_len;	/* size of sc_desc */
+	size_t			sc_desc_len;	/* size of TX descriptors */
+	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
 
 	HAL_CHANNEL		sc_channels[ATH_MAXCHAN];
 						/* HAL channel descriptors */
 	HAL_CHANNEL		*sc_cur_chan;	/* current hardware setting */
-	struct callout		sc_cal_ch;	/* callout handle for cals */
-	struct callout		sc_scan_ch;	/* callout handle for scan */
+	struct timer_list	sc_cal_ch;	/* timer for calibrations */
+	struct timer_list	sc_scan_ch;	/* timer for scans */
 	int			sc_tx_timer;	/* transmit timeout */
+	struct sk_buff_head	sc_sndq;	/* transmit queue */
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
 };
 
-#define	ATH_LOCK(_sc)	mtx_lock(&(_sc)->sc_mtx);
-#define	ATH_UNLOCK(_sc)	mtx_unlock(&(_sc)->sc_mtx);
+#define	ATH_LOCK(_sc)	spin_lock_irq(&(_sc)->sc_lock);
+#define	ATH_UNLOCK(_sc)	spin_unlock_irq(&(_sc)->sc_lock);
 
 #define	ATH_BITVAL(val, name)	(((val) & name) >> name##_S)
 
 #ifdef AR_DEBUG
 extern	int ath_debug;
-#define	DPRINTF(X)	if (ath_debug) printf X
-#define	DPRINTF2(X)	if (ath_debug > 1) printf X
+#define	DPRINTF(X)	if (ath_debug) printk X
+#define	DPRINTF2(X)	if (ath_debug > 1) printk X
 #else
 #define	DPRINTF(X)
 #define	DPRINTF2(X)
 #endif
 
-int	ath_attach(u_int16_t, struct ath_softc *);
-int	ath_detach(struct ath_softc *);
-#if 0
-int	ath_activate(struct device *, enum devact);
-#endif
-void	ath_resume(struct ath_softc *);
-void	ath_suspend(struct ath_softc *);
-void	ath_shutdown(struct ath_softc *);
+int	ath_attach(u_int16_t, struct net_device *);
+int	ath_detach(struct net_device *);
+void	ath_resume(struct net_device *);
+void	ath_suspend(struct net_device *);
+void	ath_shutdown(struct net_device *);
 void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 
 /*

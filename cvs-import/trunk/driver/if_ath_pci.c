@@ -27,21 +27,17 @@
  */
 #include "opt_ah.h"
 
+#ifndef EXPORT_SYMTAB
+#define	EXPORT_SYMTAB
+#endif
+
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/if.h>
-#include <linux/wireless.h>
-#include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,44))
-#include <linux/tqueue.h>
-#else
-#include <linux/workqueue.h>
-#endif
 
-#include <linux/ioport.h>
 #include <linux/pci.h>
 
 #include "if_athvar.h"
@@ -49,17 +45,6 @@
 /*
  * Much of this code is cribbed from Jouni Malinens hostap driver.
  */
-
-static char *version = ATH_VERSION " (Sam Leffler <sam@errno.com>)";
-static char *dev_info = "ath_pci";
-
-MODULE_AUTHOR("Errno Consulting, Sam Leffler");
-MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN PCI cards.");
-MODULE_SUPPORTED_DEVICE("Atheros WLAN PCI cards");
-#ifdef MODULE_LICENSE
-MODULE_LICENSE("BSD");
-#endif
-
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
 /*
@@ -69,88 +54,102 @@ MODULE_LICENSE("BSD");
 #error Atheros PCI version requires at least Linux kernel version 2.4.0
 #endif /* kernel < 2.4.0 */
 
+struct ath_pci_softc {
+	struct ath_softc	aps_sc;
+	struct module		*aps_module;
+#ifdef CONFIG_PM
+	u32			aps_pmstate[16];
+#endif
+};
 
-/* FIX: do we need mb/wmb/rmb with memory operations? */
-
-static struct pci_device_id atheros_pci_id_table[] __devinitdata = {
+/*
+ * User a static table of PCI id's for now.  While this is the
+ * "new way" to do things, we may want to switch back to having
+ * the HAL check them by defining a probe method.
+ */
+static struct pci_device_id ath_pci_id_table[] __devinitdata = {
 	{ 0x168c, 0x0007, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0011, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0013, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0 }
 };
 
+static	int ath_cards_found = 0;
+
 static int
 ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	unsigned long phymem;
-	unsigned long mem = 0;
-	local_info_t *local = NULL;
-	struct net_device *dev = NULL;
-	static int cards_found /* = 0 */;
-	int irq_registered = 0;
+	unsigned long mem;
+	struct ath_pci_softc *sc;
+	struct net_device *dev;
 
 	if (pci_enable_device(pdev))
 		return (-EIO);
 
-	phymem = pci_resource_start(pdev, 0);
-	if (!request_mem_region(phymem, pci_resource_len(pdev, 0), "Atheros")) {
-		printk(KERN_ERR "ath_pci_probe: cannot reserve PCI memory region\n");
-		goto err_out_disable;
-	}
-
-	mem = (unsigned long) ioremap(phymem, pci_resource_len(pdev, 0));
-	if (!mem) {
-		printk(KERN_ERR "ath_pci_probe: cannot remap PCI memory region\n") ;
-		goto fail;
+	/* XXX 32-bit addressing only */
+	if (pci_set_dma_mask(pdev, 0xffffffff)) {
+		printk(KERN_ERR "ath_pci: 32-bit DMA not available\n");
+		goto bad;
 	}
 
 	pci_set_master(pdev);
 
-	local = ath_init_local_data(&ath_pci_funcs, cards_found);
-	if (local == NULL)
-		goto fail;
-	cards_found++;
+	phymem = pci_resource_start(pdev, 0);
+	if (!request_mem_region(phymem, pci_resource_len(pdev, 0), "ath")) {
+		printk(KERN_ERR "ath_pci: cannot reserve PCI memory region\n");
+		goto bad;
+	}
 
-	dev = local->dev;
+	mem = (unsigned long) ioremap(phymem, pci_resource_len(pdev, 0));
+	if (!mem) {
+		printk(KERN_ERR "ath_pci: cannot remap PCI memory region\n") ;
+		goto bad1;
+	}
 
-        dev->irq = pdev->irq;
-        dev->mem_start = mem;
-        dev->mem_end = mem + pci_resource_len(pdev, 0);
+	sc = kmalloc(sizeof(struct ath_pci_softc), GFP_KERNEL);
+	if (sc == NULL) {
+		printk(KERN_ERR "ath_pci: no memory for device state\n");
+		goto bad2;
+	}
+	memset(sc, 0, sizeof(struct ath_pci_softc));
 
-	if (ath_init_dev(local))
-		goto fail;
+	sc->aps_module = THIS_MODULE;
+	dev = &sc->aps_sc.sc_ic.ic_dev;	/* XXX blech, violate layering */
+	memcpy(dev->name, "ath%d", sizeof("ath%d"));
 
-	ath_pci_cor_sreset(local);
+	dev->irq = pdev->irq;
+	dev->mem_start = mem;
+	dev->mem_end = mem + pci_resource_len(pdev, 0);
+	dev->priv = sc;
+
+	sc->aps_sc.sc_pci_dev = pdev;
 
 	pci_set_drvdata(pdev, dev);
 
-	if (request_irq(dev->irq, ath_interrupt, SA_SHIRQ, dev->name, dev)) {
+	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
 		printk(KERN_WARNING "%s: request_irq failed\n", dev->name);
-		goto fail;
-	} else
-		irq_registered = 1;
-
-	if (ath_hw_config(dev, 1)) {
-		printk(KERN_DEBUG "%s: hardware initialization failed\n",
-		       dev_info);
-		goto fail;
+		goto bad3;
 	}
+
+	if (ath_attach(id->device, dev) != 0)
+		goto bad4;
 
 	printk(KERN_INFO "%s: Atheros PCI: mem=0x%lx, irq=%d\n",
 		dev->name, phymem, dev->irq);
-	return 0;
-fail:
-	ath_free_local_data(local);
-	if (irq_registered && dev)
-		free_irq(dev->irq, dev);
-	if (mem)
-		iounmap((void *) mem);
-	release_mem_region(phymem, pci_resource_len(pdev, 0));
+	ath_cards_found++;
 
-err_out_disable:
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4))
+	return 0;
+bad4:
+	free_irq(dev->irq, dev);
+bad3:
+	kfree(sc);
+bad2:
+	iounmap((void *) mem);
+bad1:
+	release_mem_region(phymem, pci_resource_len(pdev, 0));
+bad:
 	pci_disable_device(pdev);
-#endif
 	return (-ENODEV);
 }
 
@@ -158,27 +157,14 @@ static void
 ath_pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	local_info_t *local = (local_info_t *) dev->priv;
-	unsigned long mem_start;
 
-	/* Reset the hardware, and ensure interrupts are disabled. */
-	ath_pci_cor_sreset(local);
-	hfa384x_disable_interrupts(dev);
-
+	ath_detach(dev);
 	if (dev->irq)
 		free_irq(dev->irq, dev);
-
-	mem_start = dev->mem_start;
-	ath_free_local_data(local);
-
-	iounmap((void *) mem_start);
-
+	iounmap((void *) dev->mem_start);
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4))
 	pci_disable_device(pdev);
-#endif
 }
 
 #ifdef CONFIG_PM
@@ -186,19 +172,11 @@ static int
 ath_pci_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	local_info_t *local = (local_info_t *) dev->priv;
+	struct ath_pci_softc *sc = dev->priv;
 
-	if (netif_running(dev)) {
-		hostap_netif_stop_queues(dev);
-		netif_device_detach(dev);
-	}
-	ath_hw_shutdown(dev, 0);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,6))
-	pci_save_state(pdev, local->pci_save_state);
-#endif
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4))
+	ath_suspend(dev);
+	pci_save_state(pdev, sc->aps_pmstate);
 	pci_disable_device(pdev);
-#endif
 	pci_set_power_state(pdev, 3);
 
 	return (0);
@@ -208,17 +186,11 @@ static int
 ath_pci_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	local_info_t *local = (local_info_t *) dev->priv;
+	struct ath_pci_softc *sc = dev->priv;
 
 	pci_enable_device(pdev);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,6))
-	pci_restore_state(pdev, local->pci_save_state);
-#endif
-	ath_hw_config(dev, 0);
-	if (netif_running(dev)) {
-		netif_device_attach(dev);
-		netif_start_queue(dev);
-	}
+	pci_restore_state(pdev, sc->aps_pmstate);
+	ath_resume(dev);
 
 	return (0);
 }
@@ -238,6 +210,19 @@ static struct pci_driver ath_pci_drv_id = {
 	/* Linux 2.4.6 has save_state and enable_wake that are not used here */
 };
 
+/*
+ * Module glue.
+ */
+static char *version = "0.0.0.0 (Sam Leffler <sam@errno.com>)";
+static char *dev_info = "ath_pci";
+
+MODULE_AUTHOR("Errno Consulting, Sam Leffler");
+MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN PCI cards.");
+MODULE_SUPPORTED_DEVICE("Atheros WLAN PCI cards");
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual BSD/GPL");		/* XXX really BSD only */
+#endif
+
 static int
 __init init_ath_pci(void)
 {
@@ -252,8 +237,8 @@ __init init_ath_pci(void)
 }
 module_init(init_ath_pci);
 
-static void
-__exit exit_ath_pci(void)
+static void __exit
+exit_ath_pci(void)
 {
 	pci_unregister_driver(&ath_pci_drv_id);
 	printk(KERN_INFO "%s: Driver unloaded\n", dev_info);
