@@ -134,8 +134,20 @@ struct ath_node {
 	u_int8_t	an_tx_rate3sp;	/* series 3 short preamble h/w rate */
 	struct ath_recv_hist an_rx_hist[ATH_RHIST_SIZE];
 	u_int		an_rx_hist_next;/* index of next ``free entry'' */
+	HAL_NODE_STATS	an_halstats;	/* rssi statistics used by hal */
 };
 #define	ATH_NODE(_n)	((struct ath_node *)(_n))
+
+#define ATH_RSSI_LPF_LEN	10
+#define ATH_RSSI_DUMMY_MARKER	0x127
+#define ATH_EP_MUL(x, mul)	((x) * (mul))
+#define ATH_RSSI_IN(x)		(ATH_EP_MUL((x), HAL_RSSI_EP_MULTIPLIER))
+#define ATH_LPF_RSSI(x, y, len) \
+    ((x != ATH_RSSI_DUMMY_MARKER) ? (((x) * ((len) - 1) + (y)) / (len)) : (y))
+#define ATH_RSSI_LPF(x, y) do {						\
+    if ((y) >= -20)							\
+    	x = ATH_LPF_RSSI((x), ATH_RSSI_IN((y)), ATH_RSSI_LPF_LEN);	\
+} while (0)
 
 struct ath_buf {
 	STAILQ_ENTRY(ath_buf)	bf_list;
@@ -192,7 +204,8 @@ struct ath_softc {
 	unsigned int		sc_invalid : 1,	/* being detached */
 				sc_mrretry : 1,	/* multi-rate retry support */
 				sc_softled : 1,	/* enable LED gpio status */
-				sc_splitmic: 1;	/* split TKIP MIC keys */
+				sc_splitmic: 1,	/* split TKIP MIC keys */
+				sc_needmib : 1;	/* enable MIB stats intr */
 						/* rate tables */
 	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
@@ -216,6 +229,7 @@ struct ath_softc {
 	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
 
 	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */
+	struct tq_struct	sc_mibtq;	/* MIB intr tasklet */
 
 	int			sc_rxbufsize;	/* rx size based on mtu */
 	STAILQ_HEAD(, ath_buf)	sc_rxbuf;	/* receive buffer */
@@ -349,11 +363,10 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_beaconInit)((_ah), (_nextb), (_bperiod)))
 #define	ath_hal_beaconreset(_ah) \
 	((*(_ah)->ah_resetStationBeaconTimers)((_ah)))
-#define	ath_hal_beacontimers(_ah, _bs, _tsf, _dc, _cc) \
-	((*(_ah)->ah_setStationBeaconTimers)((_ah), (_bs), (_tsf), \
-		(_dc), (_cc)))
+#define	ath_hal_beacontimers(_ah, _bs) \
+	((*(_ah)->ah_setStationBeaconTimers)((_ah), (_bs)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
-	((*(_ah)->ah_writeAssocid)((_ah), (_bss), (_associd), 0))
+	((*(_ah)->ah_writeAssocid)((_ah), (_bss), (_associd)))
 #define	ath_hal_phydisable(_ah) \
 	((*(_ah)->ah_phyDisable)((_ah)))
 #define	ath_hal_setopmode(_ah) \
@@ -379,8 +392,10 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_hasVEOL)((_ah)))
 #define	ath_hal_getrfgain(_ah) \
 	((*(_ah)->ah_getRfGain)((_ah)))
-#define	ath_hal_rxmonitor(_ah) \
-	((*(_ah)->ah_rxMonitor)((_ah)))
+#define	ath_hal_rxmonitor(_ah, _arg) \
+	((*(_ah)->ah_rxMonitor)((_ah), (_arg)))
+#define	ath_hal_mibevent(_ah, _stats) \
+	((*(_ah)->ah_procMibEvent)((_ah), (_stats)))
 #define	ath_hal_setslottime(_ah, _us) \
 	((*(_ah)->ah_setSlotTime)((_ah), (_us)))
 #define	ath_hal_getslottime(_ah) \
@@ -405,6 +420,8 @@ void	ath_sysctl_unregister(void);
 	(*(_pcc) = (_ah)->ah_countryCode)
 #define	ath_hal_tkipsplit(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_TKIP_SPLIT, 0, NULL) == HAL_OK)
+#define	ath_hal_hwphycounters(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_PHYCOUNTERS, 0, NULL) == HAL_OK)
 
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
