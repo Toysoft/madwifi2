@@ -47,8 +47,7 @@ struct rc4_state {
 };
 
 extern void rc4_init(struct rc4_state *state, const u_char *key, int keylen);
-extern void rc4_crypt(struct rc4_state *state,
-		const u_char *inbuf, u_char *outbuf, int buflen);
-
+extern void rc4_crypt_skip(struct rc4_state *state,
+		const u_char *inbuf, u_char *outbuf, int buflen, int skip);
 #endif
 

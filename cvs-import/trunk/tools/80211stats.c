@@ -42,16 +42,20 @@
  */
 #include <sys/types.h>
 #include <sys/file.h>
-#include <sys/sockio.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <net/if.h>
-#include <net/if_media.h>
-#include <net/if_var.h>
+#include <linux/wireless.h>
 
 #include <stdio.h>
 #include <signal.h>
 
-#include "../../../sys/net80211/ieee80211_ioctl.h"
+#include "net80211/ieee80211.h"
+#include "net80211/ieee80211_crypto.h"
+#include "net80211/ieee80211_ioctl.h"
+
+#ifndef SIOCG80211STATS
+#define	SIOCG80211STATS	(SIOCDEVPRIVATE+2)
+#endif
 
 static void
 printstats(FILE *fd, const struct ieee80211_stats *stats)
@@ -66,11 +70,13 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_wrongdir,	"rx w/ wrong direction");
 	STAT(rx_mcastecho,	"rx discard 'cuz mcast echo");
 	STAT(rx_notassoc,	"rx discard 'cuz sta !assoc");
-	STAT(rx_nowep,		"rx w/ wep but wep !config");
+	STAT(rx_noprivacy,	"rx w/ wep but privacy off");
+	STAT(rx_unencrypted,	"rx w/o wep and privacy on");
 	STAT(rx_wepfail,	"rx wep processing failed");
 	STAT(rx_decap,		"rx decapsulation failed");
 	STAT(rx_mgtdiscard,	"rx discard mgt frames");
 	STAT(rx_ctl,		"rx discard ctrl frames");
+	STAT(rx_beacon,		"rx beacon frames");
 	STAT(rx_rstoobig,	"rx rate set truncated");
 	STAT(rx_elem_missing,	"rx required element missing");
 	STAT(rx_elem_toobig,	"rx element too big");
@@ -86,21 +92,50 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_assoc_notauth,	"rx assoc w/o auth");
 	STAT(rx_assoc_capmismatch,"rx assoc w/ cap mismatch");
 	STAT(rx_assoc_norate,	"rx assoc w/ no rate match");
+	STAT(rx_assoc_badwpaie,	"rx assoc w/ bad WPA IE");
 	STAT(rx_deauth,		"rx deauthentication");
 	STAT(rx_disassoc,	"rx disassociation");
 	STAT(rx_badsubtype,	"rx frame w/ unknown subtype");
-	STAT(rx_nombuf,		"rx failed for lack of mbuf");
+	STAT(rx_nobuf,		"rx failed for lack of sk_buffer");
 	STAT(rx_decryptcrc,	"rx decrypt failed on crc");
 	STAT(rx_ahdemo_mgt,
 		"rx discard mgmt frame received in ahdoc demo mode");
 	STAT(rx_bad_auth,	"rx bad authentication request");
-	STAT(tx_nombuf,		"tx failed for lack of mbuf");
+	STAT(rx_unauth,		"rx discard 'cuz port unauthorized");
+	STAT(rx_badkeyid,	"rx w/ incorrect keyid");
+	STAT(rx_ccmpreplay,	"rx seq# violation (CCMP)");
+	STAT(rx_ccmpformat,	"rx format bad (CCMP)");
+	STAT(rx_ccmpmic,	"rx MIC check failed (CCMP)");
+	STAT(rx_tkipreplay,	"rx seq# violation (TKIP)");
+	STAT(rx_tkipformat,	"rx format bad (TKIP)");
+	STAT(rx_tkipmic,	"rx MIC check failed (TKIP)");
+	STAT(rx_tkipicv,	"rx ICV check failed (TKIP)");
+	STAT(rx_badcipher,	"rx failed 'cuz bad cipher/key type");
+	STAT(rx_nocipherctx,	"rx failed 'cuz key/cipher ctx not setup");
+	STAT(rx_acl,		"rx discard 'cuz acl policy");
+	STAT(tx_nobuf,		"tx failed for lack of sk_buffer");
 	STAT(tx_nonode,		"tx failed for no node");
 	STAT(tx_unknownmgt,	"tx of unknown mgt frame");
+	STAT(tx_badcipher,	"tx failed 'cuz bad ciper/key type");
+	STAT(tx_nodefkey,	"tx failed 'cuz no defkey");
+	STAT(tx_noheadroom,	"tx failed 'cuz no space for crypto hdrs");
 	STAT(scan_active,	"active scans started");
 	STAT(scan_passive,	"passive scans started");
 	STAT(node_timeout,	"nodes timed out inactivity");
-	STAT(crypto_nomem,	"malloc failure of rc4 context");
+	STAT(crypto_nomem,	"cipher context malloc failed");
+	STAT(crypto_tkip,	"tkip crypto done in s/w");
+	STAT(crypto_tkipenmic,	"tkip tx MIC done in s/w");
+	STAT(crypto_tkipdemic,	"tkip rx MIC done in s/w");
+	STAT(crypto_ccmp,	"ccmp crypto done in s/w");
+	STAT(crypto_wep,	"wep crypto done in s/w");
+	STAT(crypto_setkey_cipher,"setkey failed 'cuz cipher rejected data");
+	STAT(crypto_setkey_nokey,"setkey failed 'cuz no key index");
+	STAT(crypto_delkey,	"driver key delete failed");
+	STAT(crypto_badcipher,	"setkey failed 'cuz unknown cipher");
+	STAT(crypto_nocipher,	"setkey failed 'cuz cipher module unavailable");
+	STAT(crypto_attachfail,	"setkey failed 'cuz cipher attach failed");
+	STAT(crypto_swfallback,	"crypto fell back to s/w implementation");
+	STAT(crypto_keyfail,	"setkey faied 'cuz driver key alloc failed");
 #undef STAT
 #undef N
 }

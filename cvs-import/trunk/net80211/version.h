@@ -35,19 +35,4 @@
  *
  * $Id$
  */
-#ifndef _NET_IF_IEEE80211IOCTL_H_
-#define _NET_IF_IEEE80211IOCTL_H_
-
-/*
- * Wireless Extensions API, private ioctl interfaces.
- *
- * NB: Even ioctl numbers are privileged!
- */
-#define	IEEE80211_IOCTL_SETPARAM	(SIOCIWFIRSTPRIV+0)
-#define	IEEE80211_IOCTL_GETPARAM	(SIOCIWFIRSTPRIV+1)
-
-enum {
-	IEEE80211_PARAM_TURBO	= 1,	/* turbo mode */
-	IEEE80211_PARAM_MODE	= 2	/* phy mode (11a, 11b, etc.) */
-};
-#endif /* _NET_IF_IEEE80211_H_ */
+#define	WLAN_VERSION	"0.8.2.4-WPA"
