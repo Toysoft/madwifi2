@@ -77,6 +77,8 @@ struct ath_stats {
 	u_int32_t	ast_rx_phy_qam;	/* rx PHY: 64 QAM rate */
 	u_int32_t	ast_rx_phy_srv;	/* rx PHY: service bit error */
 	u_int32_t	ast_rx_phy_tor;	/* rx PHY: transmit override receive */
+	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
+	u_int32_t	ast_beacon_nobuf;/* no skbuff available for beacon */
 };
 
 struct ath_buf {
@@ -99,6 +101,7 @@ struct ath_softc {
 	volatile int		sc_invalid;	/* being detached */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
 	size_t			sc_desc_len;	/* size of TX/RX descriptors */
+	u_int16_t		sc_cachelsz;	/* cache line size */
 	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
 
 	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */

@@ -121,12 +121,19 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah;
 	int i, error = 0, ix, nchan;
-	u_int8_t *r;
+	u_int8_t *r, csz;
 #define	ATH_MAXCHAN	32		/* number of potential channels */
 	HAL_CHANNEL chans[ATH_MAXCHAN];		/* XXX get off stack */
 	HAL_STATUS status;
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
+
+	/*
+	 * Cache line size is used to size and align various
+	 * structures used to communicate with the hardware.
+	 */
+	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, &csz);
+	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
 	spin_lock_init(&sc->sc_txbuflock);
 	spin_lock_init(&sc->sc_txqlock);
@@ -822,6 +829,21 @@ ath_mode_init(struct net_device *dev)
 	    rfilt, mfilt[0], mfilt[1]));
 }
 
+static struct sk_buff *
+ath_alloc_skb(u_int size, u_int align)
+{
+	struct sk_buff *skb;
+	u_int off;
+
+	skb = dev_alloc_skb(size + align-1);
+	if (skb != NULL) {
+		off = ((unsigned long) skb->data) % align;
+		if (off != 0)
+			skb_reserve(skb, off);
+	}
+	return skb;
+}
+
 static int
 ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 {
@@ -852,9 +874,19 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		  + 2 + ni->ni_esslen
 		  + 2 + ni->ni_nrate
 		  + 6;
-	skb = dev_alloc_skb(sizeof(struct ieee80211_frame) + pktlen);
-	if (skb == NULL)
+	/*
+	 * Beacon frames must be aligned to a 32-bit boundary and
+	 * the buffer length must be a multiple of 4 bytes.  Allocate
+	 * an skbuff large enough for us to insure this.
+	 */
+	skb = ath_alloc_skb(roundup(sizeof(struct ieee80211_frame)+pktlen, 4),
+		sizeof(u_int32_t));
+	if (skb == NULL) {
+		DPRINTF(("ath_beacon_alloc: cannot allocate sk_buff; size %u\n",
+			roundup(sizeof(struct ieee80211_frame)+pktlen, 4)));
+		sc->sc_stats.ast_beacon_nobuf++;
 		return ENOMEM;
+	}
 
 	wh = (struct ieee80211_frame *)
 		skb_put(skb, sizeof(struct ieee80211_frame));
@@ -1093,24 +1125,18 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 
 	skb = bf->bf_skb;
 	if (skb == NULL) {
-		u_int off;
-
-		skb = dev_alloc_skb(sc->sc_rxbufsize + sizeof(u_int32_t)-1);
-		if (skb == NULL) {
-			DPRINTF(("ath_rxbuf_init: skbuff allocation failed; "
-				"size %u\n", sc->sc_rxbufsize));
-			return ENOMEM;
-		}
 		/*
 		 * Align on 32-bit boundary.  Atheros suggests rx
 		 * buffers be set on cache line boundaries but doing
 		 * this is typically impractical given the cache
 		 * line size.
 		 */
-		off = ((unsigned long) skb->data) % sizeof(u_int32_t);
-		if (off != 0) {
-printk("ath_rxbuf_init: align skbuff, off %u\n", off);/*XXX*/
-			skb_reserve(skb, off);
+		skb = ath_alloc_skb(sc->sc_rxbufsize, sc->sc_cachelsz);
+		if (skb == NULL) {
+			DPRINTF(("ath_rxbuf_init: skbuff allocation failed; "
+				"size %u\n", sc->sc_rxbufsize));
+			sc->sc_stats.ast_rx_nobuf++;
+			return ENOMEM;
 		}
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
@@ -1543,11 +1569,11 @@ ath_startrecv(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 
-	sc->sc_rxbufsize = dev->mtu + IEEE80211_CRC_LEN +
+	sc->sc_rxbufsize = roundup(dev->mtu + IEEE80211_CRC_LEN +
 		(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
-		 IEEE80211_WEP_CRCLEN);
-	DPRINTF(("ath_startrecv: mtu %u rxbufsize %u\n",
-		dev->mtu, sc->sc_rxbufsize));
+		 IEEE80211_WEP_CRCLEN), sc->sc_cachelsz);
+	DPRINTF(("ath_startrecv: mtu %u cachelsz %u rxbufsize %u\n",
+		dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize));
 
 	sc->sc_rxlink = NULL;
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
@@ -1952,6 +1978,8 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 	STAT(rx_orn);	  STAT(rx_crcerr);  STAT(rx_fifoerr); STAT(rx_badcrypt);
 	STAT(rx_phyerr);  STAT(rx_phy_tim); STAT(rx_phy_par); STAT(rx_phy_rate);
 	STAT(rx_phy_len); STAT(rx_phy_qam); STAT(rx_phy_srv); STAT(rx_phy_tor);
+	STAT(rx_nobuf);
+	STAT(beacon_nobuf);
 
 	return cp - page;
 #undef STAT
