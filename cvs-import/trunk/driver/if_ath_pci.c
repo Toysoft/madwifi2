@@ -86,7 +86,9 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct net_device *dev;
 	const char *athname;
 	u_int8_t csz;
+#ifdef SOFTLED
 	struct ath_softc *ath_sc;
+#endif
 
 	if (pci_enable_device(pdev))
 		return (-EIO);
