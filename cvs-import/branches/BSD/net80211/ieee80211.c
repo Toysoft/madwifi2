@@ -771,7 +771,7 @@ ieee80211_watchdog(unsigned long data)
 			need_inact_timer += nt->nt_inact_timer;
 		}
 	}
-	if (ic->ic_mgt_timer != 0 || need_inact_timer);
+	if (ic->ic_mgt_timer != 0 || need_inact_timer)
 		ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
 	add_timer(&ic->ic_slowtimo);
 }
