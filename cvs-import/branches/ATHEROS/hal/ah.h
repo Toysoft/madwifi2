@@ -95,6 +95,16 @@ typedef enum {
 	HAL_CAP_TKIP_SPLIT	= 3,	/* hardware TKIP uses split keys */
 	HAL_CAP_PHYCOUNTERS	= 4,	/* hardware PHY error counters */
 	HAL_CAP_DIVERSITY	= 5,	/* hardware supports fast diversity */
+	HAL_CAP_KEYCACHE_SIZE	= 6,	/* number of entries in key cache */
+	HAL_CAP_NUM_TXQUEUES	= 7,	/* number of hardware xmit queues */
+	HAL_CAP_VEOL		= 9,	/* hardware supports virtual EOL */
+	HAL_CAP_PSPOLL		= 10,	/* hardware has working PS-Poll support */
+	HAL_CAP_DIAG		= 11,	/* hardware diagnostic support */
+	HAL_CAP_COMPRESSION	= 12,	/* hardware supports compression */
+	HAL_CAP_BURST		= 13,	/* hardware supports packet bursting */
+	HAL_CAP_FASTFRAME	= 14,	/* hardware supoprts fast frames */
+	HAL_CAP_TXPOW		= 15,	/* global tx power limit  */
+	HAL_CAP_TPC		= 16,	/* per-packet tx power control  */
 } HAL_CAPABILITY_TYPE;
 
 /* 
@@ -162,15 +172,20 @@ typedef struct {
 	u_int32_t	tqi_ver;		/* hal TXQ version */
 	HAL_TX_QUEUE_SUBTYPE tqi_subtype;	/* subtype if applicable */
 	HAL_TX_QUEUE_FLAGS tqi_qflags;		/* flags (see above) */
-	u_int32_t	tqi_priority;
-	u_int32_t	tqi_aifs;		/* AIFS shift */
-	int32_t		tqi_cwmin;		/* cwMin shift */
-	int32_t		tqi_cwmax;		/* cwMax shift */
+	u_int32_t	tqi_priority;		/* (not used) */
+	u_int32_t	tqi_aifs;		/* aifs */
+	u_int32_t	tqi_cwmin;		/* cwMin */
+	u_int32_t	tqi_cwmax;		/* cwMax */
+	u_int16_t	tqi_shretry;		/* rts retry limit */
+	u_int16_t	tqi_lgretry;		/* long retry limit (not used)*/
 	u_int32_t	tqi_cbrPeriod;
 	u_int32_t	tqi_cbrOverflowLimit;
 	u_int32_t	tqi_burstTime;
 	u_int32_t	tqi_readyTime;
 } HAL_TXQ_INFO;
+
+/* token to use for aifs, cwmin, cwmax */
+#define	HAL_TXQ_USEDEFAULT	((u_int32_t) -1)
 
 /*
  * Transmit packet types.  This belongs in ah_desc.h, but
@@ -278,6 +293,8 @@ typedef struct {
 #define	CHANNEL_PASSIVE	0x0200	/* Only passive scan allowed in the channel */
 #define	CHANNEL_DYN	0x0400	/* dynamic CCK-OFDM channel */
 #define	CHANNEL_XR	0x0800	/* XR channel */
+#define CHANNEL_AR      0x8000  /* Software use: radar detected */ 
+
 
 #define	CHANNEL_A	(CHANNEL_5GHZ|CHANNEL_OFDM)
 #define	CHANNEL_B	(CHANNEL_2GHZ|CHANNEL_CCK)
@@ -435,7 +452,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x04093000	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x04112900	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -446,8 +463,9 @@ struct ath_hal {
 	u_int32_t	ah_macVersion;	/* MAC version id */
 	u_int16_t	ah_macRev;	/* MAC revision */
 	u_int16_t	ah_phyRev;	/* PHY revision */
-	u_int16_t	ah_analog5GhzRev;/* 2GHz radio revision */
-	u_int16_t	ah_analog2GhzRev;/* 5GHz radio revision */
+	/* NB: when only one radio is present the rev is in 5Ghz */
+	u_int16_t	ah_analog5GhzRev;/* 5GHz radio revision */
+	u_int16_t	ah_analog2GhzRev;/* 2GHz radio revision */
 
 	const HAL_RATE_TABLE *__ahdecl(*ah_getRateTable)(struct ath_hal *,
 				u_int mode);
@@ -457,9 +475,10 @@ struct ath_hal {
 	HAL_BOOL  __ahdecl(*ah_reset)(struct ath_hal *, HAL_OPMODE,
 				HAL_CHANNEL *, HAL_BOOL bChannelChange,
 				HAL_STATUS *status);
-	HAL_BOOL  __ahdecl (*ah_phyDisable)(struct ath_hal *);
-	void	  __ahdecl (*ah_setPCUConfig)(struct ath_hal *);
+	HAL_BOOL  __ahdecl(*ah_phyDisable)(struct ath_hal *);
+	void	  __ahdecl(*ah_setPCUConfig)(struct ath_hal *);
 	HAL_BOOL  __ahdecl(*ah_perCalibration)(struct ath_hal*, HAL_CHANNEL *);
+	HAL_BOOL  __ahdecl(*ah_setTxPowerLimit)(struct ath_hal *, u_int32_t);
 
 	/* Transmit functions */
 	HAL_BOOL  __ahdecl(*ah_updateTxTrigLevel)(struct ath_hal*,
@@ -468,27 +487,34 @@ struct ath_hal {
 				const HAL_TXQ_INFO *qInfo);
 	HAL_BOOL  __ahdecl(*ah_setTxQueueProps)(struct ath_hal *, int q, 
 				const HAL_TXQ_INFO *qInfo);
+	HAL_BOOL  __ahdecl(*ah_getTxQueueProps)(struct ath_hal *, int q, 
+				HAL_TXQ_INFO *qInfo);
 	HAL_BOOL  __ahdecl(*ah_releaseTxQueue)(struct ath_hal *ah, u_int q);
 	HAL_BOOL  __ahdecl(*ah_resetTxQueue)(struct ath_hal *ah, u_int q);
 	u_int32_t __ahdecl(*ah_getTxDP)(struct ath_hal*, u_int);
 	HAL_BOOL  __ahdecl(*ah_setTxDP)(struct ath_hal*, u_int, u_int32_t txdp);
+	u_int32_t __ahdecl(*ah_numTxPending)(struct ath_hal *, u_int q);
 	HAL_BOOL  __ahdecl(*ah_startTxDma)(struct ath_hal*, u_int);
 	HAL_BOOL  __ahdecl(*ah_stopTxDma)(struct ath_hal*, u_int);
+	HAL_BOOL  __ahdecl(*ah_updateCTSForBursting)(struct ath_hal *,
+				struct ath_desc *, struct ath_desc *,
+				struct ath_desc *, struct ath_desc *,
+				u_int32_t, u_int32_t);
 	HAL_BOOL  __ahdecl(*ah_setupTxDesc)(struct ath_hal *, struct ath_desc *,
 				u_int pktLen, u_int hdrLen,
 				HAL_PKT_TYPE type, u_int txPower,
 				u_int txRate0, u_int txTries0,
 				u_int keyIx, u_int antMode, u_int flags,
 				u_int rtsctsRate, u_int rtsctsDuration);
-	HAL_BOOL  __ahdecl(*ah_setupXTxDesc)(struct ath_hal *, struct ath_desc *,
+	HAL_BOOL  __ahdecl(*ah_setupXTxDesc)(struct ath_hal *, struct ath_desc*,
 				u_int txRate1, u_int txTries1,
 				u_int txRate2, u_int txTries2,
 				u_int txRate3, u_int txTries3);
 	HAL_BOOL  __ahdecl(*ah_fillTxDesc)(struct ath_hal *, struct ath_desc *,
 				u_int segLen, HAL_BOOL firstSeg,
 				HAL_BOOL lastSeg, const struct ath_desc *);
-	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc *);
-	HAL_BOOL  __ahdecl(*ah_hasVEOL)(struct ath_hal *);
+	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc*);
+	void	   __ahdecl(*ah_getTxIntrQueue)(struct ath_hal *, u_int32_t *);
 
 	/* Receive Functions */
 	u_int32_t __ahdecl(*ah_getRxDP)(struct ath_hal*);
@@ -515,13 +541,13 @@ struct ath_hal {
 				const HAL_NODE_STATS *);
 
 	/* Misc Functions */
-	HAL_STATUS __ahdecl (*ah_getCapability)(struct ath_hal *,
+	HAL_STATUS __ahdecl(*ah_getCapability)(struct ath_hal *,
 				HAL_CAPABILITY_TYPE, u_int32_t capability,
 				u_int32_t *result);
-	HAL_BOOL   __ahdecl (*ah_setCapability)(struct ath_hal *,
+	HAL_BOOL   __ahdecl(*ah_setCapability)(struct ath_hal *,
 				HAL_CAPABILITY_TYPE, u_int32_t capability,
 				u_int32_t setting, HAL_STATUS *);
-	HAL_BOOL   __ahdecl (*ah_getDiagState)(struct ath_hal *, int request,
+	HAL_BOOL   __ahdecl(*ah_getDiagState)(struct ath_hal *, int request,
 				const void *args, u_int32_t argsize,
 				void **result, u_int32_t *resultsize);
 	void	  __ahdecl(*ah_getMacAddress)(struct ath_hal *, u_int8_t *);
@@ -541,7 +567,8 @@ struct ath_hal {
 	u_int64_t __ahdecl(*ah_getTsf64)(struct ath_hal*);
 	void	  __ahdecl(*ah_resetTsf)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_detectCardPresent)(struct ath_hal*);
-	void	  __ahdecl(*ah_updateMibCounters)(struct ath_hal*, HAL_MIB_STATS*);
+	void	  __ahdecl(*ah_updateMibCounters)(struct ath_hal*,
+				HAL_MIB_STATS*);
 	HAL_RFGAIN __ahdecl(*ah_getRfGain)(struct ath_hal*);
 	u_int	  __ahdecl(*ah_getDefAntenna)(struct ath_hal*);
 	void	  __ahdecl(*ah_setDefAntenna)(struct ath_hal*, u_int);
@@ -555,7 +582,8 @@ struct ath_hal {
 	/* Key Cache Functions */
 	u_int32_t __ahdecl(*ah_getKeyCacheSize)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_resetKeyCacheEntry)(struct ath_hal*, u_int16_t);
-	HAL_BOOL  __ahdecl(*ah_isKeyCacheEntryValid)(struct ath_hal *,u_int16_t);
+	HAL_BOOL  __ahdecl(*ah_isKeyCacheEntryValid)(struct ath_hal *,
+				u_int16_t);
 	HAL_BOOL  __ahdecl(*ah_setKeyCacheEntry)(struct ath_hal*,
 				u_int16_t, const HAL_KEYVAL *,
 				const u_int8_t *, int);
@@ -567,7 +595,6 @@ struct ath_hal {
 				HAL_POWER_MODE mode, int setChip,
 				u_int16_t sleepDuration);
 	HAL_POWER_MODE __ahdecl(*ah_getPowerMode)(struct ath_hal*);
-	HAL_BOOL  __ahdecl(*ah_queryPSPollSupport)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_initPSPoll)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_enablePSPoll)(struct ath_hal *,
 				u_int8_t *, u_int16_t);
@@ -584,7 +611,7 @@ struct ath_hal {
 
 	/* Interrupt functions */
 	HAL_BOOL  __ahdecl(*ah_isInterruptPending)(struct ath_hal*);
-	HAL_BOOL  __ahdecl(*ah_getPendingInterrupts)(struct ath_hal*, HAL_INT *);
+	HAL_BOOL  __ahdecl(*ah_getPendingInterrupts)(struct ath_hal*, HAL_INT*);
 	HAL_INT	  __ahdecl(*ah_getInterrupts)(struct ath_hal*);
 	HAL_INT	  __ahdecl(*ah_setInterrupts)(struct ath_hal*, HAL_INT);
 };

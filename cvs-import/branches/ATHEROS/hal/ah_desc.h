@@ -162,7 +162,7 @@ struct ath_desc {
 		struct ath_tx_status tx;/* xmit status */
 		struct ath_rx_status rx;/* recv status */
 	} ds_us;
-} __attribute__((__packed__));
+} __packed;
 
 #define	ds_txstat	ds_us.tx
 #define	ds_rxstat	ds_us.rx
