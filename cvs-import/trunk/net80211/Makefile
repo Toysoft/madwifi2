@@ -129,7 +129,7 @@ ccmp_test.o:	$(ccmp_test-objs)
 wep_test.o:	$(wep_test-objs)
 	$(LD) $(LDOPTS) -o wep_test.$(KMODSUF) -r $(wep_test-objs)
 
-install: all
+install:
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
 	for i in ${MOD_INSTALL}; do \
 		f=`basename $$i .o`; \

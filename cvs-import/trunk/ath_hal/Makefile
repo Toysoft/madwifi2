@@ -64,7 +64,7 @@ $(obj)/hal.o:
 opt_ah.h: ${HAL}/${OS}/${TARGET}.opt_ah.h
 	cp ${HAL}/${OS}/${TARGET}.opt_ah.h opt_ah.h
 
-install: all
+install:
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
 	$(STRIP) -S ath_hal.$(KMODSUF)
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}

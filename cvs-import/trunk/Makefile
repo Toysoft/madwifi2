@@ -46,7 +46,7 @@ include Makefile.inc
 # NB: the order is important here
 DIRS=	${ATH_HAL} ${ATH_RATE} ${WLAN} ${ATH}
 
-all:
+all: configcheck
 	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS}; do \
 		(cd $$i; make) || exit 1; \
@@ -78,3 +78,58 @@ clean:
 		(cd $$i; make clean); \
 	done
 	rm -rf ${SYMBOLSDIR}
+
+info:
+	@echo "The following settings will be used for compilation:"
+	@echo "TARGET       : $(TARGET)"
+	@echo "BUS          : $(BUS)"
+	@echo "TOOLPATH     : $(TOOLPATH)"
+	@echo "KERNELRELEASE: $(KERNELRELEASE)"
+	@echo "KERNELPATH   : $(KERNELPATH)"
+	@echo "KERNELCONF   : $(KERNELCONF)"
+	@echo "MODULEPATH   : $(MODULEPATH)"
+	@echo "KMODSUF      : $(KMODSUF)"
+	@echo "DESTDIR      : $(DESTDIR)"
+
+dotconfig:
+	@#
+	@# check if kernel configuration file is available
+	@#	
+	@if [ ! -f $(KERNELCONF) ]; then \
+	    echo "You need to configure your kernel."; \
+	    exit 1; \
+	fi
+
+# new targets should be inserted ABOVE this line in order to avoid
+# problems with the included kernel configuration file below.
+include $(KERNELCONF)
+
+configcheck: dotconfig
+	@#
+	@# check if kernel configuration meets all requirements
+	@#
+	@echo -n "Checking kernel configuration... "
+	
+	@if [ -z "$(CONFIG_SYSCTL)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable sysctl support."; \
+	    exit 1; \
+	fi
+	@if [ -z "$(CONFIG_NET_RADIO)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable wireless extensions."; \
+	    exit 1; \
+	fi
+	@if [ -z "$(CONFIG_CRYPTO)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable crypto API."; \
+	    exit 1; \
+	fi
+	
+	@#
+	@# room for future improvements:
+	@# * check for correct version of wireless.h
+	@# * check for kernel version 2.4.x/2.6.x
+	@#
+	
+	@echo "passed."

@@ -43,12 +43,12 @@ endif
 # other locales sometimes cause trouble
 export LC_ALL = POSIX
 
-#
+# OS is the target operating system. Currently only Linux is supported.
 OS=		linux
-#
+
 # TARGET defines the target platform ISA per GNU rules.
 # It must match one of the target platforms supported by
-# the HAL.  To set the set of target platforms look at
+# the HAL.  To see the set of target platforms look at
 # hal/linux/*.inc.  You can set this in the environment
 # to override the default setting.
 #
@@ -59,59 +59,68 @@ endif
 # BUS defines the bus type to which the wireless devices is attached.
 # Currently, the valid BUS types are PCI and LBUS.  If BUS is not
 # defined, then, we assume the bus type is PCI
-
 ifndef BUS
 BUS=		PCI
 endif
 
-# If we are AHB bus type, then we need the kernel path for the target
-# kernel sources.
+# KERNELPATH is the path to the target kernel's build/source area.
+# This is used to obtain the kernel configuration and include files.
+# If automatic determination doesn't work as desired, you have to
+# manually set it, for example with:
+# make KERNELPATH=/path/to/kernel/source
+
+# TOOLPATH is the path which contains the crosscompile toolchain (?)
 
 ifeq ($(strip ${BUS}),AHB)
-TARGET=		mipsisa32-be-elf
+# Bus type AHB forces the target platform to be mipsisa32.
+TARGET :=	mipsisa32-be-elf
 
+# Bus type AHB requires KERNELPATH and TOOLPATH to be set manually.
 ifndef KERNELPATH
 $(error KERNELPATH must be defined for bus type AHB.)
 endif
-
 ifndef TOOLPATH
 $(error TOOLPATH must be defined for bus type AHB.)
 endif
 
-KERNELCONF=	${KERNELPATH}/.config
+else
 
-ifndef KERNELRELEASE
-VERSION := $(strip $(shell head -n 1 ${KERNELPATH}/Makefile | cut -f 2 -d'='))
-PATCHLEVEL := $(strip $(shell head -n 2 ${KERNELPATH}/Makefile | tail -1 | cut -f 2 -d'='))
-SUBVERSION := $(strip $(shell head -n 3 ${KERNELPATH}/Makefile | tail -1 | cut -f 2 -d'='))
-KERNELRELEASE := $(strip ${VERSION}.${PATCHLEVEL}.${SUBVERSION})
-endif
+KERNELPATH ?= $(firstword $(wildcard /lib/modules/$(shell uname -r)/build /usr/src/linux))
 
-ifndef MODULEPATH
-MODULEPATH :=   ${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERNELRELEASE}/net
+ifeq ($(KERNELPATH),)
+$(error KERNELPATH must be defined.)
 endif
 
 endif
 
-#
-NM=		nm
-AWK=		awk
-
-# Path to the Linux kernel, include files, etc.
-#
 # KERNELRELEASE is the target kernel's version.  If KERNELRELEASE
 # is not set in the environment then it is taken from the running
 # system.
-#
-# KERNELPATH is the path to the target kernel's build/source area.
-# This is used to obtain the kernel configuration and include files.
-# If KERNELPATH is not set in the environment then it is derived
-# from KERNELRELEASE.
-#
-ifeq ($(KERNELRELEASE),)
-KERNELRELEASE =	$(shell uname -r)
+# KERNELRELEASE is determined from Makefile in KERNELPATH
+ifndef $(KERNELRELEASE)
+_KVER = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^VERSION' | cut -d"=" -f2))
+_KPL = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^PATCHLEVEL' | cut -d"=" -f2))
+_KSUB = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^SUBLEVEL' | cut -d"=" -f2))
+_KEXT = $(strip $(shell cat $(KERNELPATH)/Makefile | grep -e '^EXTRAVERSION' | cut -d"=" -f2))
+KERNELRELEASE=$(_KVER).$(_KPL).$(_KSUB)$(_KEXT)
 endif
 
+# KERNELCONF is the name of the file that holds the configuration
+# of the target kernel.
+KERNELCONF ?=	${KERNELPATH}/.config
+
+# DESTDIR is used as path prefix during installation.
+DESTDIR ?=
+
+# MODULEPATH nominates the directory where the modules will be
+# installed to
+ifeq ($(strip ${BUS}),AHB)
+MODULEPATH := 	${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERNELRELEASE}/net
+else
+MODULEPATH ?=	/lib/modules/${KERNELRELEASE}/net
+endif
+
+# Some settings that depend on actual kernel release
 ifneq ($(findstring 2.6,$(KERNELRELEASE)),)
 export-objs	:=
 list-multi	:=
@@ -120,17 +129,8 @@ else
 KMODSUF		:= o
 endif
 
-ifeq ($(KERNELPATH),)
-KERNELPATH=	/lib/modules/${KERNELRELEASE}/build
-endif
-
-ifeq ($(DESTDIR),)
-DESTDIR=
-endif
-
-ifeq ($(MODULEPATH),)
-MODULEPATH=	/lib/modules/${KERNELRELEASE}/net
-endif
+NM=            nm
+AWK=           awk
 
 #
 # Path to the HAL source code.
