@@ -1,1 +1,1 @@
-#define	WLAN_VERSION	"0.1.0.0"
+#define	WLAN_VERSION	"0.3.0.0"
