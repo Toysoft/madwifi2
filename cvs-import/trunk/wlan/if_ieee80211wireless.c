@@ -59,32 +59,46 @@
 
 #ifdef CONFIG_NET_WIRELESS
 
+/*
+ * Units are in db above the noise floor. That means the
+ * rssi values reported in the tx/rx descriptors in the
+ * driver are the SNR expressed in db.
+ *
+ * If you assume that the noise floor is -95, which is an
+ * excellent assumption 99.5 % of the time, then you can
+ * derive the absolute signal level (i.e. -95 + rssi). 
+ * There are some other slight factors to take into account
+ * depending on whether the rssi measurement is from 11b,
+ * 11g, or 11a.   These differences are at most 2db and
+ * can be documented.
+ *
+ * NB: various calculations are based on the orinoco/wavelan
+ *     drivers for compatibility
+ */
+static void
+set_quality(struct iw_quality *iq, u_int rssi)
+{
+	iq->qual = rssi;
+	/* NB: max is 94 because noise is hardcoded to 161 */
+	if (iq->qual > 94)
+		iq->qual = 94;
+
+	iq->noise = 161;		/* -95dBm */
+	iq->level = iq->noise + iq->qual;
+	iq->updated = 7;
+}
+
 struct iw_statistics *
 ieee80211_iw_getstats(struct net_device *dev)
 {
 #define	NZ(x)	((x) ? (x) : 1)
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	/*
-	 * Units are in db above the noise floor. That means the
-	 * rssi values reported in the tx/rx descriptors in the
-	 * driver are the SNR expressed in db.
-	 *
-	 * If you assume that the noise floor is -95, which is an
-	 * excellent assumption 99.5 % of the time, then you can
-	 * derive the absolute signal level (i.e. -95 + rssi). 
-	 * There are some other slight factors to take into account
-	 * depending on whether the rssi measurement is from 11b,
-	 * 11g, or 11a.   These differences are at most 2db and
-	 * can be documented.
-	 *
-	 * NB: various calculations are based on the orinoco/wavelan
-	 *     drivers for compatibility
-	 */
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
 		/* use stats from associated ap */
-		ic->ic_iwstats.qual.qual = ieee80211_get_rssi(&ic->ic_bss);
+		set_quality(&ic->ic_iwstats.qual,
+			ieee80211_get_rssi(&ic->ic_bss));
 		break;
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
@@ -98,24 +112,16 @@ ieee80211_iw_getstats(struct net_device *dev)
 			rssi_samples++;
 			rssi_total += ieee80211_get_rssi(ni);
 		}
-		ic->ic_iwstats.qual.qual = rssi_total / NZ(rssi_samples);
+		set_quality(&ic->ic_iwstats.qual,
+			rssi_total / NZ(rssi_samples));
 		break;
 	}
 	case IEEE80211_M_MONITOR:
 	default:
 		/* no stats */
-		ic->ic_iwstats.qual.qual = 0;
+		set_quality(&ic->ic_iwstats.qual, 0);
 		break;
 	}
-	/* NB: max is 94 because noise is hardcoded to 161 */
-	if (ic->ic_iwstats.qual.qual > 94)
-		ic->ic_iwstats.qual.qual = 94;
-
-	ic->ic_iwstats.qual.noise = 161;	/* -95dBm */
-	ic->ic_iwstats.qual.level =
-		ic->ic_iwstats.qual.noise + ic->ic_iwstats.qual.qual;
-	ic->ic_iwstats.qual.updated = 7;
-
 	ic->ic_iwstats.status = ic->ic_state;
 	ic->ic_iwstats.discard.nwid = 0;
 	ic->ic_iwstats.discard.code = 0;
@@ -881,10 +887,7 @@ ieee80211_ioctl_iwaplist(struct net_device *dev,
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
 		else
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
-		qual[i].qual = ieee80211_get_rssi(ni);
-		qual[i].level = 0;
-		qual[i].noise = 0;
-		qual[i].updated = jiffies;		/* XXX */
+		set_quality(&qual[i], ieee80211_get_rssi(ni));
 		if (++i >= IW_MAX_AP)
 			break;
 	}
@@ -991,8 +994,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 		}
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVQUAL;
-		iwe.u.qual.level = ieee80211_get_rssi(ni);
-		iwe.u.qual.updated = jiffies;	/* XXX */
+		set_quality(&iwe.u.qual, ieee80211_get_rssi(ni));
 		current_ev = iwe_stream_add_event(current_ev,
 			end_buf, &iwe, IW_EV_QUAL_LEN);
 
