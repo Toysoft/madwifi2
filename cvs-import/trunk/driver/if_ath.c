@@ -1239,7 +1239,7 @@ ath_desc_free(struct ath_softc *sc)
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
 		if (bf->bf_skb != NULL) {
 			pci_unmap_single(sc->sc_pdev,
-				bf->bf_skbaddr, bf->bf_skb->len,
+				bf->bf_skbaddr, sc->sc_rxbufsize,
 				PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(bf->bf_skb);
 			bf->bf_skb = NULL;
