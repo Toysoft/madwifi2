@@ -72,6 +72,7 @@ install: all
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+	-rm -rf .tmp_versions
 # remove the files we copied to this dir
 	-rm -f ah_osdep.c opt_ah.h hal.o
 
