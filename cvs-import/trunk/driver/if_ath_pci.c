@@ -78,6 +78,7 @@ static struct pci_device_id ath_pci_id_table[] __devinitdata = {
 	{ 0x168c, 0x0012, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0013, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0xa727, 0x0013, PCI_ANY_ID, PCI_ANY_ID },	/* 3com */
+	{ 0x10b7, 0x0013, PCI_ANY_ID, PCI_ANY_ID },	/* 3com 3CRDAG675 */
 	{ 0x168c, 0x1014, PCI_ANY_ID, PCI_ANY_ID },	/* IBM minipci 5212 */
 	{ 0 }
 };
