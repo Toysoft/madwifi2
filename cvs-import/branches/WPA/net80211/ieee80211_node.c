@@ -561,13 +561,19 @@ node_cleanup(struct ieee80211com *ic, struct ieee80211_node *ni)
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 	int i;
 
-	if (ni->ni_challenge != NULL)
+	if (ni->ni_challenge != NULL) {
 		FREE(ni->ni_challenge, M_DEVBUF);
-	if (ni->ni_wpa_ie)
+		ni->ni_challenge = NULL;
+	}
+	if (ni->ni_wpa_ie) {
 		FREE(ni->ni_wpa_ie, M_DEVBUF);
+		ni->ni_wpa_ie = NULL;
+	}
 	for (i = 0; i < N(ni->ni_rxfrag); i++)
-		if (ni->ni_rxfrag[i] != NULL)
+		if (ni->ni_rxfrag[i] != NULL) {
 			kfree_skb(ni->ni_rxfrag[i]);
+			ni->ni_rxfrag[i] = NULL;
+		}
 	ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
 #undef N
 }
