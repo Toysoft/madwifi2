@@ -1042,9 +1042,12 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	*(u_int16_t *)frm = cpu_to_le16(capinfo);
 	frm += 2;
 	*frm++ = IEEE80211_ELEMID_SSID;
-	*frm++ = ni->ni_esslen;
-	memcpy(frm, ni->ni_essid, ni->ni_esslen);
-	frm += ni->ni_esslen;
+	if ((ic->ic_flags & IEEE80211_F_HIDESSID) == 0) {
+		*frm++ = ni->ni_esslen;
+		memcpy(frm, ni->ni_essid, ni->ni_esslen);
+		frm += ni->ni_esslen;
+	} else
+		*frm++ = 0;
 	frm = ieee80211_add_rates(frm, rs);
 	if (ic->ic_curmode != IEEE80211_MODE_FH) {
 		*frm++ = IEEE80211_ELEMID_DSPARMS;

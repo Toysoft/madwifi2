@@ -288,6 +288,7 @@ struct ieee80211req {
 #define	IEEE80211_IOC_WPA		26
 #define	IEEE80211_IOC_CHANLIST		27
 #define	IEEE80211_IOC_WME		28
+#define	IEEE80211_IOC_HIDESSID		29
 
 #ifndef IEEE80211_CHAN_ANY
 #define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
@@ -354,6 +355,7 @@ enum {
 	IEEE80211_PARAM_DRIVER_CAPS	= 16,	/* driver capabilities */
 	IEEE80211_PARAM_MACCMD		= 17,	/* MAC ACL operation */
 	IEEE80211_PARAM_WME		= 18,	/* WME mode (on, off) */
+	IEEE80211_PARAM_HIDESSID	= 19,	/* hide SSID mode (on, off) */
 };
 
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)

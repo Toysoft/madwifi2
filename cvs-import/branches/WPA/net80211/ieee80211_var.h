@@ -329,6 +329,7 @@ struct ieee80211com {
 #define	IEEE80211_F_WPA		0x01800000	/* CONF: WPA/WPA2 enabled */
 #define	IEEE80211_F_DROPUNENC	0x02000000	/* CONF: drop unencrypted */
 #define	IEEE80211_F_COUNTERM	0x04000000	/* CONF: TKIP countermeasures */
+#define	IEEE80211_F_HIDESSID	0x08000000	/* CONF: hide SSID in beacon */
 
 /* ic_caps */
 #define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
