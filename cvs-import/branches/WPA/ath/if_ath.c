@@ -1412,6 +1412,12 @@ ath_beacon_free(struct ath_softc *sc)
 	}
 }
 
+#if HAL_ABI_VERSION < 0x04022700
+/* XXX temporary workarounds until new HAL is released */
+#define	HAL_BEACON_PERIOD	0xffff
+#define	HAL_BEACON_RESET_TSF	0
+#endif
+
 /*
  * Configure the beacon and sleep timers.
  *
@@ -1494,6 +1500,9 @@ ath_beacon_config(struct ath_softc *sc)
 			, bs.bs_sleepduration
 		);
 		ath_hal_intrset(ah, 0);
+#if HAL_ABI_VERSION < 0x04022700
+		ath_hal_resettsf(ah);
+#endif
 		ath_hal_beacontimers(ah, &bs, 0/*XXX*/, 0, 0);
 		sc->sc_imask |= HAL_INT_BMISS;
 		ath_hal_intrset(ah, sc->sc_imask);
@@ -1501,6 +1510,7 @@ ath_beacon_config(struct ath_softc *sc)
 		DPRINTF(ATH_DEBUG_BEACON, "%s: intval %u nexttbtt %u\n",
 			__func__, ni->ni_intval, nexttbtt);
 		ath_hal_intrset(ah, 0);
+#if HAL_ABI_VERSION >= 0x04022700
 		if (nexttbtt == ni->ni_intval)
 			intval |= HAL_BEACON_RESET_TSF;
 		if (ic->ic_opmode != IEEE80211_M_MONITOR) {
@@ -1508,6 +1518,11 @@ ath_beacon_config(struct ath_softc *sc)
 			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
 		}
 		ath_hal_beaconinit(ah, nexttbtt, intval);
+#else
+		ath_hal_beaconinit(ah, nexttbtt, ni->ni_intval);
+		if (ic->ic_opmode != IEEE80211_M_MONITOR)
+			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
+#endif
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 }
@@ -3772,6 +3787,7 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 				if (!ath_hal_setslottime(sc->sc_ah, val))
 					ret = -EINVAL;
 				break;
+#if HAL_ABI_VERSION >= 0x04022000
 			case ATH_ACKTIMEOUT:
 				if (!ath_hal_setacktimeout(sc->sc_ah, val))
 					ret = -EINVAL;
@@ -3780,12 +3796,14 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 				if (!ath_hal_setctstimeout(sc->sc_ah, val))
 					ret = -EINVAL;
 				break;
+#endif
 			default:
 				return -EINVAL;
 			}
 		}
 	} else {
 		switch (ctl->ctl_name) {
+#if HAL_ABI_VERSION >= 0x04022000
 		case ATH_SLOTTIME:
 			val = ath_hal_getslottime(sc->sc_ah);
 			break;
@@ -3795,6 +3813,7 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 		case ATH_CTSTIMEOUT:
 			val = ath_hal_getctstimeout(sc->sc_ah);
 			break;
+#endif
 		default:
 			return -EINVAL;
 		}
@@ -3816,6 +3835,7 @@ static const ctl_table ath_sysctl_template[] = {
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
+#if HAL_ABI_VERSION >= 0x04022000
 	{ .ctl_name	= ATH_ACKTIMEOUT,
 	  .procname	= "acktimeout",
 	  .mode		= 0644,
@@ -3826,6 +3846,7 @@ static const ctl_table ath_sysctl_template[] = {
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
+#endif
 	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "dump",
 	  .mode		= 0200,
