@@ -42,6 +42,19 @@
  */
 
 /*
+ * Starting with 2.6.4 the kernel supports a configuration option
+ * to pass parameters in registers.  If this is enabled we must
+ * mark all function interfaces in+out of the HAL to pass parameters
+ * on the stack as this is the convention used internally (for
+ * maximum portability).
+ */
+#ifdef CONFIG_REGPARM
+#define	__ahdecl	__attribute__((regparm(0)))
+#else
+#define	__ahdecl
+#endif
+
+/*
  * When building the HAL proper we use no GPL-contaminated include
  * files and must define these types ourself.  Beware of these being
  * mismatched against the contents of <linux/types.h>
@@ -79,19 +92,17 @@ typedef u_int32_t HAL_BUS_ADDR;			/* XXX architecture dependent */
 /*
  * Delay n microseconds.
  */
-extern	void ath_hal_delay(int);
+extern	void __ahdecl ath_hal_delay(int);
 #define	OS_DELAY(_n)	ath_hal_delay(_n)
 
-/*
- * Memory zero, copy (non-overlapped), compare, and sort.
- */
-#define	OS_MEMZERO(_a, _size)		memset((_a), 0, (_size))
-#define	OS_MEMCPY(_dst, _src, _size)	memcpy((_dst), (_src), (_size))
-#define	OS_MACEQU(_a, _b) \
-	(memcmp((_a), (_b), IEEE80211_ADDR_LEN) == 0)
+#define	OS_MEMZERO(_a, _n)	__builtin_memset((_a), 0, (_n))
+#define	OS_MEMCPY(_d, _s, _n)	ath_hal_memcpy(_d,_s,_n)
+extern void * __ahdecl ath_hal_memcpy(void *, const void *, size_t);
+
+#define	abs(_a)		__builtin_abs(_a)
 
 struct ath_hal;
-extern	u_int32_t ath_hal_getuptime(struct ath_hal *);
+extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 #define	OS_GETUPTIME(_ah)	ath_hal_getuptime(_ah)
 
 /*
@@ -140,8 +151,9 @@ __bswap32(u_int32_t _x)
 #define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
 #define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
 
-extern	void ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val);
-extern	u_int32_t ath_hal_reg_read(struct ath_hal *ah, u_int reg);
+extern	void __ahdecl ath_hal_reg_write(struct ath_hal *ah,
+		u_int reg, u_int32_t val);
+extern	u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 #else
 /* inline register operations */
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
@@ -172,6 +184,10 @@ extern	u_int32_t ath_hal_reg_read(struct ath_hal *ah, u_int reg);
  * XXX We can't use HAL_STATUS because the type isn't defined at this
  *     point (circular dependency); we wack the type and patch things
  *     up in the function.
+ *
+ * NB: These are intentionally not marked __ahdecl since they are
+ *     compiled with the default calling convetion and are not called
+ *     from within the HAL.
  */
 extern	struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
 		HAL_BUS_TAG, HAL_BUS_HANDLE, void* status);
