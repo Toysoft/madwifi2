@@ -309,7 +309,7 @@ ieee80211_crypto_newkey(struct ieee80211com *ic,
 again:
 		keyctx = cip->ic_attach(ic, key);
 		if (keyctx == NULL) {
-		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
 				"%s: unable to attach cipher %s\n",
 				__func__, cip->ic_name);
 			key->wk_flags = oflags;	/* restore old flags */
