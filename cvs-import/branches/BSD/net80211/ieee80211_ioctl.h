@@ -1,7 +1,7 @@
 /*	$NetBSD: ieee80211_ioctl.h,v 1.5 2003/10/13 04:16:59 dyoung Exp $	*/
 /*-
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net80211/ieee80211_ioctl.h,v 1.4 2003/10/17 23:15:30 sam Exp $
+ * $FreeBSD: src/sys/net80211/ieee80211_ioctl.h,v 1.8 2004/12/31 22:42:38 sam Exp $
  */
 #ifndef _NET80211_IEEE80211_IOCTL_H_
 #define _NET80211_IEEE80211_IOCTL_H_
@@ -49,34 +49,42 @@ struct ieee80211_nodestats {
 	u_int32_t	ns_rx_ucast;		/* rx unicast frames */
 	u_int32_t	ns_rx_mcast;		/* rx multi/broadcast frames */
 	u_int64_t	ns_rx_bytes;		/* rx data count (bytes) */
+	u_int64_t	ns_rx_beacons;		/* rx beacon frames */
+	u_int32_t	ns_rx_proberesp;	/* rx probe response frames */
 
 	u_int32_t	ns_rx_dup;		/* rx discard 'cuz dup */
 	u_int32_t	ns_rx_noprivacy;	/* rx w/ wep but privacy off */
 	u_int32_t	ns_rx_wepfail;		/* rx wep processing failed */
+	u_int32_t	ns_rx_demicfail;	/* rx demic failed */
 	u_int32_t	ns_rx_decap;		/* rx decapsulation failed */
+	u_int32_t	ns_rx_defrag;		/* rx defragmentation failed */
 	u_int32_t	ns_rx_disassoc;		/* rx disassociation */
 	u_int32_t	ns_rx_deauth;		/* rx deauthentication */
 	u_int32_t	ns_rx_decryptcrc;	/* rx decrypt failed on crc */
 	u_int32_t	ns_rx_unauth;		/* rx on unauthorized port */
+	u_int32_t	ns_rx_unencrypted;	/* rx unecrypted w/ privacy */
 
 	u_int32_t	ns_tx_data;		/* tx data frames */
 	u_int32_t	ns_tx_mgmt;		/* tx management frames */
 	u_int32_t	ns_tx_ucast;		/* tx unicast frames */
 	u_int32_t	ns_tx_mcast;		/* tx multi/broadcast frames */
 	u_int64_t	ns_tx_bytes;		/* tx data count (bytes) */
+	u_int32_t	ns_tx_probereq;		/* tx probe request frames */
 
 	u_int32_t	ns_tx_novlantag;	/* tx discard 'cuz no tag */
 	u_int32_t	ns_tx_vlanmismatch;	/* tx discard 'cuz bad tag */
 
+	u_int32_t	ns_ps_discard;		/* ps discard 'cuz of age */
+
 	/* MIB-related state */
-	u_int32_t	ns_mib_assoc;		/* [re]associations */
-	u_int32_t	ns_mib_assoc_fail;	/* [re]association failures */
-	u_int32_t	ns_mib_auth;		/* [re]authentications */
-	u_int32_t	ns_mib_auth_fail;	/* [re]authentication failures*/
-	u_int32_t	ns_mib_deauth;		/* deauthentications */
-	u_int32_t	ns_mib_deauth_code;	/* last deauth reason */
-	u_int32_t	ns_mib_disassoc;	/* disassociations */
-	u_int32_t	ns_mib_disassoc_code;	/* last disassociation reason */
+	u_int32_t	ns_tx_assoc;		/* [re]associations */
+	u_int32_t	ns_tx_assoc_fail;	/* [re]association failures */
+	u_int32_t	ns_tx_auth;		/* [re]authentications */
+	u_int32_t	ns_tx_auth_fail;	/* [re]authentication failures*/
+	u_int32_t	ns_tx_deauth;		/* deauthentications */
+	u_int32_t	ns_tx_deauth_code;	/* last deauth reason */
+	u_int32_t	ns_tx_disassoc;		/* disassociations */
+	u_int32_t	ns_tx_disassoc_code;	/* last disassociation reason */
 };
 
 /*
@@ -157,6 +165,12 @@ struct ieee80211_stats {
 	u_int32_t	is_crypto_attachfail;	/* cipher attach failed */
 	u_int32_t	is_crypto_swfallback;	/* cipher fallback to s/w */
 	u_int32_t	is_crypto_keyfail;	/* driver key alloc failed */
+	u_int32_t	is_crypto_enmicfail;	/* en-MIC failed */
+	u_int32_t	is_ibss_capmismatch;	/* merge failed-cap mismatch */
+	u_int32_t	is_ibss_norate;		/* merge failed-rate mismatch */
+	u_int32_t	is_ps_unassoc;		/* ps-poll for unassoc. sta */
+	u_int32_t	is_ps_badaid;		/* ps-poll w/ incorrect aid */
+	u_int32_t	is_ps_qempty;		/* ps-poll w/ nothing to send */
 };
 
 /*
@@ -234,7 +248,15 @@ enum {
  * scanning.
  */
 struct ieee80211req_chanlist {
-	u_int8_t	ic_channels[32];	/* 256 channels */
+	u_int8_t	ic_channels[IEEE80211_CHAN_BYTES];
+};
+
+/*
+ * Get the active channel list info.
+ */
+struct ieee80211req_chaninfo {
+	u_int	ic_nchans;
+	struct ieee80211_channel ic_chans[IEEE80211_CHAN_MAX];
 };
 
 /*
@@ -244,6 +266,78 @@ struct ieee80211req_wpaie {
 	u_int8_t	wpa_macaddr[IEEE80211_ADDR_LEN];
 	u_int8_t	wpa_ie[IEEE80211_MAX_OPT_IE];
 };
+
+/*
+ * Retrieve per-node statistics.
+ */
+struct ieee80211req_sta_stats {
+	union {
+		/* NB: explicitly force 64-bit alignment */
+		u_int8_t	macaddr[IEEE80211_ADDR_LEN];
+		u_int64_t	pad;
+	} is_u;
+	struct ieee80211_nodestats is_stats;
+};
+
+/*
+ * Station information block; the mac address is used
+ * to retrieve other data like stats, unicast key, etc.
+ */
+struct ieee80211req_sta_info {
+	u_int16_t	isi_len;		/* length (mult of 4) */
+	u_int16_t	isi_freq;		/* MHz */
+	u_int16_t	isi_flags;		/* channel flags */
+	u_int16_t	isi_state;		/* state flags */
+	u_int8_t	isi_authmode;		/* authentication algorithm */
+	u_int8_t	isi_rssi;
+	u_int8_t	isi_capinfo;		/* capabilities */
+	u_int8_t	isi_erp;		/* ERP element */
+	u_int8_t	isi_macaddr[IEEE80211_ADDR_LEN];
+	u_int8_t	isi_nrates;
+						/* negotiated rates */
+	u_int8_t	isi_rates[IEEE80211_RATE_MAXSIZE];
+	u_int8_t	isi_txrate;		/* index to isi_rates[] */
+	u_int16_t	isi_ie_len;		/* IE length */
+	u_int16_t	isi_associd;		/* assoc response */
+	u_int16_t	isi_txpower;		/* current tx power */
+	u_int16_t	isi_vlan;		/* vlan tag */
+	u_int16_t	isi_txseqs[17];		/* seq to be transmitted */
+	u_int16_t	isi_rxseqs[17];		/* seq previous for qos frames*/
+	u_int16_t	isi_inact;		/* inactivity timer */
+	/* XXX frag state? */
+	/* variable length IE data */
+};
+
+/*
+ * Retrieve per-station information; to retrieve all
+ * specify a mac address of ff:ff:ff:ff:ff:ff.
+ */
+struct ieee80211req_sta_req {
+	union {
+		/* NB: explicitly force 64-bit alignment */
+		u_int8_t	macaddr[IEEE80211_ADDR_LEN];
+		u_int64_t	pad;
+	} is_u;
+	struct ieee80211req_sta_info info[1];	/* variable length */
+};
+
+/*
+ * Get/set per-station tx power cap.
+ */
+struct ieee80211req_sta_txpow {
+	u_int8_t	it_macaddr[IEEE80211_ADDR_LEN];
+	u_int8_t	it_txpow;
+};
+
+/*
+ * WME parameters are set and return using i_val and i_len.
+ * i_val holds the value itself.  i_len specifies the AC
+ * and, as appropriate, then high bit specifies whether the
+ * operation is to be applied to the BSS or ourself.
+ */
+#define	IEEE80211_WMEPARAM_SELF	0x0000		/* parameter applies to self */
+#define	IEEE80211_WMEPARAM_BSS	0x8000		/* parameter applies to BSS */
+#define	IEEE80211_WMEPARAM_VAL	0x7fff		/* parameter value */
 
 #ifdef __FreeBSD__
 /*
@@ -286,48 +380,67 @@ struct ieee80211req {
 #define 	IEEE80211_PROTMODE_OFF		0
 #define 	IEEE80211_PROTMODE_CTS		1
 #define 	IEEE80211_PROTMODE_RTSCTS	2
-#define	IEEE80211_IOC_TXPOWER		14
+#define	IEEE80211_IOC_TXPOWER		14	/* global tx power limit */
 #define	IEEE80211_IOC_BSSID		15
-#define	IEEE80211_IOC_ROAMING		16
-#define	IEEE80211_IOC_PRIVACY		17
-#define	IEEE80211_IOC_DROP_UNENCRYPTED	18
+#define	IEEE80211_IOC_ROAMING		16	/* roaming mode */
+#define	IEEE80211_IOC_PRIVACY		17	/* privacy invoked */
+#define	IEEE80211_IOC_DROPUNENCRYPTED	18	/* discard unencrypted frames */
 #define	IEEE80211_IOC_WPAKEY		19
 #define	IEEE80211_IOC_DELKEY		20
 #define	IEEE80211_IOC_MLME		21
-#define	IEEE80211_IOC_OPTIE		22
+#define	IEEE80211_IOC_OPTIE		22	/* optional info. element */
 #define	IEEE80211_IOC_SCAN_REQ		23
 #define	IEEE80211_IOC_SCAN_RESULTS	24
-#define	IEEE80211_IOC_COUNTERMEASURES	25
-#define	IEEE80211_IOC_WPA		26
-#define	IEEE80211_IOC_CHANLIST		27
-#define	IEEE80211_IOC_WME		28
-#define	IEEE80211_IOC_HIDESSID		29
-#define	IEEE80211_IOC_APBRIDGE		30
+#define	IEEE80211_IOC_COUNTERMEASURES	25	/* WPA/TKIP countermeasures */
+#define	IEEE80211_IOC_WPA		26	/* WPA mode (0,1,2) */
+#define	IEEE80211_IOC_CHANLIST		27	/* channel list */
+#define	IEEE80211_IOC_WME		28	/* WME mode (on, off) */
+#define	IEEE80211_IOC_HIDESSID		29	/* hide SSID mode (on, off) */
+#define	IEEE80211_IOC_APBRIDGE		30	/* AP inter-sta bridging */
+#define	IEEE80211_IOC_MCASTCIPHER	31	/* multicast/default cipher */
+#define	IEEE80211_IOC_MCASTKEYLEN	32	/* multicast key length */
+#define	IEEE80211_IOC_UCASTCIPHERS	33	/* unicast cipher suites */
+#define	IEEE80211_IOC_UCASTCIPHER	34	/* unicast cipher */
+#define	IEEE80211_IOC_UCASTKEYLEN	35	/* unicast key length */
+#define	IEEE80211_IOC_DRIVER_CAPS	36	/* driver capabilities */
+#define	IEEE80211_IOC_KEYMGTALGS	37	/* key management algorithms */
+#define	IEEE80211_IOC_RSNCAPS		38	/* RSN capabilities */
+#define	IEEE80211_IOC_WPAIE		39	/* WPA information element */
+#define	IEEE80211_IOC_STA_STATS		40	/* per-station statistics */
+#define	IEEE80211_IOC_MACCMD		41	/* MAC ACL operation */
+#define	IEEE80211_IOC_CHANINFO		42	/* channel info list */
+#define	IEEE80211_IOC_TXPOWMAX		43	/* max tx power for channel */
+#define	IEEE80211_IOC_STA_TXPOW		44	/* per-station tx power limit */
+#define	IEEE80211_IOC_STA_INFO		45	/* station/neighbor info */
+#define	IEEE80211_IOC_WME_CWMIN		46	/* WME: ECWmin */
+#define	IEEE80211_IOC_WME_CWMAX		47	/* WME: ECWmax */
+#define	IEEE80211_IOC_WME_AIFS		48	/* WME: AIFSN */
+#define	IEEE80211_IOC_WME_TXOPLIMIT	49	/* WME: txops limit */
+#define	IEEE80211_IOC_WME_ACM		50	/* WME: ACM (bss only) */
+#define	IEEE80211_IOC_WME_ACKPOLICY	51	/* WME: ACK policy (!bss only)*/
+#define	IEEE80211_IOC_DTIM_PERIOD	52	/* DTIM period (beacons) */
+#define	IEEE80211_IOC_BEACON_INTERVAL	53	/* beacon interval (ms) */
+#define	IEEE80211_IOC_ADDMAC		54	/* add sta to MAC ACL table */
+#define	IEEE80211_IOC_DELMAC		55	/* del sta from MAC ACL table */
 
-#ifndef IEEE80211_CHAN_ANY
-#define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
-#endif
-
-struct ieee80211req_scan_req {
-	u_int8_t	isq_ssid_len;			/* SSID length */
-	u_int8_t	isq_ssid[IEEE80211_NWID_LEN];
-};
-
+/*
+ * Scan result data returned for IEEE80211_IOC_SCAN_RESULTS.
+ */
 struct ieee80211req_scan_result {
-	u_int16_t	isr_len;			/* length (mult of 4) */
-	u_int16_t	isr_freq;			/* MHz */
-	u_int16_t	isr_flags;			/* channel flags */
+	u_int16_t	isr_len;		/* length (mult of 4) */
+	u_int16_t	isr_freq;		/* MHz */
+	u_int16_t	isr_flags;		/* channel flags */
 	u_int8_t	isr_noise;
 	u_int8_t	isr_rssi;
-	u_int8_t	isr_intval;			/* beacon interval */
-	u_int8_t	isr_capinfo;			/* capabilities */
-	u_int8_t	isr_erp;			/* ERP element */
+	u_int8_t	isr_intval;		/* beacon interval */
+	u_int8_t	isr_capinfo;		/* capabilities */
+	u_int8_t	isr_erp;		/* ERP element */
 	u_int8_t	isr_bssid[IEEE80211_ADDR_LEN];
 	u_int8_t	isr_nrates;
-	u_int8_t	isr_rates[15];			/* XXX */
-	u_int8_t	isr_ssid_len;			/* SSID length */
-	u_int8_t	isr_ie_len;			/* IE length */
-	u_int8_t	isr_scangen;			/* scan generation # */
+	u_int8_t	isr_rates[IEEE80211_RATE_MAXSIZE];
+	u_int8_t	isr_ssid_len;		/* SSID length */
+	u_int8_t	isr_ie_len;		/* IE length */
+	u_int8_t	isr_pad[5];
 	/* variable length SSID followed by IE data */
 };
 

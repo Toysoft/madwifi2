@@ -235,8 +235,8 @@ wep_decap(struct ieee80211_key *k, struct sk_buff *skb)
 	if ((k->wk_flags & IEEE80211_KEY_SWCRYPT) &&
 	    !wep_decrypt(k, skb, hdrlen)) {
 		IEEE80211_DPRINTF(ctx->wc_ic, IEEE80211_MSG_CRYPTO,
-		    ("[%s] WEP ICV mismatch on decrypt\n",
-		    ether_sprintf(wh->i_addr2)));
+		    "[%s] WEP ICV mismatch on decrypt\n",
+		    ether_sprintf(wh->i_addr2));
 		ctx->wc_ic->ic_stats.is_rx_wepfail++;
 		return 0;
 	}
@@ -320,9 +320,9 @@ wep_encrypt(struct ieee80211_key *key, struct sk_buff *skb, int hdrlen)
 			(struct ieee80211_frame *) skb->data;
 		/* NB: should not happen */
 		IEEE80211_DPRINTF(ctx->wc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] No room for %s ICV, tailroom %u\n",
+			"[%s] No room for %s ICV, tailroom %u\n",
 			ether_sprintf(wh->i_addr1), wep.ic_name,
-			skb_tailroom(skb)));
+			skb_tailroom(skb));
 		/* XXX statistic */
 		return 0;
 	}

@@ -1,7 +1,6 @@
-/*	$NetBSD: ieee80211_var.h,v 1.4 2003/10/13 04:27:40 dyoung Exp $	*/
 /*-
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,7 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net80211/ieee80211_var.h,v 1.11 2004/01/15 08:44:27 onoe Exp $
+ * $FreeBSD: src/sys/net80211/ieee80211_var.h,v 1.20 2005/01/24 19:39:07 sam Exp $
  */
 #ifndef _NET80211_IEEE80211_VAR_H_
 #define _NET80211_IEEE80211_VAR_H_
@@ -38,6 +37,8 @@
 /*
  * Definitions for IEEE 802.11 drivers.
  */
+#define	IEEE80211_DEBUG
+#undef	IEEE80211_DEBUG_REFCNT			/* node refcnt stuff */
 
 /* NB: portability glue must go first */
 #ifdef __NetBSD__
@@ -51,141 +52,29 @@
 #endif
 
 #include <sys/queue.h>
-
+#include <net80211/_ieee80211.h>
 #include <net80211/ieee80211.h>
 #include <net80211/ieee80211_crypto.h>
 #include <net80211/ieee80211_ioctl.h>		/* for ieee80211_stats */
 #include <net80211/ieee80211_node.h>
 #include <net80211/ieee80211_proto.h>
 
-#define	IEEE80211_CHAN_MAX	255
-#define	IEEE80211_CHAN_BYTES	howmany(IEEE80211_CHAN_MAX, NBBY)
-#define	IEEE80211_CHAN_ANY	0xffff	/* token for ``any channel'' */
-#define	IEEE80211_CHAN_ANYC \
-	((struct ieee80211_channel *) IEEE80211_CHAN_ANY)
-
 #define	IEEE80211_TXPOWER_MAX	100	/* .5 dbM (XXX units?) */
 #define	IEEE80211_TXPOWER_MIN	0	/* kill radio */
 
-enum ieee80211_phytype {
-	IEEE80211_T_DS,			/* direct sequence spread spectrum */
-	IEEE80211_T_FH,			/* frequency hopping */
-	IEEE80211_T_OFDM,		/* frequency division multiplexing */
-	IEEE80211_T_TURBO,		/* high rate OFDM, aka turbo mode */
-};
-#define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
+#define	IEEE80211_DTIM_MAX	15	/* max DTIM period */
+#define	IEEE80211_DTIM_MIN	1	/* min DTIM period */
+#define	IEEE80211_DTIM_DEFAULT	1	/* default DTIM period */
 
-/* XXX not really a mode; there are really multiple PHY's */
-enum ieee80211_phymode {
-	IEEE80211_MODE_AUTO	= 0,	/* autoselect */
-	IEEE80211_MODE_11A	= 1,	/* 5GHz, OFDM */
-	IEEE80211_MODE_11B	= 2,	/* 2GHz, CCK */
-	IEEE80211_MODE_11G	= 3,	/* 2GHz, OFDM */
-	IEEE80211_MODE_FH	= 4,	/* 2GHz, GFSK */
-	IEEE80211_MODE_TURBO	= 5,	/* 5GHz, OFDM, 2x clock */
-};
-#define	IEEE80211_MODE_MAX	(IEEE80211_MODE_TURBO+1)
-
-enum ieee80211_opmode {
-	IEEE80211_M_STA		= 1,	/* infrastructure station */
-	IEEE80211_M_IBSS 	= 0,	/* IBSS (adhoc) station */
-	IEEE80211_M_AHDEMO	= 3,	/* Old lucent compatible adhoc demo */
-	IEEE80211_M_HOSTAP	= 6,	/* Software Access Point */
-	IEEE80211_M_MONITOR	= 8	/* Monitor mode */
-};
-
-/*
- * 802.11g protection mode.
- */
-enum ieee80211_protmode {
-	IEEE80211_PROT_NONE	= 0,	/* no protection */
-	IEEE80211_PROT_CTSONLY	= 1,	/* CTS to self */
-	IEEE80211_PROT_RTSCTS	= 2,	/* RTS-CTS */
-};
-
-/*
- * Roaming mode is effectively who controls the operation
- * of the 802.11 state machine when operating as a station.
- * State transitions are controlled either by the driver
- * (typically when management frames are processed by the
- * hardware/firmware), the host (auto/normal operation of
- * the 802.11 layer), or explicitly through ioctl requests
- * when applications like wpa_supplicant want control.
- */
-enum ieee80211_roamingmode {
-	IEEE80211_ROAMING_DEVICE= 0,	/* driver/hardware control */
-	IEEE80211_ROAMING_AUTO	= 1,	/* 802.11 layer control */
-	IEEE80211_ROAMING_MANUAL= 2,	/* application control */
-};
-
-/*
- * Channels are specified by frequency and attributes.
- */
-struct ieee80211_channel {
-	u_int16_t	ic_freq;	/* setting in Mhz */
-	u_int16_t	ic_flags;	/* see below */
-};
-
-/* bits 0-3 are for private use by drivers */
-/* channel attributes */
-#define	IEEE80211_CHAN_TURBO	0x0010	/* Turbo channel */
-#define	IEEE80211_CHAN_CCK	0x0020	/* CCK channel */
-#define	IEEE80211_CHAN_OFDM	0x0040	/* OFDM channel */
-#define	IEEE80211_CHAN_2GHZ	0x0080	/* 2 GHz spectrum channel. */
-#define	IEEE80211_CHAN_5GHZ	0x0100	/* 5 GHz spectrum channel */
-#define	IEEE80211_CHAN_PASSIVE	0x0200	/* Only passive scan allowed */
-#define	IEEE80211_CHAN_DYN	0x0400	/* Dynamic CCK-OFDM channel */
-#define	IEEE80211_CHAN_GFSK	0x0800	/* GFSK channel (FHSS PHY) */
-
-/*
- * Useful combinations of channel characteristics.
- */
-#define	IEEE80211_CHAN_FHSS \
-	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_GFSK)
-#define	IEEE80211_CHAN_A \
-	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM)
-#define	IEEE80211_CHAN_B \
-	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_CCK)
-#define	IEEE80211_CHAN_PUREG \
-	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_OFDM)
-#define	IEEE80211_CHAN_G \
-	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_DYN)
-#define	IEEE80211_CHAN_T \
-	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_TURBO)
-
-#define	IEEE80211_IS_CHAN_FHSS(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_FHSS) == IEEE80211_CHAN_FHSS)
-#define	IEEE80211_IS_CHAN_A(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_A) == IEEE80211_CHAN_A)
-#define	IEEE80211_IS_CHAN_B(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_B) == IEEE80211_CHAN_B)
-#define	IEEE80211_IS_CHAN_PUREG(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_PUREG) == IEEE80211_CHAN_PUREG)
-#define	IEEE80211_IS_CHAN_G(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_G) == IEEE80211_CHAN_G)
-#define	IEEE80211_IS_CHAN_T(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_T) == IEEE80211_CHAN_T)
-
-#define	IEEE80211_IS_CHAN_2GHZ(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_2GHZ) != 0)
-#define	IEEE80211_IS_CHAN_5GHZ(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_5GHZ) != 0)
-#define	IEEE80211_IS_CHAN_OFDM(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_OFDM) != 0)
-#define	IEEE80211_IS_CHAN_CCK(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_CCK) != 0)
-#define	IEEE80211_IS_CHAN_GFSK(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_GFSK) != 0)
-
-/* ni_chan encoding for FH phy */
-#define	IEEE80211_FH_CHANMOD	80
-#define	IEEE80211_FH_CHAN(set,pat)	(((set)-1)*IEEE80211_FH_CHANMOD+(pat))
-#define	IEEE80211_FH_CHANSET(chan)	((chan)/IEEE80211_FH_CHANMOD+1)
-#define	IEEE80211_FH_CHANPAT(chan)	((chan)%IEEE80211_FH_CHANMOD)
+#define	IEEE80211_BINTVAL_MAX	500	/* max beacon interval (TU's) */
+#define	IEEE80211_BINTVAL_MIN	25	/* min beacon interval (TU's) */
+#define	IEEE80211_BINTVAL_DEFAULT 100	/* default beacon interval (TU's) */
 
 #define	IEEE80211_PS_SLEEP	0x1	/* STA is in power saving mode */
-
 #define	IEEE80211_PS_MAX_QUEUE	50	/* maximum saved packets */
+
+#define	IEEE80211_MS_TO_TU(x)	(((x) * 1000) / 1024)
+#define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
 
 struct vlan_group;
 struct eapolcom;
@@ -194,10 +83,12 @@ struct ieee80211_aclator;
 struct ieee80211com {
 	SLIST_ENTRY(ieee80211com) ic_next;
 	struct net_device	*ic_dev;	/* associated device */
+	struct ieee80211_stats	ic_stats;	/* TODO statistics */
 	struct net_device_stats	*ic_devstats;	/* interface statistics */
-	u_int32_t		msg_enable;	/* interface message flags */
 	struct timer_list	ic_slowtimo;	/* mgmt/inactivity timer */
-	struct ieee80211_stats	ic_stats;	/* private statistics */
+	u_int32_t		ic_debug;	/* debug msg flags */
+	u_int			ic_vap;		/* virtual AP index */
+	ieee80211_beacon_lock_t	ic_beaconlock;	/* beacon update lock */
 #ifdef CONFIG_SYSCTL
 	char			ic_procname[12];/* e.g. wlan%d */
 	struct ctl_table_header	*ic_sysctl_header;
@@ -219,13 +110,16 @@ struct ieee80211com {
 	void			(*ic_newassoc)(struct ieee80211com *,
 				    struct ieee80211_node *, int);
 	void			(*ic_updateslot)(struct net_device *);
-	int			(*ic_set_tim)(struct ieee80211com *, int, int);
+	void			(*ic_set_tim)(struct ieee80211com *,
+				    struct ieee80211_node *, int);
 	u_int8_t		ic_myaddr[IEEE80211_ADDR_LEN];
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211_channel ic_channels[IEEE80211_CHAN_MAX+1];
 	u_int8_t		ic_chan_avail[IEEE80211_CHAN_BYTES];
 	u_int8_t		ic_chan_active[IEEE80211_CHAN_BYTES];
 	u_int8_t		ic_chan_scan[IEEE80211_CHAN_BYTES];
+	struct ieee80211_node_table ic_scan;	/* scan candidates */
+	struct sk_buff_head	ic_mgtq;
 	u_int32_t		ic_flags;	/* state flags */
 	u_int32_t		ic_caps;	/* capabilities */
 	u_int16_t		ic_modecaps;	/* set of mode capabilities */
@@ -235,8 +129,15 @@ struct ieee80211com {
 	enum ieee80211_state	ic_state;	/* 802.11 state */
 	enum ieee80211_protmode	ic_protmode;	/* 802.11g protection mode */
 	enum ieee80211_roamingmode ic_roaming;	/* roaming mode */
-	u_int32_t		*ic_aid_bitmap;
+	struct ieee80211_node_table ic_sta;	/* stations/neighbors */
+	u_int32_t		*ic_aid_bitmap;	/* association id map */
 	u_int16_t		ic_max_aid;
+	u_int16_t		ic_sta_assoc;	/* stations associated */
+	u_int16_t		ic_ps_sta;	/* stations in power save */
+	u_int16_t		ic_ps_pending;	/* ps sta's w/ pending frames */
+	u_int8_t		*ic_tim_bitmap;	/* power-save stations w/ data*/
+	u_int16_t		ic_tim_len;	/* ic_tim_bitmap size (bytes) */
+	u_int16_t		ic_dtim_period;	/* DTIM period */
 	struct ifmedia		ic_media;	/* interface media config */
 #if NBPFILTER > 0
 	struct bpf_if		*ic_rawbpf;	/* packet filter structure */
@@ -246,18 +147,10 @@ struct ieee80211com {
 	int			ic_fixed_rate;	/* index to ic_sup_rates[] */
 	u_int16_t		ic_rtsthreshold;
 	u_int16_t		ic_fragthreshold;
-	ieee80211_node_lock_t	ic_nodelock;	/* on node table */
-	u_int			ic_scangen;	/* gen# for timeout scan */
-	struct ieee80211_node	*(*ic_node_alloc)(struct ieee80211com *);
-	void			(*ic_node_free)(struct ieee80211com *,
-					struct ieee80211_node *);
-	void			(*ic_node_cleanup)(struct ieee80211com *,
-					struct ieee80211_node *);
-	void			(*ic_node_copy)(struct ieee80211com *,
-					struct ieee80211_node *,
-					const struct ieee80211_node *);
-	u_int8_t		(*ic_node_getrssi)(struct ieee80211com *,
-					struct ieee80211_node *);
+	struct ieee80211_node	*(*ic_node_alloc)(struct ieee80211_node_table*);
+	void			(*ic_node_free)(struct ieee80211_node *);
+	void			(*ic_node_cleanup)(struct ieee80211_node *);
+	u_int8_t		(*ic_node_getrssi)(const struct ieee80211_node*);
 	TAILQ_HEAD(, ieee80211_node) ic_node;	/* information of all nodes */
 	ATH_LIST_HEAD(, ieee80211_node) ic_hash[IEEE80211_NODE_HASHSIZE];
 	u_int16_t		ic_lintval;	/* listen interval */
@@ -265,6 +158,7 @@ struct ieee80211com {
 	u_int16_t		ic_txmin;	/* min tx retry count */
 	u_int16_t		ic_txmax;	/* max tx retry count */
 	u_int16_t		ic_txlifetime;	/* tx lifetime */
+	u_int16_t		ic_txpowlimit;	/* global tx power limit */
 	u_int16_t		ic_bmisstimeout;/* beacon miss threshold (ms) */
 	u_int16_t		ic_nonerpsta;	/* # non-ERP stations */
 	u_int16_t		ic_longslotsta;	/* # long slot time stations */
@@ -282,8 +176,14 @@ struct ieee80211com {
 	 * Inactivity timer settings for nodes.
 	 */
 	int			ic_inact_init;	/* initial setting */
-	int			ic_inact_auth;	/* assoc but not auth setting */
+	int			ic_inact_auth;	/* auth but not assoc setting */
 	int			ic_inact_run;	/* authorized setting */
+	int			ic_inact_probe;	/* inactive probe time */
+
+	/*
+	 * WME/WMM state.
+	 */
+	struct ieee80211_wme_state ic_wme;
 
 	/*
 	 * Cipher state/configuration.
@@ -313,8 +213,10 @@ struct ieee80211com {
 #define	IEEE80211_ADDR_COPY(dst,src)	memcpy(dst,src,IEEE80211_ADDR_LEN)
 
 /* ic_flags */
+/* NB: bits 0x6f available */
 /* NB: this is intentionally setup to be IEEE80211_CAPINFO_PRIVACY */
 #define	IEEE80211_F_PRIVACY	0x00000010	/* CONF: privacy enabled */
+#define	IEEE80211_F_SCAN	0x00000080	/* STATUS: scanning */
 #define	IEEE80211_F_ASCAN	0x00000100	/* STATUS: active scan */
 #define	IEEE80211_F_SIBSS	0x00000200	/* STATUS: start IBSS */
 /* NB: this is intentionally setup to be IEEE80211_CAPINFO_SHORT_SLOTTIME */
@@ -322,7 +224,7 @@ struct ieee80211com {
 #define	IEEE80211_F_PMGTON	0x00000800	/* CONF: Power mgmt enable */
 #define	IEEE80211_F_DESBSSID	0x00001000	/* CONF: des_bssid is set */
 #define	IEEE80211_F_WME		0x00002000	/* CONF: enable WME use */
-#define	IEEE80211_F_ROAMING	0x00004000	/* CONF: roaming enabled */
+#define	IEEE80211_F_ROAMING	0x00004000	/* CONF: roaming enabled (???)*/
 #define	IEEE80211_F_SWRETRY	0x00008000	/* CONF: sw tx retry enabled */
 #define IEEE80211_F_TXPOW_FIXED	0x00010000	/* TX Power: fixed rate */
 #define	IEEE80211_F_IBSSON	0x00020000	/* CONF: IBSS creation enable */
@@ -338,6 +240,7 @@ struct ieee80211com {
 #define	IEEE80211_F_COUNTERM	0x04000000	/* CONF: TKIP countermeasures */
 #define	IEEE80211_F_HIDESSID	0x08000000	/* CONF: hide SSID in beacon */
 #define	IEEE80211_F_NOBRIDGE	0x10000000	/* CONF: dis. internal bridge */
+#define	IEEE80211_F_WMEUPDATE	0x20000000	/* STATUS: update beacon wme */
 
 /* ic_caps */
 #define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
@@ -355,6 +258,11 @@ struct ieee80211com {
 #define	IEEE80211_C_SHPREAMBLE	0x00008000	/* CAPABILITY: short preamble */
 #define	IEEE80211_C_MONITOR	0x00010000	/* CAPABILITY: monitor mode */
 #define	IEEE80211_C_TKIPMIC	0x00020000	/* CAPABILITY: TKIP MIC avail */
+#define	IEEE80211_C_WPA1	0x00800000	/* CAPABILITY: WPA1 avail */
+#define	IEEE80211_C_WPA2	0x01000000	/* CAPABILITY: WPA2 avail */
+#define	IEEE80211_C_WPA		0x01800000	/* CAPABILITY: WPA1+WPA2 avail*/
+#define	IEEE80211_C_BURST	0x02000000	/* CAPABILITY: frame bursting */
+#define	IEEE80211_C_WME		0x04000000	/* CAPABILITY: WME avail */
 /* XXX protection/barker? */
 
 #define	IEEE80211_C_CRYPTO	0x0000002f	/* CAPABILITY: crypto alg's */
@@ -362,11 +270,13 @@ struct ieee80211com {
 int	ieee80211_ifattach(struct ieee80211com *);
 void	ieee80211_ifdetach(struct ieee80211com *);
 void	ieee80211_announce(struct ieee80211com *);
-void	ieee80211_media_init(struct ieee80211com *, ifm_change_cb_t, ifm_stat_cb_t);
+void	ieee80211_media_init(struct ieee80211com *,
+		ifm_change_cb_t, ifm_stat_cb_t);
 struct ieee80211com *ieee80211_find_vap(const u_int8_t mac[IEEE80211_ADDR_LEN]);
 int	ieee80211_media_change(struct net_device *);
 void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
 int	ieee80211_ioctl(struct ieee80211com *, struct ifreq *, int);
+void	ieee80211_watchdog(unsigned long);
 int	ieee80211_rate2media(struct ieee80211com *, int,
 		enum ieee80211_phymode);
 int	ieee80211_media2rate(int);
@@ -374,7 +284,6 @@ u_int	ieee80211_mhz2ieee(u_int, u_int);
 u_int	ieee80211_chan2ieee(struct ieee80211com *, struct ieee80211_channel *);
 u_int	ieee80211_ieee2mhz(u_int, u_int);
 int	ieee80211_setmode(struct ieee80211com *, enum ieee80211_phymode);
-void	ieee80211_reset_erp(struct ieee80211com *);
 enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 		struct ieee80211_channel *);
 
@@ -390,6 +299,36 @@ static inline void
 ieee80211_key_update_end(struct ieee80211com *ic)
 {
 	ic->ic_crypto.cs_key_update_end(ic);
+}
+
+/*
+ * XXX these need to be here for IEEE80211_F_DATAPAD
+ */
+
+/*
+ * Return the space occupied by the 802.11 header and any
+ * padding required by the driver.  This works for a
+ * management or data frame.
+ */
+static inline int
+ieee80211_hdrspace(struct ieee80211com *ic, const void *data)
+{
+	int size = ieee80211_hdrsize(data);
+	if (ic->ic_flags & IEEE80211_F_DATAPAD)
+		size = roundup(size, sizeof(u_int32_t));
+	return size;
+}
+
+/*
+ * Like ieee80211_hdrspace, but handles any type of frame.
+ */
+static inline int
+ieee80211_anyhdrspace(struct ieee80211com *ic, const void *data)
+{
+	int size = ieee80211_anyhdrsize(data);
+	if (ic->ic_flags & IEEE80211_F_DATAPAD)
+		size = roundup(size, sizeof(u_int32_t));
+	return size;
 }
 
 #define	IEEE80211_MSG_DEBUG	0x40000000	/* IFF_DEBUG equivalent */
@@ -412,31 +351,31 @@ ieee80211_key_update_end(struct ieee80211com *ic)
 #define	IEEE80211_MSG_RADKEYS	0x00002000	/* dump 802.1x keys */
 #define	IEEE80211_MSG_WPA	0x00001000	/* WPA/RSN protocol */
 #define	IEEE80211_MSG_ACL	0x00000800	/* ACL handling */
+#define	IEEE80211_MSG_WME	0x00000400	/* WME protocol */
 
 #define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
 
-#define	IEEE80211_DEBUG
 #ifdef IEEE80211_DEBUG
-#define	IEEE80211_DPRINTF(_ic, _m, _args) do {		\
-	if (_ic->msg_enable & (_m))			\
-		printk _args;				\
+#define	IEEE80211_DPRINTF(_ic, _m, _fmt, ...) do {	\
+	if (_ic->ic_debug & (_m))			\
+		printf(_fmt, __VA_ARGS__);		\
 } while (0)
 #define	ieee80211_msg_debug(_ic) \
-	((_ic)->msg_enable & IEEE80211_MSG_DEBUG)
+	((_ic)->ic_debug & IEEE80211_MSG_DEBUG)
 #define	ieee80211_msg_dumppkts(_ic) \
-	((_ic)->msg_enable & IEEE80211_MSG_DUMPPKTS)
+	((_ic)->ic_debug & IEEE80211_MSG_DUMPPKTS)
 #define	ieee80211_msg_input(_ic) \
-	((_ic)->msg_enable & IEEE80211_MSG_INPUT)
+	((_ic)->ic_debug & IEEE80211_MSG_INPUT)
 #define	ieee80211_msg_radius(_ic) \
-	((_ic)->msg_enable & IEEE80211_MSG_RADIUS)
+	((_ic)->ic_debug & IEEE80211_MSG_RADIUS)
 #define	ieee80211_msg_dumpradius(_ic) \
-	((_ic)->msg_enable & IEEE80211_MSG_RADDUMP)
+	((_ic)->ic_debug & IEEE80211_MSG_RADDUMP)
 #define	ieee80211_msg_dumpradkeys(_ic) \
-	((_ic)->msg_enable & IEEE80211_MSG_RADKEYS)
+	((_ic)->ic_debug & IEEE80211_MSG_RADKEYS)
 #define	ieee80211_msg_scan(_ic) \
-	((_ic)->msg_enable & IEEE80211_MSG_SCAN)
+	((_ic)->ic_debug & IEEE80211_MSG_SCAN)
 #else
-#define	IEEE80211_DPRINTF(_ic, _fmt, ...)
+#define	IEEE80211_DPRINTF(_ic, _m, _fmt, ...)
 #endif
 
 #endif /* _NET80211_IEEE80211_VAR_H_ */
