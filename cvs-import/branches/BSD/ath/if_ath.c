@@ -1053,6 +1053,7 @@ ath_stop_locked(struct net_device *dev)
 		 */
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 		dev->flags &= ~IFF_RUNNING;
+		netif_stop_queue(dev);
 		// TODO: delete slowtimo here?
 		if (!sc->sc_invalid) {
 			if (sc->sc_softled) {
@@ -1070,7 +1071,6 @@ ath_stop_locked(struct net_device *dev)
 		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);
-		netif_stop_queue(dev);		// TODO: correct here?
 	}
 	return 0;
 }
@@ -1864,7 +1864,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct ath_buf *bf;
 	struct sk_buff *skb;
 
-	bf = STAILQ_FIRST(&sc->sc_bcbuf);
+	bf = STAILQ_FIRST(&sc->sc_bbuf);
 	if (bf == NULL) {
 		DPRINTF(sc, ATH_DEBUG_BEACON, "%s: no dma buffers\n", __func__);
 		sc->sc_stats.ast_be_nobuf++;	/* XXX */
@@ -1980,7 +1980,7 @@ static void
 ath_beacon_tasklet(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
-	struct ath_buf *bf = STAILQ_FIRST(&sc->sc_bcbuf);
+	struct ath_buf *bf = STAILQ_FIRST(&sc->sc_bbuf);
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct sk_buff *skb;
@@ -2128,7 +2128,7 @@ ath_beacon_free(struct ath_softc *sc)
 {
 	struct ath_buf *bf;
 
-	STAILQ_FOREACH(bf, &sc->sc_bcbuf, bf_list) {
+	STAILQ_FOREACH(bf, &sc->sc_bbuf, bf_list) {
             if (bf->bf_skb != NULL) {
 		bus_unmap_single(sc->sc_bdev,
                     bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
@@ -2351,7 +2351,7 @@ ath_desc_alloc(struct ath_softc *sc)
 
         ath_descdma_setup(sc, &sc->sc_rxbuf, &bf, ATH_RXBUF, 1);
         ath_descdma_setup(sc, &sc->sc_txbuf, &bf, ATH_TXBUF, ATH_TXDESC);
-        ath_descdma_setup(sc, &sc->sc_bcbuf, &bf, 1, 1);
+        ath_descdma_setup(sc, &sc->sc_bbuf, &bf, 1, 1);
 
 	return 0;
 bad:
@@ -2365,7 +2365,7 @@ bad:
 static void
 ath_desc_free(struct ath_softc *sc)
 {
-        ath_descdma_cleanup(sc, &sc->sc_bcbuf);
+        ath_descdma_cleanup(sc, &sc->sc_bbuf);
         ath_descdma_cleanup(sc, &sc->sc_txbuf);
         ath_descdma_cleanup(sc, &sc->sc_rxbuf);
 
