@@ -255,6 +255,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
 	ic->ic_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS | IEEE80211_C_HOSTAP | IEEE80211_C_MONITOR | IEEE80211_C_SHPREAMBLE;
+	ic->ic_flags |= IEEE80211_F_DATAPAD;
 
 	ic->ic_node_privlen = sizeof(struct ath_nodestat);
 	ic->ic_node_free = ath_node_free;
@@ -642,8 +643,8 @@ ath_reset(struct net_device *dev)
 int ieee80211_skbhdr_adjust(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ieee80211com *ic = (void*)dev->priv;
-	int len = sizeof(struct ieee80211_frame) + sizeof(struct llc) -
-				sizeof(struct ether_header);
+	int len = sizeof(struct ieee80211_qosframe) + sizeof(struct llc) +
+		IEEE80211_ADDR_LEN - sizeof(struct ether_header);
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		len += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
 
@@ -669,8 +670,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ieee80211_frame *wh;
 	int error;
 
-	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid ||
-	    ic->ic_opmode == IEEE80211_M_MONITOR) {
+	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
 		DPRINTF(("%s: discard, invalid %d flags %x\n", __func__,
 			sc->sc_invalid, dev->flags));
 		sc->sc_stats.ast_tx_invalid++;
@@ -751,6 +751,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	error = ath_tx_start(dev, ni, bf, skb);
 	ieee80211_unref_node(&ni);
+
 
 	if (error == 0)
 		return 0;
@@ -1505,13 +1506,36 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	int len = ds->ds_rxstat.rs_datalen;
 	int rssi = ds->ds_rxstat.rs_rssi;
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
+	struct ieee80211_frame *wh;
+	uint8_t qosframe[sizeof(struct ieee80211_qosframe) + IEEE80211_ADDR_LEN];
 	int rate = (rt != NULL ?
 	    (rt->info[rt->rateCodeToIndex[
 	    	ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2);
  	wlan_ng_prism2_header *ph;
+	int headersize, padbytes;
 
 	skb->protocol = ETH_P_CONTROL;
 	skb->pkt_type = PACKET_OTHERHOST;
+
+	skb_put(skb, len);
+	
+	/* Check to see if we need to remove pad bytes */
+	if (ic->ic_flags & IEEE80211_F_DATAPAD) {
+	    wh = (struct ieee80211_frame *) skb->data;
+	    if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA) &&
+		(wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK & IEEE80211_FC0_SUBTYPE_QOS)) {
+		headersize = sizeof(struct ieee80211_qosframe);
+		if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS) {
+		    headersize += IEEE80211_ADDR_LEN;
+		}
+		padbytes = roundup(headersize,4) - headersize;
+		if (padbytes > 0) {
+		    memcpy(&qosframe[0],skb->data,headersize);
+		    skb_pull(skb,padbytes);
+		    memcpy(skb->data,&qosframe[0],headersize);
+		}
+	    }
+	}
 
 	ph = (wlan_ng_prism2_header *)
 		skb_push(skb, sizeof(wlan_ng_prism2_header));
@@ -1526,10 +1550,13 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->hosttime.len = 4;
 	ph->hosttime.data = jiffies;
 
+	/* Pass up tsf clock in mactime */
 	ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
-	ph->mactime.status = P80211ENUM_msgitem_status_no_value;
+//	ph->mactime.status = P80211ENUM_msgitem_status_no_value;
+	ph->mactime.status = 0;
 	ph->mactime.len = 4;
-	ph->mactime.data = 0;
+//	ph->mactime.data = 0;
+	ph->mactime.data = ath_hal_gettsf32(sc->sc_ah);
 
 	ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
 	ph->istx.status = 0;
@@ -1560,8 +1587,6 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->rate.status = 0;
 	ph->rate.len = 4;
 	ph->rate.data = rate;
-
-	skb_put(skb, len);
 
 	skb->dev = dev;
 	skb->mac.raw = skb->data ;
@@ -1635,12 +1660,16 @@ ath_rx_tasklet(void *data)
 			 * Frame spans multiple descriptors; this
 			 * cannot happen yet as we don't support
 			 * jumbograms.  If not in monitor mode,
-			 * discard the frame.
+			 *  discard the frame.
 			 */
+
+			/* enable this if you want to see error frames in Monitor mode */
+#ifdef ERROR_FRAMES
 			if (ic->ic_opmode != IEEE80211_M_MONITOR) {
 				/* XXX statistic */
 				goto rx_next;
 			}
+#endif
 			/* fall thru for monitor mode handling... */
 		} else if (ds->ds_rxstat.rs_status != 0) {
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
@@ -1664,6 +1693,14 @@ ath_rx_tasklet(void *data)
 				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
 				sc->sc_stats.ast_rx_phy[phyerr]++;
 			}
+
+			/*
+			 * reject error frames, we normally don't want
+			 * to see them in monitor mode.
+			 */
+			if ((ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT ) ||
+			    (ds->ds_rxstat.rs_status & HAL_RXERR_PHY))
+			    goto rx_next;
 
 			/*
 			 * In monitor mode, allow through packets that
