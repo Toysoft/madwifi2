@@ -52,6 +52,7 @@
 #include <linux/pci.h>
 
 #include "if_athvar.h"
+#include "if_ath_bus.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
 /*
@@ -60,13 +61,6 @@
  */
 #error Atheros PCI version requires at least Linux kernel version 2.4.0
 #endif /* kernel < 2.4.0 */
-
-struct ath_pci_softc {
-	struct ath_softc	aps_sc;
-#ifdef CONFIG_PM
-	u32			aps_pmstate[16];
-#endif
-};
 
 /*
  * User a static table of PCI id's for now.  While this is the
@@ -88,12 +82,11 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	unsigned long phymem;
 	unsigned long mem;
-	struct ath_pci_softc *sc;
+	struct ath_bus_softc *sc;
 	struct net_device *dev;
 	const char *athname;
-	u_int8_t csz,i;
+	u_int8_t csz;
 	struct ath_softc *ath_sc;
-
 
 	if (pci_enable_device(pdev))
 		return (-EIO);
@@ -139,35 +132,17 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mem = (unsigned long) ioremap(phymem, pci_resource_len(pdev, 0));
 	if (!mem) {
 		printk(KERN_ERR "ath_pci: cannot remap PCI memory region\n") ;
+		release_mem_region(phymem, pci_resource_len(pdev, 0));
 		goto bad1;
 	}
-
-	sc = kmalloc(sizeof(struct ath_pci_softc), GFP_KERNEL);
-	if (sc == NULL) {
-		printk(KERN_ERR "ath_pci: no memory for device state\n");
+	if ((sc = ath_bus_getsc()) == NULL) {
 		goto bad2;
 	}
-	memset(sc, 0, sizeof(struct ath_pci_softc));
-        
-	/* mark the device as detached to avoid processing interrupts until setup is complete */
-	sc->aps_sc.sc_invalid = 1;
-
-	dev = &sc->aps_sc.sc_ic.ic_dev;	/* XXX blech, violate layering */
-	memcpy(dev->name, "ath%d", sizeof("ath%d"));
-
+	dev = &sc->aps_sc.sc_ic.ic_dev; /* XXX blech, violate layering */
 	dev->irq = pdev->irq;
 	dev->mem_start = mem;
 	dev->mem_end = mem + pci_resource_len(pdev, 0);
-	dev->priv = sc;
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
-	dev->owner = THIS_MODULE;
-#else
-	SET_MODULE_OWNER(dev);
-#endif
-
-	sc->aps_sc.sc_pdev = pdev;
-
+	sc->aps_sc.sc_bdev = (void *) pdev;
 	pci_set_drvdata(pdev, dev);
 
 	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
@@ -199,7 +174,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ath_hal_gpioSet(ath_sc->sc_ah,ath_sc->sc_ic.ic_ledPin,0);
 	ath_sc->sc_ic.ic_caps |= IEEE80211_C_SOFTLED;
 #endif
-
+	
 	/* ready to process interrupts */
 	sc->aps_sc.sc_invalid = 0;
 
@@ -207,7 +182,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 bad4:
 	free_irq(dev->irq, dev);
 bad3:
-	kfree(sc);
+	ath_bus_freesc(sc);
 bad2:
 	iounmap((void *) mem);
 bad1:
@@ -221,8 +196,8 @@ static void
 ath_pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct ath_pci_softc *sc = dev->priv;
-
+	struct ath_bus_softc *sc = dev->priv;
+	
 	ath_detach(dev);
 	if (dev->irq)
 		free_irq(dev->irq, dev);
@@ -230,7 +205,7 @@ ath_pci_remove(struct pci_dev *pdev)
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
-	kfree(sc);
+	ath_bus_freesc(sc);
 }
 
 #ifdef CONFIG_PM
@@ -238,8 +213,8 @@ static int
 ath_pci_suspend(struct pci_dev *pdev, u32 state)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct ath_pci_softc *sc = dev->priv;
-
+	struct ath_bus_softc *sc = dev->priv;
+	
 	ath_suspend(dev);
 	pci_save_state(pdev, sc->aps_pmstate);
 	pci_disable_device(pdev);
@@ -252,7 +227,7 @@ static int
 ath_pci_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct ath_pci_softc *sc = dev->priv;
+	struct ath_bus_softc *sc = dev->priv;
 
 	pci_enable_device(pdev);
 	pci_restore_state(pdev, sc->aps_pmstate);
@@ -276,23 +251,12 @@ static struct pci_driver ath_pci_drv_id = {
 	/* Linux 2.4.6 has save_state and enable_wake that are not used here */
 };
 
-/*
- * Module glue.
- */
-#include "release.h"
-#include "version.h"
-static char *version = ATH_PCI_VERSION " " RELEASE_TYPE;
-static char *dev_info = "ath_pci";
+extern char *dev_info;
+extern char *version;
 
-MODULE_AUTHOR("Errno Consulting, Sam Leffler");
-MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
-MODULE_SUPPORTED_DEVICE("Atheros WLAN cards");
-#ifdef MODULE_LICENSE
-MODULE_LICENSE("Dual BSD/GPL");
-#endif
-
+/* PCI specific module initialization */
 static int __init
-init_ath_pci(void)
+init_ath(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
@@ -301,21 +265,18 @@ init_ath_pci(void)
 		pci_unregister_driver(&ath_pci_drv_id);
 		return (-ENODEV);
 	}
-#ifdef CONFIG_SYSCTL
-	ath_sysctl_register();
-#endif
 	return (0);
 }
-module_init(init_ath_pci);
 
 static void __exit
-exit_ath_pci(void)
+exit_ath(void)
 {
-#ifdef CONFIG_SYSCTL
-	ath_sysctl_unregister();
-#endif
 	pci_unregister_driver(&ath_pci_drv_id);
-
-	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
-module_exit(exit_ath_pci);
+
+/* return bus cachesize in 4B word units */
+void
+bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz)
+{
+	pci_read_config_byte(sc->sc_bdev, PCI_CACHE_LINE_SIZE, csz);
+}

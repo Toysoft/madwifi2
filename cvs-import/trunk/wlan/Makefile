@@ -64,7 +64,7 @@ all:
 
 install: all
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
-	strip -S wlan.$(KMODSUF)
+	$(STRIP) -S wlan.$(KMODSUF)
 	cp wlan.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:

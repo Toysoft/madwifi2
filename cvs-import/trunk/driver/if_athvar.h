@@ -124,7 +124,9 @@ struct ath_softc {
 	u_int8_t		sc_hwmap[32];	/* h/w rate ix to IEEE table */
 	HAL_INT			sc_imask;	/* interrupt mask copy */
 
-	struct pci_dev		*sc_pdev;	/* associated pci device */
+        void                    *sc_bdev;       /* bus device (will be cast by 
+                                                 * bus specific code) 
+                                                 */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
 	size_t			sc_desc_len;	/* size of TX/RX descriptors */
 	u_int16_t		sc_cachelsz;	/* cache line size */
