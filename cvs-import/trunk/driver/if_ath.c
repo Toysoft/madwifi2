@@ -55,7 +55,7 @@
 
 #include <asm/uaccess.h>
 
-#define	AR_DEBUG
+/*#define	AR_DEBUG*/
 #include "if_athvar.h"
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
@@ -2160,8 +2160,10 @@ ath_tx_timeout(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 	sc->sc_stats.ast_watchdog++;
+#ifdef AR_DEBUG
 	if (ath_debug)
 		ath_hal_dumpstate(sc->sc_ah);
+#endif
 	ath_init(dev);
 }
 
@@ -2983,8 +2985,10 @@ enum {
 static ctl_table ath_sysctls[] = {
 	{ ATH_STATS, 		"stats",	ath_info,
 	  sizeof(ath_info),	0444,	NULL,	ath_sysctl_stats },
+#ifdef AR_DEBUG
 	{ ATH_DEBUG, 		"debug",	&ath_debug,
 	  sizeof(ath_debug),	0644,	NULL,	ath_sysctl_handler },
+#endif
 	{ ATH_DWELLTIME,	"dwelltime",	&ath_dwelltime,
 	  sizeof(ath_dwelltime),0644,	NULL,	ath_sysctl_handler },
 	{ ATH_CALIBRATE,	"calibrate",	&ath_calinterval,
