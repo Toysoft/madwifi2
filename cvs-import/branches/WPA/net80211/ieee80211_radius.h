@@ -44,12 +44,10 @@
  * is only incurred when in use (e.g. not for stations).
  */
 
-struct vendor_key {
-	u_int32_t	vk_vid;		/* vendor id */
-	u_int8_t	vk_type;	/* key type */
-	u_int8_t	vk_len;		/* length of type+len+salt+key */
-	u_int16_t	vk_salt;
-	/* variable length data follows */
+struct eapol_radius_key {
+	u_int8_t	rk_data[64];	/* decoded key length+data */
+#define	rk_len	rk_data[0]		/* decoded key length */
+	u_int16_t	rk_salt;	/* salt from server */
 } __attribute__((__packed__));
 
 struct eapol_auth_radius_node {
@@ -58,24 +56,18 @@ struct eapol_auth_radius_node {
 	struct sk_buff		*ern_msg;	/* supplicant reply */
 	u_int8_t		*ern_radmsg;	/* radius server message */
 	u_int			ern_radmsglen;	/* length of server message */
-	u_int8_t		ern_msgauth[16];
 	u_int8_t		ern_reqauth[16];/* request authenticator */
 	u_int8_t		ern_state[255];
 	u_int8_t		ern_statelen;
 	u_int8_t		ern_class[255];
 	u_int8_t		ern_classlen;
-	union {
-		struct vendor_key vk;
-		u_int8_t	data[64];
-	} ern_txu;
-#define	ern_txkey	ern_txu.vk
-	union {
-		struct vendor_key vk;
-		u_int8_t	data[64];
-	} ern_rxu;
-#define	ern_rxkey	ern_rxu.vk
+	struct eapol_radius_key	ern_txkey;
+	struct eapol_radius_key	ern_rxkey;
 };
 #define	EAPOL_RADIUSNODE(_x)	((struct eapol_auth_radius_node *)(_x))
+
+#define	ern_ic		ern_base.ean_ic
+#define	ern_node	ern_base.ean_node
 
 #define	RAD_MAXMSG	4096			/* max message size */
 

@@ -146,6 +146,10 @@ static	void radius_add_reply(struct radiuscom *,
 		struct eapol_auth_radius_node *);
 static	void radius_cleanup(struct radiuscom *);
 
+#ifdef IEEE80211_DEBUG
+static	void radius_dumpbytes(const char *tag, const void *data, u_int len);
+#endif
+
 static int
 radius_get_integer(u_int8_t *ap)
 {
@@ -422,6 +426,21 @@ radiusd(void *arg)
 }
 
 /*
+ * Write-around for bogus crypto API; requiring the address
+ * address be specified twice can easily cause mistakes.
+ */
+static __inline void
+digest_update(struct radiuscom *rc, void *data, u_int len)
+{
+	struct scatterlist sg;
+
+	sg.page = virt_to_page(data);
+	sg.offset = offset_in_page(data);
+	sg.length = len;
+	crypto_digest_update(rc->rc_md5, &sg, 1);
+}
+
+/*
  * Verify the authenticator hash in each reply using
  * the shared secret and the hash calculated for the
  * associated request.  The frame contents are assumed
@@ -431,7 +450,6 @@ static int
 radius_check_auth(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 	struct auth_hdr *ahp)
 {
-	struct scatterlist sg;
 	u_int8_t orighash[16];
 	u_int8_t hash[16];
 
@@ -440,16 +458,8 @@ radius_check_auth(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 	memcpy(orighash, ahp->ah_auth, sizeof(ahp->ah_auth));
 	memcpy(ahp->ah_auth, ern->ern_reqauth, sizeof(ern->ern_reqauth));
 
-	sg.page = virt_to_page(ahp);
-	sg.offset = offset_in_page(ahp);
-	sg.length = ntohs(ahp->ah_len);
-	crypto_digest_update(rc->rc_md5, &sg, 1);
-
-	sg.page = virt_to_page(rc->rc_secret);
-	sg.offset = offset_in_page(rc->rc_secret);
-	sg.length = rc->rc_secretlen;
-	crypto_digest_update(rc->rc_md5, &sg, 1);
-
+	digest_update(rc, ahp, ntohs(ahp->ah_len));
+	digest_update(rc, rc->rc_secret, rc->rc_secretlen);
 	crypto_digest_final(rc->rc_md5, hash);
 
 	memcpy(ahp->ah_auth, orighash, sizeof(ahp->ah_auth));
@@ -457,19 +467,16 @@ radius_check_auth(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 }
 
 static void
-radius_hmac(struct radiuscom *rc, void *data, u_int len, u_int8_t hash[16])
+radius_hmac(struct radiuscom *rc, void *data, u_int len,
+	void *key, u_int keylen, u_int8_t hash[16])
 {
 	struct scatterlist sg;
-	u_int keylen = rc->rc_secretlen;
-
-	crypto_hmac_init(rc->rc_md5, rc->rc_secret, &keylen);
 
 	sg.page = virt_to_page(data);
 	sg.offset = offset_in_page(data);
 	sg.length = len;
-	crypto_hmac_update(rc->rc_md5, &sg, 1);
 
-	crypto_hmac_final(rc->rc_md5, rc->rc_secret, &keylen, hash);
+	crypto_hmac(rc->rc_md5, key, &keylen, &sg, 1, hash);
 }
 
 /*
@@ -498,7 +505,8 @@ radius_check_msg_auth(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
 	/* NB: we smash ah_auth and don't repair it... */
 	memcpy(ahp->ah_auth, ern->ern_reqauth, authlen);
 
-	radius_hmac(rc, ahp, ntohs(ahp->ah_len), hash);
+	radius_hmac(rc, ahp, ntohs(ahp->ah_len),
+		rc->rc_secret, rc->rc_secretlen, hash);
 	if (memcmp(ahash, hash, sizeof(hash)) == 0) {
 		memcpy(ap+2, ahash, authlen);	/* restore original data */
 		return TRUE;			/* pass */
@@ -575,98 +583,93 @@ bad:
 }
 
 #define	RAD_VENDOR_MICROSOFT	311
-#define	RAD_KEYTYPE_SEND	0x10	/* MPPE */
-#define	RAD_KEYTYPE_RECV	0x11	/* MPPE */
+#define	RAD_KEYTYPE_SEND	16	/* MPPE-Send-Key */
+#define	RAD_KEYTYPE_RECV	17	/* MPPE-Recv-Key */
 
 /*
- * Generate a station transmit/receive key by mixing the
- * MPPE key with an MD5 hash of the shared secret, RA,
- * salt, and MPPE key contents.
+ * Microsoft Vendor-specific radius attributes used for
+ * distributing keys.  See MS-MPPE-Send-Key and
+ * MS-MPPE-Recv-Key in RFC 2548 for documentation on the
+ * handling of this data.
+ */
+struct vendor_key {
+	u_int32_t	vk_vid;		/* vendor id */
+	u_int8_t	vk_type;	/* key type */
+	u_int8_t	vk_len;		/* length of type+len+salt+key */
+	u_int16_t	vk_salt;
+	/* variable length key data follows */
+} __attribute__((__packed__));
+
+/*
+ * Extract a station transmit/receive key by mixing the
+ * MPPE key with an md5 hash of the shared secret, request
+ * authenticator, salt, and MPPE key contents.
  */
 static int
-radius_make_key(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
-	struct vendor_key *vk, u_int8_t *key)
+radius_extract_mppe(struct radiuscom *rc, struct eapol_auth_radius_node *ern,
+	struct vendor_key *vk, struct eapol_radius_key *key)
 {
-#define	MAXKEYSIZE	(64 - sizeof(struct vendor_key))
-	struct scatterlist sg;
-	u_int8_t hash[16];
+	u_int8_t hash[16], keybuf[sizeof(key->rk_data)];
 	u_int8_t *vkey;
+	u_int8_t *dkey;
 	int keylen, total, i, j;
 
 	/*
 	 * vk_len is the vendor attribute payload size, so deduct
-	 * the header (including salt) to get the key length.  We
-	 * round this up to a multiple of the md5 hash size, but
-	 * it should always be a multiple (perhaps should reject
-	 * bad lengths rather than being lenient).
+	 * the header (including salt) to get the key length.  If
+	 * the key length is not a multiple of the md5 hash size;
+	 * then it is zero-padded (the rfc talks about an optional
+	 * padding sub-field but we assume clients may not include
+	 * it--this may be wrong if they include it and do not use
+	 * zero for padding, in practice everyone so far just sends
+	 * keys that are a multiple of 16).  Also, verify the result
+	 * fits in the storage we have set aside for it.
 	 */
 	keylen = vk->vk_len - (sizeof(vk->vk_type) +
 		sizeof(vk->vk_len) + sizeof(vk->vk_salt));
+	/* XXX is keylen == 0 ok? */
 	total = roundup(keylen, 16);
-	/*
-	 * Verify the result will fit in the storage we have.
-	 */
-	if (total > MAXKEYSIZE) {
-		struct eapol_auth_node *ean = &ern->ern_base;
-
-		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_ANY,
+	if (total > sizeof(keybuf)) {
+		IEEE80211_DPRINTF(ern->ern_ic, IEEE80211_MSG_ANY,
 		    ("[%s] MPPE key too large, total %u (%s)\n",
-		    ether_sprintf(ean->ean_node->ni_macaddr),
+		    ether_sprintf(ern->ern_node->ni_macaddr),
 		    total, __func__));
+		/* XXX should we just truncate it? */
 		eapolstats.rs_vkeytoolong++;
 		return FALSE;
 	}
 
 	/*
+	 * Create intermediate, potentially zero-padded, copy.
+	 */
+	vkey = (u_int8_t *)&vk[1];
+	memcpy(keybuf, vkey, keylen);
+	if (keylen != total)		/* zero-pad key */
+		memset(keybuf+keylen, 0, total-keylen);
+
+	/*
 	 * The first 16 bytes are xor'd with a hash constructed
 	 * from (shared secret | req-authenticator | salt).
 	 * Subsequent 16-byte chunks of the key are xor'd with
-	 * the hash of (shared secret | key).  Note the salt has
-	 * already be byte-swapped but this should not alter the
-	 * MD5 hash calculation.
+	 * the hash of (shared secret | key).
 	 */
-	crypto_digest_init(rc->rc_md5);
-
-	sg.page = virt_to_page(rc->rc_secret);
-	sg.offset = offset_in_page(rc->rc_secret);
-	sg.length = rc->rc_secretlen;
-	crypto_digest_update(rc->rc_md5, &sg, 1);
-
-	sg.page = virt_to_page(ern->ern_reqauth);
-	sg.offset = offset_in_page(ern->ern_reqauth);
-	sg.length = sizeof(ern->ern_reqauth);
-	crypto_digest_update(rc->rc_md5, &sg, 1);
-
-	sg.page = virt_to_page(&vk->vk_salt);
-	sg.offset = offset_in_page(&vk->vk_salt);
-	sg.length = sizeof(vk->vk_salt);
-	crypto_digest_update(rc->rc_md5, &sg, 1);
-
-	crypto_digest_final(rc->rc_md5, hash);
-
-	vkey = (u_int8_t *)&vk[1];
-	for (i = 0; i < 16; i++)
-		key[i] = vkey[i] ^ hash[i];
-	for (; i < total; i += 16) {
+	dkey = key->rk_data;
+	for (i = 0; i < total; i += 16) {
 		crypto_digest_init(rc->rc_md5);
-		
-		sg.page = virt_to_page(rc->rc_secret);
-		sg.offset = offset_in_page(rc->rc_secret);
-		sg.length = rc->rc_secretlen;
-		crypto_digest_update(rc->rc_md5, &sg, 1);
-
-		sg.page = virt_to_page(&vkey[i]);
-		sg.offset = offset_in_page(&vkey[i]);
-		sg.length = 16;
-		crypto_digest_update(rc->rc_md5, &sg, 1);
-
+		digest_update(rc, rc->rc_secret, rc->rc_secretlen);
+		if (i == 0) {
+			digest_update(rc,
+				ern->ern_reqauth, sizeof(ern->ern_reqauth));
+			digest_update(rc, &vk->vk_salt, sizeof(vk->vk_salt));
+		} else {
+			digest_update(rc, &keybuf[i-16], 16);
+		}
 		crypto_digest_final(rc->rc_md5, hash);
 
 		for (j = 0; j < 16; j++)
-			key[i] = vkey[i] ^ hash[j];
+			dkey[i+j] = keybuf[i+j] ^ hash[j];
 	}
 	return TRUE;
-#undef MAXKEYSIZE
 }
 
 /*
@@ -680,13 +683,8 @@ radius_extract_key(struct radiuscom *rc,
 	int len = ntohs(ahp->ah_len);
 	u_int8_t *ap = (u_int8_t *)&ahp[1];
 	u_int8_t *ep = ap + (len - sizeof(*ahp));
-	struct vendor_key *txkey = &ern->ern_txkey;
-	struct vendor_key *rxkey = &ern->ern_rxkey;
 	struct vendor_key *vk;
 	int found = 0;
-
-	memset(&ern->ern_txu, 0, sizeof(ern->ern_txu));
-	memset(&ern->ern_rxu, 0, sizeof(ern->ern_rxu));
 
 	for (; ap < ep && found != ALLKEYS; ap += ap[1]) {
 		/* validate attribute length */
@@ -701,26 +699,47 @@ radius_extract_key(struct radiuscom *rc,
 			continue;
 		}
 		vk = (struct vendor_key *)&ap[2];
-		vk->vk_vid = ntohl(vk->vk_vid);
-		vk->vk_salt = ntohs(vk->vk_salt);
-		if (vk->vk_vid != RAD_VENDOR_MICROSOFT) {
+		/* XXX ntohl alignment */
+		if (ntohl(vk->vk_vid) != RAD_VENDOR_MICROSOFT) {
 			eapolstats.rs_vkeybadvid++;
 			continue;
 		}
-		if ((vk->vk_salt & 0x8000) == 0) {
+		if ((ntohs(vk->vk_salt) & 0x8000) == 0) {
 			eapolstats.rs_vkeybadsalt++;
 			continue;
 		}
 		switch (vk->vk_type) {
 		case RAD_KEYTYPE_SEND:
-			*txkey = *vk;
-			if (radius_make_key(rc, ern, vk, (u_int8_t *)&txkey[1]))
+			if (found && vk->vk_salt == ern->ern_rxkey.rk_salt) {
+				eapolstats.rs_vkeydupsalt++;
+				continue;
+			}
+			if (radius_extract_mppe(rc, ern, vk, &ern->ern_txkey)) {
+#ifdef IEEE80211_DEBUG
+				if (ieee80211_msg_dumpradkeys(ern->ern_ic))
+					radius_dumpbytes("send key",
+						&ern->ern_txkey.rk_data[1],
+						ern->ern_txkey.rk_len);
+#endif
+				ern->ern_txkey.rk_salt = vk->vk_salt;
 				found += RAD_KEYTYPE_SEND;
+			}
 			break;
 		case RAD_KEYTYPE_RECV:
-			*rxkey = *vk;
-			if (radius_make_key(rc, ern, vk, (u_int8_t *)&rxkey[1]))
+			if (found && vk->vk_salt == ern->ern_txkey.rk_salt) {
+				eapolstats.rs_vkeydupsalt++;
+				continue;
+			}
+			if (radius_extract_mppe(rc, ern, vk, &ern->ern_rxkey)) {
+#ifdef IEEE80211_DEBUG
+				if (ieee80211_msg_dumpradkeys(ern->ern_ic))
+					radius_dumpbytes("recv key",
+						&ern->ern_rxkey.rk_data[1],
+						ern->ern_rxkey.rk_len);
+#endif
+				ern->ern_rxkey.rk_salt = vk->vk_salt;
 				found += RAD_KEYTYPE_RECV;
+			}
 			break;
 		}
 	}
@@ -855,6 +874,17 @@ radius_attrname(int attr)
 	return buf;
 };
 
+static void
+radius_dumpbytes(const char *tag, const void *data, u_int len)
+{
+	const u_int8_t *tp;
+
+	printf("%s = 0x", tag);
+	for (tp = data; len > 0; tp++, len--)
+		printf("%02x", *tp);
+	printf("\n");
+}
+
 /*
  * Dump the contents of a RADIUS msg to the console.
  */
@@ -865,7 +895,6 @@ radius_dumppkt(const char *tag, const struct eapol_auth_node *ean,
 	int len = ntohs(ahp->ah_len);
 	const u_int8_t *ap = (const u_int8_t *)&ahp[1];
 	const u_int8_t *ep = ap + (len - sizeof(*ahp));
-	const u_int8_t *tp;
 	const char *attrname;
 	u_int32_t v;
 
@@ -905,10 +934,8 @@ radius_dumppkt(const char *tag, const struct eapol_auth_node *ean,
 				(v>>8)&0xff, (v>>0)&0xff);
 			break;
 		default:
-			printf("\t%s = 0x", attrname);
-			for (tp = ap+2; len > 0; tp++, len--)
-				printf("%02x", *tp);
-			printf("\n");
+			printf("\t");
+			radius_dumpbytes(attrname, ap+2, len);
 			break;
 		}
 	}
@@ -951,6 +978,10 @@ radius_make_response(struct radiuscom *rc, struct eapol_auth_radius_node *ern)
 
 	ahp->ah_code = RAD_ACCESS_REQUEST;
 	ahp->ah_id = eap->eap_id;		/* copy from supplicant */
+	/*
+	 * Save authenticator hash for use in validating replies
+	 * and for extracting MPPE keys returned by the server.
+	 */
 	get_random_bytes(ern->ern_reqauth, sizeof(ern->ern_reqauth));
 	memcpy(ahp->ah_auth, ern->ern_reqauth, sizeof(ern->ern_reqauth));
 
@@ -1028,7 +1059,8 @@ radius_make_response(struct radiuscom *rc, struct eapol_auth_radius_node *ern)
 	 * hash.
 	 */
 	ahp->ah_len = htons(ern->ern_radmsglen);
-	radius_hmac(rc, ern->ern_radmsg, ern->ern_radmsglen, msgauth);
+	radius_hmac(rc, ern->ern_radmsg, ern->ern_radmsglen,
+		rc->rc_secret, rc->rc_secretlen, msgauth);
 	memcpy(map+2, msgauth, sizeof(msgauth));
 
 	return TRUE;
@@ -1140,15 +1172,11 @@ radius_txkey(struct eapol_auth_radius_node *ern,
 {
 	struct eapol_auth_node *ean = &ern->ern_base;
 	struct radiuscom *rc = ean->ean_ec->ec_radius;
-	struct vendor_key *txkey = &ern->ern_txkey;
-	struct vendor_key *rxkey = &ern->ern_rxkey;
 	struct sk_buff *skb;
 	struct eapol_key *kp;
 	struct eapol_hdr *eapol;
-	struct scatterlist sg;
 	struct rc4_state ctx;
-	u_int8_t *keydata, rc4key[128];
-	u_int keylen;
+	u_int8_t *keydata, rc4key[16+64], hash[16];
 
 	KASSERT(keyix != IEEE80211_KEYIX_NONE, ("no key index"));
 	if (key->wk_len != 16 && key->wk_len != 13 && key->wk_len != 5) {
@@ -1168,33 +1196,35 @@ radius_txkey(struct eapol_auth_radius_node *ern,
 	memset(kp, 0, sizeof(struct eapol_key));
 	kp->ek_type = EAPOL_KEY_TYPE_RC4;
 	kp->ek_length = htons(key->wk_len);
-	kp->ek_replay = get_jiffies_64();;
+	/* NB: there is no htonll */
+	kp->ek_replay = cpu_to_be64(get_jiffies_64());
 
 	get_random_bytes(kp->ek_iv, sizeof(kp->ek_iv));
 	crypto_digest_init(rc->rc_md5);
-	sg.page = virt_to_page(kp->ek_iv);
-	sg.offset = offset_in_page(kp->ek_iv);
-	sg.length = sizeof(kp->ek_iv);
-	crypto_digest_update(rc->rc_md5, &sg, 1);
+	digest_update(rc, kp->ek_iv, sizeof(kp->ek_iv));
 	crypto_digest_final(rc->rc_md5, kp->ek_iv);
 
 	kp->ek_index = keyix | keytype;
 
-	if (sizeof(kp->ek_iv)+rxkey->vk_len > sizeof(rc4key)) {
+	/*
+	 * NB: this ``cannot happen'' as the rxkey has already been
+	 *     verified to fit in ern_rxkey.
+	 */
+	if (sizeof(kp->ek_iv)+ern->ern_rxkey.rk_len > sizeof(rc4key)) {
 		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_ANY,
 		    ("[%s] intermediate key buf too small, key len %u (%s)\n",
 		    ether_sprintf(ean->ean_node->ni_macaddr),
-		    rxkey->vk_len, __func__));
-		/* XXX statistic */
+		    ern->ern_rxkey.rk_len, __func__));
 		return;
 	}
 
 	/* encrypt the station key with rc4 key of (iv | rxkey) */
 	memcpy(rc4key, kp->ek_iv, sizeof(kp->ek_iv));
-	memcpy(rc4key+sizeof(kp->ek_iv), &rxkey[1], rxkey->vk_len);
+	memcpy(rc4key+sizeof(kp->ek_iv), &ern->ern_rxkey.rk_data[1],
+		ern->ern_rxkey.rk_len);
 
 	keydata = (u_int8_t *)skb_put(skb, key->wk_len);
-	arc4_setkey(&ctx, rc4key, sizeof(kp->ek_iv) + rxkey->vk_len);
+	arc4_setkey(&ctx, rc4key, sizeof(kp->ek_iv) + ern->ern_rxkey.rk_len);
 	arc4_encrypt(&ctx, keydata, key->wk_key, key->wk_len);
 	memset(rc4key, 0, sizeof(rc4key));
 
@@ -1210,13 +1240,9 @@ radius_txkey(struct eapol_auth_radius_node *ern,
 	eapol->eapol_type = EAPOL_TYPE_KEY;
 	eapol->eapol_len = htons(skb->len - sizeof(struct eapol_hdr));
 
-	keylen = txkey->vk_len;
-	crypto_hmac_init(rc->rc_md5, (u_int8_t *)&txkey[1], &keylen);
-	sg.page = virt_to_page(eapol);
-	sg.offset = offset_in_page(eapol);
-	sg.length = skb->len;
-	crypto_hmac_update(rc->rc_md5, &sg, 1);
-	crypto_hmac_final(rc->rc_md5, (u_int8_t *)&txkey[1], &keylen, kp->ek_sig);
+	radius_hmac(rc, eapol, skb->len,
+		&ern->ern_txkey.rk_data[1], ern->ern_txkey.rk_len, hash);
+	memcpy(kp->ek_sig, hash, sizeof(hash));
 
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_RADIUS,
 	    ("[%s] SEND %s EAPOL-Key ix %u len %u bits\n",
@@ -1258,7 +1284,7 @@ txKey(struct eapol_auth_node *ean)
 	/*
 	 * Construct unicast key for station and send it with index 0.
 	 */
-	if (!ieee80211_node_makekey(ic, ni)) {
+	if (!ieee80211_node_newkey(ic, ni)) {
 		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_RADIUS,
 		    ("[%s] problem creating unicast key for station\n",
 		    ether_sprintf(ni->ni_macaddr)));
@@ -1266,6 +1292,13 @@ txKey(struct eapol_auth_node *ean)
 	}
 	/* force unicast key to have the same length as the multicast key */
 	ni->ni_ucastkey.wk_len = ic->ic_nw_keys[ic->ic_wep_txkey].wk_len;
+	if (!ieee80211_node_setkey(ic, ni)) {
+		IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_RADIUS,
+		    ("[%s] problem installing unicast key for station\n",
+		    ether_sprintf(ni->ni_macaddr)));
+		/* XXX recovery? */
+		return;
+	}
 	radius_txkey(ern, EAPOL_KEY_UCAST, 0, &ni->ni_ucastkey);
 }
 
