@@ -1,0 +1,7 @@
+To build the driver at the top level do:
+
+make depend
+make
+
+This will generate driver/ath_pci.o that you can insmod.  Eventually
+the wlan support will be split out into a separate wlan.o module.
