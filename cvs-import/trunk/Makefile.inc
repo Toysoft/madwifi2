@@ -61,8 +61,8 @@ AWK=		awk
 #
 # Path to the Linux kernel, include files, and where to install the modules.
 #
-VERSION=	2.4.20
-KERNEL_PATH=	${DEPTH}/../linux-${VERSION}
+VERSION=	$(shell uname -r)
+KERNEL_PATH=	/lib/modules/${VERSION}/build
 LINUX=		${KERNEL_PATH}/include
 MODULE_PATH=	/lib/modules/${VERSION}/net
 
