@@ -194,7 +194,7 @@ ieee80211_ioctl_siwrate(struct net_device *dev,
 
 	if (rrq->fixed) {
 		/* XXX fudge checking rates */
-		rate = ieee80211_rate2media(2 * (rrq->value / 1000000),
+		rate = ieee80211_rate2media(ic, 2 * (rrq->value / 1000000),
 				ic->ic_curmode);
 	} else
 		rate = IFM_AUTO;
@@ -925,16 +925,14 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 					end_buf, &iwe, IW_EV_UINT_LEN);
 		}
 
-
 		/* return essid if present */
 		if (ni->ni_essid[0]) {	
-		    memset(&iwe, 0, sizeof(iwe));
-		    iwe.cmd = SIOCGIWESSID;
-		    iwe.u.data.length = strlen(ni->ni_essid);
-		    iwe.u.data.flags = 1;
-		    current_ev = iwe_stream_add_point(current_ev,
-				    end_buf, &iwe, ni->ni_essid);
-
+			memset(&iwe, 0, sizeof(iwe));
+			iwe.cmd = SIOCGIWESSID;
+			iwe.u.data.length = strlen(ni->ni_essid);
+			iwe.u.data.flags = 1;
+			current_ev = iwe_stream_add_point(current_ev,
+					end_buf, &iwe, ni->ni_essid);
 		}
 
 		memset(&iwe, 0, sizeof(iwe));
@@ -990,9 +988,8 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		ifr.ifr_media = imr.ifm_active;
 		break;
 	case IEEE80211_PARAM_MODE:
-		/* NB: hack, when setting modes remove any speed */
-		ifr.ifr_media = (imr.ifm_active &~ (IFM_MMASK|IFM_TMASK))
-			      | (IFM_MAKEMODE(value) | IFM_AUTO);
+		ifr.ifr_media = (imr.ifm_active &~ IFM_MMASK)
+			      | IFM_MAKEMODE(value);
 		break;
 	default:
 		return -EOPNOTSUPP;

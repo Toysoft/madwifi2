@@ -402,10 +402,11 @@ enum ieee80211_phytype {
 
 /* XXX not really a mode; there are really multiple PHY's */
 enum ieee80211_phymode {
-	IEEE80211_MODE_11A	= 0,	/* 5GHz, OFDM */
-	IEEE80211_MODE_11B	= 1,	/* 2GHz, CCK */
-	IEEE80211_MODE_11G	= 2,	/* 2GHz, OFDM */
-	IEEE80211_MODE_TURBO	= 3,	/* 5GHz, OFDM, 2x clock */
+	IEEE80211_MODE_AUTO	= 0,	/* autoselect */
+	IEEE80211_MODE_11A	= 1,	/* 5GHz, OFDM */
+	IEEE80211_MODE_11B	= 2,	/* 2GHz, CCK */
+	IEEE80211_MODE_11G	= 3,	/* 2GHz, OFDM */
+	IEEE80211_MODE_TURBO	= 4,	/* 5GHz, OFDM, 2x clock */
 };
 #define	IEEE80211_MODE_MAX	(IEEE80211_MODE_TURBO+1)
 
@@ -467,6 +468,15 @@ struct ieee80211channel {
 	(((_c)->ic_flags & IEEE80211_CHAN_G) == IEEE80211_CHAN_G)
 #define	IEEE80211_IS_CHAN_T(_c) \
 	(((_c)->ic_flags & IEEE80211_CHAN_T) == IEEE80211_CHAN_T)
+
+#define	IEEE80211_IS_CHAN_2GHZ(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_2GHZ) != 0)
+#define	IEEE80211_IS_CHAN_5GHZ(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_5GHZ) != 0)
+#define	IEEE80211_IS_CHAN_OFDM(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_OFDM) != 0)
+#define	IEEE80211_IS_CHAN_CCK(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_CCK) != 0)
 
 struct ieee80211_rateset {
 	u_int8_t		rs_nrates;
@@ -677,6 +687,9 @@ struct sk_buff *ieee80211_encap(struct net_device *, struct sk_buff *);
 struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
 u_int8_t *ieee80211_add_rates(u_int8_t *frm, const struct ieee80211_rateset *);
 u_int8_t *ieee80211_add_xrates(u_int8_t *frm, const struct ieee80211_rateset *);
+void	ieee80211_media_init(struct net_device *, ifm_change_cb_t,
+		ifm_stat_cb_t);
+int	ieee80211_media_change(struct net_device *);
 void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
 void	ieee80211_print_essid(u_int8_t *, int);
 void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
@@ -697,12 +710,15 @@ void	ieee80211_set_node(struct ieee80211com *, struct ieee80211_node *,
 int	ieee80211_fix_rate(struct ieee80211com *, struct ieee80211_node *, int);
 int	ieee80211_new_state(struct net_device *, enum ieee80211_state, int);
 struct sk_buff *ieee80211_wep_crypt(struct net_device *, struct sk_buff *, int);
-int	ieee80211_rate2media(int, enum ieee80211_phytype);
+int	ieee80211_rate2media(struct ieee80211com *, int,
+		enum ieee80211_phymode);
 int	ieee80211_media2rate(int);
 u_int	ieee80211_mhz2ieee(u_int, u_int);
 u_int	ieee80211_chan2ieee(struct ieee80211com *, struct ieee80211channel *);
 u_int	ieee80211_ieee2mhz(u_int, u_int);
 int	ieee80211_setmode(struct ieee80211com *, enum ieee80211_phymode);
+enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
+		struct ieee80211channel *);
 
 extern	const char *ether_sprintf(const u_int8_t *);		/* XXX */
 
