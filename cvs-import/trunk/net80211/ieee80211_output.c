@@ -492,13 +492,13 @@ ieee80211_setup_wpa_ie(struct ieee80211com *ic, u_int8_t *ie)
 	/* unicast cipher list */
 	selcnt = frm;
 	ADDSHORT(frm, 0);			/* selector count */
-	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
-		selcnt[0]++;
-		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
-	}
 	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_AES_CCM)) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_AES_CCM]);
+	}
+	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
+		selcnt[0]++;
+		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
 	}
 
 	/* authenticator selector list */
@@ -575,13 +575,13 @@ ieee80211_setup_rsn_ie(struct ieee80211com *ic, u_int8_t *ie)
 	/* unicast cipher list */
 	selcnt = frm;
 	ADDSHORT(frm, 0);			/* selector count */
-	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
-		selcnt[0]++;
-		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
-	}
 	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_AES_CCM)) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_AES_CCM]);
+	}
+	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
+		selcnt[0]++;
+		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
 	}
 
 	/* authenticator selector list */
@@ -620,10 +620,10 @@ ieee80211_add_wpa(u_int8_t *frm, struct ieee80211com *ic)
 {
 
 	KASSERT(ic->ic_flags & IEEE80211_F_WPA, ("no WPA/RSN!"));
-	if (ic->ic_flags & IEEE80211_F_WPA1)
-		frm = ieee80211_setup_wpa_ie(ic, frm);
 	if (ic->ic_flags & IEEE80211_F_WPA2)
 		frm = ieee80211_setup_rsn_ie(ic, frm);
+	if (ic->ic_flags & IEEE80211_F_WPA1)
+		frm = ieee80211_setup_wpa_ie(ic, frm);
 	return frm;
 }
 
