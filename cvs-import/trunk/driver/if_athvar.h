@@ -42,16 +42,20 @@
 #ifndef _DEV_ATH_ATHVAR_H
 #define _DEV_ATH_ATHVAR_H
 
+#include "if_ieee80211.h"
+#include "ah.h"
+
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
 #include <linux/workqueue.h>
 #define tq_struct work_struct
 #define INIT_TQUEUE INIT_WORK
 #define queue_task(a,b) schedule_work(a)
 #define mark_bh(a)
+#else
+typedef void irqreturn_t;
+#define	IRQ_NONE
+#define	IRQ_HANDLED
 #endif
-
-#include "if_ieee80211.h"
-#include "ah.h"
 
 #define	ATH_TIMEOUT		1000
 
@@ -197,76 +201,11 @@ int	ath_detach(struct net_device *);
 void	ath_resume(struct net_device *);
 void	ath_suspend(struct net_device *);
 void	ath_shutdown(struct net_device *);
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
-void
-#else
-irqreturn_t
-#endif
-ath_intr(int irq, void *dev_id, struct pt_regs *regs);
+irqreturn_t ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef CONFIG_SYSCTL
 void	ath_sysctl_register(void);
 void	ath_sysctl_unregister(void);
 #endif /* CONFIG_SYSCTL */
-
-
-/*
- * For packet capture, define the same physical layer packet header 
- * structure as used in the wlan-ng driver 
- */
-
-#define WLAN_DEVNAMELEN_MAX 16
-
-enum {
-	DIDmsg_lnxind_wlansniffrm		= 0x00000044,
-	DIDmsg_lnxind_wlansniffrm_hosttime	= 0x00010044,
-	DIDmsg_lnxind_wlansniffrm_mactime	= 0x00020044,
-	DIDmsg_lnxind_wlansniffrm_channel	= 0x00030044,
-	DIDmsg_lnxind_wlansniffrm_rssi		= 0x00040044,
-	DIDmsg_lnxind_wlansniffrm_sq		= 0x00050044,
-	DIDmsg_lnxind_wlansniffrm_signal	= 0x00060044,
-	DIDmsg_lnxind_wlansniffrm_noise		= 0x00070044,
-	DIDmsg_lnxind_wlansniffrm_rate		= 0x00080044,
-	DIDmsg_lnxind_wlansniffrm_istx		= 0x00090044,
-	DIDmsg_lnxind_wlansniffrm_frmlen	= 0x000A0044
-	};
-
-enum {
-	P80211ENUM_msgitem_status_no_value	= 0x00
-};
-
-enum {
-	P80211ENUM_truth_false			= 0x00
-};
-
-typedef struct {
-	
-	u_int32_t did;
-	u_int16_t status;
-	u_int16_t len;
-	u_int32_t data;
-
-} p80211item_uint32_t;
-
-typedef struct {
-
-	u_int32_t msgcode;
-	u_int32_t msglen;
-	u_int8_t devname[WLAN_DEVNAMELEN_MAX];
-	p80211item_uint32_t hosttime;
-	p80211item_uint32_t mactime;
-	p80211item_uint32_t channel;
-	p80211item_uint32_t rssi;
-	p80211item_uint32_t sq;
-	p80211item_uint32_t signal;
-	p80211item_uint32_t noise;
-	p80211item_uint32_t rate;
-	p80211item_uint32_t istx;
-	p80211item_uint32_t frmlen;
-
-} wlan_ng_prism2_header;
-
-/* End DLT_PRISM_HEADER support */
-
 
 /*
  * HAL definitions to comply with local coding convention.
