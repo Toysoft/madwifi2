@@ -69,5 +69,19 @@
 #define AR5212_AR5312_REV7      0x0057          /* AR5312 WMAC (AP30-040) */
 #define AR5212_AR2313_REV8      0x0058          /* AR2313 WMAC (AP43-030) */
 
+/* AR5212 compatible devid's also attach to 5212 */
+#define	AR5212_DEVID_0014	0x0014
+#define	AR5212_DEVID_0015	0x0015
+#define	AR5212_DEVID_0016	0x0016
+#define	AR5212_DEVID_0017	0x0017
+#define	AR5212_DEVID_0018	0x0018
+#define	AR5212_DEVID_0019	0x0019
+#define AR5212_AR2413      	0x001a          /* AR2413 aka Griffin-lite */
+
+/* AR5213 */
+#define	AR5213_SREV_1_0		0x0055
+#define	AR5213_SREV_REG		0x4020
+
 #define	AR_SUBVENDOR_ID_NOG	0x0e11		/* No 11G subvendor ID */
+#define AR_SUBVENDOR_ID_NEW_A	0x7065		/* Update device to new RD */
 #endif /* _DEV_ATH_DEVID_H */
