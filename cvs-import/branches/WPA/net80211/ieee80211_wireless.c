@@ -1221,7 +1221,7 @@ int
 ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		   	 void *w, char *extra)
 {
-	struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;;
+	struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;
 	int *i = (int *) extra;
 	int param = i[0];		/* parameter id is 1st */
 	int value = i[1];		/* NB: most values are TYPE_INT */
@@ -1468,7 +1468,7 @@ int
 ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 			void *w, char *extra)
 {
-	struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;;
+	struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;
 	struct ifmediareq imr;
 	int *param = (int *) extra;
 	u_int m;
@@ -1764,7 +1764,7 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			 * ssid to distinguish ap advertising multiple ssid's.
 			 */
 			ni = ieee80211_find_node_with_ssid(ic, mlme->im_macaddr,
-				ic->ic_des_esslen, ic->ic_des_essid);;
+				ic->ic_des_esslen, ic->ic_des_essid);
 		} else {
 			/*
 			 * Normal case; just match bssid.
