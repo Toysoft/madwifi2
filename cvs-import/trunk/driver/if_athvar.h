@@ -73,14 +73,9 @@ struct ath_stats {
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
 	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
-	u_int32_t	ast_rx_phyerr;	/* rx failed 'cuz of PHY err */
-	u_int32_t	ast_rx_phy_tim;	/* rx PHY: timing error */
-	u_int32_t	ast_rx_phy_par;	/* rx PHY: parity error */
-	u_int32_t	ast_rx_phy_rate;/* rx PHY: illegal rate */
-	u_int32_t	ast_rx_phy_len;	/* rx PHY: illegal length */
-	u_int32_t	ast_rx_phy_qam;	/* rx PHY: 64 QAM rate */
-	u_int32_t	ast_rx_phy_srv;	/* rx PHY: service bit error */
-	u_int32_t	ast_rx_phy_tor;	/* rx PHY: transmit override receive */
+	u_int32_t	ast_rx_phyerr;	/* rx PHY error summary count */
+	/* NB: only 8 are currently defined; leave room for additional codes */
+	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
 	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
 };
@@ -116,6 +111,7 @@ struct ath_softc {
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 
+	u_int			sc_txhalq;	/* HAL q for outgoing frames */
 	u_int32_t		*sc_txlink;	/* link ptr in last TX desc */
 	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
@@ -123,6 +119,7 @@ struct ath_softc {
 	spinlock_t		sc_txqlock;	/* lock on txq and txlink */
 	struct tq_struct	sc_txtq;	/* tx intr tasklet */
 
+	u_int			sc_bhalq;	/* HAL q for outgoing beacons */
 	struct ath_buf		*sc_bcbuf;	/* beacon buffer */
 	struct ath_buf		*sc_bufptr;	/* allocated buffer ptr */
 	struct tq_struct	sc_swbatq;	/* swba intr tasklet */
@@ -137,8 +134,6 @@ struct ath_softc {
 	struct proc_dir_entry	*sc_proc;	/* /proc/net/drivers/ath%d */
 #endif
 };
-
-#define	ATH_BITVAL(val, name)	(((val) & name) >> name##_S)
 
 #ifdef AR_DEBUG
 extern	int ath_debug;
@@ -199,14 +194,14 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_getTsf)((_ah)))
 #define	ath_hal_rxena(_ah) \
 	((*(_ah)->ah_enableReceive)((_ah)))
-#define	ath_hal_puttxbuf(_ah, _bufaddr) \
-	((*(_ah)->ah_setTxDP)((_ah), 0, (_bufaddr)))
-#define	ath_hal_gettxbuf(_ah) \
-	((*(_ah)->ah_getTxDP)((_ah), 0))
+#define	ath_hal_puttxbuf(_ah, _q, _bufaddr) \
+	((*(_ah)->ah_setTxDP)((_ah), (_q), (_bufaddr)))
+#define	ath_hal_gettxbuf(_ah, _q) \
+	((*(_ah)->ah_getTxDP)((_ah), (_q)))
 #define	ath_hal_getrxbuf(_ah) \
 	((*(_ah)->ah_getRxDP)((_ah)))
-#define	ath_hal_txstart(_ah) \
-	((*(_ah)->ah_startTxDma)((_ah), HAL_TX_QUEUE_DATA))
+#define	ath_hal_txstart(_ah, _q) \
+	((*(_ah)->ah_startTxDma)((_ah), (_q)))
 #define	ath_hal_setchannel(_ah, _chan) \
 	((*(_ah)->ah_setChannel)((_ah), (_chan)))
 #define	ath_hal_calibrate(_ah, _chan) \
@@ -232,12 +227,35 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_stopDmaReceive)((_ah)))
 #define	ath_hal_dumpstate(_ah) \
 	((*(_ah)->ah_dumpState)((_ah)))
+#define	ath_hal_setuptxqueue(_ah, _type, _irq) \
+	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
+#define	ath_hal_resettxqueue(_ah, _q) \
+	((*(_ah)->ah_resetTxQueue)((_ah), (_q)))
+#define	ath_hal_releasetxqueue(_ah, _q) \
+	((*(_ah)->ah_releaseTxQueue)((_ah), (_q)))
 
-#define	ath_hal_settxdeschdrlen(_ah, _ds, _l) \
-	((*(_ah)->ah_setTxDescHdrLen)((_ah), (_ds), (_l)))
-#define	ath_hal_settxdescpkttype(_ah, _ds, _t) \
-	((*(_ah)->ah_setTxDescPktType)((_ah), (_ds), (_t)))
-#define	ath_hal_settxdesckey(_ah, _ds, _kix) \
-	((*(_ah)->ah_setTxDescEncryptKeyIndex)((_ah), (_ds), (_kix)))
+#define	ath_hal_setupbeacondesc(_ah, _ds, _opmode, _flen, _hlen, \
+		_rate, _antmode) \
+	((*(_ah)->ah_setupBeaconDesc)((_ah), (_ds), (_opmode), \
+		(_flen), (_hlen), (_rate), (_antmode)))
+#define	ath_hal_setuprxdesc(_ah, _ds, _size) \
+	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size)))
+#define	ath_hal_rxprocdesc(_ah, _ds) \
+	((*(_ah)->ah_procRxDesc)((_ah), (_ds)))
+#define	ath_hal_setuptxdesc(_ah, _ds, _plen, _hlen, _atype, _txpow, \
+		_txr0, _txtr0, _keyix, _ant, _clr, _noack, _short, \
+		_rtsena, _ctsena, _rtsrate, _rtsdura) \
+	((*(_ah)->ah_setupTxDesc)((_ah), (_ds), (_plen), (_hlen), (_atype), \
+		(_txpow), (_txr0), (_txtr0), (_keyix), (_ant), \
+		(_clr), (_noack), (_short), (_rtsena), (_ctsena), \
+		(_rtsrate), (_rtsdura)))
+#define	ath_hal_setupxtxdesc(_ah, _ds, _short, \
+		_txr1, _txtr1, _txr2, _txtr2, _txr3, _txtr3) \
+	((*(_ah)->ah_setupXTxDesc)((_ah), (_ds), (_short), \
+		(_txr1), (_txtr1), (_txr2), (_txtr2), (_txr3), (_txtr3)))
+#define	ath_hal_filltxdesc(_ah, _ds, _l, _first, _last) \
+	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last)))
+#define	ath_hal_txprocdesc(_ah, _ds) \
+	((*(_ah)->ah_procTxDesc)((_ah), (_ds)))
 
 #endif /* _DEV_ATH_ATHVAR_H */

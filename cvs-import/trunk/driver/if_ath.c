@@ -95,8 +95,8 @@ static void	ath_proc_remove(struct ath_softc *sc);
 #ifdef AR_DEBUG
 int	ath_debug = 0;
 #define	IFF_DUMPPKTS(_ic)	(ath_debug || netif_msg_dumppkts(_ic))
-static	void ath_printrxbuf(struct ath_buf *bf);
-static	void ath_printtxbuf(struct ath_buf *bf);
+static	void ath_printrxbuf(struct ath_buf *bf, int);
+static	void ath_printtxbuf(struct ath_buf *bf, int);
 #else
 #define	IFF_DUMPPKTS(_ic)	netif_msg_dumppkts(_ic)
 #endif
@@ -107,11 +107,11 @@ static	void ath_printtxbuf(struct ath_buf *bf);
  * Note that we won't use 9Mbps, which is worse than 6Mbps.
  */
 static u_int8_t	ath_rate_tbl[] = {
-	0 /*0M*/,	0 /*3M*/,	AR_Rate_6M,	0 /*9M*/,
-	AR_Rate_12M,	0 /*15M*/,	AR_Rate_18M,	0 /*21M*/,
-	AR_Rate_24M,	0 /*27M*/,	0 /*30M*/,	0 /*33M*/,
-	AR_Rate_36M, 	0 /*39M*/,	0 /*42M*/,	0 /*45M*/,
-	AR_Rate_48M,	0 /*51M*/,	AR_Rate_54M,
+	0 /*0M*/,	0 /*3M*/,	HAL_RATE_6M,	0 /*9M*/,
+	HAL_RATE_12M,	0 /*15M*/,	HAL_RATE_18M,	0 /*21M*/,
+	HAL_RATE_24M,	0 /*27M*/,	0 /*30M*/,	0 /*33M*/,
+	HAL_RATE_36M, 	0 /*39M*/,	0 /*42M*/,	0 /*45M*/,
+	HAL_RATE_48M,	0 /*51M*/,	HAL_RATE_54M,
 };
 
 int
@@ -196,6 +196,30 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		goto bad;
 	}
 
+	/*
+	 * For now just pre-allocate one data queue and one
+	 * beacon queue.  Note that the HAL handles resetting
+	 * them at the needed time.  Eventually we'll want to
+	 * allocate more tx queues for splitting management
+	 * frames and for QOS support.
+	 */
+	sc->sc_txhalq = ath_hal_setuptxqueue(ah,
+		HAL_TX_QUEUE_DATA,
+		AH_TRUE			/* enable interrupts */
+	);
+	if (sc->sc_txhalq == (u_int) -1) {
+		printk("%s: unable to setup a data xmit queue!\n", dev->name);
+		goto bad;
+	}
+	sc->sc_bhalq = ath_hal_setuptxqueue(ah,
+		HAL_TX_QUEUE_BEACON,
+		AH_TRUE			/* enable interrupts */
+	);
+	if (sc->sc_bhalq == (u_int) -1) {
+		printk("%s: unable to setup a beacon xmit queue!\n", dev->name);
+		goto bad;
+	}
+
 	init_timer(&sc->sc_rate_ctl);
 	sc->sc_rate_ctl.data = (unsigned long) dev;
 	sc->sc_rate_ctl.function = ath_ratectl;
@@ -243,9 +267,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		case 0:
 			/* unsupported by hardware */
 			break;
-		case AR_Rate_6M:
-		case AR_Rate_12M:
-		case AR_Rate_24M:
+		case HAL_RATE_6M:
+		case HAL_RATE_12M:
+		case HAL_RATE_24M:
 			/* required rate in 802.11a */
 			*r++ = i * 3 * 2 | 0x80;
 			break;
@@ -844,9 +868,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = &ic->ic_dev;
-#if 0
 	struct ath_hal *ah = sc->sc_ah;
-#endif
 	struct ieee80211_frame *wh;
 	struct ath_buf *bf;
 	struct ath_desc *ds;
@@ -948,22 +970,25 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	/* setup descriptors */
 	arate = ath_rate_tbl[(ni->ni_rates[0] & IEEE80211_RATE_VAL) / 6];
 	if (arate == 0)
-		arate = AR_Rate_6M;
+		arate = HAL_RATE_6M;
 	ds = bf->bf_desc;
 
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
-	ds->ds_ctl0 = (skb->len + IEEE80211_CRC_LEN) |
-	    (sizeof(struct ieee80211_frame) << AR_HdrLen_S) |
-	    (arate << AR_XmitRate_S);
-	ds->ds_ctl1 = roundup(skb->len, 4);
-	ds->ds_status0 = ds->ds_status1 = 0;
-#if 0
-	(*ah->ah_setTxDescFrmLen)(ah, ds, m->m_pkthdr.len + IEEE80211_CRC_LEN);
-	(*ah->ah_setTxDescHdrLen)(ah, ds, sizeof(struct ieee80211_frame));
-	(*ah->ah_setTxDescRate)(ah, ds, ni->ni_rates[0] & IEEE80211_RATE_VAL);
-	(*ah->ah_setTxDescBufLen)(ah, ds, roundup(bf->bf_segs[0].ds_len, 4));
-#endif
+	/* XXX verify mbuf data area covers this roundup */
+	ath_hal_setupbeacondesc(ah, ds
+		, ic->ic_opmode				/* operating mode */
+		, skb->len + IEEE80211_CRC_LEN		/* frame length */
+		, sizeof(struct ieee80211_frame)	/* header length */
+		, arate					/* xmit rate */
+		, 0					/* antenna mode */
+	);
+	/* NB: beacon's BufLen must be a multiple of 4 bytes */
+	ath_hal_filltxdesc(ah, ds
+		, roundup(skb->len, 4)			/* buffer length */
+		, AH_TRUE				/* first segment */
+		, AH_TRUE				/* last segment */
+	);
 	return 0;
 }
 
@@ -1118,6 +1143,7 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 static int
 ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 {
+	struct ath_hal *ah = sc->sc_ah;
 	struct sk_buff *skb;
 	struct ath_desc *ds;
 
@@ -1144,9 +1170,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds = bf->bf_desc;
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
-	ds->ds_ctl0 = 0;
-	ds->ds_ctl1 = skb_tailroom(skb);
-	ds->ds_status0 = ds->ds_status1 = 0;
+	ath_hal_setuprxdesc(ah, ds, skb_tailroom(skb));
 
 	if (sc->sc_rxlink != NULL)
 		*sc->sc_rxlink = bf->bf_daddr;
@@ -1167,7 +1191,7 @@ ath_rx_tasklet(void *data)
 	struct ieee80211_frame *wh, whbuf;
 	int rssi, len;
 	u_int32_t rstamp, now;
-	u_int8_t arate, rate;
+	u_int8_t arate, rate, phyerr;
 
 	DPRINTF2(("ath_rx_tasklet\n"));
 	do {
@@ -1182,58 +1206,41 @@ ath_rx_tasklet(void *data)
 			continue;
 		}
 		ds = bf->bf_desc;
-		if ((ds->ds_status1 & AR_Done) == 0)
+		if (ath_hal_rxprocdesc(ah, ds) == HAL_EINPROGRESS)
 			break;
 		TAILQ_REMOVE(&sc->sc_rxbuf, bf, bf_list);
 
 		DPRINTF2(("R  (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
 		    ds, (struct ath_desc *)bf->bf_daddr,
 		    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1,
-		    ds->ds_status0, ds->ds_status1,
-		    (ds->ds_status1 & AR_FrmRcvOK) ? '*' : '!'));
-		if ((ds->ds_status1 & AR_FrmRcvOK) == 0) {
-			if (ds->ds_status1 & AR_CRCErr)
+		    ds->ds_hw[0], ds->ds_hw[1],
+		    (ds->ds_rxstat.rs_status == 0 ? '*' : '!')));
+		if (ds->ds_rxstat.rs_status != 0) {
+			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
 				sc->sc_stats.ast_rx_crcerr++;
-			if (ds->ds_status1 & AR_FIFOOverrun)
+			if (ds->ds_rxstat.rs_status & HAL_RXERR_FIFO)
 				sc->sc_stats.ast_rx_fifoerr++;
-			if (ds->ds_status1 & AR_DecryptCRCErr)
+			if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT)
 				sc->sc_stats.ast_rx_badcrypt++;
-			if (ds->ds_status1 & AR_PHYErr) {
+			if (ds->ds_rxstat.rs_status & HAL_RXERR_PHY) {
 				sc->sc_stats.ast_rx_phyerr++;
-				if (ds->ds_status1 & AR_PHYErr_Tim)
-					sc->sc_stats.ast_rx_phy_tim++;
-				if (ds->ds_status1 & AR_PHYErr_Par)
-					sc->sc_stats.ast_rx_phy_par++;
-				if (ds->ds_status1 & AR_PHYErr_Rate)
-					sc->sc_stats.ast_rx_phy_rate++;
-				if (ds->ds_status1 & AR_PHYErr_Len)
-					sc->sc_stats.ast_rx_phy_len++;
-				if (ds->ds_status1 & AR_PHYErr_QAM)
-					sc->sc_stats.ast_rx_phy_qam++;
-				if (ds->ds_status1 & AR_PHYErr_Srv)
-					sc->sc_stats.ast_rx_phy_srv++;
-				if (ds->ds_status1 & AR_PHYErr_TOR)
-					sc->sc_stats.ast_rx_phy_tor++;
+				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
+				sc->sc_stats.ast_rx_phy[phyerr]++;
 			}
 			goto rx_next;
 		}
 
-		len = ds->ds_status0 & AR_DataLen;
+		len = ds->ds_rxstat.rs_datalen;
 		if (len < sizeof(struct ieee80211_frame)) {
-			DPRINTF(("%s: ath_rx_tasklet: short packet\n"
-				"  (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
-			    dev->name,
-			    ds, (struct ath_desc *)bf->bf_daddr,
-			    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1,
-			    ds->ds_status0, ds->ds_status1,
-			    (ds->ds_status1 & AR_FrmRcvOK) ? '*' : '!'));
+			DPRINTF(("%s: ath_rx_tasklet: short packet %d\n",
+			    dev->name, len));
 			sc->sc_stats.ast_rx_tooshort++;
 			goto rx_next;
 		}
 
-		rssi = ATH_BITVAL(ds->ds_status0, AR_RcvSigStrength);
-		rstamp = ATH_BITVAL(ds->ds_status1, AR_RcvTimestamp);
-		arate = ATH_BITVAL(ds->ds_status0, AR_RcvRate);
+		rssi = ds->ds_rxstat.rs_rssi;
+		rstamp = ds->ds_rxstat.rs_tstamp;
+		arate = ds->ds_rxstat.rs_rate;
 		rate = ((arate & 0x4) ? 72 : 48) >> (arate & 0x3);
 		if (rate == 72)
 			rate = 54;
@@ -1305,7 +1312,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	u_int8_t hdrbuf[sizeof(struct ieee80211_frame) +
 	    IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN];
 	u_int subtype;
-	HAL_DESC_PKT_TYPE atype;
+	HAL_PKT_TYPE atype;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
@@ -1352,51 +1359,80 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	bf->bf_skb = skb;
 	bf->bf_node = ni;
 
-	/* setup descriptors */
-	rate = ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL;
-	arate = (rate % 6 == 0) ? ath_rate_tbl[rate / 6] : 0;
-	if (arate == 0)
-		arate = AR_Rate_24M;
-
-	ds = bf->bf_desc;
-	/* first descriptor only */
-	ds->ds_ctl0 = pktlen | (arate << AR_XmitRate_S);
-	ds->ds_ctl1 = skb->len;
-	ath_hal_settxdeschdrlen(ah, ds, hdrlen);
 	/*
 	 * Calculate Atheros packet type from IEEE80211 packet header.
 	 */
-	atype = HAL_DESC_PKT_TYPE_NORMAL;		/* default */
+	atype = HAL_PKT_TYPE_NORMAL;			/* default */
 	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
 	case IEEE80211_FC0_TYPE_MGT:
 		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 		if (subtype == IEEE80211_FC0_SUBTYPE_BEACON)
-			atype = HAL_DESC_PKT_TYPE_BEACON;
+			atype = HAL_PKT_TYPE_BEACON;
 		else if (subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
-			atype = HAL_DESC_PKT_TYPE_PROBE_RESP;
+			atype = HAL_PKT_TYPE_PROBE_RESP;
 		else if (subtype == IEEE80211_FC0_SUBTYPE_ATIM)
-			atype = HAL_DESC_PKT_TYPE_ATIM;
+			atype = HAL_PKT_TYPE_ATIM;
 		break;
 	case IEEE80211_FC0_TYPE_CTL:
 		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 		if (subtype == IEEE80211_FC0_SUBTYPE_PS_POLL)
-			atype = HAL_DESC_PKT_TYPE_PSPOLL;
+			atype = HAL_PKT_TYPE_PSPOLL;
 		break;
 	}
-	ath_hal_settxdescpkttype(ah, ds, atype);
-	if (iswep)
-		ath_hal_settxdesckey(ah, ds, sc->sc_ic.ic_wep_txkey);
+
+	/* 
+	 * XXX insert rate control work here.
+	 */
+	rate = ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL;
+	arate = (rate % 6 == 0) ? ath_rate_tbl[rate / 6] : 0;
+	if (arate == 0)
+		arate = HAL_RATE_24M;
+
+	ds = bf->bf_desc;
+
+	/*
+	 * Formulate first tx descriptor with tx controls.
+	 */
+	ath_hal_setuptxdesc(ah, ds
+		, pktlen	/* packet length */
+		, hdrlen	/* header length */
+		, atype		/* Atheros packet type */
+		, 0		/* txpower */
+		, arate, 1	/* series 0 rate/tries */
+		, iswep ? sc->sc_ic.ic_wep_txkey : HAL_TXKEYIX_INVALID
+		, 0		/* antenna mode */
+		, AH_FALSE	/* clear dest mask */
+		, AH_FALSE	/* no ack */
+		, AH_FALSE	/* short preamble */
+		, AH_FALSE	/* rts enable */
+		, AH_FALSE	/* cts enable */
+		, 0		/* rts/cts rate */
+		, 0		/* rts/cts duration */
+	);
+#ifdef notyet
+	ath_hal_setupxtxdesc(ah, ds
+		, AH_FALSE	/* short preamble */
+		, 0, 0		/* series 1 rate/tries */
+		, 0, 0		/* series 2 rate/tries */
+		, 0, 0		/* series 3 rate/tries */
+	);
+#endif
 
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
-	ds->ds_status0 = ds->ds_status1 = 0;
-	DPRINTF2(("ath_tx_start: %08x %08x %08x %08x\n",
-	    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1));
+	ath_hal_filltxdesc(ah, ds
+		, skb->len		/* segment length */
+		, AH_TRUE		/* first segment */
+		, AH_TRUE		/* last segment */
+	);
+	DPRINTF2(("ath_tx_start: %d: %08x %08x %08x %08x %08x %08x\n",
+	    0, ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1,
+	    ds->ds_hw[0], ds->ds_hw[1]));
 
 	spin_lock_bh(&sc->sc_txqlock);
 	TAILQ_INSERT_TAIL(&sc->sc_txq, bf, bf_list);
 	if (sc->sc_txlink == NULL) {
-		ath_hal_puttxbuf(ah, bf->bf_daddr);
+		ath_hal_puttxbuf(ah, sc->sc_txhalq, bf->bf_daddr);
 		DPRINTF2(("ath_tx_start: TXDP0 = %p (%p)\n",
 		    (caddr_t)bf->bf_daddr, bf->bf_desc));
 	} else {
@@ -1407,7 +1443,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	sc->sc_txlink = &ds->ds_link;
 	spin_unlock_bh(&sc->sc_txqlock);
 
-	ath_hal_txstart(ah);
+	ath_hal_txstart(ah, sc->sc_txhalq);
 
 	stats->tx_packets++;
 	stats->tx_bytes += pktlen;
@@ -1420,6 +1456,7 @@ ath_tx_tasklet(void *data)
 {
 	struct net_device *dev = data;
 	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct ath_nodestat *st;
@@ -1428,9 +1465,11 @@ ath_tx_tasklet(void *data)
 #ifdef AR_DEBUG
 	if (ath_debug > 1) {
 		printk("ath_tx_tasklet: tx queue %p, link %p\n",
-		    (caddr_t) ath_hal_gettxbuf(sc->sc_ah), sc->sc_txlink);
+		    (caddr_t) ath_hal_gettxbuf(sc->sc_ah, sc->sc_txhalq),
+		    sc->sc_txlink);
 		TAILQ_FOREACH(bf, &sc->sc_txq, bf_list) {
-			ath_printtxbuf(bf);
+			ath_printtxbuf(bf,
+				ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
 		}
 	}
 #endif /* AR_DEBUG */
@@ -1443,7 +1482,7 @@ ath_tx_tasklet(void *data)
 			break;
 		}
 		ds = bf->bf_desc;		/* NB: last decriptor */
-		if ((ds->ds_status1 & AR_Done) == 0) {
+		if (ath_hal_txprocdesc(ah, ds) == HAL_EINPROGRESS) {
 			spin_unlock(&sc->sc_txqlock);
 			break;
 		}
@@ -1452,19 +1491,19 @@ ath_tx_tasklet(void *data)
 
 		if (bf->bf_node != NULL) {
 			st = bf->bf_node->ni_private;
-			if (ds->ds_status0 & AR_FrmXmitOK)
+			if (ds->ds_txstat.ts_status == 0)
 				st->st_tx_ok++;
 			else {
 				st->st_tx_err++;
-				if (ds->ds_status0 & AR_ExcessiveRetries)
+				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
 					sc->sc_stats.ast_tx_xretries++;
-				if (ds->ds_status0 & AR_FIFOUnderrun)
+				if (ds->ds_txstat.ts_status & HAL_TXERR_FIFO)
 					sc->sc_stats.ast_tx_fifoerr++;
-				if (ds->ds_status0 & AR_Filtered)
+				if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
 					sc->sc_stats.ast_tx_filtered++;
 			}
-			sr = ATH_BITVAL(ds->ds_status0, AR_ShortRetryCnt);
-			lr = ATH_BITVAL(ds->ds_status0, AR_LongRetryCnt);
+			sr = ds->ds_txstat.ts_shortretry;
+			lr = ds->ds_txstat.ts_longretry;
 			sc->sc_stats.ast_tx_shortretry += sr;
 			sc->sc_stats.ast_tx_longretry += lr;
 			st->st_tx_retr += sr + lr;
@@ -1503,11 +1542,13 @@ ath_draintxq(struct ath_softc *sc)
 
 	/* XXX return value */
 	if (!sc->sc_invalid) {
-		(void) ath_hal_stoptxdma(ah, HAL_TX_QUEUE_DATA);
-		(void) ath_hal_stoptxdma(ah, HAL_TX_QUEUE_BEACON);
-		DPRINTF(("ath_draintxq: txq %p h/w %p, link %p\n",
-		    TAILQ_FIRST(&sc->sc_txq), (caddr_t) ath_hal_gettxbuf(ah),
+		(void) ath_hal_stoptxdma(ah, sc->sc_txhalq);
+		DPRINTF(("ath_draintxq: tx queue %p, link %p\n",
+		    (caddr_t) ath_hal_gettxbuf(ah, sc->sc_txhalq),
 		    sc->sc_txlink));
+		(void) ath_hal_stoptxdma(ah, sc->sc_bhalq);
+		DPRINTF(("ath_draintxq: beacon queue %p\n",
+		    (caddr_t) ath_hal_gettxbuf(ah, sc->sc_bhalq)));
 	}
 	for (;;) {
 		spin_lock_bh(&sc->sc_txqlock);
@@ -1521,7 +1562,8 @@ ath_draintxq(struct ath_softc *sc)
 		spin_unlock_bh(&sc->sc_txqlock);
 #ifdef AR_DEBUG
 		if (ath_debug)
-			ath_printtxbuf(bf);
+			ath_printtxbuf(bf,
+				ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
 #endif /* AR_DEBUG */
 		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
@@ -1554,9 +1596,8 @@ ath_stoprecv(struct ath_softc *sc)
 		printk("ath_stoprecv: rx queue %p, link %p\n",
 		    (caddr_t) ath_hal_getrxbuf(ah), sc->sc_rxlink);
 		TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
-			struct ath_desc *ds = bf->bf_desc;
-			if (ds->ds_status1 & AR_Done)
-				ath_printrxbuf(bf);
+			if (ath_hal_rxprocdesc(ah, bf->bf_desc) == HAL_OK)
+				ath_printrxbuf(bf, 1);
 		}
 	}
 #endif
@@ -1898,31 +1939,29 @@ ath_ratectl(unsigned long data)
 
 #ifdef AR_DEBUG
 static void
-ath_printrxbuf(struct ath_buf *bf)
+ath_printrxbuf(struct ath_buf *bf, int done)
 {
 	struct ath_desc *ds = bf->bf_desc;
 
-	printk("R (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
+	printk("R (%p %p) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, (struct ath_desc *)bf->bf_daddr,
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
-	    ds->ds_status0, ds->ds_status1,
-	    !(ds->ds_status1 & AR_Done) ? ' ' :
-	    (ds->ds_status0 & AR_FrmRcvOK) ? '*' : '!');
+	    ds->ds_hw[0], ds->ds_hw[1], ds->ds_hw[2], ds->ds_hw[3],
+	    !done ? ' ' : (ds->ds_rxstat.rs_status == 0) ? '*' : '!');
 }
 
 static void
-ath_printtxbuf(struct ath_buf *bf)
+ath_printtxbuf(struct ath_buf *bf, int done)
 {
 	struct ath_desc *ds = bf->bf_desc;
 
-	printk("T (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
+	printk("T (%p %p) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, (struct ath_desc *)bf->bf_daddr,
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
-	    ds->ds_status0, ds->ds_status1,
-	    !(ds->ds_status1 & AR_Done) ? ' ' :
-	    (ds->ds_status0 & AR_FrmXmitOK) ? '*' : '!');
+	    ds->ds_hw[0], ds->ds_hw[1], ds->ds_hw[2], ds->ds_hw[3],
+	    !done ? ' ' : (ds->ds_txstat.ts_status == 0) ? '*' : '!');
 }
 #endif /* AR_DEBUG */
 
@@ -1950,10 +1989,12 @@ ath_getstats(struct net_device *dev)
 			+ sc->sc_stats.ast_rx_badcrypt
 			+ sc->sc_stats.ast_rx_phyerr
 			;
-	stats->rx_length_errors = sc->sc_stats.ast_rx_phy_len;
+	stats->rx_length_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_LEN];
 	stats->rx_crc_errors = sc->sc_stats.ast_rx_crcerr;
-	stats->rx_fifo_errors = sc->sc_stats.ast_rx_phy_tim;	/* XXX??? */
-	stats->rx_missed_errors = sc->sc_stats.ast_rx_phy_tor;	/* XXX??? */
+	/* XXX??? */
+	stats->rx_fifo_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TIM];
+	/* XXX??? */
+	stats->rx_missed_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TOR];
 
 	return stats;
 }
@@ -2008,13 +2049,19 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 	STAT(tx_shortretry); STAT(tx_longretry);
 
 	STAT(rx_orn);	  STAT(rx_crcerr);  STAT(rx_fifoerr); STAT(rx_badcrypt);
-	STAT(rx_phyerr);  STAT(rx_phy_tim); STAT(rx_phy_par); STAT(rx_phy_rate);
-	STAT(rx_phy_len); STAT(rx_phy_qam); STAT(rx_phy_srv); STAT(rx_phy_tor);
+#define	PHYSTAT(x) do {							\
+	if (sc->sc_stats.ast_rx_phy[HAL_PHYERR_##x] != 0)		\
+		cp += sprintf(cp, "PHYERR_##x=%u\n",			\
+			sc->sc_stats.ast_rx_phy[HAL_PHYERR_##x]);	\
+} while (0)
+	PHYSTAT(UND); PHYSTAT(TIM); PHYSTAT(PAR); PHYSTAT(RATE);
+	PHYSTAT(LEN); PHYSTAT(QAM); PHYSTAT(SRV); PHYSTAT(TOR);
 	STAT(rx_nobuf);
 
 	STAT(be_nobuf);
 
 	return cp - page;
+#undef PHYSTAT
 #undef STAT
 }
 
