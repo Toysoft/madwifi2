@@ -96,6 +96,7 @@ static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
 static int	ath_newstate(void *, enum ieee80211_state);
 static void	ath_rate_ctl(struct ath_softc *, struct ieee80211_node *);
+static struct net_device_stats *ath_getstats(struct net_device *);
 
 #ifdef CONFIG_PROC_FS
 static void	ath_proc_init(struct ath_softc *sc);
@@ -220,6 +221,7 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	dev->open = ath_init;
 	dev->hard_start_xmit = ath_hardstart;
 	dev->set_multicast_list = ath_mode_init;
+	dev->get_stats = ath_getstats;
 
 	ic->ic_watchdog = ath_watchdog;
 	ic->ic_mgtstart = ath_mgtstart;
@@ -380,6 +382,7 @@ ath_fatal_tasklet(void *data)
 	struct ath_hal *ah = sc->sc_ah;
 
 	printk("%s: hardware error; resetting\n", dev->name);
+	sc->sc_stats.ast_hardware++;
 
 	ath_hal_dumpstate(ah);	/*XXX*/
 	ath_stop(dev);
@@ -394,6 +397,7 @@ ath_rxorn_tasklet(void *data)
 	struct ath_hal *ah = sc->sc_ah;
 
 	printk("%s: rx FIFO overrun; resetting\n", dev->name);
+	sc->sc_stats.ast_rx_orn++;
 
 	ath_hal_dumpstate(ah);	/*XXX*/
 	ath_stop(dev);
@@ -407,6 +411,7 @@ ath_bmiss_tasklet(void *data)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 			
+	sc->sc_stats.ast_bmiss++;
 	if (ic->ic_opmode == IEEE80211_M_STA && ic->ic_state == IEEE80211_S_RUN)
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 }
@@ -653,7 +658,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 bad:
 	if (bf != NULL)
 		TXBUF_QUEUE_TAIL(sc, bf);
-	ic->ic_stats.tx_errors++;
 	return error;
 }
 
@@ -728,7 +732,6 @@ bad:
 	if (bf != NULL)
 		TXBUF_QUEUE_TAIL(sc, bf);
 	dev_kfree_skb(skb);
-	ic->ic_stats.tx_errors++;
 	return error;
 }
 
@@ -746,7 +749,6 @@ ath_watchdog(struct net_device *dev)
 			ath_hal_dumpstate(sc->sc_ah);	/*XXX*/
 			ath_stop(dev);
 			ath_init(dev);
-			ic->ic_stats.tx_errors++;
 			sc->sc_stats.ast_watchdog++;
 			return;
 		}
@@ -1113,6 +1115,7 @@ ath_rx_tasklet(void *data)
 	struct net_device *dev = data;
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
+	struct net_device_stats *stats = &sc->sc_ic.ic_stats;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
@@ -1170,6 +1173,7 @@ ath_rx_tasklet(void *data)
 				ieee80211_dump_pkt(skb->data, len, rate*2, rssi);
 			}
 #endif
+			sc->sc_stats.ast_rx_tooshort++;
 			goto rx_next;
 		}
 		DPRINTF2(("R  (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
@@ -1178,7 +1182,6 @@ ath_rx_tasklet(void *data)
 		    ds->ds_status0, ds->ds_status1,
 		    (ds->ds_status1 & AR_FrmRcvOK) ? '*' : '!'));
 		if ((ds->ds_status1 & AR_FrmRcvOK) == 0) {
-			sc->sc_ic.ic_stats.rx_errors++;
 			if (ds->ds_status1 & AR_CRCErr)
 				sc->sc_stats.ast_rx_crcerr++;
 			if (ds->ds_status1 & AR_FIFOOverrun)
@@ -1226,6 +1229,8 @@ ath_rx_tasklet(void *data)
 			 */
 			skb_trim(skb, skb->len - IEEE80211_WEP_CRCLEN);
 		}
+		stats->rx_packets++;
+		stats->rx_bytes += len;
 		ieee80211_input(dev, skb, rssi, rstamp);
   rx_next:
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
@@ -1239,6 +1244,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
     struct sk_buff *skb)
 {
 	struct ath_hal *ah = sc->sc_ah;
+	struct net_device_stats *stats = &sc->sc_ic.ic_stats;
 	int i, iswep, hdrlen, pktlen;
 	u_int8_t rate, arate;
 	struct ath_desc *ds;
@@ -1351,7 +1357,9 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	spin_unlock(&sc->sc_txqlock);
 
 	ath_hal_txstart(ah);
-	sc->sc_ic.ic_stats.tx_packets++;
+
+	stats->tx_packets++;
+	stats->tx_bytes += pktlen;
 
 	return 0;
 }
@@ -1396,7 +1404,6 @@ ath_tx_tasklet(void *data)
 				st->st_tx_ok++;
 			else {
 				st->st_tx_err++;
-				sc->sc_ic.ic_stats.tx_errors++;
 				sc->sc_stats.ast_tx_descerr++;
 			}
 			st->st_tx_retr +=
@@ -1830,6 +1837,35 @@ ath_printtxbuf(struct ath_buf *bf)
 }
 #endif /* AR_DEBUG */
 
+/*
+ * Return netdevice statistics.
+ */
+static struct net_device_stats *
+ath_getstats(struct net_device *dev)
+{
+	struct ath_softc *sc = dev->priv;
+	struct net_device_stats *stats = &sc->sc_ic.ic_stats;
+
+	/* update according to private statistics */
+	stats->tx_errors = sc->sc_stats.ast_tx_encap
+			 + sc->sc_stats.ast_tx_nonode
+			 + sc->sc_stats.ast_tx_descerr
+			 ;
+	stats->tx_dropped = sc->sc_stats.ast_tx_nobuf;
+	stats->rx_errors = sc->sc_stats.ast_rx_tooshort
+			+ sc->sc_stats.ast_rx_crcerr
+			+ sc->sc_stats.ast_rx_fifoerr
+			+ sc->sc_stats.ast_rx_badcrypt
+			+ sc->sc_stats.ast_rx_phyerr
+			;
+	stats->rx_length_errors = sc->sc_stats.ast_rx_phy_len;
+	stats->rx_crc_errors = sc->sc_stats.ast_rx_crcerr;
+	stats->rx_fifo_errors = sc->sc_stats.ast_rx_phy_tim;	/* XXX??? */
+	stats->rx_missed_errors = sc->sc_stats.ast_rx_phy_tor;	/* XXX??? */
+
+	return stats;
+}
+
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 
@@ -1868,13 +1904,14 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 		return 0;
 	}
 #define	STAT(x)		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x)
-	STAT(watchdog); STAT(tx_mgmt); STAT(tx_discard);
-	STAT(tx_encap); STAT(tx_nonode); STAT(tx_nobuf);
-	STAT(tx_nodata); STAT(tx_descerr);
-	STAT(rx_crcerr); STAT(rx_fifoerr); STAT(rx_badcrypt);
-	STAT(rx_phyerr); STAT(rx_phy_tim); STAT(rx_phy_par);
-	STAT(rx_phy_rate); STAT(rx_phy_len); STAT(rx_phy_qam);
-	STAT(rx_phy_srv); STAT(rx_phy_tor);
+	STAT(watchdog); STAT(hardware); STAT(bmiss);
+	STAT(tx_mgmt); STAT(tx_discard); STAT(tx_encap);
+	STAT(tx_nonode); STAT(tx_nobuf); STAT(tx_descerr);
+	STAT(rx_orn); STAT(rx_crcerr); STAT(rx_fifoerr);
+	STAT(rx_badcrypt); STAT(rx_phyerr); STAT(rx_phy_tim);
+	STAT(rx_phy_par); STAT(rx_phy_rate); STAT(rx_phy_len);
+	STAT(rx_phy_qam); STAT(rx_phy_srv); STAT(rx_phy_tor);
+
 	return cp - page;
 #undef STAT
 }

@@ -51,13 +51,16 @@ struct ath_nodestat {
 
 struct ath_stats {
 	u_int32_t	ast_watchdog;	/* device reset by watchdog */
+	u_int32_t	ast_hardware;	/* fatal hardware error interrupt */
+	u_int32_t	ast_bmiss;	/* beacon miss interrupt */
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
 	u_int32_t	ast_tx_encap;	/* tx encapsulation failed */
 	u_int32_t	ast_tx_nonode;	/* tx failed 'cuz no node */
 	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer */
-	u_int32_t	ast_tx_nodata;	/* tx discarded empty frame */
 	u_int32_t	ast_tx_descerr;	/* tx failure reported in desc*/
+	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
+	u_int32_t	ast_rx_tooshort;/* rx failed 'cuz frame too short */
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
 	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
@@ -68,7 +71,7 @@ struct ath_stats {
 	u_int32_t	ast_rx_phy_len;	/* rx PHY: illegal length */
 	u_int32_t	ast_rx_phy_qam;	/* rx PHY: 64 QAM rate */
 	u_int32_t	ast_rx_phy_srv;	/* rx PHY: service bit error */
-	u_int32_t	ast_rx_phy_tor;	/* rx PHY: transmit voerride receive */
+	u_int32_t	ast_rx_phy_tor;	/* rx PHY: transmit override receive */
 };
 
 struct ath_buf {
