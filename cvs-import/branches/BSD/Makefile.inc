@@ -172,7 +172,7 @@ ATH=	${DEPTH}/ath
 #
 #ATH_RATE=$(shell find ath_rate/ -maxdepth 1 ! -name CVS ! -name ath_rate/ -type d)
 ifeq ($(ATH_RATE),)
-ATH_RATE=ath_rate/sample
+ATH_RATE=ath_rate/onoe
 endif
 
 INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
