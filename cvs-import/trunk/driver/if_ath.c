@@ -2377,7 +2377,7 @@ enum {
 	ATH_BMISSHACK	= 6,
 	ATH_DUMP	= 8,
 };
-static	char ath_info[256];
+static	char ath_info[512];
 static	char ath_dump[10];
 
 static int
