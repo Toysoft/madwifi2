@@ -56,7 +56,7 @@
 #define	IEEE80211_TRANS_WAIT 	5		/* transition interval (secs) */
 #define	IEEE80211_INACT_WAIT	5		/* inactivity interval (secs) */
 #define	IEEE80211_INACT_INIT	(30/IEEE80211_INACT_WAIT)	/* initial */
-#define	IEEE80211_INACT_AUTH	(120/IEEE80211_INACT_WAIT)	/* associated but not authorized */
+#define	IEEE80211_INACT_AUTH	(180/IEEE80211_INACT_WAIT)	/* associated but not authorized */
 #define	IEEE80211_INACT_RUN	(300/IEEE80211_INACT_WAIT)	/* authorized */
 
 #define	IEEE80211_NODE_HASHSIZE	32
