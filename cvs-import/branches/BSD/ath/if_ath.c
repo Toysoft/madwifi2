@@ -1157,14 +1157,15 @@ static int
 ath_start(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni = NULL;
-	struct ath_buf *bf = NULL;
+	struct ieee80211_node *ni;
+	struct ath_buf *bf;
 	struct ieee80211_cb *cb;
 	struct sk_buff *skb0;
-	struct ether_header eh;
 	struct ieee80211_frame *wh;
-	struct ath_hal *ah = sc->sc_ah;
+	struct ether_header *eh;
+	
 	int ret = 0;
 
 	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
@@ -1175,7 +1176,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		return -ENETDOWN;
 	}
 
-	for(;;){
+	for (;;) {
 		/*
 		 * Grab a TX buffer and associated resources.
 		 */
@@ -1219,11 +1220,17 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 				ATH_TXBUF_UNLOCK(sc);
 				break;
 			}
-			
-			memcpy(&eh, skb->data, sizeof(struct ether_header));
-			skb_pull(skb, sizeof(struct ether_header));
-
-			ni = ieee80211_find_txnode(ic, eh.ether_dhost);
+			/* 
+			 * Find the node for the destination so we can do
+			 * things like power save and fast frames aggregation.
+			 */
+			if (skb->len < sizeof(struct ether_header) {
+				ic->ic_stats.is_tx_nobuf++;   /* XXX */
+				ni = NULL;
+				goto bad;
+			}
+			eh = (struct ether_header *)skb->data;
+			ni = ieee80211_find_txnode(ic, eh->ether_dhost);
 			if (ni == NULL) {
 				/* NB: ieee80211_find_txnode does stat+msg */
 				goto bad;
@@ -1270,7 +1277,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 			 */
 			break;
 
-		} else{
+		} else {
 			cb = (struct ieee80211_cb *)skb0->cb;
 			ni = cb->ni;
 
