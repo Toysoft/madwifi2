@@ -121,7 +121,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		 * comes up zero.
 		 */
 		csz = L1_CACHE_BYTES / sizeof(u_int32_t);
-		printk("ath_pci: cache line size not set; forcing %u\n", csz);
 		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE, csz);
 	}
 	/*
@@ -166,11 +165,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->mem_end = mem + pci_resource_len(pdev, 0);
 	dev->priv = sc;
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
-	dev->owner = THIS_MODULE;
-#else
 	SET_MODULE_OWNER(dev);
-#endif
 
 	sc->aps_sc.sc_pdev = pdev;
 
@@ -209,7 +204,6 @@ static void
 ath_pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct ath_pci_softc *sc = dev->priv;
 
 	ath_detach(dev);
 	if (dev->irq)
@@ -218,7 +212,7 @@ ath_pci_remove(struct pci_dev *pdev)
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
-	kfree(sc);
+	free_netdev(dev);
 }
 
 #ifdef CONFIG_PM
