@@ -79,13 +79,12 @@ EXPORT_SYMBOL(ieee80211_state_name);
 #define	IEEE80211_AUTH_MAX	(IEEE80211_AUTH_WPA+1)
 /* XXX well-known names */
 static const char *auth_modnames[IEEE80211_AUTH_MAX] = {
-	/* NB: for now we have one module */
 	"wlan_internal",	/* IEEE80211_AUTH_NONE */
 	"wlan_internal",	/* IEEE80211_AUTH_OPEN */
 	"wlan_internal",	/* IEEE80211_AUTH_SHARED */
-	"wlan_auth",		/* IEEE80211_AUTH_8021X	 */
+	"wlan_xauth",		/* IEEE80211_AUTH_8021X	 */
 	"wlan_internal",	/* IEEE80211_AUTH_AUTO */
-	"wlan_auth",		/* IEEE80211_AUTH_WPA */
+	"wlan_xauth",		/* IEEE80211_AUTH_WPA */
 };
 static const struct ieee80211_authenticator *authenticators[IEEE80211_AUTH_MAX];
 
