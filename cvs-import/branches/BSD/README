@@ -112,20 +112,6 @@ SMP-safe			???
 ACPI support			???
 
 
-Requirements
-=============
-This driver requires the following support in your kernel:
-
-o Wireless Extensions versions 14 or later (version 16 preferred)
-o Sysctl support
-o Crypto API support (AES support is used if present, otherwise the
-  AES-CCMP cipher module falls back to a private implementation)
-
-Testing has been done with kernels from 2.4.2x to 2.6.10.  Early
-2.4 kernels may require patches; e.g. for crypto support and/or
-updated wireless extensions.
-
-
 Atheros Hardware
 ================
 There are currently 3 "programming generations" of Atheros 802.11
