@@ -794,6 +794,8 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 		dev_kfree_skb(skb);
 		return NULL;
 	}
+	//TODO: this is never executed, do we need it?
+#ifdef ALIGNED_POINTER
 	if (!ALIGNED_POINTER(skb->data + sizeof(*eh), u_int32_t)) {
 		struct sk_buff *n;
 
@@ -806,6 +808,7 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 		skb = n;
 		eh = (struct ether_header *) skb->data;
 	}
+#endif /* ALIGNED_POINTER */
 	if (llc != NULL)
 		eh->ether_type = htons(skb->len - sizeof(*eh));
 	else
