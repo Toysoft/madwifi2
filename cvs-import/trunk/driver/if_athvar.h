@@ -177,9 +177,9 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 #define	ath_hal_setmcastfilter(_ah, _mfilt0, _mfilt1) \
 	((*(_ah)->ah_setMulticastFilter)((_ah), (_mfilt0), (_mfilt1)))
 #define	ath_hal_waitforbeacon(_ah, _bf) \
-	((*(_ah)->ah_waitForBeaconDone)((_ah), (_bf)))
+	((*(_ah)->ah_waitForBeaconDone)((_ah), (_bf)->bf_daddr))
 #define	ath_hal_qbeacon(_ah, _bf) \
-	((*(_ah)->ah_queueBeaconAndCab)((_ah), (_bf), NULL))
+	((*(_ah)->ah_queueBeaconAndCab)((_ah), (_bf)->bf_daddr, NULL))
 #define	ath_hal_putrxbuf(_ah, _bufaddr) \
 	((*(_ah)->ah_setRxDP)((_ah), (_bufaddr)))
 #define	ath_hal_gettsf(_ah) \
@@ -201,7 +201,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 #define	ath_hal_setledstate(_ah, _state) \
 	((*(_ah)->ah_setLedState)((_ah), (_state)))
 #define	ath_hal_beaconinit(_ah, _opmode, _nextb, _bperiod, _bf) \
-	((*(_ah)->ah_beaconInit)((_ah), (_opmode), (_nextb), (_bperiod), (_bf)))
+	((*(_ah)->ah_beaconInit)((_ah), (_opmode), (_nextb), (_bperiod), \
+		(_bf) ? (_bf)->bf_daddr : 0))
 #define	ath_hal_beaconreset(_ah) \
 	((*(_ah)->ah_resetStationBeaconTimers)((_ah)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
