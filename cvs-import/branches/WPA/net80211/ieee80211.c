@@ -829,9 +829,10 @@ ieee80211_reset_erp(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	 */
 	/* XXX what about auto? */
 	ieee80211_set_shortslottime(ic,
-		mode == IEEE80211_MODE_11G &&
+		mode == IEEE80211_MODE_11A ||
+		(mode == IEEE80211_MODE_11G &&
 		ic->ic_opmode != IEEE80211_M_IBSS &&
-		(ic->ic_caps & IEEE80211_C_SHSLOT));
+		(ic->ic_caps & IEEE80211_C_SHSLOT)));
 	/*
 	 * Set short preamble and ERP barker-preamble flags.
 	 */
