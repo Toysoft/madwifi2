@@ -179,12 +179,14 @@ enum {
 	ATH_DEBUG_RX_PROC	= 0x00004000,	/* rx ISR proc */
 	ATH_DEBUG_BEACON_PROC	= 0x00008000,	/* beacon ISR proc */
 	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
+	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
 #define	DPRINTF(_m, _fmt, ...) do {				\
 	if (ath_debug & _m)					\
 		printk(_fmt, __VA_ARGS__);			\
 } while (0)
+#define	ath_debug_keycache(_sc)	(ath_debug & ATH_DEBUG_KEYCACHE)
 #else
 #define	IFF_DUMPPKTS(_ic, _m)	netif_msg_dumppkts(_ic)
 #define	DPRINTF(_m, _fmt, ...)
@@ -1026,6 +1028,21 @@ ath_media_change(struct net_device *dev)
 	return error;
 }
 
+#ifdef AR_DEBUG
+static void
+ath_keyprint(const char *tag, u_int ix, const HAL_KEYVAL *k, u_int8_t *mac)
+{
+	int i;
+
+	printk("key %u: ", ix);
+	for (i = 0; i < k->wk_len; i++)
+		printk("%02x", k->wk_key[i]);
+	if (mac)
+		printk(" %s", ether_sprintf(mac));
+	printk(" (%s)\n", tag);
+}
+#endif
+
 /*
  * Fill the hardware key cache with key entries.
  */
@@ -1033,17 +1050,32 @@ static void
 ath_initkeytable(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct net_device *dev = ic->ic_dev;
 	struct ath_hal *ah = sc->sc_ah;
+	u_int8_t *bssid;
 	int i;
 
 	/* XXX maybe should reset all keys when !WEPON */
+	if (ic->ic_state == IEEE80211_S_SCAN)
+		bssid = dev->broadcast;
+	else
+		bssid = ic->ic_bss->ni_bssid;
 	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
 		struct ieee80211_wepkey *k = &ic->ic_nw_keys[i];
-		if (k->wk_len == 0)
-			ath_hal_keyreset(ah, i);
-		else
+
+		if (k->wk_len != 0) {
+			const HAL_KEYVAL *hk = (const HAL_KEYVAL *)k;
+
 			/* XXX return value */
-			ath_hal_keyset(ah, i, (const HAL_KEYVAL *) k, NULL);
+			ath_hal_keyset(ah, i, hk, bssid);
+#ifdef AR_DEBUG
+			if (ath_debug_keycache(sc))
+				ath_keyprint("set/init", i, hk, bssid);
+#endif
+		} else {
+			ath_hal_keyreset(ah, i);
+			DPRINTF(ATH_DEBUG_KEYCACHE, "key %u: reset\n", i);
+		}
 	}
 }
 
@@ -1057,8 +1089,10 @@ ath_key_alloc(struct ieee80211com *ic)
 	for (kix = IEEE80211_WEP_NKID; kix < sc->sc_keymax; kix++)
 		if (!isset(sc->sc_keymap, kix)) {
 			setbit(sc->sc_keymap, kix);
+			DPRINTF(ATH_DEBUG_KEYCACHE, "key %u: alloc\n", kix);
 			return kix;
 		}
+	DPRINTF(ATH_DEBUG_KEYCACHE, "%s: no key\n", __func__);
 	return IEEE80211_KEYIX_NONE;
 }
 
@@ -1071,6 +1105,7 @@ ath_key_delete(struct ieee80211com *ic, u_int kix)
 
 	clrbit(sc->sc_keymap, kix);
 	ath_hal_keyreset(ah, kix);
+	DPRINTF(ATH_DEBUG_KEYCACHE, "key %u: delete\n", kix);
 	return 1;
 }
 
@@ -1083,6 +1118,10 @@ ath_key_set(struct ieee80211com *ic, u_int kix,
 	struct ath_hal *ah = sc->sc_ah;
 	const HAL_KEYVAL *hk = (const HAL_KEYVAL *)k;
 
+#ifdef AR_DEBUG
+	if (ath_debug_keycache(sc))
+		ath_keyprint("set", kix, hk, mac);
+#endif
 	return ath_hal_keyset(ah, kix, hk, mac);
 }
 
