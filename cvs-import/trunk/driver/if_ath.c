@@ -372,7 +372,7 @@ ath_shutdown(struct net_device *dev)
 }
 
 /*
- * Interrupt handler.  All the actual processing is
+ * Interrupt handler.  Most of the actual processing is
  * deferred to tasklets.
  */
 irqreturn_t
@@ -386,8 +386,8 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (sc->sc_invalid) {
 		/*
-		 * The hardware is gone, or HAL isn't yet initialized.
-		 * Don't touch anything.
+		 * The hardware is not ready/present, don't touch anything.
+		 * Note this can happen early on if the IRQ is shared.
 		 */
 		return IRQ_NONE;
 	}
@@ -421,9 +421,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	} else {
 		if (status & HAL_INT_RXEOL) {
 			/*
-			 * XXX The hardware should re-read the link when
-			 * RXE bit is written, but it doesn't work at least
-			 * on older revision of the hardware.
+			 * NB: the hardware should re-read the link when
+			 *     RXE bit is written, but it doesn't work at
+			 *     least on older hardware revs.
 			 */
 			sc->sc_stats.ast_rxeol++;
 			sc->sc_rxlink = NULL;
@@ -483,8 +483,15 @@ ath_bmiss_tasklet(void *data)
 	DPRINTF(("ath_bmiss_tasklet\n"));
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
 		("unexpect operating mode %u", ic->ic_opmode));
-	if (ic->ic_state == IEEE80211_S_RUN)
-		ieee80211_new_state(dev, IEEE80211_S_ASSOC, 0);
+	if (ic->ic_state == IEEE80211_S_RUN) {
+		/*
+		 * Rather than go directly to scan state, try to
+		 * reassociate first.  If that fails then the state
+		 * machine will drop us into scanning after timing
+		 * out waiting for a probe response.
+		 */
+		ieee80211_new_state(dev, IEEE80211_S_ASSOC, -1);
+	}
 }
 
 static u_int
@@ -938,6 +945,7 @@ ath_initkeytable(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	int i;
 
+	/* XXX maybe should reset all keys when !WEPON */
 	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
 		struct ieee80211_wepkey *k = &ic->ic_nw_keys[i];
 		if (k->wk_len == 0)
@@ -1221,6 +1229,9 @@ ath_beacon_tasklet(struct net_device *dev)
 		sc->sc_bhalq, (caddr_t)bf->bf_daddr, bf->bf_desc));
 }
 
+/*
+ * Reclaim beacon resources.
+ */
 static void
 ath_beacon_free(struct ath_softc *sc)
 {
@@ -1941,8 +1952,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 * Skip 'bad' IVs from Fluhrer/Mantin/Shamir:
 		 * (B, 255, N) with 3 <= B < 8
 		 */
-		if (iv >= 0x03ff00 &&
-		    (iv & 0xf8ff00) == 0x00ff00)
+		if (iv >= 0x03ff00 && (iv & 0xf8ff00) == 0x00ff00)
 			iv += 0x000100;
 		ic->ic_iv = iv + 1;
 
@@ -2157,6 +2167,10 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	    0, ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1,
 	    ds->ds_hw[0], ds->ds_hw[1]));
 
+	/*
+	 * Insert the frame on the outbound list and
+	 * pass it on to the hardware.
+	 */
 	spin_lock_bh(&sc->sc_txqlock);
 	TAILQ_INSERT_TAIL(&sc->sc_txq, bf, bf_list);
 	if (sc->sc_txlink == NULL) {
