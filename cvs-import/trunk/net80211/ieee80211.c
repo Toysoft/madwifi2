@@ -594,7 +594,7 @@ void
 ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 {
 	struct ieee80211com *ic;
-	struct ieee80211_node *ni = NULL;
+	struct ieee80211_rateset *rs;
 
 	ic = ieee80211_find_instance(dev);
 	if (!ic) {
@@ -605,13 +605,27 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 	imr->ifm_active = IFM_IEEE80211;
 	if (ic->ic_state == IEEE80211_S_RUN)
 		imr->ifm_status |= IFM_ACTIVE;
-	imr->ifm_active |= IFM_AUTO;
+	/*
+	 * Calculate a current rate if possible.
+	 */
+	if (ic->ic_fixed_rate != -1) {
+		/*
+		 * A fixed rate is set, report that.
+		 */
+		rs = &ic->ic_sup_rates[ic->ic_curmode];
+		imr->ifm_active |= ieee80211_rate2media(ic,
+			rs->rs_rates[ic->ic_fixed_rate], ic->ic_curmode);
+	} else if (ic->ic_opmode == IEEE80211_M_STA) {
+		/*
+		 * In station mode report the current transmit rate.
+		 */
+		rs = &ic->ic_bss->ni_rates;
+		imr->ifm_active |= ieee80211_rate2media(ic,
+			rs->rs_rates[ic->ic_bss->ni_txrate], ic->ic_curmode);
+	} else
+		imr->ifm_active |= IFM_AUTO;
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
-		ni = ic->ic_bss;
-		/* calculate rate subtype */
-		imr->ifm_active |= ieee80211_rate2media(ic,
-			ni->ni_rates.rs_rates[ni->ni_txrate], ic->ic_curmode);
 		break;
 	case IEEE80211_M_IBSS:
 		imr->ifm_active |= IFM_IEEE80211_ADHOC;
