@@ -4028,6 +4028,7 @@ static void
 ieee80211_proc_remove(struct ieee80211com *ic)
 {
 	if (ic->ic_proc != NULL) {
+		remove_proc_entry("associated_sta", ic->ic_proc);
 		remove_proc_entry("debug", ic->ic_proc);
 		remove_proc_entry(ic->ic_procname, proc_net);
 		ic->ic_proc = NULL;
