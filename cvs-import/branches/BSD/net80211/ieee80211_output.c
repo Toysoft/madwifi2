@@ -81,12 +81,12 @@ static int
 ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
     struct sk_buff *skb, int type)
 {
+	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_frame *wh;
 	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
-	struct net_device *dev = ic->ic_dev;
 
 	KASSERT(ni != NULL, ("null node"));
-	
+
 	/*
 	 * Yech, hack alert!  We want to pass the node down to the
 	 * driver's start routine.  If we don't do so then the start
@@ -173,8 +173,7 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 	}
 	cb->ni = ieee80211_ref_node(ni);
 
-	wh = (struct ieee80211_frame *) 
-	    skb_push(skb, sizeof(struct ieee80211_frame));
+	wh = (struct ieee80211_frame *) skb->data;
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
 		IEEE80211_FC0_SUBTYPE_NODATA;
 	*(u_int16_t *)wh->i_dur = 0;
@@ -428,6 +427,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	struct llc *llc;
 	int hdrsize, datalen, addqos;
 
+	KASSERT(skb->len >= sizeof(eh), ("no ethernet header!"));
 	memcpy(&eh, skb->data, sizeof(struct ether_header));
 	skb_pull(skb, sizeof(struct ether_header));
 
