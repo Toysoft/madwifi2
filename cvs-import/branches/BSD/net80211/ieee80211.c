@@ -452,6 +452,19 @@ ieee80211_announce(struct ieee80211com *ic)
 		}
 		printf("\n");
 	}
+	
+	if_printf(dev, "H/W encryption support:");
+	if (ic->ic_caps & IEEE80211_C_WEP)
+		printk(" WEP");
+	if (ic->ic_caps & IEEE80211_C_AES)
+		printk(" AES");
+	if (ic->ic_caps & IEEE80211_C_AES_CCM)
+		printk(" AES_CCM");
+	if (ic->ic_caps & IEEE80211_C_CKIP)
+		printk(" CKIP");
+	if (ic->ic_caps & IEEE80211_C_TKIP)
+		printk(" TKIP");
+	printk("\n");
 }
 EXPORT_SYMBOL(ieee80211_announce);
 
