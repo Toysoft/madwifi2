@@ -206,7 +206,7 @@ void
 ieee80211_authenticator_backend_register(
 	const struct ieee80211_authenticator_backend *be)
 {
-	printk(KERN_INFO "802.1x wlan: %s backend registered\n", be->iab_name);
+	printk(KERN_INFO "wlan: %s backend registered\n", be->iab_name);
 	backend = be;
 }
 EXPORT_SYMBOL(ieee80211_authenticator_backend_register);
@@ -217,7 +217,7 @@ ieee80211_authenticator_backend_unregister(
 {
 	if (backend == be)
 		backend = NULL;
-	printk(KERN_INFO "802.1x wlan: %s backend unregistered\n",
+	printk(KERN_INFO "wlan: %s backend unregistered\n",
 		be->iab_name);
 }
 EXPORT_SYMBOL(ieee80211_authenticator_backend_unregister);
@@ -240,8 +240,7 @@ static	const struct ieee80211_aclator *acl = NULL;
 void
 ieee80211_aclator_register(const struct ieee80211_aclator *iac)
 {
-	printk(KERN_INFO "802.1x wlan: %s acl policy registered\n",
-		iac->iac_name);
+	printk(KERN_INFO "wlan: %s acl policy registered\n", iac->iac_name);
 	acl = iac;
 }
 EXPORT_SYMBOL(ieee80211_aclator_register);
@@ -251,8 +250,7 @@ ieee80211_aclator_unregister(const struct ieee80211_aclator *iac)
 {
 	if (acl == iac)
 		acl = NULL;
-	printk(KERN_INFO "802.1x wlan: %s acl policy unregistered\n",
-		iac->iac_name);
+	printk(KERN_INFO "wlan: %s acl policy unregistered\n", iac->iac_name);
 }
 EXPORT_SYMBOL(ieee80211_aclator_unregister);
 
