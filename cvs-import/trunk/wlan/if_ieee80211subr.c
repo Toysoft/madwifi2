@@ -293,6 +293,7 @@ ieee80211_ifattach(struct net_device *dev)
 	ic->ic_fixed_rate = -1;			/* no fixed rate */
 	if (ic->ic_lintval == 0)
 		ic->ic_lintval = 100;		/* default sleep */
+	ic->ic_txpower = IEEE80211_TXPOWER_MAX;	/* default to max power */
 	ic->ic_bmisstimeout = 7*ic->ic_lintval;	/* default 7 beacons */
 
 	rwlock_init(&ic->ic_nodelock);
