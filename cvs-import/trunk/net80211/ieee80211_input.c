@@ -1861,6 +1861,21 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ic->ic_stats.is_rx_acl++;
 			return;
 		}
+		if (ic->ic_flags & IEEE80211_F_COUNTERM) {
+			/* XXX only in ap mode? */
+			IEEE80211_DPRINTF(ic,
+			    IEEE80211_MSG_AUTH | IEEE80211_MSG_CRYPTO,
+			    ("[%s] reject auth request by station due to TKIP "
+			    "countermeasures\n",
+			    ether_sprintf(wh->i_addr2)));
+			ic->ic_stats.is_rx_auth_countermeasures++;
+			if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+				IEEE80211_SEND_MGMT(ic, ni,
+					IEEE80211_FC0_SUBTYPE_AUTH,
+					IEEE80211_REASON_MIC_FAILURE);
+			}
+			return;
+		}
 		if (algo == IEEE80211_AUTH_ALG_SHARED)
 			ieee80211_auth_shared(ic, wh, frm + 6, efrm, ni, rssi,
 			    rstamp, seq, status);
