@@ -35,7 +35,12 @@ include ${DEPTH}/Makefile.inc
 SRCS=	ah_osdep.c if_ath.c if_ath_pci.c
 OBJS=	ah_osdep.o if_ath.o if_ath_pci.o
 
-CFLAGS=	-I. -I${ATH_HAL} -I${WLAN} -I${LINUX} \
+ifdef HAL_SRC
+HALINCS=-I${DEPTH}/hal -I${ATH_HAL}
+else
+HALINCS=-I${ATH_HAL}
+endif
+CFLAGS=	-I. ${HALINCS} -I${WLAN} -I${LINUX} \
 	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 #LDFLAGS=-x -S
 LDFLAGS=
