@@ -39,8 +39,7 @@
 
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	10		/* number of TX buffers */
-#define	ATH_TXDESC	4		/* number of descriptors per buffer */
-#define	ATH_MAXCHAN	32		/* number of potential channels */
+#define	ATH_TXDESC	1		/* number of descriptors per buffer */
 
 /* statistics for node */
 struct ath_nodestat {
@@ -90,14 +89,14 @@ struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
 	spinlock_t		sc_lock;
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
-	struct pci_dev		*sc_pci_dev;	/* associated pci device */
-	int			sc_unit;	/* logical card number */
-	int			sc_devno;	/* PCI device # */
+	struct pci_dev		*sc_pdev;	/* associated pci device */
 	int			(*sc_enable)(struct ath_softc *);
 	void			(*sc_disable)(struct ath_softc *);
 	unsigned int		sc_attached : 1,/* device is attached */
 				sc_invalid  : 1,/* ??? deactivated */
 				sc_oactive  : 1;/* output processing active */
+	int			sc_cachelsz;	/* system cache line size */
+	int			sc_rxbufsize;	/* rx size based on mtu */
 	TAILQ_HEAD(, ath_buf)	sc_rxbuf,	/* receive buffer */
 				sc_txbuf,	/* transmit buffer */
 				sc_txq;		/* transmitting queue */

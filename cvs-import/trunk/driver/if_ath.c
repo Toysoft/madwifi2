@@ -75,7 +75,7 @@ static void	ath_tx_int(struct net_device *);
 static int	ath_chan_set(struct ath_softc *, struct ieee80211channel *);
 static void	ath_draintxq(struct ath_softc *);
 static void	ath_stoprecv(struct ath_softc *);
-static int	ath_startrecv(struct ath_softc *);
+static int	ath_startrecv(struct net_device *);
 static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
 static int	ath_newstate(void *, enum ieee80211_state);
@@ -116,13 +116,23 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	struct ath_hal *ah;
 	int i, error = 0, ix;
 	u_int8_t *r;
+#define	ATH_MAXCHAN	32		/* number of potential channels */
 	HAL_CHANNEL chans[ATH_MAXCHAN];		/* XXX get off stack */
 	HAL_STATUS status;
+	u8 cache_line_size;
 
-	DPRINTF(("ath_attach: unit %d devid 0x%x\n", sc->sc_unit, devid));
+	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
 	spin_lock_init(&sc->sc_lock);
 	skb_queue_head_init(&sc->sc_sndq);
+
+	/*
+	 * NB: cache line size is used to size rx buffers and align
+	 *     various data structures.
+	 */
+	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE,
+		&cache_line_size);
+	sc->sc_cachelsz = cache_line_size << 4;
 
 	ah = ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
@@ -411,7 +421,7 @@ ath_init(struct net_device *dev)
 	 */
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		ath_initkeytable(sc);
-	if (ath_startrecv(sc) != 0) {
+	if (ath_startrecv(dev) != 0) {
 		printk("%s: unable to start recv logic\n", dev->name);
 		return EIO;
 	}
@@ -494,7 +504,7 @@ ath_stop(struct net_device *dev)
 
 	/* free transmit queue */
 	while ((bf = TAILQ_FIRST(&sc->sc_txq)) != NULL) {
-		pci_unmap_single(sc->sc_pci_dev,
+		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_FROMDEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -555,6 +565,7 @@ ath_start(struct net_device *dev)
 				sc->sc_oactive = 0;
 				break;
 			}
+			TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
 			skb = skb_dequeue(&ic->ic_mgtq);
 			wh = (struct ieee80211_frame *) skb->data;
 			if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
@@ -587,6 +598,7 @@ ath_start(struct net_device *dev)
 				sc->sc_oactive = 1;
 				break;
 			}
+			TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
 			skb = skb_dequeue(&sc->sc_sndq);
 			ic->ic_stats.tx_packets++;
 			/*
@@ -597,6 +609,7 @@ ath_start(struct net_device *dev)
 				DPRINTF(("ath_start: encapsulation failure\n"));
 				sc->sc_stats.ast_tx_encap++;
 				ic->ic_stats.tx_errors++;
+				TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 				continue;
 			}
 			wh = (struct ieee80211_frame *) skb->data;
@@ -613,6 +626,7 @@ ath_start(struct net_device *dev)
 			dev_kfree_skb(skb);
 			sc->sc_stats.ast_tx_nonode++;
 			ic->ic_stats.tx_errors++;
+			TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 			continue;
 		}
 		if (ni == NULL)
@@ -633,6 +647,7 @@ ath_start(struct net_device *dev)
 
 		if (ath_tx_start(sc, ni, bf, skb)) {
 			ic->ic_stats.tx_errors++;
+			TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 			continue;
 		}
 
@@ -731,7 +746,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 
 	bf = sc->sc_bcbuf;
 	if (bf->bf_skb != NULL) {
-		pci_unmap_single(sc->sc_pci_dev,
+		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -803,7 +818,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 	skb_trim(skb, frm - skb->data);
 
-	bf->bf_skbaddr = pci_map_single(sc->sc_pci_dev,
+	bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
 		skb->data, skb->len, PCI_DMA_TODEVICE);
 	DPRINTF2(("ath_beacon_alloc: skb %p [data %p len %u] skbaddr %p\n",
 		skb, skb->data, skb->len, (caddr_t) bf->bf_skbaddr));
@@ -848,7 +863,7 @@ ath_beacon_int(struct net_device *dev)
 		    sc->sc_ic.ic_flags, bf, bf ? bf->bf_skb : NULL));
 		return;
 	}
-	pci_dma_sync_single(sc->sc_pci_dev,
+	pci_dma_sync_single(sc->sc_pdev,
 		bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 	ath_hal_qbeacon(ah, bf);
 	DPRINTF2(("ath_beacon_int: TXDP1 = %p (%p)\n",
@@ -867,7 +882,7 @@ ath_beacon_free(struct ath_softc *sc)
 	struct ath_buf *bf = sc->sc_bcbuf;
 
 	if (bf->bf_skb != NULL) {
-		pci_unmap_single(sc->sc_pci_dev,
+		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -885,7 +900,7 @@ ath_desc_alloc(struct ath_softc *sc)
 	/* allocate descriptors */
 	sc->sc_desc_len = sizeof(struct ath_desc) *
 				(ATH_TXBUF * ATH_TXDESC + ATH_RXBUF + 1);
-	sc->sc_desc = pci_alloc_consistent(sc->sc_pci_dev,
+	sc->sc_desc = pci_alloc_consistent(sc->sc_pdev,
 				sc->sc_desc_len, &sc->sc_desc_daddr);
 	if (sc->sc_desc == NULL)
 		return ENOMEM;
@@ -900,6 +915,7 @@ ath_desc_alloc(struct ath_softc *sc)
 		goto bad;
 	memset(bf, 0, bsize);
 	sc->sc_bufptr = bf;
+
 	TAILQ_INIT(&sc->sc_rxbuf);
 	for (i = 0; i < ATH_RXBUF; i++, bf++, ds++) {
 		bf->bf_desc = ds;
@@ -907,6 +923,7 @@ ath_desc_alloc(struct ath_softc *sc)
 		    ((caddr_t)ds - (caddr_t)sc->sc_desc);
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	}
+
 	TAILQ_INIT(&sc->sc_txbuf);
 	for (i = 0; i < ATH_TXBUF; i++, bf++, ds += ATH_TXDESC) {
 		bf->bf_desc = ds;
@@ -915,14 +932,14 @@ ath_desc_alloc(struct ath_softc *sc)
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 	}
 	TAILQ_INIT(&sc->sc_txq);
+
 	/* beacon buffer */
 	bf->bf_desc = ds;
 	bf->bf_daddr = sc->sc_desc_daddr + ((caddr_t)ds - (caddr_t)sc->sc_desc);
 	sc->sc_bcbuf = bf;
 	return 0;
-
 bad:
-	pci_free_consistent(sc->sc_pci_dev, sc->sc_desc_len,
+	pci_free_consistent(sc->sc_pdev, sc->sc_desc_len,
 		sc->sc_desc, sc->sc_desc_daddr);
 	sc->sc_desc = NULL;
 	return ENOMEM;
@@ -934,14 +951,14 @@ ath_desc_free(struct ath_softc *sc)
 	struct ath_buf *bf;
 
 	TAILQ_FOREACH(bf, &sc->sc_txq, bf_list) {
-		pci_unmap_single(sc->sc_pci_dev,
+		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 	}
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
 		if (bf->bf_skb != NULL) {
-			pci_unmap_single(sc->sc_pci_dev,
+			pci_unmap_single(sc->sc_pdev,
 				bf->bf_skbaddr, bf->bf_skb->len,
 				PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(bf->bf_skb);
@@ -949,12 +966,12 @@ ath_desc_free(struct ath_softc *sc)
 		}
 	if (sc->sc_bcbuf != NULL) {
 		bf = sc->sc_bcbuf;
-		pci_unmap_single(sc->sc_pci_dev, bf->bf_skbaddr,
+		pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
 			bf->bf_skb->len, PCI_DMA_TODEVICE);
 		sc->sc_bcbuf = NULL;
 	}
 
-	pci_free_consistent(sc->sc_pci_dev, sc->sc_desc_len,
+	pci_free_consistent(sc->sc_pdev, sc->sc_desc_len,
 		sc->sc_desc, sc->sc_desc_daddr);
 
 	TAILQ_INIT(&sc->sc_rxbuf);
@@ -984,14 +1001,21 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 
 	skb = bf->bf_skb;
 	if (skb == NULL) {
-		skb = dev_alloc_skb(IEEE80211_MAX_LEN);
+		int off;
+
+		skb = dev_alloc_skb(sc->sc_rxbufsize);
 		if (skb == NULL)
 			return ENOMEM;
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
+
+		/* align to cache line size, buffer is assumed large enough */
+		off = ((unsigned long) skb->data) % sc->sc_cachelsz;
+		if (off)
+			skb_reserve(skb, sc->sc_cachelsz - off);
+		bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
+			skb->data, skb->len, PCI_DMA_FROMDEVICE);
 	}
-	bf->bf_skbaddr = pci_map_single(sc->sc_pci_dev,
-		skb->data, skb->len, PCI_DMA_FROMDEVICE);
 
 	/* setup descriptors */
 	ds = bf->bf_desc;
@@ -1035,7 +1059,7 @@ ath_rx_int(struct net_device *dev)
 		rate = ((arate & 0x4) ? 72 : 48) >> (arate & 0x3);
 		if (rate == 72)
 			rate = 54;
-		pci_dma_sync_single(sc->sc_pci_dev,
+		pci_dma_sync_single(sc->sc_pdev,
 			bf->bf_skbaddr, skb->len, PCI_DMA_FROMDEVICE);
 
 		/* expand AR_RcvTimestamp(13bit) to 16bit */
@@ -1095,7 +1119,7 @@ ath_rx_int(struct net_device *dev)
 			}
 			goto rx_next;
 		}
-		pci_unmap_single(sc->sc_pci_dev,
+		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, skb->len, PCI_DMA_FROMDEVICE);
 		bf->bf_skb = NULL;
 		skb_put(skb, len);
@@ -1181,7 +1205,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	 * Load the DMA map so any coalescing is done.  This
 	 * also calculates the number of descriptors we need.
 	 */
-	bf->bf_skbaddr = pci_map_single(sc->sc_pci_dev,
+	bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
 		skb->data, skb->len, PCI_DMA_TODEVICE);
 	DPRINTF2(("ath_tx_start: skb %p [data %p len %u] skbaddr %x\n",
 		skb, skb->data, skb->len, bf->bf_skbaddr));
@@ -1230,7 +1254,6 @@ ds->ds_ctl0 |= AR_TxInterReq;/*XXX*/
 	DPRINTF2(("ath_tx_start: %08x %08x %08x %08x\n",
 	    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1));
 
-	TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
 	TAILQ_INSERT_TAIL(&sc->sc_txq, bf, bf_list);
 	if (sc->sc_txlink == NULL) {
 		ath_hal_puttxbuf(ah, bf->bf_daddr);
@@ -1287,7 +1310,7 @@ ath_tx_int(struct net_device *dev)
 			    ATH_BITVAL(ds->ds_status0, AR_ShortRetryCnt) +
 			    ATH_BITVAL(ds->ds_status0, AR_LongRetryCnt);
 		}
-		pci_unmap_single(sc->sc_pci_dev,
+		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -1325,7 +1348,7 @@ ath_draintxq(struct ath_softc *sc)
 		if (ath_debug)
 			ath_printtxbuf(bf);
 #endif /* AR_DEBUG */
-		pci_unmap_single(sc->sc_pci_dev,
+		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -1369,10 +1392,17 @@ ath_stoprecv(struct ath_softc *sc)
  * Enable the receive h/w following a reset.
  */
 static int
-ath_startrecv(struct ath_softc *sc)
+ath_startrecv(struct net_device *dev)
 {
+	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
+
+	sc->sc_rxbufsize = dev->mtu + IEEE80211_CRC_LEN +
+		(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
+		 IEEE80211_WEP_CRCLEN) + (sc->sc_cachelsz - 1);
+	DPRINTF(("ath_startrecv: mtu %u cachelsz %u rxbufsize %u\n",
+		dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize));
 
 	sc->sc_rxlink = NULL;
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
@@ -1383,6 +1413,7 @@ ath_startrecv(struct ath_softc *sc)
 			return error;
 		}
 	}
+
 	bf = TAILQ_FIRST(&sc->sc_rxbuf);
 	ath_hal_putrxbuf(ah, bf->bf_daddr);
 	ath_hal_rxena(ah);		/* enable recv descriptors */
@@ -1446,7 +1477,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 		/*
 		 * Re-enable rx framework.
 		 */
-		if (ath_startrecv(sc) != 0) {
+		if (ath_startrecv(dev) != 0) {
 			printk("%s: ath_chan_set: unable to restart recv logic\n", dev->name);
 			return EIO;
 		}

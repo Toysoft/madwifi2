@@ -121,7 +121,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->mem_end = mem + pci_resource_len(pdev, 0);
 	dev->priv = sc;
 
-	sc->aps_sc.sc_pci_dev = pdev;
+	sc->aps_sc.sc_pdev = pdev;
 
 	pci_set_drvdata(pdev, dev);
 
