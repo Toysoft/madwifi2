@@ -96,6 +96,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 #define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_frame *wh;
+	struct ieee80211_key *key;
 	struct ether_header *eh;
 	int len;
 	u_int8_t dir, type, subtype;
@@ -325,28 +326,57 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			/* XXX here to keep compiler happy */
 			goto out;
 		}
+
+		/*
+		 * Handle privacy requirements.  Note that we
+		 * must not be preempted from here until after
+		 * we (potentially) call ieee80211_crypto_demic;
+		 * otherwise we may violate assumptions in the
+		 * crypto cipher modules used to do delayed update
+		 * of replay sequence numbers.
+		 */
 		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
-			/*
-			 * Device didn't handle WEP; do it in software.
-			 */
-			if (ic->ic_flags & IEEE80211_F_PRIVACY) {
-				skb = ieee80211_wep_crypt(ic, ni, skb, 0);
-				if (skb == NULL) {
-					ic->ic_stats.is_rx_wepfail++;
-					goto err;
-				}
-				wh = (struct ieee80211_frame *) skb->data;
-			} else {
+			if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0) {
+				/*
+				 * Discard encrypted frames when privacy is off.
+				 */
 				ic->ic_stats.is_rx_noprivacy++;
 				goto out;
 			}
+			key = ieee80211_crypto_decap(ic, ni, skb);
+			if (key == NULL)
+				goto out;
+		} else {
+			key = NULL;
 		}
+
+		/*
+		 * Next up, any fragmentation.
+		 */
 		skb = ieee80211_defrag(ic, ni, skb);
 		if (skb == NULL) {
 			/* XXX statistic */
 			/* Fragment dropped or frame not complete yet */
 			goto out;
 		}
+		/* NB: wh may now be invalid, reset */
+		wh = (struct ieee80211_frame *)skb->data;
+
+		/*
+		 * Next strip any MSDU crypto bits.
+		 */
+		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
+			KASSERT(key != NULL, ("null key for demic!"));
+			if (!ieee80211_crypto_demic(ic, key, skb)) {
+				/* XXX statistic? */
+				goto out;
+			}
+			/* NB: MIC is at end so no need to reset wh */
+		}
+
+		/*
+		 * Finally, strip the 802.11 header.
+		 */
 		skb = ieee80211_decap(ic, skb);
 		if (skb == NULL) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
@@ -356,13 +386,15 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			goto err;
 		}
 		eh = (struct ether_header *) skb->data;
-		/*
-		 * Deny any non-PAE frames received prior to authorization.
-		 * For open/shared-key authentication the port is mark
-		 * authorized after authentication completes.  For 802.1x
-		 * the port is not marked authorized by the authenticator.
-		 */
 		if ((ni->ni_flags & IEEE80211_NODE_AUTH) == 0) {
+			/*
+			 * Deny any non-PAE frames received prior to
+			 * authorization.  For open/shared-key
+			 * authentication the port is mark authorized
+			 * after authentication completes.  For 802.1x
+			 * the port is not marked authorized by the
+			 * authenticator until the handshake has completed.
+			 */
 			if (eh->ether_type != __constant_htons(ETHERTYPE_PAE)) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
 				    ("%s: discard data from %s on unauthorized port\n",
@@ -372,8 +404,22 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				goto err;
 			}
 			ni->ni_inact = IEEE80211_INACT_AUTH;
-		} else
+		} else {
+			/*
+			 * When denying unencrypted frames, discard
+			 * any non-PAE frames received without encryption.
+			 */
+			if ((ic->ic_flags & IEEE80211_F_DROPUNENC) &&
+			    key == NULL &&
+			    eh->ether_type != __constant_htons(ETHERTYPE_PAE)) {
+				/*
+				 * Drop unencrypted frames.
+				 */
+				ic->ic_stats.is_rx_unencrypted++;
+				goto out;
+			}
 			ni->ni_inact = IEEE80211_INACT_RUN;
+		}
 		ic->ic_devstats->rx_packets++;
 		ic->ic_devstats->rx_bytes += skb->len;
 
@@ -425,20 +471,6 @@ ieee80211_dump_nodes(ic);/*XXX*/
 		if (dir != IEEE80211_FC1_DIR_NODS) {
 			ic->ic_stats.is_rx_wrongdir++;
 			goto err;
-		}
-		if (subtype == IEEE80211_FC0_SUBTYPE_BEACON) {
-			/*
-			 * Count beacon frames specially, some drivers
-			 * use this info to do things like update LED's.
-			 * Then discard them unless we're scanning or
-			 * operating in IBSS mode.
-			 */
-			ic->ic_stats.is_rx_beacon++;
-			if (!(ic->ic_state == IEEE80211_S_SCAN ||
-			      ic->ic_opmode == IEEE80211_M_IBSS)) {
-				ic->ic_stats.is_rx_mgtdiscard++;
-				goto out;
-			}
 		}
 		if (skb->len < sizeof(struct ieee80211_frame)) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
@@ -1436,6 +1468,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	int subtype, int rssi, u_int32_t rstamp)
 {
 #define	ISPROBE(_st)	((_st) == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
+#define	ISREASSOC(_st)	((_st) == IEEE80211_FC0_SUBTYPE_REASSOC_RESP)
 	struct ieee80211_frame *wh;
 	u_int8_t *frm, *efrm;
 	u_int8_t *ssid, *rates, *xrates, *wpa;
@@ -1452,13 +1485,28 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		u_int16_t capinfo, bintval;
 		u_int16_t fhdwell;
 
-		if (ic->ic_opmode != IEEE80211_M_IBSS &&
-		    ic->ic_state != IEEE80211_S_SCAN) {
+		if (subtype == IEEE80211_FC0_SUBTYPE_BEACON) {
+			/*
+			 * Count beacon frames specially, some drivers
+			 * use this info to do things like update LED's.
+			 */
+			ic->ic_stats.is_rx_beacon++;
+		}
+		/*
+		 * We process beacon/probe response frames for:
+		 *    o station mode when associated: to collect state
+		 *      updates such as 802.11g slot time
+		 *    o adhoc mode: to discover neighbors
+		 *    o when scanning
+		 * Frames otherwise received are discarded.
+		 */ 
+		if (!((ic->ic_opmode == IEEE80211_M_STA && ni->ni_associd != 0)
+		    || ic->ic_opmode == IEEE80211_M_IBSS
+		    || ic->ic_state == IEEE80211_S_SCAN)) {
 			/* XXX: may be useful for background scan */
 			ic->ic_stats.is_rx_mgtdiscard++;
 			return;
 		}
-
 		/*
 		 * beacon/probe response frame format
 		 *	[8] time stamp
@@ -1583,6 +1631,40 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 
 		/*
+		 * Station mode, check for state updates.  We
+		 * consider only 11g stuff right now.
+		 */
+		if (ic->ic_opmode == IEEE80211_M_STA && ni->ni_associd != 0) {
+			if (ni->ni_erp != erp) {
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+				    ("erp change from %s: was 0x%x, now 0x%x\n",
+				    ether_sprintf(wh->i_addr2),
+				    ni->ni_erp, erp));
+				if (erp & IEEE80211_ERP_USE_PROTECTION)
+					ic->ic_flags |= IEEE80211_F_USEPROT;
+				else
+					ic->ic_flags &= ~IEEE80211_F_USEPROT;
+				ni->ni_erp = erp;
+				/* XXX statistic */
+			}
+			if ((ni->ni_capinfo ^ capinfo) & IEEE80211_CAPINFO_SHORT_SLOTTIME) {
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+				    ("capabilities change from %s: before 0x%x,"
+				     " now 0x%x\n", ether_sprintf(wh->i_addr2),
+				     ni->ni_capinfo, capinfo));
+				/*
+				 * NB: we assume short preamble doesn't
+				 *     change dynamically
+				 */
+				ieee80211_set_shortslottime(ic,
+					ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME);
+				ni->ni_capinfo = capinfo;
+				/* XXX statistic */
+			}
+			return;
+		}
+
+		/*
 		 * Use mac and channel for lookup so we collect all
 		 * potential AP's when scanning.  Otherwise we may
 		 * see the same AP on multiple channels and will only
@@ -1607,7 +1689,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ni->ni_esslen = ssid[1];
 			memset(ni->ni_essid, 0, sizeof(ni->ni_essid));
 			memcpy(ni->ni_essid, ssid + 2, ssid[1]);
-		} else if (ssid[1] != 0 && ISPROBE(subtype)) {
+		} else if (ssid[1] != 0 &&
+		    (ISPROBE(subtype) == ni->ni_esslen == 0)) {
 			/*
 			 * Update ESSID at probe response to adopt hidden AP by
 			 * Lucent/Cisco, which announces null ESSID in beacon.
@@ -1632,22 +1715,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ni->ni_chan = &ic->ic_channels[chan];
 		ni->ni_fhdwell = fhdwell;
 		ni->ni_fhindex = fhindex;
-		/*
-		 * Honor ERP: enable protection and/or disable
-		 * the use of short slot time.
-		 */
-		if (erp & IEEE80211_ERP_USE_PROTECTION) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-				("station %s requires protection\n",
-				ether_sprintf(wh->i_addr2)));
-			ic->ic_flags |= IEEE80211_F_USEPROT;
-		}
-		if (erp & IEEE80211_ERP_LONG_PREAMBLE) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-				("station %s requires long preamble\n",
-				ether_sprintf(wh->i_addr2)));
-			ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
-		}
+		ni->ni_erp = erp;
 		if (wpa != NULL) {
 			u_int ielen = wpa[1]+2;
 			/*
@@ -1763,6 +1831,17 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			("%s: algorithm %d seq %d from %s\n",
 			__func__, algo, seq, ether_sprintf(wh->i_addr2)));
 
+		/*
+		 * Consult the ACL policy module if setup.
+		 */
+		if (ic->ic_acl != NULL &&
+		    !ic->ic_acl->iac_check(ic, wh->i_addr2)) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+			    ("[%s] reject auth request by station due to ACL\n",
+			    ether_sprintf(wh->i_addr2)));
+			ic->ic_stats.is_rx_acl++;
+			return;
+		}
 		if (algo == IEEE80211_AUTH_ALG_SHARED)
 			ieee80211_auth_shared(ic, wh, frm + 6, efrm, ni, rssi,
 			    rstamp, seq, status);
@@ -1860,8 +1939,9 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 
 		if (ni == ic->ic_bss) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-				("%s: not authenticated for %s\n",
-				__func__, ether_sprintf(wh->i_addr2)));
+			    ("%s: deny %sassoc from %s, not authenticated\n",
+			    __func__, reassoc ? "reassoc" : "assoc",
+			    ether_sprintf(wh->i_addr2)));
 			ni = ieee80211_dup_bss(ic, wh->i_addr2);
 			if (ni != NULL) {
 				IEEE80211_SEND_MGMT(ic, ni,
@@ -1876,7 +1956,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			/*
 			 * Parse WPA information element.  Note that
 			 * we initialize the param block from the node
-			 * state so that informaiton in the IE overrides
+			 * state so that information in the IE overrides
 			 * our defaults.  The resulting parameters are
 			 * installed below after the association is assured.
 			 */
@@ -1887,10 +1967,10 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				reason = ieee80211_parse_rsn(ic, wpa, &rsn);
 			if (reason != 0) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-					("%s: bad %s ie from %s, reason %u\n",
-					__func__, ic->ic_flags & IEEE80211_F_WPA1 ?
+				    ("%s: bad %s ie from %s, reason %u\n",
+				    __func__, ic->ic_flags & IEEE80211_F_WPA1 ?
 						"WPA" : "RSN",
-					ether_sprintf(wh->i_addr2), reason));
+				    ether_sprintf(wh->i_addr2), reason));
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_DEAUTH, reason);
 				ieee80211_node_leave(ic, ni);
@@ -1956,6 +2036,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 
 	case IEEE80211_FC0_SUBTYPE_ASSOC_RESP:
 	case IEEE80211_FC0_SUBTYPE_REASSOC_RESP: {
+		u_int16_t capinfo, associd;
 		u_int16_t status;
 
 		if (ic->ic_opmode != IEEE80211_M_STA ||
@@ -1974,31 +2055,21 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 6);
 		ni = ic->ic_bss;
-		ni->ni_capinfo = le16toh(*(u_int16_t *)frm);
+		capinfo = le16toh(*(u_int16_t *)frm);
 		frm += 2;
-		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)
-			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
-		else
-			ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
-		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME)
-			ic->ic_flags |= IEEE80211_F_SHSLOT;
-		else
-			ic->ic_flags &= ~IEEE80211_F_SHSLOT;
-
 		status = le16toh(*(u_int16_t *)frm);
 		frm += 2;
 		if (status != 0) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 				("%sassociation failed (reason %d) for %s\n",
-				(subtype == IEEE80211_FC0_SUBTYPE_REASSOC_RESP ?
-					"re" : ""),
+				ISREASSOC(subtype) ?  "re" : "",
 				status, ether_sprintf(wh->i_addr3)));
-			if (ni != ic->ic_bss)
+			if (ni != ic->ic_bss)	/* XXX never true? */
 				ni->ni_fails++;
-			ic->ic_stats.is_rx_auth_fail++;
+			ic->ic_stats.is_rx_auth_fail++;	/* XXX */
 			return;
 		}
-		ni->ni_associd = le16toh(*(u_int16_t *)frm);
+		associd = le16toh(*(u_int16_t *)frm);
 		frm += 2;
 
 		rates = xrates = NULL;
@@ -2018,8 +2089,53 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ieee80211_setup_rates(ic, ni, rates, xrates,
 				IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
 				IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
-		if (ni->ni_rates.rs_nrates != 0)
-			ieee80211_new_state(ic, IEEE80211_S_RUN, subtype);
+		if (ni->ni_rates.rs_nrates == 0) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+				("%sassociation failed (rate set mismatch) "
+				"for %s\n",
+				ISREASSOC(subtype) ?  "re" : "",
+				ether_sprintf(wh->i_addr3)));
+			if (ni != ic->ic_bss)	/* XXX never true? */
+				ni->ni_fails++;
+			ic->ic_stats.is_rx_assoc_norate++;
+			return;
+		}
+
+		ni->ni_capinfo = capinfo;
+		ni->ni_associd = associd;
+		/*
+		 * Configure state now that we are associated.
+		 *
+		 * XXX may need different/additional driver callbacks?
+		 */
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) {
+			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
+			ic->ic_flags &= ~IEEE80211_F_USEBARKER;
+		} else {
+			ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
+			ic->ic_flags |= IEEE80211_F_USEBARKER;
+		}
+		ieee80211_set_shortslottime(ic,
+			ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME);
+		/*
+		 * Honor ERP protection.
+		 *
+		 * NB: ni_erp should zero for non-11g operation.
+		 * XXX check ic_curmode anyway?
+		 */
+		if (ni->ni_erp & IEEE80211_ERP_USE_PROTECTION)
+			ic->ic_flags |= IEEE80211_F_USEPROT;
+		else
+			ic->ic_flags &= ~IEEE80211_F_USEPROT;
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+			("%sassociate with %s: %s preamble, %s slot time%s\n",
+			ISREASSOC(subtype) ?  "re" : "",
+			ether_sprintf(wh->i_addr2),
+			ic->ic_flags&IEEE80211_F_SHPREAMBLE ? "short" : "long",
+			ic->ic_flags&IEEE80211_F_SHSLOT ? "short" : "long",
+			ic->ic_flags&IEEE80211_F_USEPROT ? ", protection" : "")
+		);
+		ieee80211_new_state(ic, IEEE80211_S_RUN, subtype);
 		break;
 	}
 
@@ -2100,6 +2216,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ic->ic_stats.is_rx_badsubtype++;
 		break;
 	}
+#undef ISREASSOC
 #undef ISPROBE
 }
 #undef IEEE80211_VERIFY_LENGTH
