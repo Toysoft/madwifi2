@@ -466,6 +466,8 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
 #define	IEEE80211_NODE_HASH(addr)	\
 	(((u_int8_t *)(addr))[IEEE80211_ADDR_LEN - 1] % IEEE80211_NODE_HASHSIZE)
 
+typedef TAILQ_HEAD(, ieee80211_node) IEEE80211_NODE_LIST;
+
 enum ieee80211_phytype {
 	IEEE80211_T_DS,			/* direct sequence spread spectrum */
 	IEEE80211_T_FH,			/* frequency hopping */
