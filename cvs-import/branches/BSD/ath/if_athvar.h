@@ -346,8 +346,6 @@ void	ath_sysctl_unregister(void);
 /*
  * HAL definitions to comply with local coding convention.
  */
-#define	ath_hal_detach(_ah) \
-	((*(_ah)->ah_detach)((_ah)))
 #define	ath_hal_reset(_ah, _opmode, _chan, _outdoor, _pstatus) \
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
 #define	ath_hal_getratetable(_ah, _mode) \
