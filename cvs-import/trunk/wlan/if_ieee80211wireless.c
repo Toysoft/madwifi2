@@ -182,7 +182,7 @@ getiwkeyix(struct ieee80211com *ic, const struct iw_point* erq, int *kix)
 
 	kid = erq->flags & IW_ENCODE_INDEX;
 	if (kid < 1 || kid > IEEE80211_WEP_NKID)
-		kid = ic->ic_wep_txkey-1;
+		kid = ic->ic_wep_txkey;
 	else
 		--kid;
 	if (0 <= kid && kid < IEEE80211_WEP_NKID) {
@@ -223,7 +223,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 			if (ic->ic_nw_keys[kid].wk_len == 0)
 				return -EINVAL;
 		}
-		ic->ic_wep_txkey = kid+1;
+		ic->ic_wep_txkey = kid;
 		wepchange = (ic->ic_flags & IEEE80211_F_WEPON) == 0;
 		ic->ic_flags |= IEEE80211_F_WEPON;
 	} else {
