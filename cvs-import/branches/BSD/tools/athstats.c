@@ -56,6 +56,7 @@
 #include <err.h>
 
 #include "ah_desc.h"
+#include "ieee80211_radiotap.h"
 #include "if_athioctl.h"
 
 static const struct {

@@ -50,6 +50,7 @@
 #include <ctype.h>
 #include <getopt.h>
 
+#include "net80211/_ieee80211.h"
 #include "net80211/ieee80211.h"
 #include "net80211/ieee80211_crypto.h"
 #include "net80211/ieee80211_ioctl.h"
