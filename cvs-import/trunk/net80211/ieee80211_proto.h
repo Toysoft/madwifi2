@@ -96,9 +96,7 @@ ieee80211_hdrsize(const void *data)
 		("%s: control frame", __func__));
 	if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS)
 		size += IEEE80211_ADDR_LEN;
-	if ((wh->i_fc[0] &
-	    (IEEE80211_FC0_TYPE_MASK | IEEE80211_FC0_SUBTYPE_MASK)) ==
-	    (IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_QOS))
+	if (IEEE80211_QOS_HAS_SEQ(wh))
 		size += sizeof(u_int16_t);
 	return size;
 }
