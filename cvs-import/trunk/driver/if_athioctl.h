@@ -44,10 +44,10 @@
 
 struct ath_stats {
 	u_int32_t	ast_watchdog;	/* device reset by watchdog */
-	u_int32_t	ast_hardware;	/* fatal hardware error interrupt */
-	u_int32_t	ast_bmiss;	/* beacon miss interrupt */
-	u_int32_t	ast_rxorn;	/* rxorn interrupts */
-	u_int32_t	ast_rxeol;	/* rxeol interrupts */
+	u_int32_t	ast_hardware;	/* fatal hardware error interrupts */
+	u_int32_t	ast_bmiss;	/* beacon miss interrupts */
+	u_int32_t	ast_rxorn;	/* rx overrun interrupts */
+	u_int32_t	ast_rxeol;	/* rx eol interrupts */
 	u_int32_t	ast_txurn;	/* tx underrun interrupts */
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
@@ -68,15 +68,16 @@ struct ath_stats {
 	u_int32_t	ast_tx_cts;	/* tx frames with cts enabled */
 	u_int32_t	ast_tx_shortpre;/* tx frames with short preamble */
 	u_int32_t	ast_tx_altrate;	/* tx frames with alternate rate */
+	u_int32_t	ast_tx_protect;	/* tx frames with protection */
 	int16_t		ast_tx_rssi;	/* tx rssi of last ack */
 	int16_t		ast_tx_rssidelta;/* tx rssi delta */
 	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
-	u_int32_t	ast_rx_tooshort;/* rx failed 'cuz frame too short */
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
 	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
 	u_int32_t	ast_rx_phyerr;	/* rx PHY error summary count */
 	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
+	u_int32_t	ast_rx_tooshort;/* rx discarded 'cuz frame too short */
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
 	u_int8_t	ast_rx_mgt;	/* management frames received */
 	u_int8_t	ast_rx_ctl;	/* control frames received */
