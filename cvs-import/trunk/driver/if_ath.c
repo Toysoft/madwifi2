@@ -111,6 +111,7 @@ static void	ath_newassoc(struct ieee80211com *,
 static int	ath_getchannels(struct net_device *, u_int cc,
 			HAL_BOOL outdoor, HAL_BOOL xchanmode);
 
+static int	ath_set_mac_address(struct net_device *, void *);
 static int	ath_change_mtu(struct net_device *, int);
 static int	ath_ioctl(struct net_device *, struct ifreq *, int);
 
@@ -268,6 +269,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	dev->set_multicast_list = ath_mode_init;
 	dev->do_ioctl = ath_ioctl;
 	dev->get_stats = ath_getstats;
+	dev->set_mac_address = ath_set_mac_address;
  	dev->change_mtu = &ath_change_mtu;
 	dev->tx_queue_len = ATH_TXBUF-1;		/* 1 for mgmt frame */
 
@@ -360,16 +362,38 @@ ath_shutdown(struct net_device *dev)
 	ath_stop(dev);
 }
 
-static int      
-ath_change_mtu(struct net_device *dev, int new_mtu) 
+static int
+ath_set_mac_address(struct net_device *dev, void *addr)
 {
-	if (new_mtu > ATH_MAX_MTU || new_mtu <= ATH_MIN_MTU)
-		return -EINVAL;
- 	DPRINTF(("ath_change_mtu: %d\n", new_mtu));
- 	dev->mtu = new_mtu;
- 	ath_reset(dev);
+	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+	struct sockaddr *mac = addr;
 
- 	return 0;
+	if (netif_running(dev)) {
+		DPRINTF(("%s: cannot set address; device running\n", __func__));
+		return -EBUSY;
+	}
+	DPRINTF(("%s: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", __func__,
+		mac->sa_data[0], mac->sa_data[1], mac->sa_data[2],
+		mac->sa_data[3], mac->sa_data[4], mac->sa_data[5]));
+	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
+	ath_hal_setmac(ah, dev->dev_addr);
+	ath_reset(dev);
+	return 0;
+}
+
+static int      
+ath_change_mtu(struct net_device *dev, int mtu) 
+{
+	if (!(ATH_MIN_MTU < mtu && mtu <= ATH_MAX_MTU)) {
+		DPRINTF(("%s: invalid %d, min %u, max %u\n",
+			__func__, mtu, ATH_MIN_MTU, ATH_MAX_MTU));
+		return -EINVAL;
+	}
+	DPRINTF(("%s: %d\n", __func__, mtu));
+	dev->mtu = mtu;
+	ath_reset(dev);
+	return 0;
 }
 
 /*
