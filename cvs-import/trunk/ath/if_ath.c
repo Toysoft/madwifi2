@@ -498,6 +498,15 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 */
 	ic->ic_flags |= IEEE80211_F_DATAPAD;
 
+	/*
+	 * Query the hal about antenna support.
+	 */
+	if (ath_hal_hasdiversity(ah)) {
+		sc->sc_hasdiversity = 1;
+		sc->sc_diversity = ath_hal_getdiversity(ah);
+	}
+	sc->sc_defant = ath_hal_getdefantenna(ah);
+
 	/* get mac address from hardware */
 	ath_hal_getmac(ah, ic->ic_myaddr);
 	IEEE80211_ADDR_COPY(dev->dev_addr, ic->ic_myaddr);
@@ -2430,6 +2439,19 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 }
 
 static void
+ath_setdefantenna(struct ath_softc *sc, u_int antenna)
+{
+	struct ath_hal *ah = sc->sc_ah;
+
+	/* XXX block beacon interrupts */
+	ath_hal_setdefantenna(ah, antenna);
+	if (sc->sc_defant != antenna)
+		sc->sc_stats.ast_ant_defswitch++;
+	sc->sc_defant = antenna;
+	sc->sc_rxotherant = 0;
+}
+
+static void
 ath_rx_tasklet(TQUEUE_ARG data)
 {
 #define	PA2DESC(_sc, _pa) \
@@ -2647,10 +2669,23 @@ rx_accept:
 			ni = ic->ic_bss;
 
 		/*
-		 * Track rx rssi.
+		 * Track rx rssi and do any rx antenna management.
 		 */
 		an = ATH_NODE(ni);
 		ATH_RSSI_LPF(an->an_avgrssi, ds->ds_rxstat.rs_rssi);
+		if (sc->sc_diversity) {
+			/*
+			 * When using fast diversity, change the default rx
+			 * antenna if diversity chooses the other antenna 3
+			 * times in a row.
+			 */
+			if (sc->sc_defant != ds->ds_rxstat.rs_antenna) {
+				if (++sc->sc_rxotherant >= 3)
+					ath_setdefantenna(sc,
+						ds->ds_rxstat.rs_antenna);
+			} else
+				sc->sc_rxotherant = 0;
+		}
 
 		/*
 		 * Send frame up for processing.
@@ -4280,6 +4315,8 @@ enum {
 	ATH_REGDOMAIN	= 7,
 	ATH_DEBUG	= 8,
 	ATH_TXANTENNA	= 9,
+	ATH_RXANTENNA	= 10,
+	ATH_DIVERSITY	= 11,
 };
 
 static int
@@ -4325,8 +4362,19 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_debug = val;
 				break;
 			case ATH_TXANTENNA:
-				/* XXX validate? force rx antenna too? */
+				/* XXX validate? */
 				sc->sc_txantenna = val;
+				break;
+			case ATH_RXANTENNA:
+				/* XXX validate? */
+				ath_setdefantenna(sc, val);
+				break;
+			case ATH_DIVERSITY:
+				/* XXX validate? */
+				if (!sc->sc_hasdiversity)
+					return -EINVAL;
+				sc->sc_diversity = val;
+				ath_hal_setdiversity(ah, val);
 				break;
 			default:
 				return -EINVAL;
@@ -4360,6 +4408,12 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			break;
 		case ATH_TXANTENNA:
 			val = sc->sc_txantenna;
+			break;
+		case ATH_RXANTENNA:
+			val = ath_hal_getdefantenna(ah);
+			break;
+		case ATH_DIVERSITY:
+			val = sc->sc_diversity;
 			break;
 		default:
 			return -EINVAL;
@@ -4421,6 +4475,16 @@ static const ctl_table ath_sysctl_template[] = {
 #endif
 	{ .ctl_name	= ATH_TXANTENNA,
 	  .procname	= "txantenna",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_RXANTENNA,
+	  .procname	= "rxantenna",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_DIVERSITY,
+	  .procname	= "diversity",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},

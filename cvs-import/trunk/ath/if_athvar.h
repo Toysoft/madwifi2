@@ -206,7 +206,9 @@ struct ath_softc {
 				sc_mrretry : 1,	/* multi-rate retry support */
 				sc_softled : 1,	/* enable LED gpio status */
 				sc_splitmic: 1,	/* split TKIP MIC keys */
-				sc_needmib : 1;	/* enable MIB stats intr */
+				sc_needmib : 1,	/* enable MIB stats intr */
+				sc_hasdiversity : 1,/* rx diversity available */
+				sc_diversity : 1;/* enable rx diversity */
 						/* rate tables */
 	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
@@ -237,6 +239,8 @@ struct ath_softc {
 	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
+	u_int8_t		sc_defant;	/* current default antenna */
+	u_int8_t		sc_rxotherant;	/* rx's on non-default antenna*/
 
 	STAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
@@ -392,6 +396,10 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_hasVEOL)((_ah)))
 #define	ath_hal_getrfgain(_ah) \
 	((*(_ah)->ah_getRfGain)((_ah)))
+#define	ath_hal_getdefantenna(_ah) \
+	((*(_ah)->ah_getDefAntenna)((_ah)))
+#define	ath_hal_setdefantenna(_ah, _ant) \
+	((*(_ah)->ah_setDefAntenna)((_ah), (_ant)))
 #define	ath_hal_rxmonitor(_ah, _arg) \
 	((*(_ah)->ah_rxMonitor)((_ah), (_arg)))
 #define	ath_hal_mibevent(_ah, _stats) \
@@ -422,6 +430,12 @@ void	ath_sysctl_unregister(void);
 	(ath_hal_getcapability(_ah, HAL_CAP_TKIP_SPLIT, 0, NULL) == HAL_OK)
 #define	ath_hal_hwphycounters(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_PHYCOUNTERS, 0, NULL) == HAL_OK)
+#define	ath_hal_hasdiversity(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_DIVERSITY, 0, NULL) == HAL_OK)
+#define	ath_hal_getdiversity(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_DIVERSITY, 1, NULL) == HAL_OK)
+#define	ath_hal_setdiversity(_ah, _v) \
+	ath_hal_setcapability(_ah, HAL_CAP_DIVERSITY, 1, _v, NULL)
 
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
