@@ -2461,13 +2461,6 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		}
 		break;
 	}
-	/*
-	 * Start/stop xmit queue.
-	 */
-	if (nstate == IEEE80211_S_RUN)
-		netif_start_queue(dev);		/* XXX netif_wake_queue? */
-	else if (ostate == IEEE80211_S_RUN)
-		netif_stop_queue(dev);
 	return 0;
 }
 
