@@ -1861,8 +1861,37 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_MLME_DISASSOC:
 	case IEEE80211_MLME_DEAUTH:
-		/* XXX not quite right */
-		ieee80211_new_state(ic, IEEE80211_S_INIT, mlme->im_reason);
+		switch (ic->ic_opmode) {
+		case IEEE80211_M_STA:
+			/* XXX not quite right */
+			ieee80211_new_state(ic, IEEE80211_S_INIT,
+				mlme->im_reason);
+			break;
+		case IEEE80211_M_HOSTAP:
+			ni = ieee80211_find_node(ic, mlme->im_macaddr);
+			if (ni == NULL)
+				return -EINVAL;
+			IEEE80211_SEND_MGMT(ic, ni,
+			    IEEE80211_FC0_SUBTYPE_DEAUTH,
+			    mlme->im_reason);
+			ieee80211_node_leave(ic, ni);
+			break;
+		default:
+			return -EINVAL;
+		}
+		break;
+	case IEEE80211_MLME_AUTHORIZE:
+	case IEEE80211_MLME_UNAUTHORIZE:
+		if (ic->ic_opmode != IEEE80211_M_HOSTAP)
+			return -EINVAL;
+		ni = ieee80211_find_node(ic, mlme->im_macaddr);
+		if (ni == NULL)
+			return -EINVAL;
+		if (mlme->im_op == IEEE80211_MLME_AUTHORIZE)
+			ieee80211_node_authorize(ic, ni);
+		else
+			ieee80211_node_unauthorize(ic, ni);
+		ieee80211_free_node(ic, ni);
 		break;
 	default:
 		return -EINVAL;
