@@ -34,11 +34,11 @@
 
 /*
  * 802.1x+WPA authenticator protocol handling and state machine.
- * XXX WPA to be added
  *
  * This support is optional; it is only used when the 802.11 layer's
- * authentication mode is set to use 802.1x.  If compiled as a module
- * this code does not need to be present unless 802.1x is in use.
+ * authentication mode is set to use 802.1x or WPA is enabled separately
+ * (for WPA-PSK).  If compiled as a module this code does not need
+ * to be present unless 802.1x/WPA-PSK is in use.
  *
  * The authenticator hooks into the 802.11 layer through callbacks
  * that are invoked when stations join and leave (associate and
@@ -46,8 +46,9 @@
  * 802.11 layer's node state.  State is synchronized with a single
  * lock.  This scheme is also used by the optional radius client.
  *
- * It might be possible to generalize this code to handle non-802.11
- * devices but for now it is tightly integrated with the 802.11 code.
+ * It might be possible to generalize the 802.1x support to handle
+ * non-802.11 devices but for now it is tightly integrated with the
+ * 802.11 code.
  */
 #include <linux/config.h>
 #include <linux/version.h>
@@ -58,6 +59,10 @@
 #include <linux/netfilter.h>
 #include <linux/sysctl.h>
 #include <linux/in.h>
+
+#include <linux/crypto.h>
+#include <asm/scatterlist.h>
+#include <linux/random.h>
 
 #include "if_media.h"
 #include "if_llc.h"
@@ -218,21 +223,17 @@ out:
  * Process an EAPOL Key frame.
  */
 static int
-eapol_auth_input_key(struct eapol_auth_node *ean, struct sk_buff *skb)
+eapol_auth_input_key(struct eapol_auth_node *ean, struct eapol_hdr *eapol,
+	struct sk_buff *skb)
 {
 
 	EAPOL_LOCK_ASSERT(ean->ean_ec);
 
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1X,
-		("[%s] RECV EAPOL Key\n",
+		("[%s] RECV EAPOL WPA-Key\n",
 		ether_sprintf(ean->ean_node->ni_macaddr)));
-	/* XXX fill in for WPA */
-	/*
-	 * Save the frame contents for later.
-	 */
-	if (ean->ean_skb)
-		kfree_skb(ean->ean_skb);
-	ean->ean_skb = skb;
+
+	kfree_skb(skb);
 	return 0;
 }
 
@@ -375,8 +376,17 @@ eapol_input(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 		eapol_fsm_run(ean);
 		break;
 	case EAPOL_TYPE_KEY:
-		error = eapol_auth_input_key(ean, skb);
+		if (!pskb_may_pull(skb, sizeof(struct eapol_wpa_key))) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_DOT1X,
+			    ("[%s] EAPOL KEY msg too short, eapol len %u\n",
+			    ether_sprintf(ean->ean_node->ni_macaddr),
+			    eapol->eapol_len));
+			eapolstats.eap_keytooshort++;
+			goto unlock;
+		}
+		error = eapol_auth_input_key(ean, eapol, skb);
 		skb = NULL;		/* consumed */
+		eapol_fsm_run(ean);
 		break;
 	case EAPOL_TYPE_EASFA:
 		/* XXX not handled */
@@ -399,10 +409,9 @@ out:
  * 802.1x+WPA state machine support.  We follow the 802.1x and
  * WPA specs by defining independent state machines for the
  * supplicant-authenticator, authenticator-backend, reauthentication
- * timer, and key transmit handling (more coming with WPA).
- * These machines are ``clocked'' together when various events
- * take place (receipt of EAPOL messages from the supplicant,
- * radius messages from the backened, timers, etc.)
+ * timer, and key transmit handling.  These machines are ``clocked''
+ * together when various events take place (receipt of EAPOL messages
+ * from the supplicant, radius messages from the backened, timers, etc.)
  */
 
 #define	STATE_DECL(type,state) \
@@ -414,19 +423,20 @@ out:
  */
 #define	AS_STATE_DECL(s)	STATE_DECL(AS,s)
 #define	AS_STATE_ENTER(s,ean)	STATE_ENTER(AS,s,ean)
+#ifdef IEEE80211_DEBUG
 #define	AS_STATE_DEBUG(s,ean)					\
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1XSM,	\
 		("[%s] %s -> %s\n",				\
 		ether_sprintf(ean->ean_node->ni_macaddr),	\
 		eapol_as_states[ean->ean_authState],		\
 		eapol_as_states[EAPOL_AS_##s]))
-#ifdef IEEE80211_DEBUG
 #define	AS_STATE_OPT_DEBUG(s,ean) do {				\
 	if (ean->ean_authState != EAPOL_AS_##s)			\
 		AS_STATE_DEBUG(s,ean);				\
 } while (0)
 #else
 #define	AS_STATE_DEBUG(s,ean)
+#define	AS_STATE_OPT_DEBUG(s,ean)
 #endif
 
 AS_STATE_DECL(INIT)
@@ -664,19 +674,20 @@ eapol_auth_step(struct eapol_auth_node *ean)
  */
 #define	ABS_STATE_DECL(s)	STATE_DECL(ABS,s)
 #define	ABS_STATE_ENTER(s,ean)	STATE_ENTER(ABS,s,ean)
+#ifdef IEEE80211_DEBUG
 #define	ABS_STATE_DEBUG(s,ean)					\
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1XSM,	\
 		("[%s] %s -> %s\n",				\
 		ether_sprintf(ean->ean_node->ni_macaddr),	\
 		eapol_abs_states[ean->ean_backendState],	\
 		eapol_abs_states[EAPOL_ABS_##s]))
-#ifdef IEEE80211_DEBUG
 #define	ABS_STATE_OPT_DEBUG(s,ean) do {				\
 	if (ean->ean_backendState != EAPOL_ABS_##s)		\
 		ABS_STATE_DEBUG(s,ean);				\
 } while (0)
 #else
 #define	ABS_STATE_DEBUG(s,ean)
+#define	ABS_STATE_OPT_DEBUG(s,ean)
 #endif
 
 ABS_STATE_DECL(INIT)
@@ -772,7 +783,7 @@ static void
 eapol_backend_step(struct eapol_auth_node *ean)
 {
 
-	EAPOL_LOCK_ASSERT(ec);
+	EAPOL_LOCK_ASSERT(ean->ean_ec);
 
 	if (ean->ean_portControl != EAPOL_PORTCONTROL_AUTO ||
 	    ean->ean_initialize || ean->ean_authAbort) {
@@ -830,19 +841,20 @@ eapol_backend_step(struct eapol_auth_node *ean)
  */
 #define	REAUTH_STATE_DECL(s)		STATE_DECL(ARS,s)
 #define	REAUTH_STATE_ENTER(s,ean)	STATE_ENTER(ARS,s,ean)
+#ifdef IEEE80211_DEBUG
 #define	REAUTH_STATE_DEBUG(s,ean)				\
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1XSM,	\
 		("[%s] %s -> %s\n",				\
 		ether_sprintf(ean->ean_node->ni_macaddr),	\
 		eapol_ars_states[ean->ean_reAuthState],		\
 		eapol_ars_states[EAPOL_ARS_##s]))
-#ifdef IEEE80211_DEBUG
 #define	REAUTH_STATE_OPT_DEBUG(s,ean) do {			\
 	if (ean->ean_reAuthState != EAPOL_ARS_##s)		\
 		REAUTH_STATE_DEBUG(s,ean);			\
 } while (0)
 #else
 #define	REAUTH_STATE_DEBUG(s,ean)
+#define	REAUTH_STATE_OPT_DEBUG(s,ean)
 #endif
 
 REAUTH_STATE_DECL(INIT)
@@ -869,14 +881,13 @@ REAUTH_STATE_DECL(REAUTH)
 static void
 eapol_reauth_step(struct eapol_auth_node *ean)
 {
-	struct eapolcom *ec = ean->ean_ec;
 
-	EAPOL_LOCK_ASSERT(ec);
+	EAPOL_LOCK_ASSERT(ean->ean_ec);
 
 	if (ean->ean_portControl != EAPOL_PORTCONTROL_AUTO ||
 	    ean->ean_initialize ||
 	    ean->ean_portStatus == EAPOL_PORTSTATUS_UNAUTH ||
-	    (ec->ec_flags & EAPOL_F_REAUTH_ENA) == 0) {
+	    !eapol_reauthenabled) {
 		REAUTH_STATE_ENTER(INIT, ean);
 		return;
 	}
@@ -902,19 +913,20 @@ eapol_reauth_step(struct eapol_auth_node *ean)
  */
 #define	KEY_STATE_DECL(s)	STATE_DECL(AKS,s)
 #define	KEY_STATE_ENTER(s,ean)	STATE_ENTER(AKS,s,ean)
+#ifdef IEEE80211_DEBUG
 #define	KEY_STATE_DEBUG(s,ean)					\
 	IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1XSM,	\
 		("[%s] %s -> %s\n",				\
 		ether_sprintf(ean->ean_node->ni_macaddr),	\
 		eapol_aks_states[ean->ean_keyState],		\
 		eapol_aks_states[EAPOL_AKS_##s]))
-#ifdef IEEE80211_DEBUG
 #define	KEY_STATE_OPT_DEBUG(s,ean) do {				\
 	if (ean->ean_keyState != EAPOL_AKS_##s)			\
 		KEY_STATE_DEBUG(s,ean);				\
 } while (0)
 #else
 #define	KEY_STATE_DEBUG(s,ean)
+#define	KEY_STATE_OPT_DEBUG(s,ean)
 #endif
 
 KEY_STATE_DECL(NO_KEY)
@@ -943,9 +955,8 @@ KEY_STATE_DECL(KEY)
 static void
 eapol_key_step(struct eapol_auth_node *ean)
 {
-	struct eapolcom *ec = ean->ean_ec;
 
-	EAPOL_LOCK_ASSERT(ec);
+	EAPOL_LOCK_ASSERT(ean->ean_ec);
 
 	if (ean->ean_portControl != EAPOL_PORTCONTROL_AUTO ||
 	    ean->ean_initialize) {
@@ -954,11 +965,11 @@ eapol_key_step(struct eapol_auth_node *ean)
 	}
 	switch (ean->ean_keyState) {
 	case EAPOL_AKS_NO_KEY:
-		if ((ec->ec_flags & EAPOL_F_TXKEY_ENA) && ean->ean_keyAvailable)
+		if (eapol_keytxenabled && ean->ean_keyAvailable)
 			KEY_STATE_ENTER(KEY, ean);
 		break;
 	case EAPOL_AKS_KEY:
-		if ((ec->ec_flags & EAPOL_F_TXKEY_ENA) == 0 ||
+		if (!eapol_keytxenabled ||
 		    ean->ean_authFail || ean->ean_eapLogoff)
 			KEY_STATE_ENTER(NO_KEY, ean);
 		else if (ean->ean_keyAvailable)
@@ -979,40 +990,45 @@ eapol_key_step(struct eapol_auth_node *ean)
 void
 eapol_fsm_run(struct eapol_auth_node *ean)
 {
-	int oastate, obstate, okstate, orstate;
+	int ostate, statechange;
 
 	do {
-		oastate = ean->ean_authState;
-		eapol_auth_step(ean);
-		if (ean->ean_gone) {
-			struct ieee80211com *ic = ean->ean_ic;
-			struct ieee80211_node *ni = ean->ean_node;
+		statechange = FALSE;
 
-			/*
-			 * Delayed handling of node reclamation when the
-			 * reauthentication timer expires.  We must be
-			 * careful as the call to ieee80211_node_leave
-			 * will reclaim our state so we cannot reference
-			 * it past that point.  However this happens the
-			 * caller must also be careful to not reference state.
-			 */
-			ieee80211_node_leave(ic, ni);
-			ic->ic_stats.is_node_timeout++;
-			return;
+		ostate = ean->ean_authState;
+		if (ean->ean_initialize) {
+			eapol_auth_step(ean);
+			if (ean->ean_gone) {
+				struct ieee80211com *ic = ean->ean_ic;
+				struct ieee80211_node *ni = ean->ean_node;
+
+				/*
+				 * Delayed handling of node reclamation when the
+				 * reauthentication timer expires.  We must be
+				 * careful as the call to ieee80211_node_leave
+				 * will reclaim our state so we cannot reference
+				 * it past that point.  However this happens the
+				 * caller must also be careful to not reference state.
+				 */
+				ieee80211_node_leave(ic, ni);
+				ic->ic_stats.is_node_timeout++;
+				return;
+			}
+			statechange |= ostate != ean->ean_authState;
 		}
 
-		obstate = ean->ean_backendState;
+		ostate = ean->ean_backendState;
 		eapol_backend_step(ean);
+		statechange |= ostate != ean->ean_backendState;
 
-		okstate = ean->ean_keyState;
+		ostate = ean->ean_keyState;
 		eapol_key_step(ean);
+		statechange |= ostate != ean->ean_keyState;
 
-		orstate = ean->ean_reAuthState;
+		ostate = ean->ean_reAuthState;
 		eapol_reauth_step(ean);
-	} while(oastate != ean->ean_authState ||
-		obstate != ean->ean_backendState ||
-		okstate != ean->ean_keyState ||
-		orstate != ean->ean_reAuthState);
+		statechange |= ostate != ean->ean_reAuthState;
+	} while (statechange);
 }
 EXPORT_SYMBOL(eapol_fsm_run);
 
@@ -1066,22 +1082,6 @@ eapol_check_timers(unsigned long arg)
 				eapol_as_states[ean->ean_authState]));
 			timeout = TRUE;
 		}
-#ifdef notyet
-		if (ean->ean_reKeyWhen && --ean->ean_reKeyWhen == 0) {
-			IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1X,
-				("[%s] TIMEOUT reKeyWhen, %s\n",
-				ether_sprintf(ean->ean_node->ni_macaddr),
-				eapol_arks_states[ean->ean_reKeyState]));
-			timeout = TRUE;
-		}
-		if (ean->ean_gReKeyWhen && --ean->ean_gReKeyWhen == 0) {
-			IEEE80211_DPRINTF(ean->ean_ic, IEEE80211_MSG_DOT1X,
-				("[%s] TIMEOUT gReKeyWhen, %s\n",
-				ether_sprintf(ean->ean_node->ni_macaddr),
-				eapol_arks_states[ean->ean_reKeyState]));
-			timeout = TRUE;
-		}
-#endif
 		if (timeout)
 			eapol_fsm_run(ean);
 		inuse--;
@@ -1122,6 +1122,20 @@ txCannedSuccess(struct eapol_auth_node *ean)
 		ean->ean_currentId));
 	eap_send_simple(&ean->ean_base, EAP_CODE_SUCCESS, ean->ean_currentId);
 }
+
+void
+eapol_hmac_md5(struct eapolcom *ec, void *data, u_int datalen,
+	void *key, u_int keylen, u_int8_t hash[16])
+{
+	struct scatterlist sg;
+
+	sg.page = virt_to_page(data);
+	sg.offset = offset_in_page(data);
+	sg.length = datalen;
+
+	crypto_hmac(ec->ec_md5, key, &keylen, &sg, 1, hash);
+}
+EXPORT_SYMBOL(eapol_hmac_md5);
 
 /*
  * Allocate a buffer large enough to hold the specified
@@ -1507,16 +1521,18 @@ static void
 eapol_cleanup(struct eapolcom *ec)
 {
 	EAPOL_LOCK_DESTROY(ec);
+	if (ec->ec_md5 != NULL)
+		crypto_free_tfm(ec->ec_md5);
 	if (ec->ec_table != NULL)
 		FREE(ec->ec_table, M_DEVBUF);
 	FREE(ec, M_DEVBUF);
-	eapolcom = NULL;
 }
 
 static struct eapolcom *
 eapol_setup(void)
 {
 	struct eapolcom *ec;
+	struct crypto_tfm *tfm;
 
 	/* XXX WAITOK? */
 	MALLOC(ec, struct eapolcom *, sizeof(*ec), M_DEVBUF, M_WAITOK | M_ZERO);
@@ -1526,11 +1542,23 @@ eapol_setup(void)
 	}
 	EAPOL_LOCK_INIT(ec, "eapol");
 
+	tfm = crypto_alloc_tfm("md5", 0);
+	if (tfm == NULL) {
+		/* XXX fallback on internal implementation? */
+		printf("%s: unable to allocate md5 crypto state\n", __func__);
+		/* XXX statistic */
+		goto bad;
+	}
+	ec->ec_md5 = tfm;
+
 	ec->ec_node_alloc = eapol_node_alloc;
 	ec->ec_node_free = eapol_node_free;
 	ec->ec_node_reset = eapol_node_reset;
 
 	return ec;
+bad:
+	eapol_cleanup(ec);
+	return NULL;
 }
 
 static struct packet_type eapol_packet_type = {
@@ -1556,25 +1584,19 @@ eapol_authenticator_attach(struct ieee80211com *ic)
 	}
 	ec = eapolcom;
 
+	ec->ec_maxaid = ic->ic_max_aid;
 	MALLOC(ec->ec_table, struct eapol_auth_node **,
 		sizeof(struct eapol_auth_node *) * ic->ic_max_aid,
 		M_DEVBUF, M_WAITOK | M_ZERO);
 	if (ec->ec_table == NULL) {
 		printk("%s: no memory for aid table!\n", __func__);
-		eapolcom = NULL;
-		FREE(ec, M_DEVBUF);
+		_MOD_DEC_USE(THIS_MODULE);
 		return FALSE;
 	}
-
-	ec->ec_maxaid = ic->ic_max_aid;
-	ec->ec_flags = EAPOL_F_TXKEY_ENA;
-	ec->ec_flags |= EAPOL_F_REAUTH_ENA;	/* XXX disable with WPA */
-	ec->ec_flags |= EAPOL_F_GREKEY_ENA;	/* XXX disable with WPA */
 
 	/*
 	 * Startup radius client.
 	 */
-	/* XXX only startup if !PSK */
 	ec->ec_backend = ieee80211_authenticator_backend_get("radius");
 	if (ec->ec_backend == NULL ||
 	    !ec->ec_backend->iab_attach(ec))
@@ -1625,7 +1647,7 @@ eapol_authenticator_detach(struct ieee80211com *ic)
 			FREE(ec->ec_table, M_DEVBUF);
 			ec->ec_table = NULL;
 		}
-		printk(KERN_INFO "802.1x/WPA authenticator stopped\n");
+		printk(KERN_INFO "802.1x authenticator stopped\n");
 	}
 	_MOD_DEC_USE(THIS_MODULE);
 }

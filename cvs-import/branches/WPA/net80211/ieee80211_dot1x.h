@@ -208,6 +208,8 @@ struct eapol_auth_node {
 #define	ean_idlen	ean_base.en_idlen
 #define	ean_lock	ean_base.en_lock
 
+struct crypto_tfm;
+
 /*
  * State for each authenticator instance.  We only support
  * one at the moment and it's not clear that more than one
@@ -218,11 +220,9 @@ struct eapolcom {
 	u_int16_t		ec_maxaid;	/* copy of ic_max_aid */
 	u_int16_t		ec_inuse;	/* number of entries in use */
 	eapol_lock_t		ec_lock;	/* on eapolcom/node table */
-	u_int32_t		ec_flags;
-#define	EAPOL_F_TXKEY_ENA	0x00000001
-#define	EAPOL_F_REAUTH_ENA	0x00000002	/* re-authentication enabled */
-#define	EAPOL_F_GREKEY_ENA	0x00000004	/* group re-key enabled */
 	struct timer_list	ec_timer;	/* state machine timers */
+
+	struct crypto_tfm	*ec_md5;
 
 	/* backend state and related methods */
 	const struct ieee80211_authenticator_backend *ec_backend;
@@ -246,6 +246,14 @@ struct eapolstats {
 	u_int32_t	eas_badidlen;
 	u_int32_t	eas_badtype;
 	u_int32_t	eas_idmismatch;
+	u_int32_t	eak_keynotrequest;
+	u_int32_t	eak_badkeytype;
+	u_int32_t	eak_replay;
+	u_int32_t	eak_nononce;
+	u_int32_t	eak_micfailed;
+	u_int32_t	eap_keydiscard;
+	u_int32_t	eap_keytooshort;
+	u_int32_t	eap_keynotwpa;
 	u_int32_t	eps_badalloc;
 	u_int32_t	eps_badauthfsm;
 	u_int32_t	eps_badauthlogoff;
@@ -311,6 +319,8 @@ extern	void eapol_reauth_setperiod(struct eapol_auth_node *, int timeout);
 extern	void eapol_send_raw(struct eapol_node *, struct sk_buff *);
 extern	void eapol_send(struct eapol_node *, struct sk_buff *, u_int8_t type);
 extern	struct sk_buff *eapol_alloc_skb(u_int payload);
+extern	void eapol_hmac_md5(struct eapolcom *ec, void *data, u_int datalen,
+		void *key, u_int keylen, u_int8_t hash[16]);
 
 extern	struct eapolstats eapolstats;
 
