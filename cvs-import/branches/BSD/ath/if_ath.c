@@ -412,7 +412,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 *
 	 * XXX PS-Poll
 	 */
-	//sc->sc_bhalq = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_BEACON, NULL);
 	sc->sc_bhalq = ath_beaconq_setup(ah);
 	if (sc->sc_bhalq == (u_int) -1) {
 		if_printf(dev, "unable to setup a beacon xmit queue!\n");
