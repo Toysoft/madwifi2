@@ -402,6 +402,11 @@ struct {								\
 	    (var);							\
 	    (var) = TAILQ_NEXT((var), field))
 
+#define TAILQ_FOREACH_SAFE(var, head, field, tvar)			\
+	for ((var) = TAILQ_FIRST((head));                               \
+	    (var) && ((tvar) = TAILQ_NEXT((var), field), 1);            \
+	    (var) = (tvar))
+
 #define	TAILQ_FOREACH_REVERSE(var, head, headname, field)		\
 	for ((var) = TAILQ_LAST((head), headname);			\
 	    (var);							\
