@@ -18,6 +18,9 @@ Changes since -9:
    - port skb room adjusting patch from cvs HEAD (me)
    - fix HAL_FATAL/RXORN conflict issues (me)
    - disable watchdog during passive scan (me)
+   - rename global static variables ath_debug and ieee80211_debug to ath_initialdebug 
+     and ieee80211_initialdebug. Create per-driver ath_debug and ieeee80211_debug 
+     variables. Update debugging macros to use per-driver debugging variables. (me)
 
 Changes since -8:
    - fix oops upon driver insertion: memset memory to zero in ath_node_alloc

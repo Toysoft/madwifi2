@@ -248,9 +248,9 @@ ieee80211_wep_crypt(struct ieee80211com *ic, struct mbuf *m0, int txflag)
 		}
 		if (crc != le32toh(*(u_int32_t *)crcbuf)) {
 #ifdef IEEE80211_DEBUG
-			if (ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
+			if (ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
 				if_printf(ifp, "decrypt CRC error\n");
-				if (ieee80211_debug & IEEE80211_DEBUG_LEVEL2)
+				if (ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL2)
 					ieee80211_dump_pkt(n0->m_data,
 					    n0->m_len, -1, -1);
 			}
@@ -353,9 +353,9 @@ ieee80211_wep_crypt(struct ieee80211com *ic, struct sk_buff *skb0, int txflag)
 		arc4_encrypt(ctx, crcbuf, skb->data + moff, sizeof(crcbuf));
 		if (crc != le32_to_cpu(*(u_int32_t *)crcbuf)) {
 #ifdef IEEE80211_DEBUG
-			if (ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
+			if (ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
 				printf("%s: decrypt CRC error\n", ieee80211_get_device_name (ic));
-				if (ieee80211_debug & IEEE80211_DEBUG_LEVEL2)
+				if (ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL2)
 					ieee80211_dump_pkt(n0->data,
 					    n0->len, -1, -1);
 			}

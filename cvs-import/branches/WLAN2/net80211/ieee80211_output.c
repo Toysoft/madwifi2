@@ -123,8 +123,8 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
 
 #ifdef IEEE80211_DEBUG
-	if (ieee80211_debug & IEEE80211_DEBUG_IFF &&
-	    ieee80211_debug & IEEE80211_DEBUG_LEVEL2) {
+	if (ic->ieee80211_debug & IEEE80211_DEBUG_IFF &&
+	    ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL2) {
 		/* avoid to print too many frames */
 		if (ic->ic_opmode == IEEE80211_M_IBSS ||
 		    (type & IEEE80211_FC0_SUBTYPE_MASK) !=

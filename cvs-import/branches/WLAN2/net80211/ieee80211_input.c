@@ -334,7 +334,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb, struct ieee80211_n
 		}
 
 #ifdef IEEE80211_DEBUG
-		if (ieee80211_debug & IEEE80211_DEBUG_IFF) {
+		if (ic->ieee80211_debug & IEEE80211_DEBUG_IFF) {
 			/* avoid to print too many frames */
 			int doprint = 0;
 
@@ -745,7 +745,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, u_int8_t *buffer, unsigned long buf
 		ni = ieee80211_lookup_node(ic, wh->i_addr2,
 				&ic->ic_channels[chan]);
 #ifdef IEEE80211_DEBUG
-		if ((ieee80211_debug & IEEE80211_DEBUG_LEVEL1) &&
+		if ((ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL1) &&
 		    (ni == NULL || ic->ic_state == IEEE80211_S_SCAN)) {
 			printf("%s: %s%s on chan %u (bss chan %u) ",
 			    __func__, (ni == NULL ? "new " : ""),
@@ -833,7 +833,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, u_int8_t *buffer, unsigned long buf
 		    (ssid[1] != ic->ic_bss->ni_esslen ||
 		    memcmp(ssid + 2, ic->ic_bss->ni_essid, ic->ic_bss->ni_esslen) != 0)) {
 #ifdef IEEE80211_DEBUG
-			if (ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
+			if (ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
 				printf("%s: ssid unmatch ", __func__);
 				ieee80211_print_essid(ssid + 2, ssid[1]);
 				printf(" from %s\n", ether_sprintf(wh->i_addr2));
@@ -1000,7 +1000,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, u_int8_t *buffer, unsigned long buf
 		if (ssid[1] != ic->ic_bss->ni_esslen ||
 		    memcmp(ssid + 2, ic->ic_bss->ni_essid, ssid[1]) != 0) {
 #ifdef IEEE80211_DEBUG
-			if (ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
+			if (ic->ieee80211_debug & IEEE80211_DEBUG_LEVEL1) {
 				printf("%s: ssid unmatch ", __func__);
 				ieee80211_print_essid(ssid + 2, ssid[1]);
 				printf(" from %s\n", ether_sprintf(wh->i_addr2));

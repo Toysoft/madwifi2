@@ -118,7 +118,10 @@ static int      ath_change_mtu(struct net_device *, int);
 static void     ath_rx_capture(	struct net_device *, struct sk_buff *, int , int, int);
 static void     ath_proc_init(struct ath_softc *sc, char const *dev_name);
 static void     ath_proc_remove(struct ath_softc *sc);
-
+#ifdef AR_DEBUG
+static	void ath_printrxbuf(struct ath_buf *bf, int);
+static	void ath_printtxbuf(struct ath_buf *bf, int);
+#endif
 
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
@@ -127,14 +130,6 @@ static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
 static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_TRUE;		/* enable outdoor use */
-
-#ifdef AR_DEBUG
-static int	ath_debug = 0;
-static	void ath_printrxbuf(struct ath_buf *bf, int);
-static	void ath_printtxbuf(struct ath_buf *bf, int);
-MODULE_PARM(ath_debug, "i");
-MODULE_PARM_DESC(ath_debug, "ORed debugging flags:\n - 0x1: DPRINTF debug\n - 0x2: DPRINTF2 debug\n - 0x4: DPRINTF_DUMP debug");
-#endif
 
 int
 ath_attach(u_int16_t devid, struct net_device *dev)
@@ -318,7 +313,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 #ifdef CONFIG_PROC_FS
 #ifdef IEEE80211_DEBUG
-	ieee80211_proc_init(&ic->ic_stats, dev->name);
+	ieee80211_proc_init(ic, dev->name);
 #endif
 #ifdef AR_DEBUG
 	ath_proc_init (sc, dev->name);
@@ -355,7 +350,7 @@ ath_detach(struct net_device *dev)
 
 #ifdef CONFIG_PROC_FS
 #ifdef IEEE80211_DEBUG
-	ieee80211_proc_remove(&ic->ic_stats);
+	ieee80211_proc_remove(ic);
 #endif
 #ifdef AR_DEBUG
 	ath_proc_remove (sc);
@@ -368,6 +363,7 @@ ath_detach(struct net_device *dev)
 void
 ath_suspend(struct net_device *dev)
 {
+	struct ath_softc *sc = (struct ath_softc *)dev;
 	DPRINTF(("ath_suspend flags %x\n", dev->flags));
 	ath_stop(dev);
 }
@@ -375,6 +371,7 @@ ath_suspend(struct net_device *dev)
 void
 ath_resume(struct net_device *dev)
 {
+	struct ath_softc *sc = (struct ath_softc *)dev;
 	DPRINTF(("ath_resume %x\n", dev->flags));
 	ath_init((struct ieee80211com *)dev);
 }
@@ -382,6 +379,7 @@ ath_resume(struct net_device *dev)
 void
 ath_shutdown(struct net_device *dev)
 {
+	struct ath_softc *sc = (struct ath_softc *)dev;
 	DPRINTF(("ath_shutdown %x\n", dev->flags));
 	ath_stop(dev);
 }
@@ -389,6 +387,7 @@ ath_shutdown(struct net_device *dev)
 static int      
 ath_change_mtu(struct net_device *dev, int new_mtu) 
 {
+	struct ath_softc *sc = (struct ath_softc *)dev;
 	if (new_mtu > ATH_MAX_MTU || new_mtu <= ATH_MIN_MTU) {
 		return -EINVAL;
 	}
@@ -441,7 +440,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	ath_hal_getisr(ah, &status);
 	DPRINTF2(("%s: interrupt, status 0x%x\n", dev->name, status));
 #ifdef AR_DEBUG
-	if (ath_debug & AR_DEBUG_LEVEL1 &&
+	if (sc->ath_debug & AR_DEBUG_LEVEL1 &&
 	    (status & (HAL_INT_FATAL|HAL_INT_RXORN|HAL_INT_BMISS))) {
 		printk("%s: ath_intr: status 0x%x\n", dev->name, status);
 		ath_hal_dumpstate(ah);
@@ -845,7 +844,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
 
 #ifdef AR_DEBUG
-	if (ath_debug & AR_DEBUG_DUMP)
+	if (sc->ath_debug & AR_DEBUG_DUMP)
 		ieee80211_dump_pkt(skb->data, skb->len,
 		    ni->ni_rates.rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
 #endif
@@ -933,7 +932,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 		ni = ieee80211_ref_node(ic->ic_bss);
 
 #ifdef AR_DEBUG
-	if (ath_debug & AR_DEBUG_DUMP)
+	if (sc->ath_debug & AR_DEBUG_DUMP)
 		ieee80211_dump_pkt(skb->data, skb->len,
 		    ni->ni_rates.rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
 #endif
@@ -1679,7 +1678,7 @@ ath_rx_tasklet(void *data)
 					    bf->bf_daddr, 
 					    PA2DESC(sc, ds->ds_link));
 #ifdef AR_DEBUG
-		if (ath_debug & AR_DEBUG_LEVEL2)
+		if (sc->ath_debug & AR_DEBUG_LEVEL2)
 			ath_printrxbuf(bf, status == HAL_OK); 
 #endif
 		if (status == HAL_EINPROGRESS)
@@ -1765,7 +1764,7 @@ ath_rx_tasklet(void *data)
 			skb_put(skb, len);
 			skb->protocol = ETH_P_CONTROL;		/* XXX */
 #ifdef AR_DEBUG
-			if (ath_debug & AR_DEBUG_DUMP) {
+			if (sc->ath_debug & AR_DEBUG_DUMP) {
 				const HAL_RATE_TABLE *rt = sc->sc_currates;
 				ieee80211_dump_pkt(skb->data, len,
 					   rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
@@ -2206,7 +2205,7 @@ ath_tx_tasklet(void *data)
 		ds = bf->bf_desc;		/* NB: last decriptor */
 		status = ath_hal_txprocdesc(ah, ds);
 #ifdef AR_DEBUG
-		if (ath_debug & AR_DEBUG_LEVEL2)
+		if (sc->ath_debug & AR_DEBUG_LEVEL2)
 			ath_printtxbuf(bf, status == HAL_OK);
 #endif
 		if (status == HAL_EINPROGRESS) {
@@ -2279,7 +2278,7 @@ ath_tx_timeout(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = (struct ieee80211com *)dev;
 	sc->sc_stats.ast_watchdog++;
-	if (ath_debug & AR_DEBUG_DUMP)
+	if (sc->ath_debug & AR_DEBUG_DUMP)
 		ath_hal_dumpstate(sc->sc_ah);
 	ath_init(ic);
 }
@@ -2314,7 +2313,7 @@ ath_draintxq(struct ath_softc *sc)
 		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
 		spin_unlock_bh(&sc->sc_txqlock);
 #ifdef AR_DEBUG
-		if (ath_debug & AR_DEBUG_DUMP)
+		if (sc->ath_debug & AR_DEBUG_DUMP)
 			ath_printtxbuf(bf,
 				ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
 #endif /* AR_DEBUG */
@@ -2347,7 +2346,7 @@ ath_stoprecv(struct ath_softc *sc)
 	ath_hal_stopdmarecv(ah);	/* disable DMA engine */
 	udelay(3000);			/* long enough for 1 frame */
 #ifdef AR_DEBUG
-	if (ath_debug & AR_DEBUG_LEVEL1) {
+	if (sc->ath_debug & AR_DEBUG_LEVEL1) {
 		struct ath_buf *bf;
 
 		printk("ath_stoprecv: rx queue %p, link %p\n",
@@ -2571,10 +2570,10 @@ ath_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		ath_hal_intrset(ah, sc->sc_imask);
 		error =  (*sc->sc_newstate)(ic, nstate, arg);
 		goto bad;
-        } else if (nstate == IEEE80211_S_SCAN &&
-                   !(ic->ic_flags & IEEE80211_F_ASCAN)) {
+	} else if (nstate == IEEE80211_S_SCAN &&
+		   !(ic->ic_flags & IEEE80211_F_ASCAN)) {
 		/* Disable the watchdog during passive (non-active) scan. */
-                dev->trans_start = jiffies;
+		dev->trans_start = jiffies;
 	}
 	ni = ic->ic_bss;
 	error = ath_chan_set(sc, ni->ni_chan);
@@ -2874,8 +2873,9 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
         }
                                                                                                                                                                     
         if (ni->ni_txrate != orate) {
+		struct net_device *dev = (struct net_device *)sc;
                 DPRINTF(("%s: %dM -> %dM (%d ok, %d err, %d retr)\n",
-			 __func__,
+		        __func__,
 			 (rs->rs_rates[orate] & IEEE80211_RATE_VAL) / 2,
 			 (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) / 2,
 			 an->an_tx_ok, an->an_tx_err, an->an_tx_retr));
@@ -3122,8 +3122,10 @@ enum {
 static ctl_table ath_sysctls[] = {
 	{ ATH_STATS, 		"stats",	ath_info,
 	  sizeof(ath_info),	0444,	NULL,	ath_sysctl_stats },
+#if 0
 	{ ATH_DEBUG, 		"debug",	&ath_debug,
 	  sizeof(ath_debug),	0644,	NULL,	ath_sysctl_handler },
+#endif
 	{ ATH_DWELLTIME,	"dwelltime",	&ath_dwelltime,
 	  sizeof(ath_dwelltime),0644,	NULL,	ath_sysctl_handler },
 	{ ATH_CALIBRATE,	"calibrate",	&ath_calinterval,
@@ -3179,23 +3181,25 @@ ath_sysctl_unregister(void)
 
 static int
 ath_proc_debug_read(char *page, char **start, off_t off,
-			  int count, int *eof, void *data)
+		    int count, int *eof, void *data)
 {
+	struct ath_softc *sc = (struct ath_softc *)data;
 	if (off != 0) {
 		*eof = 1;
 		return 0;
 	}
-	return sprintf(page, "%d\n", ath_debug);
+	return sprintf(page, "%d\n", sc->ath_debug);
 }
 
 static int
 ath_proc_debug_write(struct file *file, const char *buf,
-			   unsigned long count, void *data)
+		     unsigned long count, void *data)
 {
+	struct ath_softc *sc = (struct ath_softc *)data;
 	int v;
 	
 	if (sscanf(buf, "%d", &v) == 1) {
-		ath_debug = v;
+		sc->ath_debug = v;
 		return count;
 	} else
 		return -EINVAL;

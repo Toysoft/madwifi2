@@ -199,6 +199,8 @@ struct ath_softc {
 	int			(*sc_newstate)(struct ieee80211com *,enum ieee80211_state, int);
 	char			sc_procname[12];/* e.g. ath%d */
 	struct proc_dir_entry  *sc_proc;	/* /proc/net/ath-ath%d */
+
+	int                     ath_debug;      /* per-driver debugging level. */
 };
 
 #define AR_DEBUG 1
@@ -207,9 +209,9 @@ struct ath_softc {
 #define AR_DEBUG_LEVEL1 (1<<0)
 #define AR_DEBUG_LEVEL2 (1<<1)
 #define AR_DEBUG_DUMP   (1<<2)
-#define	DPRINTF(X)	if (ath_debug & AR_DEBUG_LEVEL1) printk X
-#define	DPRINTF2(X)	if (ath_debug & AR_DEBUG_LEVEL2) printk X
-#define	DPRINTF_DUMP(X)	if (ath_debug & AR_DEBUG_DUMP) printk X
+#define	DPRINTF(X)	if (sc->ath_debug & AR_DEBUG_LEVEL1) printk X
+#define	DPRINTF2(X)	if (sc->ath_debug & AR_DEBUG_LEVEL2) printk X
+#define	DPRINTF_DUMP(X)	if (sc->ath_debug & AR_DEBUG_DUMP) printk X
 #else
 #define	DPRINTF(X)
 #define	DPRINTF2(X)

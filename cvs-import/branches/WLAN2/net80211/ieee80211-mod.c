@@ -101,8 +101,9 @@ EXPORT_SYMBOL(ieee80211_watchdog);
 EXPORT_SYMBOL(ieee80211_linuxmoduleref);
 EXPORT_SYMBOL(ieee80211_linuxmoduleunref);
 
+int ieee80211_initialdebug = 0;
 
 #ifdef IEEE80211_DEBUG
-MODULE_PARM(ieee80211_debug, "i");
-MODULE_PARM_DESC(ieee80211_debug, "ORed debugging flags:\n - 0x1: DPRINTF debugging\n - 0x2: DPRINTF2 debugging\n - 0x4: DPRINTF3 debugging\n - 0x8: DPRINTF_MSG debugging\n");
+MODULE_PARM(ieee80211_initialdebug, "i");
+MODULE_PARM_DESC(ieee80211_initialdebug, "ORed debugging flags:\n - 0x1: DPRINTF debugging\n - 0x2: DPRINTF2 debugging\n - 0x4: DPRINTF3 debugging\n - 0x8: DPRINTF_MSG debugging\n");
 #endif

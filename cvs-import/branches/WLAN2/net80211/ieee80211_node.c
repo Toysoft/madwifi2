@@ -335,7 +335,7 @@ ieee80211_end_scan(struct ieee80211com *ic)
 		    !IEEE80211_ADDR_EQ(ic->ic_des_bssid, ni->ni_bssid))
 			fail |= 0x20;
 #ifdef IEEE80211_DEBUG
-		if (ieee80211_debug & IEEE80211_DEBUG_IFF) {
+		if (ic->ieee80211_debug & IEEE80211_DEBUG_IFF) {
 			printf(" %c %s", fail ? '-' : '+',
 			    ether_sprintf(ni->ni_macaddr));
 			printf(" %s%c", ether_sprintf(ni->ni_bssid),
