@@ -2591,6 +2591,7 @@ rx_accept:
 
 		if (sc->sc_softled)
 			ath_update_led(sc);
+		sc->sc_stats.ast_ant_rx[ds->ds_rxstat.rs_antenna]++;
 
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
@@ -3099,6 +3100,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		if (ni != NULL) {
 			an = ATH_NODE(ni);
 			if (ds->ds_txstat.ts_status == 0) {
+				sc->sc_stats.ast_ant_tx[ds->ds_txstat.ts_antenna]++;
 				if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
 					sc->sc_stats.ast_tx_altrate++;
 				sc->sc_stats.ast_tx_rssi =
