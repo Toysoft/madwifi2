@@ -2454,6 +2454,9 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 	struct ieee80211_node *ni;
 	struct ath_nodestat *st;
 
+	if (ic->ic_fixed_rate != -1) {
+		return;
+	}
 	st = &sc->sc_bss_stat;
 	st->st_tx_ok = st->st_tx_err = st->st_tx_retr = st->st_tx_upper = 0;
 	if (ic->ic_opmode == IEEE80211_M_STA) {
@@ -2475,7 +2478,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 			    st->st_tx_upper = 0;
 		}
 	}
-	if (state == IEEE80211_S_RUN && ic->ic_fixed_rate == -1) {
+	if (state == IEEE80211_S_RUN) {
 		/*
 		 * Start the background rate control thread if we
 		 * are not configured to use a fixed xmit rate.

@@ -1983,6 +1983,24 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 			okrate = nrs->rs_rates[i];
 		i++;
 	}
+
+	if (ic->ic_fixed_rate != -1) {
+		/*
+		 * make ni_txrate point to right index
+		 */
+		for (i = 0; i < ni->ni_rates.rs_nrates; i++ ) {
+			if (RV(srs->rs_rates[ic->ic_fixed_rate]) == RV(nrs->rs_rates[i])) {
+				ni->ni_txrate = i;
+				break;
+			}
+		}
+	}
+	else if (ni->ni_txrate >= ni->ni_rates.rs_nrates) {
+		/* we made ni_txrate invalid -- fixup
+		 */
+		ni->ni_txrate =  ni->ni_rates.rs_nrates-1;
+	}
+
 	if (okrate == 0 || error != 0)
 		return badrate | IEEE80211_RATE_BASIC;
 	else
