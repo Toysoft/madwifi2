@@ -253,10 +253,10 @@ ieee80211_aclator_get(const char *name)
 EXPORT_SYMBOL(ieee80211_aclator_get);
 
 void
-ieee80211_print_essid(u_int8_t *essid, int len)
+ieee80211_print_essid(const u_int8_t *essid, int len)
 {
 	int i;
-	u_int8_t *p; 
+	const u_int8_t *p; 
 
 	if (len > IEEE80211_NWID_LEN)
 		len = IEEE80211_NWID_LEN;
@@ -278,7 +278,7 @@ ieee80211_print_essid(u_int8_t *essid, int len)
 }
 
 void
-ieee80211_dump_pkt(u_int8_t *buf, int len, int rate, int rssi)
+ieee80211_dump_pkt(const u_int8_t *buf, int len, int rate, int rssi)
 {
 	struct ieee80211_frame *wh;
 	int i;
