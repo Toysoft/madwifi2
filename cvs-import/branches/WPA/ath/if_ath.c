@@ -1904,6 +1904,13 @@ ath_beacon_config(struct ath_softc *sc)
 		bs.bs_dtimperiod = bs.bs_intval;
 		bs.bs_nextdtim = nexttbtt;
 		/*
+		 * The 802.11 layer records the offset to the DTIM
+		 * bitmap while receiving beacons; use it here to
+		 * enable h/w detection of PS-Poll messages from
+		 * the AP.
+		 */
+		bs.bs_timoffset = ni->ni_timoff;
+		/*
 		 * Calculate the number of consecutive beacons to miss
 		 * before taking a BMISS interrupt.  The configuration
 		 * is specified in ms, so we need to convert that to
@@ -1932,7 +1939,7 @@ ath_beacon_config(struct ath_softc *sc)
 			bs.bs_sleepduration = roundup(bs.bs_sleepduration, bs.bs_dtimperiod);
 
 		DPRINTF(ATH_DEBUG_BEACON, 
-			"%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u\n"
+			"%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u maxdur %u next %u timoffset %u\n"
 			, __func__
 			, bs.bs_intval
 			, bs.bs_nexttbtt
@@ -1940,6 +1947,10 @@ ath_beacon_config(struct ath_softc *sc)
 			, bs.bs_nextdtim
 			, bs.bs_bmissthreshold
 			, bs.bs_sleepduration
+			, bs.bs_cfpperiod
+			, bs.bs_cfpmaxduration
+			, bs.bs_cfpnext
+			, bs.bs_timoffset
 		);
 		ath_hal_intrset(ah, 0);
 		ath_hal_beacontimers(ah, &bs, 0/*XXX*/, 0, 0);
