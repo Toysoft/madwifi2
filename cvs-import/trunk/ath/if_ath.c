@@ -4607,19 +4607,35 @@ ath_dynamic_sysctl_unregister(struct ath_softc *sc)
 static void
 ath_announce(struct net_device *dev)
 {
+#define	HAL_MODE_DUALBAND	(HAL_MODE_11A|HAL_MODE_11B)
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
+	u_int modes, cc;
 	int i;
 
 	printk("%s: mac %d.%d phy %d.%d", dev->name,
 		ah->ah_macVersion, ah->ah_macRev,
 		ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf);
-	if (ah->ah_analog5GhzRev)
-		printk(" 5ghz radio %d.%d",
-			ah->ah_analog5GhzRev >> 4, ah->ah_analog5GhzRev & 0xf);
-	if (ah->ah_analog2GhzRev)
-		printk(" 2ghz radio %d.%d",
-			ah->ah_analog2GhzRev >> 4, ah->ah_analog2GhzRev & 0xf);
+	/*
+	 * Print radio revision(s).  We check the wireless modes
+	 * to avoid falsely printing revs for inoperable parts.
+	 * Dual-band radio revs are returned in the 5Ghz rev number.
+	 */
+	ath_hal_getcountrycode(ah, &cc);
+	modes = ath_hal_getwirelessmodes(ah, cc);
+	if ((modes & HAL_MODE_DUALBAND) == HAL_MODE_DUALBAND) {
+		if (ah->ah_analog5GhzRev && ah->ah_analog2GhzRev)
+			printk(" 5ghz radio %d.%d 2ghz radio %d.%d",
+				ah->ah_analog5GhzRev >> 4,
+				ah->ah_analog5GhzRev & 0xf,
+				ah->ah_analog2GhzRev >> 4,
+				ah->ah_analog2GhzRev & 0xf);
+		else
+			printk(" radio %d.%d", ah->ah_analog5GhzRev >> 4,
+				ah->ah_analog5GhzRev & 0xf);
+	} else
+		printk(" radio %d.%d", ah->ah_analog5GhzRev >> 4,
+			ah->ah_analog5GhzRev & 0xf);
 	printk("\n");
 	printk("%s: 802.11 address: %s\n",
 		dev->name, ether_sprintf(dev->dev_addr));
@@ -4628,6 +4644,7 @@ ath_announce(struct net_device *dev)
 		printk("%s: Use hw queue %u for %s traffic\n",
 			dev->name, txq->axq_qnum, acnames[i]);
 	}
+#undef HAL_MODE_DUALBAND
 }
 
 /*
