@@ -3,20 +3,17 @@ $Id$
 
 WARNING: THIS IS A BETA DISTRIBUTION.  THIS SOFTWARE HAS KNOWN PROBLEMS AND
 WARNING: LIMITATIONS THAT WILL BE CORRECTED BEFORE A PRODUCTION RELEASE.
-WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTORYS YOUR DISK
+WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTROYS YOUR DISK
 WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
 WARNING: USE AT YOUR OWN RISK!
 
 
-MADWIFI: Multimode Atheros Driver for WiFi on Linux (WPA branch)
-================================================================
+MADWIFI: Multimode Atheros Driver for WiFi on Linux
+===================================================
 
 * Copyright (c) 2002-2004 Sam Leffler.  All rights reserved.
 
 Read the file COPYRIGHT for the complete copyright.
-
-NOTE: This file describes the contents of the "WPA branch" of the
-      MADWIFI project.
 
 This software contains a Linux kernel driver for Atheros-based
 Wireless LAN devices.  The driver supports station, AP, adhoc, and
@@ -24,7 +21,7 @@ monitor modes of operation.  The Atheros driver depends on a
 device-independent implementation of the 802.11 protocols that
 originated in the BSD community (NetBSD in particular).  You will
 find a small amount of BSD-ish glue code that exists mainly to
-minimize diffs with the BSD variants However as much as possible
+minimize diffs with the BSD variants. However as much as possible
 this is "native Linux code" that tries to conform to Linux style
 and operation.
 
@@ -160,6 +157,15 @@ variable.  In that case the kernel sources are automatically searched
 for in /lib/modules/$KERNELRELEASE/build.
 
 
+Madwifi currently provides two different rate control algorithms,
+ONOE and AMRR. ONOE is used by default. In order to make madwifi
+use AMRR instead, you have to specify that via the ATH_RATE
+environment variable; e.g.
+
+trouble% export ATH_RATE=ath_rate/amrr
+trouble% make
+
+
 This distribution includes support for a variety of target platforms.
 Because of the binary nature of the HAL not all platforms are
 supported (the list grows as time permits).  The supported target
@@ -247,9 +253,17 @@ Linux 2.6
     net80211/wlan_wep.ko (WEP cipher support)
     net80211/wlan_tkip.ko (TKIP cipher support)
     net80211/wlan_ccmp.ko (AES-CCMP cipher support)
+    net80211/wlan_xauth.ko (external authenticator)
     net80211/wlan_auth.ko (802.1x authenticator)
     net80211/wlan_radius.ko (RADIUS client for 802.1x authenticator)
     net80211/wlan_acl.ko (MAC ACL support for AP operation)
+
+    and, depending on the rate control algorithm you choose (see above), 
+    one of these:
+
+    ath_rate/onoe/ath_rate_onoe.ko (ONOE rate control)
+    ath_rate/amrr/ath_rate_amrr.ko (AMRR rate control)
+    
 
 Linux 2.4
     ath/ath_pci.o (Atheros driver for PCI/Cardbus devices),
@@ -258,14 +272,22 @@ Linux 2.4
     net80211/wlan_wep.o (WEP cipher support)
     net80211/wlan_tkip.o (TKIP cipher support)
     net80211/wlan_ccmp.o (AES-CCMP cipher support)
+    net80211/wlan_xauth.o (external authenticator)
     net80211/wlan_auth.o (802.1x authenticator)
     net80211/wlan_radius.o (RADIUS client for 802.1x authenticator)
     net80211/wlan_acl.o (MAC ACL support for AP operation)
 
+    and, depending on the rate control algorithm you choose (see above), 
+    one of these:
+
+    ath_rate/onoe/ath_rate_onoe.o (ONOE rate control)
+    ath_rate/amrr/ath_rate_amrr.o (AMRR rate control)
+
+
 The first three files must be loaded either manually or by the
 system, e.g. through the hotplug or card manager support.  The
 remaining modules are loaded by the wlan module as needed.  Typically
-manuals are automatically loaded via dependencies, so after doing a
+modules are automatically loaded via dependencies, so after doing a
 make install you only need to do:
 
     modprobe ath_pci
@@ -405,8 +427,8 @@ Tong Chia	  Stephane Laroche  Michael Renzmann  Dale Whitfield
 Joachim Gleissner Georg Lukas	    Paul Stewart      Alexander Wirtz
 Guy Erb		  Tom Marshall	    D. Stolte	      Kevin Yu
 Kristian Hoffmann Nick Moss	    Bindu Therthala   Thorsten von Eicken
-William S. Kish	  Nick Petroni	    Carl Thompson     Jouni Malinen
-Satish Balay
+William S. Kish	  Nick Petroni      Carl Thompson     Jouni Malinen
+Satish Balay      Richard Dawe
 
 (Apologies to anyone whose name was unintentionally left off.)
 
