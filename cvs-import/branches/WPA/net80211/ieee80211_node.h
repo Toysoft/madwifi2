@@ -112,8 +112,7 @@ struct ieee80211_node {
 	u_int32_t		ni_rxfragstamp;	/* time stamp of last rx frag */
 	struct sk_buff		*ni_rxfrag[3];	/* rx frag reassembly */
 	struct ieee80211_rsnparms ni_rsn;	/* RSN/WPA parameters */
-	u_int16_t		ni_ucastkeyix;	/* unicast key index */
-	struct ieee80211_wepkey	ni_ucastkey;	/* unicast key */
+	struct ieee80211_key	ni_ucastkey;	/* unicast key */
 
 	/* hardware */
 	u_int32_t		ni_rstamp;	/* recv timestamp */
@@ -133,6 +132,7 @@ struct ieee80211_node {
 	struct ieee80211_channel *ni_chan;
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
+	u_int8_t		ni_erp;		/* ERP from beacon/probe resp */
 
 	/* others */
 	struct sk_buff_head	ni_savedq;	/* packets queued for pspoll */
@@ -179,7 +179,7 @@ extern	int ieee80211_node_delkey(struct ieee80211com *,
 extern	int ieee80211_node_setkey(struct ieee80211com *,
 		struct ieee80211_node *);
 
-extern	void ieee80211_begin_scan(struct ieee80211com *);
+extern	void ieee80211_begin_scan(struct ieee80211com *, int);
 extern	int ieee80211_next_scan(struct ieee80211com *);
 extern	void ieee80211_create_ibss(struct ieee80211com*,
 		struct ieee80211_channel *);
@@ -217,4 +217,5 @@ extern	void ieee80211_node_join(struct ieee80211com *,
 		struct ieee80211_node *, int);
 extern	void ieee80211_node_leave(struct ieee80211com *,
 		struct ieee80211_node *);
+extern	void ieee80211_set_shortslottime(struct ieee80211com *, int onoff);
 #endif /* _NET80211_IEEE80211_NODE_H_ */
