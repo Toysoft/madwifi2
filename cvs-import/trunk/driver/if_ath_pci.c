@@ -154,6 +154,7 @@ static void
 ath_pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ath_pci_softc *sc = dev->priv;
 
 	ath_detach(dev);
 	if (dev->irq)
@@ -162,7 +163,7 @@ ath_pci_remove(struct pci_dev *pdev)
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
-	kfree(dev->priv);
+	kfree(sc);
 }
 
 #ifdef CONFIG_PM
