@@ -544,12 +544,10 @@ ath_init(struct net_device *dev)
 	mode = ieee80211_chan2mode(ic, ni->ni_chan);
 	if (mode != sc->sc_curmode)
 		ath_setcurmode(sc, mode);
-
 	if (ic->ic_opmode == IEEE80211_M_MONITOR)
 		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
 	else
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
-
 	return 0;
 }
 
@@ -594,7 +592,6 @@ ath_stop(struct net_device *dev)
 		if (!sc->sc_invalid)
 			ath_hal_setpower(ah, HAL_PM_FULL_SLEEP, 0);
 	}
-
 	return 0;
 }
 
@@ -896,7 +893,6 @@ ath_mode_init(struct net_device *dev)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
-
 	ath_hal_setrxfilter(ah, rfilt);
 
 	/* calculate and install multicast filter */
@@ -1010,8 +1006,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		capinfo = IEEE80211_CAPINFO_ESS;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		capinfo |= IEEE80211_CAPINFO_PRIVACY;
-	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE)
-	    && IEEE80211_IS_CHAN_2GHZ(ni->ni_chan))
+	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
+	    IEEE80211_IS_CHAN_2GHZ(ni->ni_chan))
 		capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
 	if (ic->ic_flags & IEEE80211_F_SHSLOT)
 		capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
@@ -1148,7 +1144,6 @@ ath_beacon_config(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = &ic->ic_bss;
 	u_int32_t nexttbtt;
-
 	
 	nexttbtt = (LE_READ_4(ni->ni_tstamp + 4) << 22) |
 	    (LE_READ_4(ni->ni_tstamp) >> 10);
@@ -1400,7 +1395,6 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	if (sc->sc_rxlink != NULL)
 		*sc->sc_rxlink = bf->bf_daddr;
 	sc->sc_rxlink = &ds->ds_link;
-
 	return 0;
 }
 
@@ -1441,7 +1435,6 @@ ath_rx_tasklet(void *data)
 		if (status == HAL_EINPROGRESS)
 			break;
 		TAILQ_REMOVE(&sc->sc_rxbuf, bf, bf_list);
-
 		if (!ds->ds_rxstat.rs_more) {
 			if (ds->ds_rxstat.rs_status != 0) {
 				if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
@@ -1487,6 +1480,7 @@ ath_rx_tasklet(void *data)
 			sc->sc_stats.ast_rx_tooshort++;
 			goto rx_next;
 		}
+
 		pci_dma_sync_single(sc->sc_pdev,
 			bf->bf_skbaddr, len, PCI_DMA_FROMDEVICE);
 
@@ -1500,10 +1494,8 @@ ath_rx_tasklet(void *data)
 					(rt != NULL ?
 					(rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2));
 		} else {
-			if (ds->ds_rxstat.rs_more) {
-				/* Ignore packets > MTU */
+			if (ds->ds_rxstat.rs_more)	/* ignore pkts > MTU */
 				goto rx_next;
-			}
 			/*
 			 * normal receive
 			 */
@@ -1791,10 +1783,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 	if (set_dur && (flags & HAL_TXDESC_NOACK) == 0) {
 		u_int16_t dur;
-
-		/* SIFS + ACK */
-		/* XXX needs modification if fragmentation is ever implemented */
-		dur = ath_hal_computetxtime(ah, rt, IEEE80211_ACK_SIZE, rix, shortPreamble);
+		/*
+		 * XXX not right with fragmentation.
+		 */
+		dur = ath_hal_computetxtime(ah, rt, IEEE80211_ACK_SIZE,
+				rix, shortPreamble);
 		*(u_int16_t *)wh->i_dur = cpu_to_le16(dur);
 	}
 
@@ -2274,16 +2267,12 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	error = ath_chan_set(sc, ni->ni_chan);
 	if (error != 0)
 		goto bad;
-
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
 	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
-
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
-
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
-
 	if (nstate == IEEE80211_S_SCAN) {
 		mod_timer(&sc->sc_scan_ch,
 			jiffies + ((HZ * ath_dwelltime) / 1000));
@@ -2475,9 +2464,8 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 	struct ieee80211_node *ni;
 	struct ath_nodestat *st;
 
-	if (ic->ic_fixed_rate != -1) {
+	if (ic->ic_fixed_rate != -1)
 		return;
-	}
 	st = &sc->sc_bss_stat;
 	st->st_tx_ok = st->st_tx_err = st->st_tx_retr = st->st_tx_upper = 0;
 	if (ic->ic_opmode == IEEE80211_M_STA) {
