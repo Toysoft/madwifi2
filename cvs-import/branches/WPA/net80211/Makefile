@@ -58,12 +58,23 @@ SRCS_80211=	ieee80211.c ieee80211_crypto.c ieee80211_input.c \
 OBJS_80211=	ieee80211.o ieee80211_crypto.o ieee80211_input.o \
 		ieee80211_node.o ieee80211_output.o ieee80211_proto.o \
 		ieee80211_wireless.o ieee80211_linux.o
+# these will eventually go in separate modules
 SRCS_DOT1X+=	ieee80211_dot1x.c
 OBJS_DOT1X+=	ieee80211_dot1x.o
 SRCS_RADIUS+=	ieee80211_radius.c
 OBJS_RADIUS+=	ieee80211_radius.o
 SRCS=	${SRCS_80211} ${SRCS_DOT1X} ${SRCS_RADIUS} if_media.c rc4.c
 OBJS=	${OBJS_80211} ${OBJS_DOT1X} ${OBJS_RADIUS} if_media.o rc4.o
+
+#
+# Bring in compatibility code when the kernel lacks crypto supoprt.
+# XXX should base this on CONFIG_CRYPTO but
+# XXX that doesn't work for my 2.4.20-8 kernel
+#
+ifneq (${LINUX_VERSION}, 206)
+SRCS+=	md5.c
+OBJS+=	md5.o
+endif
 
 INCS+=	-I. ${KERNEL_INCS} -I${DEPTH}
 
