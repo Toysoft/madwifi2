@@ -52,6 +52,24 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211_output.c,v 1.9 2003/11/02 00:17:27 dyoung 
 
 #include <net80211/ieee80211_var.h>
 
+#ifdef IEEE80211_DEBUG
+/*
+ * Decide if an outbound management frame should be
+ * printed when debugging is enabled.  This filters some
+ * of the less interesting frames that come frequently
+ * (e.g. beacons).
+ */
+static __inline int
+doprint(struct ieee80211com *ic, int subtype)
+{
+	switch (subtype) {
+	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
+		return (ic->ic_opmode == IEEE80211_M_IBSS);
+	}
+	return 1;
+}
+#endif
+
 /*
  * Send a management frame to the specified node.  The node pointer
  * must have a reference as the pointer will be passed to the driver
@@ -98,19 +116,18 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 			__func__, ether_sprintf(wh->i_addr1)));
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
 	}
-
-	/* avoid to print too many frames */
-	if (ic->ic_opmode == IEEE80211_M_IBSS ||
-	    (type & IEEE80211_FC0_SUBTYPE_MASK) !=
-	    IEEE80211_FC0_SUBTYPE_PROBE_RESP)
-		IEEE80211_DPRINTF(ic, IEEE80211_MSG_DEBUG,
-		    ("sending %s to %s on channel %u\n",
+#ifdef IEEE80211_DEBUG
+	/* avoid printing too many frames */
+	if ((ieee80211_msg_debug(ic) && doprint(ic, type)) ||
+	    ieee80211_msg_dumppkts(ic)) {
+		if_printf(ic->ic_dev, "sending %s to %s on channel %u\n",
 		    ieee80211_mgt_subtype_name[
 		    (type & IEEE80211_FC0_SUBTYPE_MASK)
 		    >> IEEE80211_FC0_SUBTYPE_SHIFT],
 		    ether_sprintf(ni->ni_macaddr),
-		    ieee80211_chan2ieee(ic, ni->ni_chan)));
-
+		    ieee80211_chan2ieee(ic, ni->ni_chan));
+	}
+#endif
 	(void) (*ic->ic_mgtstart)(ic, skb);
 }
 
@@ -209,7 +226,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		 */ 
 		ni->ni_inact = IEEE80211_INACT_RUN;
 		/* NB: PAE frames have their own encryption policy */
-		if (ic->ic_flags & IEEE80211_F_WEPON)
+		if (ic->ic_flags & IEEE80211_F_PRIVACY)
 			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 	}
 	*pni = ni;
@@ -292,6 +309,195 @@ ieee80211_add_erp(u_int8_t *frm, struct ieee80211com *ic)
 	return frm;
 }
 
+static void
+ieee80211_setup_wpa_ie(struct ieee80211com *ic)
+{
+#define	WPA_OUI_BYTES		0x00, 0x50, 0xf2
+#define	ADDSHORT(frm, v) do {			\
+	frm[0] = (v) & 0xff;			\
+	frm[1] = (v) >> 8;			\
+	frm += 2;				\
+} while (0)
+#define	ADDSELECTOR(frm, sel) do {		\
+	memcpy(frm, sel, 4);			\
+	frm += 4;				\
+} while (0)
+	static const u_int8_t oui[4] = { WPA_OUI_BYTES, WPA_OUI_TYPE };
+	static const u_int8_t cipher_suite[][4] = {
+		{ WPA_OUI_BYTES, WPA_CSE_WEP40 },	/* NB: 40-bit */
+		{ WPA_OUI_BYTES, WPA_CSE_TKIP },
+		{ 0x00, 0x00, 0x00, 0x00 },		/* XXX WRAP */
+		{ WPA_OUI_BYTES, WPA_CSE_CCMP },
+		{ 0x00, 0x00, 0x00, 0x00 },		/* XXX CKIP */
+		{ WPA_OUI_BYTES, WPA_CSE_NULL },
+	};
+	static const u_int8_t wep104_suite[4] =
+		{ WPA_OUI_BYTES, WPA_CSE_WEP104 };
+	static const u_int8_t key_mgt_unspec[4] =
+		{ WPA_OUI_BYTES, WPA_ASE_8021X_UNSPEC };
+	static const u_int8_t key_mgt_psk[4] =
+		{ WPA_OUI_BYTES, WPA_ASE_8021X_PSK };
+	struct ieee80211_ie_wpa *ie = &ic->ic_wpa_ie;
+	const struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;
+	u_int8_t *frm = (u_int8_t *)ie;
+	u_int8_t *selcnt;
+
+	*frm++ = IEEE80211_ELEMID_VENDOR;
+	*frm++ = 0;				/* length filled in below */
+	memcpy(frm, oui, sizeof(oui));		/* WPA OUI */
+	frm += sizeof(oui);
+	ADDSHORT(frm, WPA_VERSION);
+
+	/* XXX filter out CKIP */
+
+	/* multicast cipher */
+	if (rsn->rsn_mcastcipher == IEEE80211_CIPHER_WEP &&
+	    rsn->rsn_mcastkeylen >= 13)
+		ADDSELECTOR(frm, wep104_suite);
+	else
+		ADDSELECTOR(frm, cipher_suite[rsn->rsn_mcastcipher]);
+
+	/* unicast cipher list */
+	selcnt = frm;
+	ADDSHORT(frm, 0);			/* selector count */
+	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
+		selcnt[0]++;
+		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
+	}
+	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_AES_CCM)) {
+		selcnt[0]++;
+		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_AES_CCM]);
+	}
+
+	/* authenticator selector list */
+	selcnt = frm;
+	ADDSHORT(frm, 0);			/* selector count */
+	switch (rsn->rsn_keymgmt) {		/* NB: only one right now */
+	case WPA_ASE_8021X_UNSPEC:
+		selcnt[0]++;
+		ADDSELECTOR(frm, key_mgt_unspec);
+		break;
+	case WPA_ASE_8021X_PSK:
+		selcnt[0]++;
+		ADDSELECTOR(frm, key_mgt_psk);
+		break;
+	}
+
+	/* optional capabilities */
+	if (rsn->rsn_caps != 0)
+		ADDSHORT(frm, rsn->rsn_caps);
+
+	/* calculate element length */
+	ie->wpa_len = frm - &ie->wpa_oui[0];
+	KASSERT(ie->wpa_len <= sizeof(*ie), ("WPA IE too big, %u > %u",
+		ie->wpa_len, sizeof(*ie)));
+#undef ADDSHORT
+#undef ADDSELECTOR
+#undef WPA_OUI_BYTES
+}
+
+static void
+ieee80211_setup_rsn_ie(struct ieee80211com *ic)
+{
+#define	RSN_OUI_BYTES		0x00, 0x0f, 0xac
+#define	ADDSHORT(frm, v) do {			\
+	frm[0] = (v) & 0xff;			\
+	frm[1] = (v) >> 8;			\
+	frm += 2;				\
+} while (0)
+#define	ADDSELECTOR(frm, sel) do {		\
+	memcpy(frm, sel, 4);			\
+	frm += 4;				\
+} while (0)
+	static const u_int8_t cipher_suite[][4] = {
+		{ RSN_OUI_BYTES, RSN_CSE_WEP40 },	/* NB: 40-bit */
+		{ RSN_OUI_BYTES, RSN_CSE_TKIP },
+		{ RSN_OUI_BYTES, RSN_CSE_WRAP },
+		{ RSN_OUI_BYTES, RSN_CSE_CCMP },
+		{ 0x00, 0x00, 0x00, 0x00 },		/* XXX CKIP */
+		{ RSN_OUI_BYTES, RSN_CSE_NULL },
+	};
+	static const u_int8_t wep104_suite[4] =
+		{ RSN_OUI_BYTES, RSN_CSE_WEP104 };
+	static const u_int8_t key_mgt_unspec[4] =
+		{ RSN_OUI_BYTES, RSN_ASE_8021X_UNSPEC };
+	static const u_int8_t key_mgt_psk[4] =
+		{ RSN_OUI_BYTES, RSN_ASE_8021X_PSK };
+	struct ieee80211_ie_wpa *ie = &ic->ic_wpa_ie;
+	const struct ieee80211_rsnparms *rsn = &ic->ic_bss->ni_rsn;
+	u_int8_t *frm = (u_int8_t *)ie;
+	u_int8_t *selcnt;
+
+	*frm++ = IEEE80211_ELEMID_RSN;
+	*frm++ = 0;				/* length filled in below */
+	ADDSHORT(frm, RSN_VERSION);
+
+	/* XXX filter out CKIP */
+
+	/* multicast cipher */
+	if (rsn->rsn_mcastcipher == IEEE80211_CIPHER_WEP &&
+	    rsn->rsn_mcastkeylen >= 13)
+		ADDSELECTOR(frm, wep104_suite);
+	else
+		ADDSELECTOR(frm, cipher_suite[rsn->rsn_mcastcipher]);
+
+	/* unicast cipher list */
+	selcnt = frm;
+	ADDSHORT(frm, 0);			/* selector count */
+	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
+		selcnt[0]++;
+		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
+	}
+	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_AES_CCM)) {
+		selcnt[0]++;
+		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_AES_CCM]);
+	}
+
+	/* authenticator selector list */
+	selcnt = frm;
+	ADDSHORT(frm, 0);			/* selector count */
+	switch (rsn->rsn_keymgmt) {		/* NB: only one right now */
+	case WPA_ASE_8021X_UNSPEC:
+		selcnt[0]++;
+		ADDSELECTOR(frm, key_mgt_unspec);
+		break;
+	case WPA_ASE_8021X_PSK:
+		selcnt[0]++;
+		ADDSELECTOR(frm, key_mgt_psk);
+		break;
+	}
+
+	/* optional capabilities */
+	if (rsn->rsn_caps != 0)
+		ADDSHORT(frm, rsn->rsn_caps);
+	/* XXX PMKID */
+
+	/* calculate element length */
+	ie->wpa_len = frm - &ie->wpa_oui[0];
+	KASSERT(ie->wpa_len <= sizeof(*ie), ("RSN IE too big, %u > %u",
+		ie->wpa_len, sizeof(*ie)));
+#undef ADDSELECTOR
+#undef ADDSHORT
+#undef RSN_OUI_BYTES
+}
+
+/*
+ * Add a WPA/RSN element to a frame.
+ */
+static u_int8_t *
+ieee80211_add_wpa(u_int8_t *frm, struct ieee80211com *ic)
+{
+	if (ic->ic_wpa_ie.wpa_len == 0) {
+		KASSERT(ic->ic_flags & IEEE80211_F_WPA, ("no WPA/RSN!"));
+		if (ic->ic_flags & IEEE80211_F_WPA1)
+			ieee80211_setup_wpa_ie(ic);
+		else
+			ieee80211_setup_rsn_ie(ic);
+	}
+	memcpy(frm, &ic->ic_wpa_ie, 2+ic->ic_wpa_ie.wpa_len);
+	return frm + 2+ic->ic_wpa_ie.wpa_len;
+}
+
 /*
  * Send a management frame.  The node is for the destination (or ic_bss
  * when in station mode).  Nodes other than ic_bss have their reference
@@ -325,11 +531,13 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
+		 *	[tlv] user-specified ie's
 		 */
 		skb = ieee80211_getmgtframe(&frm,
 			 2 + ic->ic_des_esslen
 		       + 2 + IEEE80211_RATE_SIZE
-		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE));
+		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+		       + (ic->ic_opt_ie != NULL ? ic->ic_opt_ie_len : 0));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -337,6 +545,10 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		mode = ieee80211_chan2mode(ic, ni->ni_chan);
 		frm = ieee80211_add_rates(frm, &ic->ic_sup_rates[mode]);
 		frm = ieee80211_add_xrates(frm, &ic->ic_sup_rates[mode]);
+		if (ic->ic_opt_ie != NULL) {
+			memcpy(frm, ic->ic_opt_ie, ic->ic_opt_ie_len);
+			frm += ic->ic_opt_ie_len;
+		}
 		skb_trim(skb, frm - skb->data);
 
 		timer = IEEE80211_TRANS_WAIT;
@@ -354,6 +566,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 *	[tlv] parameter set (IBSS)
 		 *	[tlv] extended rate phy (ERP)
 		 *	[tlv] extended supported rates
+		 *	[tlv] WPA
 		 */
 		skb = ieee80211_getmgtframe(&frm,
 			 8 + 2 + 2 + 2
@@ -362,7 +575,10 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		       + (ic->ic_phytype == IEEE80211_T_FH ? 7 : 3)
 		       + 6
 		       + (ic->ic_curmode == IEEE80211_MODE_11G ? 3 : 0)
-		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE));
+		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+		       + (ic->ic_flags & IEEE80211_F_WPA ?
+				sizeof(struct ieee80211_ie_wpa) : 0)
+		);
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -409,6 +625,8 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 			*frm++ = 2;
 			*frm++ = 0; *frm++ = 0;		/* TODO: ATIM window */
 		}
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			frm = ieee80211_add_wpa(frm, ic);
 		if (ic->ic_curmode == IEEE80211_MODE_11G)
 			frm = ieee80211_add_erp(frm, ic);
 		frm = ieee80211_add_xrates(frm, &ic->ic_bss->ni_rates);
@@ -494,6 +712,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
+		 *	[tlv] user-specified ie's
 		 */
 		skb = ieee80211_getmgtframe(&frm,
 			 sizeof(capinfo)
@@ -501,7 +720,8 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		       + IEEE80211_ADDR_LEN
 		       + 2 + ni->ni_esslen
 		       + 2 + IEEE80211_RATE_SIZE
-		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE));
+		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+		       + (ic->ic_opt_ie != NULL ? ic->ic_opt_ie_len : 0));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -535,6 +755,10 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		frm = ieee80211_add_ssid(frm, ni->ni_essid, ni->ni_esslen);
 		frm = ieee80211_add_rates(frm, &ni->ni_rates);
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
+		if (ic->ic_opt_ie != NULL) {
+			memcpy(frm, ic->ic_opt_ie, ic->ic_opt_ie_len);
+			frm += ic->ic_opt_ie_len;
+		}
 		skb_trim(skb, frm - skb->data);
 
 		timer = IEEE80211_TRANS_WAIT;
@@ -636,7 +860,8 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	 *	[tlv] parameter set (IBSS/TIM)
 	 *	[tlv] extended rate phy (ERP)
 	 *	[tlv] extended supported rates
-	 * XXX WME, WPA, etc.
+	 *	[tlv] WPA/RSN supported rates
+	 * XXX WME, etc.
 	 * XXX Vendor-specific OIDs (e.g. Atheros)
 	 */
 	rs = &ni->ni_rates;
@@ -652,6 +877,8 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 pktlen += 3;		/* ERP information element */
 	if (rs->rs_nrates > IEEE80211_RATE_SIZE)
 		pktlen += 2;		/* extended rate set */
+	if (ic->ic_flags & IEEE80211_F_WPA)
+		pktlen += sizeof(struct ieee80211_ie_wpa);
 	/* XXX may be better to just allocate a max-sized buffer */
 	skb = ieee80211_getmgtframe(&frm, pktlen);
 	if (skb == NULL) {
@@ -716,11 +943,13 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 		*frm++ = 0;	/* Partial Virtual Bitmap (variable length) */
 		bo->bo_tim_len = 6;
 	}
+	bo->bo_trailer = frm;
+	if (ic->ic_flags & IEEE80211_F_WPA)
+		frm = ieee80211_add_wpa(frm, ic);
 	if (ic->ic_curmode == IEEE80211_MODE_11G)
 		frm = ieee80211_add_erp(frm, ic);
-	bo->bo_xrates = frm;
 	efrm = ieee80211_add_xrates(frm, rs);
-	bo->bo_xrates_len = efrm - frm;
+	bo->bo_trailer_len = efrm - frm;
 	skb_trim(skb, efrm - skb->data);
 	return skb;
 }
