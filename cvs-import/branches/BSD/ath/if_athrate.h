@@ -1,6 +1,6 @@
 /*-
- * Copyright (c) 2004 Sam Leffler, Errno Consulting
- * Copyright (c) 2004 Video54 Technologies, Inc.
+ * Copyright (c) 2004-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2004-2005 Video54 Technologies, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,7 +34,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id$
+ * $FreeBSD: src/sys/dev/ath/if_athrate.h,v 1.2 2004/12/31 22:41:45 sam Exp $
  */
 #ifndef _ATH_RATECTRL_H_
 #define _ATH_RATECTRL_H_
@@ -97,12 +97,6 @@ void	ath_rate_node_init(struct ath_softc *, struct ath_node *);
  * Cleanup any per-node state prior to the node being reclaimed.
  */
 void	ath_rate_node_cleanup(struct ath_softc *, struct ath_node *);
-/*
- * Copy per-node state; currently used only to duplicate bss on
- * station association.
- */
-void	ath_rate_node_copy(struct ath_softc *,
-		struct ath_node *, const struct ath_node *);
 /*
  * Update rate control state on station associate/reassociate 
  * (when operating as an ap or for nodes discovered when operating
