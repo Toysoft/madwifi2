@@ -1060,31 +1060,19 @@ EXPORT_SYMBOL(ieee80211_ioctl_siwscan);
  * element using the hostap format.
  */
 static u_int
-encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen)
+encode_ie(void *buf, size_t bufsize,
+	const u_int8_t *ie, size_t ielen,
+	const char *leader, size_t leader_len)
 {
 	u_int8_t *p;
 	int i;
 
+	if (bufsize < leader_len)
+		return 0;
 	p = buf;
-	if (ie[0] == IEEE80211_ELEMID_RSN) {
-		const char rsn_leader[] = "rsn_ie=";
-		const int rsn_leader_len = sizeof(rsn_leader)-1;
-
-		if (bufsize < rsn_leader_len)
-			return 0;
-		memcpy(p, rsn_leader, rsn_leader_len);
-		bufsize -= rsn_leader_len;
-		p += rsn_leader_len;
-	} else {
-		const char wpa_leader[] = "wpa_ie=";
-		const int wpa_leader_len = sizeof(wpa_leader)-1;
-
-		if (bufsize < wpa_leader_len)
-			return 0;
-		memcpy(p, wpa_leader, wpa_leader_len);
-		bufsize -= wpa_leader_len;
-		p += wpa_leader_len;
-	}
+	memcpy(p, leader, leader_len);
+	bufsize -= leader_len;
+	p += leader_len;
 	for (i = 0; i < ielen && bufsize > 2; i++)
 		p += sprintf(p, "%02x", ie[i]);
 	return (i == ielen ? p - (u_int8_t *)buf : 0);
@@ -1214,10 +1202,19 @@ again:
 		current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, buf);
 
 		if (ni->ni_wpa_ie != NULL) {
+			static const char rsn_leader[] = "rsn_ie=";
+			static const char wpa_leader[] = "wpa_ie=";
+
 			memset(&iwe, 0, sizeof(iwe));
 			iwe.cmd = IWEVCUSTOM;
-			iwe.u.data.length = encode_ie(buf, sizeof(buf),
-				ni->ni_wpa_ie, ni->ni_wpa_ie[1]+2);
+			if (ni->ni_wpa_ie[0] == IEEE80211_ELEMID_RSN)
+				iwe.u.data.length = encode_ie(buf, sizeof(buf),
+					ni->ni_wpa_ie, ni->ni_wpa_ie[1]+2,
+					rsn_leader, sizeof(rsn_leader)-1);
+			else
+				iwe.u.data.length = encode_ie(buf, sizeof(buf),
+					ni->ni_wpa_ie, ni->ni_wpa_ie[1]+2,
+					wpa_leader, sizeof(wpa_leader)-1);
 			if (iwe.u.data.length != 0)
 				current_ev = iwe_stream_add_point(current_ev, end_buf,
 					&iwe, buf);
