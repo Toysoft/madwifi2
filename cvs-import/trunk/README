@@ -75,14 +75,13 @@ There are currently 3 generations of Atheros 802.11 wireless devices:
 5212	supports 11a, 11b, and 11g
 
 These parts have been incorporated in a variety of retail products
-including cardbus cards from DLink, Linksys, Netgear, and Proxim; and
-mini-pci cards from some of these same vendors.  In addition many
-laptop vendors use Atheros mini-pci cards for their builtin wireless
-support.  An (incomplete) list of products that use Atheros parts is:
+including cardbus cards from DLink, Linksys, Netgear, Orinoco,
+Proxim, and 3Com; and mini-pci cards from some of these same vendors.
+In addition many laptop vendors use Atheros mini-pci cards for their
+builtin wireless support.  For an up-to-date list of cards based
+on Atheros parts visit:
 
-Netgear WAG511		D-Link DWL-AG520	Linksys WPC55AG
-Netgear WAB501		D-Link DWL-AG650	Linksys WMP55AG
-			D-Link DWL-AB650	Linksys WPC51AB
+http://customerproducts.atheros.com/customerproducts
 
 In general, if a device is identified as ``11a only'' it is almost
 certain to contain an Atheros 5210 part in it.  All retail a+b
@@ -92,21 +91,116 @@ id with a tool like lspci, the Atheros vendor id is 0x168c; e.g.
 
    00:13.0 Ethernet controller: Unknown device 168c:0012 (rev 01)
 
+but beware that come vendors use alternate vendor id's (e.g 3Com).
+The file hal/ah_devid.h has a list of known PCI id's.
+
 
 Building the driver
 ===================
-To build the driver at the top level you may need to edit Makefile.inc
-to set the pathname to your Linux kernel distribution.  By default this
-path is obtained automatically.
+Most people can just type:
 
-If you are cross-compiling the driver for a different platform define
-the CC, LD, and STRIP macros appropriately.  For example:
+trouble% make
 
-#CC=		/export/tools/bin/mips-linux-gcc
-#LD=		/export/tools/bin/mips-linux-ld
-#STRIP=		/export/tools/bin/mips-linux-strip
+at the top level to build all the modules for the system where you
+are building.  If this does not work or if you want to cross-compile
+the code for a different system then you will need to do more setup.
 
-Once you've got Makefile.inc configured appropriately, do:
+To build the software four things are needed:
+
+1. The target platform (e.g. i386-elf)
+2. The location of the kernel include files.
+3. The location of the kernel configuration file.
+4. The location of the build tools.
+
+The target platform is specified using; e.g.
+
+trouble% export TARGET=i386-elf
+
+The supported target platforms can be found with:
+
+trouble% ls hal/linux/*.inc
+hal/linux/Makefile.inc          hal/linux/mipsisa32-le-elf.inc
+hal/linux/arm9-le-thumb-elf.inc hal/linux/powerpc-be-eabi.inc
+hal/linux/i386-elf.inc          hal/linux/powerpc-le-eabi.inc
+hal/linux/mipsisa32-be-elf.inc  hal/linux/xscale-be-elf.inc
+
+A target specifies the CPU architecture, byte order, and the ABI/file
+format.
+
+The location of the kernel include and configuration files are
+typically specified together by specifiying the version of the
+kernel and then using default settings for pathnames; e.g.
+
+trouble% export KERNEL_VERSION=2.4.20-8
+
+This is sufficient if you have multiple kernel versions on your build
+machine and you want to cross-build for a different version than your
+are running.  However if the default locations are incorrect then you
+will also need to override them; e.g.
+
+trouble% export KERNEL_PATH=/cdrom/linuxppc-2.4.21-pre2-cerf/
+trouble% export KERNEL_CONF=/cdrom/linuxppc-2.4.21-pre2-cerf/default.config
+
+(These settings are most often used when cross-compiling.)
+
+Finally, if you are cross-compiling you will probably need to
+override the default toolchain settings that come with the software.
+These settings are in files in the directory hal/linux/ that are
+named <platform>.inc.  For example, the file for xscale-be-elf is:
+
+#
+# Compilation configuration for building big-endian XScale/arm-elf.
+#
+
+#
+# Built with GNU cross-devel tools:
+#
+# PREFIX=/pub/gnu
+# BINUTILS=binutils-2.14
+# GCC=gcc-3.3.2
+# target=arm-elf
+#
+# ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
+# ${GCC}/configure --target=$target   --prefix=${PREFIX} \
+#	--enable-languages=c   --with-gnu-as --with-gnu-ld \
+#	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
+#
+ifndef TOOLPREFIX
+TOOLPREFIX=	/pub/gnu/bin/arm-elf-
+endif
+#
+CC=	${TOOLPREFIX}gcc
+LD=	${TOOLPREFIX}ld
+STRIP=	${TOOLPREFIX}strip
+OBJCOPY=${TOOLPREFIX}objcopy
+NM=	${TOOLPREFIX}nm
+
+LDOPTS=	-EB
+COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
+COPTS+= -march=armv4 -mbig-endian -fno-strict-aliasing -fno-common -mapcs-32 \
+	-mtune=xscale  -mshort-load-bytes -msoft-float
+
+The first set of definitions specify the location and name of the
+programs used to build the software.  The rest of the file defines
+the compilation options for the target platform.  The latter should
+usually not be changed because they were the options used to build
+the binary HAL module, but TOOLPREFIX is unlikely to be right for
+your system and you will want to change it; e.g
+
+trouble% export TOOLPREFIX=/usr/local/bin/arm-elf-
+
+to use programs installed in /usr/local/bin.  Note that mixing different
+versions of the GNU tools may not work.  The .inc file for each target
+platform specifies the exact toolchains used, including where they
+were obtained (if pre-built).
+
+The build system is designed to support cross-building without any
+modification to the distribution files.  If you cannot do what you
+need by setting environment variables please send patches to show
+where things failed to do the right thing.
+
+
+Once you have stuff configured appropriately, do:
 
     make
 
@@ -149,9 +243,9 @@ version of Linux; e.g. building for 2.6 after building for 2.4.
 Using the driver
 ================
 The driver should support any Atheros-based cardbus or pci device.
-Management uses the normal Linux tools such as ifconfig.  Support
-is included for versions 12 and later of the Wireless Extensions
-so tools like iwconfig should work too.
+Management is done using the normal Linux tools such as ifconfig.
+Support is included for versions 12 and later of the Wireless
+Extensions so tools like iwconfig should work too.
 
 To use this software in ``station mode'' (i.e. as a client) just
 bring the interface up and the driver will scan for all access
@@ -164,6 +258,9 @@ the driver will scan both 2Ghz and 5GHz ranges and also look for
 select a mode (e.g. 11b) using iwpriv or, more commonly, select the
 AP based on SSID and/or channel.
 
+NOTE: You must mark the interface ``up'' with, e.g. ifconfig ath0 up
+      before scanning for access points with iwlist.
+
 To use this software in ``hostap mode'' you need to configure it
 with iwconfig and you will probably want to lock the operating mode
 to one of 11a, 11b, or 11g if you have a multi-mode card (if you
@@ -171,7 +268,7 @@ do not lock the mode then the driver will select a mode for you;
 usually 11a).  In addition you will need to configure the system to
 bridge frames to a wired LAN or similar.
 
-NOTE: adhoc mode is presently untested and may not work (send fixes).
+NOTE: adhoc mode is known to not work reliably.
 
 Wireless tools cribsheet:
 
@@ -184,9 +281,19 @@ iwpriv ath0 mode 0		autoselect from 11a/b/g (default)
 
 There are some debugging mechanisms for the curious/masochistic:
 
-echo 1 > /proc/sys/net/ath/debug	enable console msgs from the driver
-echo 1 > /proc/net/wlan0/debug		enable console msgs from the wlan module
-echo hal > /proc/sys/net/ath/dump	dump h/w register state to the console
+sysctl -w dev.ath.debug=1	enable console msgs from the driver
+sysctl -w dev.ath.dump="hal"	dump h/w register state to the console
+echo 1>/proc/net/wlan0/debug	enable console msgs from the wlan module
+
+In addition the program tools/athstats can be very useful in understanding
+what is going on.  In particular, something like:
+
+trouble% athstats 1
+
+will give a running display of the most interesting statistics sampled
+every 1 second.  Running athstats without any options will display a
+summary of all non-zero statistics from the time the driver was loaded.
+By default the ath0 device is used; to override this use the -i option.
 
 
 Security/Crpto Support
@@ -195,10 +302,9 @@ The driver supports fixed/shared key WEP using the hardware.  Newer
 Atheros hardware is capable of much more (e.g. AES, TKIP and Michael)
 but that work is not yet supported by the driver.
 
-This distribution does not include support for 802.1x authentication
-or (obviously) WPA.  Support for .1x should be possible using
-existing tools such as xsupplicant but this has not been tried.
-Work is planned to provide ``native'' .1x and WPA support.
+This distribution works with the xsupplicant program to support 802.1x
+client authentication.  802.1x authenticator support and full WPA support
+(client and AP) is planned.
 
 
 Known Problems
@@ -211,62 +317,40 @@ Known Problems
    in future versions of Linux.  The use of BSD macros will be removed
    in a future revision. [TEMPORARY WORKAROUND IN PLACE]
 
-1. Roaming mode is broken.  If you lose your access point by going out
-   of range the driver does not automatically re-associate. [FIXED]
-2. Adhoc mode is untested and possibly/probably broken.
-3. Performance in lossy environments is suboptimal.  The algorithm used to
+1. Adhoc mode is broken; symptoms are intermittent operation.
+2. Performance in lossy environments is suboptimal.  The algorithm used to
    select the rate for transmitted packets is very simplistic.  There is no
    software retransmit; only hardware retransmit is used.  Contributors are
    encouraged to replace the existing rate control algorithm with a better
    one (hint: all the information needed is available in the driver).
-4. 11g support is little tested and may have interoperability problems.
-   The software is known to function with an Atheros 11g access point but
-   interoperability may be problematic until vendors update firmware in
-   existing 11g products.  If you encounter problems using an 11g access
-   point you should be able to workaround incompatibilities by locking the
-   driver to 11b mode (iwpriv mode 2).  Alternatively, most 11g compatibility
-   issues are in the 802.11 layer and you may be able to workaround issues
-   by modifying the wlan module.
-5. General performance is suboptimal. The Atheros hardware is known to be
-   capable of transfer rates of 23-24 Mb/s (or more) in 11a and 11g modes
-   using their NDIS (aka Windows) driver.  Results with this driver are
-   mixed and seem to vary significantly based on the tool used to measure
-   performance.  Specifically netperf seems to perform very poorly while
-   the bw_tcp program from lmbench yield ok results (~21 Mb/s "uplink"
-   from a station with a 5212 card in it to a wired host on the same LAN
-   as the AP--under 11a). [PARTLY FIXED]
-6. It has been observed that getting a DHCP address sometimes requires
-   multiple tries.  This seems to happen only with 5211 and 5212 parts and
-   mostly in a noisy environment (i.e. one where many AP's are found).
-   This problem is specific to the driver and not the hardware and is
-   believed to be due to not receiving the broadcast frame from the DHCP
-   server.  Forcing the DHCP server to use a unicast response causes this
-   problem to go away (the guess is that the unicast frame is retransmitted
-   by the AP while the broadcast frame is not). [FIXED]
-7. The driver does not fully enable power-save operation of the chip;
+3. 11g AP support is incomplete. We don't set the slot time in the driver
+   and do not turn off short slot time when an 11b station joins the ntework.
+4. The driver does not fully enable power-save operation of the chip;
    consequently power use is suboptimal.
-8. Turbo mode is untested. [REPORTED WORKING]
 
 Acknowledgements
 ================
 This work could not have been done without the support of Atheros
 and in particular the efforts of Greg Chesson.  Comments from David
 Miller were helpful in cleaning up some of the roughest edges in
-the driver.
+early versions of the driver.
 
 Many people have contributed fixes and improvements to this software
 including:
 
-Carl Thompson
-Nick Moss
-William S. Kish
 Joerg Albert
+Tong Chia
+William S. Kish
+Mathieu Lacage
+Stephane Laroche
+Tom Marshall
+Nick Moss
+Nick Petroni
+Henry Qian
+Carl Thompson
 giova+mwfdev@faglioni.it
 
 (Apologies to anyone whose name was unintentionally left off.)
-
-The Linux 2.6 support was done by Carl Thompson <cet@carlthompson.net>
-(who says he has no idea what he is doing).
 
 Feedback and Contributions
 ==========================
@@ -280,9 +364,9 @@ When sending a problem report be sure to include the version of the
 driver and the part identification the driver prints to the console when
 the module is loaded.  For example,
 
-ath_hal: 0.8.2.0 (Sam Leffler <sam@errno.com>)
-wlan: 0.7.0.0 (Sam Leffler <sam@errno.com>)
-ath_pci: 0.8.2.0 (Sam Leffler <sam@errno.com>)
+ath_hal: 0.8.2.0
+wlan: 0.7.0.0
+ath_pci: 0.8.2.0
 PCI: Found IRQ 11 for device 00:13.0
 ath0: 11a rates: 6Mbps 9Mbps 12Mbps 18Mbps 24Mbps 36Mbps 48Mbps 54Mbps
 ath0: 11b rates: 1Mbps 2Mbps 5.5Mbps 11Mbps
