@@ -89,7 +89,17 @@ static struct net_device_stats *ath_getstats(struct net_device *);
 static int	ath_getchannels(struct net_device *, u_int cc, HAL_BOOL outdoor);
 
 static int	ath_rate_setup(struct net_device *, u_int mode);
+static void	ath_rate_mapsetup(struct net_device *);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
+
+static void	ath_phy_err_report(struct ath_softc *,
+			struct ath_phyerr *, const struct ath_rx_status *);
+static void	ath_phy_err_reset(struct ath_phyerr *, u_int freq);
+static void	ath_ani_action(struct ath_softc *, u_int phyErr);
+static void	ath_ani_poll(struct ath_softc *);
+static void	ath_ani_reset(struct ath_softc *);
+static void	ath_ani_setup(struct ath_softc *);
+static void	ath_ani_cleanup(struct ath_softc *);
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
@@ -165,6 +175,11 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ath_rate_setup(dev, IEEE80211_MODE_11B);
 	ath_rate_setup(dev, IEEE80211_MODE_11G);
 	ath_rate_setup(dev, IEEE80211_MODE_TURBO);
+
+	/*
+	 * Setup ANI handling, if supported.
+	 */
+	ath_ani_setup(sc);
 
 	error = ath_desc_alloc(sc);
 	if (error != 0) {
@@ -264,6 +279,7 @@ ath_detach(struct net_device *dev)
 	DPRINTF(("ath_detach flags %x\n", dev->flags));
 	sc->sc_invalid = 1;
 	ath_stop(dev);
+	ath_ani_cleanup(sc);
 	ath_desc_free(sc);
 	ath_hal_detach(sc->sc_ah);
 #ifdef CONFIG_PROC_FS
@@ -465,6 +481,11 @@ ath_init(struct net_device *dev)
 		val |= HAL_INT_SWBA;			/* beacon prepare */
 #endif
 	ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
+
+	/*
+	 * Setup the mapping table from IEEE rates to h/w rates.
+	 */
+	ath_rate_mapsetup(dev);
 
 	dev->flags |= IFF_RUNNING;
 	ic->ic_state = IEEE80211_S_INIT;
@@ -797,7 +818,8 @@ ath_mode_init(struct net_device *dev)
 	ath_hal_setopmode(ah, ic->ic_opmode);
 
 	/* receive filter */
-	rfilt = HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
+	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
+	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_state == IEEE80211_S_SCAN)
@@ -821,7 +843,7 @@ ath_mode_init(struct net_device *dev)
 	}
 	ath_hal_setmcastfilter(ah, mfilt[0], mfilt[1]);
 	DPRINTF(("ath_mode_init: RX filter 0x%x, MC filter %08x:%08x\n",
-	    rfilt, mfilt[0], mfilt[1]));
+		rfilt, mfilt[0], mfilt[1]));
 }
 
 static struct sk_buff *
@@ -915,6 +937,10 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		capinfo = IEEE80211_CAPINFO_ESS;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		capinfo |= IEEE80211_CAPINFO_PRIVACY;
+	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+		capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
+	if (ic->ic_flags & IEEE80211_F_SHSLOT)
+		capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
 	*(u_int16_t *)frm = cpu_to_le16(capinfo);
 	frm += 2;
 	*frm++ = IEEE80211_ELEMID_SSID;
@@ -1230,6 +1256,10 @@ ath_rx_tasklet(void *data)
 				sc->sc_stats.ast_rx_phyerr++;
 				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
 				sc->sc_stats.ast_rx_phy[phyerr]++;
+				if (sc->sc_phyerr[phyerr])
+					ath_phy_err_report(sc,
+						sc->sc_phyerr[phyerr],
+						&ds->ds_rxstat);
 			}
 			goto rx_next;
 		}
@@ -1291,6 +1321,9 @@ ath_rx_tasklet(void *data)
   rx_next:
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	} while (ath_rxbuf_init(sc, bf) == 0);
+
+	if (sc->sc_doani)			/* ANI monitoring */
+		ath_ani_poll(sc);
 
 	ath_hal_rxena(ah);			/* in case of RXEOL */
 }
@@ -1394,17 +1427,12 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		rix = 0;			/* XXX lowest rate */
 		break;
 	default:
-		txrate = ni->ni_rates.rs_rates[ni->ni_txrate];
-		/* XXX use table lookup */
-		for (rix = 0; rix < rt->rateCount; rix++)
-			if (txrate == rt->info[rix].dot11Rate)
-				break;
-		if (rix == rt->rateCount) {
-			printk("%s: %s: bogus xmit rate 0x%x; %u rates:",
-				dev->name, __func__, txrate, rt->rateCount);
-			for (rix = 0; rix < rt->rateCount; rix++)
-				printk(" 0x%x", rt->info[rix].dot11Rate);
-			printk("\n");
+		rix = sc->sc_rixmap[ni->ni_rates.rs_rates[ni->ni_txrate]];
+		if (rix == 0xff) {
+			printk("%s: %s: bogus xmit rate 0x%x\n",
+				dev->name, __func__,
+				ni->ni_rates.rs_rates[ni->ni_txrate]);
+			sc->sc_stats.ast_tx_badrate++;
 			return -EIO;
 		}
 		break;
@@ -1417,6 +1445,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE) {
 		txrate = rt->info[rix].rateCode | rt->info[rix].shortPreamble;
 		shortPreamble = AH_TRUE;
+		sc->sc_stats.ast_tx_shortpre++;
 	} else {
 		txrate = rt->info[rix].rateCode;
 		shortPreamble = AH_FALSE;
@@ -1426,10 +1455,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * Calculate miscellaneous flags.
 	 */
 	flags = 0;
-	if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
+	if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast)) {
 		flags |= HAL_TXDESC_NOACK;	/* no ack on broadcast frames */
-	else if (pktlen > ni->ni_rtsthresh)
+		sc->sc_stats.ast_tx_noack++;
+	} else if (pktlen > ni->ni_rtsthresh) {
 		flags |= HAL_TXDESC_RTSENA;	/* RTS based on frame length */
+		sc->sc_stats.ast_tx_rts++;
+	}
 
 	/*
 	 * Calculate RTS/CTS rate and duration if needed.
@@ -1718,6 +1750,8 @@ ath_startrecv(struct net_device *dev)
 	ath_hal_rxena(ah);		/* enable recv descriptors */
 	ath_mode_init(&sc->sc_ic.ic_dev);/* set filters, etc. */
 	ath_hal_startpcurecv(ah);	/* re-enable PCU/DMA engine */
+	if (sc->sc_doani)
+		ath_ani_reset(sc);	/* anti noise immunity handling */
 	return 0;
 }
 
@@ -1890,7 +1924,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	error = ath_chan_set(sc, ni->ni_chan);
 	if (error != 0)
 		goto bad;
-	rfilt = HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
+	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
+	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (nstate == IEEE80211_S_SCAN) {
@@ -1974,8 +2009,9 @@ ath_getchannels(struct net_device *dev, u_int cc, HAL_BOOL outdoor)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_CHANNEL *chans;
-	int i, ix, nchan;
+	int i, ix, nchan, nc;
 
+	sc->sc_have11g = 0;
 	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
 	if (chans == NULL) {
 		printk("%s: unable to allocate channel table\n", dev->name);
@@ -1994,6 +2030,7 @@ ath_getchannels(struct net_device *dev, u_int cc, HAL_BOOL outdoor)
 	 * Convert HAL channels to ieee80211 ones and insert
 	 * them in the table according to their channel number.
 	 */
+	nc = 0;
 	for (i = 0; i < nchan; i++) {
 		HAL_CHANNEL *c = &chans[i];
 		ix = ath_hal_mhz2ieee(c->channel, c->channelFlags);
@@ -2006,13 +2043,15 @@ ath_getchannels(struct net_device *dev, u_int cc, HAL_BOOL outdoor)
 		if (ic->ic_channels[ix].ic_freq == 0) {
 			ic->ic_channels[ix].ic_freq = c->channel;
 			ic->ic_channels[ix].ic_flags = c->channelFlags;
+			if (nc < 32)
+				ic->ic_channels[ix].ic_private =
+					&sc->sc_chans[nc++];
 		} else {
-#ifdef notdef
-			/* XXX 802.11 code can't handle this right now */
-			/* channels overlap; e.g. 11g and 11a/b */
+			/* channels overlap; e.g. 11g and 11b */
 			ic->ic_channels[ix].ic_flags |= c->channelFlags;
-#endif
 		}
+		if ((c->channelFlags & CHANNEL_G) == CHANNEL_G)
+			sc->sc_have11g = 1;
 	}
 	kfree(chans);
 	return 0;
@@ -2063,6 +2102,30 @@ ath_rate_setup(struct net_device *dev, u_int mode)
 }
 
 static void
+ath_rate_mapsetup(struct net_device *dev)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	const HAL_RATE_TABLE *rt;
+	int i;
+
+	memset(sc->sc_rixmap, 0xff, sizeof(sc->sc_rixmap));
+	rt = sc->sc_rates[ic->ic_curmode];
+	KASSERT(rt != NULL, ("no h/w rate set for current phy mode"));
+	for (i = 0; i < rt->rateCount; i++) {
+		u_int8_t r = rt->info[i].dot11Rate;
+		/*
+		 * NB: setup the 802.11 rate both w/ and w/o
+		 *     the basic rate flag to guard against
+		 *     bogus 11g AP's that send rate sets with
+		 *     basic rates not marked as basic.
+		 */
+		sc->sc_rixmap[r] = i;
+		sc->sc_rixmap[r & IEEE80211_RATE_VAL] = i;
+	}
+}
+
+static void
 ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 {
 	struct ath_softc *sc = arg;
@@ -2074,7 +2137,7 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 	 * Rate control
 	 * XXX: very primitive version.
 	 */
-	(void) sc;		/* NB: silence compiler */
+	(void) sc;			/* NB: silence compiler */
 
 	enough = (st->st_tx_ok + st->st_tx_err >= 10);
 
@@ -2111,10 +2174,11 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 	}
 
 	if (ni->ni_txrate != orate) {
-		DPRINTF(("ath_rate_ctl: %dM -> %dM (%d ok, %d err, %d retr)\n",
+		printk("%s: %dM -> %dM (%d ok, %d err, %d retr)\n",
+		    __func__,
 		    (rs->rs_rates[orate] & IEEE80211_RATE_VAL) / 2,
 		    (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) / 2,
-		    st->st_tx_ok, st->st_tx_err, st->st_tx_retr));
+		    st->st_tx_ok, st->st_tx_err, st->st_tx_retr);
 	}
 	if (ni->ni_txrate != orate || enough)
 		st->st_tx_ok = st->st_tx_err = st->st_tx_retr = 0;
@@ -2135,6 +2199,386 @@ ath_ratectl(unsigned long data)
 	}
 	sc->sc_rate_ctl.expires = jiffies + ((HZ * ath_rateinterval) / 1000);
 	add_timer(&sc->sc_rate_ctl);
+}
+
+/*
+ * Anti noise immunity support.  We track phy errors and react
+ * to excessive errors by adjusting the noise immunity parameters
+ * through the HAL.  This is (currently) only used by the 5212;
+ * all the earlier parts setup these parameters once and do not
+ * change them dynamically.
+ */
+
+static	int ath_ani_threshold = 1;
+static	int ath_ani_ofdm_high = 1500;
+static	int ath_ani_ofdm_low = 500;
+static	int ath_ani_cck_high = 500;
+static	int ath_ani_cck_low = 200;
+
+#define	MSEC_TO_USEC(_ms)	((_ms) * 1000)
+#define	USEC_TO_MSEC(_us)	((_us) / 1000)
+#define	SEC_TO_MSEC(_sec)	((_sec) * 1000)
+#define	SEC_TO_USEC(_sec)	(SEC_TO_MSEC(_sec) * 1000)
+#define	JIFFIES_TO_MSEC() \
+	(((jiffies / HZ) * 1000) + (jiffies % HZ) * (1000 / HZ))
+
+/*
+ * Reset statistics collection for the specified phy error.
+ */
+static void
+ath_phy_err_reset(struct ath_phyerr *pe, u_int freq)
+{
+	pe->threshold = 5 * SEC_TO_MSEC(ath_ani_threshold);
+	pe->triggerThreshold = SEC_TO_USEC(ath_ani_threshold);
+	pe->triggerCount = freq * (ath_ani_threshold ? ath_ani_threshold : 1);
+	pe->duration = 0;
+	pe->lastTick = JIFFIES_TO_MSEC() - USEC_TO_MSEC(pe->triggerThreshold);
+	pe->lastTs = 0;
+	pe->nextEvent = 0;
+	KASSERT(0 < pe->triggerCount && pe->triggerCount < 2500,
+		("invalid trigger count %u\n", pe->triggerCount));
+	memset(pe->delta, 0, pe->triggerCount * sizeof(pe->delta[0]));
+}
+
+/*
+ * Record a phy error event and possibly trigger an action.
+ */
+static void
+ath_phy_err_report(struct ath_softc *sc,
+	struct ath_phyerr *pe, const struct ath_rx_status *rs)
+{
+	u_int32_t ms = JIFFIES_TO_MSEC();
+
+	pe->duration -= pe->delta[pe->nextEvent];
+	pe->delta[pe->nextEvent] = MSEC_TO_USEC(ms - pe->lastTick);
+	if (pe->delta[pe->nextEvent] < MSEC_TO_USEC(30))
+		pe->delta[pe->nextEvent] = (rs->rs_tstamp - pe->lastTs) & 0x7ff;
+	pe->lastTick = ms;
+	pe->lastTs = rs->rs_tstamp;
+	pe->duration += pe->delta[pe->nextEvent];
+	if (++pe->nextEvent == pe->triggerCount)
+		pe->nextEvent = 0;
+	if (pe->duration < pe->triggerThreshold)
+		ath_ani_action(sc, rs->rs_phyerr);
+}
+
+/*
+ * Return true if it's time to do monitoring.  Note that
+ * pe->threshold is precalculated to be:
+ *
+ *	5 * USEC_TO_MSEC(pe->triggerThreshold)
+ *
+ * in ath_phy_err_reset so this check does not need to do it.
+ */
+static __inline int
+ath_phy_err_timetocheck(struct ath_phyerr *pe, u_int32_t ms)
+{
+	return ((ms - pe->lastTick) + (pe->duration * 1000) > pe->threshold);
+}
+
+/*
+ * ANI polling/monitoring routine.  Called from the receive
+ * processing path to adjust settings.
+ */
+static void
+ath_ani_poll(struct ath_softc *sc)
+{
+	struct ath_hal *ah;
+	struct ieee80211com *ic;
+	struct ath_channel *c;
+	u_int32_t ms = JIFFIES_TO_MSEC();
+
+	KASSERT(sc->sc_doani, ("ANI polling w/o ANI support"));
+
+	/*
+	 * Check if it's time to proceed.  We require the duration
+	 * corresponding to the last triggerCount errors to be
+	 * greater than threshold.
+	 */
+	if (!ath_phy_err_timetocheck(sc->sc_phyerr[HAL_PHYERR_CCK_TIMING], ms) ||
+	    !ath_phy_err_timetocheck(sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING], ms))
+		return;
+
+	sc->sc_stats.ast_ani_poll++;
+
+	ah = sc->sc_ah;
+	ic = &sc->sc_ic;
+	c = ic->ic_ibss_chan->ic_private;
+	if (c->phyErrStatsDisabled) {
+		DPRINTF(("%s: enable phy errors in rx filter\n", __func__));
+		c->phyErrStatsDisabled = AH_FALSE;
+		ath_hal_setrxfilter(ah,
+			ath_hal_getrxfilter(ah) | HAL_RX_FILTER_PHYERR);
+		sc->sc_stats.ast_ani_enable++;
+		goto resetlow;
+	}
+
+	switch (ic->ic_curmode) {
+	case IEEE80211_MODE_11A:
+	case IEEE80211_MODE_TURBO:
+		if (c->ofdmWeakSigDetectionOff && c->spurImmunityLevel == 0) {
+			ath_hal_anicontrol(ah,
+				HAL_ANI_OFDM_WEAK_SIGNAL_DETECTION,
+				!(c->ofdmWeakSigDetectionOff = AH_FALSE));
+			DPRINTF(("%s: set OFDM weak signal detection on",
+				__func__));
+			sc->sc_stats.ast_ani_ofdmon++;
+
+			ath_hal_anicontrol(ah, HAL_ANI_SPUR_IMMUNITY_LEVEL,
+				++c->spurImmunityLevel);
+			DPRINTF(("%s: increase spur immunity to %d",
+				__func__, c->spurImmunityLevel));
+			sc->sc_stats.ast_ani_spurup++;
+			goto resetlow;
+		}
+		break;
+	}
+
+	if (c->noiseImmunityLevel != 0) {
+		KASSERT(!c->spurImmunityBias, ("bogus spur immunity bias"));
+		ath_hal_anicontrol(ah, HAL_ANI_NOISE_IMMUNITY_LEVEL,
+			--c->noiseImmunityLevel);
+		DPRINTF(("%s: reduce noise immunity level to %d\n",
+			__func__, c->noiseImmunityLevel));
+		sc->sc_stats.ast_ani_nidown++;
+		goto resetlow;
+	}
+	if (c->firstepLevel != 0) {
+		ath_hal_anicontrol(ah, HAL_ANI_FIRSTEP_LEVEL,
+			--c->firstepLevel);
+		DPRINTF(("%s: reduce firstep level to %d\n",
+			__func__, c->firstepLevel));
+		sc->sc_stats.ast_ani_stepdown++;
+		goto resetlow;
+	}
+	if (c->cckWeakSigThresholdHigh) {
+		ath_hal_anicontrol(ah, HAL_ANI_CCK_WEAK_SIGNAL_THR,
+			c->cckWeakSigThresholdHigh = AH_FALSE);
+		DPRINTF(("%s: set CCK weak signal threshold to low\n",
+			__func__));
+		sc->sc_stats.ast_ani_ccklow++;
+		goto resetlow;
+	}
+	if (c->spurImmunityLevel != 0) {
+		c->spurImmunityBias = AH_TRUE;
+		ath_hal_anicontrol(ah, HAL_ANI_SPUR_IMMUNITY_LEVEL,
+			--c->spurImmunityLevel);
+		DPRINTF(("%s: reduce spur immunity level to %d\n",
+			__func__, c->spurImmunityLevel));
+		sc->sc_stats.ast_ani_spurdown++;
+		goto resetlow;
+	}
+	if (c->ofdmWeakSigDetectionOff) {
+		c->spurImmunityBias = AH_TRUE;
+		ath_hal_anicontrol(ah, HAL_ANI_OFDM_WEAK_SIGNAL_DETECTION,
+			!(c->ofdmWeakSigDetectionOff = AH_FALSE));
+		DPRINTF(("%s: enable OFDM weak signal detection\n",
+			__func__));
+		sc->sc_stats.ast_ani_ofdmon++;
+		goto resetlow;
+	}
+	return;
+resetlow:
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING],
+		ath_ani_ofdm_low);
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_CCK_TIMING],
+		ath_ani_cck_low);
+	return;
+}
+
+/*
+ * ANI phy error action handler; adjust the noise immunity
+ * settings in the HAL according to the current state of the
+ * channel.
+ */
+static void
+ath_ani_action(struct ath_softc *sc, u_int phyErr)
+{
+	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_channel *c = ic->ic_ibss_chan->ic_private;
+
+	sc->sc_stats.ast_ani_action++;
+
+	DPRINTF(("%s: ANI action for phy error %u\n", __func__, phyErr));
+
+	KASSERT(phyErr == HAL_PHYERR_OFDM_TIMING ||
+		phyErr == HAL_PHYERR_CCK_TIMING,
+		("unexpected phy error %u\n", phyErr));
+top:
+	if (c->noiseImmunityLevel == 0 && !c->spurImmunityBias) {
+		ath_hal_anicontrol(ah, HAL_ANI_NOISE_IMMUNITY_LEVEL,
+			c->noiseImmunityLevel = 4);
+		DPRINTF(("%s: set noise immunity Level to full\n", __func__));
+		sc->sc_stats.ast_ani_nifull++;
+		goto resetlow;
+	}
+	if (c->noiseImmunityLevel < 4 && !c->spurImmunityBias) {
+		ath_hal_anicontrol(ah, HAL_ANI_NOISE_IMMUNITY_LEVEL,
+			++c->noiseImmunityLevel);
+		DPRINTF(("%s: increase noise immunity level to %d\n",
+			__func__, c->noiseImmunityLevel));
+		sc->sc_stats.ast_ani_niup++;
+		goto resethigh;
+	}
+
+	switch (ic->ic_curmode) {
+	case IEEE80211_MODE_11A:
+	case IEEE80211_MODE_TURBO:
+		if (0 < c->spurImmunityLevel && c->spurImmunityLevel < 7) {
+			ath_hal_anicontrol(ah, HAL_ANI_SPUR_IMMUNITY_LEVEL,
+				++c->spurImmunityLevel);
+			DPRINTF(("%s: increase spur immunity level to %d\n",
+				__func__, c->spurImmunityLevel));
+			sc->sc_stats.ast_ani_spurup++;
+			goto resetlow;
+		}
+		break;
+	case IEEE80211_MODE_11B:
+		if (!c->ofdmWeakSigDetectionOff) {
+			ath_hal_anicontrol(ah,
+				HAL_ANI_OFDM_WEAK_SIGNAL_DETECTION,
+				!(c->ofdmWeakSigDetectionOff = AH_TRUE));
+			DPRINTF(("%s: disable OFDM weak signal detection\n",
+				__func__));
+			sc->sc_stats.ast_ani_ofdmoff++;
+			goto resetlow;
+		}
+		break;
+	}
+
+	if (c->spurImmunityBias) {
+		c->spurImmunityBias = AH_FALSE;
+		goto top;
+	}
+
+	switch (ic->ic_curmode) {
+	case IEEE80211_MODE_11B:
+	case IEEE80211_MODE_11G:
+		if (!c->cckWeakSigThresholdHigh) {
+			KASSERT(c->firstepLevel < 2,
+				("stepLevel %u", c->firstepLevel));
+			ath_hal_anicontrol(ah, HAL_ANI_CCK_WEAK_SIGNAL_THR,
+				c->cckWeakSigThresholdHigh = AH_TRUE);
+			DPRINTF(("%s: set CCK weak signal threshold high\n",
+				__func__));
+			sc->sc_stats.ast_ani_cckhigh++;
+		}
+		if (c->firstepLevel < 2) {
+			ath_hal_anicontrol(ah, HAL_ANI_FIRSTEP_LEVEL,
+				++c->firstepLevel);
+			DPRINTF(("%s: increase firstep level to %d\n",
+				__func__, c->firstepLevel));
+			sc->sc_stats.ast_ani_stepup++;
+			goto resetlow;
+		}
+		break;
+	}
+
+	/*
+	 * At this point we can't really do anything
+	 * except turn off collecting phy error stats
+	 * to reduce CPU load.
+	 */
+	DPRINTF(("%s: ANI not working; disabling stats\n", __func__));
+	c->phyErrStatsDisabled = AH_TRUE;
+	ath_hal_setrxfilter(ah,
+		ath_hal_getrxfilter(ah) &~ HAL_RX_FILTER_PHYERR);
+	sc->sc_stats.ast_ani_disable++;
+resethigh:
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING],
+		ath_ani_ofdm_high);
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_CCK_TIMING],
+		ath_ani_cck_high);
+	return;
+resetlow:
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING],
+		ath_ani_ofdm_low);
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_CCK_TIMING],
+		ath_ani_cck_low);
+	return;
+}
+
+/*
+ * Restore the ANI parameters in the HAL and reset the
+ * statistics.  This routine should be called for every
+ * hardware reset.
+ */
+static void
+ath_ani_reset(struct ath_softc *sc)
+{
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_hal *ah = sc->sc_ah;
+	struct ath_channel *c = ic->ic_ibss_chan->ic_private;
+
+	if (c->noiseImmunityLevel != 0)
+		ath_hal_anicontrol(ah, HAL_ANI_NOISE_IMMUNITY_LEVEL,
+			c->noiseImmunityLevel);
+	if (c->spurImmunityLevel != 0)
+		ath_hal_anicontrol(ah, HAL_ANI_SPUR_IMMUNITY_LEVEL,
+			c->spurImmunityLevel);
+	if (c->ofdmWeakSigDetectionOff)
+		ath_hal_anicontrol(ah, HAL_ANI_OFDM_WEAK_SIGNAL_DETECTION,
+			!c->ofdmWeakSigDetectionOff);
+	if (c->cckWeakSigThresholdHigh)
+		ath_hal_anicontrol(ah, HAL_ANI_CCK_WEAK_SIGNAL_THR,
+			c->cckWeakSigThresholdHigh);
+	if (c->firstepLevel != 0)
+		ath_hal_anicontrol(ah, HAL_ANI_FIRSTEP_LEVEL, c->firstepLevel);
+	if (c->phyErrStatsDisabled)
+		ath_hal_setrxfilter(ah,
+			ath_hal_getrxfilter(ah) &~ HAL_RX_FILTER_PHYERR);
+
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING],
+		ath_ani_ofdm_high);
+	ath_phy_err_reset(sc->sc_phyerr[HAL_PHYERR_CCK_TIMING],
+		ath_ani_cck_high);
+	ath_hal_setrxfilter(ah, ath_hal_getrxfilter(ah) | HAL_RX_FILTER_PHYERR);
+}
+
+/*
+ * Setup ANI handling if ANI support is present.
+ */
+static void
+ath_ani_setup(struct ath_softc *sc)
+{
+	struct ath_hal *ah = sc->sc_ah;
+
+	if (ath_hal_anicontrol(ah, HAL_ANI_PRESENT, 0)) {
+		/*
+		 * ANI is supported, allocate history state for the
+		 * phy errors we care about and mark the device for
+		 * ANI handling.
+		 */
+		sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING] =
+			kmalloc(sizeof(struct ath_phyerr), GFP_KERNEL);
+		sc->sc_phyerr[HAL_PHYERR_CCK_TIMING] = 
+			kmalloc(sizeof(struct ath_phyerr), GFP_KERNEL);
+		if (sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING] != NULL &&
+		    sc->sc_phyerr[HAL_PHYERR_CCK_TIMING] != NULL) {
+			sc->sc_doani = 1;
+		} else
+			printk("%s: could not setup ANI; not enough"
+				"memory for tracking phy errors\n",
+				sc->sc_ic.ic_dev.name);
+	}
+}
+
+/*
+ * Cleanup any ANI state setup.
+ */
+static void
+ath_ani_cleanup(struct ath_softc *sc)
+{
+#define	N(a)	(sizeof(a) / sizeof(a[0]))
+	int i;
+
+	for (i = 0; i < N(sc->sc_phyerr); i++)
+		if (sc->sc_phyerr[i]) {
+			kfree(sc->sc_phyerr[i]);
+			sc->sc_phyerr[i] = NULL;
+		}
+#undef N
 }
 
 #ifdef AR_DEBUG
@@ -2189,10 +2633,10 @@ ath_getstats(struct net_device *dev)
 			+ sc->sc_stats.ast_rx_badcrypt
 			+ sc->sc_stats.ast_rx_phyerr
 			;
-	stats->rx_length_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_LEN];
+	stats->rx_length_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_LENGTH];
 	stats->rx_crc_errors = sc->sc_stats.ast_rx_crcerr;
 	/* XXX??? */
-	stats->rx_fifo_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TIM];
+	stats->rx_fifo_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TIMING];
 	/* XXX??? */
 	stats->rx_missed_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TOR];
 
@@ -2246,24 +2690,90 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 	STAT(tx_mgmt);	  STAT(tx_qstop);   STAT(tx_discard); STAT(tx_invalid);
 	STAT(tx_encap);	  STAT(tx_nonode);  STAT(tx_nobuf);   STAT(tx_nobufmgt);
 	STAT(tx_xretries);STAT(tx_fifoerr); STAT(tx_filtered);
-	STAT(tx_shortretry); STAT(tx_longretry);
+	STAT(tx_shortretry);		    STAT(tx_longretry);
+	STAT(tx_badrate); STAT(tx_noack);   STAT(tx_rts);     STAT(tx_cts);
+	STAT(tx_shortpre);
 
 	STAT(rx_orn);	  STAT(rx_crcerr);  STAT(rx_fifoerr); STAT(rx_badcrypt);
 #define	PHYSTAT(x) do {							\
 	if (sc->sc_stats.ast_rx_phy[HAL_PHYERR_##x] != 0)		\
-		cp += sprintf(cp, "PHYERR_##x=%u\n",			\
+		cp += sprintf(cp, "PHYERR_" #x "=%u\n",			\
 			sc->sc_stats.ast_rx_phy[HAL_PHYERR_##x]);	\
 } while (0)
-	PHYSTAT(UND); PHYSTAT(TIM); PHYSTAT(PAR); PHYSTAT(RATE);
-	PHYSTAT(LEN); PHYSTAT(QAM); PHYSTAT(SRV); PHYSTAT(TOR);
+	PHYSTAT(UNDERRUN);	PHYSTAT(TIMING);	PHYSTAT(PARITY);
+	PHYSTAT(RATE);		PHYSTAT(LENGTH);	PHYSTAT(RADAR);
+	PHYSTAT(SERVICE);	PHYSTAT(TOR);
+
+	PHYSTAT(OFDM_TIMING);
+	PHYSTAT(OFDM_SIGNAL_PARITY);
+	PHYSTAT(OFDM_RATE_ILLEGAL);
+	PHYSTAT(OFDM_LENGTH_ILLEGAL);
+	PHYSTAT(OFDM_POWER_DROP);
+	PHYSTAT(OFDM_SERVICE);
+	PHYSTAT(OFDM_RESTART);
+	PHYSTAT(CCK_TIMING);
+	PHYSTAT(CCK_HEADER_CRC);
+	PHYSTAT(CCK_RATE_ILLEGAL);
+	PHYSTAT(CCK_SERVICE);
+	PHYSTAT(CCK_RESTART);
+
 	STAT(rx_nobuf);
 
 	STAT(be_nobuf);
+
+	STAT(ani_action);	STAT(ani_poll);		STAT(ani_nifull);
+	STAT(ani_niup);		STAT(ani_nidown);	STAT(ani_spurup);
+	STAT(ani_spurdown);	STAT(ani_ofdmon);	STAT(ani_ofdmoff);
+	STAT(ani_cckhigh);	STAT(ani_ccklow);	STAT(ani_stepup);
+	STAT(ani_stepdown);	STAT(ani_disable);	STAT(ani_enable);
 
 	return cp - page;
 #undef PHYSTAT
 #undef STAT
 }
+
+static char *
+ath_proc_ani_phyerr(char *cp, const char* tag, const struct ath_phyerr *pe)
+{
+	cp += sprintf(cp, "  %s:\n", tag);
+	cp += sprintf(cp, "      trigger: %u/sec threshold: %u duration: %u\n",
+		pe->triggerCount, pe->triggerThreshold, pe->duration);
+	cp += sprintf(cp, "      lastTick %u lastTs %u nextEvent: %u\n",
+		pe->lastTick, pe->lastTs, pe->nextEvent);
+	return cp;
+}
+
+static int
+ath_proc_ani(char *page, char **start, off_t off, int count, int *eof, void *data)
+{
+	struct ath_softc *sc = (struct ath_softc *) data;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_channel *c = ic->ic_ibss_chan->ic_private;
+	char *cp = page;
+
+	if (off != 0) {
+		*eof = 1;
+		return 0;
+	}
+	cp += sprintf(cp, "ANI status:\n");
+	cp += sprintf(cp, "Noise Immunity Level %d\n", c->noiseImmunityLevel);
+	cp += sprintf(cp, "Spur Immunity Level %d\n", c->spurImmunityLevel);
+	cp += sprintf(cp, "OFDM Weak Signal Detection %s\n",
+		c->ofdmWeakSigDetectionOff ? "OFF" : "ON");
+	cp += sprintf(cp, "CCK Weak Signal Threshold %s\n",
+		c->cckWeakSigThresholdHigh ? "HIGH" : "LOW");
+	cp += sprintf(cp, "Firstep Level %d\n", c->firstepLevel);
+	cp += sprintf(cp, "Phy Error stats collection is %s\n",
+		c->phyErrStatsDisabled ? "DISABLED" : "ENABLED");
+	if (!c->phyErrStatsDisabled) {
+		cp = ath_proc_ani_phyerr(cp, "OFDM",
+			sc->sc_phyerr[HAL_PHYERR_OFDM_TIMING]);
+		cp = ath_proc_ani_phyerr(cp, "CCK",
+			sc->sc_phyerr[HAL_PHYERR_CCK_TIMING]);
+	}
+	return cp - page;
+}
+
 
 static void
 ath_proc_init(struct ath_softc *sc)
@@ -2284,12 +2794,14 @@ ath_proc_init(struct ath_softc *sc)
 		dp->data = sc;
 	}
 	create_proc_read_entry("stats", 0644, sc->sc_proc, ath_proc_stats, sc);
+	create_proc_read_entry("ani", 0644, sc->sc_proc, ath_proc_ani, sc);
 }
 
 static void
 ath_proc_remove(struct ath_softc *sc)
 {
 	if (sc->sc_proc != NULL) {
+		remove_proc_entry("ani", sc->sc_proc);
 		remove_proc_entry("stats", sc->sc_proc);
 		remove_proc_entry("debug", sc->sc_proc);
 		remove_proc_entry(sc->sc_ic.ic_dev.name, proc_net);

@@ -44,7 +44,7 @@
 /* statistics for node */
 struct ath_nodestat {
 	u_int		st_tx_ok;	/* tx ok pkt */
-	u_int		st_tx_err;	/* tx ok pkt */
+	u_int		st_tx_err;	/* tx !ok pkt */
 	u_int		st_tx_retr;	/* tx retry count */
 	int		st_tx_upper;	/* tx upper rate req cnt */
 	u_int		st_tx_antenna;	/* antenna for last good frame */
@@ -70,16 +70,35 @@ struct ath_stats {
 	u_int32_t	ast_tx_filtered;/* tx failed 'cuz xmit filtered */
 	u_int32_t	ast_tx_shortretry;/* tx on-chip retries (short) */
 	u_int32_t	ast_tx_longretry;/* tx on-chip retries (long) */
+	u_int32_t	ast_tx_badrate;	/* tx failed 'cuz bogus xmit rate */
+	u_int32_t	ast_tx_noack;	/* tx frames with no ack marked */
+	u_int32_t	ast_tx_rts;	/* tx frames with rts enabled */
+	u_int32_t	ast_tx_cts;	/* tx frames with cts enabled */
+	u_int32_t	ast_tx_shortpre;/* tx frames with short preamble */
 	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
 	u_int32_t	ast_rx_tooshort;/* rx failed 'cuz frame too short */
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
 	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
 	u_int32_t	ast_rx_phyerr;	/* rx PHY error summary count */
-	/* NB: only 8 are currently defined; leave room for additional codes */
 	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
 	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
+	u_int32_t	ast_ani_action;	/* ANI actions invoked */
+	u_int32_t	ast_ani_poll;	/* ANI poll operations */
+	u_int32_t	ast_ani_nifull;	/* ANI set noise immunity to full */
+	u_int32_t	ast_ani_niup;	/* ANI increased noise immunity */
+	u_int32_t	ast_ani_nidown;	/* ANI decreased noise immunity */
+	u_int32_t	ast_ani_spurup;	/* ANI increased spur immunity */
+	u_int32_t	ast_ani_spurdown;/* ANI descreased spur immunity */
+	u_int32_t	ast_ani_ofdmon;	/* ANI OFDM weak signal detect on */
+	u_int32_t	ast_ani_ofdmoff;/* ANI OFDM weak signal detect off */
+	u_int32_t	ast_ani_cckhigh;/* ANI CCK weak signal threshold high */
+	u_int32_t	ast_ani_ccklow;	/* ANI CCK weak signal threshold low */
+	u_int32_t	ast_ani_stepup;	/* ANI increased first step level */
+	u_int32_t	ast_ani_stepdown;/* ANI decreased first step level */
+	u_int32_t	ast_ani_disable;/* ANI disabled stats collection */
+	u_int32_t	ast_ani_enable;	/* ANI enabled stats collection */
 };
 
 struct ath_buf {
@@ -91,6 +110,40 @@ struct ath_buf {
 	struct ieee80211_node	*bf_node;	/* pointer to the node */
 };
 
+/*
+ * Per-channel state private to the driver.  This stuff
+ * is part of the active noise immunity prevention logic.
+ */
+struct ath_channel {
+	u_int8_t	noiseImmunityLevel;
+	u_int8_t	spurImmunityLevel;
+	u_int8_t	firstepLevel;
+	u_int8_t	ofdmWeakSigDetectionOff;
+	u_int8_t	cckWeakSigThresholdHigh;
+	u_int8_t	spurImmunityBias;
+	u_int8_t	phyErrStatsDisabled;;
+};
+
+/*
+ * Phy error statistics history maintained when doing active
+ * noise immunity prevention (currently only for the 5212).
+ * One of these structures exists for each phy error to be monitored.
+ * The last triggerCount events are recorded by their relative 
+ * time delta over a rolling time period.  When the number of events
+ * exceeeds a threshold an action is done, such as raising the
+ * noise immunity settings on the current channel.
+ */
+struct ath_phyerr {
+	u_int32_t	threshold;		/* event duration to trigger */
+	u_int32_t	triggerThreshold;	/* event duration to trigger */
+	u_int		triggerCount;		/* events in the buffer */
+	u_int32_t	duration;		/* measurement duration */
+	u_int32_t	lastTick;		/* clock tick of last entry */
+	u_int32_t	lastTs;			/* timestamp from last rx */
+	u_int		nextEvent;		/* oldest event remembered */
+	u_int32_t	delta[2500];		/* history buffer */
+};
+
 struct ath_hal;
 struct ath_desc;
 struct proc_dir_entry;
@@ -100,8 +153,11 @@ struct ath_softc {
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 						/* rate tables */
 	unsigned int		sc_have11g  : 1,/* have 11g support */
+				sc_doani    : 1,/* dynamic noise immunity */
 				sc_probing  : 1;/* probing AP on beacon miss */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
+	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
+
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	volatile int		sc_invalid;	/* being detached */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
@@ -136,6 +192,10 @@ struct ath_softc {
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
+
+	struct ath_channel	sc_chans[32];	/* driver-specific chan state */
+	struct ath_phyerr	*sc_phyerr[32];	/* phy error handling state */
+
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*sc_proc;	/* /proc/net/drivers/ath%d */
 #endif
@@ -190,6 +250,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	(((*(_ah)->ah_isKeyCacheEntryValid)((_ah), (_ix))))
 #define	ath_hal_keysetmac(_ah, _ix, _mac) \
 	((*(_ah)->ah_setKeyCacheEntryMac)((_ah), (_ix), (_mac)))
+#define	ath_hal_getrxfilter(_ah) \
+	((*(_ah)->ah_getRxFilter)((_ah)))
 #define	ath_hal_setrxfilter(_ah, _filter) \
 	((*(_ah)->ah_setRxFilter)((_ah), (_filter)))
 #define	ath_hal_setmcastfilter(_ah, _mfilt0, _mfilt1) \
@@ -245,6 +307,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_resetTxQueue)((_ah), (_q)))
 #define	ath_hal_releasetxqueue(_ah, _q) \
 	((*(_ah)->ah_releaseTxQueue)((_ah), (_q)))
+#define	ath_hal_anicontrol(_ah, _op, _param) \
+	((*(_ah)->ah_aniControl)((_ah), (_op), (_param)))
 
 #define	ath_hal_setupbeacondesc(_ah, _ds, _opmode, _flen, _hlen, \
 		_rate, _antmode) \
