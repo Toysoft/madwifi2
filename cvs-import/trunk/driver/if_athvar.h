@@ -63,7 +63,11 @@ struct ath_stats {
 	u_int32_t	ast_tx_nonode;	/* tx failed 'cuz no node */
 	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer (data) */
 	u_int32_t	ast_tx_nobufmgt;/* tx failed 'cuz no tx buffer (mgmt)*/
-	u_int32_t	ast_tx_descerr;	/* tx failure reported in desc*/
+	u_int32_t	ast_tx_xretries;/* tx failed 'cuz too many retries */
+	u_int32_t	ast_tx_fifoerr;	/* tx failed 'cuz FIFO underrun */
+	u_int32_t	ast_tx_filtered;/* tx failed 'cuz xmit filtered */
+	u_int32_t	ast_tx_shortretry;/* tx on-chip retries (short) */
+	u_int32_t	ast_tx_longretry;/* tx on-chip retries (long) */
 	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
 	u_int32_t	ast_rx_tooshort;/* rx failed 'cuz frame too short */
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
@@ -78,7 +82,7 @@ struct ath_stats {
 	u_int32_t	ast_rx_phy_srv;	/* rx PHY: service bit error */
 	u_int32_t	ast_rx_phy_tor;	/* rx PHY: transmit override receive */
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
-	u_int32_t	ast_beacon_nobuf;/* no skbuff available for beacon */
+	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
 };
 
 struct ath_buf {

@@ -886,7 +886,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	if (skb == NULL) {
 		DPRINTF(("ath_beacon_alloc: cannot allocate sk_buff; size %u\n",
 			roundup(sizeof(struct ieee80211_frame)+pktlen, 4)));
-		sc->sc_stats.ast_beacon_nobuf++;
+		sc->sc_stats.ast_be_nobuf++;
 		return ENOMEM;
 	}
 
@@ -1427,6 +1427,7 @@ ath_tx_tasklet(void *data)
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct ath_nodestat *st;
+	int sr, lr;
 
 #ifdef AR_DEBUG
 	if (ath_debug > 1) {
@@ -1459,11 +1460,18 @@ ath_tx_tasklet(void *data)
 				st->st_tx_ok++;
 			else {
 				st->st_tx_err++;
-				sc->sc_stats.ast_tx_descerr++;
+				if (ds->ds_status0 & AR_ExcessiveRetries)
+					sc->sc_stats.ast_tx_xretries++;
+				if (ds->ds_status0 & AR_FIFOUnderrun)
+					sc->sc_stats.ast_tx_fifoerr++;
+				if (ds->ds_status0 & AR_Filtered)
+					sc->sc_stats.ast_tx_filtered++;
 			}
-			st->st_tx_retr +=
-			    ATH_BITVAL(ds->ds_status0, AR_ShortRetryCnt) +
-			    ATH_BITVAL(ds->ds_status0, AR_LongRetryCnt);
+			sr = ATH_BITVAL(ds->ds_status0, AR_ShortRetryCnt);
+			lr = ATH_BITVAL(ds->ds_status0, AR_LongRetryCnt);
+			sc->sc_stats.ast_tx_shortretry += sr;
+			sc->sc_stats.ast_tx_longretry += lr;
+			st->st_tx_retr += sr + lr;
 		}
 		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
@@ -1915,9 +1923,12 @@ ath_getstats(struct net_device *dev)
 	/* update according to private statistics */
 	stats->tx_errors = sc->sc_stats.ast_tx_encap
 			 + sc->sc_stats.ast_tx_nonode
-			 + sc->sc_stats.ast_tx_descerr
+			 + sc->sc_stats.ast_tx_xretries
+			 + sc->sc_stats.ast_tx_fifoerr
+			 + sc->sc_stats.ast_tx_filtered
 			 ;
-	stats->tx_dropped = sc->sc_stats.ast_tx_nobuf;
+	stats->tx_dropped = sc->sc_stats.ast_tx_nobuf
+			+ sc->sc_stats.ast_tx_nobufmgt;
 	stats->rx_errors = sc->sc_stats.ast_rx_tooshort
 			+ sc->sc_stats.ast_rx_crcerr
 			+ sc->sc_stats.ast_rx_fifoerr
@@ -1972,14 +1983,18 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 #define	STAT(x)		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x)
 	STAT(watchdog);	  STAT(hardware);   STAT(bmiss);
 	STAT(rxorn);	  STAT(rxeol);
+
 	STAT(tx_mgmt);	  STAT(tx_qstop);   STAT(tx_discard); STAT(tx_invalid);
 	STAT(tx_encap);	  STAT(tx_nonode);  STAT(tx_nobuf);   STAT(tx_nobufmgt);
-	STAT(tx_descerr);
+	STAT(tx_xretries);STAT(tx_fifoerr); STAT(tx_filtered);
+	STAT(tx_shortretry); STAT(tx_longretry);
+
 	STAT(rx_orn);	  STAT(rx_crcerr);  STAT(rx_fifoerr); STAT(rx_badcrypt);
 	STAT(rx_phyerr);  STAT(rx_phy_tim); STAT(rx_phy_par); STAT(rx_phy_rate);
 	STAT(rx_phy_len); STAT(rx_phy_qam); STAT(rx_phy_srv); STAT(rx_phy_tor);
 	STAT(rx_nobuf);
-	STAT(beacon_nobuf);
+
+	STAT(be_nobuf);
 
 	return cp - page;
 #undef STAT
