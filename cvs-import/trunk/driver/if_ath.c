@@ -111,7 +111,6 @@ static void	ath_rate_ctl(void *, struct ieee80211_node *);
 static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
 static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
-static	int ath_bmisshack = 1;			/* XXX */
 static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_TRUE;		/* enable outdoor use */
@@ -335,7 +334,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	needmark = 0;
 	ath_hal_getisr(ah, &status);
 	DPRINTF2(("%s: interrupt, status 0x%x\n", dev->name, status));
-if (ath_bmisshack) status &= ~HAL_INT_BMISS; /*XXX*/
 #ifdef AR_DEBUG
 	if (ath_debug &&
 	    (status & (HAL_INT_FATAL|HAL_INT_RXORN|HAL_INT_BMISS))) {
@@ -2425,7 +2423,6 @@ enum {
 	ATH_DWELLTIME	= 3,
 	ATH_CALIBRATE	= 4,
 	ATH_RATEINTERVAL= 5,
-	ATH_BMISSHACK	= 6,
 	ATH_DUMP	= 8,
 	ATH_CC		= 9,
 	ATH_OUTDOOR	= 10,
@@ -2580,8 +2577,6 @@ static ctl_table ath_sysctls[] = {
 	  sizeof(ath_calinterval),0644,	NULL,	ath_sysctl_handler },
 	{ ATH_RATEINTERVAL,	"rateinterval",	&ath_rateinterval,
 	  sizeof(ath_rateinterval),0644,NULL,	ath_sysctl_handler },
-	{ ATH_BMISSHACK,	"bmisshack",	&ath_bmisshack,
-	  sizeof(ath_bmisshack),0644,	NULL,	ath_sysctl_handler },
 	{ ATH_DUMP,		"dump",		ath_dump,
 	  sizeof(ath_dump),	0200,	NULL,	ath_sysctl_dump },
 	{ ATH_CC,		"countrycode",	&ath_countrycode,
