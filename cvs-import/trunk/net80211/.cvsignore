@@ -3,3 +3,4 @@
 *.cmd
 *~
 *.mod.c
+.tmp_versions
