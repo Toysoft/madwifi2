@@ -35,7 +35,7 @@ DEPTH=	..
 
 include ${DEPTH}/Makefile.inc
 
-HALINCS=-I${DEPTH}/hal -I${HAL}/linux -I${ATH_HAL}
+HALINCS=-I${HAL} -I${HAL}/linux -I${ATH_HAL}
 
 ALL=	ath_hal.o
 
@@ -49,7 +49,7 @@ CLEANFILES+= .depend opt_ah.h
 all:	${ALL}
 
 ifdef HAL_SRC
-include ${DEPTH}/hal/linux/Makefile.inc
+include ${HAL}/linux/Makefile.inc
 else
 UUDECODE?=uudecode
 
