@@ -449,7 +449,7 @@ ath_bmiss_tasklet(void *data)
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
 		("unexpect operating mode %u", ic->ic_opmode));
 	if (ic->ic_state == IEEE80211_S_RUN)
-		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
+		ieee80211_new_state(dev, IEEE80211_S_ASSOC, 0);
 }
 
 static u_int
