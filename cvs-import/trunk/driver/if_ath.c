@@ -81,7 +81,7 @@ static void	ath_ratectl(unsigned long);
 static void	ath_initkeytable(struct net_device *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
-static void	ath_beacon_tasklet(void *);
+static void	ath_beacon_tasklet(struct net_device *);
 static void	ath_beacon_free(struct ath_softc *);
 static void	ath_beacon_config(struct ath_softc *);
 static int	ath_desc_alloc(struct ath_softc *);
@@ -165,7 +165,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	INIT_TQUEUE(&sc->sc_rxtq,	ath_rx_tasklet,		dev);
 	INIT_TQUEUE(&sc->sc_txtq,	ath_tx_tasklet,		dev);
-	INIT_TQUEUE(&sc->sc_swbatq,	ath_beacon_tasklet,	dev);
 	INIT_TQUEUE(&sc->sc_bmisstq,	ath_bmiss_tasklet,	dev);
 	INIT_TQUEUE(&sc->sc_rxorntq,	ath_rxorn_tasklet,	dev);
 	INIT_TQUEUE(&sc->sc_fataltq,	ath_fatal_tasklet,	dev);
@@ -460,8 +459,14 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			needmark |= queue_task(&sc->sc_rxtq, &tq_immediate);
 		if (status & HAL_INT_TX)
 			needmark |= queue_task(&sc->sc_txtq, &tq_immediate);
-		if (status & HAL_INT_SWBA)
-			needmark |= queue_task(&sc->sc_swbatq, &tq_immediate);
+		if (status & HAL_INT_SWBA) {
+			/*
+			 * Handle beacon transmission directly; deferring
+			 * this is too slow to meet timing constraints
+			 * under load.
+			 */
+			ath_beacon_tasklet(dev);
+		}
 		if (status & HAL_INT_BMISS) {
 			sc->sc_stats.ast_bmiss++;
 			needmark |= queue_task(&sc->sc_bmisstq, &tq_immediate);
@@ -1208,9 +1213,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 }
 
 static void
-ath_beacon_tasklet(void *data)
+ath_beacon_tasklet(struct net_device *dev)
 {
-	struct net_device *dev = data;
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_buf *bf = sc->sc_bcbuf;
