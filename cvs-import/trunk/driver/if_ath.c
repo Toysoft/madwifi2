@@ -1400,9 +1400,23 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 			skb->data, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
 	}
 
-	/* setup descriptors */
+	/*
+	 * Setup descriptors.  For receive we always terminate
+	 * the descriptor list with a self-linked entry so we'll
+	 * not get overrun under high load (as can happen with a
+	 * 5212 when ANI processing enables PHY errors).
+	 *
+	 * To insure the last descriptor is self-linked we create
+	 * each descriptor as self-linked and add it to the end.  As
+	 * each additional descriptor is added the previous self-linked
+	 * entry is ``fixed'' naturally.  This should be safe even
+	 * if DMA is happening.  When processing RX interrupts we
+	 * never remove/process the last, self-linked, entry on the
+	 * descriptor list.  This insures the hardware always has
+	 * someplace to write a new frame.
+	 */
 	ds = bf->bf_desc;
-	ds->ds_link = 0;
+	ds->ds_link = bf->bf_daddr;		/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_setuprxdesc(ah, ds
 		, skb_tailroom(skb)		/* buffer size */
@@ -1441,12 +1455,16 @@ ath_rx_tasklet(void *data)
 			printk("ath_rx_tasklet: no buffer\n");
 			break;
 		}
+		ds = bf->bf_desc;
+		if (ds->ds_link == bf->bf_daddr) {
+			/* NB: never process the self-linked entry at the end */
+			break;
+		}
 		skb = bf->bf_skb;
 		if (skb == NULL) {		/* XXX ??? can this happen */
 			printk("ath_rx_tasklet: no skbuff\n");
 			continue;
 		}
-		ds = bf->bf_desc;
 		/* XXX sync descriptor memory */
 		/*
 		 * Must provide the virtual address of the current
