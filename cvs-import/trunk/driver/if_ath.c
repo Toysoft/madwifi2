@@ -38,6 +38,7 @@
 #include <linux/random.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
+#include <linux/cache.h>
 
 #include <asm/uaccess.h>
 
@@ -133,6 +134,18 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	 * structures used to communicate with the hardware.
 	 */
 	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, &csz);
+	if (csz == 0) {
+		/*
+		 * Linux 2.4.18 at least writes the cache line size
+		 * register as a 16-bit wide register which is wrong.
+		 * We must have this setup properly for rx buffer
+		 * DMA to work so force a reasonable value here if it
+		 * comes up zero.
+		 */
+		csz = L1_CACHE_BYTES / sizeof(u_int32_t);
+		printk("ath_pci: cache line size not set; forcing %u\n", csz);
+		pci_write_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, csz);
+	}
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
 	spin_lock_init(&sc->sc_txbuflock);
