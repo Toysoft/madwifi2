@@ -1505,7 +1505,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_BEACON: {
 		u_int8_t *tstamp, *country, *wpa;
 		u_int8_t chan, bchan, fhindex, erp;
-		u_int16_t capinfo, bintval;
+		u_int16_t capinfo, bintval, timoff;
 		u_int16_t fhdwell;
 
 		if (subtype == IEEE80211_FC0_SUBTYPE_BEACON) {
@@ -1553,6 +1553,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		fhdwell = 0;
 		fhindex = 0;
 		erp = 0;
+		timoff = 0;
 		while (frm < efrm) {
 			switch (*frm) {
 			case IEEE80211_ELEMID_SSID:
@@ -1580,6 +1581,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 					chan = frm[2];
 				break;
 			case IEEE80211_ELEMID_TIM:
+				/* XXX ATIM? */
+				timoff = frm - skb->data;
 				break;
 			case IEEE80211_ELEMID_IBSSPARMS:
 				break;
@@ -1737,6 +1740,13 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ni->ni_fhdwell = fhdwell;
 		ni->ni_fhindex = fhindex;
 		ni->ni_erp = erp;
+		/*
+		 * Record the byte offset from the mac header to
+		 * the start of the TIM information element for
+		 * use by hardware and/or to speedup software
+		 * processing of beacon frames.
+		 */
+		ni->ni_timoff = timoff;
 		/*
 		 * Record optional information elements that might be
 		 * used by applications or drivers.
