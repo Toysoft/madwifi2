@@ -50,7 +50,7 @@ hal.o:	hal_syms.o Makefile
 	$<
 
 hal_syms.o:	${OBJS}
-	${LD} -o $@ -r -x -S ${OBJS}
+	${LD} -o $@ -r ${OBJS}
 
 clean:
 	rm -f ${OBJS} hal.o hal_syms.o opt_ah.h .depend
@@ -102,6 +102,8 @@ opt_ah.h:
 	echo "#define AH_SUPPORT_AR5210	1" > opt_ah.h
 	echo "#define AH_SUPPORT_AR5211	1" >> opt_ah.h
 #	echo "#define AH_SUPPORT_AR5212	1" >> opt_ah.h
+	echo "#define AH_ASSERT	1" >> opt_ah.h
+	echo "#define AH_DEBUG	1" >> opt_ah.h
 
 depend:	opt_ah.h
 	gcc -M ${CFLAGS} ${SRCS} > .depend
