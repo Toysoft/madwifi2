@@ -633,7 +633,7 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 	(*ic->ic_media.ifm_status)(dev, &imr);
 
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_media = imr.ifm_active &~ IFM_OMASK;
+	ifr.ifr_media = (imr.ifm_active & ~IFM_OMASK & ~IFM_TMASK) | IFM_AUTO;
 	switch (*mode) {
 	case IW_MODE_INFRA:
 		/* NB: this is the default */
