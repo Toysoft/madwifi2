@@ -160,10 +160,10 @@ endif
 # Wish we had proper conditionals to use here..
 #
 ifneq (${LINUX_VERSION}, 204)
+MODOPTS=	-DKBUILD_BASENAME=${KMODNAME} -DKBUILD_MODNAME=${KMODNAME}
 ifdef CONFIG_MODVERSIONS
-MODOPTS=	-DMODVERSIONS \
-		-include $(KERNEL_PATH)/include/linux/modsetver.h \
-		-DKBUILD_BASENAME=${KMODNAME} -DKBUILD_MODNAME=${KMODNAME}
+MODOPTS+=	-DMODVERSIONS \
+		-include $(KERNEL_PATH)/include/linux/modsetver.h
 endif
 KMODSUF=	ko
 KERNEL_INCS+=	-I${KERNEL_PATH}/include/asm/mach-default
