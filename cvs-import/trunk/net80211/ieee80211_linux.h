@@ -313,8 +313,6 @@ extern	int ieee80211_ioctl_getoptie(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
 extern	int ieee80211_ioctl_setkey(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
-extern	int ieee80211_ioctl_getkey(struct ieee80211com *,
-		struct iw_request_info *, void *, char *);
 extern	int ieee80211_ioctl_delkey(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
 extern	int ieee80211_ioctl_setmlme(struct ieee80211com *,

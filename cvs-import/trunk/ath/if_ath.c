@@ -4353,7 +4353,6 @@ ATH_POINT_BOUNCE(giwscan)
 ATH_VOID_BOUNCE(setparam)
 ATH_VOID_BOUNCE(getparam)
 ATH_VOID_BOUNCE(setkey)
-ATH_VOID_BOUNCE(getkey)
 ATH_VOID_BOUNCE(delkey)
 ATH_VOID_BOUNCE(setmlme)
 ATH_VOID_BOUNCE(setoptie)
@@ -4420,7 +4419,7 @@ static const iw_handler ath_priv_handlers[] = {
 	(iw_handler) ath_ioctl_setparam,		/* SIOCWFIRSTPRIV+0 */
 	(iw_handler) ath_ioctl_getparam,		/* SIOCWFIRSTPRIV+1 */
 	(iw_handler) ath_ioctl_setkey,			/* SIOCWFIRSTPRIV+2 */
-	(iw_handler) ath_ioctl_getkey,			/* SIOCWFIRSTPRIV+3 */
+	(iw_handler) NULL,				/* SIOCWFIRSTPRIV+3 */
 	(iw_handler) ath_ioctl_delkey,			/* SIOCWFIRSTPRIV+4 */
 	(iw_handler) NULL,				/* SIOCWFIRSTPRIV+5 */
 	(iw_handler) ath_ioctl_setmlme,			/* SIOCWFIRSTPRIV+6 */

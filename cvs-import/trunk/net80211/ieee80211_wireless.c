@@ -1772,22 +1772,22 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 }
 EXPORT_SYMBOL(ieee80211_ioctl_setkey);
 
-int
-ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iw_request_info *info,
-		   	 void *w, char *extra)
+static int
+ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iwreq *iwr)
 {
 	struct ieee80211_node *ni;
-	struct ieee80211req_key *ik = (struct ieee80211req_key *)extra;
+	struct ieee80211req_key ik;
 	struct ieee80211_key *wk;
 	const struct ieee80211_cipher *cip;
-	union iwreq_data *u = w;
 	u_int kid;
 
-	if (copy_from_user(u->data.pointer, ik, sizeof(*ik)))
+	if (iwr->u.data.length != sizeof(ik))
+		return -EINVAL;
+	if (copy_from_user(&ik, iwr->u.data.pointer, sizeof(ik)))
 		return -EFAULT;
-	kid = ik->ik_keyix;
+	kid = ik.ik_keyix;
 	if (kid == IEEE80211_KEYIX_NONE) {
-		ni = ieee80211_find_node(ic, ik->ik_macaddr);
+		ni = ieee80211_find_node(ic, ik.ik_macaddr);
 		if (ni == NULL)
 			return -EINVAL;		/* XXX */
 		wk = &ni->ni_ucastkey;
@@ -1795,33 +1795,34 @@ ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iw_request_info *info,
 		if (kid >= IEEE80211_WEP_NKID)
 			return -EINVAL;
 		wk = &ic->ic_nw_keys[kid];
-		IEEE80211_ADDR_COPY(&ik->ik_macaddr, ic->ic_bss->ni_macaddr);
+		IEEE80211_ADDR_COPY(&ik.ik_macaddr, ic->ic_bss->ni_macaddr);
 		ni = NULL;
 	}
 	cip = wk->wk_cipher;
-	ik->ik_type = cip->ic_cipher;
-	ik->ik_keylen = wk->wk_keylen;
-	ik->ik_flags = wk->wk_flags & (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV);
+	ik.ik_type = cip->ic_cipher;
+	ik.ik_keylen = wk->wk_keylen;
+	ik.ik_flags = wk->wk_flags & (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV);
 	if (wk->wk_keyix == ic->ic_def_txkey)
-		ik->ik_flags |= IEEE80211_KEY_DEFAULT;
+		ik.ik_flags |= IEEE80211_KEY_DEFAULT;
 	if (capable(CAP_NET_ADMIN)) {
 		/* NB: only root can read key data */
-		ik->ik_keyrsc = wk->wk_keyrsc;
-		memcpy(ik->ik_keydata, wk->wk_key, wk->wk_keylen);
+		ik.ik_keyrsc = wk->wk_keyrsc;
+		memcpy(ik.ik_keydata, wk->wk_key, wk->wk_keylen);
 		if (cip->ic_cipher == IEEE80211_CIPHER_TKIP) {
-			memcpy(ik->ik_keydata+wk->wk_keylen,
+			memcpy(ik.ik_keydata+wk->wk_keylen,
 				wk->wk_key + IEEE80211_KEYBUF_SIZE,
 				IEEE80211_MICBUF_SIZE);
-			ik->ik_keylen += IEEE80211_MICBUF_SIZE;
+			ik.ik_keylen += IEEE80211_MICBUF_SIZE;
 		}
 	} else {
-		memset(ik->ik_keydata, 0, sizeof(ik->ik_keydata));
+		ik.ik_keyrsc = 0;
+		memset(ik.ik_keydata, 0, sizeof(ik.ik_keydata));
 	}
 	if (ni != NULL)
 		ieee80211_free_node(ic, ni);
-	return 0;
+	return (copy_to_user(iwr->u.data.pointer, &ik, sizeof(ik)) ?
+			-EFAULT : 0);
 }
-EXPORT_SYMBOL(ieee80211_ioctl_getkey);
 
 int
 ieee80211_ioctl_delkey(struct ieee80211com *ic, struct iw_request_info *info,
@@ -2138,6 +2139,8 @@ ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
 	case SIOCG80211STATS:
 		return copy_to_user(ifr->ifr_data, &ic->ic_stats,
 				sizeof (ic->ic_stats)) ? -EFAULT : 0;
+	case IEEE80211_IOCTL_GETKEY:
+		return ieee80211_ioctl_getkey(ic, (struct iwreq *) ifr);
 	}
 	return -EOPNOTSUPP;
 }
