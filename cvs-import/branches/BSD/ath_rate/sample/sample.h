@@ -7,7 +7,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer,
-    without modification.
+ *    without modification.
  * 2. Redistributions in binary form must reproduce at minimum a disclaimer
  *    similar to the "NO WARRANTY" disclaimer below ("Disclaimer") and any
  *    redistribution must be conditioned upon including a substantially
@@ -44,8 +44,10 @@
 /* per-device state */
 struct sample_softc {
 	struct ath_ratectrl arc;	/* base state */
+	int ath_smoothing_rate;     /* ewma percentage (out of 100) */
+	int ath_sample_rate;        /* send a different bit-rate 1/X packets */
 };
-#define	ATH_NODE_SAMPLE(an)	((struct sample_node *)&an[1])
+#define ATH_SOFTC_SAMPLE(sc)    ((struct sample_softc *)sc->sc_rc)
 
 struct rate_info {
 	int rate;
@@ -53,7 +55,6 @@ struct rate_info {
 	int rateCode;
 	int shortPreambleRateCode;
 };
-
 
 struct rate_stats {	
 	int average_tx_time;
@@ -65,13 +66,12 @@ struct rate_stats {
 	int last_tx;
 };
 
-
 /*
  * for now, we track performance for three different packet
  * size buckets
  */
 #define NUM_PACKET_SIZE_BINS 3
-static int packet_size_bins[] = {250, 1600, 3000};
+static int packet_size_bins[NUM_PACKET_SIZE_BINS] = {250, 1600, 3000};
 
 /* per-node state */
 struct sample_node {
@@ -85,9 +85,14 @@ struct sample_node {
 	int packets_sent[NUM_PACKET_SIZE_BINS];
 
 };
+#define ATH_NODE_SAMPLE(an)     ((struct sample_node *)&an[1])
 
-#define	MIN(a,b)	((a) < (b) ? (a) : (b))
-#define	MAX(a,b)	((a) > (b) ? (a) : (b))
+#ifndef MIN
+#define MIN(a,b)        ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a,b)        ((a) > (b) ? (a) : (b))
+#endif
 
 #define WIFI_CW_MIN 31
 #define WIFI_CW_MAX 1023
@@ -95,7 +100,7 @@ struct sample_node {
 /*
  * Calculate the transmit duration of a frame.
  */
-unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
+static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 				int length, 
 				int rix, int retries) {
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
@@ -126,5 +131,4 @@ unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	}
 	return tt;
 }
-
 #endif /* _DEV_ATH_RATE_SAMPLE_H */

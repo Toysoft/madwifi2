@@ -32,7 +32,10 @@
  * IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
- *
+ */
+
+/*
+ * John Bicket's SampleRate control algorithm.
  */
 
 #include <linux/config.h>
@@ -91,19 +94,12 @@ enum {
  * The difference between the algorithm in the thesis and the one in this
  * file is that the one in this file uses a ewma instead of a window.
  *
- * Also, this implementation tracks the average transmission time for
- * a few different packet sizes independently for each link.
- *
  */
 
-static	int ath_smoothing_rate = 95;	/* ewma percentage (out of 100) */
-static	int ath_sample_rate = 10;	/* send a different bit-rate 1/X packets */
+static  int ath_smoothing_rate = 95;    /* ewma percentage (out of 100) */
+static  int ath_sample_rate = 10;       /* send a different bit-rate 1/X packets */
 
 static void	ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
-static void	ath_rate_ctl_reset(struct ath_softc *, struct ieee80211_node *);
-
-
-
 
 static __inline int size_to_bin(int size) 
 {
@@ -118,6 +114,7 @@ static __inline int size_to_bin(int size)
 static __inline int bin_to_size(int index) {
 	return packet_size_bins[index];
 }
+
 /*
  * Setup rate codes for management/control frames.  We force
  * all such frames to the lowest rate.
@@ -125,19 +122,18 @@ static __inline int bin_to_size(int index) {
 static void
 ath_rate_setmgtrates(struct ath_softc *sc, struct ath_node *an)
 {
-	const HAL_RATE_TABLE *rt = sc->sc_currates;
-	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
+    const HAL_RATE_TABLE *rt = sc->sc_currates;
 
-	/* setup rates for management frames */
-	/* XXX management/control frames always go at lowest speed */
-	an->an_tx_mgtrate = rt->info[0].rateCode;
-	an->an_tx_mgtratesp = an->an_tx_mgtrate
-			    | rt->info[0].shortPreamble;
+    /* setup rates for management frames */
+    /* XXX management/control frames always go at lowest speed */
+    an->an_tx_mgtrate = rt->info[0].rateCode;
+    an->an_tx_mgtratesp = an->an_tx_mgtrate
+                | rt->info[0].shortPreamble;
 }
 
-
 void
-ath_rate_node_init(struct ath_softc *sc, struct ath_node *an){
+ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
+{
 	DPRINTF(sc, "%s:\n", __func__);
 	/* NB: assumed to be zero'd by caller */
 	ath_rate_setmgtrates(sc, an);
@@ -150,19 +146,6 @@ ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 	DPRINTF(sc, "%s:\n", __func__);
 }
 EXPORT_SYMBOL(ath_rate_node_cleanup);
-
-void
-ath_rate_node_copy(struct ath_softc *sc,
-		   struct ath_node *dst, const struct ath_node *src)
-{
-	struct sample_node *odst = ATH_NODE_SAMPLE(dst);
-	const struct sample_node *osrc = (const struct sample_node *)&src[1];
-
-	DPRINTF(sc, "%s:\n", __func__);
-	memcpy(odst, osrc, sizeof(struct sample_node));
-}
-EXPORT_SYMBOL(ath_rate_node_copy);
-
 
 /*
  * returns the ndx with the lowest average_tx_time,
@@ -234,17 +217,18 @@ static __inline int pick_sample_ndx(struct sample_node *sn, int size_bin)
 	return best_ndx;
 }
 
-
 void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 		  HAL_BOOL shortPreamble, size_t frameLen,
 		  u_int8_t *rix, int *try0, u_int8_t *txrate)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
+	struct sample_softc *ssc = ATH_SOFTC_SAMPLE(sc);
 	int x;
 	int ndx = 0;
 	int size_bin = size_to_bin(frameLen);
 	int best_ndx = best_rate_ndx(sn, size_bin);
+
 	if (sn->static_rate_ndx != -1) {
 		*try0 = 4;
 		*rix = sn->rates[sn->static_rate_ndx].rix;
@@ -256,7 +240,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	
 	best_ndx = best_rate_ndx(sn, size_bin);
 	if (!sn->packets_sent[size_bin] || 
-	    sn->packets_sent[size_bin] % ath_sample_rate > 0) {
+	    sn->packets_sent[size_bin] % ssc->ath_sample_rate > 0) {
 		/*
 		 * for most packets, send the packet at the bit-rate with 
 		 * the lowest estimated transmission time.
@@ -316,9 +300,15 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	int rateCode = -1;
-	int frame_size = ds->ds_ctl0 & 0x0fff; /* low-order 12 bits of ds_ctl0 */
-	int size_bin = size_to_bin(frame_size);
-	int best_ndx = best_rate_ndx(sn, size_bin);
+	int frame_size;
+	int size_bin;
+	int best_ndx;
+
+	frame_size = ds->ds_ctl0 & 0x0fff; /* low-order 12 bits of ds_ctl0 */
+	if (frame_size == 0)
+    	    frame_size = 1500;
+	size_bin = size_to_bin(frame_size);
+	best_ndx = best_rate_ndx(sn, size_bin);
 
 	if (best_ndx == -1 || !sn->stats[size_bin][best_ndx].packets_acked) {
 		/* 
@@ -356,17 +346,19 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		     struct ath_node *an, const struct ath_desc *ds)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
+	struct sample_softc *ssc = ATH_SOFTC_SAMPLE(sc);
 	int rate = sc->sc_hwmap[ds->ds_txstat.ts_rate &~ HAL_TXSTAT_ALTRATE].ieeerate;
 	int retries = ds->ds_txstat.ts_longretry;
 	int initial_rate_failed = ((ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
-				   || ds->ds_txstat.ts_status != 0 ||
-				   retries > 3);
+                   || ds->ds_txstat.ts_status != 0 ||
+                   retries > 3);
 	int tt = 0;
 	int rix = -1;
 	int x = 0;
-	int frame_size = ds->ds_ctl0 & 0x0fff; /* low-order 12 bits of ds_ctl0 */
-	int size_bin = size_to_bin(frame_size);
-	int size = bin_to_size(size_bin);
+	int frame_size; /* low-order 12 bits of ds_ctl0 */
+	int size_bin;
+	int size;
+
 	if (!sn->num_rates) {
 		DPRINTF(sc, "%s: no rates yet\n", __func__);
 		return;
@@ -383,8 +375,13 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		return;
 	}
 
-	tt = calc_usecs_unicast_packet(sc, size, sn->rates[rix].rix, 
-				       retries);
+	frame_size = ds->ds_ctl0 & 0x0fff; /* low-order 12 bits of ds_ctl0 */
+	if (frame_size == 0)
+    	    frame_size = 1500;
+	size_bin = size_to_bin(frame_size);
+	size = bin_to_size(size_bin);
+	tt = calc_usecs_unicast_packet(sc, size, sn->rates[rix].rix,
+                       retries);
 
 	DPRINTF(sc, "%s: rate %d rix %d frame_size %d (%d) retries %d status %d tt %d avg_tt %d perfect_tt %d ts-rate %d\n", 
 		__func__, rate, rix, frame_size, size, retries, initial_rate_failed, tt, 
@@ -400,8 +397,8 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	} else {
 		/* use a ewma */
 		sn->stats[size_bin][rix].average_tx_time = 
-			((sn->stats[size_bin][rix].average_tx_time * ath_smoothing_rate) + 
-			 (tt * (100 - ath_smoothing_rate))) / 100;
+			((sn->stats[size_bin][rix].average_tx_time * ssc->ath_smoothing_rate) + 
+			 (tt * (100 - ssc->ath_smoothing_rate))) / 100;
 	}
 	
 	if (initial_rate_failed) {
@@ -462,12 +459,10 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 			sn->stats[y][x].average_tx_time = sn->stats[y][x].perfect_tx_time;
 
 			
-			if (1) {
 				DPRINTF(sc, "%s: %d rate %d rix %d rateCode %d perfect_tx_time %d \n", __func__, 
 					x, sn->rates[x].rate, 
 					sn->rates[x].rix, sn->rates[x].rateCode,
 					sn->stats[0][x].perfect_tx_time);
-			}
 		}
 
 	}
@@ -529,6 +524,7 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 
 #undef RATE
 }
+
 /*
  * Reset the rate control state for each 802.11 state transition.
  */
@@ -536,24 +532,9 @@ void
 ath_rate_newstate(struct ath_softc *sc, enum ieee80211_state state)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni;
-	if (ic->ic_opmode == IEEE80211_M_STA) {
-		/*
-		 * Reset local xmit state; this is really only
-		 * meaningful when operating in station mode.
-		 */
-		ni = ic->ic_bss;
-		ath_rate_ctl_start(sc, ni);
-        } else {
-		/*
-		 * When operating as a station the node table holds
-		 * the AP's that were discovered during scanning.
-		 * For any other operating mode we want to reset the
-		 * tx rate state of each node.
-		 */
-		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
-			ath_rate_ctl_start(sc, ni);
-	}
+
+	if (state == IEEE80211_S_RUN)
+    	    ath_rate_newassoc(sc, ATH_NODE(ic->ic_bss), 1); 
 }
 EXPORT_SYMBOL(ath_rate_newstate);
 
@@ -580,8 +561,8 @@ ath_rate_detach(struct ath_ratectrl *arc)
 }
 EXPORT_SYMBOL(ath_rate_detach);
 
-static	int min_smoothing_rate = 0;		
-static	int max_smoothing_rate = 100;		
+static int min_smoothing_rate = 0;		
+static int max_smoothing_rate = 100;		
 
 static int min_sample_rate = 2;
 static int max_sample_rate = 100;
@@ -594,7 +575,6 @@ static int max_sample_rate = 100;
 enum {
 	DEV_ATH		= 9,			/* XXX known by many */
 };
-
 
 static ctl_table ath_rate_static_sysctls[] = {
 	{ .ctl_name	= CTL_AUTO,
@@ -646,7 +626,7 @@ MODULE_DESCRIPTION("SampleRate bit-rate selection algorithm for Atheros devices"
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static char *version = ".9";
+static char *version = "1";
 static char *dev_info = "ath_rate_sample";
 
 static int __init
