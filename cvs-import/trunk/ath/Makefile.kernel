@@ -9,7 +9,7 @@ WLAN=	${NET}/net80211
 COMPAT=	${WLAN}/compat
 
 INCS=	-include ${COMPAT}/compat.h -I${COMPAT}
-EXTRA_CFLAGS+=	${INCS} -I${HAL} -I${HAL}/linux -I${ATH_HAL} -I${WLAN} -I${NET}
+EXTRA_CFLAGS+=	-DATH_PCI ${INCS} -I${HAL} -I${HAL}/linux -I${ATH_HAL} -I${WLAN} -I${NET}
 
 obj-$(CONFIG_ATHEROS) += ath_pci.o
 
