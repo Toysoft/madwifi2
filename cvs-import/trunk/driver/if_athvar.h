@@ -71,15 +71,30 @@ typedef void irqreturn_t;
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
+#define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
 
-/* statistics for node */
-struct ath_nodestat {
-	u_int		st_tx_ok;	/* tx ok pkt */
-	u_int		st_tx_err;	/* tx !ok pkt */
-	u_int		st_tx_retr;	/* tx retry count */
-	int		st_tx_upper;	/* tx upper rate req cnt */
-	u_int		st_tx_antenna;	/* antenna for last good frame */
+/* driver-specific node state */
+struct ath_node {
+	struct ieee80211_node an_node;	/* base class */
+	u_int		an_tx_ok;	/* tx ok pkt */
+	u_int		an_tx_err;	/* tx !ok pkt */
+	u_int		an_tx_retr;	/* tx retry count */
+	int		an_tx_upper;	/* tx upper rate req cnt */
+	u_int		an_tx_antenna;	/* antenna for last good frame */
+	u_int8_t	an_tx_rix0;	/* series 0 rate index */
+	u_int8_t	an_tx_try0;	/* series 0 try count */
+	u_int8_t	an_tx_mgtrate;	/* h/w rate for management/ctl frames */
+	u_int8_t	an_tx_mgtratesp;/* short preamble h/w rate for " " */
+	u_int8_t	an_tx_rate0;	/* series 0 h/w rate */
+	u_int8_t	an_tx_rate1;	/* series 1 h/w rate */
+	u_int8_t	an_tx_rate2;	/* series 2 h/w rate */
+	u_int8_t	an_tx_rate3;	/* series 3 h/w rate */
+	u_int8_t	an_tx_rate0sp;	/* series 0 short preamble h/w rate */
+	u_int8_t	an_tx_rate1sp;	/* series 1 short preamble h/w rate */
+	u_int8_t	an_tx_rate2sp;	/* series 2 short preamble h/w rate */
+	u_int8_t	an_tx_rate3sp;	/* series 3 short preamble h/w rate */
 };
+#define	ATH_NODE(_n)	((struct ath_node *)(_n))
 
 struct ath_buf {
 	TAILQ_ENTRY(ath_buf)	bf_list;
@@ -97,17 +112,17 @@ struct proc_dir_entry;
 struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
+	unsigned int		sc_invalid : 1,	/* being detached */
+				sc_mrretry : 1;	/* multi-rate retry support */
 						/* rate tables */
-	unsigned int		sc_have11g  : 1,/* have 11g support */
-				sc_probing  : 1;/* probing AP on beacon miss */
 	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
 	enum ieee80211_phymode	sc_curmode;	/* current phy mode */
 	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
+	u_int8_t		sc_hwmap[32];	/* h/w rate ix to IEEE table */
 	HAL_INT			sc_imask;	/* interrupt mask copy */
 
 	struct pci_dev		*sc_pdev;	/* associated pci device */
-	volatile int		sc_invalid;	/* being detached */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
 	size_t			sc_desc_len;	/* size of TX/RX descriptors */
 	u_int16_t		sc_cachelsz;	/* cache line size */
@@ -138,7 +153,6 @@ struct ath_softc {
 	struct timer_list	sc_rate_ctl;	/* tx rate control timer */
 	struct timer_list	sc_cal_ch;	/* calibration timer */
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
-	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
 };
 
@@ -225,8 +239,8 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_perCalibration)((_ah), (_chan)))
 #define	ath_hal_setledstate(_ah, _state) \
 	((*(_ah)->ah_setLedState)((_ah), (_state)))
-#define	ath_hal_beaconinit(_ah, _opmode, _nextb, _bperiod) \
-	((*(_ah)->ah_beaconInit)((_ah), (_opmode), (_nextb), (_bperiod)))
+#define	ath_hal_beaconinit(_ah, _nextb, _bperiod) \
+	((*(_ah)->ah_beaconInit)((_ah), (_nextb), (_bperiod)))
 #define	ath_hal_beaconreset(_ah) \
 	((*(_ah)->ah_resetStationBeaconTimers)((_ah)))
 #define	ath_hal_beacontimers(_ah, _bs, _tsf, _dc, _cc) \
@@ -234,8 +248,8 @@ void	ath_sysctl_unregister(void);
 		(_dc), (_cc)))
 #define	ath_hal_setassocid(_ah, _bss, _associd) \
 	((*(_ah)->ah_writeAssocid)((_ah), (_bss), (_associd), 0))
-#define	ath_hal_setopmode(_ah, _opmode) \
-	((*(_ah)->ah_setPCUConfig)((_ah), (_opmode)))
+#define	ath_hal_setopmode(_ah) \
+	((*(_ah)->ah_setPCUConfig)((_ah)))
 #define	ath_hal_stoptxdma(_ah, _qnum) \
 	((*(_ah)->ah_stopTxDma)((_ah), (_qnum)))
 #define	ath_hal_stoppcurecv(_ah) \
@@ -261,10 +275,6 @@ void	ath_sysctl_unregister(void);
 #define	ath_hal_rxmonitor(_ah) \
 	((*(_ah)->ah_rxMonitor)((_ah)))
 
-#define	ath_hal_setupbeacondesc(_ah, _ds, _opmode, _flen, _hlen, \
-		_rate, _antmode) \
-	((*(_ah)->ah_setupBeaconDesc)((_ah), (_ds), (_opmode), \
-		(_flen), (_hlen), (_rate), (_antmode)))
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
 #define	ath_hal_rxprocdesc(_ah, _ds, _dspa, _dsnext) \
@@ -275,9 +285,9 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_setupTxDesc)((_ah), (_ds), (_plen), (_hlen), (_atype), \
 		(_txpow), (_txr0), (_txtr0), (_keyix), (_ant), \
 		(_flags), (_rtsrate), (_rtsdura)))
-#define	ath_hal_setupxtxdesc(_ah, _ds, _short, \
+#define	ath_hal_setupxtxdesc(_ah, _ds, \
 		_txr1, _txtr1, _txr2, _txtr2, _txr3, _txtr3) \
-	((*(_ah)->ah_setupXTxDesc)((_ah), (_ds), (_short), \
+	((*(_ah)->ah_setupXTxDesc)((_ah), (_ds), \
 		(_txr1), (_txtr1), (_txr2), (_txtr2), (_txr3), (_txtr3)))
 #define	ath_hal_filltxdesc(_ah, _ds, _l, _first, _last) \
 	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last)))
