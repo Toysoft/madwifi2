@@ -39,49 +39,22 @@
 DESTDIR=
 #
 OS=		linux
-#
-# TARGET defines the target platform ISA per GNU rules.
-# It must match one of the target platforms supported by
-# the HAL.  To set the set of target platforms look at
-# hal/linux/*.inc.  You can set this in the environment
-# to override the default setting.
-#
-ifndef TARGET
 TARGET=		i386-elf
-endif
-#
-# ARCH defines the target platform architecture.  We derive
-# it from TARGET unless it is explicitly set in the environment.
-# The rules for deriving it are taken from the Linux kernel for
-# consistency.
-#
-ifndef ARCH
-ARCH=		$(shell echo ${TARGET} | sed \
-		-e s/i.86-.*/i386/ \
-		-e s/sun4u-.*/sparc64/ \
-		-e s/powerpc-.*/ppc/ \
-		-e s/arm.-.**/arm/ \
-		-e s/sa110-.*/arm/)
-endif
 #
 NM=		nm
 AWK=		awk
 
+
+#
+# Set KERNEL_VERSION and KERNEL_PATH variables here or in the environment
+# to build for a different kernel than the one currently running
+#
+#KERNEL_VERSION=	
+#KERNEL_PATH=	
+
+#
 #
 # Path to the Linux kernel, include files, and where to install the modules.
-#
-# KERNEL_VERSION is the target kernel's version; it's used to enable
-# build techniques and some code.  If KERNEL_VERSIO is not set in the
-# environment then it is taken from the running system.
-#
-# KERNEL_PATH is the path to the target kernel's build/source area.
-# This is used to obtain the kernel configuration and include files.
-# If KERNEL_PATH is not set in the environment then it is derived from
-# KERNEL_VERSION.
-#
-# KERNEL_CONF is the filename of the target kernel's make configuration
-# file.  If this is not set in the environment then it is derived from
-# KERNEL_PATH.
 #
 ifndef KERNEL_VERSION
 KERNEL_VERSION=	$(shell uname -r)
@@ -89,9 +62,7 @@ endif
 ifndef KERNEL_PATH
 KERNEL_PATH=	/lib/modules/${KERNEL_VERSION}/build
 endif
-ifndef KERNEL_CONF
-KERNEL_CONF=	${KERNEL_PATH}/.config
-endif
+LINUX=		${KERNEL_PATH}/include
 MODULE_PATH=	/lib/modules/${KERNEL_VERSION}/net
 #
 # A numeric version of the target system's version string, suitable
@@ -110,7 +81,11 @@ ATH_HAL=${DEPTH}/ath_hal
 #
 # Path to the 802.11 include files
 #
-WLAN=	${DEPTH}/wlan
+WLAN=	${DEPTH}/net80211
+#
+# Path to the 802.11 linux includes.
+#
+WLAN_LINUX=	${DEPTH}/net80211/linux
 #
 # Path to the device driver.
 #
@@ -119,22 +94,11 @@ DRIVER=	${DEPTH}/driver
 #
 # Basic build components.
 #
-COPTS=	-Wall -O2 -D__KERNEL__ -DMODULE
-#
-# Define this for some cross-build environments
-#
-COPTS+=	-D__linux__
-#
+COPTS=	-Wall -gdwarf-2
 INCS=	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
-#
-# NB: some architectures include platform/foo.h files,
-#     so add a special include search path
-#
-KERNEL_INCS=	-I${KERNEL_PATH}/include \
-		-I${KERNEL_PATH}/arch/${ARCH}
 CLEANFILES=	.depend
 
-include ${KERNEL_CONF}
+include ${KERNEL_PATH}/.config
 
 ifdef CONFIG_SMP
 COPTS+=	-D__SMP__ -DSMP
@@ -159,9 +123,13 @@ endif
 #
 ifneq (${LINUX_VERSION}, 204)
 KMODSUF=	ko
-KERNEL_INCS+=	-I${KERNEL_PATH}/include/asm/mach-default
+INCS+=		-I${KERNEL_PATH}/include/asm/mach-default
 MODOPTS+=	-DKBUILD_BASENAME=${KMODNAME} -DKBUILD_MODNAME=${KMODNAME}
-CLEANFILES+=	*.mod.c
+CLEANFILES+=	*.mod.c *~
+%.mod.c: %.o
+	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux $<
+%.mod.o: %.mod.c
+OBJS += $(addsuffix .mod.o,$(basename $(MODULE_OBJECT_FILE_LIST)))
 else
 KMODSUF=	o
 endif
