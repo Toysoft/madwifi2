@@ -62,12 +62,59 @@
 struct iw_statistics *
 ieee80211_iw_getstats(struct net_device *dev)
 {
+#define	NZ(x)	((x) ? (x) : 1)
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	ic->ic_iwstats.qual.qual = 0;
-	ic->ic_iwstats.qual.level = ic->ic_bss.ni_rssi;
-	ic->ic_iwstats.qual.noise = 0;
-	ic->ic_iwstats.qual.updated = 0;
+	/*
+	 * Units are in db above the noise floor. That means the
+	 * rssi values reported in the tx/rx descriptors in the
+	 * driver are the SNR expressed in db.
+	 *
+	 * If you assume that the noise floor is -95, which is an
+	 * excellent assumption 99.5 % of the time, then you can
+	 * derive the absolute signal level (i.e. -95 + rssi). 
+	 * There are some other slight factors to take into account
+	 * depending on whether the rssi measurement is from 11b,
+	 * 11g, or 11a.   These differences are at most 2db and
+	 * can be documented.
+	 *
+	 * NB: various calculations are based on the orinoco/wavelan
+	 *     drivers for compatibility
+	 */
+	switch (ic->ic_opmode) {
+	case IEEE80211_M_STA:
+		/* use stats from associated ap */
+		ic->ic_iwstats.qual.qual = ieee80211_get_rssi(&ic->ic_bss);
+		break;
+	case IEEE80211_M_IBSS:
+	case IEEE80211_M_AHDEMO:
+	case IEEE80211_M_HOSTAP: {
+		struct ieee80211_node* ni;
+		u_int32_t rssi_samples = 0;
+		u_int32_t rssi_total = 0;
+
+		/* average stats from all nodes */
+		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+			rssi_samples++;
+			rssi_total += ieee80211_get_rssi(ni);
+		}
+		ic->ic_iwstats.qual.qual = rssi_total / NZ(rssi_samples);
+		break;
+	}
+	case IEEE80211_M_MONITOR:
+	default:
+		/* no stats */
+		ic->ic_iwstats.qual.qual = 0;
+		break;
+	}
+	/* NB: max is 94 because noise is hardcoded to 161 */
+	if (ic->ic_iwstats.qual.qual > 94)
+		ic->ic_iwstats.qual.qual = 94;
+
+	ic->ic_iwstats.qual.noise = 161;	/* -95dBm */
+	ic->ic_iwstats.qual.level =
+		ic->ic_iwstats.qual.noise + ic->ic_iwstats.qual.qual;
+	ic->ic_iwstats.qual.updated = 7;
 
 	ic->ic_iwstats.status = ic->ic_state;
 	ic->ic_iwstats.discard.nwid = 0;
@@ -79,6 +126,7 @@ ieee80211_iw_getstats(struct net_device *dev)
 	ic->ic_iwstats.miss.beacon = 0;
 
 	return &ic->ic_iwstats;
+#undef NZ
 }
 
 int
@@ -498,7 +546,8 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 
 	range->txpower_capa = IW_TXPOW_DBM;
 
-	if (ic->ic_opmode == IEEE80211_M_STA || ic->ic_opmode == IEEE80211_M_IBSS) {
+	if (ic->ic_opmode == IEEE80211_M_STA ||
+	    ic->ic_opmode == IEEE80211_M_IBSS) {
 		range->min_pmp = 1 * 1024;
 		range->max_pmp = 65535 * 1024;
 		range->min_pmt = 1 * 1024;
@@ -530,9 +579,19 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 				break;
 		}
 
-	range->max_qual.qual = 92; /* 0 .. 92 */
-	range->max_qual.level = 154; /* 27 .. 154 */
-	range->max_qual.noise = 154; /* 27 .. 154 */
+	/* Max quality is max field value minus noise floor */
+	range->max_qual.qual  = 0xff - 161;
+
+	/*
+	 * In order to use dBm measurements, 'level' must be lower
+	 * than any possible measurement (see iw_print_stats() in
+	 * wireless tools).  It's unclear how this is meant to be
+	 * done, but setting zero in these values forces dBm and
+	 * the actual numbers are not used.
+	 */
+	range->max_qual.level = 0;
+	range->max_qual.noise = 0;
+
 	range->sensitivity = 3;
 
 	range->max_encoding_tokens = IEEE80211_WEP_NKID;
@@ -822,7 +881,7 @@ ieee80211_ioctl_iwaplist(struct net_device *dev,
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
 		else
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
-		qual[i].qual = ni->ni_rssi;
+		qual[i].qual = ieee80211_get_rssi(ni);
 		qual[i].level = 0;
 		qual[i].noise = 0;
 		qual[i].updated = jiffies;		/* XXX */
@@ -932,7 +991,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 		}
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVQUAL;
-		iwe.u.qual.level = ni->ni_rssi;
+		iwe.u.qual.level = ieee80211_get_rssi(ni);
 		iwe.u.qual.updated = jiffies;	/* XXX */
 		current_ev = iwe_stream_add_event(current_ev,
 			end_buf, &iwe, IW_EV_QUAL_LEN);
@@ -1017,7 +1076,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 				IFM_AUTO | IFM_MAKEMODE(value);
 		retv =  ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
-	case    IEEE80211_PARAM_RESET:
+	case IEEE80211_PARAM_RESET:
 		switch (value) {
 		case IEEE80211_PARAM_RESET_INIT:
 			retv = (*ic->ic_init)(dev);
@@ -1033,7 +1092,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 
 static int
 ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
-		   	void *w, char *extra)
+			void *w, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	struct ifmediareq imr;

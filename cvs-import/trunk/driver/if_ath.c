@@ -901,7 +901,8 @@ ath_mode_init(struct net_device *dev)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
-	if (ic->ic_state == IEEE80211_S_SCAN)
+	if (ic->ic_state == IEEE80211_S_SCAN ||
+	    ic->ic_opmode == IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	ath_hal_setrxfilter(ah, rfilt);
 
@@ -1854,7 +1855,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if (st->st_tx_antenna)
 		antenna = st->st_tx_antenna;
 	else
-		antenna = ni->ni_rantenna;
+		antenna = ni->ni_recv_hist[ni->ni_hist_cur].hi_rantenna;
 
 	/*
 	 * Formulate first tx descriptor with tx controls.
@@ -2292,7 +2293,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
-	if (ic->ic_state == IEEE80211_S_SCAN)
+	if (ic->ic_state == IEEE80211_S_SCAN ||
+	    ic->ic_opmode == IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	if (nstate == IEEE80211_S_SCAN) {
 		mod_timer(&sc->sc_scan_ch,

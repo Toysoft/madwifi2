@@ -509,6 +509,17 @@ struct ieee80211_rateset {
 	u_int8_t		rs_rates[IEEE80211_RATE_MAXSIZE];
 };
 
+/* Number of history entries to keep (per node) */
+#define IEEE80211_RECV_HIST_LEN		16
+#define IEEE80211_JIFFIES_NONE		((ulong)(~0))
+
+struct ieee80211_recv_hist {
+	ulong		hi_jiffies;	/* kernel timestamp */
+	u_int8_t	hi_rssi;	/* recv ssi */
+	u_int32_t	hi_rstamp;	/* recv timestamp */
+	u_int8_t	hi_rantenna;	/* recv antenna */
+};
+
 /*
  * Node specific information.
  */
@@ -518,9 +529,8 @@ struct ieee80211_node {
 	atomic_t		ni_refcnt;
 
 	/* hardware */
-	u_int8_t		ni_rssi;	/* recv ssi */
-	u_int32_t		ni_rstamp;	/* recv timestamp */
-	u_int8_t		ni_rantenna;	/* recv antenna */
+	struct ieee80211_recv_hist ni_recv_hist[IEEE80211_RECV_HIST_LEN];
+	int			ni_hist_cur;
 
 	/* header */
 	u_int8_t		ni_macaddr[IEEE80211_ADDR_LEN];
@@ -709,6 +719,7 @@ struct ieee80211com {
 	(((p)->msg_enable & (NETIF_MSG_DEBUG|NETIF_MSG_LINK2)) == \
 		(NETIF_MSG_DEBUG|NETIF_MSG_LINK2))
 
+u_int8_t ieee80211_get_rssi(struct ieee80211_node*);
 int	ieee80211_ifattach(struct net_device *);
 void	ieee80211_ifdetach(struct net_device *);
 void	ieee80211_input(struct net_device *, struct sk_buff *,
