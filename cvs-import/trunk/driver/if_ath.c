@@ -49,6 +49,8 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/cache.h>
+#include <linux/sysctl.h>
+#include <linux/proc_fs.h>
 
 #include <asm/uaccess.h>
 
@@ -100,21 +102,14 @@ static struct net_device_stats *ath_getstats(struct net_device *);
 static int	ath_getchannels(struct net_device *, u_int cc, HAL_BOOL outdoor);
 
 static int	ath_rate_setup(struct net_device *, u_int mode);
-static void	ath_rate_mapsetup(struct net_device *);
 static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
-static	int ath_rateinterval = 1000;		/* rate control interval (ms)  */
-
-static	int ath_bmisshack = 1;
-
-#ifdef CONFIG_PROC_FS
-static void	ath_proc_init(struct ath_softc *sc);
-static void	ath_proc_remove(struct ath_softc *sc);
-#endif /* CONFIG_PROC_FS */
+static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
+static	int ath_bmisshack = 1;			/* XXX */
 
 #ifdef AR_DEBUG
 int	ath_debug = 0;
@@ -261,10 +256,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	printk("%s: 802.11 address: %s\n",
 		dev->name, ether_sprintf(dev->dev_addr));
-
-#ifdef CONFIG_PROC_FS
-	ath_proc_init(sc);
-#endif
 	return 0;
 bad:
 	if (ah)
@@ -283,9 +274,6 @@ ath_detach(struct net_device *dev)
 	ath_stop(dev);
 	ath_desc_free(sc);
 	ath_hal_detach(sc->sc_ah);
-#ifdef CONFIG_PROC_FS
-	ath_proc_remove(sc);
-#endif
 	ieee80211_ifdetach(dev);
 
 	return 0;
@@ -2206,9 +2194,10 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 			    st->st_tx_upper = 0;
 		}
 	}
-	if (state == IEEE80211_S_RUN) {
+	if (state == IEEE80211_S_RUN && ic->ic_fixed_rate != -1) {
 		/*
-		 * Start the background rate control thread.
+		 * Start the background rate control thread if we
+		 * are not configured to use a fixed xmit rate.
 		 */
 		mod_timer(&sc->sc_rate_ctl,
 			jiffies + ((HZ * ath_rateinterval) / 1000));
@@ -2360,47 +2349,40 @@ ath_getstats(struct net_device *dev)
 	return stats;
 }
 
-#ifdef CONFIG_PROC_FS
-#include <linux/proc_fs.h>
+#ifdef CONFIG_SYSCTL
+enum {
+	ATH_STATS	= 1,
+	ATH_DEBUG	= 2,
+	ATH_DWELLTIME	= 3,
+	ATH_CALIBRATE	= 4,
+	ATH_RATEINTERVAL= 5,
+	ATH_BMISSHACK	= 6,
+	ATH_DUMP	= 8,
+};
+static	char ath_info[256];
+static	char ath_dump[10];
 
 static int
-ath_proc_debug_read(char *page, char **start, off_t off,
-	int count, int *eof, void *data)
+ath_sysctl_stats(ctl_table *ctl, int write, struct file *filp,
+	void *buffer, size_t *lenp)
 {
-	if (off != 0) {
-		*eof = 1;
+	struct net_device *dev;
+	struct ath_softc *sc;
+	char *cp = ath_info;
+
+	if (!*lenp || (filp->f_pos && !write)) {
+		*lenp = 0;
 		return 0;
 	}
-	return sprintf(page, "%d\n", ath_debug);
-}
-
-static int
-ath_proc_debug_write(struct file *file, const char *buf,
-	unsigned long count, void *data)
-{
-	int v;
-	
-	if (sscanf(buf, "%d", &v) == 1) {
-		ath_debug = v;
-		return count;
-	} else
-		return -EINVAL;
-}
-
-static int
-ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ath_softc *sc = (struct ath_softc *) data;
-	char *cp = page;
-
-	if (off != 0) {
-		*eof = 1;
-		return 0;
-	}
+	dev = dev_get_by_name("ath0");		/* XXX */
+	if (!dev)
+		return EINVAL;
+	sc = dev->priv;
 #define	STAT(x) do {							\
 	if (sc->sc_stats.ast_##x != 0)					\
 		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x);	\
 } while (0)
+	*cp = '\0';
 	STAT(watchdog);	  STAT(hardware);   STAT(bmiss);
 	STAT(rxorn);	  STAT(rxeol);
 
@@ -2438,43 +2420,129 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 
 	STAT(be_nobuf);
 
-	STAT(per_cal);		STAT(per_calfail);	STAT(per_rfgain);
+	STAT(per_cal);		STAT(per_rfgain);
 	STAT(rate_calls);	STAT(rate_raise);	STAT(rate_drop);
 
-	return cp - page;
+	dev_put(dev);
+
+	return proc_dostring(ctl, write, filp, buffer, lenp);
 #undef PHYSTAT
 #undef STAT
 }
 
-static void
-ath_proc_init(struct ath_softc *sc)
+static int
+ath_sysctl_handler(ctl_table *ctl, int write, struct file *filp,
+	void *buffer, size_t *lenp)
 {
-	struct proc_dir_entry *dp;
-
-	/* XXX this uses /proc/net, but we want /proc/net/drivers */
-	sc->sc_proc = proc_mkdir(sc->sc_ic.ic_dev.name, proc_net);
-	if (sc->sc_proc == NULL) {
-		printk(KERN_INFO "/proc/net/drivers/%s: failed to create\n",
-			sc->sc_ic.ic_dev.name);
-		return;
+	int *valp = ctl->data;
+	int val = *valp;			/* save old value */
+	int ret = proc_dointvec(ctl, write, filp, buffer, lenp);
+	if (write && *valp != val) {
+		/* XXX this is wrong, need to intercept writes */
+		switch (ctl->ctl_name) {
+		case ATH_DWELLTIME:
+			if (*valp < 100)	/* 100ms min */
+				*valp = 100;
+			break;
+		case ATH_CALIBRATE:
+			if (*valp < 1)		/* 1/second min */
+				*valp = 1;
+			break;
+		case ATH_RATEINTERVAL:
+			if (*valp < 500)	/* 500ms min */
+				*valp = 500;
+			break;
+		}
 	}
-	dp = create_proc_entry("debug", 0644, sc->sc_proc);
-	if (dp) {
-		dp->read_proc = ath_proc_debug_read;
-		dp->write_proc = ath_proc_debug_write;
-		dp->data = sc;
-	}
-	create_proc_read_entry("stats", 0644, sc->sc_proc, ath_proc_stats, sc);
+	return ret;
 }
 
-static void
-ath_proc_remove(struct ath_softc *sc)
+static int
+ath_sysctl_dump(ctl_table *ctl, int write, struct file *filp,
+	void *buffer, size_t *lenp)
 {
-	if (sc->sc_proc != NULL) {
-		remove_proc_entry("stats", sc->sc_proc);
-		remove_proc_entry("debug", sc->sc_proc);
-		remove_proc_entry(sc->sc_ic.ic_dev.name, proc_net);
-		sc->sc_proc = NULL;
+	int ret = proc_dostring(ctl, write, filp, buffer, lenp);
+	/* NB: should always be a write */
+	if (ret == 0) {
+		struct net_device *dev;
+		struct ath_softc *sc;
+
+		dev = dev_get_by_name("ath0");		/* XXX */
+		if (!dev) {
+			printk("%s: no ath0 device\n", __func__);
+			return EINVAL;
+		}
+		sc = dev->priv;
+		if (*lenp >= 3 && strncmp(buffer, "hal", 3) == 0)
+			ath_hal_dumpstate(sc->sc_ah);
+		else if (*lenp >= 6 && strncmp(buffer, "eeprom", 6) == 0)
+			ath_hal_dumpeeprom(sc->sc_ah);
+		else if (*lenp >= 6 && strncmp(buffer, "rfgain", 6) == 0)
+			ath_hal_dumprfgain(sc->sc_ah);
+		else if (*lenp >= 3 && strncmp(buffer, "ani", 3) == 0)
+			ath_hal_dumpani(sc->sc_ah);
+		else {
+			printk("%s: don't grok \"%.*s\"\n",
+				__func__, *lenp, (char*) buffer);
+			ret = -EINVAL;
+		}
+		dev_put(dev);
 	}
+	return ret;
 }
+
+enum {
+	DEV_ATH		= 9,			/* XXX */
+};
+static ctl_table ath_sysctls[] = {
+	{ ATH_STATS, 		"stats",	ath_info,
+	  sizeof(ath_info),	0444,	NULL,	ath_sysctl_stats },
+	{ ATH_DEBUG, 		"debug",	&ath_debug,
+	  sizeof(ath_dwelltime),0644,	NULL,	ath_sysctl_handler },
+	{ ATH_DWELLTIME,	"dwelltime",	&ath_dwelltime,
+	  sizeof(ath_debug),	0644,	NULL,	ath_sysctl_handler },
+	{ ATH_CALIBRATE,	"calibrate",	&ath_calinterval,
+	  sizeof(ath_calinterval),0644,	NULL,	ath_sysctl_handler },
+	{ ATH_RATEINTERVAL,	"rateinterval",	&ath_rateinterval,
+	  sizeof(ath_rateinterval),0644,NULL,	ath_sysctl_handler },
+	{ ATH_BMISSHACK,	"bmisshack",	&ath_bmisshack,
+	  sizeof(ath_bmisshack),0644,	NULL,	ath_sysctl_handler },
+	{ ATH_DUMP,		"dump",		ath_dump,
+	  sizeof(ath_dump),	0200,	NULL,	ath_sysctl_dump },
+	{ 0 }
+};
+static ctl_table ath_ath_table[] = {
+	{ DEV_ATH, "ath", NULL, 0, 055, ath_sysctls },
+	{ 0 }
+};
+static ctl_table ath_root_table[] = {
+#ifdef CONFIG_PROC_FS
+	{ CTL_NET, "net", NULL, 0, 0555, ath_ath_table },
 #endif /* CONFIG_PROC_FS */
+	{ 0 }
+};
+static struct ctl_table_header *ath_sysctl_header;
+
+void
+ath_sysctl_register(void)
+{
+	static int initialized = 0;
+
+	if (!initialized) {
+		ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
+
+		ath_dwelltime = 200;		/* 5 channels/second */
+		ath_calinterval = 30;		/* calibrate every 30 secs */
+		ath_rateinterval = 1000;	/* rate ctl interval (ms)  */
+		ath_bmisshack = 1;		/* XXX */
+		initialized = 1;
+	}
+}
+
+void
+ath_sysctl_unregister(void)
+{
+	if (ath_sysctl_header)
+		unregister_sysctl_table(ath_sysctl_header);
+}
+#endif /* CONFIG_SYSCTL */

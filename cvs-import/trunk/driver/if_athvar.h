@@ -161,10 +161,6 @@ struct ath_softc {
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
-
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry	*sc_proc;	/* /proc/net/drivers/ath%d */
-#endif
 };
 
 #ifdef AR_DEBUG
@@ -182,6 +178,10 @@ void	ath_resume(struct net_device *);
 void	ath_suspend(struct net_device *);
 void	ath_shutdown(struct net_device *);
 void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
+#ifdef CONFIG_SYSCTL
+void	ath_sysctl_register(void);
+void	ath_sysctl_unregister(void);
+#endif /* CONFIG_SYSCTL */
 
 /*
  * HAL definitions to comply with local coding convention.
