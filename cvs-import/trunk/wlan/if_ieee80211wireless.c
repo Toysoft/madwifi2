@@ -518,16 +518,15 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 	range->encoding_size[0] = 5;
 	range->encoding_size[1] = 13;
 
-	/* XXX this should come through if_media */
-	range->num_bitrates = 0;
-	for (i = 0; i < ni->ni_nrate; i++) {
-		r = ic->ic_sup_rates[ic->ic_curmode][i] & IEEE80211_RATE_BASIC;
-		if (r) {
-			/* XXX */
-			range->bitrate[range->num_bitrates] = r * 5;
-			range->num_bitrates++;
-		}
+	/* XXX this only works for station mode */
+	range->num_bitrates = ni->ni_nrate;
+	if (range->num_bitrates > IW_MAX_BITRATES)
+		range->num_bitrates = IW_MAX_BITRATES;
+	for (i = 0; i < range->num_bitrates; i++) {
+		r = ni->ni_rates[i] & IEEE80211_RATE_VAL;
+		range->bitrate[i] = (r / 2) * 1000000;
 	}
+
 	/* estimated maximum TCP throughput values (bps) */
 	range->throughput = 5500000;
 
@@ -790,7 +789,7 @@ ieee80211_ioctl_iwaplist(struct net_device *dev,
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
 		else
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
-		qual[i].qual = ni->ni_rssi < 27 ? 0 : ((ni->ni_rssi-27)*92)/127;
+		qual[i].qual = ni->ni_rssi;
 		qual[i].level = 0;
 		qual[i].noise = 0;
 		qual[i].updated = jiffies;		/* XXX */
@@ -900,7 +899,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 		}
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVQUAL;
-		iwe.u.qual.noise = ni->ni_rssi;
+		iwe.u.qual.level = ni->ni_rssi;
 		iwe.u.qual.updated = jiffies;	/* XXX */
 		current_ev = iwe_stream_add_event(current_ev,
 			end_buf, &iwe, IW_EV_QUAL_LEN);
@@ -916,7 +915,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWFREQ;
-		iwe.u.freq.m = ni->ni_chan->ic_freq * 10000;
+		iwe.u.freq.m = ni->ni_chan->ic_freq * 100000;
 		iwe.u.freq.e = 1;
 		current_ev = iwe_stream_add_event(current_ev,
 				end_buf, &iwe, IW_EV_FREQ_LEN);
@@ -927,9 +926,9 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 		iwe.cmd = SIOCGIWRATE;
 		current_val = current_ev + IW_EV_LCP_LEN;
 		for (j = 0; j < ni->ni_nrate; j++) {
-			if (ni->ni_rates[j] & IEEE80211_RATE_BASIC) {
-				iwe.u.bitrate.value = (ni->ni_rates[j] &
-				    IEEE80211_RATE_VAL) * 5; /* XXX */
+			if (ni->ni_rates[j]) {
+				iwe.u.bitrate.value = ((ni->ni_rates[j] &
+				    IEEE80211_RATE_VAL) / 2) * 1000000;
 				current_val = iwe_stream_add_value(current_ev,
 					current_val, end_buf, &iwe,
 					IW_EV_PARAM_LEN);
