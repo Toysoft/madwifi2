@@ -76,7 +76,7 @@ const char *ieee80211_state_name[IEEE80211_S_MAX] = {
 };
 EXPORT_SYMBOL(ieee80211_state_name);
 
-#define	IEEE80211_AUTH_MAX	(IEEE80211_AUTH_WPA2_PSK+1)
+#define	IEEE80211_AUTH_MAX	(IEEE80211_AUTH_WPA+1)
 /* XXX well-known names */
 static const char *auth_modnames[IEEE80211_AUTH_MAX] = {
 	/* NB: for now we have one module */
@@ -87,9 +87,6 @@ static const char *auth_modnames[IEEE80211_AUTH_MAX] = {
 	"wlan_auth_8021x",	/* IEEE80211_AUTH_8021X	 */
 	"wlan_auth_auto",	/* IEEE80211_AUTH_AUTO */
 	"wlan_auth_wpa",	/* IEEE80211_AUTH_WPA */
-	"wlan_auth_wpa_psk",	/* IEEE80211_AUTH_WPA_PSK */
-	"wlan_auth_wpa2",	/* IEEE80211_AUTH_WPA2 */
-	"wlan_auth_wpa2_psk",	/* IEEE80211_AUTH_WPA2_PSK */
 #else
 	"wlan_auth",		/* IEEE80211_AUTH_NONE */
 	"wlan_auth",		/* IEEE80211_AUTH_OPEN */
@@ -97,9 +94,6 @@ static const char *auth_modnames[IEEE80211_AUTH_MAX] = {
 	"wlan_auth",		/* IEEE80211_AUTH_8021X	 */
 	"wlan_auth",		/* IEEE80211_AUTH_AUTO */
 	"wlan_auth",		/* IEEE80211_AUTH_WPA */
-	"wlan_auth",		/* IEEE80211_AUTH_WPA_PSK */
-	"wlan_auth",		/* IEEE80211_AUTH_WPA2 */
-	"wlan_auth",		/* IEEE80211_AUTH_WPA2_PSK */
 #endif
 };
 static const struct ieee80211_authenticator *authenticators[IEEE80211_AUTH_MAX];

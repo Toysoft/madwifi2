@@ -609,10 +609,7 @@ enum {
 	IEEE80211_AUTH_8021X	= 3,		/* 802.1x */
 	IEEE80211_AUTH_AUTO	= 4,		/* auto-select/accept */
 	/* NB: these are used only for ioctls */
-	IEEE80211_AUTH_WPA	= 5,		/* WPA w/ 802.1x */
-	IEEE80211_AUTH_WPA_PSK	= 6,		/* WPA w/ preshared key */
-	IEEE80211_AUTH_WPA2	= 7,		/* WPA2 w/ 802.1x */
-	IEEE80211_AUTH_WPA2_PSK	= 8,		/* WPA2 w/ preshared key */
+	IEEE80211_AUTH_WPA	= 5,		/* WPA/RSN w/ 802.1x/PSK */
 };
 
 #endif /* _NET80211_IEEE80211_H_ */
