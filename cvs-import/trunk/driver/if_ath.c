@@ -70,17 +70,17 @@ static int	ath_media_change(struct net_device *);
 static void	ath_media_status(struct net_device *, struct ifmediareq *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
-static void	ath_beacon_int(struct ath_softc *);
+static void	ath_beacon_int(struct net_device *);
 static void	ath_beacon_free(struct ath_softc *);
 static int	ath_desc_alloc(struct ath_softc *);
 static void	ath_desc_free(struct ath_softc *);
 static void	ath_node_free(struct ieee80211com *, struct ieee80211_node *);
 static int	ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
-static void	ath_rx_int(struct ath_softc *);
+static void	ath_rx_int(struct net_device *);
 static int	ath_hardstart(struct sk_buff *, struct net_device *);
 static int	ath_tx_start(struct ath_softc *, struct ieee80211_node *,
 			     struct ath_buf *, struct sk_buff *);
-static void	ath_tx_int(struct ath_softc *);
+static void	ath_tx_int(struct net_device *);
 static HAL_CHANNEL *ath_chan_find(struct ath_softc *, u_int);
 static int	ath_chan_set(struct ath_softc *, u_int8_t);
 static void	ath_draintxq(struct ath_softc *);
@@ -90,7 +90,6 @@ static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
 static int	ath_newstate(void *, enum ieee80211_state);
 static void	ath_rate_ctl(struct ath_softc *, struct ieee80211_node *);
-static struct net_device_stats *ath_getstats(struct net_device *);
 
 #ifdef AR_DEBUG
 int	ath_debug = 2;		/*XXX*/
@@ -167,15 +166,14 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) sc;
 
-#if 0
-	dev->features |= NETIF_F_SG;		/* scatter/gather supported */
-#endif
+	ether_setup(dev);
 	dev->open = ath_init;
 	dev->hard_start_xmit = ath_hardstart;
-	dev->stop = ath_stop;
-	dev->get_stats = ath_getstats;
 	dev->set_multicast_list = ath_mode_init;
 	dev->do_ioctl = ath_ioctl;
+
+	ic->ic_watchdog = ath_watchdog;
+	ic->ic_start = ath_start;
 
 	ic->ic_newstate = ath_newstate;
 	ic->ic_phytype = IEEE80211_T_OFDM;
@@ -187,7 +185,7 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	ic->ic_bss.ni_private = &sc->sc_bss_stat;
 
 	/* get mac address from hardware */
-	ath_hal_getmac(ah, ic->ic_myaddr);
+	ath_hal_getmac(ah, dev->dev_addr);
 
 	/*
 	 * Fill in 802.11 available channel set.
@@ -220,11 +218,10 @@ ath_attach(uint16_t devid, struct net_device *dev)
 		}
 	}
 
-	printk("%s: 802.11 address: %s\n", dev->name,
-		ether_sprintf(ic->ic_myaddr));
-
 	/* call MI attach routine. */
 	ieee80211_ifattach(dev);
+
+	printk("%s: 802.11 address: %s\n", dev->name, ether_sprintf(dev->dev_addr));
 
 	ifmedia_init(&sc->sc_media, 0, ath_media_change, ath_media_status);
 	ifmedia_add(&sc->sc_media,
@@ -255,7 +252,6 @@ ath_detach(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	DPRINTF(("ath_detach: sc_attached %u\n", sc->sc_attached));
-	ATH_LOCK(sc);
 	if (sc->sc_attached) {
 		sc->sc_invalid = 1;
 		ath_stop(dev);
@@ -264,7 +260,6 @@ ath_detach(struct net_device *dev)
 		ifmedia_removeall(&sc->sc_media);
 		ieee80211_ifdetach(dev);
 	}
-	ATH_UNLOCK(sc);
 	return 0;
 }
 
@@ -275,9 +270,7 @@ ath_suspend(struct net_device *dev)
 
 	DPRINTF(("ath_suspend: sc_attached %u\n", sc->sc_attached));
 	if (sc->sc_attached) {
-		ATH_LOCK(sc);
 		ath_stop(dev);
-		ATH_UNLOCK(sc);
 	}
 }
 
@@ -288,10 +281,8 @@ ath_resume(struct net_device *dev)
 
 	DPRINTF(("ath_resume: sc_attached %u\n", sc->sc_attached));
 	if (sc->sc_attached) {
-		ATH_LOCK(sc);
-		if (dev->flags & IFF_UP)
+		if (netif_running(dev))
 			ath_init(dev);
-		ATH_UNLOCK(sc);
 	}
 }
 
@@ -341,11 +332,11 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 
 		if (status & HAL_INT_RX)
-			ath_rx_int(sc);
+			ath_rx_int(dev);
 		if (status & HAL_INT_TX)
-			ath_tx_int(sc);
+			ath_tx_int(dev);
 		if (status & HAL_INT_SWBA)
-			ath_beacon_int(sc);
+			ath_beacon_int(dev);
 #if 0
 		if (status & (HAL_INT_BMISS | HAL_INT_RXNOFRM)) {
 DPRINTF(("ath_intr: beacon miss | rxnofrm: status 0x%x\n", status));
@@ -388,7 +379,6 @@ ath_init(struct net_device *dev)
 	u_int32_t val;
 	HAL_STATUS status;
 
-	ATH_LOCK(sc);
 	DPRINTF(("ath_init\n"));
 
 	ic->ic_state = IEEE80211_S_INIT;
@@ -403,7 +393,6 @@ ath_init(struct net_device *dev)
 	if (!ath_hal_reset(ah, ic->ic_opmode, sc->sc_cur_chan, AH_FALSE, &status)) {
 		printk("%s: unable to reset hardware; HAL status %u\n",
 			dev->name, status);
-		ATH_UNLOCK(sc);
 		return EIO;
 	}
 	/*
@@ -417,7 +406,6 @@ ath_init(struct net_device *dev)
 		ath_initkeytable(sc);
 	if (ath_startrecv(sc) != 0) {
 		printk("%s: unable to start recv logic\n", dev->name);
-		ATH_UNLOCK(sc);
 		return EIO;
 	}
 	/*
@@ -431,7 +419,6 @@ ath_init(struct net_device *dev)
 		val |= HAL_INT_SWBA;			/* beacon prepare */
 	ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
 
-	dev->flags |= IFF_RUNNING;
 	netif_start_queue(dev);
 
 	/*
@@ -452,8 +439,8 @@ ath_init(struct net_device *dev)
 				ni->ni_rates[ni->ni_nrate++] =
 				    ic->ic_sup_rates[i];
 		}
-		memcpy(ni->ni_macaddr, ic->ic_myaddr, IEEE80211_ADDR_LEN);
-		memcpy(ni->ni_bssid, ic->ic_myaddr, IEEE80211_ADDR_LEN);
+		memcpy(ni->ni_macaddr, dev->dev_addr, IEEE80211_ADDR_LEN);
+		memcpy(ni->ni_bssid, dev->dev_addr, IEEE80211_ADDR_LEN);
 		ni->ni_esslen = ic->ic_des_esslen;
 		memcpy(ni->ni_essid, ic->ic_des_essid, ni->ni_esslen);
 		ni->ni_capinfo = IEEE80211_CAPINFO_ESS;
@@ -467,7 +454,6 @@ ath_init(struct net_device *dev)
 		ni->ni_chan = ath_hal_ghz2ieee(c->channel, c->channelFlags);
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 	}
-	ATH_UNLOCK(sc);
 
 	return 0;
 }
@@ -479,9 +465,9 @@ ath_stop(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 
-	ATH_LOCK(sc);
 	DPRINTF(("ath_stop: sc_invalid %u\n", sc->sc_invalid));
 
+	ATH_LOCK(sc);
 	ieee80211_new_state(dev, IEEE80211_S_INIT, -1);
 	if (!sc->sc_invalid) {
 		/* 
@@ -494,7 +480,6 @@ ath_stop(struct net_device *dev)
 	}
 	ath_beacon_free(sc);
 	sc->sc_txlink = sc->sc_rxlink = NULL;
-	dev->flags &= ~IFF_RUNNING;
 	sc->sc_oactive = 0;
 	sc->sc_ic.ic_timer = 0;
 	sc->sc_tx_timer = 0;
@@ -525,11 +510,9 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 
-	ATH_LOCK(sc);
 	skb_queue_tail(&sc->sc_sndq, skb);
 	if (!sc->sc_oactive)
 		ath_start(dev);
-	ATH_UNLOCK(sc);
 
 	return 0;
 }
@@ -660,12 +643,9 @@ ath_watchdog(struct net_device *dev)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
 
-	ATH_LOCK(sc);
 	ic->ic_timer = 0;
-	if (sc->sc_invalid) {
-		ATH_UNLOCK(sc);
+	if (sc->sc_invalid)
 		return;
-	}
 	if (sc->sc_tx_timer) {
 		if (--sc->sc_tx_timer == 0) {
 			printk("%s: device timeout\n", dev->name);
@@ -673,7 +653,6 @@ ath_watchdog(struct net_device *dev)
 			ath_init(dev);
 			ic->ic_stats.tx_errors++;
 			sc->sc_stats.ast_watchdog++;
-			ATH_UNLOCK(sc);
 			return;
 		}
 		ic->ic_timer = 1;
@@ -681,12 +660,11 @@ ath_watchdog(struct net_device *dev)
 	if (sc->sc_ic.ic_opmode == IEEE80211_M_STA)
 		ath_rate_ctl(sc, &sc->sc_ic.ic_bss);
 	else {
-		TAILQ_FOREACH(ni, &sc->sc_ic.ic_node, ni_list) {
+		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
 			ath_rate_ctl(sc, ni);
 		}
 	}
 	ieee80211_watchdog(dev);
-	ATH_UNLOCK(sc);
 }
 
 static int
@@ -695,7 +673,6 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct ath_softc *sc = dev->priv;
 	int error = 0;
 
-	ATH_LOCK(sc);
 	switch (cmd) {
 	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
@@ -710,7 +687,6 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		ath_init(dev);			/* XXX lose error */
 		error = 0;
 	}
-	ATH_UNLOCK(sc);
 	return error;
 }
 
@@ -872,7 +848,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
-	int arate;
+	int arate, pktlen;
 	u_int8_t *frm;
 	u_int16_t capinfo;
 
@@ -884,23 +860,24 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 	}
-	skb = dev_alloc_skb(sizeof(struct ieee80211_frame)
-			  + 8
-			  + sizeof(u_int16_t)
-			  + sizeof(u_int16_t)
-			  + 2 + ni->ni_esslen
-			  + 2 + ni->ni_nrate
-			  + 6);
+	pktlen = + 8
+		  + sizeof(u_int16_t)
+		  + sizeof(u_int16_t)
+		  + 2 + ni->ni_esslen
+		  + 2 + ni->ni_nrate
+		  + 6;
+	skb = dev_alloc_skb(sizeof(struct ieee80211_frame) + pktlen);
 	if (skb == NULL)
 		return ENOMEM;
 
-	wh = (struct ieee80211_frame *) skb->data;
+	wh = (struct ieee80211_frame *)
+		skb_put(skb, sizeof(struct ieee80211_frame));
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
 	    IEEE80211_FC0_SUBTYPE_BEACON;
 	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
 	*(u_int16_t *)wh->i_dur = 0;
 	memcpy(wh->i_addr1, dev->broadcast, IEEE80211_ADDR_LEN);
-	memcpy(wh->i_addr2, ic->ic_myaddr, IEEE80211_ADDR_LEN);
+	memcpy(wh->i_addr2, dev->dev_addr, IEEE80211_ADDR_LEN);
 	memcpy(wh->i_addr3, ni->ni_bssid, IEEE80211_ADDR_LEN);
 	*(u_int16_t *)wh->i_seq = 0;
 
@@ -913,7 +890,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	 *	[tlv] supported rates
 	 *	[tlv] parameter set (IBSS)
 	 */
-	frm = (u_int8_t *)&wh[1];
+	frm = (u_int8_t *) skb_put(skb, pktlen);
 	memset(frm, 0, 8);	/* timestamp is set by hardware */
 	frm += 8;
 	*(u_int16_t *)frm = cpu_to_le16(ni->ni_intval);
@@ -977,8 +954,9 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 }
 
 static void
-ath_beacon_int(struct ath_softc *sc)
+ath_beacon_int(struct net_device *dev)
 {
+	struct ath_softc *sc = dev->priv;
 	struct ath_buf *bf = sc->sc_bcbuf;
 	struct ath_hal *ah = sc->sc_ah;
 
@@ -1082,16 +1060,21 @@ ath_desc_free(struct ath_softc *sc)
 		pci_unmap_single(sc->sc_pci_dev,
 			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
+		bf->bf_skb = NULL;
 	}
-	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
-		pci_unmap_single(sc->sc_pci_dev,
-			bf->bf_daddr, bf->bf_skb->len, PCI_DMA_FROMDEVICE);
-		dev_kfree_skb(bf->bf_skb);
-	}
+	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
+		if (bf->bf_skb != NULL) {
+			pci_unmap_single(sc->sc_pci_dev,
+				bf->bf_daddr, bf->bf_skb->len,
+				PCI_DMA_FROMDEVICE);
+			dev_kfree_skb(bf->bf_skb);
+			bf->bf_skb = NULL;
+		}
 	if (sc->sc_bcbuf != NULL) {
 		bf = sc->sc_bcbuf;
 		pci_unmap_single(sc->sc_pci_dev, bf->bf_daddr,
 			bf->bf_skb->len, PCI_DMA_TODEVICE);
+		sc->sc_bcbuf = NULL;
 	}
 
 	pci_free_consistent(sc->sc_pci_dev, sc->sc_desc_len,
@@ -1102,7 +1085,6 @@ ath_desc_free(struct ath_softc *sc)
 	TAILQ_INIT(&sc->sc_txq);
 	kfree(sc->sc_bufptr);
 	sc->sc_bufptr = NULL;
-	sc->sc_bcbuf = NULL;
 }
 
 static void
@@ -1149,10 +1131,10 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 }
 
 static void
-ath_rx_int(struct ath_softc *sc)
+ath_rx_int(struct net_device *dev)
 {
 	struct ath_buf *bf;
-	struct net_device *dev = &sc->sc_ic.ic_dev;
+	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
@@ -1324,7 +1306,8 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	 */
 	bf->bf_daddr = pci_map_single(sc->sc_pci_dev,
 		skb->data, skb->len, PCI_DMA_TODEVICE);
-	DPRINTF2(("ath_tx_start: m %p len %u\n", skb, pktlen));
+	DPRINTF2(("ath_tx_start: skb %p len %u daddr %x\n",
+		skb, pktlen, bf->bf_daddr));
 	bf->bf_skb = skb;
 	bf->bf_node = ni;
 
@@ -1383,14 +1366,15 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	}
 	sc->sc_txlink = &bf->bf_desc[0].ds_link;
 	ath_hal_txstart(ah);
+
 	return 0;
 }
 
 static void
-ath_tx_int(struct ath_softc *sc)
+ath_tx_int(struct net_device *dev)
 {
+	struct ath_softc *sc = dev->priv;
 	struct ath_buf *bf;
-	struct net_device *dev = &sc->sc_ic.ic_dev;
 	struct ath_desc *ds;
 	struct ath_nodestat *st;
 
@@ -1651,22 +1635,23 @@ ath_calibrate(unsigned long arg)
 	struct ath_softc *sc = (struct ath_softc *) arg;
 	struct ath_hal *ah = sc->sc_ah;
 
-	ATH_LOCK(sc);		/* XXX conservative */
 	DPRINTF(("ath_calibrate: channel %u/%x\n",
 		sc->sc_cur_chan->channel, sc->sc_cur_chan->channelFlags));
 	if (!ath_hal_calibrate(ah, sc->sc_cur_chan))
 		printk("%s: ath_calibrate: calibration of channel %u failed\n",
 			sc->sc_ic.ic_dev.name, sc->sc_cur_chan->channel);
-	ATH_UNLOCK(sc);
+
+	sc->sc_scan_ch.expires = jiffies + HZ;
+	add_timer(&sc->sc_scan_ch);
 }
 
 static int
 ath_newstate(void *arg, enum ieee80211_state nstate)
 {
-	struct ath_softc *sc = arg;
+	struct net_device *dev = (struct net_device *) arg;
+	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct net_device *dev = &ic->ic_dev;
 	struct ieee80211_node *ni = &ic->ic_bss;
 	struct ath_nodestat *st;
 	int i, error;
@@ -1685,7 +1670,6 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	    HAL_LED_RUN, 	/* IEEE80211_S_RUN */
 	};
 
-	ATH_LOCK(sc);
 	ostate = ic->ic_state;
 	now = (ath_hal_gettsf(ah) >> 10) & 0xffff;
 
@@ -1771,12 +1755,10 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 			    st->st_tx_upper = 0;
 		}
 	}
-	ATH_UNLOCK(sc);
 	return 0;
 bad:
 	del_timer(&sc->sc_scan_ch);
 	del_timer(&sc->sc_cal_ch);
-	ATH_UNLOCK(sc);
 	return error;
 }
 
@@ -1833,13 +1815,6 @@ ath_rate_ctl(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 	if (ni->ni_txrate != orate || enough)
 		st->st_tx_ok = st->st_tx_err = st->st_tx_retr = 0;
-}
-
-static struct net_device_stats *
-ath_getstats(struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-	return &sc->sc_ic.ic_stats;
 }
 
 #ifdef AR_DEBUG
