@@ -58,12 +58,15 @@
 #include "ah.h"
 
 #ifndef __MOD_INC_USE_COUNT
-#define	__MOD_INC_USE_COUNT(_m)						\
+#define	AH_MOD_INC_USE_COUNT(_m)					\
 	if (!try_module_get(_m)) {					\
 		printk(KERN_WARNING "try_module_get failed\n");		\
 		return NULL;						\
 	}
-#define	__MOD_DEC_USE_COUNT(_m)		module_put(_m)
+#define	AH_MOD_DEC_USE_COUNT(_m)	module_put(_m)
+#else
+#define	AH_MOD_INC_USE_COUNT(_m)	MOD_INC_USE_COUNT
+#define	AH_MOD_DEC_USE_COUNT(_m)	MOD_DEC_USE_COUNT
 #endif
 
 #ifdef AH_DEBUG
@@ -83,7 +86,7 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 
 	*(HAL_STATUS *)s = status;
 	if (ah)
-		__MOD_INC_USE_COUNT(THIS_MODULE);
+		AH_MOD_INC_USE_COUNT(THIS_MODULE);
 	return ah;
 }
 
@@ -91,7 +94,7 @@ void
 ath_hal_detach(struct ath_hal *ah)
 {
 	(*ah->ah_detach)(ah);
-	__MOD_DEC_USE_COUNT(THIS_MODULE);
+	AH_MOD_DEC_USE_COUNT(THIS_MODULE);
 }
 
 /*
@@ -114,6 +117,7 @@ ath_hal_printf(struct ath_hal *ah, const char* fmt, ...)
 	ath_hal_vprintf(ah, fmt, ap);
 	va_end(ap);
 }
+EXPORT_SYMBOL(ath_hal_printf);
 
 /*
  * Format an Ethernet MAC for printing.
@@ -137,6 +141,175 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
 }
 #endif /* AH_ASSERT */
 
+#ifdef AH_DEBUG_ALQ
+/*
+ * ALQ register tracing support.
+ *
+ * Setting hw.ath.hal.alq=1 enables tracing of all register reads and
+ * writes to the file /tmp/ath_hal.log.  The file format is a simple
+ * fixed-size array of records.  When done logging set hw.ath.hal.alq=0
+ * and then decode the file with the ardecode program (that is part of the
+ * HAL).  If you start+stop tracing the data will be appended to an
+ * existing file.
+ *
+ * NB: doesn't handle multiple devices properly; only one DEVICE record
+ *     is emitted and the different devices are not identified.
+ */
+#include "alq/alq.h"
+#include "ah_decode.h"
+
+static	struct alq *ath_hal_alq;
+static	int ath_hal_alq_emitdev;	/* need to emit DEVICE record */
+static	u_int ath_hal_alq_lost;		/* count of lost records */
+static	const char *ath_hal_logfile = "/tmp/ath_hal.log";
+static	u_int ath_hal_alq_qsize = 8*1024;
+
+static int
+ath_hal_setlogging(int enable)
+{
+	int error;
+
+	if (enable) {
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		error = alq_open(&ath_hal_alq, ath_hal_logfile,
+				sizeof (struct athregrec), ath_hal_alq_qsize);
+		ath_hal_alq_lost = 0;
+		ath_hal_alq_emitdev = 1;
+		printk("ath_hal: logging to %s %s\n", ath_hal_logfile,
+			error == 0 ? "enabled" : "could not be setup");
+	} else {
+		if (ath_hal_alq)
+			alq_close(ath_hal_alq);
+		ath_hal_alq = NULL;
+		printk("ath_hal: logging disabled\n");
+		error = 0;
+	}
+	return error;
+}
+
+/*
+ * Deal with the sysctl handler api changing.
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
+#define	AH_SYSCTL_ARGS_DECL \
+	ctl_table *ctl, int write, struct file *filp, void *buffer, \
+		size_t *lenp
+#define	AH_SYSCTL_ARGS		ctl, write, filp, buffer, lenp
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,8) */
+#define	AH_SYSCTL_ARGS_DECL \
+	ctl_table *ctl, int write, struct file *filp, void *buffer,\
+		size_t *lenp, loff_t *ppos
+#define	AH_SYSCTL_ARGS		ctl, write, filp, buffer, lenp, ppos
+#endif
+
+static int
+sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
+{
+	int error, enable;
+
+	ctl->data = &enable;
+	ctl->maxlen = sizeof(enable);
+	enable = (ath_hal_alq != NULL);
+        error = proc_dointvec(AH_SYSCTL_ARGS);
+        if (error || !write)
+                return error;
+	else
+		return ath_hal_setlogging(enable);
+}
+
+static struct ale *
+ath_hal_alq_get(struct ath_hal *ah)
+{
+	struct ale *ale;
+
+	if (ath_hal_alq_emitdev) {
+		ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
+		if (ale) {
+			struct athregrec *r =
+				(struct athregrec *) ale->ae_data;
+			r->op = OP_DEVICE;
+			r->reg = 0;
+			r->val = ah->ah_devid;
+			alq_post(ath_hal_alq, ale);
+			ath_hal_alq_emitdev = 0;
+		} else
+			ath_hal_alq_lost++;
+	}
+	ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
+	if (!ale)
+		ath_hal_alq_lost++;
+	return ale;
+}
+
+void __ahdecl
+ath_hal_reg_write(struct ath_hal *ah, u_int32_t reg, u_int32_t val)
+{
+	if (ath_hal_alq) {
+		unsigned long flags;
+		struct ale *ale;
+
+		local_irq_save(flags);
+		ale = ath_hal_alq_get(ah);
+		if (ale) {
+			struct athregrec *r = (struct athregrec *) ale->ae_data;
+			r->op = OP_WRITE;
+			r->reg = reg;
+			r->val = val;
+			alq_post(ath_hal_alq, ale);
+		}
+		local_irq_restore(flags);
+	}
+	_OS_REG_WRITE(ah, reg, val);
+}
+EXPORT_SYMBOL(ath_hal_reg_write);
+
+u_int32_t __ahdecl
+ath_hal_reg_read(struct ath_hal *ah, u_int32_t reg)
+{
+	u_int32_t val;
+
+	val = _OS_REG_READ(ah, reg);
+	if (ath_hal_alq) {
+		unsigned long flags;
+		struct ale *ale;
+
+		local_irq_save(flags);
+		ale = ath_hal_alq_get(ah);
+		if (ale) {
+			struct athregrec *r = (struct athregrec *) ale->ae_data;
+			r->op = OP_READ;
+			r->reg = reg;
+			r->val = val;
+			alq_post(ath_hal_alq, ale);
+		}
+		local_irq_restore(flags);
+	}
+	return val;
+}
+EXPORT_SYMBOL(ath_hal_reg_read);
+
+void __ahdecl
+OS_MARK(struct ath_hal *ah, u_int id, u_int32_t v)
+{
+	if (ath_hal_alq) {
+		unsigned long flags;
+		struct ale *ale;
+
+		local_irq_save(flags);
+		ale = ath_hal_alq_get(ah);
+		if (ale) {
+			struct athregrec *r = (struct athregrec *) ale->ae_data;
+			r->op = OP_MARK;
+			r->reg = id;
+			r->val = v;
+			alq_post(ath_hal_alq, ale);
+		}
+		local_irq_restore(flags);
+	}
+}
+EXPORT_SYMBOL(OS_MARK);
+#elif defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
 /*
  * Memory-mapped device register read/write.  These are here
  * as routines when debugging support is enabled and/or when
@@ -147,7 +320,6 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
  * NB: see the comments in ah_osdep.h about byte-swapping register
  *     reads and writes to understand what's going on below.
  */
-#if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
 void __ahdecl
 ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 {
@@ -155,10 +327,7 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 	if (ath_hal_debug > 1)
 		ath_hal_printf(ah, "WRITE 0x%x <= 0x%x\n", reg, val);
 #endif
- 	if (reg >= 0x4000 && reg < 0x5000)
- 		*((volatile u_int32_t *)(ah->ah_sh + reg)) = __bswap32(val);
- 	else
- 		*((volatile u_int32_t *)(ah->ah_sh + reg)) = val;
+	_OS_REG_WRITE(ah, reg, val);
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
 
@@ -167,9 +336,7 @@ ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
  	u_int32_t val;
 
-	val = *((volatile u_int32_t *)(ah->ah_sh + reg));
- 	if (reg >= 0x4000 && reg < 0x5000)
-		val = __bswap32(val);
+	val = _OS_REG_READ(ah, reg);
 #ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
 		ath_hal_printf(ah, "READ 0x%x => 0x%x\n", reg, val);
@@ -218,6 +385,7 @@ ath_hal_getuptime(struct ath_hal *ah)
 {
 	return ((jiffies / HZ) * 1000) + (jiffies % HZ) * (1000 / HZ);
 }
+EXPORT_SYMBOL(ath_hal_getuptime);
 
 /*
  * Allocate/free memory.
@@ -245,12 +413,14 @@ ath_hal_memzero(void *dst, size_t n)
 {
 	memset(dst, 0, n);
 }
+EXPORT_SYMBOL(ath_hal_memzero);
 
 void * __ahdecl
 ath_hal_memcpy(void *dst, const void *src, size_t n)
 {
 	return memcpy(dst, src, n);
 }
+EXPORT_SYMBOL(ath_hal_memcpy);
 
 #ifdef CONFIG_SYSCTL
 enum {
@@ -262,7 +432,7 @@ enum {
 static ctl_table ath_hal_sysctls[] = {
 #ifdef AH_DEBUG
 	{ .ctl_name	= CTL_AUTO,
-	   .procname	= "debug",
+	  .procname	= "debug",
 	  .mode		= 0644,
 	  .data		= &ath_hal_debug,
 	  .maxlen	= sizeof(ath_hal_debug),
@@ -290,6 +460,27 @@ static ctl_table ath_hal_sysctls[] = {
 	  .maxlen	= sizeof(ath_hal_additional_swba_backoff),
 	  .proc_handler	= proc_dointvec
 	},
+#ifdef AH_DEBUG_ALQ
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "alq",
+	  .mode		= 0644,
+	  .proc_handler	= sysctl_hw_ath_hal_log
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "alq_size",
+	  .mode		= 0644,
+	  .data		= &ath_hal_alq_qsize,
+	  .maxlen	= sizeof(ath_hal_alq_qsize),
+	  .proc_handler	= proc_dointvec
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "alq_lost",
+	  .mode		= 0644,
+	  .data		= &ath_hal_alq_lost,
+	  .maxlen	= sizeof(ath_hal_alq_lost),
+	  .proc_handler	= proc_dointvec
+	},
+#endif
 	{ 0 }
 };
 static ctl_table ath_hal_table[] = {
@@ -359,7 +550,16 @@ EXPORT_SYMBOL(ath_hal_ieee2mhz);
 static int __init
 init_ath_hal(void)
 {
-	printk(KERN_INFO "%s: %s\n", dev_info, ath_hal_version);
+	const char *sep;
+	int i;
+
+	printk(KERN_INFO "%s: %s (", dev_info, ath_hal_version);
+	sep = "";
+	for (i = 0; ath_hal_buildopts[i] != NULL; i++) {
+		printk("%s%s", sep, ath_hal_buildopts[i]);
+		sep = ", ";
+	}
+	printk(")\n");
 #ifdef CONFIG_SYSCTL
 	ath_hal_sysctl_register();
 #endif
