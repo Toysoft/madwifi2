@@ -240,8 +240,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				 */
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
 				    "[%s] creating adhoc node for data frame\n",
-				    ether_sprintf(type == IEEE80211_FC0_TYPE_CTL ?
-						    wh->i_addr1 : wh->i_addr2));
+				    ether_sprintf(wh->i_addr2));
 				ni = ieee80211_fakeup_adhoc_node(&ic->ic_sta,
 						    wh->i_addr2);
 				if (ni == NULL) {
@@ -293,8 +292,9 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		if (ic->ic_flags & IEEE80211_F_DATAPAD)
 			hdrsize = roundup(hdrsize, sizeof(u_int32_t));
 		if (skb->len < hdrsize) {
-			IEEE80211_DISCARD(ic, IEEE80211_MSG_ANY,
-			    wh, "data", "too short: len %u, expecting %u",
+			IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_ANY,
+			     ni->ni_macaddr, NULL,
+			     "data too short: len %u, expecting %u",
 			    skb->len, hdrsize);
 			ic->ic_stats.is_rx_tooshort++;
 			goto out;		/* XXX */
