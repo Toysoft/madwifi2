@@ -57,11 +57,21 @@ install:
 	done
 	depmod -a
 
+FILES=	ath_hal COPYRIGHT driver include Makefile Makefile.inc \
+	README release.h share wlan \
+	hal/ah.h hal/ah_desc.h hal/ah_devid.h hal/version.h \
+	hal/linux/ah_osdep.c \
+	hal/linux/ah_osdep.h \
+	hal/linux/i386-elf.hal.o.uu \
+	hal/linux/opt_ah.h
 release:
-	cd ${WLAN}; ${MAKE} clean
-	cd ${DRIVER}; ${MAKE} clean
-	cd ${ATH_HAL}; ${MAKE} clobber
-	${MAKE} all
+	DATE=`date +'%Y%m%d'`; TAG="Linux_$${DATE}"; DIR="linux-$${DATE}"; \
+	cvs tag $${TAG} ${FILES}; \
+	rm -rf $${DIR}; mkdir $${DIR}; \
+	cvs export -d $${DIR} -r $${TAG} linux; \
+	(cd $${DIR}; cvs export -r $${TAG} hal); \
+	tar zcf $${DIR}.tgz --exclude=CVS $${DIR}; \
+	rm -rf $${DIR}
 
 clean:
 	for i in ${DIRS}; do \
