@@ -56,4 +56,5 @@
 #define ALIGNED_POINTER(p,t)	1
 #endif
 
+#define	KASSERT(_condition, _x)
 #endif /* _ATH_COMPAT_H_ */
