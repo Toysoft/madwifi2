@@ -196,7 +196,12 @@ extern	void ieee80211_dump_nodes(struct ieee80211com *);
 extern	void ieee80211_timeout_nodes(struct ieee80211com *);
 extern	void ieee80211_node_leave(struct ieee80211com *,
 		struct ieee80211_node *);
-extern	int ieee80211_node_makekey(struct ieee80211com *,
+
+extern	int ieee80211_node_newkey(struct ieee80211com *,
+		struct ieee80211_node *);
+extern	int ieee80211_node_delkey(struct ieee80211com *,
+		struct ieee80211_node *);
+extern	int ieee80211_node_setkey(struct ieee80211com *,
 		struct ieee80211_node *);
 
 extern	void ieee80211_create_ibss(struct ieee80211com* ,

@@ -86,10 +86,10 @@ static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
 static void	ath_ratectl(unsigned long);
 static void	ath_initkeytable(struct ath_softc *);
-static int	ath_key_add(struct ieee80211com *, struct ieee80211_wepkey *);
+static int	ath_key_alloc(struct ieee80211com *);
 static int	ath_key_delete(struct ieee80211com *, u_int kix);
 static int	ath_key_set(struct ieee80211com *, u_int kix,
-			struct ieee80211_wepkey *);
+			struct ieee80211_wepkey *, u_int8_t *);
 static void	ath_mode_init(struct net_device *);
 static void	ath_setslottime(struct ath_softc *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
@@ -391,7 +391,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ic->ic_node_getrssi = ath_node_getrssi;
 	sc->sc_newstate = ic->ic_newstate;
 	ic->ic_newstate = ath_newstate;
-	ic->ic_key_add = ath_key_add;
+	ic->ic_key_alloc = ath_key_alloc;
 	ic->ic_key_delete = ath_key_delete;
 	ic->ic_key_set = ath_key_set;
 
@@ -1048,20 +1048,16 @@ ath_initkeytable(struct ath_softc *sc)
 }
 
 static int
-ath_key_add(struct ieee80211com *ic, struct ieee80211_wepkey *k)
+ath_key_alloc(struct ieee80211com *ic)
 {
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
-	struct ath_hal *ah = sc->sc_ah;
 	u_int kix;
 
 	for (kix = IEEE80211_WEP_NKID; kix < sc->sc_keymax; kix++)
 		if (!isset(sc->sc_keymap, kix)) {
-			if (ath_hal_keyset(ah, kix, (const HAL_KEYVAL *) k, NULL)) {
-				setbit(sc->sc_keymap, kix);
-				return kix;
-			}
-			break;
+			setbit(sc->sc_keymap, kix);
+			return kix;
 		}
 	return IEEE80211_KEYIX_NONE;
 }
@@ -1079,13 +1075,15 @@ ath_key_delete(struct ieee80211com *ic, u_int kix)
 }
 
 static int
-ath_key_set(struct ieee80211com *ic, u_int kix, struct ieee80211_wepkey *k)
+ath_key_set(struct ieee80211com *ic, u_int kix,
+	struct ieee80211_wepkey *k, u_int8_t *mac)
 {
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
+	const HAL_KEYVAL *hk = (const HAL_KEYVAL *)k;
 
-	return ath_hal_keyset(ah, kix, (const HAL_KEYVAL *) k, NULL);
+	return ath_hal_keyset(ah, kix, hk, mac);
 }
 
 /*
@@ -2110,7 +2108,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
-	int i, iswep, hdrlen, pktlen, try0;
+	int i, iswep, ismcast, keyix, hdrlen, pktlen, try0;
 	u_int8_t rix, txrate, ctsrate;
 	u_int8_t cix = 0xff;		/* NB: silence compiler */
 	struct ath_desc *ds;
@@ -2127,6 +2125,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
+	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 	hdrlen = sizeof(struct ieee80211_frame);
 	pktlen = skb->len;
 
@@ -2158,7 +2157,19 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			ivp[i] = iv;
 			iv >>= 8;
 		}
-		ivp[i] = ic->ic_wep_txkey << 6;	/* Key ID and pad */
+		/*
+		 * Multicast traffic always uses the multicast key.
+		 * Otherwise if a unicast key is set we use that and
+		 * it is always key index 0.  When no unicast key is
+		 * set we fall back to the multicast key.
+		 */
+		if (ismcast || ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
+			keyix = ic->ic_wep_txkey;
+			ivp[i] = keyix << 6;	/* Key ID and pad */
+		} else {
+			keyix = ni->ni_ucastkeyix;
+			ivp[i] = 0;		/* unicast key is always ix 0 */
+		}
 		memcpy(skb->data, hdrbuf, sizeof(hdrbuf));
 		/*
 		 * The ICV length must be included into hdrlen and pktlen.
@@ -2169,7 +2180,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 		/* Packet header has moved, reset our local pointer */
 		wh = (struct ieee80211_frame *) skb->data;
-	}
+	} else
+		keyix = HAL_TXKEYIX_INVALID;
 
 	pktlen += IEEE80211_CRC_LEN;
 
@@ -2256,7 +2268,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * Calculate miscellaneous flags.
 	 */
 	flags = HAL_TXDESC_CLRDMASK;		/* XXX needed for wep errors */
-	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+	if (ismcast) {
 		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
 		sc->sc_stats.ast_tx_noack++;
 	} else if (pktlen > ic->ic_rtsthreshold) {
@@ -2363,7 +2375,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		, atype			/* Atheros packet type */
 		, MIN(ni->ni_txpower,60)/* txpower */
 		, txrate, try0		/* series 0 rate/tries */
-		, iswep ? ic->ic_wep_txkey : HAL_TXKEYIX_INVALID
+		, keyix			/* key cache index */
 		, antenna		/* antenna mode */
 		, flags			/* flags */
 		, ctsrate		/* rts/cts rate */
