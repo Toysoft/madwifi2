@@ -99,6 +99,8 @@ struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 						/* rate tables */
+	unsigned int		sc_have11g  : 1,/* have 11g support */
+				sc_probing  : 1;/* probing AP on beacon miss */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	volatile int		sc_invalid;	/* being detached */
