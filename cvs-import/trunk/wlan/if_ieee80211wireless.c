@@ -77,7 +77,38 @@ ieee80211_get_name(struct net_device *dev,
 		   struct iw_request_info *info,
 		   char *name, char *extra)
 {
-	strcpy(name, "IEEE 802.11a");		/* XXX */
+	struct ieee80211com *ic = (struct ieee80211com *) dev;
+
+	strncpy(name, "IEEE 802.11", IFNAMSIZ);
+	if (ic->ic_opmode == IEEE80211_M_STA) {
+		struct ifmediareq imr;
+
+		ieee80211_media_status(dev, &imr);
+		switch (IFM_SUBTYPE(imr.ifm_active)) {
+		case IFM_IEEE80211_FH1:
+		case IFM_IEEE80211_FH2:
+			strncat(name, "-FH", IFNAMSIZ);
+			break;
+		case IFM_IEEE80211_DS1:
+		case IFM_IEEE80211_DS2:
+		case IFM_IEEE80211_DS5:
+		case IFM_IEEE80211_DS11:
+		case IFM_IEEE80211_DS22:
+			strncat(name, "-DS", IFNAMSIZ);
+			break;
+		case IFM_IEEE80211_ODFM6:
+		case IFM_IEEE80211_ODFM9:
+		case IFM_IEEE80211_ODFM12:
+		case IFM_IEEE80211_ODFM18:
+		case IFM_IEEE80211_ODFM24:
+		case IFM_IEEE80211_ODFM36:
+		case IFM_IEEE80211_ODFM48:
+		case IFM_IEEE80211_ODFM54:
+		case IFM_IEEE80211_ODFM72:
+			strncat(name, "-ODFM", IFNAMSIZ);
+			break;
+		}
+	}
 	return 0;
 }
 
@@ -346,7 +377,7 @@ ieee80211_ioctl_giwap(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_des_bssid);
+	IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_bss.ni_bssid);
 	ap_addr->sa_family = ARPHRD_ETHER;
 
 	return 0;
@@ -409,7 +440,7 @@ ieee80211_ioctl_giwfreq(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	freq->m = ic->ic_ibss_chan->ic_freq;
+	freq->m = ic->ic_ibss_chan->ic_freq * 100000;
 	freq->e = 1;
 
 	return 0;
@@ -442,9 +473,13 @@ ieee80211_ioctl_giwessid(struct net_device *dev,
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
 	data->flags = 1;		/* active */
-	data->length = ic->ic_des_esslen;
-	memcpy(essid, ic->ic_des_essid, ic->ic_des_esslen);
-
+	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+		data->length = ic->ic_des_esslen;
+		memcpy(essid, ic->ic_des_essid, ic->ic_des_esslen);
+	} else {
+		data->length = ic->ic_bss.ni_esslen;
+		memcpy(essid, ic->ic_bss.ni_essid, ic->ic_bss.ni_esslen);
+	}
 	return 0;
 }
 
