@@ -97,9 +97,9 @@ id with a tool like lspci, the Atheros vendor id is 0x168c; e.g.
 
 Building the driver
 ===================
-To build the driver at the top level edit Makefile.inc to set the
-pathname to your Linux kernel distribution.  By default this is set to
-/usr/src/linux.
+To build the driver at the top level you may need to edit Makefile.inc
+to set the pathname to your Linux kernel distribution.  By default this
+path is obtained automatically.
 
 If you are cross-compiling the driver for a different platform define
 the CC, LD, and STRIP macros appropriately.  For example:
@@ -196,10 +196,10 @@ Known Problems
    structures.  It has been pointed out that this may conflict with the
    equivalent Linux definitions in list.h potentially causing problems
    in future versions of Linux.  The use of BSD macros will be removed
-   in a future revision.
+   in a future revision. [TEMPORARY WORKAROUND IN PLACE]
 
 1. Roaming mode is broken.  If you lose your access point by going out
-   of range the driver does not automatically re-associate.
+   of range the driver does not automatically re-associate. [FIXED]
 2. Adhoc mode is untested and possibly/probably broken.
 3. Performance in lossy environments is suboptimal.  The algorithm used to
    select the rate for transmitted packets is very simplistic.  There is no
@@ -221,7 +221,7 @@ Known Problems
    performance.  Specifically netperf seems to perform very poorly while
    the bw_tcp program from lmbench yield ok results (~21 Mb/s "uplink"
    from a station with a 5212 card in it to a wired host on the same LAN
-   as the AP--under 11a).
+   as the AP--under 11a). [PARTLY FIXED]
 6. It has been observed that getting a DHCP address sometimes requires
    multiple tries.  This seems to happen only with 5211 and 5212 parts and
    mostly in a noisy environment (i.e. one where many AP's are found).
@@ -229,10 +229,10 @@ Known Problems
    believed to be due to not receiving the broadcast frame from the DHCP
    server.  Forcing the DHCP server to use a unicast response causes this
    problem to go away (the guess is that the unicast frame is retransmitted
-   by the AP while the broadcast frame is not).
+   by the AP while the broadcast frame is not). [FIXED]
 7. The driver does not fully enable power-save operation of the chip;
    consequently power use is suboptimal.
-8. Turbo mode is untested.
+8. Turbo mode is untested. [REPORTED WORKING]
 
 
 Acknowledgements
@@ -242,6 +242,15 @@ and in particular the efforts of Greg Chesson.  Comments from David
 Miller were helpful in cleaning up some of the roughest edges in
 the driver.
 
+Many people have contributed fixes and improvements to this software
+including:
+
+Carl Thompson
+Nick Moss
+William S. Kish
+giova+mwfdev@faglioni.it
+
+(Apologies to anyone whose name was unintentionally left off.)
 
 Feedback and Contributions
 ==========================
