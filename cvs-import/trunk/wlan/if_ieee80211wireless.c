@@ -797,6 +797,43 @@ ieee80211_ioctl_giwtxpow(struct net_device *dev,
 }
 
 int
+ieee80211_ioctl_iwaplist(struct net_device *dev,
+			struct iw_request_info *info,
+			struct iw_point *data, char *extra)
+{
+	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	struct ieee80211_node *ni;
+	struct sockaddr addr[IW_MAX_AP];
+	struct iw_quality qual[IW_MAX_AP];
+	int i;
+
+	i = 0;
+	/* XXX lock node list */
+	TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+		addr[i].sa_family = ARPHRD_ETHER;
+		memcpy(addr[i].sa_data, ni->
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
+		else
+			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
+		qual[i].qual = ni->ni_rssi < 27 ? 0 : ((ni->ni_rssi-27)*92)/127;
+		qual[i].level = 0;
+		qual[i].noise = 0;
+		qual[i].updated = jiffies;		/* XXX */
+		if (++i >= IW_MAX_AP)
+			break;
+	}
+	data->length = i;
+	memcpy(extra, &addr, i*sizeof(addr[0]));
+	data->flags = 1;		/* signal quality present (sort of) */
+	memcpy(extra + i*sizeof(addr[0]), &qual, i*sizeof(qual[i]));
+
+	return 0;
+
+}
+
+#ifdef SIOCIWSCAN
+int
 ieee80211_ioctl_siwscan(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
@@ -930,6 +967,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 	data->length = current_ev - extra;
 	return 0;
 }
+#endif /* SIOCIWAPLIST */
 
 /* Structures to export the Wireless Handlers */
 static const iw_handler ieee80211_handlers[] = {
@@ -956,7 +994,7 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
 	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
 	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) NULL,				/* SIOCGIWAPLIST */
+	(iw_handler) ieee80211_ioctl_iwaplist,		/* SIOCGIWAPLIST */
 	(iw_handler) ieee80211_ioctl_siwscan,		/* SIOCSIWSCAN */
 	(iw_handler) ieee80211_ioctl_giwscan,		/* SIOCGIWSCAN */
 	(iw_handler) ieee80211_ioctl_siwessid,		/* SIOCSIWESSID */
