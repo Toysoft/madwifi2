@@ -2070,6 +2070,11 @@ ath_beacon_tasklet(struct net_device *dev)
 	skb = bf->bf_skb;
 	ncabq = ath_hal_numtxpending(ah, sc->sc_cabq->axq_qnum);
 	if (ieee80211_beacon_update(ic, bf->bf_node, &sc->sc_boff, skb, ncabq)) {
+		
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: update, beacon len changed %d to %d\n",
+			__func__, bf->bf_skb->len, skb->len);
+		
 		/* XXX too conservative? */
 		bus_unmap_single(sc->sc_bdev,
 			bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
@@ -2127,10 +2132,16 @@ ath_beacon_tasklet(struct net_device *dev)
 
 	/*
 	 * Enable the CAB queue before the beacon queue to
-	 * insure cab frames are triggered by this beacon.
+	 * insure CAB frames are triggered by this beacon.
+	 * The CAB queue holds multicast traffic for stations in 
+	 * power-save mode.
+	 *
+	 * NB: only at DTIM
 	 */
-	if (sc->sc_boff.bo_tim[4] & 1)		/* NB: only at DTIM */
+	if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
+	    ncabq > 0 && sc->sc_boff.bo_tim[4] & 1) 
 		ath_hal_txstart(ah, sc->sc_cabq->axq_qnum);
+	
 	ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
 	ath_hal_txstart(ah, sc->sc_bhalq);
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
@@ -3109,7 +3120,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 		struct ath_txq *txq = &sc->sc_txq[qnum];
 
 		txq->axq_qnum = qnum;
-		txq->axq_depth = 0;	// TODO: zero ok?
+		txq->axq_depth = 0;
 		txq->axq_intrcnt = 0;
 		txq->axq_link = NULL;
 		STAILQ_INIT(&txq->axq_q);
