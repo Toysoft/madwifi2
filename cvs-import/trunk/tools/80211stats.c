@@ -150,9 +150,14 @@ main(int argc, char *argv[])
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
 		err(1, "socket");
-	if (argc > 1) {
-		strncpy(ifr.ifr_name, argv[1], sizeof (ifr.ifr_name));
-		argc -= 1, argv += 1;
+	if (argc > 1 && strcmp(argv[1], "-i") == 0) {
+		if (argc < 2) {
+			fprintf(stderr, "%s: missing interface name for -i\n",
+				argv[0]);
+			exit(-1);
+		}
+		strncpy(ifr.ifr_name, argv[2], sizeof (ifr.ifr_name));
+		argc -= 2, argv += 2;
 	} else
 		strncpy(ifr.ifr_name, "ath0", sizeof (ifr.ifr_name));
 
