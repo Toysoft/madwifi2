@@ -298,7 +298,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		goto bad;
 	}
 	if (ah->ah_abi != HAL_ABI_VERSION) {
-		printk(KERN_ERR "%s: HAL ABI msmatch; "
+		printk(KERN_ERR "%s: HAL ABI mismatch; "
 			"driver expects 0x%x, HAL reports 0x%x\n",
 			dev->name, HAL_ABI_VERSION, ah->ah_abi);
 		error = ENXIO;		/* XXX */
