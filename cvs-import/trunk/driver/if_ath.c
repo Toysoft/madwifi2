@@ -69,6 +69,7 @@
 	  (((u_int8_t *)(p))[2] << 16) | (((u_int8_t *)(p))[3] << 24)))
 
 static int	ath_init(struct net_device *);
+static void	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(void *);
 static void	ath_rxorn_tasklet(void *);
 static void	ath_bmiss_tasklet(void *);
@@ -80,6 +81,7 @@ static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
 static void	ath_beacon_tasklet(void *);
 static void	ath_beacon_free(struct ath_softc *);
+static void	ath_beacon_config(struct ath_softc *);
 static int	ath_desc_alloc(struct ath_softc *);
 static void	ath_desc_free(struct ath_softc *);
 static void	ath_node_free(struct ieee80211com *, struct ieee80211_node *);
@@ -379,7 +381,7 @@ ath_fatal_tasklet(void *data)
 	struct net_device *dev = data;
 
 	printk("%s: hardware error; resetting\n", dev->name);
-	ath_init(dev);
+	ath_reset(dev);
 }
 
 static void
@@ -388,7 +390,7 @@ ath_rxorn_tasklet(void *data)
 	struct net_device *dev = data;
 
 	printk("%s: rx FIFO overrun; resetting\n", dev->name);
-	ath_init(dev);
+	ath_reset(dev);
 }
 
 static void
@@ -534,6 +536,48 @@ ath_stop(struct net_device *dev)
 	}
 
 	return 0;
+}
+
+/*
+ * Reset the hardware w/o losing operational state.  This is
+ * basically a more efficient way of doing ath_stop, ath_init,
+ * followed by state transitions to the current 802.11
+ * operational state.  Used to recover from errors rx overrun
+ * and to reset the hardware when rf gain settings must be reset.
+ */
+static void
+ath_reset(struct net_device *dev)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211channel *c;
+	HAL_STATUS status;
+	HAL_CHANNEL hchan;
+
+	/*
+	 * Convert to a HAL channel description with the flags
+	 * constrained to reflect the current operating mode.
+	 */
+	c = ic->ic_ibss_chan;
+	hchan.channel = c->ic_freq;
+	hchan.channelFlags = ath_chan2flags(ic, c);
+
+	ath_hal_intrset(ah, 0);		/* disable interrupts */
+	ath_draintxq(sc);		/* stop xmit side */
+	ath_stoprecv(sc);		/* stop recv side */
+	/* NB: indicate channel change so we do a full reset */
+	if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status))
+		printk("%s: %s: unable to reset hardware; hal status %u\n",
+			dev->name, __func__, status);
+	ath_hal_intrset(ah, sc->sc_imask);
+	if (ath_startrecv(dev) != 0)	/* restart recv */
+		printk("%s: %s: unable to start recv logic\n",
+			dev->name, __func__);
+	if (ic->ic_state == IEEE80211_S_RUN) {
+		ath_beacon_config(sc);	/* restart beacons */
+		netif_start_queue(dev);		/* restart xmit */
+	}
 }
 
 /*
@@ -1028,6 +1072,101 @@ ath_beacon_free(struct ath_softc *sc)
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
+	}
+}
+
+/*
+ * Configure the beacon and sleep timers.
+ *
+ * When operating as an AP this resets the TSF and sets
+ * up the hardware to notify us when we need to issue beacons.
+ *
+ * When operating in station mode this sets up the beacon
+ * timers according to the timestamp of the last received
+ * beacon and the current TSF, configures PCF and DTIM
+ * handling, programs the sleep registers so the hardware
+ * will wakeup in time to receive beacons, and configures
+ * the beacon miss handling so we'll receive a BMISS
+ * interrupt when we stop seeing beacons from the AP
+ * we've associated with.
+ */
+static void
+ath_beacon_config(struct ath_softc *sc)
+{
+	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211_node *ni = &ic->ic_bss;
+	u_int32_t nexttbtt;
+
+	nexttbtt = (LE_READ_4(ni->ni_tstamp + 4) << 22) |
+	    (LE_READ_4(ni->ni_tstamp) >> 10);
+	DPRINTF(("%s: nexttbtt=%u\n", __func__, nexttbtt));
+	nexttbtt += ni->ni_intval;
+	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
+		HAL_BEACON_STATE bs;
+		u_int32_t bmisstime;
+
+		/* NB: no PCF support right now */
+		memset(&bs, 0, sizeof(bs));
+		bs.bs_intval = ni->ni_intval;
+		bs.bs_nexttbtt = nexttbtt;
+		bs.bs_dtimperiod = bs.bs_intval;
+		bs.bs_nextdtim = nexttbtt;
+		/*
+		 * Calculate the number of consecutive beacons to miss
+		 * before taking a BMISS interrupt.  The configuration
+		 * is specified in ms, so we need to convert that to
+		 * TU's and then calculate based on the beacon interval.
+		 * Note that we clamp the result to at most 10 beacons.
+		 */
+		bmisstime = (ic->ic_bmisstimeout * 1000) / 1024;
+		bs.bs_bmissthreshold = howmany(bmisstime,ni->ni_intval);
+		if (bs.bs_bmissthreshold > 10)
+			bs.bs_bmissthreshold = 10;
+		else if (bs.bs_bmissthreshold <= 0)
+			bs.bs_bmissthreshold = 1;
+
+		/*
+		 * Calculate sleep duration.  The configuration is
+		 * given in ms.  We insure a multiple of the beacon
+		 * period is used.  Also, if the sleep duration is
+		 * greater than the DTIM period then it makes senses
+		 * to make it a multiple of that.
+		 *
+		 * XXX fixed at 100ms
+		 */
+		bs.bs_sleepduration =
+			roundup((100 * 1000) / 1024, bs.bs_intval);
+		if (bs.bs_sleepduration > bs.bs_dtimperiod)
+			bs.bs_sleepduration = roundup(bs.bs_sleepduration, bs.bs_dtimperiod);
+
+		DPRINTF(("%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u\n"
+			, __func__
+			, bs.bs_intval
+			, bs.bs_nexttbtt
+			, bs.bs_dtimperiod
+			, bs.bs_nextdtim
+			, bs.bs_bmissthreshold
+			, bs.bs_sleepduration
+		));
+		ath_hal_intrset(ah, 0);
+		/*
+		 * Reset our tsf so the hardware will update the
+		 * tsf register to reflect timestamps found in
+		 * received beacons.
+		 */
+		ath_hal_resettsf(ah);
+		ath_hal_beacontimers(ah, &bs, 0/*XXX*/, 0, 0);
+		sc->sc_imask |= HAL_INT_BMISS;
+		ath_hal_intrset(ah, sc->sc_imask);
+	} else {
+		DPRINTF(("%s: intval %u nexttbtt %u\n",
+			__func__, ni->ni_intval, nexttbtt));
+		ath_hal_intrset(ah, 0);
+		ath_hal_beaconinit(ah, ic->ic_opmode,
+			nexttbtt, ni->ni_intval);
+		sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
+		ath_hal_intrset(ah, sc->sc_imask);
 	}
 }
 
@@ -1847,26 +1986,12 @@ ath_calibrate(unsigned long arg)
 	DPRINTF2(("%s: channel %u/%x\n", __func__, c->ic_freq, c->ic_flags));
 
 	if (ath_hal_getrfgain(ah) == HAL_RFGAIN_NEED_CHANGE) {
-		HAL_STATUS status;
-
-		sc->sc_stats.ast_per_rfgain++;
 		/*
 		 * Rfgain is out of bounds, reset the chip
 		 * to load new gain values.
 		 */
-		ath_hal_intrset(ah, 0);		/* disable interrupts */
-		netif_stop_queue(dev);		/* conservative */
-		ath_draintxq(sc);		/* stop xmit side */
-		ath_stoprecv(sc);		/* stop recv side */
-		/* NB: indicate channel change so we do a full reset */
-		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status))
-			printk("%s: %s: unable to reset hardware; "
-				"hal status %u\n", dev->name, __func__, status);
-		ath_hal_intrset(ah, sc->sc_imask);
-		if (ath_startrecv(dev) != 0)	/* restart recv */
-			printk("%s: %s: unable to start recv logic\n",
-				dev->name, __func__);
-		netif_start_queue(dev);		/* restart xmit */
+		sc->sc_stats.ast_per_rfgain++;
+		ath_reset(dev);
 	}
 	if (!ath_hal_calibrate(ah, &hchan)) {
 		DPRINTF(("%s: %s: calibration of channel %u failed\n",
@@ -1887,7 +2012,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	struct ieee80211_node *ni;
 	int i, error;
 	u_int8_t *bssid;
-	u_int32_t rfilt, nexttbtt;
+	u_int32_t rfilt;
 	enum ieee80211_state ostate;
 #ifdef AR_DEBUG
 	static const char *stname[] =
@@ -1955,7 +2080,6 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 			 , ni->ni_capinfo
 			 , ieee80211_chan2ieee(ic, ni->ni_chan)));
 
-
 		/*
 		 * Allocate and setup the beacon frame for AP or adhoc mode.
 		 */
@@ -1967,92 +2091,10 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 
 		/*
 		 * Configure the beacon and sleep timers.
-		 *
-		 * When operating as an AP this resets the TSF and sets
-		 * up the hardware to notify us when we need to issue beacons.
-		 *
-		 * When operating in station mode this sets up the beacon
-		 * timers according to the timestamp of the last received
-		 * beacon and the current TSF, configures PCF and DTIM
-		 * handling, programs the sleep registers so the hardware
-		 * will wakeup in time to receive beacons, and configures
-		 * the beacon miss handling so we'll receive a BMISS
-		 * interrupt when we stop seeing beacons from the AP
-		 * we've associated with.
 		 */
-		nexttbtt = (LE_READ_4(ni->ni_tstamp + 4) << 22) |
-		    (LE_READ_4(ni->ni_tstamp) >> 10);
-		DPRINTF(("%s: nexttbtt=%u\n", __func__, nexttbtt));
-		nexttbtt += ni->ni_intval;
-		if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
-			HAL_BEACON_STATE bs;
-			u_int32_t bmisstime;
-
-			/* NB: no PCF support right now */
-			memset(&bs, 0, sizeof(bs));
-			bs.bs_intval = ni->ni_intval;
-			bs.bs_nexttbtt = nexttbtt;
-			bs.bs_dtimperiod = bs.bs_intval;
-			bs.bs_nextdtim = nexttbtt;
-			/*
-			 * Calculate the number of consecutive beacons to miss
-			 * before taking a BMISS interrupt.  The configuration
-			 * is specified in ms, so we need to convert that to
-			 * TU's and then calculate based on the beacon interval.
-			 * Note that we clamp the result to at most 10 beacons.
-			 */
-			bmisstime = (ic->ic_bmisstimeout * 1000) / 1024;
-			bs.bs_bmissthreshold = howmany(bmisstime,ni->ni_intval);
-			if (bs.bs_bmissthreshold > 10)
-				bs.bs_bmissthreshold = 10;
-			else if (bs.bs_bmissthreshold <= 0)
-				bs.bs_bmissthreshold = 1;
-
-			/*
-			 * Calculate sleep duration.  The configuration is
-			 * given in ms.  We insure a multiple of the beacon
-			 * period is used.  Also, if the sleep duration is
-			 * greater than the DTIM period then it makes senses
-			 * to make it a multiple of that.
-			 *
-			 * XXX fixed at 100ms
-			 */
-			bs.bs_sleepduration =
-				roundup((100 * 1000) / 1024, bs.bs_intval);
-			if (bs.bs_sleepduration > bs.bs_dtimperiod)
-				bs.bs_sleepduration = roundup(bs.bs_sleepduration, bs.bs_dtimperiod);
-
-			DPRINTF(("%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u\n"
-				, __func__
-				, bs.bs_intval
-				, bs.bs_nexttbtt
-				, bs.bs_dtimperiod
-				, bs.bs_nextdtim
-				, bs.bs_bmissthreshold
-				, bs.bs_sleepduration
-			));
-			ath_hal_intrset(ah, 0);
-			/*
-			 * Reset our tsf so the hardware will update the
-			 * tsf register to reflect timestamps found in
-			 * received beacons.
-			 */
-			ath_hal_resettsf(ah);
-			ath_hal_beacontimers(ah, &bs, 0/*XXX*/, 0, 0);
-			sc->sc_imask |= HAL_INT_BMISS;
-			ath_hal_intrset(ah, sc->sc_imask);
-		} else {
-			DPRINTF(("%s: intval %u nexttbtt %u\n",
-				__func__, ni->ni_intval, nexttbtt));
-			ath_hal_intrset(ah, 0);
-			ath_hal_beaconinit(ah, ic->ic_opmode,
-				nexttbtt, ni->ni_intval);
-			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
-			ath_hal_intrset(ah, sc->sc_imask);
-		}
+		ath_beacon_config(sc);
 
 		/* start periodic recalibration timer */
-		/* XXX make timer configurable */
 		mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
 
 		netif_start_queue(dev);
