@@ -47,6 +47,16 @@ MKDIR ${ATH_HAL}
 echo "Copy ath_hal bits..."
 INSTALLX ${ATH_HAL}/Makefile ${DEPTH}/ath_hal/Makefile.kernel
 
+for RATE_ALG in onoe
+do
+	ATH_RATE=${WIRELESS}/ath_rate_${RATE_ALG}
+	MKDIR ${ATH_RATE}
+	echo "Copy ath_rate/$RATE_ALG bits..."
+	FILES=`ls ${DEPTH}/ath_rate/${RATE_ALG}/*.[ch] | sed '/mod.c/d'`
+	INSTALL ${ATH_RATE} ${FILES}
+	INSTALLX ${ATH_RATE}/Makefile ${DEPTH}/ath_rate/${RATE_ALG}/Makefile.kernel
+done
+
 MKDIR ${WIRELESS}/hal
 MKDIR ${WIRELESS}/hal/linux
 echo "Copy hal bits..."

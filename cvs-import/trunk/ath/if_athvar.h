@@ -44,6 +44,7 @@
 
 #include "ah.h"
 #include "if_athioctl.h"
+#include "if_athrate.h"
 
 #ifdef CONFIG_NET_WIRELESS
 #include <linux/wireless.h>
@@ -107,24 +108,10 @@ typedef void irqreturn_t;
 /* driver-specific node state */
 struct ath_node {
 	struct ieee80211_node an_node;	/* base class */
-	u_int		an_tx_ok;	/* tx ok pkt */
-	u_int		an_tx_err;	/* tx !ok pkt */
-	u_int		an_tx_retr;	/* tx retry count */
-	int		an_tx_upper;	/* tx upper rate req cnt */
-	u_int8_t	an_tx_rix0;	/* series 0 rate index */
-	u_int8_t	an_tx_try0;	/* series 0 try count */
 	u_int8_t	an_tx_mgtrate;	/* h/w rate for management/ctl frames */
 	u_int8_t	an_tx_mgtratesp;/* short preamble h/w rate for " " */
-	u_int8_t	an_tx_rate0;	/* series 0 h/w rate */
-	u_int8_t	an_tx_rate1;	/* series 1 h/w rate */
-	u_int8_t	an_tx_rate2;	/* series 2 h/w rate */
-	u_int8_t	an_tx_rate3;	/* series 3 h/w rate */
-	u_int8_t	an_tx_rate0sp;	/* series 0 short preamble h/w rate */
-	u_int8_t	an_tx_rate1sp;	/* series 1 short preamble h/w rate */
-	u_int8_t	an_tx_rate2sp;	/* series 2 short preamble h/w rate */
-	u_int8_t	an_tx_rate3sp;	/* series 3 short preamble h/w rate */
 	HAL_NODE_STATS	an_halstats;	/* rssi statistics used by hal */
-
+	/* variable-length rate control state follows */
 };
 #define	ATH_NODE(_n)	((struct ath_node *)(_n))
 
@@ -196,6 +183,7 @@ struct ath_softc {
 					struct ieee80211_node *,
 					const struct ieee80211_node *);
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
+	struct ath_ratectrl	*sc_rc;		/* tx rate control support */
 	unsigned int		sc_invalid : 1,	/* being detached */
 				sc_mrretry : 1,	/* multi-rate retry support */
 				sc_softled : 1,	/* enable LED gpio status */
@@ -250,7 +238,6 @@ struct ath_softc {
 		COMMIT				/* beacon sent, commit change */
 	} sc_updateslot;			/* slot time update fsm */
 
-	struct timer_list	sc_rate_ctl;	/* tx rate control timer */
 	struct timer_list	sc_cal_ch;	/* calibration timer */
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
 #ifdef CONFIG_NET_WIRELESS
