@@ -84,21 +84,6 @@ struct ath_stats {
 	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
 	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
-	u_int32_t	ast_ani_action;	/* ANI actions invoked */
-	u_int32_t	ast_ani_poll;	/* ANI poll operations */
-	u_int32_t	ast_ani_nifull;	/* ANI set noise immunity to full */
-	u_int32_t	ast_ani_niup;	/* ANI increased noise immunity */
-	u_int32_t	ast_ani_nidown;	/* ANI decreased noise immunity */
-	u_int32_t	ast_ani_spurup;	/* ANI increased spur immunity */
-	u_int32_t	ast_ani_spurdown;/* ANI descreased spur immunity */
-	u_int32_t	ast_ani_ofdmon;	/* ANI OFDM weak signal detect on */
-	u_int32_t	ast_ani_ofdmoff;/* ANI OFDM weak signal detect off */
-	u_int32_t	ast_ani_cckhigh;/* ANI CCK weak signal threshold high */
-	u_int32_t	ast_ani_ccklow;	/* ANI CCK weak signal threshold low */
-	u_int32_t	ast_ani_stepup;	/* ANI increased first step level */
-	u_int32_t	ast_ani_stepdown;/* ANI decreased first step level */
-	u_int32_t	ast_ani_disable;/* ANI disabled stats collection */
-	u_int32_t	ast_ani_enable;	/* ANI enabled stats collection */
 };
 
 struct ath_buf {
@@ -110,40 +95,6 @@ struct ath_buf {
 	struct ieee80211_node	*bf_node;	/* pointer to the node */
 };
 
-/*
- * Per-channel state private to the driver.  This stuff
- * is part of the active noise immunity prevention logic.
- */
-struct ath_channel {
-	u_int8_t	noiseImmunityLevel;
-	u_int8_t	spurImmunityLevel;
-	u_int8_t	firstepLevel;
-	u_int8_t	ofdmWeakSigDetectionOff;
-	u_int8_t	cckWeakSigThresholdHigh;
-	u_int8_t	spurImmunityBias;
-	u_int8_t	phyErrStatsDisabled;;
-};
-
-/*
- * Phy error statistics history maintained when doing active
- * noise immunity prevention (currently only for the 5212).
- * One of these structures exists for each phy error to be monitored.
- * The last triggerCount events are recorded by their relative 
- * time delta over a rolling time period.  When the number of events
- * exceeeds a threshold an action is done, such as raising the
- * noise immunity settings on the current channel.
- */
-struct ath_phyerr {
-	u_int32_t	threshold;		/* event duration to trigger */
-	u_int32_t	triggerThreshold;	/* event duration to trigger */
-	u_int		triggerCount;		/* events in the buffer */
-	u_int32_t	duration;		/* measurement duration */
-	u_int32_t	lastTick;		/* clock tick of last entry */
-	u_int32_t	lastTs;			/* timestamp from last rx */
-	u_int		nextEvent;		/* oldest event remembered */
-	u_int32_t	delta[2500];		/* history buffer */
-};
-
 struct ath_hal;
 struct ath_desc;
 struct proc_dir_entry;
@@ -153,7 +104,6 @@ struct ath_softc {
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 						/* rate tables */
 	unsigned int		sc_have11g  : 1,/* have 11g support */
-				sc_doani    : 1,/* dynamic noise immunity */
 				sc_probing  : 1;/* probing AP on beacon miss */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
@@ -193,9 +143,6 @@ struct ath_softc {
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
 	struct ath_nodestat	sc_bss_stat;	/* statistics for infra mode */
 	struct ath_stats	sc_stats;	/* interface statistics */
-
-	struct ath_channel	sc_chans[32];	/* driver-specific chan state */
-	struct ath_phyerr	*sc_phyerr[32];	/* phy error handling state */
 
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry	*sc_proc;	/* /proc/net/drivers/ath%d */
@@ -306,18 +253,20 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_dumpEeprom)((_ah)))
 #define	ath_hal_dumprfgain(_ah) \
 	((*(_ah)->ah_dumpRfGain)((_ah)))
+#define	ath_hal_dumpani(_ah) \
+	((*(_ah)->ah_dumpAni)((_ah)))
 #define	ath_hal_setuptxqueue(_ah, _type, _irq) \
 	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
 #define	ath_hal_resettxqueue(_ah, _q) \
 	((*(_ah)->ah_resetTxQueue)((_ah), (_q)))
 #define	ath_hal_releasetxqueue(_ah, _q) \
 	((*(_ah)->ah_releaseTxQueue)((_ah), (_q)))
-#define	ath_hal_anicontrol(_ah, _op, _param) \
-	((*(_ah)->ah_aniControl)((_ah), (_op), (_param)))
 #define	ath_hal_hasveol(_ah) \
 	((*(_ah)->ah_hasVEOL)((_ah)))
 #define	ath_hal_getrfgain(_ah) \
 	((*(_ah)->ah_getRfGain)((_ah)))
+#define	ath_hal_rxmonitor(_ah) \
+	((*(_ah)->ah_rxMonitor)((_ah)))
 
 #define	ath_hal_setupbeacondesc(_ah, _ds, _opmode, _flen, _hlen, \
 		_rate, _antmode) \
