@@ -135,13 +135,16 @@ extern	void skb_queue_drain(struct sk_buff_head *q);
 extern	struct net_device_stats *ieee80211_getstats(struct net_device *);
 
 #ifndef __MOD_INC_USE_COUNT
-#define	__MOD_INC_USE_COUNT(_m)						\
+#define	_MOD_INC_USE(_m, _err)						\
 	if (!try_module_get(_m)) {					\
 		printk(KERN_WARNING "%s: try_module_get failed\n",	\
-			ic->ic_dev->name);				\
-		return (ENODEV);					\
+			__func__); \
+		_err;							\
 	}
-#define	__MOD_DEC_USE_COUNT(_m)		module_put(_m)
+#define	_MOD_DEC_USE(_m)		module_put(_m)
+#else
+#define	_MOD_INC_USE(_m, _err)	__MOD_INC_USE_COUNT(_m)
+#define	_MOD_DEC_USE(_m)	__MOD_DEC_USE_COUNT(_m)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
@@ -150,8 +153,25 @@ get_jiffies_64(void)
 {
 	return (u_int64_t) jiffies;		/* XXX not right */
 }
+#endif
 
+#ifndef CLONE_KERNEL
+/*
+ * List of flags we want to share for kernel threads,
+ * if only because they are not used by them anyway.
+ */
+#define CLONE_KERNEL	(CLONE_FS | CLONE_FILES | CLONE_SIGHAND)
+#endif
 
+#ifndef offset_in_page
+#define	offset_in_page(p) ((unsigned long) (p) & ~PAGE_MASK)
+#endif
+
+#ifndef module_put_and_exit
+#define module_put_and_exit(code) do {	\
+	_MOD_DEC_USE(THIS_MODULE);	\
+	do_exit(code);			\
+} while (0)
 #endif
 
 #ifdef CONFIG_SYSCTL
@@ -238,9 +258,16 @@ extern	int ieee80211_ioctl_siwscan(struct ieee80211com *,
 		struct iw_request_info *, struct iw_point *, char *);
 extern	int ieee80211_ioctl_giwscan(struct ieee80211com *,
 		struct iw_request_info *, struct iw_point *, char *);
+
 extern	int ieee80211_ioctl_setparam(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
 extern	int ieee80211_ioctl_getparam(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_setoptie(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_getoptie(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_setmlme(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
 
 extern	void ieee80211_ioctl_iwsetup(struct iw_handler_def *);
