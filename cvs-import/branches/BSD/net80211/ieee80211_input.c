@@ -144,7 +144,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int8_t *bssid;
 	u_int16_t rxseq;
 	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ni;
+	// TODO: needed ? cb->ni = ni;
 
 	KASSERT(ni != NULL, ("null node"));
 	ni->ni_inact = ni->ni_inact_reload;
@@ -778,12 +778,10 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 	    llc->llc_control == LLC_UI && llc->llc_snap.org_code[0] == 0 &&
 	    llc->llc_snap.org_code[1] == 0 && llc->llc_snap.org_code[2] == 0) {
 		ether_type = llc->llc_un.type_snap.ether_type;
-		skb_pull(skb, sizeof(wh) + sizeof(struct llc) - sizeof(*eh));
+		skb_pull(skb, sizeof(struct llc));
 		llc = NULL;
-	} else {
-		skb_pull(skb, sizeof(wh) - sizeof(*eh));
 	}
-	eh = (struct ether_header *) skb->data;
+	eh = (struct ether_header *) skb_push(skb, sizeof(struct ether_header));
 	switch (wh.i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
 		IEEE80211_ADDR_COPY(eh->ether_dhost, wh.i_addr1);
