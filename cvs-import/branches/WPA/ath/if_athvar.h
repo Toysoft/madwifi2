@@ -129,6 +129,11 @@ struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
 	int			(*sc_newstate)(struct ieee80211com *,
 					enum ieee80211_state, int);
+	void 			(*sc_node_free)(struct ieee80211com *,
+					struct ieee80211_node *);
+	void			(*sc_node_copy)(struct ieee80211com *,
+					struct ieee80211_node *,
+					const struct ieee80211_node *);
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	unsigned int		sc_invalid : 1,	/* being detached */
 				sc_mrretry : 1;	/* multi-rate retry support */

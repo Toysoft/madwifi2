@@ -388,7 +388,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ieee80211_ifattach(ic);
 	/* override default methods */
 	ic->ic_node_alloc = ath_node_alloc;
+	sc->sc_node_free = ic->ic_node_free;
 	ic->ic_node_free = ath_node_free;
+	sc->sc_node_copy = ic->ic_node_copy;
 	ic->ic_node_copy = ath_node_copy;
 	ic->ic_node_getrssi = ath_node_getrssi;
 	sc->sc_newstate = ic->ic_newstate;
@@ -1636,14 +1638,18 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 			bf->bf_node = NULL;
 	}
 	ATH_TXQ_UNLOCK_BH(sc);
-	kfree(ni);
+	(*sc->sc_node_free)(ic, ni);
 }
 
 static void
 ath_node_copy(struct ieee80211com *ic,
 	struct ieee80211_node *dst, const struct ieee80211_node *src)
 {
-	*(struct ath_node *)dst = *(const struct ath_node *)src;
+        struct ath_softc *sc = ic->ic_dev->priv;
+
+	memcpy(&dst[1], &src[1],
+		sizeof(struct ath_node) - sizeof(struct ieee80211_node));
+	(*sc->sc_node_copy)(ic, dst, src);
 }
 
 static u_int8_t
