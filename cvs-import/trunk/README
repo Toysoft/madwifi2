@@ -39,20 +39,22 @@ in NetBSD and then FreeBSD.
 
 The ath_hal module contains the Atheros Hardware Access Layer (HAL).
 This code manages much of the chip-specific operation of the driver.
-The HAL is provided in a binary-only form in order to comply with FCC
-regulations.  In particular, a radio transmitter can only be operated at
-power levels and on frequency channels for which it is approved.  The FCC
-requires that a software-defined radio cannot be configured by a user
-to operate outside the approved power levels and frequency channels.
-This makes it difficult to open-source code that enforces limits on
-the power levels, frequency channels and other parameters of the radio
-transmitter.  See
+The HAL is provided in a binary-only form in order to comply with
+local regulatory agency requirements.  In the United States the FCC
+mandates a radio transmitter can only be operated at power levels
+and on frequency channels for which it is approved.  The FCC requires
+that a software-defined radio cannot be configured by a user to
+operate outside the approved power levels and frequency channels.
+This makes it difficult to open-source code that enforces limits
+on the power levels, frequency channels and other parameters of the
+radio transmitter.  See
 
 http://ftp.fcc.gov/Bureaus/Engineering_Technology/Orders/2001/fcc01264.pdf
 
-for the specific FCC regulation.  Because the module is provided in a
-binary-only form it is marked "Proprietary"; this means when you load
-it you will see messages that your system is now "tainted".
+for the specific FCC regulation.  Regulations for other agencies
+are similar (often more stringent).  Because the module is provided
+in a binary-only form it is marked "Proprietary"; this means when
+you load it you will see messages that your system is now "tainted".
 
 If you wish to use this driver on a platform for which an ath_hal
 module is not already provided please contact the author.  Note that
@@ -62,9 +64,10 @@ any specific version of Linux.
 
 Compatibility
 =============
-Most testing has been done with kernel versions 2.4.20 and wireless
-tools version 25 on x86 machines.  Expect some rough edges if you
-deviate from that combo.  
+Testing has been done with kernel versions 2.4.20 and later, and
+with wireless tools version 25 and later.  You may encounter some
+rough edges when working with recent Linux kernels in the 2.6 branch
+(or whatever the current development branch is the day you read this).
 
 Atheros Hardware
 ================
@@ -105,6 +108,11 @@ at the top level to build all the modules for the system where you
 are building.  If this does not work or if you want to cross-compile
 the code for a different system then you will need to do more setup.
 
+Note that 2.4 kernel sources tree must have been populated with a
+"make dep" for things to work correctly (if you use a tree where
+you built the currently running kernel then all should be fine.)
+For 2.6 kernels this step is not necessary.
+
 To build the software four things are needed:
 
 1. The target platform (e.g. i386-elf)
@@ -127,21 +135,20 @@ hal/linux/mipsisa32-be-elf.inc  hal/linux/xscale-be-elf.inc
 A target specifies the CPU architecture, byte order, and the ABI/file
 format.
 
-The location of the kernel include and configuration files are
-typically specified together by specifiying the version of the
-kernel and then using default settings for pathnames; e.g.
+The location of the kernel include files is typically given by
+specifying the version of the kernel and then using default settings
+for pathnames; e.g.
 
-trouble% export KERNEL_VERSION=2.4.20-8
+trouble% export KERNELRELEASE=2.4.20-8
 
 This is sufficient if you have multiple kernel versions on your build
 machine and you want to cross-build for a different version than your
 are running.  However if the default locations are incorrect then you
 will also need to override them; e.g.
 
-trouble% export KERNEL_PATH=/cdrom/linuxppc-2.4.21-pre2-cerf/
-trouble% export KERNEL_CONF=/cdrom/linuxppc-2.4.21-pre2-cerf/default.config
+trouble% export KERNELPATH=/cdrom/linuxppc-2.4.21-pre2-cerf/
 
-(These settings are most often used when cross-compiling.)
+(These settings are most often used when cross-compiling.)  
 
 Finally, if you are cross-compiling you will probably need to
 override the default toolchain settings that come with the software.
@@ -302,9 +309,8 @@ The driver supports fixed/shared key WEP using the hardware.  Newer
 Atheros hardware is capable of much more (e.g. AES, TKIP and Michael)
 but that work is not yet supported by the driver.
 
-This distribution works with the xsupplicant program to support 802.1x
-client authentication.  802.1x authenticator support and full WPA support
-(client and AP) is planned.
+802.1x authenticator support and full WPA support (client and AP) is
+planned.
 
 
 Known Problems
@@ -349,6 +355,7 @@ Nick Petroni
 Henry Qian
 Carl Thompson
 giova+mwfdev@faglioni.it
+D. Stolte
 
 (Apologies to anyone whose name was unintentionally left off.)
 
