@@ -58,6 +58,10 @@ OBJS=	if_ath.o if_ath_pci.o
 INCS+=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} \
 	-I${WLAN} ${KERNEL_INCS} -I${DEPTH}
 
+ifdef HAL_OBJDIR
+INCS+=	-I${HAL_OBJDIR}		# for opt_ah.h
+endif
+
 ifneq (${LINUX_VERSION}, 204)
 OBJS+=		if_ath.mod.o if_ath_pci.mod.o
 endif
