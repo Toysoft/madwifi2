@@ -312,6 +312,7 @@ done:
 	M_WME_SETAC(skb, ac);
 	return 0;
 }
+EXPORT_SYMBOL(ieee80211_classify);
 
 /*
  * Insure there is sufficient headroom and tailroom to
@@ -1607,3 +1608,4 @@ ieee80211_pwrsave(struct ieee80211com *ic, struct ieee80211_node *ni,
 	if (qlen == 1)
 		ic->ic_set_tim(ic, ni, 1);
 }
+EXPORT_SYMBOL(ieee80211_pwrsave);
