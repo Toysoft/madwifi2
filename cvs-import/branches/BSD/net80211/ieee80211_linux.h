@@ -281,7 +281,8 @@ extern	struct sk_buff *ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen);
 #define	IF_DRAIN(_q)		skb_queue_purge(_q)	// with lock
 #define	_IF_QLEN(_q)		skb_queue_len(_q)
 #define _IF_QFULL(_q)		(_IF_QLEN(_q) >= IEEE80211_PS_MAX_QUEUE)
-#define _IF_POLL(_q, _skb)	((_skb) = skb_peek(_q))
+#define _IF_POLL(_q, _skb)	((_skb) = skb_peek(_q))	// TODO: peek or peek_tail
+#define IF_POLL(_q, skb)	_IF_POLL(_q, skb)
 #define _IF_DROP(_q)
 #define IF_LOCK_ASSERT(_q)
 extern	void skb_queue_drain(struct sk_buff_head *q);
