@@ -1414,8 +1414,13 @@ ieee80211_dump_pkt(u_int8_t *buf, int len, int rate, int rssi)
 		printk(" type#%d", wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
 		break;
 	}
-	if (wh->i_fc[1] & IEEE80211_FC1_WEP)
-		printk(" WEP");
+	if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
+		int i;
+		printk(" WEP [IV");
+		for (i = 0; i < IEEE80211_WEP_IVLEN; i++)
+			printk(" %.02x", buf[sizeof(*wh)+i]);
+		printk(" KID %u]", buf[sizeof(*wh)+i] >> 6);
+	}
 	if (rate >= 0)
 		printk(" %dM", rate / 2);
 	if (rssi >= 0)
