@@ -760,12 +760,123 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 	}
 }
 
+/*
+ * This function reassemble fragments using the skb of the 1st fragment,
+ * if large enough.  If not, a new skb is allocated to hold incoming fragments.
+ *
+ * Fragments are copied at the end of the previous fragment.  A different strategy 
+ * could have been used, where a non-linear skb is allocated and fragments attached to
+ * that skb.
+ */
+static struct sk_buff *
+ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni, struct sk_buff *skb)
+{
+	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+	u_int16_t rxseq, last_rxseq;
+	u_int8_t fragno, last_fragno;
+	u_int8_t more_frag = wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG;
+
+	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+		/* Do not keep fragments of multicast frames */
+		return skb;
+	}
+		
+	rxseq =  le16_to_cpu(*(u_int16_t *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
+	fragno = le16_to_cpu(*(u_int16_t *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
+
+	/* Quick way out, if there's nothing to defragment */
+	if (!more_frag 
+	    && fragno == 0
+	    && ni->ni_rxfragskb == NULL) return skb;
+
+	/* Use this lock to make sure ni->ni_rxfragskb is not freed by the timer process
+	   while we use it */
+	write_lock(&ic->ic_nodelock);
+
+	/* Update the time stamp.  As a side effect, it also makes sure that the timer will
+	   not change ni->ni_rxfragskb for at least 1 second, or in other words, for the remaining 
+	   of this function */
+	ni->ni_rxfragstamp = jiffies;
+
+	write_unlock(&ic->ic_nodelock);
+
+	/* Validate that fragment is in order and related to the previous ones */
+	if (ni->ni_rxfragskb) {
+		struct ieee80211_frame *lwh;
+
+		lwh = (struct ieee80211_frame *) ni->ni_rxfragskb->data;
+		last_rxseq =  le16_to_cpu(*(u_int16_t *)lwh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
+		last_fragno = le16_to_cpu(*(u_int16_t *)lwh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
+		if (rxseq != last_rxseq
+		    || fragno != last_fragno + 1
+		    || (!IEEE80211_ADDR_EQ(wh->i_addr1, lwh->i_addr1))
+		    || (!IEEE80211_ADDR_EQ(wh->i_addr2, lwh->i_addr2))
+		    || (ni->ni_rxfragskb->end - ni->ni_rxfragskb->tail < skb->len)) {
+			/* Unrelated fragment or no space for it, clear current fragments */
+			dev_kfree_skb(ni->ni_rxfragskb);
+			ni->ni_rxfragskb = NULL;
+		}
+	}
+
+	/* If this is the first fragment */
+ 	if (ni->ni_rxfragskb == NULL && fragno == 0) {
+		ni->ni_rxfragskb = skb;
+		/* If more frags are coming */
+		if (more_frag) {
+			if (skb_is_nonlinear(skb)) {
+				/* We need a continous buffer to assemble fragments */
+				ni->ni_rxfragskb = skb_copy(skb, GFP_ATOMIC);
+				dev_kfree_skb(skb);
+			}
+			/* Check that we have enough space to hold incoming fragments */
+			else if (skb->end - skb->head < ic->ic_dev.mtu + sizeof(sizeof(struct ieee80211_frame))) {
+				ni->ni_rxfragskb = skb_copy_expand(skb, 0, 
+								   (ic->ic_dev.mtu + sizeof(sizeof(struct ieee80211_frame))) 
+								   - (skb->end - skb->head),
+								   GFP_ATOMIC);
+				dev_kfree_skb(skb);
+			}
+		}
+	}
+	else {
+		if (ni->ni_rxfragskb) {
+			struct ieee80211_frame *lwh = (struct ieee80211_frame *) ni->ni_rxfragskb->data;
+
+			/* We know we have enough space to copy, we've verified that before */
+			/* Copy current fragment at end of previous one */
+			memcpy(ni->ni_rxfragskb->tail,
+			       skb->data + sizeof(struct ieee80211_frame),
+			       skb->len - sizeof(struct ieee80211_frame)
+				);
+			/* Update tail and length */
+			skb_put(ni->ni_rxfragskb, skb->len - sizeof(struct ieee80211_frame));
+			/* Keep a copy of last sequence and fragno */
+			*(u_int16_t *) lwh->i_seq = *(u_int16_t *) wh->i_seq;
+			
+		}
+		/* we're done with the fragment */
+		dev_kfree_skb(skb);
+	}
+		
+	if (more_frag) {
+		/* More to come */
+		skb = NULL;
+	}
+	else {
+		/* Last fragment received, we're done! */
+		skb = ni->ni_rxfragskb;
+		ni->ni_rxfragskb = NULL;
+	}
+
+	return skb;
+}
+
 void
 ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	int rssi, u_int32_t rstamp, u_int rantenna)
 {
 	struct ieee80211com *ic = (void *)dev;
-	struct ieee80211_node *ni;
+	struct ieee80211_node *ni = NULL;
 	struct ieee80211_frame *wh;
 	struct ether_header *eh;
 	void (*rh)(struct ieee80211com *, struct sk_buff *, int, u_int32_t, u_int);
@@ -773,7 +884,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	int len;
 	u_int8_t dir, subtype;
 	u_int8_t *bssid;
-	u_int16_t rxseq;
+	u_int16_t lastrxseq;
+	u_int8_t lastfragno;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	if ((wh->i_fc[0] & IEEE80211_FC0_VERSION_MASK) !=
@@ -794,7 +906,6 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 					    dev->name,
 					    ether_sprintf(wh->i_addr2)));
 				/* not interested in */
-				ieee80211_unref_node(&ni);
 				goto out;
 			}
 			break;
@@ -834,18 +945,20 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
 		ni->ni_rantenna = rantenna;
-		rxseq = ni->ni_rxseq;
+		lastrxseq = ni->ni_rxseq;
+		lastfragno = ni->ni_fragno;
+		ni->ni_inact = 0;
 		ni->ni_rxseq =
 		    le16_to_cpu(*(u_int16_t *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
-		/* TODO: fragment */
+		ni->ni_fragno = le16_to_cpu(*(u_int16_t *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
 		if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
-		    rxseq == ni->ni_rxseq) {
+		    lastrxseq == ni->ni_rxseq &&
+		    lastfragno == ni->ni_fragno) {
 			/* duplicate, silently discarded */
-			ieee80211_unref_node(&ni);
 			goto out;
 		}
-		ni->ni_inact = 0;
-		ieee80211_unref_node(&ni);
+		if (ni == &ic->ic_bss)
+			ieee80211_unref_node(&ni);
 	}
 
 	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
@@ -883,8 +996,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		case IEEE80211_M_HOSTAP:
 			if (dir != IEEE80211_FC1_DIR_TODS)
 				goto out;
-			/* check if source STA is associated */
-			ni = ieee80211_find_node(ic, wh->i_addr2);
+			/* ni has been set previously */
 			if (ni == NULL) {
 				DPRINTF(ic, ("%s: data from unknown src %s\n",
 				    __func__, ether_sprintf(wh->i_addr2)));
@@ -894,6 +1006,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 					    IEEE80211_FC0_SUBTYPE_DEAUTH,
 					    IEEE80211_REASON_NOT_AUTHED);
 					ieee80211_free_node(ic, ni);
+					ni = NULL;
 				}
 				goto err;
 			}
@@ -903,10 +1016,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_DISASSOC,
 				    IEEE80211_REASON_NOT_ASSOCED);
-				ieee80211_unref_node(&ni);
 				goto err;
 			}
-			ieee80211_unref_node(&ni);
 			break;
 		}
 		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
@@ -918,12 +1029,23 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			} else
 				goto out;
 		}
+
+		if (ni == NULL)
+			ni = ieee80211_ref_node(&ic->ic_bss);
+
+		if ((skb = ieee80211_defrag(ic, ni, skb)) == NULL) {
+			/* Fragment dropped or frame not complete yet */
+			goto out;
+		}
+
 		/* copy to listener after decrypt */
 		skb = ieee80211_decap(dev, skb);
 		if (skb == NULL) {
 			DPRINTF(ic, ("%s: decapsulation failed\n", dev->name));
 			goto err;
 		}
+
+		ieee80211_unref_node(&ni);
 
 		/* perform as a bridge within the AP */
 		skb1 = NULL;
@@ -1001,6 +1123,15 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				    >> IEEE80211_FC0_SUBTYPE_SHIFT],
 				    ether_sprintf(wh->i_addr2), rssi);
 		}
+
+		if (ni == NULL)
+			ni = ieee80211_ref_node(&ic->ic_bss);
+
+		if ((skb = ieee80211_defrag(ic, ni, skb)) == NULL) {
+			/* Fragment dropped or frame not complete yet */
+			goto out;
+		}
+
 		rh = ic->ic_recv_mgmt[subtype >> IEEE80211_FC0_SUBTYPE_SHIFT];
 		if (rh != NULL)
 			(*rh)(ic, skb, rssi, rstamp, rantenna);
@@ -1015,6 +1146,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 err:
 	ic->ic_stats.rx_errors++;		/* XXX */
 out:
+	if (ni)
+		ieee80211_unref_node(&ni);
 	if (skb != NULL)
 		dev_kfree_skb(skb);
 }
@@ -1815,6 +1948,11 @@ _ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 	LIST_REMOVE(ni, ni_hash);
 	if (TAILQ_EMPTY(&ic->ic_node))
 		ic->ic_inact_timer = 0;
+
+	if (ni->ni_rxfragskb) {
+		kfree_skb(ni->ni_rxfragskb);
+	}
+
 	kfree(ni);
 }
 
@@ -1847,6 +1985,11 @@ ieee80211_timeout_nodes(struct ieee80211com *ic)
 
 	write_lock(&ic->ic_nodelock);
 	for (ni = TAILQ_FIRST(&ic->ic_node); ni != NULL;) {
+		/* Free fragment skb if not needed anymore (last fragment older than 1s) */
+		if (ni->ni_rxfragskb && (jiffies > ni->ni_rxfragstamp + HZ)) {
+			kfree_skb(ni->ni_rxfragskb);
+			ni->ni_rxfragskb = NULL;
+		}
 		if (++ni->ni_inact <= IEEE80211_INACT_MAX) {
 			ni = TAILQ_NEXT(ni, ni_list);
 			continue;

@@ -1443,40 +1443,42 @@ ath_rx_tasklet(void *data)
 			break;
 		TAILQ_REMOVE(&sc->sc_rxbuf, bf, bf_list);
 
-		if (ds->ds_rxstat.rs_status != 0) {
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
-				sc->sc_stats.ast_rx_crcerr++;
+		if (!ds->ds_rxstat.rs_more) {
+			if (ds->ds_rxstat.rs_status != 0) {
+				if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
+					sc->sc_stats.ast_rx_crcerr++;
+					/*
+					 * Record the rssi for crc errors; it
+					 * should still be valid.
+					 */
+					sc->sc_stats.ast_rx_rssidelta =
+						ds->ds_rxstat.rs_rssi -
+						sc->sc_stats.ast_rx_rssi;
+					sc->sc_stats.ast_rx_rssi =
+						ds->ds_rxstat.rs_rssi;
+				}
+				if (ds->ds_rxstat.rs_status & HAL_RXERR_FIFO)
+					sc->sc_stats.ast_rx_fifoerr++;
+				if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT)
+					sc->sc_stats.ast_rx_badcrypt++;
+				if (ds->ds_rxstat.rs_status & HAL_RXERR_PHY) {
+					sc->sc_stats.ast_rx_phyerr++;
+					phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
+					sc->sc_stats.ast_rx_phy[phyerr]++;
+				}
+
 				/*
-				 * Record the rssi for crc errors; it
-				 * should still be valid.
+				 * In monitor mode, allow through packets that cannot be decrypted
 				 */
-				sc->sc_stats.ast_rx_rssidelta =
-					ds->ds_rxstat.rs_rssi -
-					sc->sc_stats.ast_rx_rssi;
-				sc->sc_stats.ast_rx_rssi =
-					ds->ds_rxstat.rs_rssi;
-			}
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_FIFO)
-				sc->sc_stats.ast_rx_fifoerr++;
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT)
-				sc->sc_stats.ast_rx_badcrypt++;
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_PHY) {
-				sc->sc_stats.ast_rx_phyerr++;
-				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
-				sc->sc_stats.ast_rx_phy[phyerr]++;
+				if ((ds->ds_rxstat.rs_status & ~HAL_RXERR_DECRYPT)
+				    || (sc->sc_ic.ic_opmode != IEEE80211_M_MONITOR))
+					goto rx_next;
 			}
 
-			/*
-			 * In monitor mode, allow through packets that cannot be decrypted
-			 */
-			if ((ds->ds_rxstat.rs_status & ~HAL_RXERR_DECRYPT)
-			    || (sc->sc_ic.ic_opmode != IEEE80211_M_MONITOR))
-				goto rx_next;
+			sc->sc_stats.ast_rx_rssidelta =
+				ds->ds_rxstat.rs_rssi - sc->sc_stats.ast_rx_rssi;
+			sc->sc_stats.ast_rx_rssi = ds->ds_rxstat.rs_rssi;
 		}
-
-		sc->sc_stats.ast_rx_rssidelta =
-			ds->ds_rxstat.rs_rssi - sc->sc_stats.ast_rx_rssi;
-		sc->sc_stats.ast_rx_rssi = ds->ds_rxstat.rs_rssi;
 
 		len = ds->ds_rxstat.rs_datalen;
 
@@ -1500,6 +1502,11 @@ ath_rx_tasklet(void *data)
 				       (rt != NULL)
 				       ? (rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2);
 		} else {
+			if (ds->ds_rxstat.rs_more) {
+				/* Ignore packets > MTU */
+				goto rx_next;
+			}
+
 			/*
 			 * normal receive
 			 */

@@ -523,11 +523,14 @@ struct ieee80211_node {
 	u_int16_t		ni_timoffset;
 
 	/* others */
+	struct sk_buff          *ni_rxfragskb;  /* Current rx fragmented frame */
+	u_int32_t		ni_rxfragstamp;	/* Time stamp of last rx fragments */
 	u_int16_t		ni_associd;	/* assoc response */
 	u_int16_t		ni_txseq;	/* seq to be transmitted */
 	u_int16_t		ni_rxseq;	/* seq previous received */
 	int			ni_fails;	/* failure count to associate */
 	int			ni_inact;	/* inactivity mark count */
+	u_int8_t		ni_fragno;	/* frag. number previously received */
 	int			ni_txrate;	/* index to ni_rates[] */
 	void			*ni_private;	/* driver private */
 };
