@@ -74,7 +74,7 @@ static int	ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
 static void	ath_rx_tasklet(void *);
 static int	ath_hardstart(struct sk_buff *, struct net_device *);
 static int	ath_mgtstart(struct sk_buff *, struct net_device *);
-static int	ath_tx_start(struct ath_softc *, struct ieee80211_node *,
+static int	ath_tx_start(struct net_device *, struct ieee80211_node *,
 			     struct ath_buf *, struct sk_buff *);
 static void	ath_tx_tasklet(void *);
 static void	ath_tx_timeout(struct net_device *);
@@ -86,6 +86,9 @@ static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
 static int	ath_newstate(void *, enum ieee80211_state);
 static struct net_device_stats *ath_getstats(struct net_device *);
+
+static int	ath_rate_setup(struct net_device *, u_int mode);
+static void	ath_rate_ctl(void *, struct ieee80211_node *);
 
 #ifdef CONFIG_PROC_FS
 static void	ath_proc_init(struct ath_softc *sc);
@@ -101,19 +104,6 @@ static	void ath_printtxbuf(struct ath_buf *bf, int);
 #define	IFF_DUMPPKTS(_ic)	netif_msg_dumppkts(_ic)
 #endif
 
-/*
- * Supported Rates.
- * The step of the table is 3Mbps.
- * Note that we won't use 9Mbps, which is worse than 6Mbps.
- */
-static u_int8_t	ath_rate_tbl[] = {
-	0 /*0M*/,	0 /*3M*/,	HAL_RATE_6M,	0 /*9M*/,
-	HAL_RATE_12M,	0 /*15M*/,	HAL_RATE_18M,	0 /*21M*/,
-	HAL_RATE_24M,	0 /*27M*/,	0 /*30M*/,	0 /*33M*/,
-	HAL_RATE_36M, 	0 /*39M*/,	0 /*42M*/,	0 /*45M*/,
-	HAL_RATE_48M,	0 /*51M*/,	HAL_RATE_54M,
-};
-
 int
 ath_attach(u_int16_t devid, struct net_device *dev)
 {
@@ -121,7 +111,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah;
 	int i, error = 0, ix, nchan;
-	u_int8_t *r, csz;
+	u_int8_t csz;
 #define	ATH_MAXCHAN	32		/* number of potential channels */
 	HAL_CHANNEL chans[ATH_MAXCHAN];		/* XXX get off stack */
 	HAL_STATUS status;
@@ -158,9 +148,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/* XXX where does the country code, et. al. come from? */
 	if (!ath_hal_init_channels(ah, chans, ATH_MAXCHAN, &nchan,
 #ifdef notdef
-		CTRY_DEFAULT, MODE_SELECT_11A|MODE_SELECT_11B, 1)) {
+		CTRY_DEFAULT, HAL_MODE_ALL, AH_TRUE)) {
 #else
-		CTRY_DEFAULT, MODE_SELECT_11A, 1)) {
+		CTRY_DEFAULT, HAL_MODE_11A|HAL_MODE_11B, AH_FALSE)) {
 #endif
 		printk(KERN_ERR "%s: unable to initialize channel list\n",
 			dev->name);
@@ -169,7 +159,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	}
 	/*
 	 * Convert HAL channels to ieee80211 ones and insert
-	 * them the table according to their channel number.
+	 * them in the table according to their channel number.
 	 */
 	for (i = 0; i < nchan; i++) {
 		HAL_CHANNEL *c = &chans[i];
@@ -188,6 +178,12 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		/* NB: flags are known to be compatible */
 		ic->ic_channels[ix].ic_flags = c->channelFlags;
 	}
+	/*
+	 * Setup rate tables for all potential media types.
+	 */
+	ath_rate_setup(dev, IEEE80211_MODE_11A);
+	ath_rate_setup(dev, IEEE80211_MODE_11B);
+	ath_rate_setup(dev, IEEE80211_MODE_11G);
 
 	error = ath_desc_alloc(sc);
 	if (error != 0) {
@@ -254,30 +250,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	/* get mac address from hardware */
 	ath_hal_getmac(ah, dev->dev_addr);
-
-	/*
-	 * Fill in supported rates.
-	 */
-	r = ic->ic_sup_rates;
-	for (i = 0; i < sizeof(ath_rate_tbl); i++) {
-		if (r == ic->ic_sup_rates + IEEE80211_RATE_SIZE)
-			break;
-		/* IEEE802.11 supported rate is in 0.5Mbps */
-		switch (ath_rate_tbl[i]) {
-		case 0:
-			/* unsupported by hardware */
-			break;
-		case HAL_RATE_6M:
-		case HAL_RATE_12M:
-		case HAL_RATE_24M:
-			/* required rate in 802.11a */
-			*r++ = i * 3 * 2 | 0x80;
-			break;
-		default:
-			*r++ = i * 3 * 2;
-			break;
-		}
-	}
 
 	/* call MI attach routine. */
 	ieee80211_ifattach(dev);
@@ -389,6 +361,11 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 			sc->sc_stats.ast_rxeol++;
 			sc->sc_rxlink = NULL;
+		}
+		if (status & HAL_INT_TXURN) {
+			sc->sc_stats.ast_txurn++;
+			/* bump tx trigger level */
+			ath_hal_updatetxtriglevel(ah, AH_TRUE);
 		}
 		if (status & HAL_INT_RX)
 			needmark |= queue_task(&sc->sc_rxtq, &tq_immediate);
@@ -507,9 +484,9 @@ ath_init(struct net_device *dev)
 		memset(ni->ni_tstamp, 0, sizeof(ni->ni_tstamp));
 		ni->ni_nrate = 0;
 		for (i = 0; i < IEEE80211_RATE_SIZE; i++) {
-			if (ic->ic_sup_rates[i])
+			if (ic->ic_sup_rates[ni->ni_mode][i])
 				ni->ni_rates[ni->ni_nrate++] =
-				    ic->ic_sup_rates[i];
+				    ic->ic_sup_rates[ni->ni_mode][i];
 		}
 		memcpy(ni->ni_macaddr, dev->dev_addr, IEEE80211_ADDR_LEN);
 		memcpy(ni->ni_bssid, dev->dev_addr, IEEE80211_ADDR_LEN);
@@ -551,7 +528,7 @@ ath_stop(struct net_device *dev)
 		 *    turn off timers
 		 *    clear transmit machinery
 		 *    clear receive machinery
-		 *    drain send queue
+		 *    drain and release tx queues
 		 *    reclaim beacon resources
 		 *    reset 802.11 state machine
 		 *    power down hardware
@@ -677,7 +654,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		ieee80211_dump_pkt(skb->data, skb->len,
 		    ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
 
-	error = ath_tx_start(sc, ni, bf, skb);
+	error = ath_tx_start(dev, ni, bf, skb);
 	ieee80211_unref_node(&ni);
 	if (error == 0)
 		return 0;
@@ -764,7 +741,7 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 		ieee80211_dump_pkt(skb->data, skb->len,
 		    ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
 
-	error = ath_tx_start(sc, ni, bf, skb);
+	error = ath_tx_start(dev, ni, bf, skb);
 	ieee80211_unref_node(&ni);
 	if (error == 0) {
 		sc->sc_stats.ast_tx_mgmt++;
@@ -873,9 +850,10 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
-	int arate, pktlen;
-	u_int8_t *frm;
+	int pktlen;
+	u_int8_t *frm, rate;
 	u_int16_t capinfo;
+	const HAL_RATE_TABLE *rt;
 
 	bf = sc->sc_bcbuf;
 	if (bf->bf_skb != NULL) {
@@ -968,26 +946,39 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	bf->bf_skb = skb;
 
 	/* setup descriptors */
-	arate = ath_rate_tbl[(ni->ni_rates[0] & IEEE80211_RATE_VAL) / 6];
-	if (arate == 0)
-		arate = HAL_RATE_6M;
 	ds = bf->bf_desc;
 
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
 	/* XXX verify mbuf data area covers this roundup */
-	ath_hal_setupbeacondesc(ah, ds
-		, ic->ic_opmode				/* operating mode */
-		, skb->len + IEEE80211_CRC_LEN		/* frame length */
-		, sizeof(struct ieee80211_frame)	/* header length */
-		, arate					/* xmit rate */
-		, 0					/* antenna mode */
+	/* XXX compression processing */
+	/*
+	 * Calculate rate code.  CCK beacons need a long premable.
+	 * XXX everything at 6Mbs
+	 */
+	rt = sc->sc_rates[ni->ni_mode];
+	if (!IEEE80211_IS_CHAN_PUREG(ni->ni_chan))
+		rate = rt->info[0].rateCode | rt->info[0].shortPreamble;
+	else
+		rate = rt->info[0].rateCode;
+	ath_hal_setuptxdesc(ah, ds
+		, skb->len + IEEE80211_CRC_LEN	/* frame length */
+		, sizeof(struct ieee80211_frame)/* header length */
+		, HAL_PKT_TYPE_BEACON		/* Atheros packet type */
+		, 0x20				/* txpower XXX */
+		, rate, 4 /*XXX*/		/* series 0 rate/tries */
+		, HAL_TXKEYIX_INVALID		/* no encryption */
+		, 0				/* antenna mode */
+		, HAL_TXDESC_NOACK		/* no ack for beacons */
+		| HAL_TXDESC_VEOL		/* veol-style re-xmit */
+		, 0				/* rts/cts rate */
+		, 0				/* rts/cts duration */
 	);
 	/* NB: beacon's BufLen must be a multiple of 4 bytes */
 	ath_hal_filltxdesc(ah, ds
-		, roundup(skb->len, 4)			/* buffer length */
-		, AH_TRUE				/* first segment */
-		, AH_TRUE				/* last segment */
+		, roundup(skb->len, 4)		/* buffer length */
+		, AH_TRUE			/* first segment */
+		, AH_TRUE			/* last segment */
 	);
 	return 0;
 }
@@ -1014,9 +1005,20 @@ ath_beacon_tasklet(void *data)
 	}
 	pci_dma_sync_single(sc->sc_pdev,
 		bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
-	ath_hal_qbeacon(ah, ic->ic_opmode, bf);
-	DPRINTF2(("ath_beacon_int: TXDP1 = %p (%p)\n",
-	    (caddr_t)bf->bf_daddr, bf->bf_desc));
+
+	/*
+	 * NB: For parts other than the 5210 this will happen
+	 * only once.  Because the descriptor is marked with
+	 * VEOL the frame will be retransmitted automatically
+	 * at the next beacon time interval w/o interrupting
+	 * the host.  The 5210 doesn't have VEOL support so for
+	 * that part we take a real interrupt and re-submit the
+	 * beacon frame here.
+	 */
+	ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
+	ath_hal_txstart(ah, sc->sc_bhalq);
+	DPRINTF2(("%s: TXDP%u = %p (%p)\n", __func__,
+		sc->sc_bhalq, (caddr_t)bf->bf_daddr, bf->bf_desc));
 	/* TODO power management */
 }
 
@@ -1170,7 +1172,10 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds = bf->bf_desc;
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
-	ath_hal_setuprxdesc(ah, ds, skb_tailroom(skb));
+	ath_hal_setuprxdesc(ah, ds
+		, skb_tailroom(skb)		/* buffer size */
+		, 0
+	);
 
 	if (sc->sc_rxlink != NULL)
 		*sc->sc_rxlink = bf->bf_daddr;
@@ -1189,9 +1194,9 @@ ath_rx_tasklet(void *data)
 	struct ath_desc *ds;
 	struct sk_buff *skb;
 	struct ieee80211_frame *wh, whbuf;
-	int rssi, len;
-	u_int32_t rstamp, now;
-	u_int8_t arate, rate, phyerr;
+	int len;
+	u_int8_t phyerr;
+	HAL_STATUS status;
 
 	DPRINTF2(("ath_rx_tasklet\n"));
 	do {
@@ -1206,15 +1211,15 @@ ath_rx_tasklet(void *data)
 			continue;
 		}
 		ds = bf->bf_desc;
-		if (ath_hal_rxprocdesc(ah, ds) == HAL_EINPROGRESS)
+		status = ath_hal_rxprocdesc(ah, ds);
+#ifdef AR_DEBUG
+		if (ath_debug > 1)
+			ath_printrxbuf(bf, status == HAL_OK); 
+#endif
+		if (status == HAL_EINPROGRESS)
 			break;
 		TAILQ_REMOVE(&sc->sc_rxbuf, bf, bf_list);
 
-		DPRINTF2(("R  (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
-		    ds, (struct ath_desc *)bf->bf_daddr,
-		    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1,
-		    ds->ds_hw[0], ds->ds_hw[1],
-		    (ds->ds_rxstat.rs_status == 0 ? '*' : '!')));
 		if (ds->ds_rxstat.rs_status != 0) {
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
 				sc->sc_stats.ast_rx_crcerr++;
@@ -1238,20 +1243,6 @@ ath_rx_tasklet(void *data)
 			goto rx_next;
 		}
 
-		rssi = ds->ds_rxstat.rs_rssi;
-		rstamp = ds->ds_rxstat.rs_tstamp;
-		arate = ds->ds_rxstat.rs_rate;
-		rate = ((arate & 0x4) ? 72 : 48) >> (arate & 0x3);
-		if (rate == 72)
-			rate = 54;
-
-		/* expand AR_RcvTimestamp(13bit) to 16bit */
-		now = (ath_hal_gettsf(ah) >> 10) & 0xffff;
-		if ((now & 0x1fff) < rstamp)
-			rstamp |= (now - 0x2000) & 0xffff;
-		else
-			rstamp |= now;
-
 		pci_dma_sync_single(sc->sc_pdev,
 			bf->bf_skbaddr, len, PCI_DMA_FROMDEVICE);
 
@@ -1270,8 +1261,13 @@ ath_rx_tasklet(void *data)
 		bf->bf_skb = NULL;
 		skb_put(skb, len);
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
-		if (IFF_DUMPPKTS(&sc->sc_ic))
-			ieee80211_dump_pkt(skb->data, len, rate * 2, rssi);
+		if (IFF_DUMPPKTS(&sc->sc_ic)) {
+			struct ieee80211com *ic = &sc->sc_ic;
+			const HAL_RATE_TABLE *rt = sc->sc_rates[ic->ic_curmode];
+			ieee80211_dump_pkt(skb->data, len,
+				rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
+				ds->ds_rxstat.rs_rssi);
+		}
 		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
 			/*
@@ -1289,7 +1285,8 @@ ath_rx_tasklet(void *data)
 		}
 		stats->rx_packets++;
 		stats->rx_bytes += len;
-		ieee80211_input(dev, skb, rssi, rstamp);
+		ieee80211_input(dev, skb, ds->ds_rxstat.rs_rssi,
+			ds->ds_rxstat.rs_tstamp);
   rx_next:
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	} while (ath_rxbuf_init(sc, bf) == 0);
@@ -1297,22 +1294,29 @@ ath_rx_tasklet(void *data)
 	ath_hal_rxena(ah);			/* in case of RXEOL */
 }
 
+/*
+ * XXX Size of an ACK control frame in bytes.
+ */
+#define	IEEE80211_ACK_SIZE	(2+2+IEEE80211_ADDR_LEN+4)
+
 static int
-ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf,
+ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *bf,
     struct sk_buff *skb)
 {
+	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct net_device_stats *stats = &sc->sc_ic.ic_stats;
 	int i, iswep, hdrlen, pktlen;
-	u_int8_t rate, arate;
+	u_int8_t rix, txrate, ctsrate;
 	struct ath_desc *ds;
 	struct ieee80211_frame *wh;
 	u_int32_t iv;
 	u_int8_t *ivp;
 	u_int8_t hdrbuf[sizeof(struct ieee80211_frame) +
 	    IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN];
-	u_int subtype;
+	u_int subtype, flags, ctsduration;
 	HAL_PKT_TYPE atype;
+	const HAL_RATE_TABLE *rt;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
@@ -1359,8 +1363,12 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	bf->bf_skb = skb;
 	bf->bf_node = ni;
 
+	ds = bf->bf_desc;
+	rt = sc->sc_rates[ni->ni_mode];
+
 	/*
-	 * Calculate Atheros packet type from IEEE80211 packet header.
+	 * Calculate Atheros packet type from IEEE80211 packet header
+	 * and setup for rate calculations.
 	 */
 	atype = HAL_PKT_TYPE_NORMAL;			/* default */
 	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
@@ -1372,49 +1380,84 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 			atype = HAL_PKT_TYPE_PROBE_RESP;
 		else if (subtype == IEEE80211_FC0_SUBTYPE_ATIM)
 			atype = HAL_PKT_TYPE_ATIM;
+		rix = 0;			/* XXX lowest rate */
 		break;
 	case IEEE80211_FC0_TYPE_CTL:
 		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 		if (subtype == IEEE80211_FC0_SUBTYPE_PS_POLL)
 			atype = HAL_PKT_TYPE_PSPOLL;
+		rix = 0;			/* XXX lowest rate */
+		break;
+	default:
+		/* 
+		 * XXX insert rate control work here.
+		 */
+		txrate = ni->ni_rates[ni->ni_txrate];
+		for (rix = 0; rix < rt->rateCount; rix++)
+			if (txrate == rt->info[rix].dot11Rate)
+				break;
 		break;
 	}
+	if (IEEE80211_IS_CHAN_PUREG(ni->ni_chan)) {
+		/* 11g always uses long preamble */
+		txrate = rt->info[rix].rateCode;
+		flags &= ~HAL_TXDESC_SHORTPRE;
+	} else {
+		/* XXX no control over long/short preamble */
+		txrate = rt->info[rix].rateCode | rt->info[rix].shortPreamble;
+		flags |= HAL_TXDESC_SHORTPRE;
+	}
 
-	/* 
-	 * XXX insert rate control work here.
+	/*
+	 * Calculate miscellaneous flags.
 	 */
-	rate = ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL;
-	arate = (rate % 6 == 0) ? ath_rate_tbl[rate / 6] : 0;
-	if (arate == 0)
-		arate = HAL_RATE_24M;
+	flags = 0;
+	if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
+		flags |= HAL_TXDESC_NOACK;
 
-	ds = bf->bf_desc;
+	/*
+	 * Calculate RTS/CTS rate and duration if needed.
+	 */
+	ctsduration = 0;
+	if (flags & (HAL_TXDESC_RTSENA|HAL_TXDESC_CTSENA)) {
+		ctsrate = rt->info[rix].rateCode;
+		if (flags & HAL_TXDESC_RTSENA) {	/* SIFS + CTS */
+			ctsduration += ath_hal_computetxtime(ah,
+				rt, IEEE80211_ACK_SIZE,
+				ctsrate, (flags & HAL_TXDESC_SHORTPRE) != 0);
+		}
+		/* SIFS + data */
+		ctsduration += ath_hal_computetxtime(ah, rt, pktlen,
+			txrate, (flags & HAL_TXDESC_SHORTPRE) != 0);
+		if ((flags & HAL_TXDESC_NOACK) == 0) {	/* SIFS + ACK */
+			ctsduration += ath_hal_computetxtime(ah,
+				rt, IEEE80211_ACK_SIZE,
+				ctsrate, (flags & HAL_TXDESC_SHORTPRE) != 0);
+		}
+	} else
+		ctsrate = 0;
 
 	/*
 	 * Formulate first tx descriptor with tx controls.
 	 */
 	ath_hal_setuptxdesc(ah, ds
-		, pktlen	/* packet length */
-		, hdrlen	/* header length */
-		, atype		/* Atheros packet type */
-		, 0		/* txpower */
-		, arate, 1	/* series 0 rate/tries */
+		, pktlen		/* packet length */
+		, hdrlen		/* header length */
+		, atype			/* Atheros packet type */
+		, 60			/* txpower XXX */
+		, txrate, 1+10		/* series 0 rate/tries */
 		, iswep ? sc->sc_ic.ic_wep_txkey : HAL_TXKEYIX_INVALID
-		, 0		/* antenna mode */
-		, AH_FALSE	/* clear dest mask */
-		, AH_FALSE	/* no ack */
-		, AH_FALSE	/* short preamble */
-		, AH_FALSE	/* rts enable */
-		, AH_FALSE	/* cts enable */
-		, 0		/* rts/cts rate */
-		, 0		/* rts/cts duration */
+		, 0			/* antenna mode */
+		, flags			/* flags */
+		, ctsrate		/* rts/cts rate */
+		, ctsduration		/* rts/cts duration */
 	);
 #ifdef notyet
 	ath_hal_setupxtxdesc(ah, ds
-		, AH_FALSE	/* short preamble */
-		, 0, 0		/* series 1 rate/tries */
-		, 0, 0		/* series 2 rate/tries */
-		, 0, 0		/* series 3 rate/tries */
+		, AH_FALSE		/* short preamble */
+		, 0, 0			/* series 1 rate/tries */
+		, 0, 0			/* series 2 rate/tries */
+		, 0, 0			/* series 3 rate/tries */
 	);
 #endif
 
@@ -1461,18 +1504,11 @@ ath_tx_tasklet(void *data)
 	struct ath_desc *ds;
 	struct ath_nodestat *st;
 	int sr, lr;
+	HAL_STATUS status;
 
-#ifdef AR_DEBUG
-	if (ath_debug > 1) {
-		printk("ath_tx_tasklet: tx queue %p, link %p\n",
-		    (caddr_t) ath_hal_gettxbuf(sc->sc_ah, sc->sc_txhalq),
-		    sc->sc_txlink);
-		TAILQ_FOREACH(bf, &sc->sc_txq, bf_list) {
-			ath_printtxbuf(bf,
-				ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
-		}
-	}
-#endif /* AR_DEBUG */
+	DPRINTF2(("ath_tx_tasklet: tx queue %p, link %p\n",
+		(caddr_t) ath_hal_gettxbuf(sc->sc_ah, sc->sc_txhalq),
+		sc->sc_txlink));
 	for (;;) {
 		spin_lock(&sc->sc_txqlock);
 		bf = TAILQ_FIRST(&sc->sc_txq);
@@ -1482,7 +1518,12 @@ ath_tx_tasklet(void *data)
 			break;
 		}
 		ds = bf->bf_desc;		/* NB: last decriptor */
-		if (ath_hal_txprocdesc(ah, ds) == HAL_EINPROGRESS) {
+		status = ath_hal_txprocdesc(ah, ds);
+#ifdef AR_DEBUG
+		if (ath_debug > 1)
+			ath_printtxbuf(bf, status == HAL_OK);
+#endif
+		if (status == HAL_EINPROGRESS) {
 			spin_unlock(&sc->sc_txqlock);
 			break;
 		}
@@ -1863,6 +1904,48 @@ bad:
 	return error;
 }
 
+static int
+ath_rate_setup(struct net_device *dev, u_int mode)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211com *ic = &sc->sc_ic;
+	const HAL_RATE_TABLE *rt;
+	u_int8_t *r;
+	int i, maxrates;
+
+	switch (mode) {
+	case IEEE80211_MODE_11A:
+		sc->sc_rates[mode] = ath_hal_getratetable(ah, HAL_MODE_11A);
+		break;
+	case IEEE80211_MODE_11B:
+		sc->sc_rates[mode] = ath_hal_getratetable(ah, HAL_MODE_11B);
+		break;
+	case IEEE80211_MODE_11G:
+		sc->sc_rates[mode] = ath_hal_getratetable(ah, HAL_MODE_11B);
+		break;
+	case IEEE80211_MODE_TURBO:
+		sc->sc_rates[mode] =
+			ath_hal_getratetable(ah, HAL_MODE_TURBO);
+		break;
+	default:
+		DPRINTF(("%s: invalid mode %u\n", __func__, mode));
+		return 0;
+	}
+	r = ic->ic_sup_rates[mode];
+	rt = sc->sc_rates[mode];
+	if (rt->rateCount > IEEE80211_RATE_SIZE) {
+		DPRINTF(("%s: rate table too small (%u > %u)\n",
+			__func__, rt->rateCount, IEEE80211_RATE_SIZE));
+		maxrates = IEEE80211_RATE_SIZE;
+	} else
+		maxrates = rt->rateCount;
+	/* XXX must mark basic rates for 11g */
+	for (i = 0; i < maxrates; i++)
+		*r++ = rt->info[i].dot11Rate;
+	return 1;
+}
+
 static void
 ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 {
@@ -1943,11 +2026,11 @@ ath_printrxbuf(struct ath_buf *bf, int done)
 {
 	struct ath_desc *ds = bf->bf_desc;
 
-	printk("R (%p %p) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
+	printk("R (%p %p) %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, (struct ath_desc *)bf->bf_daddr,
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
-	    ds->ds_hw[0], ds->ds_hw[1], ds->ds_hw[2], ds->ds_hw[3],
+	    ds->ds_hw[0], ds->ds_hw[1],
 	    !done ? ' ' : (ds->ds_rxstat.rs_status == 0) ? '*' : '!');
 }
 

@@ -55,6 +55,7 @@ struct ath_stats {
 	u_int32_t	ast_bmiss;	/* beacon miss interrupt */
 	u_int32_t	ast_rxorn;	/* rxorn interrupts */
 	u_int32_t	ast_rxeol;	/* rxeol interrupts */
+	u_int32_t	ast_txurn;	/* tx underrun interrupts */
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
 	u_int32_t	ast_tx_invalid;	/* frames discarded 'cuz device gone */
@@ -96,6 +97,8 @@ struct proc_dir_entry;
 struct ath_softc {
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
+						/* rate tables */
+	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	volatile int		sc_invalid;	/* being detached */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
@@ -170,6 +173,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_isInterruptPending)((_ah)))
 #define	ath_hal_getisr(_ah, _pmask) \
 	((*(_ah)->ah_getPendingInterrupts)((_ah), (_pmask)))
+#define	ath_hal_updatetxtriglevel(_ah, _inc) \
+	((*(_ah)->ah_updateTxTrigLevel)((_ah), (_inc)))
 #define	ath_hal_setpower(_ah, _mode, _sleepduration) \
 	((*(_ah)->ah_setPowerMode)((_ah), (_mode), AH_TRUE, (_sleepduration)))
 #define	ath_hal_keyreset(_ah, _ix) \
@@ -186,8 +191,6 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_setMulticastFilter)((_ah), (_mfilt0), (_mfilt1)))
 #define	ath_hal_waitforbeacon(_ah, _bf) \
 	((*(_ah)->ah_waitForBeaconDone)((_ah), (_bf)->bf_daddr))
-#define	ath_hal_qbeacon(_ah, _mode, _bf) \
-	((*(_ah)->ah_queueBeaconAndCab)((_ah), (_mode), (_bf)->bf_daddr, 0))
 #define	ath_hal_putrxbuf(_ah, _bufaddr) \
 	((*(_ah)->ah_setRxDP)((_ah), (_bufaddr)))
 #define	ath_hal_gettsf(_ah) \
@@ -227,6 +230,8 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 	((*(_ah)->ah_stopDmaReceive)((_ah)))
 #define	ath_hal_dumpstate(_ah) \
 	((*(_ah)->ah_dumpState)((_ah)))
+#define	ath_hal_dumpeeprom(_ah) \
+	((*(_ah)->ah_dumpEeprom)((_ah)))
 #define	ath_hal_setuptxqueue(_ah, _type, _irq) \
 	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
 #define	ath_hal_resettxqueue(_ah, _q) \
@@ -238,17 +243,16 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 		_rate, _antmode) \
 	((*(_ah)->ah_setupBeaconDesc)((_ah), (_ds), (_opmode), \
 		(_flen), (_hlen), (_rate), (_antmode)))
-#define	ath_hal_setuprxdesc(_ah, _ds, _size) \
-	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size)))
+#define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
+	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
 #define	ath_hal_rxprocdesc(_ah, _ds) \
 	((*(_ah)->ah_procRxDesc)((_ah), (_ds)))
 #define	ath_hal_setuptxdesc(_ah, _ds, _plen, _hlen, _atype, _txpow, \
-		_txr0, _txtr0, _keyix, _ant, _clr, _noack, _short, \
-		_rtsena, _ctsena, _rtsrate, _rtsdura) \
+		_txr0, _txtr0, _keyix, _ant, _flags, \
+		_rtsrate, _rtsdura) \
 	((*(_ah)->ah_setupTxDesc)((_ah), (_ds), (_plen), (_hlen), (_atype), \
 		(_txpow), (_txr0), (_txtr0), (_keyix), (_ant), \
-		(_clr), (_noack), (_short), (_rtsena), (_ctsena), \
-		(_rtsrate), (_rtsdura)))
+		(_flags), (_rtsrate), (_rtsdura)))
 #define	ath_hal_setupxtxdesc(_ah, _ds, _short, \
 		_txr1, _txtr1, _txr2, _txtr2, _txr3, _txtr3) \
 	((*(_ah)->ah_setupXTxDesc)((_ah), (_ds), (_short), \
