@@ -487,10 +487,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			else 
 			{
 				/* Added by JOTA */
-				if (ritdev_frame_hook && dev->ritdev) 
-					ritdev_frame_hook (skb);
-				else
-					netif_rx(skb);
+				netif_rx(skb);
 			}
 			dev->last_rx = jiffies;
 		}
