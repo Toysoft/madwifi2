@@ -89,6 +89,9 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/if_ether.h>
+#include <linux/in.h>
+#include <linux/ip.h>
 #include <linux/random.h>
 
 #include "rc4.h"
@@ -137,6 +140,8 @@ static int ieee80211_send_asreq(struct ieee80211com *,
 static int ieee80211_send_asresp(struct ieee80211com *,
     struct ieee80211_node *, int, int);
 static int ieee80211_send_disassoc(struct ieee80211com *,
+    struct ieee80211_node *, int, int);
+static int ieee80211_send_tspec(struct ieee80211com *,
     struct ieee80211_node *, int, int);
 
 static void ieee80211_recv_beacon(struct ieee80211com *,
@@ -195,6 +200,15 @@ static const char *ieee80211_phymode_name[] = {
 	"11b",		/* IEEE80211_MODE_11B */
 	"11g",		/* IEEE80211_MODE_11G */
 	"turbo",	/* IEEE80211_MODE_TURBO	*/
+};
+
+struct wme_ie wme_ie ={
+	{0x00, 0x50, 0xf2},
+	//{0xf2, 0x50, 0x00},
+	2,		// type = 2
+	0,		// subtype = 0
+	1,		// version = 0
+	0		// count = 0
 };
 
 int
@@ -912,9 +926,10 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	struct ieee80211_frame *wh;
 	struct ether_header *eh;
 	void (*rh)(struct ieee80211com *, struct sk_buff *, int, u_int32_t, u_int);
+	struct ieee80211_qosframe qosframe;
 	struct sk_buff *skb1;
 	int len;
-	u_int8_t dir, subtype;
+	u_int8_t dir, subtype, type;
 	u_int8_t *bssid;
 	u_int16_t lastrxseq;
 	u_int8_t lastfragno;
@@ -928,6 +943,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 	}
 
 	dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
+	type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 
 	if (ic->ic_state != IEEE80211_S_SCAN) {
 		switch (ic->ic_opmode) {
@@ -982,6 +999,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		    le16_to_cpu(*(u_int16_t *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
 		ni->ni_fragno = le16_to_cpu(*(u_int16_t *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
 		if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
+		    !((type==IEEE80211_FC0_TYPE_DATA) && (subtype&IEEE80211_FC0_SUBTYPE_QOS)) &&
 		    lastrxseq == ni->ni_rxseq &&
 		    lastfragno == ni->ni_fragno) {
 			/* duplicate, silently discarded */
@@ -993,10 +1011,32 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		}
 	}
 
-	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
+	switch (type) {
 	case IEEE80211_FC0_TYPE_DATA:
-		switch (ic->ic_opmode) {
-		case IEEE80211_M_STA:
+	    if (subtype & IEEE80211_FC0_SUBTYPE_QOS) {
+		u_int8_t tid;
+		u_int32_t headersize;
+		tid = ((struct ieee80211_qosframe*)wh)->i_qos[0] & 0xf;
+		wh->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
+		if (ni) {
+		    lastrxseq = ni->ni_rxseqs[tid];
+		    
+		    ni->ni_rxseqs[tid] = le16_to_cpu(*(u_int16_t *)wh->i_seq);
+		    if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) && lastrxseq == ni->ni_rxseqs[tid]) {
+			goto out;
+		    }
+		}
+		headersize = sizeof(qosframe);
+		if (ic->ic_flags & IEEE80211_F_DATAPAD) {
+		    headersize = roundup(headersize, 4);
+		}
+		memcpy(&qosframe, skb->data, sizeof(qosframe));
+		skb_pull(skb, headersize);
+		wh = (struct ieee80211_frame *)skb_push(skb, sizeof(struct ieee80211_frame));
+		memcpy(skb->data, &qosframe, sizeof(struct ieee80211_frame));
+	    }
+	    switch (ic->ic_opmode) {
+	    case IEEE80211_M_STA:
 			if (dir != IEEE80211_FC1_DIR_FROMDS) {
 				DPRINTF(ic, ("%s:discard frame with invalid "
 					"direction %x\n", dev->name, dir));
@@ -1255,6 +1295,13 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 	struct ieee80211_frame *wh;
 	struct llc *llc;
 	struct ieee80211_node *ni;
+	struct iphdr *iph;
+	u_int8_t fc0;
+	u_int8_t qospri = 0;
+	u_int8_t isqos = 0;
+	u_int8_t acc = 0;
+	u_int16_t headersize = 0;
+	u_int16_t  padbytes = 0;
 
 	memcpy(&eh, skb->data, sizeof(struct ether_header));
 	skb_pull(skb, sizeof(struct ether_header));
@@ -1264,6 +1311,41 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 		ni = ieee80211_ref_node(ic->ic_bss);
 	ni->ni_inact = 0;
 
+	/*
+	 * Set qospri and acc from dscp value, if present, for IPv4 frames.
+	 * TBD: also set qospri from vlan tag.
+	 */
+	if (ni->ni_flags & IEEE80211_N_QOSDATA) {
+		isqos = 2;
+		qospri = 0;                                     /* BE Priority */
+                acc = WME_AC_BE;
+	}
+	if (eh.ether_type == be16_to_cpu(ETH_P_IP)) {
+		iph = (struct iphdr *) skb->data;
+		switch (iph->tos) {
+		case 0x08:
+		case 0x20:
+			qospri = 1; acc = WME_AC_BK;        	/* BK (background) */
+			break;
+		case 0x28:
+		case 0xa0:
+			qospri = 4; acc = WME_AC_VI;		/* VI (video) */
+			break;
+		case 0x30:
+		case 0xe0:
+			qospri = 6; acc = WME_AC_VO;		/* VO (voice) */
+			break;
+		case 0x88:
+		case 0xb8:
+			qospri = 6; acc = WME_AC_VO;		/* UPSD */
+			break;
+		case 0x0:					/* BE (best effort) */
+		case 0x18:
+		default:
+			qospri = 0; acc = WME_AC_BE;
+		}
+	}
+
 	llc = (struct llc *) skb_push(skb, sizeof(struct llc));
 	llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
 	llc->llc_control = LLC_UI;
@@ -1272,8 +1354,47 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 	llc->llc_snap.org_code[2] = 0;
 	llc->llc_snap.ether_type = eh.ether_type;
 
+	/* compute headersize and any padbytes */
+	headersize += sizeof(struct ieee80211_frame) + isqos;
+	if (ic->ic_flags & IEEE80211_F_DATAPAD) {
+		padbytes = roundup(headersize, 4) - headersize;
+	}
+
+	/*
+	 * XXX If we're loaded as a module the system may not be
+	 * configured to leave enough headroom for us to push the
+	 * 802.11 frame.  In that case fallback on reallocating
+	 * the frame with enough space.  Alternatively we can carry
+	 * the frame separately and use s/g support in the hardware.
+	 */
+	if ((skb_headroom(skb) < (headersize+padbytes)) &&
+	    pskb_expand_head(skb, sizeof(*wh), 0, GFP_ATOMIC)) {
+		dev_kfree_skb(skb);
+		ieee80211_unref_node(&ni);
+		return NULL;
+	}
+	/* add padding if needed */
+	if (padbytes) {
+		unsigned char *p;
+
+		p = skb_push(skb, padbytes);
+	}
+
+	fc0 = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
+
+	/* add qos cntl field, setting only the priority field for now */
+	if (isqos) {
+		u_int8_t *q;
+
+		q = (u_int8_t *) skb_push(skb, sizeof(struct ieee80211_qoscntl));
+		q[0] = qospri;
+		q[1] = 0;
+                skb->priority = acc;
+		fc0 |= IEEE80211_FC0_SUBTYPE_QOS;
+	}
+
 	wh = (struct ieee80211_frame *) skb_push(skb, sizeof(struct ieee80211_frame));
-	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
+	wh->i_fc[0] = fc0;
 	*(u_int16_t *)wh->i_dur = 0;
 	*(u_int16_t *)wh->i_seq =
 	    cpu_to_le16(ni->ni_txseq << IEEE80211_SEQ_SEQ_SHIFT);
@@ -2299,6 +2420,15 @@ ieee80211_add_ssid(u_int8_t *frm, const u_int8_t *ssid, u_int len)
 	return frm + len;
 }
 
+static u_int8_t *
+ieee80211_add_element(u_int8_t *frm, u_int8_t eid, u_int8_t *ele, u_int len)
+{
+	*frm++ = eid;
+	*frm++ = len;
+	memcpy(frm, ele, len);
+	return frm + len;
+}
+
 static int
 ieee80211_send_prreq(struct ieee80211com *ic, struct ieee80211_node *ni,
     int type, int dummy)
@@ -2480,6 +2610,7 @@ ieee80211_send_asreq(struct ieee80211com *ic, struct ieee80211_node *ni,
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
 	 *	[tlv] extended supported rates
+	 *	[tlv] WME information element
 	 */
 	pktlen = sizeof(capinfo)
 	       + sizeof(u_int16_t)
@@ -2487,6 +2618,7 @@ ieee80211_send_asreq(struct ieee80211com *ic, struct ieee80211_node *ni,
 	       + 2 + ni->ni_esslen
 	       + 2 + IEEE80211_RATE_SIZE
 	       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+	       + 2 + (sizeof(struct wme_ie))
 	       ;
 	skb = dev_alloc_skb(sizeof(struct ieee80211_frame) + pktlen);
 	if (skb == NULL)
@@ -2521,6 +2653,11 @@ ieee80211_send_asreq(struct ieee80211com *ic, struct ieee80211_node *ni,
 	frm = ieee80211_add_ssid(frm, ni->ni_essid, ni->ni_esslen);
 	frm = ieee80211_add_rates(frm, &ni->ni_rates);
 	frm = ieee80211_add_xrates(frm, &ni->ni_rates);
+
+#ifndef NO_WME
+	frm = ieee80211_add_element(frm, IEEE80211_ELEMID_VENDOR, 
+                                    (u_int8_t*) &wme_ie, sizeof(wme_ie));
+#endif
 	skb_trim(skb, frm - skb->data);
 
 	ret = ieee80211_mgmt_output(&ic->ic_dev, ni, skb, type);
@@ -2613,6 +2750,45 @@ ieee80211_send_disassoc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	    IEEE80211_FC0_SUBTYPE_DISASSOC);
 }
 
+static int
+ieee80211_send_tspec(struct ieee80211com *ic, struct ieee80211_node *ni,
+    int type, int dummy)
+{
+	int ret, pktlen;
+	struct sk_buff *skb;
+	struct ieee80211_wme_tspec *ts;
+	struct ieee80211_mnf *m;
+
+	/*
+	 */
+	pktlen = sizeof(struct ieee80211_mnf) + sizeof(struct ieee80211_wme_tspec);
+	skb = dev_alloc_skb(sizeof(struct ieee80211_frame) + pktlen);
+	if (skb == NULL) {
+		DPRINTF(ic, ("ieee80211_send_prreq: no space\n"));
+		return ENOMEM;
+	}
+	skb_reserve(skb, sizeof(struct ieee80211_frame));
+
+	ts = (struct ieee80211_wme_tspec *) skb_put(skb, pktlen);
+	ts->ts_id = 221;
+	ts->ts_len = sizeof(*ts) - 2;
+	ts->ts_oui[0] = 0x00;
+	ts->ts_oui[1] = 0x50;
+	ts->ts_oui[2] = 0xf2;
+	ts->ts_oui_type = 2;
+	ts->ts_oui_subtype = 2;
+	ts->ts_version = 1;
+
+	m = (struct ieee80211_mnf *) skb_push(skb, sizeof(*m));
+	m->mnf_category = 17;
+	m->mnf_action = 0;
+	m->mnf_dialog = 29;
+	m->mnf_status = 0;
+
+	ret = ieee80211_mgmt_output(&ic->ic_dev, ni, skb, IEEE80211_FC0_SUBTYPE_ACTION);
+	return ret;
+}
+
 /* Verify the existence and length of __elem or get out. */
 #define IEEE80211_VERIFY_ELEMENT(__elem, __maxlen, __wh) do {		\
 	if ((__elem) == NULL) {						\
@@ -2641,6 +2817,8 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	u_int8_t *rates, *xrates, *country;
 	u_int8_t chan, bchan, fhindex, erp;
 	u_int16_t fhdwell;
+	struct wme_param_element AC_BE, AC_BK, AC_VI, AC_VO;
+	u_int8_t wmeinfo, is_wme;
 
 	wh = (struct ieee80211_frame *) skb0->data;
 	frm = (u_int8_t *)&wh[1];
@@ -2656,6 +2834,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	 *	[tlv] parameter set (FH/DS)
 	 *	[tlv] erp information
 	 *	[tlv] extended supported rates
+	 *	[tlv] wme element
 	 */
 	tstamp  = frm;	frm += 8;
 	bintval = frm;	frm += 2;
@@ -2666,6 +2845,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	fhdwell = 0;
 	fhindex = 0;
 	erp = 0;
+	is_wme = 0;
 	while (frm < efrm) {
 		switch (*frm) {
 		case IEEE80211_ELEMID_SSID:
@@ -2705,6 +2885,42 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 				break;
 			}
 			erp = frm[2];
+			break;
+		/*
+		 * Vendor-specific element
+		 */
+		case IEEE80211_ELEMID_VENDOR:
+#ifdef DEBUG_VENDOR_ID
+		{
+		static int vendorflag =0;
+
+			if (vendorflag < 5) {
+				printk("Vendor ID in Beacon\n");
+				printk("OUI %x %x %x\n", frm[2],frm[3],frm[4]);
+				printk("type %d subtype %d version %d\n", frm[5], frm[6], frm[7]);
+				printk("info %d\n", frm[8]);
+				vendorflag++;
+			}
+		}
+#endif
+
+			/*
+			 * WME information element (OUI==00:50:f2)
+			 */
+			if (frm[2]==0 && frm[3]==0x50 && frm[4]==0xf2 && 
+			    frm[5]==2 && frm[7]==1) {
+				if (frm[6]==1) {
+					AC_BE.aifsn = frm[10];
+					AC_BK.aifsn = frm[14];
+					AC_VI.aifsn = frm[18];
+					AC_VO.aifsn = frm[22];
+				}
+				if (frm[6]<2) {
+					wmeinfo = frm[8];
+					is_wme = 1;
+				}
+			}
+			
 			break;
 		default:
 			DPRINTF(ic, ("%s: element id %u/len %u ignored\n",
@@ -2809,6 +3025,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	ni->ni_fhdwell = fhdwell;
 	ni->ni_fhindex = fhindex;
 	ni->ni_erp = erp;
+	ni->ni_iswme = is_wme;
 	/* NB: must be after ni_chan is setup */
 	ieee80211_setup_rates(ic, ni, rates, xrates, IEEE80211_F_DOSORT);
 	ieee80211_unref_node(&ni);
@@ -3130,7 +3347,7 @@ ieee80211_recv_asresp(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	struct net_device *dev = &ic->ic_dev;
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
-	u_int8_t *frm, *efrm, *rates, *xrates;
+	u_int8_t *frm, *efrm, *rates, *xrates, *wmeParam;
 	int status;
 
 	if (ic->ic_opmode != IEEE80211_M_STA ||
@@ -3181,6 +3398,16 @@ ieee80211_recv_asresp(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 			break;
 		case IEEE80211_ELEMID_XRATES:
 			xrates = frm;
+			break;
+		case IEEE80211_ELEMID_VENDOR:
+		    if ((frm[2] == ((u_int8_t) (OUI_WME>>16) & (0xFF))) &&
+			(frm[3] == ((u_int8_t) (OUI_WME>>8) & (0xFF))) &&
+			(frm[4] == ((u_int8_t) (OUI_WME & 0xFF))) &&
+			(frm[5] == OUI_TYPE) &&
+			(frm[6] == WME_PARAM_OUI_SUBTYPE)) {
+			wmeParam = frm;
+			ni->ni_flags |= IEEE80211_N_QOSDATA;
+			}
 			break;
 		}
 		frm += frm[1] + 2;

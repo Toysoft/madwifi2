@@ -55,7 +55,7 @@ include $(obj)/${DEPTH}/Makefile.inc
 INCS+=	-I${HAL} -I${HAL}/${OS} -I$(obj)/${ATH_HAL} -I$(obj)/${WLAN} \
 	-I${obj}/${DEPTH}
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS)
+EXTRA_CFLAGS+=$(INCS) ${COPTS}
 
 -include $(TOPDIR)/Rules.make
 

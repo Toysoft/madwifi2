@@ -249,12 +249,27 @@ version of Linux; e.g. building for 2.6 after building for 2.4.
 
 Optional Features
 =================
+
+1. SOFTLED
+
 Users with IBM ThinkPad systems that have a panel LED wired to a GPIO
 output pin on the miniPCI card may wish to compile the driver with the
 SOFTLED option.  This is accomplished by setting an environment variable
 (COPTS) as follows:
 
-bash% export COPTS=-DSOFTLED
+bash% export COPTS="$COPTS -DSOFTLED"
+
+
+2. WME disable
+
+The default configuration for this driver enables WME association of
+the client to a WME capable AP.  Some legacy AP's may have problems
+skipping over the WME Information element.  To disable the inclusion
+of the WME information element in the association request, compile the
+driver with the environment variable (COPTS) set as follows:
+
+bash% export COPTS="$COPTS -DNO_WME"
+
 
 
 Using the driver
