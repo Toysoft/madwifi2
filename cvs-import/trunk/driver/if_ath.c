@@ -246,14 +246,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
  	dev->change_mtu = &ath_change_mtu;
 	dev->tx_queue_len = ATH_TXBUF-1;		/* 1 for mgmt frame */
 
-	/* 
-	 * Advise upper layers to leave room in the buffer for max-size 802.11 frames.
-	 * This eliminates spurious buffer copies on output.
-	 * TODO: change hard_header_len when in Monitor Mode to also make room
-	 * for the Prism header.
-	 */
-	dev->hard_header_len += sizeof(struct ieee80211_qosframe) + sizeof(struct llc) + IEEE80211_ADDR_LEN;
-
 	ic->ic_mgtstart = ath_mgtstart;
 	ic->ic_init = ath_init;
 	ic->ic_reset = ath_reset;
@@ -642,12 +634,12 @@ ath_reset(struct net_device *dev)
 }
 
 /*
- * this is no longer needed.
  * XXX System may not be
  * configured to leave enough headroom for us to push the
  * 802.11 frame.  In that case fallback on reallocating
  * the frame with enough space.  Alternatively we can carry
  * the frame separately and use s/g support in the hardware.
+ */
 int ieee80211_skbhdr_adjust(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ieee80211com *ic = (void*)dev->priv;
@@ -663,7 +655,6 @@ int ieee80211_skbhdr_adjust(struct sk_buff *skb, struct net_device *dev)
 	}
 	return 0;
 }
- */
 
 /*
  * Transmit a data packet.  On failure caller is
@@ -686,13 +677,9 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		return -ENETDOWN;
 	}
 	
-/*
- * This is no longer needed by virtue of adjusting dev->hard_header_len if ath_attach().
- * Thanks for Kevin Yu.
 	error = ieee80211_skbhdr_adjust(skb, dev);
 	if (error != 0)
 		return error;
-*/
 
 	/*
 	 * No data frames go out unless we're associated; this

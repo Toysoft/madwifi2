@@ -1080,30 +1080,9 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			}
 		}
 		if (skb != NULL) {
-			u_int8_t *original_data = skb->data;
-
 			dev->last_rx = jiffies;
 			skb->dev = dev;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-			/* Adjust skb pointers to compensate for eth_type_trans()
-			 * popping off dev->hard_header_len from the buffer.
-			 * 2.6 doesn't do this, hence the conditional compilation.
-			 * The oldest kernel checked for this behavior was 2.4.17.
-			 * It might be preferable in future to replace eth_type_trans()
-			 * with a local variant less subject to change.
-			 */
-			if (dev->hard_header_len > sizeof(struct ethhdr)) {
-				skb_push(skb, dev->hard_header_len - sizeof(struct ethhdr));
-				memcpy(skb->data, original_data, sizeof(struct ethhdr));
-				skb->protocol = eth_type_trans(skb, dev);
-				skb->mac.raw = original_data;
-			} else {
-				skb->protocol = eth_type_trans(skb, dev);
-			}
-#else
 			skb->protocol = eth_type_trans(skb, dev);
-#endif
 			netif_rx(skb);
 		}
 		return;
