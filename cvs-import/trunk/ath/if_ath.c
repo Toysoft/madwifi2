@@ -1707,6 +1707,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf, struct sk_buff *skb)
 		, roundup(skb->len, 4)		/* buffer length */
 		, AH_TRUE			/* first segment */
 		, AH_TRUE			/* last segment */
+		, ds				/* first descriptor */
 	);
 	return 0;
 #undef MIN
@@ -2696,6 +2697,11 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 	}
 	memset(&qi, 0, sizeof(qi));
 	qi.tqi_subtype = haltype;
+	qi.tqi_qflags = TXQ_FLAG_TXOKINT_ENABLE
+		      | TXQ_FLAG_TXERRINT_ENABLE
+		      | TXQ_FLAG_TXDESCINT_ENABLE
+		      | TXQ_FLAG_TXURNINT_ENABLE
+		      ;
 	qnum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qi);
 	if (qnum == -1) {
 		printk("%s: Unable to setup hardware queue for %s traffic!\n",
@@ -3004,6 +3010,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		, skb->len		/* segment length */
 		, AH_TRUE		/* first segment */
 		, AH_TRUE		/* last segment */
+		, ds			/* first descriptor */
 	);
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
 	    __func__, txq->axq_qnum, ds->ds_link, ds->ds_data,

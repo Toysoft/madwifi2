@@ -437,8 +437,8 @@ void	ath_sysctl_unregister(void);
 		_txr1, _txtr1, _txr2, _txtr2, _txr3, _txtr3) \
 	((*(_ah)->ah_setupXTxDesc)((_ah), (_ds), \
 		(_txr1), (_txtr1), (_txr2), (_txtr2), (_txr3), (_txtr3)))
-#define	ath_hal_filltxdesc(_ah, _ds, _l, _first, _last) \
-	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last)))
+#define	ath_hal_filltxdesc(_ah, _ds, _l, _first, _last, _ds0) \
+	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last), (_ds0)))
 #define	ath_hal_txprocdesc(_ah, _ds) \
 	((*(_ah)->ah_procTxDesc)((_ah), (_ds)))
 
