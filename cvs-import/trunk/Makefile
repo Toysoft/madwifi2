@@ -6,20 +6,23 @@ DEPTH=	.
 
 include Makefile.inc
 
+# NB: the order is important here
+DIRS=	${ATH_HAL} ${WLAN} ${DRIVER}
+
 all:
-	cd ath_hal; make
-	cd ${WLAN}; make
-	cd ${DRIVER}; make
+	for i in ${DIRS}; do \
+		(cd $$i; make); \
+	done
 
 install:
 	cd ${DRIVER}; make install
 
 clean:
-	cd ${DRIVER}; make clean
-	cd ${WLAN}; make clean
-	cd ${ATH_HAL}; make clean
+	for i in ${DIRS}; do \
+		(cd $$i; make clean); \
+	done
 
 depend:
-	cd ${ATH_HAL}; make depend
-	cd ${DRIVER}; make depend
-	cd ${WLAN}; make depend
+	for i in ${DIRS}; do \
+		(cd $$i; make depend); \
+	done
