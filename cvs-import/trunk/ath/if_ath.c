@@ -2737,11 +2737,19 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 	}
 	memset(&qi, 0, sizeof(qi));
 	qi.tqi_subtype = haltype;
-	qi.tqi_qflags = TXQ_FLAG_TXOKINT_ENABLE
-		      | TXQ_FLAG_TXERRINT_ENABLE
-		      | TXQ_FLAG_TXDESCINT_ENABLE
-		      | TXQ_FLAG_TXURNINT_ENABLE
-		      ;
+	/*
+	 * Enable interrupts only for EOL and DESC conditions.
+	 * We mark tx descriptors to receive a DESC interrupt
+	 * when a tx queue gets deep; otherwise waiting for the
+	 * EOL to reap descriptors.  Note that this is done to
+	 * reduce interrupt load and this only defers reaping
+	 * descriptors, never transmitting frames.  Aside from
+	 * reducing interrupts this also permits more concurrency.
+	 * The only potential downside is if the tx queue backs
+	 * up in which case the top half of the kernel may backup
+	 * due to a lack of tx descriptors.
+	 */
+	qi.tqi_qflags = TXQ_FLAG_TXEOLINT_ENABLE | TXQ_FLAG_TXDESCINT_ENABLE;
 	qnum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qi);
 	if (qnum == -1) {
 		printk("%s: Unable to setup hardware queue for %s traffic!\n",
@@ -2757,6 +2765,8 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 		struct ath_txq *txq = &sc->sc_txq[qnum];
 
 		txq->axq_qnum = qnum;
+		txq->axq_depth = 0;
+		txq->axq_intrcnt = 0;
 		txq->axq_link = NULL;
 		STAILQ_INIT(&txq->axq_q);
 		ATH_TXQ_LOCK_INIT(txq);
@@ -3018,6 +3028,26 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		ieee80211_dump_pkt(skb->data, skb->len,
 			sc->sc_hwmap[txrate], -1);
 
+	/* 
+	 * Determine if a tx interrupt should be generated for
+	 * this descriptor.  We take a tx interrupt to reap
+	 * descriptors when the h/w hits an EOL condition or
+	 * when the descriptor is specifically marked to generate
+	 * an interrupt.  We periodically mark descriptors in this
+	 * way to insure timely replenishing of the supply needed
+	 * for sending frames.  Defering interrupts reduces system
+	 * load and potentially allows more concurrent work to be
+	 * done but if done to aggressively can cause senders to
+	 * backup.
+	 *
+	 * NB: use >= to deal with sc_txintrperiod changing
+	 *     dynamically through sysctl.
+	 */
+	if (++txq->axq_intrcnt >= sc->sc_txintrperiod) {
+		flags |= HAL_TXDESC_INTREQ;
+		txq->axq_intrcnt = 0;
+	}
+
 	/*
 	 * Formulate first tx descriptor with tx controls.
 	 */
@@ -3061,7 +3091,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * pass it on to the hardware.
 	 */
 	ATH_TXQ_LOCK_BH(txq);
-	STAILQ_INSERT_TAIL(&txq->axq_q, bf, bf_list);
+	ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
+	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n",
+		__func__, txq->axq_depth);
 	if (txq->axq_link == NULL) {
 		ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
 		DPRINTF(sc, ATH_DEBUG_XMIT, "%s: TXDP[%u] = %p (%p)\n",
@@ -3106,6 +3138,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		txq->axq_link);
 	for (;;) {
 		ATH_TXQ_LOCK(txq);
+		txq->axq_intrcnt = 0;	/* reset periodic desc intr count */
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
@@ -3122,7 +3155,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			ATH_TXQ_UNLOCK(txq);
 			break;
 		}
-		STAILQ_REMOVE_HEAD(&txq->axq_q, bf_list);
+		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
 		ATH_TXQ_UNLOCK(txq);
 
 		ni = bf->bf_node;
@@ -3277,7 +3310,7 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 			ATH_TXQ_UNLOCK(txq);
 			break;
 		}
-		STAILQ_REMOVE_HEAD(&txq->axq_q, bf_list);
+		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
 		ATH_TXQ_UNLOCK(txq);
 #ifdef AR_DEBUG
 		if (sc->sc_debug & ATH_DEBUG_RESET)
@@ -4322,6 +4355,7 @@ enum {
 	ATH_TXANTENNA	= 9,
 	ATH_RXANTENNA	= 10,
 	ATH_DIVERSITY	= 11,
+	ATH_TXINTRPERIOD= 12,
 };
 
 static int
@@ -4381,6 +4415,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_diversity = val;
 				ath_hal_setdiversity(ah, val);
 				break;
+			case ATH_TXINTRPERIOD:
+				sc->sc_txintrperiod = val;
+				break;
 			default:
 				return -EINVAL;
 			}
@@ -4419,6 +4456,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			break;
 		case ATH_DIVERSITY:
 			val = sc->sc_diversity;
+			break;
+		case ATH_TXINTRPERIOD:
+			val = sc->sc_txintrperiod;
 			break;
 		default:
 			return -EINVAL;
@@ -4493,6 +4533,11 @@ static const ctl_table ath_sysctl_template[] = {
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
+	{ .ctl_name	= ATH_TXINTRPERIOD,
+	  .procname	= "txintrperiod",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
 	{ 0 }
 };
 
@@ -4540,6 +4585,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	/* initialize values */
 	sc->sc_debug = ath_debug;
 	sc->sc_txantenna = 0;		/* default to auto-selection */
+	sc->sc_txintrperiod = ATH_TXINTR_PERIOD;
 }
 
 static void

@@ -121,6 +121,7 @@ typedef void irqreturn_t;
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
 #define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
+#define	ATH_TXINTR_PERIOD 5		/* max number of batched tx descriptors */
 
 /* driver-specific node state */
 struct ath_node {
@@ -168,6 +169,8 @@ struct proc_dir_entry;
  */
 struct ath_txq {
 	u_int			axq_qnum;	/* hardware q number */
+	u_int			axq_depth;	/* queue depth (stat only) */
+	u_int			axq_intrcnt;	/* interrupt count */
 	u_int32_t		*axq_link;	/* link ptr in last TX desc */
 	STAILQ_HEAD(, ath_buf)	axq_q;		/* transmit queue */
 	spinlock_t		axq_lock;	/* lock on q and link */
@@ -181,6 +184,15 @@ struct ath_txq {
 #define	ATH_TXQ_UNLOCK_BH(_tq)		spin_unlock_bh(&(_tq)->axq_lock)
 #define	ATH_TXQ_LOCK_ASSERT(_tq) \
 	KASSERT(spin_is_locked(&(_tq)->axq_lock), ("txq not locked!"))
+
+#define ATH_TXQ_INSERT_TAIL(_tq, _elm, _field) do { \
+	STAILQ_INSERT_TAIL(&(_tq)->axq_q, (_elm), _field); \
+	(_tq)->axq_depth++; \
+} while (0)
+#define ATH_TXQ_REMOVE_HEAD(_tq, _field) do { \
+	STAILQ_REMOVE_HEAD(&(_tq)->axq_q, _field); \
+	(_tq)->axq_depth--; \
+} while (0)
 
 struct ath_softc {
 	struct net_device	sc_dev;		/* NB: must be first */
@@ -245,6 +257,7 @@ struct ath_softc {
 	STAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
 	u_int			sc_txqsetup;	/* h/w queues setup */
+	u_int			sc_txintrperiod;/* tx interrupt batching */
 	struct ath_txq		sc_txq[HAL_NUM_TX_QUEUES];
 	struct ath_txq		*sc_ac2q[5];	/* WME AC -> h/w qnum */ 
 	struct tq_struct	sc_txtq;	/* tx intr tasklet */
