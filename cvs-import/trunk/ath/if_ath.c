@@ -94,7 +94,6 @@ static void	ath_bmiss_tasklet(TQUEUE_ARG);
 static int	ath_stop_locked(struct net_device *);
 static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
-static void	ath_ratectl(unsigned long);
 static void	ath_initkeytable(struct ath_softc *);
 static int	ath_key_alloc(struct ieee80211com *,
 			const struct ieee80211_key *);
@@ -162,11 +161,6 @@ static int	ath_ioctl(struct net_device *, struct ifreq *, int);
 
 static int	ath_rate_setup(struct net_device *, u_int mode);
 static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
-static void	ath_rate_update(struct ath_softc *, struct ieee80211_node *,
-			int rate);
-static void	ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
-static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
-static void	ath_rate_ctl(void *, struct ieee80211_node *);
 
 #ifdef CONFIG_SYSCTL
 static void	ath_dynamic_sysctl_register(struct ath_softc *);
@@ -187,28 +181,6 @@ static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
-/*
- * Default parameters for the rate control algorithm.  These are
- * all tunable with sysctls.  The rate controller runs periodically
- * (each ath_rateinterval ms) analyzing transmit statistics for each
- * neighbor/station (when operating in station mode this is only the AP).
- * If transmits look to be working well over a sampling period then
- * it gives a "raise rate credit".  If transmits look to not be working
- * well than it deducts a credit.  If the credits cross a threshold then
- * the transmit rate is raised.  Various error conditions force the
- * the transmit rate to be dropped.
- *
- * The decision to issue/deduct a credit is based on the errors and
- * retries accumulated over the sampling period.  ath_rate_raise defines
- * the percent of retransmits for which a credit is issued/deducted.
- * ath_rate_raise_threshold defines the threshold on credits at which
- * the transmit rate is increased.
- *
- * XXX this algorithm is flawed and needs replacement.
- */
-static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
-static	int ath_rate_raise = 10;		/* add credit threshold */
-static	int ath_rate_raise_threshold = 10;	/* rate ctl raise threshold */
 
 #ifdef AR_DEBUG
 int	ath_debug = 0;
@@ -429,9 +401,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		break;
 	}
 
-	init_timer(&sc->sc_rate_ctl);
-	sc->sc_rate_ctl.data = (unsigned long) dev;
-	sc->sc_rate_ctl.function = ath_ratectl;
+	sc->sc_rc = ath_rate_attach(sc);
+	if (sc->sc_rc == NULL)
+		goto bad2;
 
 	init_timer(&sc->sc_scan_ch);
 	sc->sc_scan_ch.function = ath_next_scan;
@@ -566,6 +538,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	return 0;
 bad3:
 	ieee80211_ifdetach(ic);
+	ath_rate_detach(sc->sc_rc);
 bad2:
 	if (sc->sc_txq[WME_AC_BK].axq_qnum != (u_int) -1)
 		ATH_TXQ_LOCK_DESTROY(&sc->sc_txq[WME_AC_BK]);
@@ -601,6 +574,7 @@ ath_detach(struct net_device *dev)
 	 *     entries can be handled.
 	 */
 	ieee80211_ifdetach(ic);
+	ath_rate_detach(sc->sc_rc);
 	ath_desc_free(sc);
 	ath_hal_detach(sc->sc_ah);
 
@@ -2122,12 +2096,14 @@ ath_desc_free(struct ath_softc *sc)
 static struct ieee80211_node *
 ath_node_alloc(struct ieee80211com *ic)
 {
-	struct ath_node *an = kmalloc(sizeof(struct ath_node), GFP_ATOMIC);
-	if (an) {
-		struct ath_softc *sc = ic->ic_dev->priv;
+	struct ath_softc *sc = ic->ic_dev->priv;
+	const size_t space = sizeof(struct ath_node) + sc->sc_rc->arc_space;
+	struct ath_node *an;
 
-		memset(an, 0, sizeof(struct ath_node));
-		ath_rate_update(sc, &an->an_node, 0);
+	an = kmalloc(space, GFP_ATOMIC);
+	if (an != NULL) {
+		memset(an, 0, space);
+		ath_rate_node_init(sc, an);
 		return &an->an_node;
 	} else
 		return NULL;
@@ -2162,6 +2138,7 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_cleanq(&sc->sc_txq[i], ni);
+	ath_rate_node_cleanup(sc, ATH_NODE(ni));
 	(*sc->sc_node_free)(ic, ni);
 }
 
@@ -2170,9 +2147,11 @@ ath_node_copy(struct ieee80211com *ic,
 	struct ieee80211_node *dst, const struct ieee80211_node *src)
 {
         struct ath_softc *sc = ic->ic_dev->priv;
+	const struct ath_node *an = (const struct ath_node *)src;
 
 	memcpy(&dst[1], &src[1],
 		sizeof(struct ath_node) - sizeof(struct ieee80211_node));
+	ath_rate_node_copy(sc, ATH_NODE(dst), an);
 	(*sc->sc_node_copy)(ic, dst, src);
 }
 
@@ -2654,7 +2633,7 @@ rx_accept:
 		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV)) {
 			ieee80211_dump_pkt(skb->data, len,
 				   sc->sc_hwmap[ds->ds_rxstat.rs_rate] &
-				   	IEEE80211_RATE_VAL,
+					IEEE80211_RATE_VAL,
 				   ds->ds_rxstat.rs_rssi);
 		}
 
@@ -2909,20 +2888,10 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	case IEEE80211_FC0_TYPE_DATA:
 		atype = HAL_PKT_TYPE_NORMAL;		/* default */
 		/*
-		 * Data frames.
+		 * Data frames; consult the rate control module.
 		 */
-		rix = an->an_tx_rix0;
-		try0 = an->an_tx_try0;
-		if (rix == 0xff) {
-			printk("%s: bogus xmit rate 0x%x (%s)\n", dev->name,
-				ni->ni_rates.rs_rates[ni->ni_txrate], __func__);
-			sc->sc_stats.ast_tx_badrate++;
-			return -EIO;
-		}
-		if (shortPreamble)
-			txrate = an->an_tx_rate0sp;
-		else
-			txrate = an->an_tx_rate0;
+		ath_rate_findrate(sc, an, shortPreamble, skb->len,
+			&rix, &try0, &txrate);
 		/*
 		 * Default all non-QoS traffic to the background queue.
 		 */
@@ -2991,7 +2960,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 */
 	ctsduration = 0;
 	if (flags & (HAL_TXDESC_RTSENA|HAL_TXDESC_CTSENA)) {
-		/* XXX optimize a la data transmit rate */
 		/*
 		 * CTS transmit rate is derived from the transmit rate
 		 * by looking in the h/w rate table.  We must also factor
@@ -3060,11 +3028,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * we don't use it.
 	 */
 	if (try0 != ATH_TXMAXTRY)
-		ath_hal_setupxtxdesc(ah, ds
-			, an->an_tx_rate1sp, 2	/* series 1 */
-			, an->an_tx_rate2sp, 2	/* series 2 */
-			, an->an_tx_rate3sp, 2	/* series 3 */
-		);
+		ath_rate_setupxtxdesc(sc, an, ds, shortPreamble, rix);
 
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
@@ -3150,7 +3114,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		if (ni != NULL) {
 			an = ATH_NODE(ni);
 			if (ds->ds_txstat.ts_status == 0) {
-				an->an_tx_ok++;
 				if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
 					sc->sc_stats.ast_tx_altrate++;
 				sc->sc_stats.ast_tx_rssi =
@@ -3158,7 +3121,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 				ATH_RSSI_LPF(an->an_halstats.ns_avgtxrssi,
 					ds->ds_txstat.ts_rssi);
 			} else {
-				an->an_tx_err++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
 					sc->sc_stats.ast_tx_xretries++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_FIFO)
@@ -3170,7 +3132,10 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			lr = ds->ds_txstat.ts_longretry;
 			sc->sc_stats.ast_tx_shortretry += sr;
 			sc->sc_stats.ast_tx_longretry += lr;
-			an->an_tx_retr += sr + lr;
+			/*
+			 * Hand the descriptor to the rate control algorithm.
+			 */
+			ath_rate_tx_complete(sc, ATH_NODE(ni), ds);
 			/*
 			 * Reclaim reference to node.
 			 *
@@ -3615,7 +3580,6 @@ ath_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 	netif_stop_queue(dev);			/* before we do anything else */
 
 	if (nstate == IEEE80211_S_INIT) {
-		del_timer(&sc->sc_rate_ctl);
 		sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 		ath_hal_intrset(ah, sc->sc_imask);
 		goto done;
@@ -3675,12 +3639,11 @@ ath_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 			sc->sc_imask &~ (HAL_INT_SWBA | HAL_INT_BMISS));
 		sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 	}
-
-	/*
-	 * Reset the rate control state.
-	 */
-	ath_rate_ctl_reset(sc, nstate);
 done:
+	/*
+	 * Notify the rate control algorithm.
+	 */
+	ath_rate_newstate(sc, nstate);
 	/*
 	 * Invoke the parent method to complete the work.
 	 */
@@ -3709,8 +3672,9 @@ bad:
 static void
 ath_newassoc(struct ieee80211com *ic, struct ieee80211_node *ni, int isnew)
 {
-	if (isnew)
-		ath_rate_ctl_start(ic->ic_dev->priv, ni);
+	struct ath_softc *sc = ic->ic_dev->priv;
+
+	ath_rate_newassoc(sc, ATH_NODE(ni), isnew);
 }
 
 static int
@@ -3860,274 +3824,6 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 	 */
 	sc->sc_protrix = (mode == IEEE80211_MODE_11G ? 1 : 0);
 	/* NB: caller is responsible for reseting rate control state */
-}
-
-static void
-ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
-{
-	struct ath_node *an = ATH_NODE(ni);
-	const HAL_RATE_TABLE *rt = sc->sc_currates;
-	u_int8_t rix;
-
-	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-
-	DPRINTF(sc, ATH_DEBUG_RATE, "%s: set xmit rate for %s to %dM\n",
-	    __func__, ether_sprintf(ni->ni_macaddr),
-	    ni->ni_rates.rs_nrates > 0 ?
-		(ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL) / 2 : 0);
-
-	ni->ni_txrate = rate;
-	/* XXX management/control frames always go at the lowest speed */
-	an->an_tx_mgtrate = rt->info[0].rateCode;
-	an->an_tx_mgtratesp = an->an_tx_mgtrate | rt->info[0].shortPreamble;
-	/*
-	 * Before associating a node has no rate set setup
-	 * so we can't calculate any transmit codes to use.
-	 * This is ok since we should never be sending anything
-	 * but management frames and those always go at the
-	 * lowest hardware rate.
-	 */
-	if (ni->ni_rates.rs_nrates == 0)
-		goto done;
-	an->an_tx_rix0 = sc->sc_rixmap[
-		ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
-	an->an_tx_rate0 = rt->info[an->an_tx_rix0].rateCode;
-	
-	an->an_tx_rate0sp = an->an_tx_rate0 |
-		rt->info[an->an_tx_rix0].shortPreamble;
-	if (sc->sc_mrretry) {
-		/*
-		 * Hardware supports multi-rate retry; setup two
-		 * step-down retry rates and make the lowest rate
-		 * be the ``last chance''.  We use 4, 2, 2, 2 tries
-		 * respectively (4 is set here, the rest are fixed
-		 * in the xmit routine).
-		 */
-		an->an_tx_try0 = 1 + 3;		/* 4 tries at rate 0 */
-		if (--rate >= 0) {
-			rix = sc->sc_rixmap[
-				ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
-			an->an_tx_rate1 = rt->info[rix].rateCode;
-			an->an_tx_rate1sp = an->an_tx_rate1 |
-				rt->info[rix].shortPreamble;
-		} else {
-			an->an_tx_rate1 = an->an_tx_rate1sp = 0;
-		}
-		if (--rate >= 0) {
-			rix = sc->sc_rixmap[
-				ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
-			an->an_tx_rate2 = rt->info[rix].rateCode;
-			an->an_tx_rate2sp = an->an_tx_rate2 |
-				rt->info[rix].shortPreamble;
-		} else {
-			an->an_tx_rate2 = an->an_tx_rate2sp = 0;
-		}
-		if (rate > 0) {
-			/* NB: only do this if we didn't already do it above */
-			an->an_tx_rate3 = rt->info[0].rateCode;
-			an->an_tx_rate3sp =
-				an->an_tx_mgtrate | rt->info[0].shortPreamble;
-		} else {
-			an->an_tx_rate3 = an->an_tx_rate3sp = 0;
-		}
-	} else {
-		an->an_tx_try0 = ATH_TXMAXTRY;	/* max tries at rate 0 */
-		an->an_tx_rate1 = an->an_tx_rate1sp = 0;
-		an->an_tx_rate2 = an->an_tx_rate2sp = 0;
-		an->an_tx_rate3 = an->an_tx_rate3sp = 0;
-	}
-done:
-	an->an_tx_ok = an->an_tx_err = an->an_tx_retr = an->an_tx_upper = 0;
-}
-
-/*
- * Set the starting transmit rate for a node.
- */
-static void
-ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
-{
-#define	RATE(_ix)	(ni->ni_rates.rs_rates[(_ix)] & IEEE80211_RATE_VAL)
-	struct ieee80211com *ic = &sc->sc_ic;
-	int srate;
-
-	KASSERT(ni->ni_rates.rs_nrates > 0, ("no rates"));
-	if (ic->ic_fixed_rate == -1) {
-		/*
-		 * No fixed rate is requested. For 11b start with
-		 * the highest negotiated rate; otherwise, for 11g
-		 * and 11a, we start "in the middle" at 24Mb or 36Mb.
-		 */
-		srate = ni->ni_rates.rs_nrates - 1;
-		if (sc->sc_curmode != IEEE80211_MODE_11B) {
-			/*
-			 * Scan the negotiated rate set to find the
-			 * closest rate.
-			 */
-			/* NB: the rate set is assumed sorted */
-			for (; srate >= 0 && RATE(srate) > 72; srate--)
-				;
-			KASSERT(srate >= 0, ("bogus rate set"));
-		}
-	} else {
-		/*
-		 * A fixed rate is to be used; ic_fixed_rate is an
-		 * index into the supported rate set.  Convert this
-		 * to the index into the negotiated rate set for
-		 * the node.  We know the rate is there because the
-		 * rate set is checked when the station associates.
-		 */
-		const struct ieee80211_rateset *rs =
-			&ic->ic_sup_rates[ic->ic_curmode];
-		int r = rs->rs_rates[ic->ic_fixed_rate] & IEEE80211_RATE_VAL;
-		/* NB: the rate set is assumed sorted */
-		srate = ni->ni_rates.rs_nrates - 1;
-		for (; srate >= 0 && RATE(srate) != r; srate--)
-			;
-		KASSERT(srate >= 0,
-			("fixed rate %d not in rate set", ic->ic_fixed_rate));
-	}
-	ath_rate_update(sc, ni, srate);
-#undef RATE
-}
-
-/*
- * Reset the rate control state for each 802.11 state transition.
- */
-static void
-ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
-{
-	struct ieee80211com *ic=&sc->sc_ic;
-	struct ieee80211_node *ni;
-
-	if (ic->ic_opmode == IEEE80211_M_STA) {
-		/*
-		 * Reset local xmit state; this is really only
-		 * meaningful when operating in station mode.
-		 */
-		ni = ic->ic_bss;
-		if (state == IEEE80211_S_RUN) {
-			ath_rate_ctl_start(sc, ni);
-		} else {
-			ath_rate_update(sc, ni, 0);
-		}
-	} else {
-		/*
-		 * When operating as a station the node table holds
-		 * the AP's that were discovered during scanning.
-		 * For any other operating mode we want to reset the
-		 * tx rate state of each node.
-		 */
-		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
-			ath_rate_update(sc, ni, 0);	/* use lowest rate */
-		ath_rate_update(sc, ic->ic_bss, 0);
-	}
-	if (ic->ic_fixed_rate == -1 && state == IEEE80211_S_RUN) {
-		int interval;
-		/*
-		 * Start the background rate control thread if we
-		 * are not configured to use a fixed xmit rate.
-		 */
-		interval = ath_rateinterval;
-		if (ic->ic_opmode == IEEE80211_M_STA)
-			interval /= 2;
-		mod_timer(&sc->sc_rate_ctl, jiffies + ((HZ * interval) / 1000));
-	}
-}
-
-/* 
- * Examine and potentially adjust the transmit rate.
- */
-static void
-ath_rate_ctl(void *arg, struct ieee80211_node *ni)
-{
-	struct ath_softc *sc = arg;
-	struct ath_node *an = ATH_NODE(ni);
-	struct ieee80211_rateset *rs = &ni->ni_rates;
-	int dir = 0, nrate, enough;
-
-	/*
-	 * Rate control
-	 * XXX: very primitive version.
-	 */
-	enough = (an->an_tx_ok + an->an_tx_err >= 10);
-
-	/* no packet reached -> down */
-	if (an->an_tx_err > 0 && an->an_tx_ok == 0)
-		dir = -1;
-
-	/* all packets needs retry in average -> down */
-	if (enough && an->an_tx_ok < an->an_tx_retr)
-		dir = -1;
-
-	/* no error and less than rate_raise% of packets need retry -> up */
-	if (enough && an->an_tx_err == 0 &&
-	    an->an_tx_retr < (an->an_tx_ok * ath_rate_raise) / 100)
-		dir = 1;
-
-	DPRINTF(sc, ATH_DEBUG_RATE,
-		"%s: ok %d err %d retr %d upper %d dir %d\n",
-		ether_sprintf(ni->ni_macaddr),
-		an->an_tx_ok, an->an_tx_err, an->an_tx_retr,
-		an->an_tx_upper, dir);
-
-	nrate = ni->ni_txrate;
-	switch (dir) {
-	case 0:
-		if (enough && an->an_tx_upper > 0)
-			an->an_tx_upper--;
-		break;
-	case -1:
-		if (nrate > 0) {
-			nrate--;
-			sc->sc_stats.ast_rate_drop++;
-		}
-		an->an_tx_upper = 0;
-		break;
-	case 1:
-		/* raise rate if we hit rate_raise_threshold */
-		if (++an->an_tx_upper < ath_rate_raise_threshold)
-			break;
-		an->an_tx_upper = 0;
-		if (nrate + 1 < rs->rs_nrates) {
-			nrate++;
-			sc->sc_stats.ast_rate_raise++;
-		}
-		break;
-	}
-
-	if (nrate != ni->ni_txrate) {
-		DPRINTF(sc, ATH_DEBUG_RATE,
-		    "%s: %dM -> %dM (%d ok, %d err, %d retr)\n",
-		    __func__,
-		    (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) / 2,
-		    (rs->rs_rates[nrate] & IEEE80211_RATE_VAL) / 2,
-		    an->an_tx_ok, an->an_tx_err, an->an_tx_retr);
-		ath_rate_update(sc, ni, nrate);
-	} else if (enough)
-		an->an_tx_ok = an->an_tx_err = an->an_tx_retr = 0;
-}
-
-static void
-ath_ratectl(unsigned long data)
-{
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
-	int interval;
-
-	if (dev->flags & IFF_RUNNING) {
-		sc->sc_stats.ast_rate_calls++;
-
-		if (ic->ic_opmode == IEEE80211_M_STA)
-			ath_rate_ctl(sc, ic->ic_bss);	/* NB: no reference */
-		else
-			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
-	}
-	interval = ath_rateinterval;
-	if (ic->ic_opmode == IEEE80211_M_STA)
-		interval /= 2;
-	sc->sc_rate_ctl.expires = jiffies + ((HZ * interval) / 1000);
-	add_timer(&sc->sc_rate_ctl);
 }
 
 #if IEEE80211_VLAN_TAG_USED
@@ -4700,10 +4396,7 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 
 static	int mindwelltime = 100;			/* 100ms */
 static	int mincalibrate = 1;			/* once a second */
-static	int minrateinterval = 500;		/* 500ms */
 static	int maxint = 0x7fffffff;		/* 32-bit big */
-static	int maxpercent = 100;			/* 100% */
-static	int minpercent = 0;			/* 0% */
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
@@ -4880,31 +4573,6 @@ static ctl_table ath_static_sysctls[] = {
 	  .extra1	= &mincalibrate,
 	  .extra2	= &maxint,
 	  .proc_handler	= proc_dointvec_minmax
-	},
-	{ .ctl_name	= CTL_AUTO,
-	  .procname	= "rate_interval",
-	  .mode		= 0644,
-	  .data		= &ath_rateinterval,
-	  .maxlen	= sizeof(ath_rateinterval),
-	  .extra1	= &minrateinterval,
-	  .extra2	= &maxint,
-	  .proc_handler	= proc_dointvec_minmax
-	},
-	{ .ctl_name	= CTL_AUTO,
-	  .procname	= "rate_raise",
-	  .mode		= 0644,
-	  .data		= &ath_rate_raise,
-	  .maxlen	= sizeof(ath_rate_raise),
-	  .extra1	= &minpercent,
-	  .extra2	= &maxpercent,
-	  .proc_handler	= proc_dointvec_minmax
-	},
-	{ .ctl_name	= CTL_AUTO,
-	  .procname	= "rate_raise_threshold",
-	  .mode		= 0644,
-	  .data		= &ath_rate_raise_threshold,
-	  .maxlen	= sizeof(ath_rate_raise_threshold),
-	  .proc_handler	= proc_dointvec
 	},
 	{ 0 }
 };

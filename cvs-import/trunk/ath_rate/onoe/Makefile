@@ -1,5 +1,6 @@
 #
-# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2004 Video54 Technologies, Inc.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -37,42 +38,39 @@
 #
 
 #
-# Makefile for the HAL-based Atheros driver.
+# Makefile for the Atheros Rate Control Support.
 #
-DEPTH=	.
-
-include Makefile.inc
-
-# NB: the order is important here
-DIRS=	${ATH_HAL} ${ATH_RATE} ${WLAN} ${ATH}
-
-all:
-	for i in ${DIRS}; do \
-		(cd $$i; make) || exit 1; \
-	done
-
-install:
-	for i in ${DIRS}; do \
-		(cd $$i; make install); \
-	done
-ifeq ($(DESTDIR),)
-	/sbin/depmod -ae
+ifeq ($(obj),)
+obj=	.
 endif
 
-FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
-	README release.h share net80211 ath_rate
-HAL_TAG=ATH_HAL_20030802
+DEPTH=	../..
 
-release:
-	DATE=`date +'%Y%m%d'`; TAG="MADWIFI_$${DATE}"; DIR="madwifi-$${DATE}"; \
-	cvs tag -F $${TAG} ${FILES}; \
-	rm -rf $${DIR}; mkdir $${DIR}; \
-	cvs export -d $${DIR} -r $${TAG} linux; \
-	(cd $${DIR}; cvs export -r ${HAL_TAG} hal); \
-	tar zcf $${DIR}.tgz --exclude=CVS --exclude=hal/freebsd $${DIR}; \
-	rm -rf $${DIR}
+obj-m		+= ath_rate_onoe.o
+ath_rate_onoe-objs	:= onoe.o
+export-objs	:= onoe.o
+list-multi	:= ath_rate_onoe.o
+
+include $(obj)/${DEPTH}/Makefile.inc
+
+INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH} -I${obj}/${WLAN} \
+	-I${obj}/${DEPTH}
+
+EXTRA_CFLAGS+= ${INCS} ${COPTS}
+
+-include $(TOPDIR)/Rules.make
+
+all:
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+
+install: all
+	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	${TOOLPREFIX}strip -S ath_rate_onoe.$(KMODSUF)
+	cp ath_rate_onoe.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	for i in ${DIRS}; do \
-		(cd $$i; make clean); \
-	done
+	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+
+ath_rate_onoe.o: ${ath_rate_onoe-objs}
+	$(LD) $(LDOPTS) -o ath_rate_onoe.$(KMODSUF) -r $(ath_rate_onoe-objs)

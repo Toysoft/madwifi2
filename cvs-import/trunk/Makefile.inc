@@ -147,9 +147,13 @@ ATH_HAL=${DEPTH}/ath_hal
 #
 WLAN=	${DEPTH}/net80211
 #
-# Path to the device Atheros driver.
+# Path to the Atheros device driver.
 #
 ATH=	${DEPTH}/ath
+#
+# Path to the rate control algorithm.
+#
+ATH_RATE=	ath_rate/onoe
 
 INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
 
