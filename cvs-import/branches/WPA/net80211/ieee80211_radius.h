@@ -47,10 +47,10 @@
 struct vendor_key {
 	u_int32_t	vk_vid;		/* vendor id */
 	u_int8_t	vk_type;	/* key type */
-	u_int8_t	vk_len;		/* key length */
+	u_int8_t	vk_len;		/* length of type+len+salt+key */
 	u_int16_t	vk_salt;
 	/* variable length data follows */
-};
+} __attribute__((__packed__));
 
 struct eapol_auth_radius_node {
 	struct eapol_auth_node	ern_base;
