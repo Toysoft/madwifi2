@@ -31,76 +31,49 @@
 # NB: we can't support MODVERSIONS because it requires building
 #     from source which may not be available
 #
+ifeq ($(obj),)
+obj=	.
+endif
+
 DEPTH=	..
 
-KMODNAME=	ath_hal
+obj-m		+= ath_hal.o
+ath_hal-objs	:= ah_osdep.o hal.o
+export-objs	:= ah_osdep.o
+list-multi	:= ath_hal.o
 
-include ${DEPTH}/Makefile.inc
+include $(obj)/${DEPTH}/Makefile.inc
 
-HALINCS=-I${HAL} -I${HAL}/${OS} -I${ATH_HAL}
-
-SRCS=	${HAL}/${OS}/ah_osdep.c
-OBJS=	ah_osdep.o
-INCS+=	${HALINCS} ${KERNEL_INCS} -I${DEPTH}
-
-ifneq (${LINUX_VERSION}, 204)
-OBJS+=		ah_osdep.mod.o
-CLEANFILES+=	ah_osdep.mod.c
-endif
-
-ALL=	${KMODNAME}.${KMODSUF}
-CFLAGS=	${INCS} ${MODOPTS} ${COPTS}
-
-all:	${ALL}
-
-${KMODNAME}.${KMODSUF}: ${OBJS} ${HAL_OBJDIR}hal.o ${HAL}/version.h Makefile
-	${LD} -o $@ -r -x ${OBJS} ${HAL_OBJDIR}hal.o
-
-ifndef HAL_OBJDIR
-#
-# Use release version of HAL.
-#
-# NB: binary HAL's are distributed in a uuencode'd file; on some
-#     systems uuencode is not installed by default and you must
-#     specially install it from the sharutils package.
-#
 UUDECODE?=uudecode
-OPT_AH_H=	opt_ah.h
-CLEANFILES+=	hal.o opt_ah.h
 
-hal.o:	${HAL}/${OS}/${TARGET}.hal.o.uu
-	${UUDECODE} < $<
+INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH_HAL} -I${obj}/${DEPTH}
+
+EXTRA_CFLAGS+= ${INCS} ${COPTS}
+
+-include $(TOPDIR)/Rules.make
+
+all:	ah_osdep.c hal.o opt_ah.h
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+
+ah_osdep.c:
+	cp ${HAL}/${OS}/ah_osdep.c ah_osdep.c
+
+$(obj)/hal.o:
+	${UUDECODE} ${HAL}/${OS}/${TARGET}.hal.o.uu
+
 opt_ah.h: ${HAL}/${OS}/${TARGET}.opt_ah.h
 	cp ${HAL}/${OS}/${TARGET}.opt_ah.h opt_ah.h
-else
-#
-# Use private version of HAL.
-#
-OPT_AH_H=	${HAL_OBJDIR}/opt_ah.h
-HALINCS+=	-I${HAL_OBJDIR}		# for opt_ah.h
-endif
-
-ah_osdep.o: ${HAL}/${OS}/ah_osdep.c
-	${CC} -c -o $@ ${CFLAGS} $<
-
-ifneq (${LINUX_VERSION}, 204)
-ah_osdep.mod.c: ah_osdep.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux $<
-ah_osdep.mod.o: ah_osdep.mod.c
-	${CC} -c -o $@ ${CFLAGS} $<
-endif
 
 install: all
-	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
-	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
+	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	strip -S ath_hal.$(KMODSUF)
+	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	rm -f ${ALL} ${OBJS} ${CLEANFILES}
+	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+# remove the files we copied to this dir
+	-rm -f ah_osdep.c opt_ah.h hal.o
 
-depend: beforedepend .depend afterdepend
-.depend: ${SRCS} ${OPT_AH_H}
-	rm -f .depend
-	${CC} -M ${CFLAGS} ${SRCS} > .depend
-beforedepend:
-afterdepend:
--include .depend
+ath_hal.o: ${ath_hal-objs}
+	$(LD) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)

@@ -39,119 +39,54 @@
 #
 # Makefile for the 802.11 WLAN module.
 #
+ifeq ($(obj),)
+obj=	.
+endif
+
 DEPTH=	..
 
-KMODNAME=	wlan
+obj-m		+= wlan.o wlan_auth.o wlan_radius.o
 
-include ${DEPTH}/Makefile.inc
+wlan-objs	:= if_media.o rc4.o \
+		   ieee80211.o ieee80211_crypto.o ieee80211_input.o \
+		   ieee80211_node.o ieee80211_output.o ieee80211_proto.o \
+		   ieee80211_wireless.o ieee80211_linux.o
+wlan_auth-objs	:= ieee80211_dot1x.o
+wlan_radius-objs := ieee80211_radius.o
 
-ifdef CONFIG_MODVERSIONS
-MODOPTS+=	-include ${WLAN}/ieee80211.ver
-ALL_VER+=	ieee80211.ver
-MODOPTS+=	-include ${WLAN}/if_media.ver
-ALL_VER+=	if_media.ver
-endif
+list-multi	:= wlan.o wlan_auth.o wlan_radius.o
+export-objs	:= if_media.o rc4.o \
+		   ieee80211.o ieee80211_crypto.o ieee80211_input.o \
+		   ieee80211_node.o ieee80211_output.o ieee80211_proto.o \
+		   ieee80211_wireless.o ieee80211_linux.o \
+		   ieee80211_dot1x.o ieee80211_radius.o
 
-SRCS_80211=	ieee80211.c ieee80211_crypto.c ieee80211_input.c \
-		ieee80211_node.c ieee80211_output.c ieee80211_proto.c \
-		ieee80211_wireless.c ieee80211_linux.c
-OBJS_80211=	ieee80211.o ieee80211_crypto.o ieee80211_input.o \
-		ieee80211_node.o ieee80211_output.o ieee80211_proto.o \
-		ieee80211_wireless.o ieee80211_linux.o
-# these will eventually go in separate modules
-SRCS_DOT1X+=	ieee80211_dot1x.c
-OBJS_DOT1X+=	ieee80211_dot1x.o
-SRCS_RADIUS+=	ieee80211_radius.c
-OBJS_RADIUS+=	ieee80211_radius.o
-SRCS=	${SRCS_80211} ${SRCS_DOT1X} ${SRCS_RADIUS} if_media.c rc4.c
-OBJS=	${OBJS_80211} ${OBJS_DOT1X} ${OBJS_RADIUS} if_media.o rc4.o
+include $(obj)/${DEPTH}/Makefile.inc
 
-#
-# Bring in compatibility code when the kernel lacks crypto supoprt.
-# XXX should base this on CONFIG_CRYPTO but
-# XXX that doesn't work for my 2.4.20-8 kernel
-#
-ifneq (${LINUX_VERSION}, 206)
-SRCS+=	md5.c
-OBJS+=	md5.o
-endif
+INCS+=	-I${HAL} -I${HAL}/${OS} -I$(obj)/${ATH_HAL} -I$(obj)/${WLAN} \
+	-I${obj}/${DEPTH}
 
-INCS+=	-I. ${KERNEL_INCS} -I${DEPTH}
+EXTRA_CFLAGS+=$(INCS) ${COPTS}
 
-CLEANFILES=	.depend
+-include $(TOPDIR)/Rules.make
 
-ifneq (${LINUX_VERSION}, 204)
-OBJS+=		ieee80211_crypto.mod.o ieee80211_input.mod.o \
-		ieee80211_linux.mod.o ieee80211.mod.o ieee80211_node.mod.o \
-		ieee80211_output.mod.o ieee80211_proto.mod.o \
-		ieee80211_wireless.mod.o
-OBJS+=		ieee80211_dot1x.mod.o ieee80211_radius.mod.o
-CLEANFILES+=	ieee80211_crypto.mod.c ieee80211_input.mod.c \
-		ieee80211_linux.mod.c ieee80211.mod.c ieee80211_node.mod.c \
-		ieee80211_output.mod.c ieee80211_proto.mod.c \
-		ieee80211_wireless.mod.c
-CLEANFILES+=	ieee80211_dot1x.mod.c ieee80211_radius.mod.c
-endif
+all:
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
-ALL=	${KMODNAME}.${KMODSUF}
-CFLAGS=	${INCS} ${MODOPTS} ${COPTS}
-
-all:	${ALL}
-
-${KMODNAME}.${KMODSUF}: ${OBJS}
-	${LD} -o $@ -r -x ${OBJS}
-
-ieee80211_linux.o: version.h
-
-ifneq (${LINUX_VERSION}, 204)
-ieee80211.mod.c: ieee80211.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211.o
-ieee80211_crypto.mod.c: ieee80211_crypto.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_crypto.o
-ieee80211_dot1x.mod.c: ieee80211_dot1x.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_dot1x.o
-ieee80211_input.mod.c: ieee80211_input.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_input.o
-ieee80211_linux.mod.c: ieee80211_linux.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_linux.o
-ieee80211_node.mod.c: ieee80211_node.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_node.o
-ieee80211_output.mod.c: ieee80211_output.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_output.o
-ieee80211_proto.mod.c: ieee80211_proto.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_proto.o
-ieee80211_radius.mod.c: ieee80211_radius.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_radius.o
-ieee80211_wireless.mod.c: ieee80211_wireless.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux ieee80211_wireless.o
-endif
-
-ifdef CONFIG_MODVERSIONS
-GEN_VERSION=	$(shell echo $(KERNEL_VERSION) | sed -e "s/-.*//")
-ieee80211.ver: ${SRCS_80211}
-	rm -f $@
-	for i in ${SRCS_80211}; do \
-		${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $$i | \
-			${GENKSYMS} -k ${GEN_VERSION} >> $@; \
-	done
-if_media.ver: if_media.c
-	${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $< | \
-		${GENKSYMS} -k ${GEN_VERSION} > $@
-
-${OBJS}: ieee80211.ver if_media.ver
-endif
+wlan.o:	$(wlan-objs)
+	$(LD) -o wlan.$(KMODSUF) -r $(wlan-objs)
+wlan_auth.o:	$(wlan_auth-objs)
+	$(LD) -o wlan_auth.$(KMODSUF) -r $(wlan_auth-objs)
+wlan_radius.o:	$(wlan_radius-objs)
+	$(LD) -o wlan_radius.$(KMODSUF) -r $(wlan_radius-objs)
 
 install: all
-	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
-	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
+	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	for i in wlan wlan_auth wlan_radius; do \
+		strip -S $$i.$(KMODSUF); \
+		cp $$i.${KMODSUF} ${DESTDIR}/${MODULEPATH}; \
+	done
 
 clean:
-	rm -f ${OBJS} ${ALL} ${ALL_VER} ${CLEANFILES}
-
-depend: beforedepend .depend afterdepend
-.depend: ${SRCS} ${ALL_VER}
-	rm -f .depend
-	${CC} -M ${CFLAGS} ${SRCS} > .depend
-beforedepend:
-afterdepend:
--include .depend
+	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
