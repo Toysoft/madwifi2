@@ -146,8 +146,6 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 #endif
 	IEEE80211_NODE_STAT(ni, tx_mgmt);
 	IF_ENQUEUE(&ic->ic_mgtq, skb);
-	mod_timer(&ic->ic_slowtimo, jiffies + HZ);
-	//if_start(dev);
 	(*dev->hard_start_xmit)(NULL, dev);
 	return 0;
 }
@@ -193,7 +191,6 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 	IEEE80211_NODE_STAT(ni, tx_data);
 
 	IF_ENQUEUE(&ic->ic_mgtq, skb);		/* cheat */
-	//if_start(dev);
 	(*dev->hard_start_xmit)(NULL, dev);
 
 	return 0;
@@ -947,14 +944,12 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
-		 *	[tlv] WME (optional)
 		 *	[tlv] user-specified ie's
 		 */
 		skb = ieee80211_getmgtframe(&frm,
 			 2 + IEEE80211_NWID_LEN
 		       + 2 + IEEE80211_RATE_SIZE
 		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
-		       + sizeof(struct ieee80211_wme_param)
 		       + (ic->ic_opt_ie != NULL ? ic->ic_opt_ie_len : 0)
 		);
 		if (skb == NULL)
@@ -964,8 +959,6 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		mode = ieee80211_chan2mode(ic, ni->ni_chan);
 		frm = ieee80211_add_rates(frm, &ic->ic_sup_rates[mode]);
 		frm = ieee80211_add_xrates(frm, &ic->ic_sup_rates[mode]);
-		if (ic->ic_flags & IEEE80211_F_WME)
-			frm = ieee80211_add_wme_param(frm, &ic->ic_wme);
 		if (ic->ic_opt_ie != NULL) {
 			memcpy(frm, ic->ic_opt_ie, ic->ic_opt_ie_len);
 			frm += ic->ic_opt_ie_len;
@@ -990,6 +983,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 *	[tlv] extended rate phy (ERP)
 		 *	[tlv] extended supported rates
 		 *	[tlv] WPA
+		 *	[tlv] WME (optional)
 		 */
 		skb = ieee80211_getmgtframe(&frm,
 			 8
@@ -1004,6 +998,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		       /* XXX !WPA1+WPA2 fits w/o a cluster */
 		       + (ic->ic_flags & IEEE80211_F_WPA ?
 				2*sizeof(struct ieee80211_ie_wpa) : 0)
+		       + sizeof(struct ieee80211_wme_param)
 		);
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
@@ -1051,11 +1046,13 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 			*frm++ = 2;
 			*frm++ = 0; *frm++ = 0;		/* TODO: ATIM window */
 		}
-		if (ic->ic_flags & IEEE80211_F_WPA)
-			frm = ieee80211_add_wpa(frm, ic);
+		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
 		if (ic->ic_curmode == IEEE80211_MODE_11G)
 			frm = ieee80211_add_erp(frm, ic);
-		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			frm = ieee80211_add_wpa(frm, ic);
+		if (ic->ic_flags & IEEE80211_F_WME)
+			frm = ieee80211_add_wme_param(frm, &ic->ic_wme);		
 		skb_trim(skb, frm - skb->data);
 		break;
 
