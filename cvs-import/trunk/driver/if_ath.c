@@ -293,6 +293,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		| IEEE80211_C_IBSS		/* ibss, nee adhoc, mode */
 		| IEEE80211_C_HOSTAP		/* hostap mode */
 		| IEEE80211_C_MONITOR		/* monitor mode */
+		| IEEE80211_C_TXPMGT		/* transmit power control */
 		| IEEE80211_C_SHPREAMBLE;	/* short preamble supported */
 	ic->ic_flags |= IEEE80211_F_DATAPAD;
 
@@ -1048,6 +1049,7 @@ ath_alloc_skb(u_int size, u_int align)
 static int
 ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 {
+#define	MIN(a,b)	((a) < (b) ? (a) : (b))
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = &ic->ic_dev;
 	struct ath_hal *ah = sc->sc_ah;
@@ -1182,7 +1184,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		, skb->len + IEEE80211_CRC_LEN	/* frame length */
 		, sizeof(struct ieee80211_frame)/* header length */
 		, HAL_PKT_TYPE_BEACON		/* Atheros packet type */
-		, 0x20				/* txpower XXX */
+		, MIN(ic->ic_txpower,ATH_TPC_MAX) /* txpower */
 		, rate, 1			/* series 0 rate/tries */
 		, HAL_TXKEYIX_INVALID		/* no encryption */
 		, 0				/* antenna mode */
@@ -1197,6 +1199,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		, AH_TRUE			/* last segment */
 	);
 	return 0;
+#undef MIN
 }
 
 static void
@@ -1910,6 +1913,7 @@ static int
 ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *bf,
     struct sk_buff *skb)
 {
+#define	MIN(a,b)	((a) < (b) ? (a) : (b))
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
@@ -2135,7 +2139,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		, pktlen		/* packet length */
 		, hdrlen		/* header length */
 		, atype			/* Atheros packet type */
-		, 60			/* txpower XXX */
+		, MIN(ic->ic_txpower,ATH_TPC_MAX) /* txpower */
 		, txrate, try0		/* series 0 rate/tries */
 		, iswep ? ic->ic_wep_txkey : HAL_TXKEYIX_INVALID
 		, antenna		/* antenna mode */
@@ -2194,6 +2198,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	dev->trans_start = jiffies;
 
 	return 0;
+#undef MIN
 }
 
 static void
