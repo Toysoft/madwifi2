@@ -69,6 +69,5 @@
 #define AR5212_AR5312_REV7      0x0057          /* AR5312 WMAC (AP30-040) */
 #define AR5212_AR2313_REV8      0x0058          /* AR2313 WMAC (AP43-030) */
 
-
 #define	AR_SUBVENDOR_ID_NOG	0x0e11		/* No 11G subvendor ID */
 #endif /* _DEV_ATH_DEVID_H */
