@@ -18,7 +18,7 @@ MKDIR()
 
 PATCH()
 {
-	cmp -s $1 $2 || patch -N $1 < $2.patch
+	patch -N $1 < $2
 }
 
 INSTALL()
@@ -30,57 +30,93 @@ INSTALL()
 INSTALLX()
 {
 	DEST=$1; shift
-	sed -e 's/^##2.4##//' $1 > $DEST
+	sed -e 's/^##2.4##//' -e '/^##2.6##/d' $1 > $DEST
 }
 
+#
+# Location of various pieces.  These mimic what is in Makefile.inc
+# and can be overridden from the environment.
+#
+SRC_HAL=${HAL:-${DEPTH}/hal}
+test -d ${SRC_HAL} || { echo "No hal directory ${SRC_HAL}!"; exit 1; }
+SRC_ATH_HAL=${ATH_HAL:-${DEPTH}/ath_hal}
+test -d ${SRC_ATH_HAL} ||
+	{ echo "No ath_hal directory ${SRC_ATH_HAL}!"; exit 1; }
+SRC_NET80211=${WLAN:-${DEPTH}/net80211}
+test -d ${SRC_NET80211} ||
+	{ echo "No net80211 directory ${SRC_NET80211}!"; exit 1; }
+SRC_ATH=${ATH:-${DEPTH}/ath}
+test -d ${SRC_ATH} || { echo "No ath directory ${SRC_ATH}!"; exit 1; }
+SRC_ATH_RATE=${ATH_RATE:-${DEPTH}/ath_rate/onoe}
+test -d ${SRC_ATH_RATE} ||
+	{ echo "No rate control algorithm directory ${SRC_ATH_RATE}!"; exit 1; }
+SRC_COMPAT=${DEPTH}/include
+test -d ${SRC_COMPAT} || { echo "No compat directory ${SRC_COMPAT}!"; exit 1; }
+
 WIRELESS=${KERNEL_PATH}/drivers/net/wireless
-ATH=${WIRELESS}/ath
-MKDIR ${ATH}
+test -d ${WIRELESS} || { echo "No wireless directory ${WIRELESS}!"; exit 1; }
+
+DST_ATH=${WIRELESS}/ath
+MKDIR ${DST_ATH}
 echo "Copy ath driver bits..."
-FILES=`ls ${DEPTH}/ath/*.[ch] | sed '/mod.c/d'`
-INSTALL ${ATH} ${FILES}
-INSTALLX ${ATH}/Makefile ${DEPTH}/ath/Makefile.kernel
+FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
+INSTALL ${DST_ATH} ${FILES}
+INSTALL ${DST_ATH} ${SRC_ATH}/Kconfig
+INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 
-ATH_HAL=${WIRELESS}/_ath_hal
-MKDIR ${ATH_HAL}
+# NB: use leading '_' to insure it's built before the driver
+DST_ATH_HAL=${WIRELESS}/_ath_hal
+MKDIR ${DST_ATH_HAL}
 echo "Copy ath_hal bits..."
-INSTALLX ${ATH_HAL}/Makefile ${DEPTH}/ath_hal/Makefile.kernel
+INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/Kconfig
+INSTALLX ${DST_ATH_HAL}/Makefile ${SRC_ATH_HAL}/Makefile.kernel
 
-MKDIR ${WIRELESS}/hal
-MKDIR ${WIRELESS}/hal/linux
+# NB: use leading '_' to insure it's built before the driver
+DST_ATH_RATE=${WIRELESS}/_ath_rate
+MKDIR ${DST_ATH_RATE}
+echo "Copy $SRC_ATH_RATE bits..."
+FILES=`ls ${SRC_ATH_RATE}/*.[ch] | sed '/mod.c/d'`
+INSTALL ${DST_ATH_RATE} ${FILES}
+INSTALL ${DST_ATH_RATE} ${SRC_ATH_RATE}/Kconfig
+INSTALLX ${DST_ATH_RATE}/Makefile ${SRC_ATH_RATE}/Makefile.kernel
+
+DST_HAL=${WIRELESS}/hal
+MKDIR ${DST_HAL}
 echo "Copy hal bits..."
-INSTALL ${WIRELESS}/hal ${DEPTH}/hal/*
-INSTALL ${WIRELESS}/hal/linux ${DEPTH}/hal/linux/*
-
-if [ -f Config.in.wireless-${KERNEL_VERSION}.patch ]; then
-	PATCH ${WIRELESS}/Config.in Config.in.wireless-${KERNEL_VERSION}
-else
-	echo "No patch file for your ${KERNEL_VERSION} kernel."
-	echo "Look at Config.in.wireless to see how to change"
-	echo "${WIRELESS}/Config.in to suit."
+INSTALL ${DST_HAL} ${SRC_HAL}/ah.h
+INSTALL ${DST_HAL} ${SRC_HAL}/ah_desc.h
+INSTALL ${DST_HAL} ${SRC_HAL}/ah_devid.h
+INSTALL ${DST_HAL} ${SRC_HAL}/version.h
+MKDIR ${DST_HAL}/linux
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.c
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.h
+# XXX copy only target or use arch? 
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.inc
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.opt_ah.h
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.hal.o.uu
+if [ -d ${SRC_HAL}/ar5212 ]; then
+	MKDIR ${DST_HAL}/ar5212
+	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212desc.h
 fi
-PATCH ${WIRELESS}/Makefile Makefile.wireless
 
-NET=${KERNEL_PATH}/net
-NET80211=${NET}/net80211
-DOC=${KERNEL_PATH}/Documentation
-MKDIR ${NET80211}
+DST_NET80211=${WIRELESS}/net80211
+MKDIR ${DST_NET80211}
 echo "Copy net80211 bits..."
-FILES=`ls ${DEPTH}/net80211/*.[ch] | sed '/mod.c/d'`
-INSTALL ${NET80211} ${FILES}
-INSTALLX ${NET80211}/Makefile ${DEPTH}/net80211/Makefile.kernel
-MKDIR ${NET80211}/compat
-echo "Setting up compatibility bits..."
-INSTALL ${NET80211}/compat ${DEPTH}/include/compat.h
-MKDIR ${NET80211}/compat/sys
-INSTALL ${NET80211}/compat/sys ${DEPTH}/include/sys/*.h
+FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
+INSTALL ${DST_NET80211} ${FILES}
+INSTALL ${DST_NET80211} ${SRC_NET80211}/Kconfig
+INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
-if [ -f Config.in.net-${KERNEL_VERSION}.patch ]; then
-	PATCH ${NET}/Config.in Config.in.net-${KERNEL_VERSION}
-else
-	echo "No patch file for your ${KERNEL_VERSION} kernel."
-	echo "Look at Config.in.net to see how to change"
-	echo "${NET}/Config.in to suit."
-fi
-PATCH ${NET}/Makefile Makefile.net
-PATCH ${DOC}/Configure.help Configure.help
+MKDIR ${DST_NET80211}/compat
+echo "Setting up compatibility bits..."
+INSTALL ${DST_NET80211}/compat ${SRC_COMPAT}/compat.h
+MKDIR ${DST_NET80211}/compat/sys
+INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
+
+grep -q 'CONFIG_ATHEROS' ${WIRELESS}/Config.in || \
+	PATCH ${WIRELESS}/Config.in Config.in.patch
+grep -q 'CONFIG_ATHEROS' ${WIRELESS}/Makefile || \
+	PATCH ${WIRELESS}/Makefile Makefile.patch
+DST_DOC=${KERNEL_PATH}/Documentation
+grep -q 'CONFIG_ATHEROS' ${DST_DOC}/Configure.help || \
+	PATCH ${DST_DOC}/Configure.help Configure.help.patch

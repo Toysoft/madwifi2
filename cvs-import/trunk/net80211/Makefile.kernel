@@ -1,11 +1,13 @@
 #
-# Makefile for the 802.11 WLAN module.
+# Makefile for the 802.11 NET80211 module.
 #
 
-COMPAT=	net/net80211/compat
-NET=	net
+##2.4##src=.
 
-EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${NET}
+##2.4##COMPAT=	compat
+##2.6##COMPAT=	drivers/net/wireless/net80211/compat
+
+EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${src}/..
 
 #
 # There are two authenticator mechanisms: an in-kernel implementation
@@ -18,7 +20,7 @@ EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${NET}
 #
 MOD_AUTH	:= wlan_xauth.o
 
-obj-$(CONFIG_WLAN) += wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
+obj-$(CONFIG_NET80211) += wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
 		   $(MOD_AUTH) wlan_acl.o
 
 wlan-objs	:= if_media.o rc4.o \
@@ -44,19 +46,22 @@ wlan_acl-objs	:= ieee80211_acl.o
 ##2.4##list-multi	:= wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
 ##2.4##		   $(MOD_AUTH) wlan_acl.o
 
-#wlan.o:	$(wlan-objs)
-#	$(LD) -o wlan.$(KMODSUF) -r $(wlan-objs)
-#wlan_wep.o:	$(wlan_wep-objs)
-#	$(LD) -o wlan_wep.$(KMODSUF) -r $(wlan_wep-objs)
-#wlan_tkip.o:	$(wlan_tkip-objs)
-#	$(LD) -o wlan_tkip.$(KMODSUF) -r $(wlan_tkip-objs)
-#wlan_ccmp.o:	$(wlan_ccmp-objs)
-#	$(LD) -o wlan_ccmp.$(KMODSUF) -r $(wlan_ccmp-objs)
-#wlan_xauth.o:	$(wlan_xauth-objs)
-#	$(LD) -o wlan_xauth.$(KMODSUF) -r $(wlan_xauth-objs)
-#wlan_auth.o:	$(wlan_auth-objs)
-#	$(LD) -o wlan_auth.$(KMODSUF) -r $(wlan_auth-objs)
-#wlan_radius.o:	$(wlan_radius-objs)
-#	$(LD) -o wlan_radius.$(KMODSUF) -r $(wlan_radius-objs)
-#wlan_acl.o:	$(wlan_acl-objs)
-#	$(LD) -o wlan_acl.$(KMODSUF) -r $(wlan_acl-objs)
+##2.4##O_TARGET := net80211.o
+##2.4##include $(TOPDIR)/Rules.make
+
+##2.4##wlan.o:	$(wlan-objs)
+##2.4##	$(LD) -o wlan.o -r $(wlan-objs)
+##2.4##wlan_wep.o:	$(wlan_wep-objs)
+##2.4##	$(LD) -o wlan_wep.o -r $(wlan_wep-objs)
+##2.4##wlan_tkip.o:	$(wlan_tkip-objs)
+##2.4##	$(LD) -o wlan_tkip.o -r $(wlan_tkip-objs)
+##2.4##wlan_ccmp.o:	$(wlan_ccmp-objs)
+##2.4##	$(LD) -o wlan_ccmp.o -r $(wlan_ccmp-objs)
+##2.4##wlan_xauth.o:	$(wlan_xauth-objs)
+##2.4##	$(LD) -o wlan_xauth.o -r $(wlan_xauth-objs)
+##2.4##wlan_auth.o:	$(wlan_auth-objs)
+##2.4##	$(LD) -o wlan_auth.o -r $(wlan_auth-objs)
+##2.4##wlan_radius.o:	$(wlan_radius-objs)
+##2.4##	$(LD) -o wlan_radius.o -r $(wlan_radius-objs)
+##2.4##wlan_acl.o:	$(wlan_acl-objs)
+##2.4##	$(LD) -o wlan_acl.o -r $(wlan_acl-objs)
