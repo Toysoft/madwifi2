@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -39,6 +39,8 @@
 #
 # Compilation configuration for building little-endian ARM9/arm-elf.
 #
+# Known to work on:
+#	Arm940T
 
 #
 # Force register read/write operations to go through a function so

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -95,29 +95,7 @@ extern	u_int32_t ath_hal_getuptime(struct ath_hal *);
 #define	OS_GETUPTIME(_ah)	ath_hal_getuptime(_ah)
 
 /*
- * Register read/write; we assume the registers will always
- * be memory-mapped.  Note that register accesses are done
- * using target-specific functions when debugging is enabled
- * (AH_DEBUG) or we are explicitly configured this way.  The
- * latter is used on some platforms where the full i/o space
- * cannot be directly mapped.
- */
-#if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
-#define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
-#define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
-
-extern	void ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val);
-extern	u_int32_t ath_hal_reg_read(struct ath_hal *ah, u_int reg);
-#else
-
-/*
- * The hardware registers are native little-endian byte order.
- * Big-endian hosts are handled by enabling hardware byte-swap
- * of register reads and writes at reset.  But the PCI clock
- * domain registers are not byte swapped!  Thus, on big-endian
- * platforms we have to byte-swap thoese registers specifically.
- * Most of this code is collapsed at compile time because the
- * register values are constants.
+ * Byte order/swapping support.
  */
 #define	AH_LITTLE_ENDIAN	1234
 #define	AH_BIG_ENDIAN		4321
@@ -137,6 +115,36 @@ __bswap32(u_int32_t _x)
 	      (((const u_int8_t *)(&_x))[3]<<24))
 	);
 }
+#else
+#define __bswap32(_x)	(_x)
+#endif
+
+/*
+ * Register read/write; we assume the registers will always
+ * be memory-mapped.  Note that register accesses are done
+ * using target-specific functions when debugging is enabled
+ * (AH_DEBUG) or we are explicitly configured this way.  The
+ * latter is used on some platforms where the full i/o space
+ * cannot be directly mapped.
+ *
+ * The hardware registers are native little-endian byte order.
+ * Big-endian hosts are handled by enabling hardware byte-swap
+ * of register reads and writes at reset.  But the PCI clock
+ * domain registers are not byte swapped!  Thus, on big-endian
+ * platforms we have to byte-swap thoese registers specifically.
+ * Most of this code is collapsed at compile time because the
+ * register values are constants.
+ */
+#if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
+/* use functions to do register operations */
+#define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
+#define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
+
+extern	void ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val);
+extern	u_int32_t ath_hal_reg_read(struct ath_hal *ah, u_int reg);
+#else
+/* inline register operations */
+#if AH_BYTE_ORDER == AH_BIG_ENDIAN
 #define OS_REG_WRITE(_ah, _reg, _val) do {				    \
 	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
 		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
