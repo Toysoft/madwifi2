@@ -235,8 +235,7 @@ main(int argc, char *argv[])
 		u_long interval = strtoul(argv[1], NULL, 0);
 		u_long off;
 		int line, omask;
-		u_int rate = getifrate(s, ifr.ifr_name);
-		u_int32_t rate_raise, rate_drop, mgmt;
+		u_int rate;
 		struct ath_stats cur, total;
 		u_long icur, ocur;
 		u_long itot, otot;
@@ -264,18 +263,11 @@ main(int argc, char *argv[])
 		fflush(stdout);
 		line = 0;
 	loop:
+		rate = getifrate(s, ifr.ifr_name);
 		if (line != 0) {
 			ifr.ifr_data = (caddr_t) &cur;
 			if (ioctl(s, SIOCGATHSTATS, &ifr) < 0)
 				err(1, ifr.ifr_name);
-			if (total.ast_rate_raise != rate_raise ||
-			    total.ast_rate_drop != rate_drop ||
-			    total.ast_tx_mgmt != mgmt) {
-				rate = getifrate(s, ifr.ifr_name);
-				rate_raise = total.ast_rate_raise;
-				rate_drop = total.ast_rate_drop;
-				mgmt = total.ast_tx_mgmt;
-			}
 			if (!getifstats(ifr.ifr_name, &icur, &ocur))
 				err(1, ifr.ifr_name);
 			printf("%8u %8u %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
@@ -299,14 +291,6 @@ main(int argc, char *argv[])
 			ifr.ifr_data = (caddr_t) &total;
 			if (ioctl(s, SIOCGATHSTATS, &ifr) < 0)
 				err(1, ifr.ifr_name);
-			if (total.ast_rate_raise != rate_raise ||
-			    total.ast_rate_drop != rate_drop ||
-			    total.ast_tx_mgmt != mgmt) {
-				rate = getifrate(s, ifr.ifr_name);
-				rate_raise = total.ast_rate_raise;
-				rate_drop = total.ast_rate_drop;
-				mgmt = total.ast_tx_mgmt;
-			}
 			if (!getifstats(ifr.ifr_name, &itot, &otot))
 				err(1, ifr.ifr_name);
 			printf("%8u %8u %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
