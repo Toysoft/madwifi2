@@ -152,7 +152,10 @@ int
 ieee80211_ifattach(struct net_device *dev)
 {
 	struct ieee80211com *ic = (void *)dev;
-	int i, rate;
+	int i;
+#ifdef notdef
+	int rate;
+#endif
 
 	if (register_netdev(&ic->ic_dev)) {
 		printk(KERN_WARNING "%s: unable to register device\n",
