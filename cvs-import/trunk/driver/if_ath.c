@@ -2095,6 +2095,15 @@ ath_startrecv(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 
+	/*
+	 * Cisco's VPN software requires that drivers be able to
+	 * receive encapsulated frames that are larger than the MTU.
+	 * Since we can't be sure how large a frame we'll get, setup
+	 * to handle the larges on possible.  If you're not using the
+	 * VPN driver and want to save memory, define ATH_ENFORCE_MTU
+	 * and you'll allocate only what you really need.
+	 */
+#ifdef ATH_ENFORCE_MTU
 	if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
 		sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
 	} else {
@@ -2103,6 +2112,9 @@ ath_startrecv(struct net_device *dev)
 			(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
 			 IEEE80211_WEP_CRCLEN), sc->sc_cachelsz);
 	}
+#else
+	sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
+#endif
 	DPRINTF(("ath_startrecv: mtu %u cachelsz %u rxbufsize %u\n",
 		dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize));
 
