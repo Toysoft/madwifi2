@@ -79,7 +79,40 @@ any specific version of Linux--in fact the identical HAL binary code
 is used unchanged with other operating systems.
 
 
-Compatibility
+Driver status
+-------------
+
+At the moment there exist no stable releases for madwifi project.
+We are working on it but for now only the sourceforge cvs and 
+daily snapshots at http://madwifi.otaku42.de/ exist.
+
+The following list is updated incrementally. Only if a feature
+has proven to be stable it is marked "OK".
+
+Super AG			???
+Atheros XR			???
+Virtual AP			???
+802.11e (QoS)			???
+802.11h (DFS, TPC)		???
+WDS support			???
+Power Safe mode			???
+WPA 1/2 AP support (hostapd)	???
+Managed mode (client)		???
+Master mode (AP)		???
+Ad-Hoc mode			???
+Monitor/Promiscuous mode	???
+Throughput 802.11b		??? (specs)
+Throughput 802.11g		??? (specs)
+Throughput 802.11a		??? (specs)
+Kismet support			???
+Linux Wireless API Support	???
+Platform independence		???
+Full Linux Wireless compat	???
+SMP-safe			???
+ACPI support			???
+
+
+Requirements
 =============
 This driver requires the following support in your kernel:
 
@@ -91,6 +124,7 @@ o Crypto API support (AES support is used if present, otherwise the
 Testing has been done with kernels from 2.4.2x to 2.6.10.  Early
 2.4 kernels may require patches; e.g. for crypto support and/or
 updated wireless extensions.
+
 
 Atheros Hardware
 ================
@@ -124,187 +158,6 @@ but beware that come vendors use alternate vendor id's (e.g 3Com, IBM).
 The file hal/ah_devid.h has a list of known PCI id's.
 
 
-Building the driver
-===================
-The driver is built using the Linux kernel build mechanism.  This
-means you must have some part of the kernel source distribution
-installed on the machine where you want to build the driver.  In
-particular, the kernel include files and configuration must be
-available as well as the build scripts.  If you built your kernel
-from source then this will be present.  Otherwise you may need to
-install some materials from your distribution.
-
-Most people can just type:
-
-trouble% make
-
-at the top level to build all the modules for the system where you
-are building.  If you installed your kernel sources as the super-user
-then this may fail because of permission problems.  In that case
-you either need to change the permission/ownership of the kernel
-sources or build the driver as the super-user.
-
-Otherwise, if this does not work or if you want to cross-compile
-the code for a different system then you will need to explicitly
-specify the location where the kernel sources are located, e.g.:
-
-trouble% make KERNELPATH=/usr/src/linux-2.6.3
-
-Note that you can also specify this path by setting an environment
-variable; e.g.
-
-trouble% export KERNELPATH=/usr/src/linux-2.6.3
-trouble% make
-
-You can also just specify a kernel version using the KERNELRELEASE
-variable.  In that case the kernel sources are automatically searched
-for in /lib/modules/$KERNELRELEASE/build.
-
-
-Madwifi currently provides two different rate control algorithms,
-ONOE and AMRR. ONOE is used by default. In order to make madwifi
-use AMRR instead, you have to specify that via the ATH_RATE
-environment variable; e.g.
-
-trouble% export ATH_RATE=ath_rate/amrr
-trouble% make
-
-
-This distribution includes support for a variety of target platforms.
-Because of the binary nature of the HAL not all platforms are
-supported (the list grows as time permits).  The supported target
-platforms can be found with:
-
-trouble% ls hal/linux/*.inc
-hal/linux/Makefile.inc          hal/linux/mips1-le-elf.inc
-hal/linux/arm9-le-thumb-elf.inc hal/linux/mipsisa32-be-elf.inc
-hal/linux/armv4-be-elf.inc      hal/linux/mipsisa32-le-elf.inc
-hal/linux/armv4-le-elf.inc      hal/linux/powerpc-be-eabi.inc
-hal/linux/i386-elf.inc          hal/linux/powerpc-le-eabi.inc
-hal/linux/mips-be-elf.inc       hal/linux/sh4-le-elf.inc
-hal/linux/mips-le-elf.inc       hal/linux/xscale-be-elf.inc
-hal/linux/mips1-be-elf.inc
-
-A target specifies the CPU architecture, byte order, and the ABI/file
-format.  Consult the contents of the .inc file to find out what the
-target platform is and what toolchain was used to build the HAL object
-module.  Beware of mixing toolchains; many target platforms require that
-the HAL and driver be built with the same toolchain (i.e. compiler,
-assembler, and loader).  If you want to override the default toolchain
-specified in the .inc file you can do that by editing the .inc file
-or by specifying environment variables.
-
-For example, the file for xscale-be-elf is:
-
-#
-# Compilation configuration for building big-endian XScale/arm-elf.
-#
-
-#
-# Built with GNU cross-devel tools:
-#
-# PREFIX=/pub/gnu
-# BINUTILS=binutils-2.14
-# GCC=gcc-3.3.2
-# target=arm-elf
-#
-# ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
-# ${GCC}/configure --target=$target   --prefix=${PREFIX} \
-#	--enable-languages=c   --with-gnu-as --with-gnu-ld \
-#	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
-#
-ifndef TOOLPREFIX
-TOOLPREFIX=	/pub/gnu/bin/arm-elf-
-endif
-#
-CC=	${TOOLPREFIX}gcc
-LD=	${TOOLPREFIX}ld
-STRIP=	${TOOLPREFIX}strip
-OBJCOPY=${TOOLPREFIX}objcopy
-NM=	${TOOLPREFIX}nm
-
-LDOPTS=	-EB
-COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+= -march=armv4 -mbig-endian -fno-strict-aliasing -fno-common -mapcs-32 \
-	-mtune=xscale  -mshort-load-bytes -msoft-float
-
-The first set of definitions specify the location and name of the
-programs used to build the software.  The rest of the file defines
-the compilation options for the target platform.  The latter should
-usually not be changed because they were the options used to build
-the binary HAL module, but TOOLPREFIX is unlikely to be right for
-your system and you will want to change it; e.g
-
-trouble% export TOOLPREFIX=/usr/local/bin/arm-elf-
-
-to use programs installed in /usr/local/bin.  Note that mixing different
-versions of the GNU tools may not work.  The .inc file for each target
-platform specifies the exact toolchains used, including where they
-were obtained (if pre-built).
-
-The build system is designed to support cross-building without any
-modification to the distribution files.  If you cannot do what you
-need by setting environment variables please send patches to show
-where things failed to do the right thing.
-
-
-Building the software will generate numerous loadable modules:
-
-Linux 2.6
-    ath/ath_pci.ko (Atheros driver for PCI/Cardbus devices),
-    ath_hal/ath_hal.ko (Atheros HAL), and
-    net80211/wlan.ko (802.11 support layer)
-    net80211/wlan_wep.ko (WEP cipher support)
-    net80211/wlan_tkip.ko (TKIP cipher support)
-    net80211/wlan_ccmp.ko (AES-CCMP cipher support)
-    net80211/wlan_xauth.ko (external authenticator)
-    net80211/wlan_auth.ko (802.1x authenticator)
-    net80211/wlan_radius.ko (RADIUS client for 802.1x authenticator)
-    net80211/wlan_acl.ko (MAC ACL support for AP operation)
-
-    and, depending on the rate control algorithm you choose (see above), 
-    one of these:
-
-    ath_rate/onoe/ath_rate_onoe.ko (ONOE rate control)
-    ath_rate/amrr/ath_rate_amrr.ko (AMRR rate control)
-    
-
-Linux 2.4
-    ath/ath_pci.o (Atheros driver for PCI/Cardbus devices),
-    ath_hal/ath_hal.o (Atheros HAL), and
-    net80211/wlan.o (802.11 support layer)
-    net80211/wlan_wep.o (WEP cipher support)
-    net80211/wlan_tkip.o (TKIP cipher support)
-    net80211/wlan_ccmp.o (AES-CCMP cipher support)
-    net80211/wlan_xauth.o (external authenticator)
-    net80211/wlan_auth.o (802.1x authenticator)
-    net80211/wlan_radius.o (RADIUS client for 802.1x authenticator)
-    net80211/wlan_acl.o (MAC ACL support for AP operation)
-
-    and, depending on the rate control algorithm you choose (see above), 
-    one of these:
-
-    ath_rate/onoe/ath_rate_onoe.o (ONOE rate control)
-    ath_rate/amrr/ath_rate_amrr.o (AMRR rate control)
-
-
-The first three files must be loaded either manually or by the
-system, e.g. through the hotplug or card manager support.  The
-remaining modules are loaded by the wlan module as needed.  Typically
-modules are automatically loaded via dependencies, so after doing a
-make install you only need to do:
-
-    modprobe ath_pci
-
-For automatic module loading you may need to modify your system's
-configuration files so the necessary modules are loaded when an
-Atheros device is recognized.  The exact procedure varies from
-system to system.
-
-
-Note that you MUST do a "make clean" before compiling for a different
-version of Linux; e.g. building for 2.6 after building for 2.4.
-
 Using the driver
 ================
 The driver should support any Atheros-based cardbus or pci device.
@@ -331,8 +184,6 @@ to one of 11a, 11b, or 11g if you have a multi-mode card (if you
 do not lock the mode then the driver will select a mode for you;
 usually 11a).  In addition you will need to configure the system to
 bridge frames to a wired LAN or similar.
-
-NOTE: adhoc mode is known to not work reliably.
 
 Wireless tools cribsheet:
 
@@ -369,7 +220,9 @@ trouble% athstats 1
 will give a running display of the most interesting statistics sampled
 every 1 second.  Running athstats without any options will display a
 summary of all non-zero statistics from the time the driver was loaded.
-By default the ath0 device is used; to override this use the -i option.
+
+NOTE: By default the ath0 device is used; to override this use the 
+      -i athX option.
 
 
 Security/Crpto Support
@@ -408,8 +261,7 @@ Known Problems
 ==============
 [All these problems are to be fixed in future revisions.]
 
-1. Adhoc mode is broken; symptoms are intermittent operation.
-2. Performance in lossy environments is suboptimal.  The algorithm used to
+1. Performance in lossy environments is suboptimal.  The algorithm used to
    select the rate for transmitted packets is very simplistic.  There is no
    software retransmit; only hardware retransmit is used.  Contributors are
    encouraged to replace the existing rate control algorithm with a better
@@ -432,7 +284,7 @@ Joachim Gleissner Georg Lukas	    Paul Stewart      Alexander Wirtz
 Guy Erb		  Tom Marshall	    D. Stolte	      Kevin Yu
 Kristian Hoffmann Nick Moss	    Bindu Therthala   Thorsten von Eicken
 William S. Kish	  Nick Petroni      Carl Thompson     Jouni Malinen
-Satish Balay      Richard Dawe
+Satish Balay      Richard Dawe      Bruno Randolf     Sebastian Weitzel
 
 (Apologies to anyone whose name was unintentionally left off.)
 
