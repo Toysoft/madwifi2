@@ -121,6 +121,7 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(rx_crcerr, "rx failed 'cuz of bad CRC");
 	STAT(rx_fifoerr, "rx failed 'cuz of FIFO overrun");
 	STAT(rx_badcrypt, "rx failed 'cuz decryption");
+	STAT(rx_badmic, "rx failed 'cuz MIC failure");
 	STAT(rx_tooshort, "rx failed 'cuz frame too short");
 	STAT(rx_nobuf, "rx setup failed 'cuz no skbuff");
 	STAT(rx_mgt, "rx management frames");
@@ -192,7 +193,7 @@ getifstats(const char *ifname, u_long *iframes, u_long *oframes)
 				;
 			if (*tp == ':') {
 				*tp++ = '\0';
-				if (strcmp(line, ifname) == 0)
+				if (strcmp(cp, ifname) != 0)
 					continue;
 				sscanf(tp, "%*llu %lu %*u %*u %*u %*u %*u %*u %*llu %lu",
 					iframes, oframes);
