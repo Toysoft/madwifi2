@@ -79,7 +79,7 @@ clean:
 depend: beforedepend .depend afterdepend
 .depend: ${SRCS} ${ATH_HAL}/opt_ah.h Makefile
 	rm -f .depend
-	-gcc -M ${CFLAGS} ${SRCS} > .depend
+	-${CC} -M ${CFLAGS} ${SRCS} > .depend
 beforedepend:
 afterdepend:
 -include .depend

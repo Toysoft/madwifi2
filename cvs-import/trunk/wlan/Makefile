@@ -93,7 +93,7 @@ clean:
 depend: beforedepend .depend afterdepend
 .depend: ${SRCS} ${ALL_VER}
 	rm -f .depend
-	gcc -M ${CFLAGS} ${SRCS} > .depend
+	${CC} -M ${CFLAGS} ${SRCS} > .depend
 beforedepend:
 afterdepend:
 -include .depend
