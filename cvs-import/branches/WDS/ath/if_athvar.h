@@ -247,6 +247,9 @@ struct ath_softc {
 
 	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */
 
+	/* Added by JOTA */
+	struct tq_struct	sc_radartq; 	/* Radar detection */
+
 	int			sc_rxbufsize;	/* rx size based on mtu */
 	STAILQ_HEAD(, ath_buf)	sc_rxbuf;	/* receive buffer */
 	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
@@ -276,6 +279,10 @@ struct ath_softc {
 
 	struct timer_list	sc_cal_ch;	/* calibration timer */
 	struct timer_list	sc_scan_ch;	/* AP scan timer */
+
+	/* Added by JOTA */
+	struct timer_list	sc_beacontimer; /* Stuck beacon fix timer */
+
 #ifdef CONFIG_NET_WIRELESS
 	struct iw_statistics	sc_iwstats;	/* wireless statistics block */
 #endif
@@ -315,6 +322,9 @@ void	ath_sysctl_unregister(void);
 /*
  * HAL definitions to comply with local coding convention.
  */
+
+#define ath_hal_setregdomain (_ah, _regdomain, _pstatus) \
+	((*(_ah)->ah_setRegulatoryDomain((_ah), (_regdomain), (_pstatus)))
 #define	ath_hal_reset(_ah, _opmode, _chan, _outdoor, _pstatus) \
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
 #define	ath_hal_getratetable(_ah, _mode) \

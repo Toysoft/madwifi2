@@ -191,6 +191,21 @@ struct vlan_group;
 struct eapolcom;
 struct ieee80211_aclator;
 
+
+/* Added by JOTA */
+typedef struct
+{
+  unsigned int key;
+  u_int8_t mac[6];
+  unsigned int time;
+  u_int8_t nimac[6];
+  void *pnext;
+}
+MDBMACITEM;
+#define MDB_HASH_SIZE 256
+
+/*==================*/
+
 struct ieee80211com {
 	SLIST_ENTRY(ieee80211com) ic_next;
 	struct net_device	*ic_dev;	/* associated device */
@@ -307,6 +322,12 @@ struct ieee80211com {
 	 */
 	const struct ieee80211_aclator *ic_acl;
 	void			*ic_as;
+
+	/* Added by JOTA */
+	MDBMACITEM *mdbLocalHash[MDB_HASH_SIZE];
+	MDBMACITEM *mdbRemoteHash[MDB_HASH_SIZE];
+	/* ======================= */
+
 };
 
 #define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
@@ -378,7 +399,11 @@ void	ieee80211_reset_erp(struct ieee80211com *);
 enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 		struct ieee80211_channel *);
 
-/* 
+/* Added by JOTA */
+int ieee80211_rate2index (int rate);
+
+
+/*
  * Key update synchronization methods.  XXX should not be visible.
  */
 static inline void

@@ -1002,18 +1002,29 @@ ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 	struct iw_quality qual[IW_MAX_AP];
 	int i;
 
+
 	i = 0;
-	/* XXX lock node list */
+
+	IEEE80211_NODE_LOCK(ic);
+
 	TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
-		addr[i].sa_family = ARPHRD_ETHER;
-		if (ic->ic_opmode == IEEE80211_M_HOSTAP)
-			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
-		else
-			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
-		set_quality(&qual[i], (*ic->ic_node_getrssi)(ic, ni));
-		if (++i >= IW_MAX_AP)
-			break;
+
+		/* Added by JOTA, filters fucked up nodes */
+		if (ni->ni_associd != 0) {
+			addr[i].sa_family = ARPHRD_ETHER;
+			if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+				IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
+			else
+				IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
+			set_quality(&qual[i], (*ic->ic_node_getrssi)(ic, ni));
+
+			if (++i >= IW_MAX_AP)
+				break;
+		}
 	}
+
+	IEEE80211_NODE_UNLOCK(ic);
+
 	data->length = i;
 	memcpy(extra, &addr, i*sizeof(addr[0]));
 	data->flags = 1;		/* signal quality present (sort of) */
@@ -1958,6 +1969,68 @@ ieee80211_ioctl_delmac(struct ieee80211com *ic, struct iw_request_info *info,
 }
 EXPORT_SYMBOL(ieee80211_ioctl_delmac);
 
+
+/* Added by JOTA */
+static int
+ieee80211_ioctl_nodeinfo(struct ieee80211com *ic, struct iwreq *iwr)
+{
+	struct ieee80211_node *ni;
+	struct ieee80211_node_info ninfo;
+
+	/* FIXME: Find out how size checks works for this shit
+	if (iwr->u.data.length != sizeof (struct ieee80211_node_info))
+	{
+		printk ("%s: Data has illegal size %d != %d\n",
+			__func__,
+			iwr->u.data.length,
+			sizeof (struct ieee80211_node_info));
+
+		return -EINVAL;
+	}
+	*/
+
+	if (copy_from_user(&ninfo, iwr->u.data.pointer, sizeof(struct ieee80211_node_info)))
+	{
+		printk ("%s: Copy from user failed!\n", __func__);
+		return -EFAULT;
+	}
+
+	/*
+	printk ("%s: Find node for mac %02x:%02x:%02x:%02x:%02x:%02x\n",
+		__func__,
+		ninfo.mac[0],
+		ninfo.mac[1],
+		ninfo.mac[2],
+		ninfo.mac[3],
+		ninfo.mac[4],
+		ninfo.mac[5]);
+	*/
+
+	ni = ieee80211_find_node(ic, ninfo.mac);
+
+	if (ni == NULL) return -EINVAL;
+
+	ninfo.associd = ni->ni_associd;
+	ninfo.rssi = ni->ni_rssi;
+	ninfo.assocstamp = ni->ni_assocstamp;
+	ninfo.rx_currate = ni->ni_stats.ns_rx_currate;
+	ninfo.tx_currate = ni->ni_stats.ns_tx_currate;
+
+	memcpy (ninfo.ns_ratestats, ni->ni_stats.ns_ratestats, sizeof (struct ieee80211_noderatestats) * 16);
+
+	ieee80211_free_node(ic, ni);
+
+	if (copy_to_user (iwr->u.data.pointer, &ninfo, sizeof (struct ieee80211_node_info)))
+	{
+		printk ("%s: Copy to user failed!\n", __func__);
+		return -EFAULT;
+	}
+
+	return 0;
+}
+/* =================================== */
+
+
 int
 ieee80211_ioctl_chanlist(struct ieee80211com *ic, struct iw_request_info *info,
 			void *w, char *extra)
@@ -2056,6 +2129,7 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"delmac" },
 	{ IEEE80211_IOCTL_CHANLIST,
 	  IW_PRIV_TYPE_CHANLIST | IW_PRIV_SIZE_FIXED, 0,"chanlist" },
+
 #if WIRELESS_EXT >= 12
 	{ IEEE80211_IOCTL_SETPARAM,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "setparam" },
@@ -2199,6 +2273,8 @@ ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
 		return ieee80211_ioctl_getkey(ic, (struct iwreq *) ifr);
 	case IEEE80211_IOCTL_GETWPAIE:
 		return ieee80211_ioctl_getwpaie(ic, (struct iwreq *) ifr);
+	case SIOCGNODEINFO:
+		return ieee80211_ioctl_nodeinfo (ic, (struct iwreq *) ifr);
 	}
 	return -EOPNOTSUPP;
 }

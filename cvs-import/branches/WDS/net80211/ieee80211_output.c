@@ -52,6 +52,8 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211_output.c,v 1.9 2003/11/02 00:17:27 dyoung 
 
 #include <net80211/ieee80211_var.h>
 
+#include "mdb.h"
+
 #ifdef IEEE80211_DEBUG
 /*
  * Decide if an outbound management frame should be
@@ -232,7 +234,7 @@ ieee80211_crypto_getkey(struct ieee80211com *ic,
  * Encapsulate an outbound data frame.  The mbuf chain is updated and
  * a reference to the destination node is returned.  If an error is
  * encountered NULL is returned and the node reference will also be NULL.
- * 
+ *
  * NB: The caller is responsible for free'ing a returned node reference.
  *     The convention is ic_bss is not reference counted; the caller must
  *     maintain that.
@@ -247,19 +249,32 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211_key *key;
 	struct llc *llc;
 
+
+	/* Added by JOTA */
+	int isaddr4 = 0;
+	u_int8_t addr4[6];
+
 	memcpy(&eh, skb->data, sizeof(struct ether_header));
 	skb_pull(skb, sizeof(struct ether_header));
 
-	ni = ieee80211_find_txnode(ic, eh.ether_dhost);
+	/* Added by JOTA */
+	ni = mdb_remote_get (ic, eh.ether_dhost);
+
 	if (ni == NULL) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
 			("%s: no node for dst %s, discard frame\n",
 			__func__, ether_sprintf(eh.ether_dhost)));
-		ic->ic_stats.is_tx_nonode++; 
+		ic->ic_stats.is_tx_nonode++;
 		goto bad;
 	}
 
-	/* 
+	if (!IEEE80211_ADDR_EQ (eh.ether_dhost, ni->ni_macaddr))
+	{
+		mdb_local_add (ic, eh.ether_shost);
+	}
+
+
+	/*
 	 * If node has a vlan tag then all traffic
 	 * to it must have a matching tag.
 	 */
@@ -273,6 +288,65 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 			goto bad;
 		}
 	}
+
+	/* Added by JOTA */
+	/* =========================================== */
+
+	if (IEEE80211_IS_MULTICAST (eh.ether_dhost))
+	{
+		/* MULTICAST */
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+		{
+			isaddr4 = 0;
+		}
+		else
+		{
+			if (IEEE80211_ADDR_EQ (eh.ether_shost, ic->ic_myaddr))
+			{
+				isaddr4 = 0;
+			}
+			else
+			{
+				isaddr4 = 1;
+			}
+		}
+	}
+	else
+	{
+		/* UNICAST */
+		if (IEEE80211_ADDR_EQ (eh.ether_dhost, ni->ni_macaddr))
+		{
+			if (IEEE80211_ADDR_EQ (eh.ether_shost, ic->ic_myaddr))
+			{
+				isaddr4 = 0;
+			}
+			else
+			{
+				if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+				{
+					isaddr4 = 0;
+				}
+				else
+				{
+					isaddr4 = 1;
+				}
+			}
+		}
+		else
+		{
+			if (ic->ic_opmode != IEEE80211_M_HOSTAP && IEEE80211_ADDR_EQ (eh.ether_shost, ic->ic_myaddr))
+			{
+				isaddr4 = 0;
+			}
+			else
+			{
+				isaddr4 = 1;
+			}
+		}
+	}
+
+	/* =========================================== */
+
 
 	/*
 	 * Insure space for additional headers.  First
@@ -303,6 +377,21 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	llc->llc_snap.org_code[2] = 0;
 	llc->llc_snap.ether_type = eh.ether_type;
 
+	/* Added by JOTA */
+	if (isaddr4)
+	{
+		void *p;
+		p = skb_push (skb, 2);
+		*( (u_int16_t *) p) = 0xabba;
+
+		p = (void *) skb_push (skb, IEEE80211_ADDR_LEN);
+		memcpy (p, eh.ether_shost, IEEE80211_ADDR_LEN);
+	}
+
+
+
+
+
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));;
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
@@ -312,10 +401,23 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	ni->ni_txseq++;
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
-		wh->i_fc[1] = IEEE80211_FC1_DIR_TODS;
-		IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_bssid);
-		IEEE80211_ADDR_COPY(wh->i_addr2, eh.ether_shost);
-		IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_dhost);
+
+		/* Added bY JOTA */
+		if (isaddr4)
+		{
+			wh->i_fc[1] = IEEE80211_FC1_DIR_DSTODS;
+			IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr2, ic->ic_myaddr);
+			IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_dhost);
+		}
+		/* ================================ */
+		else
+		{
+			wh->i_fc[1] = IEEE80211_FC1_DIR_TODS;
+			IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr2, eh.ether_shost);
+			IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_dhost);
+		}
 		break;
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
@@ -325,10 +427,25 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
 		break;
 	case IEEE80211_M_HOSTAP:
-		wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
-		IEEE80211_ADDR_COPY(wh->i_addr1, eh.ether_dhost);
-		IEEE80211_ADDR_COPY(wh->i_addr2, ni->ni_bssid);
-		IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_shost);
+
+		/* Added by JOTA */
+		if (isaddr4)
+		{
+			wh->i_fc[1] = IEEE80211_FC1_DIR_DSTODS;
+			IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_macaddr);
+			IEEE80211_ADDR_COPY(wh->i_addr2, ic->ic_myaddr);
+			IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_dhost);
+		}
+		/* ============================= */
+		else
+		{
+			wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
+			IEEE80211_ADDR_COPY(wh->i_addr1, eh.ether_dhost);
+			IEEE80211_ADDR_COPY(wh->i_addr2, ni->ni_bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_shost);
+		}
+		
+	
 		break;
 	case IEEE80211_M_MONITOR:
 		goto bad;
@@ -868,9 +985,24 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 * NB: Some 11a AP's reject the request when
 		 *     short premable is set.
 		 */
+
+		/*
 		if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
 		    IEEE80211_IS_CHAN_2GHZ(ni->ni_chan))
 			capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
+		*/
+
+		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE))
+		{
+			capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
+			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
+		}
+		else
+		{
+			ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
+		}
+		
+
 		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) &&
 		    (ic->ic_caps & IEEE80211_C_SHSLOT))
 			capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;

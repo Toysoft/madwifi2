@@ -156,12 +156,19 @@ ieee80211_notify_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, i
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
+
+		/* Added by JOTA */
+		ieee80211_notify_assoc (ic);
+
 	} else if (newassoc) {
 		/* fire off wireless event only for new station */
 		memset(&wreq, 0, sizeof(wreq));
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, IWEVREGISTERED, &wreq, NULL);
+
+		/* Added by JOTA */
+		ieee80211_notify_stajoin (ic, ni);
 	}
 }
 
@@ -175,12 +182,19 @@ ieee80211_notify_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 		memset(wreq.ap_addr.sa_data, 0, ETHER_ADDR_LEN);
 		wreq.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
+
+		/* Added by JOTA */
+		ieee80211_notify_disassoc (ic, 0);
+
 	} else {
 		/* fire off wireless event station leaving */
 		memset(&wreq, 0, sizeof(wreq));
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, IWEVEXPIRED, &wreq, NULL);
+
+		/* Added by JOTA */
+		ieee80211_notify_staleave (ic, ni, 0);
 	}
 }
 
@@ -251,6 +265,86 @@ ieee80211_notify_michael_failure(struct ieee80211com *ic,
 }
 EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 
+
+
+
+/* Added by JOTA */
+void ieee80211_notify_staleave (struct ieee80211com *ic, struct ieee80211_node *ni, int reason)
+{
+	union iwreq_data wrqu;
+	char buf[128];
+
+	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
+		return;
+
+	snprintf(buf, sizeof(buf), "STALEAVE|%s|%d|%d",
+		ether_sprintf (ni->ni_macaddr),
+		ni->ni_associd,
+		reason);
+
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+EXPORT_SYMBOL(ieee80211_notify_staleave);
+
+/* Added by JOTA */
+void ieee80211_notify_stajoin (struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	union iwreq_data wrqu;
+	char buf[128];
+
+	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
+		return;
+
+	snprintf(buf, sizeof(buf), "STAJOIN|%s|%d",
+		ether_sprintf (ni->ni_macaddr),
+		ni->ni_associd);
+
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+EXPORT_SYMBOL(ieee80211_notify_stajoin);
+
+/* Added by JOTA */
+void ieee80211_notify_assoc (struct ieee80211com *ic)
+{
+	union iwreq_data wrqu;
+	char buf[128];
+
+	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
+		return;
+
+	snprintf(buf, sizeof(buf), "ASSOC|%s",
+		ether_sprintf (ic->ic_bss->ni_macaddr));
+
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+EXPORT_SYMBOL(ieee80211_notify_assoc);
+
+/* Added by JOTA */
+void ieee80211_notify_disassoc (struct ieee80211com *ic, int reason)
+{
+	union iwreq_data wrqu;
+	char buf[128];
+
+	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
+		return;
+
+	snprintf(buf, sizeof(buf), "DISASSOC|%s|%d",
+		ether_sprintf (ic->ic_bss->ni_macaddr), reason);
+
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+EXPORT_SYMBOL(ieee80211_notify_disassoc);
+
+
+
 #ifdef CONFIG_SYSCTL
 #include <linux/ctype.h>
 
@@ -265,7 +359,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 
 	IEEE80211_NODE_LOCK_BH(ic);
 	TAILQ_FOREACH(ni, head, ni_list) {
-		/* Assume each node needs 300 bytes */ 
+		/* Assume each node needs 300 bytes */
 		if (p - page > space - 300)
 			break;
 

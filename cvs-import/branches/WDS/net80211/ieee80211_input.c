@@ -53,6 +53,12 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211_input.c,v 1.13 2004/01/15 08:44:2
 
 #include <net80211/ieee80211_var.h>
 
+#include "mdb.h"
+
+/* Added by JOTA */
+extern int (*ritdev_frame_hook)(struct sk_buff *skb);
+
+
 static struct sk_buff *ieee80211_defrag(struct ieee80211com *,
 	struct ieee80211_node *, struct sk_buff *);
 static struct sk_buff *ieee80211_decap(struct ieee80211com *, struct sk_buff *);
@@ -104,6 +110,11 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int8_t *bssid;
 	u_int16_t rxseq;
 
+	/* Added by JOTA */
+	int isaddr4 = 0;
+	u_int8_t addr4[6];
+
+
 	KASSERT(ni != NULL, ("null node"));
 	KASSERT(skb->len >= sizeof(struct ieee80211_frame_min),
 		("frame length too short: %u", skb->len));
@@ -141,6 +152,14 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	}
 
 	dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
+
+	/* Added by JOTA */
+	if (dir == IEEE80211_FC1_DIR_DSTODS)
+	{
+		isaddr4 = 1;
+	}
+
+
 	type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 	subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 	if (ic->ic_state != IEEE80211_S_SCAN) {
@@ -242,7 +261,8 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 
 	switch (type) {
 	case IEEE80211_FC0_TYPE_DATA:
-		if (skb->len < sizeof(struct ieee80211_frame)) {
+		/* Added by JOTA */
+		if ( (!isaddr4 && skb->len < sizeof(struct ieee80211_frame)) || (isaddr4 && skb->len < sizeof (struct ieee80211_frame_addr4)) ) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 				("%s: data frame too short, len %u\n",
 				__func__, skb->len));
@@ -251,13 +271,13 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
-			if (dir != IEEE80211_FC1_DIR_FROMDS) {
+			if (dir != IEEE80211_FC1_DIR_FROMDS && dir != IEEE80211_FC1_DIR_DSTODS) {
 				ic->ic_stats.is_rx_wrongdir++;
 				goto out;
 			}
 			if ((dev->flags & IFF_MULTICAST) &&
 			    IEEE80211_IS_MULTICAST(wh->i_addr1) &&
-			    IEEE80211_ADDR_EQ(wh->i_addr3, ic->ic_myaddr)) {
+			    (IEEE80211_ADDR_EQ(wh->i_addr3, ic->ic_myaddr) || mdb_local_get (ic, wh->i_addr3) ) ) {
 				/*
 				 * In IEEE802.11 network, multicast packet
 				 * sent from me is broadcasted from AP.
@@ -282,7 +302,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			break;
 		case IEEE80211_M_HOSTAP:
-			if (dir != IEEE80211_FC1_DIR_TODS) {
+			if (dir != IEEE80211_FC1_DIR_TODS && dir != IEEE80211_FC1_DIR_DSTODS) {
 				ic->ic_stats.is_rx_wrongdir++;
 				goto out;
 			}
@@ -291,7 +311,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
 					("[%s] discard data from unknown src\n",
 					ether_sprintf(wh->i_addr2)));
-ieee80211_dump_nodes(ic);/*XXX*/
+
 				/* NB: caller deals with reference to ic_bss */
 				ni = ieee80211_dup_bss(ic, wh->i_addr2);
 				if (ni != NULL) {
@@ -313,6 +333,11 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				ic->ic_stats.is_rx_notassoc++;
 				goto err;
 			}
+
+			/* Added by JOTA */
+			memcpy (addr4, (wh + 1), IEEE80211_ADDR_LEN);
+			if (isaddr4) mdb_remote_add (ic, addr4, ni->ni_macaddr);
+
 			break;
 		default:
 			/* XXX here to keep compiler happy */
@@ -458,8 +483,14 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				/* attach vlan tag */
 				vlan_hwaccel_receive_skb(skb, ic->ic_vlgrp,
 					ni->ni_vlan);
-			} else {
-				netif_rx(skb);
+			} 
+			else 
+			{
+				/* Added by JOTA */
+				if (ritdev_frame_hook && dev->ritdev) 
+					ritdev_frame_hook (skb);
+				else
+					netif_rx(skb);
 			}
 			dev->last_rx = jiffies;
 		}
@@ -696,8 +727,23 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 	struct llc *llc;
 	u_short ether_type = 0;
 
+	/* Added by JOTA */
+	int isaddr4 = 0;
+	u_int8_t addr4[6];
+
 	memcpy(&wh, skb->data, sizeof(struct ieee80211_frame));
 	llc = (struct llc *) skb_pull(skb, sizeof(struct ieee80211_frame));
+
+	/* Added by JOTA */
+	if ( (wh.i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS)
+	{
+		isaddr4 = 1;
+	
+		/* Pull ADDR4 */
+		memcpy (addr4, skb->data, IEEE80211_ADDR_LEN);
+		llc = (struct llc *) skb_pull (skb, 2 + IEEE80211_ADDR_LEN);
+	}
+
 	if (skb->len >= sizeof(struct llc) &&
 	    llc->llc_dsap == LLC_SNAP_LSAP && llc->llc_ssap == LLC_SNAP_LSAP &&
 	    llc->llc_control == LLC_UI && llc->llc_snap.org_code[0] == 0 &&
@@ -721,11 +767,10 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 		IEEE80211_ADDR_COPY(eh->ether_shost, wh.i_addr3);
 		break;
 	case IEEE80211_FC1_DIR_DSTODS:
-		/* not yet supported */
-		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-			("%s: discard DS to DS frame\n", __func__));
-		dev_kfree_skb(skb);
-		return NULL;
+		/* Added by JOTA */
+		IEEE80211_ADDR_COPY (eh->ether_dhost, wh.i_addr3);
+		IEEE80211_ADDR_COPY (eh->ether_shost, addr4);
+		break;
 	}
 	if (!ALIGNED_POINTER(skb->data + sizeof(*eh), u_int32_t)) {
 		struct sk_buff *n;
@@ -1790,6 +1835,16 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_PROBE_REQ: {
 		u_int8_t rate;
 
+		/* Added by JOTA
+		 * Disables all code bellow.
+		 * We don't like being probled
+		 */
+
+		ic->ic_stats.is_rx_mgtdiscard ++;
+		return;
+
+		/* ============================ */
+
 		if (ic->ic_opmode == IEEE80211_M_STA ||
 		    ic->ic_state != IEEE80211_S_RUN) {
 			ic->ic_stats.is_rx_mgtdiscard++;
@@ -1882,9 +1937,6 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			("%s: algorithm %d seq %d from %s\n",
 			__func__, algo, seq, ether_sprintf(wh->i_addr2)));
 
-		/*
-		 * Consult the ACL policy module if setup.
-		 */
 		if (ic->ic_acl != NULL &&
 		    !ic->ic_acl->iac_check(ic, wh->i_addr2)) {
 			IEEE80211_DPRINTF(ic,
@@ -1894,6 +1946,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ic->ic_stats.is_rx_acl++;
 			return;
 		}
+
 		if (ic->ic_flags & IEEE80211_F_COUNTERM) {
 			/* XXX only in ap mode? */
 			IEEE80211_DPRINTF(ic,
@@ -1962,7 +2015,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, (reassoc ? 10 : 4));
 		if (!IEEE80211_ADDR_EQ(wh->i_addr3, ic->ic_bss->ni_bssid)) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 				("%s: ignore assoc request with bss %s not "
 				"our own\n",
 				__func__, ether_sprintf(wh->i_addr2)));
@@ -2001,11 +2054,11 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 		IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE);
 		IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN);
-		IEEE80211_VERIFY_SSID(ic->ic_bss, ssid, 
+		IEEE80211_VERIFY_SSID(ic->ic_bss, ssid,
 			reassoc ? "reassoc" : "assoc");
 
 		if (ni == ic->ic_bss) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 			    ("[%s] deny %sassoc, not authenticated\n",
 			    ether_sprintf(wh->i_addr2), reassoc ? "re" : ""));
 			ni = ieee80211_dup_bss(ic, wh->i_addr2);
@@ -2065,7 +2118,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		if ((capinfo & IEEE80211_CAPINFO_ESS) == 0 ||
 		    (capinfo & IEEE80211_CAPINFO_PRIVACY) ^
 		    (ic->ic_flags & IEEE80211_F_PRIVACY)) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 				("%s: capability mismatch 0x%x for %s\n",
 				__func__, capinfo, ether_sprintf(wh->i_addr2)));
 			IEEE80211_SEND_MGMT(ic, ni, resp,
@@ -2078,7 +2131,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
 				IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
 		if (ni->ni_rates.rs_nrates == 0) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 				("%s: rate mismatch for %s\n",
 				__func__, ether_sprintf(wh->i_addr2)));
 			IEEE80211_SEND_MGMT(ic, ni, resp,
@@ -2094,6 +2147,10 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ni->ni_chan = ic->ic_bss->ni_chan;
 		ni->ni_fhdwell = ic->ic_bss->ni_fhdwell;
 		ni->ni_fhindex = ic->ic_bss->ni_fhindex;
+
+		/* Added by JOTA: Save association time */
+		ni->ni_assocstamp = jiffies;
+
 		if (wpa != NULL) {
 			/*
 			 * Record WPA/RSN parameters for station, mark

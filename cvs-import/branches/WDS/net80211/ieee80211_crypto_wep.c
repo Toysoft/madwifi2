@@ -143,10 +143,14 @@ wep_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 
 	hdrlen = ieee80211_hdrsize(skb->data);
 
+	/* JOTA */
+	if (hdrlen == 30) hdrlen = 32;
+
 	/*
 	 * Copy down 802.11 header and add the IV + KeyID.
 	 */
 	ivp = skb_push(skb, wep.ic_header);
+
 	memmove(ivp, ivp + wep.ic_header, hdrlen);
 	ivp += hdrlen;
 
