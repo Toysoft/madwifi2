@@ -41,10 +41,9 @@ DESTDIR=
 # Define this to build the HAL from source code
 #
 #HAL_SRC=	true
-HALO=		hal.o
 #
 #
-# Define these for cross-compilation:
+# Define these for cross-compilation; e.g.
 #
 #TOOLPREFIX=	/export/tools/bin/mips-linux-
 #TARGET_OPTS=	-g -O -G 0 -mno-abicalls -fno-pic -mcpu=r4600 -mips2 -Wa,--trap
@@ -60,13 +59,19 @@ AWK=		awk
 
 #
 #
-# Path to the Linux kernel and kernel include files.
+# Path to the Linux kernel, include files, and where to install the modules.
 #
 VERSION=	2.4.20
 KERNEL_PATH=	${DEPTH}/../linux-${VERSION}
 LINUX=		${KERNEL_PATH}/include
+MODULE_PATH=	/lib/modules/${VERSION}/net
+
 #
-# Path to the public HAL materials.
+# Path to the HAL source code.
+#
+HAL=	${DEPTH}/hal
+#
+# Path to the HAL build area.
 #
 ATH_HAL=${DEPTH}/ath_hal
 #

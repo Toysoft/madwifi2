@@ -82,9 +82,8 @@ ${OBJS}: if_ieee80211.ver if_media.ver
 endif
 
 install: all
-	test -d ${DESTDIR}/lib/modules/${VERSION}/net || \
-		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
-	cp wlan.o ${DESTDIR}/lib/modules/${VERSION}/net
+	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
+	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
 
 clean:
 	rm -f ${OBJS} ${ALL} ${ALL_VER} .depend

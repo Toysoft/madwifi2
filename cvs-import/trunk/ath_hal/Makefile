@@ -35,46 +35,41 @@ DEPTH=	..
 
 include ${DEPTH}/Makefile.inc
 
-#
-# When we have source code use those include files so we
-# know we're in sync.  Otherwise, use the ``released'' .h
-# files that correspond to hal.o.
-#
-ifndef HAL_SRC
-HALINCS=-I${ATH_HAL}
-else
-HALINCS=-I${DEPTH}/hal -I${ATH_HAL}
-endif
+HALINCS=-I${DEPTH}/hal -I${HAL}/linux -I${ATH_HAL}
 
 ALL=	ath_hal.o
-# NB: add to SRCS so we get dependency info, but don't add to OBJS
-SRCS=	ah_osdep.c
+
+SRCS=	${HAL}/linux/ah_osdep.c
+OBJS=	ah_osdep.o hal.o
 INCS=	${HALINCS} -I${LINUX} -I${DEPTH}
-COPTS+= -D_BUILD_STANDALONE_
 CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
+
+CLEANFILES+= .depend opt_ah.h
 
 all:	${ALL}
 
-#
-# When we have source code; just use the HAL makefile smarts.
-# Otherwise, use the existing hal.o and be careful it doesn't
-# get removed.
-#
 ifdef HAL_SRC
-include ${DEPTH}/hal/Makefile.inc
+include ${DEPTH}/hal/linux/Makefile.inc
 else
-.PRECIOUS: ${HALO} opt_ah.h
+UUDECODE?=uudecode
+
+hal.o:	${HAL}/linux/i386-elf.hal.o.uu
+	${UUDECODE} < ${HAL}/linux/i386-elf.hal.o.uu
+opt_ah.h: ${HAL}/linux/opt_ah.h
+	cp ${HAL}/linux/opt_ah.h opt_ah.h
 endif
 
-ath_hal.o: ah_osdep.o ${HALO} version.h Makefile
-	${LD} -o $@ -r -x ah_osdep.o ${HALO}
+ah_osdep.o: ${HAL}/linux/ah_osdep.c
+	${CC} -c -o $@ ${CFLAGS} $<
+
+ath_hal.o: ${OBJS} ${HAL}/version.h Makefile
+	${LD} -o $@ -r -x ${OBJS}
 
 install: all
-	test -d ${DESTDIR}/lib/modules/${VERSION}/net || \
-		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
-	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
+	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
+	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
 clean:
-	rm -f ${ALL} ${OBJS} ah_osdep.o .depend
+	rm -f ${ALL} ${OBJS} ${CLEANFILES}
 
 depend: beforedepend .depend afterdepend
 .depend: ${SRCS} opt_ah.h

@@ -53,12 +53,7 @@ endif
 SRCS=	if_ath.c if_ath_pci.c
 OBJS=	if_ath.o if_ath_pci.o
 
-ifdef HAL_SRC
-HALINCS=-I${DEPTH}/hal -I${ATH_HAL}
-else
-HALINCS=-I${ATH_HAL}
-endif
-CFLAGS=	-I. ${HALINCS} -I${WLAN} -I${LINUX} -I${DEPTH} \
+CFLAGS=	-I. -I${HAL} -I${HAL}/linux -I${WLAN} -I${LINUX} -I${DEPTH} \
 	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 LDFLAGS=
 
@@ -67,9 +62,8 @@ ALL=	ath_pci.o
 all:	${ALL}
 
 install: all
-	test -d ${DESTDIR}/lib/modules/${VERSION}/net || \
-		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
-	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
+	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
+	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
 
 ath_pci.o: ${OBJS} Makefile
 	${LD} -o $@ -r ${LDFLAGS} ${OBJS}
