@@ -996,26 +996,24 @@ eapol_fsm_run(struct eapol_auth_node *ean)
 		statechange = FALSE;
 
 		ostate = ean->ean_authState;
-		if (ean->ean_initialize) {
-			eapol_auth_step(ean);
-			if (ean->ean_gone) {
-				struct ieee80211com *ic = ean->ean_ic;
-				struct ieee80211_node *ni = ean->ean_node;
+		eapol_auth_step(ean);
+		if (ean->ean_gone) {
+			struct ieee80211com *ic = ean->ean_ic;
+			struct ieee80211_node *ni = ean->ean_node;
 
-				/*
-				 * Delayed handling of node reclamation when the
-				 * reauthentication timer expires.  We must be
-				 * careful as the call to ieee80211_node_leave
-				 * will reclaim our state so we cannot reference
-				 * it past that point.  However this happens the
-				 * caller must also be careful to not reference state.
-				 */
-				ieee80211_node_leave(ic, ni);
-				ic->ic_stats.is_node_timeout++;
-				return;
-			}
-			statechange |= ostate != ean->ean_authState;
+			/*
+			 * Delayed handling of node reclamation when the
+			 * reauthentication timer expires.  We must be
+			 * careful as the call to ieee80211_node_leave
+			 * will reclaim our state so we cannot reference
+			 * it past that point.  However this happens the
+			 * caller must also be careful to not reference state.
+			 */
+			ieee80211_node_leave(ic, ni);
+			ic->ic_stats.is_node_timeout++;
+			return;
 		}
+		statechange |= ostate != ean->ean_authState;
 
 		ostate = ean->ean_backendState;
 		eapol_backend_step(ean);
