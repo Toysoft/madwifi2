@@ -90,7 +90,7 @@ static int	ath_getchannels(struct net_device *, u_int cc, HAL_BOOL outdoor);
 
 static int	ath_rate_setup(struct net_device *, u_int mode);
 static void	ath_rate_mapsetup(struct net_device *);
-static void	ath_rate_ctl_reset(struct ath_softc *);
+static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
@@ -1824,6 +1824,8 @@ ath_calibrate(unsigned long arg)
 	struct ieee80211channel *c;
 	HAL_CHANNEL hchan;
 
+	sc->sc_stats.ast_per_cal++;
+
 	/*
 	 * Convert to a HAL channel description with the flags
 	 * constrained to reflect the current operating mode.
@@ -1836,24 +1838,24 @@ ath_calibrate(unsigned long arg)
 
 	if (ath_hal_getrfgain(ah) == HAL_RFGAIN_NEED_CHANGE) {
 		HAL_STATUS status;
+
+		sc->sc_stats.ast_per_rfgain++;
 		/*
 		 * Rfgain is out of bounds, reset the chip
 		 * to load new gain values.
 		 */
-printk("%s: gain values need update, reset channel\n", dev->name);/*XXX*/
 		ath_hal_intrset(ah, 0);		/* disable interrupts */
-		ath_hal_stoptxdma(ah, sc->sc_txhalq);
-		ath_hal_stoptxdma(ah, sc->sc_bhalq);
-		ath_stoprecv(sc);
-		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_FALSE, &status))
+		netif_stop_queue(dev);		/* conservative */
+		ath_draintxq(sc);		/* stop xmit side */
+		ath_stoprecv(sc);		/* stop recv side */
+		/* NB: indicate channel change so we do a full reset */
+		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status))
 			printk("%s: unable to reset hardware; hal status %u\n",
 				dev->name, status);
-		/* XXX needed? */
-		if (ic->ic_flags & IEEE80211_F_WEPON)
-			ath_initkeytable(sc);
-		if (ath_startrecv(dev) != 0)
-			printk("%s: unable to start recv logic\n", dev->name);
 		ath_hal_intrset(ah, sc->sc_imask);
+		if (ath_startrecv(dev) != 0)	/* restart recv */
+			printk("%s: unable to start recv logic\n", dev->name);
+		netif_start_queue(dev);		/* restart xmit */
 	}
 	if (!ath_hal_calibrate(ah, &hchan))
 		printk("%s: ath_calibrate: calibration of channel %u failed\n",
@@ -1891,7 +1893,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 
 	DPRINTF(("%s: %s -> %s\n", __func__, stname[ostate], stname[nstate]));
 
-	ath_hal_setledstate(ah, leds[nstate]);	/* set LED */
+	ath_hal_setledstate(ah, leds[nstate]);		/* set LED */
 	netif_stop_queue(dev);			/* before we do anything else */
 
 	if (nstate == IEEE80211_S_INIT) {
@@ -2050,7 +2052,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	/*
 	 * Reset the rate control state.
 	 */
-	ath_rate_ctl_reset(sc);
+	ath_rate_ctl_reset(sc, nstate);
 	return 0;
 bad:
 	del_timer(&sc->sc_scan_ch);
@@ -2167,8 +2169,11 @@ ath_rate_mapsetup(struct net_device *dev)
 		sc->sc_rixmap[rt->info[i].dot11Rate & IEEE80211_RATE_VAL] = i;
 }
 
+/*
+ * Reset the rate control state for each 802.11 state transition.
+ */
 static void
-ath_rate_ctl_reset(struct ath_softc *sc)
+ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
@@ -2176,8 +2181,20 @@ ath_rate_ctl_reset(struct ath_softc *sc)
 
 	st = &sc->sc_bss_stat;
 	st->st_tx_ok = st->st_tx_err = st->st_tx_retr = st->st_tx_upper = 0;
-	if (ic->ic_opmode != IEEE80211_M_STA) {
+	if (ic->ic_opmode == IEEE80211_M_STA) {
+		ni = &ic->ic_bss;
+		if (state == IEEE80211_S_RUN) {
+			/* start with highest negotiated rate */
+			KASSERT(ni->ni_rates.rs_nrates > 0,
+				("transition to RUN state w/ no rates!"));
+			ni->ni_txrate = ni->ni_rates.rs_nrates - 1;
+		} else {
+			/* use lowest rate */
+			ni->ni_txrate = 0;
+		}
+	} else {
 		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+			ni->ni_txrate = 0;		/* use lowest rate */
 			st = ni->ni_private;
 			st->st_tx_ok = st->st_tx_err = st->st_tx_retr =
 			    st->st_tx_upper = 0;
@@ -2185,6 +2202,9 @@ ath_rate_ctl_reset(struct ath_softc *sc)
 	}
 }
 
+/* 
+ * Examine and potentially adjust the transmit rate.
+ */
 static void
 ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 {
@@ -2197,7 +2217,7 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 	 * Rate control
 	 * XXX: very primitive version.
 	 */
-	(void) sc;			/* NB: silence compiler */
+	sc->sc_stats.ast_rate_calls++;
 
 	enough = (st->st_tx_ok + st->st_tx_err >= 10);
 
@@ -2220,16 +2240,20 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 			st->st_tx_upper--;
 		break;
 	case -1:
-		if (ni->ni_txrate > 0)
+		if (ni->ni_txrate > 0) {
 			ni->ni_txrate--;
+			sc->sc_stats.ast_rate_drop++;
+		}
 		st->st_tx_upper = 0;
 		break;
 	case 1:
 		if (++st->st_tx_upper < 2)
 			break;
 		st->st_tx_upper = 0;
-		if (ni->ni_txrate + 1 < rs->rs_nrates)
+		if (ni->ni_txrate + 1 < rs->rs_nrates) {
 			ni->ni_txrate++;
+			sc->sc_stats.ast_rate_raise++;
+		}
 		break;
 	}
 
@@ -2400,6 +2424,9 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 	STAT(rx_nobuf);
 
 	STAT(be_nobuf);
+
+	STAT(per_cal);		STAT(per_rfgain);
+	STAT(rate_calls);	STAT(rate_raise);	STAT(rate_drop);
 
 	return cp - page;
 #undef PHYSTAT

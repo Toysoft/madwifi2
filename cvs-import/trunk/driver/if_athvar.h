@@ -84,6 +84,11 @@ struct ath_stats {
 	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
 	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
+	u_int32_t	ast_per_cal;	/* periodic calibration calls */
+	u_int32_t	ast_per_rfgain;	/* periodic calibration rfgain reset */
+	u_int32_t	ast_rate_calls;	/* rate control checks */
+	u_int32_t	ast_rate_raise;	/* rate control raised xmit rate */
+	u_int32_t	ast_rate_drop;	/* rate control dropped xmit rate */
 };
 
 struct ath_buf {
