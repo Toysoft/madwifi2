@@ -64,6 +64,22 @@ typedef spinlock_t eapol_lock_t;
 #define	EAPOL_LOCK_ASSERT(_ec)
 #endif
 
+/*
+ * 802.1x MAC ACL database locking definitions.
+ */
+typedef spinlock_t acl_lock_t;
+#define	ACL_LOCK_INIT(_as, _name)	spin_lock_init(&(_as)->as_lock)
+#define	ACL_LOCK_DESTROY(_as)
+#define	ACL_LOCK(_as)			spin_lock_bh(&(_as)->as_lock)
+#define	ACL_UNLOCK(_as)			spin_unlock_bh(&(_as)->as_lock)
+/* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+#define	ACL_LOCK_ASSERT(_as) \
+	KASSERT(spin_is_locked(&(_as)->as_lock), ("ACL not locked!"))
+#else
+#define	ACL_LOCK_ASSERT(_as)
+#endif
+
 #define	M_LINK0		0x01		/* frame needs WEP encryption */
 
 /*
@@ -88,6 +104,10 @@ typedef spinlock_t eapol_lock_t;
 
 #define	le16toh(_x)	le16_to_cpu(_x)
 #define	htole16(_x)	cpu_to_le16(_x)
+#define	le32toh(_x)	le32_to_cpu(_x)
+#define	htole32(_x)	cpu_to_le32(_x)
+#define	be32toh(_x)	be32_to_cpu(_x)
+#define	htobe32(_x)	cpu_to_be32(_x)
 
 /*
  * Linux has no equivalents to malloc types so null these out.
@@ -172,6 +192,22 @@ get_jiffies_64(void)
 	_MOD_DEC_USE(THIS_MODULE);	\
 	do_exit(code);			\
 } while (0)
+#endif
+
+/*
+ * Linux uses __BIG_ENDIAN and __LITTLE_ENDIAN while BSD uses _foo
+ * and an explicit _BYTE_ORDER.  Sorry, BSD got there first--define
+ * things in the BSD way...
+ */
+#define	_LITTLE_ENDIAN	1234	/* LSB first: i386, vax */
+#define	_BIG_ENDIAN	4321	/* MSB first: 68000, ibm, net */
+#include <asm/byteorder.h>
+#if defined(__LITTLE_ENDIAN)
+#define	_BYTE_ORDER	_LITTLE_ENDIAN
+#elif defined(__BIG_ENDIAN)
+#define	_BYTE_ORDER	_BIG_ENDIAN
+#else
+#error "Please fix asm/byteorder.h"
 #endif
 
 #ifdef CONFIG_SYSCTL
@@ -267,7 +303,19 @@ extern	int ieee80211_ioctl_setoptie(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
 extern	int ieee80211_ioctl_getoptie(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_setkey(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_getkey(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_delkey(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
 extern	int ieee80211_ioctl_setmlme(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_addmac(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_delmac(struct ieee80211com *,
+		struct iw_request_info *, void *, char *);
+extern	int ieee80211_ioctl_chanlist(struct ieee80211com *,
 		struct iw_request_info *, void *, char *);
 
 extern	void ieee80211_ioctl_iwsetup(struct iw_handler_def *);
