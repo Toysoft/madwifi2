@@ -1079,14 +1079,16 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	case IEEE80211_PARAM_RESET:
 		switch (value) {
 		case IEEE80211_PARAM_RESET_INIT:
-			retv = (*ic->ic_init)(dev);
+			retv = ENETRESET;
 			break;
 		case IEEE80211_PARAM_RESET_RESET:
-			(*ic->ic_reset)(dev);
+			(void) (*ic->ic_reset)(dev);
 			retv = 0;
 			break;
 		}
 	}
+	if (retv == ENETRESET)
+		retv = (*ic->ic_init)(dev);
 	return -retv;
 }
 
