@@ -280,8 +280,8 @@ ath_detach(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	DPRINTF(("ath_detach flags %x\n", dev->flags));
-	sc->sc_invalid = 1;
 	ath_stop(dev);
+	sc->sc_invalid = 1;
 	ath_desc_free(sc);
 	ath_hal_detach(sc->sc_ah);
 	ieee80211_ifdetach(dev);
