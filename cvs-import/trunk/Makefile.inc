@@ -41,17 +41,22 @@ DESTDIR=
 # Define this to build the HAL from source code
 #
 #HAL_SRC=	true
+HALO=		hal.o
 #
 #
 # Define these for cross-compilation:
 #
-#CC=		/export/tools/bin/mips-linux-gcc
-#LD=		/export/tools/bin/mips-linux-ld
-#STRIP=		/export/tools/bin/mips-linux-strip
+#TOOLPREFIX=	/export/tools/bin/mips-linux-
 #TARGET_OPTS=	-g -O -G 0 -mno-abicalls -fno-pic -mcpu=r4600 -mips2 -Wa,--trap
 #
-STRIP=		strip
+CC=		${TOOLPREFIX}gcc
+LD=		${TOOLPREFIX}ld
+STRIP=		${TOOLPREFIX}strip
+OBJCOPY=	${TOOLPREFIX}objcopy
 TARGET_OPTS=	-g -O
+#
+NM=		nm
+AWK=		awk
 
 #
 #
