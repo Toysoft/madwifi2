@@ -55,10 +55,10 @@
 
 #include <asm/uaccess.h>
 
-#define	AR_DEBUG
 #include "if_athvar.h"
-#include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
+
+#include "if_stats.h"
 
 /* unalligned little endian access */     
 #define LE_READ_2(p)							\
@@ -69,7 +69,8 @@
 	 ((((u_int8_t *)(p))[0]      ) | (((u_int8_t *)(p))[1] <<  8) |	\
 	  (((u_int8_t *)(p))[2] << 16) | (((u_int8_t *)(p))[3] << 24)))
 
-static int	ath_init(struct net_device *);
+static int	ath_open(struct net_device *);
+static int	ath_init(struct ieee80211com *);
 static void	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(void *);
 static void	ath_rxorn_tasklet(void *);
@@ -77,6 +78,7 @@ static void	ath_bmiss_tasklet(void *);
 static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
 static void	ath_ratectl(unsigned long);
+static void     ath_watchdog (unsigned long);
 static void	ath_initkeytable(struct ath_softc *);
 static void	ath_mode_init(struct net_device *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
@@ -85,22 +87,25 @@ static void	ath_beacon_free(struct ath_softc *);
 static void	ath_beacon_config(struct ath_softc *);
 static int	ath_desc_alloc(struct ath_softc *);
 static void	ath_desc_free(struct ath_softc *);
-static void	ath_node_free(struct ieee80211com *, struct ieee80211_node *);
+static struct ieee80211_node *ath_node_alloc (struct ieee80211com *);
+static void     ath_node_free(struct ieee80211com *,struct ieee80211_node *);
+static void     ath_node_copy(struct ieee80211com *,struct ieee80211_node *,const struct ieee80211_node *);
+static u_int8_t	ath_node_getrssi(struct ieee80211com *,struct ieee80211_node *);
 static int	ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
 static void	ath_rx_tasklet(void *);
 static int	ath_hardstart(struct sk_buff *, struct net_device *);
-static int	ath_mgtstart(struct sk_buff *, struct net_device *);
+static int	ath_mgtstart(struct ieee80211com *, struct sk_buff *);
 static int	ath_tx_start(struct net_device *, struct ieee80211_node *,
 			     struct ath_buf *, struct sk_buff *);
 static void	ath_tx_tasklet(void *);
 static void	ath_tx_timeout(struct net_device *);
-static int	ath_chan_set(struct ath_softc *, struct ieee80211channel *);
+static int	ath_chan_set(struct ath_softc *, struct ieee80211_channel *);
 static void	ath_draintxq(struct ath_softc *);
 static void	ath_stoprecv(struct ath_softc *);
 static int	ath_startrecv(struct net_device *);
 static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
-static int	ath_newstate(void *, enum ieee80211_state);
+static int	ath_newstate(struct ieee80211com *, enum ieee80211_state, int);
 static struct net_device_stats *ath_getstats(struct net_device *);
 static int	ath_getchannels(struct net_device *, u_int cc, HAL_BOOL outdoor);
 
@@ -110,6 +115,9 @@ static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
 static int      ath_change_mtu(struct net_device *, int);
 static void     ath_rx_capture(	struct net_device *, struct sk_buff *, int , int, int);
+static void     ath_proc_init(struct ath_softc *sc, char const *dev_name);
+static void     ath_proc_remove(struct ath_softc *sc);
+
 
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
@@ -120,12 +128,11 @@ static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_TRUE;		/* enable outdoor use */
 
 #ifdef AR_DEBUG
-int	ath_debug = 0;
-#define	IFF_DUMPPKTS(_ic)	(ath_debug || netif_msg_dumppkts(_ic))
+static int	ath_debug = 0;
 static	void ath_printrxbuf(struct ath_buf *bf, int);
 static	void ath_printtxbuf(struct ath_buf *bf, int);
-#else
-#define	IFF_DUMPPKTS(_ic)	netif_msg_dumppkts(_ic)
+MODULE_PARM(ath_debug, "i");
+MODULE_PARM_DESC(ath_debug, "ORed debugging flags:\n - 0x1: DPRINTF debug\n - 0x2: DPRINTF2 debug\n - 0x4: DPRINTF_DUMP debug");
 #endif
 
 int
@@ -138,6 +145,12 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	u_int8_t csz;
 	HAL_STATUS status;
 
+#ifdef CONFIG_PROC_FS
+#ifdef AR_DEBUG
+	ath_proc_init (sc, dev->name);
+#endif
+#endif
+
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
 	/*
@@ -146,6 +159,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 */
 	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, &csz);
 	/* XXX assert csz is non-zero */
+	KASSERT (csz != 0, ("bad things happen if the cache line size is set to zero."));
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
 	spin_lock_init(&sc->sc_txbuflock);
@@ -236,43 +250,77 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) dev;
 
+	init_timer(&sc->sc_ieee80211_watchdog);
+	sc->sc_ieee80211_watchdog.function = ath_watchdog;
+	sc->sc_ieee80211_watchdog.data = (unsigned long) dev;
+
 	ether_setup(dev);
-	dev->open = ath_init;
+	dev->open = ath_open;
 	dev->stop = ath_stop;
 	dev->hard_start_xmit = ath_hardstart;
 	dev->tx_timeout = ath_tx_timeout;
+	/* why XXX  below ? the BSD code does exactly the same. (ie: a 5s timeout) */
 	dev->watchdog_timeo = 5 * HZ;			/* XXX */
 	dev->set_multicast_list = ath_mode_init;
 	dev->get_stats = ath_getstats;
  	dev->change_mtu = &ath_change_mtu;
 	dev->tx_queue_len = ATH_TXBUF-1;		/* 1 for mgmt frame */
+	/* we do not need to set hard_header_len because this field is correctly
+	   initialized by ether_setup to 14 (ETH_ALEN*2+2). This is because
+	   this driver behaves as a standard ethernet driver to the network stack
+	   even though it neither sends nor receives ethernet frames (it sends
+	   and receives 802.11/LLC encapsulated data frames)
+	   dev->hard_header_len = sizeof (struct ieee80211_frame);
+	 */
+	/* we do not set the hardware mac address length of the device
+	   because it is equal to that of ethernet and ether_setup takes
+	   care of initializing this field for us dev->addr_len = ETH_ALEN; */
 
-	ic->ic_mgtstart = ath_mgtstart;
-	ic->ic_init = ath_init;
-	ic->ic_reset = ath_reset;
-
-	ic->ic_newstate = ath_newstate;
 	/* XXX not right but it's not used anywhere important */
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
 	ic->ic_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS | IEEE80211_C_HOSTAP | IEEE80211_C_MONITOR | IEEE80211_C_SHPREAMBLE;
 
-	ic->ic_node_privlen = sizeof(struct ath_nodestat);
-	ic->ic_node_free = ath_node_free;
-	ic->ic_bss.ni_private = &sc->sc_bss_stat;
-
 	/* get mac address from hardware */
 	ath_hal_getmac(ah, dev->dev_addr);
 
+	ieee80211_stats_attach (ic);
+
+	error = ieee80211_linuxmoduleref (ic);
+	if (error) {
+		goto bad;
+	}
+
+	if ((error = register_netdev(dev))) {
+		printk(KERN_WARNING "%s: unable to register device\n",
+			dev->name);
+		goto bad;
+	}
 	/* call MI attach routine. */
-	ieee80211_ifattach(dev);
-	ieee80211_media_init(dev, ath_media_change, ieee80211_media_status);
+	ieee80211_ifattach(ic);
+
+	/* override class methods. */
+	ic->ic_mgtstart = ath_mgtstart;
+	ic->ic_init = ath_init;
+	ic->ic_node_alloc = ath_node_alloc;
+	ic->ic_node_copy = ath_node_copy;
+	ic->ic_node_free = ath_node_free;
+	ic->ic_node_getrssi = ath_node_getrssi;
+
+	/* override but save previous method to be able to chain up if needed. */
+	sc->sc_newstate = ic->ic_newstate;
+	ic->ic_newstate = ath_newstate;
+
+	/* the cast below works because ic == dev is true.*/
+	ieee80211_media_init(ic, ath_media_change, (ifm_stat_cb_t)ieee80211_media_status);
 
 	/* don't accept xmit's until we are associated */
 	netif_stop_queue(dev);
 
 	printk("%s: 802.11 address: %s\n",
 		dev->name, ether_sprintf(dev->dev_addr));
+
+	/* enable interrupts */
 	return 0;
 bad:
 	if (ah)
@@ -285,13 +333,26 @@ int
 ath_detach(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
 	DPRINTF(("ath_detach flags %x\n", dev->flags));
 	ath_stop(dev);
 	sc->sc_invalid = 1;
 	ath_desc_free(sc);
 	ath_hal_detach(sc->sc_ah);
-	ieee80211_ifdetach(dev);
+	ieee80211_ifdetach(ic);
+
+	unregister_netdev(dev);
+
+	ieee80211_stats_detach (ic);
+
+	ieee80211_linuxmoduleunref (ic);
+
+#ifdef CONFIG_PROC_FS
+#ifdef AR_DEBUG
+	ath_proc_remove (sc);
+#endif
+#endif
 
 	return 0;
 }
@@ -307,7 +368,7 @@ void
 ath_resume(struct net_device *dev)
 {
 	DPRINTF(("ath_resume %x\n", dev->flags));
-	ath_init(dev);
+	ath_init((struct ieee80211com *)dev);
 }
 
 void
@@ -352,6 +413,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 * The hardware is gone, or HAL isn't yet initialized.
 		 * Don't touch anything.
 		 */
+	  printk ("invalid\n");
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
 		return;
 #else
@@ -372,7 +434,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	ath_hal_getisr(ah, &status);
 	DPRINTF2(("%s: interrupt, status 0x%x\n", dev->name, status));
 #ifdef AR_DEBUG
-	if (ath_debug &&
+	if (ath_debug & AR_DEBUG_LEVEL1 &&
 	    (status & (HAL_INT_FATAL|HAL_INT_RXORN|HAL_INT_BMISS))) {
 		printk("%s: ath_intr: status 0x%x\n", dev->name, status);
 		ath_hal_dumpstate(ah);
@@ -448,12 +510,14 @@ ath_bmiss_tasklet(void *data)
 	DPRINTF(("ath_bmiss_tasklet\n"));
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
 		("unexpect operating mode %u", ic->ic_opmode));
+#if 0
 	if (ic->ic_state == IEEE80211_S_RUN)
-		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
+	  //ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+#endif
 }
 
 static u_int
-ath_chan2flags(struct ieee80211com *ic, struct ieee80211channel *chan)
+ath_chan2flags(struct ieee80211com *ic, struct ieee80211_channel *chan)
 {
 	static const u_int modeflags[] = {
 		0,			/* IEEE80211_MODE_AUTO */
@@ -466,10 +530,17 @@ ath_chan2flags(struct ieee80211com *ic, struct ieee80211channel *chan)
 }
 
 static int
-ath_init(struct net_device *dev)
+ath_open(struct net_device *dev)
 {
+	struct ieee80211com *ic = (struct ieee80211com *)dev;
+	return ath_init (ic);
+}
+
+static int
+ath_init(struct ieee80211com *ic)
+{
+	struct net_device *dev = (struct net_device *)ic;
 	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
 	enum ieee80211_phymode mode;
 	struct ath_hal *ah = sc->sc_ah;
@@ -534,6 +605,9 @@ ath_init(struct net_device *dev)
 		return EIO;
 	}
 
+	/* start ieee80211 watchdog (it was stopped in ath_stop) */
+	ath_watchdog ((unsigned long)dev);
+
 	/*
 	 * Enable interrupts.
 	 */
@@ -550,15 +624,16 @@ ath_init(struct net_device *dev)
 	 * to kick the 802.11 state machine as it's likely to
 	 * immediately call back to us to send mgmt frames.
 	 */
-	ni = &ic->ic_bss;
+	ni = ic->ic_bss;
 	ni->ni_chan = ic->ic_ibss_chan;
 	mode = ieee80211_chan2mode(ic, ni->ni_chan);
 	if (mode != sc->sc_curmode)
 		ath_setcurmode(sc, mode);
+	/* the BSD version inverts the test. Maybe we should do the same. */
 	if (ic->ic_opmode != IEEE80211_M_MONITOR)
-		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
+		ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 	else
-		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
+		ieee80211_new_state(ic, IEEE80211_S_RUN, -1);
 	return 0;
 }
 
@@ -566,6 +641,7 @@ static int
 ath_stop(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = (struct ieee80211com *)dev;
 	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(("ath_stop: invalid %u flags 0x%x\n",
@@ -598,11 +674,12 @@ ath_stop(struct net_device *dev)
 		else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);
-		ieee80211_new_state(dev, IEEE80211_S_INIT, -1);
+		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 		del_timer(&sc->sc_rate_ctl);
 		if (!sc->sc_invalid)
 			ath_hal_setpower(ah, HAL_PM_FULL_SLEEP, 0);
 	}
+	del_timer(&sc->sc_ieee80211_watchdog);
 	return 0;
 }
 
@@ -619,9 +696,11 @@ ath_reset(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211channel *c;
+	struct ieee80211_channel *c;
 	HAL_STATUS status;
 	HAL_CHANNEL hchan;
+
+	DPRINTF (("ath_reset\n"));
 
 	/*
 	 * Convert to a HAL channel description with the flags
@@ -709,34 +788,22 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Encapsulate the packet for transmission.
 	 */
-	skb = ieee80211_encap(dev, skb);
+	skb = ieee80211_encap(ic, skb, &ni);
 	if (skb == NULL) {
 		DPRINTF(("%s: discard, encapsulation failure\n", __func__));
 		sc->sc_stats.ast_tx_encap++;
+		KASSERT (ni == NULL, ("node should be NULL"));
 		goto bad;
 	}
 	wh = (struct ieee80211_frame *) skb->data;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
-	/*
-	 * Locate node state.  When operating
-	 * in station mode we always use ic_bss.
-	 */
-	if (ic->ic_opmode != IEEE80211_M_STA) {
-		ni = ieee80211_find_node(ic, wh->i_addr1);
-		if (ni == NULL && !IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-			DPRINTF(("%s: discard, no destination state\n",
-				__func__));
-			sc->sc_stats.ast_tx_nonode++;
-			goto bad;
-		}
-		if (ni == NULL)
-			ni = ieee80211_ref_node(&ic->ic_bss);
-	} else
-		ni = ieee80211_ref_node(&ic->ic_bss);
-	if (IFF_DUMPPKTS(ic))
+
+#ifdef AR_DEBUG
+	if (ath_debug & AR_DEBUG_DUMP)
 		ieee80211_dump_pkt(skb->data, skb->len,
 		    ni->ni_rates.rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
+#endif
 
 	error = ath_tx_start(dev, ni, bf, skb);
 	ieee80211_unref_node(&ni);
@@ -760,11 +827,11 @@ bad:
  * using priority queueing so management frames can bypass data.
  */
 static int
-ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
+ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 {
+	struct net_device *dev = (struct net_device *) ic;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
 	struct ath_buf *bf = NULL;
 	struct ieee80211_frame *wh;
@@ -816,14 +883,19 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 	if (ic->ic_opmode != IEEE80211_M_STA) {
 		ni = ieee80211_find_node(ic, wh->i_addr1);
 		if (ni == NULL)
-			ni = ieee80211_ref_node(&ic->ic_bss);
+			ni = ieee80211_ref_node(ic->ic_bss);
 	} else
-		ni = ieee80211_ref_node(&ic->ic_bss);
+		ni = ieee80211_ref_node(ic->ic_bss);
 
-	if (IFF_DUMPPKTS(ic))
+#ifdef AR_DEBUG
+	if (ath_debug & AR_DEBUG_DUMP)
 		ieee80211_dump_pkt(skb->data, skb->len,
 		    ni->ni_rates.rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
+#endif
 
+	/* XXX: this code assumes that tx_start refs the node if needed.
+	 * This does not seem to be the case.
+	 */
 	error = ath_tx_start(dev, ni, bf, skb);
 	ieee80211_unref_node(&ni);
 	if (error == 0) {
@@ -832,7 +904,8 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 		 * XXX probably shouldn't be mucking with this
 		 * stuff, but we need to timeout the xmit.
 		 */
-		dev->trans_start = jiffies;
+		/* XXX: we do not need to set trans_start since it is set by tx_start. */
+		/* dev->trans_start = jiffies;*/
 		return 0;
 	}
 	/* fall thru... */
@@ -849,12 +922,13 @@ bad:
 static int
 ath_media_change(struct net_device *dev)
 {
+	struct ieee80211com *ic = (struct ieee80211com *)dev;
 	int error;
 
-	error = ieee80211_media_change(dev);
+	error = ieee80211_media_change(ic);
 	if (error == ENETRESET) {
 		if ((dev->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
-			error = ath_init(dev);
+			error = ath_init(ic);
 		else
 			error = 0;
 	}
@@ -901,7 +975,8 @@ ath_mode_init(struct net_device *dev)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
-	if (ic->ic_state == IEEE80211_S_SCAN)
+	if (ic->ic_state == IEEE80211_S_SCAN ||
+	    ic->ic_opmode == IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	ath_hal_setrxfilter(ah, rfilt);
 
@@ -1159,7 +1234,7 @@ ath_beacon_config(struct ath_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni = &ic->ic_bss;
+	struct ieee80211_node *ni = ic->ic_bss;
 	u_int32_t nexttbtt;
 	
 	nexttbtt = (LE_READ_4(ni->ni_tstamp + 4) << 22) |
@@ -1329,8 +1404,24 @@ ath_desc_free(struct ath_softc *sc)
 	sc->sc_bufptr = NULL;
 }
 
-static void
-ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
+static struct ieee80211_node *
+ath_node_alloc (struct ieee80211com *ic)
+{
+	struct ath_node *an;
+	an = kmalloc(sizeof(struct ath_node), GFP_ATOMIC);
+        if (an) {
+		memset (an, 0, sizeof (struct ath_node));
+                int i;
+                for (i = 0; i < ATH_RHIST_SIZE; i++)
+                        an->an_rx_hist[i].arh_jiffies = ATH_RHIST_NOTIME;
+                an->an_rx_hist_next = ATH_RHIST_SIZE-1;
+                return &an->an_node;
+        } else
+                return NULL;
+}
+
+static void 
+ath_node_free(struct ieee80211com *ic,struct ieee80211_node *ni)
 {
         struct ath_softc *sc = ic->ic_dev.priv;
 	struct ath_buf *bf;
@@ -1342,6 +1433,52 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 			bf->bf_node = NULL;
 	}
 	spin_unlock_bh(&sc->sc_txqlock);
+	/* XXX: I kfree the node myself here but the BSD driver does not. 
+	 * I _think_ this is a memory leak in the BSD driver.
+	 */
+	kfree (ni);
+}
+
+static void
+ath_node_copy(struct ieee80211com *ic,struct ieee80211_node *dest,const struct ieee80211_node *src)
+{
+	struct ath_node *s = (struct ath_node *)src;
+	struct ath_node *d = (struct ath_node *)dest;
+	*d = *s;
+}
+
+static u_int8_t
+ath_node_getrssi(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+     struct ath_node *an = (struct ath_node *)ni;
+     int i, now, nsamples, rssi;
+ 
+     /*
+      * Calculate the average over the last second of sampled data.
+      */
+     now = jiffies;
+     nsamples = 0;
+     rssi = 0;
+     i = an->an_rx_hist_next;
+     do {
+	     struct ath_recv_hist *rh = &an->an_rx_hist[i];
+	     if (rh->arh_jiffies == ATH_RHIST_NOTIME)
+		     goto done;
+	     if (now - rh->arh_jiffies > HZ)
+		     goto done;
+	     rssi += rh->arh_rssi;
+	     nsamples++;
+	     if (i == 0)
+		     i = ATH_RHIST_SIZE-1;
+	     else
+		     i--;
+     } while (i != an->an_rx_hist_next);
+done:
+     /*
+      * Return either the average or the last known
+      * value if there is no recent data.
+      */
+     return (nsamples ? rssi / nsamples : an->an_rx_hist[i].arh_rssi);
 }
 
 static int
@@ -1421,10 +1558,13 @@ ath_rx_tasklet(void *data)
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct net_device_stats *stats = &sc->sc_ic.ic_stats;
+	struct net_device_stats *stats = &ic->ic_stats.ic_stats;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
+	struct ieee80211_node *ni;
+	struct ath_node *an;
+	struct ath_recv_hist *rh;
 	struct ieee80211_frame *wh, whbuf;
 	int len;
 	u_int8_t phyerr;
@@ -1445,7 +1585,7 @@ ath_rx_tasklet(void *data)
 		ds = bf->bf_desc;
 		status = ath_hal_rxprocdesc(ah, ds);
 #ifdef AR_DEBUG
-		if (ath_debug > 1)
+		if (ath_debug & AR_DEBUG_LEVEL2)
 			ath_printrxbuf(bf, status == HAL_OK); 
 #endif
 		if (status == HAL_EINPROGRESS)
@@ -1530,12 +1670,14 @@ ath_rx_tasklet(void *data)
 			bf->bf_skb = NULL;
 			skb_put(skb, len);
 			skb->protocol = ETH_P_CONTROL;		/* XXX */
-			if (IFF_DUMPPKTS(&sc->sc_ic)) {
+#ifdef AR_DEBUG
+			if (ath_debug & AR_DEBUG_DUMP) {
 				const HAL_RATE_TABLE *rt = sc->sc_currates;
 				ieee80211_dump_pkt(skb->data, len,
 					   rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
 					   ds->ds_rxstat.rs_rssi);
 			}
+#endif /* AR_DEBUG */
 			skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 			if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
 				/*
@@ -1552,10 +1694,36 @@ ath_rx_tasklet(void *data)
 				skb_trim(skb, skb->len - IEEE80211_WEP_CRCLEN);
 			}
 
-			ieee80211_input(dev, skb,
+			/*
+			 * Locate the node for sender, track state, and
+			 * then pass this node (referenced) up to the 802.11
+			 * layer for its use.  We are required to pass
+			 * something so we fall back to ic_bss when this frame
+			 * is from an unknown sender.
+			 */
+			if (ic->ic_opmode != IEEE80211_M_STA) {
+				ni = ieee80211_find_node(ic, wh->i_addr2);
+				if (ni == NULL)
+					ni = ieee80211_ref_node(ic->ic_bss);
+			} else
+
+				ni = ieee80211_ref_node(ic->ic_bss);
+			/*
+			 * Record driver-specific state.
+			 */
+			an = (struct ath_node *)ni;
+			if (++(an->an_rx_hist_next) == ATH_RHIST_SIZE)
+				an->an_rx_hist_next = 0;
+			rh = &an->an_rx_hist[an->an_rx_hist_next];
+			rh->arh_jiffies = jiffies;
+			rh->arh_rssi = ds->ds_rxstat.rs_rssi;
+			rh->arh_antenna = ds->ds_rxstat.rs_antenna;
+
+
+			ieee80211_input(ic, skb,
+					ni,
 					ds->ds_rxstat.rs_rssi,
-					ds->ds_rxstat.rs_tstamp,
-					ds->ds_rxstat.rs_antenna);
+					ds->ds_rxstat.rs_tstamp);
 		}
 
 		stats->rx_packets++;
@@ -1654,7 +1822,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
-	struct net_device_stats *stats = &ic->ic_stats;
+	struct net_device_stats *stats = &ic->ic_stats.ic_stats;
 	int i, iswep, hdrlen, pktlen;
 	u_int8_t rix, cix, txrate, ctsrate;
 	struct ath_desc *ds;
@@ -1667,7 +1835,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	HAL_PKT_TYPE atype;
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
-	struct ath_nodestat *st;
+	struct ath_node *an;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
@@ -1727,7 +1895,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	DPRINTF2(("ath_tx_start: skb %p [data %p len %u] skbaddr %x\n",
 		skb, skb->data, skb->len, bf->bf_skbaddr));
 	bf->bf_skb = skb;
-	bf->bf_node = ni;
+	bf->bf_node = ni; /* XXX: we should ref the node here and unref it when the buffer is treated. */
 
 	/* setup descriptors */
 	ds = bf->bf_desc;
@@ -1850,11 +2018,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * initialized to 0 which gives us ``auto'' or the
 	 * ``default'' antenna.
 	 */
-	st = ni->ni_private;
-	if (st->st_tx_antenna)
-		antenna = st->st_tx_antenna;
-	else
-		antenna = ni->ni_rantenna;
+        an = (struct ath_node *) ni;
+        if (an->an_tx_antenna)
+                antenna = an->an_tx_antenna;
+        else
+                antenna = an->an_rx_hist[an->an_rx_hist_next].arh_antenna;
 
 	/*
 	 * Formulate first tx descriptor with tx controls.
@@ -1926,7 +2094,7 @@ ath_tx_tasklet(void *data)
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct ieee80211_node *ni;
-	struct ath_nodestat *st;
+	struct ath_node *an;
 	int sr, lr;
 	HAL_STATUS status;
 
@@ -1944,7 +2112,7 @@ ath_tx_tasklet(void *data)
 		ds = bf->bf_desc;		/* NB: last decriptor */
 		status = ath_hal_txprocdesc(ah, ds);
 #ifdef AR_DEBUG
-		if (ath_debug > 1)
+		if (ath_debug & AR_DEBUG_LEVEL2)
 			ath_printtxbuf(bf, status == HAL_OK);
 #endif
 		if (status == HAL_EINPROGRESS) {
@@ -1956,31 +2124,41 @@ ath_tx_tasklet(void *data)
 
 		ni = bf->bf_node;
 		if (ni != NULL) {
-			st = ni->ni_private;
+			an = (struct ath_node *)ni;
 			if (ds->ds_txstat.ts_status == 0) {
-				st->st_tx_ok++;
-				st->st_tx_antenna = ds->ds_txstat.ts_antenna;
+				an->an_tx_ok++;
+				an->an_tx_antenna = ds->ds_txstat.ts_antenna;
 				sc->sc_stats.ast_tx_rssidelta =
 					ds->ds_txstat.ts_rssi -
 					sc->sc_stats.ast_tx_rssi;
 				sc->sc_stats.ast_tx_rssi =
 					ds->ds_txstat.ts_rssi;
 			} else {
-				st->st_tx_err++;
+				an->an_tx_err++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
 					sc->sc_stats.ast_tx_xretries++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_FIFO)
 					sc->sc_stats.ast_tx_fifoerr++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
 					sc->sc_stats.ast_tx_filtered++;
-				st->st_tx_antenna = 0;	/* invalidate */
+				an->an_tx_antenna = 0;	/* invalidate */
 			}
 			sr = ds->ds_txstat.ts_shortretry;
 			lr = ds->ds_txstat.ts_longretry;
 			sc->sc_stats.ast_tx_shortretry += sr;
 			sc->sc_stats.ast_tx_longretry += lr;
 			if (sr + lr)
-				st->st_tx_retr++;
+                                an->an_tx_retr++;
+
+                        /*
+                         * Reclaim reference to node.
+                         *
+                         * NB: the node may be reclaimed here if, for example
+                         *     this is a DEAUTH message that was sent and the
+                         *     node was timed out due to inactivity.
+                         */
+                        if (ni != ic->ic_bss)
+                                ieee80211_free_node(ic, ni);
 		}
 		pci_unmap_single(sc->sc_pdev,
 			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
@@ -2005,10 +2183,11 @@ static void
 ath_tx_timeout(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = (struct ieee80211com *)dev;
 	sc->sc_stats.ast_watchdog++;
-	if (ath_debug)
+	if (ath_debug & AR_DEBUG_DUMP)
 		ath_hal_dumpstate(sc->sc_ah);
-	ath_init(dev);
+	ath_init(ic);
 }
 
 /*
@@ -2041,7 +2220,7 @@ ath_draintxq(struct ath_softc *sc)
 		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
 		spin_unlock_bh(&sc->sc_txqlock);
 #ifdef AR_DEBUG
-		if (ath_debug)
+		if (ath_debug & AR_DEBUG_DUMP)
 			ath_printtxbuf(bf,
 				ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
 #endif /* AR_DEBUG */
@@ -2070,7 +2249,7 @@ ath_stoprecv(struct ath_softc *sc)
 	ath_hal_stopdmarecv(ah);	/* disable DMA engine */
 	udelay(3000);			/* long enough for 1 frame */
 #ifdef AR_DEBUG
-	if (ath_debug) {
+	if (ath_debug & AR_DEBUG_LEVEL1) {
 		struct ath_buf *bf;
 
 		printk("ath_stoprecv: rx queue %p, link %p\n",
@@ -2094,6 +2273,15 @@ ath_startrecv(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 
+	/*
+	 * Cisco's VPN software requires that drivers be able to
+	 * receive encapsulated frames that are larger than the MTU.
+	 * Since we can't be sure how large a frame we'll get, setup
+	 * to handle the larges on possible.  If you're not using the
+	 * VPN driver and want to save memory, define ATH_ENFORCE_MTU
+	 * and you'll allocate only what you really need.
+	 */
+#ifdef ATH_ENFORCE_MTU
 	if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
 		sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
 	} else {
@@ -2102,6 +2290,9 @@ ath_startrecv(struct net_device *dev)
 			(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
 			 IEEE80211_WEP_CRCLEN), sc->sc_cachelsz);
 	}
+#else
+	sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
+#endif
 	DPRINTF(("ath_startrecv: mtu %u cachelsz %u rxbufsize %u\n",
 		dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize));
 
@@ -2127,7 +2318,7 @@ ath_startrecv(struct net_device *dev)
  * ath_init.
  */
 static int
-ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
+ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -2199,7 +2390,7 @@ ath_next_scan(unsigned long arg)
 	struct ieee80211com *ic = &sc->sc_ic;
 
 	if (ic->ic_state == IEEE80211_S_SCAN)
-		ieee80211_next_scan(dev);
+		ieee80211_next_scan(ic);
 }
 
 /*
@@ -2213,7 +2404,7 @@ ath_calibrate(unsigned long arg)
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211channel *c;
+	struct ieee80211_channel *c;
 	HAL_CHANNEL hchan;
 
 	sc->sc_stats.ast_per_cal++;
@@ -2234,6 +2425,7 @@ ath_calibrate(unsigned long arg)
 		 * to load new gain values.
 		 */
 		sc->sc_stats.ast_per_rfgain++;
+		printk ("call to ath_reset from calibrate\n");
 		ath_reset(dev);
 	}
 	if (!ath_hal_calibrate(ah, &hchan)) {
@@ -2246,12 +2438,11 @@ ath_calibrate(unsigned long arg)
 }
 
 static int
-ath_newstate(void *arg, enum ieee80211_state nstate)
+ath_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 {
-	struct net_device *dev = (struct net_device *) arg;
+	struct net_device *dev = (struct net_device *) ic;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
 	int i, error;
 	u_int8_t *bssid;
@@ -2279,10 +2470,10 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	if (nstate == IEEE80211_S_INIT) {
 		sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 		ath_hal_intrset(ah, sc->sc_imask);
-		error = 0;			/* cheat + use error return */
+		error =  (*sc->sc_newstate)(ic, nstate, arg);
 		goto bad;
 	}
-	ni = &ic->ic_bss;
+	ni = ic->ic_bss;
 	error = ath_chan_set(sc, ni->ni_chan);
 	if (error != 0)
 		goto bad;
@@ -2292,7 +2483,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
-	if (ic->ic_state == IEEE80211_S_SCAN)
+	if (ic->ic_state == IEEE80211_S_SCAN ||
+	    ic->ic_opmode == IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	if (nstate == IEEE80211_S_SCAN) {
 		mod_timer(&sc->sc_scan_ch,
@@ -2306,6 +2498,10 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	DPRINTF(("%s: RX filter 0x%x bssid %s\n",
 		 __func__, rfilt, ether_sprintf(bssid)));
 
+	/** XXX: here, I wonder if the author really wanted to test for != M_IBSS and != M_MONITOR or simply for == M_STA. 
+	 * There is a similar question for the != M_STA test below.
+	 * clearly, the BSD code does not do what is shown below.
+	 */
 	if (nstate == IEEE80211_S_RUN &&
 	    ic->ic_opmode != IEEE80211_M_IBSS && ic->ic_opmode != IEEE80211_M_MONITOR)
 		ath_hal_setassocid(ah, bssid, ni->ni_associd);
@@ -2359,7 +2555,8 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	 * Reset the rate control state.
 	 */
 	ath_rate_ctl_reset(sc, nstate);
-	return 0;
+	error = (*sc->sc_newstate)(ic, nstate, arg);
+	return error;
 bad:
 	del_timer(&sc->sc_scan_ch);
 	del_timer(&sc->sc_cal_ch);
@@ -2482,14 +2679,15 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
-	struct ath_nodestat *st;
+	struct ath_node *an;
 
-	if (ic->ic_fixed_rate != -1)
+	if (ic->ic_fixed_rate != -1) {
 		return;
-	st = &sc->sc_bss_stat;
-	st->st_tx_ok = st->st_tx_err = st->st_tx_retr = st->st_tx_upper = 0;
+	}
+	an = (struct ath_node *)ic->ic_bss;
+	an->an_tx_ok = an->an_tx_err = an->an_tx_retr = an->an_tx_upper = 0;
 	if (ic->ic_opmode == IEEE80211_M_STA) {
-		ni = &ic->ic_bss;
+		ni = ic->ic_bss;
 		if (state == IEEE80211_S_RUN) {
 			/* start with highest negotiated rate */
 			KASSERT(ni->ni_rates.rs_nrates > 0,
@@ -2502,9 +2700,9 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 	} else {
 		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
 			ni->ni_txrate = 0;		/* use lowest rate */
-			st = ni->ni_private;
-			st->st_tx_ok = st->st_tx_err = st->st_tx_retr =
-			    st->st_tx_upper = 0;
+			an = (struct ath_node *)ni;
+			an->an_tx_ok = an->an_tx_err = an->an_tx_retr =
+			    an->an_tx_upper = 0;
 		}
 	}
 	if (state == IEEE80211_S_RUN) {
@@ -2523,64 +2721,76 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 static void
 ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 {
-	struct ath_softc *sc = arg;
-	struct ath_nodestat *st = ni->ni_private;
-	struct ieee80211_rateset *rs = &ni->ni_rates;
-	int mod = 0, orate, enough;
+        struct ath_softc *sc = arg;
+        struct ath_node *an = (struct ath_node *) ni;
+        struct ieee80211_rateset *rs = &ni->ni_rates;
+        int mod = 0, orate, enough;
+                                                                                                                                                                    
+        /*
+         * Rate control
+         * XXX: very primitive version.
+         */
+        sc->sc_stats.ast_rate_calls++;
+                                                                                                                                                                    
+        enough = (an->an_tx_ok + an->an_tx_err >= 10);
+ 
+        /* no packet reached -> down */
+        if (an->an_tx_err > 0 && an->an_tx_ok == 0)
+                mod = -1;
+ 
+        /* all packets needs retry in average -> down */
+        if (enough && an->an_tx_ok < an->an_tx_retr)
+                mod = -1;
+ 
+        /* no error and less than 10% of packets needs retry -> up */
+        if (enough && an->an_tx_err == 0 && an->an_tx_ok > an->an_tx_retr * 10)
+                mod = 1;
+                                                                                                                                                                    
+        orate = ni->ni_txrate;
+        switch (mod) {
+        case 0:
+                if (enough && an->an_tx_upper > 0)
+                        an->an_tx_upper--;
+                break;
+        case -1:
+                if (ni->ni_txrate > 0) {
+                        ni->ni_txrate--;
+                        sc->sc_stats.ast_rate_drop++;
+                }
+                an->an_tx_upper = 0;
+                break;
+        case 1:
+                if (++an->an_tx_upper < 2)
+                        break;
+                an->an_tx_upper = 0;
+                if (ni->ni_txrate + 1 < rs->rs_nrates) {
+                        ni->ni_txrate++;
+                        sc->sc_stats.ast_rate_raise++;
+                }
+                break;
+        }
+                                                                                                                                                                    
+        if (ni->ni_txrate != orate) {
+                printf("%s: %dM -> %dM (%d ok, %d err, %d retr)\n",
+		       __func__,
+		       (rs->rs_rates[orate] & IEEE80211_RATE_VAL) / 2,
+		       (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) / 2,
+		       an->an_tx_ok, an->an_tx_err, an->an_tx_retr);
+        }
+        if (ni->ni_txrate != orate || enough)
+                an->an_tx_ok = an->an_tx_err = an->an_tx_retr = 0;
+}
 
-	/*
-	 * Rate control
-	 * XXX: very primitive version.
-	 */
-	sc->sc_stats.ast_rate_calls++;
+static void     
+ath_watchdog (unsigned long data)
+{
+	struct ath_softc *sc = (struct ath_softc *)data;
+	struct ieee80211com *ic = (struct ieee80211com *)data;
 
-	enough = (st->st_tx_ok + st->st_tx_err >= 10);
+	ieee80211_watchdog (ic);
 
-	/* no packet reached -> down */
-	if (st->st_tx_err > 0 && st->st_tx_ok == 0)
-		mod = -1;
-
-	/* all packets needs retry in average -> down */
-	if (enough && st->st_tx_ok < st->st_tx_retr)
-		mod = -1;
-
-	/* no error and less than 10% of packets needs retry -> up */
-	if (enough && st->st_tx_err == 0 && st->st_tx_ok > st->st_tx_retr * 10)
-		mod = 1;
-
-	orate = ni->ni_txrate;
-	switch (mod) {
-	case 0:
-		if (enough && st->st_tx_upper > 0)
-			st->st_tx_upper--;
-		break;
-	case -1:
-		if (ni->ni_txrate > 0) {
-			ni->ni_txrate--;
-			sc->sc_stats.ast_rate_drop++;
-		}
-		st->st_tx_upper = 0;
-		break;
-	case 1:
-		if (++st->st_tx_upper < 2)
-			break;
-		st->st_tx_upper = 0;
-		if (ni->ni_txrate + 1 < rs->rs_nrates) {
-			ni->ni_txrate++;
-			sc->sc_stats.ast_rate_raise++;
-		}
-		break;
-	}
-
-	if (ni->ni_txrate != orate) {
-		printk("%s: %dM -> %dM (%d ok, %d err, %d retr)\n",
-		    __func__,
-		    (rs->rs_rates[orate] & IEEE80211_RATE_VAL) / 2,
-		    (rs->rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) / 2,
-		    st->st_tx_ok, st->st_tx_err, st->st_tx_retr);
-	}
-	if (ni->ni_txrate != orate || enough)
-		st->st_tx_ok = st->st_tx_err = st->st_tx_retr = 0;
+	sc->sc_ieee80211_watchdog.expires = jiffies + HZ;
+	add_timer(&sc->sc_ieee80211_watchdog);
 }
 
 static void
@@ -2592,7 +2802,7 @@ ath_ratectl(unsigned long data)
 
 	if (dev->flags & IFF_RUNNING) {
 		if (ic->ic_opmode == IEEE80211_M_STA)
-			ath_rate_ctl(sc, &ic->ic_bss);	/* NB: no reference */
+			ath_rate_ctl(sc, ic->ic_bss);	/* NB: no reference */
 		else
 			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
 	}
@@ -2635,7 +2845,7 @@ static struct net_device_stats *
 ath_getstats(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
-	struct net_device_stats *stats = &sc->sc_ic.ic_stats;
+	struct net_device_stats *stats = &sc->sc_ic.ic_stats.ic_stats;
 
 	/* update according to private statistics */
 	stats->tx_errors = sc->sc_stats.ast_tx_encap
@@ -2863,3 +3073,67 @@ ath_sysctl_unregister(void)
 		unregister_sysctl_table(ath_sysctl_header);
 }
 #endif /* CONFIG_SYSCTL */
+
+
+#ifdef CONFIG_PROC_FS
+#ifdef AR_DEBUG
+#include <linux/proc_fs.h>
+#include <linux/ctype.h>
+
+static int
+ath_proc_debug_read(char *page, char **start, off_t off,
+			  int count, int *eof, void *data)
+{
+	if (off != 0) {
+		*eof = 1;
+		return 0;
+	}
+	return sprintf(page, "%d\n", ath_debug);
+}
+
+static int
+ath_proc_debug_write(struct file *file, const char *buf,
+			   unsigned long count, void *data)
+{
+	int v;
+	
+	if (sscanf(buf, "%d", &v) == 1) {
+		ath_debug = v;
+		return count;
+	} else
+		return -EINVAL;
+}
+
+static void
+ath_proc_init(struct ath_softc *sc, char const *dev_name)
+{
+	struct proc_dir_entry *dp;
+
+	for (; *dev_name && !isdigit(*dev_name); dev_name++)
+		;
+	snprintf(sc->sc_procname, sizeof(sc->sc_procname), "ath%s", dev_name);
+	sc->sc_proc = proc_mkdir(sc->sc_procname, proc_net);
+	if (sc->sc_proc == NULL) {
+		printk(KERN_INFO "/proc/net/%s: failed to create\n",
+		       sc->sc_procname);
+		return;
+	}
+	dp = create_proc_entry("debug", 0644, sc->sc_proc);
+	if (dp) {
+		dp->read_proc = ath_proc_debug_read;
+		dp->write_proc = ath_proc_debug_write;
+		dp->data = sc;
+	}
+}
+
+static void
+ath_proc_remove(struct ath_softc *sc)
+{
+	if (sc->sc_proc != NULL) {
+		remove_proc_entry("debug", sc->sc_proc);
+		remove_proc_entry(sc->sc_procname, proc_net);
+		sc->sc_proc = NULL;
+	}
+}
+#endif  /* AR_DEBUG */
+#endif /* CONFIG_PROC_FS */
