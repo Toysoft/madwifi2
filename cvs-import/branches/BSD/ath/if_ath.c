@@ -544,6 +544,12 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		| IEEE80211_C_SHSLOT		/* short slot time supported */
 		| IEEE80211_C_WPA		/* capable of WPA1+WPA2 */
 		;
+
+	/*
+	 * initialize management queue
+	 */
+	skb_queue_head_init(&ic->ic_mgtq);
+
 	/*
 	 * Query the hal to figure out h/w crypto support.
 	 */
