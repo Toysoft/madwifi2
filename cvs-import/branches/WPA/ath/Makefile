@@ -72,4 +72,4 @@ clean:
 	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 
 ath_pci.o: ${ath_pci-objs}
-	$(LD) -o ath_pci.$(KMODSUF) -r $(ath_pci-objs)
+	$(LD) $(LDOPTS) -o ath_pci.$(KMODSUF) -r $(ath_pci-objs)

@@ -88,26 +88,26 @@ all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
 wlan.o:	$(wlan-objs)
-	$(LD) -o wlan.$(KMODSUF) -r $(wlan-objs)
+	$(LD) $(LDOPTS) -o wlan.$(KMODSUF) -r $(wlan-objs)
 wlan_wep.o:	$(wlan_wep-objs)
-	$(LD) -o wlan_wep.$(KMODSUF) -r $(wlan_wep-objs)
+	$(LD) $(LDOPTS) -o wlan_wep.$(KMODSUF) -r $(wlan_wep-objs)
 wlan_tkip.o:	$(wlan_tkip-objs)
-	$(LD) -o wlan_tkip.$(KMODSUF) -r $(wlan_tkip-objs)
+	$(LD) $(LDOPTS) -o wlan_tkip.$(KMODSUF) -r $(wlan_tkip-objs)
 wlan_ccmp.o:	$(wlan_ccmp-objs)
-	$(LD) -o wlan_ccmp.$(KMODSUF) -r $(wlan_ccmp-objs)
+	$(LD) $(LDOPTS) -o wlan_ccmp.$(KMODSUF) -r $(wlan_ccmp-objs)
 wlan_auth.o:	$(wlan_auth-objs)
-	$(LD) -o wlan_auth.$(KMODSUF) -r $(wlan_auth-objs)
+	$(LD) $(LDOPTS) -o wlan_auth.$(KMODSUF) -r $(wlan_auth-objs)
 wlan_radius.o:	$(wlan_radius-objs)
-	$(LD) -o wlan_radius.$(KMODSUF) -r $(wlan_radius-objs)
+	$(LD) $(LDOPTS) -o wlan_radius.$(KMODSUF) -r $(wlan_radius-objs)
 wlan_acl.o:	$(wlan_acl-objs)
-	$(LD) -o wlan_acl.$(KMODSUF) -r $(wlan_acl-objs)
+	$(LD) $(LDOPTS) -o wlan_acl.$(KMODSUF) -r $(wlan_acl-objs)
 
 tkip_test.o:	$(tkip_test-objs)
-	$(LD) -o tkip_test.$(KMODSUF) -r $(tkip_test-objs)
+	$(LD) $(LDOPTS) -o tkip_test.$(KMODSUF) -r $(tkip_test-objs)
 ccmp_test.o:	$(ccmp_test-objs)
-	$(LD) -o ccmp_test.$(KMODSUF) -r $(ccmp_test-objs)
+	$(LD) $(LDOPTS) -o ccmp_test.$(KMODSUF) -r $(ccmp_test-objs)
 wep_test.o:	$(wep_test-objs)
-	$(LD) -o wep_test.$(KMODSUF) -r $(wep_test-objs)
+	$(LD) $(LDOPTS) -o wep_test.$(KMODSUF) -r $(wep_test-objs)
 
 MODULES=wlan wlan_wep wlan_tkip wlan_ccmp wlan_auth wlan_radius wlan_acl
 
