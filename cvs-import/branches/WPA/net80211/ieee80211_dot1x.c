@@ -1695,10 +1695,14 @@ static ctl_table net_table[] = {
 
 static struct ctl_table_header *eapol_sysctls;
 
+/* XXX hide after module restructuring */
+extern	int init_ieee80211_radius(void);
+extern	void exit_ieee80211_radius(void);
+
 /*
  * Called once on startup.
  */
-int __init
+int
 init_ieee80211_auth(void)
 {
 	eapol_sysctls = register_sysctl_table(net_table, 0);
@@ -1710,7 +1714,7 @@ init_ieee80211_auth(void)
 /*
  * Called once at shutdown/unload.
  */
-void __exit
+void
 exit_ieee80211_auth(void)
 {
 	exit_ieee80211_radius();
