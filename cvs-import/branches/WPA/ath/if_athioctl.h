@@ -69,8 +69,6 @@ struct ath_stats {
 	u_int32_t	ast_tx_shortpre;/* tx frames with short preamble */
 	u_int32_t	ast_tx_altrate;	/* tx frames with alternate rate */
 	u_int32_t	ast_tx_protect;	/* tx frames with protection */
-	int16_t		ast_tx_rssi;	/* tx rssi of last ack */
-	int16_t		ast_tx_rssidelta;/* tx rssi delta */
 	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
@@ -83,7 +81,8 @@ struct ath_stats {
 	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
 	u_int32_t	ast_rx_mgt;	/* management frames received */
 	u_int32_t	ast_rx_ctl;	/* control frames received */
-	u_int8_t	ast_rx_rssi;	/* rx rssi from histogram */
+	int8_t		ast_tx_rssi;	/* tx rssi of last ack */
+	int8_t		ast_rx_rssi;	/* rx rssi from histogram */
 	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
 	u_int32_t	ast_per_cal;	/* periodic calibration calls */
 	u_int32_t	ast_per_calfail;/* periodic calibration failed */
