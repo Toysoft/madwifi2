@@ -913,6 +913,18 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 					end_buf, &iwe, IW_EV_UINT_LEN);
 		}
 
+
+		/* return essid if present */
+		if (ni->ni_essid[0]) {	
+		    memset(&iwe, 0, sizeof(iwe));
+		    iwe.cmd = SIOCGIWESSID;
+		    iwe.u.data.length = strlen(ni->ni_essid);
+		    iwe.u.data.flags = 1;
+		    current_ev = iwe_stream_add_point(current_ev,
+				    end_buf, &iwe, ni->ni_essid);
+
+		}
+
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWFREQ;
 		iwe.u.freq.m = ni->ni_chan->ic_freq * 100000;
