@@ -749,6 +749,7 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 		dev_kfree_skb(skb);
 	}
 	if (more_frag) {			/* more to come, save */
+		ni->ni_rxfragstamp = jiffies;
 		ni->ni_rxfrag[0] = skbfrag;
 		skbfrag = NULL;
 	}
