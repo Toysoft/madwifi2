@@ -127,7 +127,7 @@ usage(void)
 {
 	int i;
 
-	fprintf(stderr, "usage: %s [-i device] [flags]\n", progname);
+	fprintf(stderr, "usage: %s [-i device] [[+|-]flags]\n", progname);
 	fprintf(stderr, "where flags are:\n");
 	for (i = 0; i < N(flags); i++)
 		printf("%s\n", flags[i].name);
