@@ -92,7 +92,6 @@ struct ath_softc {
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	struct pci_dev		*sc_pdev;	/* associated pci device */
 	volatile int		sc_invalid;	/* being detached */
-	int			sc_cachelsz;	/* system cache line size */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
 	size_t			sc_desc_len;	/* size of TX/RX descriptors */
 	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */

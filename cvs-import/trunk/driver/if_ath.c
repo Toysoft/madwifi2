@@ -47,16 +47,16 @@
 #include "ah_desc.h"
 
 #define	TXBUF_DEQUEUE(_sc, _bf) do {					\
-	spin_lock(&(_sc)->sc_txbuflock);				\
+	spin_lock_bh(&(_sc)->sc_txbuflock);				\
 	_bf = TAILQ_FIRST(&(_sc)->sc_txbuf);				\
 	if (_bf != NULL)						\
 		TAILQ_REMOVE(&(_sc)->sc_txbuf, _bf, bf_list);		\
-	spin_unlock(&(_sc)->sc_txbuflock);				\
+	spin_unlock_bh(&(_sc)->sc_txbuflock);				\
 } while (0);
 #define	TXBUF_QUEUE_TAIL(_sc, _bf) do {					\
-	spin_lock(&(_sc)->sc_txbuflock);				\
+	spin_lock_bh(&(_sc)->sc_txbuflock);				\
 	TAILQ_INSERT_TAIL(&(_sc)->sc_txbuf, _bf, bf_list);		\
-	spin_unlock(&(_sc)->sc_txbuflock);				\
+	spin_unlock_bh(&(_sc)->sc_txbuflock);				\
 } while (0);
 
 /* unalligned little endian access */     
@@ -136,7 +136,6 @@ ath_attach(uint16_t devid, struct net_device *dev)
 #define	ATH_MAXCHAN	32		/* number of potential channels */
 	HAL_CHANNEL chans[ATH_MAXCHAN];		/* XXX get off stack */
 	HAL_STATUS status;
-	u8 cache_line_size;
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
@@ -149,14 +148,6 @@ ath_attach(uint16_t devid, struct net_device *dev)
 	INIT_TQUEUE(&sc->sc_bmisstq,	ath_bmiss_tasklet,	dev);
 	INIT_TQUEUE(&sc->sc_rxorntq,	ath_rxorn_tasklet,	dev);
 	INIT_TQUEUE(&sc->sc_fataltq,	ath_fatal_tasklet,	dev);
-
-	/*
-	 * NB: cache line size is used to size rx buffers and align
-	 *     various data structures.
-	 */
-	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE,
-		&cache_line_size);
-	sc->sc_cachelsz = cache_line_size << 4;
 
 	ah = ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
@@ -408,6 +399,7 @@ ath_bmiss_tasklet(void *data)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 			
+	DPRINTF(("ath_bmiss_tasklet\n"));
 	sc->sc_stats.ast_bmiss++;
 	if (ic->ic_opmode == IEEE80211_M_STA && ic->ic_state == IEEE80211_S_RUN)
 		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
@@ -928,6 +920,7 @@ ath_beacon_tasklet(void *data)
 	struct ath_buf *bf = sc->sc_bcbuf;
 	struct ath_hal *ah = sc->sc_ah;
 
+	DPRINTF(("ath_beacon_tasklet\n"));
 	if (!ath_hal_waitforbeacon(ah, bf)) {
 		DPRINTF(("ath_beacon_int: TXQ1F busy"));
 		return;				/* busy */
@@ -1071,18 +1064,19 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 
 	skb = bf->bf_skb;
 	if (skb == NULL) {
-		int off;
-
 		skb = dev_alloc_skb(sc->sc_rxbufsize);
-		if (skb == NULL)
+		if (skb == NULL) {
+			DPRINTF(("ath_rxbuf_init: skbuff allocation failed; "
+				"size %u\n", sc->sc_rxbufsize));
 			return ENOMEM;
+		}
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
-
-		/* align to cache line size, buffer is assumed large enough */
-		off = ((unsigned long) skb->data) % sc->sc_cachelsz;
-		if (off)
-			skb_reserve(skb, sc->sc_cachelsz - off);
+		/*
+		 * NB: Atheros wants rx buffers set on cache line boundaries
+		 *     but doing this is typically impractical given the
+		 *     cache line size.
+		 */
 		bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
 			skb->data, skb->len, PCI_DMA_FROMDEVICE);
 	}
@@ -1116,6 +1110,7 @@ ath_rx_tasklet(void *data)
 	u_int32_t rstamp, now;
 	u_int8_t arate, rate;
 
+	DPRINTF(("ath_rx_tasklet\n"));
 	do {
 		bf = TAILQ_FIRST(&sc->sc_rxbuf);
 		if (bf == NULL) {		/* XXX ??? can this happen */
@@ -1337,7 +1332,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	DPRINTF2(("ath_tx_start: %08x %08x %08x %08x\n",
 	    ds->ds_link, ds->ds_data, ds->ds_ctl0, ds->ds_ctl1));
 
-	spin_lock(&sc->sc_txqlock);
+	spin_lock_bh(&sc->sc_txqlock);
 	TAILQ_INSERT_TAIL(&sc->sc_txq, bf, bf_list);
 	if (sc->sc_txlink == NULL) {
 		ath_hal_puttxbuf(ah, bf->bf_daddr);
@@ -1349,7 +1344,7 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 		    sc->sc_txlink, (caddr_t)bf->bf_daddr, bf->bf_desc));
 	}
 	sc->sc_txlink = &ds->ds_link;
-	spin_unlock(&sc->sc_txqlock);
+	spin_unlock_bh(&sc->sc_txqlock);
 
 	ath_hal_txstart(ah);
 
@@ -1368,6 +1363,7 @@ ath_tx_tasklet(void *data)
 	struct ath_desc *ds;
 	struct ath_nodestat *st;
 
+	DPRINTF(("ath_tx_tasklet\n"));
 #ifdef AR_DEBUG
 	if (ath_debug > 1) {
 		printk("ath_tx_int: tx queue %p, link %p\n",
@@ -1411,7 +1407,9 @@ ath_tx_tasklet(void *data)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
-		TXBUF_QUEUE_TAIL(sc, bf);
+		spin_lock(&sc->sc_txbuflock);
+		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+		spin_unlock(&sc->sc_txbuflock);
 	}
 	sc->sc_tx_timer = 0;
 }
@@ -1433,7 +1431,7 @@ ath_draintxq(struct ath_softc *sc)
 	    TAILQ_FIRST(&sc->sc_txq), (caddr_t) ath_hal_gettxbuf(ah),
 	    sc->sc_txlink));
 	for (;;) {
-		spin_lock(&sc->sc_txqlock);
+		spin_lock_bh(&sc->sc_txqlock);
 		bf = TAILQ_FIRST(&sc->sc_txq);
 		if (bf == NULL) {
 			sc->sc_txlink = NULL;
@@ -1441,7 +1439,7 @@ ath_draintxq(struct ath_softc *sc)
 			break;
 		}
 		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
-		spin_unlock(&sc->sc_txqlock);
+		spin_unlock_bh(&sc->sc_txqlock);
 #ifdef AR_DEBUG
 		if (ath_debug)
 			ath_printtxbuf(bf);
@@ -1498,18 +1496,15 @@ ath_startrecv(struct net_device *dev)
 
 	sc->sc_rxbufsize = dev->mtu + IEEE80211_CRC_LEN +
 		(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
-		 IEEE80211_WEP_CRCLEN) + (sc->sc_cachelsz - 1);
-	DPRINTF(("ath_startrecv: mtu %u cachelsz %u rxbufsize %u\n",
-		dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize));
+		 IEEE80211_WEP_CRCLEN);
+	DPRINTF(("ath_startrecv: mtu %u rxbufsize %u\n",
+		dev->mtu, sc->sc_rxbufsize));
 
 	sc->sc_rxlink = NULL;
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
 		int error = ath_rxbuf_init(sc, bf);
-		if (error != 0) {
-			DPRINTF(("ath_startrecv: ath_rxbuf_init failed %d\n",
-				error));
+		if (error != 0)
 			return error;
-		}
 	}
 
 	bf = TAILQ_FIRST(&sc->sc_rxbuf);
