@@ -973,6 +973,47 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 }
 #endif /* SIOCGIWSCAN */
 
+static int
+ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	int *i = (int *) extra;
+	int param = i[0];		/* parameter id is 1st */
+	int value = i[1];		/* NB: all values are TYPE_INT */
+
+	switch (param) {
+	case IEEE80211_PARAM_TURBO:
+		if (value) {
+			if ((ic->ic_caps & IEEE80211_C_TURBO) == 0)
+				return -EOPNOTSUPP;
+			ic->ic_flags |= IEEE80211_F_TURBO;
+		} else
+			ic->ic_flags &= ~IEEE80211_F_TURBO;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return -(*ic->ic_init)(dev);	/* kick driver to set param */
+}
+
+static int
+ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
+		   	void *w, char *extra)
+{
+	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	int *param = (int *) extra;
+
+	switch (param[0]) {
+	case IEEE80211_PARAM_TURBO:
+		param[0] = (ic->ic_flags & IEEE80211_F_TURBO) != 0;
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+	return 0;
+}
+
 /* Structures to export the Wireless Handlers */
 static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) NULL,				/* SIOCSIWCOMMIT */
@@ -1027,13 +1068,41 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) ieee80211_ioctl_siwpower,		/* SIOCSIWPOWER */
 	(iw_handler) ieee80211_ioctl_giwpower,		/* SIOCGIWPOWER */
 };
+static const iw_handler ieee80211_priv_handlers[] = {
+	(iw_handler) ieee80211_ioctl_setparam,		/* SIOCWFIRSTPRIV+0 */
+	(iw_handler) ieee80211_ioctl_getparam,		/* SIOCWFIRSTPRIV+1 */
+};
+static const struct iw_priv_args ieee80211_priv_args[] = {
+	{ IEEE80211_IOCTL_SETPARAM,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "setparam" },
+#if WIRELESS_EXT >= 12
+	/*
+	 * These depends on sub-ioctl support which added in version 12.
+	 */
+	{ IEEE80211_IOCTL_GETPARAM,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "getparam" },
+	/* sub-ioctl handlers */
+	{ IEEE80211_IOCTL_SETPARAM,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "" },
+	{ IEEE80211_IOCTL_GETPARAM,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "" },
+	/* sub-ioctl definitions */
+	{ IEEE80211_PARAM_TURBO,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "turbo" },
+	{ IEEE80211_PARAM_TURBO,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_turbo" },
+#endif /* WIRELESS_EXT >= 12 */
+};
 
 const struct iw_handler_def ieee80211_iw_handler_def = {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
-	.num_standard		=  N(ieee80211_handlers),
-	.num_private		= 0,
-	.num_private_args	= 0,
 	.standard		= (iw_handler *) ieee80211_handlers,
+	.num_standard		= N(ieee80211_handlers),
+	.private		= (iw_handler *) ieee80211_priv_handlers,
+	.num_private		= N(ieee80211_priv_handlers),
+	.private_args		= (struct iw_priv_args *) ieee80211_priv_args,
+	.num_private_args	= N(ieee80211_priv_args),
 #undef N
 };
 #endif /* CONFIG_NET_WIRELESS */

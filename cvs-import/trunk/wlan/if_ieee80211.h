@@ -43,6 +43,7 @@
 #ifdef CONFIG_NET_WIRELESS
 #include <linux/wireless.h>
 #endif
+#include "if_ieee80211ioctl.h"
 
 #define	IEEE80211_ADDR_LEN			6
 
@@ -285,128 +286,7 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
 #define	IEEE80211_MAX_LEN			(2300 + IEEE80211_CRC_LEN + \
     (IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + IEEE80211_WEP_CRCLEN))
 
-/*
- * ioctls
- */
-
-#ifndef SIOCSIFGENERIC
-#define	SIOCSIFGENERIC	 _IOW('i', 57, struct ifreq)	/* generic IF set op */
-#endif
-#ifndef SIOCGIFGENERIC
-#define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */
-#endif
-
-/* nwid is pointed at by ifr.ifr_data */
-struct ieee80211_nwid {
-	u_int8_t	i_len;
-	u_int8_t	i_nwid[IEEE80211_NWID_LEN];
-};
-
-#define	SIOCS80211NWID		_IOWR('i', 230, struct ifreq)
-#define	SIOCG80211NWID		_IOWR('i', 231, struct ifreq)
-
-/* the first member must be matched with struct ifreq */
-struct ieee80211_nwkey {
-	char		i_name[IFNAMSIZ];	/* if_name, e.g. "wi0" */
-	int		i_wepon;		/* wep enabled flag */
-	int		i_defkid;		/* default encrypt key id */
-	struct {
-		int		i_keylen;
-		u_int8_t	*i_keydat;
-	}		i_key[IEEE80211_WEP_NKID];
-};
-#define	SIOCS80211NWKEY		 _IOW('i', 232, struct ieee80211_nwkey)
-#define	SIOCG80211NWKEY		_IOWR('i', 233, struct ieee80211_nwkey)
-/* i_wepon */
-#define	IEEE80211_NWKEY_OPEN	0		/* No privacy */
-#define	IEEE80211_NWKEY_WEP	1		/* WEP enabled */
-#define	IEEE80211_NWKEY_EAP	2		/* EAP enabled */
-#define	IEEE80211_NWKEY_PERSIST	0x100		/* designate persist keyset */
-
-/* power management parameters */
-struct ieee80211_power {
-	char		i_name[IFNAMSIZ];	/* if_name, e.g. "wi0" */
-	int		i_enabled;		/* 1 == on, 0 == off */
-	int		i_maxsleep;		/* max sleep in ms */
-};
-#ifdef __NetBSD__
-#define	SIOCS80211POWER		 _IOW('i', 234, struct ieee80211_power)
-#define	SIOCG80211POWER		_IOWR('i', 235, struct ieee80211_power)
-#else
-#define	SIOCS80211POWER		 _IOW('i', 242, struct ieee80211_power)
-#define	SIOCG80211POWER		_IOWR('i', 243, struct ieee80211_power)
-#endif
-
-struct ieee80211_auth {
-	char		i_name[IFNAMSIZ];	/* if_name, e.g. "wi0" */
-	int		i_authtype;
-};
-
-#define	IEEE80211_AUTH_NONE	0
-#define	IEEE80211_AUTH_OPEN	1
-#define	IEEE80211_AUTH_SHARED	2
-
-#define	SIOCS80211AUTH		 _IOW('i', 236, struct ieee80211_auth)
-#define	SIOCG80211AUTH		_IOWR('i', 237, struct ieee80211_auth)
-
-struct ieee80211_channel {
-	char		i_name[IFNAMSIZ];	/* if_name, e.g. "wi0" */
-	u_int16_t	i_channel;
-};
-
-#define	IEEE80211_CHAN_ANY	0xffff
-
-#define	SIOCS80211CHANNEL	 _IOW('i', 238, struct ieee80211_channel)
-#define	SIOCG80211CHANNEL	_IOWR('i', 239, struct ieee80211_channel)
-
-struct ieee80211_bssid {
-	char		i_name[IFNAMSIZ];	/* if_name, e.g. "wi0" */
-	u_int8_t	i_bssid[IEEE80211_ADDR_LEN];
-};
-
-#define	SIOCS80211BSSID		 _IOW('i', 240, struct ieee80211_bssid)
-#define	SIOCG80211BSSID		_IOWR('i', 241, struct ieee80211_bssid)
-
-/*
- * FreeBSD-style ioctls.
- */
-/* the first member must be matched with struct ifreq */
-struct ieee80211req {
-	char		i_name[IFNAMSIZ];	/* if_name, e.g. "wi0" */
-	u_int16_t	i_type;			/* req type */
-	int16_t		i_val;			/* Index or simple value */
-	int16_t		i_len;			/* Index or simple value */
-	void		*i_data;		/* Extra data */
-};
-#ifdef __FreeBSD__
-#define	SIOCS80211		 _IOW('i', 234, struct ieee80211req)
-#define	SIOCG80211		_IOWR('i', 235, struct ieee80211req)
-#else
-#define	SIOCS80211		 _IOW('i', 242, struct ieee80211req)
-#define	SIOCG80211		_IOWR('i', 243, struct ieee80211req)
-#endif
-
-#define IEEE80211_IOC_SSID		1
-#define IEEE80211_IOC_NUMSSIDS		2
-#define IEEE80211_IOC_WEP		3
-#define 	IEEE80211_WEP_NOSUP	-1
-#define 	IEEE80211_WEP_OFF	0
-#define 	IEEE80211_WEP_ON	1
-#define 	IEEE80211_WEP_MIXED	2
-#define IEEE80211_IOC_WEPKEY		4
-#define IEEE80211_IOC_NUMWEPKEYS	5
-#define IEEE80211_IOC_WEPTXKEY		6
-#define IEEE80211_IOC_AUTHMODE		7
-#define IEEE80211_IOC_STATIONNAME	8
-#define IEEE80211_IOC_CHANNEL		9
-#define IEEE80211_IOC_POWERSAVE		10
-#define 	IEEE80211_POWERSAVE_NOSUP	-1
-#define 	IEEE80211_POWERSAVE_OFF		0
-#define 	IEEE80211_POWERSAVE_CAM		1
-#define 	IEEE80211_POWERSAVE_PSP		2
-#define 	IEEE80211_POWERSAVE_PSP_CAM	3
-#define 	IEEE80211_POWERSAVE_ON		IEEE80211_POWERSAVE_CAM
-#define IEEE80211_IOC_POWERSAVESLEEP	11
+#define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
 
 #ifdef __KERNEL__
 
@@ -644,6 +524,7 @@ struct ieee80211com {
 #define IEEE80211_F_TXPOW_OFF	0x00000000	/* TX Power: radio disabled */
 #define IEEE80211_F_TXPOW_FIXED	0x00008000	/* TX Power: fixed rate */
 #define IEEE80211_F_TXPOW_AUTO	0x00010000	/* TX Power: undefined */
+#define IEEE80211_F_TURBO	0x00020000	/* CONF: turbo mode enabled */
 
 /* ic_capabilities */
 #define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
@@ -653,6 +534,7 @@ struct ieee80211com {
 #define	IEEE80211_C_AHDEMO	0x00000010	/* CAPABILITY: Old Adhoc Demo */
 #define	IEEE80211_C_SWRETRY	0x00000020	/* CAPABILITY: sw tx retry */
 #define	IEEE80211_C_TXPMGT	0x00000040	/* CAPABILITY: tx power mgmt */
+#define	IEEE80211_C_TURBO	0x00000080	/* CAPABILITY: turbo mode */
 
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
