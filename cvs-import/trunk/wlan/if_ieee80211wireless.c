@@ -345,12 +345,16 @@ ieee80211_ioctl_siwap(struct net_device *dev,
 		      struct sockaddr *ap_addr, char *extra)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
+	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
 
 	/* NB: should only be set when in STA mode */
-	/* XXX how is this disabled? */
 	if (ic->ic_opmode == IEEE80211_M_STA) {
 		IEEE80211_ADDR_COPY(ic->ic_des_bssid, &ap_addr->sa_data);
-		ic->ic_flags |= IEEE80211_F_DESBSSID;
+		/* looks like a zero address disables */
+		if (IEEE80211_ADDR_EQ(ic->ic_des_bssid, zero_bssid))
+			ic->ic_flags &= ~IEEE80211_F_DESBSSID;
+		else
+			ic->ic_flags |= IEEE80211_F_DESBSSID;
 		return -(*ic->ic_init)(dev);
 	} else
 		return -EINVAL;
