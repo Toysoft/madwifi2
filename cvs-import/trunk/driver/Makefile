@@ -44,8 +44,6 @@ DEPTH=	..
 include ${DEPTH}/Makefile.inc
 
 ifdef CONFIG_MODVERSIONS
-MODOPTS+=	-include ${ATH_HAL}/ath_hal.ver
-ALL_VER+=	${ATH_HAL}/ath_hal.ver
 MODOPTS+=	-include ${WLAN}/if_ieee80211.ver
 ALL_VER+=	${WLAN}/if_ieee80211.ver
 MODOPTS+=	-include ${WLAN}/if_media.ver
