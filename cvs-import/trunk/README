@@ -7,8 +7,6 @@ WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTORYS YOUR DISK
 WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
 WARNING: USE AT YOUR OWN RISK!
 
-WARNING: THE LINUX 2.6 SUPPORT IS ALPHA.  COMMENTS ARE WELCOME.
-
 
 MADWIFI: Multimode Atheros Driver for WiFi on Linux
 ===================================================
@@ -262,6 +260,7 @@ including:
 Carl Thompson
 Nick Moss
 William S. Kish
+Joerg Albert
 giova+mwfdev@faglioni.it
 
 (Apologies to anyone whose name was unintentionally left off.)
