@@ -41,7 +41,7 @@ HALINCS=-I${HAL} -I${HAL}/linux -I${ATH_HAL}
 
 SRCS=	${HAL}/linux/ah_osdep.c
 OBJS=	ah_osdep.o hal.o
-INCS=	${HALINCS} -I${LINUX} -I${DEPTH}
+INCS+=	${HALINCS} -I${LINUX} -I${DEPTH}
 
 CLEANFILES+= opt_ah.h
 
