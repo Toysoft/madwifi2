@@ -1906,8 +1906,9 @@ ath_beacon_config(struct ath_softc *sc)
 		/*
 		 * The 802.11 layer records the offset to the DTIM
 		 * bitmap while receiving beacons; use it here to
-		 * enable h/w detection of PS-Poll messages from
-		 * the AP.
+		 * enable h/w detection of our AID being marked in
+		 * the bitmap vector (to indicate frames for us are
+		 * pending at the AP).
 		 */
 		bs.bs_timoffset = ni->ni_timoff;
 		/*
