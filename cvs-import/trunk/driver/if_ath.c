@@ -2736,14 +2736,8 @@ ath_getstats(struct net_device *dev)
 			+ sc->sc_stats.ast_rx_crcerr
 			+ sc->sc_stats.ast_rx_fifoerr
 			+ sc->sc_stats.ast_rx_badcrypt
-			+ sc->sc_stats.ast_rx_phyerr
 			;
-	stats->rx_length_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_LENGTH];
 	stats->rx_crc_errors = sc->sc_stats.ast_rx_crcerr;
-	/* XXX??? */
-	stats->rx_fifo_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TIMING];
-	/* XXX??? */
-	stats->rx_missed_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TOR];
 
 	return stats;
 }
