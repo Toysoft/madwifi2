@@ -1799,6 +1799,7 @@ ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iwreq *iwr)
 	if (capable(CAP_NET_ADMIN)) {
 		/* NB: only root can read key data */
 		ik.ik_keyrsc = wk->wk_keyrsc;
+		ik.ik_keytsc = wk->wk_keytsc;
 		memcpy(ik.ik_keydata, wk->wk_key, wk->wk_keylen);
 		if (cip->ic_cipher == IEEE80211_CIPHER_TKIP) {
 			memcpy(ik.ik_keydata+wk->wk_keylen,
@@ -1808,6 +1809,7 @@ ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iwreq *iwr)
 		}
 	} else {
 		ik.ik_keyrsc = 0;
+		ik.ik_keytsc = 0;
 		memset(ik.ik_keydata, 0, sizeof(ik.ik_keydata));
 	}
 	if (ni != NULL)

@@ -184,6 +184,7 @@ struct ieee80211req_key {
 #define	IEEE80211_KEY_DEFAULT	0x80	/* default xmit key */
 	u_int8_t	ik_macaddr[IEEE80211_ADDR_LEN];
 	u_int64_t	ik_keyrsc;	/* key receive sequence counter */
+	u_int64_t	ik_keytsc;	/* key transmit sequence counter */
 	u_int8_t	ik_keydata[IEEE80211_KEYBUF_SIZE+IEEE80211_MICBUF_SIZE];
 };
 
