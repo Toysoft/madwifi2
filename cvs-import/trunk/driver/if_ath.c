@@ -1290,7 +1290,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
 		bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
-			skb->data, skb->len, PCI_DMA_FROMDEVICE);
+			skb->data, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
 	}
 
 	/* setup descriptors */
@@ -1501,7 +1501,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * also calculates the number of descriptors we need.
 	 */
 	bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
-		skb->data, skb->len, PCI_DMA_TODEVICE);
+		skb->data, pktlen, PCI_DMA_TODEVICE);
 	DPRINTF2(("ath_tx_start: skb %p [data %p len %u] skbaddr %x\n",
 		skb, skb->data, skb->len, bf->bf_skbaddr));
 	bf->bf_skb = skb;
