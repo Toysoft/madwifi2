@@ -1411,7 +1411,7 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		retv = 0;
 		break;
 	case IEEE80211_PARAM_WPA:
-		if (value > 2)
+		if (value > 3)
 			return -EINVAL;
 		/* XXX verify ciphers available */
 		ic->ic_flags &= ~IEEE80211_F_WPA;
@@ -1421,6 +1421,9 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			break;
 		case 2:
 			ic->ic_flags |= IEEE80211_F_WPA2;
+			break;
+		case 3:
+			ic->ic_flags |= IEEE80211_F_WPA1 | IEEE80211_F_WPA2;
 			break;
 		}
 		retv = ENETRESET;		/* XXX? */
@@ -1608,6 +1611,9 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 			break;
 		case IEEE80211_F_WPA2:
 			param[0] = 2;
+			break;
+		case IEEE80211_F_WPA1 | IEEE80211_F_WPA2:
+			param[0] = 3;
 			break;
 		default:
 			param[0] = 0;

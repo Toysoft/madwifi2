@@ -1193,7 +1193,7 @@ ieee80211_parse_wpa(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 	 * version, mcast cipher, and 2 selector counts.
 	 * Other, variable-length data, must be checked separately.
 	 */
-	KASSERT((ic->ic_flags & IEEE80211_F_WPA) == IEEE80211_F_WPA1,
+	KASSERT(ic->ic_flags & IEEE80211_F_WPA1,
 		("not WPA, flags 0x%x", ic->ic_flags));
 	if (len < 14) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
@@ -1348,7 +1348,7 @@ ieee80211_parse_rsn(struct ieee80211com *ic, u_int8_t *frm, struct ieee80211_rsn
 	 * version, mcast cipher, and 2 selector counts.
 	 * Other, variable-length data, must be checked separately.
 	 */
-	KASSERT((ic->ic_flags & IEEE80211_F_WPA) == IEEE80211_F_WPA2,
+	KASSERT(ic->ic_flags & IEEE80211_F_WPA2,
 		("not RSN, flags 0x%x", ic->ic_flags));
 	if (len < 10) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
@@ -1962,14 +1962,14 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			 * installed below after the association is assured.
 			 */
 			rsn = ni->ni_rsn;
-			if (ic->ic_flags & IEEE80211_F_WPA1)
+			if (wpa[0] != IEEE80211_ELEMID_RSN)
 				reason = ieee80211_parse_wpa(ic, wpa, &rsn);
 			else
 				reason = ieee80211_parse_rsn(ic, wpa, &rsn);
 			if (reason != 0) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 				    ("%s: bad %s ie from %s, reason %u\n",
-				    __func__, ic->ic_flags & IEEE80211_F_WPA1 ?
+				    __func__, wpa[0] != IEEE80211_ELEMID_RSN ?
 						"WPA" : "RSN",
 				    ether_sprintf(wh->i_addr2), reason));
 				IEEE80211_SEND_MGMT(ic, ni,
@@ -1982,7 +1982,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
 				("%s: %s ie from %s, "
 				"mc %u/%u uc %u/%u key %u caps 0x%x\n",
-				__func__, ic->ic_flags & IEEE80211_F_WPA1 ?
+				__func__, wpa[0] != IEEE80211_ELEMID_RSN ?
 					"WPA" : "RSN",
 				ether_sprintf(wh->i_addr2),
 				rsn.rsn_mcastcipher, rsn.rsn_mcastkeylen,
