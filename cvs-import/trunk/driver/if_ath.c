@@ -1216,8 +1216,18 @@ ath_rx_tasklet(void *data)
 		TAILQ_REMOVE(&sc->sc_rxbuf, bf, bf_list);
 
 		if (ds->ds_rxstat.rs_status != 0) {
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
+			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
 				sc->sc_stats.ast_rx_crcerr++;
+				/*
+				 * Record the rssi for crc errors; it
+				 * should still be valid.
+				 */
+				sc->sc_stats.ast_rx_rssidelta =
+					ds->ds_rxstat.rs_rssi -
+					sc->sc_stats.ast_rx_rssi;
+				sc->sc_stats.ast_rx_rssi =
+					ds->ds_rxstat.rs_rssi;
+			}
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_FIFO)
 				sc->sc_stats.ast_rx_fifoerr++;
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT)
@@ -1229,6 +1239,9 @@ ath_rx_tasklet(void *data)
 			}
 			goto rx_next;
 		}
+		sc->sc_stats.ast_rx_rssidelta =
+			ds->ds_rxstat.rs_rssi - sc->sc_stats.ast_rx_rssi;
+		sc->sc_stats.ast_rx_rssi = ds->ds_rxstat.rs_rssi;
 
 		len = ds->ds_rxstat.rs_datalen;
 		if (len < sizeof(struct ieee80211_frame)) {
@@ -1576,6 +1589,11 @@ ath_tx_tasklet(void *data)
 			if (ds->ds_txstat.ts_status == 0) {
 				st->st_tx_ok++;
 				st->st_tx_antenna = ds->ds_txstat.ts_antenna;
+				sc->sc_stats.ast_tx_rssidelta =
+					ds->ds_txstat.ts_rssi -
+					sc->sc_stats.ast_tx_rssi;
+				sc->sc_stats.ast_tx_rssi =
+					ds->ds_txstat.ts_rssi;
 			} else {
 				st->st_tx_err++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
@@ -2382,6 +2400,9 @@ ath_sysctl_stats(ctl_table *ctl, int write, struct file *filp,
 	if (sc->sc_stats.ast_##x != 0)					\
 		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x);	\
 } while (0)
+#define	ISTAT(x) do {							\
+	cp += sprintf(cp, #x "=%d\n", sc->sc_stats.ast_##x);		\
+} while (0)
 	*cp = '\0';
 	STAT(watchdog);	  STAT(hardware);   STAT(bmiss);
 	STAT(rxorn);	  STAT(rxeol);
@@ -2391,7 +2412,7 @@ ath_sysctl_stats(ctl_table *ctl, int write, struct file *filp,
 	STAT(tx_xretries);STAT(tx_fifoerr); STAT(tx_filtered);
 	STAT(tx_shortretry);		    STAT(tx_longretry);
 	STAT(tx_badrate); STAT(tx_noack);   STAT(tx_rts);     STAT(tx_cts);
-	STAT(tx_shortpre);
+	STAT(tx_shortpre);ISTAT(tx_rssi);   ISTAT(tx_rssidelta);
 
 	STAT(rx_orn);	  STAT(rx_crcerr);  STAT(rx_fifoerr); STAT(rx_badcrypt);
 #define	PHYSTAT(x) do {							\
@@ -2416,7 +2437,7 @@ ath_sysctl_stats(ctl_table *ctl, int write, struct file *filp,
 	PHYSTAT(CCK_SERVICE);
 	PHYSTAT(CCK_RESTART);
 
-	STAT(rx_nobuf);
+	STAT(rx_nobuf);		ISTAT(rx_rssi);		ISTAT(rx_rssidelta);
 
 	STAT(be_nobuf);
 
