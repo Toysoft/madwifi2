@@ -2,9 +2,9 @@ $Id$
 
 
 WARNING: THIS IS A BETA DISTRIBUTION.  THIS SOFTWARE HAS KNOWN PROBLEMS AND
-WARNING: LIMITATIONS THAT WILL BE CORRECTED BEFORE RELEASE.
+WARNING: LIMITATIONS THAT WILL BE CORRECTED BEFORE A PRODUCTION RELEASE.
 WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTORYS YOUR DISK
-WARNING: OR MAKES UOR CORN-FLAKES SOGGY.
+WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
 WARNING: USE AT YOUR OWN RISK!
 
 
@@ -26,7 +26,7 @@ of operation you will see elements of BSD design/operation.
 
 The driver functions as a normal network device and uses the Wireless
 Extensions API.  As such normal Linux tools can and should be used
-with it.
+with it.  
 
 There is only one driver included here; it supports miniPCI and Cardbus
 devices.  The driver can be built as a module or linked into the kernel.
@@ -83,7 +83,7 @@ combo parts but many retail products use the 5211.  Likewise for the
 latest generation of a+b+g combo products.  When in doubt check the PCI
 vendor id with a tool like lspci, the Atheros vendor id is 0x168c; e.g.
 
-00:13.0 Ethernet controller: Unknown device 168c:0012 (rev 01)
+   00:13.0 Ethernet controller: Unknown device 168c:0012 (rev 01)
 
 
 Building the driver
@@ -120,7 +120,8 @@ depends on them).  You can also try:
 
 	make install
 
-to install the drivers where they can be loaded automatically at boot.
+to install the drivers where they can be loaded automatically, i.e.
+/lib/modules/<your kernel name>/net.
 
 
 Using the driver
@@ -145,14 +146,14 @@ To use this software in ``hostap mode'' you need to configure it
 with iwconfig and you will probably want to lock the operating mode
 to one of 11a, 11b, or 11g if you have a multi-mode card (if you
 do not lock the mode then the driver will select a mode for you;
-usually 11a).  Otherwise you will need to configure the system to
+usually 11a).  In addition you will need to configure the system to
 bridge frames to a wired LAN or similar.
 
 NOTE: adhoc mode is presently untested and may not work (send fixes).
 
 Wireless tools cribsheet:
 
-iwlist ath0 scan		list the AP's the driver has scanned
+iwlist ath0 scan		list AP's the driver has scanned
 iwconfig ath0 essid "foo"	set the ssid to foo
 iwpriv ath0 mode 1		lock operation to 11a only
 iwpriv ath0 mode 2		lock operation to 11b only
@@ -170,7 +171,7 @@ Security/Crpto Support
 ======================
 The driver supports fixed/shared key WEP using the hardware.  Newer
 Atheros hardware is capable of much more (e.g. AES, TKIP and Michael)
-but that work is not yet available.
+but that work is not yet supported by the driver.
 
 This distribution does not include support for 802.1x authentication
 or (obviously) WPA.  Support for .1x should be possible using
