@@ -260,7 +260,7 @@ static struct pci_driver ath_pci_drv_id = {
  */
 #include "release.h"
 #include "version.h"
-static char *version = ATH_PCI_VERSION " " RELEASE_TYPE " (Sam Leffler <sam@errno.com>)";
+static char *version = ATH_PCI_VERSION " " RELEASE_TYPE;
 static char *dev_info = "ath_pci";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
