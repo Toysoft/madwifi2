@@ -1011,7 +1011,8 @@ ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 	/* XXX lock node list */
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		addr[i].sa_family = ARPHRD_ETHER;
-		if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP ||
+		    ic->ic_opmode == IEEE80211_M_IBSS)
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
 		else
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
@@ -1109,7 +1110,7 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
-    	struct ieee80211_node_table *nt = &ic->ic_sta;
+    	struct ieee80211_node_table *nt = &ic->ic_scan;
 	struct ieee80211_node *ni;
 	char *current_ev = extra;
 	char *end_buf = extra + IW_SCAN_MAX_DATA;
