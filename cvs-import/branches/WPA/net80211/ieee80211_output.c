@@ -209,11 +209,13 @@ static inline struct ieee80211_key *
 ieee80211_crypto_getkey(struct ieee80211com *ic,
 	const u_int8_t mac[IEEE80211_ADDR_LEN], struct ieee80211_node *ni)
 {
-	if (IEEE80211_IS_MULTICAST(mac) ||
-	    ni->ni_ucastkey.wk_cipher == &ieee80211_cipher_none) {
-		if (ic->ic_def_txkey == IEEE80211_KEYIX_NONE) {
+#define	KEY_UNDEFINED(k)	((k).wk_cipher == &ieee80211_cipher_none)
+	if (IEEE80211_IS_MULTICAST(mac) || KEY_UNDEFINED(ni->ni_ucastkey)) {
+		if (ic->ic_def_txkey == IEEE80211_KEYIX_NONE ||
+		    KEY_UNDEFINED(ic->ic_nw_keys[ic->ic_def_txkey])) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			    ("%s: No default transmit key\n", __func__));
+			    ("%s: No transmit key, def_txkey %u\n",
+			    __func__, ic->ic_def_txkey));
 			/* XXX statistic */
 			return NULL;
 		}
@@ -221,6 +223,7 @@ ieee80211_crypto_getkey(struct ieee80211com *ic,
 	} else {
 		return &ni->ni_ucastkey;
 	}
+#undef KEY_UNDEFINED
 }
 
 /*
@@ -328,8 +331,12 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	case IEEE80211_M_MONITOR:
 		goto bad;
 	}
-	if (eh.ether_type != __constant_htons(ETHERTYPE_PAE)) {
-		/* NB: PAE frames have their own encryption policy */
+	if (eh.ether_type != __constant_htons(ETHERTYPE_PAE) ||
+	    (key != NULL && (ic->ic_flags & IEEE80211_F_WPA))) {
+		/*
+		 * IEEE 802.1X: send EAPOL frames always in the clear.
+		 * WPA/WPA2: encrypt EAPOL keys when pairwise keys are set.
+		 */
 		if (key != NULL) {
 			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 			/* XXX do fragmentation */
@@ -341,6 +348,8 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 				goto bad;
 			}
 		}
+	}
+	if (eh.ether_type != __constant_htons(ETHERTYPE_PAE)) {
 		/*
 		 * Reset the inactivity timer only for non-PAE traffic
 		 * to avoid a problem where the station leaves w/o
