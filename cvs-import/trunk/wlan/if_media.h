@@ -202,14 +202,7 @@ int	ifmedia_ioctl(struct net_device *, struct ifreq *ifr,
 #define	IFM_IEEE80211_OFDM36	15	/* OFDM 36Mbps */
 #define	IFM_IEEE80211_OFDM48	16	/* OFDM 48Mbps */
 #define	IFM_IEEE80211_OFDM54	17	/* OFDM 54Mbps */
-#define	IFM_IEEE80211_CCK6	18	/* CCK 6Mbps */
-#define	IFM_IEEE80211_CCK9	19	/* CCK 9Mbps */
-#define	IFM_IEEE80211_CCK12	20	/* CCK 12Mbps */
-#define	IFM_IEEE80211_CCK18	21	/* CCK 18Mbps */
-#define	IFM_IEEE80211_CCK24	22	/* CCK 24Mbps */
-#define	IFM_IEEE80211_CCK36	23	/* CCK 36Mbps */
-#define	IFM_IEEE80211_CCK48	24	/* CCK 48Mbps */
-#define	IFM_IEEE80211_CCK54	25	/* CCK 54Mbps */
+#define	IFM_IEEE80211_OFDM72	18	/* OFDM 72Mbps */
 #define	IFM_IEEE80211_ADHOC	0x00000100	/* Operate in Adhoc mode */
 #define	IFM_IEEE80211_HOSTAP	0x00000200	/* Operate in Host AP mode */
 #define	IFM_IEEE80211_IBSS	0x00000400	/* Operate in IBSS mode */
@@ -405,14 +398,7 @@ struct ifmedia_description {
 	{ IFM_IEEE80211_OFDM36, "OFDM/36Mbps" },			\
 	{ IFM_IEEE80211_OFDM48, "OFDM/48Mbps" },			\
 	{ IFM_IEEE80211_OFDM54, "OFDM/54Mbps" },			\
-	{ IFM_IEEE80211_CCK6, "CCK/6Mbps" },				\
-	{ IFM_IEEE80211_CCK9, "CCK/9Mbps" },				\
-	{ IFM_IEEE80211_CCK12, "CCK/12Mbps" },				\
-	{ IFM_IEEE80211_CCK18, "CCK/18Mbps" },				\
-	{ IFM_IEEE80211_CCK24, "CCK/24Mbps" },				\
-	{ IFM_IEEE80211_CCK36, "CCK/36Mbps" },				\
-	{ IFM_IEEE80211_CCK48, "CCK/48Mbps" },				\
-	{ IFM_IEEE80211_CCK54, "CCK/54Mbps" },				\
+	{ IFM_IEEE80211_OFDM72, "OFDM/72Mbps" },			\
 	{ 0, NULL },							\
 }
 
@@ -439,14 +425,11 @@ struct ifmedia_description {
 	{ IFM_IEEE80211_OFDM36, "OFDM36" },				\
 	{ IFM_IEEE80211_OFDM48, "OFDM48" },				\
 	{ IFM_IEEE80211_OFDM54, "OFDM54" },				\
-	{ IFM_IEEE80211_CCK6, "CCK6" },					\
-	{ IFM_IEEE80211_CCK9, "CCK9" },					\
-	{ IFM_IEEE80211_CCK12, "CCK12" },				\
-	{ IFM_IEEE80211_CCK18, "CCK18" },				\
-	{ IFM_IEEE80211_CCK24, "CCK24" },				\
-	{ IFM_IEEE80211_CCK36, "CCK36" },				\
-	{ IFM_IEEE80211_CCK48, "CCK48" },				\
-	{ IFM_IEEE80211_CCK54, "CCK54" },				\
+	{ IFM_IEEE80211_OFDM72, "OFDM72" },				\
+	{ IFM_IEEE80211_DS1, "CCK1" },					\
+	{ IFM_IEEE80211_DS2, "CCK2" },					\
+	{ IFM_IEEE80211_DS5, "CCK5.5" },				\
+	{ IFM_IEEE80211_DS11, "CCK11" },				\
 	{ 0, NULL },							\
 }
 
@@ -485,11 +468,6 @@ struct ifmedia_description {
 	{ IFM_FLAG1,	"flag1" },					\
 	{ IFM_FLAG2,	"flag2" },					\
 	{ IFM_LOOP,	"hw-loopback" },				\
-	{ 0, NULL },							\
-}
-
-#define	IFM_MODE_SHARED_DESCRIPTIONS {					\
-	{ IFM_AUTO,	"auto" },					\
 	{ 0, NULL },							\
 }
 

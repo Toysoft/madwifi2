@@ -57,6 +57,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/if.h>
+#include <linux/netdevice.h>
 #ifndef ifr_media
 #define	ifr_media	ifr_ifru.ifru_ivalue
 #endif
@@ -412,6 +413,7 @@ struct ifmedia_description ifm_shared_option_descriptions[] =
 struct ifmedia_type_to_subtype {
 	struct ifmedia_description *subtypes;
 	struct ifmedia_description *options;
+	struct ifmedia_description *modes;
 };
 
 /* must be in the same order as IFM_TYPE_DESCRIPTIONS */
@@ -419,17 +421,17 @@ struct ifmedia_type_to_subtype ifmedia_types_to_subtypes[] = {
 	{
 	  &ifm_subtype_ethernet_descriptions[0],
 	  &ifm_subtype_ethernet_option_descriptions[0],
-	  NULL
+	  NULL,
 	},
 	{
 	  &ifm_subtype_tokenring_descriptions[0],
 	  &ifm_subtype_tokenring_option_descriptions[0],
-	  NULL
+	  NULL,
 	},
 	{
 	  &ifm_subtype_fddi_descriptions[0],
 	  &ifm_subtype_fddi_option_descriptions[0],
-	  NULL
+	  NULL,
 	},
 	{
 	  &ifm_subtype_ieee80211_descriptions[0],
@@ -463,7 +465,7 @@ ifmedia_printword(int ifmw)
 	for (desc = ttos->modes; desc && desc->ifmt_string != NULL; desc++)
 		if (IFM_MODE(ifmw) == desc->ifmt_word) {
 			if (desc->ifmt_string != NULL)
-				printf(" %s", desc->ifmt_string);
+				printk(" mode %s", desc->ifmt_string);
 			break;
 		}
 
