@@ -107,6 +107,8 @@ static int	ath_rate_setup(struct net_device *, u_int mode);
 static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
+static int      ath_change_mtu(struct net_device *, int);
+
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
@@ -232,6 +234,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	dev->watchdog_timeo = 5 * HZ;			/* XXX */
 	dev->set_multicast_list = ath_mode_init;
 	dev->get_stats = ath_getstats;
+ 	dev->change_mtu = &ath_change_mtu;
 	dev->tx_queue_len = ATH_TXBUF-1;		/* 1 for mgmt frame */
 
 	ic->ic_mgtstart = ath_mgtstart;
@@ -303,6 +306,19 @@ ath_shutdown(struct net_device *dev)
 {
 	DPRINTF(("ath_shutdown %x\n", dev->flags));
 	ath_stop(dev);
+}
+
+static int      
+ath_change_mtu(struct net_device *dev, int new_mtu) 
+{
+	if (new_mtu > ATH_MAX_MTU || new_mtu <= ATH_MIN_MTU) {
+		return -EINVAL;
+	}
+ 	DPRINTF(("ath_change_mtu: %d\n", new_mtu));
+ 	dev->mtu = new_mtu;
+ 	ath_reset(dev);
+
+ 	return 0;
 }
 
 /*

@@ -55,6 +55,14 @@
 
 #define	ATH_TIMEOUT		1000
 
+/*
+ * Maximum acceptable MTU
+ * MAXFRAMEBODY - WEP - QOS - RSN/WPA:
+ * 2312 - 8 - 2 - 12 = 2290
+ */
+#define ATH_MAX_MTU     2290
+#define ATH_MIN_MTU     32  
+
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
