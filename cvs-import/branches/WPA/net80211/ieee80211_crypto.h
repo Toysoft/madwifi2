@@ -39,15 +39,31 @@
  * 802.11 protocol crypto-related definitions.
  */
 #define	IEEE80211_KEYBUF_SIZE	16
+#define	IEEE80211_MICBUF_SIZE	(8+8)	/* space for both tx+rx keys */
 
 struct ieee80211_wepkey {
 	int			wk_len;
 	u_int8_t		wk_key[IEEE80211_KEYBUF_SIZE];
 };
 
+/*
+ * NB: these values are ordered carefully; there are lots of
+ * of implications in any reordering.  In particular beware
+ * that 4 is not used to avoid conflicting with IEEE80211_F_PRIVACY.
+ */
+#define	IEEE80211_CIPHER_WEP		0
+#define	IEEE80211_CIPHER_TKIP		1
+#define	IEEE80211_CIPHER_AES_OCB	2
+#define	IEEE80211_CIPHER_AES_CCM	3
+#define	IEEE80211_CIPHER_CKIP		5
+#define	IEEE80211_CIPHER_NONE		6	/* pseudo value */
+
+#define	IEEE80211_CIPHER_MAX		(IEEE80211_CIPHER_NONE+1)
+
 /* XXX need key index typedef */
 #define	IEEE80211_KEYIX_NONE	((u_int16_t) -1)
 
+#if defined(__KERNEL__) || defined(_KERNEL)
 struct ieee80211com;
 struct ieee80211_node;
 struct sk_buff;
@@ -55,4 +71,5 @@ extern	void ieee80211_crypto_attach(struct ieee80211com *);
 extern	void ieee80211_crypto_detach(struct ieee80211com *);
 extern	struct sk_buff * ieee80211_wep_crypt(struct ieee80211com *,
 		struct ieee80211_node *, struct sk_buff *skb0, int txflag);
+#endif /* defined(__KERNEL__) || defined(_KERNEL) */
 #endif /* _NET80211_IEEE80211_CRYPTO_H_ */
