@@ -769,14 +769,21 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 static u_int
 ath_chan2flags(struct ieee80211com *ic, struct ieee80211_channel *chan)
 {
+#define	N(a)	(sizeof(a) / sizeof(a[0]))
 	static const u_int modeflags[] = {
 		0,			/* IEEE80211_MODE_AUTO */
 		CHANNEL_A,		/* IEEE80211_MODE_11A */
 		CHANNEL_B,		/* IEEE80211_MODE_11B */
 		CHANNEL_PUREG,		/* IEEE80211_MODE_11G */
+		0,			/* IEEE80211_MODE_FH */
 		CHANNEL_T		/* IEEE80211_MODE_TURBO */
 	};
-	return modeflags[ieee80211_chan2mode(ic, chan)];
+	enum ieee80211_phymode mode = ieee80211_chan2mode(ic, chan);
+
+	KASSERT(mode < N(modeflags), ("unexpected phy mode %u", mode));
+	KASSERT(modeflags[mode] != 0, ("mode %u undefined", mode));
+	return modeflags[mode];
+#undef N
 }
 
 static int
