@@ -450,6 +450,8 @@ enum {
 #define	RSN_ASE_8021X_UNSPEC	0x01
 #define	RSN_ASE_8021X_PSK	0x02
 
+#define	RSN_CAP_PREAUTH		0x01
+
 #define	WME_OUI			0xf25000
 #define	WME_OUI_TYPE		0x02
 #define	WME_VERSION		1
