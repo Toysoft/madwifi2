@@ -71,7 +71,7 @@ extern	void ieee80211_proto_attach(struct ieee80211com *);
 extern	void ieee80211_proto_detach(struct ieee80211com *);
 
 struct ieee80211_node;
-extern	void ieee80211_input(struct ieee80211com *, struct sk_buff *,
+extern	int ieee80211_input(struct ieee80211com *, struct sk_buff *,
 		struct ieee80211_node *, int, u_int32_t);
 extern	void ieee80211_recv_mgmt(struct ieee80211com *, struct sk_buff *,
 		struct ieee80211_node *, int, int, u_int32_t);

@@ -124,7 +124,7 @@ static void ieee80211_recv_pspoll(struct ieee80211com *,
  * mean ``better signal''.  The receive timestamp is currently not used
  * by the 802.11 layer.
  */
-void
+int
 ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211_node *ni, int rssi, u_int32_t rstamp)
 {
@@ -151,6 +151,8 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	}
 	KASSERT(skb->len >= sizeof(struct ieee80211_frame_min),
 		("frame length too short: %u", skb->len));
+
+	type = -1;	/* undefined */	
 
 	/*
 	 * In monitor mode, send everything directly to bpf.
@@ -547,7 +549,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			dev->last_rx = jiffies;
 		}
-		return;
+		return IEEE80211_FC0_TYPE_DATA;
 
 	case IEEE80211_FC0_TYPE_MGT:
 		IEEE80211_NODE_STAT(ni, rx_mgmt);
@@ -603,7 +605,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 		(*ic->ic_recv_mgmt)(ic, skb, ni, subtype, rssi, rstamp);
 		dev_kfree_skb(skb);
-		return;
+		return type;
 
 	case IEEE80211_FC0_TYPE_CTL:
 		IEEE80211_NODE_STAT(ni, rx_ctrl);
@@ -627,6 +629,7 @@ err:
 out:
 	if (skb != NULL)
 		dev_kfree_skb(skb);
+	return type;
 #undef HAS_SEQ
 #undef SEQ_LEQ
 }
