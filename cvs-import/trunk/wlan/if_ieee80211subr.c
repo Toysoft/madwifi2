@@ -139,7 +139,7 @@ static const char *ieee80211_mgt_subtype_name[] = {
 /*
  * Format an Ethernet MAC for printing.
  */
-static const char*
+const char*
 ether_sprintf(const u_int8_t *mac)
 {
 	static char etherbuf[18];
@@ -3292,6 +3292,8 @@ MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");		/* XXX really BSD only */
 #endif
+
+EXPORT_SYMBOL(ether_sprintf);		/* XXX */
 
 EXPORT_SYMBOL(ieee80211_ifattach);
 EXPORT_SYMBOL(ieee80211_ifdetach);
