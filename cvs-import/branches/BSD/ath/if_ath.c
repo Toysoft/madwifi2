@@ -3271,12 +3271,24 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
 	struct ath_node *an;
+	struct llc *llc;
+	int eapol;
 	u_int pri;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 	hdrlen = ieee80211_anyhdrsize(wh);
+	// TODO: not so correct (WDS)
+	llc = (struct llc *) (skb->data + sizeof(struct ieee80211_frame));
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: ether_type: 0x%x\n",
+		__func__, __constant_htons(llc->llc_snap.ether_type));
+	if (__constant_htons(llc->llc_snap.ether_type) == ETHERTYPE_PAE)
+		eapol = 1;
+	else
+		eapol = 0;
+	llc = NULL;
+
 	/*
 	 * Packet length must not include any
 	 * pad bytes; deduct them here.
@@ -3387,7 +3399,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			txrate = an->an_tx_mgtrate;
 		/* NB: force all management frames to highest queue */
 		if (ni->ni_flags & IEEE80211_NODE_QOS) {
-			/* NB: force all management frames to highest queue */
 			pri = WME_AC_VO;
 		} else
 			pri = WME_AC_BE;
@@ -3403,7 +3414,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			txrate = an->an_tx_mgtrate;
 		/* NB: force all ctl frames to highest queue */
 		if (ni->ni_flags & IEEE80211_NODE_QOS) {
-			/* NB: force all ctl frames to highest queue */
 			pri = WME_AC_VO;
 		} else
 			pri = WME_AC_BE;
@@ -3414,8 +3424,23 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		/*
 		 * Data frames; consult the rate control module.
 		 */
-		ath_rate_findrate(sc, an, shortPreamble, pktlen,
-			&rix, &try0, &txrate);
+		if (eapol) {
+			rix = 0;			/* XXX lowest rate */
+			try0 = ATH_TXMAXTRY;	// TODO: userspace or hardware retry?
+			if (shortPreamble)
+				txrate = an->an_tx_mgtratesp;
+			else
+				txrate = an->an_tx_mgtrate;
+			/* NB: force all management frames to highest queue */
+			if (ni->ni_flags & IEEE80211_NODE_QOS) {
+				pri = WME_AC_VO;
+			} else
+				pri = WME_AC_BE;
+			flags |= HAL_TXDESC_INTREQ;	/* force interrupt */
+		} else {
+			ath_rate_findrate(sc, an, shortPreamble, pktlen,
+					  &rix, &try0, &txrate);
+		}
 		sc->sc_txrate = txrate;			/* for LED blinking */
 		/*
 		 * Default all non-QoS traffic to the background queue.
@@ -3428,7 +3453,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			}
 		} else
 			pri = WME_AC_BE;
-		// TODO: set EAPOL to mgtmrate (see line 3385)
 		break;
 	default:
 		if_printf(dev, "bogus frame type 0x%x (%s)\n",
