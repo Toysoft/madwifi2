@@ -1134,6 +1134,7 @@ ath_reset(struct net_device *dev)
 	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		if_printf(dev, "%s: unable to reset hardware: '%s' (%u)\n",
 			__func__, hal_status_desc[status], status);
+	ath_update_txpow(sc);		/* update tx power state */
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		if_printf(dev, "%s: unable to start recv logic\n", __func__);
 	/*
@@ -1706,8 +1707,8 @@ static u_int32_t
 ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct net_device *dev = ic->ic_dev;
 	struct ath_hal *ah = sc->sc_ah;
+	struct net_device *dev = ic->ic_dev;
 	u_int32_t rfilt;
 
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
@@ -1719,7 +1720,7 @@ ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_opmode == IEEE80211_M_STA ||
 	    ic->ic_opmode == IEEE80211_M_IBSS ||
-	    ic->ic_state == IEEE80211_S_SCAN)
+		    state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	return rfilt;
 }
@@ -2012,7 +2013,7 @@ ath_beacon_tasklet(struct net_device *dev)
 	 */
 	skb = bf->bf_skb;
 	ncabq = ath_hal_numtxpending(ah, sc->sc_cabq->axq_qnum);
-	if (ieee80211_beacon_update(ic, bf->bf_node, &sc->sc_boff, &skb, ncabq)) {
+	if (ieee80211_beacon_update(ic, bf->bf_node, &sc->sc_boff, skb, ncabq)) {
 		/* XXX too conservative? */
 		bus_unmap_single(sc->sc_bdev,
 			bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
@@ -2563,10 +2564,10 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	 * someplace to write a new frame.
 	 */
 	ds = bf->bf_desc;
-	ds->ds_link = bf->bf_daddr;		/* link to self */
+	ds->ds_link = bf->bf_daddr;	/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_setuprxdesc(ah, ds
-		, skb_tailroom(skb)		/* buffer size */
+		, skb->len;		/* buffer size */
 		, 0
 	);
 
@@ -2662,10 +2663,15 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->rssi.len = 4;
 	ph->rssi.data = 0;
 
+	ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
+	ph->noise.status = 0;
+	ph->noise.len = 4;
+	ph->noise.data = -95;
+
 	ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
 	ph->signal.status = 0;
 	ph->signal.len = 4;
-	ph->signal.data = ds->ds_rxstat.rs_rssi;
+	ph->signal.data = -95 + ds->ds_rxstat.rs_rssi;
 
 	ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 	ph->rate.status = 0;
@@ -2994,7 +3000,6 @@ rx_accept:
 		/*
 		 * Reclaim node reference.
 		 */
-		//if (ni != ic->ic_bss)
                 ieee80211_free_node(ni);
 rx_next:
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
@@ -3574,8 +3579,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 static void
 ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 {
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_buf *bf;
 	struct ath_desc *ds;
 	struct ieee80211_node *ni;
@@ -3585,7 +3590,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 
 	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %u head %p link %p\n",
 		__func__, txq->axq_qnum,
-		(caddr_t)(unsigned int *) ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
+		(caddr_t)(uintptr_t) ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
 		txq->axq_link);
 	for (;;) {
 		ATH_TXQ_LOCK(txq);
@@ -3827,7 +3832,7 @@ ath_tx_stopdma(struct ath_softc *sc, struct ath_txq *txq)
 	(void) ath_hal_stoptxdma(ah, txq->axq_qnum);
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: tx queue [%u] %p, link %p\n",
 	    __func__, txq->axq_qnum,
-	    (caddr_t)(unsigned int *) ath_hal_gettxbuf(ah, txq->axq_qnum),
+	    (caddr_t)(uintptr_t) ath_hal_gettxbuf(ah, txq->axq_qnum),
 	    txq->axq_link);
 }
 
@@ -3846,7 +3851,7 @@ ath_draintxq(struct ath_softc *sc)
 		(void) ath_hal_stoptxdma(ah, sc->sc_bhalq);
 		DPRINTF(sc, ATH_DEBUG_RESET,
 		    "%s: beacon queue %p\n", __func__,
-		    (caddr_t)(unsigned int *) ath_hal_gettxbuf(ah, sc->sc_bhalq));
+		    (caddr_t)(uintptr_t) ath_hal_gettxbuf(ah, sc->sc_bhalq));
 		for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
 			if (ATH_TXQ_SETUP(sc, i))
 				ath_tx_stopdma(sc, &sc->sc_txq[i]);
@@ -3879,7 +3884,7 @@ ath_stoprecv(struct ath_softc *sc)
 		struct ath_buf *bf;
 
 		printk("%s: rx queue %p, link %p\n", __func__,
-			(caddr_t)(unsigned int *) ath_hal_getrxbuf(ah), sc->sc_rxlink);
+			(caddr_t)(uintptr_t) ath_hal_getrxbuf(ah), sc->sc_rxlink);
 		STAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
 			struct ath_desc *ds = bf->bf_desc;
 			HAL_STATUS status = ath_hal_rxprocdesc(ah, ds,
@@ -4001,7 +4006,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	hchan.channelFlags = ath_chan2flags(ic, chan);
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: %u (%u MHz) -> %u (%u MHz)\n",
-		__func__,
+	    __func__,
 	    ath_hal_mhz2ieee(sc->sc_curchan.channel,
 		sc->sc_curchan.channelFlags),
 	    	sc->sc_curchan.channel,
@@ -5014,6 +5019,10 @@ enum {
 	ATH_RXANTENNA	= 10,
 	ATH_DIVERSITY	= 11,
 	ATH_TXINTRPERIOD= 12,
+	ATH_TPSCALE     = 13,
+	ATH_TPC         = 14,
+	ATH_TXPOWLIMIT  = 15,	
+	ATH_VEOL        = 16,
 };
 
 static int
@@ -5076,6 +5085,26 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			case ATH_TXINTRPERIOD:
 				sc->sc_txintrperiod = val;
 				break;
+                        case ATH_TPSCALE:
+                                /* XXX validate? */
+                                !ath_hal_settpscale(ah, val) ? -EINVAL : ath_reset(dev);
+                                break;
+                        case ATH_TPC:
+                                /* XXX validate? */
+                                if (!sc->sc_hastpc)
+                                        return -EINVAL;
+                                ath_hal_settpc(ah, val);
+                                break;
+                        case ATH_TXPOWLIMIT:
+                                /* XXX validate? */
+                                ath_hal_settxpowlimit(ah, val);
+                                break;
+                        case ATH_VEOL:
+                                /* TODO: maybe not needed to be writable? */
+                                if (!sc->sc_hasveol)
+                                        return -EINVAL;
+                                ath_hal_setveol(ah, val);
+                                break;
 			default:
 				return -EINVAL;
 			}
@@ -5118,6 +5147,18 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 		case ATH_TXINTRPERIOD:
 			val = sc->sc_txintrperiod;
 			break;
+		case ATH_TPSCALE:
+			ath_hal_gettpscale(ah, &val);
+			break;
+		case ATH_TPC:
+			ath_hal_gettpc(ah, &val);
+			break;
+		case ATH_TXPOWLIMIT:
+			ath_hal_gettxpowlimit(ah, &val);
+			break;
+		case ATH_VEOL:
+			ath_hal_getveol(ah, &val);
+ 			break;
 		default:
 			return -EINVAL;
 		}
@@ -5193,6 +5234,26 @@ static const ctl_table ath_sysctl_template[] = {
 	},
 	{ .ctl_name	= ATH_TXINTRPERIOD,
 	  .procname	= "txintrperiod",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_TPSCALE,
+	  .procname	= "tpscale",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_TPC,
+	  .procname	= "tpc",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_TXPOWLIMIT,
+	  .procname	= "txpowlimit",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_VEOL,
+	  .procname	= "veol",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
