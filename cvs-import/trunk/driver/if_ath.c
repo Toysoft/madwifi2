@@ -2028,9 +2028,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		rix = 0;			/* XXX lowest rate */
 		try0 = ATH_TXMAXTRY;
 		if (shortPreamble)
-			txrate = an->an_tx_mgtrate;
-		else
 			txrate = an->an_tx_mgtratesp;
+		else
+			txrate = an->an_tx_mgtrate;
 		break;
 	case IEEE80211_FC0_TYPE_CTL:
 		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
@@ -2039,9 +2039,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		rix = 0;			/* XXX lowest rate */
 		try0 = ATH_TXMAXTRY;
 		if (shortPreamble)
-			txrate = an->an_tx_mgtrate;
-		else
 			txrate = an->an_tx_mgtratesp;
+		else
+			txrate = an->an_tx_mgtrate;
 		break;
 	default:
 		rix = an->an_tx_rix0;
@@ -2054,9 +2054,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			return -EIO;
 		}
 		if (shortPreamble)
-			txrate = an->an_tx_rate0;
-		else
 			txrate = an->an_tx_rate0sp;
+		else
+			txrate = an->an_tx_rate0;
 		break;
 	}
 
