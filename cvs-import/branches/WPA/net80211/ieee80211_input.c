@@ -94,6 +94,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211_node *ni, int rssi, u_int32_t rstamp)
 {
 #define	SEQ_LEQ(a,b)	((int)((a)-(b)) <= 0)
+#define	HAS_SEQ(type)	((type & 0x4) == 0)
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_frame *wh;
 	struct ieee80211_key *key;
@@ -169,7 +170,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		case IEEE80211_M_HOSTAP:
 			if (dir != IEEE80211_FC1_DIR_NODS)
 				bssid = wh->i_addr1;
-			else if (subtype == IEEE80211_FC0_SUBTYPE_PS_POLL)
+			else if (type == IEEE80211_FC0_TYPE_CTL)
 				bssid = wh->i_addr1;
 			else {
 				if (skb->len < sizeof(struct ieee80211_frame)) {
@@ -181,10 +182,9 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				}
 				bssid = wh->i_addr3;
 			}
-			if (!IEEE80211_ADDR_EQ(bssid, ic->ic_bss->ni_bssid) &&
-			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast) &&
-			    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
-			    IEEE80211_FC0_TYPE_DATA) {
+			if (type == IEEE80211_FC0_TYPE_DATA &&
+			    !IEEE80211_ADDR_EQ(bssid, ic->ic_bss->ni_bssid) &&
+			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
 				    ("[%s] discard data frame from bss %s\n",
@@ -200,23 +200,26 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
-		rxseq = le16toh(*(u_int16_t *)wh->i_seq);
-		if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
-		    SEQ_LEQ(rxseq, ni->ni_rxseq)) {
-		    	/* duplicate, discard */
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
-				("[%s] discard duplicate frame from %s, "
-				"seqno <%u,%u> fragno <%u,%u>\n",
-				ieee80211_state_name[ic->ic_state],
-				ether_sprintf(bssid),
-				rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
-				ni->ni_rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
-				rxseq & IEEE80211_SEQ_FRAG_MASK,
-				ni->ni_rxseq & IEEE80211_SEQ_FRAG_MASK));
-			ic->ic_stats.is_rx_dup++; /* XXX per-station stat */
-			goto out;
+		if (HAS_SEQ(type)) {
+			rxseq = le16toh(*(u_int16_t *)wh->i_seq);
+			if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
+			    SEQ_LEQ(rxseq, ni->ni_rxseq)) {
+				/* duplicate, discard */
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+				    ("[%s] discard duplicate frame from %s, "
+				    "seqno <%u,%u> fragno <%u,%u>\n",
+				    ieee80211_state_name[ic->ic_state],
+				    ether_sprintf(bssid),
+				    rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
+				    ni->ni_rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
+				    rxseq & IEEE80211_SEQ_FRAG_MASK,
+				    ni->ni_rxseq & IEEE80211_SEQ_FRAG_MASK));
+				/* XXX per-station stat */
+				ic->ic_stats.is_rx_dup++;
+				goto out;
+			}
+			ni->ni_rxseq = rxseq;
 		}
-		ni->ni_rxseq = rxseq;
 	}
 
 	/*
@@ -497,13 +500,15 @@ ieee80211_dump_nodes(ic);/*XXX*/
 		ic->ic_stats.is_rx_ctl++;
 		if (ic->ic_opmode != IEEE80211_M_HOSTAP)
 			goto out;
-		if (subtype == IEEE80211_FC0_SUBTYPE_PS_POLL) {
+		switch (subtype) {
+		case IEEE80211_FC0_SUBTYPE_PS_POLL:
 			/* XXX statistic */
 			/* Dump out a single packet from the host */
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER,
 				("got power save probe from %s\n",
 				ether_sprintf(wh->i_addr2)));
 			ieee80211_recv_pspoll(ic, ni, skb);
+			break;
 		}
 		goto out;
 	default:
@@ -517,6 +522,7 @@ err:
 out:
 	if (skb != NULL)
 		dev_kfree_skb(skb);
+#undef HAS_SEQ
 #undef SEQ_LEQ
 }
 EXPORT_SYMBOL(ieee80211_input);
