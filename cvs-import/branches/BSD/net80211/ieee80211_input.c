@@ -531,7 +531,12 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				skb1->nh.raw = skb1->data + 
 					sizeof(struct ether_header);
 				skb1->protocol = __constant_htons(ETH_P_802_2);
-				dev_queue_xmit(skb1);
+				dev_queue_xmit(skb1);			// send directly to iface queue
+				//IF_ENQUEUE(&dev->if_dev, skb1);		// TODO: too slow???
+                                //if (skb1 != NULL)
+				//	sc->sc_devstats.multicast++;	// stats needed?
+                                //sc->sc_devstats.tx_bytes += len;
+
 			}
 		}
 		if (skb != NULL) {
@@ -2555,8 +2560,8 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		}
 		/* XXX need different driver interface */
 		/* XXX bypasses q max */
-		//IF_ENQUEUE(&ic->ic_dev->if_snd, skb);			// TODO: no q avail?
 		(*(ic->ic_dev)->hard_start_xmit)(skb, ic->ic_dev);
+		//IF_ENQUEUE(&ic->ic_dev->if_snd, skb);
 	}
 }
 
@@ -2627,8 +2632,8 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 		ic->ic_set_tim(ic, ni, 0);
 	}
 	cb->flags |= M_PWR_SAV;			/* bypass PS handling */
-	//IF_ENQUEUE(&ic->ic_ifp->if_snd, m);	
-	(*dev->hard_start_xmit)(skb0, dev);	/* TODO */
+	(*dev->hard_start_xmit)(skb0, dev);
+	//IF_ENQUEUE(&ic->ic_dev->if_snd, skb0);	
 }
 
 #ifdef IEEE80211_DEBUG

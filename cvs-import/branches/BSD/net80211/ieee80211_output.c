@@ -146,7 +146,8 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 	IEEE80211_NODE_STAT(ni, tx_mgmt);
 	IF_ENQUEUE(&ic->ic_mgtq, skb);
 	mod_timer(&ic->ic_slowtimo, jiffies + HZ); // also done in ath_start
-	(*dev->hard_start_xmit)(skb, dev);	// TODO: needed?
+	//if_start(dev);
+	(*dev->hard_start_xmit)(NULL, dev);
 	return 0;
 }
 
@@ -191,7 +192,8 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 	IEEE80211_NODE_STAT(ni, tx_data);
 
 	IF_ENQUEUE(&ic->ic_mgtq, skb);		/* cheat */
-	(*dev->hard_start_xmit)(skb, dev);	// TODO: proper equiv. of if_start(ifp);
+	//if_start(dev);
+	(*dev->hard_start_xmit)(NULL, dev);
 
 	return 0;
 }

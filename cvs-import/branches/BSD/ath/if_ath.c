@@ -1197,7 +1197,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		if (bf == NULL) {		/* NB: should not happen */
 			DPRINTF(sc, ATH_DEBUG_ANY, "%s: out of xmit buffers\n",
 				__func__);
-			sc->sc_stats.ast_tx_nobuf++; /* TODO: qstop++ ??? */
+			sc->sc_stats.ast_tx_nobuf++;
 			break;
 		}
 
@@ -1207,6 +1207,8 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		 */
 		IF_DEQUEUE(&ic->ic_mgtq, skb0);
 		if (skb0 == NULL) {
+			if (!skb)		/* NB: no data (called for mgmt) */
+				break;
 			/*
 			 * No data frames go out unless we're associated; this
 			 * should not happen as the 802.11 layer does not enable
@@ -1727,7 +1729,7 @@ ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 	if (ic->ic_opmode != IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
- 	    (dev->flags & IFF_PROMISC))
+	    (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_opmode == IEEE80211_M_STA ||
 	    ic->ic_opmode == IEEE80211_M_IBSS ||
