@@ -1056,7 +1056,6 @@ ath_stop_locked(struct net_device *dev)
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 		netif_stop_queue(dev);
 		dev->flags &= ~IFF_RUNNING;
-		// TODO: delete slowtimo here?
 		if (!sc->sc_invalid) {
 			if (sc->sc_softled) {
 				del_timer(&sc->sc_ledtimer);
@@ -1179,11 +1178,13 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_stats.ast_tx_invalid++;
 		return -ENETDOWN;
 	}
-
+	int counter = 0;
 	for (;;) {
 		/*
 		 * Grab a TX buffer and associated resources.
 		 */
+		if (counter++ > 200)
+		    printk("%s: endlessloop? (counter=%i)\n",__func__, counter);
 		ATH_TXBUF_LOCK_BH(sc);
 		bf = STAILQ_FIRST(&sc->sc_txbuf);
 		if (bf != NULL)
@@ -1210,9 +1211,9 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		IF_DEQUEUE(&ic->ic_mgtq, skb0);
 		if (skb0 == NULL) {
 			if (!skb) {		/* NB: no data (called for mgmt) */
-				ATH_TXBUF_LOCK(sc);
+				ATH_TXBUF_LOCK_BH(sc);
 				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-				ATH_TXBUF_UNLOCK(sc);
+				ATH_TXBUF_UNLOCK_BH(sc);
 				break;
 			}
 			/*
@@ -1225,9 +1226,9 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 					"%s: ignore data packet, state %u\n",
 					__func__, ic->ic_state);
 				sc->sc_stats.ast_tx_discard++;
-				ATH_TXBUF_LOCK(sc);
+				ATH_TXBUF_LOCK_BH(sc);
 				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-				ATH_TXBUF_UNLOCK(sc);
+				ATH_TXBUF_UNLOCK_BH(sc);
 				break;
 			}
 			/* 
@@ -1307,9 +1308,9 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 	bad:
 			ret = 0; /* TODO: error value */
 	reclaim:
-			ATH_TXBUF_LOCK(sc);
+			ATH_TXBUF_LOCK_BH(sc);
 			STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-			ATH_TXBUF_UNLOCK(sc);
+			ATH_TXBUF_UNLOCK_BH(sc);
 			if (ni != NULL)
 				ieee80211_free_node(ni);
 			continue;
@@ -1320,7 +1321,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		if (skb0 == skb)
 			break; 
 		sc->sc_tx_timer = 5;
-		mod_timer(&ic->ic_slowtimo, jiffies + HZ);
+		//mod_timer(&ic->ic_slowtimo, jiffies + HZ);
 		//ifp->if_timer = 1;	// TODO: ???
 	}
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
@@ -2330,7 +2331,7 @@ ath_desc_alloc(struct ath_softc *sc)
 	    __func__, ds, sc->sc_desc_len, (caddr_t) sc->sc_desc_daddr);
 
 	/* allocate buffers */
-	bsize = sizeof(struct ath_buf) * (ATH_TXBUF + ATH_RXBUF + 1);
+	bsize = sizeof(struct ath_buf) * (ATH_TXBUF + ATH_RXBUF + ATH_BCBUF + 1);
 	bf = kmalloc(bsize, GFP_KERNEL);
 	if (bf == NULL)
 		goto bad;
@@ -3810,15 +3811,15 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 	 *     we do not need to block ath_tx_tasklet
 	 */
 	for (;;) {
-		ATH_TXQ_LOCK(txq);
+		ATH_TXQ_LOCK_BH(txq);
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
-			ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_BH(txq);
 			break;
 		}
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
-		ATH_TXQ_UNLOCK(txq);
+		ATH_TXQ_UNLOCK_BH(txq);
 #ifdef AR_DEBUG
 		if (sc->sc_debug & ATH_DEBUG_RESET)
 			ath_printtxbuf(bf,
@@ -3836,9 +3837,9 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 			 */
 			ieee80211_free_node(ni);
 		}
-		ATH_TXBUF_LOCK(sc);
+		ATH_TXBUF_LOCK_BH(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		ATH_TXBUF_UNLOCK(sc);
+		ATH_TXBUF_UNLOCK_BH(sc);
 	}
 }
 
