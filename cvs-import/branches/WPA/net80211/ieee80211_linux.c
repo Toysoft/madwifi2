@@ -274,35 +274,25 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 			(*ic->ic_node_getrssi)(ic, ni));
 
 		p += sprintf(p, "  capinfo:");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_ESS) ==
-				IEEE80211_CAPINFO_ESS)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_ESS)
 			p += sprintf(p, " ess");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_IBSS) ==
-       				IEEE80211_CAPINFO_IBSS)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_IBSS)
 			p += sprintf(p, " ibss");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_CF_POLLABLE) ==
-				IEEE80211_CAPINFO_CF_POLLABLE)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_CF_POLLABLE)
 			p += sprintf(p, " cfpollable");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_CF_POLLREQ) ==
-				IEEE80211_CAPINFO_CF_POLLREQ)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_CF_POLLREQ)
 			p += sprintf(p, " cfpollreq");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY) ==
-				IEEE80211_CAPINFO_PRIVACY)
-			p += sprintf(p, " wep");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_CHNL_AGILITY) ==
-				IEEE80211_CAPINFO_CHNL_AGILITY)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY)
+			p += sprintf(p, " privacy");
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_CHNL_AGILITY)
 			p += sprintf(p, " chanagility");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_PBCC) ==
-				IEEE80211_CAPINFO_PBCC)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_PBCC)
 			p += sprintf(p, " pbcc");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) ==
-				IEEE80211_CAPINFO_SHORT_PREAMBLE)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)
 			p += sprintf(p, " shortpreamble");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) ==
-				IEEE80211_CAPINFO_SHORT_SLOTTIME)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME)
 			p += sprintf(p, " shortslot");
-		if ((ni->ni_capinfo & IEEE80211_CAPINFO_DSSSOFDM) ==
-				IEEE80211_CAPINFO_DSSSOFDM)
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_DSSSOFDM)
 			p += sprintf(p, " dsssofdm");
 		p += sprintf(p, "\n");
 
