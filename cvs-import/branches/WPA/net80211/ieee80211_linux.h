@@ -40,7 +40,7 @@ typedef rwlock_t ieee80211_node_lock_t;
 #define	IEEE80211_NODE_LOCK_BH(_ic)	write_lock_bh(&(_ic)->ic_nodelock)
 #define	IEEE80211_NODE_UNLOCK_BH(_ic)	write_unlock_bh(&(_ic)->ic_nodelock)
 /* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
-#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(rwlock_is_locked)
 #define	IEEE80211_NODE_LOCK_ASSERT(_ic) \
 	KASSERT(rwlock_is_locked(&(_ic)->ic_nodelock), \
 		("802.11 node not locked!"))
