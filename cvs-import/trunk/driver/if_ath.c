@@ -46,19 +46,6 @@
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
 
-#define	TXBUF_DEQUEUE(_sc, _bf) do {					\
-	spin_lock_bh(&(_sc)->sc_txbuflock);				\
-	_bf = TAILQ_FIRST(&(_sc)->sc_txbuf);				\
-	if (_bf != NULL)						\
-		TAILQ_REMOVE(&(_sc)->sc_txbuf, _bf, bf_list);		\
-	spin_unlock_bh(&(_sc)->sc_txbuflock);				\
-} while (0);
-#define	TXBUF_QUEUE_TAIL(_sc, _bf) do {					\
-	spin_lock_bh(&(_sc)->sc_txbuflock);				\
-	TAILQ_INSERT_TAIL(&(_sc)->sc_txbuf, _bf, bf_list);		\
-	spin_unlock_bh(&(_sc)->sc_txbuflock);				\
-} while (0);
-
 /* unalligned little endian access */     
 #define LE_READ_2(p)							\
 	((u_int16_t)							\
@@ -584,7 +571,11 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Grab a TX buffer and associated resources.
 	 */
-	TXBUF_DEQUEUE(sc, bf);
+	spin_lock_bh(&sc->sc_txbuflock);
+	bf = TAILQ_FIRST(&sc->sc_txbuf);
+	if (bf != NULL)
+		TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
+	spin_unlock_bh(&sc->sc_txbuflock);
 	if (bf == NULL) {
 		DPRINTF(("ath_hardstart: discard, no xmit buf\n"));
 		sc->sc_stats.ast_tx_nobuf++;
@@ -645,8 +636,11 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	}
 	/* fall thru... */
 bad:
-	if (bf != NULL)
-		TXBUF_QUEUE_TAIL(sc, bf);
+	if (bf != NULL) {
+		spin_lock_bh(&sc->sc_txbuflock);
+		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+		spin_unlock_bh(&sc->sc_txbuflock);
+	}
 	return error;
 }
 
@@ -672,7 +666,11 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Grab a TX buffer and associated resources.
 	 */
-	TXBUF_DEQUEUE(sc, bf);
+	spin_lock_bh(&sc->sc_txbuflock);
+	bf = TAILQ_FIRST(&sc->sc_txbuf);
+	if (bf != NULL)
+		TAILQ_REMOVE(&sc->sc_txbuf, bf, bf_list);
+	spin_unlock_bh(&sc->sc_txbuflock);
 	if (bf == NULL) {
 		DPRINTF(("ath_mgtstart: discard, no xmit buf\n"));
 		sc->sc_stats.ast_tx_nobuf++;
@@ -718,8 +716,11 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 	}
 	/* fall thru... */
 bad:
-	if (bf != NULL)
-		TXBUF_QUEUE_TAIL(sc, bf);
+	if (bf != NULL) {
+		spin_lock_bh(&sc->sc_txbuflock);
+		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+		spin_unlock_bh(&sc->sc_txbuflock);
+	}
 	dev_kfree_skb(skb);
 	return error;
 }
@@ -1435,7 +1436,7 @@ ath_draintxq(struct ath_softc *sc)
 		bf = TAILQ_FIRST(&sc->sc_txq);
 		if (bf == NULL) {
 			sc->sc_txlink = NULL;
-			spin_unlock(&sc->sc_txqlock);
+			spin_unlock_bh(&sc->sc_txqlock);
 			break;
 		}
 		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
@@ -1450,7 +1451,9 @@ ath_draintxq(struct ath_softc *sc)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
-		TXBUF_QUEUE_TAIL(sc, bf);
+		spin_lock_bh(&sc->sc_txbuflock);
+		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+		spin_unlock_bh(&sc->sc_txbuflock);
 	}
 
 	sc->sc_tx_timer = 0;
