@@ -711,7 +711,7 @@ ath_detach(struct net_device *dev)
 #ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_unregister(sc);
 #endif /* CONFIG_SYSCTL */
-	printk("%s: calling unregister_netdev\n", __func__);
+	printk("%s: calling unregister_netdev (refcnt=%i)\n", __func__, dev->refcnt);
 	unregister_netdev(dev);
 
 	return 0;
@@ -1159,6 +1159,15 @@ ath_reset(struct net_device *dev)
 static int
 ath_start(struct sk_buff *skb, struct net_device *dev)
 {
+#define CLEANUP()	\
+	do{ \
+		ATH_TXBUF_LOCK_BH(sc); \
+		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list); \
+		ATH_TXBUF_UNLOCK_BH(sc); \
+		if (ni != NULL)	\
+			ieee80211_free_node(ni);	\
+	} while (0)
+
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -1184,8 +1193,6 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		/*
 		 * Grab a TX buffer and associated resources.
 		 */
-		if (counter++ > 200)
-		    printk("%s: endlessloop? (counter=%i)\n",__func__, counter);
 		ATH_TXBUF_LOCK_BH(sc);
 		bf = STAILQ_FIRST(&sc->sc_txbuf);
 		if (bf != NULL)
@@ -1211,6 +1218,9 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		 */
 		IF_DEQUEUE(&ic->ic_mgtq, skb0);
 		if (skb0 == NULL) {
+			if (counter++ > 200)
+			    DPRINTF(sc, ATH_DEBUG_FATAL, "%s (%s): endlessloop (data) (counter=%i)\n", __func__, dev->name, counter);
+
 			if (!skb) {		/* NB: no data (called for mgmt) */
 				ATH_TXBUF_LOCK_BH(sc);
 				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
@@ -1239,13 +1249,19 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 			if (skb->len < sizeof(struct ether_header)) {
 				ic->ic_stats.is_tx_nobuf++;   /* XXX */
 				ni = NULL;
-				goto bad;
+
+				ret = 0; /* error return */
+				CLEANUP();
+				break;
 			}
 			eh = (struct ether_header *)skb->data;
 			ni = ieee80211_find_txnode(ic, eh->ether_dhost);
 			if (ni == NULL) {
 				/* NB: ieee80211_find_txnode does stat+msg */
-				goto bad;
+
+				ret = 0; /* error return */
+				CLEANUP();
+				break;
 			}
 			cb = (struct ieee80211_cb *)skb->cb;
 			if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT) &&
@@ -1256,14 +1272,19 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 				 * the frame back when the time is right.
 				 */
 				ieee80211_pwrsave(ic, ni, skb);
-				goto reclaim;
+
+				CLEANUP();
+				break;
 			}
 			/* calculate priority so we can find the tx queue */
 			if (ieee80211_classify(ic, skb, ni)) {
 				DPRINTF(sc, ATH_DEBUG_XMIT,
 					"%s: discard, classification failure\n",
 					__func__);
-				goto bad;
+
+				ret = 0; /* error return */
+				CLEANUP();
+				break;
 			}
 			sc->sc_devstats.tx_packets++;
 			sc->sc_devstats.tx_bytes += skb->len;
@@ -1277,7 +1298,10 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 					"%s: encapsulation failure\n",
 					__func__);
 				sc->sc_stats.ast_tx_encap++;
-				goto bad;
+
+				ret = 0; /* error return */
+				CLEANUP();
+				break;
 			}
 
 			/*
@@ -1287,6 +1311,9 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		} else {
 			cb = (struct ieee80211_cb *)skb0->cb;
 			ni = cb->ni;
+
+			if (counter++ > 200)
+			    DPRINTF(sc, ATH_DEBUG_FATAL, "%s (%s): endlessloop (mgnt) (counter=%i)\n", __func__, dev->name, counter);
 
 			wh = (struct ieee80211_frame *) skb0->data;
 			if ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) == 
@@ -1306,14 +1333,8 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		}
 
 		if (ath_tx_start(dev, ni, bf, skb0)) {
-	bad:
 			ret = 0; /* TODO: error value */
-	reclaim:
-			ATH_TXBUF_LOCK_BH(sc);
-			STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-			ATH_TXBUF_UNLOCK_BH(sc);
-			if (ni != NULL)
-				ieee80211_free_node(ni);
+			CLEANUP();
 			continue;
 		}
 		/*
@@ -1326,6 +1347,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		//ifp->if_timer = 1;	// TODO: ???
 	}
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
+#undef CLEANUP
 }
 
 static int
@@ -1678,7 +1700,8 @@ ath_key_update_begin(struct ieee80211com *ic)
 {
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
-
+	
+	DPRINTF(sc, ATH_DEBUG_FATAL, "%u %s (%s)\n", jiffies, __func__, dev->name);
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s:\n", __func__);
 	/*
 	 * When called from the rx tasklet we cannot use
@@ -1703,6 +1726,7 @@ ath_key_update_end(struct ieee80211com *ic)
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
 
+	DPRINTF(sc, ATH_DEBUG_FATAL, "%u %s (%s)\n", jiffies, __func__, dev->name);
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s:\n", __func__);
 	netif_start_queue(dev);
 #if 1
@@ -3374,6 +3398,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		if_printf(dev, "bogus frame type 0x%x (%s)\n",
 			wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK, __func__);
 		/* XXX statistic */
+		DPRINTF(sc, ATH_DEBUG_FATAL, "%s: kfree_skb: skb %p [data %p len %u] skbaddr %x\n",
+			__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
 		dev_kfree_skb(skb);
 		bf->bf_skb = NULL;
 		return -EIO;
@@ -4359,9 +4385,9 @@ ath_led_blink(struct ath_softc *sc, int on, int off)
 	DPRINTF(sc, ATH_DEBUG_LED, "%s: on %u off %u\n", __func__, on, off);
 	ath_hal_gpioset(sc->sc_ah, sc->sc_ledpin, sc->sc_ledon);
 	sc->sc_blinking = 1;
-        sc->sc_endblink = 0;
+	sc->sc_endblink = 0;
 	sc->sc_ledoff = off;
-        mod_timer(&sc->sc_ledtimer, jiffies + on);
+	mod_timer(&sc->sc_ledtimer, jiffies + on);
 }
 
 static void
