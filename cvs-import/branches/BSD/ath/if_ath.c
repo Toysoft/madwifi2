@@ -2567,7 +2567,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds->ds_link = bf->bf_daddr;	/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_setuprxdesc(ah, ds
-		, skb->len;		/* buffer size */
+		, skb->len		/* buffer size */
 		, 0
 	);
 
@@ -5087,7 +5087,8 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				break;
                         case ATH_TPSCALE:
                                 /* XXX validate? */
-                                !ath_hal_settpscale(ah, val) ? -EINVAL : ath_reset(dev);
+				// TODO: error handling
+                                ath_hal_settpscale(ah, val);
                                 break;
                         case ATH_TPC:
                                 /* XXX validate? */
@@ -5098,12 +5099,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
                         case ATH_TXPOWLIMIT:
                                 /* XXX validate? */
                                 ath_hal_settxpowlimit(ah, val);
-                                break;
-                        case ATH_VEOL:
-                                /* TODO: maybe not needed to be writable? */
-                                if (!sc->sc_hasveol)
-                                        return -EINVAL;
-                                ath_hal_setveol(ah, val);
                                 break;
 			default:
 				return -EINVAL;
@@ -5151,13 +5146,13 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			ath_hal_gettpscale(ah, &val);
 			break;
 		case ATH_TPC:
-			ath_hal_gettpc(ah, &val);
+			val = ath_hal_gettpc(ah);
 			break;
 		case ATH_TXPOWLIMIT:
 			ath_hal_gettxpowlimit(ah, &val);
 			break;
 		case ATH_VEOL:
-			ath_hal_getveol(ah, &val);
+			val = sc->sc_hasveol;
  			break;
 		default:
 			return -EINVAL;
