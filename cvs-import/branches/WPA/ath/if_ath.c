@@ -922,6 +922,8 @@ bad:
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 		ATH_TXBUF_UNLOCK(sc);
 	}
+	if (skb)
+		dev_kfree_skb(skb);
 	return 0;	/* NB: return !0 only in a ``hard error condition'' */
 }
 
