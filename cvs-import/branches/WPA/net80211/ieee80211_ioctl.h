@@ -289,6 +289,7 @@ struct ieee80211req {
 #define	IEEE80211_IOC_CHANLIST		27
 #define	IEEE80211_IOC_WME		28
 #define	IEEE80211_IOC_HIDESSID		29
+#define	IEEE80211_IOC_APBRIDGE		30
 
 #ifndef IEEE80211_CHAN_ANY
 #define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
@@ -356,6 +357,7 @@ enum {
 	IEEE80211_PARAM_MACCMD		= 17,	/* MAC ACL operation */
 	IEEE80211_PARAM_WME		= 18,	/* WME mode (on, off) */
 	IEEE80211_PARAM_HIDESSID	= 19,	/* hide SSID mode (on, off) */
+	IEEE80211_PARAM_APBRIDGE	= 20,	/* AP inter-sta bridging */
 };
 
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)

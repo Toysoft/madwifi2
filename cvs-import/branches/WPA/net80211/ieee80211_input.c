@@ -424,7 +424,8 @@ ieee80211_dump_nodes(ic);/*XXX*/
 		ic->ic_devstats->rx_bytes += skb->len;
 
 		/* perform as a bridge within the AP */
-		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
+		    (ic->ic_flags & IEEE80211_F_NOBRIDGE) == 0) {
 			struct sk_buff *skb1 = NULL;
 
 			if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
