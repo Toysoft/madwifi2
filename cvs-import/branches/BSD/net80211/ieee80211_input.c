@@ -718,16 +718,21 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 			/*
 			 * Check that we have enough space to hold
 			 * all remaining incoming fragments
+			 * 
+			 * ath always has enough space, since we always
+			 * allocate the largest possible buffer
+			 * (IEEE80211_MAX_LEN + cacheline size)
+			 * but maybe it's better to double check here
 			 */
 			if (skb->end - skb->head < ic->ic_dev->mtu +
-				sizeof(sizeof(struct ieee80211_frame))) {
+				sizeof(struct ieee80211_frame)) {
 				/*
 				 * This should also linearize the skbuff
 				 * TODO: not 100% sure
 				 */
 				skbfrag = skb_copy_expand(skb, 0,
 					(ic->ic_dev->mtu +
-					 sizeof(struct ieee80211_frame))	// TODO: sizeof(sizeof...)?
+					 sizeof(struct ieee80211_frame))
 				         - (skb->end - skb->head), GFP_ATOMIC);
 				dev_kfree_skb(skb);
 			}
