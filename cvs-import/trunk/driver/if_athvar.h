@@ -179,7 +179,7 @@ void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 #define	ath_hal_waitforbeacon(_ah, _bf) \
 	((*(_ah)->ah_waitForBeaconDone)((_ah), (_bf)->bf_daddr))
 #define	ath_hal_qbeacon(_ah, _bf) \
-	((*(_ah)->ah_queueBeaconAndCab)((_ah), (_bf)->bf_daddr, NULL))
+	((*(_ah)->ah_queueBeaconAndCab)((_ah), (_bf)->bf_daddr, 0))
 #define	ath_hal_putrxbuf(_ah, _bufaddr) \
 	((*(_ah)->ah_setRxDP)((_ah), (_bufaddr)))
 #define	ath_hal_gettsf(_ah) \
