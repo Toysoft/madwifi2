@@ -2544,6 +2544,7 @@ rx_accept:
 		 * allocated when the rx descriptor is setup again
 		 * to receive another frame.
 		 */
+		len = ds->ds_rxstat.rs_datalen;
 		pci_dma_sync_single(sc->sc_pdev,
 			bf->bf_skbaddr, len, PCI_DMA_FROMDEVICE);
 		pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
@@ -2553,7 +2554,6 @@ rx_accept:
 		if (sc->sc_softled)
 			ath_update_led(sc);
 
-		len = ds->ds_rxstat.rs_datalen;
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
 			 * Monitor mode: discard anything shorter than
