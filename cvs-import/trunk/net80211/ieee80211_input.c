@@ -2045,8 +2045,15 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ni->ni_chan = ic->ic_bss->ni_chan;
 		ni->ni_fhdwell = ic->ic_bss->ni_fhdwell;
 		ni->ni_fhindex = ic->ic_bss->ni_fhindex;
-		if (wpa != NULL)		/* NB: override defaults */
+		if (wpa != NULL) {
+			/*
+			 * Record WPA/RSN parameters for station, mark
+			 * node as using WPA and record information element
+			 * for applications that require it.
+			 */
 			ni->ni_rsn = rsn;
+			ieee80211_saveie(&ni->ni_wpa_ie, wpa);
+		}
 		ieee80211_node_join(ic, ni, resp);
 		break;
 	}
