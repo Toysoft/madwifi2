@@ -172,14 +172,6 @@ extern	void ieee80211_node_authorize(struct ieee80211com *,
 extern	void ieee80211_node_unauthorize(struct ieee80211com *,
 		struct ieee80211_node *);
 
-/* XXX to be replaced */
-extern	int ieee80211_node_newkey(struct ieee80211com *,
-		struct ieee80211_node *);
-extern	int ieee80211_node_delkey(struct ieee80211com *,
-		struct ieee80211_node *);
-extern	int ieee80211_node_setkey(struct ieee80211com *,
-		struct ieee80211_node *);
-
 extern	void ieee80211_begin_scan(struct ieee80211com *, int);
 extern	int ieee80211_next_scan(struct ieee80211com *);
 extern	void ieee80211_create_ibss(struct ieee80211com*,
