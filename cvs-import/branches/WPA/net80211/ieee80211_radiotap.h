@@ -46,11 +46,11 @@
  * function of...") that I cannot set false expectations for lawyerly
  * readers.
  */
-#ifdef _KERNEL
+#if defined(__KERNEL__) || defined(_KERNEL)
 #ifndef DLT_IEEE802_11_RADIO
 #define	DLT_IEEE802_11_RADIO	127	/* 802.11 plus WLAN header */
 #endif
-#endif /* _KERNEL */
+#endif /* defined(__KERNEL__) || defined(_KERNEL) */
 
 /* The radio capture header precedes the 802.11 header. */
 struct ieee80211_radiotap_header {
@@ -172,7 +172,7 @@ enum ieee80211_radiotap_type {
 	IEEE80211_RADIOTAP_EXT = 31,
 };
 
-#ifndef _KERNEL
+#if !defined(__KERNEL__) && !defined(_KERNEL))
 /* Channel flags. */
 #define IEEE80211_CHAN_TURBO    0x0010  /* Turbo channel */
 #define IEEE80211_CHAN_CCK      0x0020  /* CCK channel */
@@ -182,7 +182,7 @@ enum ieee80211_radiotap_type {
 #define IEEE80211_CHAN_PASSIVE  0x0200  /* Only passive scan allowed */
 #define	IEEE80211_CHAN_DYN	0x0400	/* Dynamic CCK-OFDM channel */
 #define	IEEE80211_CHAN_GFSK	0x0800	/* GFSK channel (FHSS PHY) */
-#endif /* !_KERNEL */
+#endif /* !defined(__KERNEL__) && !defined(_KERNEL) */
 
 /* For IEEE80211_RADIOTAP_FLAGS */
 #define	IEEE80211_RADIOTAP_F_CFP	0x01	/* sent/received
