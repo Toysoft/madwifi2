@@ -66,7 +66,7 @@ opt_ah.h: ${HAL}/${OS}/${TARGET}.opt_ah.h
 
 install: all
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
-	strip -S ath_hal.$(KMODSUF)
+	$(STRIP) -S ath_hal.$(KMODSUF)
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:

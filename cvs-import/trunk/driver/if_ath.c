@@ -49,7 +49,7 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/random.h>
-#include <linux/pci.h>
+
 #include <linux/delay.h>
 #include <linux/cache.h>
 #include <linux/sysctl.h>
@@ -65,6 +65,8 @@
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "ah_desc.h"
 #include "if_llc.h"
+#include "ah_osdep.h"
+#include "if_ath_bus.h"
 
 /* unalligned little endian access */     
 #define LE_READ_2(p)							\
@@ -170,7 +172,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * Cache line size is used to size and align various
 	 * structures used to communicate with the hardware.
 	 */
-	pci_read_config_byte(sc->sc_pdev, PCI_CACHE_LINE_SIZE, &csz);
+        bus_read_cachesize(sc, &csz);
 	/* XXX assert csz is non-zero */
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
@@ -578,9 +580,9 @@ ath_init(struct net_device *dev)
 		struct ath_buf *bf;
 		TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
 			if (bf->bf_skb != NULL) {
-				pci_unmap_single(sc->sc_pdev,
-					bf->bf_skbaddr, sc->sc_rxbufsize,
-					PCI_DMA_FROMDEVICE);
+				bus_unmap_single(sc->sc_bdev,
+						 bf->bf_skbaddr, sc->sc_rxbufsize,
+						 BUS_DMA_FROMDEVICE);
 				dev_kfree_skb(bf->bf_skb);
 				bf->bf_skb = NULL;
 			}
@@ -1111,8 +1113,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 
 	bf = sc->sc_bcbuf;
 	if (bf->bf_skb != NULL) {
-		pci_unmap_single(sc->sc_pdev,
-			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+		bus_unmap_single(sc->sc_bdev,
+				 bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
@@ -1204,8 +1206,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	frm = ieee80211_add_xrates(frm, &ni->ni_rates);
 	skb_trim(skb, frm - skb->data);
 
-	bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
-		skb->data, skb->len, PCI_DMA_TODEVICE);
+	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
+					skb->data, skb->len, BUS_DMA_TODEVICE);
 	DPRINTF2(("ath_beacon_alloc: skb %p [data %p len %u] skbaddr %p\n",
 		skb, skb->data, skb->len, (caddr_t) bf->bf_skbaddr));
 	bf->bf_skb = skb;
@@ -1270,8 +1272,8 @@ ath_beacon_tasklet(struct net_device *dev)
 			__func__, sc->sc_bhalq));
 		/* NB: the HAL still stops DMA, so proceed */
 	}
-	pci_dma_sync_single(sc->sc_pdev,
-		bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+	bus_dma_sync_single(sc->sc_bdev,
+			    bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 
 	ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
 	ath_hal_txstart(ah, sc->sc_bhalq);
@@ -1288,8 +1290,8 @@ ath_beacon_free(struct ath_softc *sc)
 	struct ath_buf *bf = sc->sc_bcbuf;
 
 	if (bf->bf_skb != NULL) {
-		pci_unmap_single(sc->sc_pdev,
-			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+		bus_unmap_single(sc->sc_bdev,
+				 bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
@@ -1404,9 +1406,9 @@ ath_desc_alloc(struct ath_softc *sc)
 
 	/* allocate descriptors */
 	sc->sc_desc_len = sizeof(struct ath_desc) *
-				(ATH_TXBUF * ATH_TXDESC + ATH_RXBUF + 1);
-	sc->sc_desc = pci_alloc_consistent(sc->sc_pdev,
-				sc->sc_desc_len, &sc->sc_desc_daddr);
+		(ATH_TXBUF * ATH_TXDESC + ATH_RXBUF + 1);
+	sc->sc_desc = bus_alloc_consistent(sc->sc_bdev,
+					   sc->sc_desc_len, &sc->sc_desc_daddr);
 	if (sc->sc_desc == NULL)
 		return ENOMEM;
 	ds = sc->sc_desc;
@@ -1445,8 +1447,8 @@ ath_desc_alloc(struct ath_softc *sc)
 	sc->sc_bcbuf = bf;
 	return 0;
 bad:
-	pci_free_consistent(sc->sc_pdev, sc->sc_desc_len,
-		sc->sc_desc, sc->sc_desc_daddr);
+	bus_free_consistent(sc->sc_bdev, sc->sc_desc_len,
+			    sc->sc_desc, sc->sc_desc_daddr);
 	sc->sc_desc = NULL;
 	return ENOMEM;
 }
@@ -1465,9 +1467,9 @@ ath_desc_free(struct ath_softc *sc)
 	/* Free all pre-allocated RX skb */
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
 		if (bf->bf_skb != NULL) {
-			pci_unmap_single(sc->sc_pdev,
-				bf->bf_skbaddr, sc->sc_rxbufsize,
-				PCI_DMA_FROMDEVICE);
+			bus_unmap_single(sc->sc_bdev,
+					 bf->bf_skbaddr, sc->sc_rxbufsize,
+					 BUS_DMA_FROMDEVICE);
 			dev_kfree_skb(bf->bf_skb);
 			bf->bf_skb = NULL;
 		}
@@ -1476,15 +1478,15 @@ ath_desc_free(struct ath_softc *sc)
 	if (sc->sc_bcbuf != NULL) {
 		bf = sc->sc_bcbuf;
 		if (bf->bf_skb != NULL) {
-			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
-					 bf->bf_skb->len, PCI_DMA_TODEVICE);
+			bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr,
+					 bf->bf_skb->len, BUS_DMA_TODEVICE);
 		}
 		sc->sc_bcbuf = NULL;
 	}
 
 	/* Free memory associated with all descriptors */
-	pci_free_consistent(sc->sc_pdev, sc->sc_desc_len,
-		sc->sc_desc, sc->sc_desc_daddr);
+	bus_free_consistent(sc->sc_bdev, sc->sc_desc_len,
+			    sc->sc_desc, sc->sc_desc_daddr);
 
 	TAILQ_INIT(&sc->sc_rxbuf);
 	TAILQ_INIT(&sc->sc_txbuf);
@@ -1638,8 +1640,8 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 		}
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
-		bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
-			skb->data, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
+		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
+						skb->data, sc->sc_rxbufsize, BUS_DMA_FROMDEVICE);
 	}
 
 	/*
@@ -1932,8 +1934,8 @@ ath_rx_tasklet(void *data)
                                 goto rx_next;
                         }
                 }
-		pci_dma_sync_single(sc->sc_pdev,
-			bf->bf_skbaddr, len, PCI_DMA_FROMDEVICE);
+		bus_dma_sync_single(sc->sc_bdev,
+			bf->bf_skbaddr, len, BUS_DMA_FROMDEVICE);
 
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
@@ -1941,8 +1943,8 @@ ath_rx_tasklet(void *data)
 			 * the Prism header existing tools expect,
 			 * and dispatch.
 			 */
-			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
-					sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
+			bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr,
+					 sc->sc_rxbufsize, BUS_DMA_FROMDEVICE);
 			bf->bf_skb = NULL;
 #ifdef SOFTLED
 			if (ic->ic_caps & IEEE80211_C_SOFTLED) {
@@ -1969,8 +1971,8 @@ ath_rx_tasklet(void *data)
 		case IEEE80211_FC0_TYPE_MGT:
 			sc->sc_stats.ast_rx_mgt++;
 		}
-		pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
-			sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
+		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr,
+				 sc->sc_rxbufsize, BUS_DMA_FROMDEVICE);
 		bf->bf_skb = NULL;
 		skb_put(skb, len);
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
@@ -2102,8 +2104,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * Load the DMA map so any coalescing is done.  This
 	 * also calculates the number of descriptors we need.
 	 */
-	bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
-		skb->data, pktlen, PCI_DMA_TODEVICE);
+	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
+					skb->data, pktlen, BUS_DMA_TODEVICE);
 	DPRINTF2(("ath_tx_start: skb %p [data %p len %u] skbaddr %x\n",
 		skb, skb->data, skb->len, bf->bf_skbaddr));
 	bf->bf_skb = skb;
@@ -2393,8 +2395,8 @@ ath_tx_tasklet(void *data)
 					sc->sc_stats.ast_tx_longretry += lr;
 					an->an_tx_retr += sr + lr;
 				}
-				pci_unmap_single(sc->sc_pdev,
-						 bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+				bus_unmap_single(sc->sc_bdev,
+						 bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 				dev_kfree_skb(bf->bf_skb);
 				bf->bf_skb = NULL;
 				bf->bf_node = NULL;
@@ -2462,8 +2464,8 @@ ath_draintxq(struct ath_softc *sc)
                                         ath_printtxbuf(bf,
                                                        ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
 #endif /* AR_DEBUG */
-                                pci_unmap_single(sc->sc_pdev,
-                                                 bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+                                bus_unmap_single(sc->sc_bdev,
+                                                 bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
                                 dev_kfree_skb(bf->bf_skb);
                                 bf->bf_skb = NULL;
                                 bf->bf_node = NULL;
