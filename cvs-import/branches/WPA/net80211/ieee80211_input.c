@@ -1560,7 +1560,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				break;
 			case IEEE80211_ELEMID_FHPARMS:
 				if (ic->ic_phytype == IEEE80211_T_FH) {
-					fhdwell = (frm[3] << 8) | frm[2];
+					fhdwell = LE_READ_2(&frm[2]);
 					chan = IEEE80211_FH_CHAN(frm[4], frm[5]);
 					fhindex = frm[6];
 				}
@@ -1731,13 +1731,12 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		ni->ni_fhdwell = fhdwell;
 		ni->ni_fhindex = fhindex;
 		ni->ni_erp = erp;
-		if (wpa != NULL) {
-			/*
-			 * Record WPA/RSN information element for use by
-			 * applications like wpa_supplicant.
-			 */
+		/*
+		 * Record optional information elements that might be
+		 * used by applications or drivers.
+		 */
+		if (wpa != NULL)
 			ieee80211_saveie(&ni->ni_wpa_ie, wpa);
-		}
 		/* NB: must be after ni_chan is setup */
 		ieee80211_setup_rates(ic, ni, rates, xrates, IEEE80211_F_DOSORT);
 		ieee80211_unref_node(&ni);	/* NB: do not free */
