@@ -135,7 +135,6 @@ ieee80211_proto_detach(struct ieee80211com *ic)
 		ic->ic_auth->ia_detach(ic);
 
 	_IF_DRAIN(&ic->ic_mgtq);
-	//mtx_destroy(&ic->ic_mgtq.ifq_mtx); TODO  */
 
 	/*
 	 * Detach any ACL'ator.
