@@ -1272,11 +1272,6 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 			 * using unified sk_buff for transmit data and management frames
 			 */
 			skb0 = skb;
-			/*
-			 * under linux: only one skb to transmit, so we can break here
-			 */
-			break;
-
 		} else {
 			cb = (struct ieee80211_cb *)skb0->cb;
 			ni = cb->ni;
@@ -1300,7 +1295,6 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 
 		if (ath_tx_start(dev, ni, bf, skb0)) {
 	bad:
-			dev_kfree_skb(skb);	
 			ret = 0; /* TODO: error value */
 	reclaim:
 			ATH_TXBUF_LOCK(sc);
@@ -1310,6 +1304,11 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 				ieee80211_free_node(ni);
 			continue;
 		}
+		/*
+		 * the data frame is last
+		 */
+		if (skb0 == sbk)
+			break; 
 	}
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
 }
