@@ -168,7 +168,7 @@ extern	struct net_device_stats *ieee80211_getstats(struct net_device *);
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-static __inline__ u_int64_t
+static inline u_int64_t
 get_jiffies_64(void)
 {
 	return (u_int64_t) jiffies;		/* XXX not right */
