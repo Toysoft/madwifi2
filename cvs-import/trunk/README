@@ -23,18 +23,24 @@ with it.
 There is only one driver included here; it supports miniPCI and Cardbus
 devices.  The driver can be built as a module or linked into the kernel.
 
-The driver depends on a wlan module that contains the 802.11 state machine,
-protocol support, and other glue code.  This code is derived from work
-that first appeared in NetBSD and then FreeBSD.
+The driver depends on two other modules: wlan.o and ath_hal.o.
 
-The Atheros drivers depends on a chunk of code termed the Hardware
-Access Layer (HAL).  This code manages much of the hardware-specific
-operation of the driver.  The HAL is provided in a binary-only form
-in order to comply with FCC regulations.  The file fcc.pdf contains
-these regulations.  If you wish to use this driver on a platform
-that is not already supported please contact the author.  Note that
-this is only necessary for new _architectures_; the HAL is not tied
-to any specific version of Linux.
+The wlan module contains the 802.11 state machine, protocol support,
+and other glue code.  This code is derived from work that first appeared
+in NetBSD and then FreeBSD.
+
+The ath_hal module contains the Atheros Hardware Access Layer (HAL).
+This code manages much of the chip-specific operation of the driver.
+The HAL is provided in a binary-only form in order to comply with FCC
+regulations.  The file fcc.pdf contains these regulations.  Because the
+module is provided in a binary-only form it is marked "Proprietary"; this
+means when you load it you will see messages that your system is now
+"tainted".
+
+If you wish to use this driver on a platform for which an ath_hal
+module is not already provided please contact the author.  Note that
+this is only necessary for new _architectures_; the HAL is not tied to
+any specific version of Linux.
 
 
 Compatibility
@@ -64,33 +70,45 @@ Netgear WAB501		D-Link DWL-AG650	Linksys WMP55AG
 			D-Link DWL-AB650	Linksys WPC51AB
 
 In general, if a device is identified as ``11a only'' it is almost
-certain to contain an Atheros 5210 part in it.  There are several
-a+b combo parts but many retail products use the 5211.  Likewise
-for the latest generation of a+b+g combo products.
+certain to contain an Atheros 5210 part in it.  There are several a+b
+combo parts but many retail products use the 5211.  Likewise for the
+latest generation of a+b+g combo products.  When in doubt check the PCI
+vendor id with a tool like lspci, the Atheros vendor id is 0x168c; e.g.
+
+00:13.0 Ethernet controller: Unknown device 168c:0012 (rev 01)
 
 
 Building the driver
 ===================
-To build the driver at the top level edit Makefile.inc and set the
+To build the driver at the top level edit Makefile.inc to set the
 pathname to your Linux kernel distribution.  By default this is set to
 /usr/src/linux.
 
-Then do:
+If you are cross-compiling the driver for a different platform define
+the CC, LD, and STRIP macros appropriately.  For example:
+
+#CC=		/export/tools/bin/mips-linux-gcc
+#LD=		/export/tools/bin/mips-linux-ld
+#STRIP=		/export/tools/bin/mips-linux-strip
+
+Once you've got Makefile.inc configured appropriately, do:
 
 	make
 
-This will generate two important files:
+This will generate three important files:
 
-driver/ath_pci.o (driver for PCI/Cardbus devices), and
+driver/ath_pci.o (driver for PCI/Cardbus devices),
+ath_hal/ath_hal.o (Atheros HAL), and
 wlan/wlan.o (802.11 support layer)
 
 These files can be loaded with insmod or modprobe; e.g.
 
 	insmod wlan/wlan.o
+	insmod ath_hal/ath_hal.o
 	insmod driver/ath_pci.o
 
-(note you must load the wlan module first as the driver depends on it).
-You can also use:
+(note you must load the wlan and ath_hal modules first as the driver
+depends on them).  You can also try:
 
 	make install
 
@@ -119,7 +137,7 @@ To use this software in ``hostap mode'' you need to configure it
 with iwconfig and you will probably want to lock the operating mode
 to one of 11a, 11b, or 11g if you have a multi-mode card (if you
 do not lock the mode then the driver will select a mode for you;
-usually 11a).  Otherwise you will need to configure the device to
+usually 11a).  Otherwise you will need to configure the system to
 bridge frames to a wired LAN or similar.
 
 NOTE: adhoc mode is presently untested and may not work (send fixes).
@@ -208,14 +226,17 @@ Miller were helpful in cleaning up some of the rough edges in the driver.
 
 Feedback and Contributions
 ==========================
-Please send all correspondence about this driver to:
+This project is hosted at http://madwifi.sourceforge.  Fixes and
+enhancements are encouraged.  Please send all bug reports about this
+driver to:
 
-	atheros-linux@errno.com		XXX change this to sourceforge
+	madwifi-bugs@sourceforge.net
 
-Fixes and enhancements are encouraged.  When sending a problem report be sure
-to include the version of the driver and the part identification the driver
-prints to the console when the module is loaded.  For example,
+When sending a problem report be sure to include the version of the
+driver and the part identification the driver prints to the console when
+the module is loaded.  For example,
 
+ath_hal: 0.8.2.0 (Sam Leffler <sam@errno.com>)
 wlan: 0.7.0.0 (Sam Leffler <sam@errno.com>)
 ath_pci: 0.8.2.0 (Sam Leffler <sam@errno.com>)
 PCI: Found IRQ 11 for device 00:13.0
@@ -224,8 +245,9 @@ ath0: 11b rates: 1Mbps 2Mbps 5.5Mbps 11Mbps
 ath0: 802.11 address: 00:05:5d:6f:99:5f
 ath0: Atheros 5211: mem=0xfebf0000, irq=11
 
-[This says the wlan module is version 0.7, the driver is version 0.8.2 and
-the hardware uses an Atheros 5211 chip.]
+This says the HAL module is version 0.8.2, the wlan module is version
+0.7, the driver is version 0.8.2 and the hardware uses an Atheros
+5211 chip (which supports 11a and 11b modes).
 
-I will try to respond in a timely manner but understand this software
+We will try to respond in a timely manner but understand this software
 is provided as-is; i.e. with no promise of support.
