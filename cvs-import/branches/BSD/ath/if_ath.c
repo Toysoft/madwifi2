@@ -3063,7 +3063,6 @@ rx_accept:
 			 * periodic beacon frames to trigger the poll event.
 			 */
 			if (type == IEEE80211_FC0_TYPE_DATA) {
-				sc->sc_ipackets = ic->ic_devstats->rx_packets;
 				sc->sc_rxrate = ds->ds_rxstat.rs_rate;
 				ath_led_event(sc, ATH_LED_RX);
 			} else if (jiffies - sc->sc_ledevent >= sc->sc_ledidle)
@@ -3429,6 +3428,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			}
 		} else
 			pri = WME_AC_BE;
+		// TODO: set EAPOL to mgtmrate (see line 3385)
 		break;
 	default:
 		if_printf(dev, "bogus frame type 0x%x (%s)\n",
