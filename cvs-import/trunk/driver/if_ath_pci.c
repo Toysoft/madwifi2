@@ -87,6 +87,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned long mem;
 	struct ath_pci_softc *sc;
 	struct net_device *dev;
+	const char *athname;
 	u_int8_t csz;
 
 	if (pci_enable_device(pdev))
@@ -164,8 +165,9 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (ath_attach(id->device, dev) != 0)
 		goto bad4;
 
-	printk(KERN_INFO "%s: Atheros PCI: mem=0x%lx, irq=%d\n",
-		dev->name, phymem, dev->irq);
+	athname = ath_hal_probe(id->vendor, id->device);
+	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
+		dev->name, athname ? athname : "Atheros ???", phymem, dev->irq);
 
 	return 0;
 bad4:
@@ -187,13 +189,14 @@ ath_pci_remove(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct ath_pci_softc *sc = dev->priv;
 
-	ath_detach(dev);
+	sc->aps_sc.sc_invalid = 1;
 	if (dev->irq)
 		free_irq(dev->irq, dev);
 	iounmap((void *) dev->mem_start);
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
+	ath_detach(dev);
 	kfree(sc);
 }
 

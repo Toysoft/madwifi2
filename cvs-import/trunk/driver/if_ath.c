@@ -224,6 +224,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	ether_setup(dev);
 	dev->open = ath_init;
+	dev->stop = ath_stop;
 	dev->hard_start_xmit = ath_hardstart;
 	dev->tx_timeout = ath_tx_timeout;
 	dev->watchdog_timeo = 5 * HZ;			/* XXX */
@@ -272,8 +273,6 @@ ath_detach(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	DPRINTF(("ath_detach flags %x\n", dev->flags));
-	sc->sc_invalid = 1;
-	ath_stop(dev);
 	ath_desc_free(sc);
 	ath_hal_detach(sc->sc_ah);
 	ieee80211_ifdetach(dev);
@@ -576,7 +575,7 @@ ath_reset(struct net_device *dev)
 			dev->name, __func__);
 	if (ic->ic_state == IEEE80211_S_RUN) {
 		ath_beacon_config(sc);	/* restart beacons */
-		netif_start_queue(dev);		/* restart xmit */
+		netif_wake_queue(dev);	/* restart xmit */
 	}
 }
 
@@ -598,8 +597,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		DPRINTF(("ath_hardstart: discard, invalid %d flags %x\n",
 			sc->sc_invalid, dev->flags));
 		sc->sc_stats.ast_tx_invalid++;
-		error = -ENETDOWN;
-		goto bad;
+		return -ENETDOWN;
 	}
 	/*
 	 * No data frames go out unless we're associated; this
@@ -614,7 +612,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		 * turn it off until we asociate (yech).
 		 */
 		netif_stop_queue(dev);
-		error = -ENETDOWN;
 		goto bad;
 	}
 	/*
@@ -634,7 +631,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (bf == NULL) {		/* NB: should not happen */
 		printk("ath_hardstart: discard, no xmit buf\n");
 		sc->sc_stats.ast_tx_nobuf++;
-		error = -ENOBUFS;
 		goto bad;
 	}
 	/*
@@ -644,15 +640,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (skb == NULL) {
 		DPRINTF(("ath_hardstart: discard, encapsulation failure\n"));
 		sc->sc_stats.ast_tx_encap++;
-#ifdef notdef
-		error = -ENOMEM;
-#else
-		/*
-		 * Can't return an error code here because the caller
-		 * reclaims the skbuff on error and it's already gone.
-		 */
-		error = 0;
-#endif
 		goto bad;
 	}
 	wh = (struct ieee80211_frame *) skb->data;
@@ -665,7 +652,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	    ic->ic_opmode != IEEE80211_M_STA) {
 		DPRINTF(("ath_hardstart: discard, no destination state\n"));
 		sc->sc_stats.ast_tx_nonode++;
-		error = -EHOSTUNREACH;
 		goto bad;
 	}
 	if (ni == NULL)
@@ -694,7 +680,7 @@ bad:
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 		spin_unlock_bh(&sc->sc_txbuflock);
 	}
-	return error;
+	return 0;	/* NB: return !0 only in a ``hard error condition'' */
 }
 
 /*
@@ -1690,6 +1676,7 @@ ath_tx_tasklet(void *data)
 {
 	struct net_device *dev = data;
 	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 	struct ath_desc *ds;
@@ -1760,7 +1747,13 @@ ath_tx_tasklet(void *data)
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 		spin_unlock(&sc->sc_txbuflock);
 	}
-	netif_wake_queue(dev);
+	/*
+	 * Don't wakeup unless we're associated; this insures we don't
+	 * signal the upper layer it's ok to start sending data frames.
+	 */
+	/* XXX use a low watermark to reduce wakeups */
+	if (ic->ic_state == IEEE80211_S_RUN)
+		netif_wake_queue(dev);
 }
 
 static void
