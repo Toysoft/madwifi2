@@ -135,4 +135,6 @@ depend: beforedepend .depend afterdepend
 .depend: ${SRCS} opt_ah.h
 	rm -f .depend
 	gcc -M ${CFLAGS} ${SRCS} > .depend
+beforedepend:
+afterdepend:
 sinclude .depend

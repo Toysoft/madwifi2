@@ -69,4 +69,6 @@ else
 endif
 	rm -f .depend
 	gcc -M ${CFLAGS} ${SRCS} > .depend
+beforedepend:
+afterdepend:
 -include .depend
