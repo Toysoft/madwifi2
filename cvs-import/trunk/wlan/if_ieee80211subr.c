@@ -64,15 +64,8 @@
 #include "if_ieee80211.h"
 #include "if_wavelan_ieee.h"
 #include "if_media.h"
-#define	__packed	__attribute__((__packed__))
 #include "if_llc.h"
 #include "if_ethersubr.h"
-
-/* Bit map related macros. */
-#define	setbit(a,i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
-#define	clrbit(a,i)	((a)[(i)/NBBY] &= ~(1<<((i)%NBBY)))
-#define	isset(a,i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
-#define	isclr(a,i)	(((a)[(i)/NBBY] & (1<<((i)%NBBY))) == 0)
 
 #define	IEEE80211_DEBUG
 #ifdef IEEE80211_DEBUG
@@ -82,18 +75,6 @@ static	int ieee80211_debug = 2;
 #else
 #define	DPRINTF(X)
 #define	DPRINTF2(X)
-#endif
-
-/* XXX belongs elsewhere */
-#ifndef ALIGNED_POINTER
-/*
- * ALIGNED_POINTER is a boolean macro that checks whether an address
- * is valid to fetch data elements of type t from on this architecture.
- * This does not reflect the optimal alignment, just the possibility
- * (within reasonable limits). 
- *
- */
-#define ALIGNED_POINTER(p,t)	1
 #endif
 
 static int ieee80211_send_prreq(struct ieee80211com *,

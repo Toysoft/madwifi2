@@ -15,6 +15,8 @@ OBJS=		${OBJS_COMMON} if_ath_cs.o if_ath_pci.o
 
 CFLAGS=	-I. -I${ATH_HAL} -I${HAL} -I${WLAN} -I${LINUX} \
 	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
+#LDFLAGS=-x -S
+LDFLAGS=
 
 #ALL=	ath_cs.o ath_pci.o
 ALL=	ath_pci.o
@@ -25,9 +27,9 @@ install: all
 	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
 
 ath_cs.o: ${OBJS_CS} Makefile
-	${LD} -o $@ -r -x -S ${OBJS_CS}
+	${LD} -o $@ -r ${LDFLAGS} ${OBJS_CS}
 ath_pci.o: ${OBJS_PCI} Makefile
-	${LD} -o $@ -r -x -S ${OBJS_PCI}
+	${LD} -o $@ -r ${LDFLAGS} ${OBJS_PCI}
 ifdef CONFIG_MODVERSIONS
 if_ath.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
 if_ath_pci.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver

@@ -39,16 +39,6 @@
 
 #include <sys/queue.h>
 
-/*
- * BSD portability stuff.
- */
-#ifndef NBBY
-#define	NBBY	8			/* number of bits/byte */
-#endif
-#ifndef roundup
-#define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
-#endif
-
 #define	IEEE80211_ADDR_LEN			6
 
 /*

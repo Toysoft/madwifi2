@@ -24,7 +24,7 @@ WLAN=	${DEPTH}/wlan
 #
 DRIVER=	${DEPTH}/driver
 
-COPTS=	-g -O -Wall
+COPTS=	-g -O -Wall -include ${DEPTH}/include/compat.h -I${DEPTH}/include
 
 include ${KERNEL_PATH}/.config
 
