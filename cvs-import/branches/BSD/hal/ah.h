@@ -80,12 +80,12 @@ typedef enum {
 	HAL_EINVAL	= 12,	/* Invalid parameter to function */
 	HAL_ENOTSUPP	= 13,	/* Hardware revision not supported */
 	HAL_ESELFTEST	= 14,	/* Hardware self-test failed */
-	HAL_EINPROGRESS	= 15,	/* Operation incomplete */
+	HAL_EINPROGRESS	= 15	/* Operation incomplete */
 } HAL_STATUS;
 
 typedef enum {
 	AH_FALSE = 0,		/* NB: lots of code assumes false is zero */
-	AH_TRUE  = 1,
+	AH_TRUE  = 1
 } HAL_BOOL;
 
 typedef enum {
@@ -104,7 +104,7 @@ typedef enum {
 	HAL_CAP_BURST		= 13,	/* hardware supports packet bursting */
 	HAL_CAP_FASTFRAME	= 14,	/* hardware supoprts fast frames */
 	HAL_CAP_TXPOW		= 15,	/* global tx power limit  */
-	HAL_CAP_TPC		= 16,	/* per-packet tx power control  */
+	HAL_CAP_TPC		= 16	/* per-packet tx power control  */
 } HAL_CAPABILITY_TYPE;
 
 /* 
@@ -132,7 +132,7 @@ typedef enum {
 	HAL_TX_QUEUE_DATA	= 1,		/* data xmit q's */
 	HAL_TX_QUEUE_BEACON	= 2,		/* beacon xmit q */
 	HAL_TX_QUEUE_CAB	= 3,		/* "crap after beacon" xmit q */
-	HAL_TX_QUEUE_PSPOLL	= 4,		/* power-save poll xmit q */
+	HAL_TX_QUEUE_PSPOLL	= 4		/* power-save poll xmit q */
 } HAL_TX_QUEUE;
 
 #define	HAL_NUM_TX_QUEUES	10		/* max possible # of queues */
@@ -147,7 +147,7 @@ typedef enum {
 	HAL_WME_AC_BE	= 1, 			/* best effort access category*/
 	HAL_WME_AC_VI	= 2,			/* video access category */
 	HAL_WME_AC_VO	= 3,			/* voice access category */
-	HAL_WME_UPSD	= 4,			/* uplink power save */
+	HAL_WME_UPSD	= 4			/* uplink power save */
 } HAL_TX_QUEUE_SUBTYPE;
 
 /*
@@ -164,7 +164,7 @@ typedef enum {
 	TXQ_FLAG_COMPRESSION_ENABLE = 0x0020,    /* compression enabled */
 	TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE = 0x0040, /* enable ready time
 							expiry policy */
-	TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = 0x0080, /* enable backoff while
+	TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = 0x0080	/* enable backoff while
 							sending fragment burst*/
 } HAL_TX_QUEUE_FLAGS;
 
@@ -200,7 +200,7 @@ typedef enum {
 	HAL_PKT_TYPE_ATIM	= 1,
 	HAL_PKT_TYPE_PSPOLL	= 2,
 	HAL_PKT_TYPE_BEACON	= 3,
-	HAL_PKT_TYPE_PROBE_RESP	= 4,
+	HAL_PKT_TYPE_PROBE_RESP	= 4
 } HAL_PKT_TYPE;
 
 /* Rx Filter Frame Types */
@@ -213,7 +213,7 @@ typedef enum {
 	HAL_RX_FILTER_PROM	= 0x00000020,	/* Promiscuous mode */
 	HAL_RX_FILTER_PROBEREQ	= 0x00000080,	/* Allow probe request frames */
 	HAL_RX_FILTER_PHYERR	= 0x00000100,	/* Allow phy errors */
-	HAL_RX_FILTER_PHYRADAR	= 0x00000200,	/* Allow phy radar errors*/
+	HAL_RX_FILTER_PHYRADAR	= 0x00000200	/* Allow phy radar errors*/
 } HAL_RX_FILTER;
 
 typedef enum {
@@ -368,7 +368,7 @@ typedef struct {
 typedef enum {
 	HAL_ANT_VARIABLE = 0,			/* variable by programming */
 	HAL_ANT_FIXED_A	 = 1,			/* fixed to 11a frequencies */
-	HAL_ANT_FIXED_B	 = 2,			/* fixed to 11b frequencies */
+	HAL_ANT_FIXED_B	 = 2			/* fixed to 11b frequencies */
 } HAL_ANT_SETTING;
 
 typedef enum {
@@ -399,7 +399,7 @@ typedef enum {
 
 enum {
 	HAL_SLOT_TIME_9	 = 9,
-	HAL_SLOT_TIME_20 = 20,
+	HAL_SLOT_TIME_20 = 20
 };
 
 /*

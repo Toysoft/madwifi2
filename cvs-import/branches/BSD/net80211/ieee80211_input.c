@@ -727,7 +727,7 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 				 */
 				skbfrag = skb_copy_expand(skb, 0,
 					(ic->ic_dev->mtu +
-					 sizeof(sizeof(struct ieee80211_frame)))
+					 sizeof(struct ieee80211_frame))	// TODO: sizeof(sizeof...)?
 				         - (skb->end - skb->head), GFP_ATOMIC);
 				dev_kfree_skb(skb);
 			}
@@ -2567,7 +2567,6 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 
 /*
  * Process a received ps-poll frame.
- * TODO: dont understand this yet, howto send packet ?
  */
 static void
 ieee80211_recv_pspoll(struct ieee80211com *ic,

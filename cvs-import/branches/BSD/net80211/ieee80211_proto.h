@@ -43,7 +43,7 @@ enum ieee80211_state {
 	IEEE80211_S_SCAN	= 1,	/* scanning */
 	IEEE80211_S_AUTH	= 2,	/* try to authenticate */
 	IEEE80211_S_ASSOC	= 3,	/* try to assoc */
-	IEEE80211_S_RUN		= 4,	/* associated */
+	IEEE80211_S_RUN		= 4	/* associated */
 };
 #define	IEEE80211_S_MAX		(IEEE80211_S_RUN+1)
 

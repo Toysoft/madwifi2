@@ -239,7 +239,7 @@ enum {
 	IEEE80211_MACCMD_POLICY_ALLOW	= 1,	/* set policy: allow traffic */
 	IEEE80211_MACCMD_POLICY_DENY	= 2,	/* set policy: deny traffic */
 	IEEE80211_MACCMD_FLUSH		= 3,	/* flush ACL database */
-	IEEE80211_MACCMD_DETACH		= 4,	/* detach ACL policy */
+	IEEE80211_MACCMD_DETACH		= 4	/* detach ACL policy */
 };
 
 /*
@@ -490,7 +490,7 @@ enum {
 	IEEE80211_PARAM_RSNCAPS		= 22,	/* RSN capabilities */
 	IEEE80211_PARAM_INACT		= 23,	/* station inactivity timeout */
 	IEEE80211_PARAM_INACT_AUTH	= 24,	/* station auth inact timeout */
-	IEEE80211_PARAM_INACT_INIT	= 25,	/* station init inact timeout */
+	IEEE80211_PARAM_INACT_INIT	= 25	/* station init inact timeout */
 };
 
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)

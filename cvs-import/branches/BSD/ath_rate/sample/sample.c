@@ -64,7 +64,7 @@
 #define	SAMPLE_DEBUG
 #ifdef SAMPLE_DEBUG
 enum {
-	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
+	ATH_DEBUG_RATE		= 0x00000010	/* rate control */
 };
 #define	DPRINTF(sc, _fmt, ...) do {				\
 	if (sc->sc_debug & ATH_DEBUG_RATE)			\
@@ -573,7 +573,7 @@ static int max_sample_rate = 100;
  * Static (i.e. global) sysctls.
  */
 enum {
-	DEV_ATH		= 9,			/* XXX known by many */
+	DEV_ATH		= 9			/* XXX known by many */
 };
 
 static ctl_table ath_rate_static_sysctls[] = {

@@ -1595,7 +1595,7 @@ ieee80211_pwrsave(struct ieee80211com *ic, struct ieee80211_node *ni,
 			ether_sprintf(ni->ni_macaddr), IEEE80211_PS_MAX_QUEUE);
 #ifdef IEEE80211_DEBUG
 		if (ieee80211_msg_dumppkts(ic))
-			ieee80211_dump_pkt((caddr_t) skb->data, skb->len, -1, -1);	// TODO: skb->len or skb->data_len?
+			ieee80211_dump_pkt((caddr_t) skb->data, skb->len, -1, -1);
 #endif
 		dev_kfree_skb(skb);
 		return;
