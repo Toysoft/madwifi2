@@ -316,6 +316,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	needmark = 0;
 	ath_hal_getisr(ah, &status);
 	DPRINTF2(("%s: interrupt, status 0x%x\n", dev->name, status));
+status &= ~HAL_INT_BMISS;	/* XXX*/
 #ifdef AR_DEBUG
 	if (ath_debug &&
 	    (status & (HAL_INT_FATAL|HAL_INT_RXORN|HAL_INT_BMISS))) {
