@@ -118,7 +118,7 @@ static __inline int size_to_bin(int size)
 {
 	int x = 0;
 	for (x = 0; x < NUM_PACKET_SIZE_BINS; x++) {
-		if (size < packet_size_bins[x]) {
+		if (size <= packet_size_bins[x]) {
 			return x;
 		}
 	}
@@ -141,12 +141,6 @@ static __inline int rate_to_ndx(struct sample_node *sn, int rate) {
 
 void
 ath_rate_node_init(struct ath_softc *sc, struct ath_node *an){
-	struct sample_softc *ssc = ATH_SOFTC_SAMPLE(sc);
-
-	/* XXX where should this go? */
-	ssc->ath_smoothing_rate = ath_smoothing_rate;
-	ssc->ath_sample_rate = ath_sample_rate;
-
 	/* NB: assumed to be zero'd by caller */
 	ath_rate_ctl_reset(sc,&an->an_node);
 }
@@ -253,7 +247,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	size_bin = size_to_bin(frameLen);
 	best_ndx = best_rate_ndx(sn, size_bin, !mrr);
 
-	if (best_ndx > 0) {
+	if (best_ndx >= 0) {
 		average_tx_time = sn->stats[size_bin][best_ndx].average_tx_time;
 	} else {
 		average_tx_time = 0;
@@ -799,6 +793,10 @@ ath_rate_attach(struct ath_softc *sc)
 	if (osc == NULL)
 		return NULL;
 	osc->arc.arc_space = sizeof(struct sample_node);
+
+	osc->ath_smoothing_rate = ath_smoothing_rate;
+	osc->ath_sample_rate = ath_sample_rate;
+
 	return &osc->arc;
 }
 EXPORT_SYMBOL(ath_rate_attach);
