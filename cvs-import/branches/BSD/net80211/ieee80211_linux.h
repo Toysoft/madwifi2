@@ -234,7 +234,7 @@ typedef spinlock_t acl_lock_t;
 #define	le64toh(_x)	le64_to_cpu(_x)
 #define	htole64(_x)	cpu_to_le64(_x)
 
-#define uintptr_t	unsigned long
+#define uintptr_t	unsigned long *
 
 /*
  * Linux has no equivalents to malloc types so null these out.
