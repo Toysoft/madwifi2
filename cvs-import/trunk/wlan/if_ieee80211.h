@@ -658,6 +658,7 @@ int	ieee80211_mgmt_output(struct net_device *, struct ieee80211_node *,
 		struct sk_buff *, int);
 struct sk_buff *ieee80211_encap(struct net_device *, struct sk_buff *);
 struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
+void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
 void	ieee80211_print_essid(u_int8_t *, int);
 void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
 void	ieee80211_watchdog(struct net_device *);
