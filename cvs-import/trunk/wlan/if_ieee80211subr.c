@@ -2319,7 +2319,7 @@ ieee80211_send_prresp(struct ieee80211com *ic, struct ieee80211_node *bs0,
 	pktlen = 8 + 2 + 2 + 2
 	       + 2 + ni->ni_esslen
 	       + 2 + IEEE80211_RATE_SIZE
-	       + 6
+	       + 3 + 6
 	       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
 	       ;
 	skb = dev_alloc_skb(sizeof(struct ieee80211_frame) + pktlen);
@@ -2350,6 +2350,9 @@ ieee80211_send_prresp(struct ieee80211com *ic, struct ieee80211_node *bs0,
 	frm = ieee80211_add_ssid(frm, ni->ni_essid, ni->ni_esslen);
 	frm = ieee80211_add_rates(frm, &ni->ni_rates);
 
+	*frm++ = IEEE80211_ELEMID_DSPARMS;
+	*frm++ = 1;
+	*frm++ = ieee80211_chan2ieee(ic, ni->ni_chan);
 	if (ic->ic_opmode == IEEE80211_M_IBSS) {
 		*frm++ = IEEE80211_ELEMID_IBSSPARMS;
 		*frm++ = 2;
