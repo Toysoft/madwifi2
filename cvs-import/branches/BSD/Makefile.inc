@@ -53,8 +53,7 @@ OS=		linux
 # to override the default setting.
 #
 ifeq ($(TARGET),)
-TARGET=		$(shell uname -m)-elf
-TOOLPREFIX=	""
+TARGET=		i386-elf
 endif
 
 # BUS defines the bus type to which the wireless devices is attached.
