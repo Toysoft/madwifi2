@@ -53,13 +53,8 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211_input.c,v 1.32 2005/01/24 19:32:0
 
 #include <net80211/ieee80211_var.h>
 
-static struct sk_buff *ieee80211_defrag(struct ieee80211com *,
-	struct ieee80211_node *, struct sk_buff *);
-static struct sk_buff *ieee80211_decap(struct ieee80211com *, struct sk_buff *);
-static void ieee80211_recv_pspoll(struct ieee80211com *,
-	struct ieee80211_node *, struct sk_buff *);
-
 #ifdef IEEE80211_DEBUG
+
 /*
  * Decide if a received management frame should be
  * printed when debugging is enabled.  This filters some
@@ -144,7 +139,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int8_t *bssid;
 	u_int16_t rxseq;
 	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
-	// TODO: needed ? cb->ni = ni;
+	// TODO: where is cb->flags set?
 
 	KASSERT(ni != NULL, ("null node"));
 	ni->ni_inact = ni->ni_inact_reload;
@@ -294,7 +289,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		hdrsize = ieee80211_hdrsize(wh);
 		if (ic->ic_flags & IEEE80211_F_DATAPAD)
 			hdrsize = roundup(hdrsize, sizeof(u_int32_t));
-		if (skb->len < sizeof(struct ieee80211_frame)) {
+		if (skb->len < hdrsize) {
 			IEEE80211_DISCARD(ic, IEEE80211_MSG_ANY,
 			    wh, "data", "too short: len %u, expecting %u",
 			    skb->len, hdrsize);
@@ -687,7 +682,7 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 	if (skbfrag != NULL) {
 		u_int16_t last_rxseq;
 
-		lwh = (struct ieee80211_frame *) skbfrag->data; // TODO: skbfrag or skbfrag->data ?
+		lwh = (struct ieee80211_frame *) skbfrag->data;
 		last_rxseq = le16toh(*(u_int16_t *)lwh->i_seq);
 		/* NB: check seq # and frag together */
 		if (rxseq != last_rxseq+1 ||
@@ -704,31 +699,23 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	/* If this is the first fragment */
  	if (skbfrag == NULL) {
-		/* TODO: not sure if this covers all cases */
 		if (fragno != 0) {		/* !first fragment, discard */
 			IEEE80211_NODE_STAT(ni, rx_defrag);
 			dev_kfree_skb(skb);
 			return NULL;
 		}
-		else if (fragno == 0) {
-			skbfrag = skb;
-		}
-		/* If more frags are coming */
+		skbfrag = skb;
 		if (more_frag) {
-			if (skb_is_nonlinear(skb)) {
-				/*
-				 * We need a continous buffer to
-				 * assemble fragments
-				 */
-				skbfrag = skb_copy(skb, GFP_ATOMIC);
-				dev_kfree_skb(skb);
-			}
 			/*
 			 * Check that we have enough space to hold
-			 * incoming fragments
+			 * all remaining incoming fragments
 			 */
-			else if (skb->end - skb->head < (int)ic->ic_dev->mtu +
-				(int)sizeof(sizeof(struct ieee80211_frame))) {
+			if (skb->end - skb->head < ic->ic_dev->mtu +
+				sizeof(sizeof(struct ieee80211_frame))) {
+				/*
+				 * This should also linearize the skbuff
+				 * TODO: not 100% sure
+				 */
 				skbfrag = skb_copy_expand(skb, 0,
 					(ic->ic_dev->mtu +
 					 sizeof(sizeof(struct ieee80211_frame)))
@@ -736,36 +723,30 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 				dev_kfree_skb(skb);
 			}
 		}
-	} else {
-		if (skbfrag) {
-			/*
-			 * We know we have enough space to copy,
-			 * we've verified that before
-			 */
-			/* Copy current fragment at end of previous one */
-			memcpy(skbfrag->tail,
-			       skb->data + sizeof(struct ieee80211_frame),
-			       skb->len - sizeof(struct ieee80211_frame)
-			);
-			/* Update tail and length */
-			skb_put(skbfrag,
-				skb->len - sizeof(struct ieee80211_frame));
-			/* Keep a copy of last sequence and fragno */
-			*(u_int16_t *) lwh->i_seq = *(u_int16_t *) wh->i_seq;
-		}
+	} else {				/* concatenate */
+		/*
+		 * We know we have enough space to copy,
+		 * we've verified that before
+		 */
+		/* Copy current fragment at end of previous one */
+		memcpy(skbfrag->tail,
+		       skb->data + sizeof(struct ieee80211_frame),
+		       skb->len - sizeof(struct ieee80211_frame)
+		);
+		/* Update tail and length */
+		skb_put(skbfrag,
+			skb->len - sizeof(struct ieee80211_frame));
+		/* track last seqnum and fragno */
+		lwh = (struct ieee80211_frame *) skbfrag->data;
+		*(u_int16_t *) lwh->i_seq = *(u_int16_t *) wh->i_seq;
 		/* we're done with the fragment */
 		dev_kfree_skb(skb);
 	}
-		
-	if (more_frag) {
-		/* More to come */
-		skb = NULL;
-	} else {
-		/* Last fragment received, we're done! */
-		skb = skbfrag;
+	if (more_frag) {			/* more to come, save */
+		ni->ni_rxfrag[0] = skbfrag;
 		skbfrag = NULL;
 	}
-	return skb;
+	return skbfrag;
 }
 
 static struct sk_buff *
