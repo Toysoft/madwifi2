@@ -3896,6 +3896,7 @@ EXPORT_SYMBOL(ieee80211_dump_pkt);
 EXPORT_SYMBOL(ieee80211_encap);
 EXPORT_SYMBOL(ieee80211_end_scan);
 EXPORT_SYMBOL(ieee80211_find_node);
+EXPORT_SYMBOL(ieee80211_get_rssi);
 EXPORT_SYMBOL(ieee80211_ieee2mhz);
 EXPORT_SYMBOL(ieee80211_ifattach);
 EXPORT_SYMBOL(ieee80211_ifdetach);
