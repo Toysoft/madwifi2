@@ -2,26 +2,7 @@
 #
 # Makefile for the Atheros WLAN driver.
 #
-DESTDIR=
-
-VERSION=	2.4.20
-
-#
-# Path to the HAL source code.
-#
-HAL=	../hal
-#
-# Path to the build area for the HAL.
-#
-ATH_HAL=../ath_hal
-#
-# Path to the 802.11 include files
-#
-WLAN=	../wlan
-#
-# Path to the Linux kernel include files.
-#
-LINUX=	../../linux-${VERSION}/include
+include ../Makefile.inc
 
 SRCS=	ah_osdep.c if_ath.c if_ath_cs.c if_ath_pci.c
 
@@ -31,7 +12,7 @@ OBJS_PCI=	${OBJS_COMMON} ${ATH_HAL}/hal.o if_ath_pci.o ${WLAN}/wlan.o
 OBJS=		${OBJS_COMMON} if_ath_cs.o if_ath_pci.o
 
 CFLAGS=	-I. -I${ATH_HAL} -I${HAL} -I${WLAN} -I${LINUX} \
-	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE -g -O
+	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${COPTS}
 
 #ALL=	ath_cs.o ath_pci.o
 ALL=	ath_pci.o

@@ -10,10 +10,7 @@
 # distribution.  The hal_syms.o file is intended for debugging.
 #
 
-#
-# Path to the HAL source code.
-#
-HAL=	../hal
+include ../Makefile.inc
 
 AH_SRCS=${HAL}/ah.c ${HAL}/ah_regdomain.c
 AH_OBJS=ah.o ah_regdomain.o
@@ -41,7 +38,7 @@ AR5211_OBJS=ar5211_attach.o ar5211_beacon.o ar5211_interrupts.o \
 SRCS=	${AH_SRCS} ${AR5210_SRCS} ${AR5211_SRCS} ${AR5212_SRCS}
 OBJS=	${AH_OBJS} ${AR5210_OBJS} ${AR5211_OBJS} ${AR5212_OBJS}
 
-CFLAGS=	-I. -I${HAL} -D_BUILD_STANDALONE_ -D__KERNEL__ -O
+CFLAGS=	-I. -I${HAL} -D_BUILD_STANDALONE_ ${COPTS}
 
 hal.o:	hal_syms.o Makefile
 	strip -x -o $@ \

@@ -2,20 +2,13 @@
 #
 # Makefile for the 802.11 WLAN module.
 #
-DESTDIR=
-
-VERSION=	2.4.20
-
-#
-# Path to the Linux kernel include files.
-#
-LINUX=	../../linux-${VERSION}/include
+include ../Makefile.inc
 
 SRCS=	if_ieee80211subr.c if_media.c rc4.c
 OBJS=	if_ieee80211subr.o if_media.o rc4.o
 
-#CFLAGS=	-I. -I${LINUX} -D__KERNEL__ -DMODULE -g -O
-CFLAGS=	-I. -I${LINUX} -D__KERNEL__ -g -O
+#CFLAGS=	-I. -I${LINUX} -D__KERNEL__ -DMODULE ${COPTS}
+CFLAGS=	-I. -I${LINUX} -D__KERNEL__ ${COPTS}
 
 all:	wlan.o
 
