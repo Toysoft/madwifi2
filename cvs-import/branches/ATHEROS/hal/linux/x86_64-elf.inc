@@ -37,26 +37,12 @@
 #
 
 #
-# Compilation configuration for building big-endian PowerPC/powerpc-eabi.
+# Compilation configuration for building x86-64-elf.
 #
-# Known to work on:
-#	IBM 450EP
 
 #
-# Built with GNU cross-devel tools:
-#
-# PREFIX=/pub/gnu
-# BINUTILS=binutils-2.14
-# GCC=gcc-3.3.2
-# target=powerpc-eabi
-#
-# ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
-# ${GCC}/configure --target=$target   --prefix=${PREFIX} \
-#	--enable-languages=c   --with-gnu-as --with-gnu-ld \
-#	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
-#
 ifndef TOOLPREFIX
-TOOLPREFIX=	/pub/gnu/bin/powerpc-eabi-
+TOOLPREFIX=	/pub/gnu/bin/x86_64-linux-
 endif
 #
 CC=	${TOOLPREFIX}gcc
@@ -65,7 +51,8 @@ STRIP=	${TOOLPREFIX}strip
 OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
-LDOPTS=	-EB
-COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN -DAH_REGOPS_FUNC
-COPTS+= -mbig-endian
-COPTS+= -msoft-float -ffixed-r2
+COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
+COPTS+=	-mcmodel=kernel -mno-red-zone
+ifndef CONFIG_FRAME_POINTER
+COPTS+=	-fomit-frame-pointer
+endif
