@@ -1389,6 +1389,22 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		rsn->rsn_ucastkeylen = value;
 		retv = 0;
 		break;
+	case IEEE80211_PARAM_KEYMGTALGS:
+		/* XXX check */
+		rsn->rsn_keymgmtset = value;
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			retv = ENETRESET;
+		else
+			retv = 0;
+		break;
+	case IEEE80211_PARAM_RSNCAPS:
+		/* XXX check */
+		rsn->rsn_caps = value;
+		if (ic->ic_flags & IEEE80211_F_WPA)
+			retv = ENETRESET;
+		else
+			retv = 0;
+		break;
 	case IEEE80211_PARAM_WPA:
 		if (value > 3)
 			return -EINVAL;
@@ -1589,6 +1605,12 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
 		param[0] = rsn->rsn_ucastkeylen;
+		break;
+	case IEEE80211_PARAM_KEYMGTALGS:
+		param[0] = rsn->rsn_keymgmtset;
+		break;
+	case IEEE80211_PARAM_RSNCAPS:
+		param[0] = rsn->rsn_caps;
 		break;
 	case IEEE80211_PARAM_WPA:
 		switch (ic->ic_flags & IEEE80211_F_WPA) {
@@ -2091,6 +2113,14 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ucastkeylen" },
 	{ IEEE80211_PARAM_UCASTKEYLEN,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ucastkeylen" },
+	{ IEEE80211_PARAM_KEYMGTALGS,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "keymgtalgs" },
+	{ IEEE80211_PARAM_KEYMGTALGS,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_keymgtalgs" },
+	{ IEEE80211_PARAM_RSNCAPS,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "rsncaps" },
+	{ IEEE80211_PARAM_RSNCAPS,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_rsncaps" },
 	{ IEEE80211_PARAM_ROAMING,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "roaming" },
 	{ IEEE80211_PARAM_ROAMING,
