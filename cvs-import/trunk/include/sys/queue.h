@@ -32,6 +32,7 @@
  *
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
  * $FreeBSD: src/sys/sys/queue.h,v 1.54 2002/08/05 05:18:43 alfred Exp $
+ * $Id$
  */
 
 #ifndef _SYS_QUEUE_H_

@@ -1,3 +1,5 @@
+$Id$
+
 Atheros Driver For Linux
 =========================
 
@@ -11,29 +13,27 @@ The driver is actually a port of the BSD Atheros driver and includes
 a port of the 802.11 link layer code originally found in NetBSD.
 You may/will also find other BSD-ish glue code.  As much as possible
 I've tried to make this driver a "native Linux" driver that conforms to
-Linux style and operation but in some areas of operation you may still
-see elements of BSD design/operation.
+Linux style and operation but in some areas of operation you will see
+elements of BSD design/operation.
 
 The driver functions as a normal network device and uses the Wireless
 Extensions API.  As such normal Linux tools can and should be used
 with it.
 
-There are two drivers included here:
+There is only one driver included here; it supports miniPCI and Cardbus
+devices.  The driver can be built as a module or linked into the kernel.
 
-ath_pci for PCI devices, and
-ath_cs for Cardbus devices
-
-These drivers are built as modules that are loaded with insmod or
-modprobe.  Both drivers depend on a wlan module that includes the 802.11
-state protocol support and other glue code.
+The driver depends on a wlan module that contains the 802.11 state machine,
+protocol support, and other glue code.  This code is derived from work
+that first appeared in NetBSD and then FreeBSD.
 
 The Atheros drivers depends on a chunk of code termed the Hardware
 Access Layer (HAL).  This code manages much of the hardware-specific
 operation of the driver.  The HAL is provided in a binary-only form in
 order to comply with FCC regulations.  If you wish to use this driver
-on a platform that is not already supported please contact the author
-to arrange compilation of the HAL.  Note that this is only necessary for
-new _architectures_; the HAL is not tied to any specific version of Linux.
+on a platform that is not already supported please contact the author.
+Note that this is only necessary for new _architectures_; the HAL is
+not tied to any specific version of Linux.
 
 
 Building the driver
@@ -44,22 +44,28 @@ pathname to your Linux kernel distribution.  By default this is set to
 
 Then do:
 
-make depend
-make
+	make depend
+	make
 
-This will generate two files:
+This will generate two important files:
 
-driver/ath_pci.o (for PCI devices), and
-driver/ath_cs.o (for Cardbus devices)
+driver/ath_pci.o (driver for PCI/Cardbus devices), and
+wlan/wlan.o (802.11 support layer)
 
-These files can be loaded with insmod or modprobe.  You can also use:
+These files can be loaded with insmod or modprobe; e.g.
 
-make install
+	insmod wlan/wlan.o
+	insmod driver/ath_pci.o
+
+(note you must load the wlan module first as the driver depends on it).
+You can also use:
+
+	make install
 
 to install the drivers where they can be loaded automatically at boot.
 
-[So far this has only been tested with RH 7.3 and a 2.4.20 kernel on an
- x86 machine.]
+[So far this has only been tested with RH 7.3 and 2.4.18, and 2.4.20
+ kernels on an x86 machine.]
 
 Feedback
 ========
