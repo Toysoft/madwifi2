@@ -1963,6 +1963,8 @@ ath_beacon_config(struct ath_softc *sc)
 static int
 ath_desc_alloc(struct ath_softc *sc)
 {
+#define	DS2PHYS(_sc, _ds) \
+	((_sc)->sc_desc_daddr + ((caddr_t)(_ds) - (caddr_t)(_sc)->sc_desc))
 	int i, bsize;
 	struct ath_desc *ds;
 	struct ath_buf *bf;
@@ -1989,22 +1991,20 @@ ath_desc_alloc(struct ath_softc *sc)
 	STAILQ_INIT(&sc->sc_rxbuf);
 	for (i = 0; i < ATH_RXBUF; i++, bf++, ds++) {
 		bf->bf_desc = ds;
-		bf->bf_daddr = sc->sc_desc_daddr +
-		    ((caddr_t)ds - (caddr_t)sc->sc_desc);
+		bf->bf_daddr = DS2PHYS(sc, ds);
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	}
 
 	STAILQ_INIT(&sc->sc_txbuf);
 	for (i = 0; i < ATH_TXBUF; i++, bf++, ds += ATH_TXDESC) {
 		bf->bf_desc = ds;
-		bf->bf_daddr = sc->sc_desc_daddr +
-		    ((caddr_t)ds - (caddr_t)sc->sc_desc);
+		bf->bf_daddr = DS2PHYS(sc, ds);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 	}
 
 	/* beacon buffer */
 	bf->bf_desc = ds;
-	bf->bf_daddr = sc->sc_desc_daddr + ((caddr_t)ds - (caddr_t)sc->sc_desc);
+	bf->bf_daddr = DS2PHYS(sc, ds);
 	sc->sc_bcbuf = bf;
 	return 0;
 bad:
@@ -2012,6 +2012,7 @@ bad:
 		sc->sc_desc, sc->sc_desc_daddr);
 	sc->sc_desc = NULL;
 	return ENOMEM;
+#undef DS2PHYS
 }
 
 static void
