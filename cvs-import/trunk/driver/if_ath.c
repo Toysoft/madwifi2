@@ -2771,8 +2771,11 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 	for (i = 0; i < rt->rateCount; i++)
 		sc->sc_rixmap[rt->info[i].dot11Rate & IEEE80211_RATE_VAL] = i;
 	memset(sc->sc_hwmap, 0, sizeof(sc->sc_hwmap));
-	for (i = 0; i < 32; i++)
-		sc->sc_hwmap[i] = rt->info[rt->rateCodeToIndex[i]].dot11Rate;
+	for (i = 0; i < 32; i++) {
+		u_int8_t ix = rt->rateCodeToIndex[i];
+		if (ix != 0xff)
+			sc->sc_hwmap[i] = rt->info[ix].dot11Rate;
+	}
 	sc->sc_currates = rt;
 	sc->sc_curmode = mode;
 	/* NB: caller is responsible for reseting rate control state */
@@ -2792,14 +2795,23 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 	    (ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL) / 2));
 
 	ni->ni_txrate = rate;
+	/* XXX management/control frames always go at the lowest speed */
+	an->an_tx_mgtrate = rt->info[0].rateCode;
+	an->an_tx_mgtratesp = an->an_tx_mgtrate | rt->info[0].shortPreamble;
+	/*
+	 * Before associating a node has no rate set setup
+	 * so we can't calculate any transmit codes to use.
+	 * This is ok since we should never be sending anything
+	 * but management frames and those always go at the
+	 * lowest hardware rate.
+	 */
+	if (ni->ni_rates.rs_nrates == 0)
+		goto done;
 	an->an_tx_rix0 = sc->sc_rixmap[
 		ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
 	an->an_tx_rate0 = rt->info[an->an_tx_rix0].rateCode;
 	an->an_tx_rate0sp = an->an_tx_rate0 |
 		rt->info[an->an_tx_rix0].shortPreamble;
-	/* XXX management/control frames always go at the lowest speed */
-	an->an_tx_mgtrate = rt->info[0].rateCode;
-	an->an_tx_mgtratesp = an->an_tx_mgtrate | rt->info[0].shortPreamble;
 	if (sc->sc_mrretry) {
 		/*
 		 * Hardware supports multi-rate retry; setup two
@@ -2841,6 +2853,7 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 		an->an_tx_rate2 = an->an_tx_rate2sp = 0;
 		an->an_tx_rate3 = an->an_tx_rate3sp = 0;
 	}
+done:
 	an->an_tx_ok = an->an_tx_err = an->an_tx_retr = an->an_tx_upper = 0;
 }
 
