@@ -82,7 +82,7 @@ if_ieee80211subr.mod.o: if_ieee80211subr.mod.c
 endif
 
 ifdef CONFIG_MODVERSIONS
-GEN_VERSION=	$(shell echo $(VERSION) | sed -e "s/-.*//")
+GEN_VERSION=	$(shell echo $(KERNEL_VERSION) | sed -e "s/-.*//")
 if_ieee80211.ver: ${SRCS_80211}
 	rm -f $@
 	for i in ${SRCS_80211}; do \

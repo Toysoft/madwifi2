@@ -57,19 +57,31 @@ TARGET_OPTS=	-g -O
 NM=		nm
 AWK=		awk
 
+
+#
+# Set KERNEL_VERSION and KERNEL_PATH variables here or in the environment
+# to build for a different kernel than the one currently running
+#
+#KERNEL_VERSION=	
+#KERNEL_PATH=	
+
 #
 #
 # Path to the Linux kernel, include files, and where to install the modules.
 #
-VERSION=	$(shell uname -r)
-KERNEL_PATH=	/lib/modules/${VERSION}/build
+ifndef KERNEL_VERSION
+KERNEL_VERSION=	$(shell uname -r)
+endif
+ifndef KERNEL_PATH
+KERNEL_PATH=	/lib/modules/${KERNEL_VERSION}/build
+endif
 LINUX=		${KERNEL_PATH}/include
-MODULE_PATH=	/lib/modules/${VERSION}/net
+MODULE_PATH=	/lib/modules/${KERNEL_VERSION}/net
 #
-# A numeric version of the running system's version string, suitable
+# A numeric version of the target system's version string, suitable
 # for doing if checks in make files.
 #
-LINUX_VERSION=	$(shell uname -r | \
+LINUX_VERSION=	$(shell echo $(KERNEL_VERSION) | \
 		awk '{ split($$0,a,"."); print a[1]*100+a[2]; }')
 #
 # Path to the HAL source code.
