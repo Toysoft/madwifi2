@@ -957,8 +957,10 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			/* duplicate, silently discarded */
 			goto out;
 		}
-		if (ni == &ic->ic_bss)
+		if (ni == &ic->ic_bss) {
 			ieee80211_unref_node(&ni);
+			ni = NULL;
+		}
 	}
 
 	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
