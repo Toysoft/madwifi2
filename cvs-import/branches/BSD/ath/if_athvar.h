@@ -7,7 +7,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer,
-    without modification.
+ *    without modification.
  * 2. Redistributions in binary form must reproduce at minimum a disclaimer
  *    similar to the "NO WARRANTY" disclaimer below ("Disclaimer") and any
  *    redistribution must be conditioned upon including a substantially
@@ -134,8 +134,8 @@ struct ath_node {
 	HAL_NODE_STATS	an_halstats;	/* rssi statistics used by hal */
 	/* variable-length rate control state follows */
 };
-#define	ATH_NODE(_n)	((struct ath_node *)(_n))
-#define ATH_NODE_CONST(_n)	((const struct ath_node *)(_n))
+#define	ATH_NODE(ni)	((struct ath_node *)(ni))
+#define	ATH_NODE_CONST(ni)	((const struct ath_node *)(ni))
 
 #define ATH_RSSI_LPF_LEN	10
 #define ATH_RSSI_DUMMY_MARKER	0x127
@@ -217,8 +217,8 @@ struct ath_softc {
 	void 			(*sc_node_free)(struct ieee80211_node *);
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	struct ath_ratectrl	*sc_rc;		/* tx rate control support */
-        void                    (*sc_setdefantenna)(struct ath_softc *, u_int);
-	unsigned int		sc_invalid : 1,	/* being detached */
+	void			(*sc_setdefantenna)(struct ath_softc *, u_int);
+	unsigned int		sc_invalid : 1,	/* disable hardware accesses */
 				sc_mrretry : 1,	/* multi-rate retry support */
 				sc_softled : 1,	/* enable LED gpio status */
 				sc_splitmic: 1,	/* split TKIP MIC keys */
@@ -493,7 +493,6 @@ void	ath_sysctl_unregister(void);
 	ath_hal_setcapability(_ah, HAL_CAP_DIAG, 0, _v, NULL)
 #define	ath_hal_getnumtxqueues(_ah, _pv) \
 	(ath_hal_getcapability(_ah, HAL_CAP_NUM_TXQUEUES, 0, _pv) == HAL_OK)
-
 #define	ath_hal_hasveol(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_VEOL, 0, NULL) == HAL_OK)
 #define	ath_hal_hastxpowlimit(_ah) \
