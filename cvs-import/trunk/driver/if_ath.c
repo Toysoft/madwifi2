@@ -110,6 +110,7 @@ static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
 static int      ath_change_mtu(struct net_device *, int);
+static int	ath_ioctl(struct net_device *, struct ifreq *, int);
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
@@ -242,6 +243,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	dev->tx_timeout = ath_tx_timeout;
 	dev->watchdog_timeo = 5 * HZ;			/* XXX */
 	dev->set_multicast_list = ath_mode_init;
+	dev->do_ioctl = ath_ioctl;
 	dev->get_stats = ath_getstats;
  	dev->change_mtu = &ath_change_mtu;
 	dev->tx_queue_len = ATH_TXBUF-1;		/* 1 for mgmt frame */
@@ -2836,6 +2838,35 @@ ath_getstats(struct net_device *dev)
 	stats->rx_crc_errors = sc->sc_stats.ast_rx_crcerr;
 
 	return stats;
+}
+
+static int
+ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+{
+	struct ath_softc *sc = dev->priv;
+
+	switch (cmd) {
+	case SIOCGATHSTATS:
+		if (copy_to_user(ifr->ifr_data, &sc->sc_stats,
+		    sizeof (sc->sc_stats)))
+			return -EFAULT;
+		return 0;
+	case SIOCGATHDIAG: {
+		struct ath_diag *ad = (struct ath_diag *)ifr;
+		struct ath_hal *ah = sc->sc_ah;
+		void *data;
+		u_int size;
+
+		if (!ath_hal_getdiagstate(ah, ad->ad_id, &data, &size))
+			return -EINVAL;
+		if (size < ad->ad_size)
+			ad->ad_size = size;
+		if (data && copy_to_user(ad->ad_data, data, ad->ad_size))
+			return -EFAULT;
+		return 0;
+	}
+	}
+	return -EOPNOTSUPP;
 }
 
 #ifdef CONFIG_SYSCTL

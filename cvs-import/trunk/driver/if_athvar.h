@@ -44,6 +44,7 @@
 
 #include "if_ieee80211.h"
 #include "ah.h"
+#include "if_athioctl.h"
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
 #include <linux/workqueue.h>
@@ -78,52 +79,6 @@ struct ath_nodestat {
 	u_int		st_tx_retr;	/* tx retry count */
 	int		st_tx_upper;	/* tx upper rate req cnt */
 	u_int		st_tx_antenna;	/* antenna for last good frame */
-};
-
-struct ath_stats {
-	u_int32_t	ast_watchdog;	/* device reset by watchdog */
-	u_int32_t	ast_hardware;	/* fatal hardware error interrupt */
-	u_int32_t	ast_bmiss;	/* beacon miss interrupt */
-	u_int32_t	ast_rxorn;	/* rxorn interrupts */
-	u_int32_t	ast_rxeol;	/* rxeol interrupts */
-	u_int32_t	ast_txurn;	/* tx underrun interrupts */
-	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
-	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
-	u_int32_t	ast_tx_invalid;	/* frames discarded 'cuz device gone */
-	u_int32_t	ast_tx_qstop;	/* tx queue stopped 'cuz full */
-	u_int32_t	ast_tx_encap;	/* tx encapsulation failed */
-	u_int32_t	ast_tx_nonode;	/* tx failed 'cuz no node */
-	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer (data) */
-	u_int32_t	ast_tx_nobufmgt;/* tx failed 'cuz no tx buffer (mgmt)*/
-	u_int32_t	ast_tx_xretries;/* tx failed 'cuz too many retries */
-	u_int32_t	ast_tx_fifoerr;	/* tx failed 'cuz FIFO underrun */
-	u_int32_t	ast_tx_filtered;/* tx failed 'cuz xmit filtered */
-	u_int32_t	ast_tx_shortretry;/* tx on-chip retries (short) */
-	u_int32_t	ast_tx_longretry;/* tx on-chip retries (long) */
-	u_int32_t	ast_tx_badrate;	/* tx failed 'cuz bogus xmit rate */
-	u_int32_t	ast_tx_noack;	/* tx frames with no ack marked */
-	u_int32_t	ast_tx_rts;	/* tx frames with rts enabled */
-	u_int32_t	ast_tx_cts;	/* tx frames with cts enabled */
-	u_int32_t	ast_tx_shortpre;/* tx frames with short preamble */
-	int16_t		ast_tx_rssi;	/* tx rssi of last ack */
-	int16_t		ast_tx_rssidelta;/* tx rssi delta */
-	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
-	u_int32_t	ast_rx_tooshort;/* rx failed 'cuz frame too short */
-	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
-	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
-	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
-	u_int32_t	ast_rx_phyerr;	/* rx PHY error summary count */
-	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
-	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
-	int16_t		ast_rx_rssi;	/* rx rssi of last recv'd frame */
-	int16_t		ast_rx_rssidelta;/* rx rssi delta */
-	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
-	u_int32_t	ast_per_cal;	/* periodic calibration calls */
-	u_int32_t	ast_per_calfail;/* periodic calibration failed */
-	u_int32_t	ast_per_rfgain;	/* periodic calibration rfgain reset */
-	u_int32_t	ast_rate_calls;	/* rate control checks */
-	u_int32_t	ast_rate_raise;	/* rate control raised xmit rate */
-	u_int32_t	ast_rate_drop;	/* rate control dropped xmit rate */
 };
 
 struct ath_buf {
@@ -291,6 +246,8 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_stopDmaReceive)((_ah)))
 #define	ath_hal_dumpstate(_ah) \
 	((*(_ah)->ah_dumpState)((_ah)))
+#define	ath_hal_getdiagstate(_ah, _id, _data, _size) \
+	((*(_ah)->ah_getDiagState)((_ah), (_id), (_data), (_size)))
 #define	ath_hal_setuptxqueue(_ah, _type, _irq) \
 	((*(_ah)->ah_setupTxQueue)((_ah), (_type), (_irq)))
 #define	ath_hal_resettxqueue(_ah, _q) \
