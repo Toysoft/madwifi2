@@ -48,7 +48,14 @@
 
 enum {
 	IEEE80211_PARAM_TURBO	= 1,	/* turbo mode */
-	IEEE80211_PARAM_MODE	= 2	/* phy mode (11a, 11b, etc.) */
+	IEEE80211_PARAM_MODE	= 2,	/* phy mode (11a, 11b, etc.) */
+	IEEE80211_PARAM_RESET   = 3,    /* chip hardware reset */ 
 };
+
+enum {
+    IEEE80211_PARAM_RESET_INIT      = 1,    /* hard reset + init */
+    IEEE80211_PARAM_RESET_RESET     = 2,    /* hard reset only */
+};
+
 
 #endif /* _NET_IF_IEEE80211_H_ */

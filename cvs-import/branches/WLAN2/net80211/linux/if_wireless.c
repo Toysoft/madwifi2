@@ -50,28 +50,83 @@
 
 #ifdef CONFIG_NET_WIRELESS
 
+/*
+ * Units are in db above the noise floor. That means the
+ * rssi values reported in the tx/rx descriptors in the
+ * driver are the SNR expressed in db.
+ *
+ * If you assume that the noise floor is -95, which is an
+ * excellent assumption 99.5 % of the time, then you can
+ * derive the absolute signal level (i.e. -95 + rssi). 
+ * There are some other slight factors to take into account
+ * depending on whether the rssi measurement is from 11b,
+ * 11g, or 11a.   These differences are at most 2db and
+ * can be documented.
+ *
+ * NB: various calculations are based on the orinoco/wavelan
+ *     drivers for compatibility
+ */
+static void
+set_quality(struct iw_quality *iq, u_int rssi)
+{
+	iq->qual = rssi;
+	/* NB: max is 94 because noise is hardcoded to 161 */
+	if (iq->qual > 94)
+		iq->qual = 94;
+	
+	iq->noise = 161;                /* -95dBm */
+	iq->level = iq->noise + iq->qual;
+	iq->updated = 7;
+}
+
 struct iw_statistics *
 ieee80211_iw_getstats(struct net_device *dev)
 {
+#define	NZ(x)	((x) ? (x) : 1)
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	/* wireless statistics block */
 	struct iw_statistics *ic_iwstats = &(ic->ic_stats.ic_iwstats);
 
-	ic_iwstats->qual.qual = 0;
-	ic_iwstats->qual.level = ic->ic_bss->ni_rssi;
-	ic_iwstats->qual.noise = 0;
-	ic_iwstats->qual.updated = 0;
-
+	switch (ic->ic_opmode) {
+	case IEEE80211_M_STA:
+		/* use stats from associated ap */
+		set_quality(&ic_iwstats->qual,
+			    (*ic->ic_node_getrssi)(ic,ic->ic_bss));
+		break;
+	case IEEE80211_M_IBSS:
+	case IEEE80211_M_AHDEMO:
+	case IEEE80211_M_HOSTAP: {
+		struct ieee80211_node* ni;
+		u_int32_t rssi_samples = 0;
+		u_int32_t rssi_total = 0;
+		
+		/* average stats from all nodes */
+		/* XXX: I lack the hardware to test this. -Mike */
+		TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
+			rssi_samples++;
+			rssi_total += (*ic->ic_node_getrssi)(ic,ni);
+		}
+		set_quality(&ic_iwstats->qual,
+			    rssi_total / NZ(rssi_samples));
+		break;
+	}
+	case IEEE80211_M_MONITOR:
+	default:
+		/* no stats */
+		set_quality(&ic_iwstats->qual, 0);
+		break;
+	}
 	ic_iwstats->status = ic->ic_state;
 	ic_iwstats->discard.nwid = 0;
 	ic_iwstats->discard.code = 0;
 	ic_iwstats->discard.fragment = 0;
 	ic_iwstats->discard.retries = 0;
 	ic_iwstats->discard.misc = 0;
-
+	
 	ic_iwstats->miss.beacon = 0;
-
+	
 	return ic_iwstats;
+#undef NZ
 }
 
 static int
@@ -84,18 +139,18 @@ ieee80211_ioctl_giwname(struct net_device *dev,
 	/* XXX should use media status but IFM_AUTO case gets tricky */
 	switch (ic->ic_curmode) {
 	case IEEE80211_MODE_11A:
-		strncpy(name, "IEEE 802.11-OFDM", IFNAMSIZ);
+		strncpy(name, "IEEE 802.11a", IFNAMSIZ);
 		break;
 	case IEEE80211_MODE_11B:
-		strncpy(name, "IEEE 802.11-DS", IFNAMSIZ);
+		strncpy(name, "IEEE 802.11b", IFNAMSIZ);
 		break;
 	case IEEE80211_MODE_11G:
-		strncpy(name, "IEEE 802.11-OFDM/DS", IFNAMSIZ);
+		strncpy(name, "IEEE 802.11g", IFNAMSIZ);
 		break;
 	case IEEE80211_MODE_TURBO:
-		strncpy(name, "IEEE 802.11-TURBO", IFNAMSIZ);
+		strncpy(name, "ATHEROS TURBO", IFNAMSIZ);
 		break;
-	default:
+	case IEEE80211_MODE_AUTO:
 		strncpy(name, "IEEE 802.11", IFNAMSIZ);
 		break;
 	}
@@ -115,6 +170,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 		error = ENETRESET;
 		goto done;
 	}
+	/* XXX ? if ((ic->ic_flags & IEEE80211_F_WEPON) == 0) {*/
 	if ((ic->ic_caps & IEEE80211_C_WEP) == 0) {
 		error = EOPNOTSUPP;
 		goto done;
@@ -151,7 +207,7 @@ ieee80211_ioctl_giwencode(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	if ((ic->ic_caps & IEEE80211_C_WEP) == 0) {
+	if ((ic->ic_flags & IEEE80211_F_WEPON) == 0) {
 		erq->length = 0;
 		erq->flags = IW_ENCODE_DISABLED;
 	} else {
@@ -383,6 +439,8 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 	struct ieee80211_channel *c;
 	int i;
 	
+	if (ic->ic_opmode == IEEE80211_M_STA)
+		return 0;
 	if (freq->e > 1)
 		return -EINVAL;
 	if (freq->e == 1)
@@ -451,9 +509,15 @@ ieee80211_ioctl_giwessid(struct net_device *dev,
 			data->length = ic->ic_des_esslen;
 		memcpy(essid, ic->ic_des_essid, data->length);
 	} else {
-		if (data->length > ic->ic_bss->ni_esslen)
-			data->length = ic->ic_bss->ni_esslen;
-		memcpy(essid, ic->ic_bss->ni_essid, data->length);
+		if (strlen(ic->ic_des_essid) == 0) {
+			if (data->length > ic->ic_bss->ni_esslen)
+				data->length = ic->ic_bss->ni_esslen;
+			memcpy(essid, ic->ic_bss->ni_essid, data->length);
+		} else {
+			if (data->length > ic->ic_des_esslen)
+				data->length = ic->ic_des_esslen;
+			memcpy(essid, ic->ic_des_essid, data->length);
+		}
 	}
 	return 0;
 }
@@ -509,9 +573,18 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 				break;
 		}
 
-	range->max_qual.qual = 92; /* 0 .. 92 */
-	range->max_qual.level = 154; /* 27 .. 154 */
-	range->max_qual.noise = 154; /* 27 .. 154 */
+	/* Max quality is max field value minus noise floor */
+	range->max_qual.qual  = 0xff - 161;
+
+	/*
+	 * In order to use dBm measurements, 'level' must be lower
+	 * than any possible measurement (see iw_print_stats() in
+	 * wireless tools).  It's unclear how this is meant to be
+	 * done, but setting zero in these values forces dBm and
+	 * the actual numbers are not used.
+	 */
+	range->max_qual.level = 0;
+	range->max_qual.noise = 0;
 	range->sensitivity = 3;
 
 	range->max_encoding_tokens = IEEE80211_WEP_NKID;
@@ -553,10 +626,11 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 	(*ic->ic_media.ifm_status)(dev, &imr);
 
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_media = imr.ifm_active &~ IFM_OMASK;
+	ifr.ifr_media = (imr.ifm_active & ~IFM_OMASK & ~IFM_TMASK) | IFM_AUTO;
 	switch (*mode) {
 	case IW_MODE_INFRA:
 		/* NB: this is the default */
+		ic->ic_des_chan = IEEE80211_CHAN_ANYC;
 		break;
 	case IW_MODE_ADHOC:
 		ifr.ifr_media |= IFM_IEEE80211_ADHOC;
@@ -800,10 +874,7 @@ ieee80211_ioctl_iwaplist(struct net_device *dev,
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
 		else
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
-		qual[i].qual = ni->ni_rssi;
-		qual[i].level = 0;
-		qual[i].noise = 0;
-		qual[i].updated = jiffies;		/* XXX */
+		set_quality(&qual[i], ni->ni_rssi);
 		if (++i >= IW_MAX_AP)
 			break;
 	}
@@ -910,8 +981,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 		}
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVQUAL;
-		iwe.u.qual.level = ni->ni_rssi;
-		iwe.u.qual.updated = jiffies;	/* XXX */
+		set_quality(&iwe.u.qual, ni->ni_rssi);
 		current_ev = iwe_stream_add_event(current_ev,
 			end_buf, &iwe, IW_EV_QUAL_LEN);
 
@@ -973,29 +1043,47 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	int value = i[1];		/* NB: all values are TYPE_INT */
 	struct ifmediareq imr;
 	struct ifreq ifr;
+	int retv = EOPNOTSUPP;
 
-	memset(&imr, 0, sizeof(imr));
-	(*ic->ic_media.ifm_status)(dev, &imr);
-
-	memset(&ifr, 0, sizeof(ifr));
-
-	switch (param) {
+	switch(param) {
 	case IEEE80211_PARAM_TURBO:
+		memset(&imr, 0, sizeof(imr));
+		(*ic->ic_media.ifm_status)(dev, &imr);
+
+		memset(&ifr, 0, sizeof(ifr));
+
 		if (value)
 			imr.ifm_active |= IFM_IEEE80211_TURBO;
 		else
 			imr.ifm_active &= ~IFM_IEEE80211_TURBO;
 		ifr.ifr_media = imr.ifm_active;
+		retv = ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
 	case IEEE80211_PARAM_MODE:
-		ifr.ifr_media = (imr.ifm_active &~ IFM_MMASK)
-			      | IFM_MAKEMODE(value);
-		break;
-	default:
-		return -EOPNOTSUPP;
-	}
+		memset(&imr, 0, sizeof(imr));
+		(*ic->ic_media.ifm_status)(dev, &imr);
+		memset(&ifr, 0, sizeof(ifr));
+  	 
+		ifr.ifr_media = (imr.ifm_active & ~IFM_MMASK & ~IFM_TMASK) | 
+			IFM_AUTO | IFM_MAKEMODE(value);
 
-	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
+		retv = ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);   
+		break;
+	case IEEE80211_PARAM_RESET:
+		switch(value) {
+		case IEEE80211_PARAM_RESET_INIT:
+			retv = ENETRESET;
+			break;
+		case IEEE80211_PARAM_RESET_RESET:
+			(void) (*ic->ic_reset)(ic);
+			retv = 0;
+			break;
+		}
+	}
+	if (retv == ENETRESET)
+		retv = (*ic->ic_init)(ic);
+ 
+	return -retv;
 }
 
 static int
@@ -1102,6 +1190,8 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "mode" },
 	{ IEEE80211_PARAM_MODE,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_mode" },
+	{ IEEE80211_PARAM_RESET,
+  	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },  
 #endif /* WIRELESS_EXT >= 12 */
 };
 
