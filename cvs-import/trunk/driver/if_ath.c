@@ -1967,7 +1967,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			ivp[i] = iv;
 			iv >>= 8;
 		}
-		ivp[i] = sc->sc_ic.ic_wep_txkey << 6;	/* Key ID and pad */
+		ivp[i] = ic->ic_wep_txkey << 6;	/* Key ID and pad */
 		memcpy(skb->data, hdrbuf, sizeof(hdrbuf));
 		/*
 		 * The ICV length must be included into hdrlen and pktlen.
@@ -2143,7 +2143,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		, atype			/* Atheros packet type */
 		, 60			/* txpower XXX */
 		, txrate, try0		/* series 0 rate/tries */
-		, iswep ? sc->sc_ic.ic_wep_txkey : HAL_TXKEYIX_INVALID
+		, iswep ? ic->ic_wep_txkey : HAL_TXKEYIX_INVALID
 		, antenna		/* antenna mode */
 		, flags			/* flags */
 		, ctsrate		/* rts/cts rate */
