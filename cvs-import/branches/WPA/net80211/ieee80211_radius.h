@@ -96,9 +96,4 @@ struct radiuscom {
 	void		(*rc_sendsrvr)(struct eapol_auth_node *);
 	void		(*rc_txkey)(struct eapol_auth_node *);
 };
-
-#if defined(__KERNEL__) || defined(_KERNEL)
-extern	int ieee80211_radius_attach(struct eapolcom *);
-extern	void ieee80211_radius_detach(struct eapolcom *);
-#endif
 #endif /* _NET80211_RADIUS_H_ */
