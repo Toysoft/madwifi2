@@ -2680,7 +2680,6 @@ rx_accept:
 		 * Record driver-specific state.
 		 */
 		an = ATH_NODE(ni);
-		an->an_rx_antenna = ds->ds_rxstat.rs_antenna;
 
 		/* XXX monitor stats to identify packet type */
 		opackets = sc->sc_devstats.rx_packets;
@@ -2780,7 +2779,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ath_desc *ds;
 	struct ath_txq *txq;
 	struct ieee80211_frame *wh;
-	u_int subtype, flags, ctsduration, antenna;
+	u_int subtype, flags, ctsduration;
 	HAL_PKT_TYPE atype;
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
@@ -3027,17 +3026,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	} else
 		ctsrate = 0;
 
-	/*
-	 * For now use the antenna on which the last good
-	 * frame was received on.  We assume this field is
-	 * initialized to 0 which gives us ``auto'' or the
-	 * ``default'' antenna.
-	 */
-	if (an->an_tx_antenna)
-		antenna = an->an_tx_antenna;
-	else
-		antenna = an->an_rx_antenna;
-
 	if (IFF_DUMPPKTS(ic, ATH_DEBUG_XMIT))
 		ieee80211_dump_pkt(skb->data, skb->len,
 			sc->sc_hwmap[txrate] & IEEE80211_RATE_VAL, -1);
@@ -3053,7 +3041,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		, MIN(ni->ni_txpower,60)/* txpower */
 		, txrate, try0		/* series 0 rate/tries */
 		, keyix			/* key cache index */
-		, antenna		/* antenna mode */
+		, sc->sc_txantenna	/* antenna mode */
 		, flags			/* flags */
 		, ctsrate		/* rts/cts rate */
 		, ctsduration		/* rts/cts duration */
@@ -3155,7 +3143,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			an = ATH_NODE(ni);
 			if (ds->ds_txstat.ts_status == 0) {
 				an->an_tx_ok++;
-				an->an_tx_antenna = ds->ds_txstat.ts_antenna;
 				if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
 					sc->sc_stats.ast_tx_altrate++;
 				sc->sc_stats.ast_tx_rssi =
@@ -3170,7 +3157,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 					sc->sc_stats.ast_tx_fifoerr++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
 					sc->sc_stats.ast_tx_filtered++;
-				an->an_tx_antenna = 0;	/* invalidate */
 			}
 			sr = ds->ds_txstat.ts_shortretry;
 			lr = ds->ds_txstat.ts_longretry;
@@ -4605,6 +4591,7 @@ enum {
 	ATH_CTSTIMEOUT	= 3,
 	ATH_SOFTLED	= 4,
 	ATH_LEDPIN	= 5,
+	ATH_ANTENNA	= 9,
 };
 
 static int
@@ -4646,6 +4633,10 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 			case ATH_LEDPIN:
 				sc->sc_ledpin = val;
 				break;
+			case ATH_ANTENNA:
+				/* XXX validate? force rx antenna too? */
+				sc->sc_txantenna = val;
+				break;
 			default:
 				return -EINVAL;
 			}
@@ -4666,6 +4657,9 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 			break;
 		case ATH_LEDPIN:
 			val = sc->sc_ledpin;
+			break;
+		case ATH_ANTENNA:
+			val = sc->sc_txantenna;
 			break;
 		default:
 			return -EINVAL;
@@ -4707,6 +4701,11 @@ static const ctl_table ath_sysctl_template[] = {
 	},
 	{ .ctl_name	= ATH_LEDPIN,
 	  .procname	= "ledpin",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_ANTENNA,
+	  .procname	= "antenna",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
