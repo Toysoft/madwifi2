@@ -215,6 +215,11 @@ struct ath_softc {
 	int			(*sc_newstate)(struct ieee80211com *,
 					enum ieee80211_state, int);
 	void 			(*sc_node_free)(struct ieee80211_node *);
+	void			*sc_bdev;	/* associated bus device */
+	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
+	size_t			sc_desc_len;	/* size of TX/RX descriptors */
+	u_int16_t		sc_cachelsz;	/* cache line size */
+	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	struct ath_ratectrl	*sc_rc;		/* tx rate control support */
 	void			(*sc_setdefantenna)(struct ath_softc *, u_int);
@@ -260,38 +265,41 @@ struct ath_softc {
 	u_int16_t		sc_ledoff;	/* off time for current blink */
 	struct timer_list	sc_ledtimer;	/* led off timer */
 
-	void			*sc_bdev;	/* associated bus device */
-	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
-	size_t			sc_desc_len;	/* size of TX/RX descriptors */
-	u_int16_t		sc_cachelsz;	/* cache line size */
-	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
+	union {
+		struct ath_tx_radiotap_header th;
+		u_int8_t	pad[64];
+	} u_tx_rt;
+	int			sc_tx_th_len;
+	union {
+		struct ath_rx_radiotap_header th;
+		u_int8_t	pad[64];
+	} u_rx_rt;
+	int			sc_rx_th_len;
 
-	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */
+	struct tq_struct	sc_fataltq;	/* fatal int tasklet */
 
 	int			sc_rxbufsize;	/* rx size based on mtu */
-	ath_bufhead     	sc_rxbuf;	/* receive buffer */
+	ath_bufhead		sc_rxbuf;	/* receive buffer */
 	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 	u_int8_t		sc_defant;	/* current default antenna */
 	u_int8_t		sc_rxotherant;	/* rx's on non-default antenna*/
 
-	ath_bufhead	        sc_txbuf;	/* tx buffer queue */
+	ath_bufhead		sc_txbuf;	/* transmit buffer */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
 	int			sc_tx_timer;	/* transmit timeout */
 	u_int			sc_txqsetup;	/* h/w queues setup */
 	u_int			sc_txintrperiod;/* tx interrupt batching */
 	struct ath_txq		sc_txq[HAL_NUM_TX_QUEUES];
-	struct ath_txq		*sc_ac2q[5];	/* WME AC -> h/w qnum */ 
+	struct ath_txq		*sc_ac2q[5];	/* WME AC -> h/w q map */ 
 	struct tq_struct	sc_txtq;	/* tx intr tasklet */
 
-	ath_bufhead	        sc_bcbuf;	/* beacon buffer queue */
-	spinlock_t		sc_bcbuflock;	/* bcbuf lock */
+	ath_bufhead		sc_bbuf;	/* beacon buffers */
 	u_int			sc_bhalq;	/* HAL q for outgoing beacons */
 	u_int			sc_bmisscount;	/* missed beacon transmits */
 	u_int32_t		sc_ant_tx[8];	/* recent tx frames/antenna */
 	struct ath_txq		*sc_cabq;	/* tx q for cab frames */
-	//struct ath_buf		*sc_bcbuf;	/* beacon buffer */
 	struct ath_buf		*sc_bufptr;	/* allocated buffer ptr */
 	struct ieee80211_beacon_offsets sc_boff;/* dynamic update state */
 	struct tq_struct	sc_bmisstq;	/* bmiss intr tasklet */
@@ -313,6 +321,14 @@ struct ath_softc {
 #endif
 };
 
+#define	ATH_LOCK_INIT(_sc) \
+	init_MUTEX(&(_sc)->sc_lock)
+#define	ATH_LOCK_DESTROY(_sc)
+#define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
+#define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
+#define	ATH_LOCK_ASSERT(_sc)
+//TODO:	KASSERT(spin_is_locked(&(_sc)->sc_lock), ("buf not locked!"))
+
 #define	ATH_TXQ_SETUP(sc, i)	((sc)->sc_txqsetup & (1<<i))
 
 #define	ATH_TXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_txbuflock)
@@ -323,14 +339,6 @@ struct ath_softc {
 #define	ATH_TXBUF_UNLOCK_BH(_sc)	spin_unlock_bh(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_ASSERT(_sc) \
 	KASSERT(spin_is_locked(&(_sc)->sc_txbuflock), ("txbuf not locked!"))
-
-#define	ATH_LOCK_INIT(_sc)		init_MUTEX(&(_sc)->sc_lock)
-#define	ATH_LOCK_DESTROY(_sc)
-#define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
-#define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
-#define	ATH_LOCK_ASSERT(_sc)
-
-// TODO ? KASSERT(spin_is_locked(&(_sc)->sc_lock), ("buf not locked!"))
 
 int	ath_attach(u_int16_t, struct net_device *);
 int	ath_detach(struct net_device *);
