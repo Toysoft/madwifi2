@@ -60,6 +60,7 @@ enum ieee80211_state {
  */
 struct ieee80211_cb {
 	struct ieee80211_node	*ni;
+	struct ieee80211_key	*key;
 	u_int8_t		flags;
 };
 
@@ -79,6 +80,22 @@ extern	void ieee80211_pwrsave(struct ieee80211com *, struct ieee80211_node *,
 		struct sk_buff *);
 extern	struct sk_buff *ieee80211_encap(struct ieee80211com *, struct sk_buff *,
 		struct ieee80211_node **);
+
+/*
+ * Return the size of the 802.11 header for a data frame.
+ */
+static inline int
+ieee80211_hdrsize(const void *data)
+{
+	const struct ieee80211_frame *wh = data;
+	int size = sizeof(struct ieee80211_frame);
+
+	if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS)
+		size += IEEE80211_ADDR_LEN;
+	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS)
+		size += sizeof(u_int16_t);
+	return size;
+}
 
 /*
  * Template for an in-kernel authenticator.  Authenticators
@@ -117,6 +134,29 @@ extern	void ieee80211_authenticator_backend_unregister(
 		const struct ieee80211_authenticator_backend *);
 extern	const struct ieee80211_authenticator_backend *
 	ieee80211_authenticator_backend_get(const char *name);
+
+/*
+ * Template for an MAC ACL policy module.  Such modules
+ * register with the protocol code and are passed the sender's
+ * address of each received frame for validation.
+ */
+struct ieee80211_aclator {
+	const char *iac_name;		/* printable name */
+	int	(*iac_attach)(struct ieee80211com *);
+	void	(*iac_detach)(struct ieee80211com *);
+	int	(*iac_check)(struct ieee80211com *,
+			const u_int8_t mac[IEEE80211_ADDR_LEN]);
+	int	(*iac_add)(struct ieee80211com *,
+			const u_int8_t mac[IEEE80211_ADDR_LEN]);
+	int	(*iac_remove)(struct ieee80211com *,
+			const u_int8_t mac[IEEE80211_ADDR_LEN]);
+	int	(*iac_flush)(struct ieee80211com *);
+	int	(*iac_setpolicy)(struct ieee80211com *, int);
+	int	(*iac_getpolicy)(struct ieee80211com *);
+};
+extern	void ieee80211_aclator_register(const struct ieee80211_aclator *);
+extern	void ieee80211_aclator_unregister(const struct ieee80211_aclator *);
+extern	const struct ieee80211_aclator *ieee80211_aclator_get(const char *name);
 
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
