@@ -343,12 +343,18 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 {
 #define	RV(v)	((v) & IEEE80211_RATE_VAL)
 	int i, j, ignore, error;
-	int okrate, badrate;
+	int okrate, badrate, fixedrate;
 	struct ieee80211_rateset *srs, *nrs;
 	u_int8_t r;
 
+	/*
+	 * If the fixed rate check was requested but no
+	 * fixed has been defined then just remove it.
+	 */
+	if ((flags & IEEE80211_F_DOFRATE) && ic->ic_fixed_rate < 0)
+		flags &= ~IEEE80211_F_DOFRATE;
 	error = 0;
-	okrate = badrate = 0;
+	okrate = badrate = fixedrate = 0;
 	srs = &ic->ic_sup_rates[ieee80211_chan2mode(ic, ni->ni_chan)];
 	nrs = &ni->ni_rates;
 	for (i = 0; i < nrs->rs_nrates; ) {
@@ -369,17 +375,10 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 		badrate = r;
 		if (flags & IEEE80211_F_DOFRATE) {
 			/*
-			 * Apply fixed rate constraint.  Note that we do
-			 * not apply the constraint to basic rates as
-			 * otherwise we may not be able to associate if
-			 * the rate set we submit to the AP is invalid
-			 * (e.g. fix rate at 36Mb/s which is not a basic
-			 * rate for 11a operation).
+			 * Check any fixed rate is included. 
 			 */
-			if ((nrs->rs_rates[i] & IEEE80211_RATE_BASIC) == 0 &&
-			    ic->ic_fixed_rate >= 0 &&
-			    r != RV(srs->rs_rates[ic->ic_fixed_rate]))
-				ignore++;
+			if (r == RV(srs->rs_rates[ic->ic_fixed_rate]))
+				fixedrate = r;
 		}
 		if (flags & IEEE80211_F_DONEGO) {
 			/*
@@ -429,7 +428,8 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 			okrate = nrs->rs_rates[i];
 		i++;
 	}
-	if (okrate == 0 || error != 0)
+	if (okrate == 0 || error != 0 ||
+	    ((flags & IEEE80211_F_DOFRATE) && fixedrate == 0))
 		return badrate | IEEE80211_RATE_BASIC;
 	else
 		return RV(okrate);
