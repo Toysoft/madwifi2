@@ -41,6 +41,7 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211_proto.c,v 1.5 2003/10/13 04:23:56 dyoung E
  */
 #include <linux/config.h>
 #include <linux/version.h>
+#include <linux/kmod.h>
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
@@ -68,6 +69,42 @@ const char *ieee80211_state_name[IEEE80211_S_MAX] = {
 };
 EXPORT_SYMBOL(ieee80211_state_name);
 
+#define	IEEE80211_AUTH_MAX	(IEEE80211_AUTH_WPA2_PSK+1)
+/* XXX well-known names */
+static const char *auth_modnames[IEEE80211_AUTH_MAX] = {
+	/* NB: for now we have one module */
+#if 0
+	"wlan_auth_none",	/* IEEE80211_AUTH_NONE */
+	"wlan_auth_open",	/* IEEE80211_AUTH_OPEN */
+	"wlan_auth_shared",	/* IEEE80211_AUTH_SHARED */
+	"wlan_auth_8021x",	/* IEEE80211_AUTH_8021X	 */
+	"wlan_auth_auto",	/* IEEE80211_AUTH_AUTO */
+	"wlan_auth_wpa",	/* IEEE80211_AUTH_WPA */
+	"wlan_auth_wpa_psk",	/* IEEE80211_AUTH_WPA_PSK */
+	"wlan_auth_wpa2",	/* IEEE80211_AUTH_WPA2 */
+	"wlan_auth_wpa2_psk",	/* IEEE80211_AUTH_WPA2_PSK */
+#else
+	"wlan_auth",		/* IEEE80211_AUTH_NONE */
+	"wlan_auth",		/* IEEE80211_AUTH_OPEN */
+	"wlan_auth",		/* IEEE80211_AUTH_SHARED */
+	"wlan_auth",		/* IEEE80211_AUTH_8021X	 */
+	"wlan_auth",		/* IEEE80211_AUTH_AUTO */
+	"wlan_auth",		/* IEEE80211_AUTH_WPA */
+	"wlan_auth",		/* IEEE80211_AUTH_WPA_PSK */
+	"wlan_auth",		/* IEEE80211_AUTH_WPA2 */
+	"wlan_auth",		/* IEEE80211_AUTH_WPA2_PSK */
+#endif
+};
+static const struct ieee80211_authenticator *authenticators[IEEE80211_AUTH_MAX];
+
+static const struct ieee80211_authenticator auth_internal = {
+	.ia_name		= "internal",
+	.ia_attach		= NULL,
+	.ia_detach		= NULL,
+	.ia_node_join		= NULL,
+	.ia_node_leave		= NULL,
+};
+
 static int ieee80211_newstate(struct ieee80211com *, enum ieee80211_state, int);
 
 void
@@ -82,6 +119,7 @@ ieee80211_proto_attach(struct ieee80211com *ic)
 	ic->ic_fragthreshold = 2346;		/* XXX not used yet */
 	ic->ic_fixed_rate = -1;			/* no fixed rate */
 	ic->ic_protmode = IEEE80211_PROT_CTSONLY;
+	ic->ic_roaming = IEEE80211_ROAMING_AUTO;
 
 	/* protocol state change handler */
 	ic->ic_newstate = ieee80211_newstate;
@@ -89,6 +127,10 @@ ieee80211_proto_attach(struct ieee80211com *ic)
 	/* initialize management frame handlers */
 	ic->ic_recv_mgmt = ieee80211_recv_mgmt;
 	ic->ic_send_mgmt = ieee80211_send_mgmt;
+
+	ieee80211_authenticator_register(IEEE80211_AUTH_OPEN, &auth_internal);
+	ieee80211_authenticator_register(IEEE80211_AUTH_SHARED, &auth_internal);
+	ieee80211_authenticator_register(IEEE80211_AUTH_AUTO, &auth_internal);
 }
 
 void
@@ -99,8 +141,82 @@ ieee80211_proto_detach(struct ieee80211com *ic)
 	 * the state but be conservative here since the
 	 * authenticator may do things like spawn kernel threads.
 	 */
-	ieee80211_authenticator_detach(ic);
+	if (ic->ic_auth->ia_detach)
+		ic->ic_auth->ia_detach(ic);
+
+	ieee80211_authenticator_unregister(IEEE80211_AUTH_OPEN);
+	ieee80211_authenticator_unregister(IEEE80211_AUTH_SHARED);
+	ieee80211_authenticator_unregister(IEEE80211_AUTH_AUTO);
 }
+
+/*
+ * Simple-minded authenticator module support.
+ */
+
+const struct ieee80211_authenticator *
+ieee80211_authenticator_get(int auth)
+{
+	if (auth >= IEEE80211_AUTH_MAX)
+		return NULL;
+	if (authenticators[auth] == NULL)
+		request_module(auth_modnames[auth]);
+	return authenticators[auth];
+}
+
+void
+ieee80211_authenticator_register(int type,
+	const struct ieee80211_authenticator *auth)
+{
+	if (type >= IEEE80211_AUTH_MAX)
+		return;
+	authenticators[type] = auth;
+}
+EXPORT_SYMBOL(ieee80211_authenticator_register);
+
+void
+ieee80211_authenticator_unregister(int type)
+{
+
+	if (type >= IEEE80211_AUTH_MAX)
+		return;
+	authenticators[type] = NULL;
+}
+EXPORT_SYMBOL(ieee80211_authenticator_unregister);
+
+/*
+ * Very simple-minded authenticator backend module support.
+ */
+/* XXX just one for now */
+static	const struct ieee80211_authenticator_backend *backend = NULL;
+
+void
+ieee80211_authenticator_backend_register(
+	const struct ieee80211_authenticator_backend *be)
+{
+	printk(KERN_INFO "802.1x wlan: %s backend registered\n", be->iab_name);
+	backend = be;
+}
+EXPORT_SYMBOL(ieee80211_authenticator_backend_register);
+
+void
+ieee80211_authenticator_backend_unregister(
+	const struct ieee80211_authenticator_backend * be)
+{
+	if (backend == be)
+		backend = NULL;
+	printk(KERN_INFO "802.1x wlan: %s backend unregistered\n",
+		be->iab_name);
+}
+EXPORT_SYMBOL(ieee80211_authenticator_backend_unregister);
+
+const struct ieee80211_authenticator_backend *
+ieee80211_authenticator_backend_get(const char *name)
+{
+	if (backend == NULL)
+		request_module("wlan_radius");
+	return backend && strcmp(backend->iab_name, name) == 0 ? backend : NULL;
+}
+EXPORT_SYMBOL(ieee80211_authenticator_backend_get);
 
 void
 ieee80211_print_essid(u_int8_t *essid, int len)
@@ -343,6 +459,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_DISASSOC,
 				    IEEE80211_REASON_ASSOC_LEAVE);
+				ieee80211_notify_node_leave(ic, ni);
 				break;
 			case IEEE80211_M_HOSTAP:
 				IEEE80211_NODE_LOCK(ic);
@@ -382,14 +499,12 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_SCAN:
 			ic->ic_mgt_timer = 0;
-			if (ic->ic_wep_ctx != NULL) {
-				FREE(ic->ic_wep_ctx, M_DEVBUF);
-				ic->ic_wep_ctx = NULL;
-			}
 			ieee80211_free_allnodes(ic);
+			ieee80211_crypto_detach(ic);
 			break;
 		}
-		ieee80211_authenticator_detach(ic);
+		if (ic->ic_auth->ia_detach != NULL)
+			ic->ic_auth->ia_detach(ic);
 		break;
 	case IEEE80211_S_SCAN:
 		ic->ic_flags &= ~IEEE80211_F_SIBSS;
@@ -427,6 +542,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_STATE,
 				("no recent beacons from %s; rescanning\n",
 				ether_sprintf(ic->ic_bss->ni_bssid)));
+			ieee80211_notify_node_leave(ic, ni);
 			ieee80211_free_allnodes(ic);
 			/* FALLTHRU */
 		case IEEE80211_S_AUTH:
@@ -444,9 +560,6 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 	case IEEE80211_S_AUTH:
 		switch (ostate) {
 		case IEEE80211_S_INIT:
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
-				("%s: invalid transition\n", __func__));
-			break;
 		case IEEE80211_S_SCAN:
 			IEEE80211_SEND_MGMT(ic, ni,
 			    IEEE80211_FC0_SUBTYPE_AUTH, 1);
@@ -475,6 +588,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 				/* try to reauth */
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_AUTH, 1);
+				ieee80211_notify_node_leave(ic, ni);
 				break;
 			}
 			break;
@@ -499,6 +613,9 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 		}
 		break;
 	case IEEE80211_S_RUN:
+		if (ic->ic_flags & IEEE80211_F_WPA) {
+			/* XXX validate prerequisites */
+		}
 		switch (ostate) {
 		case IEEE80211_S_INIT:
 			if (ic->ic_opmode == IEEE80211_M_MONITOR)
@@ -529,19 +646,23 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int mgt
 					IEEE80211_RATE2MBS(ni->ni_rates.rs_rates[ni->ni_txrate]));
 			}
 			ic->ic_mgt_timer = 0;
+			if (ic->ic_opmode == IEEE80211_M_STA)
+				ieee80211_notify_node_join(ic, ni, 
+					mgt == IEEE80211_FC0_SUBTYPE_ASSOC_RESP);
 			break;
 		}
 		/*
-		 * Start/stop the 802.1x authenticator when operating
-		 * as an AP.  We delay until here to allow configuration
-		 * to happen out of order.
+		 * Start/stop the authenticator when operating as an
+		 * AP.  We delay until here to allow configuration to
+		 * happen out of order.
 		 */
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP && /* XXX IBSS/AHDEMO */
-		    ni->ni_authmode == IEEE80211_AUTH_8021X)
+		    ic->ic_auth->ia_attach != NULL) {
 			/* XXX check failure */
-			ieee80211_authenticator_attach(ic);
-		else
-			ieee80211_authenticator_detach(ic);
+			ic->ic_auth->ia_attach(ic);
+		} else if (ic->ic_auth->ia_detach != NULL) {
+			ic->ic_auth->ia_detach(ic);
+		}
 		/*
 		 * When 802.1x is not in use mark the port authorized
 		 * at this point so traffic can flow.
