@@ -74,7 +74,7 @@ ieee80211_add_vap(struct ieee80211com *ic)
 	u_int i;
 	u_int8_t b;
 	unsigned long flags;
-
+	spin_lock_init(&ieee80211_vap_spinlock);
 	spin_lock_irqsave(&ieee80211_vap_spinlock,flags);
 	ic->ic_vap = 0;
 	for (i = 0; i < N(ieee80211_vapmap) && ieee80211_vapmap[i] == 0xff; i++)
@@ -192,11 +192,7 @@ ieee80211_ifattach(struct ieee80211com *ic)
 
 	ieee80211_node_attach(ic);
 	ieee80211_proto_attach(ic);
-
-	/* TODO: not yet
-		ieee80211_add_vap(ic);
-	*/
-
+	ieee80211_add_vap(ic);
 	/*
 	 * Install a default reset method for the ioctl support.
 	 * The driver is expected to fill this in before calling us.
@@ -204,9 +200,6 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	 */
 	if (ic->ic_reset == NULL)
 		ic->ic_reset = ieee80211_default_reset;
-
-	/* XXX lock */
-	SLIST_INSERT_HEAD(&ieee80211_list, ic, ic_next);
 
 	init_timer(&ic->ic_slowtimo);
 	ic->ic_slowtimo.data = (unsigned long) ic;
@@ -224,11 +217,7 @@ void
 ieee80211_ifdetach(struct ieee80211com *ic)
 {
 
-	/* XXX lock */
-	SLIST_REMOVE(&ieee80211_list, ic, ieee80211com, ic_next);
-	/* TODO: not yet
 	ieee80211_remove_vap(ic);
-	*/
 	del_timer(&ic->ic_slowtimo);
 	ieee80211_proto_detach(ic);
 	ieee80211_crypto_detach(ic);
