@@ -138,12 +138,12 @@ struct ath_softc {
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 
-	u_int			sc_txhalq;	/* HAL q for outgoing frames */
-	u_int32_t		*sc_txlink;	/* link ptr in last TX desc */
+        int sc_AC2qNum[4];  /* HAL q nums for each AC value */
+	u_int32_t		*sc_txlink[HAL_NUM_TX_QUEUES];	/* link ptr in last TX desc */
 	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
-	TAILQ_HEAD(, ath_buf)	sc_txq;		/* transmit queue */
-	spinlock_t		sc_txqlock;	/* lock on txq and txlink */
+        TAILQ_HEAD(, ath_buf)	sc_txq[HAL_NUM_TX_QUEUES];		/* transmit queue */
+        spinlock_t		sc_txqlock[HAL_NUM_TX_QUEUES];	/* lock on txq and txlink */
 	struct tq_struct	sc_txtq;	/* tx intr tasklet */
 
 	u_int			sc_bhalq;	/* HAL q for outgoing beacons */

@@ -91,7 +91,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct ath_pci_softc *sc;
 	struct net_device *dev;
 	const char *athname;
-	u_int8_t csz;
+	u_int8_t csz,i;
 
 	if (pci_enable_device(pdev))
 		return (-EIO);
@@ -146,7 +146,11 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bad2;
 	}
 	memset(sc, 0, sizeof(struct ath_pci_softc));
-
+	
+	for (i=0;i<4;i++) {
+                sc->aps_sc.sc_AC2qNum[i] = 0;
+	}
+        
 	/* mark the device as detached to avoid processing interrupts until setup is complete */
 	sc->aps_sc.sc_invalid = 1;
 

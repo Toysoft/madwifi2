@@ -342,6 +342,15 @@ struct ieee80211_information {
 #define	IEEE80211_ELEMID_XRATES			50
 #define	IEEE80211_ELEMID_VENDOR			221
 #define	OUI_WME					0x0050f2
+#define OUI_TYPE                                0x02
+#define WME_PARAM_OUI_SUBTYPE                   0x01
+
+/* Classes for WME streams */
+#define WME_AC_BE 0
+#define WME_AC_BK 1
+#define WME_AC_VI 2
+#define WME_AC_VO 3
+
 
 #define	IEEE80211_RATE_BASIC			0x80
 #define	IEEE80211_RATE_VAL			0x7f
@@ -504,6 +513,17 @@ enum ieee80211_state {
 	IEEE80211_S_ASSOC,		/* try to assoc */
 	IEEE80211_S_RUN			/* associated */
 };
+
+/*
+ * WME information element
+ */
+struct wme_ie {
+	u_int8_t	wme_oui[3];
+	u_int8_t	wme_oui_type;
+	u_int8_t	wme_oui_subtype;
+	u_int8_t	wme_version;
+	u_int8_t	wme_info;
+} __attribute__((__packed__));
 
 /*
  * WME parameters

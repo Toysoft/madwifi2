@@ -152,6 +152,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	int error = 0;
 	u_int8_t csz;
 	HAL_STATUS status;
+	HAL_TXQ_INFO qInfo;
+	int i,qNum;
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
@@ -164,8 +166,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
 	spin_lock_init(&sc->sc_txbuflock);
-	spin_lock_init(&sc->sc_txqlock);
-
+	for (i=0;i<HAL_NUM_TX_QUEUES;i++) {
+		spin_lock_init(&sc->sc_txqlock[i]);
+	}
 	INIT_TQUEUE(&sc->sc_rxtq,	ath_rx_tasklet,		dev);
 	INIT_TQUEUE(&sc->sc_txtq,	ath_tx_tasklet,		dev);
 	INIT_TQUEUE(&sc->sc_bmisstq,	ath_bmiss_tasklet,	dev);
@@ -238,15 +241,50 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * allocate more tx queues for splitting management
 	 * frames and for QOS support.
 	 */
-	sc->sc_txhalq = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, NULL);
-	if (sc->sc_txhalq == (u_int) -1) {
-		printk("%s: unable to setup a data xmit queue!\n", dev->name);
-		goto bad2;
-	}
-	sc->sc_bhalq = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_BEACON, NULL);
+
+	sc->sc_bhalq = ath_hal_setuptxqueue(ah,HAL_TX_QUEUE_BEACON,NULL);
 	if (sc->sc_bhalq == (u_int) -1) {
 		printk("%s: unable to setup a beacon xmit queue!\n", dev->name);
 		goto bad2;
+	}
+
+	memset (&qInfo, 0, sizeof(qInfo));
+	qInfo.tqi_subtype = HAL_WME_AC_BK;
+	/* Enable interrupts */
+	qNum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qInfo);
+	printk ("Setup queue (%d) for WME_AC_BK\n",qNum);
+        //	setACtoQNumTable(sc, WME_AC_BK, qNum);
+        sc->sc_AC2qNum[WME_AC_BK] = qNum;
+	if (qNum == (u_int) -1) {
+		printk("%s: unable to setup a data xmit queue!\n", dev->name);
+		goto bad;
+	}
+
+	qInfo.tqi_subtype = HAL_WME_AC_BE;
+	qNum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qInfo);
+        sc->sc_AC2qNum[WME_AC_BE] = qNum;
+	printk ("Setup queue (%d) for WME_AC_BE\n",qNum);
+	if (qNum == (u_int) -1) {
+		printk("%s: unable to setup a data xmit queue!\n", dev->name);
+		goto bad;
+	}
+
+	qInfo.tqi_subtype = HAL_WME_AC_VI;
+	qNum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qInfo);
+        sc->sc_AC2qNum[WME_AC_VI] = qNum;
+	printk ("Setup queue (%d) for WME_AC_VI\n",qNum);
+	if (qNum == (u_int) -1) {
+		printk("%s: unable to setup a data xmit queue!\n", dev->name);
+		goto bad;
+	}
+
+	qInfo.tqi_subtype = HAL_WME_AC_VO;
+	qNum = ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_DATA, &qInfo);
+        sc->sc_AC2qNum[WME_AC_VO] = qNum;
+	printk ("Setup queue (%d) for WME_AC_VO\n",qNum);
+	if (qNum == (u_int) -1) {
+		printk("%s: unable to setup a data xmit queue!\n", dev->name);
+		goto bad;
 	}
 
 	init_timer(&sc->sc_rate_ctl);
@@ -1388,8 +1426,9 @@ ath_desc_alloc(struct ath_softc *sc)
 		    ((caddr_t)ds - (caddr_t)sc->sc_desc);
 		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 	}
-	TAILQ_INIT(&sc->sc_txq);
-
+	for (i=0;i<HAL_NUM_TX_QUEUES; i++) {
+		TAILQ_INIT(&sc->sc_txq[i]);
+	}
 	/* beacon buffer */
 	bf->bf_desc = ds;
 	bf->bf_daddr = sc->sc_desc_daddr + ((caddr_t)ds - (caddr_t)sc->sc_desc);
@@ -1406,6 +1445,7 @@ static void
 ath_desc_free(struct ath_softc *sc)
 {
 	struct ath_buf *bf;
+	int i;
 
 	/*
 	 * NB: TX queues have already been freed in ath_draintxq(),
@@ -1438,7 +1478,9 @@ ath_desc_free(struct ath_softc *sc)
 
 	TAILQ_INIT(&sc->sc_rxbuf);
 	TAILQ_INIT(&sc->sc_txbuf);
-	TAILQ_INIT(&sc->sc_txq);
+	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
+		TAILQ_INIT(&sc->sc_txq[i]);
+	}
 	kfree(sc->sc_bufptr);
 	sc->sc_bufptr = NULL;
 }
@@ -1462,14 +1504,19 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
         struct ath_softc *sc = ic->ic_dev.priv;
 	struct ath_buf *bf;
+	int i;
 
 	/* XXX do we need to block bh? */
-	spin_lock_bh(&sc->sc_txqlock);
-	TAILQ_FOREACH(bf, &sc->sc_txq, bf_list) {
-		if (bf->bf_node == ni)
-			bf->bf_node = NULL;
+	for (i=0;i < HAL_NUM_TX_QUEUES; i++) {
+		if (i != sc->sc_bhalq) {
+			spin_lock_bh(&sc->sc_txqlock[i]);
+			TAILQ_FOREACH(bf, &sc->sc_txq[i], bf_list) {
+				if (bf->bf_node == ni)
+					bf->bf_node = NULL;
+			}
+			spin_unlock_bh(&sc->sc_txqlock[i]);
+		}
 	}
-	spin_unlock_bh(&sc->sc_txqlock);
 	kfree(ni);
 }
 
@@ -1711,10 +1758,8 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 
 	/* Pass up tsf clock in mactime */
 	ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
-//	ph->mactime.status = P80211ENUM_msgitem_status_no_value;
 	ph->mactime.status = 0;
 	ph->mactime.len = 4;
-//	ph->mactime.data = 0;
 	ph->mactime.data = ath_hal_gettsf32(sc->sc_ah);
 
 	ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
@@ -1967,30 +2012,37 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct net_device_stats *stats = &ic->ic_stats;
-	int i, iswep, hdrlen, pktlen, try0;
+	int i, iswep, hdrlen, pktlen, try0,isqos=0;
 	u_int8_t rix, cix, txrate, ctsrate;
 	struct ath_desc *ds;
-	struct ieee80211_frame *wh;
+	struct ieee80211_frame *wh, *whWep;
+	u_int8_t acc=0;
 	u_int32_t iv;
 	u_int8_t *ivp;
-	u_int8_t hdrbuf[sizeof(struct ieee80211_frame) +
-	    IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN];
 	u_int subtype, flags, ctsduration, antenna;
 	HAL_PKT_TYPE atype;
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
 	struct ath_node *an;
-
+	u_int8_t qNum;
+	u_int16_t padbytes;
+	
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
 	hdrlen = sizeof(struct ieee80211_frame);
+	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
+		isqos = 1;
+		acc = skb->priority;
+		hdrlen += sizeof(struct ieee80211_qoscntl);
+	}
+	qNum = sc->sc_AC2qNum[acc];
+	padbytes = roundup(hdrlen, 4) - hdrlen;
 	pktlen = skb->len;
 
 	if (iswep) {
-		memcpy(hdrbuf, skb->data, hdrlen);
-		skb_pull(skb, hdrlen);
-		skb_push(skb, sizeof(hdrbuf));
-		ivp = hdrbuf + hdrlen;
+		whWep = (struct ieee80211_frame *) skb_push(skb,IEEE80211_WEP_IVLEN+IEEE80211_WEP_KIDLEN);
+		ivp = ((u_int8_t *) whWep)+hdrlen+padbytes;
+		memmove(whWep, wh, hdrlen);
 		/*
 		 * XXX
 		 * IV must not duplicate during the lifetime of the key.
@@ -2014,17 +2066,16 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			ivp[i] = iv;
 			iv >>= 8;
 		}
-		ivp[i] = ic->ic_wep_txkey << 6;	/* Key ID and pad */
-		memcpy(skb->data, hdrbuf, sizeof(hdrbuf));
+		ivp[i] = ic->ic_wep_txkey << 6; /* Key ID and pad */
 		/*
 		 * The ICV length must be included into hdrlen and pktlen.
 		 */
-		hdrlen = sizeof(hdrbuf) + IEEE80211_WEP_CRCLEN;
+		hdrlen += IEEE80211_WEP_IVLEN+IEEE80211_WEP_KIDLEN;
 		pktlen += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN+
 			IEEE80211_WEP_CRCLEN;
 
 		/* Packet header has moved, reset our local pointer */
-		wh = (struct ieee80211_frame *) skb->data;
+		wh = whWep;
 	}
 
 	pktlen += IEEE80211_CRC_LEN;
@@ -2079,6 +2130,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			txrate = an->an_tx_mgtratesp;
 		else
 			txrate = an->an_tx_mgtrate;
+		qNum = sc->sc_AC2qNum[WME_AC_VO]; /* mgmt go out highest queue -WME_AC_VO */
+		
 		break;
 	case IEEE80211_FC0_TYPE_CTL:
 		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
@@ -2225,25 +2278,25 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * Insert the frame on the outbound list and
 	 * pass it on to the hardware.
 	 */
-	spin_lock_bh(&sc->sc_txqlock);
-	TAILQ_INSERT_TAIL(&sc->sc_txq, bf, bf_list);
-	if (sc->sc_txlink == NULL) {
-		ath_hal_puttxbuf(ah, sc->sc_txhalq, bf->bf_daddr);
+	spin_lock_bh(&sc->sc_txqlock[qNum]);
+	TAILQ_INSERT_TAIL(&sc->sc_txq[qNum], bf, bf_list);
+	if (sc->sc_txlink[qNum] == NULL) {
+		ath_hal_puttxbuf(ah, qNum, bf->bf_daddr);
 		DPRINTF2(("ath_tx_start: TXDP0 = %p (%p)\n",
 		    (caddr_t)bf->bf_daddr, bf->bf_desc));
 	} else {
-		*sc->sc_txlink = bf->bf_daddr;
+		*(sc->sc_txlink[qNum]) = bf->bf_daddr;
 		DPRINTF2(("ath_tx_start: link(%p)=%p (%p)\n",
-		    sc->sc_txlink, (caddr_t)bf->bf_daddr, bf->bf_desc));
+			  sc->sc_txlink[qNum], (caddr_t)bf->bf_daddr, bf->bf_desc));
 	}
-	sc->sc_txlink = &ds->ds_link;
-	spin_unlock_bh(&sc->sc_txqlock);
-
+	sc->sc_txlink[qNum] = &ds->ds_link;
+	spin_unlock_bh(&sc->sc_txqlock[qNum]);
+	
 #ifdef SOFTLED
 	ath_update_LED(dev, ah, ic, TRANSMIT_EVENT);
 #endif
-	ath_hal_txstart(ah, sc->sc_txhalq);
-
+	ath_hal_txstart(ah, qNum);
+	
 	stats->tx_packets++;
 	stats->tx_bytes += pktlen;
 
@@ -2264,71 +2317,75 @@ ath_tx_tasklet(void *data)
 	struct ath_desc *ds;
 	struct ieee80211_node *ni;
 	struct ath_node *an;
-	int sr, lr;
+	int sr, lr,i;
 	HAL_STATUS status;
 
-	DPRINTF2(("ath_tx_tasklet: tx queue %p, link %p\n",
-		(caddr_t) ath_hal_gettxbuf(sc->sc_ah, sc->sc_txhalq),
-		sc->sc_txlink));
-	for (;;) {
-		spin_lock(&sc->sc_txqlock);
-		bf = TAILQ_FIRST(&sc->sc_txq);
-		if (bf == NULL) {
-			sc->sc_txlink = NULL;
-			spin_unlock(&sc->sc_txqlock);
-			break;
-		}
-		ds = bf->bf_desc;		/* NB: last decriptor */
-		status = ath_hal_txprocdesc(ah, ds);
+	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
+		if (i != sc->sc_bhalq) {
+			DPRINTF2(("ath_tx_tasklet: tx queue %p, link %p\n",
+				  (caddr_t) ath_hal_gettxbuf(sc->sc_ah, i),
+				  sc->sc_txlink[i]));
+			for (;;) {
+				spin_lock(&sc->sc_txqlock[i]);
+				bf = TAILQ_FIRST(&sc->sc_txq[i]);
+				if (bf == NULL) {
+					sc->sc_txlink[i] = NULL;
+					spin_unlock(&sc->sc_txqlock[i]);
+					break;
+				}
+				ds = bf->bf_desc;	    /* NB: last decriptor */
+				status = ath_hal_txprocdesc(ah, ds);
 #ifdef AR_DEBUG
 		if (ath_debug > 1)
 			ath_printtxbuf(bf, status == HAL_OK);
 #endif
-		if (status == HAL_EINPROGRESS) {
-			spin_unlock(&sc->sc_txqlock);
-			break;
-		}
-		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
-		spin_unlock(&sc->sc_txqlock);
-
-		ni = bf->bf_node;
-		if (ni != NULL) {
-			an = ATH_NODE(ni);
-			if (ds->ds_txstat.ts_status == 0) {
-				an->an_tx_ok++;
-				an->an_tx_antenna = ds->ds_txstat.ts_antenna;
-				if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
-					sc->sc_stats.ast_tx_altrate++;
-				sc->sc_stats.ast_tx_rssidelta =
-					ds->ds_txstat.ts_rssi -
-					sc->sc_stats.ast_tx_rssi;
-				sc->sc_stats.ast_tx_rssi =
-					ds->ds_txstat.ts_rssi;
-			} else {
-				an->an_tx_err++;
-				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
-					sc->sc_stats.ast_tx_xretries++;
-				if (ds->ds_txstat.ts_status & HAL_TXERR_FIFO)
-					sc->sc_stats.ast_tx_fifoerr++;
-				if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
-					sc->sc_stats.ast_tx_filtered++;
-				an->an_tx_antenna = 0;	/* invalidate */
+				if (status == HAL_EINPROGRESS) {
+					spin_unlock(&sc->sc_txqlock[i]);
+					break;
+				}
+				TAILQ_REMOVE(&sc->sc_txq[i], bf, bf_list);
+				spin_unlock(&sc->sc_txqlock[i]);
+				
+				ni = bf->bf_node;
+				if (ni != NULL) {
+					an = ATH_NODE(ni);
+					if (ds->ds_txstat.ts_status == 0) {
+						an->an_tx_ok++;
+						an->an_tx_antenna = ds->ds_txstat.ts_antenna;
+						if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
+							sc->sc_stats.ast_tx_altrate++;
+						sc->sc_stats.ast_tx_rssidelta =
+							ds->ds_txstat.ts_rssi -
+							sc->sc_stats.ast_tx_rssi;
+						sc->sc_stats.ast_tx_rssi =
+							ds->ds_txstat.ts_rssi;
+					} else {
+						an->an_tx_err++;
+						if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
+							sc->sc_stats.ast_tx_xretries++;
+						if (ds->ds_txstat.ts_status & HAL_TXERR_FIFO)
+							sc->sc_stats.ast_tx_fifoerr++;
+						if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
+							sc->sc_stats.ast_tx_filtered++;
+						an->an_tx_antenna = 0;	/* invalidate */
+					}
+					sr = ds->ds_txstat.ts_shortretry;
+					lr = ds->ds_txstat.ts_longretry;
+					sc->sc_stats.ast_tx_shortretry += sr;
+					sc->sc_stats.ast_tx_longretry += lr;
+					an->an_tx_retr += sr + lr;
+				}
+				pci_unmap_single(sc->sc_pdev,
+						 bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+				dev_kfree_skb(bf->bf_skb);
+				bf->bf_skb = NULL;
+				bf->bf_node = NULL;
+				
+				spin_lock(&sc->sc_txbuflock);
+				TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+				spin_unlock(&sc->sc_txbuflock);
 			}
-			sr = ds->ds_txstat.ts_shortretry;
-			lr = ds->ds_txstat.ts_longretry;
-			sc->sc_stats.ast_tx_shortretry += sr;
-			sc->sc_stats.ast_tx_longretry += lr;
-			an->an_tx_retr += sr + lr;
 		}
-		pci_unmap_single(sc->sc_pdev,
-			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
-		dev_kfree_skb(bf->bf_skb);
-		bf->bf_skb = NULL;
-		bf->bf_node = NULL;
-
-		spin_lock(&sc->sc_txbuflock);
-		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		spin_unlock(&sc->sc_txbuflock);
 	}
 	/*
 	 * Don't wakeup unless we're associated; this insures we don't
@@ -2359,42 +2416,46 @@ ath_draintxq(struct ath_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
+	int i;
 
 	/* XXX return value */
 	if (!sc->sc_invalid) {
-		(void) ath_hal_stoptxdma(ah, sc->sc_txhalq);
-		DPRINTF(("ath_draintxq: tx queue %p, link %p\n",
-		    (caddr_t) ath_hal_gettxbuf(ah, sc->sc_txhalq),
-		    sc->sc_txlink));
-		(void) ath_hal_stoptxdma(ah, sc->sc_bhalq);
-		DPRINTF(("ath_draintxq: beacon queue %p\n",
-		    (caddr_t) ath_hal_gettxbuf(ah, sc->sc_bhalq)));
-	}
-	for (;;) {
-		spin_lock_bh(&sc->sc_txqlock);
-		bf = TAILQ_FIRST(&sc->sc_txq);
-		if (bf == NULL) {
-			sc->sc_txlink = NULL;
-			spin_unlock_bh(&sc->sc_txqlock);
-			break;
+		for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
+			(void) ath_hal_stoptxdma(ah, i);
+			DPRINTF(("ath_draintxq: tx queue %p, link %p\n",
+				 (caddr_t) ath_hal_gettxbuf(ah, i),
+				 sc->sc_txlink[i]));
 		}
-		TAILQ_REMOVE(&sc->sc_txq, bf, bf_list);
-		spin_unlock_bh(&sc->sc_txqlock);
-#ifdef AR_DEBUG
-		if (ath_debug)
-			ath_printtxbuf(bf,
-				ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
-#endif /* AR_DEBUG */
-		pci_unmap_single(sc->sc_pdev,
-			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
-		dev_kfree_skb(bf->bf_skb);
-		bf->bf_skb = NULL;
-		bf->bf_node = NULL;
-
-		spin_lock_bh(&sc->sc_txbuflock);
-		TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		spin_unlock_bh(&sc->sc_txbuflock);
 	}
+	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
+		if (i != sc->sc_bhalq) {
+			for (;;) {
+				spin_lock_bh(&sc->sc_txqlock[i]);
+				bf = TAILQ_FIRST(&sc->sc_txq[i]);
+				if (bf == NULL) {
+					sc->sc_txlink[i] = NULL;
+					spin_unlock_bh(&sc->sc_txqlock[i]);
+					break;
+				}
+				TAILQ_REMOVE(&sc->sc_txq[i], bf, bf_list);
+				spin_unlock_bh(&sc->sc_txqlock[i]);
+#ifdef AR_DEBUG
+                                if (ath_debug)
+                                        ath_printtxbuf(bf,
+                                                       ath_hal_txprocdesc(ah, bf->bf_desc) == HAL_OK);
+#endif /* AR_DEBUG */
+                                pci_unmap_single(sc->sc_pdev,
+                                                 bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
+                                dev_kfree_skb(bf->bf_skb);
+                                bf->bf_skb = NULL;
+                                bf->bf_node = NULL;
+                                
+                                spin_lock_bh(&sc->sc_txbuflock);
+                                TAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+                                spin_unlock_bh(&sc->sc_txbuflock);
+                        }
+                }
+        }
 }
 
 /*
@@ -3290,6 +3351,7 @@ ath_sysctl_dump(ctl_table *ctl, int write, struct file *filp,
 enum {
 	DEV_ATH		= 9,			/* XXX */
 };
+
 static ctl_table ath_sysctls[] = {
 #ifdef AR_DEBUG
 	{ ATH_DEBUG, 		"debug",	&ath_debug,
