@@ -188,6 +188,7 @@ struct ieee80211_channel {
 
 struct vlan_group;
 struct eapolcom;
+struct ieee80211_aclator;
 
 struct ieee80211com {
 	SLIST_ENTRY(ieee80211com) ic_next;
@@ -216,6 +217,7 @@ struct ieee80211com {
 				    enum ieee80211_state, int);
 	void			(*ic_newassoc)(struct ieee80211com *,
 				    struct ieee80211_node *, int);
+	void			(*ic_updateslot)(struct net_device *);
 	int			(*ic_set_tim)(struct ieee80211com *, int, int);
 	u_int8_t		ic_myaddr[IEEE80211_ADDR_LEN];
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
@@ -278,14 +280,10 @@ struct ieee80211com {
 	/*
 	 * Cipher state/configuration.
 	 */
-	struct ieee80211_wepkey	ic_nw_keys[IEEE80211_WEP_NKID];
-	int			ic_wep_txkey;	/* default tx key index */
-	void			*ic_wep_ctx;	/* wep crypt context */
-	u_int32_t		ic_iv;		/* initial vector for wep */
-	int			(*ic_key_alloc)(struct ieee80211com *);
-	int			(*ic_key_delete)(struct ieee80211com *, u_int);
-	int			(*ic_key_set)(struct ieee80211com *, u_int kix,
-					struct ieee80211_wepkey *, u_int8_t *);
+	struct ieee80211_crypto_state ic_crypto;
+#define	ic_nw_keys	ic_crypto.cs_nw_keys	/* XXX compatibility */
+#define	ic_def_txkey	ic_crypto.cs_def_txkey	/* XXX compatibility */
+
 	/*
 	 * 802.1x glue.  When an authenticator attaches it
 	 * fills in this section.  We assume that when ic_ec
@@ -293,6 +291,14 @@ struct ieee80211com {
 	 */
 	const struct ieee80211_authenticator *ic_auth;
 	struct eapolcom		*ic_ec;	
+
+	/*
+	 * Access control glue.  When a control agent attaches
+	 * it fills in this section.  We assume that when ic_ac
+	 * is setup that the methods are safe to call.
+	 */
+	const struct ieee80211_aclator *ic_acl;
+	void			*ic_as;
 };
 
 #define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
@@ -303,15 +309,16 @@ struct ieee80211com {
 #define	IEEE80211_F_PRIVACY	0x00000010	/* CONF: privacy enabled */
 #define	IEEE80211_F_ASCAN	0x00000100	/* STATUS: active scan */
 #define	IEEE80211_F_SIBSS	0x00000200	/* STATUS: start IBSS */
-#define	IEEE80211_F_IBSSON	0x00000400	/* CONF: IBSS creation enable */
+/* NB: this is intentionally setup to be IEEE80211_CAPINFO_SHORT_SLOTTIME */
+#define	IEEE80211_F_SHSLOT	0x00000400	/* STATUS: use short slot time*/
 #define	IEEE80211_F_PMGTON	0x00000800	/* CONF: Power mgmt enable */
 #define	IEEE80211_F_DESBSSID	0x00001000	/* CONF: des_bssid is set */
 /* 0x00002000 is unused */
 #define	IEEE80211_F_ROAMING	0x00004000	/* CONF: roaming enabled */
 #define	IEEE80211_F_SWRETRY	0x00008000	/* CONF: sw tx retry enabled */
 #define IEEE80211_F_TXPOW_FIXED	0x00010000	/* TX Power: fixed rate */
-#define	IEEE80211_F_SHSLOT	0x00020000	/* CONF: short slot time */
-#define	IEEE80211_F_SHPREAMBLE	0x00040000	/* CONF: short preamble */
+#define	IEEE80211_F_IBSSON	0x00020000	/* CONF: IBSS creation enable */
+#define	IEEE80211_F_SHPREAMBLE	0x00040000	/* STATUS: use short preamble */
 #define	IEEE80211_F_DATAPAD	0x00080000	/* CONF: do alignment pad */
 #define	IEEE80211_F_USEPROT	0x00100000	/* STATUS: protection enabled */
 #define	IEEE80211_F_USEBARKER	0x00200000	/* STATUS: use barker preamble*/
@@ -344,6 +351,7 @@ struct ieee80211com {
 
 int	ieee80211_ifattach(struct ieee80211com *);
 void	ieee80211_ifdetach(struct ieee80211com *);
+void	ieee80211_announce(struct ieee80211com *);
 void	ieee80211_media_init(struct ieee80211com *, ifm_change_cb_t, ifm_stat_cb_t);
 struct ieee80211com *ieee80211_find_vap(const u_int8_t mac[IEEE80211_ADDR_LEN]);
 int	ieee80211_media_change(struct net_device *);
@@ -359,6 +367,20 @@ int	ieee80211_setmode(struct ieee80211com *, enum ieee80211_phymode);
 void	ieee80211_reset_erp(struct ieee80211com *, enum ieee80211_phymode);
 enum ieee80211_phymode ieee80211_chan2mode(struct ieee80211com *,
 		struct ieee80211_channel *);
+
+/* 
+ * Key update synchronization methods.  XXX should not be visible.
+ */
+static inline void
+ieee80211_key_update_begin(struct ieee80211com *ic)
+{
+	ic->ic_crypto.cs_key_update_begin(ic);
+}
+static inline void
+ieee80211_key_update_end(struct ieee80211com *ic)
+{
+	ic->ic_crypto.cs_key_update_end(ic);
+}
 
 #define	IEEE80211_MSG_DEBUG	0x40000000	/* IFF_DEBUG equivalent */
 #define	IEEE80211_MSG_DUMPPKTS	0x20000000	/* IFF_LINK2 equivalant */
