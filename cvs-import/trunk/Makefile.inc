@@ -172,6 +172,6 @@ ifeq ($(strip ${BUS}),AHB)
 INCS+= -isystem ${TOOLPATH}/include
 endif
 
-include ${HAL}/${OS}/${TARGET}.inc
+include ${HAL}/public/${TARGET}.inc
 
 SYMBOLSDIR=${DEPTH}/symbols

@@ -21,6 +21,10 @@ endif
 
 EXTRA_CFLAGS+=	-I. -I${HAL}/.. -I${HAL}
 
+ifndef OS
+OS = linux
+endif
+
 ifndef HAL_OBJDIR
 #
 # Use release version of HAL.
@@ -31,8 +35,8 @@ ifndef HAL_OBJDIR
 #
 UUDECODE?=	uudecode
 
-HAL=		$(src)/../hal/linux
-OPT_AH_H=	${HAL}/${TARGET}.opt_ah.h
+HAL=		$(src)/../hal
+OPT_AH_H=	${HAL}/public/${TARGET}.opt_ah.h
 else
 #
 # Use private version of HAL.
@@ -53,7 +57,7 @@ endif
 ##2.4##include $(TOPDIR)/Rules.make
 
 ifndef HAL_OBJDIR
-$(obj)/hal.o:	${HAL}/${TARGET}.hal.o.uu
+$(obj)/hal.o:	${HAL}/public/${TARGET}.hal.o.uu
 	${UUDECODE} -o $(obj)/hal.o < $<
 else
 $(obj)/hal.o:	${HAL_OBJDIR}/hal.o
@@ -62,6 +66,6 @@ endif
 
 # XXX need opt_ah.h to do dependencies so give this bogus dependency
 $(obj)/ah_osdep.c: ${HAL}/ah_osdep.c $(obj)/opt_ah.h
-	cp ${HAL}/ah_osdep.c $(obj)/ah_osdep.c
+	cp ${HAL}/${OS}/ah_osdep.c $(obj)/ah_osdep.c
 $(obj)/opt_ah.h: ${OPT_AH_H}
 	cp ${OPT_AH_H} $(obj)/opt_ah.h

@@ -46,7 +46,7 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 UUDECODE?=uudecode
 
-INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH_HAL} -I${obj}/${DEPTH}
+INCS+=	-I${HAL} -I${HAL}/${OS} -I${HAL}/public -I${obj}/${ATH_HAL} -I${obj}/${DEPTH}
 
 EXTRA_CFLAGS+= ${INCS} ${COPTS}
 
@@ -59,10 +59,10 @@ ah_osdep.c:
 	cp ${HAL}/${OS}/ah_osdep.c ah_osdep.c
 
 $(obj)/hal.o:
-	${UUDECODE} ${HAL}/${OS}/${TARGET}.hal.o.uu
+	${UUDECODE} ${HAL}/public/${TARGET}.hal.o.uu
 
-opt_ah.h: ${HAL}/${OS}/${TARGET}.opt_ah.h
-	cp ${HAL}/${OS}/${TARGET}.opt_ah.h opt_ah.h
+opt_ah.h: ${HAL}/public/${TARGET}.opt_ah.h
+	cp ${HAL}/public/${TARGET}.opt_ah.h opt_ah.h
 
 install:
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
