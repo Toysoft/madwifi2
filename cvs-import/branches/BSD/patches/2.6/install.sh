@@ -48,6 +48,9 @@ test -d ${SRC_NET80211} ||
 	{ echo "No net80211 directory ${SRC_NET80211}!"; exit 1; }
 SRC_ATH=${ATH:-${DEPTH}/ath}
 test -d ${SRC_ATH} || { echo "No ath directory ${SRC_ATH}!"; exit 1; }
+#
+# Change line below to chose other rate control
+#
 SRC_ATH_RATE=${ATH_RATE:-${DEPTH}/ath_rate/onoe}
 test -d ${SRC_ATH_RATE} ||
 	{ echo "No rate control algorithm directory ${SRC_ATH_RATE}!"; exit 1; }
@@ -92,9 +95,10 @@ MKDIR ${DST_HAL}/linux
 INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.c
 INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.h
 # XXX copy only target or use arch? 
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.inc
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.opt_ah.h
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.hal.o.uu
+MKDIR ${DST_HAL}/public
+INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.inc
+INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.opt_ah.h
+INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.hal.o.uu
 if [ -d ${SRC_HAL}/ar5212 ]; then
 	MKDIR ${DST_HAL}/ar5212
 	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212desc.h
