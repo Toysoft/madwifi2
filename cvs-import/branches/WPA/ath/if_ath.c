@@ -2418,6 +2418,8 @@ ath_rx_tasklet(TQUEUE_ARG data)
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_desc + \
 		((_pa) - (_sc)->sc_desc_daddr)))
+#define	IS_CTL(wh) \
+	((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
 	struct net_device *dev = (struct net_device *)data;
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
@@ -2619,7 +2621,10 @@ rx_accept:
 		if (ic->ic_opmode != IEEE80211_M_STA) {
 			struct ieee80211_frame_min *wh =
 				(struct ieee80211_frame_min *) skb->data;
-			ni = ieee80211_find_node(ic, wh->i_addr2);
+			if (IS_CTL(wh))
+				ni = ieee80211_find_node(ic, wh->i_addr1);
+			else
+				ni = ieee80211_find_node(ic, wh->i_addr2);
 			if (ni == NULL)
 				ni = ic->ic_bss;
 		} else
@@ -2652,6 +2657,7 @@ rx_next:
 	} while (ath_rxbuf_init(sc, bf) == 0);
 
 	ath_hal_rxmonitor(ah);			/* rx signal state monitoring */
+#undef IS_CTL
 #undef PA2DESC
 }
 
