@@ -56,14 +56,14 @@ SRCS=	if_ath.c if_ath_pci.c
 OBJS=	if_ath.o if_ath_pci.o
 
 INCS+=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} \
-	-I${WLAN} -I${LINUX} -I${DEPTH}
+	-I${WLAN} ${KERNEL_INCS} -I${DEPTH}
 
 ifneq (${LINUX_VERSION}, 204)
 OBJS+=		if_ath.mod.o if_ath_pci.mod.o
 endif
 
 ALL=	${KMODNAME}.${KMODSUF}
-CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
+CFLAGS=	${INCS} ${MODOPTS} ${COPTS}
 LDFLAGS=
 
 all:	${ALL}

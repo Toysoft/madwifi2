@@ -40,29 +40,44 @@ include ${DEPTH}/Makefile.inc
 HALINCS=-I${HAL} -I${HAL}/${OS} -I${ATH_HAL}
 
 SRCS=	${HAL}/${OS}/ah_osdep.c
-OBJS=	ah_osdep.o hal.o
-INCS+=	${HALINCS} -I${LINUX} -I${DEPTH}
-
-CLEANFILES+= opt_ah.h
+OBJS=	ah_osdep.o
+INCS+=	${HALINCS} ${KERNEL_INCS} -I${DEPTH}
 
 ifneq (${LINUX_VERSION}, 204)
 OBJS+=		ah_osdep.mod.o
 endif
 
+ifndef HAL_OBJDIR
+CLEANFILES+=	hal.o
+else
+HALINCS+=	-I${HAL_OBJDIR}		# for opt_ah.h
+endif
+
 ALL=	${KMODNAME}.${KMODSUF}
-CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
+CFLAGS=	${INCS} ${MODOPTS} ${COPTS}
+
+CLEANFILES+=	opt_ah.h
 
 all:	${ALL}
 
-${KMODNAME}.${KMODSUF}: ${OBJS} ${HAL}/version.h Makefile
-	${LD} -o $@ -r -x ${OBJS}
+${KMODNAME}.${KMODSUF}: ${OBJS} ${HAL_OBJDIR}hal.o ${HAL}/version.h Makefile
+	${LD} -o $@ -r -x ${OBJS} ${HAL_OBJDIR}hal.o
 
+ifndef ${HAL_OBJDIR}
+#
+# Use release version of HAL.
+#
+# NB: binary HAL's are distributed in a uuencode'd file; on some
+#     systems uuencode is not installed by default and you must
+#     specially install it from the sharutils package.
+#
 UUDECODE?=uudecode
 
 hal.o:	${HAL}/${OS}/${TARGET}.hal.o.uu
 	${UUDECODE} < $<
 opt_ah.h: ${HAL}/${OS}/${TARGET}.opt_ah.h
 	cp ${HAL}/${OS}/${TARGET}.opt_ah.h opt_ah.h
+endif
 
 ah_osdep.o: ${HAL}/${OS}/ah_osdep.c
 	${CC} -c -o $@ ${CFLAGS} $<
