@@ -170,8 +170,8 @@ extern	int ieee80211_iserp_rateset(struct ieee80211com *,
 		struct ieee80211_rateset *);
 #define	ieee80211_new_state(_ic, _nstate, _arg) \
 	(((_ic)->ic_newstate)((_ic), (_nstate), (_arg)))
-extern	void ieee80211_print_essid(u_int8_t *, int);
-extern	void ieee80211_dump_pkt(u_int8_t *, int, int, int);
+extern	void ieee80211_print_essid(const u_int8_t *, int);
+extern	void ieee80211_dump_pkt(const u_int8_t *, int, int, int);
 
 extern	const char *ieee80211_state_name[IEEE80211_S_MAX];
 
