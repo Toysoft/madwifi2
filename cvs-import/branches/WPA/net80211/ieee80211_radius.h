@@ -55,7 +55,8 @@ struct eapol_auth_radius_node {
 	LIST_ENTRY(eapol_auth_radius_node) ern_next;	/* reply list */
 	struct sk_buff		*ern_msg;	/* supplicant reply */
 	u_int8_t		*ern_radmsg;	/* radius server message */
-	u_int			ern_radmsglen;	/* length of server message */
+	u_int16_t		ern_radmsglen;	/* length of server message */
+	u_int8_t		ern_onreply;	/* on reply pending list */
 	u_int8_t		ern_reqauth[16];/* request authenticator */
 	u_int8_t		ern_state[255];
 	u_int8_t		ern_statelen;
