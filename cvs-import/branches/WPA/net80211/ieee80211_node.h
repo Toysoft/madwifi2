@@ -133,6 +133,7 @@ struct ieee80211_node {
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
 	u_int8_t		ni_erp;		/* ERP from beacon/probe resp */
+	u_int16_t		ni_timoff;	/* byte offset to TIM ie */
 
 	/* others */
 	struct sk_buff_head	ni_savedq;	/* packets queued for pspoll */
