@@ -375,8 +375,8 @@ _ieee80211_crypto_delkey(struct ieee80211com *ic, struct ieee80211_key *key)
 	KASSERT(key->wk_cipher != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-	    "%s: %s keyix %u flags 0x%x rsc %llx tsc %llx len %u\n",
-	    __func__, key->wk_cipher->ic_name,
+	    "%s (%s): %s keyix %u flags 0x%x rsc %llx tsc %llx len %u\n",
+	    __func__, ic->ic_dev->name, key->wk_cipher->ic_name,
 	    key->wk_keyix, key->wk_flags,
 	    key->wk_keyrsc, key->wk_keytsc, key->wk_keylen);
 
@@ -388,8 +388,8 @@ _ieee80211_crypto_delkey(struct ieee80211com *ic, struct ieee80211_key *key)
 		/* XXX key cache */
 		if (!dev_key_delete(ic, key)) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			    "%s: driver did not delete key index %u\n",
-			    __func__, keyix);
+			    "%s (%s): driver did not delete key index %u\n",
+			    __func__, ic->ic_dev->name, keyix);
 			ic->ic_stats.is_crypto_delkey++;
 			/* XXX recovery? */
 		}
