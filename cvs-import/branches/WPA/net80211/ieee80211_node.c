@@ -510,11 +510,17 @@ ieee80211_node_alloc(struct ieee80211com *ic)
 static void
 ieee80211_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-	if (ni->ni_challenge != NULL) {
+#define	N(a)	(sizeof(a)/sizeof(a[0]))
+	int i;
+
+	if (ni->ni_challenge != NULL)
 		FREE(ni->ni_challenge, M_DEVBUF);
-		ni->ni_challenge = NULL;
-	}
+	for (i = 0; i < N(ni->ni_rxfrag); i++)
+		if (ni->ni_rxfrag[i] != NULL)
+			kfree_skb(ni->ni_rxfrag[i]);
+	ieee80211_node_delkey(ic, ni);
 	FREE(ni, M_80211_NODE);
+#undef N
 }
 
 static void
@@ -523,6 +529,7 @@ ieee80211_node_copy(struct ieee80211com *ic,
 {
 	*dst = *src;
 	dst->ni_challenge = NULL;
+	dst->ni_ucastkeyix = IEEE80211_KEYIX_NONE;
 }
 
 static u_int8_t
@@ -686,8 +693,6 @@ ieee80211_lookup_node(struct ieee80211com *ic,
 static void
 _ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
-	int i;
 
 	KASSERT(ni != ic->ic_bss, ("freeing bss node"));
 
@@ -704,15 +709,9 @@ _ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 		 */
 		IF_DRAIN(&ni->ni_savedq);
 		if (ic->ic_set_tim)
-			ic->ic_set_tim(ic, ni->ni_associd, 0);
+			(*ic->ic_set_tim)(ic, ni->ni_associd, 0);
 	}
-	for (i = 0; i < N(ni->ni_rxfrag); i++)
-		if (ni->ni_rxfrag[i] != NULL)
-			kfree_skb(ni->ni_rxfrag[i]);
-	if (ni->ni_ucastkeyix != IEEE80211_KEYIX_NONE)
-		(*ic->ic_key_delete)(ic, ni->ni_ucastkeyix);
 	(*ic->ic_node_free)(ic, ni);
-#undef N
 }
 
 void
