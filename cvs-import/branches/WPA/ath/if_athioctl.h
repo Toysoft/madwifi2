@@ -94,10 +94,16 @@ struct ath_stats {
 };
 
 struct ath_diag {
-	char	ad_name[IFNAMSIZ];		/* if name, e.g. "ath0" */
-	u_int	ad_id;
-	caddr_t	ad_data;
-	u_int	ad_size;
+	char	ad_name[IFNAMSIZ];	/* if name, e.g. "ath0" */
+	u_int16_t ad_id;
+#define	ATH_DIAG_DYN	0x8000		/* allocate buffer in caller */
+#define	ATH_DIAG_IN	0x4000		/* copy in parameters */
+#define	ATH_DIAG_OUT	0x0000		/* copy out results (always) */
+#define	ATH_DIAG_ID	0x0fff
+	u_int16_t ad_in_size;		/* pack to fit, yech */
+	caddr_t	ad_in_data;
+	caddr_t	ad_out_data;
+	u_int	ad_out_size;
 
 };
 
