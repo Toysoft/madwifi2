@@ -2738,20 +2738,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
+	/* XXX use ieee80211_hdrsize */
 	hdrlen = sizeof(struct ieee80211_frame);
-	pktlen = skb->len;
-	/*
-	 * Select hardware transmit queue and adjust header
-	 * length if this is a QoS frame.  Default all non-QoS
-	 * traffic to the background queue.  Management frames
-	 * get reassigned below.
-	 */
-	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
-		/* XXX validate skb->priority */
-		txq = sc->sc_ac2q[skb->priority];
+	if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS)
 		hdrlen += sizeof(u_int16_t);
-	} else
-		txq = sc->sc_ac2q[WME_AC_BK];
+	pktlen = skb->len;
 
 	if (iswep) {
 		const struct ieee80211_cipher *cip;
@@ -2825,10 +2816,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 	an = ATH_NODE(ni);
 	/*
-	 * Calculate Atheros packet type from IEEE80211 packet header
-	 * and setup for rate calculations.
+	 * Calculate Atheros packet type from IEEE80211 packet header,
+	 * setup for rate calculations, and select h/w transmit queue.
 	 */
-	atype = HAL_PKT_TYPE_NORMAL;			/* default */
 	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
 	case IEEE80211_FC0_TYPE_MGT:
 		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
@@ -2838,6 +2828,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			atype = HAL_PKT_TYPE_PROBE_RESP;
 		else if (subtype == IEEE80211_FC0_SUBTYPE_ATIM)
 			atype = HAL_PKT_TYPE_ATIM;
+		else
+			atype = HAL_PKT_TYPE_NORMAL;	/* XXX */
 		rix = 0;			/* XXX lowest rate */
 		try0 = ATH_TXMAXTRY;
 		if (shortPreamble)
@@ -2848,17 +2840,21 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		txq = sc->sc_ac2q[WME_AC_VO];
 		break;
 	case IEEE80211_FC0_TYPE_CTL:
-		subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
-		if (subtype == IEEE80211_FC0_SUBTYPE_PS_POLL)
-			atype = HAL_PKT_TYPE_PSPOLL;
+		atype = HAL_PKT_TYPE_PSPOLL;	/* stop setting of duration */
 		rix = 0;			/* XXX lowest rate */
 		try0 = ATH_TXMAXTRY;
 		if (shortPreamble)
 			txrate = an->an_tx_mgtratesp;
 		else
 			txrate = an->an_tx_mgtrate;
+		/* NB: force all ctl frames to highest queue */
+		txq = sc->sc_ac2q[WME_AC_VO];
 		break;
-	default:
+	case IEEE80211_FC0_TYPE_DATA:
+		atype = HAL_PKT_TYPE_NORMAL;		/* default */
+		/*
+		 * Data frames.
+		 */
 		rix = an->an_tx_rix0;
 		try0 = an->an_tx_try0;
 		if (rix == 0xff) {
@@ -2871,7 +2867,20 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			txrate = an->an_tx_rate0sp;
 		else
 			txrate = an->an_tx_rate0;
+		/*
+		 * Default all non-QoS traffic to the background queue.
+		 */
+		if (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS) {
+			/* XXX validate skb->priority */
+			txq = sc->sc_ac2q[skb->priority];
+		} else
+			txq = sc->sc_ac2q[WME_AC_BK];
 		break;
+	default:
+		printk("%s: bogus frame type 0x%x (%s)\n", dev->name,
+			wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK, __func__);
+		/* XXX statistic */
+		return -EIO;
 	}
 
 	/*
