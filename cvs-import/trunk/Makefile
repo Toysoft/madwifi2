@@ -69,7 +69,20 @@ release:
 	tar zcf $${DIR}.tgz --exclude=CVS --exclude=hal/freebsd $${DIR}; \
 	rm -rf $${DIR}
 
+#
+# This stuff is bogus as it requires us to understand how each
+# individual Makefile works; but it's much faster than doing
+# make clean in each subdir 'cuz gmake is so woeful handling
+# .depend files.
+#
 clean:
-	find . -name '*.[oas]' -or -name core -or -name '*.ver' -or -name .depend | xargs rm -f
-	rm -f ath_hal/opt_ah.h
-
+	find . -name '*.[oas]' \
+	   -or -name core \
+	   -or -name '*.ver' \
+	   -or -name '*.mod.c' \
+	   -or -name "*.${KMODSUF}" \
+	   -or -name .depend \
+	| xargs rm -f
+ifndef HAL_OBJDIR
+	rm -f ${ATH_HAL}/opt_ah.h
+endif

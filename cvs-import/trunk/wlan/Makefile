@@ -63,6 +63,7 @@ CLEANFILES=	.depend
 
 ifneq (${LINUX_VERSION}, 204)
 OBJS+=		if_ieee80211subr.mod.o
+CLEANFILES+=	if_ieee80211subr.mod.c
 endif
 
 ALL=	${KMODNAME}.${KMODSUF}

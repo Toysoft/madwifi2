@@ -64,6 +64,7 @@ endif
 
 ifneq (${LINUX_VERSION}, 204)
 OBJS+=		if_ath.mod.o if_ath_pci.mod.o
+CLEANFILES+=	if_ath.mod.c if_ath_pci.mod.c
 endif
 
 ALL=	${KMODNAME}.${KMODSUF}

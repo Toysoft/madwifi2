@@ -45,6 +45,7 @@ INCS+=	${HALINCS} ${KERNEL_INCS} -I${DEPTH}
 
 ifneq (${LINUX_VERSION}, 204)
 OBJS+=		ah_osdep.mod.o
+CLEANFILES+=	ah_osdep.mod.c
 endif
 
 ALL=	${KMODNAME}.${KMODSUF}
