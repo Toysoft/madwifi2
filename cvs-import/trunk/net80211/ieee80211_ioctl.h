@@ -234,6 +234,14 @@ struct ieee80211req_chanlist {
 	u_int8_t	ic_channels[32];	/* 256 channels */
 };
 
+/*
+ * Retrieve the WPA/RSN information element for an associated station.
+ */
+struct ieee80211req_wpaie {
+	u_int8_t	wpa_macaddr[IEEE80211_ADDR_LEN];
+	u_int8_t	wpa_ie[IEEE80211_MAX_OPT_IE];
+};
+
 #ifdef __FreeBSD__
 /*
  * FreeBSD-style ioctls.
@@ -367,6 +375,7 @@ enum {
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)
 /* NB: require in+out parameters so cannot use wireless extensions, yech */
 #define	IEEE80211_IOCTL_GETKEY		(SIOCDEVPRIVATE+3)
+#define	IEEE80211_IOCTL_GETWPAIE	(SIOCDEVPRIVATE+4)
 
 #endif /* __linux__ */
 

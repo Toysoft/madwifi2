@@ -1981,6 +1981,31 @@ found:
 }
 EXPORT_SYMBOL(ieee80211_ioctl_chanlist);
 
+static int
+ieee80211_ioctl_getwpaie(struct ieee80211com *ic, struct iwreq *iwr)
+{
+	struct ieee80211_node *ni;
+	struct ieee80211req_wpaie wpaie;
+
+	if (iwr->u.data.length != sizeof(wpaie))
+		return -EINVAL;
+	if (copy_from_user(&wpaie, iwr->u.data.pointer, IEEE80211_ADDR_LEN))
+		return -EFAULT;
+	ni = ieee80211_find_node(ic, wpaie.wpa_macaddr);
+	if (ni == NULL)
+		return -EINVAL;		/* XXX */
+	memset(wpaie.wpa_ie, 0, sizeof(wpaie.wpa_ie));
+	if (ni->ni_wpa_ie != NULL) {
+		int ielen = ni->ni_wpa_ie[1] + 2;
+		if (ielen > sizeof(wpaie.wpa_ie))
+			ielen = sizeof(wpaie.wpa_ie);
+		memcpy(wpaie.wpa_ie, ni->ni_wpa_ie, ielen);
+	}
+	ieee80211_free_node(ic, ni);
+	return (copy_to_user(iwr->u.data.pointer, &wpaie, sizeof(wpaie)) ?
+			-EFAULT : 0);
+}
+
 #define	IW_PRIV_TYPE_OPTIE	IW_PRIV_TYPE_BYTE | IEEE80211_MAX_OPT_IE
 #define	IW_PRIV_TYPE_KEY \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_key)
@@ -2142,6 +2167,8 @@ ieee80211_ioctl(struct ieee80211com *ic, struct ifreq *ifr, int cmd)
 				sizeof (ic->ic_stats)) ? -EFAULT : 0;
 	case IEEE80211_IOCTL_GETKEY:
 		return ieee80211_ioctl_getkey(ic, (struct iwreq *) ifr);
+	case IEEE80211_IOCTL_GETWPAIE:
+		return ieee80211_ioctl_getwpaie(ic, (struct iwreq *) ifr);
 	}
 	return -EOPNOTSUPP;
 }
