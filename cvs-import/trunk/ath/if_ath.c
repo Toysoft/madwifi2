@@ -2310,14 +2310,13 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 static void
 ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 {
+#define	IS_QOS_DATA(wh) \
+	((wh->i_fc[0] & (IEEE80211_FC0_TYPE_MASK|IEEE80211_FC0_SUBTYPE_QOS)) ==\
+		(IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_QOS))
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	int len = ds->ds_rxstat.rs_datalen;
-	int rssi = ds->ds_rxstat.rs_rssi;
-	const HAL_RATE_TABLE *rt = sc->sc_currates;
-	int rate = (rt != NULL ?
-	    (rt->info[rt->rateCodeToIndex[
-	    	ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2);
+	struct ieee80211_frame *wh;
  	wlan_ng_prism2_header *ph;
 	u_int32_t tsf;
 
@@ -2325,28 +2324,20 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	skb->pkt_type = PACKET_OTHERHOST;
 	skb_put(skb, len);
 	
-	/* Check to see if we need to remove pad bytes */
-	if (ic->ic_flags & IEEE80211_F_DATAPAD) {
-		struct ieee80211_frame *wh =
-			(struct ieee80211_frame *) skb->data;
+	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
+		("data padding not enabled?"));
+	/* Remove pad bytes */
+	wh = (struct ieee80211_frame *) skb->data;
+	if (IS_QOS_DATA(wh)) {
+		int headersize = ieee80211_hdrsize(wh);
+		int padbytes = roundup(headersize,4) - headersize;
 
-		if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
-		    IEEE80211_FC0_TYPE_DATA) &&
-		    (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS)) {
-			int headersize = sizeof(struct ieee80211_qosframe);
-			int padbytes;
-
-			if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) ==
-			    IEEE80211_FC1_DIR_DSTODS)
-				headersize += IEEE80211_ADDR_LEN;
-			padbytes = roundup(headersize,4) - headersize;
-			if (padbytes > 0) {
-				uint8_t qos[sizeof(struct ieee80211_qosframe) +
-					IEEE80211_ADDR_LEN];
-				memcpy(&qos[0], skb->data, headersize);
-				skb_pull(skb, padbytes);
-				memcpy(skb->data, &qos[0], headersize);
-			}
+		/*
+		 * Copy up 802.11 header and strip h/w padding.
+		 */
+		if (padbytes > 0) {
+			memmove(skb->data + padbytes, skb->data, headersize);
+			skb_pull(skb, padbytes);
 		}
 	}
 
@@ -2400,20 +2391,21 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
 	ph->signal.status = 0;
 	ph->signal.len = 4;
-	ph->signal.data = rssi;
+	ph->signal.data = ds->ds_rxstat.rs_rssi;
 
 	ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 	ph->rate.status = 0;
 	ph->rate.len = 4;
-	ph->rate.data = rate;
+	ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate];
 
 	skb->dev = dev;
-	skb->mac.raw = skb->data ;
+	skb->mac.raw = skb->data;
 	skb->ip_summed = CHECKSUM_NONE;
 	skb->pkt_type = PACKET_OTHERHOST;
 	skb->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
 
 	netif_rx(skb);
+#undef IS_QOS_DATA
 }
 
 /*
@@ -2631,8 +2623,7 @@ rx_accept:
 
 		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV)) {
 			ieee80211_dump_pkt(skb->data, len,
-				   sc->sc_hwmap[ds->ds_rxstat.rs_rate] &
-					IEEE80211_RATE_VAL,
+				   sc->sc_hwmap[ds->ds_rxstat.rs_rate],
 				   ds->ds_rxstat.rs_rssi);
 		}
 
@@ -2988,7 +2979,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 	if (IFF_DUMPPKTS(sc, ATH_DEBUG_XMIT))
 		ieee80211_dump_pkt(skb->data, skb->len,
-			sc->sc_hwmap[txrate] & IEEE80211_RATE_VAL, -1);
+			sc->sc_hwmap[txrate], -1);
 
 	/*
 	 * Formulate first tx descriptor with tx controls.
@@ -3800,7 +3791,7 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 	for (i = 0; i < 32; i++) {
 		u_int8_t ix = rt->rateCodeToIndex[i];
 		if (ix != 0xff)
-			sc->sc_hwmap[i] = rt->info[ix].dot11Rate;
+			sc->sc_hwmap[i] = rt->info[ix].dot11Rate & IEEE80211_RATE_VAL;
 	}
 	sc->sc_currates = rt;
 	sc->sc_curmode = mode;
