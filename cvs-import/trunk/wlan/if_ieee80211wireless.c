@@ -1020,10 +1020,13 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			ifr.ifr_media = IFM_IEEE80211 | IFM_IEEE80211_OFDM54 |
 				IFM_MAKEMODE(value);
 			break;
-		default:
+		case IFM_IEEE80211_11B:
 			ifr.ifr_media = IFM_IEEE80211 | IFM_IEEE80211_DS11 |
 				IFM_MAKEMODE(value);
 			break;
+		default:
+			ifr.ifr_media = (imr.ifm_active &~ IFM_MMASK) |
+				IFM_MAKEMODE(value);
 		}
 		retv =  ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
