@@ -56,7 +56,7 @@
 #include <err.h>
 
 #include "ah_desc.h"
-#include "driver/if_athioctl.h"
+#include "if_athioctl.h"
 
 static const struct {
 	u_int		phyerr;
@@ -116,11 +116,13 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(tx_cts, "tx frames with cts enabled");
 	STAT(tx_shortpre, "tx frames with short preamble");
 	STAT(tx_altrate, "tx frames with an alternate rate");
+	STAT(tx_protect, "tx frames with 11g protection");
 	STAT(rx_orn, "rx failed 'cuz of desc overrun");
-	STAT(rx_tooshort, "rx failed 'cuz frame too short");
 	STAT(rx_crcerr, "rx failed 'cuz of bad CRC");
 	STAT(rx_fifoerr, "rx failed 'cuz of FIFO overrun");
 	STAT(rx_badcrypt, "rx failed 'cuz decryption");
+	STAT(rx_badmic, "rx failed 'cuz MIC failure");
+	STAT(rx_tooshort, "rx failed 'cuz frame too short");
 	STAT(rx_nobuf, "rx setup failed 'cuz no skbuff");
 	STAT(rx_mgt, "rx management frames");
 	STAT(rx_ctl, "rx control frames");
@@ -151,11 +153,9 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(rate_raise, "rate control raised xmit rate");
 	STAT(rate_drop, "rate control dropped xmit rate");
 	if (stats->ast_tx_rssi)
-		fprintf(fd, "rssi of last ack: %u (%+d)\n",
-			stats->ast_tx_rssi, stats->ast_tx_rssidelta);
+		fprintf(fd, "rssi of last ack: %u\n", stats->ast_tx_rssi);
 	if (stats->ast_rx_rssi)
-		fprintf(fd, "rssi of last recvd frame: %u\n",
-			stats->ast_rx_rssi);
+		fprintf(fd, "rssi of last rcv: %u\n", stats->ast_rx_rssi);
 #undef STAT
 #undef STATI
 #undef N
@@ -191,7 +191,7 @@ getifstats(const char *ifname, u_long *iframes, u_long *oframes)
 				;
 			if (*tp == ':') {
 				*tp++ = '\0';
-				if (strcmp(line, ifname) == 0)
+				if (strcmp(cp, ifname) != 0)
 					continue;
 				sscanf(tp, "%*llu %lu %*u %*u %*u %*u %*u %*u %*llu %lu",
 					iframes, oframes);

@@ -38,6 +38,9 @@
  */
 
 #include <linux/types.h>
+#include <linux/config.h>
+#include <linux/version.h>
+#include <linux/module.h>
 
 #include "rc4.h"
 
@@ -73,6 +76,7 @@ rc4_init(struct rc4_state *const state, const u_char *key, int keylen)
 		swap_bytes(&state->perm[i], &state->perm[j]);
 	}
 }
+EXPORT_SYMBOL(rc4_init);
 
 /*
  * Encrypt some data using the supplied RC4 state buffer.
@@ -81,12 +85,25 @@ rc4_init(struct rc4_state *const state, const u_char *key, int keylen)
  * for both encryption and decryption.
  */
 void
-rc4_crypt(struct rc4_state *const state,
-	const u_char *inbuf, u_char *outbuf, int buflen)
+rc4_crypt_skip(struct rc4_state *const state,
+	const u_char *inbuf, u_char *outbuf, int buflen, int skip)
 {
 	int i;
 	u_char j;
 
+	for (i = 0; i < skip; i++) {
+
+		/* Update modification indicies */
+		state->index1++;
+		state->index2 += state->perm[state->index1];
+
+		/* Modify permutation */
+		swap_bytes(&state->perm[state->index1],
+		    &state->perm[state->index2]);
+
+		/* Encrypt/decrypt next byte */
+		j = state->perm[state->index1] + state->perm[state->index2];
+	}
 	for (i = 0; i < buflen; i++) {
 
 		/* Update modification indicies */
@@ -102,3 +119,4 @@ rc4_crypt(struct rc4_state *const state,
 		outbuf[i] = inbuf[i] ^ state->perm[j];
 	}
 }
+EXPORT_SYMBOL(rc4_crypt_skip);

@@ -37,42 +37,39 @@
 #
 
 #
-# Makefile for the HAL-based Atheros driver.
+# Makefile for the Atheros WLAN driver.
 #
-DEPTH=	.
-
-include Makefile.inc
-
-# NB: the order is important here
-DIRS=	${ATH_HAL} ${WLAN} ${DRIVER}
-
-all:
-	for i in ${DIRS}; do \
-		(cd $$i; make) || exit 1; \
-	done
-
-install:
-	for i in ${DIRS}; do \
-		(cd $$i; make install); \
-	done
-ifeq ($(DESTDIR),)
-	/sbin/depmod -ae
+ifeq ($(obj),)
+obj=	.
 endif
 
-FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
-	README release.h share net80211
-HAL_TAG=ATH_HAL_20030802
+DEPTH=	..
 
-release:
-	DATE=`date +'%Y%m%d'`; TAG="MADWIFI_$${DATE}"; DIR="madwifi-$${DATE}"; \
-	cvs tag -F $${TAG} ${FILES}; \
-	rm -rf $${DIR}; mkdir $${DIR}; \
-	cvs export -d $${DIR} -r $${TAG} linux; \
-	(cd $${DIR}; cvs export -r ${HAL_TAG} hal); \
-	tar zcf $${DIR}.tgz --exclude=CVS --exclude=hal/freebsd $${DIR}; \
-	rm -rf $${DIR}
+obj-m		+= ath_pci.o
+ath_pci-objs	:= if_ath.o if_ath_pci.o
+export-objs	:= if_ath_pci.o
+list-multi	:= ath_pci.o
+
+include $(obj)/${DEPTH}/Makefile.inc
+
+INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH_HAL} \
+	-I${obj}/${WLAN} -I${obj}/${DEPTH}
+
+EXTRA_CFLAGS+= ${INCS} ${COPTS}
+
+-include $(TOPDIR)/Rules.make
+
+all:
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+
+install: all
+	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	strip -S ath_pci.$(KMODSUF)
+	cp ath_pci.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	for i in ${DIRS}; do \
-		(cd $$i; make clean); \
-	done
+	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+
+ath_pci.o: ${ath_pci-objs}
+	$(LD) $(LDOPTS) -o ath_pci.$(KMODSUF) -r $(ath_pci-objs)

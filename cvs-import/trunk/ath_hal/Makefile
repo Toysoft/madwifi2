@@ -76,4 +76,4 @@ clean:
 	-rm -f ah_osdep.c opt_ah.h hal.o
 
 ath_hal.o: ${ath_hal-objs}
-	$(LD) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)
+	$(LD) $(LDOPTS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)
