@@ -4,7 +4,7 @@
 
 # XXX use ${ARCH}
 TARGET=	i386-elf
-EXTRA_CFLAGS+=	-I${HAL}/.. -I${HAL}
+EXTRA_CFLAGS+=	-I. -I${HAL}/.. -I${HAL}
 
 ifndef HAL_OBJDIR
 #
@@ -45,6 +45,3 @@ $(obj)/ah_osdep.c: ${HAL}/ah_osdep.c
 	cp ${HAL}/ah_osdep.c $(obj)/ah_osdep.c
 $(obj)/opt_ah.h: ${OPT_AH_H}
 	cp ${OPT_AH_H} $(obj)/opt_ah.h
-
-$(obj)/ah_osdep.o: $(obj)/ah_osdep.c $(obj)/opt_ah.h
-	${CC} -o $@ -c ${CFLAGS} -I. ${EXTRA_CFLAGS} $<
