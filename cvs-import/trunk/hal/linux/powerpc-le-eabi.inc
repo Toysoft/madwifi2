@@ -64,7 +64,7 @@ OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
 LDOPTS=	-EL
-COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
+COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN -DAH_REGOPS_FUNC
 COPTS+= -mlittle-endian
 # NB: explicitly disable multiple and string instructions for little-endian
 COPTS+= -msoft-float -ffixed-r2 -mno-multiple -mno-string
