@@ -91,15 +91,25 @@ struct ath_stats {
 	u_int32_t	ast_rate_drop;	/* rate control dropped xmit rate */
 };
 
-#define	SIOCGATHSTATS	(SIOCDEVPRIVATE+0)
-
 struct ath_diag {
-	char	ad_name[IFNAMSIZ];		/* if name, e.g. "ath0" */
-	u_int	ad_id;
-	caddr_t	ad_data;
-	u_int	ad_size;
+	char	ad_name[IFNAMSIZ];	/* if name, e.g. "ath0" */
+	u_int16_t ad_id;
+#define	ATH_DIAG_DYN	0x8000		/* allocate buffer in caller */
+#define	ATH_DIAG_IN	0x4000		/* copy in parameters */
+#define	ATH_DIAG_OUT	0x0000		/* copy out results (always) */
+#define	ATH_DIAG_ID	0x0fff
+	u_int16_t ad_in_size;		/* pack to fit, yech */
+	caddr_t	ad_in_data;
+	caddr_t	ad_out_data;
+	u_int	ad_out_size;
 
 };
-#define	SIOCGATHDIAG	(SIOCDEVPRIVATE+1)
 
+#ifdef __linux__
+#define	SIOCGATHSTATS	(SIOCDEVPRIVATE+0)
+#define	SIOCGATHDIAG	(SIOCDEVPRIVATE+1)
+#else
+#define	SIOCGATHSTATS	_IOWR('i', 137, struct ifreq)
+#define	SIOCGATHDIAG	_IOWR('i', 138, struct ath_diag)
+#endif
 #endif /* _DEV_ATH_ATHIOCTL_H */
