@@ -1170,6 +1170,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 	struct ether_header *eh;
 	
 	int ret = 0;
+	int counter = 0;
 
 	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
 		DPRINTF(sc, ATH_DEBUG_XMIT,
@@ -1178,7 +1179,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_stats.ast_tx_invalid++;
 		return -ENETDOWN;
 	}
-	int counter = 0;
+	
 	for (;;) {
 		/*
 		 * Grab a TX buffer and associated resources.
@@ -1930,7 +1931,11 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	DPRINTF(sc, ATH_DEBUG_BEACON,
 		"%s: skb %p [data %p len %u] skbaddr %p\n",
 		__func__, skb, skb->data, skb->len, (caddr_t) bf->bf_skbaddr);
-
+	if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
+		if_printf(&sc->sc_dev, "s: DMA mapping failed\n", __func__);
+		return;
+	}
+	
 	/* setup descriptors */
 	ds = bf->bf_desc;
 
@@ -2047,14 +2052,10 @@ ath_beacon_tasklet(struct net_device *dev)
 
                 bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
                     skb->data, skb->len, BUS_DMA_TODEVICE);
-
-                // TODO: error handling
-                /*
-			dev_kfree_skb(skb);
-                        bf->bf_skb = NULL;
-			return;	
+                if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
+			if_printf(dev, "s: DMA mapping failed\n", __func__);
+			return;
 		}
-                */
 	}
 
 	/*
@@ -2322,8 +2323,10 @@ ath_desc_alloc(struct ath_softc *sc)
 				(ATH_TXBUF * ATH_TXDESC + ATH_RXBUF + ATH_BCBUF + 1);
 	sc->sc_desc = bus_alloc_consistent(sc->sc_bdev,
 				sc->sc_desc_len, &sc->sc_desc_daddr);
-	if (sc->sc_desc == NULL)
+	if (sc->sc_desc == NULL) {
+		if_printf(&sc->sc_dev, "%s, could not allocate descriptors\n", __func__);
 		return ENOMEM;
+	}
 	ds = sc->sc_desc;
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: DMA map: %p (%d) -> %p\n",
 	    __func__, ds, sc->sc_desc_len, (caddr_t) sc->sc_desc_daddr);
@@ -2546,6 +2549,13 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 		bf->bf_skb = skb;
 		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 			skb->data, sc->sc_rxbufsize, BUS_DMA_FROMDEVICE);
+		if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
+			if_printf(&sc->sc_dev, "s: DMA mapping failed\n", __func__);
+			dev_kfree_skb(skb);
+			bf->bf_skb = NULL;
+			sc->sc_stats.ast_rx_busdma++;
+			return ENOMEM;
+		}
 	}
 
 	/*
@@ -3264,6 +3274,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		skb->data, pktlen, BUS_DMA_TODEVICE);
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %x\n",
 		__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
+	if (BUS_DMA_MAP_ERROR(bf->bf_skbaddr)) {
+		if_printf(dev, "s: DMA mapping failed\n", __func__);
+		dev_kfree_skb(skb);
+		bf->bf_skb = NULL;
+		sc->sc_stats.ast_tx_busdma++;
+		return -EIO;
+	}
 	bf->bf_skb = skb;
 	bf->bf_node = ni;
 
@@ -3357,7 +3374,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		if_printf(dev, "bogus frame type 0x%x (%s)\n",
 			wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK, __func__);
 		/* XXX statistic */
-		dev_kfree_skb(skb); // TODO ???
+		dev_kfree_skb(skb);
+		bf->bf_skb = NULL;
 		return -EIO;
 	}
 
