@@ -1121,6 +1121,7 @@ ieee80211_find_txnode(struct ieee80211com *ic, const u_int8_t *macaddr)
 	}
 	return ni;
 }
+EXPORT_SYMBOL(ieee80211_find_txnode);
 
 /*
  * Like find but search based on the channel too.
