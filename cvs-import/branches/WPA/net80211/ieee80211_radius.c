@@ -1575,11 +1575,7 @@ ieee80211_radius_attach(struct eapolcom *ec)
 	rc->rc_secretlen = radius_secretlen;
 
 	rc->rc_local = radius_clientaddr;
-#ifdef CONFIG_SECURITY_NETWORK
-	error = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &rc->rc_sock, 0);
-#else
 	error = sock_create(PF_INET, SOCK_DGRAM, IPPROTO_UDP, &rc->rc_sock);
-#endif
 	if (error < 0) {
 		printf("%s: cannot create socket, error %u\n",
 			__func__, -error);
