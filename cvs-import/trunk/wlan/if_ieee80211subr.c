@@ -91,11 +91,6 @@
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 
-#include "rc4.h"
-#define	arc4_ctxlen()			sizeof (struct rc4_state)
-#define	arc4_setkey(_c,_k,_l)		rc4_init(_c,_k,_l)
-#define	arc4_encrypt(_c,_d,_s,_l)	rc4_crypt(_c,_s,_d,_l)
-
 #include "if_ieee80211.h"
 #include "if_llc.h"
 #include "if_ethersubr.h"
