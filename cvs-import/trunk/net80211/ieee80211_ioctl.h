@@ -207,6 +207,8 @@ struct ieee80211req_mlme {
 #define	IEEE80211_MLME_ASSOC		1	/* associate station */
 #define	IEEE80211_MLME_DISASSOC		2	/* disassociate station */
 #define	IEEE80211_MLME_DEAUTH		3	/* deauthenticate station */
+#define	IEEE80211_MLME_AUTHORIZE	4	/* authorize station */
+#define	IEEE80211_MLME_UNAUTHORIZE	5	/* unauthorize station */
 	u_int16_t	im_reason;	/* 802.11 reason code */
 	u_int8_t	im_macaddr[IEEE80211_ADDR_LEN];
 };
