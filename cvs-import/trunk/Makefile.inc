@@ -153,7 +153,9 @@ ATH=	${DEPTH}/ath
 #
 # Path to the rate control algorithm.
 #
+ifeq ($(ATH_RATE),)
 ATH_RATE=	ath_rate/onoe
+endif
 
 INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
 
