@@ -880,7 +880,7 @@ ath_alloc_skb(u_int size, u_int align)
 	if (skb != NULL) {
 		off = ((unsigned long) skb->data) % align;
 		if (off != 0)
-			skb_reserve(skb, off);
+			skb_reserve(skb, align - off);
 	}
 	return skb;
 }
