@@ -86,6 +86,7 @@ static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
 static int	ath_newstate(void *, enum ieee80211_state);
 static struct net_device_stats *ath_getstats(struct net_device *);
+static int	ath_getchannels(struct net_device *, u_int cc, HAL_BOOL outdoor);
 
 static int	ath_rate_setup(struct net_device *, u_int mode);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
@@ -110,10 +111,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah;
-	int i, error = 0, ix, nchan;
+	int error = 0;
 	u_int8_t csz;
-#define	ATH_MAXCHAN	32		/* number of potential channels */
-	HAL_CHANNEL chans[ATH_MAXCHAN];		/* XXX get off stack */
 	HAL_STATUS status;
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
@@ -145,45 +144,23 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	}
 	sc->sc_ah = ah;
 
-	/* XXX where does the country code, et. al. come from? */
-	if (!ath_hal_init_channels(ah, chans, ATH_MAXCHAN, &nchan,
-#ifdef notdef
-		CTRY_DEFAULT, HAL_MODE_ALL, AH_TRUE)) {
-#else
-		CTRY_DEFAULT, HAL_MODE_11A|HAL_MODE_11B, AH_FALSE)) {
-#endif
-		printk(KERN_ERR "%s: unable to initialize channel list\n",
-			dev->name);
-		error = EINVAL;
-		goto bad;
-	}
 	/*
-	 * Convert HAL channels to ieee80211 ones and insert
-	 * them in the table according to their channel number.
+	 * Collect the channel list using the default country
+	 * code and including outdoor channels.  The 802.11 layer
+	 * is resposible for filtering this list to a set of
+	 * channels that it considers ok to use.
 	 */
-	for (i = 0; i < nchan; i++) {
-		HAL_CHANNEL *c = &chans[i];
-		ix = ath_hal_mhz2ieee(c->channel, c->channelFlags);
-		if (ix > IEEE80211_CHAN_MAX) {
-			printk(KERN_ERR "%s: bad HAL channel %u/%x ignored\n",
-				dev->name, c->channel, c->channelFlags);
-			continue;
-		}
-		if (ic->ic_channels[ix].ic_freq != 0) {
-			printk(KERN_ERR "%s: chan %u already (freq %u)\n",
-				dev->name, ix, ic->ic_channels[ix].ic_freq);
-			continue;
-		}
-		ic->ic_channels[ix].ic_freq = c->channel;
-		/* NB: flags are known to be compatible */
-		ic->ic_channels[ix].ic_flags = c->channelFlags;
-	}
+	error = ath_getchannels(dev, CTRY_DEFAULT, AH_TRUE);
+	if (error != 0)
+		goto bad;
+
 	/*
 	 * Setup rate tables for all potential media types.
 	 */
 	ath_rate_setup(dev, IEEE80211_MODE_11A);
 	ath_rate_setup(dev, IEEE80211_MODE_11B);
 	ath_rate_setup(dev, IEEE80211_MODE_11G);
+	ath_rate_setup(dev, IEEE80211_MODE_TURBO);
 
 	error = ath_desc_alloc(sc);
 	if (error != 0) {
@@ -461,10 +438,12 @@ ath_init(struct net_device *dev)
 	 */
 	val = HAL_INT_RX | HAL_INT_TX |
 	      HAL_INT_RXEOL | HAL_INT_RXORN | HAL_INT_FATAL;
+#if 0
 	if (ic->ic_opmode == IEEE80211_M_STA)		/* beacon miss */
 		val |= HAL_INT_BMISS;
 	else
 		val |= HAL_INT_SWBA;			/* beacon prepare */
+#endif
 	ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
 
 	dev->flags |= IFF_RUNNING;
@@ -1689,7 +1668,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = &ic->ic_dev;
 
-	DPRINTF(("ath_chan_set: %u %uMHz -> %u %uMHz\n",
+	DPRINTF(("ath_chan_set: %u (%u MHz) -> %u (%u MHz)\n",
 	    ieee80211_chan2ieee(ic, ic->ic_ibss_chan),
 	    	ic->ic_ibss_chan->ic_freq,
 	    ieee80211_chan2ieee(ic, chan), chan->ic_freq));
@@ -1742,10 +1721,12 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211channel *chan)
 		 */
 		val = HAL_INT_RX | HAL_INT_TX |
 		      HAL_INT_RXEOL | HAL_INT_RXORN | HAL_INT_FATAL;
+#if 0
 		if (ic->ic_opmode == IEEE80211_M_STA)
 			val |= HAL_INT_BMISS;		/* beacon miss */
 		else
 			val |= HAL_INT_SWBA;		/* beacon prepare */
+#endif
 		ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
 
 		ic->ic_ibss_chan = chan;
@@ -1922,11 +1903,10 @@ ath_rate_setup(struct net_device *dev, u_int mode)
 		sc->sc_rates[mode] = ath_hal_getratetable(ah, HAL_MODE_11B);
 		break;
 	case IEEE80211_MODE_11G:
-		sc->sc_rates[mode] = ath_hal_getratetable(ah, HAL_MODE_11B);
+		sc->sc_rates[mode] = ath_hal_getratetable(ah, HAL_MODE_11G);
 		break;
 	case IEEE80211_MODE_TURBO:
-		sc->sc_rates[mode] =
-			ath_hal_getratetable(ah, HAL_MODE_TURBO);
+		sc->sc_rates[mode] = ath_hal_getratetable(ah, HAL_MODE_TURBO);
 		break;
 	default:
 		DPRINTF(("%s: invalid mode %u\n", __func__, mode));
@@ -2080,6 +2060,51 @@ ath_getstats(struct net_device *dev)
 	stats->rx_missed_errors = sc->sc_stats.ast_rx_phy[HAL_PHYERR_TOR];
 
 	return stats;
+}
+
+static int
+ath_getchannels(struct net_device *dev, u_int cc, HAL_BOOL outdoor)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_hal *ah = sc->sc_ah;
+#define	ATH_MAXCHAN	32		/* number of potential channels */
+	HAL_CHANNEL chans[ATH_MAXCHAN];	/* XXX get off stack */
+	int i, ix, nchan;
+
+	/* XXX where does the country code, et. al. come from? */
+	if (!ath_hal_init_channels(ah, chans, ATH_MAXCHAN, &nchan,
+	    CTRY_DEFAULT, HAL_MODE_ALL, AH_TRUE)) {
+		printk("%s: unable to collect channel list from hal\n",
+			dev->name);
+		return EINVAL;
+	}
+
+	/*
+	 * Convert HAL channels to ieee80211 ones and insert
+	 * them in the table according to their channel number.
+	 */
+	for (i = 0; i < nchan; i++) {
+		HAL_CHANNEL *c = &chans[i];
+		ix = ath_hal_mhz2ieee(c->channel, c->channelFlags);
+		if (ix > IEEE80211_CHAN_MAX) {
+			printk("%s: bad hal channel %u (%u/%x) ignored\n",
+				dev->name, ix, c->channel, c->channelFlags);
+			continue;
+		}
+		/* NB: flags are known to be compatible */
+		if (ic->ic_channels[ix].ic_freq == 0) {
+			ic->ic_channels[ix].ic_freq = c->channel;
+			ic->ic_channels[ix].ic_flags = c->channelFlags;
+		} else {
+#ifdef notdef
+			/* XXX 802.11 code can't handle this right now */
+			/* channels overlap; e.g. 11g and 11a/b */
+			ic->ic_channels[ix].ic_flags |= c->channelFlags;
+#endif
+		}
+	}
+	return 0;
 }
 
 #ifdef CONFIG_PROC_FS

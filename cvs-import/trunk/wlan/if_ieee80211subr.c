@@ -168,9 +168,9 @@ static const char *ieee80211_mgt_subtype_name[] = {
 };
 static const char *ieee80211_phymode_name[] = {
 	"11a",		/* IEEE80211_MODE_11A */
-	"11a turbo",	/* IEEE80211_MODE_TURBO	 */
 	"11b",		/* IEEE80211_MODE_11B */
 	"11g",		/* IEEE80211_MODE_11G */
+	"turbo",	/* IEEE80211_MODE_TURBO	 */
 };
 
 int
@@ -243,20 +243,14 @@ ieee80211_ifattach(struct net_device *dev)
 			/*
 			 * Identify mode capabilities.
 			 */
-			switch (c->ic_flags &~ IEEE80211_CHAN_PASSIVE) {
-			case IEEE80211_CHAN_A:
+			if (IEEE80211_IS_CHAN_A(c))
 				ic->ic_modecaps |= 1<<IEEE80211_MODE_11A;
-				break;
-			case IEEE80211_CHAN_T:
-				ic->ic_modecaps |= 1<<IEEE80211_MODE_TURBO;
-				break;
-			case IEEE80211_CHAN_B:
+			if (IEEE80211_IS_CHAN_B(c))
 				ic->ic_modecaps |= 1<<IEEE80211_MODE_11B;
-				break;
-			case IEEE80211_CHAN_PUREG:
+			if (IEEE80211_IS_CHAN_PUREG(c))
 				ic->ic_modecaps |= 1<<IEEE80211_MODE_11G;
-				break;
-			}
+			if (IEEE80211_IS_CHAN_T(c))
+				ic->ic_modecaps |= 1<<IEEE80211_MODE_TURBO;
 		}
 	}
 	/* validate ic->ic_curmode */
@@ -301,11 +295,10 @@ ieee80211_ifattach(struct net_device *dev)
 	maxrate = 0;
 	for (mode = IEEE80211_MODE_11A; mode < IEEE80211_MODE_MAX; mode++) {
 		static const u_int mopts[] = { 
-			IFM_IEEE80211_11A,
-			IFM_IEEE80211_TURBO,
-			IFM_IEEE80211_11B,
-			IFM_IEEE80211_11G,
-			IFM_IEEE80211_FH,
+			IFM_MAKEMODE(IFM_IEEE80211_11A),
+			IFM_MAKEMODE(IFM_IEEE80211_11B),
+			IFM_MAKEMODE(IFM_IEEE80211_11G),
+			IFM_MAKEMODE(IFM_IEEE80211_11A) | IFM_IEEE80211_TURBO,
 		};
 		if ((ic->ic_modecaps & (1<<mode)) == 0)
 			continue;
@@ -525,30 +518,8 @@ ieee80211_ieee2mhz(u_int chan, u_int flags)
 static int
 ieee80211_media_change(struct net_device *dev)
 {
-#define	N(a)	(sizeof(a) / sizeof(a[0]))
 #define	IEEERATE(_ic,_m,_i) \
 	((_ic)->ic_sup_rates[_m][_i] & IEEE80211_RATE_VAL)
-	static const int ieeerates[] = {
-		-1,		/* IFM_AUTO */
-		0,		/* IFM_MANUAL */
-		0,		/* IFM_NONE */
-		2,		/* IFM_IEEE80211_1 */
-		4,		/* IFM_IEEE80211_2 */
-		11,		/* IFM_IEEE80211_5 */
-		12,		/* IFM_IEEE80211_6 */
-		18,		/* IFM_IEEE80211_9 */
-		22,		/* IFM_IEEE80211_11 */
-		24,		/* IFM_IEEE80211_12 */
-		36,		/* IFM_IEEE80211_18 */
-		44,		/* IFM_IEEE80211_22 */
-		48,		/* IFM_IEEE80211_24 */
-		72,		/* IFM_IEEE80211_36 */
-		96,		/* IFM_IEEE80211_48 */
-		108,		/* IFM_IEEE80211_54 */
-		144,		/* IFM_IEEE80211_72 */
-		192,		/* IFM_IEEE80211_96 */
-		216,		/* IFM_IEEE80211_108 */
-	};
 	struct ieee80211com *ic = (void *)dev;
 	struct ifmedia_entry *ime;
 	enum ieee80211_opmode newopmode;
@@ -559,10 +530,7 @@ ieee80211_media_change(struct net_device *dev)
 	/*
 	 * First, identify the mode and fixed/variable rate.
 	 */
-	switch (ime->ifm_media & IFM_IEEE80211_MODE) {
-	case IFM_IEEE80211_FH:
-		newphymode = IEEE80211_MODE_FH;
-		break;
+	switch (IFM_MODE(ime->ifm_media)) {
 	case IFM_IEEE80211_11A:
 		newphymode = IEEE80211_MODE_11A;
 		break;
@@ -572,21 +540,25 @@ ieee80211_media_change(struct net_device *dev)
 	case IFM_IEEE80211_11G:
 		newphymode = IEEE80211_MODE_11G;
 		break;
-	case IFM_IEEE80211_TURBO:
-		newphymode = IEEE80211_MODE_TURBO;
-		break;
-	case IFM_IEEE80211_ANY:
+	case IFM_AUTO:
 		newphymode = ic->ic_curmode;
 		break;
 	default:
 		return EINVAL;
 	}
+	/*
+	 * Turbo mode is an ``option''.  Eventually it
+	 * needs to be applied to 11g too.
+	 */
+	if (ime->ifm_media & IFM_IEEE80211_TURBO) {
+		if (newphymode != IEEE80211_MODE_11A)
+			return EINVAL;
+		newphymode = IEEE80211_MODE_TURBO;
+	}
 	if ((ic->ic_modecaps & (1<<newphymode)) == 0)
 		return EINVAL;				/* no mode capability */
 	if (IFM_SUBTYPE(ime->ifm_media) != IFM_AUTO) {
-		if (IFM_SUBTYPE(ime->ifm_media) >= N(ieeerates))
-			return EINVAL;			/* invalid rate index */
-		newrate = ieeerates[IFM_SUBTYPE(ime->ifm_media)];
+		newrate = ieee80211_media2rate(ime->ifm_media);
 		if (newrate == 0)
 			return EINVAL;			/* rate not supported */
 	} else if (newphymode != ic->ic_curmode) {
@@ -658,7 +630,6 @@ ieee80211_media_change(struct net_device *dev)
 #endif
 	return error;
 #undef	IEEERATE
-#undef N
 }
 
 void
@@ -678,6 +649,11 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 		ni = ieee80211_find_node(ic, ic->ic_bss.ni_bssid);
 		if (ni == NULL)
 			ni = ieee80211_ref_node(&ic->ic_bss);
+		if (ni != NULL) {		/* calculate rate subtype */
+			imr->ifm_active |= ieee80211_rate2media(
+				ni->ni_rates[ni->ni_txrate], ic->ic_curmode);
+			ieee80211_unref_node(&ni);
+		}
 		break;
 	case IEEE80211_M_IBSS:
 		imr->ifm_active |= IFM_IEEE80211_ADHOC;
@@ -691,75 +667,19 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 	}
 	switch (ic->ic_curmode) {
 	case IEEE80211_MODE_11A:
-		imr->ifm_active |= IFM_IEEE80211_11A;
+		imr->ifm_active |= IFM_MAKEMODE(IFM_IEEE80211_11A);
 		break;
 	case IEEE80211_MODE_11B:
-		imr->ifm_active |= IFM_IEEE80211_11B;
+		imr->ifm_active |= IFM_MAKEMODE(IFM_IEEE80211_11B);
 		break;
 	case IEEE80211_MODE_11G:
-		imr->ifm_active |= IFM_IEEE80211_11G;
+		imr->ifm_active |= IFM_MAKEMODE(IFM_IEEE80211_11G);
 		break;
 	case IEEE80211_MODE_TURBO:
-		imr->ifm_active |= IFM_IEEE80211_TURBO;
+		imr->ifm_active |= IFM_MAKEMODE(IFM_IEEE80211_11A)
+				|  IFM_IEEE80211_TURBO;
 		break;
 	}
-	if (ni == NULL)
-		return;
-	switch (ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL) {
-	case 0:
-		imr->ifm_active |= IFM_AUTO;
-		break;
-	case 2:
-		imr->ifm_active |= IFM_IEEE80211_1;
-		break;
-	case 4:
-		imr->ifm_active |= IFM_IEEE80211_2;
-		break;
-	case 11:
-		imr->ifm_active |= IFM_IEEE80211_5;
-		break;
-	case 12:
-		imr->ifm_active |= IFM_IEEE80211_6;
-		break;
-	case 18:
-		imr->ifm_active |= IFM_IEEE80211_9;
-		break;
-	case 22:
-		imr->ifm_active |= IFM_IEEE80211_11;
-		break;
-	case 24:
-		imr->ifm_active |= IFM_IEEE80211_12;
-		break;
-	case 36:
-		imr->ifm_active |= IFM_IEEE80211_18;
-		break;
-	case 44:
-		imr->ifm_active |= IFM_IEEE80211_22;
-		break;
-	case 48:
-		imr->ifm_active |= IFM_IEEE80211_24;
-		break;
-	case 72:
-		imr->ifm_active |= IFM_IEEE80211_36;
-		break;
-	case 96:
-		imr->ifm_active |= IFM_IEEE80211_48;
-		break;
-	case 108:
-		imr->ifm_active |= IFM_IEEE80211_54;
-		break;
-	case 144:
-		imr->ifm_active |= IFM_IEEE80211_72;
-		break;
-	case 192:
-		imr->ifm_active |= IFM_IEEE80211_96;
-		break;
-	case 216:
-		imr->ifm_active |= IFM_IEEE80211_108;
-		break;
-	/* XXX catch bad values */
-	}
-	ieee80211_unref_node(&ni);
 }
 
 void
@@ -1324,7 +1244,7 @@ ieee80211_chan2mode(struct ieee80211channel *chan)
 	case IEEE80211_CHAN_T:
 		return IEEE80211_MODE_TURBO;
 	}
-	return IEEE80211_MODE_FH;
+	return 0;		/* XXX FH */
 }
 
 void
@@ -3043,127 +2963,91 @@ ieee80211_crc_update(u_int32_t crc, u_int8_t *buf, int len)
 int
 ieee80211_rate2media(int rate, enum ieee80211_phymode mode)
 {
-	int mword;
+#define	N(a)	(sizeof(a) / sizeof(a[0]))
+	static const struct {
+		u_int	m;	/* rate + mode */
+		u_int	r;	/* if_media rate */
+	} rates[] = {
+		{   2,					 IFM_IEEE80211_FH1 },
+		{   4,					 IFM_IEEE80211_FH2 },
+		{   2 | IFM_MAKEMODE(IFM_IEEE80211_11B), IFM_IEEE80211_DS1 },
+		{   4 | IFM_MAKEMODE(IFM_IEEE80211_11B), IFM_IEEE80211_DS2 },
+		{  11 | IFM_MAKEMODE(IFM_IEEE80211_11B), IFM_IEEE80211_DS5 },
+		{  22 | IFM_MAKEMODE(IFM_IEEE80211_11B), IFM_IEEE80211_DS11 },
+		{  44 | IFM_MAKEMODE(IFM_IEEE80211_11B), IFM_IEEE80211_DS22 },
+		{  12 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM6 },
+		{  18 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM9 },
+		{  24 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM12 },
+		{  36 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM18 },
+		{  48 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM24 },
+		{  72 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM36 },
+		{  96 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM48 },
+		{ 108 | IFM_MAKEMODE(IFM_IEEE80211_11A), IFM_IEEE80211_OFDM54 },
+		{  12 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK6 },
+		{  18 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK9 },
+		{  24 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK12 },
+		{  36 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK18 },
+		{  48 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK24 },
+		{  72 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK36 },
+		{  96 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK48 },
+		{ 108 | IFM_MAKEMODE(IFM_IEEE80211_11G), IFM_IEEE80211_CCK54 },
+	};
+	u_int mask, i;
 
-	rate &= IEEE80211_RATE_VAL;
-	if (rate == 0)
-		return IFM_AUTO;
-	mword = IFM_NONE;
-	if (mode == IEEE80211_MODE_FH || mode == IEEE80211_MODE_11B ||
-	    mode == IEEE80211_MODE_11G) {
-		switch (rate) {
-		case 2:
-			mword = IFM_IEEE80211_1;
-			break;
-		case 4:
-			mword = IFM_IEEE80211_2;
-			break;
-		}
+	mask = rate & IEEE80211_RATE_VAL;
+	switch (mode) {
+	case IEEE80211_MODE_11A:
+	case IEEE80211_MODE_TURBO:
+		mask |= IFM_MAKEMODE(IFM_IEEE80211_11A);
+		break;
+	case IEEE80211_MODE_11B:
+		mask |= IFM_MAKEMODE(IFM_IEEE80211_11B);
+		break;
+	case IEEE80211_MODE_11G:
+		mask |= IFM_MAKEMODE(IFM_IEEE80211_11G);
+		break;
 	}
-	if (mode == IEEE80211_MODE_11B || mode == IEEE80211_MODE_11G) {
-		switch (rate) {
-		case 2:
-			mword = IFM_IEEE80211_1;
-			break;
-		case 4:
-			mword = IFM_IEEE80211_2;
-			break;
-		case 11:
-			mword = IFM_IEEE80211_5;
-			break;
-		case 22:
-			mword = IFM_IEEE80211_11;
-			break;
-		}
-	}
-	if (mode == IEEE80211_MODE_11A || mode == IEEE80211_MODE_11G) {
-		switch (rate) {
-		case 12:
-			mword = IFM_IEEE80211_6;
-			break;
-		case 18:
-			mword = IFM_IEEE80211_9;
-			break;
-		case 24:
-			mword = IFM_IEEE80211_12;
-			break;
-		case 36:
-			mword = IFM_IEEE80211_18;
-			break;
-		case 48:
-			mword = IFM_IEEE80211_24;
-			break;
-		case 72:
-			mword = IFM_IEEE80211_36;
-			break;
-		case 108:
-			mword = IFM_IEEE80211_54;
-			break;
-		}
-	}
-	if (mode == IEEE80211_MODE_TURBO) {
-		switch (rate) {
-		case 24:
-			mword = IFM_IEEE80211_12;
-			break;
-		case 36:
-			mword = IFM_IEEE80211_18;
-			break;
-		case 48:
-			mword = IFM_IEEE80211_24;
-			break;
-		case 72:
-			mword = IFM_IEEE80211_36;
-			break;
-		case 108:
-			mword = IFM_IEEE80211_54;
-			break;
-		case 144:
-			mword = IFM_IEEE80211_72;
-			break;
-		case 192:
-			mword = IFM_IEEE80211_96;
-			break;
-		case 216:
-			mword = IFM_IEEE80211_108;
-			break;
-		}
-	}
-	return mword;
+	for (i = 0; i < N(rates); i++)
+		if (rates[i].m == mask)
+			return rates[i].r;
+	return IFM_AUTO;
+#undef N
 }
 
 int
 ieee80211_media2rate(int mword)
 {
 #define	N(a)	(sizeof(a) / sizeof(a[0]))
-	static const u_int8_t ieeerates[] = {
-		0,	/* IFM_AUTO */
-		0,	/* IFM_MANUAL */
-		0,	/* IFM_NONE */
-		2,	/* IFM_IEEE80211_1 */
-		4,	/* IFM_IEEE80211_2 */
-		10,	/* IFM_IEEE80211_5 */
-		12,	/* IFM_IEEE80211_6 */
-		18,	/* IFM_IEEE80211_9 */
-		22,	/* IFM_IEEE80211_11 */
-		24,	/* IFM_IEEE80211_12 */
-		36,	/* IFM_IEEE80211_18 */
-		44,	/* IFM_IEEE80211_22 */
-		48,	/* IFM_IEEE80211_24 */
-		72,	/* IFM_IEEE80211_36 */
-		96,	/* IFM_IEEE80211_48 */
-		108,	/* IFM_IEEE80211_54 */
-		144,	/* IFM_IEEE80211_72 */
-		192,	/* IFM_IEEE80211_96 */
-		216,	/* IFM_IEEE80211_108 */
+	static const int ieeerates[] = {
+		-1,		/* IFM_AUTO */
+		0,		/* IFM_MANUAL */
+		0,		/* IFM_NONE */
+		2,		/* IFM_IEEE80211_FH1 */
+		4,		/* IFM_IEEE80211_FH2 */
+		2,		/* IFM_IEEE80211_DS1 */
+		4,		/* IFM_IEEE80211_DS2 */
+		11,		/* IFM_IEEE80211_DS5 */
+		22,		/* IFM_IEEE80211_DS11 */
+		44,		/* IFM_IEEE80211_DS22 */
+		12,		/* IFM_IEEE80211_OFDM6 */
+		18,		/* IFM_IEEE80211_OFDM9 */
+		24,		/* IFM_IEEE80211_OFDM12 */
+		36,		/* IFM_IEEE80211_OFDM18 */
+		48,		/* IFM_IEEE80211_OFDM24 */
+		72,		/* IFM_IEEE80211_OFDM36 */
+		96,		/* IFM_IEEE80211_OFDM48 */
+		108,		/* IFM_IEEE80211_OFDM54 */
+		12,		/* IFM_IEEE80211_CCK6 */
+		18,		/* IFM_IEEE80211_CCK9 */
+		24,		/* IFM_IEEE80211_CCK12 */
+		36,		/* IFM_IEEE80211_CCK18 */
+		48,		/* IFM_IEEE80211_CCK24 */
+		72,		/* IFM_IEEE80211_CCK36 */
+		96,		/* IFM_IEEE80211_CCK48 */
+		108,		/* IFM_IEEE80211_CCK54 */
 	};
-	int rate;
-
-	if (IFM_SUBTYPE(mword) < N(ieeerates))
-		rate = ieeerates[IFM_SUBTYPE(mword)];
-	else
-		rate = 0;
-	return rate;
+	return IFM_SUBTYPE(mword) < N(ieeerates) ?
+		ieeerates[IFM_SUBTYPE(mword)] : 0;
 #undef N
 }
 

@@ -324,19 +324,18 @@ enum ieee80211_phytype {
 	IEEE80211_T_DS,			/* direct sequence spread spectrum */
 	IEEE80211_T_FH,			/* frequency hopping */
 	IEEE80211_T_OFDM,		/* frequency division multiplexing */
-	IEEE80211_T_HRDS,		/* high rate DS, aka turbo mode */
+	IEEE80211_T_TURBO,		/* high rate OFDM, aka turbo mode */
 };
 #define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
 
 /* XXX not really a mode; there are really multiple PHY's */
 enum ieee80211_phymode {
 	IEEE80211_MODE_11A	= 0,	/* 5GHz, OFDM */
-	IEEE80211_MODE_TURBO	= 1,	/* 5GHz, OFDM, 2x clocking */
-	IEEE80211_MODE_11B	= 2,	/* 2GHz, CCK */
-	IEEE80211_MODE_11G	= 3,	/* 2GHz, OFDM */
+	IEEE80211_MODE_11B	= 1,	/* 2GHz, CCK */
+	IEEE80211_MODE_11G	= 2,	/* 2GHz, OFDM */
+	IEEE80211_MODE_TURBO	= 3,	/* 5GHz, OFDM, 2x clock */
 };
-#define	IEEE80211_MODE_FH	IEEE80211_MODE_11B	/* cheat, overlay */
-#define	IEEE80211_MODE_MAX	(IEEE80211_MODE_11G+1)
+#define	IEEE80211_MODE_MAX	(IEEE80211_MODE_TURBO+1)
 
 enum ieee80211_opmode {
 	IEEE80211_M_STA		= 1,	/* infrastructure station */

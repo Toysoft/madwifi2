@@ -85,10 +85,10 @@ ieee80211_ioctl_giwname(struct net_device *dev,
 		ieee80211_media_status(dev, &imr);
 		if (imr.ifm_active & (IFM_IEEE80211_11A | IFM_IEEE80211_TURBO))
 			strncpy(name, "IEEE 802.11-OFDM", IFNAMSIZ);
-		else if (imr.ifm_active & (IFM_IEEE80211_11B | IFM_IEEE80211_11G))
+		else if (imr.ifm_active & (IFM_IEEE80211_11B))
 			strncpy(name, "IEEE 802.11-DS", IFNAMSIZ);
-		else if (imr.ifm_active & IFM_IEEE80211_FH)
-			strncpy(name, "IEEE 802.11-FH", IFNAMSIZ);
+		else if (imr.ifm_active & (IFM_IEEE80211_11G))
+			strncpy(name, "IEEE 802.11-OFDM/DS", IFNAMSIZ);
 	}
 	return 0;
 }
