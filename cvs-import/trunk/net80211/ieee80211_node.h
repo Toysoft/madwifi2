@@ -179,6 +179,8 @@ extern	void ieee80211_create_ibss(struct ieee80211com*,
 extern	void ieee80211_end_scan(struct ieee80211com *);
 extern	int ieee80211_sta_join(struct ieee80211com *,
 		struct ieee80211_node *);
+extern	void ieee80211_sta_leave(struct ieee80211com *,
+		struct ieee80211_node *);
 
 extern	struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *,
 		u_int8_t *);

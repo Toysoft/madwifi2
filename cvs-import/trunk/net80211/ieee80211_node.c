@@ -52,6 +52,7 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211_node.c,v 1.8 2003/11/02 01:29:05 dyoung Ex
 #include <net80211/ieee80211_var.h>
 
 static struct ieee80211_node *ieee80211_node_alloc(struct ieee80211com *);
+static void node_cleanup(struct ieee80211com *, struct ieee80211_node *);
 static void ieee80211_node_free(struct ieee80211com *, struct ieee80211_node *);
 static void ieee80211_node_copy(struct ieee80211com *,
 		struct ieee80211_node *, const struct ieee80211_node *);
@@ -549,6 +550,18 @@ ieee80211_sta_join(struct ieee80211com *ic, struct ieee80211_node *selbs)
 	return 1;
 }
 
+/*
+ * Leave the specified IBSS/BSS network.  The node is assumed to
+ * be passed in with a held reference.
+ */
+void
+ieee80211_sta_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+
+	node_cleanup(ic, ni);
+	ieee80211_notify_node_leave(ic, ni);
+}
+
 static struct ieee80211_node *
 ieee80211_node_alloc(struct ieee80211com *ic)
 {
@@ -564,6 +577,10 @@ node_cleanup(struct ieee80211com *ic, struct ieee80211_node *ni)
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 	int i;
 
+	ni->ni_flags = 0;
+	ni->ni_associd = 0;
+	ni->ni_esslen = 0;
+	/* XXX ni_savedq */
 	if (ni->ni_challenge != NULL) {
 		FREE(ni->ni_challenge, M_DEVBUF);
 		ni->ni_challenge = NULL;
@@ -1163,7 +1180,13 @@ ieee80211_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 
 	if (ic->ic_curmode == IEEE80211_MODE_11G)
 		ieee80211_node_leave_11g(ic, ni);
-	ieee80211_notify_node_leave(ic, ni);
+	/*
+	 * Cleanup station state.  In particular clear various
+	 * state that might otherwise be reused if the node
+	 * is reused before the reference count goes to zero
+	 * (and memory is reclaimed).
+	 */
+	ieee80211_sta_leave(ic, ni);
 done:
 	ieee80211_free_node(ic, ni);
 }
