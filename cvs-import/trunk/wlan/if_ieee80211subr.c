@@ -466,6 +466,8 @@ ieee80211_media_init(struct net_device *dev,
 			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_ADHOC);
 		if (ic->ic_caps & IEEE80211_C_HOSTAP)
 			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_HOSTAP);
+		if (ic->ic_caps & IEEE80211_C_MONITOR)
+			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_MONITOR);
 		if (ic->ic_caps & IEEE80211_C_AHDEMO)
 			ADD(ic, IFM_AUTO, mopt | IFM_IEEE80211_ADHOC | IFM_FLAG0);
 		if (mode == IEEE80211_MODE_AUTO)
@@ -486,6 +488,8 @@ ieee80211_media_init(struct net_device *dev,
 				ADD(ic, mword, mopt | IFM_IEEE80211_ADHOC);
 			if (ic->ic_caps & IEEE80211_C_HOSTAP)
 				ADD(ic, mword, mopt | IFM_IEEE80211_HOSTAP);
+			if (ic->ic_caps & IEEE80211_C_MONITOR)
+				ADD(ic, mword, mopt | IFM_IEEE80211_MONITOR);
 			if (ic->ic_caps & IEEE80211_C_AHDEMO)
 				ADD(ic, mword, mopt | IFM_IEEE80211_ADHOC | IFM_FLAG0);
 			/*
@@ -517,6 +521,8 @@ ieee80211_media_init(struct net_device *dev,
 			ADD(ic, mword, IFM_IEEE80211_ADHOC);
 		if (ic->ic_caps & IEEE80211_C_HOSTAP)
 			ADD(ic, mword, IFM_IEEE80211_HOSTAP);
+		if (ic->ic_caps & IEEE80211_C_MONITOR)
+			ADD(ic, mword, IFM_IEEE80211_MONITOR);
 		if (ic->ic_caps & IEEE80211_C_AHDEMO)
 			ADD(ic, mword, IFM_IEEE80211_ADHOC | IFM_FLAG0);
 	}
@@ -633,6 +639,8 @@ ieee80211_media_change(struct net_device *dev)
 		newopmode = IEEE80211_M_HOSTAP;
 	else if (ime->ifm_media & IFM_IEEE80211_ADHOC)
 		newopmode = IEEE80211_M_IBSS;
+	else if (ime->ifm_media & IFM_IEEE80211_MONITOR)
+		newopmode = IEEE80211_M_MONITOR;
 	else
 		newopmode = IEEE80211_M_STA;
 
@@ -673,12 +681,21 @@ ieee80211_media_change(struct net_device *dev)
 	 * Handle operating mode change.
 	 */
 	if (ic->ic_opmode != newopmode) {
+		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
+			/* forget channel assignment in transition from monitor mode
+			 * since it is essentially random and will prevent us from associating
+			 */
+			ic->ic_des_chan = (struct ieee80211channel *) IEEE80211_CHAN_ANY;
+		}
 		ic->ic_opmode = newopmode;
 		switch (newopmode) {
 		case IEEE80211_M_AHDEMO:
 		case IEEE80211_M_HOSTAP:
 		case IEEE80211_M_STA:
+		case IEEE80211_M_MONITOR:
 			ic->ic_flags &= ~IEEE80211_F_IBSSON;
+			break;
+
 			break;
 		case IEEE80211_M_IBSS:
 			ic->ic_flags |= IEEE80211_F_IBSSON;
@@ -721,6 +738,9 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 		break;
 	case IEEE80211_M_HOSTAP:
 		imr->ifm_active |= IFM_IEEE80211_HOSTAP;
+		break;
+	case IEEE80211_M_MONITOR:
+		imr->ifm_active |= IFM_IEEE80211_MONITOR;
 		break;
 	}
 	switch (ic->ic_curmode) {
@@ -805,6 +825,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				ni = ieee80211_ref_node(&ic->ic_bss);
 			}
 			break;
+		case IEEE80211_M_MONITOR:
+			goto out;
 		default:
 			/* XXX catch bad values */
 			break;
@@ -851,6 +873,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			}
 #endif
 			break;
+		case IEEE80211_M_MONITOR:
+			goto out;
 		case IEEE80211_M_IBSS:
 		case IEEE80211_M_AHDEMO:
 			if (dir != IEEE80211_FC1_DIR_NODS)
@@ -1100,6 +1124,9 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 		IEEE80211_ADDR_COPY(wh->i_addr1, eh.ether_dhost);
 		IEEE80211_ADDR_COPY(wh->i_addr2, ni->ni_bssid);
 		IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_shost);
+		break;
+	case IEEE80211_M_MONITOR:
+		printk("%s: invalid mode\n", __func__);
 		break;
 	}
 	ieee80211_unref_node(&ni);
@@ -1645,6 +1672,7 @@ ieee80211_end_scan(struct net_device *dev)
 			ieee80211_unref_node(&ni);
 		}
 	}
+
 	if (selbs == NULL)
 		goto notfound;
 	p = ic->ic_bss.ni_private;
@@ -2675,6 +2703,10 @@ ieee80211_recv_auth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		ieee80211_new_state(&ic->ic_dev, IEEE80211_S_ASSOC,
 		    wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK);
 		break;
+
+	case IEEE80211_M_MONITOR:
+		printk("%s: unexpected in monitor mode\n", __func__);
+		break;
 	}
 }
 
@@ -3164,7 +3196,8 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		case IEEE80211_S_INIT:
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_RUN:
-			DPRINTF(ic, ("%s: invalid transition\n", __func__));
+			if (ic->ic_opmode != IEEE80211_M_MONITOR)
+				DPRINTF(ic, ("%s: invalid transition\n", __func__));
 			break;
 		case IEEE80211_S_SCAN:		/* adhoc/hostap mode */
 		case IEEE80211_S_ASSOC:		/* infra mode */

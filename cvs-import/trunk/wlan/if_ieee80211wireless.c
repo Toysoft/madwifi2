@@ -394,7 +394,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev,
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	struct ieee80211channel *c;
 	int i;
-
+	
 	if (freq->e > 1)
 		return -EINVAL;
 	if (freq->e == 1)
@@ -577,6 +577,9 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 	case IW_MODE_MASTER:
 		ifr.ifr_media |= IFM_IEEE80211_HOSTAP;
 		break;
+	case IW_MODE_MONITOR:
+		ifr.ifr_media |= IFM_IEEE80211_MONITOR;
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -596,6 +599,8 @@ ieee80211_ioctl_giwmode(struct net_device *dev,
 
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		*mode = IW_MODE_MASTER;
+	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
+		*mode = IW_MODE_MONITOR;
 	else if (imr.ifm_active & IFM_IEEE80211_IBSS)
 		*mode = IW_MODE_ADHOC;
 	else
@@ -982,6 +987,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	(*ic->ic_media.ifm_status)(dev, &imr);
 
 	memset(&ifr, 0, sizeof(ifr));
+
 	switch (param) {
 	case IEEE80211_PARAM_TURBO:
 		if (value)
@@ -997,7 +1003,10 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	default:
 		return -EOPNOTSUPP;
 	}
+
 	return -ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
+
+	return 0;
 }
 
 static int

@@ -51,6 +51,7 @@
 #include <linux/cache.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
+#include <linux/if_arp.h>
 
 #include <asm/uaccess.h>
 
@@ -108,6 +109,7 @@ static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 static void	ath_rate_ctl_reset(struct ath_softc *, enum ieee80211_state);
 static void	ath_rate_ctl(void *, struct ieee80211_node *);
 static int      ath_change_mtu(struct net_device *, int);
+static void     ath_rx_capture(	struct net_device *, struct sk_buff *, int , int, int);
 
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
@@ -244,7 +246,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/* XXX not right but it's not used anywhere important */
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
-	ic->ic_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS | IEEE80211_C_HOSTAP;
+	ic->ic_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS | IEEE80211_C_HOSTAP | IEEE80211_C_MONITOR;
 	/* NB: 11g support is identified when we fetch the channel set */
 	if (sc->sc_have11g)
 		ic->ic_caps |= IEEE80211_C_SHPREAMBLE;
@@ -464,12 +466,33 @@ ath_init(struct net_device *dev)
 	HAL_STATUS status;
 	HAL_CHANNEL hchan;
 
-	DPRINTF(("ath_init\n"));
+	DPRINTF(("ath_init: mode=%d\n",ic->ic_opmode));
 	/*
 	 * Stop anything previously setup.  This is safe
 	 * whether this is the first time through or not.
 	 */
 	ath_stop(dev);
+	
+	/*
+	 * Resize receive skb's if changing to or from monitor mode
+	 */
+	if ((dev->type == ARPHRD_ETHER && (ic->ic_opmode == IEEE80211_M_MONITOR))
+		|| (dev->type == ARPHRD_IEEE80211_PRISM && (ic->ic_opmode != IEEE80211_M_MONITOR))) {
+		struct ath_buf *bf;
+		TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
+			if (bf->bf_skb != NULL) {
+				pci_unmap_single(sc->sc_pdev,
+					bf->bf_skbaddr, sc->sc_rxbufsize,
+					PCI_DMA_FROMDEVICE);
+				dev_kfree_skb(bf->bf_skb);
+				bf->bf_skb = NULL;
+			}
+	}
+
+	/*
+	 * Change our interface type if we are in monitor mode.
+	 */
+	dev->type = (ic->ic_opmode == IEEE80211_M_MONITOR) ? ARPHRD_IEEE80211_PRISM : ARPHRD_ETHER;
 
 	/*
 	 * The basic interface to setting the hardware in a good
@@ -521,7 +544,11 @@ ath_init(struct net_device *dev)
 	mode = ieee80211_chan2mode(ic, ni->ni_chan);
 	if (mode != sc->sc_curmode)
 		ath_setcurmode(sc, mode);
-	ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
+
+	if (ic->ic_opmode == IEEE80211_M_MONITOR)
+		ieee80211_new_state(dev, IEEE80211_S_RUN, -1);
+	else
+		ieee80211_new_state(dev, IEEE80211_S_SCAN, -1);
 
 	return 0;
 }
@@ -627,12 +654,14 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ieee80211_frame *wh;
 	int error;
 
-	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
+	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid ||
+	    ic->ic_opmode == IEEE80211_M_MONITOR) {
 		DPRINTF(("%s: discard, invalid %d flags %x\n", __func__,
 			sc->sc_invalid, dev->flags));
 		sc->sc_stats.ast_tx_invalid++;
 		return -ENETDOWN;
 	}
+	
 	/*
 	 * No data frames go out unless we're associated; this
 	 * should not happen as the 802.11 layer does not enable
@@ -648,6 +677,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		netif_stop_queue(dev);
 		goto bad;
 	}
+
 	/*
 	 * Grab a TX buffer and associated resources.
 	 */
@@ -667,6 +697,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_stats.ast_tx_nobuf++;
 		goto bad;
 	}
+
 	/*
 	 * Encapsulate the packet for transmission.
 	 */
@@ -709,6 +740,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	error = ath_tx_start(dev, ni, bf, skb);
 	ieee80211_unref_node(&ni);
+
 	if (error == 0)
 		return 0;
 	/* fall thru... */
@@ -879,6 +911,7 @@ ath_mode_init(struct net_device *dev)
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
+
 	ath_hal_setrxfilter(ah, rfilt);
 
 	/* calculate and install multicast filter */
@@ -1072,9 +1105,10 @@ ath_beacon_tasklet(void *data)
 	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(("ath_beacon_tasklet\n"));
-	if (ic->ic_opmode == IEEE80211_M_STA || bf == NULL || bf->bf_skb == NULL) {
-		DPRINTF(("ath_beacon_int: ic_flags=%x bf=%p bf_m=%p\n",
-		    ic->ic_flags, bf, bf ? bf->bf_skb : NULL));
+	if (ic->ic_opmode == IEEE80211_M_STA || ic->ic_opmode == IEEE80211_M_MONITOR ||
+	    bf == NULL || bf->bf_skb == NULL) {
+		DPRINTF(("%s: ic_flags=%x bf=%p bf_m=%p\n",
+			 __func__, ic->ic_flags, bf, bf ? bf->bf_skb : NULL));
 		return;
 	}
 	/* update beacon to reflect PS poll state */
@@ -1129,10 +1163,12 @@ ath_beacon_config(struct ath_softc *sc)
 	struct ieee80211_node *ni = &ic->ic_bss;
 	u_int32_t nexttbtt;
 
+	
 	nexttbtt = (LE_READ_4(ni->ni_tstamp + 4) << 22) |
 	    (LE_READ_4(ni->ni_tstamp) >> 10);
 	DPRINTF(("%s: nexttbtt=%u\n", __func__, nexttbtt));
 	nexttbtt += ni->ni_intval;
+
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
 		HAL_BEACON_STATE bs;
 		u_int32_t bmisstime;
@@ -1196,7 +1232,8 @@ ath_beacon_config(struct ath_softc *sc)
 		ath_hal_intrset(ah, 0);
 		ath_hal_beaconinit(ah, ic->ic_opmode,
 			nexttbtt, ni->ni_intval);
-		sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
+		if (ic->ic_opmode != IEEE80211_M_MONITOR)
+			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 }
@@ -1316,17 +1353,46 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 
 	skb = bf->bf_skb;
 	if (skb == NULL) {
-		/*
-		 * Cache-line-align.  This is important (for the 5210 at
-		 * least) as not doing so causes bogus data in rx'd frames.
-		 */
-		skb = ath_alloc_skb(sc->sc_rxbufsize, sc->sc_cachelsz);
-		if (skb == NULL) {
-			DPRINTF(("ath_rxbuf_init: skbuff allocation failed; "
-				"size %u\n", sc->sc_rxbufsize));
-			sc->sc_stats.ast_rx_nobuf++;
-			return ENOMEM;
+		
+ 		if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
+ 			/*
+ 			 * Allocate buffer for monitor mode with space for the wlan-ng style
+ 			 * physical layer header at the start
+ 			 */
+ 			u_int off;
+ 			skb = dev_alloc_skb(sc->sc_rxbufsize + sizeof(wlan_ng_prism2_header) + sc->sc_cachelsz - 1);
+ 			if (skb == NULL) {
+ 				DPRINTF(("ath_rxbuf_init: skbuff allocation failed; "
+ 					"size %u\n", sc->sc_rxbufsize + sizeof(wlan_ng_prism2_header)));
+ 				sc->sc_stats.ast_rx_nobuf++;
+ 				return ENOMEM;
+ 			}
+ 			/*
+			 * Reserve space for the Prism header
+ 			 */
+ 			skb_reserve(skb, sizeof(wlan_ng_prism2_header));
+			/*
+ 			 * Cache line alignment
+			 */
+ 			off = ((unsigned long) skb->data) % sc->sc_cachelsz;
+ 
+ 			if (off != 0)
+ 				skb_reserve(skb, sc->sc_cachelsz - off);
 		}
+		else {
+			/*
+			 * Cache-line-align.  This is important (for the 5210 at
+			 * least) as not doing so causes bogus data in rx'd frames.
+			 */
+			skb = ath_alloc_skb(sc->sc_rxbufsize, sc->sc_cachelsz);
+			if (skb == NULL) {
+				DPRINTF(("ath_rxbuf_init: skbuff allocation failed; "
+					 "size %u\n", sc->sc_rxbufsize));
+				sc->sc_stats.ast_rx_nobuf++;
+				return ENOMEM;
+			}
+		}
+		
 		skb->dev = &sc->sc_ic.ic_dev;
 		bf->bf_skb = skb;
 		bf->bf_skbaddr = pci_map_single(sc->sc_pdev,
@@ -1345,6 +1411,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	if (sc->sc_rxlink != NULL)
 		*sc->sc_rxlink = bf->bf_daddr;
 	sc->sc_rxlink = &ds->ds_link;
+
 	return 0;
 }
 
@@ -1354,10 +1421,12 @@ ath_rx_tasklet(void *data)
 	struct net_device *dev = data;
 	struct ath_buf *bf;
 	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device_stats *stats = &sc->sc_ic.ic_stats;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
+
 	struct ieee80211_frame *wh, whbuf;
 	int len;
 	u_int8_t phyerr;
@@ -1407,13 +1476,21 @@ ath_rx_tasklet(void *data)
 				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
 				sc->sc_stats.ast_rx_phy[phyerr]++;
 			}
-			goto rx_next;
+
+			/*
+			 * In monitor mode, allow through packets that cannot be decrypted
+			 */
+			if ((ds->ds_rxstat.rs_status & ~HAL_RXERR_DECRYPT)
+			    || (sc->sc_ic.ic_opmode != IEEE80211_M_MONITOR))
+				goto rx_next;
 		}
+
 		sc->sc_stats.ast_rx_rssidelta =
 			ds->ds_rxstat.rs_rssi - sc->sc_stats.ast_rx_rssi;
 		sc->sc_stats.ast_rx_rssi = ds->ds_rxstat.rs_rssi;
 
 		len = ds->ds_rxstat.rs_datalen;
+
 		if (len < sizeof(struct ieee80211_frame)) {
 			DPRINTF(("%s: ath_rx_tasklet: short packet %d\n",
 			    dev->name, len));
@@ -1424,48 +1501,66 @@ ath_rx_tasklet(void *data)
 		pci_dma_sync_single(sc->sc_pdev,
 			bf->bf_skbaddr, len, PCI_DMA_FROMDEVICE);
 
-		wh = (struct ieee80211_frame *) skb->data;
-		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
-		    IEEE80211_FC0_TYPE_CTL) {
-			/*
-			 * Ignore control frame received in promisc mode.
-			 */
-			DPRINTF(("%s: ath_rx_tasklet: discard ctl frame, "
-				"fc %x\n", dev->name, wh->i_fc[0]));
-			goto rx_next;
-		}
-		pci_unmap_single(sc->sc_pdev,
-			bf->bf_skbaddr, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
-		bf->bf_skb = NULL;
-		skb_put(skb, len);
-		skb->protocol = ETH_P_CONTROL;		/* XXX */
-		if (IFF_DUMPPKTS(&sc->sc_ic)) {
+
+		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			const HAL_RATE_TABLE *rt = sc->sc_currates;
+			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
+			bf->bf_skb = NULL;
+
+			ath_rx_capture(dev, skb, len, ds->ds_rxstat.rs_rssi,
+				       (rt != NULL)
+				       ? (rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL) : 2);
+		} else {
+			/*
+			 * normal receive
+			 */
+			wh = (struct ieee80211_frame *) skb->data;
+			if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+			    IEEE80211_FC0_TYPE_CTL) {
+				/*
+				 * Ignore control frame received in promisc mode.
+				 */
+				DPRINTF(("%s: ath_rx_tasklet: discard ctl frame, "
+					 "fc %x\n", dev->name, wh->i_fc[0]));
+				goto rx_next;
+			}
+			pci_unmap_single(sc->sc_pdev,
+					 bf->bf_skbaddr, sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
+			bf->bf_skb = NULL;
+			skb_put(skb, len);
+			skb->protocol = ETH_P_CONTROL;		/* XXX */
+			if (IFF_DUMPPKTS(&sc->sc_ic)) {
+				const HAL_RATE_TABLE *rt = sc->sc_currates;
+	
 			ieee80211_dump_pkt(skb->data, len,
-				rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
-				ds->ds_rxstat.rs_rssi);
+						   rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
+						   ds->ds_rxstat.rs_rssi);
+			}
+			skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
+			if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
+				/*
+				 * WEP is decrypted by hardware. Clear WEP bit
+				 * and trim WEP header for ieee80211_input().
+				 */
+				wh->i_fc[1] &= ~IEEE80211_FC1_WEP;
+				memcpy(&whbuf, wh, sizeof(whbuf));
+				skb_pull(skb, IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN);
+				memcpy(skb->data, &whbuf, sizeof(whbuf));
+				/*
+				 * Also trim WEP ICV from the tail.
+				 */
+				skb_trim(skb, skb->len - IEEE80211_WEP_CRCLEN);
+			}
+
+			ieee80211_input(dev, skb,
+					ds->ds_rxstat.rs_rssi,
+					ds->ds_rxstat.rs_tstamp,
+					ds->ds_rxstat.rs_antenna);
 		}
-		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
-		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
-			/*
-			 * WEP is decrypted by hardware. Clear WEP bit
-			 * and trim WEP header for ieee80211_input().
-			 */
-			wh->i_fc[1] &= ~IEEE80211_FC1_WEP;
-			memcpy(&whbuf, wh, sizeof(whbuf));
-			skb_pull(skb, IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN);
-			memcpy(skb->data, &whbuf, sizeof(whbuf));
-			/*
-			 * Also trim WEP ICV from the tail.
-			 */
-			skb_trim(skb, skb->len - IEEE80211_WEP_CRCLEN);
-		}
+
 		stats->rx_packets++;
 		stats->rx_bytes += len;
-		ieee80211_input(dev, skb,
-			ds->ds_rxstat.rs_rssi,
-			ds->ds_rxstat.rs_tstamp,
-			ds->ds_rxstat.rs_antenna);
+		
   rx_next:
 		TAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	} while (ath_rxbuf_init(sc, bf) == 0);
@@ -1473,6 +1568,80 @@ ath_rx_tasklet(void *data)
 	ath_hal_rxmonitor(ah);			/* rx signal state monitoring */
 	ath_hal_rxena(ah);			/* in case of RXEOL */
 }
+
+
+static void
+ath_rx_capture(	struct net_device *dev, struct sk_buff *skb, int len, int rssi, int rate) 
+{
+	/*
+	 * Add a header (prism2) that capture tools like kismet can understand
+	 */
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+ 	wlan_ng_prism2_header *ph;
+	
+	skb->protocol = ETH_P_CONTROL;
+	skb->pkt_type = PACKET_OTHERHOST;
+	
+	ph = (wlan_ng_prism2_header *)skb_push(skb, sizeof(wlan_ng_prism2_header));
+	
+	memset(ph,0,sizeof(wlan_ng_prism2_header));
+	
+	ph->msgcode = DIDmsg_lnxind_wlansniffrm;
+	ph->msglen = sizeof(wlan_ng_prism2_header);
+	strcpy(ph->devname, dev->name);
+	
+	ph->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
+	ph->hosttime.status = 0;
+	ph->hosttime.len = 4;
+	ph->hosttime.data = jiffies;
+	
+	ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
+	ph->mactime.status = P80211ENUM_msgitem_status_no_value;
+	ph->mactime.len = 4;
+	ph->mactime.data = 0;
+	
+	ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
+	ph->istx.status = 0;
+	ph->istx.len = 4;
+	ph->istx.data = P80211ENUM_truth_false;
+	
+	ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
+	ph->frmlen.status = 0;
+	ph->frmlen.len = 4;
+	ph->frmlen.data = len;
+	
+	ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
+	ph->channel.status = 0;
+	ph->channel.len = 4;
+	ph->channel.data = ieee80211_mhz2ieee(ic->ic_ibss_chan->ic_freq,0);
+	
+	ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
+	ph->rssi.status = P80211ENUM_msgitem_status_no_value;
+	ph->rssi.len = 4;
+	ph->rssi.data = 0;
+	
+	ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
+	ph->signal.status = 0;
+	ph->signal.len = 4;
+	ph->signal.data = rssi;
+	
+	ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
+	ph->rate.status = 0;
+	ph->rate.len = 4;
+	ph->rate.data = rate;
+	
+	skb_put(skb, len);
+	
+	skb->dev = dev;
+	skb->mac.raw = skb->data ;
+	skb->ip_summed = CHECKSUM_NONE;
+	skb->pkt_type = PACKET_OTHERHOST;
+	skb->protocol = htons(0x0019);  /* ETH_P_80211_RAW */
+	
+	netif_rx(skb);
+}
+
 
 /*
  * XXX Size of an ACK control frame in bytes.
@@ -1534,6 +1703,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		pktlen += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN+
 			IEEE80211_WEP_CRCLEN;
 	}
+
 	pktlen += IEEE80211_CRC_LEN;
 
 	/*
@@ -1805,7 +1975,6 @@ static void
 ath_tx_timeout(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
-
 	sc->sc_stats.ast_watchdog++;
 	if (ath_debug)
 		ath_hal_dumpstate(sc->sc_ah);
@@ -1895,9 +2064,14 @@ ath_startrecv(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 
-	sc->sc_rxbufsize = roundup(dev->mtu + IEEE80211_CRC_LEN +
-		(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
-		 IEEE80211_WEP_CRCLEN), sc->sc_cachelsz);
+	if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
+		sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
+	} else {
+		sc->sc_rxbufsize = roundup(sizeof(struct ieee80211_frame) +
+			dev->mtu + IEEE80211_CRC_LEN +
+			(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN +
+			 IEEE80211_WEP_CRCLEN), sc->sc_cachelsz);
+	}
 	DPRINTF(("ath_startrecv: mtu %u cachelsz %u rxbufsize %u\n",
 		dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize));
 
@@ -2082,10 +2256,13 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	error = ath_chan_set(sc, ni->ni_chan);
 	if (error != 0)
 		goto bad;
+
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
 	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
+
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
+
 	if (nstate == IEEE80211_S_SCAN) {
 		mod_timer(&sc->sc_scan_ch,
 			jiffies + ((HZ * ath_dwelltime) / 1000));
@@ -2099,7 +2276,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	DPRINTF(("%s: RX filter 0x%x bssid %s\n",
 		 __func__, rfilt, ether_sprintf(bssid)));
 
-	if (nstate == IEEE80211_S_RUN && ic->ic_opmode != IEEE80211_M_IBSS)
+	if (nstate == IEEE80211_S_RUN && ic->ic_opmode != IEEE80211_M_IBSS && ic->ic_opmode != IEEE80211_M_MONITOR)
 		ath_hal_setassocid(ah, bssid, ni->ni_associd);
 	else
 		ath_hal_setassocid(ah, bssid, 0);
@@ -2109,7 +2286,12 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 				ath_hal_keysetmac(ah, i, bssid);
 	}
 
-	if (nstate == IEEE80211_S_RUN) {
+	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
+		/* start periodic recalibration timer */
+		mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
+		netif_start_queue(dev);
+	}
+	else if (nstate == IEEE80211_S_RUN) {
 		DPRINTF(("%s(RUN): ic_flags=0x%08x iv=%d bssid=%s "
 			"capinfo=0x%04x chan=%d\n"
 			 , __func__
@@ -2142,6 +2324,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		ath_hal_intrset(ah, sc->sc_imask);
 		del_timer(&sc->sc_cal_ch);	/* no calibration */
 	}
+
 	/*
 	 * Reset the rate control state.
 	 */

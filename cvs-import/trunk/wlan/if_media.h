@@ -208,6 +208,7 @@ int	ifmedia_ioctl(struct net_device *, struct ifreq *ifr,
 #define	IFM_IEEE80211_IBSS	0x00000400	/* Operate in IBSS mode */
 #define	IFM_IEEE80211_IBSSMASTER 0x00000800	/* Operate as an IBSS master */
 #define	IFM_IEEE80211_TURBO	0x00001000	/* Operate in turbo mode */
+#define IFM_IEEE80211_MONITOR   0x00002000      /* Operate in Monitor mode */
 /* operating mode for multi-mode devices */
 #define	IFM_IEEE80211_11A	1	/* 5Ghz, OFDM mode */
 #define	IFM_IEEE80211_11B	2	/* Direct Sequence mode */
