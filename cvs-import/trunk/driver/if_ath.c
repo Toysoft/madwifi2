@@ -726,14 +726,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			ni = ieee80211_ref_node(&ic->ic_bss);
 	} else
 		ni = ieee80211_ref_node(&ic->ic_bss);
-	/*
-	 * TODO:
-	 * The duration field of 802.11 header should be filled.
-	 * XXX This may be done in the ieee80211 layer, but the upper 
-	 *     doesn't know the detail of parameters such as IFS
-	 *     for now..
-	 */
-
 	if (IFF_DUMPPKTS(ic))
 		ieee80211_dump_pkt(skb->data, skb->len,
 		    ni->ni_rates.rs_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
@@ -820,14 +812,6 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 			ni = ieee80211_ref_node(&ic->ic_bss);
 	} else
 		ni = ieee80211_ref_node(&ic->ic_bss);
-
-	/*
-	 * TODO:
-	 * The duration field of 802.11 header should be filled.
-	 * XXX This may be done in the ieee80211 layer, but the upper 
-	 *     doesn't know the detail of parameters such as IFS
-	 *     for now..
-	 */
 
 	if (IFF_DUMPPKTS(ic))
 		ieee80211_dump_pkt(skb->data, skb->len,
@@ -1669,6 +1653,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	const HAL_RATE_TABLE *rt;
 	HAL_BOOL shortPreamble;
 	struct ath_nodestat *st;
+	int set_dur = 1;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
@@ -1756,6 +1741,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		if (subtype == IEEE80211_FC0_SUBTYPE_PS_POLL)
 			atype = HAL_PKT_TYPE_PSPOLL;
 		rix = 0;			/* XXX lowest rate */
+		set_dur = 0;   /* Do not set duration for this type of frame */
 		break;
 	default:
 		rix = sc->sc_rixmap[ni->ni_rates.rs_rates[ni->ni_txrate] &
@@ -1793,6 +1779,15 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	} else if (pktlen > ic->ic_rtsthreshold) {
 		flags |= HAL_TXDESC_RTSENA;	/* RTS based on frame length */
 		sc->sc_stats.ast_tx_rts++;
+	}
+
+	if (set_dur && (flags & HAL_TXDESC_NOACK) == 0) {
+		u_int16_t dur;
+
+		/* SIFS + ACK */
+		/* XXX needs modification if fragmentation is ever implemented */
+		dur = ath_hal_computetxtime(ah, rt, IEEE80211_ACK_SIZE, rix, shortPreamble);
+		*(u_int16_t *)wh->i_dur = cpu_to_le16(dur);
 	}
 
 	/*
