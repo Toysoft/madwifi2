@@ -91,6 +91,8 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	if (stats->ast_##x) fprintf(fd, "%u " fmt "\n", stats->ast_##x)
 #define	STATI(x,fmt) \
 	if (stats->ast_##x) fprintf(fd, "%d " fmt "\n", stats->ast_##x)
+	int i, j;
+
 	STAT(watchdog, "watchdog timeouts");
 	STAT(hardware, "hardware error interrupts");
 	STAT(bmiss, "beacon miss interrupts");
@@ -128,7 +130,6 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(rx_ctl, "rx control frames");
 	STAT(rx_phyerr, "PHY errors");
 	if (stats->ast_rx_phyerr != 0) {
-		int i, j;
 		for (i = 0; i < 32; i++) {
 			if (stats->ast_rx_phy[i] == 0)
 				continue;
@@ -156,6 +157,13 @@ printstats(FILE *fd, const struct ath_stats *stats)
 		fprintf(fd, "rssi of last ack: %u\n", stats->ast_tx_rssi);
 	if (stats->ast_rx_rssi)
 		fprintf(fd, "rssi of last rcv: %u\n", stats->ast_rx_rssi);
+	STAT(ant_defswitch, "switched default/rx antenna");
+	STAT(ant_txswitch, "tx used alternate antenna");
+	fprintf(fd, "Antenna profile:\n");
+	for (i = 0; i < 8; i++)
+		if (stats->ast_ant_rx[i] || stats->ast_ant_tx[i])
+			fprintf(fd, "[%u] tx %8u rx %8u\n", i,
+				stats->ast_ant_tx[i], stats->ast_ant_rx[i]);
 #undef STAT
 #undef STATI
 #undef N

@@ -91,6 +91,10 @@ struct ath_stats {
 	u_int32_t	ast_rate_calls;	/* rate control checks */
 	u_int32_t	ast_rate_raise;	/* rate control raised xmit rate */
 	u_int32_t	ast_rate_drop;	/* rate control dropped xmit rate */
+	u_int32_t	ast_ant_defswitch;/* rx/default antenna switches */
+	u_int32_t	ast_ant_txswitch;/* tx antenna switches */
+	u_int32_t	ast_ant_rx[8];	/* rx frames with antenna */
+	u_int32_t	ast_ant_tx[8];	/* tx frames with antenna */
 };
 
 struct ath_diag {
