@@ -59,6 +59,7 @@
 #include "ah_desc.h"
 
 #include "if_stats.h"
+#include "if_proc.h"
 
 /* unalligned little endian access */     
 #define LE_READ_2(p)							\
@@ -144,12 +145,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	int error = 0;
 	u_int8_t csz;
 	HAL_STATUS status;
-
-#ifdef CONFIG_PROC_FS
-#ifdef AR_DEBUG
-	ath_proc_init (sc, dev->name);
-#endif
-#endif
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
@@ -320,6 +315,16 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	printk("%s: 802.11 address: %s\n",
 		dev->name, ether_sprintf(dev->dev_addr));
 
+
+#ifdef CONFIG_PROC_FS
+#ifdef IEEE80211_DEBUG
+	ieee80211_proc_init(&ic->ic_stats, dev->name);
+#endif
+#ifdef AR_DEBUG
+	ath_proc_init (sc, dev->name);
+#endif
+#endif
+
 	/* enable interrupts */
 	return 0;
 bad:
@@ -349,6 +354,9 @@ ath_detach(struct net_device *dev)
 	ieee80211_linuxmoduleunref (ic);
 
 #ifdef CONFIG_PROC_FS
+#ifdef IEEE80211_DEBUG
+	ieee80211_proc_remove(&ic->ic_stats);
+#endif
 #ifdef AR_DEBUG
 	ath_proc_remove (sc);
 #endif
@@ -788,6 +796,12 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/*
 	 * Encapsulate the packet for transmission.
 	 */
+#if 0
+	printk ("hardstart 0x%02x%02x%02x%02x%02x%02x -- 0x%02x%02x%02x%02x%02x%02x -- 0x%02x%02x%02x\n", 
+		skb->data[0], skb->data[1], skb->data[2], skb->data[3], skb->data[4], skb->data[5],
+		skb->data[6], skb->data[7], skb->data[8], skb->data[9], skb->data[10], skb->data[11], 
+		skb->data[12], skb->data[13], skb->data[14]);
+#endif
 	skb = ieee80211_encap(ic, skb, &ni);
 	if (skb == NULL) {
 		DPRINTF(("%s: discard, encapsulation failure\n", __func__));
@@ -795,6 +809,12 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		KASSERT (ni == NULL, ("node should be NULL"));
 		goto bad;
 	}
+#if 0
+	printk ("hardstart encap 0x%x%x%x%x%x%x -- 0x%x%x%x%x%x%x -- 0x%x%x%x\n", 
+		skb1->data[0], skb1->data[1], skb1->data[2], skb1->data[3], skb1->data[4], skb1->data[5],
+		skb1->data[6], skb1->data[7], skb1->data[8], skb1->data[9], skb1->data[10], skb1->data[11], 
+		skb1->data[12], skb1->data[13], skb1->data[14]);
+#endif
 	wh = (struct ieee80211_frame *) skb->data;
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
@@ -1178,7 +1198,7 @@ ath_beacon_tasklet(void *data)
 	struct ath_buf *bf = sc->sc_bcbuf;
 	struct ath_hal *ah = sc->sc_ah;
 
-	DPRINTF(("ath_beacon_tasklet\n"));
+	DDEVPRINTF (sc, "ath_beacon_tasklet\n");
 	if (ic->ic_opmode == IEEE80211_M_STA || ic->ic_opmode == IEEE80211_M_MONITOR ||
 	    bf == NULL || bf->bf_skb == NULL) {
 		DPRINTF(("%s: ic_flags=%x bf=%p bf_m=%p\n",
@@ -1718,7 +1738,6 @@ ath_rx_tasklet(void *data)
 			rh->arh_jiffies = jiffies;
 			rh->arh_rssi = ds->ds_rxstat.rs_rssi;
 			rh->arh_antenna = ds->ds_rxstat.rs_antenna;
-
 
 			ieee80211_input(ic, skb,
 					ni,
@@ -3109,9 +3128,7 @@ ath_proc_init(struct ath_softc *sc, char const *dev_name)
 {
 	struct proc_dir_entry *dp;
 
-	for (; *dev_name && !isdigit(*dev_name); dev_name++)
-		;
-	snprintf(sc->sc_procname, sizeof(sc->sc_procname), "ath%s", dev_name);
+	snprintf(sc->sc_procname, sizeof(sc->sc_procname), "ath-%s", dev_name);
 	sc->sc_proc = proc_mkdir(sc->sc_procname, proc_net);
 	if (sc->sc_proc == NULL) {
 		printk(KERN_INFO "/proc/net/%s: failed to create\n",

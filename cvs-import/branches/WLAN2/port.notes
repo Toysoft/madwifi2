@@ -2,6 +2,11 @@ TODO: figure out module refcount issues.
 
 TODO: re-initialize bssid to zero when moving to SCAN mode.
 
+Changes since -9:
+   - change /proc/net/ device names (patch from Mike Hudson): 
+     create /proc/net/wlan-device_name and /proc/net/ath-device-name
+   - move around calls to proc_attach and stats_attach (patch from Mike Hudson)
+
 Changes since -8:
    - fix oops upon driver insertion: memset memory to zero in ath_node_alloc
    - add ieee80211_decap function and use it in ieee80211_input to convert the

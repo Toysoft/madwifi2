@@ -281,4 +281,6 @@ extern	int ieee80211_debug;
 #define	IEEE80211_DPRINTF_MSG(X)
 #endif
 
+#define IEEE80211_DDEVPRINTF(dev,x) IEEE80211_DPRINTF (("%s:%s", ieee80211_get_device_name ((struct ieee80211com *)dev), x))
+
 #endif /* _NET80211_IEEE80211_VAR_H_ */

@@ -198,7 +198,7 @@ struct ath_softc {
 
 	int			(*sc_newstate)(struct ieee80211com *,enum ieee80211_state, int);
 	char			sc_procname[12];/* e.g. ath%d */
-	struct proc_dir_entry  *sc_proc;	/* /proc/net/wlan%d */
+	struct proc_dir_entry  *sc_proc;	/* /proc/net/ath-ath%d */
 };
 
 #define AR_DEBUG 1
@@ -215,6 +215,8 @@ struct ath_softc {
 #define	DPRINTF2(X)
 #define	DPRINTF_DUMP(X)
 #endif
+
+#define DDEVPRINTF(dev, x) DPRINTF (("%s:%s", (((struct net_device *)dev)->name), x))
 
 int	ath_attach(u_int16_t, struct net_device *);
 int	ath_detach(struct net_device *);

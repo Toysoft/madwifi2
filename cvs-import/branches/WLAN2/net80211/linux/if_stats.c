@@ -36,20 +36,8 @@ void ieee80211_stats_attach (struct ieee80211com *com)
 	if (dev->wireless_handlers == NULL)
 		dev->wireless_handlers = (struct iw_handler_def *) &ieee80211_iw_handler_def;
 #endif /* CONFIG_NET_WIRELESS */
-
-#ifdef CONFIG_PROC_FS
-#ifdef IEEE80211_DEBUG
-	ieee80211_proc_init(&com->ic_stats, ieee80211_get_device_name (com));
-#endif
-#endif
 }
 
 void ieee80211_stats_detach (struct ieee80211com *com)
 {
-#ifdef CONFIG_PROC_FS
-#ifdef IEEE80211_DEBUG
-	ieee80211_proc_remove(&com->ic_stats);
-#endif
-#endif
-
 }

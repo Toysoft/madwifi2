@@ -1,5 +1,7 @@
 #include <net80211/ieee80211_var.h>
 
+#include "linux/if_proc.h"
+
 #include <linux/module.h>
 
 struct sk_buff;
@@ -92,6 +94,8 @@ EXPORT_SYMBOL(ieee80211_rate2media);
 EXPORT_SYMBOL(ieee80211_setmode);
 EXPORT_SYMBOL(ieee80211_stats_attach);
 EXPORT_SYMBOL(ieee80211_stats_detach);
+EXPORT_SYMBOL(ieee80211_proc_init);
+EXPORT_SYMBOL(ieee80211_proc_remove);
 EXPORT_SYMBOL(ieee80211_free_node);
 EXPORT_SYMBOL(ieee80211_watchdog);
 EXPORT_SYMBOL(ieee80211_linuxmoduleref);

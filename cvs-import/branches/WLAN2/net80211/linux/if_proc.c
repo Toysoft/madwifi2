@@ -42,9 +42,7 @@ ieee80211_proc_init(struct ieee80211_stats *stats, char const *dev_name)
 {
 	struct proc_dir_entry *dp;
 
-	for (; *dev_name && !isdigit(*dev_name); dev_name++)
-		;
-	snprintf(stats->ic_procname, sizeof(stats->ic_procname), "wlan%s", dev_name);
+	snprintf(stats->ic_procname, sizeof(stats->ic_procname), "wlan-%s", dev_name);
 	stats->ic_proc = proc_mkdir(stats->ic_procname, proc_net);
 	if (stats->ic_proc == NULL) {
 		printk(KERN_INFO "/proc/net/%s: failed to create\n",
