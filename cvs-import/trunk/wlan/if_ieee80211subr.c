@@ -335,10 +335,6 @@ ieee80211_ifdetach(struct net_device *dev)
 	struct ieee80211com *ic = (void *)dev;
 
 	del_timer(&ic->ic_slowtimo);
-	if (ic->ic_wep_ctx != NULL) {
-		kfree(ic->ic_wep_ctx);
-		ic->ic_wep_ctx = NULL;
-	}
 	ieee80211_free_allnodes(ic);
 	ifmedia_removeall(&ic->ic_media);
 	unregister_netdev(&ic->ic_dev);
@@ -3079,10 +3075,6 @@ ieee80211_new_state(struct net_device *dev, enum ieee80211_state nstate, int mgt
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_SCAN:
 			ic->ic_mgt_timer = 0;
-			if (ic->ic_wep_ctx != NULL) {
-				kfree(ic->ic_wep_ctx);
-				ic->ic_wep_ctx = NULL;
-			}
 			ieee80211_free_allnodes(ic);
 			break;
 		}

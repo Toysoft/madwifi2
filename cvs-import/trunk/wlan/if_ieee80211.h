@@ -614,7 +614,6 @@ struct ieee80211com {
 	u_int8_t		ic_des_bssid[IEEE80211_ADDR_LEN];
 	struct ieee80211_wepkey	ic_nw_keys[IEEE80211_WEP_NKID];
 	int			ic_wep_txkey;	/* default tx key index */
-	void			*ic_wep_ctx;	/* wep crypt context */
 	u_int32_t		ic_iv;		/* initial vector for wep */
 #ifdef CONFIG_PROC_FS
 	char			ic_procname[12];/* e.g. wlan%d */
