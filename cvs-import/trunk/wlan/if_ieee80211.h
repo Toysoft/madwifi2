@@ -37,14 +37,19 @@
 #ifndef _NET_IF_IEEE80211_H_
 #define _NET_IF_IEEE80211_H_
 
-#include <net/ethernet.h>
-#include <net/if_arp.h>
+#include <sys/queue.h>
 
-/* XXX */
-typedef struct sk_buff os_buf_t;
-typedef struct netdevice os_ifnet_t;
+/*
+ * BSD portability stuff.
+ */
+#ifndef NBBY
+#define	NBBY	8			/* number of bits/byte */
+#endif
+#ifndef roundup
+#define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
+#endif
 
-#define	IEEE80211_ADDR_LEN			ETHER_ADDR_LEN
+#define	IEEE80211_ADDR_LEN			6
 
 /*
  * generic definitions for IEEE 802.11 frames
@@ -289,6 +294,13 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
  * ioctls
  */
 
+#ifndef SIOCSIFGENERIC
+#define	SIOCSIFGENERIC	 _IOW('i', 57, struct ifreq)	/* generic IF set op */
+#endif
+#ifndef SIOCGIFGENERIC
+#define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */
+#endif
+
 /* nwid is pointed at by ifr.ifr_data */
 struct ieee80211_nwid {
 	u_int8_t	i_len;
@@ -401,7 +413,7 @@ struct ieee80211req {
 #define 	IEEE80211_POWERSAVE_ON		IEEE80211_POWERSAVE_CAM
 #define IEEE80211_IOC_POWERSAVESLEEP	11
 
-#ifdef _KERNEL
+#ifdef __KERNEL__
 
 #define	IEEE80211_ASCAN_WAIT	2		/* active scan wait */
 #define	IEEE80211_PSCAN_WAIT 	5		/* passive scan wait */
@@ -499,15 +511,15 @@ struct ieee80211_wepkey {
 };
 
 struct ieee80211com {
-#ifdef __NetBSD__
-	struct ethercom		ic_ec;
-#endif
-#ifdef __FreeBSD__
-	struct arpcom		ic_ac;
-	struct mtx		ic_mtx;
-#endif
+	struct net_device	ic_dev;		/* NB: this must be first */
+	int			ic_timer;	/* equivalent of if_timer */
+	void			(*ic_watchdog)(struct net_device *);
+	void			(*ic_start)(struct net_device *);
 	void			(*ic_recv_mgmt[16])(struct ieee80211com *,
-				    os_buf_t *, int, u_int32_t);
+				    struct sk_buff *, int, u_int32_t);
+	spinlock_t		ic_lock;
+	struct net_device_stats	ic_stats;	/* interface statistics */
+	u_int32_t		msg_enable;	/* interface message flags */
 	int			(*ic_send_mgmt[16])(struct ieee80211com *,
 				    struct ieee80211_node *, int, int);
 	int			(*ic_newstate)(void *, enum ieee80211_state);
@@ -516,9 +528,7 @@ struct ieee80211com {
 	u_int8_t		ic_sup_rates[IEEE80211_RATE_SIZE];
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
-#ifdef notdef
-	struct ifqueue		ic_mgtq;
-#endif
+	struct sk_buff_head	ic_mgtq;
 	int			ic_flags;
 	enum ieee80211_phytype	ic_phytype;
 	enum ieee80211_opmode	ic_opmode;
@@ -545,17 +555,8 @@ struct ieee80211com {
 	void			*ic_wep_ctx;	/* wep crypt context */
 	u_int32_t		ic_iv;		/* initial vector for wep */
 };
-#ifdef __NetBSD__
-#define	ic_if		ic_ec.ec_if
-#define	IEEE80211_LOCK(_ic)	do { s = splnet(); } while (0)
-#define	IEEE80211_UNLOCK(_ic)	splx(s)
-#endif
-#ifdef __FreeBSD__
-#define	ic_if		ic_ac.ac_if
-#define	IEEE80211_LOCK(_ic)	mtx_lock(&(_ic)->ic_mtx)
-#define	IEEE80211_UNLOCK(_ic)	mtx_unlock(&(_ic)->ic_mtx)
-#endif
-#define	ic_softc	ic_if.if_softc
+#define	IEEE80211_LOCK(_ic)	spin_lock(&(_ic)->ic_lock)
+#define	IEEE80211_UNLOCK(_ic)	spin_unlock(&(_ic)->ic_lock)
 
 #define	IEEE80211_SEND_MGMT(ic,ni,type,arg)	do {			      \
 	if ((ic)->ic_send_mgmt[(type)>>IEEE80211_FC0_SUBTYPE_SHIFT] != NULL)  \
@@ -588,33 +589,37 @@ struct ieee80211com {
 #define	IEEE80211_F_DONEGO	0x00000004	/* calc negotiated rate */
 #define	IEEE80211_F_DODEL	0x00000008	/* delete ignore rate */
 
-void	ieee80211_ifattach(os_ifnet_t *);
-void	ieee80211_ifdetach(os_ifnet_t *);
-void	ieee80211_input(os_ifnet_t *, os_buf_t *, int, u_int32_t);
-int	ieee80211_mgmt_output(os_ifnet_t *, struct ieee80211_node *,
-    os_buf_t *, int);
-os_buf_t *ieee80211_encap(os_ifnet_t *, os_buf_t *);
-os_buf_t *ieee80211_decap(os_ifnet_t *, os_buf_t *);
-int	ieee80211_ioctl(os_ifnet_t *, u_long, caddr_t);
+/* private extensions to netdevice.h's netif_msg* mechanism */
+#define	NETIF_MSG_DEBUG		0x80000000	/* enable debugging msgs */
+#define	netif_msg_debug(p)	((p)->msg_enable & NETIF_MSG_DEBUG)
+
+int	ieee80211_ifattach(struct net_device *);
+void	ieee80211_ifdetach(struct net_device *);
+void	ieee80211_input(struct net_device *, struct sk_buff *, int, u_int32_t);
+int	ieee80211_mgmt_output(struct net_device *, struct ieee80211_node *,
+    struct sk_buff *, int);
+struct sk_buff *ieee80211_encap(struct net_device *, struct sk_buff *);
+struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
+int	ieee80211_ioctl(struct net_device *, u_long, caddr_t);
 void	ieee80211_print_essid(u_int8_t *, int);
 void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
-void	ieee80211_watchdog(os_ifnet_t *);
-void	ieee80211_next_scan(os_ifnet_t *);
-void	ieee80211_end_scan(os_ifnet_t *);
+void	ieee80211_watchdog(struct net_device *);
+void	ieee80211_next_scan(struct net_device *);
+void	ieee80211_end_scan(struct net_device *);
 struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *, u_int8_t *,
     int);
 struct ieee80211_node *ieee80211_find_node(struct ieee80211com *, u_int8_t *);
 void	ieee80211_free_node(struct ieee80211com *, struct ieee80211_node *);
 void	ieee80211_free_allnodes(struct ieee80211com *);
 int	ieee80211_fix_rate(struct ieee80211com *, struct ieee80211_node *, int);
-int	ieee80211_new_state(os_ifnet_t *, enum ieee80211_state, int);
-os_buf_t *ieee80211_wep_crypt(os_ifnet_t *, os_buf_t *, int);
+int	ieee80211_new_state(struct net_device *, enum ieee80211_state, int);
+struct sk_buff *ieee80211_wep_crypt(struct net_device *, struct sk_buff *, int);
 int	ieee80211_rate2media(int, enum ieee80211_phytype);
 int	ieee80211_media2rate(int, enum ieee80211_phytype);
 
-int	ieee80211_cfgget(os_ifnet_t *, u_long, caddr_t);
-int	ieee80211_cfgset(os_ifnet_t *, u_long, caddr_t);
+int	ieee80211_cfgget(struct net_device *, u_long, caddr_t);
+int	ieee80211_cfgset(struct net_device *, u_long, caddr_t);
 
-#endif /* _KERNEL */
+#endif /* __KERNEL__ */
 
 #endif /* _NET_IF_IEEE80211_H_ */
