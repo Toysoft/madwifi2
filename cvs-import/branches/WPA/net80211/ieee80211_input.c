@@ -2114,7 +2114,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ic->ic_flags |= IEEE80211_F_USEBARKER;
 		}
 		ieee80211_set_shortslottime(ic,
-			ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME);
+			ic->ic_curmode == IEEE80211_MODE_11A ||
+			(ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME));
 		/*
 		 * Honor ERP protection.
 		 *
