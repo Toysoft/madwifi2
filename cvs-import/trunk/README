@@ -58,9 +58,6 @@ make install
 
 to install the drivers where they can be loaded automatically at boot.
 
-[Eventually the wlan support will be split out into a separate wlan.o
- module.]
-
 [So far this has only been tested with RH 7.3 and a 2.4.20 kernel on an
  x86 machine.]
 
