@@ -1224,7 +1224,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 			 * Find the node for the destination so we can do
 			 * things like power save and fast frames aggregation.
 			 */
-			if (skb->len < sizeof(struct ether_header) {
+			if (skb->len < sizeof(struct ether_header)) {
 				ic->ic_stats.is_tx_nobuf++;   /* XXX */
 				ni = NULL;
 				goto bad;
