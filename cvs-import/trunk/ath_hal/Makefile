@@ -37,9 +37,9 @@ KMODNAME=	ath_hal
 
 include ${DEPTH}/Makefile.inc
 
-HALINCS=-I${HAL} -I${HAL}/linux -I${ATH_HAL}
+HALINCS=-I${HAL} -I${HAL}/${OS} -I${ATH_HAL}
 
-SRCS=	${HAL}/linux/ah_osdep.c
+SRCS=	${HAL}/${OS}/ah_osdep.c
 OBJS=	ah_osdep.o hal.o
 INCS+=	${HALINCS} -I${LINUX} -I${DEPTH}
 
@@ -57,18 +57,14 @@ all:	${ALL}
 ${KMODNAME}.${KMODSUF}: ${OBJS} ${HAL}/version.h Makefile
 	${LD} -o $@ -r -x ${OBJS}
 
-ifdef HAL_SRC
-include ${HAL}/linux/Makefile.inc
-else
 UUDECODE?=uudecode
 
-hal.o:	${HAL}/linux/i386-elf.hal.o.uu
-	${UUDECODE} < ${HAL}/linux/i386-elf.hal.o.uu
-opt_ah.h: ${HAL}/linux/opt_ah.h
-	cp ${HAL}/linux/opt_ah.h opt_ah.h
-endif
+hal.o:	${HAL}/${OS}/${TARGET}.hal.o.uu
+	${UUDECODE} < $<
+opt_ah.h: ${HAL}/${OS}/${TARGET}.opt_ah.h
+	cp ${HAL}/${OS}/${TARGET}.opt_ah.h opt_ah.h
 
-ah_osdep.o: ${HAL}/linux/ah_osdep.c
+ah_osdep.o: ${HAL}/${OS}/ah_osdep.c
 	${CC} -c -o $@ ${CFLAGS} $<
 
 ifneq (${LINUX_VERSION}, 204)

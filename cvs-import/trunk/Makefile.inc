@@ -38,21 +38,8 @@
 
 DESTDIR=
 #
-# Define this to build the HAL from source code
-#
-#HAL_SRC=	true
-#
-#
-# Define these for cross-compilation; e.g.
-#
-#TOOLPREFIX=	/export/tools/bin/mips-linux-
-#TARGET_OPTS=	-g -O -G 0 -mno-abicalls -fno-pic -mcpu=r4600 -mips2 -Wa,--trap
-#
-CC=		${TOOLPREFIX}gcc
-LD=		${TOOLPREFIX}ld
-STRIP=		${TOOLPREFIX}strip
-OBJCOPY=	${TOOLPREFIX}objcopy
-TARGET_OPTS=	-g -O
+OS=		linux
+TARGET=		i386-elf
 #
 NM=		nm
 AWK=		awk
@@ -103,7 +90,7 @@ DRIVER=	${DEPTH}/driver
 #
 # Basic build components.
 #
-COPTS=	-Wall ${TARGET_OPTS}
+COPTS=	-Wall
 INCS=	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
 CLEANFILES=	.depend
 
@@ -138,3 +125,5 @@ CLEANFILES+=	*.mod.c
 else
 KMODSUF=	o
 endif
+#
+include ${HAL}/${OS}/${TARGET}.inc
