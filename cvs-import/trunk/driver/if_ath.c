@@ -890,12 +890,12 @@ ath_mode_init(struct net_device *dev)
 	/* receive filter */
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
 	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
+	if (ic->ic_opmode != IEEE80211_M_STA)
+		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
-		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	ath_hal_setrxfilter(ah, rfilt);
 
 	/* calculate and install multicast filter */
@@ -2275,15 +2275,16 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 		goto bad;
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
 	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
+	if (ic->ic_opmode != IEEE80211_M_STA)
+		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
-		rfilt |= HAL_RX_FILTER_PROBEREQ;
+	if (ic->ic_state == IEEE80211_S_SCAN)
+		rfilt |= HAL_RX_FILTER_BEACON;
 	if (nstate == IEEE80211_S_SCAN) {
 		mod_timer(&sc->sc_scan_ch,
 			jiffies + ((HZ * ath_dwelltime) / 1000));
 		bssid = dev->broadcast;
-		rfilt |= HAL_RX_FILTER_BEACON;
 	} else {
 		del_timer(&sc->sc_scan_ch);
 		bssid = ni->ni_bssid;
