@@ -1428,8 +1428,6 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		ic->ic_roaming = value;
 		break;
 	case IEEE80211_PARAM_PRIVACY:
-		if (ic->ic_opmode != IEEE80211_M_STA)
-			return -EINVAL;
 		if (value) {
 			/* XXX check for key state? */
 			ic->ic_flags |= IEEE80211_F_PRIVACY;
