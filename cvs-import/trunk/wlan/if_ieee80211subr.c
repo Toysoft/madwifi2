@@ -1582,6 +1582,15 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 		ic->ic_flags &= ~(IEEE80211_F_SHSLOT);
 	}
 
+	/*
+	 * Setup an initial rate set according to the
+	 * current/default channel.  This will be changed
+	 * when scanning but must exist now so drivers have
+	 * consistent state of ic_ibss_chan.
+	 */
+	if (ic->ic_bss)
+		ic->ic_bss->ni_rates = ic->ic_sup_rates[mode];
+
 	ic->ic_curmode = mode;
 	return 0;
 #undef N
