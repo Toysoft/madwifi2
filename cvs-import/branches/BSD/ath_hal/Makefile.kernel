@@ -19,7 +19,7 @@ ifeq ($(strip ${ARCH}),x86_64)
 TARGET=	x86_64-elf
 endif
 
-EXTRA_CFLAGS+=	-I. -I${HAL}/.. -I${HAL}
+EXTRA_CFLAGS+=	-I. -I${HAL}/.. -I${HAL} -I${HAL}/linux
 
 ifndef OS
 OS = linux
