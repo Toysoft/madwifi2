@@ -88,6 +88,13 @@ typedef enum {
 	AH_TRUE  = 1,
 } HAL_BOOL;
 
+typedef enum {
+	HAL_CAP_REG_DMN		= 0,	/* current regulatory domain */
+	HAL_CAP_CIPHER		= 1,	/* hardware supports cipher */
+	HAL_CAP_TKIP_MIC	= 2,	/* handle TKIP MIC in hardware */
+	HAL_CAP_TKIP_SPLIT	= 3,	/* hardware TKIP uses split keys */
+} HAL_CAPABILITY_TYPE;
+
 /* 
  * "States" for setting the LED.  These correspond to
  * the possible 802.11 operational states and there may
@@ -348,14 +355,22 @@ typedef enum {
 } HAL_OPMODE;
 
 typedef struct {
-	int		wk_len;
-	u_int8_t	wk_key[16];		/* XXX big enough for WEP */
+	u_int8_t	kv_type;		/* one of HAL_CIPHER */
+	u_int8_t	kv_pad;
+	u_int16_t	kv_len;			/* length in bits */
+	u_int8_t	kv_val[16];		/* enough for 128-bit keys */
+	u_int8_t	kv_mic[8];		/* TKIP MIC key */
 } HAL_KEYVAL;
 
 typedef enum {
 	HAL_CIPHER_WEP		= 0,
-	HAL_CIPHER_AES_CCM	= 1,
-	HAL_CIPHER_CKIP		= 2
+	HAL_CIPHER_AES_OCB	= 1,
+	HAL_CIPHER_AES_CCM	= 2,
+	HAL_CIPHER_CKIP		= 3,
+	HAL_CIPHER_TKIP		= 4,
+	HAL_CIPHER_CLR		= 5,		/* no encryption */
+
+	HAL_CIPHER_MIC		= 127		/* TKIP-MIC, not a cipher */
 } HAL_CIPHER;
 
 enum {
@@ -399,7 +414,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x04030601	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x04050400	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -421,7 +436,8 @@ struct ath_hal {
 	HAL_BOOL  __ahdecl(*ah_reset)(struct ath_hal *, HAL_OPMODE,
 				HAL_CHANNEL *, HAL_BOOL bChannelChange,
 				HAL_STATUS *status);
-	void __ahdecl		(*ah_setPCUConfig)(struct ath_hal *);
+	HAL_BOOL  __ahdecl (*ah_phyDisable)(struct ath_hal *);
+	void	  __ahdecl (*ah_setPCUConfig)(struct ath_hal *);
 	HAL_BOOL  __ahdecl(*ah_perCalibration)(struct ath_hal*, HAL_CHANNEL *);
 
 	/* Transmit functions */
@@ -452,6 +468,12 @@ struct ath_hal {
 				HAL_BOOL lastSeg);
 	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc *);
 	HAL_BOOL  __ahdecl(*ah_hasVEOL)(struct ath_hal *);
+	/* NB: experimental, may go away */
+	HAL_BOOL  __ahdecl(*ah_updateTxDesc)(struct ath_hal *, struct ath_desc *,
+				u_int txRate0, u_int txTries0,
+				u_int txRate1, u_int txTries1,
+				u_int txRate2, u_int txTries2,
+				u_int txRate3, u_int txTries3);
 
 	/* Receive Functions */
 	u_int32_t __ahdecl(*ah_getRxDP)(struct ath_hal*);
@@ -475,9 +497,15 @@ struct ath_hal {
 	void	  __ahdecl(*ah_rxMonitor)(struct ath_hal *);
 
 	/* Misc Functions */
-	void	  __ahdecl(*ah_dumpState)(struct ath_hal *);
-	HAL_BOOL  __ahdecl(*ah_getDiagState)(struct ath_hal *,
-				int, void **, u_int *);
+	HAL_STATUS __ahdecl (*ah_getCapability)(struct ath_hal *,
+				HAL_CAPABILITY_TYPE, u_int32_t capability,
+				u_int32_t *result);
+	HAL_BOOL   __ahdecl (*ah_setCapability)(struct ath_hal *,
+				HAL_CAPABILITY_TYPE, u_int32_t capability,
+				u_int32_t setting, HAL_STATUS *);
+	HAL_BOOL   __ahdecl (*ah_getDiagState)(struct ath_hal *, int request,
+				const void *args, u_int32_t argsize,
+				void **result, u_int32_t *resultsize);
 	void	  __ahdecl(*ah_getMacAddress)(struct ath_hal *, u_int8_t *);
 	HAL_BOOL  __ahdecl(*ah_setMacAddress)(struct ath_hal *, const u_int8_t*);
 	HAL_BOOL  __ahdecl(*ah_setRegulatoryDomain)(struct ath_hal*,
@@ -495,10 +523,8 @@ struct ath_hal {
 	u_int32_t __ahdecl(*ah_getTsf32)(struct ath_hal*);
 	u_int64_t __ahdecl(*ah_getTsf64)(struct ath_hal*);
 	void	  __ahdecl(*ah_resetTsf)(struct ath_hal*);
-	u_int16_t __ahdecl(*ah_getRegDomain)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_detectCardPresent)(struct ath_hal*);
 	void	  __ahdecl(*ah_updateMibCounters)(struct ath_hal*, HAL_MIB_STATS*);
-	HAL_BOOL  __ahdecl(*ah_isHwCipherSupported)(struct ath_hal*, HAL_CIPHER);
 	HAL_RFGAIN __ahdecl(*ah_getRfGain)(struct ath_hal*);
 #if 0
 	u_int32_t __ahdecl(*ah_getCurRssi)(struct ath_hal*);
