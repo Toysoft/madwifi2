@@ -485,6 +485,37 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			    ether_sprintf(wh->i_addr2), rssi);
 		}
 #endif
+		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
+			if (subtype != IEEE80211_FC0_SUBTYPE_AUTH) {
+				/*
+				 * Only shared key auth frames with a challenge
+				 * should be encrypted, discard all others.
+				 */
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+					("[%s] discard %s with WEP\n",
+					ether_sprintf(wh->i_addr2),
+					ieee80211_mgt_subtype_name[subtype >>
+					    IEEE80211_FC0_SUBTYPE_SHIFT]));
+				ic->ic_stats.is_rx_mgtdiscard++; /* XXX */
+				goto out;
+			}
+			if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0) {
+				/*
+				 * Discard encrypted frames when privacy is off.
+				 */
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+					("[%s] discard WEP mgt frame 'cuz "
+					"PRIVACY off\n",
+					ether_sprintf(wh->i_addr2)));
+				ic->ic_stats.is_rx_noprivacy++;
+				goto out;
+			}
+			key = ieee80211_crypto_decap(ic, ni, skb);
+			if (key == NULL) {
+				/* NB: stats+msgs handled in crypto_decap */
+				goto out;
+			}
+		}
 		(*ic->ic_recv_mgmt)(ic, skb, ni, subtype, rssi, rstamp);
 		dev_kfree_skb(skb);
 		return;
