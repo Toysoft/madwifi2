@@ -56,6 +56,43 @@ ifeq ($(TARGET),)
 TARGET=		i386-elf
 endif
 
+# BUS defines the bus type to which the wireless devices is attached.
+# Currently, the valid BUS types are PCI and LBUS.  If BUS is not
+# defined, then, we assume the bus type is PCI
+
+ifndef BUS
+BUS=            PCI
+endif
+
+# If we are AHB bus type, then we need the kernel path for the target
+# kernel sources.
+
+ifeq ($(strip ${BUS}),AHB)
+TARGET=         mipsisa32-be-elf
+
+ifndef KERNELPATH
+$(error KERNELPATH must be defined for bus type AHB.)
+endif
+
+ifndef TOOLPATH
+$(error TOOLPATH must be defined for bus type AHB.)
+endif
+
+KERNELCONF=     ${KERNELPATH}/.config
+
+ifndef KERNELRELEASE
+VERSION := $(strip $(shell head -n 1 ${KERNELPATH}/Makefile | cut -f 2 -d'='))
+PATCHLEVEL := $(strip $(shell head -n 2 ${KERNELPATH}/Makefile | tail -1 | cut -f 2 -d'='))
+SUBVERSION := $(strip $(shell head -n 3 ${KERNELPATH}/Makefile | tail -1 | cut -f 2 -d'='))
+KERNELRELEASE := $(strip ${VERSION}.${PATCHLEVEL}.${SUBVERSION})
+endif
+
+ifndef MODULEPATH
+MODULEPATH :=   ${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERNELRELEASE}/net
+endif
+
+endif
+
 #
 NM=		nm
 AWK=		awk
@@ -90,7 +127,10 @@ endif
 ifeq ($(DESTDIR),)
 DESTDIR=
 endif
+
+ifeq ($(MODULEPATH),)
 MODULEPATH=	/lib/modules/${KERNELRELEASE}/net
+endif
 
 #
 # Path to the HAL source code.
@@ -112,5 +152,9 @@ WLAN=	${DEPTH}/net80211
 DRIVER=	${DEPTH}/ath
 
 INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
+
+ifeq ($(strip ${BUS}),AHB)
+INCS+= -isystem ${TOOLPATH}/include
+endif
 
 include ${HAL}/${OS}/${TARGET}.inc

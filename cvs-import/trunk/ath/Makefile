@@ -45,10 +45,18 @@ endif
 
 DEPTH=	..
 
-obj-m		+= ath_pci.o
-ath_pci-objs	:= if_ath.o if_ath_pci.o
-export-objs	:= if_ath_pci.o
-list-multi	:= ath_pci.o
+ifeq ($(strip ${BUS}),AHB)
+BUSNAME=ahb
+COPTS+= -DATH_AHB
+else
+BUSNAME=pci
+COPTS+= -DATH_PCI
+endif
+
+obj-m		+= ath_${BUSNAME}.o
+ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
+export-objs	:= if_ath_${BUSNAME}.o
+list-multi	:= ath_${BUSNAME}.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 
@@ -64,12 +72,12 @@ all:
 
 install: all
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
-	strip -S ath_pci.$(KMODSUF)
-	cp ath_pci.${KMODSUF} ${DESTDIR}/${MODULEPATH}
+	${TOOLPREFIX}strip -S ath_${BUSNAME}.$(KMODSUF)
+	cp ath_${BUSNAME}.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 
-ath_pci.o: ${ath_pci-objs}
-	$(LD) $(LDOPTS) -o ath_pci.$(KMODSUF) -r $(ath_pci-objs)
+ath_${BUSNAME}.o: ${ath_${BUSNAME}-objs}
+	$(LD) $(LDOPTS) -o ath_${BUSNAME}.$(KMODSUF) -r $(ath_${BUSNAME}-objs)

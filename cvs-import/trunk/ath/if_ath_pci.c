@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+ * Copyright (c) 2004 Atheros Communications, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -179,7 +180,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
-	sc->aps_sc.sc_pdev = pdev;
+	sc->aps_sc.sc_bdev = (void *) pdev;
 
 	pci_set_drvdata(pdev, dev);
 
@@ -339,3 +340,10 @@ exit_ath_pci(void)
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_ath_pci);
+
+/* return bus cachesize in 4B word units */
+void
+bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz)
+{
+	pci_read_config_byte(sc->sc_bdev, PCI_CACHE_LINE_SIZE, csz);
+}
