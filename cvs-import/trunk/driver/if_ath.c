@@ -224,7 +224,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	ether_setup(dev);
 	dev->open = ath_init;
-	dev->stop = ath_stop;
 	dev->hard_start_xmit = ath_hardstart;
 	dev->tx_timeout = ath_tx_timeout;
 	dev->watchdog_timeo = 5 * HZ;			/* XXX */
@@ -273,6 +272,8 @@ ath_detach(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	DPRINTF(("ath_detach flags %x\n", dev->flags));
+	sc->sc_invalid = 1;
+	ath_stop(dev);
 	ath_desc_free(sc);
 	ath_hal_detach(sc->sc_ah);
 	ieee80211_ifdetach(dev);

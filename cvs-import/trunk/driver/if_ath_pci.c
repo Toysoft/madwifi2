@@ -189,14 +189,13 @@ ath_pci_remove(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct ath_pci_softc *sc = dev->priv;
 
-	sc->aps_sc.sc_invalid = 1;
+	ath_detach(dev);
 	if (dev->irq)
 		free_irq(dev->irq, dev);
 	iounmap((void *) dev->mem_start);
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
-	ath_detach(dev);
 	kfree(sc);
 }
 
