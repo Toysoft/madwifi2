@@ -1040,8 +1040,9 @@ ath_stop_locked(struct net_device *dev)
 		/*
 		 * Shutdown the hardware and driver:
 		 *    reset 802.11 state machine
-		 *    turn off timers
+		 *    stop output from above
 		 *    disable interrupts
+		 *    turn off timers
 		 *    turn off the radio
 		 *    clear transmit machinery
 		 *    clear receive machinery
@@ -1053,8 +1054,8 @@ ath_stop_locked(struct net_device *dev)
 		 * hardware is gone (invalid).
 		 */
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-		dev->flags &= ~IFF_RUNNING;
 		netif_stop_queue(dev);
+		dev->flags &= ~IFF_RUNNING;
 		// TODO: delete slowtimo here?
 		if (!sc->sc_invalid) {
 			if (sc->sc_softled) {
@@ -2655,7 +2656,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
 	ph->frmlen.status = 0;
 	ph->frmlen.len = 4;
-	ph->frmlen.data = len - IEEE80211_CRC_LEN ;
+	ph->frmlen.data = len;
 
 	ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
 	ph->channel.status = 0;
@@ -2684,7 +2685,6 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 
 	skb->dev = dev;
 	skb->mac.raw = skb->data;
-	skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 	skb->ip_summed = CHECKSUM_NONE;
 	skb->pkt_type = PACKET_OTHERHOST;
 	skb->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
