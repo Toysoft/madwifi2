@@ -994,26 +994,24 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	 *	[tlv] parameter set (IBSS/TIM)
 	 *	[tlv] extended rate phy (ERP)
 	 *	[tlv] extended supported rates
-	 *	[tlv] WPA/RSN supported rates
+	 *	[tlv] WPA/RSN parameters
 	 * XXX WME, etc.
 	 * XXX Vendor-specific OIDs (e.g. Atheros)
 	 */
 	rs = &ni->ni_rates;
-	pktlen =   8
-		 + sizeof(u_int16_t)
-		 + sizeof(u_int16_t)
-		 + 2 + ni->ni_esslen
-		 + 2 + rs->rs_nrates
-		 + 6;
-	if (ic->ic_curmode != IEEE80211_MODE_FH)
-		 pktlen += 3;		/* DS parameter set */
-	if (ic->ic_curmode == IEEE80211_MODE_11G)
-		 pktlen += 3;		/* ERP information element */
-	if (rs->rs_nrates > IEEE80211_RATE_SIZE)
-		pktlen += 2;		/* extended rate set */
-	if (ic->ic_flags & IEEE80211_F_WPA)
-		pktlen += sizeof(struct ieee80211_ie_wpa);
 	/* XXX may be better to just allocate a max-sized buffer */
+	pktlen =   8					/* time stamp */
+		 + sizeof(u_int16_t)			/* beacon interval */
+		 + sizeof(u_int16_t)			/* capabilities */
+		 + 2 + ni->ni_esslen			/* ssid */
+	         + 2 + IEEE80211_RATE_SIZE		/* supported rates */
+	         + 2 + 1				/* DS parameters */
+		 + 2 + 4				/* CF parameters */
+		 + 2 + 4				/* DTIM/IBSSPARMS */
+		 + 2 + 1					/* ERP */
+	         + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+		 + sizeof(struct ieee80211_ie_wpa)	/* WPA */
+		 ;
 	skb = ieee80211_getmgtframe(&frm, pktlen);
 	if (skb == NULL) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
@@ -1028,9 +1026,9 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	    IEEE80211_FC0_SUBTYPE_BEACON;
 	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
 	*(u_int16_t *)wh->i_dur = 0;
-	memcpy(wh->i_addr1, dev->broadcast, IEEE80211_ADDR_LEN);
-	memcpy(wh->i_addr2, ic->ic_myaddr, IEEE80211_ADDR_LEN);
-	memcpy(wh->i_addr3, ni->ni_bssid, IEEE80211_ADDR_LEN);
+	IEEE80211_ADDR_COPY(wh->i_addr1, dev->broadcast);
+	IEEE80211_ADDR_COPY(wh->i_addr2, ic->ic_myaddr);
+	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
 	*(u_int16_t *)wh->i_seq = 0;
 
 	memset(frm, 0, 8);	/* XXX timestamp is set by hardware */
@@ -1086,7 +1084,7 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	if (ic->ic_curmode == IEEE80211_MODE_11G)
 		frm = ieee80211_add_erp(frm, ic);
 	efrm = ieee80211_add_xrates(frm, rs);
-	bo->bo_trailer_len = efrm - frm;
+	bo->bo_trailer_len = efrm - bo->bo_trailer;
 	skb_trim(skb, efrm - skb->data);
 	return skb;
 }
