@@ -82,7 +82,6 @@ struct radiuscom {
 	struct sockaddr_in rc_local;		/* local address */
 	u_int8_t	*rc_secret;		/* shared secret */
 	u_int		rc_secretlen;		/* length of shared secret */
-	struct crypto_tfm *rc_md5;		/* crypto handle */
 	u_int8_t	rc_buf[RAD_MAXMSG];	/* recv thread msg buffer */
 	ATH_LIST_HEAD(, eapol_auth_radius_node) rc_replies;
 	/* saved copies of eapolcom methods */
