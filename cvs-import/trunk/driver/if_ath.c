@@ -703,14 +703,15 @@ ath_reset(struct net_device *dev)
  * the frame with enough space.  Alternatively we can carry
  * the frame separately and use s/g support in the hardware.
  */
-int ieee80211_skbhdr_adjust(struct sk_buff *skb, struct net_device *dev)
+static int
+ath_skbhdr_adjust(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ieee80211com *ic = (void*)dev->priv;
 	int len = sizeof(struct ieee80211_qosframe) + sizeof(struct llc) +
 		IEEE80211_ADDR_LEN - sizeof(struct ether_header);
+
 	if (ic->ic_flags & IEEE80211_F_WEPON)
 		len += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
-
 	if ((skb_headroom(skb) < len) &&
 	    pskb_expand_head(skb, len - skb_headroom(skb), 0, GFP_ATOMIC)) {
 		dev_kfree_skb(skb);
@@ -740,7 +741,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		return -ENETDOWN;
 	}
 	
-	error = ieee80211_skbhdr_adjust(skb, dev);
+	error = ath_skbhdr_adjust(skb, dev);
 	if (error != 0)
 		return error;
 
