@@ -204,7 +204,12 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 			ath_outdoor, ath_xchanmode);
 	if (error != 0)
 		goto bad;
-	ath_regdomain = ath_hal_getregdomain(ah);	/* for users */
+	/*
+	 * Copy these back; they are set as a side effect
+	 * of constructing the channel list.
+	 */
+	ath_regdomain = ath_hal_getregdomain(ah);
+	ath_countrycode = ath_hal_getcountrycode(ah);
 
 	/*
 	 * Setup rate tables for all potential media types.

@@ -182,6 +182,7 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
 #define	ath_hal_getregdomain(_ah) \
 	((*(_ah)->ah_getRegDomain)((_ah)))
+#define	ath_hal_getcountrycode(_ah)	(_ah)->ah_countryCode
 #define	ath_hal_getratetable(_ah, _mode) \
 	((*(_ah)->ah_getRateTable)((_ah), (_mode)))
 #define	ath_hal_getmac(_ah, _mac) \
