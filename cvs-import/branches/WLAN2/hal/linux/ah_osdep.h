@@ -47,7 +47,8 @@
  * mismatched against the contents of <linux/types.h>
  */
 #ifndef _LINUX_TYPES_H
-typedef char int8_t;
+/* NB: arm defaults to unsigned so be explicit */
+typedef signed char int8_t;
 typedef short int16_t;
 typedef int int32_t;
 typedef long long int64_t;
