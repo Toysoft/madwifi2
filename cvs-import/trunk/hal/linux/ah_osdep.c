@@ -98,7 +98,7 @@ ath_hal_detach(struct ath_hal *ah)
  * Print/log message support.
  */
 
-void
+void __ahdecl
 ath_hal_vprintf(struct ath_hal *ah, const char* fmt, va_list ap)
 {
 	char buf[1024];					/* XXX */
@@ -106,7 +106,7 @@ ath_hal_vprintf(struct ath_hal *ah, const char* fmt, va_list ap)
 	printk("%s", buf);
 }
 
-void
+void __ahdecl
 ath_hal_printf(struct ath_hal *ah, const char* fmt, ...)
 {
 	va_list ap;
@@ -118,7 +118,7 @@ ath_hal_printf(struct ath_hal *ah, const char* fmt, ...)
 /*
  * Format an Ethernet MAC for printing.
  */
-const char*
+const char* __ahdecl
 ath_hal_ether_sprintf(const u_int8_t *mac)
 {
 	static char etherbuf[18];
@@ -128,7 +128,7 @@ ath_hal_ether_sprintf(const u_int8_t *mac)
 }
 
 #ifdef AH_ASSERT
-void
+void __ahdecl
 ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
 {
 	printk("Atheros HAL assertion failure: %s: line %u: %s\n",
@@ -148,7 +148,7 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
  *     reads and writes to understand what's going on below.
  */
 #if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
-void
+void __ahdecl
 ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 {
 #ifdef AH_DEBUG
@@ -161,17 +161,14 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
  		*((volatile u_int32_t *)(ah->ah_sh + reg)) = val;
 }
 
-u_int32_t
+u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
  	u_int32_t val;
 
- 	if (reg >= 0x4000 && reg < 0x5000) {
- 		val = readl(ah->ah_sh + reg);
+	val = *((volatile u_int32_t *)(ah->ah_sh + reg));
+ 	if (reg >= 0x4000 && reg < 0x5000)
 		val = __bswap32(val);
-	} else {
- 		val = *((volatile u_int32_t *)(ah->ah_sh + reg));
-	}
 #ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
 		ath_hal_printf(ah, "READ 0x%x => 0x%x\n", reg, val);
@@ -181,7 +178,7 @@ ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 #endif /* AH_DEBUG || AH_REGOPS_FUNC */
 
 #ifdef AH_DEBUG
-void
+void __ahdecl
 HALDEBUG(struct ath_hal *ah, const char* fmt, ...)
 {
 	if (ath_hal_debug) {
@@ -193,7 +190,7 @@ HALDEBUG(struct ath_hal *ah, const char* fmt, ...)
 }
 
 
-void
+void __ahdecl
 HALDEBUGn(struct ath_hal *ah, u_int level, const char* fmt, ...)
 {
 	if (ath_hal_debug >= level) {
@@ -208,13 +205,13 @@ HALDEBUGn(struct ath_hal *ah, u_int level, const char* fmt, ...)
 /*
  * Delay n microseconds.
  */
-void
+void __ahdecl
 ath_hal_delay(int n)
 {
 	udelay(n);
 }
 
-u_int32_t
+u_int32_t __ahdecl
 ath_hal_getuptime(struct ath_hal *ah)
 {
 	return ((jiffies / HZ) * 1000) + (jiffies % HZ) * (1000 / HZ);
@@ -224,7 +221,7 @@ ath_hal_getuptime(struct ath_hal *ah)
  * Allocate/free memory.
  */
 
-void*
+void * __ahdecl
 ath_hal_malloc(size_t size)
 {
 	void *p;
@@ -235,47 +232,78 @@ ath_hal_malloc(size_t size)
 		
 }
 
-void
+void __ahdecl
 ath_hal_free(void* p)
 {
 	kfree(p);
 }
 
+void * __ahdecl
+ath_hal_memcpy(void *dst, const void *src, size_t n)
+{
+	return memcpy(dst, src, n);
+}
+
 #ifdef CONFIG_SYSCTL
 enum {
 	DEV_ATH		= 9,			/* XXX must match driver */
-
-	ATH_HAL_DEBUG	= 1,
-	ATH_HAL_DBRT	= 2,			/* DMA beacon response time */
-	ATH_HAL_SBRT	= 3,			/* s/w beacon response time */
-	ATH_HAL_SWBA_BO	= 4,			/* additional swba backoff */
 };
+
+#define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
 static ctl_table ath_hal_sysctls[] = {
 #ifdef AH_DEBUG
-	{ ATH_HAL_DEBUG,	"debug",	&ath_hal_debug,
-	  sizeof(ath_hal_debug),0644,	NULL,	proc_dointvec },
+	{ .ctl_name	= CTL_AUTO,
+	   .procname	= "debug",
+	  .mode		= 0644,
+	  .data		= &ath_hal_debug,
+	  .maxlen	= sizeof(ath_hal_debug),
+	  .proc_handler	= proc_dointvec
+	},
 #endif
-	{ ATH_HAL_DBRT,		"dma_beacon_response_time",
-	  &ath_hal_dma_beacon_response_time,
-	  sizeof(ath_hal_dma_beacon_response_time), 0644, NULL, proc_dointvec },
-	{ ATH_HAL_SBRT,		"sw_beacon_response_time",
-	  &ath_hal_sw_beacon_response_time,
-	  sizeof(ath_hal_sw_beacon_response_time), 0644, NULL, proc_dointvec },
-	{ ATH_HAL_SWBA_BO,	"swba_backoff",
-	  &ath_hal_additional_swba_backoff,
-	  sizeof(ath_hal_additional_swba_backoff), 0644, NULL, proc_dointvec },
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "dma_beacon_response_time",
+	  .data		= &ath_hal_dma_beacon_response_time,
+	  .maxlen	= sizeof(ath_hal_dma_beacon_response_time),
+	  .mode		= 0644,
+	  .proc_handler	= proc_dointvec
+	},
+	{ .ctl_name	= CTL_AUTO,	
+	  .procname	= "sw_beacon_response_time",
+	  .mode		= 0644,
+	  .data		= &ath_hal_sw_beacon_response_time,
+	  .maxlen	= sizeof(ath_hal_sw_beacon_response_time),
+	  .proc_handler	= proc_dointvec
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "swba_backoff",
+	  .mode		= 0644,
+	  .data		= &ath_hal_additional_swba_backoff,
+	  .maxlen	= sizeof(ath_hal_additional_swba_backoff),
+	  .proc_handler	= proc_dointvec
+	},
 	{ 0 }
 };
 static ctl_table ath_hal_table[] = {
-	{ 1, "hal", NULL, 0, 0555, ath_hal_sysctls }, { 0 }
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "hal",
+	  .mode		= 0555,
+	  .child	= ath_hal_sysctls
+	}, { 0 }
 };
 static ctl_table ath_ath_table[] = {
-	{ DEV_ATH, "ath", NULL, 0, 0555, ath_hal_table }, { 0 }
+	{ .ctl_name	= DEV_ATH,
+	  .procname	= "ath",
+	  .mode		= 0555,
+	  .child	= ath_hal_table
+	}, { 0 }
 };
 static ctl_table ath_root_table[] = {
-	{ CTL_DEV, "dev", NULL, 0, 0555, ath_ath_table },
-	{ 0 }
+	{ .ctl_name	= CTL_DEV,
+	  .procname	= "dev",
+	  .mode		= 0555,
+	  .child	= ath_ath_table
+	}, { 0 }
 };
 static struct ctl_table_header *ath_hal_sysctl_header;
 
