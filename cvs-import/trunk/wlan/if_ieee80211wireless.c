@@ -884,7 +884,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev,
 			return -EOPNOTSUPP;
 		if (rrq->flags != IW_TXPOW_DBM)
 			return -EOPNOTSUPP;
-		ic->ic_txpower = rrq->value;
+		ic->ic_txpower = 2*rrq->value;
 		if (curtxpmgt != IEEE80211_F_TXPOW_FIXED) {
 			ic->ic_flags &= ~IEEE80211_F_TXPMGT;
 			ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
@@ -911,7 +911,7 @@ ieee80211_ioctl_giwtxpow(struct net_device *dev,
 	rrq->disabled = (curtxmgt == IEEE80211_F_TXPOW_OFF);
 	rrq->fixed = (curtxmgt == IEEE80211_F_TXPOW_FIXED);
 	rrq->flags = IW_TXPOW_DBM;
-	rrq->value = ic->ic_txpower;
+	rrq->value = ic->ic_txpower/2;
 	return 0;
 }
 
