@@ -144,6 +144,16 @@ extern	struct net_device_stats *ieee80211_getstats(struct net_device *);
 #define	__MOD_DEC_USE_COUNT(_m)		module_put(_m)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+static __inline__ u_int64_t
+get_jiffies_64(void)
+{
+	return (u_int64_t) jiffies;		/* XXX not right */
+}
+
+
+#endif
+
 #ifdef CONFIG_SYSCTL
 extern	void ieee80211_sysctl_register(struct ieee80211com *);
 extern	void ieee80211_sysctl_unregister(struct ieee80211com *);
