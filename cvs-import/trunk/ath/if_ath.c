@@ -85,7 +85,6 @@ extern	void bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz);
 	 ((((u_int8_t *)(p))[0]      ) | (((u_int8_t *)(p))[1] <<  8) |	\
 	  (((u_int8_t *)(p))[2] << 16) | (((u_int8_t *)(p))[3] << 24)))
 
-static void	ath_announce(struct net_device *);
 static int	ath_init(struct net_device *);
 static int	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(TQUEUE_ARG);
@@ -166,6 +165,7 @@ static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 static void	ath_dynamic_sysctl_register(struct ath_softc *);
 static void	ath_dynamic_sysctl_unregister(struct ath_softc *);
 #endif /* CONFIG_SYSCTL */
+static void	ath_announce(struct net_device *);
 
 static const char *acnames[] = {
 	"WME_AC_BE",
@@ -333,8 +333,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/*
 	 * Collect the channel list using the default country
 	 * code and including outdoor channels.  The 802.11 layer
-	 * is resposible for filtering this list to a set of
-	 * channels that it considers ok to use.
+	 * is resposible for filtering this list based on settings
+	 * like the phy mode.
 	 */
 	if (countrycode != -1)
 		ath_countrycode = countrycode;
@@ -600,35 +600,6 @@ ath_detach(struct net_device *dev)
 	return 0;
 }
 
-/*
- * Announce various information on device/driver attach.
- */
-static void
-ath_announce(struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-	struct ath_hal *ah = sc->sc_ah;
-	int i;
-
-	printk("%s: mac %d.%d phy %d.%d", dev->name,
-		ah->ah_macVersion, ah->ah_macRev,
-		ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf);
-	if (ah->ah_analog5GhzRev)
-		printk(" 5ghz radio %d.%d",
-			ah->ah_analog5GhzRev >> 4, ah->ah_analog5GhzRev & 0xf);
-	if (ah->ah_analog2GhzRev)
-		printk(" 2ghz radio %d.%d",
-			ah->ah_analog2GhzRev >> 4, ah->ah_analog2GhzRev & 0xf);
-	printk("\n");
-	printk("%s: 802.11 address: %s\n",
-		dev->name, ether_sprintf(dev->dev_addr));
-	for (i = 0; i <= WME_AC_VO; i++) {
-		struct ath_txq *txq = sc->sc_ac2q[i];
-		printk("%s: Use hw queue %u for %s traffic\n",
-			dev->name, txq->axq_qnum, acnames[i]);
-	}
-}
-
 void
 ath_suspend(struct net_device *dev)
 {
@@ -685,6 +656,12 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		return IRQ_HANDLED;
 	}
 	needmark = 0;
+	/*
+	 * Figure out the reason(s) for the interrupt.  Note
+	 * that the hal returns a pseudo-ISR that may include
+	 * bits we haven't explicitly enabled so we mask the
+	 * value to insure we only process bits we requested.
+	 */
 	ath_hal_getisr(ah, &status);		/* NB: clears ISR too */
 	DPRINTF(sc, ATH_DEBUG_INTR, "%s: status 0x%x\n", __func__, status);
 	status &= sc->sc_imask;			/* discard unasked for bits */
@@ -717,6 +694,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, &needmark);
 		if (status & HAL_INT_SWBA) {
 			/*
+			 * Software beacon alert--time to send a beacon.
 			 * Handle beacon transmission directly; deferring
 			 * this is too slow to meet timing constraints
 			 * under load.
@@ -1578,7 +1556,8 @@ ath_key_update_end(struct ieee80211com *ic)
  * operating mode and state:
  *
  * o always accept unicast, broadcast, and multicast traffic
- * o maintain current state of phy error reception
+ * o maintain current state of phy error reception (the hal
+ *   may enable phy error frames for noise immunity work)
  * o probe request frames are accepted only when operating in
  *   hostap, adhoc, or monitor modes
  * o enable promiscuous mode according to the interface state
@@ -2103,12 +2082,11 @@ ath_node_alloc(struct ieee80211com *ic)
 	struct ath_node *an;
 
 	an = kmalloc(space, GFP_ATOMIC);
-	if (an != NULL) {
-		memset(an, 0, space);
-		ath_rate_node_init(sc, an);
-		return &an->an_node;
-	} else
+	if (an == NULL)
 		return NULL;
+	memset(an, 0, space);
+	ath_rate_node_init(sc, an);
+	return &an->an_node;
 }
 
 /*
@@ -2141,7 +2119,7 @@ ath_node_free(struct ieee80211com *ic, struct ieee80211_node *ni)
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_cleanq(&sc->sc_txq[i], ni);
 	ath_rate_node_cleanup(sc, ATH_NODE(ni));
-	(*sc->sc_node_free)(ic, ni);
+	sc->sc_node_free(ic, ni);
 }
 
 static void
@@ -2154,7 +2132,7 @@ ath_node_copy(struct ieee80211com *ic,
 	memcpy(&dst[1], &src[1],
 		sizeof(struct ath_node) - sizeof(struct ieee80211_node));
 	ath_rate_node_copy(sc, ATH_NODE(dst), an);
-	(*sc->sc_node_copy)(ic, dst, src);
+	sc->sc_node_copy(ic, dst, src);
 }
 
 static u_int8_t
@@ -2281,7 +2259,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	 * Setup descriptors.  For receive we always terminate
 	 * the descriptor list with a self-linked entry so we'll
 	 * not get overrun under high load (as can happen with a
-	 * 5212 when ANI processing enables PHY errors).
+	 * 5212 when ANI processing enables PHY error frames).
 	 *
 	 * To insure the last descriptor is self-linked we create
 	 * each descriptor as self-linked and add it to the end.  As
@@ -2426,7 +2404,7 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	 * Call up first so subsequent work can use information
 	 * potentially stored in the node (e.g. for ibss merge).
 	 */
-	(*sc->sc_recv_mgmt)(ic, skb, ni, subtype, rssi, rstamp);
+	sc->sc_recv_mgmt(ic, skb, ni, subtype, rssi, rstamp);
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* update rssi statistics for use by the hal */
@@ -3174,7 +3152,6 @@ ath_tx_tasklet_q0123(TQUEUE_ARG data)
 	/*
 	 * Process each active queue.
 	 */
-
 	ath_tx_processq(sc, &sc->sc_txq[0]);
 	ath_tx_processq(sc, &sc->sc_txq[1]);
 	ath_tx_processq(sc, &sc->sc_txq[2]);
@@ -3628,7 +3605,7 @@ done:
 	/*
 	 * Invoke the parent method to complete the work.
 	 */
-	error = (*sc->sc_newstate)(ic, nstate, arg);
+	error = sc->sc_newstate(ic, nstate, arg);
 	/*
 	 * Finally, start any timers.
 	 */
@@ -4489,6 +4466,35 @@ ath_dynamic_sysctl_unregister(struct ath_softc *sc)
 	if (sc->sc_sysctls) {
 		kfree(sc->sc_sysctls);
 		sc->sc_sysctls = NULL;
+	}
+}
+
+/*
+ * Announce various information on device/driver attach.
+ */
+static void
+ath_announce(struct net_device *dev)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+	int i;
+
+	printk("%s: mac %d.%d phy %d.%d", dev->name,
+		ah->ah_macVersion, ah->ah_macRev,
+		ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf);
+	if (ah->ah_analog5GhzRev)
+		printk(" 5ghz radio %d.%d",
+			ah->ah_analog5GhzRev >> 4, ah->ah_analog5GhzRev & 0xf);
+	if (ah->ah_analog2GhzRev)
+		printk(" 2ghz radio %d.%d",
+			ah->ah_analog2GhzRev >> 4, ah->ah_analog2GhzRev & 0xf);
+	printk("\n");
+	printk("%s: 802.11 address: %s\n",
+		dev->name, ether_sprintf(dev->dev_addr));
+	for (i = 0; i <= WME_AC_VO; i++) {
+		struct ath_txq *txq = sc->sc_ac2q[i];
+		printk("%s: Use hw queue %u for %s traffic\n",
+			dev->name, txq->axq_qnum, acnames[i]);
 	}
 }
 
