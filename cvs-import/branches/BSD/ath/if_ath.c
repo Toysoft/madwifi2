@@ -1469,7 +1469,7 @@ ath_initkeytable(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = ic->ic_dev;
 	struct ath_hal *ah = sc->sc_ah;
-	u_int8_t *bssid;
+	const u_int8_t *bssid;
 	int i;
 
 	/* XXX maybe should reset all keys when !PRIVACY */
@@ -1731,7 +1731,7 @@ ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_opmode == IEEE80211_M_STA ||
 	    ic->ic_opmode == IEEE80211_M_IBSS ||
-		    state == IEEE80211_S_SCAN)
+	    state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	return rfilt;
 }
@@ -1740,8 +1740,8 @@ static void
 ath_mode_init(struct net_device *dev)
 {
         struct ath_softc *sc = dev->priv;
-	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t rfilt, mfilt[2], val;
 	u_int8_t pos;
 	struct dev_mc_list *mc;
@@ -1985,6 +1985,7 @@ ath_beacon_tasklet(struct net_device *dev)
 	int ncabq, otherant;
 
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s\n", __func__);
+	
 	if (ic->ic_opmode == IEEE80211_M_STA ||
 	    ic->ic_opmode == IEEE80211_M_MONITOR ||
 	    bf == NULL || bf->bf_skb == NULL) {
