@@ -1440,8 +1440,7 @@ ath_rx_tasklet(void *data)
 		skb_put(skb, len);
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
 		if (IFF_DUMPPKTS(&sc->sc_ic)) {
-			struct ieee80211com *ic = &sc->sc_ic;
-			const HAL_RATE_TABLE *rt = sc->sc_rates[ic->ic_curmode];
+			const HAL_RATE_TABLE *rt = sc->sc_currates;
 			ieee80211_dump_pkt(skb->data, len,
 				rt->info[rt->rateCodeToIndex[ds->ds_rxstat.rs_rate]].dot11Rate & IEEE80211_RATE_VAL,
 				ds->ds_rxstat.rs_rssi);
