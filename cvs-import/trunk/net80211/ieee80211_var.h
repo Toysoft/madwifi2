@@ -277,6 +277,12 @@ struct ieee80211com {
 	void			*ic_opt_ie;	/* user-specified IE's */
 	u_int16_t		ic_opt_ie_len;	/* length of ni_opt_ie */
 	struct ieee80211_ie_wpa	ic_wpa_ie;	/* WPA information element */
+	/*
+	 * Inactivity timer settings for nodes.
+	 */
+	int			ic_inact_init;	/* initial setting */
+	int			ic_inact_auth;	/* assoc but not auth setting */
+	int			ic_inact_run;	/* authorized setting */
 
 	/*
 	 * Cipher state/configuration.

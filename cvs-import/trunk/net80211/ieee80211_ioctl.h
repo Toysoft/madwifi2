@@ -358,6 +358,9 @@ enum {
 	IEEE80211_PARAM_WME		= 18,	/* WME mode (on, off) */
 	IEEE80211_PARAM_HIDESSID	= 19,	/* hide SSID mode (on, off) */
 	IEEE80211_PARAM_APBRIDGE	= 20,	/* AP inter-sta bridging */
+	IEEE80211_PARAM_INACT		= 23,	/* station inactivity timeout */
+	IEEE80211_PARAM_INACT_AUTH	= 24,	/* station auth inact timeout */
+	IEEE80211_PARAM_INACT_INIT	= 25,	/* station init inact timeout */
 };
 
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)

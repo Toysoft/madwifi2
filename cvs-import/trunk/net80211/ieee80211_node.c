@@ -77,6 +77,10 @@ ieee80211_node_attach(struct ieee80211com *ic)
 	ic->ic_node_copy = ieee80211_node_copy;
 	ic->ic_node_getrssi = ieee80211_node_getrssi;
 	ic->ic_scangen = 1;
+	/* default inactivity timer setings */
+	ic->ic_inact_init = IEEE80211_INACT_INIT;
+	ic->ic_inact_auth = IEEE80211_INACT_AUTH;
+	ic->ic_inact_run = IEEE80211_INACT_RUN;
 
 	if (ic->ic_max_aid == 0)
 		ic->ic_max_aid = IEEE80211_AID_DEF;
@@ -628,7 +632,7 @@ ieee80211_setup_node(struct ieee80211com *ic,
 	skb_queue_head_init(&ni->ni_savedq);
 	ieee80211_node_initref(ni);		/* mark referenced */
 	ieee80211_crypto_resetkey(ic, &ni->ni_ucastkey, IEEE80211_KEYIX_NONE);
-	ni->ni_inact = IEEE80211_INACT_INIT;
+	ni->ni_inact = ic->ic_inact_init;
 
 	IEEE80211_NODE_LOCK_BH(ic);
 	TAILQ_INSERT_TAIL(&ic->ic_node, ni, ni_list);
@@ -893,7 +897,7 @@ restart:
 			kfree_skb(ni->ni_rxfrag[0]);
 			ni->ni_rxfrag[0] = NULL;
 		}
-		if (--ni->ni_inact <= 0) {
+		if (ni->ni_inact && --ni->ni_inact <= 0) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
 			    ("station %s timed out due to inactivity\n",
 			    ether_sprintf(ni->ni_macaddr)));

@@ -399,7 +399,7 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				/* XXX node statistic */
 				goto err;
 			}
-			ni->ni_inact = IEEE80211_INACT_AUTH;
+			ni->ni_inact = ic->ic_inact_auth;
 		} else {
 			/*
 			 * When denying unencrypted frames, discard
@@ -414,7 +414,7 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				ic->ic_stats.is_rx_unencrypted++;
 				goto out;
 			}
-			ni->ni_inact = IEEE80211_INACT_RUN;
+			ni->ni_inact = ic->ic_inact_run;
 		}
 		ic->ic_devstats->rx_packets++;
 		ic->ic_devstats->rx_bytes += skb->len;
