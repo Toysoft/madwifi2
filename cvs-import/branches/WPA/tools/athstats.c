@@ -56,7 +56,7 @@
 #include <err.h>
 
 #include "ah_desc.h"
-#include "driver/if_athioctl.h"
+#include "if_athioctl.h"
 
 static const struct {
 	u_int		phyerr;
@@ -116,11 +116,12 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(tx_cts, "tx frames with cts enabled");
 	STAT(tx_shortpre, "tx frames with short preamble");
 	STAT(tx_altrate, "tx frames with an alternate rate");
+	STAT(tx_protect, "tx frames with 11g protection");
 	STAT(rx_orn, "rx failed 'cuz of desc overrun");
-	STAT(rx_tooshort, "rx failed 'cuz frame too short");
 	STAT(rx_crcerr, "rx failed 'cuz of bad CRC");
 	STAT(rx_fifoerr, "rx failed 'cuz of FIFO overrun");
 	STAT(rx_badcrypt, "rx failed 'cuz decryption");
+	STAT(rx_tooshort, "rx failed 'cuz frame too short");
 	STAT(rx_nobuf, "rx setup failed 'cuz no skbuff");
 	STAT(rx_mgt, "rx management frames");
 	STAT(rx_ctl, "rx control frames");

@@ -42,16 +42,18 @@
  */
 #include <sys/types.h>
 #include <sys/file.h>
-#include <sys/sockio.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <net/if.h>
-#include <net/if_media.h>
-#include <net/if_var.h>
+#include <linux/wireless.h>
 
 #include <stdio.h>
 #include <signal.h>
 
-#include "../../../sys/net80211/ieee80211_ioctl.h"
+#include "net80211/ieee80211_ioctl.h"
+
+#ifndef SIOCG80211STATS
+#define	SIOCG80211STATS	(SIOCDEVPRIVATE+2)
+#endif
 
 static void
 printstats(FILE *fd, const struct ieee80211_stats *stats)
@@ -89,12 +91,13 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_deauth,		"rx deauthentication");
 	STAT(rx_disassoc,	"rx disassociation");
 	STAT(rx_badsubtype,	"rx frame w/ unknown subtype");
-	STAT(rx_nombuf,		"rx failed for lack of mbuf");
+	STAT(rx_nobuf,		"rx failed for lack of sk_buffer");
 	STAT(rx_decryptcrc,	"rx decrypt failed on crc");
 	STAT(rx_ahdemo_mgt,
 		"rx discard mgmt frame received in ahdoc demo mode");
 	STAT(rx_bad_auth,	"rx bad authentication request");
-	STAT(tx_nombuf,		"tx failed for lack of mbuf");
+	STAT(rx_unauth,		"rx discard 'cuz port unauthorized");
+	STAT(tx_nobuf,		"tx failed for lack of sk_buffer");
 	STAT(tx_nonode,		"tx failed for no node");
 	STAT(tx_unknownmgt,	"tx of unknown mgt frame");
 	STAT(scan_active,	"active scans started");
