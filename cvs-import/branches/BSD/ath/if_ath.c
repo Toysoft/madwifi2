@@ -2003,7 +2003,7 @@ ath_beacon_tasklet(struct net_device *dev)
 	    ic->ic_opmode == IEEE80211_M_MONITOR ||
 	    bf == NULL || bf->bf_skb == NULL) {
 		DPRINTF(sc, ATH_DEBUG_ANY, "%s: ic_flags=%x bf=%p bf_skb=%p\n",
-			 __func__, ic->ic_flags, bf, bf ? bf->bf_skb : NULL);
+			__func__, ic->ic_flags, bf, bf ? bf->bf_skb : NULL);
 		return;
 	}
 	/*
@@ -2015,14 +2015,12 @@ ath_beacon_tasklet(struct net_device *dev)
 	 */
 	if (ath_hal_numtxpending(ah, sc->sc_bhalq) != 0) {
 		sc->sc_bmisscount++;
-		printk("%s: missed %u consequent beacons", __func__, sc->sc_bmisscount); 
+		if_printf(dev, "%s: missed %u consequent beacons\n", __func__, sc->sc_bmisscount); 
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: missed %u consecutive beacons\n",
 			__func__, sc->sc_bmisscount);
-		if (sc->sc_bmisscount > 3){		/* NB: 3 is a guess */
-                        //TODO: ???
-			//taskqueue_enqueue(taskqueue_swi, &sc->sc_bstucktask);
-			printk("%s: stuck beacon time (%u missed)", __func__, sc->sc_bmisscount); 
+		if (sc->sc_bmisscount > 3) {		/* NB: 3 is a guess */
+			if_printf(dev, "%s: stuck beacon time (%u missed)", __func__, sc->sc_bmisscount); 
                         ATH_SCHEDULE_TQUEUE(&sc->sc_bstuckq, &needmark);
                 }
 		return;
