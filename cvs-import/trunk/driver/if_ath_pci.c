@@ -66,7 +66,7 @@ struct ath_pci_softc {
  */
 static struct pci_device_id ath_pci_id_table[] __devinitdata = {
 	{ 0x168c, 0x0007, PCI_ANY_ID, PCI_ANY_ID },
-	{ 0x168c, 0x0011, PCI_ANY_ID, PCI_ANY_ID },
+	{ 0x168c, 0x0012, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0013, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0 }
 };
