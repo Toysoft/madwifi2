@@ -68,7 +68,7 @@
 #endif
 
 #ifdef __KERNEL__
-#include <asm/bug.h>
+#include <asm/page.h>
 
 #define	KASSERT(exp, msg) do {			\
 	if (unlikely(!(exp))) {			\
