@@ -145,6 +145,8 @@ static void ieee80211_recv_deauth(struct ieee80211com *,
     struct sk_buff *, int, u_int32_t, u_int);
 
 static int ieee80211_media_change(struct net_device *);
+static void ieee80211_set11gbasicrates(struct ieee80211_rateset *,
+		enum ieee80211_phymode);
 static void ieee80211_crc_init(void);
 static u_int32_t ieee80211_crc_update(u_int32_t, u_int8_t *, int);
 static struct net_device_stats *ieee80211_getstats(struct net_device *);
@@ -152,7 +154,7 @@ static void ieee80211_free_allnodes(struct ieee80211com *);
 static void ieee80211_watchdog(unsigned long);
 static void ieee80211_timeout_nodes(struct ieee80211com *);
 static int ieee80211_setup_rates(struct ieee80211com *, struct ieee80211_node *,
-	u_int8_t *rates, u_int8_t *xrates, int flags);
+		u_int8_t *rates, u_int8_t *xrates, int flags);
 
 extern	int ieee80211_cfgget(struct net_device *, u_long, caddr_t);
 extern	int ieee80211_cfgset(struct net_device *, u_long, caddr_t);
@@ -588,6 +590,12 @@ ieee80211_media_change(struct net_device *dev)
 			break;
 		case IEEE80211_M_IBSS:
 			ic->ic_flags |= IEEE80211_F_IBSSON;
+#ifdef notdef
+			if (ic->ic_curmode == IEEE80211_MODE_11G)
+				ieee80211_set11gbasicrates(
+					&ic->ic_suprates[newphymode],
+					IEEE80211_MODE_11B);
+#endif
 			break;
 		}
 		error = ENETRESET;
@@ -696,7 +704,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			if (!IEEE80211_ADDR_EQ(bssid, ic->ic_bss.ni_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
-				DPRINTF2(ic, ("ieee80211_input: other bss %s\n",
+				DPRINTF2(ic, ("%s: other bss %s\n", __func__,
 				    ether_sprintf(wh->i_addr3)));
 				goto out;
 			}
@@ -705,30 +713,12 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				DPRINTF(ic, ("%s: warning, unknown src %s\n",
 				    __func__, ether_sprintf(wh->i_addr2)));
 				/*
-				 * Prism cards (at least) do not present probe
-				 * request frames to the host when in hostap
-				 * mode.  This means authentication request
-				 * frames are the first indication that a new
-				 * station is present that we need to handle.
-				 * So allocate a new node for this unknown
-				 * address and fill in the approprite bits.
-				 * Note that this means we're without much of
-				 * the state that would normally be builtup from
-				 * a probe request frame; this sucks!
+				 * NB: Node allocation is handled in the
+				 * management handling routines.  Just fake
+				 * up a reference to the hosts's node to do
+				 * the stuff below.
 				 */
-				ni = ieee80211_alloc_node(ic, wh->i_addr2);
-				if (ni == NULL) {
-					goto out;
-				}
-				/*
-				 * XXX this seems wrong; when in hostap mode the
-				 * card may be scanning many channels and we
-				 * have no idea which channel this frame came
-				 * in on.  This may not matter so long as the
-				 * bss channel has the same mode as that which
-				 * the frame was received on.
-				 */
-				ni->ni_chan = ic->ic_bss.ni_chan;
+				ni = ieee80211_ref_node(&ic->ic_bss);
 			}
 			break;
 		default:
@@ -788,9 +778,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			/* check if source STA is associated */
 			ni = ieee80211_find_node(ic, wh->i_addr2);
 			if (ni == NULL) {
-				DPRINTF(ic, ("ieee80211_input: "
-				    "data from unknown src %s\n",
-				    ether_sprintf(wh->i_addr2)));
+				DPRINTF(ic, ("%s: data from unknown src %s\n",
+				    __func__, ether_sprintf(wh->i_addr2)));
 				ni = ieee80211_dup_bss(ic, wh->i_addr2);
 				if (ni != NULL) {
 					IEEE80211_SEND_MGMT(ic, ni,
@@ -801,9 +790,8 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				goto err;
 			}
 			if (ni->ni_associd == 0) {
-				DPRINTF(ic, ("ieee80211_input: "
-				    "data from unassoc src %s\n",
-				    ether_sprintf(wh->i_addr2)));
+				DPRINTF(ic, ("%s: data from unassoc src %s\n",
+				    __func__, ether_sprintf(wh->i_addr2)));
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_DISASSOC,
 				    IEEE80211_REASON_NOT_ASSOCED);
@@ -912,7 +900,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 
 	case IEEE80211_FC0_TYPE_CTL:
 	default:
-		DPRINTF(ic, ("ieee80211_input: bad type %x\n", wh->i_fc[0]));
+		DPRINTF(ic, ("%s: bad type %x\n", __func__, wh->i_fc[0]));
 		/* should not come here */
 		break;
 	}
@@ -1190,6 +1178,34 @@ ieee80211_watchdog(unsigned long data)
 }
 
 /*
+ * Mark the basic rates for the 11g rate table based on the
+ * operating mode.  For real 11g we mark all the 11b rates
+ * and 6, 12, and 24 OFDM.  For 11b compatibility we mark only
+ * 11b rates.  There's also a pseudo 11a-mode used to mark only
+ * the basic OFDM rates.
+ */
+static void
+ieee80211_set11gbasicrates(struct ieee80211_rateset *rs, enum ieee80211_phymode mode)
+{
+	static const struct ieee80211_rateset basic[] = {
+	    { 3, { 12, 24, 48 } },		/* IEEE80211_MODE_11A */
+	    { 4, { 2, 4, 11, 22 } },		/* IEEE80211_MODE_11B */
+	    { 7, { 2, 4, 11, 22, 12, 24, 48 } },/* IEEE80211_MODE_11G */
+	    { 0 },				/* IEEE80211_MODE_TURBO	*/
+	};
+	int i, j;
+
+	for (i = 0; i < rs->rs_nrates; i++) {
+		rs->rs_rates[i] &= IEEE80211_RATE_VAL;
+		for (j = 0; j < basic[mode].rs_nrates; j++)
+			if (basic[mode].rs_rates[j] == rs->rs_rates[i]) {
+				rs->rs_rates[i] |= IEEE80211_RATE_BASIC;
+				break;
+			}
+	}
+}
+
+/*
  * Set the current phy mode and recalculate the active channel
  * set based on the available channels for this mode.  Also
  * select a new default/current channel if the current one is
@@ -1267,6 +1283,8 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 			ic->ic_flags |= IEEE80211_F_SHSLOT;
 		if (ic->ic_caps & IEEE80211_C_SHPREAMBLE)
 			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
+		ieee80211_set11gbasicrates(&ic->ic_sup_rates[mode],
+			IEEE80211_MODE_11G);
 	} else {
 		ic->ic_flags &= ~(IEEE80211_F_SHSLOT | IEEE80211_F_SHPREAMBLE);
 	}
@@ -1330,8 +1348,15 @@ ieee80211_next_scan(struct net_device *dev)
 	for (;;) {
 		if (++chan > &ic->ic_channels[IEEE80211_CHAN_MAX])
 			chan = &ic->ic_channels[0];
-		if (isset(ic->ic_chan_scan, ieee80211_chan2ieee(ic, chan)))
-			break;
+		if (isset(ic->ic_chan_scan, ieee80211_chan2ieee(ic, chan))) {
+			/*
+			 * Honor channels marked passive-only
+			 * during an active scan.
+			 */
+			if ((ic->ic_flags & IEEE80211_F_ASCAN) == 0 ||
+			    (chan->ic_flags & IEEE80211_CHAN_PASSIVE) == 0)
+				break;
+		}
 		if (chan == ic->ic_bss.ni_chan) {
 			ieee80211_end_scan(dev);
 			return;
@@ -1505,8 +1530,6 @@ ieee80211_setup_node(struct ieee80211com *ic,
 		memset(ni->ni_private, 0, ic->ic_node_privlen);
 	} else
 		ni->ni_private = NULL;
-
-	ni->ni_rtsthresh = ic->ic_rtsthreshold;
 
 	hash = IEEE80211_NODE_HASH(macaddr);
 	write_lock_bh(&ic->ic_nodelock);
@@ -2146,7 +2169,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
 	u_int8_t *frm, *efrm, *tstamp, *bintval, *capinfo, *ssid;
-	u_int8_t *rates, *xrates;
+	u_int8_t *rates, *xrates, *country;
 	u_int8_t chan, fhindex, erp;
 	u_int16_t fhdwell;
 
@@ -2166,6 +2189,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	 *	[2] cabability information
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
+	 *	[tlv] country information
 	 *	[tlv] parameter set (FH/DS)
 	 *	[tlv] erp information
 	 *	[tlv] extended supported rates
@@ -2173,7 +2197,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	tstamp  = frm;	frm += 8;
 	bintval = frm;	frm += 2;
 	capinfo = frm;	frm += 2;
-	ssid = rates = xrates = NULL;
+	ssid = rates = xrates = country = NULL;
 	chan = ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan);
 	fhdwell = 0;
 	fhindex = 0;
@@ -2185,6 +2209,9 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 			break;
 		case IEEE80211_ELEMID_RATES:
 			rates = frm;
+			break;
+		case IEEE80211_ELEMID_COUNTRY:
+			country = frm;
 			break;
 		case IEEE80211_ELEMID_FHPARMS:
 			if (ic->ic_phytype == IEEE80211_T_FH) {
@@ -2247,11 +2274,14 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		    chan, ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan));
 		ieee80211_print_essid(ssid + 2, ssid[1]);
 		printk(" from %s\n", ether_sprintf(wh->i_addr2));
-		printk("%s: caps 0x%x bintval %u erp 0x%x\n", __func__
-			, le16_to_cpu(*(u_int16_t *)capinfo)
-			, le16_to_cpu(*(u_int16_t *)bintval)
-			, erp
-		);
+		printk("%s: caps 0x%x bintval %u erp 0x%x\n",
+			__func__, le16_to_cpu(*(u_int16_t *)capinfo),
+			le16_to_cpu(*(u_int16_t *)bintval), erp);
+#if 0
+		if (country)
+			printk("%s: country info %*D\n",
+				__func__, country[1], country+2, " ");
+#endif
 	}
 #endif
 	if (ni == NULL) {
@@ -2428,6 +2458,10 @@ ieee80211_recv_auth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 			if (ni == NULL)
 				return;
 			IEEE80211_ADDR_COPY(ni->ni_bssid, ic->ic_bss.ni_bssid);
+			ni->ni_rssi = rssi;
+			ni->ni_rstamp = rstamp;
+			ni->ni_rantenna = rantenna;
+			ni->ni_chan = ic->ic_bss.ni_chan;
 			allocbs = 1;
 		}
 		IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_AUTH, 2);
@@ -2620,8 +2654,8 @@ ieee80211_recv_asresp(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	 *	[tlv] extended supported rates
 	 */
 	if (frm + 6 > efrm) {
-		DPRINTF(ic, ("ieee80211_recv_asresp: too short from %s\n",
-		    ether_sprintf(wh->i_addr2)));
+		DPRINTF(ic, ("%s: too short from %s\n",
+			__func__, ether_sprintf(wh->i_addr2)));
 		return;
 	}
 

@@ -222,6 +222,7 @@ struct ieee80211_information {
 #define	IEEE80211_ELEMID_CFPARMS		4
 #define	IEEE80211_ELEMID_TIM			5
 #define	IEEE80211_ELEMID_IBSSPARMS		6
+#define	IEEE80211_ELEMID_COUNTRY		7
 #define	IEEE80211_ELEMID_CHALLENGE		16
 #define	IEEE80211_ELEMID_ERP			42
 #define	IEEE80211_ELEMID_XRATES			50
@@ -338,6 +339,9 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
  */
 
 #define	IEEE80211_CHAN_MAX	255
+#define	IEEE80211_CHAN_ANYC \
+	((struct ieee80211channel *) IEEE80211_CHAN_ANY)
+
 #define	IEEE80211_RATE_SIZE	8		/* 802.11 standard */
 #define	IEEE80211_RATE_MAXSIZE	15		/* max rates we'll handle */
 #define	IEEE80211_KEYBUF_SIZE	16
@@ -407,6 +411,8 @@ struct ieee80211channel {
 	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_CCK)
 #define	IEEE80211_CHAN_PUREG \
 	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_OFDM)
+#define	IEEE80211_CHAN_G \
+	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_DYN)
 #define	IEEE80211_CHAN_T \
 	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_TURBO)
 
@@ -416,6 +422,8 @@ struct ieee80211channel {
 	(((_c)->ic_flags & IEEE80211_CHAN_B) == IEEE80211_CHAN_B)
 #define	IEEE80211_IS_CHAN_PUREG(_c) \
 	(((_c)->ic_flags & IEEE80211_CHAN_PUREG) == IEEE80211_CHAN_PUREG)
+#define	IEEE80211_IS_CHAN_G(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_G) == IEEE80211_CHAN_G)
 #define	IEEE80211_IS_CHAN_T(_c) \
 	(((_c)->ic_flags & IEEE80211_CHAN_T) == IEEE80211_CHAN_T)
 
@@ -448,6 +456,7 @@ struct ieee80211_node {
 	u_int8_t		ni_esslen;
 	u_int8_t		ni_essid[IEEE80211_NWID_LEN];
 	struct ieee80211_rateset ni_rates;
+	u_int8_t		*ni_country;	/* country information */
 	struct ieee80211channel	*ni_chan;
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
@@ -465,7 +474,6 @@ struct ieee80211_node {
 	u_int16_t		ni_associd;	/* assoc response */
 	u_int16_t		ni_txseq;	/* seq to be transmitted */
 	u_int16_t		ni_rxseq;	/* seq previous received */
-	u_int16_t		ni_rtsthresh;	/* RTS frame length threshold */
 	int			ni_fails;	/* failure count to associate */
 	int			ni_inact;	/* inactivity mark count */
 	int			ni_txrate;	/* index to ni_rates[] */
