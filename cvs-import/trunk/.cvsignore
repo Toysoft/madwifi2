@@ -1,7 +1,0 @@
-ath/*.o
-ath/*.ko
-ath/*.cmd
-ath/*~
-ath/*.mod.c
-ath/.tmp_versions
-*~
