@@ -13,8 +13,10 @@ o Wireless Extensions support (14 or later, 17 preferred)
 o Sysctl support
 o Crypto API support (AES support is used if present, otherwise the
   AES-CCMP cipher module falls back to a private implementation)
-
-Kernels 2.4.2x - 2.6.10 should work without Problems. Other
+o gcc in same version as the compiled kernel, or you get problems 
+  during module load (Invalid module format)
+  
+Kernels 2.4.2x - 2.6.10 should work without problems. Other
 kernel versions may require modifications; e.g. for crypto support 
 and/or updated wireless extensions.
 
@@ -54,8 +56,11 @@ trouble% KERNELPATH=/usr/src/linux-2.6.3
 trouble% make
 
 You can also just specify a kernel version using the KERNELRELEASE
-variable.  In that case the kernel sources are automatically searched
-for in /lib/modules/$KERNELRELEASE/build.
+variable which is required for distributions which install kernels
+with names like '2.6.10-4-686' but the kernel-source is only called
+2.6.10 for example. Without specifying KERNELRELEASE you will get
+problems during module load time in that case. The kernel sources are 
+automatically searched for in /lib/modules/$KERNELRELEASE/build.
 
 If you want to build for a machine different of i386 you will have
 to specifiy the Target. A complete example for building on a AMD 
