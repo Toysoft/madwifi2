@@ -439,6 +439,9 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
 
 #define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
 
+#define IEEE80211_TXPOWER_MAX	100	/* .5 dbM (XXX units?) */
+#define IEEE80211_TXPOWER_MIN	0	/* kill radio */
+
 #define	IEEE80211_AUTH_NONE	0
 #define	IEEE80211_AUTH_OPEN	1
 #define	IEEE80211_AUTH_SHARED	2
