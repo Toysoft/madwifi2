@@ -1093,8 +1093,9 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 #if WIRELESS_EXT > 14
 	char buf[64*2 + 30];
 #endif
-	int j;
+	int j, startmode, mode;
 
+	/* XXX use generation number and always return current results */
 	if (ic->ic_state == IEEE80211_S_SCAN && (ic->ic_flags & IEEE80211_F_ASCAN)) {
 		/*
 		 * Still scanning, indicate the caller should try again.
@@ -1103,11 +1104,26 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 	}
 
 	/*
+	 * Do two passes to insure WPA/non-WPA scan candidates
+	 * are sorted to the front.  This is a hack to deal with
+	 * the wireless extensions capping scan results at
+	 * IW_SCAN_MAX_DATA bytes.  In densely populated environments
+	 * it's easy to overflow this buffer (especially with WPA/RSN
+	 * information elements).  Note this sorting hack does not
+	 * guarantee we won't overflow anyway.
+	 */
+	startmode = ic->ic_flags & IEEE80211_F_WPA;
+	mode = startmode;
+again:
+	/*
 	 * Translate data to WE format.
 	 */
 	TAILQ_FOREACH(ni, &ic->ic_node, ni_list) {
 		if (current_ev >= end_buf)
-			break;
+			goto done;
+		/* WPA/!WPA sort criteria */
+		if ((mode != 0) ^ (ni->ni_wpa_ie != NULL))
+			continue;
 
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWAP;
@@ -1186,7 +1202,6 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 		iwe.u.data.length = strlen(buf);
 		current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, buf);
 
-
 		if (ni->ni_wpa_ie != NULL) {
 			memset(&iwe, 0, sizeof(iwe));
 			iwe.cmd = IWEVCUSTOM;
@@ -1198,6 +1213,11 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 		}
 #endif /* WIRELESS_EXT > 14 */
 	}
+	if (mode == startmode) {
+		mode = mode ? 0 : IEEE80211_F_WPA;
+		goto again;		/* sort of an Algol-style for loop */
+	}
+done:
 	data->length = current_ev - extra;
 	return 0;
 }
