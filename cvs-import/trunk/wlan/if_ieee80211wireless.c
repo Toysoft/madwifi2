@@ -577,9 +577,11 @@ ieee80211_ioctl_siwmode(struct net_device *dev,
 	case IW_MODE_MASTER:
 		ifr.ifr_media |= IFM_IEEE80211_HOSTAP;
 		break;
+#if WIRELESS_EXT >= 15
 	case IW_MODE_MONITOR:
 		ifr.ifr_media |= IFM_IEEE80211_MONITOR;
 		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -599,8 +601,10 @@ ieee80211_ioctl_giwmode(struct net_device *dev,
 
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		*mode = IW_MODE_MASTER;
+#if WIRELESS_EXT >= 15
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		*mode = IW_MODE_MONITOR;
+#endif
 	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		*mode = IW_MODE_ADHOC;
 	else
