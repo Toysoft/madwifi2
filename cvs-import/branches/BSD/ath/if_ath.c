@@ -1888,8 +1888,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 	}
-        bf->bf_skb = skb;
-        bf->bf_node = ieee80211_ref_node(ni);
+	bf->bf_skb = skb;
+	bf->bf_node = ieee80211_ref_node(ni);
 
 	return 0; // TODO: return value
 }
@@ -1912,6 +1912,8 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	int flags, antenna;
 	u_int8_t rate;
 
+	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
+		skb->data, skb->len, BUS_DMA_TODEVICE);
 	DPRINTF(sc, ATH_DEBUG_BEACON,
 		"%s: skb %p [data %p len %u] skbaddr %p\n",
 		__func__, skb, skb->data, skb->len, (caddr_t) bf->bf_skbaddr);
@@ -3437,7 +3439,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			sc->sc_hwmap[txrate].ieeerate, -1);
 
         // TODO: okay????
-        if (ic->ic_opmode == IEEE80211_M_MONITOR) {
+	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
             /*
 		sc->sc_tx_th.wt_flags = sc->sc_hwmap[txrate].txflags;
 		if (iswep)
@@ -3546,7 +3548,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			txq->axq_qnum, txq->axq_link,
 			(caddr_t)bf->bf_daddr, bf->bf_desc, txq->axq_depth);
 	}
-	txq->axq_link = &ds->ds_link;
+	txq->axq_link = &bf->bf_desc->ds_link;
 	ATH_TXQ_UNLOCK_BH(txq);
 
 	/*
