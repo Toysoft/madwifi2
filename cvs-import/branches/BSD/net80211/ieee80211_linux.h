@@ -277,7 +277,8 @@ extern	struct sk_buff *ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen);
 #define	IF_DEQUEUE(_q,_skb)	(_skb = skb_dequeue(_q))
 #define IF_LOCK(_q)		spin_lock_bh(&(_q)->lock)
 #define IF_UNLOCK(_q)		spin_unlock_bh(&(_q)->lock)
-#define	_IF_DRAIN(_q)		skb_queue_drain(_q)
+#define	_IF_DRAIN(_q)		__skb_queue_purge(_q)	// without lock
+#define	IF_DRAIN(_q)		skb_queue_purge(_q)	// with lock
 #define	_IF_QLEN(_q)		skb_queue_len(_q)
 #define _IF_QFULL(_q)		(_IF_QLEN(_q) >= IEEE80211_PS_MAX_QUEUE)
 #define _IF_POLL(_q, _skb)	((_skb) = skb_peek(_q))
