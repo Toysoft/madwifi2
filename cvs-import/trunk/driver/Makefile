@@ -53,8 +53,9 @@ endif
 SRCS=	if_ath.c if_ath_pci.c
 OBJS=	if_ath.o if_ath_pci.o
 
-CFLAGS=	-I. -I${HAL} -I${HAL}/linux -I${WLAN} -I${LINUX} -I${DEPTH} \
-	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
+CFLAGS=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} \
+	-I${WLAN} -I${LINUX} -I${DEPTH} \
+	-D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 LDFLAGS=
 
 ALL=	ath_pci.o
