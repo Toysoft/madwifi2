@@ -92,6 +92,8 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct net_device *dev;
 	const char *athname;
 	u_int8_t csz,i;
+	struct ath_softc *ath_sc;
+
 
 	if (pci_enable_device(pdev))
 		return (-EIO);
@@ -146,10 +148,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bad2;
 	}
 	memset(sc, 0, sizeof(struct ath_pci_softc));
-	
-	for (i=0;i<4;i++) {
-                sc->aps_sc.sc_AC2qNum[i] = -1;
-	}
         
 	/* mark the device as detached to avoid processing interrupts until setup is complete */
 	sc->aps_sc.sc_invalid = 1;
@@ -184,21 +182,22 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
 		dev->name, athname ? athname : "Atheros ???", phymem, dev->irq);
 #ifdef SOFTLED
-        sc->aps_sc.sc_ic.ic_beaconCnt = 0;
-        /* Check to see if we have an IBM card */
-        printk ("Vendor = 0x%x   id=0x%x subsys: %d\n",id->vendor,id->device,
-                id->subdevice);
-        if ((id->vendor == 0x168c) && 
-            ((id->device == 0x1014) || (id->device==0x12))) {
-            sc->aps_sc.sc_ic.ic_ledPin = 0;
-            sc->aps_sc.sc_ic.ic_rfKillPin = 1;
-        } else {
-            sc->aps_sc.sc_ic.ic_ledPin = 1;
-            sc->aps_sc.sc_ic.ic_rfKillPin = 0;
-        }
-        ath_hal_gpioCfgOutput(sc->aps_sc.sc_ah, sc->aps_sc.sc_ic.ic_ledPin);
-        ath_hal_gpioSet(sc->aps_sc.sc_ah,sc->aps_sc.sc_ic.ic_ledPin,0);
-        sc->aps_sc.sc_ic.ic_caps |= IEEE80211_C_SOFTLED;
+	ath_sc = dev->priv;
+	ath_sc->sc_ic.ic_beaconCnt = 0;
+	/* Check to see if we have an IBM card */
+	printk ("Vendor = 0x%x   id=0x%x subsys: %d\n",id->vendor,id->device,
+		id->subdevice);
+	if ((id->vendor == 0x168c) && 
+	    ((id->device == 0x1014) || (id->device==0x12))) {
+		ath_sc->sc_ic.ic_ledPin = 0;
+		ath_sc->sc_ic.ic_rfKillPin = 1;
+	} else {
+		ath_sc->sc_ic.ic_ledPin = 1;
+		ath_sc->sc_ic.ic_rfKillPin = 0;
+	}
+	ath_hal_gpioCfgOutput(ath_sc->sc_ah, ath_sc->sc_ic.ic_ledPin);
+	ath_hal_gpioSet(ath_sc->sc_ah,ath_sc->sc_ic.ic_ledPin,0);
+	ath_sc->sc_ic.ic_caps |= IEEE80211_C_SOFTLED;
 #endif
 
 	/* ready to process interrupts */

@@ -160,6 +160,12 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	DPRINTF(("ath_attach: devid 0x%x\n", devid));
 
+        /* Clear AC/Queue number table */
+
+	for (i=0;i<4;i++) {
+                sc->sc_AC2qNum[i] = -1;
+	}
+
 	/*
 	 * Cache line size is used to size and align various
 	 * structures used to communicate with the hardware.
@@ -1670,37 +1676,37 @@ void
 ath_update_LED (struct net_device *dev, struct ath_hal *ah, 
                 struct ieee80211com *ic, u_int32_t event)
 {
-    static unsigned int state=1;
-    int rateOn, rateOff, diff;
-
-    if (ic->ic_state != IEEE80211_S_RUN) {
-        // Device is in scan mode, searching for AP
-        /* We flash the LED on for 5s and off for 200ms */
-        if (ic->ic_beaconCnt >= (2+state*48)) {
-          ath_hal_gpioCfgOutput(ah,ic->ic_ledPin);
-          ath_hal_gpioSet(ah,ic->ic_ledPin,state);
-            state ^= 1;
-            ic->ic_beaconCnt = 0;
-        }
-    }
-    else {
-        switch(event) {
-        case TRANSMIT_EVENT:
-        case RECEIVE_EVENT:
-            rateOn = 20;
-            rateOff = 2;
-            diff = rateOn-rateOff;
-            if (ic->ic_beaconCnt >= (rateOff + state*diff)) {
-              ath_hal_gpioCfgOutput(ah,ic->ic_ledPin);
-              ath_hal_gpioSet(ah,ic->ic_ledPin,state);
-              state ^= 1;
-              ic->ic_beaconCnt = 0;
-            }
-            break;
-        default:
-            break;
-        }
-    }
+	static unsigned int state=1;
+	int rateOn, rateOff, diff;
+	
+	if (ic->ic_state != IEEE80211_S_RUN) {
+		// Device is in scan mode, searching for AP
+		/* We flash the LED on for 5s and off for 200ms */
+		if (ic->ic_beaconCnt >= (2+state*48)) {
+			ath_hal_gpioCfgOutput(ah,ic->ic_ledPin);
+			ath_hal_gpioSet(ah,ic->ic_ledPin,state);
+			state ^= 1;
+			ic->ic_beaconCnt = 0;
+		}
+	}
+	else {
+		switch(event) {
+		case TRANSMIT_EVENT:
+		case RECEIVE_EVENT:
+			rateOn = 20;
+			rateOff = 2;
+			diff = rateOn-rateOff;
+			if (ic->ic_beaconCnt >= (rateOff + state*diff)) {
+				ath_hal_gpioCfgOutput(ah,ic->ic_ledPin);
+				ath_hal_gpioSet(ah,ic->ic_ledPin,state);
+				state ^= 1;
+				ic->ic_beaconCnt = 0;
+			}
+			break;
+		default:
+			break;
+		}
+	}
 }
 #endif
 
@@ -1731,20 +1737,20 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	
 	/* Check to see if we need to remove pad bytes */
 	if (ic->ic_flags & IEEE80211_F_DATAPAD) {
-	    wh = (struct ieee80211_frame *) skb->data;
-	    if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA) &&
-		(wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK & IEEE80211_FC0_SUBTYPE_QOS)) {
-		headersize = sizeof(struct ieee80211_qosframe);
-		if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS) {
-		    headersize += IEEE80211_ADDR_LEN;
+		wh = (struct ieee80211_frame *) skb->data;
+		if (((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA) &&
+		    (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK & IEEE80211_FC0_SUBTYPE_QOS)) {
+			headersize = sizeof(struct ieee80211_qosframe);
+			if ((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) == IEEE80211_FC1_DIR_DSTODS) {
+				headersize += IEEE80211_ADDR_LEN;
+			}
+			padbytes = roundup(headersize,4) - headersize;
+			if (padbytes > 0) {
+				memcpy(&qosframe[0],skb->data,headersize);
+				skb_pull(skb,padbytes);
+				memcpy(skb->data,&qosframe[0],headersize);
+			}
 		}
-		padbytes = roundup(headersize,4) - headersize;
-		if (padbytes > 0) {
-		    memcpy(&qosframe[0],skb->data,headersize);
-		    skb_pull(skb,padbytes);
-		    memcpy(skb->data,&qosframe[0],headersize);
-		}
-	    }
 	}
 
 	ph = (wlan_ng_prism2_header *)
@@ -1991,7 +1997,7 @@ ath_rx_tasklet(void *data)
 		}
 #ifdef SOFTLED
 		if (ic->ic_caps & IEEE80211_C_SOFTLED) {
-		    ath_update_LED(dev, ah, ic, RECEIVE_EVENT);
+			ath_update_LED(dev, ah, ic, RECEIVE_EVENT);
 		}
 #endif
 		ieee80211_input(dev, skb,

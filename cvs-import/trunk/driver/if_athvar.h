@@ -138,7 +138,7 @@ struct ath_softc {
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 
-        int sc_AC2qNum[4];  /* HAL q nums for each AC value */
+        int sc_AC2qNum[4];                      /* HAL q nums for each AC value */
 	u_int32_t		*sc_txlink[HAL_NUM_TX_QUEUES];	/* link ptr in last TX desc */
 	TAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
