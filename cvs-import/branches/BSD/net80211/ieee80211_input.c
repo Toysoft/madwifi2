@@ -632,7 +632,13 @@ out:
 EXPORT_SYMBOL(ieee80211_input);
 
 /*
- * This function reassemble fragments.
+ * This function reassemble fragments using the skb of the 1st fragment,
+ * if large enough. If not, a new skb is allocated to hold incoming
+ * fragments.
+ *
+ * Fragments are copied at the end of the previous fragment.  A different
+ * strategy could have been used, where a non-linear skb is allocated and
+ * fragments attached to that skb.
  */
 static struct sk_buff *
 ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
