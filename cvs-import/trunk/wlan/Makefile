@@ -43,6 +43,13 @@ DEPTH=	..
 
 include ${DEPTH}/Makefile.inc
 
+ifdef CONFIG_MODVERSIONS
+MODOPTS+=	-include ${WLAN}/if_ieee80211.ver
+ALL_VER+=	if_ieee80211.ver
+MODOPTS+=	-include ${WLAN}/if_media.ver
+ALL_VER+=	if_media.ver
+endif
+
 SRCS_80211=	if_ieee80211subr.c if_ieee80211wireless.c
 OBJS_80211=	if_ieee80211subr.o if_ieee80211wireless.o
 SRCS=	${SRCS_80211} if_media.c rc4.c
@@ -52,9 +59,6 @@ INCS=	-I. -I${LINUX}
 CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
 ALL=	wlan.o
-ifdef CONFIG_MODVERSIONS
-ALL_VER=if_ieee80211.ver if_media.ver
-endif
 
 all:	${ALL}
 
@@ -64,11 +68,6 @@ wlan.o: ${OBJS}
 if_ieee80211subr.o: version.h
 
 ifdef CONFIG_MODVERSIONS
-GENKSYMS=	/sbin/genksyms
-ifdef CONFIG_SMP
-GENKSYMS+=	-p smp_
-endif
-
 if_ieee80211.ver: ${SRCS_80211}
 	rm -f $@
 	for i in ${SRCS_80211}; do \

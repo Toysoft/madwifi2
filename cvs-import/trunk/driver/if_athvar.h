@@ -196,8 +196,6 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_getRateTable)((_ah), (_mode)))
 #define	ath_hal_getmac(_ah, _mac) \
 	((*(_ah)->ah_getMacAddress)((_ah), (_mac)))
-#define	ath_hal_detach(_ah) \
-	((*(_ah)->ah_detach)((_ah)))
 #define	ath_hal_intrset(_ah, _mask) \
 	((*(_ah)->ah_setInterrupts)((_ah), (_mask)))
 #define	ath_hal_intrget(_ah) \

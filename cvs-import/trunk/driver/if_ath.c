@@ -152,7 +152,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	INIT_TQUEUE(&sc->sc_rxorntq,	ath_rxorn_tasklet,	dev);
 	INIT_TQUEUE(&sc->sc_fataltq,	ath_fatal_tasklet,	dev);
 
-	ah = ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
+	ah = _ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware; HAL status %u\n",
 			dev->name, status);

@@ -85,6 +85,9 @@ endif
 
 ifdef CONFIG_MODVERSIONS
 MODOPTS=-DMODVERSIONS -include $(KERNEL_PATH)/include/linux/modversions.h
-MODOPTS+= -include ${WLAN}/if_ieee80211.ver
-MODOPTS+= -include ${WLAN}/if_media.ver
+
+GENKSYMS=	/sbin/genksyms
+ifdef CONFIG_SMP
+GENKSYMS+=	-p smp_
+endif
 endif

@@ -43,8 +43,17 @@ DEPTH=	..
 
 include ${DEPTH}/Makefile.inc
 
-SRCS=	ah_osdep.c if_ath.c if_ath_pci.c
-OBJS=	ah_osdep.o if_ath.o if_ath_pci.o
+ifdef CONFIG_MODVERSIONS
+MODOPTS+=	-include ${ATH_HAL}/ath_hal.ver
+ALL_VER+=	${ATH_HAL}/ath_hal.ver
+MODOPTS+=	-include ${WLAN}/if_ieee80211.ver
+ALL_VER+=	${WLAN}/if_ieee80211.ver
+MODOPTS+=	-include ${WLAN}/if_media.ver
+ALL_VER+=	${WLAN}/if_media.ver
+endif
+
+SRCS=	if_ath.c if_ath_pci.c
+OBJS=	if_ath.o if_ath_pci.o
 
 ifdef HAL_SRC
 HALINCS=-I${DEPTH}/hal -I${ATH_HAL}
@@ -53,7 +62,6 @@ HALINCS=-I${ATH_HAL}
 endif
 CFLAGS=	-I. ${HALINCS} -I${WLAN} -I${LINUX} \
 	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
-#LDFLAGS=-x -S
 LDFLAGS=
 
 ALL=	ath_pci.o
@@ -65,19 +73,19 @@ install: all
 		mkdir ${DESTDIR}/lib/modules/${VERSION}/net
 	cp ${ALL} ${DESTDIR}/lib/modules/${VERSION}/net
 
-ath_pci.o: ${OBJS} ${ATH_HAL}/hal.o Makefile
-	${LD} -o $@ -r ${LDFLAGS} ${OBJS} ${ATH_HAL}/hal.o
+ath_pci.o: ${OBJS} Makefile
+	${LD} -o $@ -r ${LDFLAGS} ${OBJS}
 if_ath_pci.o:	version.h
 ifdef CONFIG_MODVERSIONS
-if_ath.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
-if_ath_pci.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
+if_ath.o:	${ALL_VER}
+if_ath_pci.o:	${ALL_VER}
 endif
 
 clean:
 	rm -f ${OBJS} ${ALL} .depend
 
 depend: beforedepend .depend afterdepend
-.depend: ${SRCS} ${ATH_HAL}/opt_ah.h Makefile
+.depend: ${SRCS} Makefile
 	rm -f .depend
 	-${CC} -M ${CFLAGS} ${SRCS} > .depend
 beforedepend:

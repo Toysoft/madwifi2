@@ -52,8 +52,9 @@ all:
 	done
 
 install:
-	cd ${WLAN}; make install
-	cd ${DRIVER}; make install
+	for i in ${DIRS}; do \
+		(cd $$i; make install); \
+	done
 	depmod -a
 
 clean:
