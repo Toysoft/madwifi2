@@ -254,6 +254,12 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		wepchange = 1;
 		error = 0;
 	}
+	if (error == 0) {
+		if (erq->flags & IW_ENCODE_OPEN)
+			ic->ic_flags &= ~IEEE80211_F_DROPUNENC;
+		else
+			ic->ic_flags |= IEEE80211_F_DROPUNENC;
+	}
 	if (error == 0 && IS_UP(ic->ic_dev)) {
 		/*
 		 * Device is up and running; we must kick it to
@@ -288,12 +294,15 @@ ieee80211_ioctl_giwencode(struct ieee80211com *ic,
 		if (erq->length > k->wk_keylen)
 			erq->length = k->wk_keylen;
 		memcpy(key, k->wk_key, erq->length);
-		erq->flags |= IW_ENCODE_ENABLED;	/* XXX */
-		erq->flags |= IW_ENCODE_OPEN;		/* XXX */
+		erq->flags |= IW_ENCODE_ENABLED;
 	} else {
 		erq->length = 0;
 		erq->flags = IW_ENCODE_DISABLED;
 	}
+	if (ic->ic_flags & IEEE80211_F_DROPUNENC)
+		erq->flags |= IW_ENCODE_RESTRICTED;
+	else
+		erq->flags |= IW_ENCODE_OPEN;
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_giwencode);
