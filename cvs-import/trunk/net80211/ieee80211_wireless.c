@@ -1999,8 +1999,6 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  0, IW_PRIV_TYPE_OPTIE,			"getoptie" },
 	{ IEEE80211_IOCTL_SETKEY,
 	  IW_PRIV_TYPE_KEY | IW_PRIV_SIZE_FIXED, 0,	"setkey" },
-	{ IEEE80211_IOCTL_GETKEY,
-	  0, IW_PRIV_TYPE_KEY | IW_PRIV_SIZE_FIXED,	"getkey" },
 	{ IEEE80211_IOCTL_DELKEY,
 	  IW_PRIV_TYPE_DELKEY | IW_PRIV_SIZE_FIXED, 0,	"delkey" },
 	{ IEEE80211_IOCTL_SETMLME,
