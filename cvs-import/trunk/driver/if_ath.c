@@ -997,7 +997,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	 */
 	rt = sc->sc_currates;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) == 0)
+	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 		rate = rt->info[0].rateCode | rt->info[0].shortPreamble;
 	else
 		rate = rt->info[0].rateCode;
