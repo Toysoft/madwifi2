@@ -246,10 +246,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/* XXX not right but it's not used anywhere important */
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
-	ic->ic_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS | IEEE80211_C_HOSTAP | IEEE80211_C_MONITOR;
-	/* NB: 11g support is identified when we fetch the channel set */
-	if (sc->sc_have11g)
-		ic->ic_caps |= IEEE80211_C_SHPREAMBLE;
+	ic->ic_caps = IEEE80211_C_WEP | IEEE80211_C_IBSS | IEEE80211_C_HOSTAP | IEEE80211_C_MONITOR | IEEE80211_C_SHPREAMBLE;
+
 	ic->ic_node_privlen = sizeof(struct ath_nodestat);
 	ic->ic_node_free = ath_node_free;
 	ic->ic_bss.ni_private = &sc->sc_bss_stat;
@@ -1760,7 +1758,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * use short preamble based on the current mode and
 	 * negotiated parameters.
 	 */
-	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE) {
+	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) && (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)) {
 		txrate = rt->info[rix].rateCode | rt->info[rix].shortPreamble;
 		shortPreamble = AH_TRUE;
 		sc->sc_stats.ast_tx_shortpre++;
