@@ -1689,7 +1689,17 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 * So we use pseudo random IV for now, though it is not the
 		 * right way.
 		 */
-		get_random_bytes(&iv, sizeof(iv));
+                iv = ic->ic_iv;
+
+		/*
+		 * Skip 'bad' IVs from Fluhrer/Mantin/Shamir:
+		 * (B, 255, N) with 3 <= B < 8
+		 */
+		if (iv >= 0x03ff00 &&
+		    (iv & 0xf8ff00) == 0x00ff00)
+			iv += 0x000100;
+		ic->ic_iv = iv + 1;
+
 		for (i = 0; i < IEEE80211_WEP_IVLEN; i++) {
 			ivp[i] = iv;
 			iv >>= 8;
@@ -1702,6 +1712,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		hdrlen = sizeof(hdrbuf) + IEEE80211_WEP_CRCLEN;
 		pktlen += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN+
 			IEEE80211_WEP_CRCLEN;
+
+		/* Packet header has moved, reset our local pointer */
+		wh = (struct ieee80211_frame *) skb->data;
 	}
 
 	pktlen += IEEE80211_CRC_LEN;
