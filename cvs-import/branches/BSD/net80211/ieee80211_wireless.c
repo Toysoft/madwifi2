@@ -1858,6 +1858,22 @@ ieee80211_ioctl_delkey(struct ieee80211com *ic, struct iw_request_info *info,
 }
 EXPORT_SYMBOL(ieee80211_ioctl_delkey);
 
+static void
+domlme(void *arg, struct ieee80211_node *ni)
+{
+	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211req_mlme *mlme = arg;
+
+	if (ni->ni_associd != 0) {
+		IEEE80211_SEND_MGMT(ic, ni,
+			mlme->im_op == IEEE80211_MLME_DEAUTH ?
+				IEEE80211_FC0_SUBTYPE_DEAUTH :
+				IEEE80211_FC0_SUBTYPE_DISASSOC,
+			mlme->im_reason);
+	}
+	ieee80211_node_leave(ic, ni);
+}
+
 int
 ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 		   	 void *w, char *extra)
@@ -1867,17 +1883,18 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 
 	switch (mlme->im_op) {
 	case IEEE80211_MLME_ASSOC:
-		if (ic->ic_opmode != IEEE80211_M_STA)
-			return -EINVAL;
-		/* XXX must be in S_SCAN state? */
+                if (ic->ic_opmode != IEEE80211_M_STA)
+                        return EINVAL;
+                /* XXX must be in S_SCAN state? */
 
 		if (ic->ic_des_esslen != 0) {
 			/*
 			 * Desired ssid specified; must match both bssid and
 			 * ssid to distinguish ap advertising multiple ssid's.
 			 */
-			ni = ieee80211_find_node_with_ssid(&ic->ic_scan, mlme->im_macaddr,
-				ic->ic_des_esslen, ic->ic_des_essid);	// TODO
+			ni = ieee80211_find_node_with_ssid(&ic->ic_scan,
+				mlme->im_macaddr,
+				ic->ic_des_esslen, ic->ic_des_essid);
 		} else {
 			/*
 			 * Normal case; just match bssid.
@@ -1885,11 +1902,10 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			ni = ieee80211_find_node(&ic->ic_scan, mlme->im_macaddr);
 		}
 		if (ni == NULL)
-			return -EINVAL;
+			return EINVAL;
 		if (!ieee80211_sta_join(ic, ni)) {
-			/* NB: from AP scan; don't free, just unref */
-			ieee80211_unref_node(&ni);
-			return -EINVAL;
+			ieee80211_free_node(ni);
+			return EINVAL;
 		}
 		break;
 	case IEEE80211_MLME_DISASSOC:
@@ -1901,18 +1917,20 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 				mlme->im_reason);
 			break;
 		case IEEE80211_M_HOSTAP:
-			ni = ieee80211_find_node(&ic->ic_sta, mlme->im_macaddr);
-			if (ni == NULL)
-				return -EINVAL;
-			IEEE80211_SEND_MGMT(ic, ni,
-				mlme->im_op == IEEE80211_MLME_DEAUTH ?
-					  IEEE80211_FC0_SUBTYPE_DEAUTH
-					: IEEE80211_FC0_SUBTYPE_DISASSOC,
-				mlme->im_reason);
-			ieee80211_node_leave(ic, ni);
+			/* NB: the broadcast address means do 'em all */
+			if (!IEEE80211_ADDR_EQ(mlme->im_macaddr, ic->ic_dev->broadcast)) {
+				if ((ni = ieee80211_find_node(&ic->ic_sta,
+						mlme->im_macaddr)) == NULL)
+					return EINVAL;
+				domlme(&mlme, ni);
+				ieee80211_free_node(ni);
+			} else {
+				ieee80211_iterate_nodes(&ic->ic_sta,
+						domlme, &mlme);
+			}
 			break;
 		default:
-			return -EINVAL;
+			return EINVAL;
 		}
 		break;
 	case IEEE80211_MLME_AUTHORIZE:
@@ -1929,9 +1947,9 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 		ieee80211_free_node(ni);
 		break;
 	case IEEE80211_MLME_CLEAR_STATS:
-	        if (ic->ic_opmode != IEEE80211_M_HOSTAP)
+		if (ic->ic_opmode != IEEE80211_M_HOSTAP)
 		    return -EINVAL;
-		ni = ieee80211_find_node(ic, mlme->im_macaddr);
+		ni = ieee80211_find_node(&ic->ic_sta, mlme->im_macaddr);
 		if (ni == NULL)
 		    return -EINVAL;
 		/* clear statistics */
