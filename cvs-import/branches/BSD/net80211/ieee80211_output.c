@@ -88,7 +88,7 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 	KASSERT(ni != NULL, ("null node"));
 
 	/*
-	 * Yech, hack alert!  We want to pass the node down to the
+	 * We want to pass the node down to the
 	 * driver's start routine.  If we don't do so then the start
 	 * routine must immediately look it up again and that can
 	 * cause a lock order reversal if, for example, this frame
@@ -188,7 +188,7 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 	IEEE80211_ADDR_COPY(wh->i_addr2, ni->ni_bssid);
 	IEEE80211_ADDR_COPY(wh->i_addr3, ic->ic_myaddr);
 	skb_trim(skb, sizeof(struct ieee80211_frame));
- 
+
 	IEEE80211_NODE_STAT(ni, tx_data);
 
 	IF_ENQUEUE(&ic->ic_mgtq, skb);		/* cheat */
@@ -325,9 +325,7 @@ static struct sk_buff *
 ieee80211_skbhdr_adjust(struct ieee80211com *ic, int hdrsize,
 	struct ieee80211_key *key, struct sk_buff *skb)
 {
-#define	TO_BE_RECLAIMED	(sizeof(struct ether_header) - sizeof(struct llc))
 	int need_headroom = hdrsize;
-
 	int need_tailroom = 0;
 
 	if (key != NULL) {
@@ -349,7 +347,12 @@ ieee80211_skbhdr_adjust(struct ieee80211com *ic, int hdrsize,
 		if (key->wk_flags & IEEE80211_KEY_SWMIC)
 			need_tailroom += cip->ic_miclen;
 	}
-
+	/*
+	 * We know we are called just after stripping an Ethernet
+	 * header and before prepending an LLC header.  This means we 
+	 * need to assure the LLC header fits in.
+	 */
+	need_headroom += sizeof(struct llc);
 	skb = skb_unshare(skb, GFP_ATOMIC);
 	if (skb == NULL) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
@@ -477,7 +480,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		hdrsize = roundup(hdrsize, sizeof(u_int32_t));
 	skb = ieee80211_skbhdr_adjust(ic, hdrsize, key, skb);
 	if (skb == NULL) {
-		/* NB: ieee80211_mbuf_adjust handles msgs+statistics */
+		/* NB: ieee80211_skbhdr_adjust handles msgs+statistics */
 		goto bad;
 	}
 
@@ -490,13 +493,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	llc->llc_snap.ether_type = eh.ether_type;
 	datalen = skb->len;		/* NB: w/o 802.11 header */
 
-	if (skb == NULL) {	// TODO: is this correct without M_PREPEND
-		ic->ic_stats.is_tx_nobuf++;
-		goto bad;
-	}
-
-	wh = (struct ieee80211_frame *)
-		skb_push(skb, sizeof(struct ieee80211_frame));;
+	wh = (struct ieee80211_frame *)skb_push(skb, hdrsize);
 
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
 	*(u_int16_t *)wh->i_dur = 0;
@@ -556,8 +553,8 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		 */
 		if (eh.ether_type != __constant_htons(ETHERTYPE_PAE) ||
 		    ((ic->ic_flags & IEEE80211_F_WPA) &&
-		    (ic->ic_opmode == IEEE80211_M_STA ?
-		    !KEY_UNDEFINED(*key) : !KEY_UNDEFINED(ni->ni_ucastkey)))) {
+		     (ic->ic_opmode == IEEE80211_M_STA ?
+		      !KEY_UNDEFINED(*key) : !KEY_UNDEFINED(ni->ni_ucastkey)))) {
 			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 			/* XXX do fragmentation */
 			if (!ieee80211_crypto_enmic(ic, key, skb)) {
