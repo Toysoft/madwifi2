@@ -794,8 +794,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 	wh = (struct ieee80211_frame *) skb->data;
-	if (ic->ic_flags & IEEE80211_F_WEPON)
-		wh->i_fc[1] |= IEEE80211_FC1_WEP;
 	/*
 	 * Locate node state.  When operating
 	 * in station mode we always use ic_bss.

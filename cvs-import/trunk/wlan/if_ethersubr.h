@@ -50,6 +50,10 @@ struct	ether_header {
 	u_short	ether_type;
 };
 
+#ifndef ETHERTYPE_EAPOL
+#define	ETHERTYPE_EAPOL	0x888e		/* EAPOL/802.1x */
+#endif
+
 /*
  * Structure of a 48-bit Ethernet address.
  */

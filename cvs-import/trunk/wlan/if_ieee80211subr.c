@@ -1282,6 +1282,10 @@ ieee80211_encap(struct net_device *dev, struct sk_buff *skb)
 		printk("%s: invalid mode\n", __func__);
 		break;
 	}
+	/* NB: EAPOL frames have their own encryption policy */
+	if (ic->ic_flags & IEEE80211_F_WEPON &&
+	    eh.ether_type != ETHERTYPE_EAPOL)
+		wh->i_fc[1] |= IEEE80211_FC1_WEP;
 	ieee80211_unref_node(&ni);
 	return skb;
 }
