@@ -161,11 +161,11 @@ static int
 acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 {
 	struct aclstate *as = ic->ic_as;
-	struct acl *acl;
+	struct acl *acl, *new;
 	int hash;
 
-	MALLOC(acl, struct acl *, sizeof(struct acl), M_80211_ACL, M_NOWAIT | M_ZERO);
-	if (acl == NULL) {
+	MALLOC(new, struct acl *, sizeof(struct acl), M_80211_ACL, M_NOWAIT | M_ZERO);
+	if (new == NULL) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
 			("ACL: add %s failed, no memory\n",
 			ether_sprintf(mac)));
@@ -178,16 +178,16 @@ acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 	LIST_FOREACH(acl, &as->as_hash[hash], acl_hash) {
 		if (IEEE80211_ADDR_EQ(acl->acl_macaddr, mac)) {
 			ACL_UNLOCK(as);
-			FREE(acl, M_80211_ACL);
+			FREE(new, M_80211_ACL);
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
 				("ACL: add %s failed, already present\n",
 				ether_sprintf(mac)));
 			return EEXIST;
 		}
 	}
-	IEEE80211_ADDR_COPY(acl->acl_macaddr, mac);
-	TAILQ_INSERT_TAIL(&as->as_list, acl, acl_list);
-	LIST_INSERT_HEAD(&as->as_hash[hash], acl, acl_hash);
+	IEEE80211_ADDR_COPY(new->acl_macaddr, mac);
+	TAILQ_INSERT_TAIL(&as->as_list, new, acl_list);
+	LIST_INSERT_HEAD(&as->as_hash[hash], new, acl_hash);
 	ACL_UNLOCK(as);
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
