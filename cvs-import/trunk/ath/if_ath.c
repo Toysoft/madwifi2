@@ -2161,8 +2161,7 @@ ath_node_getrssi(struct ieee80211com *ic, struct ieee80211_node *ni)
 	((((x)%(mul)) >= ((mul)/2)) ? ((x) + ((mul) - 1)) / (mul) : (x)/(mul))
 	int32_t rssi;
 
-	rssi = HAL_EP_RND(ATH_NODE(ni)->an_halstats.ns_avgrssi,
-		HAL_RSSI_EP_MULTIPLIER);
+	rssi = HAL_EP_RND(ATH_NODE(ni)->an_avgrssi, HAL_RSSI_EP_MULTIPLIER);
 	/* NB: theoretically we shouldn't need this, but be paranoid */
 	return rssi < 0 ? 0 : rssi > 127 ? 127 : rssi;
 #undef HAL_EP_RND
@@ -2460,7 +2459,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct sk_buff *skb;
 	struct ieee80211_node *ni;
 	struct ath_node *an;
-	int len, opackets;
+	int len;
 	u_int phyerr;
 	HAL_STATUS status;
 
@@ -2661,12 +2660,10 @@ rx_accept:
 			ni = ic->ic_bss;
 
 		/*
-		 * Record driver-specific state.
+		 * Track rx rssi.
 		 */
 		an = ATH_NODE(ni);
-
-		/* XXX monitor stats to identify packet type */
-		opackets = sc->sc_devstats.rx_packets;
+		ATH_RSSI_LPF(an->an_avgrssi, ds->ds_rxstat.rs_rssi);
 
 		/*
 		 * Send frame up for processing.
@@ -2674,17 +2671,6 @@ rx_accept:
 		ieee80211_input(ic, skb, ni,
 			ds->ds_rxstat.rs_rssi, ds->ds_rxstat.rs_tstamp);
 
-		/*
-		 * Update rssi statistics for use by the hal.
-		 *
-		 * NB: Do this before reclaiming any reference in case
-		 *     the node is deallocated.
-		 * XXX could optimize; we only use this data for station
-		 *     operation (at the moment)
-		 */
-		if (sc->sc_devstats.rx_packets != opackets)
-			ATH_RSSI_LPF(an->an_halstats.ns_avgrssi,
-				ds->ds_rxstat.rs_rssi);
 		/*
 		 * Reclaim node reference.
 		 */
