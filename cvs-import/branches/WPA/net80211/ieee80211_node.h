@@ -72,6 +72,17 @@ struct ieee80211_rateset {
 	u_int8_t		rs_rates[IEEE80211_RATE_MAXSIZE];
 };
 
+struct ieee80211_rsnparms {
+	u_int8_t	rsn_mcastcipher;	/* mcast/group cipher */
+	u_int8_t	rsn_mcastkeylen;	/* mcast key length */
+	u_int8_t	rsn_ucastcipherset;	/* unicast cipher set */
+	u_int8_t	rsn_ucastcipher;	/* selected unicast cipher */
+	u_int8_t	rsn_ucastkeylen;	/* unicast key length */
+	u_int8_t	rsn_keymgmtset;		/* key mangement algorithms */
+	u_int8_t	rsn_keymgmt;		/* selected key mgmt algo */
+	u_int16_t	rsn_caps;		/* capabilities */
+};
+
 /*
  * Node specific information.  Note that drivers are expected
  * to derive from this structure to add device-specific per-node
@@ -83,24 +94,24 @@ struct ieee80211_node {
 	LIST_ENTRY(ieee80211_node)	ni_hash;
 	atomic_t		ni_refcnt;
 	u_int			ni_scangen;	/* gen# for timeout scan */
-	u_int8_t		ni_fragno;	/* frag # of previous frame */
 	u_int8_t		ni_authmode;	/* authentication algorithm */
 	u_int16_t		ni_flags;	/* special-purpose state */
 #define	IEEE80211_NODE_AUTH	0x0001		/* authorized for data */
-#define	IEEE80211_NODE_WPA	0x0002		/* WPA enabled */
-#define	IEEE80211_NODE_QOS	0x0004		/* QoS enabled */
-#define	IEEE80211_NODE_ERP	0x0008		/* ERP enabled */
+#define	IEEE80211_NODE_QOS	0x0002		/* QoS enabled */
+#define	IEEE80211_NODE_ERP	0x0004		/* ERP enabled */
 /* NB: this must have the same value as IEEE80211_FC1_PWR_MGT */
 #define	IEEE80211_NODE_PWR_MGT	0x0010		/* power save mode enabled */
 	u_int16_t		ni_associd;	/* assoc response */
 	u_int16_t		ni_txpower;	/* current transmit power */
 	u_int16_t		ni_vlan;	/* vlan tag */
 	u_int32_t		*ni_challenge;	/* shared-key challenge */
+	u_int8_t		*ni_wpa_ie;	/* captured WPA/RSN ie */
 	u_int16_t		ni_txseq;	/* seq to be transmitted */
 	u_int16_t		ni_rxseq;	/* seq previous received */
 	u_int16_t		ni_rxseqs[16];	/* seq previous for qos frames*/
 	u_int32_t		ni_rxfragstamp;	/* time stamp of last rx frag */
 	struct sk_buff		*ni_rxfrag[3];	/* rx frag reassembly */
+	struct ieee80211_rsnparms ni_rsn;	/* RSN/WPA parameters */
 	u_int16_t		ni_ucastkeyix;	/* unicast key index */
 	struct ieee80211_wepkey	ni_ucastkey;	/* unicast key */
 
@@ -119,20 +130,9 @@ struct ieee80211_node {
 	u_int8_t		ni_esslen;
 	u_int8_t		ni_essid[IEEE80211_NWID_LEN];
 	struct ieee80211_rateset ni_rates;	/* negotiated rate set */
-	u_int8_t		*ni_country;	/* country information XXX */
 	struct ieee80211_channel *ni_chan;
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
-
-#ifdef notyet
-	/* DTIM and contention free period (CFP) */
-	u_int8_t		ni_dtimperiod;
-	u_int8_t		ni_cfpperiod;	/* # of DTIMs between CFPs */
-	u_int16_t		ni_cfpduremain;	/* remaining cfp duration */
-	u_int16_t		ni_cfpmaxduration;/* max CFP duration in TU */
-	u_int16_t		ni_nextdtim;	/* time to next DTIM */
-	u_int16_t		ni_timoffset;
-#endif
 
 	/* others */
 	struct sk_buff_head	ni_savedq;	/* packets queued for pspoll */
@@ -141,7 +141,6 @@ struct ieee80211_node {
 	int			ni_inact;	/* current inactivity count */
 	int			ni_txrate;	/* index to ni_rates[] */
 	struct ieee80211_nodestats ni_stats;	/* per-node statistics */
-	struct proc_dir_entry	*ni_proc;	/* status of associated sta's */
 };
 MALLOC_DECLARE(M_80211_NODE);
 
@@ -172,31 +171,7 @@ extern	void ieee80211_node_authorize(struct ieee80211com *,
 extern	void ieee80211_node_unauthorize(struct ieee80211com *,
 		struct ieee80211_node *);
 
-extern	void ieee80211_begin_scan(struct ieee80211com *);
-extern	void ieee80211_next_scan(struct ieee80211com *);
-extern	void ieee80211_end_scan(struct ieee80211com *);
-extern	struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *,
-		u_int8_t *);
-extern	struct ieee80211_node *ieee80211_dup_bss(struct ieee80211com *,
-		u_int8_t *);
-extern	struct ieee80211_node *ieee80211_find_node(struct ieee80211com *,
-		u_int8_t *);
-extern	struct ieee80211_node * ieee80211_find_txnode(struct ieee80211com *,
-		u_int8_t *);
-extern	struct ieee80211_node * ieee80211_lookup_node(struct ieee80211com *,
-		u_int8_t *macaddr, struct ieee80211_channel *);
-extern	void ieee80211_free_node(struct ieee80211com *,
-		struct ieee80211_node *);
-extern	void ieee80211_free_allnodes(struct ieee80211com *);
-typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
-extern	void ieee80211_iterate_nodes(struct ieee80211com *,
-		ieee80211_iter_func *, void *);
-extern	void ieee80211_dump_node(struct ieee80211_node *);
-extern	void ieee80211_dump_nodes(struct ieee80211com *);
-extern	void ieee80211_timeout_nodes(struct ieee80211com *);
-extern	void ieee80211_node_leave(struct ieee80211com *,
-		struct ieee80211_node *);
-
+/* XXX to be replaced */
 extern	int ieee80211_node_newkey(struct ieee80211com *,
 		struct ieee80211_node *);
 extern	int ieee80211_node_delkey(struct ieee80211com *,
@@ -204,6 +179,42 @@ extern	int ieee80211_node_delkey(struct ieee80211com *,
 extern	int ieee80211_node_setkey(struct ieee80211com *,
 		struct ieee80211_node *);
 
-extern	void ieee80211_create_ibss(struct ieee80211com* ,
+extern	void ieee80211_begin_scan(struct ieee80211com *);
+extern	int ieee80211_next_scan(struct ieee80211com *);
+extern	void ieee80211_create_ibss(struct ieee80211com*,
 		struct ieee80211_channel *);
+extern	void ieee80211_end_scan(struct ieee80211com *);
+extern	int ieee80211_sta_join(struct ieee80211com *,
+		struct ieee80211_node *);
+
+extern	struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *,
+		u_int8_t *);
+extern	struct ieee80211_node *ieee80211_dup_bss(struct ieee80211com *,
+		u_int8_t *);
+extern	struct ieee80211_node *ieee80211_find_node(struct ieee80211com *,
+		u_int8_t *);
+extern	struct ieee80211_node *ieee80211_find_txnode(struct ieee80211com *,
+		u_int8_t *);
+extern	struct ieee80211_node *ieee80211_find_node_with_channel(
+		struct ieee80211com *, u_int8_t *macaddr,
+		struct ieee80211_channel *);
+extern	struct ieee80211_node *ieee80211_find_node_with_ssid(
+		struct ieee80211com *, u_int8_t *macaddr, u_int ssidlen,
+		const u_int8_t *ssid);
+extern	void ieee80211_free_node(struct ieee80211com *,
+		struct ieee80211_node *);
+extern	void ieee80211_free_allnodes(struct ieee80211com *);
+
+typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
+extern	void ieee80211_iterate_nodes(struct ieee80211com *,
+		ieee80211_iter_func *, void *);
+
+extern	void ieee80211_dump_node(struct ieee80211_node *);
+extern	void ieee80211_dump_nodes(struct ieee80211com *);
+extern	void ieee80211_timeout_nodes(struct ieee80211com *);
+
+extern	void ieee80211_node_join(struct ieee80211com *,
+		struct ieee80211_node *, int);
+extern	void ieee80211_node_leave(struct ieee80211com *,
+		struct ieee80211_node *);
 #endif /* _NET80211_IEEE80211_NODE_H_ */
