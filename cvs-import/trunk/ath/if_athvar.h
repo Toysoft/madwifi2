@@ -111,8 +111,6 @@ struct ath_node {
 	u_int		an_tx_err;	/* tx !ok pkt */
 	u_int		an_tx_retr;	/* tx retry count */
 	int		an_tx_upper;	/* tx upper rate req cnt */
-	u_int8_t	an_tx_antenna;	/* antenna for last good tx */
-	u_int8_t	an_rx_antenna;	/* antenna for last good rx */
 	u_int8_t	an_tx_rix0;	/* series 0 rate index */
 	u_int8_t	an_tx_try0;	/* series 0 try count */
 	u_int8_t	an_tx_mgtrate;	/* h/w rate for management/ctl frames */
@@ -210,6 +208,7 @@ struct ath_softc {
 	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
 	u_int8_t		sc_hwmap[32];	/* h/w rate ix to IEEE table */
 	u_int8_t		sc_protrix;	/* protection rate index */
+	u_int8_t		sc_txantenna;	/* tx antenna (fixed or auto) */
 	HAL_INT			sc_imask;	/* interrupt mask copy */
 	u_int			sc_keymax;	/* size of key cache */
 	u_int8_t		sc_keymap[16];	/* bit map of key cache use */
