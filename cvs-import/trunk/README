@@ -5,7 +5,7 @@ Atheros Driver For Linux
 
 * Copyright (c) 2002, 2003 Sam Leffler.  All rights reserved.
 
-Read the file COPYRIGHT; this is not GPL code.
+Read the file COPYRIGHT.
 
 This software contains a kernel driver for Atheros-based Wireless LAN
 devices.  The driver supports both station and AP modes of operation.
