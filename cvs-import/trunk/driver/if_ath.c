@@ -1619,7 +1619,7 @@ ath_rx_capture(	struct net_device *dev, struct sk_buff *skb, int len, int rssi, 
 	skb->mac.raw = skb->data ;
 	skb->ip_summed = CHECKSUM_NONE;
 	skb->pkt_type = PACKET_OTHERHOST;
-	skb->protocol = htons(0x0019);  /* ETH_P_80211_RAW */
+	skb->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
 	
 	netif_rx(skb);
 }
