@@ -35,4 +35,4 @@
  *
  * $Id$
  */
-#define	ATH_PCI_VERSION	"0.9.2.1-WPA"
+#define	ATH_PCI_VERSION	"0.9.2.2-WPA"
