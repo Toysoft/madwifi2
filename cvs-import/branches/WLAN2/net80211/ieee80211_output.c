@@ -574,7 +574,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 	} else {
 bad:
 		if (ni != ic->ic_bss)		/* remove ref we added */
-			ieee80211_free_node(ic, ni);
+			ieee80211_unref_node(&ni);
 	}
 	return ret;
 #undef senderr
