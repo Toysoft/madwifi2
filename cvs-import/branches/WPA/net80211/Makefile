@@ -37,7 +37,7 @@
 #
 
 #
-# Makefile for the 802.11 WLAN module.
+# Makefile for the 802.11 WLAN modules.
 #
 ifeq ($(obj),)
 obj=	.
@@ -45,21 +45,35 @@ endif
 
 DEPTH=	..
 
-obj-m		+= wlan.o wlan_auth.o wlan_radius.o
+obj-m		+= wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
+		   wlan_auth.o wlan_radius.o wlan_acl.o \
+		   tkip_test.o ccmp_test.o wep_test.o
 
 wlan-objs	:= if_media.o rc4.o \
 		   ieee80211.o ieee80211_crypto.o ieee80211_input.o \
 		   ieee80211_node.o ieee80211_output.o ieee80211_proto.o \
-		   ieee80211_wireless.o ieee80211_linux.o
+		   ieee80211_wireless.o ieee80211_linux.o \
+		   ieee80211_crypto_none.o
+wlan_wep-objs	:= ieee80211_crypto_wep.o
+wlan_tkip-objs	:= ieee80211_crypto_tkip.o
+wlan_ccmp-objs	:= ieee80211_crypto_ccmp.o
 wlan_auth-objs	:= ieee80211_dot1x.o
-wlan_radius-objs := ieee80211_radius.o
+wlan_radius-objs:= ieee80211_radius.o
+wlan_acl-objs	:= ieee80211_acl.o
 
-list-multi	:= wlan.o wlan_auth.o wlan_radius.o
+tkip_test-objs	:= test_tkip.o
+ccmp_test-objs	:= test_ccmp.o
+wep_test-objs	:= test_wep.o
+
 export-objs	:= if_media.o rc4.o \
 		   ieee80211.o ieee80211_crypto.o ieee80211_input.o \
 		   ieee80211_node.o ieee80211_output.o ieee80211_proto.o \
 		   ieee80211_wireless.o ieee80211_linux.o \
+		   ieee80211_crypto_none.o ieee80211_crypto_wep.o \
+		   ieee80211_crypto_tkip.o ieee80211_crypto_ccmp.o \
 		   ieee80211_dot1x.o ieee80211_radius.o
+list-multi	:= wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
+		   wlan_auth.o wlan_radius.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 
@@ -75,14 +89,31 @@ all:
 
 wlan.o:	$(wlan-objs)
 	$(LD) -o wlan.$(KMODSUF) -r $(wlan-objs)
+wlan_wep.o:	$(wlan_wep-objs)
+	$(LD) -o wlan_wep.$(KMODSUF) -r $(wlan_wep-objs)
+wlan_tkip.o:	$(wlan_tkip-objs)
+	$(LD) -o wlan_tkip.$(KMODSUF) -r $(wlan_tkip-objs)
+wlan_ccmp.o:	$(wlan_ccmp-objs)
+	$(LD) -o wlan_ccmp.$(KMODSUF) -r $(wlan_ccmp-objs)
 wlan_auth.o:	$(wlan_auth-objs)
 	$(LD) -o wlan_auth.$(KMODSUF) -r $(wlan_auth-objs)
 wlan_radius.o:	$(wlan_radius-objs)
 	$(LD) -o wlan_radius.$(KMODSUF) -r $(wlan_radius-objs)
+wlan_acl.o:	$(wlan_acl-objs)
+	$(LD) -o wlan_acl.$(KMODSUF) -r $(wlan_acl-objs)
+
+tkip_test.o:	$(tkip_test-objs)
+	$(LD) -o tkip_test.$(KMODSUF) -r $(tkip_test-objs)
+ccmp_test.o:	$(ccmp_test-objs)
+	$(LD) -o ccmp_test.$(KMODSUF) -r $(ccmp_test-objs)
+wep_test.o:	$(wep_test-objs)
+	$(LD) -o wep_test.$(KMODSUF) -r $(wep_test-objs)
+
+MODULES=wlan wlan_wep wlan_tkip wlan_ccmp wlan_auth wlan_radius wlan_acl
 
 install: all
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
-	for i in wlan wlan_auth wlan_radius; do \
+	for i in ${MODULES}; do \
 		strip -S $$i.$(KMODSUF); \
 		cp $$i.${KMODSUF} ${DESTDIR}/${MODULEPATH}; \
 	done
