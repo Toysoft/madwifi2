@@ -37,7 +37,9 @@
  * $Id$
  */
 
-#include <linux/types.h>
+#include <linux/config.h>
+#include <linux/version.h>
+#include <linux/module.h>
 
 #include "rc4.h"
 
@@ -73,6 +75,7 @@ rc4_init(struct rc4_state *const state, const u_char *key, int keylen)
 		swap_bytes(&state->perm[i], &state->perm[j]);
 	}
 }
+EXPORT_SYMBOL(rc4_init);
 
 /*
  * Encrypt some data using the supplied RC4 state buffer.
@@ -102,3 +105,4 @@ rc4_crypt(struct rc4_state *const state,
 		outbuf[i] = inbuf[i] ^ state->perm[j];
 	}
 }
+EXPORT_SYMBOL(rc4_crypt);
