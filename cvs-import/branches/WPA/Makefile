@@ -44,7 +44,7 @@ DEPTH=	.
 include Makefile.inc
 
 # NB: the order is important here
-DIRS=	${ATH_HAL} ${WLAN} ${DRIVERS}
+DIRS=	${ATH_HAL} ${WLAN} ${DRIVER}
 
 all:
 	for i in ${DIRS}; do \
@@ -55,11 +55,14 @@ install:
 	for i in ${DIRS}; do \
 		(cd $$i; make install); \
 	done
+ifeq ($(DESTDIR),)
 	/sbin/depmod -ae
+endif
 
 FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
 	README release.h share net80211
 HAL_TAG=ATH_HAL_20030802
+
 release:
 	DATE=`date +'%Y%m%d'`; TAG="MADWIFI_$${DATE}"; DIR="madwifi-$${DATE}"; \
 	cvs tag -F $${TAG} ${FILES}; \
@@ -69,20 +72,7 @@ release:
 	tar zcf $${DIR}.tgz --exclude=CVS --exclude=hal/freebsd $${DIR}; \
 	rm -rf $${DIR}
 
-#
-# This stuff is bogus as it requires us to understand how each
-# individual Makefile works; but it's much faster than doing
-# make clean in each subdir 'cuz gmake is so woeful handling
-# .depend files.
-#
 clean:
-	find . -name '*.[oas]' \
-	   -or -name core \
-	   -or -name '*.ver' \
-	   -or -name '*.mod.c' \
-	   -or -name "*.${KMODSUF}" \
-	   -or -name .depend \
-	| xargs rm -f
-ifndef HAL_OBJDIR
-	rm -f ${ATH_HAL}/opt_ah.h
-endif
+	for i in ${DIRS}; do \
+		(cd $$i; make clean); \
+	done
