@@ -173,11 +173,32 @@ static const char *acnames[] = {
 
 static	int ath_dwelltime = 200;		/* 5 channels/second */
 static	int ath_calinterval = 30;		/* calibrate every 30 secs */
-static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
 static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
+/*
+ * Default parameters for the rate control algorithm.  These are
+ * all tunable with sysctls.  The rate controller runs periodically
+ * (each ath_rateinterval ms) analyzing transmit statistics for each
+ * neighbor/station (when operating in station mode this is only the AP).
+ * If transmits look to be working well over a sampling period then
+ * it gives a "raise rate credit".  If transmits look to not be working
+ * well than it deducts a credit.  If the credits cross a threshold then
+ * the transmit rate is raised.  Various error conditions force the
+ * the transmit rate to be dropped.
+ *
+ * The decision to issue/deduct a credit is based on the errors and
+ * retries accumulated over the sampling period.  ath_rate_raise defines
+ * the percent of retransmits for which a credit is issued/deducted.
+ * ath_rate_raise_threshold defines the threshold on credits at which
+ * the transmit rate is increased.
+ *
+ * XXX this algorithm is flawed and needs replacement.
+ */
+static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
+static	int ath_rate_raise = 10;		/* add credit threshold */
+static	int ath_rate_raise_threshold = 10;	/* rate ctl raise threshold */
 
 #ifdef AR_DEBUG
 int	ath_debug = 0;
@@ -3930,30 +3951,34 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 	struct ath_softc *sc = arg;
 	struct ath_node *an = ATH_NODE(ni);
 	struct ieee80211_rateset *rs = &ni->ni_rates;
-	int mod = 0, nrate, enough;
+	int dir = 0, nrate, enough;
 
 	/*
 	 * Rate control
 	 * XXX: very primitive version.
 	 */
-	sc->sc_stats.ast_rate_calls++;
-
 	enough = (an->an_tx_ok + an->an_tx_err >= 10);
 
 	/* no packet reached -> down */
 	if (an->an_tx_err > 0 && an->an_tx_ok == 0)
-		mod = -1;
+		dir = -1;
 
 	/* all packets needs retry in average -> down */
 	if (enough && an->an_tx_ok < an->an_tx_retr)
-		mod = -1;
+		dir = -1;
 
-	/* no error and less than 10% of packets needs retry -> up */
-	if (enough && an->an_tx_err == 0 && an->an_tx_ok > an->an_tx_retr * 10)
-		mod = 1;
+	/* no error and less than rate_raise% of packets need retry -> up */
+	if (enough && an->an_tx_err == 0 &&
+	    an->an_tx_retr < (an->an_tx_ok * ath_rate_raise) / 100)
+		dir = 1;
+
+	DPRINTF(ATH_DEBUG_RATE, "%s: ok %d err %d retr %d upper %d dir %d\n",
+		ether_sprintf(ni->ni_macaddr),
+		an->an_tx_ok, an->an_tx_err, an->an_tx_retr,
+		an->an_tx_upper, dir);
 
 	nrate = ni->ni_txrate;
-	switch (mod) {
+	switch (dir) {
 	case 0:
 		if (enough && an->an_tx_upper > 0)
 			an->an_tx_upper--;
@@ -3966,7 +3991,8 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 		an->an_tx_upper = 0;
 		break;
 	case 1:
-		if (++an->an_tx_upper < 10)
+		/* raise rate if we hit rate_raise_threshold */
+		if (++an->an_tx_upper < ath_rate_raise_threshold)
 			break;
 		an->an_tx_upper = 0;
 		if (nrate + 1 < rs->rs_nrates) {
@@ -3997,6 +4023,8 @@ ath_ratectl(unsigned long data)
 	int interval;
 
 	if (dev->flags & IFF_RUNNING) {
+		sc->sc_stats.ast_rate_calls++;
+
 		if (ic->ic_opmode == IEEE80211_M_STA)
 			ath_rate_ctl(sc, ic->ic_bss);	/* NB: no reference */
 		else
@@ -4558,6 +4586,8 @@ static	int mindwelltime = 100;			/* 100ms */
 static	int mincalibrate = 1;			/* once a second */
 static	int minrateinterval = 500;		/* 500ms */
 static	int maxint = 0x7fffffff;		/* 32-bit big */
+static	int maxpercent = 100;			/* 100% */
+static	int minpercent = 0;			/* 0% */
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
@@ -4710,13 +4740,29 @@ static ctl_table ath_static_sysctls[] = {
 	  .proc_handler	= proc_dointvec_minmax
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .procname	= "rateinterval",
+	  .procname	= "rate_interval",
 	  .mode		= 0644,
 	  .data		= &ath_rateinterval,
 	  .maxlen	= sizeof(ath_rateinterval),
 	  .extra1	= &minrateinterval,
 	  .extra2	= &maxint,
 	  .proc_handler	= proc_dointvec_minmax
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "rate_raise",
+	  .mode		= 0644,
+	  .data		= &ath_rate_raise,
+	  .maxlen	= sizeof(ath_rate_raise),
+	  .extra1	= &minpercent,
+	  .extra2	= &maxpercent,
+	  .proc_handler	= proc_dointvec_minmax
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "rate_raise_threshold",
+	  .mode		= 0644,
+	  .data		= &ath_rate_raise_threshold,
+	  .maxlen	= sizeof(ath_rate_raise_threshold),
+	  .proc_handler	= proc_dointvec
 	},
 	{ 0 }
 };
