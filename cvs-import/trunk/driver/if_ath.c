@@ -340,8 +340,8 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (sc->sc_invalid) {
 		/*
-		 * The hardware is gone, don't touch anything.
-		 * XXX can this happen?
+		 * The hardware is gone, or HAL isn't yet initialized.
+		 * Don't touch anything.
 		 */
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
 		return;
