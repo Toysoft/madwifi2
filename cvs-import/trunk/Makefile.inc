@@ -33,11 +33,7 @@ VERSION=	2.4.20
 KERNEL_PATH=	${DEPTH}/../linux-${VERSION}
 LINUX=		${KERNEL_PATH}/include
 #
-# Path to the HAL source code.
-#
-HAL=	${DEPTH}/hal
-#
-# Path to the build area for the HAL.
+# Path to the public HAL materials.
 #
 ATH_HAL=${DEPTH}/ath_hal
 #
