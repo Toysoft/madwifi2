@@ -71,6 +71,7 @@ struct aclstate {
 	int			as_policy;
 	TAILQ_HEAD(, acl)	as_list;	/* list of all ACL's */
 	ATH_LIST_HEAD(, acl)	as_hash[ACL_HASHSIZE];
+	struct ieee80211com	*as_ic;
 };
 
 /* simple hash is enough for variation of macaddr */
@@ -94,8 +95,10 @@ acl_attach(struct ieee80211com *ic)
 		_MOD_DEC_USE(THIS_MODULE);
 		return 0;
 	}
+	ACL_LOCK_INIT(as, "acl");
 	TAILQ_INIT(&as->as_list);
 	as->as_policy = ACL_POLICY_OPEN;
+	as->as_ic = ic;
 	ic->ic_as = as;
 	return 1;
 }
@@ -107,6 +110,7 @@ acl_detach(struct ieee80211com *ic)
 
 	acl_free_all(ic);
 	ic->ic_as = NULL;
+	ACL_LOCK_DESTROY(as);
 	FREE(as, M_DEVBUF);
 
 	_MOD_DEC_USE(THIS_MODULE);
