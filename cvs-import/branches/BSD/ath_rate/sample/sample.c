@@ -817,6 +817,14 @@ static int max_smoothing_rate = 99;
 static int min_sample_rate = 2;
 static int max_sample_rate = 100;
 
+#ifdef CONFIG_SYSCTL
+void
+ath_rate_dynamic_sysctl_register(struct ath_softc *sc)
+{
+}
+EXPORT_SYMBOL(ath_rate_dynamic_sysctl_register);
+#endif /* CONFIG_SYSCTL */
+
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
 /*

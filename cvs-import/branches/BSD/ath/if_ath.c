@@ -646,6 +646,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 */
 #ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_register(sc);
+	ath_rate_dynamic_sysctl_register(sc);
 	ieee80211_sysctl_register(ic);
 #endif /* CONFIG_SYSCTL */
 	ieee80211_announce(ic);

@@ -481,6 +481,14 @@ static	int maxint = 0x7fffffff;		/* 32-bit big */
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
+#ifdef CONFIG_SYSCTL
+void
+ath_rate_dynamic_sysctl_register(struct ath_softc *sc)
+{
+}
+EXPORT_SYMBOL(ath_rate_dynamic_sysctl_register);
+#endif /* CONFIG_SYSCTL */
+
 /*
  * Static (i.e. global) sysctls.
  */
