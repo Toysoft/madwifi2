@@ -1940,7 +1940,7 @@ ath_beacon_config(struct ath_softc *sc)
 			bs.bs_sleepduration = roundup(bs.bs_sleepduration, bs.bs_dtimperiod);
 
 		DPRINTF(ATH_DEBUG_BEACON, 
-			"%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u maxdur %u next %u timoffset %u\n"
+			"%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u maxdur %u timoffset %u\n"
 			, __func__
 			, bs.bs_intval
 			, bs.bs_nexttbtt
@@ -1950,7 +1950,6 @@ ath_beacon_config(struct ath_softc *sc)
 			, bs.bs_sleepduration
 			, bs.bs_cfpperiod
 			, bs.bs_cfpmaxduration
-			, bs.bs_cfpnext
 			, bs.bs_timoffset
 		);
 		ath_hal_intrset(ah, 0);
