@@ -98,7 +98,7 @@ ieee80211_iw_getstats(struct net_device *dev)
 	case IEEE80211_M_STA:
 		/* use stats from associated ap */
 		set_quality(&ic->ic_iwstats.qual,
-			ieee80211_get_rssi(&ic->ic_bss));
+			ieee80211_get_rssi(ic->ic_bss));
 		break;
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
@@ -402,7 +402,7 @@ ieee80211_ioctl_giwap(struct net_device *dev,
 	if (ic->ic_flags & IEEE80211_F_DESBSSID)
 		IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_des_bssid);
 	else
-		IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_bss.ni_bssid);
+		IEEE80211_ADDR_COPY(&ap_addr->sa_data, ic->ic_bss->ni_bssid);
 	ap_addr->sa_family = ARPHRD_ETHER;
 	return 0;
 }
@@ -521,9 +521,9 @@ ieee80211_ioctl_giwessid(struct net_device *dev,
 		memcpy(essid, ic->ic_des_essid, data->length);
 	} else {
 		if (strlen(ic->ic_des_essid) == 0) {
-			if (data->length > ic->ic_bss.ni_esslen)
-				data->length = ic->ic_bss.ni_esslen;
-			memcpy(essid, ic->ic_bss.ni_essid, data->length);
+			if (data->length > ic->ic_bss->ni_esslen)
+				data->length = ic->ic_bss->ni_esslen;
+			memcpy(essid, ic->ic_bss->ni_essid, data->length);
 		} else {
 			if (data->length > ic->ic_des_esslen)
 				data->length = ic->ic_des_esslen;
@@ -539,7 +539,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 			 struct iw_point *data, char *extra)
 {
 	struct ieee80211com *ic = dev->priv;
-	struct ieee80211_node *ni = &ic->ic_bss;
+	struct ieee80211_node *ni = ic->ic_bss;
 	struct iw_range *range = (struct iw_range *) extra;
 	struct ieee80211_rateset *rs;
 	int i, r;
