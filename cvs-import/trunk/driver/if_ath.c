@@ -1516,7 +1516,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 * The ICV length must be included into hdrlen and pktlen.
 		 */
 		hdrlen = sizeof(hdrbuf) + IEEE80211_WEP_CRCLEN;
-		pktlen += IEEE80211_WEP_CRCLEN;
+		pktlen += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN+
+			IEEE80211_WEP_CRCLEN;
 	}
 	pktlen += IEEE80211_CRC_LEN;
 
