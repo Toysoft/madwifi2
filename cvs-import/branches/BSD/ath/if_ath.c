@@ -2567,7 +2567,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds->ds_link = bf->bf_daddr;	/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_setuprxdesc(ah, ds
-		, skb->len		/* buffer size */
+		, skb_tailroom(skb)	/* buffer size */
 		, 0
 	);
 
