@@ -811,6 +811,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		/*
 		 * When 802.1x is not in use mark the port
 		 * authorized at this point so traffic can flow.
+		 * XXX shared key auth
 		 */
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
 		    status == IEEE80211_STATUS_SUCCESS &&
