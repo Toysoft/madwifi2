@@ -177,6 +177,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->priv = sc;
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	sc->aps_sc.sc_pdev = pdev;
 
