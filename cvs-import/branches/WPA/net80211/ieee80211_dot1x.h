@@ -222,14 +222,6 @@ struct eapolcom {
 #define	EAPOL_F_TXKEY_ENA	0x00000001
 #define	EAPOL_F_REAUTH_ENA	0x00000002	/* re-authentication enabled */
 #define	EAPOL_F_GREKEY_ENA	0x00000004	/* group re-key enabled */
-	u_int			ec_quietPeriod;	/* idle timeout */
-	u_int			ec_reAuthPeriod;/* reauthentication timeout */
-	u_int			ec_reAuthMax;	/* max # reauthentications */
-	u_int			ec_txPeriod;	/* transmit timeout */
-	u_int			ec_suppTimeout;	/* supplicant timeout */
-	u_int			ec_serverTimeout;/* backend server timeout */
-	u_int			ec_maxSuppReq;	/* max # supplicant requests */
-	u_int			ec_maxServReq;	/* max # server requests */
 	struct timer_list	ec_timer;	/* state machine timers */
 
 	/* backend state and related methods */

@@ -455,14 +455,13 @@ AS_STATE_DECL(DISCONNECTED)
 
 AS_STATE_DECL(HELD)
 {
-	struct eapolcom *ec = ean->ean_ec;
 
 	AS_STATE_DEBUG(HELD, ean);
 
 	ean->ean_portStatus = EAPOL_PORTSTATUS_UNAUTH;
 	ieee80211_node_unauthorize(ean->ean_ic, ean->ean_node);
 
-	ean->ean_quietWhile = ec->ec_quietPeriod;
+	ean->ean_quietWhile = eapol_idletimo;
 	ean->ean_eapLogoff = FALSE;
 	ean->ean_currentId++;
 	ean->ean_authState = EAPOL_AS_HELD;
@@ -470,13 +469,12 @@ AS_STATE_DECL(HELD)
 
 AS_STATE_DECL(CONNECTING)
 {
-	struct eapolcom *ec = ean->ean_ec;
 
 	AS_STATE_DEBUG(CONNECTING, ean);
 
 	ean->ean_eapStart = FALSE;
 	ean->ean_reAuthenticate = FALSE;
-	ean->ean_txWhen = ec->ec_txPeriod;
+	ean->ean_txWhen = eapol_txtimo;
 	ean->ean_rxRespId = FALSE;
 	txReqId(ean);
 	ean->ean_reAuthCount++;
@@ -551,7 +549,6 @@ AS_STATE_DECL(FORCE_UNAUTH)
 static void
 eapol_auth_step(struct eapol_auth_node *ean)
 {
-	struct eapolcom *ec = ean->ean_ec;
 
 	EAPOL_LOCK_ASSERT(ec);
 
@@ -574,7 +571,7 @@ eapol_auth_step(struct eapol_auth_node *ean)
 			AS_STATE_ENTER(CONNECTING, ean);
 		break;
 	case EAPOL_AS_CONNECTING:
-		if (ean->ean_reAuthCount <= ec->ec_reAuthMax) {
+		if (ean->ean_reAuthCount <= eapol_reauthlimit) {
 			if (ean->ean_rxRespId) {
 				ean->ean_txWhen = 0;
 				ean->ean_authEntersAuthenticating++;
@@ -705,7 +702,7 @@ ABS_STATE_DECL(REQUEST)
 
 	ean->ean_currentId = ean->ean_idFromServer;
 	txReq(ean);
-	ean->ean_aWhile = ean->ean_ec->ec_suppTimeout;
+	ean->ean_aWhile = eapol_supptimo;
 	ean->ean_reqCount++;
 	ean->ean_reqSrvCount = 0;
 	ean->ean_backendState = EAPOL_ABS_REQUEST;
@@ -722,7 +719,7 @@ ABS_STATE_DECL(RESPONSE)
 	ean->ean_authTimeout = FALSE;
 	ean->ean_rxResp = FALSE;
 	ean->ean_aFail = FALSE;
-	ean->ean_aWhile = ean->ean_ec->ec_serverTimeout;
+	ean->ean_aWhile = eapol_servtimo;
 	ean->ean_reqCount = 0;
 	sendRespToServer(ean);
 	ean->ean_reqSrvCount++;
@@ -769,7 +766,6 @@ ABS_STATE_DECL(TIMEOUT)
 static void
 eapol_backend_step(struct eapol_auth_node *ean)
 {
-	struct eapolcom *ec = ean->ean_ec;
 
 	EAPOL_LOCK_ASSERT(ec);
 
@@ -790,7 +786,7 @@ eapol_backend_step(struct eapol_auth_node *ean)
 		if (ean->ean_rxResp)
 			ABS_STATE_ENTER(RESPONSE, ean);
 		else if (ean->ean_aWhile == 0) {
-			if (ean->ean_reqCount < ec->ec_maxSuppReq)
+			if (ean->ean_reqCount < eapol_suppreqlimit)
 				ABS_STATE_ENTER(REQUEST, ean);
 			else
 				ABS_STATE_ENTER(TIMEOUT, ean);
@@ -804,7 +800,7 @@ eapol_backend_step(struct eapol_auth_node *ean)
 		else if (ean->ean_aSuccess)
 			ABS_STATE_ENTER(SUCCESS, ean);
 		else if (ean->ean_aWhile == 0) {
-			if (ean->ean_reqSrvCount < ec->ec_maxServReq)
+			if (ean->ean_reqSrvCount < eapol_servreqlimit)
 				ABS_STATE_ENTER(RESPONSE, ean);
 			else
 				ABS_STATE_ENTER(TIMEOUT, ean);
@@ -848,7 +844,7 @@ REAUTH_STATE_DECL(INIT)
 {
 	REAUTH_STATE_OPT_DEBUG(INIT, ean);
 
-	ean->ean_reAuthWhen = ean->ean_reAuthPeriod;
+	ean->ean_reAuthWhen = eapol_reauthtimo;
 	ean->ean_reAuthState = EAPOL_ARS_INIT;
 }
 
@@ -1174,7 +1170,7 @@ txReqId(struct eapol_auth_node *ean)
 
 	eapol_send(&ean->ean_base, skb, EAPOL_TYPE_EAP);
 
-	ean->ean_txWhen = ean->ean_ec->ec_txPeriod;
+	ean->ean_txWhen = eapol_txtimo;
 }
 
 /*
@@ -1186,10 +1182,9 @@ txReqId(struct eapol_auth_node *ean)
 void
 eapol_reauth_setperiod(struct eapol_auth_node *ean, int timeout)
 {
-	struct eapolcom *ec = ean->ean_ec;
 
 	if (timeout == 0)
-		ean->ean_reAuthPeriod = ec->ec_reAuthPeriod;
+		ean->ean_reAuthPeriod = eapol_reauthtimo;
 	else if (timeout < eapol_reauthmin)
 		ean->ean_reAuthPeriod = eapol_reauthmin;
 	else
@@ -1537,14 +1532,6 @@ ieee80211_authenticator_attach(struct ieee80211com *ic)
 	ec->ec_flags = EAPOL_F_TXKEY_ENA;
 	ec->ec_flags |= EAPOL_F_REAUTH_ENA;	/* XXX disable with WPA */
 	ec->ec_flags |= EAPOL_F_GREKEY_ENA;	/* XXX disable with WPA */
-	ec->ec_quietPeriod = eapol_idletimo;
-	ec->ec_reAuthPeriod = eapol_reauthtimo;
-	ec->ec_reAuthMax = eapol_reauthlimit;
-	ec->ec_txPeriod = eapol_txtimo;
-	ec->ec_suppTimeout = eapol_supptimo;
-	ec->ec_serverTimeout = eapol_servtimo;
-	ec->ec_maxSuppReq = eapol_suppreqlimit;
-	ec->ec_maxServReq = eapol_servreqlimit;
 
 	/* 
 	 * Startup/attach the radius support if needed.
