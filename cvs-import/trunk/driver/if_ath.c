@@ -414,6 +414,8 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 */
 		return IRQ_NONE;
 	}
+	if (!ath_hal_intrpend(ah))		/* shared irq, not for us */
+		return IRQ_NONE;
 	if ((dev->flags & (IFF_RUNNING|IFF_UP)) != (IFF_RUNNING|IFF_UP)) {
 		DPRINTF(("ath_intr: flags 0x%x\n", dev->flags));
 		ath_hal_getisr(ah, &status);	/* clear ISR */
