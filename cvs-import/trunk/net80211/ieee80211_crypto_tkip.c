@@ -168,9 +168,23 @@ static int
 tkip_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 {
 	struct tkip_ctx *ctx = k->wk_private;
+	struct ieee80211com *ic = ctx->tc_ic;
 	u_int8_t *ivp;
 	int hdrlen;
 
+	/*
+	 * Handle TKIP counter measures requirement.
+	 */
+	if (ic->ic_flags & IEEE80211_F_COUNTERM) {
+		struct ieee80211_frame *wh =
+			(struct ieee80211_frame *) skb->data;
+
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+			("[%s] Discard frame due to countermeasures (%s)\n",
+			ether_sprintf(wh->i_addr2), __func__));
+		ic->ic_stats.is_crypto_tkipcm++;
+		return 0;
+	}
 	hdrlen = ieee80211_hdrsize(skb->data);
 
 	/*
@@ -257,6 +271,7 @@ static int
 tkip_decap(struct ieee80211_key *k, struct sk_buff *skb)
 {
 	struct tkip_ctx *ctx = k->wk_private;
+	struct ieee80211com *ic = ctx->tc_ic;
 	struct ieee80211_frame *wh;
 	u_int8_t *ivp;
 	int hdrlen;
@@ -272,10 +287,20 @@ tkip_decap(struct ieee80211_key *k, struct sk_buff *skb)
 		/*
 		 * No extended IV; discard frame.
 		 */
-		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
 			("[%s] Missing ExtIV for TKIP cipher\n",
 			ether_sprintf(wh->i_addr2)));
-		ctx->tc_ic->ic_stats.is_rx_tkipformat++;
+		ic->ic_stats.is_rx_tkipformat++;
+		return 0;
+	}
+	/*
+	 * Handle TKIP counter measures requirement.
+	 */
+	if (ic->ic_flags & IEEE80211_F_COUNTERM) {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+			("[%s] Discard frame due to countermeasures (%s)\n",
+			ether_sprintf(wh->i_addr2), __func__));
+		ic->ic_stats.is_crypto_tkipcm++;
 		return 0;
 	}
 
@@ -286,8 +311,8 @@ tkip_decap(struct ieee80211_key *k, struct sk_buff *skb)
 		/*
 		 * Replay violation; notify upper layer.
 		 */
-		ieee80211_notify_replay_failure(ctx->tc_ic, wh, k, ctx->rx_rsc);
-		ctx->tc_ic->ic_stats.is_rx_tkipreplay++;
+		ieee80211_notify_replay_failure(ic, wh, k, ctx->rx_rsc);
+		ic->ic_stats.is_rx_tkipreplay++;
 		return 0;
 	}
 	/*

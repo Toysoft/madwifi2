@@ -108,6 +108,7 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_ssidmismatch;	/* rx frame ssid mismatch  */
 	u_int32_t	is_rx_auth_unsupported;	/* rx w/ unsupported auth alg */
 	u_int32_t	is_rx_auth_fail;	/* rx sta auth failure */
+	u_int32_t	is_rx_auth_countermeasures;/* rx auth discard 'cuz CM */
 	u_int32_t	is_rx_assoc_bss;	/* rx assoc from wrong bssid */
 	u_int32_t	is_rx_assoc_notauth;	/* rx assoc w/o auth */
 	u_int32_t	is_rx_assoc_capmismatch;/* rx assoc w/ cap mismatch */
@@ -145,6 +146,7 @@ struct ieee80211_stats {
 	u_int32_t	is_crypto_tkip;		/* tkip crypto done in s/w */
 	u_int32_t	is_crypto_tkipenmic;	/* tkip en-MIC done in s/w */
 	u_int32_t	is_crypto_tkipdemic;	/* tkip de-MIC done in s/w */
+	u_int32_t	is_crypto_tkipcm;	/* tkip counter measures */
 	u_int32_t	is_crypto_ccmp;		/* ccmp crypto done in s/w */
 	u_int32_t	is_crypto_wep;		/* wep crypto done in s/w */
 	u_int32_t	is_crypto_setkey_cipher;/* cipher rejected key */
