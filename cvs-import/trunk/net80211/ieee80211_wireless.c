@@ -99,7 +99,7 @@ ieee80211_iw_getstats(struct ieee80211com *ic, struct iw_statistics *is)
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:
 		/* use stats from associated ap */
-		if (ic->ic_bss)
+		if (ic->ic_bss && ic->ic_state == IEEE80211_S_RUN)
 			set_quality(&is->qual,
 				(*ic->ic_node_getrssi)(ic, ic->ic_bss));
 		else
