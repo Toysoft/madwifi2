@@ -2645,7 +2645,7 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 		st->st_tx_upper = 0;
 		break;
 	case 1:
-		if (++st->st_tx_upper < 2)
+		if (++st->st_tx_upper < 10)
 			break;
 		st->st_tx_upper = 0;
 		if (ni->ni_txrate + 1 < rs->rs_nrates) {
@@ -2679,7 +2679,10 @@ ath_ratectl(unsigned long data)
 		else
 			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
 	}
-	sc->sc_rate_ctl.expires = jiffies + ((HZ * ath_rateinterval) / 1000);
+	if (ic->ic_opmode == IEEE80211_M_STA)
+		sc->sc_rate_ctl.expires = jiffies + ((HZ * ath_rateinterval/2) / 1000);
+	else
+		sc->sc_rate_ctl.expires = jiffies + ((HZ * ath_rateinterval) / 1000);
 	add_timer(&sc->sc_rate_ctl);
 }
 
