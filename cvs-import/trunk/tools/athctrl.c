@@ -37,7 +37,7 @@
 
 /*
  * Simple Atheros-specific tool to inspect and set atheros specific values
- * athstats [-i interface] [-d distance]
+ * athctrl [-i interface] [-d distance]
  * (default interface is ath0).  
  */
 #include <sys/types.h>
@@ -72,7 +72,7 @@ static void usage(void)
         "Atheros driver control\n"
         "Copyright (c) 2002-2004 Gunter Burchardt, Local-Web AG\n"
         "\n"
-        "usage: athstats [-i interface] [-d distance]\n"
+        "usage: athctrl [-i interface] [-d distance]\n"
         "\n"
         "options:\n"
         "   -h   show this usage\n"
