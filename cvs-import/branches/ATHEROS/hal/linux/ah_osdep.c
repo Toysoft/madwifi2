@@ -63,8 +63,6 @@
 #define	__MOD_DEC_USE_COUNT(_m)		module_put(_m)
 #endif
 
-#define	AH_TIMEOUT	1000
-
 #ifdef AH_DEBUG
 static	int ath_hal_debug = 0;
 #endif /* AH_DEBUG */
@@ -218,25 +216,6 @@ ath_hal_getuptime(struct ath_hal *ah)
 }
 
 /*
- * Poll the register looking for a specific value.
- */
-HAL_BOOL
-ath_hal_wait(struct ath_hal *ah, u_int reg, u_int32_t mask, u_int32_t val)
-{
-	int i;
-
-	for (i = 0; i < AH_TIMEOUT; i++) {
-		if ((OS_REG_READ(ah, reg) & mask) == val)
-			return AH_TRUE;
-		OS_DELAY(10);
-	}
-	ath_hal_printf(ah, "ath_hal_wait: timeout on reg 0x%x: "
-		"0x%08x & 0x%08x != 0x%08x\n", reg, OS_REG_READ(ah, reg),
-		 mask, val);
-	return AH_FALSE;
-}
-
-/*
  * Allocate/free memory.
  */
 
@@ -260,9 +239,6 @@ ath_hal_free(void* p)
 /*
  * Module glue.
  */
-#include "release.h"
-#include "version.h"
-static char *version = ATH_HAL_VERSION " " RELEASE_TYPE " (Sam Leffler <sam@errno.com>)";
 static char *dev_info = "ath_hal";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
@@ -284,7 +260,7 @@ EXPORT_SYMBOL(ath_hal_ieee2mhz);
 static int __init
 init_ath_hal(void)
 {
-	printk(KERN_INFO "%s: %s\n", dev_info, version);
+	printk(KERN_INFO "%s: %s\n", dev_info, ath_hal_version);
 	return (0);
 }
 module_init(init_ath_hal);
