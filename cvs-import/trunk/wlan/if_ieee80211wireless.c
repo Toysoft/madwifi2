@@ -244,11 +244,11 @@ ieee80211_ioctl_siwrts(struct net_device *dev,
 	u16 val;
 
 	if (rts->disabled)
-		val = __constant_cpu_to_le16(2347);
-	else if (rts->value < 0 || rts->value > 2347)
+		val = IEEE80211_RTS_MAX;
+	else if (IEEE80211_RTS_MIN < rts->value || rts->value > IEEE80211_RTS_MAX)
 		return -EINVAL;
 	else
-		val = __cpu_to_le16(rts->value);
+		val = rts->value;
 	if (val != ic->ic_rtsthreshold) {
 		ic->ic_rtsthreshold = val;
 		return -(*ic->ic_init)(dev);
@@ -265,7 +265,7 @@ ieee80211_ioctl_giwrts(struct net_device *dev,
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
 	rts->value = ic->ic_rtsthreshold;
-	rts->disabled = (rts->value == 2347);
+	rts->disabled = (rts->value == IEEE80211_RTS_MAX);
 	rts->fixed = 1;
 
 	return 0;
@@ -466,6 +466,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 	struct ieee80211_node *ni = &ic->ic_bss;
 	struct iw_range *range = (struct iw_range *) extra;
+	struct ieee80211_rateset *rs;
 	int i, r;
 
 	data->length = sizeof(struct iw_range);
@@ -519,11 +520,12 @@ ieee80211_ioctl_giwrange(struct net_device *dev,
 	range->encoding_size[1] = 13;
 
 	/* XXX this only works for station mode */
-	range->num_bitrates = ni->ni_nrate;
+	rs = &ni->ni_rates;
+	range->num_bitrates = rs->rs_nrates;
 	if (range->num_bitrates > IW_MAX_BITRATES)
 		range->num_bitrates = IW_MAX_BITRATES;
 	for (i = 0; i < range->num_bitrates; i++) {
-		r = ni->ni_rates[i] & IEEE80211_RATE_VAL;
+		r = rs->rs_rates[i] & IEEE80211_RATE_VAL;
 		range->bitrate[i] = (r / 2) * 1000000;
 	}
 
@@ -937,9 +939,9 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = SIOCGIWRATE;
 		current_val = current_ev + IW_EV_LCP_LEN;
-		for (j = 0; j < ni->ni_nrate; j++) {
-			if (ni->ni_rates[j]) {
-				iwe.u.bitrate.value = ((ni->ni_rates[j] &
+		for (j = 0; j < ni->ni_rates.rs_nrates; j++) {
+			if (ni->ni_rates.rs_rates[j]) {
+				iwe.u.bitrate.value = ((ni->ni_rates.rs_rates[j] &
 				    IEEE80211_RATE_VAL) / 2) * 1000000;
 				current_val = iwe_stream_add_value(current_ev,
 					current_val, end_buf, &iwe,

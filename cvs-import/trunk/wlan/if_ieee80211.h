@@ -167,9 +167,11 @@ typedef uint8_t *ieee80211_mgt_beacon_t;
 #define	IEEE80211_CAPINFO_SHORT_PREAMBLE	0x0020
 #define	IEEE80211_CAPINFO_PBCC			0x0040
 #define	IEEE80211_CAPINFO_CHNL_AGILITY		0x0080
-
-#define	IEEE80211_RATE_BASIC			0x80
-#define	IEEE80211_RATE_VAL			0x7f
+/* bits 8-9 are reserved */
+#define	IEEE80211_CAPINFO_SHORT_SLOTTIME	0x0400
+/* bits 11-12 are reserved */
+#define	IEEE80211_CAPINFO_DSSSOFDM		0x2000
+/* bits 14-15 are reserved */
 
 /*
  * Management information elements
@@ -208,6 +210,9 @@ struct ieee80211_information {
 		u_int8_t	*p;
 		u_int8_t	len;
 	} challenge;
+	struct erp {
+		u_int8_t	flags;
+	} erp;
 };
 
 #define	IEEE80211_ELEMID_SSID			0
@@ -218,6 +223,16 @@ struct ieee80211_information {
 #define	IEEE80211_ELEMID_TIM			5
 #define	IEEE80211_ELEMID_IBSSPARMS		6
 #define	IEEE80211_ELEMID_CHALLENGE		16
+#define	IEEE80211_ELEMID_ERP			42
+#define	IEEE80211_ELEMID_XRATES			50
+
+#define	IEEE80211_RATE_BASIC			0x80
+#define	IEEE80211_RATE_VAL			0x7f
+
+/* EPR information element flags */
+#define	IEEE80211_ERP_NON_ERP_PRESENT		0x01
+#define	IEEE80211_ERP_USE_PROTECTION		0x02
+#define	IEEE80211_ERP_BARKER_MODE		0x04
 
 /*
  * AUTH management packets
@@ -295,6 +310,14 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
 #define	IEEE80211_MAX_LEN			(2300 + IEEE80211_CRC_LEN + \
     (IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + IEEE80211_WEP_CRCLEN))
 
+/* 
+ * RTS frame length parameters.  The default is specified in
+ * the 802.11 spec.  The max may be wrong for jumbo frames.
+ */
+#define	IEEE80211_RTS_DEFAULT			512
+#define	IEEE80211_RTS_MIN			1
+#define	IEEE80211_RTS_MAX			IEEE80211_MAX_LEN
+
 #define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
 
 #define	IEEE80211_AUTH_NONE	0
@@ -313,7 +336,8 @@ typedef u_int8_t *ieee80211_mgt_auth_t;
  */
 
 #define	IEEE80211_CHAN_MAX	255
-#define	IEEE80211_RATE_SIZE	12
+#define	IEEE80211_RATE_SIZE	8		/* 802.11 standard */
+#define	IEEE80211_RATE_MAXSIZE	15		/* max rates we'll handle */
 #define	IEEE80211_KEYBUF_SIZE	16
 #define	IEEE80211_NODE_HASHSIZE	32
 /* simple hash is enough for variation of macaddr */
@@ -392,6 +416,11 @@ struct ieee80211channel {
 #define	IEEE80211_IS_CHAN_T(_c) \
 	(((_c)->ic_flags & IEEE80211_CHAN_T) == IEEE80211_CHAN_T)
 
+struct ieee80211_rateset {
+	u_int8_t		rs_nrates;
+	u_int8_t		rs_rates[IEEE80211_RATE_MAXSIZE];
+};
+
 /*
  * Node specific information.
  */
@@ -415,12 +444,11 @@ struct ieee80211_node {
 	u_int16_t		ni_capinfo;
 	u_int8_t		ni_esslen;
 	u_int8_t		ni_essid[IEEE80211_NWID_LEN];
-	int			ni_nrate;
-	u_int8_t		ni_rates[IEEE80211_RATE_SIZE];
+	struct ieee80211_rateset ni_rates;
 	struct ieee80211channel	*ni_chan;
 	u_int16_t		ni_fhdwell;	/* FH only */
 	u_int8_t		ni_fhindex;	/* FH only */
-	u_int8_t		ni_mode;	/* operating mode */
+	u_int8_t		ni_erp;		/* 11g only */
 
 	/* DTIM and contention free period (CFP) */
 	u_int8_t		ni_dtimperiod;
@@ -434,6 +462,7 @@ struct ieee80211_node {
 	u_int16_t		ni_associd;	/* assoc response */
 	u_int16_t		ni_txseq;	/* seq to be transmitted */
 	u_int16_t		ni_rxseq;	/* seq previous received */
+	u_int16_t		ni_rtsthresh;	/* RTS frame length threshold */
 	int			ni_fails;	/* failure count to associate */
 	int			ni_inact;	/* inactivity mark count */
 	int			ni_txrate;	/* index to ni_rates[] */
@@ -483,7 +512,7 @@ struct ieee80211com {
 				    struct ieee80211_node *, int, int);
 	int			(*ic_newstate)(void *, enum ieee80211_state);
 	int			(*ic_chancheck)(void *, u_char *);
-	u_int8_t		ic_sup_rates[IEEE80211_MODE_MAX][IEEE80211_RATE_SIZE];
+	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211channel ic_channels[IEEE80211_CHAN_MAX+1];
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
@@ -557,6 +586,8 @@ struct ieee80211com {
 #define IEEE80211_F_TXPOW_OFF	0x00000000	/* TX Power: radio disabled */
 #define IEEE80211_F_TXPOW_FIXED	0x00008000	/* TX Power: fixed rate */
 #define IEEE80211_F_TXPOW_AUTO	0x00010000	/* TX Power: undefined */
+#define	IEEE80211_F_SHSLOT	0x00020000	/* CONF: short slot time */
+#define	IEEE80211_F_SHPREAMBLE	0x00040000	/* CONF: short preamble */
 
 /* ic_capabilities */
 #define	IEEE80211_C_WEP		0x00000001	/* CAPABILITY: WEP available */
@@ -566,6 +597,8 @@ struct ieee80211com {
 #define	IEEE80211_C_AHDEMO	0x00000010	/* CAPABILITY: Old Adhoc Demo */
 #define	IEEE80211_C_SWRETRY	0x00000020	/* CAPABILITY: sw tx retry */
 #define	IEEE80211_C_TXPMGT	0x00000040	/* CAPABILITY: tx power mgmt */
+#define	IEEE80211_C_SHSLOT	0x00000080	/* CAPABILITY: short slottime */
+#define	IEEE80211_C_SHPREAMBLE	0x00000100	/* CAPABILITY: short preamble */
 
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
@@ -589,6 +622,8 @@ int	ieee80211_mgmt_output(struct net_device *, struct ieee80211_node *,
 		struct sk_buff *, int);
 struct sk_buff *ieee80211_encap(struct net_device *, struct sk_buff *);
 struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
+u_int8_t *ieee80211_add_rates(u_int8_t *frm, const struct ieee80211_rateset *);
+u_int8_t *ieee80211_add_xrates(u_int8_t *frm, const struct ieee80211_rateset *);
 void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
 void	ieee80211_print_essid(u_int8_t *, int);
 void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
@@ -598,6 +633,8 @@ void	ieee80211_end_scan(struct net_device *);
 struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *, u_int8_t *);
 struct ieee80211_node *ieee80211_dup_bss(struct ieee80211com *, u_int8_t *);
 struct ieee80211_node *ieee80211_find_node(struct ieee80211com *, u_int8_t *);
+struct ieee80211_node * ieee80211_lookup_node(struct ieee80211com *,
+		u_int8_t *macaddr, struct ieee80211channel *);
 void	ieee80211_free_node(struct ieee80211com *, struct ieee80211_node *);
 typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
 void	ieee80211_iterate_nodes(struct ieee80211com *ic,
