@@ -52,10 +52,8 @@ DEPTH=	..
 # names that defines the default module to auto-load for each authentication
 # scheme; to get the in-kernel authenticator by default modify it to load
 # wlan_auth instead of wlan_xauth or manually load wlan_auth prior to use.
-#
-# NB: we build both authenticators for now to avoid bitrot.
 # 
-MOD_AUTH	:= wlan_auth.o wlan_radius.o wlan_xauth.o
+MOD_AUTH	:= wlan_xauth.o
 #
 # Crypto test modules.  These are used only to test/validate the
 # software crypto implementations.

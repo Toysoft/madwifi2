@@ -16,9 +16,7 @@ EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${NET}
 # scheme; to get the in-kernel authenticator by default modify it to load
 # wlan_auth instead of wlan_xauth or manually load wlan_auth prior to use.
 #
-# NB: we build both authenticators for now to avoid bitrot.
-# 
-MOD_AUTH	:= wlan_auth.o wlan_radius.o wlan_xauth.o
+MOD_AUTH	:= wlan_xauth.o
 
 obj-$(CONFIG_WLAN) += wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
 		   $(MOD_AUTH) wlan_acl.o
