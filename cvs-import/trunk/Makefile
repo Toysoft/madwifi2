@@ -66,7 +66,7 @@ release:
 	rm -rf $${DIR}; mkdir $${DIR}; \
 	cvs export -d $${DIR} -r $${TAG} linux; \
 	(cd $${DIR}; cvs export -r ${HAL_TAG} hal); \
-	tar zcf $${DIR}.tgz --exclude=CVS $${DIR}; \
+	tar zcf $${DIR}.tgz --exclude=CVS --exclude=hal/freebsd $${DIR}; \
 	rm -rf $${DIR}
 
 clean:
