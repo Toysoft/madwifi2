@@ -434,7 +434,6 @@ ath_init(struct net_device *dev)
 		val |= HAL_INT_BMISS;
 	else
 		val |= HAL_INT_SWBA;			/* beacon prepare */
-val |= HAL_INT_TXDESC|HAL_INT_RXDESC;
 	ath_hal_intrset(ah, val | HAL_INT_GLOBAL);
 
 	netif_start_queue(dev);
@@ -1221,7 +1220,6 @@ ath_tx_start(struct ath_softc *sc, struct ieee80211_node *ni, struct ath_buf *bf
 	ds = bf->bf_desc;
 	/* first descriptor only */
 	ds->ds_ctl0 = pktlen | (arate << AR_XmitRate_S);
-ds->ds_ctl0 |= AR_TxInterReq;/*XXX*/
 	ds->ds_ctl1 = skb->len;
 	ath_hal_settxdeschdrlen(ah, ds, hdrlen);
 	/*
