@@ -218,10 +218,18 @@ extern	void ieee80211_sysctl_unregister(struct ieee80211com *);
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define IEEE80211_VLAN_TAG_USED 1
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,20)
+#define	vlan_hwaccel_receive_skb(skb, grp, tag)	vlan_hwaccel_rx(skb, grp, tag)
+#endif
+
 extern	void ieee80211_vlan_register(struct ieee80211com *, struct vlan_group*);
 extern	void ieee80211_vlan_kill_vid(struct ieee80211com *, unsigned short);
 #else
 #define IEEE80211_VLAN_TAG_USED 0
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define	free_netdev(dev)	kfree(dev)
 #endif
 
 #ifdef CONFIG_NET_WIRELESS
