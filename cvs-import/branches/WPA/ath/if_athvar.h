@@ -85,6 +85,10 @@ typedef void irqreturn_t;
 } while (0)
 #endif
 
+#ifndef SET_NETDEV_DEV
+#define	SET_NETDEV_DEV(ndev, pdev)
+#endif
+
 #define	ATH_TIMEOUT		1000
 
 /*
