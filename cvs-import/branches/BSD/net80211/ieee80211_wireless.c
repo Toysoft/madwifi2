@@ -202,77 +202,87 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *keybuf)
 {
-	int kid, error;
+	int kid, error = 0;
 	int wepchange = 0;
-
-	if ((erq->flags & IW_ENCODE_DISABLED) == 0) {
+	
+	/* 
+	 * set key
+	 *
+	 * New version of iwconfig set the IW_ENCODE_NOKEY flag
+	 * when no key is given, but older versions don't,
+	 * so we have to check the length too.
+	 */
+	if (erq->length > 0 && !(erq->flags & IW_ENCODE_NOKEY)) {
 		/*
-		 * Enable crypto, set key contents, and
-		 * set the default transmit key.
-		 */
+		 * set key contents, set the default transmit key
+		 * and enable crypto.
+	 	 */
 		error = getiwkeyix(ic, erq, &kid);
 		if (error)
 			return -error;
 		if (erq->length > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
-		/* XXX no way to install 0-length key */
+		/* set key contents */
+		struct ieee80211_key *k = &ic->ic_nw_keys[kid];
 		ieee80211_key_update_begin(ic);
-		if (erq->length > 0) {
-			struct ieee80211_key *k = &ic->ic_nw_keys[kid];
-
-			/*
-			 * Set key contents.  This interface only supports WEP.
-			 */
-			if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP, k)) {
-				k->wk_keylen = erq->length;
-				/* NB: preserve flags set by newkey */
-				k->wk_flags |=
-					IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
-				memcpy(k->wk_key, keybuf, erq->length);
-				memset(k->wk_key + erq->length, 0,
-					IEEE80211_KEYBUF_SIZE - erq->length);
-				if (!ieee80211_crypto_setkey(ic, k, ic->ic_myaddr))
-					error = -EINVAL;		/* XXX */
-			} else {
+		if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP, k)) {
+			k->wk_keylen = erq->length;
+			/* NB: preserve flags set by newkey */
+			k->wk_flags |=
+				IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
+			memcpy(k->wk_key, keybuf, erq->length);
+			memset(k->wk_key + erq->length, 0,
+				IEEE80211_KEYBUF_SIZE - erq->length);
+			if (!ieee80211_crypto_setkey(ic, k, ic->ic_myaddr))
 				error = -EINVAL;
-			}
 		} else {
-			/*
-			 * When the length is zero the request only changes
-			 * the default transmit key.  Verify the new key has
-			 * a non-zero length.
-			 */
-			if (ic->ic_nw_keys[kid].wk_keylen == 0)
-				error = -EINVAL;
-		}
-		if (error == 0) {
-			/*
-			 * The default transmit key is only changed when:
-			 * 1. Privacy is enabled and no key matter is
-			 *    specified.
-			 * 2. Privacy is currently disabled.
-			 * This is deduced from the iwconfig man page.
-			 */
-			if (erq->length == 0 ||
-			    (ic->ic_flags & IEEE80211_F_PRIVACY) == 0)
-				ic->ic_def_txkey = kid;
-			wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) == 0;
-			ic->ic_flags |= IEEE80211_F_PRIVACY;
+			error = -EINVAL;
 		}
 		ieee80211_key_update_end(ic);
-	} else {
-		if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0)
-			return 0;
-		ic->ic_flags &= ~IEEE80211_F_PRIVACY;
-		wepchange = 1;
-		error = 0;
-	}
-	if (error == 0) {
-		if (erq->flags & IW_ENCODE_OPEN)
-			ic->ic_flags &= ~IEEE80211_F_DROPUNENC;
-		else
+		
+		if (error == 0) {
+			/* set default key & enable privacy */
+			ic->ic_def_txkey = kid;
+			wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) == 0;
+			ic->ic_flags |= IEEE80211_F_PRIVACY;
 			ic->ic_flags |= IEEE80211_F_DROPUNENC;
+		}
 	}
+	/* 
+	 * set key index only
+	 */
+	else if ( (erq->flags & IW_ENCODE_INDEX) > 0) {
+		/* 
+		 * verify the new key has a non-zero length
+		 * and change the default transmit key.
+		 */
+		error = getiwkeyix(ic, erq, &kid);
+		if (error)
+			return -error;
+		
+		if (ic->ic_nw_keys[kid].wk_keylen == 0)
+			return -EINVAL;
+		
+		ic->ic_def_txkey = kid;
+	}
+	
+	/* disable crypto & make sure we allow unencrypted packets again */
+        if (erq->flags & IW_ENCODE_DISABLED) {
+		wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) != 0;
+		ic->ic_flags &= ~IEEE80211_F_PRIVACY;
+		ic->ic_flags &= ~IEEE80211_F_DROPUNENC;
+	}
+	/* allow unencrypted packets */
+	if (erq->flags & IW_ENCODE_OPEN) {
+		ic->ic_flags &= ~IEEE80211_F_DROPUNENC;
+	}
+	/* dont allow unencrypted packets & make sure privacy is enabled */
+	if (erq->flags & IW_ENCODE_RESTRICTED) {
+		wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) == 0;
+		ic->ic_flags |= IEEE80211_F_PRIVACY;
+		ic->ic_flags |= IEEE80211_F_DROPUNENC;
+	}
+	
 	if (error == 0 && IS_UP(ic->ic_dev)) {
 		/*
 		 * Device is up and running; we must kick it to
@@ -282,7 +292,8 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		 * the key state should have been updated above.
 		 */
 		if (wepchange && ic->ic_roaming == IEEE80211_ROAMING_AUTO)
-			error = -(*ic->ic_init)(ic->ic_dev);
+			//error = -(*ic->ic_init)(ic->ic_dev);
+			error = -(*ic->ic_reset)(ic->ic_dev);
 	}
 	return error;
 }
