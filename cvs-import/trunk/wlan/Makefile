@@ -24,6 +24,8 @@ all:	${ALL} ${ALL_VER}
 wlan.o: ${OBJS}
 	${LD} -o $@ -r -x ${OBJS}
 
+if_ieee80211subr.o: version.h
+
 ifdef CONFIG_MODVERSIONS
 GENKSYMS=	/sbin/genksyms
 ifdef CONFIG_SMP

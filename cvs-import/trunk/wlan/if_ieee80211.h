@@ -406,7 +406,6 @@ struct ieee80211req {
 
 #ifdef __KERNEL__
 
-#define	IEEE80211_ASCAN_WAIT	2		/* active scan wait */
 #define	IEEE80211_PSCAN_WAIT 	5		/* passive scan wait */
 #define	IEEE80211_TRANS_WAIT 	5		/* transition wait */
 #define	IEEE80211_INACT_WAIT	5		/* inactivity timer interval */
@@ -556,6 +555,7 @@ struct ieee80211com {
 	struct ieee80211channel ic_channels[IEEE80211_CHAN_MAX+1];
 	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
+	u_char			ic_chan_scan[roundup(IEEE80211_CHAN_MAX,NBBY)];
 	struct sk_buff_head	ic_mgtq;	/* management frame tx q */
 	u_int32_t		ic_flags;	/* state flags */
 	u_int32_t		ic_caps;	/* capabilities */
@@ -580,7 +580,6 @@ struct ieee80211com {
 	u_int16_t		ic_txlifetime;	/* tx lifetime */
 	u_int16_t		ic_txpower;	/* tx power setting (dbM) */
 	int			ic_mgt_timer;	/* mgmt timeout */
-	int			ic_scan_timer;	/* scant wait */
 	int			ic_inact_timer;	/* inactivity timer wait */
 	int			ic_des_esslen;
 	u_int8_t		ic_des_essid[IEEE80211_NWID_LEN];
