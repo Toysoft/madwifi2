@@ -60,6 +60,13 @@ const char *ieee80211_mgt_subtype_name[] = {
 	"deauth",	"reserved#13",	"reserved#14",	"reserved#15"
 };
 EXPORT_SYMBOL(ieee80211_mgt_subtype_name);
+const char *ieee80211_ctl_subtype_name[] = {
+	"reserved#0",	"reserved#1",	"reserved#2",	"reserved#3",
+	"reserved#3",	"reserved#5",	"reserved#6",	"reserved#7",
+	"reserved#8",	"reserved#9",	"ps_poll",	"rts",
+	"cts",		"ack",		"cf_end",	"cf_end_ack"
+};
+EXPORT_SYMBOL(ieee80211_ctl_subtype_name);
 const char *ieee80211_state_name[IEEE80211_S_MAX] = {
 	"INIT",		/* IEEE80211_S_INIT */
 	"SCAN",		/* IEEE80211_S_SCAN */
