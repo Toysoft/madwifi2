@@ -4941,6 +4941,7 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		sc->sc_stats.ast_tx_packets = ic->ic_devstats->tx_packets;
 		sc->sc_stats.ast_rx_packets = ic->ic_devstats->rx_packets;
 		sc->sc_stats.ast_rx_rssi = ieee80211_getrssi(ic);
+		ATH_UNLOCK(sc);
 		if (copy_to_user(ifr->ifr_data, &sc->sc_stats,
 		    sizeof (sc->sc_stats)))
 			error = -EFAULT;
