@@ -841,6 +841,7 @@ static void
 node_cleanup(struct ieee80211_node *ni)
 {
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define KEY_UNDEFINED(k)        ((k).wk_cipher == &ieee80211_cipher_none)
 	struct ieee80211com *ic = ni->ni_ic;
 	int qlen;
 	u_int i;
@@ -883,7 +884,9 @@ node_cleanup(struct ieee80211_node *ni)
 			kfree_skb(ni->ni_rxfrag[i]);
 			ni->ni_rxfrag[i] = NULL;
 		}
-	ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
+	if(!KEY_UNDEFINED(ni->ni_ucastkey))
+	    ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
+#undef KEY_UNDEFINED
 #undef N
 }
 
