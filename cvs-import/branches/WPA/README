@@ -1,0 +1,381 @@
+$Id$
+
+
+WARNING: THIS IS A BETA DISTRIBUTION.  THIS SOFTWARE HAS KNOWN PROBLEMS AND
+WARNING: LIMITATIONS THAT WILL BE CORRECTED BEFORE A PRODUCTION RELEASE.
+WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTORYS YOUR DISK
+WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
+WARNING: USE AT YOUR OWN RISK!
+
+
+MADWIFI: Multimode Atheros Driver for WiFi on Linux
+===================================================
+
+* Copyright (c) 2002-2004 Sam Leffler.  All rights reserved.
+
+Read the file COPYRIGHT for the complete copyright.
+
+This software contains a Linux kernel driver for Atheros-based
+Wireless LAN devices.  The driver supports both station and AP modes
+of operation.  The driver is actually a port of the BSD Atheros
+driver and includes a port of the 802.11 link layer code originally
+found in NetBSD.  You may/will also find other BSD-ish glue code.
+As much as possible I've tried to make this driver a "native Linux"
+driver that conforms to Linux style and operation but in some areas
+of operation you will see elements of BSD design/operation.
+
+The driver functions as a normal network device and uses the Wireless
+Extensions API.  As such normal Linux tools can and should be used
+with it.  
+
+There is only one driver included here; it supports miniPCI and Cardbus
+devices.  The driver can be built as a module or linked into the kernel.
+
+The driver depends on two other modules: wlan.o and ath_hal.o.
+
+The wlan module contains the 802.11 state machine, protocol support,
+and other glue code.  This code is derived from work that first appeared
+in NetBSD and then FreeBSD.
+
+The ath_hal module contains the Atheros Hardware Access Layer (HAL).
+This code manages much of the chip-specific operation of the driver.
+The HAL is provided in a binary-only form in order to comply with FCC
+regulations.  In particular, a radio transmitter can only be operated at
+power levels and on frequency channels for which it is approved.  The FCC
+requires that a software-defined radio cannot be configured by a user
+to operate outside the approved power levels and frequency channels.
+This makes it difficult to open-source code that enforces limits on
+the power levels, frequency channels and other parameters of the radio
+transmitter.  See
+
+http://ftp.fcc.gov/Bureaus/Engineering_Technology/Orders/2001/fcc01264.pdf
+
+for the specific FCC regulation.  Because the module is provided in a
+binary-only form it is marked "Proprietary"; this means when you load
+it you will see messages that your system is now "tainted".
+
+If you wish to use this driver on a platform for which an ath_hal
+module is not already provided please contact the author.  Note that
+this is only necessary for new _architectures_; the HAL is not tied to
+any specific version of Linux.
+
+
+Compatibility
+=============
+Most testing has been done with kernel versions 2.4.20 and wireless
+tools version 25 on x86 machines.  Expect some rough edges if you
+deviate from that combo.  
+
+Atheros Hardware
+================
+There are currently 3 generations of Atheros 802.11 wireless devices:
+
+5210	supports 11a only
+5211	supports both 11a and 11b
+5212	supports 11a, 11b, and 11g
+
+These parts have been incorporated in a variety of retail products
+including cardbus cards from DLink, Linksys, Netgear, Orinoco,
+Proxim, and 3Com; and mini-pci cards from some of these same vendors.
+In addition many laptop vendors use Atheros mini-pci cards for their
+builtin wireless support.  For an up-to-date list of cards based
+on Atheros parts visit:
+
+http://customerproducts.atheros.com/customerproducts
+
+In general, if a device is identified as ``11a only'' it is almost
+certain to contain an Atheros 5210 part in it.  All retail a+b
+products use the 5211.  The latest generation of universal a+b+g
+combo products use the 5212.  When in doubt check the PCI vendor
+id with a tool like lspci, the Atheros vendor id is 0x168c; e.g.
+
+   00:13.0 Ethernet controller: Unknown device 168c:0012 (rev 01)
+
+but beware that come vendors use alternate vendor id's (e.g 3Com).
+The file hal/ah_devid.h has a list of known PCI id's.
+
+
+Building the driver
+===================
+Most people can just type:
+
+trouble% make
+
+at the top level to build all the modules for the system where you
+are building.  If this does not work or if you want to cross-compile
+the code for a different system then you will need to do more setup.
+
+To build the software four things are needed:
+
+1. The target platform (e.g. i386-elf)
+2. The location of the kernel include files.
+3. The location of the kernel configuration file.
+4. The location of the build tools.
+
+The target platform is specified using; e.g.
+
+trouble% export TARGET=i386-elf
+
+The supported target platforms can be found with:
+
+trouble% ls hal/linux/*.inc
+hal/linux/Makefile.inc          hal/linux/mipsisa32-le-elf.inc
+hal/linux/arm9-le-thumb-elf.inc hal/linux/powerpc-be-eabi.inc
+hal/linux/i386-elf.inc          hal/linux/powerpc-le-eabi.inc
+hal/linux/mipsisa32-be-elf.inc  hal/linux/xscale-be-elf.inc
+
+A target specifies the CPU architecture, byte order, and the ABI/file
+format.
+
+The location of the kernel include and configuration files are
+typically specified together by specifiying the version of the
+kernel and then using default settings for pathnames; e.g.
+
+trouble% export KERNEL_VERSION=2.4.20-8
+
+This is sufficient if you have multiple kernel versions on your build
+machine and you want to cross-build for a different version than your
+are running.  However if the default locations are incorrect then you
+will also need to override them; e.g.
+
+trouble% export KERNEL_PATH=/cdrom/linuxppc-2.4.21-pre2-cerf/
+trouble% export KERNEL_CONF=/cdrom/linuxppc-2.4.21-pre2-cerf/default.config
+
+(These settings are most often used when cross-compiling.)
+
+Finally, if you are cross-compiling you will probably need to
+override the default toolchain settings that come with the software.
+These settings are in files in the directory hal/linux/ that are
+named <platform>.inc.  For example, the file for xscale-be-elf is:
+
+#
+# Compilation configuration for building big-endian XScale/arm-elf.
+#
+
+#
+# Built with GNU cross-devel tools:
+#
+# PREFIX=/pub/gnu
+# BINUTILS=binutils-2.14
+# GCC=gcc-3.3.2
+# target=arm-elf
+#
+# ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
+# ${GCC}/configure --target=$target   --prefix=${PREFIX} \
+#	--enable-languages=c   --with-gnu-as --with-gnu-ld \
+#	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
+#
+ifndef TOOLPREFIX
+TOOLPREFIX=	/pub/gnu/bin/arm-elf-
+endif
+#
+CC=	${TOOLPREFIX}gcc
+LD=	${TOOLPREFIX}ld
+STRIP=	${TOOLPREFIX}strip
+OBJCOPY=${TOOLPREFIX}objcopy
+NM=	${TOOLPREFIX}nm
+
+LDOPTS=	-EB
+COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
+COPTS+= -march=armv4 -mbig-endian -fno-strict-aliasing -fno-common -mapcs-32 \
+	-mtune=xscale  -mshort-load-bytes -msoft-float
+
+The first set of definitions specify the location and name of the
+programs used to build the software.  The rest of the file defines
+the compilation options for the target platform.  The latter should
+usually not be changed because they were the options used to build
+the binary HAL module, but TOOLPREFIX is unlikely to be right for
+your system and you will want to change it; e.g
+
+trouble% export TOOLPREFIX=/usr/local/bin/arm-elf-
+
+to use programs installed in /usr/local/bin.  Note that mixing different
+versions of the GNU tools may not work.  The .inc file for each target
+platform specifies the exact toolchains used, including where they
+were obtained (if pre-built).
+
+The build system is designed to support cross-building without any
+modification to the distribution files.  If you cannot do what you
+need by setting environment variables please send patches to show
+where things failed to do the right thing.
+
+
+Once you have stuff configured appropriately, do:
+
+    make
+
+This will generate three important files:
+
+Linux 2.6
+    driver/ath_pci.ko (driver for PCI/Cardbus devices),
+    ath_hal/ath_hal.ko (Atheros HAL), and
+    wlan/wlan.ko (802.11 support layer)
+
+Linux 2.4
+    driver/ath_pci.o (driver for PCI/Cardbus devices),
+    ath_hal/ath_hal.o (Atheros HAL), and
+    wlan/wlan.o (802.11 support layer)
+
+These files can be loaded with insmod or modprobe; e.g.
+
+Linux 2.6
+    insmod wlan/wlan.ko
+    insmod ath_hal/ath_hal.ko
+    insmod driver/ath_pci.ko
+
+Linux 2.4
+    insmod wlan/wlan.o
+    insmod ath_hal/ath_hal.o
+    insmod driver/ath_pci.o
+
+(note you must load the wlan and ath_hal modules first as the driver
+depends on them).  You can also try:
+
+    make install
+
+to install the drivers where they can be loaded automatically, i.e.
+/lib/modules/<your kernel name>/net.
+
+
+Note that you MUST do a "make clean" before compiling for a different
+version of Linux; e.g. building for 2.6 after building for 2.4.
+
+Using the driver
+================
+The driver should support any Atheros-based cardbus or pci device.
+Management is done using the normal Linux tools such as ifconfig.
+Support is included for versions 12 and later of the Wireless
+Extensions so tools like iwconfig should work too.
+
+To use this software in ``station mode'' (i.e. as a client) just
+bring the interface up and the driver will scan for all access
+points in all supported frequency bands supported by the hardware.
+Specifically for 5210-based devices scanning will happen in the
+5Ghz (11a) range, for 5211-based devices scanning will happen over
+both 2Ghz (11b) and 5GHz frequencies (11a).  For 5212-based devices
+the driver will scan both 2Ghz and 5GHz ranges and also look for
+11g devices in the 2Ghz range.  To restrict operation you can either
+select a mode (e.g. 11b) using iwpriv or, more commonly, select the
+AP based on SSID and/or channel.
+
+NOTE: You must mark the interface ``up'' with, e.g. ifconfig ath0 up
+      before scanning for access points with iwlist.
+
+To use this software in ``hostap mode'' you need to configure it
+with iwconfig and you will probably want to lock the operating mode
+to one of 11a, 11b, or 11g if you have a multi-mode card (if you
+do not lock the mode then the driver will select a mode for you;
+usually 11a).  In addition you will need to configure the system to
+bridge frames to a wired LAN or similar.
+
+NOTE: adhoc mode is known to not work reliably.
+
+Wireless tools cribsheet:
+
+iwlist ath0 scan		list AP's the driver has scanned
+iwconfig ath0 essid "foo"	set the ssid to foo
+iwpriv ath0 mode 1		lock operation to 11a only
+iwpriv ath0 mode 2		lock operation to 11b only
+iwpriv ath0 mode 3		lock operation to 11g only
+iwpriv ath0 mode 0		autoselect from 11a/b/g (default)
+
+There are some debugging mechanisms for the curious/masochistic:
+
+sysctl -w dev.ath.debug=1	enable console msgs from the driver
+sysctl -w dev.ath.dump="hal"	dump h/w register state to the console
+echo 1>/proc/net/wlan0/debug	enable console msgs from the wlan module
+
+In addition the program tools/athstats can be very useful in understanding
+what is going on.  In particular, something like:
+
+trouble% athstats 1
+
+will give a running display of the most interesting statistics sampled
+every 1 second.  Running athstats without any options will display a
+summary of all non-zero statistics from the time the driver was loaded.
+By default the ath0 device is used; to override this use the -i option.
+
+
+Security/Crpto Support
+======================
+The driver supports fixed/shared key WEP using the hardware.  Newer
+Atheros hardware is capable of much more (e.g. AES, TKIP and Michael)
+but that work is not yet supported by the driver.
+
+This distribution works with the xsupplicant program to support 802.1x
+client authentication.  802.1x authenticator support and full WPA support
+(client and AP) is planned.
+
+
+Known Problems
+==============
+[All these problems are to be fixed in future revisions.]
+
+0. The driver uses the BSD queue.h macros for managing various data
+   structures.  It has been pointed out that this may conflict with the
+   equivalent Linux definitions in list.h potentially causing problems
+   in future versions of Linux.  The use of BSD macros will be removed
+   in a future revision. [TEMPORARY WORKAROUND IN PLACE]
+
+1. Adhoc mode is broken; symptoms are intermittent operation.
+2. Performance in lossy environments is suboptimal.  The algorithm used to
+   select the rate for transmitted packets is very simplistic.  There is no
+   software retransmit; only hardware retransmit is used.  Contributors are
+   encouraged to replace the existing rate control algorithm with a better
+   one (hint: all the information needed is available in the driver).
+3. 11g AP support is incomplete. We don't set the slot time in the driver
+   and do not turn off short slot time when an 11b station joins the ntework.
+4. The driver does not fully enable power-save operation of the chip;
+   consequently power use is suboptimal.
+
+Acknowledgements
+================
+This work could not have been done without the support of Atheros
+and in particular the efforts of Greg Chesson.  Comments from David
+Miller were helpful in cleaning up some of the roughest edges in
+early versions of the driver.
+
+Many people have contributed fixes and improvements to this software
+including:
+
+Joerg Albert
+Tong Chia
+William S. Kish
+Mathieu Lacage
+Stephane Laroche
+Tom Marshall
+Nick Moss
+Nick Petroni
+Henry Qian
+Carl Thompson
+giova+mwfdev@faglioni.it
+
+(Apologies to anyone whose name was unintentionally left off.)
+
+Feedback and Contributions
+==========================
+This project is hosted at http://madwifi.sourceforge.net.  Fixes and
+enhancements are encouraged.  Please send all bug reports about this
+driver to:
+
+	madwifi-users@lists.sourceforge.net
+
+When sending a problem report be sure to include the version of the
+driver and the part identification the driver prints to the console when
+the module is loaded.  For example,
+
+ath_hal: 0.8.2.0
+wlan: 0.7.0.0
+ath_pci: 0.8.2.0
+PCI: Found IRQ 11 for device 00:13.0
+ath0: 11a rates: 6Mbps 9Mbps 12Mbps 18Mbps 24Mbps 36Mbps 48Mbps 54Mbps
+ath0: 11b rates: 1Mbps 2Mbps 5.5Mbps 11Mbps
+ath0: 802.11 address: 00:05:5d:6f:99:5f
+ath0: Atheros 5211: mem=0xfebf0000, irq=11
+
+This says the HAL module is version 0.8.2, the wlan module is version
+0.7, the driver is version 0.8.2 and the hardware uses an Atheros
+5211 chip (which supports 11a and 11b modes).
+
+We will try to respond in a timely manner but understand this software
+is provided as-is; i.e. with no promise of support.
