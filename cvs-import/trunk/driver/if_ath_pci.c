@@ -144,6 +144,9 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 	memset(sc, 0, sizeof(struct ath_pci_softc));
 
+	/* mark the device as detached to avoid processing interrupts until setup is complete */
+	sc->aps_sc.sc_invalid = 1;
+
 	dev = &sc->aps_sc.sc_ic.ic_dev;	/* XXX blech, violate layering */
 	memcpy(dev->name, "ath%d", sizeof("ath%d"));
 
@@ -173,6 +176,9 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	athname = ath_hal_probe(id->vendor, id->device);
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
 		dev->name, athname ? athname : "Atheros ???", phymem, dev->irq);
+
+	/* ready to process interrupts */
+	sc->aps_sc.sc_invalid = 0;
 
 	return 0;
 bad4:
