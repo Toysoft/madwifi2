@@ -9,12 +9,12 @@ include ${DEPTH}/Makefile.inc
 SRCS=	ah_osdep.c if_ath.c if_ath_cs.c if_ath_pci.c
 
 OBJS_COMMON=	ah_osdep.o if_ath.o
-OBJS_CS=	${OBJS_COMMON} ${ATH_HAL}/hal.o if_ath_cs.o ${WLAN}/wlan.o
-OBJS_PCI=	${OBJS_COMMON} ${ATH_HAL}/hal.o if_ath_pci.o ${WLAN}/wlan.o
+OBJS_CS=	${OBJS_COMMON} ${ATH_HAL}/hal.o if_ath_cs.o
+OBJS_PCI=	${OBJS_COMMON} ${ATH_HAL}/hal.o if_ath_pci.o
 OBJS=		${OBJS_COMMON} if_ath_cs.o if_ath_pci.o
 
 CFLAGS=	-I. -I${ATH_HAL} -I${HAL} -I${WLAN} -I${LINUX} \
-	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${COPTS}
+	-D_BUILD_STANDALONE_ -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
 #ALL=	ath_cs.o ath_pci.o
 ALL=	ath_pci.o
@@ -28,6 +28,11 @@ ath_cs.o: ${OBJS_CS} Makefile
 	${LD} -o $@ -r -x -S ${OBJS_CS}
 ath_pci.o: ${OBJS_PCI} Makefile
 	${LD} -o $@ -r -x -S ${OBJS_PCI}
+ifdef CONFIG_MODVERSIONS
+if_ath.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
+if_ath_pci.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
+if_ath_cs.o:	${WLAN}/if_ieee80211.ver ${WLAN}/if_media.ver
+endif
 
 clean:
 	rm -f ${OBJS} ath_cs.o ath_pci.o .depend

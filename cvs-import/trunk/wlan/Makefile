@@ -9,21 +9,40 @@ include ${DEPTH}/Makefile.inc
 SRCS=	if_ieee80211subr.c if_media.c rc4.c
 OBJS=	if_ieee80211subr.o if_media.o rc4.o
 
-#CFLAGS=	-I. -I${LINUX} -D__KERNEL__ -DMODULE ${COPTS}
-CFLAGS=	-I. -I${LINUX} -D__KERNEL__ ${COPTS}
+INCS=	-I. -I${LINUX}
+CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
-all:	wlan.o
+ALL=	wlan.o
+ifdef CONFIG_MODVERSIONS
+ALL_VER=if_ieee80211.ver if_media.ver
+endif
+
+all:	${ALL} ${ALL_VER}
 
 wlan.o: ${OBJS}
 	${LD} -o $@ -r -x ${OBJS}
+
+ifdef CONFIG_MODVERSIONS
+GENKSYMS=	/sbin/genksyms
+ifdef CONFIG_SMP
+GENKSYMS+=	-p smp_
+endif
+
+if_ieee80211.ver: if_ieee80211subr.c
+	${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $< | ${GENKSYMS} -k ${VERSION} > $@
+if_media.ver: if_media.c
+	${CC} ${INCS} ${COPTS} -E -D__GENKSYMS__ $< | ${GENKSYMS} -k ${VERSION} > $@
+
+${OBJS}: if_ieee80211.ver if_media.ver
+endif
 
 install: all
 	cp wlan.o ${DESTDIR}/lib/modules/${VERSION}/net
 
 clean:
-	rm -f ${OBJS} wlan.o .depend
+	rm -f ${OBJS} ${ALL} ${ALL_VER} .depend
 
-depend:
+depend:	${ALL_VER}
 	gcc -M ${CFLAGS} ${SRCS} > .depend
 
 sinclude .depend

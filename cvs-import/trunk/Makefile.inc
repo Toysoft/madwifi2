@@ -27,3 +27,17 @@ DRIVER=	${DEPTH}/driver
 COPTS=	-g -O -Wall
 
 include ${KERNEL_PATH}/.config
+
+ifdef CONFIG_SMP
+COPTS+=	-D__SMP__ -DSMP
+endif
+
+ifndef CONFIG_FRAME_POINTER
+COPTS+=	-fomit-frame-pointer
+endif
+
+ifdef CONFIG_MODVERSIONS
+MODOPTS=-DMODVERSIONS -include $(KERNEL_PATH)/include/linux/modversions.h
+MODOPTS+= -include ${WLAN}/if_ieee80211.ver
+MODOPTS+= -include ${WLAN}/if_media.ver
+endif
