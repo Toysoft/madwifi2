@@ -70,6 +70,6 @@ release:
 	rm -rf $${DIR}
 
 clean:
-	for i in ${DIRS}; do \
-		(cd $$i; make clean); \
-	done
+	find . -name '*.[oas]' -or -name core -or -name '*.ver' -or -name .depend | xargs rm -f
+	rm -f ath_hal/opt_ah.h
+
