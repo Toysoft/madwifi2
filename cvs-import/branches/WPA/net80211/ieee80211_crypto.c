@@ -141,6 +141,7 @@ ieee80211_crypto_attach(struct ieee80211com *ic)
 	cs->cs_key_update_begin = null_key_update;
 	cs->cs_key_update_end = null_key_update;
 }
+EXPORT_SYMBOL(ieee80211_crypto_attach);
 
 /*
  * Teardown crypto support.
@@ -150,6 +151,7 @@ ieee80211_crypto_detach(struct ieee80211com *ic)
 {
 	ieee80211_crypto_delglobalkeys(ic);
 }
+EXPORT_SYMBOL(ieee80211_crypto_detach);
 
 /*
  * Register a crypto cipher module.
