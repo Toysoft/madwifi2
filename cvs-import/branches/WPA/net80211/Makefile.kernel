@@ -8,7 +8,7 @@ NET=	net
 EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${NET}
 
 obj-$(CONFIG_WLAN) += wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
-		   wlan_auth.o wlan_radius.o
+		   wlan_auth.o wlan_radius.o wlan_acl.o
 
 wlan-objs	:= if_media.o rc4.o \
 		   ieee80211.o ieee80211_crypto.o ieee80211_input.o \
@@ -20,6 +20,7 @@ wlan_tkip-objs	:= ieee80211_crypto_tkip.o
 wlan_ccmp-objs	:= ieee80211_crypto_ccmp.o
 wlan_auth-objs	:= ieee80211_dot1x.o
 wlan_radius-objs:= ieee80211_radius.o
+wlan_acl-objs	:= ieee80211_acl.o
 
 ##2.4##export-objs	:= if_media.o rc4.o \
 ##2.4##		   ieee80211.o ieee80211_crypto.o ieee80211_input.o \
@@ -43,3 +44,5 @@ wlan_radius-objs:= ieee80211_radius.o
 #	$(LD) -o wlan_auth.$(KMODSUF) -r $(wlan_auth-objs)
 #wlan_radius.o:	$(wlan_radius-objs)
 #	$(LD) -o wlan_radius.$(KMODSUF) -r $(wlan_radius-objs)
+#wlan_acl.o:	$(wlan_acl-objs)
+#	$(LD) -o wlan_acl.$(KMODSUF) -r $(wlan_acl-objs)
