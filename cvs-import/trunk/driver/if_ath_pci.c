@@ -116,6 +116,12 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk("ath_pci: cache line size not set; forcing %u\n", csz);
 		pci_write_config_byte(pdev, PCI_CACHE_LINE_SIZE, csz);
 	}
+	/*
+	 * The default setting of latency timer yields poor results,
+	 * set it to the value used by other systems.  It may be worth
+	 * tweaking this setting more.
+	 */
+	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0xa8);
 
 	pci_set_master(pdev);
 
