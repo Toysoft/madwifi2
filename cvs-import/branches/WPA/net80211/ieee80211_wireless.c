@@ -1436,7 +1436,7 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_COUNTERMEASURES:
 		if (value) {
-			if (ic->ic_flags & IEEE80211_F_WPA)
+			if ((ic->ic_flags & IEEE80211_F_WPA) == 0)
 				return -EINVAL;
 			ic->ic_flags |= IEEE80211_F_COUNTERM;
 		} else
