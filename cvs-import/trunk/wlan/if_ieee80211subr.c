@@ -2331,7 +2331,7 @@ ieee80211_recv_deauth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 				    " by peer (reason %d)\n",
 				    dev->name,
 				    ether_sprintf(ni->ni_macaddr), reason));
-			ieee80211_free_node(&ni);
+			ieee80211_free_node(ic, &ni);
 		}
 		break;
 	default:
