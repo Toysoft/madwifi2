@@ -90,6 +90,7 @@ const char *ieee80211_wme_acnames[] = {
 EXPORT_SYMBOL(ieee80211_wme_acnames);
 
 static int ieee80211_newstate(struct ieee80211com *, enum ieee80211_state, int);
+static void ieee80211_auth_setup(void);
 
 void
 ieee80211_proto_attach(struct ieee80211com *ic)
