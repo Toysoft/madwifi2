@@ -85,7 +85,6 @@ static int	ath_startrecv(struct net_device *);
 static void	ath_next_scan(unsigned long);
 static void	ath_calibrate(unsigned long);
 static int	ath_newstate(void *, enum ieee80211_state);
-static void	ath_rate_ctl(struct ath_softc *, struct ieee80211_node *);
 static struct net_device_stats *ath_getstats(struct net_device *);
 
 #ifdef CONFIG_PROC_FS
@@ -640,7 +639,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 	if (ni == NULL)
-		ni = &ic->ic_bss;
+		ni = ieee80211_ref_node(&ic->ic_bss);
 
 	/*
 	 * TODO:
@@ -655,6 +654,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		    ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
 
 	error = ath_tx_start(sc, ni, bf, skb);
+	ieee80211_unref_node(&ni);
 	if (error == 0)
 		return 0;
 	/* fall thru... */
@@ -726,7 +726,7 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 	}
 	ni = ieee80211_find_node(ic, wh->i_addr1);
 	if (ni == NULL)
-		ni = &ic->ic_bss;
+		ni = ieee80211_ref_node(&ic->ic_bss);
 
 	/*
 	 * TODO:
@@ -741,6 +741,7 @@ ath_mgtstart(struct sk_buff *skb, struct net_device *dev)
 		    ni->ni_rates[ni->ni_txrate] & IEEE80211_RATE_VAL, -1);
 
 	error = ath_tx_start(sc, ni, bf, skb);
+	ieee80211_unref_node(&ni);
 	if (error == 0) {
 		sc->sc_stats.ast_tx_mgmt++;
 		/*
@@ -1711,7 +1712,7 @@ ath_newstate(void *arg, enum ieee80211_state nstate)
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni = &ic->ic_bss;
+	struct ieee80211_node *ni = &ic->ic_bss;	/* NB: no reference */
 	struct ath_nodestat *st;
 	int i, error;
 	u_int8_t *bssid;
@@ -1822,8 +1823,9 @@ bad:
 }
 
 static void
-ath_rate_ctl(struct ath_softc *sc, struct ieee80211_node *ni)
+ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 {
+	struct ath_softc *sc = arg;
 	struct ath_nodestat *st = ni->ni_private;
 	int mod = 0, orate, enough;
 
@@ -1831,6 +1833,7 @@ ath_rate_ctl(struct ath_softc *sc, struct ieee80211_node *ni)
 	 * Rate control
 	 * XXX: very primitive version.
 	 */
+	(void) sc;		/* NB: silence compiler */
 
 	enough = (st->st_tx_ok + st->st_tx_err >= 10);
 
@@ -1885,12 +1888,9 @@ ath_ratectl(unsigned long data)
 
 	if (dev->flags & IFF_RUNNING) {
 		if (ic->ic_opmode == IEEE80211_M_STA)
-			ath_rate_ctl(sc, &ic->ic_bss);
-		else {
-			struct ieee80211_node *ni;
-			TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
-				ath_rate_ctl(sc, ni);
-		}
+			ath_rate_ctl(sc, &ic->ic_bss);	/* NB: no reference */
+		else
+			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
 	}
 	sc->sc_rate_ctl.expires = jiffies + HZ;		/* once a second */
 	add_timer(&sc->sc_rate_ctl);

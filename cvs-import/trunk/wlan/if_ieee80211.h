@@ -490,6 +490,7 @@ struct ieee80211channel {
 struct ieee80211_node {
 	TAILQ_ENTRY(ieee80211_node)	ni_list;
 	LIST_ENTRY(ieee80211_node)	ni_hash;
+	atomic_t		ni_refcnt;
 
 	/* hardware */
 	u_int8_t		ni_rssi;
@@ -527,6 +528,20 @@ struct ieee80211_node {
 	int			ni_txrate;	/* index to ni_rates[] */
 	void			*ni_private;	/* driver private */
 };
+
+static inline struct ieee80211_node *
+ieee80211_ref_node(struct ieee80211_node *ni)
+{
+	atomic_inc(&ni->ni_refcnt);
+	return ni;
+}
+
+static inline void
+ieee80211_unref_node(struct ieee80211_node **ni)
+{
+	atomic_dec(&(*ni)->ni_refcnt);
+	*ni = NULL;			/* guard against use */
+}
 
 /* ni_chan encoding for FH phy */
 #define	IEEE80211_FH_CHANMOD	80
@@ -576,7 +591,7 @@ struct ieee80211com {
 	int			ic_fixed_rate;	/* index to ic_sup_rates[] */
 	u_int16_t		ic_rtsthreshold;
 	u_int16_t		ic_fragthreshold;
-	spinlock_t		ic_nodelock;	/* on node table */
+	rwlock_t		ic_nodelock;	/* on node table */
 	TAILQ_HEAD(, ieee80211_node) ic_node;	/* information of all nodes */
 	LIST_HEAD(, ieee80211_node) ic_hash[IEEE80211_NODE_HASHSIZE];
 	u_int16_t		ic_lintval;	/* listen interval */
@@ -669,7 +684,9 @@ struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *, u_int8_t *);
 struct ieee80211_node *ieee80211_dup_bss(struct ieee80211com *, u_int8_t *);
 struct ieee80211_node *ieee80211_find_node(struct ieee80211com *, u_int8_t *);
 void	ieee80211_free_node(struct ieee80211com *, struct ieee80211_node *);
-void	ieee80211_free_allnodes(struct ieee80211com *);
+typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
+void	ieee80211_iterate_nodes(struct ieee80211com *ic,
+		ieee80211_iter_func *, void *);
 int	ieee80211_fix_rate(struct ieee80211com *, struct ieee80211_node *, int);
 int	ieee80211_new_state(struct net_device *, enum ieee80211_state, int);
 struct sk_buff *ieee80211_wep_crypt(struct net_device *, struct sk_buff *, int);
