@@ -7,8 +7,21 @@ NET=	net
 
 EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${NET}
 
+#
+# There are two authenticator mechanisms: an in-kernel implementation
+# (wlan_auth+wlan_radius) and an external implementation (wlan_xauth) that
+# requires a user process to manage the authentication process.  By default
+# the external authenticator is used.  ieee80211_proto.c has a table of module
+# names that defines the default module to auto-load for each authentication
+# scheme; to get the in-kernel authenticator by default modify it to load
+# wlan_auth instead of wlan_xauth or manually load wlan_auth prior to use.
+#
+# NB: we build both authenticators for now to avoid bitrot.
+# 
+MOD_AUTH	:= wlan_auth.o wlan_radius.o wlan_xauth.o
+
 obj-$(CONFIG_WLAN) += wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
-		   wlan_auth.o wlan_radius.o wlan_acl.o
+		   $(MOD_AUTH) wlan_acl.o
 
 wlan-objs	:= if_media.o rc4.o \
 		   ieee80211.o ieee80211_crypto.o ieee80211_input.o \
@@ -18,6 +31,7 @@ wlan-objs	:= if_media.o rc4.o \
 wlan_wep-objs	:= ieee80211_crypto_wep.o
 wlan_tkip-objs	:= ieee80211_crypto_tkip.o
 wlan_ccmp-objs	:= ieee80211_crypto_ccmp.o
+wlan_xauth-objs	:= ieee80211_xauth.o
 wlan_auth-objs	:= ieee80211_dot1x.o
 wlan_radius-objs:= ieee80211_radius.o
 wlan_acl-objs	:= ieee80211_acl.o
@@ -28,9 +42,9 @@ wlan_acl-objs	:= ieee80211_acl.o
 ##2.4##		   ieee80211_wireless.o ieee80211_linux.o \
 ##2.4##		   ieee80211_crypto_none.o ieee80211_crypto_wep.o \
 ##2.4##		   ieee80211_crypto_tkip.o ieee80211_crypto_ccmp.o \
-##2.4##		   ieee80211_dot1x.o ieee80211_radius.o
+##2.4##		   ieee80211_dot1x.o ieee80211_radius.o ieee80211_xauth.o
 ##2.4##list-multi	:= wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o \
-##2.4##		   wlan_auth.o wlan_radius.o
+##2.4##		   $(MOD_AUTH) wlan_acl.o
 
 #wlan.o:	$(wlan-objs)
 #	$(LD) -o wlan.$(KMODSUF) -r $(wlan-objs)
@@ -40,6 +54,8 @@ wlan_acl-objs	:= ieee80211_acl.o
 #	$(LD) -o wlan_tkip.$(KMODSUF) -r $(wlan_tkip-objs)
 #wlan_ccmp.o:	$(wlan_ccmp-objs)
 #	$(LD) -o wlan_ccmp.$(KMODSUF) -r $(wlan_ccmp-objs)
+#wlan_xauth.o:	$(wlan_xauth-objs)
+#	$(LD) -o wlan_xauth.$(KMODSUF) -r $(wlan_xauth-objs)
 #wlan_auth.o:	$(wlan_auth-objs)
 #	$(LD) -o wlan_auth.$(KMODSUF) -r $(wlan_auth-objs)
 #wlan_radius.o:	$(wlan_radius-objs)
