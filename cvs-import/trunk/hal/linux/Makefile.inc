@@ -1,6 +1,6 @@
 #
-# Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting
-# Copyright (c) 2002, 2003 Atheros Communications, Inc.
+# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2004 Atheros Communications, Inc.
 # All rights reserved.
 #
 # $Id$
@@ -29,6 +29,8 @@ HAL=	..
 # AH_REGOPS_FUNC	arrange for OS_REG_READ and OS_REG_WRITE to be function
 #			calls and not inline expanded to memory references
 # AH_ENABLE_TX_TPC	enables per-tx descriptor tpc support for the 5212
+# AH_ENABLE_AP_SUPPORT	enables AP-specific support not publicly available
+#			(e.g. don't cap turbo power limits)
 #
 # AH_WRITE_REGDOMAIN	permit EEPROM writes of the regulatory domain
 #
@@ -45,6 +47,7 @@ AH_REGOPS_FUNC=0		# use inline memory references
 AH_WRITE_REGDOMAIN=0		# support EEPROM writes of the regulatory domain
 AH_DEBUG_COUNTRY=0		# accept CTR_DEBUG country code
 AH_ENABLE_TX_TPC=0		# enable per-tx tpc for 5212
+AH_ENABLE_AP_SUPPORT=0		# enable AP-specific support
 
 #
 # Basic build components.
@@ -271,6 +274,9 @@ ifeq ($(strip ${AH_REGOPS_FUNC}),1)
 endif
 ifeq ($(strip ${AH_ENABLE_TX_TPC}),1)
 	echo "#define AH_ENABLE_TX_TPC 1"	>>${OBJDIR}/opt_ah.h
+endif
+ifeq ($(strip ${AH_ENABLE_AP_SUPPORT}),1)
+	echo "#define AH_ENABLE_AP_SUPPORT 1"	>>${OBJDIR}/opt_ah.h
 endif
 
 clean:

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002, 2003 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -53,6 +53,7 @@ struct ath_tx_status {
 	u_int16_t	ts_tstamp;	/* h/w assigned timestamp */
 	u_int8_t	ts_status;	/* frame status, 0 => xmit ok */
 	u_int8_t	ts_rate;	/* h/w transmit rate index */
+#define	HAL_TXSTAT_ALTRATE	0x80	/* alternate xmit rate used */
 	int8_t		ts_rssi;	/* tx ack RSSI */
 	u_int8_t	ts_shortretry;	/* # short retries */
 	u_int8_t	ts_longretry;	/* # long retries */
