@@ -1701,7 +1701,7 @@ ath_key_update_begin(struct ieee80211com *ic)
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
 	
-	DPRINTF(sc, ATH_DEBUG_FATAL, "%u %s (%s)\n", jiffies, __func__, dev->name);
+	DPRINTF(sc, ATH_DEBUG_FATAL, "%lu %s (%s)\n", jiffies, __func__, dev->name);
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s:\n", __func__);
 	/*
 	 * When called from the rx tasklet we cannot use
@@ -1726,7 +1726,7 @@ ath_key_update_end(struct ieee80211com *ic)
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
 
-	DPRINTF(sc, ATH_DEBUG_FATAL, "%u %s (%s)\n", jiffies, __func__, dev->name);
+	DPRINTF(sc, ATH_DEBUG_FATAL, "%lu %s (%s)\n", jiffies, __func__, dev->name);
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s:\n", __func__);
 	netif_start_queue(dev);
 #if 1
@@ -3276,7 +3276,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			 * 802.11 layer counts failures and provides
 			 * debugging/diagnostics.
 			 */
-			printk("%s: wep key null\n", __func__);
+			dev_kfree_skb(skb);
 			return -EIO;
 		}
 		/*
