@@ -134,7 +134,7 @@ ieee80211_proto_detach(struct ieee80211com *ic)
 	if (ic->ic_auth->ia_detach)
 		ic->ic_auth->ia_detach(ic);
 
-	_IF_DRAIN(&ic->ic_mgtq);
+	IF_DRAIN(&ic->ic_mgtq);
 
 	/*
 	 * Detach any ACL'ator.
@@ -898,7 +898,7 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 		case IEEE80211_S_AUTH:
 		reset:
 			ic->ic_mgt_timer = 0;
-			_IF_DRAIN(&ic->ic_mgtq);	// TODO: b4 ic->ic_inact_timer = 0
+			IF_DRAIN(&ic->ic_mgtq);	// TODO: b4 ic->ic_inact_timer = 0
 			ieee80211_reset_bss(ic);
 			break;
 		}
