@@ -84,6 +84,7 @@ static int	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(TQUEUE_ARG);
 static void	ath_rxorn_tasklet(TQUEUE_ARG);
 static void	ath_bmiss_tasklet(TQUEUE_ARG);
+static void	ath_mib_tasklet(TQUEUE_ARG);
 static int	ath_stop_locked(struct net_device *);
 static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
@@ -222,6 +223,7 @@ enum {
 	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
 	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
 	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
+	ATH_DEBUG_MIB		= 0x00080000,	/* MIB processing */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
@@ -277,6 +279,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq,ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq,ath_fatal_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_mibtq,	ath_mib_tasklet,	dev);
 
 	/*
 	 * Attach the hal and verify ABI compatibility by checking
@@ -309,6 +312,14 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * support it will return true w/o doing anything.
 	 */
 	sc->sc_mrretry = ath_hal_setupxtxdesc(ah, NULL, 0,0, 0,0, 0,0);
+
+	/*
+	 * Check if the device has hardware counters for PHY
+	 * errors.  If so we need to enable the MIB interrupt
+	 * so we can act on stat triggers.
+	 */
+	if (ath_hal_hwphycounters(ah))
+		sc->sc_needmib = 1;
 
 	/*
 	 * Get the hardware key cache size.
@@ -728,6 +739,16 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			sc->sc_stats.ast_bmiss++;
 			ATH_SCHEDULE_TQUEUE(&sc->sc_bmisstq, &needmark);
 		}
+		if (status & HAL_INT_MIB) {
+			sc->sc_stats.ast_mib++;
+			/*
+			 * Disable the MIB interrupt until we service it in the
+			 * tasklet; otherwise it will continue to be delivered.
+			 */
+			sc->sc_imask &= ~HAL_INT_MIB;
+			ath_hal_intrset(ah, sc->sc_imask);
+			ATH_SCHEDULE_TQUEUE(&sc->sc_mibtq, &needmark);
+		}
 	}
 	if (needmark)
 		mark_bh(IMMEDIATE_BH);
@@ -771,6 +792,26 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 		 */
 		ieee80211_new_state(ic, IEEE80211_S_ASSOC, -1);
 	}
+}
+
+static void
+ath_mib_tasklet(TQUEUE_ARG data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_hal *ah = sc->sc_ah;
+
+	DPRINTF(ATH_DEBUG_MIB, "%s\n", __func__);
+	/*
+	 * Let the hal handle the event.  We assume it will
+	 * clear whatever condition caused the interrupt so
+	 * it's safe to re-enable the MIB interrupt before
+	 * returning.
+	 */
+	ath_hal_mibevent(ah, &ATH_NODE(ic->ic_bss)->an_halstats);
+	sc->sc_imask |= HAL_INT_MIB;
+	ath_hal_intrset(ah, sc->sc_imask);
 }
 
 static u_int
@@ -866,6 +907,12 @@ ath_init(struct net_device *dev)
 	sc->sc_imask = HAL_INT_RX | HAL_INT_TX
 		  | HAL_INT_RXEOL | HAL_INT_RXORN
 		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
+	/*
+	 * Enable MIB interrupts when there are hardware phy counters.
+	 * Note we only do this (at the moment) for station mode.
+	 */
+	if (sc->sc_needmib && ic->ic_opmode == IEEE80211_M_STA)
+		sc->sc_imask |= HAL_INT_MIB;
 	ath_hal_intrset(ah, sc->sc_imask);
 
 	dev->flags |= IFF_RUNNING;
@@ -1940,7 +1987,7 @@ ath_beacon_config(struct ath_softc *sc)
 			bs.bs_sleepduration = roundup(bs.bs_sleepduration, bs.bs_dtimperiod);
 
 		DPRINTF(ATH_DEBUG_BEACON, 
-			"%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u maxdur %u timoffset %u\n"
+			"%s: intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u maxdur %u next %u timoffset %u\n"
 			, __func__
 			, bs.bs_intval
 			, bs.bs_nexttbtt
@@ -1950,10 +1997,11 @@ ath_beacon_config(struct ath_softc *sc)
 			, bs.bs_sleepduration
 			, bs.bs_cfpperiod
 			, bs.bs_cfpmaxduration
+			, bs.bs_cfpnext
 			, bs.bs_timoffset
 		);
 		ath_hal_intrset(ah, 0);
-		ath_hal_beacontimers(ah, &bs, 0/*XXX*/, 0, 0);
+		ath_hal_beacontimers(ah, &bs);
 		sc->sc_imask |= HAL_INT_BMISS;
 		ath_hal_intrset(ah, sc->sc_imask);
 	} else {
@@ -2441,7 +2489,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct ieee80211_node *ni;
 	struct ath_node *an;
 	struct ath_recv_hist *rh;
-	int len;
+	int len, opackets, obeacons;
 	u_int phyerr;
 	HAL_STATUS status;
 
@@ -2652,12 +2700,30 @@ rx_accept:
 		rh->arh_rssi = ds->ds_rxstat.rs_rssi;
 		rh->arh_antenna = ds->ds_rxstat.rs_antenna;
 
+		/* XXX monitor stats to identify packet type */
+		opackets = sc->sc_devstats.rx_packets;
+		obeacons = ic->ic_stats.is_rx_beacon;
+
 		/*
 		 * Send frame up for processing.
 		 */
 		ieee80211_input(ic, skb, ni,
 			ds->ds_rxstat.rs_rssi, ds->ds_rxstat.rs_tstamp);
 
+		/*
+		 * Update rssi statistics for use by the hal.
+		 *
+		 * NB: Do this before reclaiming any reference in case
+		 *     the node is deallocated.
+		 * XXX could optimize; we only use this data for station
+		 *     operation (at the moment)
+		 */
+		if (sc->sc_devstats.rx_packets != opackets)
+			ATH_RSSI_LPF(an->an_halstats.ns_avgrssi,
+				ds->ds_rxstat.rs_rssi);
+		else if (ic->ic_stats.is_rx_beacon != obeacons)
+			ATH_RSSI_LPF(an->an_halstats.ns_avgbrssi,
+				ds->ds_rxstat.rs_rssi);
 		/*
 		 * Reclaim node reference.
 		 */
@@ -2667,7 +2733,8 @@ rx_next:
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 	} while (ath_rxbuf_init(sc, bf) == 0);
 
-	ath_hal_rxmonitor(ah);			/* rx signal state monitoring */
+	/* rx signal state monitoring */
+	ath_hal_rxmonitor(ah, &ATH_NODE(ic->ic_bss)->an_halstats);
 #undef IS_CTL
 #undef PA2DESC
 }
@@ -3112,6 +3179,8 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 					sc->sc_stats.ast_tx_altrate++;
 				sc->sc_stats.ast_tx_rssi =
 					ds->ds_txstat.ts_rssi;
+				ATH_RSSI_LPF(an->an_halstats.ns_avgtxrssi,
+					ds->ds_txstat.ts_rssi);
 			} else {
 				an->an_tx_err++;
 				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)

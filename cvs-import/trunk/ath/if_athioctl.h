@@ -49,6 +49,7 @@ struct ath_stats {
 	u_int32_t	ast_rxorn;	/* rx overrun interrupts */
 	u_int32_t	ast_rxeol;	/* rx eol interrupts */
 	u_int32_t	ast_txurn;	/* tx underrun interrupts */
+	u_int32_t	ast_mib;	/* mib interrupts */
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
 	u_int32_t	ast_tx_invalid;	/* frames discarded 'cuz device gone */
