@@ -78,17 +78,23 @@ ieee80211_ioctl_giwname(struct net_device *dev,
 {
 	struct ieee80211com *ic = (struct ieee80211com *) dev;
 
-	strncpy(name, "IEEE 802.11", IFNAMSIZ);
-	if (ic->ic_opmode == IEEE80211_M_STA) {
-		struct ifmediareq imr;
-
-		ieee80211_media_status(dev, &imr);
-		if (imr.ifm_active & (IFM_IEEE80211_11A | IFM_IEEE80211_TURBO))
-			strncpy(name, "IEEE 802.11-OFDM", IFNAMSIZ);
-		else if (imr.ifm_active & (IFM_IEEE80211_11B))
-			strncpy(name, "IEEE 802.11-DS", IFNAMSIZ);
-		else if (imr.ifm_active & (IFM_IEEE80211_11G))
-			strncpy(name, "IEEE 802.11-OFDM/DS", IFNAMSIZ);
+	/* XXX should use media status but IFM_AUTO case gets tricky */
+	switch (ic->ic_curmode) {
+	case IEEE80211_MODE_11A:
+		strncpy(name, "IEEE 802.11-OFDM", IFNAMSIZ);
+		break;
+	case IEEE80211_MODE_11B:
+		strncpy(name, "IEEE 802.11-DS", IFNAMSIZ);
+		break;
+	case IEEE80211_MODE_11G:
+		strncpy(name, "IEEE 802.11-OFDM/DS", IFNAMSIZ);
+		break;
+	case IEEE80211_MODE_TURBO:
+		strncpy(name, "IEEE 802.11-TURBO", IFNAMSIZ);
+		break;
+	default:
+		strncpy(name, "IEEE 802.11", IFNAMSIZ);
+		break;
 	}
 	return 0;
 }
