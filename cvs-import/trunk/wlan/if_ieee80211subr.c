@@ -159,7 +159,6 @@ ieee80211_ifattach(struct net_device *dev)
 	}
 
 	spin_lock_init(&ic->ic_lock);
-ic->msg_enable = NETIF_MSG_INTR|NETIF_MSG_DEBUG|NETIF_MSG_LINK2;/*XXX*/
 
 	/*
 	 * Emulate the BSD ifnet timer ourselves.
