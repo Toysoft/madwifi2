@@ -590,14 +590,20 @@ struct ieee80211com {
 #define	IEEE80211_F_DODEL	0x00000008	/* delete ignore rate */
 
 /* private extensions to netdevice.h's netif_msg* mechanism */
-#define	NETIF_MSG_DEBUG		0x80000000	/* enable debugging msgs */
+#define	NETIF_MSG_DEBUG		0x80000000	/* IFF_DEBUG equivalent */
+#define	NETIF_MSG_LINK2		0x40000000	/* IFF_LINK2 equivalant */
 #define	netif_msg_debug(p)	((p)->msg_enable & NETIF_MSG_DEBUG)
+#define	netif_msg_dumppkts(p) \
+	((p)->msg_enable & (NETIF_MSG_DEBUG|NETIF_MSG_LINK2) == \
+		(NETIF_MSG_DEBUG|NETIF_MSG_LINK2))
+
+const char *ether_sprintf(const u_int8_t *);		/* XXX */
 
 int	ieee80211_ifattach(struct net_device *);
 void	ieee80211_ifdetach(struct net_device *);
 void	ieee80211_input(struct net_device *, struct sk_buff *, int, u_int32_t);
 int	ieee80211_mgmt_output(struct net_device *, struct ieee80211_node *,
-    struct sk_buff *, int);
+		struct sk_buff *, int);
 struct sk_buff *ieee80211_encap(struct net_device *, struct sk_buff *);
 struct sk_buff *ieee80211_decap(struct net_device *, struct sk_buff *);
 int	ieee80211_ioctl(struct net_device *, u_long, caddr_t);
@@ -606,8 +612,8 @@ void	ieee80211_dump_pkt(u_int8_t *, int, int, int);
 void	ieee80211_watchdog(struct net_device *);
 void	ieee80211_next_scan(struct net_device *);
 void	ieee80211_end_scan(struct net_device *);
-struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *, u_int8_t *,
-    int);
+struct ieee80211_node *ieee80211_alloc_node(struct ieee80211com *,
+		u_int8_t *, int);
 struct ieee80211_node *ieee80211_find_node(struct ieee80211com *, u_int8_t *);
 void	ieee80211_free_node(struct ieee80211com *, struct ieee80211_node *);
 void	ieee80211_free_allnodes(struct ieee80211com *);
