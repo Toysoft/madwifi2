@@ -1,0 +1,43 @@
+# XXX use ${ARCH}
+TARGET= i386-elf
+HAL= ../hal
+EXTRA_CFLAGS+=	-I${HAL} -I${HAL}/linux
+
+O_TARGET := ath_hal.o
+obj-${CONFIG_ATHEROS_HAL}	:= ah_osdep.o hal.o
+
+obj-m	:= ${O_TARGET}
+
+all:		all_targets
+.PHONY:		all
+
+ifndef HAL_OBJDIR
+#
+# Use release version of HAL.
+#
+# NB: binary HAL's are distributed in a uuencode'd file; on some
+#     systems uuencode is not installed by default and you must
+#     specially install it from the sharutils package.
+#
+UUDECODE?= uudecode
+OPT_AH_H= ${HAL}/opt_ah.h
+EXTRA_CFLAGS+=	-I.			# for opt_ah.h
+
+${OPT_AH_H}: ${HAL}/linux/${TARGET}.opt_ah.h
+	cp ${HAL}/linux/${TARGET}.opt_ah.h ${OPT_AH_H}
+hal.o:	${HAL}/linux/${TARGET}.hal.o.uu
+	${UUDECODE} -o hal.o < $<
+else
+#
+# Use private version of HAL.
+#
+OPT_AH_H=	${HAL_OBJDIR}/opt_ah.h
+EXTRA_CFLAGS+=	-I${HAL_OBJDIR}		# for opt_ah.h
+endif
+
+ah_osdep.o: ${HAL}/linux/ah_osdep.c ${OPT_AH_H}
+	${CC} -o $@ -c ${CFLAGS} ${EXTRA_CFLAGS} $<
+
+fastdep:	${OPT_AH_H} 
+
+include ${TOPDIR}/Rules.make

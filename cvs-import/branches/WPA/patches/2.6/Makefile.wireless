@@ -28,4 +28,4 @@ obj-$(CONFIG_PCMCIA_ATMEL)      += atmel_cs.o atmel.o
 obj-$(CONFIG_PCMCIA_WL3501)	+= wl3501_cs.o
 
 obj-$(CONFIG_ATHEROS)		+= ath/
-obj-$(CONFIG_ATHEROS_HAL)	+= ath_hal/
+obj-$(CONFIG_ATHEROS_HAL)	+= _ath_hal/
