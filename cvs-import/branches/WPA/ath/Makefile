@@ -39,69 +39,37 @@
 #
 # Makefile for the Atheros WLAN driver.
 #
+ifeq ($(obj),)
+obj=	.
+endif
+
 DEPTH=	..
 
-KMODNAME=	ath_pci
+obj-m		+= ath_pci.o
+ath_pci-objs	:= if_ath.o if_ath_pci.o
+export-objs	:= if_ath_pci.o
+list-multi	:= ath_pci.o
 
-include ${DEPTH}/Makefile.inc
+include $(obj)/${DEPTH}/Makefile.inc
 
-ifdef CONFIG_MODVERSIONS
-MODOPTS+=	-include ${WLAN}/ieee80211.ver
-ALL_VER+=	${WLAN}/ieee80211.ver
-MODOPTS+=	-include ${WLAN}/if_media.ver
-ALL_VER+=	${WLAN}/if_media.ver
-endif
+INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH_HAL} \
+	-I${obj}/${WLAN} -I${obj}/${DEPTH}
 
-SRCS=	if_ath.c if_ath_pci.c
-OBJS=	if_ath.o if_ath_pci.o
+EXTRA_CFLAGS+= ${INCS} ${COPTS}
 
-INCS+=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} \
-	-I${WLAN} ${KERNEL_INCS} -I${DEPTH}
+-include $(TOPDIR)/Rules.make
 
-ifdef HAL_OBJDIR
-INCS+=	-I${HAL_OBJDIR}		# for opt_ah.h
-endif
-
-ifneq (${LINUX_VERSION}, 204)
-OBJS+=		if_ath.mod.o if_ath_pci.mod.o
-CLEANFILES+=	if_ath.mod.c if_ath_pci.mod.c
-endif
-
-ALL=	${KMODNAME}.${KMODSUF}
-CFLAGS=	${INCS} ${MODOPTS} ${COPTS}
-LDFLAGS=
-
-all:	${ALL}
+all:
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
 install: all
-	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
-	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
-
-${KMODNAME}.${KMODSUF}: ${OBJS} Makefile
-	${LD} -o $@ -r ${LDFLAGS} ${OBJS}
-if_ath_pci.o:	version.h
-ifdef CONFIG_MODVERSIONS
-if_ath.o:	${ALL_VER}
-if_ath_pci.o:	${ALL_VER}
-endif
-
-ifneq (${LINUX_VERSION}, 204)
-if_ath_pci.mod.c: if_ath_pci.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux if_ath_pci.o
-if_ath_pci.mod.o:	if_ath_pci.mod.c
-
-if_ath.mod.c: if_ath.o
-	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux if_ath.o
-if_ath.mod.o:	if_ath.mod.c
-endif
+	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	strip -S ath_pci.$(KMODSUF)
+	cp ath_pci.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	rm -f ${OBJS} ${ALL} ${CLEANFILES}
+	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 
-depend: beforedepend .depend afterdepend
-.depend: ${SRCS} Makefile
-	rm -f .depend
-	-${CC} -M ${CFLAGS} ${SRCS} > .depend
-beforedepend:
-afterdepend:
--include .depend
+ath_pci.o: ${ath_pci-objs}
+	$(LD) -o ath_pci.$(KMODSUF) -r $(ath_pci-objs)
