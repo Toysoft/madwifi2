@@ -210,7 +210,7 @@ ieee80211_ifattach(struct ieee80211com *ic)
 
 	init_timer(&ic->ic_slowtimo);
 	ic->ic_slowtimo.data = (unsigned long) ic;
-	ic->ic_slowtimo.function = ieee80211_watchdog;	/* TODO ? */
+	ic->ic_slowtimo.function = ieee80211_watchdog;
 	ieee80211_watchdog((unsigned long) ic);		/* prime timer */
 	/*
 	 * NB: ieee80211_sysctl_register is called by the driver
@@ -772,8 +772,7 @@ ieee80211_watchdog(unsigned long data)
 		}
 	}
 	if (ic->ic_mgt_timer != 0 || need_inact_timer)
-		ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
-	add_timer(&ic->ic_slowtimo);
+		mod_timer(&ic->ic_slowtimo, jiffies + HZ);	/* once a second */
 }
 
 /*
