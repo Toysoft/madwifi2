@@ -450,12 +450,12 @@ struct ieee80211_node {
 	u_int8_t		ni_bssid[IEEE80211_ADDR_LEN];
 
 	/* beacon, probe response */
-	u_int8_t		ni_tstamp[8];
-	u_int16_t		ni_intval;
-	u_int16_t		ni_capinfo;
+	u_int8_t		ni_tstamp[8];	/* from last rcv'd beacon */
+	u_int16_t		ni_intval;	/* beacon interval */
+	u_int16_t		ni_capinfo;	/* capabilities */
 	u_int8_t		ni_esslen;
 	u_int8_t		ni_essid[IEEE80211_NWID_LEN];
-	struct ieee80211_rateset ni_rates;
+	struct ieee80211_rateset ni_rates;	/* negotiated rate set */
 	u_int8_t		*ni_country;	/* country information */
 	struct ieee80211channel	*ni_chan;
 	u_int16_t		ni_fhdwell;	/* FH only */
@@ -465,8 +465,8 @@ struct ieee80211_node {
 	/* DTIM and contention free period (CFP) */
 	u_int8_t		ni_dtimperiod;
 	u_int8_t		ni_cfpperiod;	/* # of DTIMs between CFPs */
-	u_int16_t		ni_cfpmaxduration;/* max CFP duration in TU */
 	u_int16_t		ni_cfpduremain;	/* remaining cfp duration */
+	u_int16_t		ni_cfpmaxduration;/* max CFP duration in TU */
 	u_int16_t		ni_nextdtim;	/* time to next DTIM */
 	u_int16_t		ni_timoffset;
 
@@ -553,6 +553,7 @@ struct ieee80211com {
 	u_int16_t		ic_txmax;	/* max tx retry count */
 	u_int16_t		ic_txlifetime;	/* tx lifetime */
 	u_int16_t		ic_txpower;	/* tx power setting (dbM) */
+	u_int16_t		ic_bmisstimeout;/* beacon miss threshold (ms) */
 	int			ic_nicknamelen;
 	u_int8_t		ic_nickname[IEEE80211_NWID_LEN];
 	int			ic_des_esslen;

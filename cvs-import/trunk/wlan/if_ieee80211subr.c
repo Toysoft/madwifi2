@@ -346,6 +346,7 @@ ieee80211_ifattach(struct net_device *dev)
 	ic->ic_fixed_rate = -1;			/* no fixed rate */
 	if (ic->ic_lintval == 0)
 		ic->ic_lintval = 100;		/* default sleep */
+	ic->ic_bmisstimeout = 7*ic->ic_lintval;	/* default 7 beacons */
 
 	/* initialize management frame handlers */
 	ic->ic_recv_mgmt[IEEE80211_FC0_SUBTYPE_PROBE_RESP
@@ -1735,6 +1736,7 @@ ieee80211_setup_rates(struct ieee80211com *ic, struct ieee80211_node *ni,
 int
 ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags)
 {
+#define	RV(v)	((v) & IEEE80211_RATE_VAL)
 	int i, j, ignore, error;
 	int okrate, badrate;
 	struct ieee80211_rateset *srs, *nrs;
@@ -1747,9 +1749,11 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 	for (i = 0; i < ni->ni_rates.rs_nrates; ) {
 		ignore = 0;
 		if (flags & IEEE80211_F_DOSORT) {
+			/*
+			 * Sort rates.
+			 */
 			for (j = i + 1; j < nrs->rs_nrates; j++) {
-				if ((nrs->rs_rates[i] & IEEE80211_RATE_VAL) >
-				    (nrs->rs_rates[j] & IEEE80211_RATE_VAL)) {
+				if (RV(nrs->rs_rates[i]) > RV(nrs->rs_rates[j])) {
 					r = nrs->rs_rates[i];
 					nrs->rs_rates[i] = nrs->rs_rates[j];
 					nrs->rs_rates[j] = r;
@@ -1759,23 +1763,31 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 		r = nrs->rs_rates[i] & IEEE80211_RATE_VAL;
 		badrate = r;
 		if (flags & IEEE80211_F_DOFRATE) {
+			/*
+			 * Apply fixed rate constraint.
+			 */
 			if (ic->ic_fixed_rate >= 0 &&
-			    r != (srs->rs_rates[ic->ic_fixed_rate] &
-			    IEEE80211_RATE_VAL))
+			    r != RV(srs->rs_rates[ic->ic_fixed_rate]))
 				ignore++;
 		}
 		if (flags & IEEE80211_F_DONEGO) {
-			for (j = 0; j < IEEE80211_RATE_MAXSIZE; j++) {
-				if (r == (srs->rs_rates[j] & IEEE80211_RATE_VAL))
+			/*
+			 * Check against supported rates.
+			 */
+			for (j = 0; j < srs->rs_nrates; j++) {
+				if (r == RV(srs->rs_rates[j]))
 					break;
 			}
-			if (j == IEEE80211_RATE_MAXSIZE) {
+			if (j == srs->rs_nrates) {
 				if (nrs->rs_rates[i] & IEEE80211_RATE_BASIC)
 					error++;
 				ignore++;
 			}
 		}
 		if (flags & IEEE80211_F_DODEL) {
+			/*
+			 * Delete unacceptable rates.
+			 */
 			if (ignore) {
 				nrs->rs_nrates--;
 				for (j = i; j < nrs->rs_nrates; j++)
@@ -1791,7 +1803,8 @@ ieee80211_fix_rate(struct ieee80211com *ic, struct ieee80211_node *ni, int flags
 	if (okrate == 0 || error != 0)
 		return badrate | IEEE80211_RATE_BASIC;
 	else
-		return okrate & IEEE80211_RATE_VAL;
+		return RV(okrate);
+#undef RV
 }
 
 /*
@@ -2170,7 +2183,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	struct ieee80211_node *ni;
 	u_int8_t *frm, *efrm, *tstamp, *bintval, *capinfo, *ssid;
 	u_int8_t *rates, *xrates, *country;
-	u_int8_t chan, fhindex, erp;
+	u_int8_t bchan, chan, fhindex, erp;
 	u_int16_t fhdwell;
 
 	if (ic->ic_opmode != IEEE80211_M_IBSS &&
@@ -2198,7 +2211,8 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	bintval = frm;	frm += 2;
 	capinfo = frm;	frm += 2;
 	ssid = rates = xrates = country = NULL;
-	chan = ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan);
+	bchan = ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan);
+	chan = bchan;
 	fhdwell = 0;
 	fhindex = 0;
 	erp = 0;
@@ -2221,7 +2235,11 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 			}
 			break;
 		case IEEE80211_ELEMID_DSPARMS:
-			if (ic->ic_phytype == IEEE80211_T_DS)
+			/*
+			 * XXX hack this since depending on phytype
+			 * is problematic for multi-mode devices.
+			 */
+			if (ic->ic_phytype != IEEE80211_T_FH)
 				chan = frm[2];
 			break;
 		case IEEE80211_ELEMID_TIM:
@@ -2253,6 +2271,20 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 			chan));
 		return;
 	}
+	if (chan != bchan) {
+		/*
+		 * Frame was received on a channel different from the
+		 * one indicated in the DS/FH params element id; silently
+		 * discard it.
+		 *
+		 * NB: this can happen due to signal leakage.
+		 */
+		DPRINTF(ic, ("%s: ignore %s on channel %u marked for channel %u\n",
+			__func__, ISPROBE(wh) ? "probe response" : "beacon",
+			bchan, chan));
+		/* XXX statistic */
+		return;
+	}
 
 	/*
 	 * Use mac and channel for lookup so we collect all
@@ -2271,7 +2303,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		printk("%s: %s%s on chan %u (bss chan %u) ",
 		    __func__, (ni == NULL ? "new " : ""),
 		    ISPROBE(wh) ? "probe response" : "beacon",
-		    chan, ieee80211_chan2ieee(ic, ic->ic_bss.ni_chan));
+		    chan, bchan);
 		ieee80211_print_essid(ssid + 2, ssid[1]);
 		printk(" from %s\n", ether_sprintf(wh->i_addr2));
 		printk("%s: caps 0x%x bintval %u erp 0x%x\n",
