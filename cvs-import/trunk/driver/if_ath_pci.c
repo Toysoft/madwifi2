@@ -255,7 +255,7 @@ extern char *dev_info;
 extern char *version;
 
 /* PCI specific module initialization */
-static int __init
+int 
 init_ath(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
@@ -268,7 +268,7 @@ init_ath(void)
 	return (0);
 }
 
-static void __exit
+void
 exit_ath(void)
 {
 	pci_unregister_driver(&ath_pci_drv_id);
