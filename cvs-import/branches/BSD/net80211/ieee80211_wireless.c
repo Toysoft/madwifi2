@@ -1001,7 +1001,7 @@ ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
-	struct ieee80211_node_table *nt = &ic->ic_sta;
+	struct ieee80211_node_table *nt = &ic->ic_scan;
 	struct ieee80211_node *ni;
 	struct sockaddr addr[IW_MAX_AP];
 	struct iw_quality qual[IW_MAX_AP];
@@ -1009,6 +1009,11 @@ ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 
 	i = 0;
 	/* XXX lock node list */
+	/*
+	 * TODO: use ieee80211_iterate_nodes(&ic->ic_scan,func,&args)
+	 * also create a func like bsd does: wi_read_ap_result()
+	 */
+	
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		addr[i].sa_family = ARPHRD_ETHER;
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP ||
@@ -1040,6 +1045,7 @@ ieee80211_ioctl_siwscan(struct ieee80211com *ic,
 	int i;
 
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP)
+		// return stations ?
 		return -EINVAL;
 	/*
 	 * XXX don't permit a scan to be started unless we
@@ -1067,18 +1073,18 @@ found:
 	if (ic->ic_bss->ni_chan == IEEE80211_CHAN_ANYC ||
 	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan)))
 		ic->ic_bss->ni_chan = ic->ic_ibss_chan;
-	/*
+	memcpy(ic->ic_chan_active, chanlist, sizeof(ic->ic_chan_active));
+ 	/*
 	 * We force the state to INIT before calling ieee80211_new_state
 	 * to get ieee80211_begin_scan called.  We really want to scan w/o
 	 * altering the current state but that's not possible right now.
 	 */
 	/* XXX handle proberequest case */
-	if (ic->ic_state != IEEE80211_S_INIT)
-		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-	ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
+	ic->ic_state = IEEE80211_S_INIT;	/* XXX bypass state machine */
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwscan);
+
 
 #if WIRELESS_EXT > 14
 /*
