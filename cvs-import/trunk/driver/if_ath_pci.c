@@ -74,8 +74,6 @@ static struct pci_device_id ath_pci_id_table[] __devinitdata = {
 	{ 0 }
 };
 
-static	int ath_cards_found = 0;
-
 static int
 ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
@@ -137,7 +135,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	printk(KERN_INFO "%s: Atheros PCI: mem=0x%lx, irq=%d\n",
 		dev->name, phymem, dev->irq);
-	ath_cards_found++;
 
 	return 0;
 bad4:
@@ -165,6 +162,7 @@ ath_pci_remove(struct pci_dev *pdev)
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
+	kfree(dev->priv);
 }
 
 #ifdef CONFIG_PM
@@ -223,8 +221,8 @@ MODULE_SUPPORTED_DEVICE("Atheros WLAN PCI cards");
 MODULE_LICENSE("Dual BSD/GPL");		/* XXX really BSD only */
 #endif
 
-static int
-__init init_ath_pci(void)
+static int __init
+init_ath_pci(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
@@ -241,6 +239,7 @@ static void __exit
 exit_ath_pci(void)
 {
 	pci_unregister_driver(&ath_pci_drv_id);
-	printk(KERN_INFO "%s: Driver unloaded\n", dev_info);
+
+	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_ath_pci);
