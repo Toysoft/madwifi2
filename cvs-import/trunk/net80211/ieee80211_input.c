@@ -339,8 +339,10 @@ ieee80211_dump_nodes(ic);/*XXX*/
 				goto out;
 			}
 			key = ieee80211_crypto_decap(ic, ni, skb);
-			if (key == NULL)
+			if (key == NULL) {
+				/* NB: stats+msgs handled in crypto_decap */
 				goto out;
+			}
 		} else {
 			key = NULL;
 		}
@@ -502,6 +504,7 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			break;
 		}
 		goto out;
+
 	default:
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 			("%s: bad frame type %x\n", __func__, type));
