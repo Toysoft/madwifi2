@@ -147,7 +147,6 @@ struct ath_softc {
 	u_int			sc_bhalq;	/* HAL q for outgoing beacons */
 	struct ath_buf		*sc_bcbuf;	/* beacon buffer */
 	struct ath_buf		*sc_bufptr;	/* allocated buffer ptr */
-	struct tq_struct	sc_swbatq;	/* swba intr tasklet */
 	struct tq_struct	sc_bmisstq;	/* bmiss intr tasklet */
 
 	struct timer_list	sc_rate_ctl;	/* tx rate control timer */
