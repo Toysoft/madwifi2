@@ -104,14 +104,6 @@ typedef void irqreturn_t;
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
 #define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
 
-struct ath_recv_hist {
-	ulong		arh_ticks;	/* kernel timestamp */
-	u_int8_t	arh_rssi;	/* rssi */
-	u_int8_t	arh_antenna;	/* antenna */
-};
-#define	ATH_RHIST_SIZE		16	/* number of samples (must be <256) */
-#define	ATH_RHIST_NOTIME	((ulong)(~0))
-
 /* driver-specific node state */
 struct ath_node {
 	struct ieee80211_node an_node;	/* base class */
@@ -119,7 +111,8 @@ struct ath_node {
 	u_int		an_tx_err;	/* tx !ok pkt */
 	u_int		an_tx_retr;	/* tx retry count */
 	int		an_tx_upper;	/* tx upper rate req cnt */
-	u_int		an_tx_antenna;	/* antenna for last good frame */
+	u_int8_t	an_tx_antenna;	/* antenna for last good tx */
+	u_int8_t	an_rx_antenna;	/* antenna for last good rx */
 	u_int8_t	an_tx_rix0;	/* series 0 rate index */
 	u_int8_t	an_tx_try0;	/* series 0 try count */
 	u_int8_t	an_tx_mgtrate;	/* h/w rate for management/ctl frames */
@@ -132,8 +125,6 @@ struct ath_node {
 	u_int8_t	an_tx_rate1sp;	/* series 1 short preamble h/w rate */
 	u_int8_t	an_tx_rate2sp;	/* series 2 short preamble h/w rate */
 	u_int8_t	an_tx_rate3sp;	/* series 3 short preamble h/w rate */
-	struct ath_recv_hist an_rx_hist[ATH_RHIST_SIZE];
-	u_int		an_rx_hist_next;/* index of next ``free entry'' */
 	HAL_NODE_STATS	an_halstats;	/* rssi statistics used by hal */
 
 };
