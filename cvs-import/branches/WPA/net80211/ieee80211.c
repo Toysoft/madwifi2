@@ -646,11 +646,12 @@ ieee80211_watchdog(unsigned long data)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) data;
 
-	if (ic->ic_mgt_timer && --ic->ic_mgt_timer == 0)
-		ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
-	if (ic->ic_inact_timer && --ic->ic_inact_timer == 0)
-		ieee80211_timeout_nodes(ic);
-
+	if (ic->ic_state != IEEE80211_S_INIT) {
+		if (ic->ic_mgt_timer && --ic->ic_mgt_timer == 0)
+			ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
+		if (ic->ic_inact_timer && --ic->ic_inact_timer == 0)
+			ieee80211_timeout_nodes(ic);
+	}
 	ic->ic_slowtimo.expires = jiffies + HZ;		/* once a second */
 	add_timer(&ic->ic_slowtimo);
 }
