@@ -1836,7 +1836,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 */
 		if (ic->ic_acl != NULL &&
 		    !ic->ic_acl->iac_check(ic, wh->i_addr2)) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
 			    ("[%s] reject auth request by station due to ACL\n",
 			    ether_sprintf(wh->i_addr2)));
 			ic->ic_stats.is_rx_acl++;
