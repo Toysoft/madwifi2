@@ -1317,6 +1317,7 @@ radius_get_reply(struct radiuscom *rc, u_int8_t id)
 	LIST_FOREACH(ern, &rc->rc_replies, ern_next)
 		if (ern->ern_base.ean_currentId == id) {
 			LIST_REMOVE(ern, ern_next);
+			ern->ern_onreply = FALSE;
 			return ern;
 		}
 	return NULL;
@@ -1332,6 +1333,7 @@ radius_remove_reply(struct radiuscom *rc, struct eapol_auth_radius_node *p)
 	LIST_FOREACH(ern, &rc->rc_replies, ern_next)
 		if (ern == p) {
 			LIST_REMOVE(ern, ern_next);
+			ern->ern_onreply = FALSE;
 			break;
 		}
 }
@@ -1343,9 +1345,13 @@ radius_remove_reply(struct radiuscom *rc, struct eapol_auth_radius_node *p)
 static void
 radius_add_reply(struct radiuscom *rc, struct eapol_auth_radius_node *ern)
 {
+
 	EAPOL_LOCK_ASSERT(rc->rc_ec);
 
-	LIST_INSERT_HEAD(&rc->rc_replies, ern, ern_next);
+	if (!ern->ern_onreply) {
+		LIST_INSERT_HEAD(&rc->rc_replies, ern, ern_next);
+		ern->ern_onreply = TRUE;
+	}
 }
 
 /*
@@ -1375,7 +1381,19 @@ radius_node_free(struct eapol_auth_node *ean)
 	struct eapol_auth_radius_node *ern = EAPOL_RADIUSNODE(ean);
 	struct radiuscom *rc = ean->ean_ec->ec_radius;
 
+	/*
+	 * NB: we're called from eapol_node_leave which drops it's
+	 * EAPOL lock before calling us as it's already removed the
+	 * reference to us from the table and needs to drop the lock
+	 * before calling back in to the 802.11 layer.  However we
+	 * need to grab the lock again to safeguard removing any
+	 * reference to use on the reply list.  There's probably
+	 * a better way to do this.
+	 */
+	EAPOL_LOCK(ean->ean_ec);
 	radius_remove_reply(rc, ern);
+	EAPOL_UNLOCK(ean->ean_ec);
+
 	if (ern->ern_msg != NULL)
 		kfree_skb(ern->ern_msg);
 	if (ern->ern_radmsg != NULL)
@@ -1392,6 +1410,8 @@ radius_node_reset(struct eapol_auth_node *ean)
 {
 	struct eapol_auth_radius_node *ern = EAPOL_RADIUSNODE(ean);
 	struct radiuscom *rc = ean->ean_ec->ec_radius;
+
+	EAPOL_LOCK_ASSERT(rc->rc_ec);
 
 	radius_remove_reply(rc, ern);
 	if (ern->ern_msg != NULL) {
