@@ -213,7 +213,7 @@ ieee80211_classify(struct ieee80211com *ic, struct sk_buff *skb, struct ieee8021
 	const struct iphdr *ip;
 
 	if ((ni->ni_flags & IEEE80211_NODE_QOS) == 0) {
-    		printk("%s (%s): no QOS/WME for this node\n", __func__, ic->ic_dev->name);
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s] no QOS/WME for this node (%s)\n", __func__, ether_sprintf(ni->ni_macaddr));
 		ac = WME_AC_BE;
 		goto done;
 	}
@@ -254,7 +254,7 @@ ieee80211_classify(struct ieee80211com *ic, struct sk_buff *skb, struct ieee8021
 	}
 
 	//eh = (struct ether_header *) skb->data;
-	eh = (struct ether_header *) skb->mac.ethernet;
+	eh = (struct ether_header *) skb->data;
 	if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
     		ip = skb->nh.iph;
 
@@ -262,30 +262,38 @@ ieee80211_classify(struct ieee80211com *ic, struct sk_buff *skb, struct ieee8021
 		 * IP frame, map the TOS field.
 		 */
 		printk("%s (%s): src: 0x%x dst: 0x%x paket tos: 0x%x\n", __func__, ic->ic_dev->name, ip->saddr, ip->daddr, ip->tos);
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] src: 0x%x dst: 0x%x paket tos: 0x%x\n", 
+				__func__, ic->ic_dev->name, ip->saddr, ip->daddr, ip->tos);
 		switch (ip->tos) {
 		case 0x08:
 		case 0x20:
-    			printk("%s (%s): sorting packet in WME_AC_BK queue\n", __func__, ic->ic_dev->name);
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] sorting packet in WME_AC_BK queue (node %s)\n", 
+				__func__, ic->ic_dev->name, ether_sprintf(ni->ni_macaddr));
 			d_wme_ac = WME_AC_BK;	/* background */
 			break;
 		case 0x28:
 		case 0xa0:
 			d_wme_ac = WME_AC_VI;	/* video */
-    			printk("%s (%s): sorting packet in WME_AC_VI queue\n", __func__, ic->ic_dev->name);
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] sorting packet in WME_AC_VI queue (node %s)\n", 
+				__func__, ic->ic_dev->name, ether_sprintf(ni->ni_macaddr));
 			break;
 		case 0x30:			/* voice */
 		case 0xe0:
 		case 0x88:			/* XXX UPSD */
 		case 0xb8:
-    			printk("%s (%s): sorting packet in WME_AC_VO queue\n", __func__, ic->ic_dev->name);
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] sorting packet in WME_AC_VO queue (node %s)\n", 
+				__func__, ic->ic_dev->name, ether_sprintf(ni->ni_macaddr));
 			d_wme_ac = WME_AC_VO;
 			break;
 		default:
-    			printk("%s (%s): sorting packet in WME_AC_BE queue\n", __func__, ic->ic_dev->name);
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] sorting packet in WME_AC_BE queue (node %s)\n", 
+				__func__, ic->ic_dev->name, ether_sprintf(ni->ni_macaddr));
 			d_wme_ac = WME_AC_BE;
 			break;
 		}
 	} else {
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] no IP packet, sorting packet in WME_AC_BE queue (node %s)\n", 
+			__func__, ic->ic_dev->name, ether_sprintf(ni->ni_macaddr));
 		d_wme_ac = WME_AC_BE;
 	}
 	/*
