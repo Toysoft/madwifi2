@@ -666,6 +666,12 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	DPRINTF(sc, ATH_DEBUG_INTR, "%s: status 0x%x\n", __func__, status);
 	status &= sc->sc_imask;			/* discard unasked for bits */
 	if (status & HAL_INT_FATAL) {
+		/*
+		 * Fatal errors are unrecoverable.  Typically
+		 * these are caused by DMA errors.  Unfortunately
+		 * the exact reason is not (presently) returned
+		 * by the hal.
+		 */
 		sc->sc_stats.ast_hardware++;
 		ath_hal_intrset(ah, 0);		/* disable intr's until reset */
 		ATH_SCHEDULE_TQUEUE(&sc->sc_fataltq, &needmark);
