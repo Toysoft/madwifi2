@@ -1307,7 +1307,7 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		/*
 		 * the data frame is last
 		 */
-		if (skb0 == sbk)
+		if (skb0 == skb)
 			break; 
 	}
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
