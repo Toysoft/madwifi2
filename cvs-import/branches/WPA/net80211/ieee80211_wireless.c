@@ -49,7 +49,6 @@
 #include <linux/netdevice.h>
 #include <linux/utsname.h>
 #include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
-
 #include <net/iw_handler.h>
 
 #include <asm/uaccess.h>
@@ -182,7 +181,7 @@ getiwkeyix(struct ieee80211com *ic, const struct iw_point* erq, int *kix)
 
 	kid = erq->flags & IW_ENCODE_INDEX;
 	if (kid < 1 || kid > IEEE80211_WEP_NKID) {
-		kid = ic->ic_wep_txkey;
+		kid = ic->ic_def_txkey;
 		if (kid == IEEE80211_KEYIX_NONE)
 			kid = 0;
 	} else
@@ -199,34 +198,55 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *keybuf)
 {
-	int kid, error, wepchange;
+	int kid, error;
+	int wepchange = 0;
 
 	if ((erq->flags & IW_ENCODE_DISABLED) == 0) {
 		/*
-		 * Enable crypto.  The device must support
-		 * it and any specified key must be valid.
+		 * Enable crypto, set key contents, and
+		 * set the default transmit key.
 		 */
-		if ((ic->ic_caps & IEEE80211_C_WEP) == 0)
-			return -EOPNOTSUPP;
 		error = getiwkeyix(ic, erq, &kid);
 		if (error)
 			return -error;
 		if (erq->length > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
 		/* XXX no way to install 0-length key */
+		ieee80211_key_update_begin(ic);
 		if (erq->length > 0) {
-			memcpy(ic->ic_nw_keys[kid].wk_key, keybuf, erq->length);
-			memset(ic->ic_nw_keys[kid].wk_key + erq->length, 0,
-				IEEE80211_KEYBUF_SIZE - erq->length);
-			ic->ic_nw_keys[kid].wk_len = erq->length;
+			struct ieee80211_key *k = &ic->ic_nw_keys[kid];
+
+			/*
+			 * Set key contents.  This interface only supports WEP.
+			 */
+			if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP, k)) {
+				k->wk_keylen = erq->length;
+				/* NB: preserve flags set by newkey */
+				k->wk_flags |=
+					IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
+				memcpy(k->wk_key, keybuf, erq->length);
+				memset(k->wk_key + erq->length, 0,
+					IEEE80211_KEYBUF_SIZE - erq->length);
+				if (!ieee80211_crypto_setkey(ic, k, ic->ic_myaddr))
+					error = -EINVAL;		/* XXX */
+			} else {
+				error = -EINVAL;
+			}
 		} else {
-			/* verify the key to be installed is non-zero length */
-			if (ic->ic_nw_keys[kid].wk_len == 0)
-				return -EINVAL;
+			/*
+			 * When the length is zero the request only changes
+			 * the default transmit key.  Verify the new key has
+			 * a non-zero length.
+			 */
+			if (ic->ic_nw_keys[kid].wk_keylen == 0)
+				error = -EINVAL;
 		}
-		ic->ic_wep_txkey = kid;
-		wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) == 0;
-		ic->ic_flags |= IEEE80211_F_PRIVACY;
+		if (error == 0) {
+			ic->ic_def_txkey = kid;
+			wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) == 0;
+			ic->ic_flags |= IEEE80211_F_PRIVACY;
+		}
+		ieee80211_key_update_end(ic);
 	} else {
 		if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0)
 			return 0;
@@ -234,8 +254,7 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		wepchange = 1;
 		error = 0;
 	}
-	KASSERT(error == 0, ("something wrong, error %d", error));
-	if (IS_UP(ic->ic_dev)) {
+	if (error == 0 && IS_UP(ic->ic_dev)) {
 		/*
 		 * Device is up and running; we must kick it to
 		 * effect the change.  If we're enabling/disabling
@@ -244,9 +263,9 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		 * the key state should have been updated above.
 		 */
 		if (wepchange && ic->ic_roaming == IEEE80211_ROAMING_AUTO)
-			error = (*ic->ic_init)(ic->ic_dev);
+			error = -(*ic->ic_init)(ic->ic_dev);
 	}
-	return -error;
+	return error;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwencode);
 
@@ -255,22 +274,27 @@ ieee80211_ioctl_giwencode(struct ieee80211com *ic,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *key)
 {
+	struct ieee80211_key *k;
 	int error, kid;
 
-	if ((ic->ic_flags & IEEE80211_F_PRIVACY) == 0) {
+	if (ic->ic_flags & IEEE80211_F_PRIVACY) {
+		error = getiwkeyix(ic, erq, &kid);
+		if (error != 0)
+			return -error;
+		k = &ic->ic_nw_keys[kid];
 		/* XXX no way to return cipher/key type */
-		erq->length = 0;
-		erq->flags = IW_ENCODE_DISABLED;
-		error = 0;
-	} else if ((error = getiwkeyix(ic, erq, &kid)) == 0) {
+
 		erq->flags = kid + 1;			/* NB: base 1 */
-		if (erq->length > ic->ic_nw_keys[kid].wk_len)
-			erq->length = ic->ic_nw_keys[kid].wk_len;
-		memcpy(key, ic->ic_nw_keys[kid].wk_key, erq->length);
+		if (erq->length > k->wk_keylen)
+			erq->length = k->wk_keylen;
+		memcpy(key, k->wk_key, erq->length);
 		erq->flags |= IW_ENCODE_ENABLED;	/* XXX */
 		erq->flags |= IW_ENCODE_OPEN;		/* XXX */
+	} else {
+		erq->length = 0;
+		erq->flags = IW_ENCODE_DISABLED;
 	}
-	return -error;
+	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_giwencode);
 
@@ -555,13 +579,25 @@ ieee80211_ioctl_siwessid(struct ieee80211com *ic,
 {
 
 	if (data->flags == 0) {		/* ANY */
-		memset(ic->ic_des_essid, 0, IEEE80211_NWID_LEN);
+		memset(ic->ic_des_essid, 0, sizeof(ic->ic_des_essid));
 		ic->ic_des_esslen = 0;
 	} else {
 		if (data->length > sizeof(ic->ic_des_essid))
 			data->length = sizeof(ic->ic_des_essid);
 		memcpy(ic->ic_des_essid, ssid, data->length);
 		ic->ic_des_esslen = data->length;
+		/*
+		 * Deduct a trailing \0 since iwconfig passes a string
+		 * length that includes this.  Unfortunately this means
+		 * that specifying a string with multiple trailing \0's
+		 * won't be handled correctly.  Not sure there's a good
+		 * solution; the API is botched (the length should be
+		 * exactly those bytes that are meaningful and not include
+		 * extraneous stuff).
+		 */
+		if (ic->ic_des_esslen > 0 &&
+		    ic->ic_des_essid[ic->ic_des_esslen-1] == '\0')
+			ic->ic_des_esslen--;
 	}
 	return IS_UP_AUTO(ic) ? -(*ic->ic_init)(ic->ic_dev) : 0;
 }
@@ -997,12 +1033,12 @@ found:
 	/*
 	 * We force the state to INIT before calling ieee80211_new_state
 	 * to get ieee80211_begin_scan called.  We really want to scan w/o
-	 * alterating the current state but that's not possible right now.
+	 * altering the current state but that's not possible right now.
 	 */
 	/* XXX handle proberequest case */
 	if (ic->ic_state != IEEE80211_S_INIT)
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
-	ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+	ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwscan);
@@ -1193,6 +1229,7 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 	int retv = EOPNOTSUPP;
 	int j, caps;
 	const struct ieee80211_authenticator *auth;
+	const struct ieee80211_aclator *acl;
 
 	switch (param) {
 	case IEEE80211_PARAM_TURBO:
@@ -1377,10 +1414,39 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_DRIVER_CAPS:
 		ic->ic_caps = value;		/* NB: for testing */
+		retv = 0;
+		break;
+	case IEEE80211_PARAM_MACCMD:
+		acl = ic->ic_acl;
+		switch (value) {
+		case IEEE80211_MACCMD_POLICY_OPEN:
+		case IEEE80211_MACCMD_POLICY_ALLOW:
+		case IEEE80211_MACCMD_POLICY_DENY:
+			if (acl == NULL) {
+				acl = ieee80211_aclator_get("mac");
+				if (acl == NULL || !acl->iac_attach(ic))
+					return -EINVAL;
+				ic->ic_acl = acl;
+			}
+			acl->iac_setpolicy(ic, value);
+			break;
+		case IEEE80211_MACCMD_FLUSH:
+			if (acl != NULL)
+				acl->iac_flush(ic);
+			/* NB: silently ignore when not in use */
+			break;
+		case IEEE80211_MACCMD_DETACH:
+			if (acl != NULL) {
+				ic->ic_acl = NULL;
+				acl->iac_detach(ic);
+			}
+			break;
+		}
+		retv = 0;
 		break;
 	}
 	if (retv == ENETRESET)
-		retv = IS_UP(ic->ic_dev) ? (*ic->ic_init)(ic->ic_dev) : 0;
+		retv = IS_UP_AUTO(ic) ? (*ic->ic_init)(ic->ic_dev) : 0;
 	return -retv;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_setparam);
@@ -1541,6 +1607,144 @@ ieee80211_ioctl_getoptie(struct ieee80211com *ic, struct iw_request_info *info,
 EXPORT_SYMBOL(ieee80211_ioctl_getoptie);
 
 int
+ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct ieee80211req_key *ik = (struct ieee80211req_key *)extra;
+	struct ieee80211_node *ni;
+	struct ieee80211_key *wk;
+	u_int16_t kid;
+	int error;
+
+	/* NB: cipher support is verified by ieee80211_crypt_newkey */
+	/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
+	if (ik->ik_keylen > sizeof(ik->ik_keydata))
+		return -EINVAL;
+	kid = ik->ik_keyix;
+	if (kid == IEEE80211_KEYIX_NONE) {
+		/* XXX unicast keys currently must be tx/rx */
+		if (ik->ik_flags != (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV))
+			return -EINVAL;
+		if (ic->ic_opmode == IEEE80211_M_STA) {
+			ni = ic->ic_bss;
+			if (!IEEE80211_ADDR_EQ(ik->ik_macaddr, ni->ni_bssid))
+				return -EINVAL;	/* XXX */
+		} else
+			ni = ieee80211_find_node(ic, ik->ik_macaddr);
+		if (ni == NULL)
+			return -EINVAL;		/* XXX */
+		wk = &ni->ni_ucastkey;
+	} else {
+		if (kid >= IEEE80211_WEP_NKID)
+			return -EINVAL;
+		wk = &ic->ic_nw_keys[kid];
+		ni = NULL;
+	}
+	error = 0;
+	ieee80211_key_update_begin(ic);
+	if (ieee80211_crypto_newkey(ic, ik->ik_type, wk)) {
+		wk->wk_keylen = ik->ik_keylen;
+		/* NB: MIC presence is implied by cipher type */
+		if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
+			wk->wk_keylen = IEEE80211_KEYBUF_SIZE;
+		wk->wk_keyrsc = ik->ik_keyrsc;
+		wk->wk_keytsc = 0;			/* new key, reset */
+		wk->wk_flags |=
+			ik->ik_flags & (IEEE80211_KEY_XMIT|IEEE80211_KEY_RECV);
+		memset(wk->wk_key, 0, sizeof(wk->wk_key));
+		memcpy(wk->wk_key, ik->ik_keydata, ik->ik_keylen);
+		if (!ieee80211_crypto_setkey(ic, wk,
+		    ni != NULL ? ni->ni_macaddr : ik->ik_macaddr))
+			error = -ENOENT;		/* XXX */
+		else if ((ik->ik_flags & IEEE80211_KEY_DEFAULT))
+			ic->ic_def_txkey = kid;
+	} else
+		error = -EINVAL;		/* XXX */
+	ieee80211_key_update_end(ic);
+	if (ni != NULL && ni != ic->ic_bss)
+		ieee80211_free_node(ic, ni);
+	return error;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_setkey);
+
+int
+ieee80211_ioctl_getkey(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct ieee80211_node *ni;
+	struct ieee80211req_key *ik = (struct ieee80211req_key *)extra;
+	struct ieee80211_key *wk;
+	const struct ieee80211_cipher *cip;
+	union iwreq_data *u = w;
+	u_int kid;
+
+	if (copy_from_user(u->data.pointer, ik, sizeof(*ik)))
+		return -EFAULT;
+	kid = ik->ik_keyix;
+	if (kid == IEEE80211_KEYIX_NONE) {
+		ni = ieee80211_find_node(ic, ik->ik_macaddr);
+		if (ni == NULL)
+			return -EINVAL;		/* XXX */
+		wk = &ni->ni_ucastkey;
+	} else {
+		if (kid >= IEEE80211_WEP_NKID)
+			return -EINVAL;
+		wk = &ic->ic_nw_keys[kid];
+		IEEE80211_ADDR_COPY(&ik->ik_macaddr, ic->ic_bss->ni_macaddr);
+		ni = NULL;
+	}
+	cip = wk->wk_cipher;
+	ik->ik_type = cip->ic_cipher;
+	ik->ik_keylen = wk->wk_keylen;
+	ik->ik_flags = wk->wk_flags & (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV);
+	if (wk->wk_keyix == ic->ic_def_txkey)
+		ik->ik_flags |= IEEE80211_KEY_DEFAULT;
+	if (capable(CAP_NET_ADMIN)) {
+		/* NB: only root can read key data */
+		ik->ik_keyrsc = wk->wk_keyrsc;
+		memcpy(ik->ik_keydata, wk->wk_key, wk->wk_keylen);
+		if (cip->ic_cipher == IEEE80211_CIPHER_TKIP) {
+			memcpy(ik->ik_keydata+wk->wk_keylen,
+				wk->wk_key + IEEE80211_KEYBUF_SIZE,
+				IEEE80211_MICBUF_SIZE);
+			ik->ik_keylen += IEEE80211_MICBUF_SIZE;
+		}
+	} else {
+		memset(ik->ik_keydata, 0, sizeof(ik->ik_keydata));
+	}
+	if (ni != NULL)
+		ieee80211_free_node(ic, ni);
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_getkey);
+
+int
+ieee80211_ioctl_delkey(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct ieee80211req_del_key *dk = (struct ieee80211req_del_key *)extra;
+	int kid;
+
+	kid = dk->idk_keyix;
+	if (dk->idk_keyix == IEEE80211_KEYIX_NONE) {
+		struct ieee80211_node *ni =
+			ieee80211_find_node(ic, dk->idk_macaddr);
+		if (ni == NULL)
+			return -EINVAL;		/* XXX */
+		/* XXX error return */
+		ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
+		ieee80211_free_node(ic, ni);
+	} else {
+		if (kid >= IEEE80211_WEP_NKID)
+			return -EINVAL;
+		/* XXX error return */
+		ieee80211_crypto_delkey(ic, &ic->ic_nw_keys[kid]);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_delkey);
+
+int
 ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 		   	 void *w, char *extra)
 {
@@ -1586,9 +1790,95 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 }
 EXPORT_SYMBOL(ieee80211_ioctl_setmlme);
 
+int
+ieee80211_ioctl_addmac(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct sockaddr *sa = (struct sockaddr *)extra;
+	const struct ieee80211_aclator *acl = ic->ic_acl;
+
+	if (acl == NULL) {
+		acl = ieee80211_aclator_get("mac");
+		if (acl == NULL || !acl->iac_attach(ic))
+			return -EINVAL;
+		ic->ic_acl = acl;
+	}
+	acl->iac_add(ic, sa->sa_data);
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_addmac);
+
+int
+ieee80211_ioctl_delmac(struct ieee80211com *ic, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct sockaddr *sa = (struct sockaddr *)extra;
+	const struct ieee80211_aclator *acl = ic->ic_acl;
+
+	if (acl == NULL) {
+		acl = ieee80211_aclator_get("mac");
+		if (acl == NULL || !acl->iac_attach(ic))
+			return -EINVAL;
+		ic->ic_acl = acl;
+	}
+	acl->iac_remove(ic, sa->sa_data);
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_delmac);
+
+int
+ieee80211_ioctl_chanlist(struct ieee80211com *ic, struct iw_request_info *info,
+			void *w, char *extra)
+{
+	struct ieee80211req_chanlist *list =
+		(struct ieee80211req_chanlist *)extra;
+	u_char chanlist[roundup(IEEE80211_CHAN_MAX, NBBY)];
+	int i, j;
+
+	memset(chanlist, 0, sizeof(chanlist));
+	/*
+	 * Since channel 0 is not available for DS, channel 1
+	 * is assigned to LSB on WaveLAN.
+	 */
+	if (ic->ic_phytype == IEEE80211_T_DS)
+		i = 1;
+	else
+		i = 0;
+	for (j = 0; i <= IEEE80211_CHAN_MAX; i++, j++) {
+		if (isclr(list->ic_channels, j))
+			continue;
+		if (isclr(ic->ic_chan_avail, i))
+			return EPERM;
+		setbit(chanlist, i);
+	}
+	if (ic->ic_ibss_chan == NULL ||
+	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_ibss_chan))) {
+		for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
+			if (isset(chanlist, i)) {
+				ic->ic_ibss_chan = &ic->ic_channels[i];
+				goto found;
+			}
+		return EINVAL;			/* no active channels */
+found:
+		;
+	}
+	memcpy(ic->ic_chan_active, chanlist, sizeof(ic->ic_chan_active));
+	if (ic->ic_bss->ni_chan == IEEE80211_CHAN_ANYC ||
+	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan)))
+		ic->ic_bss->ni_chan = ic->ic_ibss_chan;
+	return IS_UP_AUTO(ic) ? -(*ic->ic_init)(ic->ic_dev) : 0;
+}
+EXPORT_SYMBOL(ieee80211_ioctl_chanlist);
+
 #define	IW_PRIV_TYPE_OPTIE	IW_PRIV_TYPE_BYTE | IEEE80211_MAX_OPT_IE
+#define	IW_PRIV_TYPE_KEY \
+	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_key)
+#define	IW_PRIV_TYPE_DELKEY \
+	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_del_key)
 #define	IW_PRIV_TYPE_MLME \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_mlme)
+#define	IW_PRIV_TYPE_CHANLIST \
+	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chanlist)
 
 static const struct iw_priv_args ieee80211_priv_args[] = {
 	/* NB: setoptie & getoptie are !IW_PRIV_SIZE_FIXED */
@@ -1596,8 +1886,20 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_OPTIE, 0,			"setoptie" },
 	{ IEEE80211_IOCTL_GETOPTIE,
 	  0, IW_PRIV_TYPE_OPTIE,			"getoptie" },
+	{ IEEE80211_IOCTL_SETKEY,
+	  IW_PRIV_TYPE_KEY | IW_PRIV_SIZE_FIXED, 0,	"setkey" },
+	{ IEEE80211_IOCTL_GETKEY,
+	  0, IW_PRIV_TYPE_KEY | IW_PRIV_SIZE_FIXED,	"getkey" },
+	{ IEEE80211_IOCTL_DELKEY,
+	  IW_PRIV_TYPE_DELKEY | IW_PRIV_SIZE_FIXED, 0,	"delkey" },
 	{ IEEE80211_IOCTL_SETMLME,
 	  IW_PRIV_TYPE_MLME | IW_PRIV_SIZE_FIXED, 0,	"setmlme" },
+	{ IEEE80211_IOCTL_ADDMAC,
+	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED, 0,	"addmac" },
+	{ IEEE80211_IOCTL_DELMAC,
+	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED, 0,	"delmac" },
+	{ IEEE80211_IOCTL_CHANLIST,
+	  IW_PRIV_TYPE_CHANLIST | IW_PRIV_SIZE_FIXED, 0,"chanlist" },
 #if WIRELESS_EXT >= 12
 	{ IEEE80211_IOCTL_SETPARAM,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "setparam" },
@@ -1613,6 +1915,7 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "" },
 	{ IEEE80211_IOCTL_GETPARAM,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "" },
+
 	/* sub-ioctl definitions */
 	{ IEEE80211_PARAM_TURBO,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "turbo" },
@@ -1678,6 +1981,8 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "driver_caps" },
 	{ IEEE80211_PARAM_DRIVER_CAPS,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_driver_caps" },
+	{ IEEE80211_PARAM_MACCMD,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "maccmd" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 

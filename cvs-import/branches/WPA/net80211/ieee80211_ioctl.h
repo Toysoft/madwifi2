@@ -131,16 +131,30 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_tkipicv;		/* rx ICV check failed (TKIP) */
 	u_int32_t	is_rx_badcipher;	/* rx failed 'cuz key type */
 	u_int32_t	is_rx_nocipherctx;	/* rx failed 'cuz key !setup */
+	u_int32_t	is_rx_acl;		/* rx discard 'cuz acl policy */
 	u_int32_t	is_tx_nobuf;		/* tx failed for lack of buf */
 	u_int32_t	is_tx_nonode;		/* tx failed for no node */
 	u_int32_t	is_tx_unknownmgt;	/* tx of unknown mgt frame */
 	u_int32_t	is_tx_badcipher;	/* tx failed 'cuz key type */
-	u_int32_t	is_tx_nocipherctx;	/* tx failed 'cuz key !setup */
-	u_int32_t	is_tx_wepfail;		/* tx wep processing failed */
+	u_int32_t	is_tx_nodefkey;		/* tx failed 'cuz no defkey */
+	u_int32_t	is_tx_noheadroom;	/* tx failed 'cuz no space */
 	u_int32_t	is_scan_active;		/* active scans started */
 	u_int32_t	is_scan_passive;	/* passive scans started */
 	u_int32_t	is_node_timeout;	/* nodes timed out inactivity */
 	u_int32_t	is_crypto_nomem;	/* no memory for crypto ctx */
+	u_int32_t	is_crypto_tkip;		/* tkip crypto done in s/w */
+	u_int32_t	is_crypto_tkipenmic;	/* tkip en-MIC done in s/w */
+	u_int32_t	is_crypto_tkipdemic;	/* tkip de-MIC done in s/w */
+	u_int32_t	is_crypto_ccmp;		/* ccmp crypto done in s/w */
+	u_int32_t	is_crypto_wep;		/* wep crypto done in s/w */
+	u_int32_t	is_crypto_setkey_cipher;/* cipher rejected key */
+	u_int32_t	is_crypto_setkey_nokey;	/* no key index for setkey */
+	u_int32_t	is_crypto_delkey;	/* driver key delete failed */
+	u_int32_t	is_crypto_badcipher;	/* unknown cipher */
+	u_int32_t	is_crypto_nocipher;	/* cipher not available */
+	u_int32_t	is_crypto_attachfail;	/* cipher attach failed */
+	u_int32_t	is_crypto_swfallback;	/* cipher fallback to s/w */
+	u_int32_t	is_crypto_keyfail;	/* driver key alloc failed */
 };
 
 /*
@@ -149,6 +163,38 @@ struct ieee80211_stats {
  * the max parameter size of the wireless extensions).
  */
 #define	IEEE80211_MAX_OPT_IE	256
+
+/*
+ * WPA/RSN get/set key request.  Specify the key/cipher
+ * type and whether the key is to be used for sending and/or
+ * receiving.  The key index should be set only when working
+ * with global keys (use IEEE80211_KEYIX_NONE for ``no index'').
+ * Otherwise a unicast/pairwise key is specified by the bssid
+ * (on a station) or mac address (on an ap).  They key length
+ * must include any MIC key data; otherwise it should be no
+ more than IEEE80211_KEYBUF_SIZE.
+ */
+struct ieee80211req_key {
+	u_int8_t	ik_type;	/* key/cipher type */
+	u_int8_t	ik_pad;
+	u_int16_t	ik_keyix;	/* key index */
+	u_int8_t	ik_keylen;	/* key length in bytes */
+	u_int8_t	ik_flags;
+/* NB: IEEE80211_KEY_XMIT and IEEE80211_KEY_RECV defined elsewhere */
+#define	IEEE80211_KEY_DEFAULT	0x80	/* default xmit key */
+	u_int8_t	ik_macaddr[IEEE80211_ADDR_LEN];
+	u_int64_t	ik_keyrsc;	/* key receive sequence counter */
+	u_int8_t	ik_keydata[IEEE80211_KEYBUF_SIZE+IEEE80211_MICBUF_SIZE];
+};
+
+/*
+ * Delete a key either by index or address.  Set the index
+ * to IEEE80211_KEYIX_NONE when deleting a unicast key.
+ */
+struct ieee80211req_del_key {
+	u_int8_t	idk_keyix;	/* key index */
+	u_int8_t	idk_macaddr[IEEE80211_ADDR_LEN];
+};
 
 /*
  * MLME state manipulation request.  IEEE80211_MLME_ASSOC
@@ -163,6 +209,27 @@ struct ieee80211req_mlme {
 #define	IEEE80211_MLME_DEAUTH		3	/* deauthenticate station */
 	u_int16_t	im_reason;	/* 802.11 reason code */
 	u_int8_t	im_macaddr[IEEE80211_ADDR_LEN];
+};
+
+/* 
+ * MAC ACL operations.
+ */
+enum {
+	IEEE80211_MACCMD_POLICY_OPEN	= 0,	/* set policy: no ACL's */
+	IEEE80211_MACCMD_POLICY_ALLOW	= 1,	/* set policy: allow traffic */
+	IEEE80211_MACCMD_POLICY_DENY	= 2,	/* set policy: deny traffic */
+	IEEE80211_MACCMD_FLUSH		= 3,	/* flush ACL database */
+	IEEE80211_MACCMD_DETACH		= 4,	/* detach ACL policy */
+};
+
+/*
+ * Set the active channel list.  Note this list is
+ * intersected with the available channel list in
+ * calculating the set of channels actually used in
+ * scanning.
+ */
+struct ieee80211req_chanlist {
+	u_int8_t	ic_channels[32];	/* 256 channels */
 };
 
 #ifdef __FreeBSD__
@@ -211,12 +278,15 @@ struct ieee80211req {
 #define	IEEE80211_IOC_ROAMING		16
 #define	IEEE80211_IOC_PRIVACY		17
 #define	IEEE80211_IOC_DROP_UNENCRYPTED	18
+#define	IEEE80211_IOC_WPAKEY		19
+#define	IEEE80211_IOC_DELKEY		20
 #define	IEEE80211_IOC_MLME		21
 #define	IEEE80211_IOC_OPTIE		22
 #define	IEEE80211_IOC_SCAN_REQ		23
 #define	IEEE80211_IOC_SCAN_RESULTS	24
 #define	IEEE80211_IOC_COUNTERMEASURES	25
 #define	IEEE80211_IOC_WPA		26
+#define	IEEE80211_IOC_CHANLIST		27
 
 #ifndef IEEE80211_CHAN_ANY
 #define	IEEE80211_CHAN_ANY	0xffff		/* token for ``any channel'' */
@@ -255,9 +325,15 @@ struct ieee80211req_scan_result {
  */
 #define	IEEE80211_IOCTL_SETPARAM	(SIOCIWFIRSTPRIV+0)
 #define	IEEE80211_IOCTL_GETPARAM	(SIOCIWFIRSTPRIV+1)
+#define	IEEE80211_IOCTL_SETKEY		(SIOCIWFIRSTPRIV+2)
+#define	IEEE80211_IOCTL_GETKEY		(SIOCIWFIRSTPRIV+3)
+#define	IEEE80211_IOCTL_DELKEY		(SIOCIWFIRSTPRIV+4)
 #define	IEEE80211_IOCTL_SETMLME		(SIOCIWFIRSTPRIV+6)
 #define	IEEE80211_IOCTL_SETOPTIE	(SIOCIWFIRSTPRIV+8)
 #define	IEEE80211_IOCTL_GETOPTIE	(SIOCIWFIRSTPRIV+9)
+#define	IEEE80211_IOCTL_ADDMAC		(SIOCIWFIRSTPRIV+10)
+#define	IEEE80211_IOCTL_DELMAC		(SIOCIWFIRSTPRIV+12)
+#define	IEEE80211_IOCTL_CHANLIST	(SIOCIWFIRSTPRIV+14)
 
 enum {
 	IEEE80211_PARAM_TURBO		= 1,	/* turbo mode */
@@ -275,9 +351,11 @@ enum {
 	IEEE80211_PARAM_COUNTERMEASURES	= 14,	/* WPA/TKIP countermeasures */
 	IEEE80211_PARAM_DROPUNENCRYPTED	= 15,	/* discard unencrypted frames */
 	IEEE80211_PARAM_DRIVER_CAPS	= 16,	/* driver capabilities */
+	IEEE80211_PARAM_MACCMD		= 17,	/* MAC ACL operation */
 };
 
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)
+
 #endif /* __linux__ */
 
 #endif /* _NET80211_IEEE80211_IOCTL_H_ */
