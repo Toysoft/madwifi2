@@ -1099,6 +1099,9 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			if (skb1 != NULL) {
 				len = skb1->len;
 				skb1->dev = dev;
+				skb1->mac.raw = skb1->data;
+				skb1->nh.raw = skb1->data + 
+					sizeof(struct ether_header);
 				skb1->protocol = __constant_htons(ETH_P_802_2);
 				dev_queue_xmit(skb1);
 			}
