@@ -2632,7 +2632,7 @@ static int
 ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 {
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
-	struct ath_hal *ah = sc->sc_ah;;
+	struct ath_hal *ah = sc->sc_ah;
 	HAL_TXQ_INFO qi;
 	int qnum;
 
