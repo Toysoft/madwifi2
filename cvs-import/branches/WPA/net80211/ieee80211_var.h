@@ -59,6 +59,7 @@
 #include <net80211/ieee80211_proto.h>
 
 #define	IEEE80211_CHAN_MAX	255
+#define	IEEE80211_CHAN_BYTES	howmany(IEEE80211_CHAN_MAX, NBBY)
 #define	IEEE80211_CHAN_ANY	0xffff	/* token for ``any channel'' */
 #define	IEEE80211_CHAN_ANYC \
 	((struct ieee80211_channel *) IEEE80211_CHAN_ANY)
@@ -222,9 +223,9 @@ struct ieee80211com {
 	u_int8_t		ic_myaddr[IEEE80211_ADDR_LEN];
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211_channel ic_channels[IEEE80211_CHAN_MAX+1];
-	u_char			ic_chan_avail[roundup(IEEE80211_CHAN_MAX,NBBY)];
-	u_char			ic_chan_active[roundup(IEEE80211_CHAN_MAX, NBBY)];
-	u_char			ic_chan_scan[roundup(IEEE80211_CHAN_MAX,NBBY)];
+	u_int8_t		ic_chan_avail[IEEE80211_CHAN_BYTES];
+	u_int8_t		ic_chan_active[IEEE80211_CHAN_BYTES];
+	u_int8_t		ic_chan_scan[IEEE80211_CHAN_BYTES];
 	u_int32_t		ic_flags;	/* state flags */
 	u_int32_t		ic_caps;	/* capabilities */
 	u_int16_t		ic_modecaps;	/* set of mode capabilities */
