@@ -4297,6 +4297,7 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 	void *buffer, size_t *lenp)
 {
 	struct ath_softc *sc = ctl->extra1;
+	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
 	int ret;
 
@@ -4307,24 +4308,23 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 		if (ret == 0) {
 			switch (ctl->ctl_name) {
 			case ATH_SLOTTIME:
-				if (!ath_hal_setslottime(sc->sc_ah, val))
+				if (!ath_hal_setslottime(ah, val))
 					ret = -EINVAL;
 				break;
 			case ATH_ACKTIMEOUT:
-				if (!ath_hal_setacktimeout(sc->sc_ah, val))
+				if (!ath_hal_setacktimeout(ah, val))
 					ret = -EINVAL;
 				break;
 			case ATH_CTSTIMEOUT:
-				if (!ath_hal_setctstimeout(sc->sc_ah, val))
+				if (!ath_hal_setctstimeout(ah, val))
 					ret = -EINVAL;
 				break;
 			case ATH_SOFTLED:
 				if (val != sc->sc_softled) {
 					if (val)
-						ath_hal_gpioCfgOutput(sc->sc_ah,
+						ath_hal_gpioCfgOutput(ah,
 							sc->sc_ledpin);
-					ath_hal_gpioset(sc->sc_ah,
-						sc->sc_ledpin,!val);
+					ath_hal_gpioset(ah, sc->sc_ledpin,!val);
 					sc->sc_softled = val;
 				}
 				break;
@@ -4345,13 +4345,13 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 	} else {
 		switch (ctl->ctl_name) {
 		case ATH_SLOTTIME:
-			val = ath_hal_getslottime(sc->sc_ah);
+			val = ath_hal_getslottime(ah);
 			break;
 		case ATH_ACKTIMEOUT:
-			val = ath_hal_getacktimeout(sc->sc_ah);
+			val = ath_hal_getacktimeout(ah);
 			break;
 		case ATH_CTSTIMEOUT:
-			val = ath_hal_getctstimeout(sc->sc_ah);
+			val = ath_hal_getctstimeout(ah);
 			break;
 		case ATH_SOFTLED:
 			val = sc->sc_softled;
@@ -4360,10 +4360,10 @@ ath_sysctl_halparam(ctl_table *ctl, int write, struct file *filp,
 			val = sc->sc_ledpin;
 			break;
 		case ATH_COUNTRYCODE:
-			ath_hal_getcountrycode(sc->sc_ah, &val);
+			ath_hal_getcountrycode(ah, &val);
 			break;
 		case ATH_REGDOMAIN:
-			ath_hal_getregdomain(sc->sc_ah, &val);
+			ath_hal_getregdomain(ah, &val);
 			break;
 		case ATH_DEBUG:
 			val = sc->sc_debug;
