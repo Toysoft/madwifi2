@@ -78,11 +78,13 @@ ieee80211_crypto_detach(struct ieee80211com *ic)
 }
 
 struct sk_buff *
-ieee80211_wep_crypt(struct ieee80211com *ic, struct sk_buff *skb0, int txflag)
+ieee80211_wep_crypt(struct ieee80211com *ic, struct ieee80211_node *ni,
+	struct sk_buff *skb0, int txflag)
 {
 	struct sk_buff *skb, *n, *n0;
 	struct ieee80211_frame *wh;
-	int i, left, len, moff, noff, kid;
+	struct ieee80211_wepkey *key;
+	int i, left, len, moff, noff, ismcast, kid;
 	u_int32_t iv, crc;
 	u_int8_t *ivp;
 	void *ctx;
@@ -121,21 +123,13 @@ ieee80211_wep_crypt(struct ieee80211com *ic, struct sk_buff *skb0, int txflag)
 	moff = sizeof(struct ieee80211_frame);
 	noff = sizeof(struct ieee80211_frame);
 	if (txflag) {
-		kid = ic->ic_wep_txkey;
-		if (kid == IEEE80211_KEYIX_NONE) {
-			IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-				("no xmit key setup\n"));
-			/* XXX statistic */
-			goto fail;
-		}
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
                 iv = ic->ic_iv;
 		/*
 		 * Skip 'bad' IVs from Fluhrer/Mantin/Shamir:
 		 * (B, 255, N) with 3 <= B < 8
 		 */
-		if (iv >= 0x03ff00 &&
-		    (iv & 0xf8ff00) == 0x00ff00)
+		if (iv >= 0x03ff00 && (iv & 0xf8ff00) == 0x00ff00)
 			iv += 0x000100;
 		ic->ic_iv = iv + 1;
 		/* put iv in little endian to prepare 802.11i */
@@ -144,19 +138,36 @@ ieee80211_wep_crypt(struct ieee80211com *ic, struct sk_buff *skb0, int txflag)
 			ivp[i] = iv & 0xff;
 			iv >>= 8;
 		}
-		ivp[IEEE80211_WEP_IVLEN] = kid << 6;	/* pad and keyid */
+		ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
+		if (ismcast || ni->ni_ucastkeyix == IEEE80211_KEYIX_NONE) {
+			kid = ic->ic_wep_txkey;
+			if (kid == IEEE80211_KEYIX_NONE) {
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
+					("no xmit key setup\n"));
+				/* XXX statistic */
+				goto fail;
+			}
+			ivp[IEEE80211_WEP_IVLEN] = kid << 6;/* pad and keyid */
+			key = &ic->ic_nw_keys[kid];
+		} else {
+			ivp[IEEE80211_WEP_IVLEN] = 0;	/* pad and keyid */
+			key= &ni->ni_ucastkey;
+		}
 		noff += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
 	} else {
 		wh->i_fc[1] &= ~IEEE80211_FC1_WEP;
 		ivp = skb->data + moff;
 		kid = ivp[IEEE80211_WEP_IVLEN] >> 6;
+		/* check for station key; fallback to shared key */
+		if (kid == 0 && ni->ni_ucastkeyix != IEEE80211_KEYIX_NONE)
+			key = &ni->ni_ucastkey;
+		else
+			key = &ic->ic_nw_keys[kid];
 		moff += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
 	}
 	memcpy(keybuf, ivp, IEEE80211_WEP_IVLEN);
-	memcpy(keybuf + IEEE80211_WEP_IVLEN, ic->ic_nw_keys[kid].wk_key,
-	    ic->ic_nw_keys[kid].wk_len);
-	arc4_setkey(ctx, keybuf,
-	    IEEE80211_WEP_IVLEN + ic->ic_nw_keys[kid].wk_len);
+	memcpy(keybuf + IEEE80211_WEP_IVLEN, key->wk_key, key->wk_len);
+	arc4_setkey(ctx, keybuf, IEEE80211_WEP_IVLEN + key->wk_len);
 
 	/* encrypt with calculating CRC */
 	crc = ~0;

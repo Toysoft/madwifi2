@@ -329,7 +329,7 @@ ieee80211_dump_nodes(ic);/*XXX*/
 			 * Device didn't handle WEP; do it in software.
 			 */
 			if (ic->ic_flags & IEEE80211_F_WEPON) {
-				skb = ieee80211_wep_crypt(ic, skb, 0);
+				skb = ieee80211_wep_crypt(ic, ni, skb, 0);
 				if (skb == NULL) {
 					ic->ic_stats.is_rx_wepfail++;
 					goto err;
