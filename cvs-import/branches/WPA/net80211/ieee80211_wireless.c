@@ -242,7 +242,16 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 				error = -EINVAL;
 		}
 		if (error == 0) {
-			ic->ic_def_txkey = kid;
+			/*
+			 * The default transmit key is only changed when:
+			 * 1. Privacy is enabled and no key matter is
+			 *    specified.
+			 * 2. Privacy is currently disabled.
+			 * This is deduced from the iwconfig man page.
+			 */
+			if (erq->length == 0 ||
+			    (ic->ic_flags & IEEE80211_F_PRIVACY) == 0)
+				ic->ic_def_txkey = kid;
 			wepchange = (ic->ic_flags & IEEE80211_F_PRIVACY) == 0;
 			ic->ic_flags |= IEEE80211_F_PRIVACY;
 		}
