@@ -397,9 +397,10 @@ ieee80211_ioctl_giwnickn(struct net_device *dev,
 
 	if (data->length > ic->ic_nicknamelen + 1)
 		data->length = ic->ic_nicknamelen + 1;
-	memcpy(nickname, ic->ic_nickname, data->length-1);
-	nickname[data->length-1] = '\0';
-
+	if (data->length > 0) {
+		memcpy(nickname, ic->ic_nickname, data->length-1);
+		nickname[data->length-1] = '\0';
+	}
 	return 0;
 }
 
