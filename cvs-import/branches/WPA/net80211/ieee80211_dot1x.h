@@ -225,6 +225,7 @@ struct eapolcom {
 	struct timer_list	ec_timer;	/* state machine timers */
 
 	/* backend state and related methods */
+	const struct ieee80211_authenticator_backend *ec_backend;
 	struct radiuscom	*ec_radius;
 	struct eapol_auth_node	*(*ec_node_alloc)(struct eapolcom *);
 	void			(*ec_node_free)(struct eapol_auth_node *);
@@ -305,9 +306,6 @@ enum {
 #endif
 
 #if defined(__KERNEL__) || defined(_KERNEL)
-extern	int ieee80211_authenticator_attach(struct ieee80211com *);
-extern	void ieee80211_authenticator_detach(struct ieee80211com *);
-
 extern	void eapol_fsm_run(struct eapol_auth_node *);
 extern	void eapol_reauth_setperiod(struct eapol_auth_node *, int timeout);
 extern	void eapol_send_raw(struct eapol_node *, struct sk_buff *);
