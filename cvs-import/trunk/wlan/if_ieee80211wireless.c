@@ -966,7 +966,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 	data->length = current_ev - extra;
 	return 0;
 }
-#endif /* SIOCIWAPLIST */
+#endif /* SIOCGIWSCAN */
 
 /* Structures to export the Wireless Handlers */
 static const iw_handler ieee80211_handlers[] = {
@@ -994,8 +994,13 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
 	(iw_handler) NULL,				/* -- hole -- */
 	(iw_handler) ieee80211_ioctl_iwaplist,		/* SIOCGIWAPLIST */
+#ifdef SIOCGIWSCAN
 	(iw_handler) ieee80211_ioctl_siwscan,		/* SIOCSIWSCAN */
 	(iw_handler) ieee80211_ioctl_giwscan,		/* SIOCGIWSCAN */
+#else
+	(iw_handler) NULL,				/* SIOCSIWSCAN */
+	(iw_handler) NULL,				/* SIOCGIWSCAN */
+#endif /* SIOCGIWSCAN */
 	(iw_handler) ieee80211_ioctl_siwessid,		/* SIOCSIWESSID */
 	(iw_handler) ieee80211_ioctl_giwessid,		/* SIOCGIWESSID */
 	(iw_handler) ieee80211_ioctl_siwnickn,		/* SIOCSIWNICKN */
