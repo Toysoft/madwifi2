@@ -533,6 +533,7 @@ struct ieee80211_node {
 	u_int8_t		ni_fragno;	/* frag. number previously received */
 	int			ni_txrate;	/* index to ni_rates[] */
 	void			*ni_private;	/* driver private */
+	struct proc_dir_entry	*ni_proc;	/* status of associated stations */
 };
 
 static inline struct ieee80211_node *

@@ -170,6 +170,10 @@ extern	int ieee80211_cfgset(struct net_device *, u_long, caddr_t);
 #ifdef CONFIG_PROC_FS
 static	void ieee80211_proc_init(struct ieee80211com *);
 static	void ieee80211_proc_remove(struct ieee80211com *);
+static void ieee80211_proc_add_sta(struct ieee80211com *ic, struct ieee80211_node *ni);
+static void ieee80211_proc_del_sta(struct ieee80211com *ic, struct ieee80211_node *ni);
+static int ieee80211_proc_read_sta(char *page, char **start, off_t off,
+					int count, int *eof, void *data);
 #endif /* CONFIG_PROC_FS */
 #ifdef CONFIG_NET_WIRELESS
 extern	struct iw_statistics *ieee80211_iw_getstats(struct net_device *);
@@ -1946,6 +1950,9 @@ _ieee80211_free_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 			dev->name, ether_sprintf(ni->ni_macaddr),
 			atomic_read(&ni->ni_refcnt));
 	}
+#ifdef CONFIG_PROC_FS
+	ieee80211_proc_del_sta(ic, ni);
+#endif
 	if (ic->ic_node_free != NULL)
 		(*ic->ic_node_free)(ic, ni);
 	TAILQ_REMOVE(&ic->ic_node, ni, ni_list);
@@ -3015,6 +3022,9 @@ ieee80211_recv_asreq(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 		    dev->name,
 		    (newassoc ? "newly" : "already"),
 		    ether_sprintf(ni->ni_macaddr)));
+#ifdef CONFIG_PROC_FS
+	ieee80211_proc_add_sta(ic, ni);
+#endif
 	ieee80211_unref_node(&ni);
 }
 
@@ -3125,6 +3135,9 @@ ieee80211_recv_disassoc(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 				    dev->name,
 				    ether_sprintf(ni->ni_macaddr), reason));
 			ni->ni_associd = 0;
+#ifdef CONFIG_PROC_FS
+			ieee80211_proc_del_sta(ic, ni);
+#endif
 			ieee80211_unref_node(&ni);
 		}
 		break;
@@ -3167,6 +3180,9 @@ ieee80211_recv_deauth(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 				    " by peer (reason %d)\n",
 				    dev->name,
 				    ether_sprintf(ni->ni_macaddr), reason));
+#ifdef CONFIG_PROC_FS
+			ieee80211_proc_del_sta(ic, ni);
+#endif
 			ieee80211_free_node(ic, ni);
 		}
 		break;
@@ -3516,6 +3532,56 @@ ieee80211_getstats(struct net_device *dev)
 #ifdef CONFIG_PROC_FS
 #include <linux/proc_fs.h>
 #include <linux/ctype.h>
+
+static void
+ieee80211_proc_add_sta(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	if (!ni->ni_proc) {
+		ni->ni_proc = create_proc_entry(ether_sprintf(ni->ni_macaddr),
+			0444, ic->ic_proc);
+		if (ni->ni_proc) {
+			ni->ni_proc->read_proc = ieee80211_proc_read_sta;
+			ni->ni_proc->data = ni;
+		}
+	}
+}
+
+static void
+ieee80211_proc_del_sta(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	if (ni->ni_proc) {
+		remove_proc_entry(ether_sprintf(ni->ni_macaddr), ic->ic_proc);
+		ni->ni_proc = 0;
+	}
+}
+
+static int
+ieee80211_proc_read_sta(char *page, char **start, off_t off,
+				int count, int *eof, void *data)
+{
+	char *p = page;
+	struct ieee80211_node *ni = data;
+
+	if (off != 0) {
+		*eof = 1;
+		return 0;
+	}
+
+	p += sprintf(p, "rssi: %d\n", ni->ni_rssi);
+	p += sprintf(p, "capinfo: %x\n", ni->ni_capinfo);
+	p += sprintf(p, "freq: %d\n", ni->ni_chan->ic_freq);
+	p += sprintf(p, "flags: %x\n", ni->ni_chan->ic_flags);
+	p += sprintf(p, "txseq: %d\n", ni->ni_txseq);
+	p += sprintf(p, "rxseq: %d\n", ni->ni_rxseq);
+	p += sprintf(p, "fails: %d\n", ni->ni_fails);
+	p += sprintf(p, "inact: %d\n", ni->ni_inact);
+	if ((ni->ni_txrate >= 0) && (ni->ni_txrate < IEEE80211_RATE_MAXSIZE))
+		p += sprintf(p, "txrate: %d\n", ni->ni_rates.rs_rates[ni->ni_txrate]);
+	else
+		p += sprintf(p, "txrate!: %d\n", ni->ni_txrate);
+
+	return (p - page);
+}
 
 static int
 ieee80211_proc_debug_read(char *page, char **start, off_t off,
