@@ -3612,7 +3612,8 @@ ieee80211_getstats(struct net_device *dev)
  */
 #define PROC_BLOCK_SIZE (PAGE_SIZE - 1024)
 
-static int proc_read_node(char *page, struct ieee80211com *ic, void *data)
+static int
+proc_read_node(char *page, struct ieee80211com *ic, void *data)
 {
 	char *p = page;
 	struct ieee80211_node *ni;
@@ -3620,9 +3621,7 @@ static int proc_read_node(char *page, struct ieee80211com *ic, void *data)
 	int i;
 
 	read_lock_bh(&ic->ic_nodelock);
-	for (ni = TAILQ_FIRST((IEEE80211_NODE_LIST *)data);
-			ni != NULL; ni = TAILQ_NEXT(ni, ni_list)) {
-
+	TAILQ_FOREACH(ni, (IEEE80211_NODE_LIST *)data, ni_list) {
 		/* Assume each node needs 300 bytes */ 
 		if (p - page > PROC_BLOCK_SIZE - 300)
 			break;
@@ -3679,10 +3678,11 @@ static int proc_read_node(char *page, struct ieee80211com *ic, void *data)
 		p += sprintf(p, "\n");
 
 		rs = &ni->ni_rates;
-		if ((ni->ni_txrate >= 0) && (ni->ni_txrate < rs->rs_nrates)) {
+		if (ni->ni_txrate >= 0 && ni->ni_txrate < rs->rs_nrates) {
 			p += sprintf(p, "  txrate: ");
 			for (i = 0; i < rs->rs_nrates; i++) {
-				p += sprintf(p, "%s%d%sMbps", (i != 0 ? " " : ""),
+				p += sprintf(p, "%s%d%sMbps",
+					(i != 0 ? " " : ""),
 					(rs->rs_rates[i] & IEEE80211_RATE_VAL) / 2,
 					((rs->rs_rates[i] & 0x1) != 0 ? ".5" : ""));
 				if (i == ni->ni_txrate)
@@ -3703,7 +3703,8 @@ static int proc_read_node(char *page, struct ieee80211com *ic, void *data)
 	return (p - page);
 }
 
-static int ieee80211_proc_read_node(char *page, char **start, off_t off,
+static int
+ieee80211_proc_read_node(char *page, char **start, off_t off,
                                 int count, int *eof, void *data)
 {
 	struct ieee80211com *ic = data;
@@ -3714,7 +3715,8 @@ static int ieee80211_proc_read_node(char *page, char **start, off_t off,
 		return 0;
 	}
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-		retv = proc_read_node(page, ic, (IEEE80211_NODE_LIST *)&ic->ic_node);
+		retv = proc_read_node(page, ic,
+				(IEEE80211_NODE_LIST *)&ic->ic_node);
 	}
 	return retv;
 }
