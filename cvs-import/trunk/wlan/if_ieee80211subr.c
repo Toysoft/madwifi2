@@ -333,7 +333,11 @@ ieee80211_ifattach(struct net_device *dev)
 	ifmedia_set(&ic->ic_media, imr.ifm_active);
 #undef ADD
 
+#ifdef notdef
 	ic->ic_rtsthreshold = IEEE80211_RTS_DEFAULT;
+#else
+	ic->ic_rtsthreshold = IEEE80211_RTS_MAX;
+#endif
 	ic->ic_fragthreshold = 2346;		/* XXX not used yet */
 	ic->ic_des_chan =			/* any channel is ok */
 		(struct ieee80211channel *) IEEE80211_CHAN_ANY;
