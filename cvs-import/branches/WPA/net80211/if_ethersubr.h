@@ -59,6 +59,9 @@ struct	ether_header {
 #ifndef ETHERTYPE_PAE
 #define	ETHERTYPE_PAE	0x888e		/* EAPOL PAE/802.1x */
 #endif
+#ifndef ETHERTYPE_IP
+#define	ETHERTYPE_IP	0x0800		/* IP protocol */
+#endif
 
 /*
  * Structure of a 48-bit Ethernet address.
