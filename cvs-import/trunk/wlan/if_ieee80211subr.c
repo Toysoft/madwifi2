@@ -177,8 +177,6 @@ extern	int ieee80211_cfgset(struct net_device *, u_long, caddr_t);
 #ifdef CONFIG_PROC_FS
 static	void ieee80211_proc_init(struct ieee80211com *);
 static	void ieee80211_proc_remove(struct ieee80211com *);
-static int ieee80211_proc_read_sta(char *page, char **start, off_t off,
-					int count, int *eof, void *data);
 #endif /* CONFIG_PROC_FS */
 #ifdef CONFIG_NET_WIRELESS
 extern	struct iw_statistics *ieee80211_iw_getstats(struct net_device *);
