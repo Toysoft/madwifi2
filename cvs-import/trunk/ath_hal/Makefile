@@ -54,6 +54,9 @@ CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
 all:	${ALL}
 
+${KMODNAME}.${KMODSUF}: ${OBJS} ${HAL}/version.h Makefile
+	${LD} -o $@ -r -x ${OBJS}
+
 ifdef HAL_SRC
 include ${HAL}/linux/Makefile.inc
 else
@@ -67,9 +70,6 @@ endif
 
 ah_osdep.o: ${HAL}/linux/ah_osdep.c
 	${CC} -c -o $@ ${CFLAGS} $<
-
-ath_hal.o: ${OBJS} ${HAL}/version.h Makefile
-	${LD} -o $@ -r -x ${OBJS}
 
 ifneq (${LINUX_VERSION}, 204)
 ah_osdep.mod.c: ah_osdep.o
