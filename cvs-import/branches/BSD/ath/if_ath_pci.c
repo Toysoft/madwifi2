@@ -45,6 +45,9 @@
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0))
+#include <linux/moduleparam.h>
+#endif
 #include <linux/init.h>
 #include <linux/if.h>
 #include <linux/netdevice.h>
@@ -59,6 +62,16 @@
 
 #include "if_athvar.h"
 #include "if_ath_pci.h"
+
+/* support for module parameters */
+static char *ifname = "ath";
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
+MODULE_PARM(ifname, "s");
+#else
+module_param(ifname, charp, 0);
+#endif
+
+MODULE_PARM_DESC(ifname, "Interface name prefix (default: ath)");
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
 /*
@@ -177,7 +190,10 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	sc->aps_sc.sc_invalid = 1;
 
 	dev = &sc->aps_sc.sc_dev;	/* XXX blech, violate layering */
-	memcpy(dev->name, "ath%d", sizeof("ath%d"));
+
+	/* use variable interface name prefix */
+	strncpy(dev->name, ifname, IFNAMSIZ - sizeof("%d") - 1);
+	strncat(dev->name, "%d", sizeof("%d"));
 
 	dev->irq = pdev->irq;
 	dev->mem_start = mem;
