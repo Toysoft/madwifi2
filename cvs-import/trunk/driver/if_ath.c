@@ -2870,23 +2870,26 @@ static void
 ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 {
 #define	RATE(_ix)	(ni->ni_rates.rs_rates[(_ix)] & IEEE80211_RATE_VAL)
-	int srate;
+	struct ieee80211com *ic = &sc->sc_ic;
 
 	KASSERT(ni->ni_rates.rs_nrates > 0, ("no rates"));
-	/* start with highest negotiated rate */
-	srate = ni->ni_rates.rs_nrates - 1;
-	if (sc->sc_curmode != IEEE80211_MODE_11B) {
-		/*
-		 * 11a and 11g work better if you start at 24Mb
-		 * or 36Mb and raise the rate.  Scan the negotiated
-		 * rate set to find the closest rate.
-		 */
-		/* NB: rate set assumed sorted */
-		for (; srate >= 0 && RATE(srate) > 72; srate--)
-			;
-		KASSERT(srate >= 0, ("bogus rate set"));
-	}
-	ath_rate_update(sc, ni, srate);
+	if (ic->ic_fixed_rate == -1) {
+		/* start with highest negotiated rate */
+		int srate = ni->ni_rates.rs_nrates - 1;
+		if (sc->sc_curmode != IEEE80211_MODE_11B) {
+			/*
+			 * 11a and 11g work better if you start at 24Mb
+			 * or 36Mb and raise the rate.  Scan the negotiated
+			 * rate set to find the closest rate.
+			 */
+			/* NB: rate set assumed sorted */
+			for (; srate >= 0 && RATE(srate) > 72; srate--)
+				;
+			KASSERT(srate >= 0, ("bogus rate set"));
+		}
+		ath_rate_update(sc, ni, srate);
+	} else
+		ath_rate_update(sc, ni, ic->ic_fixed_rate);
 #undef RATE
 }
 
@@ -2899,8 +2902,6 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
 
-	if (ic->ic_fixed_rate != -1)
-		return;
 	if (ic->ic_opmode == IEEE80211_M_STA) {
 		/*
 		 * Reset local xmit state; this is really only
@@ -2923,7 +2924,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, enum ieee80211_state state)
 			ath_rate_update(sc, ni, 0);	/* use lowest rate */
 		ath_rate_update(sc, ic->ic_bss, 0);
 	}
-	if (state == IEEE80211_S_RUN) {
+	if (ic->ic_fixed_rate == -1 && state == IEEE80211_S_RUN) {
 		int interval;
 		/*
 		 * Start the background rate control thread if we
