@@ -252,32 +252,33 @@ ieee80211_classify(struct ieee80211com *ic, struct sk_buff *skb, struct ieee8021
 			break;
 		}
 	}
-
-	//eh = (struct ether_header *) skb->data;
 	eh = (struct ether_header *) skb->data;
 	if (eh->ether_type == __constant_htons(ETHERTYPE_IP)) {
-    		ip = skb->nh.iph;
+		ip = skb->nh.iph;
 
 		/*
-		 * IP frame, map the TOS field.
+		 * IP frame, map the DSCP field (corrected version, <<2).
 		 */
-		printk("%s (%s): src: 0x%x dst: 0x%x paket tos: 0x%x\n", __func__, ic->ic_dev->name, ip->saddr, ip->daddr, ip->tos);
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "skb=%p, skb->data=%p, skb->mac.ethernet=%p, skb->nh.iph=%p\n",
+			skb, skb->data, skb->mac.ethernet, skb->nh.iph);
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "ip=%p,ip->version=%d, ip->length=%d, &(ip->saddr)=%p, &(ip->daddr)=%p\n",
+			ip, ip->version, ip->ihl, &(ip->saddr), &(ip->daddr));
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] src: 0x%x dst: 0x%x paket tos: 0x%x\n", 
 				__func__, ic->ic_dev->name, ip->saddr, ip->daddr, ip->tos);
 		switch (ip->tos) {
-		case 0x08:
 		case 0x20:
+		case 0x40:
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] sorting packet in WME_AC_BK queue (node %s)\n", 
 				__func__, ic->ic_dev->name, ether_sprintf(ni->ni_macaddr));
 			d_wme_ac = WME_AC_BK;	/* background */
 			break;
-		case 0x28:
+		case 0x80:
 		case 0xa0:
 			d_wme_ac = WME_AC_VI;	/* video */
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_WME, "[%s (%s)] sorting packet in WME_AC_VI queue (node %s)\n", 
 				__func__, ic->ic_dev->name, ether_sprintf(ni->ni_macaddr));
 			break;
-		case 0x30:			/* voice */
+		case 0xc0:			/* voice */
 		case 0xe0:
 		case 0x88:			/* XXX UPSD */
 		case 0xb8:
