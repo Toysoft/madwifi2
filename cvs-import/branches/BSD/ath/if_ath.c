@@ -496,7 +496,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * 5211 minipci cards.  Users can also manually enable/disable
 	 * support with a sysctl.
 	 */
-	sc->sc_softled = (devid == AR5212_DEVID_IBM || devid == AR5211_DEVID);
+	//sc->sc_softled = (devid == AR5212_DEVID_IBM || devid == AR5211_DEVID);
+	sc->sc_softled = 0;
 	if (sc->sc_softled) {
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
@@ -1207,8 +1208,12 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		 */
 		IF_DEQUEUE(&ic->ic_mgtq, skb0);
 		if (skb0 == NULL) {
-			if (!skb)		/* NB: no data (called for mgmt) */
+			if (!skb) {		/* NB: no data (called for mgmt) */
+				ATH_TXBUF_LOCK(sc);
+				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
+				ATH_TXBUF_UNLOCK(sc);
 				break;
+			}
 			/*
 			 * No data frames go out unless we're associated; this
 			 * should not happen as the 802.11 layer does not enable
@@ -1682,9 +1687,11 @@ ath_key_update_begin(struct ieee80211com *ic)
 	 * ath_rx_tasklet.
 	 * TODO: can cause bugs
 	 */
+#if 1
 	if (!in_softirq())
 		tasklet_disable(&sc->sc_rxtq);
-	netif_stop_queue(dev);
+#endif
+	netif_stop_queue(dev);	// TODO: find a way to not block mgmt frames
 }
 
 static void
@@ -1695,8 +1702,10 @@ ath_key_update_end(struct ieee80211com *ic)
 
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s:\n", __func__);
 	netif_start_queue(dev);
+#if 1
 	if (!in_softirq())		/* NB: see above */
 		tasklet_enable(&sc->sc_rxtq);
+#endif
 }
 
 /*
@@ -3218,6 +3227,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			 * 802.11 layer counts failures and provides
 			 * debugging/diagnostics.
 			 */
+			printk("%s: wep key null\n", __func__);
 			return -EIO;
 		}
 		/*
