@@ -636,7 +636,9 @@ ieee80211_end_scan(struct ieee80211com *ic)
 					break;
 				}
 				if (maxrssi[i] < maxrssi[bestchan])
-					bestchan = i;
+				if (bestchan == -1 || 
+				  maxrssi[i] < maxrssi[bestchan])
+				    bestchan = i;
 			}
 		if (bestchan != -1) {
 			ieee80211_create_ibss(ic, &ic->ic_channels[bestchan]);
