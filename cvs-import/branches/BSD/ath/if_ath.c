@@ -659,19 +659,24 @@ bad3:
 	ieee80211_ifdetach(ic);
 	ath_rate_detach(sc->sc_rc);
 bad2:
-	if (sc->sc_txq[WME_AC_BK].axq_qnum != (u_int) -1)
+	if (sc->sc_txq[WME_AC_BK].axq_qnum != (u_int) -1) {
 		ATH_TXQ_LOCK_DESTROY(&sc->sc_txq[WME_AC_BK]);
-	if (sc->sc_txq[WME_AC_BE].axq_qnum != (u_int) -1)
+	}
+	if (sc->sc_txq[WME_AC_BE].axq_qnum != (u_int) -1) {
 		ATH_TXQ_LOCK_DESTROY(&sc->sc_txq[WME_AC_BE]);
-	if (sc->sc_txq[WME_AC_VI].axq_qnum != (u_int) -1)
+	}
+	if (sc->sc_txq[WME_AC_VI].axq_qnum != (u_int) -1) {
 		ATH_TXQ_LOCK_DESTROY(&sc->sc_txq[WME_AC_VI]);
-	if (sc->sc_txq[WME_AC_VO].axq_qnum != (u_int) -1)
+	}
+	if (sc->sc_txq[WME_AC_VO].axq_qnum != (u_int) -1) {
 		ATH_TXQ_LOCK_DESTROY(&sc->sc_txq[WME_AC_VO]);
+	}
 	ath_tx_cleanup(sc);
 	ath_desc_free(sc);
 bad:
-	if (ah)
+	if (ah) {
 		ath_hal_detach(ah);
+	}
 	sc->sc_invalid = 1;
 	return error;
 }
@@ -845,8 +850,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			ath_hal_intrset(ah, sc->sc_imask);
 		}
 	}
-	if (needmark)
-		mark_bh(IMMEDIATE_BH);
+	if (needmark) {
+	    mark_bh(IMMEDIATE_BH);
+	}
 	return IRQ_HANDLED;
 }
 
@@ -994,7 +1000,7 @@ ath_init(struct net_device *dev)
 	 */
 	sc->sc_imask = HAL_INT_RX | HAL_INT_TX
 		  | HAL_INT_RXEOL | HAL_INT_RXORN
-		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
+		  | HAL_INT_FATAL | HAL_INT_GLOBAL;	// TODO: compiler warning integer overflow in expression
 	/*
 	 * Enable MIB interrupts when there are hardware phy counters.
 	 * Note we only do this (at the moment) for station mode.
@@ -2773,7 +2779,7 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* update rssi statistics for use by the hal */
-		ATH_RSSI_LPF(ATH_NODE(ni)->an_halstats.ns_avgbrssi, rssi);
+		ATH_RSSI_LPF((ATH_NODE(ni))->an_halstats.ns_avgbrssi, rssi);
 		/* fall thru... */
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 		if (ic->ic_opmode == IEEE80211_M_IBSS &&
@@ -3951,7 +3957,7 @@ ath_stoprecv(struct ath_softc *sc)
 	ath_hal_stopdmarecv(ah);	/* disable DMA engine */
 	mdelay(3);			/* 3ms is long enough for 1 frame */
 #ifdef AR_DEBUG
-	if (sc->sc_debug & (ATH_DEBUG_RESET | ATH_DEBUG_FATAL)) {
+	if (sc->sc_debug & (ATH_DEBUG_RESET | ATH_DEBUG_FATAL)) {	// TODO: compiler warns integer overflow
 		struct ath_buf *bf;
 
 		printk("%s: rx queue %p, link %p\n", __func__,
@@ -4205,7 +4211,7 @@ ath_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 		/*
 		 * NB: disable interrupts so we don't rx frames.
 		 */
-		ath_hal_intrset(ah, sc->sc_imask &~ ~HAL_INT_GLOBAL);
+		ath_hal_intrset(ah, sc->sc_imask &~ ~HAL_INT_GLOBAL);	// TODO: compiler warns integer overflow
 		/*
 		 * Notify the rate control algorithm.
 		 */
@@ -5095,7 +5101,7 @@ enum {
 	ATH_TPC         = 14,
 	ATH_TXPOWLIMIT  = 15,	
 	ATH_VEOL        = 16,
-	ATH_BINTVAL	= 17,
+	ATH_BINTVAL	= 17
 };
 
 static int

@@ -424,7 +424,7 @@ EXPORT_SYMBOL(ath_hal_memcpy);
 
 #ifdef CONFIG_SYSCTL
 enum {
-	DEV_ATH		= 9,			/* XXX must match driver */
+	DEV_ATH		= 9			/* XXX must match driver */
 };
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
