@@ -115,12 +115,15 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(tx_rts, "tx frames with rts enabled");
 	STAT(tx_cts, "tx frames with cts enabled");
 	STAT(tx_shortpre, "tx frames with short preamble");
+	STAT(tx_altrate, "tx frames with an alternate rate");
 	STAT(rx_orn, "rx failed 'cuz of desc overrun");
 	STAT(rx_tooshort, "rx failed 'cuz frame too short");
 	STAT(rx_crcerr, "rx failed 'cuz of bad CRC");
 	STAT(rx_fifoerr, "rx failed 'cuz of FIFO overrun");
 	STAT(rx_badcrypt, "rx failed 'cuz decryption");
 	STAT(rx_nobuf, "rx setup failed 'cuz no skbuff");
+	STAT(rx_mgt, "rx management frames");
+	STAT(rx_ctl, "rx control frames");
 	STAT(rx_phyerr, "PHY errors");
 	if (stats->ast_rx_phyerr != 0) {
 		int i, j;
@@ -151,8 +154,8 @@ printstats(FILE *fd, const struct ath_stats *stats)
 		fprintf(fd, "rssi of last ack: %u (%+d)\n",
 			stats->ast_tx_rssi, stats->ast_tx_rssidelta);
 	if (stats->ast_rx_rssi)
-		fprintf(fd, "rssi of last recvd frame: %u (%+d)\n",
-			stats->ast_rx_rssi, stats->ast_rx_rssidelta);
+		fprintf(fd, "rssi of last recvd frame: %u\n",
+			stats->ast_rx_rssi);
 #undef STAT
 #undef STATI
 #undef N
@@ -244,9 +247,10 @@ main(int argc, char *argv[])
 		signalled = 0;
 		alarm(interval);
 	banner:
-		printf("%8s %8s %7s %7s %6s %6s %6s %7s %4s %4s"
+		printf("%8s %8s %7s %7s %7s %6s %6s %6s %7s %4s %4s"
 			, "input"
 			, "output"
+			, "altrate"
 			, "short"
 			, "long"
 			, "xretry"
@@ -274,9 +278,11 @@ main(int argc, char *argv[])
 			}
 			if (!getifstats(ifr.ifr_name, &icur, &ocur))
 				err(1, ifr.ifr_name);
-			printf("%8u %8u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
-				, icur - itot
+			printf("%8u %8u %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
+				, (icur - itot) -
+					(cur.ast_rx_mgt - total.ast_rx_mgt)
 				, ocur - otot
+				, cur.ast_tx_altrate - total.ast_tx_altrate
 				, cur.ast_tx_shortretry - total.ast_tx_shortretry
 				, cur.ast_tx_longretry - total.ast_tx_longretry
 				, cur.ast_tx_xretries - total.ast_tx_xretries
@@ -303,9 +309,10 @@ main(int argc, char *argv[])
 			}
 			if (!getifstats(ifr.ifr_name, &itot, &otot))
 				err(1, ifr.ifr_name);
-			printf("%8u %8u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
-				, itot
+			printf("%8u %8u %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
+				, itot - total.ast_rx_mgt
 				, otot
+				, total.ast_tx_altrate
 				, total.ast_tx_shortretry
 				, total.ast_tx_longretry
 				, total.ast_tx_xretries
