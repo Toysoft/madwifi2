@@ -437,6 +437,16 @@ enum {
 #define	RSN_ASE_8021X_UNSPEC	0x01
 #define	RSN_ASE_8021X_PSK	0x02
 
+#define	WME_OUI			0x0050f2
+#define	WME_OUI_TYPE		0x02
+#define	WME_PARAM_SUBTYPE	0x01
+
+/* WME stream classes */
+#define	WME_AC_BE	0		/* best effort */
+#define	WME_AC_BK	1		/* background */
+#define	WME_AC_VI	2		/* video */
+#define	WME_AC_VO	3		/* voice */
+
 /*
  * AUTH management packets
  *
