@@ -1980,7 +1980,10 @@ ath_proc_stats(char *page, char **start, off_t off, int count, int *eof, void *d
 		*eof = 1;
 		return 0;
 	}
-#define	STAT(x)		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x)
+#define	STAT(x) do {							\
+	if (sc->sc_stats.ast_##x != 0)					\
+		cp += sprintf(cp, #x "=%u\n", sc->sc_stats.ast_##x);	\
+} while (0)
 	STAT(watchdog);	  STAT(hardware);   STAT(bmiss);
 	STAT(rxorn);	  STAT(rxeol);
 
