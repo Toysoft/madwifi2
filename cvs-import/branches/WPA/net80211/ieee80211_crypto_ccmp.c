@@ -42,6 +42,7 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/random.h>
+#include <linux/init.h>
 
 #include <linux/crypto.h>
 #include <asm/scatterlist.h>
