@@ -107,47 +107,6 @@ struct ieee80211_qosframe_addr4 {
 	u_int8_t	i_qos[2];
 } __packed;
 
-/*
- * Management Notification Frame
- */
-struct ieee80211_mnf {
-	u_int8_t	mnf_category;
-	u_int8_t	mnf_action;
-	u_int8_t	mnf_dialog;
-	u_int8_t	mnf_status;
-} __packed;
-#define	MNF_SETUP_REQ	0
-#define	MNF_SETUP_RESP	1
-#define	MNF_TEARDOWN	2
-
-/*
- * WME/802.11e Tspec Element
- */
-struct ieee80211_wme_tspec {
-	u_int8_t	ts_id;
-	u_int8_t	ts_len;
-	u_int8_t	ts_oui[3];
-	u_int8_t	ts_oui_type;
-	u_int8_t	ts_oui_subtype;
-	u_int8_t	ts_version;
-	u_int8_t	ts_tsinfo[3];
-	u_int8_t	ts_nom_msdu[2];
-	u_int8_t	ts_max_msdu[2];
-	u_int8_t	ts_min_svc[4];
-	u_int8_t	ts_max_svc[4];
-	u_int8_t	ts_inactv_intv[4];
-	u_int8_t	ts_susp_intv[4];
-	u_int8_t	ts_start_svc[4];
-	u_int8_t	ts_min_rate[4];
-	u_int8_t	ts_mean_rate[4];
-	u_int8_t	ts_max_burst[4];
-	u_int8_t	ts_min_phy[4];
-	u_int8_t	ts_peak_rate[4];
-	u_int8_t	ts_delay[4];
-	u_int8_t	ts_surplus[2];
-	u_int8_t	ts_medium_time[2];
-} __packed;
-
 #define	IEEE80211_FC0_VERSION_MASK		0x03
 #define	IEEE80211_FC0_VERSION_SHIFT		0
 #define	IEEE80211_FC0_VERSION_0			0x00
@@ -214,6 +173,60 @@ struct ieee80211_wme_tspec {
 #define	IEEE80211_QOS_ACKPOLICY			0x0600
 #define	IEEE80211_QOS_ESOP			0x0800
 #define	IEEE80211_QOS_TID			0xf000
+
+/*
+ * WME/802.11e information element.
+ */
+struct ieee80211_ie_wme {
+	u_int8_t	wme_id;		/* IEEE80211_ELEMID_VENDOR */
+	u_int8_t	wme_len;	/* length in bytes */
+	u_int8_t	wme_oui[3];	/* 0x00, 0x50, 0xf2 */
+	u_int8_t	wme_type;	/* OUI type */
+	u_int8_t	wme_subtype;	/* OUI subtype */
+	u_int8_t	wme_version;	/* spec revision */
+	u_int8_t	wme_info;	/* AC info */
+} __packed;
+
+/*
+ * WME/802.11e Tspec Element
+ */
+struct ieee80211_wme_tspec {
+	u_int8_t	ts_id;
+	u_int8_t	ts_len;
+	u_int8_t	ts_oui[3];
+	u_int8_t	ts_oui_type;
+	u_int8_t	ts_oui_subtype;
+	u_int8_t	ts_version;
+	u_int8_t	ts_tsinfo[3];
+	u_int8_t	ts_nom_msdu[2];
+	u_int8_t	ts_max_msdu[2];
+	u_int8_t	ts_min_svc[4];
+	u_int8_t	ts_max_svc[4];
+	u_int8_t	ts_inactv_intv[4];
+	u_int8_t	ts_susp_intv[4];
+	u_int8_t	ts_start_svc[4];
+	u_int8_t	ts_min_rate[4];
+	u_int8_t	ts_mean_rate[4];
+	u_int8_t	ts_max_burst[4];
+	u_int8_t	ts_min_phy[4];
+	u_int8_t	ts_peak_rate[4];
+	u_int8_t	ts_delay[4];
+	u_int8_t	ts_surplus[2];
+	u_int8_t	ts_medium_time[2];
+} __packed;
+
+/*
+ * Management Notification Frame
+ */
+struct ieee80211_mnf {
+	u_int8_t	mnf_category;
+	u_int8_t	mnf_action;
+	u_int8_t	mnf_dialog;
+	u_int8_t	mnf_status;
+} __packed;
+#define	MNF_SETUP_REQ	0
+#define	MNF_SETUP_RESP	1
+#define	MNF_TEARDOWN	2
 
 /*
  * Control frames.
@@ -437,9 +450,9 @@ enum {
 #define	RSN_ASE_8021X_UNSPEC	0x01
 #define	RSN_ASE_8021X_PSK	0x02
 
-#define	WME_OUI			0x0050f2
+#define	WME_OUI			0xf25000
 #define	WME_OUI_TYPE		0x02
-#define	WME_PARAM_SUBTYPE	0x01
+#define	WME_VERSION		1
 
 /* WME stream classes */
 #define	WME_AC_BE	0		/* best effort */
