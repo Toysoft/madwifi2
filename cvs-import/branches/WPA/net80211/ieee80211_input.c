@@ -1577,14 +1577,11 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				erp = frm[2];
 				break;
 			case IEEE80211_ELEMID_RSN:
-				if (ic->ic_flags & IEEE80211_F_WPA2)
-					wpa = frm;
+				wpa = frm;
 				break;
 			case IEEE80211_ELEMID_VENDOR:
-				if (iswpaoui(frm)) {
-					if (ic->ic_flags & IEEE80211_F_WPA1)
-						wpa = frm;
-				}
+				if (iswpaoui(frm))
+					wpa = frm;
 				/* XXX Atheros OUI support */
 				break;
 			default:
