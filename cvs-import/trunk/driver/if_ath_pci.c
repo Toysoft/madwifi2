@@ -179,6 +179,23 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	athname = ath_hal_probe(id->vendor, id->device);
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
 		dev->name, athname ? athname : "Atheros ???", phymem, dev->irq);
+#ifdef SOFTLED
+        sc->aps_sc.sc_ic.ic_beaconCnt = 0;
+        /* Check to see if we have an IBM card */
+        printk ("Vendor = 0x%x   id=0x%x subsys: %d\n",id->vendor,id->device,
+                id->subdevice);
+        if ((id->vendor == 0x168c) && 
+            ((id->device == 0x1014) || (id->device==0x12))) {
+            sc->aps_sc.sc_ic.ic_ledPin = 0;
+            sc->aps_sc.sc_ic.ic_rfKillPin = 1;
+        } else {
+            sc->aps_sc.sc_ic.ic_ledPin = 1;
+            sc->aps_sc.sc_ic.ic_rfKillPin = 0;
+        }
+        ath_hal_gpioCfgOutput(sc->aps_sc.sc_ah, sc->aps_sc.sc_ic.ic_ledPin);
+        ath_hal_gpioSet(sc->aps_sc.sc_ah,sc->aps_sc.sc_ic.ic_ledPin,0);
+        sc->aps_sc.sc_ic.ic_caps |= IEEE80211_C_SOFTLED;
+#endif
 
 	/* ready to process interrupts */
 	sc->aps_sc.sc_invalid = 0;

@@ -336,6 +336,10 @@ ath_detach(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 
 	DPRINTF(("ath_detach flags %x\n", dev->flags));
+#ifdef SOFTLED 
+	sc->sc_ic.ic_beaconCnt = 0;
+	ath_hal_gpioSet(sc->sc_ah,sc->sc_ic.ic_ledPin,1);
+#endif
 	ath_stop(dev);
 	sc->sc_invalid = 1;
 	ath_desc_free(sc);
@@ -1610,6 +1614,45 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	return 0;
 }
 
+#ifdef SOFTLED
+void
+ath_update_LED (struct net_device *dev, struct ath_hal *ah, 
+                struct ieee80211com *ic, u_int32_t event)
+{
+    static unsigned int state=1;
+    int rateOn, rateOff, diff;
+
+    if (ic->ic_state != IEEE80211_S_RUN) {
+        // Device is in scan mode, searching for AP
+        /* We flash the LED on for 5s and off for 200ms */
+        if (ic->ic_beaconCnt >= (2+state*48)) {
+          ath_hal_gpioCfgOutput(ah,ic->ic_ledPin);
+          ath_hal_gpioSet(ah,ic->ic_ledPin,state);
+            state ^= 1;
+            ic->ic_beaconCnt = 0;
+        }
+    }
+    else {
+        switch(event) {
+        case TRANSMIT_EVENT:
+        case RECEIVE_EVENT:
+            rateOn = 20;
+            rateOff = 2;
+            diff = rateOn-rateOff;
+            if (ic->ic_beaconCnt >= (rateOff + state*diff)) {
+              ath_hal_gpioCfgOutput(ah,ic->ic_ledPin);
+              ath_hal_gpioSet(ah,ic->ic_ledPin,state);
+              state ^= 1;
+              ic->ic_beaconCnt = 0;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+}
+#endif
+
 /*
  * Add a prism2 header to a received frame and
  * dispatch it to capture tools like kismet.
@@ -1837,7 +1880,11 @@ ath_rx_tasklet(void *data)
 			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
 					sc->sc_rxbufsize, PCI_DMA_FROMDEVICE);
 			bf->bf_skb = NULL;
-
+#ifdef SOFTLED
+			if (ic->ic_caps & IEEE80211_C_SOFTLED) {
+			    ath_update_LED(dev, ah, ic, RECEIVE_EVENT);
+			}
+#endif
 			ath_rx_capture(dev, ds, skb);
 			goto rx_done;
 		}
@@ -1885,7 +1932,11 @@ ath_rx_tasklet(void *data)
 			 */
 			skb_trim(skb, skb->len - IEEE80211_WEP_CRCLEN);
 		}
-
+#ifdef SOFTLED
+		if (ic->ic_caps & IEEE80211_C_SOFTLED) {
+		    ath_update_LED(dev, ah, ic, RECEIVE_EVENT);
+		}
+#endif
 		ieee80211_input(dev, skb,
 				ds->ds_rxstat.rs_rssi,
 				ds->ds_rxstat.rs_tstamp,
@@ -2188,6 +2239,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	sc->sc_txlink = &ds->ds_link;
 	spin_unlock_bh(&sc->sc_txqlock);
 
+#ifdef SOFTLED
+	ath_update_LED(dev, ah, ic, TRANSMIT_EVENT);
+#endif
 	ath_hal_txstart(ah, sc->sc_txhalq);
 
 	stats->tx_packets++;
