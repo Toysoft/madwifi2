@@ -27,18 +27,24 @@ INSTALL()
 	cp $* $DEST
 }
 
+INSTALLX()
+{
+	DEST=$1; shift
+	sed -e 's/^##2.4##//' $1 > $DEST
+}
+
 WIRELESS=${KERNEL_PATH}/drivers/net/wireless
 ATH=${WIRELESS}/ath
 MKDIR ${ATH}
 echo "Copy ath driver bits..."
 FILES=`ls ${DEPTH}/ath/*.[ch] | sed '/mod.c/d'`
 INSTALL ${ATH} ${FILES}
-INSTALL ${ATH}/Makefile ${DEPTH}/ath/Makefile.kernel-${KERNEL_VERSION}
+INSTALLX ${ATH}/Makefile ${DEPTH}/ath/Makefile.kernel
 
 ATH_HAL=${WIRELESS}/_ath_hal
 MKDIR ${ATH_HAL}
 echo "Copy ath_hal bits..."
-INSTALL ${ATH_HAL}/Makefile ${DEPTH}/ath_hal/Makefile.kernel-${KERNEL_VERSION}
+INSTALLX ${ATH_HAL}/Makefile ${DEPTH}/ath_hal/Makefile.kernel
 
 MKDIR ${WIRELESS}/hal
 MKDIR ${WIRELESS}/hal/linux
@@ -62,7 +68,7 @@ MKDIR ${NET80211}
 echo "Copy net80211 bits..."
 FILES=`ls ${DEPTH}/net80211/*.[ch] | sed '/mod.c/d'`
 INSTALL ${NET80211} ${FILES}
-INSTALL ${NET80211}/Makefile ${DEPTH}/net80211/Makefile.kernel-${KERNEL_VERSION}
+INSTALLX ${NET80211}/Makefile ${DEPTH}/net80211/Makefile.kernel
 MKDIR ${NET80211}/compat
 echo "Setting up compatibility bits..."
 INSTALL ${NET80211}/compat ${DEPTH}/include/compat.h
