@@ -174,6 +174,22 @@ getifrate(int s, const char* ifname)
 		return wrq.u.bitrate.value / 1000000;
 }
 
+static u_int
+getrssi(int s, const char* ifname)
+{
+	struct iw_statistics stats;
+	struct iwreq wrq;
+
+	(void) memset(&wrq, 0, sizeof(wrq));
+	wrq.u.data.pointer = (caddr_t) &stats;
+	wrq.u.data.flags = 1;
+	strncpy(wrq.ifr_name, ifname, IFNAMSIZ);
+	if (ioctl(s, SIOCGIWSTATS, &wrq) < 0)
+		return 0;
+	else
+		return stats.qual.qual;
+}
+
 static int
 getifstats(const char *ifname, u_long *iframes, u_long *oframes)
 {
@@ -235,7 +251,7 @@ main(int argc, char *argv[])
 		u_long interval = strtoul(argv[1], NULL, 0);
 		u_long off;
 		int line, omask;
-		u_int rate;
+		u_int rate, rssi;
 		struct ath_stats cur, total;
 		u_long icur, ocur;
 		u_long itot, otot;
@@ -264,6 +280,7 @@ main(int argc, char *argv[])
 		line = 0;
 	loop:
 		rate = getifrate(s, ifr.ifr_name);
+		rssi = getrssi(s, ifr.ifr_name);
 		if (line != 0) {
 			ifr.ifr_data = (caddr_t) &cur;
 			if (ioctl(s, SIOCGATHSTATS, &ifr) < 0)
@@ -281,7 +298,7 @@ main(int argc, char *argv[])
 				, cur.ast_rx_crcerr - total.ast_rx_crcerr
 				, cur.ast_rx_badcrypt - total.ast_rx_badcrypt
 				, cur.ast_rx_phyerr - total.ast_rx_phyerr
-				, cur.ast_rx_rssi
+				, rssi
 				, rate
 			);
 			total = cur;
@@ -303,7 +320,7 @@ main(int argc, char *argv[])
 				, total.ast_rx_crcerr
 				, total.ast_rx_badcrypt
 				, total.ast_rx_phyerr
-				, total.ast_rx_rssi
+				, rssi
 				, rate
 			);
 		}
