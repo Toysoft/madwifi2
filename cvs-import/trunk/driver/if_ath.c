@@ -577,8 +577,7 @@ ath_init(struct net_device *dev)
 	 * in the frame output path; there's nothing to do
 	 * here except setup the interrupt mask.
 	 */
-	if (ic->ic_flags & IEEE80211_F_WEPON)
-		ath_initkeytable(dev);
+	ath_initkeytable(dev);
 	if (ath_startrecv(dev) != 0) {
 		printk("%s: unable to start recv logic\n", dev->name);
 		return EIO;
