@@ -2299,7 +2299,7 @@ static void
 ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 {
 #define	IS_QOS_DATA(wh) \
-	((wh->i_fc[0] & (IEEE80211_FC0_TYPE_MASK|IEEE80211_FC0_SUBTYPE_QOS)) ==\
+	((wh->i_fc[0] & (IEEE80211_FC0_TYPE_MASK|IEEE80211_FC0_SUBTYPE_MASK))==\
 		(IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_QOS))
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
