@@ -84,4 +84,4 @@ depend: beforedepend .depend afterdepend
 	gcc -M ${CFLAGS} ${SRCS} > .depend
 beforedepend:
 afterdepend:
-sinclude .depend
+-include .depend
