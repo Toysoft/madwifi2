@@ -863,7 +863,8 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
 		    IEEE80211_IS_CHAN_2GHZ(ni->ni_chan))
 			capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
-		if (ic->ic_flags & IEEE80211_F_SHSLOT)
+		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) &&
+		    (ic->ic_caps & IEEE80211_C_SHSLOT))
 			capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
 		*(u_int16_t *)frm = htole16(capinfo);
 		frm += 2;
