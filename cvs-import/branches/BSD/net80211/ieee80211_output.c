@@ -163,17 +163,18 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 	struct ieee80211_cb *cb;
 	u_int8_t *frm;
 
-	skb = ieee80211_getmgtframe(&frm, sizeof(struct ieee80211_frame));
-        cb  = (struct ieee80211_cb *)skb->cb;
+	skb = ieee80211_getmgtframe(&frm, 0);
 
-	if (skb == NULL) {			// TODO: is this neccessary?
+	if (skb == NULL) {
 		/* XXX debug msg */
 		ic->ic_stats.is_tx_nobuf++;
 		return ENOMEM;
 	}
+	cb  = (struct ieee80211_cb *)skb->cb;
 	cb->ni = ieee80211_ref_node(ni);
 
-	wh = (struct ieee80211_frame *) skb->data;
+	wh = (struct ieee80211_frame *)
+		skb_push(skb, sizeof(struct ieee80211_frame));
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
 		IEEE80211_FC0_SUBTYPE_NODATA;
 	*(u_int16_t *)wh->i_dur = 0;
@@ -186,7 +187,7 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 	IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_macaddr);
 	IEEE80211_ADDR_COPY(wh->i_addr2, ni->ni_bssid);
 	IEEE80211_ADDR_COPY(wh->i_addr3, ic->ic_myaddr);
-	skb_trim(skb, sizeof(struct ieee80211_frame)); // TODO: correctly translated?
+	skb_trim(skb, sizeof(struct ieee80211_frame));
  
 	IEEE80211_NODE_STAT(ni, tx_data);
 
