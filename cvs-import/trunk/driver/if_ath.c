@@ -567,6 +567,11 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (ic->ic_state != IEEE80211_S_RUN) {
 		DPRINTF(("ath_hardstart: discard, state %u\n", ic->ic_state));
 		sc->sc_stats.ast_tx_discard++;
+		/*
+		 * Someone outside the driver started the queue;
+		 * turn it off until we asociate (yech).
+		 */
+		netif_stop_queue(dev);
 		error = -ENETDOWN;
 		goto bad;
 	}
