@@ -1078,16 +1078,6 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 				IFM_AUTO | IFM_MAKEMODE(value);
 		retv =  ifmedia_ioctl(dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
-	case IEEE80211_PARAM_RESET:
-		switch (value) {
-		case IEEE80211_PARAM_RESET_INIT:
-			retv = ENETRESET;
-			break;
-		case IEEE80211_PARAM_RESET_RESET:
-			(void) (*ic->ic_reset)(dev);
-			retv = 0;
-			break;
-		}
 	}
 	if (retv == ENETRESET)
 		retv = (*ic->ic_init)(dev);
@@ -1198,8 +1188,6 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "mode" },
 	{ IEEE80211_PARAM_MODE,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_mode" },
-	{ IEEE80211_PARAM_RESET,
-	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
