@@ -309,7 +309,11 @@ ath_shutdown(struct net_device *dev)
  * Interrupt handler.  All the actual processing is
  * deferred to tasklets.
  */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
 void
+#else
+irqreturn_t
+#endif
 ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
@@ -323,13 +327,21 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 * The hardware is gone, don't touch anything.
 		 * XXX can this happen?
 		 */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
 		return;
+#else
+		return IRQ_NONE;
+#endif
 	}
 	if ((dev->flags & (IFF_RUNNING|IFF_UP)) != (IFF_RUNNING|IFF_UP)) {
 		DPRINTF(("ath_intr: flags 0x%x\n", dev->flags));
 		ath_hal_getisr(ah, &status);	/* clear ISR */
 		ath_hal_intrset(ah, 0);		/* disable further intr's */
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
 		return;
+#else
+		return IRQ_NONE;
+#endif
 	}
 	needmark = 0;
 	ath_hal_getisr(ah, &status);
@@ -375,6 +387,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	if (needmark)
 		mark_bh(IMMEDIATE_BH);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
+		return IRQ_HANDLED;
+#endif
 }
 
 static void

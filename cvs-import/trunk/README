@@ -7,6 +7,8 @@ WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTORYS YOUR DISK
 WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
 WARNING: USE AT YOUR OWN RISK!
 
+WARNING: THE LINUX 2.6 SUPPORT IS ALPHA.  COMMENTS ARE WELCOME.
+
 
 MADWIFI: Multimode Atheros Driver for WiFi on Linux
 ===================================================
@@ -64,9 +66,7 @@ Compatibility
 =============
 Most testing has been done with kernel versions 2.4.20 and wireless
 tools version 25 on x86 machines.  Expect some rough edges if you
-deviate from that combo.  In particular the code does not compile
-with 2.5 versions of the kernel and probably needs modifications.
-
+deviate from that combo.  
 
 Atheros Hardware
 ================
@@ -110,28 +110,43 @@ the CC, LD, and STRIP macros appropriately.  For example:
 
 Once you've got Makefile.inc configured appropriately, do:
 
-	make
+    make
 
 This will generate three important files:
 
-driver/ath_pci.o (driver for PCI/Cardbus devices),
-ath_hal/ath_hal.o (Atheros HAL), and
-wlan/wlan.o (802.11 support layer)
+Linux 2.6
+    driver/ath_pci.ko (driver for PCI/Cardbus devices),
+    ath_hal/ath_hal.ko (Atheros HAL), and
+    wlan/wlan.ko (802.11 support layer)
+
+Linux 2.4
+    driver/ath_pci.o (driver for PCI/Cardbus devices),
+    ath_hal/ath_hal.o (Atheros HAL), and
+    wlan/wlan.o (802.11 support layer)
 
 These files can be loaded with insmod or modprobe; e.g.
 
-	insmod wlan/wlan.o
-	insmod ath_hal/ath_hal.o
-	insmod driver/ath_pci.o
+Linux 2.6
+    insmod wlan/wlan.ko
+    insmod ath_hal/ath_hal.ko
+    insmod driver/ath_pci.ko
+
+Linux 2.4
+    insmod wlan/wlan.o
+    insmod ath_hal/ath_hal.o
+    insmod driver/ath_pci.o
 
 (note you must load the wlan and ath_hal modules first as the driver
 depends on them).  You can also try:
 
-	make install
+    make install
 
 to install the drivers where they can be loaded automatically, i.e.
 /lib/modules/<your kernel name>/net.
 
+
+Note that you MUST do a "make clean" before compiling for a different
+version of Linux; e.g. building for 2.6 after building for 2.4.
 
 Using the driver
 ================
@@ -234,7 +249,6 @@ Known Problems
    consequently power use is suboptimal.
 8. Turbo mode is untested. [REPORTED WORKING]
 
-
 Acknowledgements
 ================
 This work could not have been done without the support of Atheros
@@ -251,6 +265,9 @@ William S. Kish
 giova+mwfdev@faglioni.it
 
 (Apologies to anyone whose name was unintentionally left off.)
+
+The Linux 2.6 support was done by Carl Thompson <cet@carlthompson.net>
+(who says he has no idea what he is doing).
 
 Feedback and Contributions
 ==========================

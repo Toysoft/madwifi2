@@ -41,6 +41,8 @@
 #
 DEPTH=	..
 
+KMODNAME=	wlan
+
 include ${DEPTH}/Makefile.inc
 
 ifdef CONFIG_MODVERSIONS
@@ -55,17 +57,29 @@ OBJS_80211=	if_ieee80211subr.o if_ieee80211wireless.o
 SRCS=	${SRCS_80211} if_media.c rc4.c
 OBJS=	${OBJS_80211} if_media.o rc4.o
 
-INCS=	-I. -I${LINUX} -I${DEPTH}
-CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
+INCS+=	-I. -I${LINUX} -I${DEPTH}
 
-ALL=	wlan.o
+CLEANFILES=	.depend
+
+ifneq (${LINUX_VERSION}, 204)
+OBJS+=		if_ieee80211subr.mod.o
+endif
+
+ALL=	${KMODNAME}.${KMODSUF}
+CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
 all:	${ALL}
 
-wlan.o: ${OBJS}
+${KMODNAME}.${KMODSUF}: ${OBJS}
 	${LD} -o $@ -r -x ${OBJS}
 
 if_ieee80211subr.o: version.h
+
+ifneq (${LINUX_VERSION}, 204)
+if_ieee80211subr.mod.c: if_ieee80211subr.o
+	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux if_ieee80211subr.o
+if_ieee80211subr.mod.o: if_ieee80211subr.mod.c
+endif
 
 ifdef CONFIG_MODVERSIONS
 GEN_VERSION=	$(shell echo $(VERSION) | sed -e "s/-.*//")
@@ -87,7 +101,7 @@ install: all
 	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
 
 clean:
-	rm -f ${OBJS} ${ALL} ${ALL_VER} .depend
+	rm -f ${OBJS} ${ALL} ${ALL_VER} ${CLEANFILES}
 
 depend: beforedepend .depend afterdepend
 .depend: ${SRCS} ${ALL_VER}

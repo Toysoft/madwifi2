@@ -65,7 +65,12 @@ VERSION=	$(shell uname -r)
 KERNEL_PATH=	/lib/modules/${VERSION}/build
 LINUX=		${KERNEL_PATH}/include
 MODULE_PATH=	/lib/modules/${VERSION}/net
-
+#
+# A numeric version of the running system's version string, suitable
+# for doing if checks in make files.
+#
+LINUX_VERSION=	$(shell uname -r | \
+		awk '{ split($$0,a,"."); print a[1]*100+a[2]; }')
 #
 # Path to the HAL source code.
 #
@@ -83,8 +88,12 @@ WLAN=	${DEPTH}/wlan
 #
 DRIVER=	${DEPTH}/driver
 
-COPTS=	-Wall ${TARGET_OPTS} \
-	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
+#
+# Basic build components.
+#
+COPTS=	-Wall ${TARGET_OPTS}
+INCS=	-include ${DEPTH}/include/compat.h -I${DEPTH}/include
+CLEANFILES=	.depend
 
 include ${KERNEL_PATH}/.config
 
@@ -103,4 +112,17 @@ GENKSYMS=	/sbin/genksyms
 ifdef CONFIG_SMP
 GENKSYMS+=	-p smp_
 endif
+endif
+
+#
+# 2.4, 2.5, 2.6 handling.
+# Wish we had proper conditionals to use here..
+#
+ifneq (${LINUX_VERSION}, 204)
+KMODSUF=	ko
+INCS+=		-I${KERNEL_PATH}/include/asm/mach-default
+MODOPTS+=	-DKBUILD_BASENAME=${KMODNAME} -DKBUILD_MODNAME=${KMODNAME}
+CLEANFILES+=	*.mod.c
+else
+KMODSUF=	o
 endif

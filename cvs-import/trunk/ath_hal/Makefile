@@ -33,18 +33,24 @@
 #
 DEPTH=	..
 
+KMODNAME=	ath_hal
+
 include ${DEPTH}/Makefile.inc
 
 HALINCS=-I${HAL} -I${HAL}/linux -I${ATH_HAL}
 
-ALL=	ath_hal.o
-
 SRCS=	${HAL}/linux/ah_osdep.c
 OBJS=	ah_osdep.o hal.o
 INCS=	${HALINCS} -I${LINUX} -I${DEPTH}
-CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
-CLEANFILES+= .depend opt_ah.h
+CLEANFILES+= opt_ah.h
+
+ifneq (${LINUX_VERSION}, 204)
+OBJS+=		ah_osdep.mod.o
+endif
+
+ALL=	${KMODNAME}.${KMODSUF}
+CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
 
 all:	${ALL}
 
@@ -65,9 +71,17 @@ ah_osdep.o: ${HAL}/linux/ah_osdep.c
 ath_hal.o: ${OBJS} ${HAL}/version.h Makefile
 	${LD} -o $@ -r -x ${OBJS}
 
+ifneq (${LINUX_VERSION}, 204)
+ah_osdep.mod.c: ah_osdep.o
+	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux $<
+ah_osdep.mod.o: ah_osdep.mod.c
+	${CC} -c -o $@ ${CFLAGS} $<
+endif
+
 install: all
 	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
 	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
+
 clean:
 	rm -f ${ALL} ${OBJS} ${CLEANFILES}
 

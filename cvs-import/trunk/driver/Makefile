@@ -41,6 +41,8 @@
 #
 DEPTH=	..
 
+KMODNAME=	ath_pci
+
 include ${DEPTH}/Makefile.inc
 
 ifdef CONFIG_MODVERSIONS
@@ -53,12 +55,16 @@ endif
 SRCS=	if_ath.c if_ath_pci.c
 OBJS=	if_ath.o if_ath_pci.o
 
-CFLAGS=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} \
-	-I${WLAN} -I${LINUX} -I${DEPTH} \
-	-D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
-LDFLAGS=
+INCS+=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} \
+	-I${WLAN} -I${LINUX} -I${DEPTH}
 
-ALL=	ath_pci.o
+ifneq (${LINUX_VERSION}, 204)
+OBJS+=		if_ath.mod.o if_ath_pci.mod.o
+endif
+
+ALL=	${KMODNAME}.${KMODSUF}
+CFLAGS=	${INCS} -D__KERNEL__ -DMODULE ${MODOPTS} ${COPTS}
+LDFLAGS=
 
 all:	${ALL}
 
@@ -66,7 +72,7 @@ install: all
 	test -d ${DESTDIR}/${MODULE_PATH} || mkdir ${DESTDIR}/${MODULE_PATH}
 	cp ${ALL} ${DESTDIR}/${MODULE_PATH}
 
-ath_pci.o: ${OBJS} Makefile
+${KMODNAME}.${KMODSUF}: ${OBJS} Makefile
 	${LD} -o $@ -r ${LDFLAGS} ${OBJS}
 if_ath_pci.o:	version.h
 ifdef CONFIG_MODVERSIONS
@@ -74,8 +80,18 @@ if_ath.o:	${ALL_VER}
 if_ath_pci.o:	${ALL_VER}
 endif
 
+ifneq (${LINUX_VERSION}, 204)
+if_ath_pci.mod.c: if_ath_pci.o
+	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux if_ath_pci.o
+if_ath_pci.mod.o:	if_ath_pci.mod.c
+
+if_ath.mod.c: if_ath.o
+	${KERNEL_PATH}/scripts/modpost ${KERNEL_PATH}/vmlinux if_ath.o
+if_ath.mod.o:	if_ath.mod.c
+endif
+
 clean:
-	rm -f ${OBJS} ${ALL} .depend
+	rm -f ${OBJS} ${ALL} ${CLEANFILES}
 
 depend: beforedepend .depend afterdepend
 .depend: ${SRCS} Makefile

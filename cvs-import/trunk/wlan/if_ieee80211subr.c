@@ -100,7 +100,7 @@
 #include "if_llc.h"
 #include "if_ethersubr.h"
 
-#ifdef NEW_MODULE_CODE
+#ifndef __MOD_INC_USE_COUNT
 #define	__MOD_INC_USE_COUNT(_m)						\
 	if (!try_module_get(_m)) {					\
 		printk(KERN_WARNING "%s: try_module_get failed\n",	\

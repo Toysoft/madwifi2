@@ -42,6 +42,14 @@
 #ifndef _DEV_ATH_ATHVAR_H
 #define _DEV_ATH_ATHVAR_H
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
+#include <linux/workqueue.h>
+#define tq_struct work_struct
+#define INIT_TQUEUE INIT_WORK
+#define queue_task(a,b) schedule_work(a)
+#define mark_bh(a)
+#endif
+
 #include "if_ieee80211.h"
 #include "ah.h"
 
@@ -181,7 +189,12 @@ int	ath_detach(struct net_device *);
 void	ath_resume(struct net_device *);
 void	ath_suspend(struct net_device *);
 void	ath_shutdown(struct net_device *);
-void	ath_intr(int irq, void *dev_id, struct pt_regs *regs);
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
+void
+#else
+irqreturn_t
+#endif
+ath_intr(int irq, void *dev_id, struct pt_regs *regs);
 #ifdef CONFIG_SYSCTL
 void	ath_sysctl_register(void);
 void	ath_sysctl_unregister(void);
