@@ -69,6 +69,8 @@
 #include <asm/uaccess.h>
 #include <linux/random.h>
 
+#include <net/sock.h>			/* XXX for sk_allocation/allocation */
+
 #include "if_media.h"
 #include "if_ethersubr.h"		/* for ETHER_MAX_LEN */
 #include "if_llc.h"			/* for LLC_SNAPFRAMELEN */
@@ -1582,6 +1584,16 @@ ieee80211_radius_attach(struct eapolcom *ec)
 		eapolstats.rs_nosocket++;
 		goto bad;
 	}
+	/*
+	 * Force atomic allocation since we sometimes send
+	 * messages from interrupt level.
+	 */
+/* XXX 2.6.0 is just a guess */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+	rc->rc_sock->sk->allocation = GFP_ATOMIC;
+#else
+	rc->rc_sock->sk->sk_allocation = GFP_ATOMIC;
+#endif
 	error = (*rc->rc_sock->ops->bind)(rc->rc_sock,
 	    (struct sockaddr *)&rc->rc_local, sizeof(rc->rc_local));
 	if (error < 0) {
