@@ -2595,6 +2595,7 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 #define	ISPROBE(_wh)	IEEE80211_IS_SUBTYPE((_wh)->i_fc[0], PROBE_RESP)
 	struct ieee80211_frame *wh;
 	struct ieee80211_node *ni;
+	struct net_device *dev = &ic->ic_dev;
 	u_int8_t *frm, *efrm, *tstamp, *bintval, *capinfo, *ssid;
 	u_int8_t *rates, *xrates, *country;
 	u_int8_t chan, bchan, fhindex, erp;
@@ -2725,7 +2726,8 @@ ieee80211_recv_beacon(struct ieee80211com *ic, struct sk_buff *skb0, int rssi,
 	}
 #endif
 	if (ni && ic->ic_opmode == IEEE80211_M_STA &&
-	    ic->ic_state != IEEE80211_S_SCAN) {
+	    ic->ic_state != IEEE80211_S_SCAN &&
+	    IEEE80211_ADDR_EQ(wh->i_addr2, ic->ic_bss.ni_macaddr)) {
 		/* from our ap but we are not scanning, update stats only */
 		ieee80211_add_recvhist(ni, rssi, rstamp, rantenna);
 		ieee80211_unref_node(&ni);
