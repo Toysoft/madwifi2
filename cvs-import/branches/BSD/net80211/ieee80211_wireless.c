@@ -1014,30 +1014,40 @@ ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
-	struct ieee80211_node_table *nt = &ic->ic_scan;
+	struct ieee80211_node_table *nt;
 	struct ieee80211_node *ni;
 	struct sockaddr addr[IW_MAX_AP];
 	struct iw_quality qual[IW_MAX_AP];
 	int i;
 
 	i = 0;
-	/* XXX lock node list */
+	
+	if (ic->ic_opmode == IEEE80211_M_STA)
+		nt = &ic->ic_scan;
+	else
+		nt = &ic->ic_sta;
+	
 	/*
 	 * TODO: use ieee80211_iterate_nodes(&ic->ic_scan,func,&args)
 	 * also create a func like bsd does: wi_read_ap_result()
 	 */
 	
+	IEEE80211_NODE_LOCK(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
-		addr[i].sa_family = ARPHRD_ETHER;
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP ||
-		    ic->ic_opmode == IEEE80211_M_IBSS)
+		    ic->ic_opmode == IEEE80211_M_IBSS) {
+			if (ni == ic->ic_bss) /* don't include BSS node */
+				continue;
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_macaddr);
+		}
 		else
 			IEEE80211_ADDR_COPY(addr[i].sa_data, ni->ni_bssid);
+		addr[i].sa_family = ARPHRD_ETHER;
 		set_quality(&qual[i], (*ic->ic_node_getrssi)(ni));
 		if (++i >= IW_MAX_AP)
 			break;
 	}
+	IEEE80211_NODE_UNLOCK(nt);
 	data->length = i;
 	memcpy(extra, &addr, i*sizeof(addr[0]));
 	data->flags = 1;		/* signal quality present (sort of) */

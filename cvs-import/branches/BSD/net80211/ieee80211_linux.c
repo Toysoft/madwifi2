@@ -287,12 +287,15 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 	int i;
 	u_int16_t temp;
 
-	IEEE80211_NODE_LOCK_BH(nt);
+	IEEE80211_NODE_LOCK(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		/* Assume each node needs 300 bytes */ 
 		if (p - page > space - 300)
 			break;
+		
 		p += sprintf(p, "\nmacaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
+		if (ni == ic->ic_bss)
+			p += sprintf(p, "BSS\n");
 		p += sprintf(p, "  rssi: %d dBm ;", ic->ic_node_getrssi(ni));
 		p += sprintf(p, "refcnt: %d\n", ieee80211_node_refcnt(ni));
 
@@ -373,7 +376,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 		p += sprintf(p, "  fails: %d  inact: %d\n",
 				ni->ni_fails, temp);
 	}
-	IEEE80211_NODE_UNLOCK_BH(nt);
+	IEEE80211_NODE_UNLOCK(nt);
 	return (p - page);
 }
 
