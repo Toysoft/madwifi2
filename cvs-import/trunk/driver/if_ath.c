@@ -231,6 +231,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	ether_setup(dev);
 	dev->open = ath_init;
+	dev->stop = ath_stop;
 	dev->hard_start_xmit = ath_hardstart;
 	dev->tx_timeout = ath_tx_timeout;
 	dev->watchdog_timeo = 5 * HZ;			/* XXX */
@@ -1281,12 +1282,10 @@ ath_desc_free(struct ath_softc *sc)
 {
 	struct ath_buf *bf;
 
-	TAILQ_FOREACH(bf, &sc->sc_txq, bf_list) {
-		pci_unmap_single(sc->sc_pdev,
-			bf->bf_skbaddr, bf->bf_skb->len, PCI_DMA_TODEVICE);
-		dev_kfree_skb(bf->bf_skb);
-		bf->bf_skb = NULL;
-	}
+	/* Note: TX queues have already been freed in ath_draintxq(),
+	   which is and must be called before calling this function */
+	
+	/* Free all pre-allocated RX skb */
 	TAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
 		if (bf->bf_skb != NULL) {
 			pci_unmap_single(sc->sc_pdev,
@@ -1295,13 +1294,18 @@ ath_desc_free(struct ath_softc *sc)
 			dev_kfree_skb(bf->bf_skb);
 			bf->bf_skb = NULL;
 		}
+
+	/* If beacon skb has not been freed yet, do it now */
 	if (sc->sc_bcbuf != NULL) {
 		bf = sc->sc_bcbuf;
-		pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
-			bf->bf_skb->len, PCI_DMA_TODEVICE);
+		if (bf->bf_skb != NULL) {
+			pci_unmap_single(sc->sc_pdev, bf->bf_skbaddr,
+					 bf->bf_skb->len, PCI_DMA_TODEVICE);
+		}
 		sc->sc_bcbuf = NULL;
 	}
 
+	/* Free memory associated with all descriptors */
 	pci_free_consistent(sc->sc_pdev, sc->sc_desc_len,
 		sc->sc_desc, sc->sc_desc_daddr);
 
