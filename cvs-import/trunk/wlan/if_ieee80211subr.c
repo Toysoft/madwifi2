@@ -143,14 +143,18 @@ ieee80211_ifattach(struct net_device *dev)
 	 * name is filled in for any msgs.
 	 *
 	 * NB: The driver is expected to fill in anything
-	 *     else of interest.
+	 *     it cares about; we fillin only default handlers.
 	 */
-	dev->get_stats = ieee80211_getstats;
-	dev->do_ioctl = ieee80211_ioctl;
+	if (dev->get_stats == NULL)
+		dev->get_stats = ieee80211_getstats;
+	if (dev->do_ioctl == NULL)
+		dev->do_ioctl = ieee80211_ioctl;
 #ifdef CONFIG_NET_WIRELESS
-	dev->get_wireless_stats = ieee80211_iw_getstats;
-	dev->wireless_handlers = 
-		(struct iw_handler_def *) &ieee80211_iw_handler_def;
+	if (dev->get_wireless_stats == NULL)
+		dev->get_wireless_stats = ieee80211_iw_getstats;
+	if (dev->wireless_handlers == NULL)
+		dev->wireless_handlers = 
+			(struct iw_handler_def *) &ieee80211_iw_handler_def;
 #endif /* CONFIG_NET_WIRELESS */
 	if (register_netdev(&ic->ic_dev)) {
 		printk(KERN_WARNING "%s: unable to register device\n",
@@ -666,7 +670,6 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		skb = ieee80211_decap(dev, skb);
 		if (skb == NULL)
 			goto err;
-		ic->ic_stats.rx_packets++;
 
 		/* perform as a bridge within the AP */
 		skb1 = NULL;
@@ -674,8 +677,6 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 			eh = (struct ether_header *) skb->data;
 			if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
 				skb1 = skb_copy(skb, 0);
-				if (skb1 == NULL)
-					ic->ic_stats.tx_errors++;
 			} else {
 				ni = ieee80211_find_node(ic, eh->ether_dhost);
 				if (ni != NULL && ni->ni_associd != 0) {
@@ -688,7 +689,6 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 				skb1->dev = dev;
 				skb1->protocol = __constant_htons(ETH_P_802_2);
 				dev_queue_xmit(skb1);
-				ic->ic_stats.tx_bytes += len;
 			}
 		}
 		if (skb != NULL) {
@@ -756,7 +756,7 @@ ieee80211_input(struct net_device *dev, struct sk_buff *skb,
 		break;
 	}
   err:
-	ic->ic_stats.rx_errors++;
+	ic->ic_stats.rx_errors++;		/* XXX */
   out:
 	if (skb != NULL)
 		dev_kfree_skb(skb);
