@@ -30,7 +30,8 @@ BINDIR=	/usr/local/bin
 
 include ${DEPTH}/Makefile.inc
 
-ALL=	athstats 80211stats athkey athchans athctrl
+ALL_INSTALL=	athstats 80211stats athdebug 80211debug
+ALL=	${ALL_INSTALL} athkey athchans athctrl
 
 all:	${ALL}
 
@@ -48,9 +49,14 @@ athkey: athkey.c
 	${CC} -o athkey ${CFLAGS} ${LDFLAGS} athkey.c
 athctrl: athctrl.c
 	${CC} -o athctrl ${CFLAGS} ${LDFLAGS} athctrl.c
-install: ${ALL}
-	cp athstats ${DESTDIR}${BINDIR}
-	cp 80211stats ${DESTDIR}${BINDIR}
+athdebug: athdebug.c
+	${CC} -o athdebug ${CFLAGS} ${LDFLAGS} athdebug.c
+80211debug: 80211debug.c
+	${CC} -o 80211debug ${CFLAGS} ${LDFLAGS} 80211debug.c
+install: ${ALL_INSTALL}
+	for i in ${ALL_INSTALL}; do \
+		cp $$i ${DESTDIR}${BINDIR}; \
+	done
 
 clean:
 	rm -f ${ALL} core a.out
