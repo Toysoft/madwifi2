@@ -286,6 +286,8 @@ ieee80211_ifattach(struct net_device *dev)
 
 	rwlock_init(&ic->ic_nodelock);
 	TAILQ_INIT(&ic->ic_node);
+	for (i = 0; i < IEEE80211_NODE_HASHSIZE; i++)
+		LIST_INIT(&ic->ic_hash[i]);
 
 	/* initialize management frame handlers */
 	ic->ic_recv_mgmt[IEEE80211_FC0_SUBTYPE_PROBE_RESP
