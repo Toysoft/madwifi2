@@ -1152,8 +1152,7 @@ ath_beacon_config(struct ath_softc *sc)
 	    (LE_READ_4(ni->ni_tstamp) >> 10);
 	DPRINTF(("%s: nexttbtt=%u\n", __func__, nexttbtt));
 	nexttbtt += ni->ni_intval;
-
-	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
+	if (ic->ic_opmode == IEEE80211_M_STA) {
 		HAL_BEACON_STATE bs;
 		u_int32_t bmisstime;
 
