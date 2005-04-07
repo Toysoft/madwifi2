@@ -2051,12 +2051,13 @@ ath_beacon_tasklet(struct net_device *dev)
 	 */
 	if (ath_hal_numtxpending(ah, sc->sc_bhalq) != 0) {
 		sc->sc_bmisscount++;
-		if_printf(dev, "%s: missed %u consequent beacons\n", __func__, sc->sc_bmisscount); 
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: missed %u consecutive beacons\n",
 			__func__, sc->sc_bmisscount);
 		if (sc->sc_bmisscount > 3) {		/* NB: 3 is a guess */
-			if_printf(dev, "%s: stuck beacon time (%u missed)", __func__, sc->sc_bmisscount); 
+			DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: stuck beacon time (%u missed)\n",
+			__func__, sc->sc_bmisscount);
                         ATH_SCHEDULE_TQUEUE(&sc->sc_bstuckq, &needmark);
                 }
 		return;
@@ -2077,7 +2078,6 @@ ath_beacon_tasklet(struct net_device *dev)
 	skb = bf->bf_skb;
 	ncabq = ath_hal_numtxpending(ah, sc->sc_cabq->axq_qnum);
 	if (ieee80211_beacon_update(ic, bf->bf_node, &sc->sc_boff, skb, ncabq)) {
-		
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: update, beacon len changed %d to %d\n",
 			__func__, bf->bf_skb->len, skb->len);
@@ -3426,16 +3426,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 */
 		if (eapol) {
 			rix = 0;			/* XXX lowest rate */
-			try0 = ATH_TXMAXTRY;	// TODO: userspace or hardware retry?
+			try0 = 0;			// TODO: userspace or hardware retry?
 			if (shortPreamble)
 				txrate = an->an_tx_mgtratesp;
 			else
 				txrate = an->an_tx_mgtrate;
-			/* NB: force all management frames to highest queue */
-			if (ni->ni_flags & IEEE80211_NODE_QOS) {
-				pri = WME_AC_VO;
-			} else
-				pri = WME_AC_BE;
 			flags |= HAL_TXDESC_INTREQ;	/* force interrupt */
 		} else {
 			ath_rate_findrate(sc, an, shortPreamble, pktlen,
@@ -4145,6 +4140,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	 * the flags constrained to reflect the current
 	 * operating mode.
 	 */
+	if (chan == IEEE80211_CHAN_ANYC) {
+		return 0;
+	}
 	hchan.channel = chan->ic_freq;
 	hchan.channelFlags = ath_chan2flags(ic, chan);
 
