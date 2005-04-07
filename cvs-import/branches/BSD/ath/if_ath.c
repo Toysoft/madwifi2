@@ -3421,10 +3421,15 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		break;
 	case IEEE80211_FC0_TYPE_DATA:
 		atype = HAL_PKT_TYPE_NORMAL;		/* default */
-		/*
-		 * Data frames; consult the rate control module.
-		 */
-		if (eapol) {
+		if (ismcast) {
+			rix = 0;			/* XXX lowest rate */
+			try0 = 0;
+			if (shortPreamble)
+				txrate = an->an_tx_mgtratesp;
+			else
+				txrate = an->an_tx_mgtrate;
+		}
+		else if (eapol) {
 			rix = 0;			/* XXX lowest rate */
 			try0 = 0;			// TODO: userspace or hardware retry?
 			if (shortPreamble)
@@ -3433,6 +3438,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 				txrate = an->an_tx_mgtrate;
 			flags |= HAL_TXDESC_INTREQ;	/* force interrupt */
 		} else {
+			/*
+			 * Data frames; consult the rate control module.
+			 */
 			ath_rate_findrate(sc, an, shortPreamble, pktlen,
 					  &rix, &try0, &txrate);
 		}
