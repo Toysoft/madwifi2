@@ -65,7 +65,7 @@ $(obj)/hal.o:	${HAL_OBJDIR}/hal.o
 endif
 
 # XXX need opt_ah.h to do dependencies so give this bogus dependency
-$(obj)/ah_osdep.c: ${HAL}/ah_osdep.c $(obj)/opt_ah.h
+$(obj)/ah_osdep.c: ${HAL}/${OS}/ah_osdep.c $(obj)/opt_ah.h
 	cp ${HAL}/${OS}/ah_osdep.c $(obj)/ah_osdep.c
 $(obj)/opt_ah.h: ${OPT_AH_H}
 	cp ${OPT_AH_H} $(obj)/opt_ah.h
