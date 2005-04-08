@@ -205,7 +205,8 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	int cw = WIFI_CW_MIN;
 	int cix = rt->info[rix].controlRate;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-	
+	KASSERT(rix < rt->rateCount, ("bad rix %d vs %d", rix, rt->rateCount));
+
 	if (rt->info[rix].phy == IEEE80211_T_OFDM) {
 		t_slot = 9;
 		t_sifs = 9;
