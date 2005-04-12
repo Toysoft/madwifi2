@@ -247,7 +247,8 @@ struct ath_softc {
 				sc_hastpc  : 1,	/* per-packet TPC support */
 				sc_ledstate: 1,	/* LED on/off state */
 				sc_blinking: 1,	/* LED blink operation active */
-				sc_endblink: 1;	/* finish LED blink operation */
+				sc_endblink: 1,	/* finish LED blink operation */
+				sc_mcastkey: 1; /* mcast key cache search */
 						/* rate tables */
 	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
