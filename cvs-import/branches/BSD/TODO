@@ -1,8 +1,8 @@
-- wpa_supplicant (using madwifi) doesn't reconnect if the hostapd goes down and
-  up again, beeing stuck waiting for the scan finished wireless event
+- manually scanning is not available before background scan, which is initiated
+  after setting interface up, is done through finding an accesspoint
 - check locking (especially the macros in ieee80211_linux.h)
-    - to strict locking -> loose performance
-    - to soft -> oops
+    - too strict locking -> loose performance
+    - too soft -> oops
 - define commonly used macros global
 - cleanup code
 - generate a Configure script to create a Makefile fitting the build environment
