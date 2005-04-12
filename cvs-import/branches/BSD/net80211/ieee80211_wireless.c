@@ -225,7 +225,9 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		/* set key contents */
 		k = &ic->ic_nw_keys[kid];
 		ieee80211_key_update_begin(ic);
-		if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP, k)) {
+		k->wk_keyix = kid;      /* NB: force fixed key id */
+		if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP,
+		    IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV, k)) {
 			k->wk_keylen = erq->length;
 			/* NB: preserve flags set by newkey */
 			k->wk_flags |=
@@ -979,8 +981,8 @@ ieee80211_ioctl_siwtxpow(struct ieee80211com *ic,
 	if (rrq->fixed) {
 		if ((ic->ic_caps & IEEE80211_C_TXPMGT) == 0)
 			return -EOPNOTSUPP;
-                if (!(IEEE80211_TXPOWER_MIN < ireq->i_val &&
-                      ireq->i_val < IEEE80211_TXPOWER_MAX))
+                if (!(IEEE80211_TXPOWER_MIN < rrq->value &&
+                      rrq->value < IEEE80211_TXPOWER_MAX))
                         return -EINVAL;
 		ic->ic_txpowlimit = rrq->value;
 		ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
@@ -989,7 +991,6 @@ ieee80211_ioctl_siwtxpow(struct ieee80211com *ic,
 			return 0;
 		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
 	}
-done:
 	return IS_UP(ic->ic_dev) ? -(*ic->ic_reset)(ic->ic_dev) : 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwtxpow);
@@ -1764,10 +1765,13 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 			return -EINVAL;
 		wk = &ic->ic_nw_keys[kid];
 		ni = NULL;
+		/* XXX auto-add group key flag until applications are updated */
+		if ((ik->ik_flags & IEEE80211_KEY_XMIT) == 0)    /* XXX */
+			ik->ik_flags |= IEEE80211_KEY_GROUP;     /* XXX */
 	}
 	error = 0;
 	ieee80211_key_update_begin(ic);
-	if (ieee80211_crypto_newkey(ic, ik->ik_type, wk)) {
+	if (ieee80211_crypto_newkey(ic, ik->ik_type, ik->ik_flags, wk)) {
 		wk->wk_keylen = ik->ik_keylen;
 		/* NB: MIC presence is implied by cipher type */
 		if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
