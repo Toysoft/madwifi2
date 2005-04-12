@@ -204,7 +204,7 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 {
 	int kid, error = 0;
 	int wepchange = 0;
-	
+	struct ieee80211_key *k;
 	/* 
 	 * set key
 	 *
@@ -223,7 +223,7 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		if (erq->length > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
 		/* set key contents */
-		struct ieee80211_key *k = &ic->ic_nw_keys[kid];
+		k = &ic->ic_nw_keys[kid];
 		ieee80211_key_update_begin(ic);
 		if (ieee80211_crypto_newkey(ic, IEEE80211_CIPHER_WEP, k)) {
 			k->wk_keylen = erq->length;
@@ -973,28 +973,16 @@ ieee80211_ioctl_siwtxpow(struct ieee80211com *ic,
 {
 	int fixed, disabled;
 
-	fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED);
-	disabled = (fixed && ic->ic_bss->ni_txpower == 0);
-	if (rrq->disabled) {
-		if (!disabled) {
-			if ((ic->ic_caps & IEEE80211_C_TXPMGT) == 0)
-				return -EOPNOTSUPP;
-			ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
-			ic->ic_bss->ni_txpower = 0;
-			goto done;
-		}
-		return 0;
-	}
+        fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED);
+        disabled = (fixed && ic->ic_bss->ni_txpower == 0);
 
 	if (rrq->fixed) {
 		if ((ic->ic_caps & IEEE80211_C_TXPMGT) == 0)
 			return -EOPNOTSUPP;
-		if (rrq->flags != IW_TXPOW_MWATT)
-			return -EOPNOTSUPP;
-                if (!(IEEE80211_TXPOWER_MIN < rrq->value &&
-                      rrq->value < IEEE80211_TXPOWER_MAX))
-                        return -EOPNOTSUPP;
-		ic->ic_bss->ni_txpower = rrq->value;
+                if (!(IEEE80211_TXPOWER_MIN < ireq->i_val &&
+                      ireq->i_val < IEEE80211_TXPOWER_MAX))
+                        return -EINVAL;
+		ic->ic_txpowlimit = rrq->value;
 		ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
 	} else {
 		if (!fixed)		/* no change */
@@ -1012,14 +1000,14 @@ ieee80211_ioctl_giwtxpow(struct ieee80211com *ic,
 			 struct iw_param *rrq, char *extra)
 {
 
-	rrq->value = ic->ic_bss->ni_txpower;
+	rrq->value = ic->ic_txpowlimit;
 	rrq->fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED) != 0;
 	rrq->disabled = (rrq->fixed && rrq->value == 0);
 	rrq->flags = IW_TXPOW_MWATT;
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_giwtxpow);
-
+/* is obsolete iwlist ap */
 int
 ieee80211_ioctl_iwaplist(struct ieee80211com *ic,
 			struct iw_request_info *info,
@@ -1091,8 +1079,10 @@ ieee80211_ioctl_siwscan(struct ieee80211com *ic,
 	 */
 	if (!IS_UP(ic->ic_dev))
 		return -ENETDOWN;
-	if (ic->ic_state == IEEE80211_S_SCAN && (ic->ic_flags & IEEE80211_F_ASCAN))
+	if (ic->ic_state == IEEE80211_S_SCAN &&
+	    (ic->ic_flags & (IEEE80211_F_SCAN|IEEE80211_F_ASCAN))) {
 		return -EINPROGRESS;
+	}
 	if (ic->ic_ibss_chan == NULL ||
 	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_ibss_chan))) {
 		for (i = 0; i <= IEEE80211_CHAN_MAX; i++)
@@ -1103,6 +1093,7 @@ ieee80211_ioctl_siwscan(struct ieee80211com *ic,
 		return -EINVAL;			/* no active channels */
 found:
 		;
+
 	}
 	if (ic->ic_bss->ni_chan == IEEE80211_CHAN_ANYC ||
 	    isclr(chanlist, ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan)))
@@ -1163,9 +1154,9 @@ ieee80211_ioctl_giwscan(struct ieee80211com *ic,
 	char buf[64*2 + 30];
 #endif
 	int j, startmode, mode;
-
 	/* XXX use generation number and always return current results */
-	if (ic->ic_state == IEEE80211_S_SCAN && (ic->ic_flags & IEEE80211_F_ASCAN)) {
+	if (ic->ic_state == IEEE80211_S_SCAN &&
+	    (ic->ic_flags & (IEEE80211_F_SCAN|IEEE80211_F_ASCAN))) {
 		/*
 		 * Still scanning, indicate the caller should try again.
 		 */
