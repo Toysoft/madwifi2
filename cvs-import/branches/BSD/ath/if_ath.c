@@ -1968,7 +1968,8 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_node *an = ATH_NODE(ni);
 	struct ath_desc *ds;
-	int flags, antenna;
+	int antenna = sc->sc_txantenna;
+	int flags;
 	u_int8_t rate;
 
 	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
@@ -1989,16 +1990,17 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		ds->ds_link = bf->bf_daddr;	/* self-linked */
 		flags |= HAL_TXDESC_VEOL;
 		/*
-		 * Let hardware handle antenna switching.
+		 * Let hardware handle antenna switching if txantenna is not set
 		 */
-		antenna = 0;
 	} else {
 		ds->ds_link = 0;
 		/*
-		 * Switch antenna every 4 beacons.
+		 * Switch antenna every 4 beacons if txantenna is not set
 		 * XXX assumes two antenna
 		 */
-		antenna = (sc->sc_stats.ast_be_xmit & 4 ? 2 : 1);
+		if (antenna == 0) {
+			antenna = (sc->sc_stats.ast_be_xmit & 4 ? 2 : 1);
+		}
 	}
 
 	ds->ds_data = bf->bf_skbaddr;
