@@ -283,6 +283,7 @@ struct ath_softc {
 	u_int8_t		sc_txrate;	/* current tx rate for LED */
 	u_int16_t		sc_ledoff;	/* off time for current blink */
 	struct timer_list	sc_ledtimer;	/* led off timer */
+	u_int32_t               sc_rxfilter;
 
 	union {
 		struct ath_tx_radiotap_header th;

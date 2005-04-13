@@ -619,7 +619,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * use with IBSS beacons; check here for it.
 	 */
 	sc->sc_hasveol = ath_hal_hasveol(ah);
-	
+
+	sc->sc_rxfilter = 0;
 	sc->sc_rawdev_enabled = 0;
 	sc->sc_rawdev.type = ARPHRD_IEEE80211;
 
@@ -1782,6 +1783,7 @@ ath_key_update_end(struct ieee80211com *ic)
  *   - when operating in station mode for collecting rssi data when
  *     the station is otherwise quiet, or
  *   - when scanning
+ * o accept any additional packets specified by sc_rxfilter
  */
 static u_int32_t
 ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
@@ -1802,6 +1804,9 @@ ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 	    ic->ic_opmode == IEEE80211_M_IBSS ||
 	    state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
+
+	rfilt |= sc->sc_rxfilter;
+
 	return rfilt;
 }
 
@@ -3211,7 +3216,7 @@ rx_accept:
 				ath_rx_capture(&sc->sc_rawdev, ds, skb2);
 			}
 		}
-		
+
 		/*
 		 * From this point on we assume the frame is at least
 		 * as large as ieee80211_frame_min; verify that.
@@ -5423,8 +5428,9 @@ enum {
 	ATH_TXPOWLIMIT  = 15,	
 	ATH_VEOL        = 16,
 	ATH_BINTVAL	= 17,
-	ATH_RAWDEV     = 18,
-	ATH_RAWDEV_TYPE    = 19,
+	ATH_RAWDEV      = 18,
+	ATH_RAWDEV_TYPE = 19,
+	ATH_RXFILTER   = 20,
 };
 
 static int
@@ -5537,6 +5543,10 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				}
 				ath_reset(&sc->sc_dev);
 				break;
+			case ATH_RXFILTER:
+				sc->sc_rxfilter = val;
+				ath_reset(&sc->sc_dev);
+				break;
 			default:
 				return -EINVAL;
 			}
@@ -5606,6 +5616,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				val = 0;
 			}
  			break;
+		case ATH_RXFILTER:
+			val = sc->sc_rxfilter;
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -5716,6 +5729,11 @@ static const ctl_table ath_sysctl_template[] = {
 	},
 	{ .ctl_name	= ATH_RAWDEV_TYPE,
 	  .procname	= "rawdev_type",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_RXFILTER,
+	  .procname	= "rxfilter",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
