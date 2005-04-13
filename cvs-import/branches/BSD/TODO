@@ -14,6 +14,8 @@ HIGH PRIO:
 - merge in changes from FreeBSD since last merge from 12.04.2005
 - AIFS and CWMIN are set wrong on the beacon queue.  They should be zero 
   for AP mode but CWMIN should be 2x for adhoc mode (check the spec).
+- check if private crypto tkip implementation works for cards without hardware 
+  crypto support (SWMIC, SWCRYPT).
 
 LOW PRIO:
 
