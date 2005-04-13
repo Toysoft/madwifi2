@@ -11,6 +11,7 @@ HIGH PRIO:
 - IBSS merging, sychronization and beaconing
 - implement "right" iwconfig ath0 key open / restricted behaviour
     - authentication mode open / shared key
+    - accept unencrypted frames
 - merge in changes from FreeBSD since last merge from 12.04.2005
 - AIFS and CWMIN are set wrong on the beacon queue.  They should be zero 
   for AP mode but CWMIN should be 2x for adhoc mode (check the spec).
@@ -23,7 +24,11 @@ LOW PRIO:
 - cleanup code
 - remove redundand definitions which have been copied from FreeBSD
     - e.g.: struct ether_header
-
+- consistent configuration either thru sysctl or iwpriv commands
+    - i'd suggest iwpriv (br1)
+- antenna reconfiguration in ad-hoc mode does not affect beacons
+  if it is done after the beacon is set up (the IBSS is started)
+    
 LONG TERM:
 
 - integration with linux ieee 802.11 stack (work in progress)
