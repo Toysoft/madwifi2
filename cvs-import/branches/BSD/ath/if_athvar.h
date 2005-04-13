@@ -51,6 +51,10 @@
 #include <linux/wireless.h>
 #endif
 
+#ifndef ARPHRD_IEEE80211_RADIOTAP
+#define ARPHRD_IEEE80211_RADIOTAP 803 /* IEEE 802.11 + radiotap header */
+#endif /* ARPHRD_IEEE80211_RADIOTAP */
+
 /*
  * Deduce if tasklets are available.  If not then
  * fall back to using the immediate work queue.
@@ -214,6 +218,7 @@ struct ath_txq {
 
 struct ath_softc {
 	struct net_device	sc_dev;		/* NB: must be first */
+	struct net_device	sc_rawdev;	/* live monitor device */
 	struct semaphore	sc_lock;	/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats	sc_stats;	/* private statistics */
@@ -248,7 +253,8 @@ struct ath_softc {
 				sc_ledstate: 1,	/* LED on/off state */
 				sc_blinking: 1,	/* LED blink operation active */
 				sc_endblink: 1,	/* finish LED blink operation */
-				sc_mcastkey: 1; /* mcast key cache search */
+				sc_mcastkey: 1, /* mcast key cache search */
+				sc_rawdev_enabled : 1;  /* enable sc_rawdev */
 						/* rate tables */
 	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */

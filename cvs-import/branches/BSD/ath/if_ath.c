@@ -178,6 +178,8 @@ static int	ath_ioctl(struct net_device *, struct ifreq *, int);
 static int	ath_rate_setup(struct net_device *, u_int mode);
 static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 
+static int      ath_rawdev_attach(struct ath_softc *);
+static void     ath_rawdev_detach(struct ath_softc *);
 #ifdef CONFIG_SYSCTL
 static void	ath_dynamic_sysctl_register(struct ath_softc *);
 static void	ath_dynamic_sysctl_unregister(struct ath_softc *);
@@ -617,6 +619,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * use with IBSS beacons; check here for it.
 	 */
 	sc->sc_hasveol = ath_hal_hasveol(ah);
+	
+	sc->sc_rawdev_enabled = 0;
+	sc->sc_rawdev.type = ARPHRD_IEEE80211;
 
 	/* get mac address from hardware */
 	ath_hal_getmac(ah, ic->ic_myaddr);
@@ -719,6 +724,7 @@ ath_detach(struct net_device *dev)
 #ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_unregister(sc);
 #endif /* CONFIG_SYSCTL */
+	ath_rawdev_detach(sc);
 	unregister_netdev(dev);
 
 	return 0;
@@ -939,23 +945,6 @@ ath_init(struct net_device *dev)
 	 */
 	ath_stop_locked(dev);
 
-	/*
-	 * Resize receive skb's if changing to or from monitor mode
-	 */
-	if ((dev->type == ARPHRD_ETHER &&
-	     ic->ic_opmode == IEEE80211_M_MONITOR) ||
-	    (dev->type == ARPHRD_IEEE80211_PRISM &&
-	     ic->ic_opmode != IEEE80211_M_MONITOR)) {
-		struct ath_buf *bf;
-		STAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list)
-			if (bf->bf_skb != NULL) {
-				bus_unmap_single(sc->sc_bdev,
-					bf->bf_skbaddr, sc->sc_rxbufsize,
-					BUS_DMA_FROMDEVICE);
-				dev_kfree_skb(bf->bf_skb);
-				bf->bf_skb = NULL;
-			}
-	}
 	/*
 	 * Change our interface type if we are in monitor mode.
 	 */
@@ -1864,21 +1853,6 @@ ath_mode_init(struct net_device *dev)
 		__func__, rfilt, mfilt[0], mfilt[1]);
 }
 
-static struct sk_buff *
-ath_alloc_skb(u_int size, u_int align)
-{
-	struct sk_buff *skb;
-	u_int off;
-
-	skb = dev_alloc_skb(size + align-1);
-	if (skb != NULL) {
-		off = ((unsigned long) skb->data) % align;
-		if (off != 0)
-			skb_reserve(skb, align - off);
-	}
-	return skb;
-}
-
 /*
  * Set the slot time based on the current setting.
  */
@@ -2541,7 +2515,8 @@ enum {
 	P80211ENUM_msgitem_status_no_value	= 0x00
 };
 enum {
-	P80211ENUM_truth_false			= 0x00
+	P80211ENUM_truth_false			= 0x00,
+	P80211ENUM_truth_true			= 0x01
 };
 
 typedef struct {
@@ -2574,53 +2549,63 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	struct ath_hal *ah = sc->sc_ah;
 	struct sk_buff *skb;
 	struct ath_desc *ds;
+	int headroom_needed = 0;
+	
+	if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
+		headroom_needed = sizeof(wlan_ng_prism2_header);
+	} else if (sc->sc_rawdev.type == ARPHRD_IEEE80211_PRISM) {
+		headroom_needed = sizeof(wlan_ng_prism2_header);
+	} else if (sc->sc_rawdev.type == ARPHRD_IEEE80211_RADIOTAP) {
+		headroom_needed = sizeof(struct ath_rx_radiotap_header);
+	}
+
+	/* 
+	 * Check if we have enough headroom. If not, just free the skb
+	 * and we'll alloc another one below.
+	 */
+	if (bf->bf_skb && skb_headroom(bf->bf_skb) < headroom_needed) {
+		bus_unmap_single(sc->sc_bdev,
+				 bf->bf_skbaddr, sc->sc_rxbufsize,
+				 BUS_DMA_FROMDEVICE);
+		dev_kfree_skb(bf->bf_skb);
+		bf->bf_skb = NULL;
+	}
 
 	skb = bf->bf_skb;
+
 	if (skb == NULL) {
- 		if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
- 			u_int off;
- 			/*
- 			 * Allocate buffer for monitor mode with space for the
-			 * wlan-ng style physical layer header at the start.
- 			 */
- 			skb = dev_alloc_skb(sc->sc_rxbufsize +
-					    sizeof(wlan_ng_prism2_header) +
-					    sc->sc_cachelsz - 1);
- 			if (skb == NULL) {
- 				DPRINTF(sc, ATH_DEBUG_ANY,
-					"%s: skbuff alloc of size %d failed\n",
-					__func__,
-					(int)(sc->sc_rxbufsize
-					+ sizeof(wlan_ng_prism2_header)
-					+ sc->sc_cachelsz - 1));
- 				sc->sc_stats.ast_rx_nobuf++;
- 				return ENOMEM;
- 			}
- 			/*
-			 * Reserve space for the Prism header.
- 			 */
- 			skb_reserve(skb, sizeof(wlan_ng_prism2_header));
-			/*
- 			 * Align to cache line.
-			 */
- 			off = ((unsigned long) skb->data) % sc->sc_cachelsz;
- 			if (off != 0)
- 				skb_reserve(skb, sc->sc_cachelsz - off);
-		} else {
-			/*
-			 * Cache-line-align.  This is important (for the
-			 * 5210 at least) as not doing so causes bogus data
-			 * in rx'd frames.
-			 */
-			skb = ath_alloc_skb(sc->sc_rxbufsize, sc->sc_cachelsz);
-			if (skb == NULL) {
-				DPRINTF(sc, ATH_DEBUG_ANY,
-					"%s: skbuff alloc of size %u failed\n",
-					__func__, sc->sc_rxbufsize);
-				sc->sc_stats.ast_rx_nobuf++;
-				return ENOMEM;
-			}
+		u_int off;
+
+		/*
+		 * Allocate buffer with headroom_needed space for the
+		 * fake physical layer header at the start.
+		 */
+		skb = dev_alloc_skb(sc->sc_rxbufsize +
+				    headroom_needed + 
+				    sc->sc_cachelsz - 1);
+		if (skb == NULL) {
+			DPRINTF(sc, ATH_DEBUG_ANY,
+				"%s: skbuff alloc of size %d failed\n",
+				__func__,
+				(int)(sc->sc_rxbufsize
+				      + headroom_needed
+				      + sc->sc_cachelsz - 1));
+			sc->sc_stats.ast_rx_nobuf++;
+			return ENOMEM;
 		}
+		/*
+		 * Reserve space for the fake physical layer header.
+		 */
+		skb_reserve(skb, headroom_needed);
+		/*
+		 * Cache-line-align.  This is important (for the
+		 * 5210 at least) as not doing so causes bogus data
+		 * in rx'd frames.
+		 */
+		off = ((unsigned long) skb->data) % sc->sc_cachelsz;
+		if (off != 0)
+			skb_reserve(skb, sc->sc_cachelsz - off);
+
 		skb->dev = &sc->sc_dev;
 		bf->bf_skb = skb;
 		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
@@ -2664,9 +2649,154 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 }
 
 /*
- * Add a prism2 header to a received frame and
- * dispatch it to capture tools like kismet.
- * TODO: can stay unchanged?
+ * Add additional headers to a transmitted frame and netif_rx it on
+ * a monitor or raw device
+ */
+static void
+ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	u_int32_t tsf;
+
+	/* 
+	 * release the owner of this skb since we're basically
+	 * recycling it 
+	 */
+	if (atomic_read(&skb->users) != 1) {
+		struct sk_buff *skb2 = skb;
+		skb = skb_clone(skb, GFP_ATOMIC);
+		if (skb == NULL) {
+			dev_kfree_skb(skb2);
+			return;
+		}
+		kfree_skb(skb2);
+	} else {
+		skb_orphan(skb);
+	}
+
+	switch (dev->type) {
+	case ARPHRD_IEEE80211:
+		break;
+	case ARPHRD_IEEE80211_PRISM: {
+		wlan_ng_prism2_header *ph;
+		if (skb_headroom(skb) < sizeof(wlan_ng_prism2_header) &&
+		    pskb_expand_head(skb, 
+				     sizeof(wlan_ng_prism2_header), 
+				     0, GFP_ATOMIC)) {
+			DPRINTF(sc, ATH_DEBUG_RECV, 
+				"%s: couldn't pskb_expand_head\n", __func__);
+			goto bad;
+		}
+
+		ph = (wlan_ng_prism2_header *)
+			skb_push(skb, sizeof(wlan_ng_prism2_header));
+		memset(ph, 0, sizeof(wlan_ng_prism2_header));
+		
+		ph->msgcode = DIDmsg_lnxind_wlansniffrm;
+		ph->msglen = sizeof(wlan_ng_prism2_header);
+		strcpy(ph->devname, sc->sc_dev.name);
+		
+		ph->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
+		ph->hosttime.status = 0;
+		ph->hosttime.len = 4;
+		ph->hosttime.data = jiffies;
+		
+		/* Pass up tsf clock in mactime */
+		ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
+		ph->mactime.status = 0;
+		ph->mactime.len = 4;
+		/*
+		 * Rx descriptor has the low 15 bits of the tsf at
+		 * the time the frame was received.  Use the current
+		 * tsf to extend this to 32 bits.
+		 */
+		tsf = ath_hal_gettsf32(sc->sc_ah);
+		if ((tsf & 0x7fff) < ds->ds_rxstat.rs_tstamp)
+			tsf -= 0x8000;
+		ph->mactime.data = ds->ds_rxstat.rs_tstamp | (tsf &~ 0x7fff);
+		
+		ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
+		ph->istx.status = 0;
+		ph->istx.len = 4;
+		ph->istx.data = P80211ENUM_truth_true;
+		
+		ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
+		ph->frmlen.status = 0;
+		ph->frmlen.len = 4;
+		ph->frmlen.data = ds->ds_rxstat.rs_datalen;
+		
+		ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
+		ph->channel.status = 0;
+		ph->channel.len = 4;
+		ph->channel.data = ieee80211_mhz2ieee(ic->ic_ibss_chan->ic_freq,0);
+		
+		ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
+		ph->rssi.status = 0;
+		ph->rssi.len = 4;
+		ph->rssi.data = ds->ds_rxstat.rs_rssi;
+		
+		ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
+		ph->noise.status = 0;
+		ph->noise.len = 4;
+		ph->noise.data = -95;
+		
+		ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
+		ph->signal.status = 0;
+		ph->signal.len = 4;
+		ph->signal.data = -95 + ds->ds_rxstat.rs_rssi;
+		
+		ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
+		ph->rate.status = 0;
+		ph->rate.len = 4;
+		ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+		break;
+	}
+	case ARPHRD_IEEE80211_RADIOTAP: {
+		struct ath_tx_radiotap_header *th;
+
+		if (skb_headroom(skb) < sizeof(struct ath_tx_radiotap_header) &&
+		    pskb_expand_head(skb, 
+				     sizeof(struct ath_tx_radiotap_header), 
+				     0, GFP_ATOMIC)) {
+			DPRINTF(sc, ATH_DEBUG_RECV, 
+				"%s: couldn't pskb_expand_head\n", __func__);
+			goto bad;
+		}
+		
+		th = (struct ath_tx_radiotap_header *) skb_push(skb, sizeof(struct ath_tx_radiotap_header));
+		memset(th, 0, sizeof(struct ath_rx_radiotap_header));
+		th->wt_ihdr.it_version = 0;
+		th->wt_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
+		th->wt_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
+		th->wt_flags = 0;
+		th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
+		th->wt_chan_freq = ic->ic_ibss_chan->ic_freq;
+		th->wt_chan_flags = ic->ic_ibss_chan->ic_flags;
+		th->wt_txpower = 0;
+		th->wt_antenna = ds->ds_txstat.ts_antenna;
+		break;
+	}
+	default:
+		break;
+	}
+
+	skb->dev = dev;
+	skb->mac.raw = skb->data;
+	skb->ip_summed = CHECKSUM_NONE;
+	skb->pkt_type = PACKET_OTHERHOST;
+	skb->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
+	netif_rx(skb);
+	return;
+
+ bad:
+	dev_kfree_skb(skb);
+	return;
+}
+
+/*
+ * Add additional headers to a received frame and netif_rx it on
+ * a monitor or raw device
  */
 static void
 ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
@@ -2678,7 +2808,6 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	struct ieee80211com *ic = &sc->sc_ic;
 	int len = ds->ds_rxstat.rs_datalen;
 	struct ieee80211_frame *wh;
- 	wlan_ng_prism2_header *ph;
 	u_int32_t tsf;
 
 	skb->protocol = ETH_P_CONTROL;
@@ -2703,78 +2832,121 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		}
 	}
 
-	/*
-	 * enough headroom ist assured by ath_rxbuf_init
-	 */
-	ph = (wlan_ng_prism2_header *)
-		skb_push(skb, sizeof(wlan_ng_prism2_header));
-	memset(ph, 0, sizeof(wlan_ng_prism2_header));
+	switch (dev->type) {
+	case ARPHRD_IEEE80211:
+		break;
+	case ARPHRD_IEEE80211_PRISM: {
+		wlan_ng_prism2_header *ph;
+		if (skb_headroom(skb) < sizeof(wlan_ng_prism2_header)) {
+			DPRINTF(sc, ATH_DEBUG_RECV,
+				"%s: prism not enough headroom %d/%d\n",
+				__func__, skb_headroom(skb), 
+				sizeof(wlan_ng_prism2_header));
+			goto bad;
+		}
+		ph = (wlan_ng_prism2_header *)
+			skb_push(skb, sizeof(wlan_ng_prism2_header));
+		memset(ph, 0, sizeof(wlan_ng_prism2_header));
+		
+		ph->msgcode = DIDmsg_lnxind_wlansniffrm;
+		ph->msglen = sizeof(wlan_ng_prism2_header);
+		strcpy(ph->devname, sc->sc_dev.name);
+		
+		ph->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
+		ph->hosttime.status = 0;
+		ph->hosttime.len = 4;
+		ph->hosttime.data = jiffies;
+		
+		/* Pass up tsf clock in mactime */
+		ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
+		ph->mactime.status = 0;
+		ph->mactime.len = 4;
+		/*
+		 * Rx descriptor has the low 15 bits of the tsf at
+		 * the time the frame was received.  Use the current
+		 * tsf to extend this to 32 bits.
+		 */
+		tsf = ath_hal_gettsf32(sc->sc_ah);
+		if ((tsf & 0x7fff) < ds->ds_rxstat.rs_tstamp)
+			tsf -= 0x8000;
+		ph->mactime.data = ds->ds_rxstat.rs_tstamp | (tsf &~ 0x7fff);
+		
+		ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
+		ph->istx.status = 0;
+		ph->istx.len = 4;
+		ph->istx.data = P80211ENUM_truth_false;
+		
+		ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
+		ph->frmlen.status = 0;
+		ph->frmlen.len = 4;
+		ph->frmlen.data = len;
+		
+		ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
+		ph->channel.status = 0;
+		ph->channel.len = 4;
+		ph->channel.data = ieee80211_mhz2ieee(ic->ic_ibss_chan->ic_freq,0);
+		
+		ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
+		ph->rssi.status = 0;
+		ph->rssi.len = 4;
+		ph->rssi.data = ds->ds_rxstat.rs_rssi;
+		
+		ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
+		ph->noise.status = 0;
+		ph->noise.len = 4;
+		ph->noise.data = -95;
+		
+		ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
+		ph->signal.status = 0;
+		ph->signal.len = 4;
+		ph->signal.data = -95 + ds->ds_rxstat.rs_rssi;
+		
+		ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
+		ph->rate.status = 0;
+		ph->rate.len = 4;
+		ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+		break;
+	}
+	case ARPHRD_IEEE80211_RADIOTAP: {
+		struct ath_rx_radiotap_header *th;
+		if (skb_headroom(skb) < sizeof(struct ath_rx_radiotap_header)) {
+			DPRINTF(sc, ATH_DEBUG_RECV,
+				"%s: radiotap not enough headroom %d/%d\n",
+				__func__, skb_headroom(skb), 
+				sizeof(struct ath_rx_radiotap_header));
+			goto bad;
+		}
+		th = (struct ath_rx_radiotap_header  *) skb_push(skb, sizeof(struct ath_rx_radiotap_header));
+		memset(th, 0, sizeof(struct ath_rx_radiotap_header));
 
-	ph->msgcode = DIDmsg_lnxind_wlansniffrm;
-	ph->msglen = sizeof(wlan_ng_prism2_header);
-	strcpy(ph->devname, dev->name);
+		th->wr_ihdr.it_version = 0;
+		th->wr_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
+		th->wr_ihdr.it_present = ATH_RX_RADIOTAP_PRESENT;
+		th->wr_flags = 0;
+		th->wr_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+		th->wr_chan_freq = ic->ic_ibss_chan->ic_freq;
+		th->wr_chan_flags = ic->ic_ibss_chan->ic_flags;
+		th->wr_antenna = ds->ds_rxstat.rs_antenna;
+		th->wr_antsignal = ds->ds_rxstat.rs_rssi;
 
-	ph->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
-	ph->hosttime.status = 0;
-	ph->hosttime.len = 4;
-	ph->hosttime.data = jiffies;
-
-	/* Pass up tsf clock in mactime */
-	ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
-	ph->mactime.status = 0;
-	ph->mactime.len = 4;
-	/*
-	 * Rx descriptor has the low 15 bits of the tsf at
-	 * the time the frame was received.  Use the current
-	 * tsf to extend this to 32 bits.
-	 */
-	tsf = ath_hal_gettsf32(sc->sc_ah);
-	if ((tsf & 0x7fff) < ds->ds_rxstat.rs_tstamp)
-		tsf -= 0x8000;
-	ph->mactime.data = ds->ds_rxstat.rs_tstamp | (tsf &~ 0x7fff);
-
-	ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
-	ph->istx.status = 0;
-	ph->istx.len = 4;
-	ph->istx.data = P80211ENUM_truth_false;
-
-	ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
-	ph->frmlen.status = 0;
-	ph->frmlen.len = 4;
-	ph->frmlen.data = len;
-
-	ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
-	ph->channel.status = 0;
-	ph->channel.len = 4;
-	ph->channel.data = ieee80211_mhz2ieee(ic->ic_ibss_chan->ic_freq,0);
-
-	ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
-	ph->rssi.status = 0;
-	ph->rssi.len = 4;
-	ph->rssi.data = ds->ds_rxstat.rs_rssi;
-
-	ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
-	ph->noise.status = 0;
-	ph->noise.len = 4;
-	ph->noise.data = -95;
-
-	ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
-	ph->signal.status = 0;
-	ph->signal.len = 4;
-	ph->signal.data = -95 + ds->ds_rxstat.rs_rssi;
-
-	ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
-	ph->rate.status = 0;
-	ph->rate.len = 4;
-	ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
-
+		break;
+	}
+	default:
+		break;
+	}
+	
 	skb->dev = dev;
 	skb->mac.raw = skb->data;
 	skb->ip_summed = CHECKSUM_NONE;
 	skb->pkt_type = PACKET_OTHERHOST;
 	skb->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
-
+		
 	netif_rx(skb);
+	return;
+
+ bad:
+	dev_kfree_skb(skb);
+	return;
 #undef IS_QOS_DATA
 }
 
@@ -3010,6 +3182,14 @@ rx_accept:
 		bf->bf_skb = NULL;
 
 		sc->sc_stats.ast_ant_rx[ds->ds_rxstat.rs_antenna]++;
+		
+		if (len < IEEE80211_ACK_LEN) {
+			DPRINTF(sc, ATH_DEBUG_RECV,
+				"%s: runt packet %d\n", __func__, len);
+			sc->sc_stats.ast_rx_tooshort++;
+			dev_kfree_skb(skb);
+			goto rx_next;
+		}
 
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
@@ -3018,19 +3198,20 @@ rx_accept:
 			 * the Prism header existing tools expect,
 			 * and dispatch.
 			 */
-			if (len < IEEE80211_ACK_LEN) {
-				DPRINTF(sc, ATH_DEBUG_RECV,
-					"%s: runt packet %d\n", __func__, len);
-				sc->sc_stats.ast_rx_tooshort++;
-				dev_kfree_skb(skb);
-				goto rx_next;
-			}
 			/* XXX TSF */
 
 			ath_rx_capture(dev, ds, skb);
 			goto rx_next;
 		}
 
+		if (sc->sc_rawdev_enabled && (sc->sc_rawdev.flags & IFF_UP)) {
+			struct sk_buff *skb2;
+			skb2 = skb_clone(skb, GFP_ATOMIC);
+			if (skb2) {
+				ath_rx_capture(&sc->sc_rawdev, ds, skb2);
+			}
+		}
+		
 		/*
 		 * From this point on we assume the frame is at least
 		 * as large as ieee80211_frame_min; verify that.
@@ -3609,19 +3790,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		ieee80211_dump_pkt(skb->data, skb->len,
 			sc->sc_hwmap[txrate].ieeerate, -1);
 
-        // TODO: okay????
-	if (ic->ic_opmode == IEEE80211_M_MONITOR) {
-            /*
-		sc->sc_tx_th.wt_flags = sc->sc_hwmap[txrate].txflags;
-		if (iswep)
-			sc->sc_tx_th.wt_flags |= IEEE80211_RADIOTAP_F_WEP;
-		sc->sc_tx_th.wt_rate = sc->sc_hwmap[txrate].ieeerate;
-		sc->sc_tx_th.wt_txpower = ni->ni_txpower;
-		sc->sc_tx_th.wt_antenna = sc->sc_txantenna;
-            */
-                ath_rx_capture(dev, ds, skb);
-	}
-
 	/* 
 	 * Determine if a tx interrupt should be generated for
 	 * this descriptor.  We take a tx interrupt to reap
@@ -3842,7 +4010,12 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		}
 		bus_unmap_single(sc->sc_bdev,
 			bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
-		dev_kfree_skb(bf->bf_skb);
+
+		if (sc->sc_rawdev_enabled) {
+			ath_tx_capture(&sc->sc_rawdev, ds, bf->bf_skb);
+		} else {
+			dev_kfree_skb(bf->bf_skb);
+		}
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
@@ -4675,6 +4848,47 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 #undef N
 }
 
+
+static int
+ath_rawdev_attach(struct ath_softc *sc) 
+{
+	struct net_device *rawdev;
+	unsigned t;
+	rawdev = &sc->sc_rawdev;
+	strcpy(rawdev->name, sc->sc_dev.name);
+	strcat(rawdev->name, "raw");
+	rawdev->priv = sc;
+
+	/* ether_setup clobbers type, so save it */
+	t = rawdev->type;
+	ether_setup(rawdev);
+	rawdev->type = t;
+
+	rawdev->stop = NULL;
+	rawdev->hard_start_xmit = NULL;
+	rawdev->set_multicast_list = NULL;
+	rawdev->get_stats = ath_getstats;
+	rawdev->tx_queue_len = 0;
+	rawdev->flags |= IFF_NOARP;
+	rawdev->flags &= ~IFF_MULTICAST;
+
+	if (register_netdev(rawdev)) {
+		goto bad;
+	}
+	sc->sc_rawdev_enabled = 1;
+	return 0;
+ bad:
+	return -1;
+}
+
+static void
+ath_rawdev_detach(struct ath_softc *sc) 
+{
+	if (sc->sc_rawdev_enabled) {
+		sc->sc_rawdev_enabled = 0;
+		unregister_netdev(&sc->sc_rawdev);
+	}
+}
 #if IEEE80211_VLAN_TAG_USED
 static void
 ath_vlan_register(struct net_device *dev, struct vlan_group *grp)
@@ -5208,7 +5422,9 @@ enum {
 	ATH_TPC         = 14,
 	ATH_TXPOWLIMIT  = 15,	
 	ATH_VEOL        = 16,
-	ATH_BINTVAL	= 17
+	ATH_BINTVAL	= 17,
+	ATH_RAWDEV     = 18,
+	ATH_RAWDEV_TYPE    = 19,
 };
 
 static int
@@ -5297,6 +5513,30 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
             			} else
                     		    ret = -EINVAL;
                                 break;
+			case ATH_RAWDEV:
+				if (val && !sc->sc_rawdev_enabled) {
+					ath_rawdev_attach(sc);
+				} else if (!val && sc->sc_rawdev_enabled) {
+					ath_rawdev_detach(sc);
+				}
+				ath_reset(&sc->sc_dev);
+				break;
+			case ATH_RAWDEV_TYPE:
+				switch (val) {
+				case 0: 
+					sc->sc_rawdev.type = ARPHRD_IEEE80211;
+					break;
+				case 1: 
+					sc->sc_rawdev.type = ARPHRD_IEEE80211_PRISM;
+					break;
+				case 2: 
+					sc->sc_rawdev.type = ARPHRD_IEEE80211_RADIOTAP;
+					break;
+				default:
+					return -EINVAL;
+				}
+				ath_reset(&sc->sc_dev);
+				break;
 			default:
 				return -EINVAL;
 			}
@@ -5353,6 +5593,18 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
  			break;
 		case ATH_BINTVAL:
 			val = (sc->sc_ic).ic_lintval;
+ 			break;
+		case ATH_RAWDEV:
+			val = sc->sc_rawdev_enabled;
+ 			break;
+		case ATH_RAWDEV_TYPE:
+			switch (sc->sc_rawdev.type) {
+			case ARPHRD_IEEE80211:          val = 0; break;
+			case ARPHRD_IEEE80211_PRISM:    val = 1; break;
+			case ARPHRD_IEEE80211_RADIOTAP: val = 2; break;
+			default: 
+				val = 0;
+			}
  			break;
 		default:
 			return -EINVAL;
@@ -5454,6 +5706,16 @@ static const ctl_table ath_sysctl_template[] = {
 	},
 	{ .ctl_name	= ATH_BINTVAL,
 	  .procname	= "bintval",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_RAWDEV,
+	  .procname	= "rawdev",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_RAWDEV_TYPE,
+	  .procname	= "rawdev_type",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
