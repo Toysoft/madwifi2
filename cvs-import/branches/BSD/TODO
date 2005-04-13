@@ -1,10 +1,32 @@
+HIGH PRIO:
+
 - manually scanning is not available before background scan, which is initiated
   after setting interface up, is done through finding an accesspoint
+    - what does that mean?
 - check locking (especially the macros in ieee80211_linux.h)
     - too strict locking -> loose performance
     - too soft -> oops
+- send multicast / broadcast frames with highest possible basic rate
+    -  allow user configuration of basic rates
+- IBSS merging, sychronization and beaconing
+- implement "right" iwconfig ath0 key open / restricted behaviour
+    - authentication mode open / shared key
+- merge in changes from FreeBSD since last merge from 12.04.2005
+
+LOW PRIO:
+
 - define commonly used macros global
 - cleanup code
+- remove redundand definitions which have been copied from FreeBSD
+    - e.g.: struct ether_header
+
+LONG TERM:
+
+- integration with linux ieee 802.11 stack (work in progress)
+- inclusion into linux kernel
+
+IDEAS:
+
 - generate a Configure script to create a Makefile fitting the build environment
 - write a userspace tool to control all the things wireless_tools do but
   furthermore also things which are not supported by them
