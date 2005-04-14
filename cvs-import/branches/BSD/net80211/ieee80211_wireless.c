@@ -1109,7 +1109,7 @@ found:
 	if (ic->ic_state != IEEE80211_S_INIT)
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
-	ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+	ieee80211_new_state(ic, IEEE80211_S_SCAN, 1);
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwscan);
@@ -1941,11 +1941,11 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 				if ((ni = ieee80211_find_node(&ic->ic_sta,
 						mlme->im_macaddr)) == NULL)
 					return EINVAL;
-				domlme(&mlme, ni);
+				domlme(mlme, ni);
 				ieee80211_free_node(ni);
 			} else {
 				ieee80211_iterate_nodes(&ic->ic_sta,
-						domlme, &mlme);
+						domlme, mlme);
 			}
 			break;
 		default:
