@@ -275,16 +275,17 @@ void
 ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 {
 
-	ic->ic_scan.nt_scangen++;
 	/*
 	 * In all but hostap mode scanning starts off in
 	 * an active mode before switching to passive.
 	 */
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
-		ic->ic_flags |= IEEE80211_F_ASCAN;
+		ic->ic_flags |= IEEE80211_F_ASCAN;	/* XXX */
 		ic->ic_stats.is_scan_active++;
-	} else
+	} else {
+		ic->ic_flags |= IEEE80211_F_SCAN;
 		ic->ic_stats.is_scan_passive++;
+	}
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
 		"begin %s scan in %s mode, scangen %u\n",
 		(ic->ic_flags & IEEE80211_F_ASCAN) ?  "active" : "passive",
@@ -295,8 +296,6 @@ ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 	ieee80211_reset_scan(ic);
 	if (reset)
 		ieee80211_free_allnodes(&ic->ic_scan);
-
-	ic->ic_flags |= IEEE80211_F_SCAN;
 
 	/* Scan the next channel. */
 	ieee80211_next_scan(ic);
@@ -596,7 +595,9 @@ ieee80211_end_scan(struct ieee80211com *ic)
 {
 	struct ieee80211_node_table *nt = &ic->ic_scan;
 	struct ieee80211_node *ni, *selbs;
+	ic->ic_flags &= ~IEEE80211_F_SSCAN;
 
+	ic->ic_scan.nt_scangen++;
 	ieee80211_cancel_scan(ic);
 	ieee80211_notify_scan_done(ic);
 
@@ -652,8 +653,9 @@ ieee80211_end_scan(struct ieee80211com *ic)
 	 * controlling application is expected to setup state and
 	 * initiate an association.
 	 */
-	if (ic->ic_roaming == IEEE80211_ROAMING_MANUAL)
+	if (ic->ic_roaming == IEEE80211_ROAMING_MANUAL) {
 		return;
+	}
 	/*
 	 * Automatic sequencing; look for a candidate and
 	 * if found join the network.
@@ -693,7 +695,7 @@ ieee80211_end_scan(struct ieee80211com *ic)
 				__func__, ether_sprintf(ni->ni_macaddr),
 				ni->ni_fails);
 			ni->ni_fails++;
-#if 0
+#if 1
 			if (ni->ni_fails++ > 2)
 				ieee80211_free_node(ni);
 #endif
@@ -709,8 +711,10 @@ ieee80211_end_scan(struct ieee80211com *ic)
 	if (selbs != NULL)		/* NB: grab ref while dropping lock */
 		(void) ieee80211_ref_node(selbs);
 	IEEE80211_NODE_UNLOCK(nt);
-	if (selbs == NULL)
+	if (selbs == NULL) {
+		ic->ic_flags |= IEEE80211_F_SSCAN;
 		goto notfound;
+	}
 	if (!ieee80211_sta_join(ic, selbs)) {
 		ieee80211_free_node(selbs);
 		goto notfound;
