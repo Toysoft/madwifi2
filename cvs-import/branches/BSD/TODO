@@ -1,8 +1,7 @@
 HIGH PRIO:
 
-- manually scanning is not available before background scan, which is initiated
-  after setting interface up, is done through finding an accesspoint
-    - what does that mean?
+- allow sending of management packets in other states than IEEE80211_S_RUN
+  (e.g. PROBE_REQUESTS in IEEE80211_S_SCAN state)
 - check locking (especially the macros in ieee80211_linux.h)
     - too strict locking -> loose performance
     - too soft -> oops
@@ -12,7 +11,6 @@ HIGH PRIO:
 - implement "right" iwconfig ath0 key open / restricted behaviour
     - authentication mode open / shared key
     - accept unencrypted frames
-- merge in changes from FreeBSD since last merge from 12.04.2005
 - AIFS and CWMIN are set wrong on the beacon queue.  They should be zero 
   for AP mode but CWMIN should be 2x for adhoc mode (check the spec).
 - check if private crypto tkip implementation works for cards without hardware 
