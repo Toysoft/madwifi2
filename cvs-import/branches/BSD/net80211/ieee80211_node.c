@@ -280,7 +280,7 @@ ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 	 * an active mode before switching to passive.
 	 */
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
-		ic->ic_flags |= IEEE80211_F_ASCAN;	/* XXX */
+		ic->ic_flags |= IEEE80211_F_SCAN;	/* XXX */
 		ic->ic_stats.is_scan_active++;
 	} else {
 		ic->ic_flags |= IEEE80211_F_SCAN;
