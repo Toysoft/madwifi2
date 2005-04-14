@@ -32,22 +32,28 @@
 /*
  * Beacon locking definitions.
  */
-typedef rwlock_t ieee80211_beacon_lock_t;
+typedef spinlock_t ieee80211_beacon_lock_t;
 #define	IEEE80211_BEACON_LOCK_INIT(_ic, _name) \
-	rwlock_init(&(_ic)->ic_beaconlock)
+	spin_lock_init(&(_ic)->ic_beaconlock)
 #define	IEEE80211_BEACON_LOCK_DESTROY(_ic)
-#define	IEEE80211_BEACON_LOCK(_ic)	   write_lock(&(_ic)->ic_beaconlock)
-#define	IEEE80211_BEACON_UNLOCK(_ic)	   write_unlock(&(_ic)->ic_beaconlock)
-#define	IEEE80211_BEACON_LOCK_BH(_ic)	   write_lock_bh(&(_ic)->ic_beaconlock)
-#define	IEEE80211_BEACON_UNLOCK_BH(_ic)	   write_unlock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_LOCK(_ic)	   spin_lock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_UNLOCK(_ic)	   spin_unlock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_LOCK_BH(_ic)	   spin_lock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_UNLOCK_BH(_ic)	   spin_unlock_bh(&(_ic)->ic_beaconlock)
+/* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+#define	IEEE80211_BEACON_LOCK_ASSERT(_ic) \
+	KASSERT(spin_is_locked(&(_ic)->ic_beaconlock), ("BEACONLOCK not locked!"))
+#else
 #define	IEEE80211_BEACON_LOCK_ASSERT(_ic)
+#endif
 
 /*
  * Node locking definitions.
  * TODO: should i use irqsave?
  */
 typedef rwlock_t ieee80211_node_lock_t;
-#define	IEEE80211_NODE_LOCK_INIT(_nt, _name)	rwlock_init(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_LOCK_INIT(_nt, _name) rwlock_init(&(_nt)->nt_nodelock)
 #define	IEEE80211_NODE_LOCK_DESTROY(_nt)
 #define	IEEE80211_NODE_LOCK(_nt)	write_lock(&(_nt)->nt_nodelock)
 #define	IEEE80211_NODE_UNLOCK(_nt)	write_unlock(&(_nt)->nt_nodelock)
@@ -84,7 +90,7 @@ typedef spinlock_t eapol_lock_t;
 #define	EAPOL_LOCK(_ec)			spin_lock_bh(&(_ec)->ec_lock)
 #define	EAPOL_UNLOCK(_ec)		spin_unlock_bh(&(_ec)->ec_lock)
 /* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
-#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(rwlock_is_locked)
+#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT))
 #define	EAPOL_LOCK_ASSERT(_ec) \
 	KASSERT(spin_is_locked(&(_ec)->ec_lock), ("EAPOL not locked!"))
 #else
@@ -298,7 +304,7 @@ extern	struct net_device_stats *ieee80211_getstats(struct net_device *);
 			__func__); \
 		_err;							\
 	}
-#define	_MOD_DEC_USE(_m)		module_put(_m)
+#define	_MOD_DEC_USE(_m)	module_put(_m)
 #else
 #define	_MOD_INC_USE(_m, _err)	MOD_INC_USE_COUNT
 #define	_MOD_DEC_USE(_m)	MOD_DEC_USE_COUNT
