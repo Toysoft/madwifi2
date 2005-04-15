@@ -3475,7 +3475,7 @@ rx_accept:
 		}
 
 		if (sc->sc_rawdev_enabled && 
-		    ((sc->sc_rawdev.flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))) {
+		    (sc->sc_rawdev.flags & IFF_UP)) {
 			struct sk_buff *skb2;
 			skb2 = skb_clone(skb, GFP_ATOMIC);
 			if (skb2) {
