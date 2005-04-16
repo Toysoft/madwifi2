@@ -67,10 +67,11 @@ static void ieee80211_timeout_stations(struct ieee80211_node_table *);
 static void ieee80211_set_tim(struct ieee80211com *,
 		struct ieee80211_node *, int set);
 
-static void ieee80211_node_table_init(struct ieee80211com *ic,
-	struct ieee80211_node_table *nt, const char *name, int inact,
+static void ieee80211_node_table_init(struct ieee80211com *,
+	struct ieee80211_node_table *, const char *, int,
 	void (*timeout)(struct ieee80211_node_table *));
-static void ieee80211_node_table_cleanup(struct ieee80211_node_table *nt);
+static void ieee80211_node_table_cleanup(struct ieee80211_node_table *);
+static void node_reclaim(struct ieee80211_node_table *, struct ieee80211_node *)
 
 MALLOC_DEFINE(M_80211_NODE, "80211node", "802.11 node state");
 
@@ -280,7 +281,7 @@ ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 	 * an active mode before switching to passive.
 	 */
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
-		ic->ic_flags |= IEEE80211_F_SCAN;	/* XXX */
+		ic->ic_flags |= IEEE80211_F_ASCAN;	/* XXX */
 		ic->ic_stats.is_scan_active++;
 	} else {
 		ic->ic_flags |= IEEE80211_F_SCAN;
@@ -359,6 +360,7 @@ copy_bss(struct ieee80211_node *nbss, const struct ieee80211_node *obss)
 	nbss->ni_txpower = obss->ni_txpower;
 	nbss->ni_vlan = obss->ni_vlan;
 	nbss->ni_rsn = obss->ni_rsn;
+	nbss->ni_chan = obss->ni_chan;
 	/* XXX statistics? */
 }
 
@@ -696,8 +698,11 @@ ieee80211_end_scan(struct ieee80211com *ic)
 				ni->ni_fails);
 			ni->ni_fails++;
 #if 1
-			if (ni->ni_fails++ > 2)
-				ieee80211_free_node(ni);
+			if (ni->ni_fails++ > 2) {
+				IEEE80211_NODE_LOCK(nt);
+				node_reclaim(nt, ni);
+				IEEE80211_NODE_UNLOCK(nt);
+			}
 #endif
 			continue;
 		}
@@ -1381,6 +1386,7 @@ ieee80211_timeout_scan_candidates(struct ieee80211_node_table *nt)
 		kfree_skb(ni->ni_rxfrag[0]);
 		ni->ni_rxfrag[0] = NULL;
 	}
+	ni = NULL;
 	TAILQ_FOREACH_SAFE(ni, &nt->nt_node, ni_list, tni) {
 		if (ni->ni_inact && --ni->ni_inact == 0) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
