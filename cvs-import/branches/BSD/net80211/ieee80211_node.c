@@ -283,10 +283,9 @@ ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP) {
 		ic->ic_flags |= IEEE80211_F_ASCAN;	/* XXX */
 		ic->ic_stats.is_scan_active++;
-	} else {
-		ic->ic_flags |= IEEE80211_F_SCAN;
+	} else
 		ic->ic_stats.is_scan_passive++;
-	}
+
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
 		"begin %s scan in %s mode, scangen %u\n",
 		(ic->ic_flags & IEEE80211_F_ASCAN) ?  "active" : "passive",
@@ -297,6 +296,8 @@ ieee80211_begin_scan(struct ieee80211com *ic, int reset)
 	ieee80211_reset_scan(ic);
 	if (reset)
 		ieee80211_free_allnodes(&ic->ic_scan);
+
+	ic->ic_flags |= IEEE80211_F_SCAN;
 
 	/* Scan the next channel. */
 	ieee80211_next_scan(ic);
