@@ -115,9 +115,8 @@ static	int ath_sample_rate = 10;	/* use x% of transmission time
 static void ath_rate_ctl_reset(struct ath_softc *, struct ieee80211_node *);
 
 
-
-
-static __inline int size_to_bin(int size) 
+static __inline int 
+size_to_bin(int size) 
 {
 	int x = 0;
 	for (x = 0; x < NUM_PACKET_SIZE_BINS; x++) {
@@ -127,11 +126,15 @@ static __inline int size_to_bin(int size)
 	}
 	return NUM_PACKET_SIZE_BINS-1;
 }
-static __inline int bin_to_size(int index) {
+
+static __inline int 
+bin_to_size(int index) {
 	return packet_size_bins[index];
 }
 
-static __inline int rate_to_ndx(struct sample_node *sn, int rate) {
+static __inline int 
+rate_to_ndx(struct sample_node *sn, int rate)
+{
 	int x = 0;
 	for (x = 0; x < sn->num_rates; x++) {
 		if (sn->rates[x].rate == rate) {
@@ -143,7 +146,8 @@ static __inline int rate_to_ndx(struct sample_node *sn, int rate) {
 
 
 void
-ath_rate_node_init(struct ath_softc *sc, struct ath_node *an){
+ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
+{
 	/* NB: assumed to be zero'd by caller */
 	ath_rate_ctl_reset(sc,&an->an_node);
 }
@@ -165,7 +169,6 @@ ath_rate_node_copy(struct ath_softc *sc,
 	memcpy(odst, osrc, sizeof(struct sample_node));
 }
 EXPORT_SYMBOL(ath_rate_node_copy);
-
 
 /*
  * returns the ndx with the lowest average_tx_time,
@@ -203,7 +206,8 @@ static __inline int best_rate_ndx(struct sample_node *sn, int size_bin,
 /*
  * pick a good "random" bit-rate to sample other than the current one
  */
-static __inline int pick_sample_ndx(struct sample_node *sn, int size_bin) 
+static __inline int 
+pick_sample_ndx(struct sample_node *sn, int size_bin) 
 {
 	int x = 0;
 	int current_ndx = 0;
@@ -253,7 +257,6 @@ static __inline int pick_sample_ndx(struct sample_node *sn, int size_bin)
 	}
 	return current_ndx;
 }
-
 
 void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
@@ -379,7 +382,7 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 	int size_bin = 0;
 	int ndx = 0;
 
-	size_bin = size_to_bin(frame_size);
+	size_bin = size_to_bin(frame_size);	// TODO: it's correct that frame_size alway 0 ?
 	ndx = sn->current_rate[size_bin]; /* retry at the current bit-rate */
 	
 	if (!sn->stats[size_bin][ndx].packets_acked) {
@@ -400,9 +403,8 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 }
 EXPORT_SYMBOL(ath_rate_setupxtxdesc);
 
-
-
-void update_stats(struct ath_softc *sc, struct ath_node *an, 
+static void 
+update_stats(struct ath_softc *sc, struct ath_node *an, 
 		  int frame_size,
 		  int ndx0, int tries0,
 		  int ndx1, int tries1,
@@ -491,8 +493,8 @@ void update_stats(struct ath_softc *sc, struct ath_node *an,
 		sn->sample_tt[size_bin] = tt;
 		sn->current_sample_ndx[size_bin] = -1;
 	}
-
 }
+
 void
 ath_rate_tx_complete(struct ath_softc *sc,
 		     struct ath_node *an, const struct ath_desc *ds)
@@ -645,8 +647,6 @@ ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 		ath_rate_ctl_reset(sc, &an->an_node);
 }
 EXPORT_SYMBOL(ath_rate_newassoc);
-
-
 
 /*
  * Initialize the tables for a node.
@@ -936,13 +936,11 @@ ATH_SYSCTL_DECL(ath_sysctl_rate_stats, ctl, write, filp, buffer,
 	return 0;
 }
 
-
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
 /*
  * Dynamic (i.e per-device) sysctls.
  */
-	
 static const ctl_table sample_dynamic_sysctl_template[] = {
 	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "stats_250",
@@ -964,6 +962,7 @@ static const ctl_table sample_dynamic_sysctl_template[] = {
 	},
 	{ 0 }
 };
+
 void
 ath_rate_dynamic_sysctl_register(struct ath_softc *sc)
 {
@@ -1052,6 +1051,7 @@ static ctl_table ath_rate_static_sysctls[] = {
 	},
 	{ 0 }
 };
+
 static ctl_table ath_rate_table[] = {
 	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "rate",
@@ -1059,6 +1059,7 @@ static ctl_table ath_rate_table[] = {
 	  .child	= ath_rate_static_sysctls
 	}, { 0 }
 };
+
 static ctl_table ath_ath_table[] = {
 	{ .ctl_name	= DEV_ATH,
 	  .procname	= "ath",
@@ -1066,6 +1067,7 @@ static ctl_table ath_ath_table[] = {
 	  .child	= ath_rate_table
 	}, { 0 }
 };
+
 static ctl_table ath_root_table[] = {
 	{ .ctl_name	= CTL_DEV,
 	  .procname	= "dev",
@@ -1073,6 +1075,7 @@ static ctl_table ath_root_table[] = {
 	  .child	= ath_ath_table
 	}, { 0 }
 };
+
 static struct ctl_table_header *ath_sysctl_header;
 
 MODULE_AUTHOR("John Bicket");
