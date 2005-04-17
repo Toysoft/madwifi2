@@ -531,13 +531,14 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 							ni1->ni_associd);
 					}
 					/* XXX statistic? */
-					ieee80211_free_node(ni1);
 				} else if (!IEEE80211_ADDR_EQ(eh->ether_dhost, ic->ic_bss->ni_bssid)) {
 					IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
 						eh->ether_shost, "data",
 						"bridge: dest node %s not found", 
 						ether_sprintf(eh->ether_dhost));
 				}
+				if(ni1 != NULL)
+					ieee80211_free_node(ni1);
 			}
 			if (skb1 != NULL) {
 				len = skb1->len;
@@ -1886,7 +1887,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				 *     change dynamically
 				 */
 				ieee80211_set_shortslottime(ic,
-					ic->ic_curmode == IEEE80211_MODE_11A ||
+					(ic->ic_curmode == IEEE80211_MODE_11A || 
+					 ic->ic_curmode == IEEE80211_MODE_TURBO_A) ||
 					(ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME));
 				ni->ni_capinfo = capinfo;
 				/* XXX statistic */
@@ -2424,7 +2426,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 *
 		 * XXX may need different/additional driver callbacks?
 		 */
-		if (ic->ic_curmode == IEEE80211_MODE_11A ||
+		if ((ic->ic_curmode == IEEE80211_MODE_11A ||
+		     ic->ic_curmode == IEEE80211_MODE_TURBO_A) ||
 		    (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)) {
 			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
 			ic->ic_flags &= ~IEEE80211_F_USEBARKER;
@@ -2433,7 +2436,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ic->ic_flags |= IEEE80211_F_USEBARKER;
 		}
 		ieee80211_set_shortslottime(ic,
-			ic->ic_curmode == IEEE80211_MODE_11A ||
+			(ic->ic_curmode == IEEE80211_MODE_11A ||
+			 ic->ic_curmode == IEEE80211_MODE_TURBO_A) ||
 			(ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME));
 		/*
 		 * Honor ERP protection.
