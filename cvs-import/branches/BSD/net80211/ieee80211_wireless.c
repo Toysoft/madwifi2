@@ -920,7 +920,6 @@ ieee80211_ioctl_siwmode(struct ieee80211com *ic,
 			__u32 *mode, char *extra)
 {
 	struct ifreq ifr;
-
 	if (!ic->ic_media.ifm_cur)
 		return -EINVAL;
 	memset(&ifr, 0, sizeof(ifr));
@@ -946,6 +945,11 @@ ieee80211_ioctl_siwmode(struct ieee80211com *ic,
 	default:
 		return -EINVAL;
 	}
+	if (ic->ic_curmode == IEEE80211_MODE_TURBO_G ||
+	    ic->ic_curmode == IEEE80211_MODE_TURBO_A) {
+		ifr.ifr_media |= IFM_IEEE80211_TURBO;
+	}
+
 	return -ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 }
 EXPORT_SYMBOL(ieee80211_ioctl_siwmode);
@@ -1409,7 +1413,8 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 			return -EINVAL;
 		ic->ic_protmode = value;
 		/* NB: if not operating in 11g this can wait */
-		if (ic->ic_curmode == IEEE80211_MODE_11G)
+		if (ic->ic_curmode == IEEE80211_MODE_11G ||
+		    ic->ic_curmode == IEEE80211_MODE_TURBO_G)
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_MCASTCIPHER:
