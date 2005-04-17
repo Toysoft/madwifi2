@@ -1047,7 +1047,8 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 			*frm++ = 0; *frm++ = 0;		/* TODO: ATIM window */
 		}
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
-		if (ic->ic_curmode == IEEE80211_MODE_11G)
+		if (ic->ic_curmode == IEEE80211_MODE_11G ||
+		    ic->ic_curmode == IEEE80211_MODE_TURBO_G)
 			frm = ieee80211_add_erp(frm, ic);
 		if (ic->ic_flags & IEEE80211_F_WPA)
 			frm = ieee80211_add_wpa(frm, ic);
@@ -1407,7 +1408,8 @@ ieee80211_beacon_alloc(struct ieee80211com *ic, struct ieee80211_node *ni,
 	}
 	if (ic->ic_flags & IEEE80211_F_WPA)
 		frm = ieee80211_add_wpa(frm, ic);
-	if (ic->ic_curmode == IEEE80211_MODE_11G)
+	if (ic->ic_curmode == IEEE80211_MODE_11G ||
+	    ic->ic_curmode == IEEE80211_MODE_TURBO_G)
 		frm = ieee80211_add_erp(frm, ic);
 	efrm = ieee80211_add_xrates(frm, rs);
 	cb->ni = ni;
