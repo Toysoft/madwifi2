@@ -423,7 +423,8 @@ ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 	/*
 	 * Do mode-specific rate setup.
 	 */
-	if (ic->ic_curmode == IEEE80211_MODE_11G) {
+	if (ic->ic_curmode == IEEE80211_MODE_11G ||
+	    ic->ic_curmode == IEEE80211_MODE_TURBO_G) {
 		/*
 		 * Use a mixed 11b/11g rate set.
 		 */

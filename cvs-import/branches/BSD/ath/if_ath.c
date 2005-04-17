@@ -5132,7 +5132,7 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 	 * 11g, otherwise at 1Mb/s.
 	 * XXX select protection rate index from rate table.
 	 */
-	sc->sc_protrix = (mode == IEEE80211_MODE_11G ? 1 : 0);
+	sc->sc_protrix = ((mode == IEEE80211_MODE_11G || mode == IEEE80211_MODE_TURBO_G) ? 1 : 0);
 	/* NB: caller is responsible for reseting rate control state */
 #undef N
 }

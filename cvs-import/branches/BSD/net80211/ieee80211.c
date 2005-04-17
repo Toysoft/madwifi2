@@ -818,8 +818,9 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 		c = &ic->ic_channels[i];
 		if (mode == IEEE80211_MODE_AUTO) {
 			/* ignore turbo channels for autoselect */
-			if ((c->ic_flags &~ IEEE80211_CHAN_TURBO) != 0)
+			if ((c->ic_flags &~ IEEE80211_CHAN_TURBO) != 0) {
 				break;
+			}
 		} else {
 			if ((c->ic_flags & modeflags) == modeflags)
 				break;
@@ -875,7 +876,7 @@ ieee80211_setmode(struct ieee80211com *ic, enum ieee80211_phymode mode)
 	/*
 	 * Do mode-specific rate setup.
 	 */
-	if (mode == IEEE80211_MODE_11G) {
+	if (mode == IEEE80211_MODE_11G || mode == IEEE80211_MODE_TURBO_G) {
 		/*
 		 * Use a mixed 11b/11g rate set.
 		 */
