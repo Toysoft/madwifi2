@@ -146,10 +146,12 @@ ccmp_setkey(struct ieee80211_key *k)
 static int
 ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 {
+	struct ccmp_ctx *ctx = k->wk_private;
+	struct ieee80211com *ic = ctx->cc_ic;
 	u_int8_t *ivp;
 	int hdrlen;
 
-	hdrlen = ieee80211_hdrsize(skb->data);
+	hdrlen = ieee80211_hdrspace(ic, skb->data);
 
 	/*
 	 * Copy down 802.11 header and add the IV, KeyID, and ExtIV.
