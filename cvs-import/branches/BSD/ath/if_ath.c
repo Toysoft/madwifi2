@@ -1173,6 +1173,8 @@ ath_reset(struct net_device *dev)
 	struct ieee80211_channel *c;
 	HAL_STATUS status;
 
+	if_printf(dev, "resetting\n");
+	
 	/*
 	 * Convert to a HAL channel description with the flags
 	 * constrained to reflect the current operating mode.
