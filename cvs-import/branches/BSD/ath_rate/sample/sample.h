@@ -255,7 +255,7 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 		int ctsduration = 0;
 
 		KASSERT(rt->info[cix].rateKbps, ("cix %d (%d) bad ratekbps %d mode %u",
-						 rix, rt->info[cix].dot11Rate,
+						 cix, rt->info[cix].dot11Rate,
 						 rt->info[cix].rateKbps,
 						 sc->sc_curmode));
 		
