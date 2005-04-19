@@ -713,12 +713,6 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 	
 
-	DPRINTF(sc, "%s: %s %s %d rates %d%sMbps - %d%sMbps\n", dev_info, __func__, ether_sprintf(ni->ni_macaddr), 
-		sn->num_rates,
-		sn->rates[0].rate/2, sn->rates[0].rate % 0x1 ? ".5" : " ",
-		sn->rates[sn->num_rates-1].rate/2, sn->rates[sn->num_rates-1].rate % 0x1 ? ".5" : " "
-		);
-
 	for (y = 0; y < NUM_PACKET_SIZE_BINS; y++) {
 		int size = bin_to_size(y);
 		int ndx = 0;
@@ -748,6 +742,14 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		}
 		sn->current_rate[y] = ndx;
 	}
+
+	DPRINTF(sc, "%s: %s %s %d rates %d%sMbps (%dus)- %d%sMbps (%dus)\n", dev_info, __func__, ether_sprintf(ni->ni_macaddr), 
+		sn->num_rates,
+		sn->rates[0].rate/2, sn->rates[0].rate % 0x1 ? ".5" : "",
+		sn->stats[1][0].perfect_tx_time,
+		sn->rates[sn->num_rates-1].rate/2, sn->rates[sn->num_rates-1].rate % 0x1 ? ".5" : "",
+		sn->stats[1][sn->num_rates-1].perfect_tx_time
+		);
 
 	ni->ni_txrate = sn->current_rate[0];
 }
