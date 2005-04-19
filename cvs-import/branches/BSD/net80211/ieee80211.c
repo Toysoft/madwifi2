@@ -65,7 +65,7 @@ SLIST_HEAD(ieee80211_list, ieee80211com);
 static struct ieee80211_list ieee80211_list =
 	SLIST_HEAD_INITIALIZER(ieee80211_list);
 static u_int8_t ieee80211_vapmap[32];		// enough for 256
-static spinlock_t ieee80211_vap_spinlock;
+DECLARE_MUTEX(ieee80211_vap_mtx);
 
 static void
 ieee80211_add_vap(struct ieee80211com *ic)
@@ -73,9 +73,7 @@ ieee80211_add_vap(struct ieee80211com *ic)
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 	u_int i;
 	u_int8_t b;
-	unsigned long flags;
-	spin_lock_init(&ieee80211_vap_spinlock);
-	spin_lock_irqsave(&ieee80211_vap_spinlock,flags);
+	down(&ieee80211_vap_mtx);
 	ic->ic_vap = 0;
 	for (i = 0; i < N(ieee80211_vapmap) && ieee80211_vapmap[i] == 0xff; i++)
 		ic->ic_vap += NBBY;
@@ -85,23 +83,21 @@ ieee80211_add_vap(struct ieee80211com *ic)
 		ic->ic_vap++;
 	setbit(ieee80211_vapmap, ic->ic_vap);
 	SLIST_INSERT_HEAD(&ieee80211_list, ic, ic_next);
-	spin_unlock_irqrestore(&ieee80211_vap_spinlock,flags);
+	up(&ieee80211_vap_mtx);
 #undef N
 }
 
 static void
 ieee80211_remove_vap(struct ieee80211com *ic)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&ieee80211_vap_spinlock,flags);
+	down(&ieee80211_vap_mtx);
 	SLIST_REMOVE(&ieee80211_list, ic, ieee80211com, ic_next);
 	KASSERT(ic->ic_vap < sizeof(ieee80211_vapmap)*NBBY,
 		("invalid vap id %d", ic->ic_vap));
 	KASSERT(isset(ieee80211_vapmap, ic->ic_vap),
 		("vap id %d not allocated", ic->ic_vap));
 	clrbit(ieee80211_vapmap, ic->ic_vap);
-	spin_unlock_irqrestore(&ieee80211_vap_spinlock,flags);
+	up(&ieee80211_vap_mtx);
 }
 
 /*
