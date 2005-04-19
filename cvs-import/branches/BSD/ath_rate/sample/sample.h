@@ -205,6 +205,10 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	int cix = rt->info[rix].controlRate;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
+	KASSERT(rt->info[rix].rateKbps, ("rix %d (%d) bad ratekbps %d mode %u",
+					 rix, rt->info[rix].dot11Rate,
+					 rt->info[rix].rateKbps,
+					 sc->sc_curmode));
 	/* 
 	 * XXX getting mac/phy level timings should be fixed for turbo
 	 * rates, and there is probably a way to get this from the
@@ -212,10 +216,13 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	 */
 	switch (rt->info[rix].phy) {
 	case IEEE80211_T_OFDM:
+		t_slot = 9;
+		t_sifs = 16;
+		t_difs = 28;
 		/* fall through */
 	case IEEE80211_T_TURBO:
 		t_slot = 9;
-		t_sifs = 9;
+		t_sifs = 8;
 		t_difs = 28;
 		break;
 	case IEEE80211_T_DS:
@@ -237,7 +244,6 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 			cts = 1;
 
 		cix = rt->info[sc->sc_protrix].controlRate;
-
 	}
 
 	if (length > ic->ic_rtsthreshold) {
@@ -247,6 +253,13 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	if (rts || cts) {
 		int ctsrate = rt->info[cix].rateCode;
 		int ctsduration = 0;
+
+		KASSERT(rt->info[cix].rateKbps, ("cix %d (%d) bad ratekbps %d mode %u",
+						 rix, rt->info[cix].dot11Rate,
+						 rt->info[cix].rateKbps,
+						 sc->sc_curmode));
+		
+
 		ctsrate |= rt->info[cix].shortPreamble;
 		if (rts)		/* SIFS + CTS */
 			ctsduration += rt->info[cix].spAckDuration;
@@ -260,7 +273,7 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 		tt += (short_retries + 1) * ctsduration;
 	}
 	tt += t_difs;
-	tt += (long_retries+1)*(t_sifs + rt->info[cix].spAckDuration);
+	tt += (long_retries+1)*(t_sifs + rt->info[rix].spAckDuration);
 	tt += (long_retries+1)*ath_hal_computetxtime(sc->sc_ah, rt, length, 
 						rix, AH_TRUE);
 	for (x = 0; x <= short_retries + long_retries; x++) {
