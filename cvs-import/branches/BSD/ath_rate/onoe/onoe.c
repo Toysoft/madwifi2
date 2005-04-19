@@ -137,10 +137,27 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 {
 	struct onoe_node *on = ATH_NODE_ONOE(an);
 
+	u_int8_t rate1, rate2, rate3, try1, try2, try3;
+	
+	if (shortPreamble) {
+		rate1 = on->on_tx_rate1sp;
+		rate2 = on->on_tx_rate2sp;
+		rate3 = on->on_tx_rate3sp;
+	} else {
+		rate1 = on->on_tx_rate1;
+		rate2 = on->on_tx_rate2;
+		rate3 = on->on_tx_rate3;
+	}
+		
+	/* setting try to 0 seems to bypass this rate */
+	try1 = (rate1 == 0) ? 0 : 2;
+	try2 = (rate2 == 0) ? 0 : 2;
+	try3 = (rate3 == 0) ? 0 : 2;
+	
 	ath_hal_setupxtxdesc(sc->sc_ah, ds
-		, on->on_tx_rate1sp, 2	/* series 1 */
-		, on->on_tx_rate2sp, 2	/* series 2 */
-		, on->on_tx_rate3sp, 2	/* series 3 */
+		, rate1, try1	/* series 1 */
+		, rate2, try2	/* series 2 */
+		, rate3, try3	/* series 3 */
 	);
 }
 EXPORT_SYMBOL(ath_rate_setupxtxdesc);
