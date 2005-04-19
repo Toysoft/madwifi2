@@ -204,9 +204,6 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	int cw = WIFI_CW_MIN;
 	int cix = rt->info[rix].controlRate;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-	KASSERT(rt->info[rix].valid, ("rix %d (rate %d) invalid, mode %u", 
-				      rix, rt->info[rix].dot11Rate,
-				      sc->sc_curmode));
 
 	/* 
 	 * XXX getting mac/phy level timings should be fixed for turbo
@@ -253,12 +250,6 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 		ctsrate |= rt->info[cix].shortPreamble;
 		if (rts)		/* SIFS + CTS */
 			ctsduration += rt->info[cix].spAckDuration;
-
-
-		KASSERT(rt->info[cix].valid, 
-			("ctsrate %d (ctsrate %d) invalid, mode %u", 
-			 cix, rt->info[cix].dot11Rate, sc->sc_curmode));
-
 
 		ctsduration += ath_hal_computetxtime(sc->sc_ah,
 						     rt, length, rix, AH_TRUE);
