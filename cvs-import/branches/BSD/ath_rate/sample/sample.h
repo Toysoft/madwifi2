@@ -195,7 +195,6 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
 	int rts, cts;
 	
-	/* pg 205 ieee.802.11.pdf */
 	unsigned t_slot = 20;
 	unsigned t_difs = 50; 
 	unsigned t_sifs = 10; 
@@ -205,11 +204,30 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	int cw = WIFI_CW_MIN;
 	int cix = rt->info[rix].controlRate;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
+	KASSERT(rt->info[rix].valid, ("rix %d (rate %d) invalid, mode %u", 
+				      rix, rt->info[rix].dot11Rate,
+				      sc->sc_curmode));
 
-	if (rt->info[rix].phy == IEEE80211_T_OFDM) {
+	/* 
+	 * XXX getting mac/phy level timings should be fixed for turbo
+	 * rates, and there is probably a way to get this from the
+	 * hal...
+	 */
+	switch (rt->info[rix].phy) {
+	case IEEE80211_T_OFDM:
+		/* fall through */
+	case IEEE80211_T_TURBO:
 		t_slot = 9;
 		t_sifs = 9;
 		t_difs = 28;
+		break;
+	case IEEE80211_T_DS:
+		/* fall through to default */
+	default:
+		/* pg 205 ieee.802.11.pdf */
+		t_slot = 20;
+		t_difs = 50;
+		t_sifs = 10;
 	}
 
 	rts = cts = 0;
@@ -235,6 +253,12 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 		ctsrate |= rt->info[cix].shortPreamble;
 		if (rts)		/* SIFS + CTS */
 			ctsduration += rt->info[cix].spAckDuration;
+
+
+		KASSERT(rt->info[cix].valid, 
+			("ctsrate %d (ctsrate %d) invalid, mode %u", 
+			 cix, rt->info[cix].dot11Rate, sc->sc_curmode));
+
 
 		ctsduration += ath_hal_computetxtime(sc->sc_ah,
 						     rt, length, rix, AH_TRUE);
