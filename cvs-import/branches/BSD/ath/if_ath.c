@@ -785,8 +785,12 @@ void
 ath_suspend(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
+	if (sc->sc_softled) 
+	    	ath_hal_gpioset(ah, sc->sc_ledpin, 1);
+
 	ath_stop(dev);
 }
 
@@ -794,9 +798,14 @@ void
 ath_resume(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
 	ath_init(dev);
+	if (sc->sc_softled) {
+	    	ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
+	    	ath_hal_gpioset(ah, sc->sc_ledpin, 0);
+	}
 }
 
 void
