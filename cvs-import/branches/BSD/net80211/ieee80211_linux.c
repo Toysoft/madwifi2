@@ -149,16 +149,19 @@ ieee80211_notify_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, i
 {
 	union iwreq_data wreq;
 
+	memset(&wreq, 0, sizeof(wreq));
 	if (ni == ic->ic_bss) {
 		if (newassoc)
 			netif_carrier_on(ic->ic_dev);
-		memset(&wreq, 0, sizeof(wreq));
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
-	} else if (newassoc) {
-		/* fire off wireless event only for new station */
-		memset(&wreq, 0, sizeof(wreq));
+	} else {
+		/* fire off wireless for new and reassoc station
+		 * please note that this is ok atm because there is no
+		 * difference in handling in hostapd.
+		 * If needed we will change to use an IWEVCUSTOM event.
+		 */
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, IWEVREGISTERED, &wreq, NULL);
