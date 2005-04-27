@@ -264,7 +264,7 @@ main(int argc, char *argv[])
 	if (s < 0)
 		err(1, "socket");
 	if (argc > 1 && strcmp(argv[1], "-i") == 0) {
-		if (argc < 2) {
+		if (argc < 3) {
 			fprintf(stderr, "%s: missing interface name for -i\n",
 				argv[0]);
 			exit(-1);
