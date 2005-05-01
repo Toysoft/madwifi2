@@ -3549,6 +3549,15 @@ rx_accept:
 		skb_put(skb, len);
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
 
+		if (sc->sc_rawdev_enabled && 
+		    (sc->sc_rawdev.flags & IFF_UP)) {
+			struct sk_buff *skb2;
+			skb2 = skb_copy(skb, GFP_ATOMIC);
+			if (skb2) {
+				ath_rx_capture(&sc->sc_rawdev, ds, skb2);
+			}
+		}
+
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
 			 * Monitor mode: discard anything shorter than
@@ -3560,15 +3569,6 @@ rx_accept:
 
 			ath_rx_capture(dev, ds, skb);
 			goto rx_next;
-		}
-
-		if (sc->sc_rawdev_enabled && 
-		    (sc->sc_rawdev.flags & IFF_UP)) {
-			struct sk_buff *skb2;
-			skb2 = skb_copy(skb, GFP_ATOMIC);
-			if (skb2) {
-				ath_rx_capture(&sc->sc_rawdev, ds, skb2);
-			}
 		}
 
 		/*
@@ -5245,6 +5245,7 @@ ath_rawdev_attach(struct ath_softc *sc)
 	rawdev->tx_queue_len = 0;
 	rawdev->flags |= IFF_NOARP;
 	rawdev->flags &= ~IFF_MULTICAST;
+	rawdev->mtu = IEEE80211_MAX_LEN;
 
 	if (register_netdev(rawdev)) {
 		goto bad;
