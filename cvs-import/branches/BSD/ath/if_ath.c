@@ -1220,6 +1220,54 @@ ath_reset(struct net_device *dev)
 	return 0;
 }
 
+
+/*
+ * the following rt_* functions deal with verifying that a valid
+ * radiotap header is on a packet as well as functions to extracting
+ * what information is included.
+ * XXX maybe these should go in ieee_radiotap.c
+ */
+static int rt_el_present(struct ieee80211_radiotap_header *th, u_int32_t element)
+{
+	if (element > NUM_RADIOTAP_ELEMENTS)
+		return 0;
+	return th->it_present & (1 << element);
+}
+
+static int rt_check_header(struct ieee80211_radiotap_header *th, int len) 
+{
+	int bytes = 0;
+	int x = 0;
+	if (th->it_version != 0) 
+		return 0;
+
+	if (th->it_len < sizeof(struct ieee80211_radiotap_header))
+		return 0;
+	
+	for (x = 0; x < NUM_RADIOTAP_ELEMENTS; x++) {
+		if (rt_el_present(th, x))
+		    bytes += radiotap_elem_to_bytes[x];
+	}
+
+	if (th->it_len < sizeof(struct ieee80211_radiotap_header) + bytes) 
+		return 0;
+	
+	if (th->it_len > len)
+		return 0;
+
+	return 1;
+}
+
+static u_int8_t *rt_el_offset(struct ieee80211_radiotap_header *th, u_int32_t element) {
+	unsigned int x = 0;
+	u_int8_t *offset = ((u_int8_t *) th) + sizeof(struct ieee80211_radiotap_header);
+	for (x = 0; x < NUM_RADIOTAP_ELEMENTS && x < element; x++) {
+		if (rt_el_present(th, x))
+			offset += radiotap_elem_to_bytes[x];
+	}
+
+	return offset;
+}
 /*
  * ath_start for raw 802.11 packets.
  */
@@ -1240,7 +1288,7 @@ ath_start_raw(struct sk_buff *skb, struct net_device *dev)
 	struct ath_txq *txq;
 	struct ath_buf *bf;
 	HAL_PKT_TYPE atype;
-	int pktlen, hdrlen, try0, pri, dot11Rate; 
+	int pktlen, hdrlen, try0, pri, dot11Rate, txpower; 
 	u_int8_t ctsrate, ctsduration, txrate;
 	u_int8_t cix = 0xff;         /* NB: silence compiler */
 	u_int flags = 0;
@@ -1286,6 +1334,7 @@ ath_start_raw(struct sk_buff *skb, struct net_device *dev)
 	ctsrate = 0;
 	ctsduration = 0;
 	pri = 0;
+	txpower = 60;
 	txq = sc->sc_ac2q[pri];
 	txrate = rt->info[0].rateCode;
 	atype =  HAL_PKT_TYPE_NORMAL;
@@ -1310,8 +1359,29 @@ ath_start_raw(struct sk_buff *skb, struct net_device *dev)
 		} 
 		break;
 	}
-	case ARPHRD_IEEE80211_RADIOTAP:
+	case ARPHRD_IEEE80211_RADIOTAP: {
+		struct ieee80211_radiotap_header *th = (struct ieee80211_radiotap_header *) skb->data;
+		if (rt_check_header(th, skb->len)) {
+			if (rt_el_present(th, IEEE80211_RADIOTAP_RATE)) {
+				dot11Rate = *((u_int8_t *) rt_el_offset(th, 
+					      IEEE80211_RADIOTAP_RATE));
+			}
+			if (rt_el_present(th, IEEE80211_RADIOTAP_DATA_RETRIES)) {
+				try0 = 1 + *((u_int8_t *) rt_el_offset(th, 
+					      IEEE80211_RADIOTAP_DATA_RETRIES));
+			}
+			if (rt_el_present(th, IEEE80211_RADIOTAP_DBM_TX_POWER)) {
+				txpower = *((u_int8_t *) rt_el_offset(th, 
+					      IEEE80211_RADIOTAP_DBM_TX_POWER));
+				if (txpower > 60) 
+					txpower = 60;
+				
+			}
+
+			skb_pull(skb, th->it_len);
+		}
 		break;
+	}
 	default:
 		/* nothing */
 		break;
@@ -1375,7 +1445,7 @@ ath_start_raw(struct sk_buff *skb, struct net_device *dev)
 		, pktlen		/* packet length */
 		, hdrlen		/* header length */
 		, atype			/* Atheros packet type */
-		, 60                 	/* txpower */
+		, txpower     	        /* txpower */
 		, txrate, try0		/* series 0 rate/tries */
 		, HAL_TXKEYIX_INVALID	/* key cache index */
 		, sc->sc_txantenna	/* antenna mode */
@@ -3046,16 +3116,20 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		}
 		
 		th = (struct ath_tx_radiotap_header *) skb_push(skb, sizeof(struct ath_tx_radiotap_header));
-		memset(th, 0, sizeof(struct ath_rx_radiotap_header));
+		memset(th, 0, sizeof(struct ath_tx_radiotap_header));
 		th->wt_ihdr.it_version = 0;
-		th->wt_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
+		th->wt_ihdr.it_len = sizeof(struct ath_tx_radiotap_header);
 		th->wt_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
 		th->wt_flags = 0;
-		th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
-		th->wt_chan_freq = ic->ic_ibss_chan->ic_freq;
-		th->wt_chan_flags = ic->ic_ibss_chan->ic_flags;
+		th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate &~ HAL_TXSTAT_ALTRATE].ieeerate;
 		th->wt_txpower = 0;
 		th->wt_antenna = ds->ds_txstat.ts_antenna;
+		th->wt_tx_flags = 0;
+		if (ds->ds_txstat.ts_status) 
+			th->wt_tx_flags |= IEEE80211_RADIOTAP_F_TX_FAIL;
+		th->wt_rts_retries = ds->ds_txstat.ts_shortretry;
+		th->wt_data_retries = ds->ds_txstat.ts_longretry;
+		
 		break;
 	}
 	default:
@@ -3091,10 +3165,6 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	struct ieee80211_frame *wh;
 	u_int32_t tsf;
 
-	skb->protocol = ETH_P_CONTROL;
-	skb->pkt_type = PACKET_OTHERHOST;
-	skb_put(skb, len);
-	
 	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
 		("data padding not enabled?"));
 	/* Remove pad bytes */
@@ -3221,7 +3291,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	skb->ip_summed = CHECKSUM_NONE;
 	skb->pkt_type = PACKET_OTHERHOST;
 	skb->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
-		
+
 	netif_rx(skb);
 	return;
 
@@ -3472,6 +3542,13 @@ rx_accept:
 			goto rx_next;
 		}
 
+		KASSERT(len <= skb_tailroom(skb), 
+			("not enough tailroom (%d vs %d)",
+			 len, skb_tailroom(skb)));
+
+		skb_put(skb, len);
+		skb->protocol = ETH_P_CONTROL;		/* XXX */
+
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
 			 * Monitor mode: discard anything shorter than
@@ -3488,7 +3565,7 @@ rx_accept:
 		if (sc->sc_rawdev_enabled && 
 		    (sc->sc_rawdev.flags & IFF_UP)) {
 			struct sk_buff *skb2;
-			skb2 = skb_clone(skb, GFP_ATOMIC);
+			skb2 = skb_copy(skb, GFP_ATOMIC);
 			if (skb2) {
 				ath_rx_capture(&sc->sc_rawdev, ds, skb2);
 			}
@@ -3509,9 +3586,6 @@ rx_accept:
 		/*
 		 * Normal receive.
 		 */
-		skb_put(skb, len);
-		skb->protocol = ETH_P_CONTROL;		/* XXX */
-
 		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV)) {
 			ieee80211_dump_pkt(skb->data, len,
 				   sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate,

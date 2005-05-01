@@ -146,20 +146,48 @@ struct ath_rx_radiotap_header {
 #define ATH_TX_RADIOTAP_PRESENT (		\
 	(1 << IEEE80211_RADIOTAP_FLAGS)		| \
 	(1 << IEEE80211_RADIOTAP_RATE)		| \
-	(1 << IEEE80211_RADIOTAP_CHANNEL)	| \
 	(1 << IEEE80211_RADIOTAP_DBM_TX_POWER)	| \
 	(1 << IEEE80211_RADIOTAP_ANTENNA)	| \
+	(1 << IEEE80211_RADIOTAP_TX_FLAGS)	| \
+	(1 << IEEE80211_RADIOTAP_RTS_RETRIES)	| \
+	(1 << IEEE80211_RADIOTAP_DATA_RETRIES)	| \
 	0)
 
 struct ath_tx_radiotap_header {
 	struct ieee80211_radiotap_header wt_ihdr;
 	u_int8_t	wt_flags;		/* XXX for padding */
 	u_int8_t	wt_rate;
-	u_int16_t	wt_chan_freq;
-	u_int16_t	wt_chan_flags;
 	u_int8_t	wt_txpower;
 	u_int8_t	wt_antenna;
+	u_int16_t       wt_tx_flags;
+	u_int8_t        wt_rts_retries;
+	u_int8_t        wt_data_retries;
+
 };
+
+
+#define NUM_RADIOTAP_ELEMENTS 18
+
+static int radiotap_elem_to_bytes[NUM_RADIOTAP_ELEMENTS] = 
+	{8, /* IEEE80211_RADIOTAP_TSFT */
+	 1, /* IEEE80211_RADIOTAP_FLAGS */
+	 1, /* IEEE80211_RADIOTAP_RATE */
+	 4, /* IEEE80211_RADIOTAP_CHANNEL */
+	 2, /* IEEE80211_RADIOTAP_FHSS */
+	 1, /* IEEE80211_RADIOTAP_DBM_ANTSIGNAL */
+	 1, /* IEEE80211_RADIOTAP_DBM_ANTNOISE */
+	 2, /* IEEE80211_RADIOTAP_LOCK_QUALITY */
+	 2, /* IEEE80211_RADIOTAP_TX_ATTENUATION */
+	 2, /* IEEE80211_RADIOTAP_DB_TX_ATTENUATION */
+	 1, /* IEEE80211_RADIOTAP_DBM_TX_POWER */
+	 1, /* IEEE80211_RADIOTAP_ANTENNA */
+	 1, /* IEEE80211_RADIOTAP_DB_ANTSIGNAL */
+	 1, /* IEEE80211_RADIOTAP_DB_ANTNOISE */
+	 2, /* IEEE80211_RADIOTAP_RX_FLAGS */
+	 2, /* IEEE80211_RADIOTAP_TX_FLAGS */
+	 1, /* IEEE80211_RADIOTAP_RTS_RETRIES */
+	 1, /* IEEE80211_RADIOTAP_DATA_RETRIES */
+	};
 
 #ifdef __linux__
 #define	SIOCGATHSTATS	(SIOCDEVPRIVATE+0)
