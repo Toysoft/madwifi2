@@ -3303,6 +3303,9 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		th->wr_chan_flags = ic->ic_ibss_chan->ic_flags;
 		th->wr_antenna = ds->ds_rxstat.rs_antenna;
 		th->wr_antsignal = ds->ds_rxstat.rs_rssi;
+		th->wr_rx_flags = 0;
+		if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
+			th->wr_rx_flags |= IEEE80211_RADIOTAP_F_RX_BADFCS;
 
 		break;
 	}
@@ -3531,13 +3534,22 @@ ath_rx_tasklet(TQUEUE_ARG data)
 
 			// TODO: correct?
 			ic->ic_devstats->rx_errors++;
+
+			/*
+			 * accept error frames on the raw device
+			 * or in monitor mode if we ask for them.
+			 * we'll explicity drop them after capture.
+			 */
+			if (sc->sc_rxfilter & HAL_RX_FILTER_PHYERR)
+				goto rx_accept;
+
 			/*
 			 * Reject error frames, we normally don't want
 			 * to see them in monitor mode (in monitor mode
 			 * allow through packets that have crypto problems).
 			 */
 			if ((ds->ds_rxstat.rs_status &~
-				(HAL_RXERR_DECRYPT|HAL_RXERR_MIC)) ||
+			     (HAL_RXERR_DECRYPT|HAL_RXERR_MIC)) ||
 			    sc->sc_ic.ic_opmode != IEEE80211_M_MONITOR)
 				goto rx_next;
 		}
@@ -3581,7 +3593,7 @@ rx_accept:
 				ath_rx_capture(&sc->sc_rawdev, ds, skb2);
 			}
 		}
-
+		
 		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
 			/*
 			 * Monitor mode: discard anything shorter than
@@ -3595,6 +3607,17 @@ rx_accept:
 			goto rx_next;
 		}
 
+
+		/*
+		 * At this point we have no need for error frames
+		 * that aren't crypto problems since we're done
+		 * with capture.
+		 */
+		if (ds->ds_rxstat.rs_status &~
+		    (HAL_RXERR_DECRYPT|HAL_RXERR_MIC)) {
+			dev_kfree_skb(skb);
+			goto rx_next;
+		}
 		/*
 		 * From this point on we assume the frame is at least
 		 * as large as ieee80211_frame_min; verify that.
