@@ -3297,7 +3297,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		th->wr_ihdr.it_version = 0;
 		th->wr_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
 		th->wr_ihdr.it_present = ATH_RX_RADIOTAP_PRESENT;
-		th->wr_flags = 0;
+		th->wr_flags = IEEE80211_RADIOTAP_F_FCS;
 		th->wr_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
 		th->wr_chan_freq = ic->ic_ibss_chan->ic_freq;
 		th->wr_chan_flags = ic->ic_ibss_chan->ic_flags;
