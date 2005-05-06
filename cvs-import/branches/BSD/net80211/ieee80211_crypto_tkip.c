@@ -232,7 +232,7 @@ tkip_enmic(struct ieee80211_key *k, struct sk_buff *skb)
 
 		mic = skb_put(skb, tkip.ic_miclen);
 		michael_mic(ctx, k->wk_txmic,
-			skb, hdrlen, skb->len - hdrlen + tkip.ic_miclen, mic);
+			skb, hdrlen, skb->len - (hdrlen + tkip.ic_miclen), mic);
 	}
 	return 1;
 }
