@@ -1558,7 +1558,8 @@ ath_start_raw(struct sk_buff *skb, struct net_device *dev)
 
 	sc->sc_devstats.tx_packets++;
 	sc->sc_devstats.tx_bytes += skb->len;
-	dev->trans_start = jiffies;
+	sc->sc_dev.trans_start = jiffies;
+	sc->sc_rawdev.trans_start = jiffies;
 
 	return 0;
 #undef updateCTSForBursting
@@ -4319,6 +4320,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	ATH_TXQ_UNLOCK_BH(txq);
 
 	dev->trans_start = jiffies;
+	sc->sc_rawdev.trans_start = jiffies;
 	return 0;
 #undef updateCTSForBursting
 #undef CTS_DURATION
@@ -4623,6 +4625,8 @@ ath_draintxq(struct ath_softc *sc)
 		}
 	}
 	sc->sc_dev.trans_start = jiffies;
+	sc->sc_rawdev.trans_start = jiffies;
+	
 	netif_start_queue(&sc->sc_dev);		// TODO: needed here?
 	if (sc->sc_rawdev_enabled)
 		netif_start_queue(&sc->sc_rawdev);
@@ -5289,7 +5293,7 @@ ath_rawdev_attach(struct ath_softc *sc)
 	rawdev->hard_start_xmit = ath_start_raw;
 	rawdev->set_multicast_list = NULL;
 	rawdev->get_stats = ath_getstats;
-	rawdev->tx_queue_len = 0;
+	rawdev->tx_queue_len = ATH_TXBUF;
 	rawdev->flags |= IFF_NOARP;
 	rawdev->flags &= ~IFF_MULTICAST;
 	rawdev->mtu = IEEE80211_MAX_LEN;
