@@ -297,6 +297,7 @@ struct ath_softc {
 	int			sc_rx_th_len;
 
 	struct tq_struct	sc_fataltq;	/* fatal int tasklet */
+	struct tq_struct	sc_radartq;	/* Radar detection */
 
 	int			sc_rxbufsize;	/* rx size based on mtu */
 	ath_bufhead		sc_rxbuf;	/* receive buffer */
