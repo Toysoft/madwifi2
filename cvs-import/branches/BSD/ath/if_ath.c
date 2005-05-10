@@ -65,7 +65,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ath/if_ath.c,v 1.76 2005/01/24 20:31:24 sam Exp 
 
 #include <net80211/ieee80211_var.h>
 
-#define	AR_DEBUG
+#include "radar.h"
+
 #include "if_athvar.h"
 #include "ah_desc.h"
 #include "ah_devid.h"			/* XXX to identify IBM cards */
@@ -100,6 +101,7 @@ static void	ath_fatal_tasklet(TQUEUE_ARG);
 static void	ath_bstuck_tasklet(TQUEUE_ARG);
 static void	ath_rxorn_tasklet(TQUEUE_ARG);
 static void	ath_bmiss_tasklet(TQUEUE_ARG);
+static void	ath_radar_tasklet(TQUEUE_ARG);
 static int	ath_stop_locked(struct net_device *);
 static int	ath_stop(struct net_device *);
 static int	ath_media_change(struct net_device *);
@@ -249,7 +251,7 @@ enum {
 static	void ath_printrxbuf(struct ath_buf *bf, int);
 static	void ath_printtxbuf(struct ath_buf *bf, int);
 #else
-#define	IFF_DUMPPKTS(sc, _m)	netif_msg_dumppkts(&sc->sc_ic)
+#define	IFF_DUMPPKTS(sc, _m)	0
 #define	DPRINTF(sc, _m, _fmt, ...)
 #define	KEYPRINTF(sc, k, ix, mac)
 #endif
@@ -348,6 +350,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ATH_INIT_TQUEUE(&sc->sc_fataltq,ath_fatal_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq,ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bstuckq,ath_bstuck_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_radartq,ath_radar_tasklet,	dev);
 	
 	/*
 	 * Attach the hal and verify ABI compatibility by checking
@@ -694,6 +697,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ic->ic_crypto.cs_key_set = ath_key_set;
 	ic->ic_crypto.cs_key_update_begin = ath_key_update_begin;
 	ic->ic_crypto.cs_key_update_end = ath_key_update_end;
+
+	radar_init(ic);
+
 	/* complete initialization */
 	ieee80211_media_init(ic, ath_media_change, ieee80211_media_status);
 
@@ -811,7 +817,9 @@ ath_resume(struct net_device *dev)
 void
 ath_shutdown(struct net_device *dev)
 {
+#ifdef AR_DEBUG
 	struct ath_softc *sc = dev->priv;
+#endif
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
 
@@ -932,6 +940,29 @@ ath_fatal_tasklet(TQUEUE_ARG data)
 
 	if_printf(dev, "hardware error; resetting\n");
 	ath_reset(dev);
+}
+
+static void
+ath_radar_tasklet (TQUEUE_ARG data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211_channel *c;
+
+	c = radar_handle_interference (ic);
+
+	if (c == NULL)
+	{
+ 		ath_stop (dev);
+		printk ("%s: FATAL ERROR - All available channels are marked as being interfered by radar. Stopping radio.\n", dev->name);
+		return;
+	}
+
+	ic->ic_des_chan = c;
+	ic->ic_ibss_chan = c;
+	ieee80211_new_state (ic, IEEE80211_S_INIT, -1);
+	ath_init (dev);
 }
 
 static void
@@ -2212,7 +2243,7 @@ ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 	u_int32_t rfilt;
 
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
-	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST;
+	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST | HAL_RX_FILTER_PHYRADAR;
 	if (ic->ic_opmode != IEEE80211_M_STA)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
@@ -3495,6 +3526,12 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				sc->sc_stats.ast_rx_phyerr++;
 				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
 				sc->sc_stats.ast_rx_phy[phyerr]++;
+
+				if (phyerr == HAL_PHYERR_RADAR && ic->ic_opmode == IEEE80211_M_HOSTAP)
+				{
+					ATH_SCHEDULE_TQUEUE (&sc->sc_radartq, &needmark);
+				}
+
 				goto rx_next;
 			}
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT) {
@@ -4550,7 +4587,9 @@ ath_tx_timeout(struct net_device *dev)
 static void
 ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 {
+#ifdef AR_DEBUG
 	struct ath_hal *ah = sc->sc_ah;
+#endif
 	struct ieee80211_node *ni;
 	struct ath_buf *bf;
 
@@ -5858,6 +5897,7 @@ enum {
 	ATH_RAWDEV      = 18,
 	ATH_RAWDEV_TYPE = 19,
 	ATH_RXFILTER   = 20,
+	ATH_RADARSIM   = 21,
 };
 
 static int
@@ -5974,6 +6014,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_rxfilter = val;
 				ath_reset(&sc->sc_dev);
 				break;
+			case ATH_RADARSIM:
+				ATH_SCHEDULE_TQUEUE (&sc->sc_radartq, &needmark);
+				break;
 			default:
 				return -EINVAL;
 			}
@@ -6045,6 +6088,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
  			break;
 		case ATH_RXFILTER:
 			val = sc->sc_rxfilter;
+			break;
+		case ATH_RADARSIM:
+			val = 0;
 			break;
 		default:
 			return -EINVAL;
@@ -6164,6 +6210,11 @@ static const ctl_table ath_sysctl_template[] = {
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
+	{ .ctl_name	= ATH_RADARSIM,
+	  .procname	= "radarsim",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
 	{ 0 }
 };
 
@@ -6209,7 +6260,9 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	}
 
 	/* initialize values */
+#ifdef AR_DEBUG
 	sc->sc_debug = ath_debug;
+#endif
 	sc->sc_txantenna = 0;		/* default to auto-selection */
 	sc->sc_txintrperiod = ATH_TXINTR_PERIOD;
 }

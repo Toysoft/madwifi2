@@ -203,6 +203,9 @@ struct ieee80211com {
 	 */
 	const struct ieee80211_aclator *ic_acl;
 	void			*ic_as;
+
+	struct timer_list	ic_radar_reanimate;	/* reanimation timer after stopping all channels after redar detection */
+	u_int32_t ic_channelList[IEEE80211_CHAN_MAX];
 };
 
 #define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
