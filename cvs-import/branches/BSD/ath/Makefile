@@ -54,8 +54,8 @@ COPTS+= -DATH_PCI
 endif
 
 obj-m		+= ath_${BUSNAME}.o
-ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
-export-objs	:= if_ath_${BUSNAME}.o
+ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o radar.o
+export-objs	:= if_ath_${BUSNAME}.o radar.o
 list-multi	:= ath_${BUSNAME}.o
 
 include $(obj)/${DEPTH}/Makefile.inc
@@ -72,7 +72,6 @@ all:
 
 install:
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
-	${TOOLPREFIX}strip -S ath_${BUSNAME}.$(KMODSUF)
 	cp ath_${BUSNAME}.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
