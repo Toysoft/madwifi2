@@ -490,7 +490,8 @@ enum {
 	IEEE80211_PARAM_RSNCAPS		= 22,	/* RSN capabilities */
 	IEEE80211_PARAM_INACT		= 23,	/* station inactivity timeout */
 	IEEE80211_PARAM_INACT_AUTH	= 24,	/* station auth inact timeout */
-	IEEE80211_PARAM_INACT_INIT	= 25	/* station init inact timeout */
+	IEEE80211_PARAM_INACT_INIT	= 25,	/* station init inact timeout */
+	IEEE80211_PARAM_RESET		= 99    /* reset the device */
 };
 
 #define	SIOCG80211STATS		(SIOCDEVPRIVATE+2)
