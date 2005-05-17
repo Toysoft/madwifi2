@@ -1580,6 +1580,9 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 	case IEEE80211_PARAM_INACT_INIT:
 		ic->ic_inact_init = value / IEEE80211_INACT_WAIT;
 		break;
+	case IEEE80211_PARAM_RESET:
+		ic->ic_reset(ic->ic_dev);
+		break;
 	default:
 		retv = EOPNOTSUPP;
 		break;
@@ -2280,6 +2283,8 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "inact_init" },
 	{ IEEE80211_PARAM_INACT_INIT,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_inact_init" },
+	{ IEEE80211_PARAM_RESET,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },
 #endif /* WIRELESS_EXT >= 12 */
 };
 
