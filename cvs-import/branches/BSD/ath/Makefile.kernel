@@ -25,9 +25,9 @@ EXTRA_CFLAGS+=	${INCS} -I${HAL} -I${HAL}/linux -I${ATH_HAL} -I${WLAN} \
 	-I${src}/..
 
 ##2.6##obj-$(CONFIG_ATHEROS) += ath_${BUSNAME}.o
-##2.6##ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
+##2.6##ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o radar.o
 
-##2.4##obj-$(CONFIG_ATHEROS) := if_ath.o if_ath_${BUSNAME}.o
+##2.4##obj-$(CONFIG_ATHEROS) := if_ath.o if_ath_${BUSNAME}.o radar.o
 
 ##2.4##O_TARGET := ath_${BUSNAME}.o
 ##2.4##include $(TOPDIR)/Rules.make
