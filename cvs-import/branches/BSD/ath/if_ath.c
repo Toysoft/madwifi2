@@ -65,6 +65,12 @@ __FBSDID("$FreeBSD: src/sys/dev/ath/if_ath.c,v 1.76 2005/01/24 20:31:24 sam Exp 
 
 #include <net80211/ieee80211_var.h>
 
+/*
+ * #define AR_DEBUG here if you need to debug the ath_pci module (athdebug)
+ * disable this if not needed because it adds an amount of load
+ */
+#define AR_DEBUG
+
 #include "radar.h"
 
 #include "if_athvar.h"
@@ -5904,6 +5910,7 @@ static int
 ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 {
 	struct ath_softc *sc = ctl->extra1;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
 	int ret;
@@ -5973,7 +5980,8 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
                                 break;
                         case ATH_TXPOWLIMIT:
                                 /* XXX validate? */
-                                ath_hal_settxpowlimit(ah, val);
+                                ic->ic_txpowlimit = val;
+                                ath_reset(&sc->sc_dev);
                                 break;
                         case ATH_BINTVAL:
 				if ((sc->sc_ic).ic_opmode != IEEE80211_M_HOSTAP &&
