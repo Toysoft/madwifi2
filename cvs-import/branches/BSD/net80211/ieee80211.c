@@ -422,6 +422,9 @@ ieee80211_announce(struct ieee80211com *ic)
 	struct ieee80211_rateset *rs;
 
 	printk("Build date: %s\n", __DATE__);
+#ifdef IEEE80211_DEBUG
+	printk("Debugging version (IEEE80211)\n");
+#endif
 	
 	for (mode = IEEE80211_MODE_11A; mode < IEEE80211_MODE_MAX; mode++) {
 		if ((ic->ic_modecaps & (1<<mode)) == 0)
