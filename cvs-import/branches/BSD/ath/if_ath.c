@@ -6332,6 +6332,10 @@ ath_announce(struct ath_softc *sc)
         if_printf(dev, "Use hw queue %u for CAB traffic\n",
                 sc->sc_cabq->axq_qnum);
         if_printf(dev, "Use hw queue %u for beacons\n", sc->sc_bhalq);
+	
+#ifdef AR_DEBUG
+	printk("Debugging version (ATH)\n");
+#endif
 #undef HAL_MODE_DUALBAND
 }
 
