@@ -1036,6 +1036,9 @@ ath_reset(struct net_device *dev)
 	ath_hal_intrset(ah, 0);		/* disable interrupts */
 	ath_draintxq(sc);		/* stop xmit side */
 	ath_stoprecv(sc);		/* stop recv side */
+	/* Setup max txpower */
+	ath_hal_settxpower(ah, ic->ic_bss->ni_txpower);
+
 	/* NB: indicate channel change so we do a full reset */
 	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
@@ -4395,12 +4398,14 @@ enum {
 	ATH_RXANTENNA	= 10,
 	ATH_DIVERSITY	= 11,
 	ATH_TXINTRPERIOD= 12,
+	ATH_TXPOWLIMIT  = 13,
 };
 
 static int
 ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 {
 	struct ath_softc *sc = ctl->extra1;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
 	int ret;
@@ -4457,6 +4462,11 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			case ATH_TXINTRPERIOD:
 				sc->sc_txintrperiod = val;
 				break;
+			case ATH_TXPOWLIMIT:
+				/* XXX validate? */
+				ic->ic_bss->ni_txpower = val;
+				ath_reset(&sc->sc_dev);
+				break;
 			default:
 				return -EINVAL;
 			}
@@ -4498,6 +4508,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			break;
 		case ATH_TXINTRPERIOD:
 			val = sc->sc_txintrperiod;
+			break;
+		case ATH_TXPOWLIMIT:
+			ath_hal_gettxpowlimit(ah, &val);
 			break;
 		default:
 			return -EINVAL;
@@ -4749,6 +4762,11 @@ static ctl_table ath_static_sysctls[] = {
 	  .extra1	= &mincalibrate,
 	  .extra2	= &maxint,
 	  .proc_handler	= proc_dointvec_minmax
+	},
+	{ .ctl_name     = ATH_TXPOWLIMIT,
+	   .procname     = "txpowlimit",
+	   .mode         = 0644,
+	   .proc_handler = ath_sysctl_halparam
 	},
 	{ 0 }
 };
