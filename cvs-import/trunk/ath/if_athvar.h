@@ -317,6 +317,10 @@ void	ath_sysctl_unregister(void);
  */
 #define	ath_hal_reset(_ah, _opmode, _chan, _outdoor, _pstatus) \
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
+#define ath_hal_settxpower(_ah, _txpower) \
+	((*(ah)->ah_setTxPowerLimit)((_ah), (_txpower)))
+#define ath_hal_gettxpowlimit(_ah, _ppow) \
+        (ath_hal_getcapability(_ah, HAL_CAP_TXPOW, 1, _ppow) == HAL_OK)
 #define	ath_hal_getratetable(_ah, _mode) \
 	((*(_ah)->ah_getRateTable)((_ah), (_mode)))
 #define	ath_hal_getmac(_ah, _mac) \
