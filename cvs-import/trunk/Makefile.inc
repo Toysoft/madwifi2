@@ -104,8 +104,10 @@ endif
 # KERNELRELEASE is the target kernel's version.  If KERNELRELEASE
 # is not set in the environment then it is taken from the running
 # system.
-# KERNELRELEASE is determined from include/linux/version.h in
-# KERNELPATH
+# To determine the correct version a mini-Makefile is piped to make
+# which includes the Makefile in KERNELPATH and prints out the version.
+# This is done to come by problems recently introduced with some distros
+# and newer kernel releases.
 #
 # Note: '\044' used instead of '$' in order to avoid make complaining like
 # "Recursive variable `KERNELRELEASE' references itself (eventually)."
