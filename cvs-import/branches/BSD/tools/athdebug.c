@@ -196,7 +196,8 @@ main(int argc, char *argv[])
 			if (strncmp(ifname, "ath", 3) != 0)
 				errx(2, "huh, this is for ath devices?");
 			argc -= 2, argv += 2;
-		} else if (strcmp(argv[1], "-?") == 0)
+		} else if ((strcmp(argv[1], "-?") == 0) ||
+		           (strcmp(argv[1], "--help") == 0))
 			usage();
 	}
 
