@@ -210,12 +210,12 @@ tkip_enmic(struct ieee80211_key *k, struct sk_buff *skb)
 	if (k->wk_flags & IEEE80211_KEY_SWMIC) {
 		struct ieee80211_frame *wh =
 			(struct ieee80211_frame *) skb->data;
-		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
-			"%s: [%s] doing SWMIC\n",
-			__func__, ether_sprintf(wh->i_addr1));
 		struct ieee80211com *ic = ctx->tc_ic;
 		int hdrlen;
 		u_int8_t *mic;
+		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
+			"%s: [%s] doing SWMIC\n",
+			__func__, ether_sprintf(wh->i_addr1));
 
 		ic->ic_stats.is_crypto_tkipenmic++;
 
@@ -336,11 +336,11 @@ tkip_demic(struct ieee80211_key *k, struct sk_buff *skb)
 	if (k->wk_flags & IEEE80211_KEY_SWMIC) {
 		struct ieee80211_frame *wh =
 			(struct ieee80211_frame *) skb->data;
+		int hdrlen;
+		u8 mic[IEEE80211_WEP_MICLEN];
 		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
 			"%s: [%s] doing SWMIC\n",
 			__func__, ether_sprintf(wh->i_addr1));
-		int hdrlen;
-		u8 mic[IEEE80211_WEP_MICLEN];
 
 		ctx->tc_ic->ic_stats.is_crypto_tkipdemic++;
 
