@@ -235,7 +235,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			 * exist. This should probably done after an ACL check.
 			 */
 			if (ni == ic->ic_bss &&
-			    ic->ic_opmode != IEEE80211_M_HOSTAP) {
+			    ic->ic_opmode == IEEE80211_M_IBSS) {
 				/*
 				 * Fake up a node for this newly
 				 * discovered member of the IBSS.

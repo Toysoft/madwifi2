@@ -601,6 +601,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ic->ic_opmode = IEEE80211_M_STA;
 	ic->ic_caps =
 		  IEEE80211_C_IBSS		/* ibss, nee adhoc, mode */
+		| IEEE80211_C_AHDEMO		/* adhoc demo (pseudo_ibss) mode */
 		| IEEE80211_C_HOSTAP		/* hostap mode */
 		| IEEE80211_C_MONITOR		/* monitor mode */
 		| IEEE80211_C_SHPREAMBLE	/* short preamble supported */
@@ -1031,7 +1032,8 @@ ath_init(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_STATUS status;
 	int error = 0;
-
+	int opmode;
+	
 	ATH_LOCK(sc);
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: mode %d\n", __func__, ic->ic_opmode);
@@ -1057,7 +1059,8 @@ ath_init(struct net_device *dev)
 	 */
 	sc->sc_curchan.channel = ic->ic_ibss_chan->ic_freq;
 	sc->sc_curchan.channelFlags = ath_chan2flags(ic, ic->ic_ibss_chan);
-	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_FALSE, &status)) {
+	opmode = (ic->ic_opmode == IEEE80211_M_AHDEMO) ? 0 : ic->ic_opmode;
+	if (!ath_hal_reset(ah, opmode, &sc->sc_curchan, AH_FALSE, &status)) {
 		if_printf(dev, "unable to reset hardware; hal status %u\n",
 			status);
 		error = -EIO;
@@ -1218,7 +1221,8 @@ ath_reset(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_channel *c;
 	HAL_STATUS status;
-
+	int opmode;
+	
 	if_printf(dev, "resetting\n");
 	
 	/*
@@ -1232,8 +1236,10 @@ ath_reset(struct net_device *dev)
 	ath_hal_intrset(ah, 0);		/* disable interrupts */
 	ath_draintxq(sc);		/* stop xmit side */
 	ath_stoprecv(sc);		/* stop recv side */
+	
+	opmode = (ic->ic_opmode == IEEE80211_M_AHDEMO) ? 0 : ic->ic_opmode;
 	/* NB: indicate channel change so we do a full reset */
-	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_TRUE, &status))
+	if (!ath_hal_reset(ah, opmode, &sc->sc_curchan, AH_TRUE, &status))
 		if_printf(dev, "%s: unable to reset hardware: '%s' (%u)\n",
 			__func__, hal_status_desc[status], status);
 	ath_update_txpow(sc);		/* update tx power state */
@@ -2250,7 +2256,8 @@ ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 
 	rfilt = (ath_hal_getrxfilter(ah) & HAL_RX_FILTER_PHYERR)
 	      | HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST | HAL_RX_FILTER_MCAST | HAL_RX_FILTER_PHYRADAR;
-	if (ic->ic_opmode != IEEE80211_M_STA)
+	if (ic->ic_opmode != IEEE80211_M_STA && 
+	    ic->ic_opmode != IEEE80211_M_AHDEMO)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
 	    (dev->flags & IFF_PROMISC))
@@ -4815,7 +4822,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	HAL_CHANNEL hchan;
-
+	int opmode;
+	
 	/*
 	 * Convert to a HAL channel description with
 	 * the flags constrained to reflect the current
@@ -4846,7 +4854,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		ath_hal_intrset(ah, 0);		/* disable interrupts */
 		ath_draintxq(sc);		/* clear pending tx frames */
 		ath_stoprecv(sc);		/* turn off frame recv */
-		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status)) {
+		opmode = (ic->ic_opmode == IEEE80211_M_AHDEMO) ? 0 : ic->ic_opmode;
+		if (!ath_hal_reset(ah, opmode, &hchan, AH_TRUE, &status)) {
 			if_printf(ic->ic_dev, "ath_chan_set: unable to reset "
 				"channel %u (%u Mhz)\n",
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq);

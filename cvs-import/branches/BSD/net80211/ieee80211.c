@@ -717,7 +717,7 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 		imr->ifm_active |= IFM_IEEE80211_ADHOC;
 		break;
 	case IEEE80211_M_AHDEMO:
-		/* should not come here */
+		imr->ifm_active |= (IFM_IEEE80211_ADHOC|IFM_FLAG0);
 		break;
 	case IEEE80211_M_HOSTAP:
 		imr->ifm_active |= IFM_IEEE80211_HOSTAP;

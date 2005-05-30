@@ -392,7 +392,8 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_stations, ctl, write, filp, buffer,
 	int len = *lenp;
 
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
-	    ic->ic_opmode != IEEE80211_M_IBSS)
+	    ic->ic_opmode != IEEE80211_M_IBSS &&
+	    ic->ic_opmode != IEEE80211_M_AHDEMO)
 		return -EINVAL;
 #if	LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
 	if (len && filp->f_pos == 0) {

@@ -414,6 +414,17 @@ ieee80211_create_ibss(struct ieee80211com* ic, struct ieee80211_channel *chan)
 		    IEEE80211_ADDR_COPY(ni->ni_bssid, ic->ic_des_bssid);
 		else
 		    ni->ni_bssid[0] |= 0x02;        /* local bit for IBSS */
+	} else if (ic->ic_opmode == IEEE80211_M_AHDEMO) {
+		if (ic->ic_flags & IEEE80211_F_DESBSSID)
+		    IEEE80211_ADDR_COPY(ni->ni_bssid, ic->ic_des_bssid);
+		else {
+		    ni->ni_bssid[0] = 0x00;
+		    ni->ni_bssid[1] = 0x00;
+		    ni->ni_bssid[2] = 0x00;
+		    ni->ni_bssid[3] = 0x00;
+		    ni->ni_bssid[4] = 0x00;
+		    ni->ni_bssid[5] = 0x00;
+		}
 	}
 	/* 
 	 * Fix the channel and related attributes.
@@ -1141,7 +1152,9 @@ ieee80211_find_txnode(struct ieee80211com *ic, const u_int8_t *macaddr)
 	 * unless we are operating in station mode or this is a
 	 * multicast/broadcast frame.
 	 */
-	if (ic->ic_opmode == IEEE80211_M_STA || IEEE80211_IS_MULTICAST(macaddr))
+	if (ic->ic_opmode == IEEE80211_M_STA || 
+	    ic->ic_opmode == IEEE80211_M_AHDEMO || 
+	    IEEE80211_IS_MULTICAST(macaddr))
 		return ieee80211_ref_node(ic->ic_bss);
 
 	/* XXX can't hold lock across dup_bss 'cuz of recursive locking */
@@ -1150,8 +1163,7 @@ ieee80211_find_txnode(struct ieee80211com *ic, const u_int8_t *macaddr)
 	IEEE80211_NODE_UNLOCK(nt);
 
 	if (ni == NULL) {
-		if (ic->ic_opmode == IEEE80211_M_IBSS ||
-		    ic->ic_opmode == IEEE80211_M_AHDEMO) {
+		if (ic->ic_opmode == IEEE80211_M_IBSS) {
 			/*
 			 * In adhoc mode cons up a node for the destination.
 			 * Note that we need an additional reference for the

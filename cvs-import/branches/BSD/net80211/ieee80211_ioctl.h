@@ -491,6 +491,7 @@ enum {
 	IEEE80211_PARAM_INACT		= 23,	/* station inactivity timeout */
 	IEEE80211_PARAM_INACT_AUTH	= 24,	/* station auth inact timeout */
 	IEEE80211_PARAM_INACT_INIT	= 25,	/* station init inact timeout */
+	IEEE80211_PARAM_ADHOC		= 26,	/* pseudo ad-hoc mode or standard IBSS mode */
 	IEEE80211_PARAM_RESET		= 99    /* reset the device */
 };
 

@@ -619,7 +619,8 @@ ieee80211_ioctl_siwap(struct ieee80211com *ic,
 	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
 
 	/* NB: should only be set when in STA mode */
-	if (ic->ic_opmode != IEEE80211_M_STA)
+	if (ic->ic_opmode != IEEE80211_M_STA &&
+	    ic->ic_opmode != IEEE80211_M_AHDEMO)
 		return -EINVAL;
 	IEEE80211_ADDR_COPY(ic->ic_des_bssid, &ap_addr->sa_data);
 	/* looks like a zero address disables */
@@ -924,8 +925,9 @@ ieee80211_ioctl_siwmode(struct ieee80211com *ic,
 		return -EINVAL;
 	memset(&ifr, 0, sizeof(ifr));
 	/* NB: remove any fixed-rate at the same time */
+	/* also remove pseudo_ibss (IFM_FLAG0) flag */
 	ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media &~
-		(IFM_OMASK | IFM_TMASK);
+		(IFM_OMASK | IFM_TMASK | IFM_FLAG0);
 	switch (*mode) {
 	case IW_MODE_INFRA:
 		/* NB: this is the default */
@@ -1580,6 +1582,23 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 	case IEEE80211_PARAM_INACT_INIT:
 		ic->ic_inact_init = value / IEEE80211_INACT_WAIT;
 		break;
+	case IEEE80211_PARAM_ADHOC:
+		if (!ic->ic_media.ifm_cur)
+			return -EINVAL;
+		memset(&ifr, 0, sizeof(ifr));
+		/* NB: remove any fixed-rate at the same time */
+		ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media &~
+			(IFM_OMASK | IFM_TMASK);
+		if (value) {
+			// IFM_FLAG0 signals adhoc demo mode
+			ifr.ifr_media |= (IFM_IEEE80211_ADHOC|IFM_FLAG0);
+		}
+		else {
+			ifr.ifr_media |= IFM_IEEE80211_ADHOC;
+			ifr.ifr_media &= ~IFM_FLAG0;
+		}
+		retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
+		break;
 	case IEEE80211_PARAM_RESET:
 		ic->ic_reset(ic->ic_dev);
 		break;
@@ -1710,6 +1729,9 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_INACT_INIT:
 		param[0] = ic->ic_inact_init * IEEE80211_INACT_WAIT;
+		break;
+	case IEEE80211_PARAM_ADHOC:
+		param[0] = (ic->ic_opmode == IEEE80211_M_AHDEMO);
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -2283,6 +2305,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "inact_init" },
 	{ IEEE80211_PARAM_INACT_INIT,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_inact_init" },
+	{ IEEE80211_PARAM_ADHOC,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "adhoc" },
+	{ IEEE80211_PARAM_ADHOC,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_adhoc" },
 	{ IEEE80211_PARAM_RESET,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },
 #endif /* WIRELESS_EXT >= 12 */
