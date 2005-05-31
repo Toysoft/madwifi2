@@ -458,7 +458,7 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 		/* use a ewma */
 		sn->stats[size_bin][ndx0].average_tx_time = 
 			((sn->stats[size_bin][ndx0].average_tx_time * ssc->ath_smoothing_rate) + 
-			 (tt * (100 - ath_smoothing_rate))) / 100;
+			 (tt * (100 - ssc->ath_smoothing_rate))) / 100;
 	}
 	
 	if (status) {
@@ -661,14 +661,23 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	const struct ieee80211_rateset *rs;
 	int r, x, y;
 	int srate;
+	sn->num_rates = 0;
 
-	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
+	if (rt == NULL) {
+		printk(KERN_WARNING "no rates yet! mode %u\n", sc->sc_curmode);
+		return;
+	}
         sn->static_rate_ndx = -1;
 
 	sn->num_rates = ni->ni_rates.rs_nrates;
         for (x = 0; x < ni->ni_rates.rs_nrates; x++) {
 		sn->rates[x].rate = ni->ni_rates.rs_rates[x] & IEEE80211_RATE_VAL;
 		sn->rates[x].rix = sc->sc_rixmap[sn->rates[x].rate];
+		if (sn->rates[x].rix == 0xff) {
+			DPRINTF(sc, "%s: %s ignore bogus rix at %d\n",
+				dev_info, __func__, x);
+			continue;
+		}
 		sn->rates[x].rateCode = rt->info[sn->rates[x].rix].rateCode;
 		sn->rates[x].shortPreambleRateCode = 
 			rt->info[sn->rates[x].rix].rateCode | 
@@ -721,17 +730,19 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		sn->last_sample_ndx[y] = 0;
 		
 		for (x = 0; x < ni->ni_rates.rs_nrates; x++) {
+
 			sn->stats[y][x].successive_failures = 0;
 			sn->stats[y][x].tries = 0;
 			sn->stats[y][x].total_packets = 0;
 			sn->stats[y][x].packets_acked = 0;
 			sn->stats[y][x].last_tx = 0;
-			
+
 			sn->stats[y][x].perfect_tx_time = 
 				calc_usecs_unicast_packet(sc, size, 
 							  sn->rates[x].rix,
 							  0, 0);
 			sn->stats[y][x].average_tx_time = sn->stats[y][x].perfect_tx_time;
+
 		}
 
 		/* set the initial rate */
