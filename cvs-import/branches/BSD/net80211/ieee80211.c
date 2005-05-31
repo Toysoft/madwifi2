@@ -701,7 +701,8 @@ ieee80211_media_status(struct net_device *dev, struct ifmediareq *imr)
 		rs = &ic->ic_sup_rates[ic->ic_curmode];
 		imr->ifm_active |= ieee80211_rate2media(ic,
 			rs->rs_rates[ic->ic_fixed_rate], ic->ic_curmode);
-	} else if (ic->ic_opmode == IEEE80211_M_STA) {
+	} else if (ic->ic_opmode == IEEE80211_M_STA ||
+		   ic->ic_opmode == IEEE80211_M_AHDEMO ) {
 		/*
 		 * In station mode report the current transmit rate.
 		 */
