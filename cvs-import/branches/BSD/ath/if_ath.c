@@ -4108,11 +4108,21 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 				txrate = an->an_tx_mgtrate;
 			flags |= HAL_TXDESC_INTREQ;	/* force interrupt */
 		} else {
-			/*
-			 * Data frames; consult the rate control module.
-			 */
-			ath_rate_findrate(sc, an, shortPreamble, pktlen,
+			if (ic->ic_fixed_rate == -1) {
+				/*
+				 * Data frames; consult the rate control module.
+				 */
+				ath_rate_findrate(sc, an, shortPreamble, pktlen,
 					  &rix, &try0, &txrate);
+			} 
+			else {
+				rix = ic->ic_fixed_rate;
+				try0 = ATH_TXMAXTRY; //XXX: should be configurabe
+				if (shortPreamble)
+					txrate = rt->info[rix].shortPreamble;
+				else
+					txrate = rt->info[rix].rateCode;
+			}
 		}
 		sc->sc_txrate = txrate;			/* for LED blinking */
 		/*
