@@ -15,6 +15,7 @@ HIGH PRIO:
   for AP mode but CWMIN should be 2x for adhoc mode (check the spec).
 - check if private crypto tkip implementation works for cards without hardware 
   crypto support (SWMIC, SWCRYPT).
+- duration in 802.11 frames is 0
 
 LOW PRIO:
 
