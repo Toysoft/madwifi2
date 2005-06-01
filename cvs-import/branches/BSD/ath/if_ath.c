@@ -4116,7 +4116,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 				 */
 				ath_rate_findrate(sc, an, shortPreamble, pktlen,
 					  &rix, &try0, &txrate);
-			} 
+			}
 			else {
 				rix = ic->ic_fixed_rate;
 				try0 = ATH_TXMAXTRY; //XXX: should be configurabe
@@ -4151,6 +4151,10 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	}
 	txq = sc->sc_ac2q[pri];
 
+	DPRINTF(sc, ATH_DEBUG_RATE, "%s: [%s] rix %d, try %d, txrate %d (rs_nrates %d)\n",
+		__func__, ether_sprintf(ni->ni_macaddr), 
+		rix, try0, txrate, ni->ni_rates.rs_nrates);
+	
 	/*
 	 * When servicing one or more stations in power-save mode
 	 * multicast frames must be buffered until after the beacon.
