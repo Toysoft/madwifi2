@@ -906,8 +906,7 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
 			ni = ieee80211_dup_bss(&ic->ic_sta, wh->i_addr2);
 			if (ni == NULL)
 				return;
-		} else
-			(void) ieee80211_ref_node(ni);
+		}
 		IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_DEBUG | IEEE80211_MSG_AUTH,
 		    "[%s] station authenticated (open)\n",
@@ -1056,7 +1055,6 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 				}
 				allocbs = 1;
 			} else {
-				(void) ieee80211_ref_node(ni);
 				allocbs = 0;
 			}
 			ni->ni_rssi = rssi;
