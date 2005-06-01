@@ -271,7 +271,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			    SEQ_LEQ(rxseq, ni->ni_rxseqs[tid])) {
 				/* duplicate, discard */
 				IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
-				    bssid, "duplicate",
+				    ni->ni_macaddr, "duplicate",
 				    "seqno <%u,%u> fragno <%u,%u> tid %u",
 				    rxseq >> IEEE80211_SEQ_SEQ_SHIFT,
 				    ni->ni_rxseqs[tid] >>
@@ -1981,7 +1981,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		u_int8_t rate;
 
 		if (ic->ic_opmode == IEEE80211_M_STA ||
-		    ic->ic_state != IEEE80211_S_RUN) {
+		    ic->ic_opmode == IEEE80211_M_AHDEMO ||
+		    ic->ic_state != IEEE80211_S_RUN ) {
 			ic->ic_stats.is_rx_mgtdiscard++;
 			return;
 		}
