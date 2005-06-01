@@ -441,9 +441,11 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		ath_xchanmode = xchanmode;
 	error = ath_getchannels(dev, ath_countrycode,
 			ath_outdoor, ath_xchanmode);
-	if (error != 0)
-		goto bad;
-
+	if (error != 0) {
+		printk("error! but continuing anyways...\n");
+		//goto bad;
+	}
+	
 	/*
 	 * Setup rate tables for all potential media types.
 	 */
