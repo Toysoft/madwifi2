@@ -4590,6 +4590,11 @@ static const ctl_table ath_sysctl_template[] = {
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
+	{ .ctl_name     = ATH_TXPOWLIMIT,
+	   .procname     = "txpowlimit",
+	   .mode         = 0644,
+	   .proc_handler = ath_sysctl_halparam
+	},
 	{ 0 }
 };
 
@@ -4763,13 +4768,9 @@ static ctl_table ath_static_sysctls[] = {
 	  .extra2	= &maxint,
 	  .proc_handler	= proc_dointvec_minmax
 	},
-	{ .ctl_name     = ATH_TXPOWLIMIT,
-	   .procname     = "txpowlimit",
-	   .mode         = 0644,
-	   .proc_handler = ath_sysctl_halparam
-	},
 	{ 0 }
 };
+
 static ctl_table ath_ath_table[] = {
 	{ .ctl_name	= DEV_ATH,
 	  .procname	= "ath",
