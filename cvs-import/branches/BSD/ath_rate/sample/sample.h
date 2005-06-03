@@ -205,10 +205,14 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	int cix = rt->info[rix].controlRate;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
-	KASSERT(rt->info[rix].rateKbps, ("rix %d (%d) bad ratekbps %d mode %u",
-					 rix, rt->info[rix].dot11Rate,
-					 rt->info[rix].rateKbps,
-					 sc->sc_curmode));
+	if (!rt->info[rix].rateKbps) {
+		printk(KERN_WARNING "rix %d (%d) bad ratekbps %d mode %u",
+		       rix, rt->info[rix].dot11Rate,
+		       rt->info[rix].rateKbps,
+		       sc->sc_curmode);
+
+		return 0;
+	}
 	/* 
 	 * XXX getting mac/phy level timings should be fixed for turbo
 	 * rates, and there is probably a way to get this from the
@@ -254,10 +258,13 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 		int ctsrate = rt->info[cix].rateCode;
 		int ctsduration = 0;
 
-		KASSERT(rt->info[cix].rateKbps, ("cix %d (%d) bad ratekbps %d mode %u",
-						 cix, rt->info[cix].dot11Rate,
-						 rt->info[cix].rateKbps,
-						 sc->sc_curmode));
+		if (!rt->info[cix].rateKbps) {
+			printk(KERN_WARNING "cix %d (%d) bad ratekbps %d mode %u",
+			       cix, rt->info[cix].dot11Rate,
+			       rt->info[cix].rateKbps,
+			       sc->sc_curmode);
+			return 0;
+		}
 		
 
 		ctsrate |= rt->info[cix].shortPreamble;

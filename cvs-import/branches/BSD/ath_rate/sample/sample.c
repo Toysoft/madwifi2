@@ -778,24 +778,15 @@ void
 ath_rate_newstate(struct ath_softc *sc, enum ieee80211_state newstate)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_node *ni;
-
-	if (ic->ic_opmode == IEEE80211_M_STA) {
-		/*
-		 * Reset local xmit state; this is really only
-		 * meaningful when operating in station mode.
-		 */
-		ni = ic->ic_bss;
-		ath_rate_ctl_reset(sc, ni);
-        } else {
-		/*
-		 * When operating as a station the node table holds
-		 * the AP's that were discovered during scanning.
-		 * For any other operating mode we want to reset the
-		 * tx rate state of each node.
-		 */
-                ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, sc);
-		ath_rate_ctl_reset(sc, ic->ic_bss);
+	
+	if (newstate == IEEE80211_S_RUN) {
+		if (ic->ic_opmode != IEEE80211_M_STA) {
+			/*
+			 * Sync rates for associated stations and neighbors.
+			 */
+			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, sc);
+		}
+		ath_rate_newassoc(sc, ATH_NODE(ic->ic_bss), 1);
 	}
 }
 EXPORT_SYMBOL(ath_rate_newstate);
