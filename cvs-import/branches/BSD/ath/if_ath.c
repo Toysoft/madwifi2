@@ -2369,8 +2369,50 @@ ath_beaconq_setup(struct ath_hal *ah)
 	qi.tqi_aifs = HAL_TXQ_USEDEFAULT;
 	qi.tqi_cwmin = HAL_TXQ_USEDEFAULT;
 	qi.tqi_cwmax = HAL_TXQ_USEDEFAULT;
-	/* NB: don't enable any interrupts */
-	return ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_BEACON, &qi);
+        /* NB: for dynamic turbo, don't enable any other interrupts */
+        qi.tqi_qflags = TXQ_FLAG_TXDESCINT_ENABLE;
+        return ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_BEACON, &qi);
+}
+
+/*
+ * Setup the transmit queue parameters for the beacon queue.
+ */
+static int
+ath_beaconq_config(struct ath_softc *sc)
+{
+#define ATH_EXPONENT_TO_VALUE(v)        ((1<<(v))-1)
+        struct ieee80211com *ic = &sc->sc_ic;
+        struct ath_hal *ah = sc->sc_ah;
+        HAL_TXQ_INFO qi;
+
+        ath_hal_gettxqueueprops(ah, sc->sc_bhalq, &qi);
+        if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+                /*
+                 * Always burst out beacon and CAB traffic.
+                 */
+                qi.tqi_aifs = ATH_BEACON_AIFS_DEFAULT;
+                qi.tqi_cwmin = ATH_BEACON_CWMIN_DEFAULT;
+                qi.tqi_cwmax = ATH_BEACON_CWMAX_DEFAULT;
+        } else {
+                struct wmeParams *wmep =
+                        &ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BE];
+                /*
+                 * Adhoc mode; important thing is to use 2x cwmin.
+                 */
+                qi.tqi_aifs = wmep->wmep_aifsn;
+                qi.tqi_cwmin = 2*ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmin);
+                qi.tqi_cwmax = ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmax);
+        }
+
+        if (!ath_hal_settxqueueprops(ah, sc->sc_bhalq, &qi)) {
+                printk("%s: unable to update parameters for "
+                        "beacon hardware queue! (%s)\n", __func__, sc->sc_dev.name);
+                return 0;
+        } else {
+                ath_hal_resettxqueue(ah, sc->sc_bhalq); /* push to h/w */
+                return 1;
+        }
+#undef ATH_EXPONENT_TO_VALUE
 }
 
 /*
@@ -2780,6 +2822,7 @@ ath_beacon_config(struct ath_softc *sc)
 			intval |= HAL_BEACON_ENA;
 			if (!sc->sc_hasveol)
 				sc->sc_imask |= HAL_INT_SWBA;
+			ath_beaconq_config(sc);
 		} else if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 			/*
 			 * In AP mode we enable the beacon timers and
@@ -2787,6 +2830,7 @@ ath_beacon_config(struct ath_softc *sc)
 			 */
 			intval |= HAL_BEACON_ENA;
 			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
+			ath_beaconq_config(sc);
 		}
 		ath_hal_beaconinit(ah, nexttbtt, intval);
 		sc->sc_bmisscount = 0;
