@@ -290,9 +290,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 
 	switch (type) {
 	case IEEE80211_FC0_TYPE_DATA:
-		hdrsize = ieee80211_hdrsize(wh);
-		if (ic->ic_flags & IEEE80211_F_DATAPAD)
-			hdrsize = roundup(hdrsize, sizeof(u_int32_t));
+		hdrsize = ieee80211_hdrspace(ic, wh);
 		if (skb->len < hdrsize) {
 			IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_ANY,
 			     ni->ni_macaddr, NULL,
@@ -2618,7 +2616,6 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 	struct ieee80211_node *ni, struct sk_buff *skb0)
 {
 	struct ieee80211_frame_min *wh;
-	struct ieee80211_cb *cb = (struct ieee80211_cb*)skb0->cb;
 	struct net_device *dev = ic->ic_dev;
 	struct sk_buff *skb;
 	u_int16_t aid;
@@ -2675,9 +2672,10 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 		    ether_sprintf(ni->ni_macaddr));
 		ic->ic_set_tim(ic, ni, 0);
 	}
-	cb->flags |= M_PWR_SAV;			/* bypass PS handling */
-	(*dev->hard_start_xmit)(skb0, dev);
-	//IF_ENQUEUE(&ic->ic_dev->if_snd, skb0);	
+	/* bypass PS handling */
+	((struct ieee80211_cb *)skb->cb)->flags |= M_PWR_SAV;
+
+	(*dev->hard_start_xmit)(skb, dev);
 }
 
 #ifdef IEEE80211_DEBUG

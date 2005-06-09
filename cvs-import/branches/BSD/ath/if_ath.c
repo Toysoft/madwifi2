@@ -2596,7 +2596,7 @@ ath_beacon_tasklet(struct net_device *dev)
 	 * of the TIM bitmap).
 	 */
 	skb = bf->bf_skb;
-	ncabq = ath_hal_numtxpending(ah, sc->sc_cabq->axq_qnum);
+	ncabq = sc->sc_cabq->axq_depth;
 	if (ieee80211_beacon_update(ic, bf->bf_node, &sc->sc_boff, skb, ncabq)) {
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: update, beacon len changed %d to %d\n",
