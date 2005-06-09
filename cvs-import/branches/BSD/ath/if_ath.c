@@ -1365,6 +1365,7 @@ ath_start_raw(struct sk_buff *skb, struct net_device *dev)
 	struct ieee80211_frame *wh; 
 	struct ath_desc *ds;
 	const HAL_RATE_TABLE *rt;
+	uint8_t testmac[IEEE80211_ADDR_LEN];
 
 	if ((sc->sc_dev.flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
 		/* device is not up... silently discard packet */
@@ -1476,6 +1477,20 @@ ath_start_raw(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_stats.ast_tx_noack++;
 	}
 	
+	testmac[0] = 0x41; /* A */
+	testmac[1] = 0x54; /* T */
+	testmac[2] = 0x48; /* H */
+	testmac[3] = 0x54; /* T */
+	testmac[4] = 0x53; /* S */
+	testmac[5] = 0x54; /* T */
+
+	if (IEEE80211_ADDR_EQ(wh->i_addr1, testmac)) {
+		flags |= HAL_TXDESC_NOACK;	/* no ack for test packets */
+		sc->sc_stats.ast_tx_noack++;
+		DPRINTF(sc, ATH_DEBUG_XMIT, "%s: output testpacket (len %i)\n",
+		    __func__, skb->len);
+	}
+
 	if (IFF_DUMPPKTS(sc, ATH_DEBUG_XMIT))
 		ieee80211_dump_pkt(skb->data, skb->len,
 				   sc->sc_hwmap[txrate].ieeerate, -1);
@@ -1807,8 +1822,6 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_tx_timer = 5;
 		mod_timer(&ic->ic_slowtimo, jiffies + HZ);
 	}
-	if (skb)
-		dev_kfree_skb(skb);
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
 #undef CLEANUP
 }
