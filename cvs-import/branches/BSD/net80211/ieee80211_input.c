@@ -1899,6 +1899,22 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			IEEE80211_NODE_STAT(ni, rx_proberesp);
 
 		/*
+		 * We need to record the TSF of Beacons in IBSS Mode for
+		 * proper IBSS Merging and setup of the Beacon Timers
+		 */
+		if (ic->ic_opmode == IEEE80211_M_IBSS) {
+			/* record tsf of last beacon in bss */
+			memcpy(ic->ic_bss->ni_tstamp.data,
+			    tstamp,sizeof(ic->ic_bss->ni_tstamp));
+			
+			if (ni != ic->ic_bss) {
+				/* record tsf of last beacon for sending node */
+				memcpy(ni->ni_tstamp.data,
+					tstamp,sizeof(ni->ni_tstamp));
+			}
+		}
+		
+		/*
 		 * When operating in station mode, check for state updates.
 		 * Be careful to ignore beacons received while doing a
 		 * background scan.  We consider only 11g/WMM stuff right now.
