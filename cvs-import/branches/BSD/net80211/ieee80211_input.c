@@ -110,6 +110,8 @@ static void ieee80211_discard_mac(struct ieee80211com *,
 static struct sk_buff *ieee80211_defrag(struct ieee80211com *,
 	struct ieee80211_node *, struct sk_buff *);
 static struct sk_buff *ieee80211_decap(struct ieee80211com *, struct sk_buff *);
+static void ieee80211_send_error(struct ieee80211com *, struct ieee80211_node *,
+	const u_int8_t *mac, int subtype, int arg);
 static void ieee80211_node_pwrsave(struct ieee80211_node *, int enable);
 static void ieee80211_recv_pspoll(struct ieee80211com *,
 	struct ieee80211_node *, struct sk_buff *);
@@ -356,14 +358,9 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			if (ni == ic->ic_bss) {
 				IEEE80211_DISCARD(ic, IEEE80211_MSG_INPUT,
 				    wh, "data", "%s", "unknown src");
-				/* NB: caller deals with reference */
-				ni = ieee80211_dup_bss(&ic->ic_sta, wh->i_addr2);
-				if (ni != NULL) {
-					IEEE80211_SEND_MGMT(ic, ni,
-					    IEEE80211_FC0_SUBTYPE_DEAUTH,
-					    IEEE80211_REASON_NOT_AUTHED);
-					ieee80211_free_node(ni);
-				}
+				ieee80211_send_error(ic, ni, wh->i_addr2,
+                            	    IEEE80211_FC0_SUBTYPE_DEAUTH,
+				    IEEE80211_REASON_NOT_AUTHED);
 				ic->ic_stats.is_rx_notassoc++;
 				goto err;
 			}
@@ -878,6 +875,19 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
     u_int16_t status)
 {
 
+	if (ni->ni_authmode == IEEE80211_AUTH_SHARED) {
+		IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_AUTH,
+		    ni->ni_macaddr, "open auth",
+		    "bad sta auth mode %u", ni->ni_authmode);
+		ic->ic_stats.is_rx_bad_auth++;  /* XXX */
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+			/* XXX hack to workaround calling convention */
+			ieee80211_send_error(ic, ni, wh->i_addr2,
+	    		    IEEE80211_FC0_SUBTYPE_AUTH,
+			    (seq + 1) | (IEEE80211_STATUS_ALG<<16));
+		}
+		return;
+	}
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_IBSS:
 		if (ic->ic_state != IEEE80211_S_RUN ||
@@ -942,6 +952,33 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
 	}
 }
 
+/*
+ * Send a management frame error response to the specified
+ * station.  If ni is associated with the station then use
+ * it; otherwise allocate a temporary node suitable for
+ * transmitting the frame and then free the reference so
+ * it will go away as soon as the frame has been transmitted.
+ */
+static void
+ieee80211_send_error(struct ieee80211com *ic, struct ieee80211_node *ni,
+    const u_int8_t *mac, int subtype, int arg)
+{
+	int istmp;
+
+	if (ni == ic->ic_bss) {
+		ni = ieee80211_dup_bss(&ic->ic_sta, mac);
+		if (ni == NULL) {
+			/* XXX msg */
+			return;
+		}
+		istmp = 1;
+	} else
+		istmp = 0;
+		IEEE80211_SEND_MGMT(ic, ni, subtype, arg);
+		if (istmp)
+			ieee80211_free_node(ni);
+}
+      
 static int
 alloc_challenge(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
@@ -1163,9 +1200,9 @@ bad:
 	 */
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/* XXX hack to workaround calling convention */
-		IEEE80211_SEND_MGMT(ic, ni,
-			IEEE80211_FC0_SUBTYPE_AUTH,
-			(seq + 1) | (estatus<<16));
+		ieee80211_send_error(ic, ni, wh->i_addr2,
+		    IEEE80211_FC0_SUBTYPE_AUTH,
+		    (seq + 1) | (estatus<<16));
 	}
 }
 
@@ -2231,13 +2268,9 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			    "[%s] deny %s request, sta not authenticated\n",
 			    ether_sprintf(wh->i_addr2),
 			    reassoc ? "reassoc" : "assoc");
-			ni = ieee80211_dup_bss(&ic->ic_sta, wh->i_addr2);
-			if (ni != NULL) {
-				IEEE80211_SEND_MGMT(ic, ni,
-				    IEEE80211_FC0_SUBTYPE_DEAUTH,
-				    IEEE80211_REASON_ASSOC_NOT_AUTHED);
-				ieee80211_free_node(ni);
-			}
+			ieee80211_send_error(ic, ni, wh->i_addr2,
+			    IEEE80211_FC0_SUBTYPE_DEAUTH,
+			    IEEE80211_REASON_ASSOC_NOT_AUTHED);
 			ic->ic_stats.is_rx_assoc_notauth++;
 			return;
 		}
