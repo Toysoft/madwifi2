@@ -2749,22 +2749,23 @@ ath_beacon_config(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = ic->ic_bss;
 	u_int32_t nexttbtt, intval;
-
+	u_int64_t tsf;
+	u_int32_t tsftu;
+	
 	/* extract tstamp from last beacon and convert to TU */
 	nexttbtt = TSF_TO_TU(LE_READ_4(ni->ni_tstamp.data + 4),
-	    LE_READ_4(ni->ni_tstamp.data));
+			     LE_READ_4(ni->ni_tstamp.data));
 	/* NB: the beacon interval is kept internally in TU's */
 	intval = ni->ni_intval & HAL_BEACON_PERIOD;
-	if (nexttbtt == 0)		/* e.g. for ap mode */
-		nexttbtt = intval;
-	else if (intval)		/* NB: can be 0 for monitor mode */
-		nexttbtt = roundup(nexttbtt, intval); 
-	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: nexttbtt %u intval %u (%u)\n",
-		__func__, nexttbtt, intval, ni->ni_intval);
+	/* current TSF converted to TU */
+	tsf = ath_hal_gettsf64(ah);
+	tsftu = TSF_TO_TU((u_int32_t)(tsf>>32), (u_int32_t)tsf);
+	
+	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: last beacon %u intval %u (%u) hw tsftu %u\n",
+		__func__, nexttbtt, intval, ni->ni_intval, tsftu);
+	
 	if (ic->ic_opmode == IEEE80211_M_STA) {
 		HAL_BEACON_STATE bs;
-		u_int64_t tsf;
-		u_int32_t tsftu;
 		int dtimperiod, dtimcount;
 		int cfpperiod, cfpcount;
 
@@ -2785,8 +2786,6 @@ ath_beacon_config(struct ath_softc *sc)
 		 * Pull nexttbtt forward to reflect the current
 		 * TSF and calculate dtim+cfp state for the result.
 		 */
-		tsf = ath_hal_gettsf64(ah);
-		tsftu = TSF_TO_TU((u_int32_t)(tsf>>32), (u_int32_t)tsf) + FUDGE;
 		do {
 			nexttbtt += intval;
 			if (--dtimcount < 0) {
@@ -2794,7 +2793,7 @@ ath_beacon_config(struct ath_softc *sc)
 				if (--cfpcount < 0)
 					cfpcount = cfpperiod - 1;
 			}
-		} while (nexttbtt < tsftu);
+		} while (nexttbtt < tsftu + FUDGE);
 #undef FUDGE
 		memset(&bs, 0, sizeof(bs));
 		bs.bs_intval = intval;
@@ -2862,11 +2861,23 @@ ath_beacon_config(struct ath_softc *sc)
 		ath_hal_beacontimers(ah, &bs);
 		sc->sc_imask |= HAL_INT_BMISS;
 		ath_hal_intrset(ah, sc->sc_imask);
-	} else {
+	} else { /* IBSS or HOSTAP */
 		ath_hal_intrset(ah, 0);
-		if (nexttbtt == intval)
-			intval |= HAL_BEACON_RESET_TSF;
+		
 		if (ic->ic_opmode == IEEE80211_M_IBSS) {
+			/*
+			 * Pull nexttbtt forward to reflect the current
+			 * TSF. Add one intval otherwise the timespan
+			 * can be too short for ibss merges.
+			 */
+			do {
+				nexttbtt += intval;
+			} while (nexttbtt < tsftu+intval);
+			nexttbtt += intval;
+		
+			DPRINTF(sc, ATH_DEBUG_BEACON, "%s: nexttbtt %u intval %u\n",
+				__func__, nexttbtt, intval & HAL_BEACON_PERIOD );
+			
 			/*
 			 * In IBSS mode enable the beacon timers but only
 			 * enable SWBA interrupts if we need to manually
@@ -2874,20 +2885,32 @@ ath_beacon_config(struct ath_softc *sc)
 			 * self-linked tx descriptor and let the hardware
 			 * deal with things.
 			 */
-			intval |= HAL_BEACON_ENA;
 			if (!sc->sc_hasveol)
 				sc->sc_imask |= HAL_INT_SWBA;
-			ath_beaconq_config(sc);
+		
 		} else if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+			if (nexttbtt == 0) {
+				/*
+				 * starting a new BSS: we can reset the TSF 
+				 * and start with zero
+				 */
+				nexttbtt = intval;
+				intval |= HAL_BEACON_RESET_TSF;
+			} else {
+				nexttbtt += intval;
+			}
 			/*
 			 * In AP mode we enable the beacon timers and
 			 * SWBA interrupts to prepare beacon frames.
 			 */
-			intval |= HAL_BEACON_ENA;
 			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
-			ath_beaconq_config(sc);
 		}
+		
+		intval |= HAL_BEACON_ENA;
+		
+		ath_beaconq_config(sc);
 		ath_hal_beaconinit(ah, nexttbtt, intval);
+		
 		sc->sc_bmisscount = 0;
 		ath_hal_intrset(ah, sc->sc_imask);
 		/*
@@ -3507,6 +3530,7 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	 * potentially stored in the node (e.g. for ibss merge).
 	 */
 	sc->sc_recv_mgmt(ic, skb, ni, subtype, rssi, rstamp);
+	
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* update rssi statistics for use by the hal */
