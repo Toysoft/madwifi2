@@ -2555,7 +2555,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		u_int16_t reason;
 
 		if (ic->ic_state != IEEE80211_S_RUN &&
-		    ic->ic_state != IEEE80211_S_AUTH) {		// TODO: IEEE80211_S_ASSOC?
+		    ic->ic_state != IEEE80211_S_ASSOC &&
+		    ic->ic_state != IEEE80211_S_AUTH) {
 			ic->ic_stats.is_rx_mgtdiscard++;
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 			    "[%s] station DISASSOC in bad state.\n",
