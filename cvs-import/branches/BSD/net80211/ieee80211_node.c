@@ -51,6 +51,16 @@ __KERNEL_RCSID(0, "$NetBSD: ieee80211_node.c,v 1.8 2003/11/02 01:29:05 dyoung Ex
 
 #include <net80211/ieee80211_var.h>
 
+/*
+ * Association id's are managed with a bit vector.
+ */
+#define IEEE80211_AID_SET(b, w) \
+    ((w)[IEEE80211_AID(b) / 32] |= (1 << (IEEE80211_AID(b) % 32)))
+#define IEEE80211_AID_CLR(b, w) \
+    ((w)[IEEE80211_AID(b) / 32] &= ~(1 << (IEEE80211_AID(b) % 32)))
+#define IEEE80211_AID_ISSET(b, w) \
+    ((w)[IEEE80211_AID(b) / 32] & (1 << (IEEE80211_AID(b) % 32)))
+
 static struct ieee80211_node *node_alloc(struct ieee80211_node_table *);
 static void node_cleanup(struct ieee80211_node *);
 static void node_free(struct ieee80211_node *);
