@@ -1877,7 +1877,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				    "[%s] erp change: was 0x%x, now 0x%x\n",
 				    ether_sprintf(wh->i_addr2),
 				    ni->ni_erp, erp);
-				if (erp & IEEE80211_ERP_USE_PROTECTION)
+				if (ic->ic_curmode == IEEE80211_MODE_11G &&
+				    (ni->ni_erp & IEEE80211_ERP_USE_PROTECTION))
 					ic->ic_flags |= IEEE80211_F_USEPROT;
 				else
 					ic->ic_flags &= ~IEEE80211_F_USEPROT;
@@ -2289,12 +2290,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			FREE(ni->ni_challenge, M_DEVBUF);
 			ni->ni_challenge = NULL;
 		}
-		/* XXX some stations use the privacy bit for handling APs
-		       that suport both encrypted and unencrypted traffic */
-		/* NB: PRIVACY flag bits are assumed to match */
-		if ((capinfo & IEEE80211_CAPINFO_ESS) == 0 ||
-		    (capinfo & IEEE80211_CAPINFO_PRIVACY) ^
-		    (ic->ic_flags & IEEE80211_F_PRIVACY)) {
+		/* NB: 802.11 spec says to ignore station's privacy bit */
+		if ((capinfo & IEEE80211_CAPINFO_ESS) == 0) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 			    "[%s] deny %s request, capability mismatch 0x%x\n",
 			    ether_sprintf(wh->i_addr2),
@@ -2463,7 +2460,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		 * NB: ni_erp should zero for non-11g operation.
 		 * XXX check ic_curmode anyway?
 		 */
-		if (ni->ni_erp & IEEE80211_ERP_USE_PROTECTION)
+		if (ic->ic_curmode == IEEE80211_MODE_11G &&
+		    (ni->ni_erp & IEEE80211_ERP_USE_PROTECTION))
 			ic->ic_flags |= IEEE80211_F_USEPROT;
 		else
 			ic->ic_flags &= ~IEEE80211_F_USEPROT;
