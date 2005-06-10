@@ -1701,6 +1701,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int8_t *frm, *efrm;
 	u_int8_t *ssid, *rates, *xrates, *wpa, *wme;
 	int reassoc, resp, allocbs;
+	u_int8_t rate;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	frm = (u_int8_t *)&wh[1];
@@ -1998,9 +1999,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		break;
 	}
 
-	case IEEE80211_FC0_SUBTYPE_PROBE_REQ: {
-		u_int8_t rate;
-
+	case IEEE80211_FC0_SUBTYPE_PROBE_REQ:
 		if (ic->ic_opmode == IEEE80211_M_STA ||
 		    ic->ic_opmode == IEEE80211_M_AHDEMO ||
 		    ic->ic_state != IEEE80211_S_RUN ) {
@@ -2086,7 +2085,6 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ieee80211_free_node(ni);
 		}
 		break;
-	}
 
 	case IEEE80211_FC0_SUBTYPE_AUTH: {
 		u_int16_t algo, seq, status;
@@ -2306,10 +2304,10 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			ic->ic_stats.is_rx_assoc_capmismatch++;
 			return;
 		}
-		ieee80211_setup_rates(ic, ni, rates, xrates,
+		rate = ieee80211_setup_rates(ic, ni, rates, xrates,
 				IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
 				IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
-		if (ni->ni_rates.rs_nrates == 0) {
+		if (rate & IEEE80211_RATE_BASIC) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 			    "[%s] deny %s request, rate set mismatch\n",
 			    ether_sprintf(wh->i_addr2),
@@ -2419,10 +2417,10 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 
 		IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE);
-		ieee80211_setup_rates(ic, ni, rates, xrates,
+		rate = ieee80211_setup_rates(ic, ni, rates, xrates,
 				IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
 				IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
-		if (ni->ni_rates.rs_nrates == 0) {
+		if (rate & IEEE80211_RATE_BASIC) {
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
 			    "[%s] %sassoc failed (rate set mismatch)\n",
 			    ether_sprintf(wh->i_addr2),
