@@ -890,17 +890,12 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
 	}
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_IBSS:
-		if (ic->ic_state != IEEE80211_S_RUN ||
-		    seq != IEEE80211_AUTH_OPEN_REQUEST) {
-			ic->ic_stats.is_rx_bad_auth++;
-			return;
-		}
-		ieee80211_new_state(ic, IEEE80211_S_AUTH,
-		    wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK);
-		break;
-
 	case IEEE80211_M_AHDEMO:
+	case IEEE80211_M_MONITOR:
 		/* should not come here */
+		IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_AUTH,
+		    ni->ni_macaddr, "open auth",
+		    "bad operating mode %u", ic->ic_opmode);
 		break;
 
 	case IEEE80211_M_HOSTAP:
@@ -942,12 +937,10 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
 			if (ni != ic->ic_bss)
 				ni->ni_fails++;
 			ic->ic_stats.is_rx_auth_fail++;
-			return;
-		}
-		ieee80211_new_state(ic, IEEE80211_S_ASSOC,
-		    wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK);
-		break;
-	case IEEE80211_M_MONITOR:
+			ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
+		} else
+			ieee80211_new_state(ic, IEEE80211_S_ASSOC,
+			wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK);
 		break;
 	}
 }
@@ -1203,6 +1196,14 @@ bad:
 		ieee80211_send_error(ic, ni, wh->i_addr2,
 		    IEEE80211_FC0_SUBTYPE_AUTH,
 		    (seq + 1) | (estatus<<16));
+	} else if (ic->ic_opmode == IEEE80211_M_STA) {
+		/*
+		 * Kick the state machine.  This short-circuits
+		 * using the mgt frame timeout to trigger the
+		 * state transition.
+		 */
+		if (ic->ic_state == IEEE80211_S_AUTH)
+			ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 	}
 }
 
@@ -2458,6 +2459,7 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			if (ni != ic->ic_bss)	/* XXX never true? */
 				ni->ni_fails++;
 			ic->ic_stats.is_rx_assoc_norate++;
+			ieee80211_new_state(ic, IEEE80211_S_SCAN, 0);
 			return;
 		}
 
@@ -2529,19 +2531,18 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		reason = le16toh(*(u_int16_t *)frm);
 		ic->ic_stats.is_rx_deauth++;
 		IEEE80211_NODE_STAT(ni, rx_deauth);
+
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_AUTH,
+		    "[%s] recv deauthenticate (reason %d)\n",
+		    ether_sprintf(ni->ni_macaddr), reason);
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
 			ieee80211_new_state(ic, IEEE80211_S_AUTH,
 			    wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK);
 			break;
 		case IEEE80211_M_HOSTAP:
-			if (ni != ic->ic_bss) {
-				IEEE80211_DPRINTF(ic, IEEE80211_MSG_AUTH,
-				    "station %s deauthenticated by peer "
-				    "(reason %d)\n",
-				    ether_sprintf(ni->ni_macaddr), reason);
+			if (ni != ic->ic_bss)
 				ieee80211_node_leave(ic, ni);
-			}
 			break;
 		default:
 			ic->ic_stats.is_rx_mgtdiscard++;
@@ -2568,19 +2569,19 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 2);
 		reason = le16toh(*(u_int16_t *)frm);
 		ic->ic_stats.is_rx_disassoc++;
-		IEEE80211_NODE_STAT(ni, rx_disassoc);
+	    	IEEE80211_NODE_STAT(ni, rx_disassoc);
+
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
+		    "[%s] recv disassociated (reason %d)\n",
+		    ether_sprintf(ni->ni_macaddr), reason);
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
 			ieee80211_new_state(ic, IEEE80211_S_ASSOC,
 			    wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK);
 			break;
 		case IEEE80211_M_HOSTAP:
-			if (ni != ic->ic_bss) {
-				IEEE80211_DPRINTF(ic, IEEE80211_MSG_ASSOC,
-				    "[%s] sta disassociated by peer (reason %d)\n",
-				    ether_sprintf(ni->ni_macaddr), reason);
+			if (ni != ic->ic_bss)
 				ieee80211_node_leave(ic, ni);
-			}
 			break;
 		default:
 			ic->ic_stats.is_rx_mgtdiscard++;
