@@ -50,8 +50,8 @@ static	void none_detach(struct ieee80211_key *);
 static	int none_setkey(struct ieee80211_key *);
 static	int none_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t);
 static	int none_decap(struct ieee80211_key *, struct sk_buff *);
-static	int none_enmic(struct ieee80211_key *, struct sk_buff *);
-static	int none_demic(struct ieee80211_key *, struct sk_buff *);
+static	int none_enmic(struct ieee80211_key *, struct sk_buff *, int);
+static	int none_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 const struct ieee80211_cipher ieee80211_cipher_none = {
 	.ic_name	= "NONE",
@@ -129,7 +129,7 @@ none_decap(struct ieee80211_key *k, struct sk_buff *skb)
 }
 
 static int
-none_enmic(struct ieee80211_key *k, struct sk_buff *skb)
+none_enmic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
 	struct ieee80211com *ic = k->wk_private;
 
@@ -138,7 +138,7 @@ none_enmic(struct ieee80211_key *k, struct sk_buff *skb)
 }
 
 static int
-none_demic(struct ieee80211_key *k, struct sk_buff *skb)
+none_demic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
 	struct ieee80211com *ic = k->wk_private;
 

@@ -64,8 +64,8 @@ static	int ccmp_setkey(struct ieee80211_key *);
 static	int ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb,
 		u_int8_t keyid);
 static	int ccmp_decap(struct ieee80211_key *, struct sk_buff *);
-static	int ccmp_enmic(struct ieee80211_key *, struct sk_buff *);
-static	int ccmp_demic(struct ieee80211_key *, struct sk_buff *);
+static	int ccmp_enmic(struct ieee80211_key *, struct sk_buff *, int);
+static	int ccmp_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 static const struct ieee80211_cipher ccmp = {
 	.ic_name	= "AES-CCM",
@@ -184,7 +184,7 @@ ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
  * Add MIC to the frame as needed.
  */
 static int
-ccmp_enmic(struct ieee80211_key *k, struct sk_buff *skb)
+ccmp_enmic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
 
 	return 1;
@@ -270,7 +270,7 @@ ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb)
  * Verify and strip MIC from the frame.
  */
 static int
-ccmp_demic(struct ieee80211_key *k, struct sk_buff *skb)
+ccmp_demic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
 	return 1;
 }
