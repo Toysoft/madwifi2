@@ -5092,6 +5092,7 @@ ath_calibrate(unsigned long arg)
 		 * to load new gain values.
 		 */
 		sc->sc_stats.ast_per_rfgain++;
+		if_printf(dev, "calibration, need reset\n");
 		ath_reset(dev);
 	}
 	if (!ath_hal_calibrate(ah, &sc->sc_curchan)) {
