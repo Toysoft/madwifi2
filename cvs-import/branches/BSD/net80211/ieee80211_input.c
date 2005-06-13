@@ -433,7 +433,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		/*
 		 * Next strip any MSDU crypto bits.
 		 */
-		if (key != NULL && !ieee80211_crypto_demic(ic, key, skb)) {
+		if (key != NULL && !ieee80211_crypto_demic(ic, key, skb, 0)) {
 			IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
 			    ni->ni_macaddr, "data", "%s", "demic error");
 			IEEE80211_NODE_STAT(ni, rx_demicfail);

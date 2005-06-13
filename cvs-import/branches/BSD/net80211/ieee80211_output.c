@@ -564,7 +564,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		      !KEY_UNDEFINED(*key) : !KEY_UNDEFINED(ni->ni_ucastkey)))) {
 			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 			/* XXX do fragmentation */
-			if (!ieee80211_crypto_enmic(ic, key, skb)) {
+			if (!ieee80211_crypto_enmic(ic, key, skb, 0)) {
 				IEEE80211_DPRINTF(ic, IEEE80211_MSG_OUTPUT,
 				    "[%s] enmic failed, discard frame\n",
 				    ether_sprintf(eh.ether_dhost));
