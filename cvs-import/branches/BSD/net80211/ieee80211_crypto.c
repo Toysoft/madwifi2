@@ -545,7 +545,7 @@ EXPORT_SYMBOL(ieee80211_crypto_encap);
  */
 struct ieee80211_key *
 ieee80211_crypto_decap(struct ieee80211com *ic,
-	struct ieee80211_node *ni, struct sk_buff *skb)
+	struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 {
 #define	IEEE80211_WEP_HDRLEN	(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN)
 #define	IEEE80211_WEP_MINLEN \
@@ -555,7 +555,6 @@ ieee80211_crypto_decap(struct ieee80211com *ic,
 	struct ieee80211_frame *wh;
 	const u_int8_t *ivp;
 	u_int8_t keyid;
-	int hdrlen;
 
 	/* NB: this minimum size data frame could be bigger */
 	if (skb->len < IEEE80211_WEP_MINLEN) {
@@ -572,7 +571,6 @@ ieee80211_crypto_decap(struct ieee80211com *ic,
 	 * the key id in the header is meaningless (typically 0).
 	 */
 	wh = (struct ieee80211_frame *) skb->data;
-	hdrlen = ieee80211_hdrsize(wh);
 	ivp = skb->data + hdrlen;
 	keyid = ivp[IEEE80211_WEP_IVLEN];
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1) ||
@@ -580,7 +578,7 @@ ieee80211_crypto_decap(struct ieee80211com *ic,
 		k = &ic->ic_nw_keys[keyid >> 6];
 	else
 		k = &ni->ni_ucastkey;
-	return ((*k->wk_cipher->ic_decap)(k, skb) ? k : NULL);
+	return ((*k->wk_cipher->ic_decap)(k, skb, hdrlen) ? k : NULL);
 #undef IEEE80211_WEP_MINLEN
 #undef IEEE80211_WEP_HDRLEN
 }

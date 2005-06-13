@@ -108,8 +108,8 @@ static void ieee80211_discard_mac(struct ieee80211com *,
 #endif /* IEEE80211_DEBUG */
 
 static struct sk_buff *ieee80211_defrag(struct ieee80211com *,
-	struct ieee80211_node *, struct sk_buff *);
-static struct sk_buff *ieee80211_decap(struct ieee80211com *, struct sk_buff *);
+	struct ieee80211_node *, struct sk_buff *, int);
+static struct sk_buff *ieee80211_decap(struct ieee80211com *, struct sk_buff *, int);
 static void ieee80211_send_error(struct ieee80211com *, struct ieee80211_node *,
 	const u_int8_t *mac, int subtype, int arg);
 static void ieee80211_node_pwrsave(struct ieee80211_node *, int enable);
@@ -136,7 +136,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211_frame *wh;
 	struct ieee80211_key *key;
 	struct ether_header *eh;
-	int len, hdrsize, off;
+	int len, hdrspace;
 	u_int8_t dir, type, subtype;
 	u_int8_t *bssid;
 	u_int16_t rxseq;
@@ -292,29 +292,14 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 
 	switch (type) {
 	case IEEE80211_FC0_TYPE_DATA:
-		hdrsize = ieee80211_hdrspace(ic, wh);
-		if (skb->len < hdrsize) {
+		hdrspace = ieee80211_hdrspace(ic, wh);
+		if (skb->len < hdrspace) {
 			IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_ANY,
 			     ni->ni_macaddr, NULL,
 			     "data too short: len %u, expecting %u",
-			    skb->len, hdrsize);
+			    skb->len, hdrspace);
 			ic->ic_stats.is_rx_tooshort++;
 			goto out;		/* XXX */
-		}
-		if (subtype & IEEE80211_FC0_SUBTYPE_QOS) {
-			/* XXX discard if node w/o IEEE80211_NODE_QOS? */
-			/*
-			 * Strip QoS control and any padding so only a
-			 * stock 802.11 header is at the front.
-			 */
-			/* XXX 4-address QoS frame */
-			off = hdrsize - sizeof(struct ieee80211_frame);
-			memmove(skb->data + off, skb->data, hdrsize - off);
-			skb_pull(skb, off);
-			wh = (struct ieee80211_frame *)skb->data;
-			wh->i_fc[0] &= ~IEEE80211_FC0_SUBTYPE_QOS;
-		} else {
-			/* XXX copy up for 4-address frames w/ padding */
 		}
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
@@ -406,7 +391,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				IEEE80211_NODE_STAT(ni, rx_noprivacy);
 				goto out;
 			}
-			key = ieee80211_crypto_decap(ic, ni, skb);
+			key = ieee80211_crypto_decap(ic, ni, skb, hdrspace);
 			if (key == NULL) {
 				/* NB: stats+msgs handled in crypto_decap */
 				IEEE80211_NODE_STAT(ni, rx_wepfail);
@@ -422,7 +407,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		 * Next up, any fragmentation.
 		 */
 		if (!IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-			skb = ieee80211_defrag(ic, ni, skb);
+			skb = ieee80211_defrag(ic, ni, skb, hdrspace);
 			if (skb == NULL) {
 				/* Fragment dropped or frame not complete yet */
 				goto out;
@@ -443,7 +428,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		/*
 		 * Finally, strip the 802.11 header.
 		 */
-		skb = ieee80211_decap(ic, skb);
+		skb = ieee80211_decap(ic, skb, hdrspace);
 		if (skb == NULL) {
 			/* don't count Null data frames as errors */
 			if (subtype == IEEE80211_FC0_SUBTYPE_NODATA)
@@ -602,7 +587,8 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				ic->ic_stats.is_rx_noprivacy++;
 				goto out;
 			}
-			key = ieee80211_crypto_decap(ic, ni, skb);
+			hdrspace = ieee80211_hdrspace(ic, wh);
+			key = ieee80211_crypto_decap(ic, ni, skb, hdrspace);
 			if (key == NULL) {
 				/* NB: stats+msgs handled in crypto_decap */
 				goto out;
@@ -643,7 +629,7 @@ out:
 EXPORT_SYMBOL(ieee80211_input);
 
 /*
- * This function reassemble fragments using the skb of the 1st fragment,
+ * This function reassembles fragments using the skb of the 1st fragment,
  * if large enough. If not, a new skb is allocated to hold incoming
  * fragments.
  *
@@ -653,7 +639,7 @@ EXPORT_SYMBOL(ieee80211_input);
  */
 static struct sk_buff *
 ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
-	struct sk_buff *skb)
+	struct sk_buff *skb, int hdrspace)
 {
 	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
 	struct ieee80211_frame *lwh;
@@ -752,12 +738,12 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 		 */
 		/* Copy current fragment at end of previous one */
 		memcpy(skbfrag->tail,
-		       skb->data + sizeof(struct ieee80211_frame),
-		       skb->len - sizeof(struct ieee80211_frame)
+		       skb->data + hdrspace,
+		       skb->len - hdrspace
 		);
 		/* Update tail and length */
 		skb_put(skbfrag,
-			skb->len - sizeof(struct ieee80211_frame));
+			skb->len - hdrspace);
 		/* track last seqnum and fragno */
 		lwh = (struct ieee80211_frame *) skbfrag->data;
 		*(u_int16_t *) lwh->i_seq = *(u_int16_t *) wh->i_seq;
@@ -773,18 +759,22 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 }
 
 static struct sk_buff *
-ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
+ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb, int hdrlen)
 {
-	struct ieee80211_frame wh;	/* NB: QoS stripped above */
+	struct ieee80211_qosframe_addr4 wh;	/* Max size address frames */
 	struct ether_header *eh;
 	struct llc *llc;
 	u_short ether_type = 0;
 	
-	// TODO: why not using linux llc.h ..., same for ieee80211_encap()
-	memcpy(&wh, skb->data, sizeof(struct ieee80211_frame));
-	llc = (struct llc *) skb_pull(skb, sizeof(struct ieee80211_frame));
-	if (skb->len >= sizeof(struct llc) &&
-	    llc->llc_dsap == LLC_SNAP_LSAP && llc->llc_ssap == LLC_SNAP_LSAP &&
+	// TODO: use linux llc.h ..., same for ieee80211_encap()
+	
+	if (skb->len < hdrlen + sizeof(*llc)) {
+                /* XXX stat, msg */
+                return NULL;
+        }
+	memcpy(&wh, skb->data, hdrlen);
+	llc = (struct llc *) skb_pull(skb, hdrlen);
+	if (llc->llc_dsap == LLC_SNAP_LSAP && llc->llc_ssap == LLC_SNAP_LSAP &&
 	    llc->llc_control == LLC_UI && llc->llc_snap.org_code[0] == 0 &&
 	    llc->llc_snap.org_code[1] == 0 && llc->llc_snap.org_code[2] == 0) {
 		ether_type = llc->llc_un.type_snap.ether_type;
@@ -806,11 +796,9 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb)
 		IEEE80211_ADDR_COPY(eh->ether_shost, wh.i_addr3);
 		break;
 	case IEEE80211_FC1_DIR_DSTODS:
-		/* not yet supported */
-		IEEE80211_DISCARD(ic, IEEE80211_MSG_ANY,
-		    &wh, "data", "%s", "DS to DS not supported");
-		dev_kfree_skb(skb);
-		return NULL;
+		IEEE80211_ADDR_COPY(eh->ether_dhost, wh.i_addr3);
+		IEEE80211_ADDR_COPY(eh->ether_shost, wh.i_addr4);
+		break;
 	}
 	/*
 	 *  TODO: we should ensure alignment on specific arch like amd64, alpha 

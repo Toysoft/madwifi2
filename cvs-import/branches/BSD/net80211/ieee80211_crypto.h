@@ -160,7 +160,7 @@ struct ieee80211_cipher {
 	int	(*ic_setkey)(struct ieee80211_key *);
 	int	(*ic_encap)(struct ieee80211_key *, struct sk_buff *,
 			u_int8_t keyid);
-	int	(*ic_decap)(struct ieee80211_key *, struct sk_buff *);
+	int	(*ic_decap)(struct ieee80211_key *, struct sk_buff *, int);
 	int	(*ic_enmic)(struct ieee80211_key *, struct sk_buff *, int);
 	int	(*ic_demic)(struct ieee80211_key *, struct sk_buff *, int);
 };
@@ -173,7 +173,7 @@ extern	int ieee80211_crypto_available(u_int cipher);
 extern	struct ieee80211_key *ieee80211_crypto_encap(struct ieee80211com *,
 		struct ieee80211_node *, struct sk_buff *);
 extern	struct ieee80211_key *ieee80211_crypto_decap(struct ieee80211com *,
-		struct ieee80211_node *, struct sk_buff *);
+		struct ieee80211_node *, struct sk_buff *, int);
 
 /*
  * Check and remove any MIC.
