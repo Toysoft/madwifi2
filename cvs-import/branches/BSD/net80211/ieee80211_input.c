@@ -221,8 +221,12 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			/*
 			 * Validate the bssid.
+			 * In IBSS Mode we have to let beacons thru for IBSS merging
 			 */
-			if (!IEEE80211_ADDR_EQ(bssid, ic->ic_bss->ni_bssid) &&
+			if ((ic->ic_opmode != IEEE80211_M_IBSS ||
+			     (subtype != IEEE80211_FC0_SUBTYPE_BEACON &&
+			      subtype != IEEE80211_FC0_SUBTYPE_PROBE_RESP)) &&
+			    !IEEE80211_ADDR_EQ(bssid, ic->ic_bss->ni_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
 				IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
