@@ -59,7 +59,7 @@ static	int tkip_setkey(struct ieee80211_key *);
 static	int tkip_encap(struct ieee80211_key *, struct sk_buff *,
 		u_int8_t keyid);
 static	int tkip_enmic(struct ieee80211_key *, struct sk_buff *, int);
-static	int tkip_decap(struct ieee80211_key *, struct sk_buff *);
+static	int tkip_decap(struct ieee80211_key *, struct sk_buff *, int);
 static	int tkip_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 static const struct ieee80211_cipher tkip  = {
@@ -194,7 +194,7 @@ tkip_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 			return 0;
 		/* NB: tkip_encrypt handles wk_keytsc */
 	} else
-		k->wk_keytsc++;		/* XXX wrap at 48 bits */
+		k->wk_keytsc++;
 
 	return 1;
 }
@@ -251,27 +251,25 @@ READ_6(u_int8_t b0, u_int8_t b1, u_int8_t b2, u_int8_t b3, u_int8_t b4, u_int8_t
  * the specified key.
  */
 static int
-tkip_decap(struct ieee80211_key *k, struct sk_buff *skb)
+tkip_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 {
 	struct tkip_ctx *ctx = k->wk_private;
 	struct ieee80211com *ic = ctx->tc_ic;
 	struct ieee80211_frame *wh;
 	u_int8_t *ivp;
-	int hdrlen;
 
 	/*
 	 * Header should have extended IV and sequence number;
 	 * verify the former and validate the latter.
 	 */
 	wh = (struct ieee80211_frame *)skb->data;
-	hdrlen = ieee80211_hdrsize(wh);
 	ivp = skb->data + hdrlen;
 	if ((ivp[IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV) == 0) {
 		/*
 		 * No extended IV; discard frame.
 		 */
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			"[%s] Missing ExtIV for TKIP cipher\n",
+			"[%s] missing ExtIV for TKIP cipher\n",
 			ether_sprintf(wh->i_addr2));
 		ic->ic_stats.is_rx_tkipformat++;
 		return 0;
@@ -281,7 +279,7 @@ tkip_decap(struct ieee80211_key *k, struct sk_buff *skb)
 	 */
 	if (ic->ic_flags & IEEE80211_F_COUNTERM) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-			"[%s] Discard frame due to countermeasures (%s)\n",
+			"[%s] discard frame due to countermeasures (%s)\n",
 			ether_sprintf(wh->i_addr2), __func__);
 		ic->ic_stats.is_crypto_tkipcm++;
 		return 0;
@@ -336,22 +334,20 @@ tkip_demic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 	if (force || k->wk_flags & IEEE80211_KEY_SWMIC) {
 		struct ieee80211_frame *wh =
 			(struct ieee80211_frame *) skb->data;
-		int hdrlen;
+		struct ieee80211com *ic = ctx->tc_ic;
+		int hdrlen = ieee80211_hdrspace(ic, wh);
 		u8 mic[IEEE80211_WEP_MICLEN];
 		IEEE80211_DPRINTF(ctx->tc_ic, IEEE80211_MSG_CRYPTO,
 			"%s: [%s] doing SWMIC\n",
 			__func__, ether_sprintf(wh->i_addr1));
 
-		ctx->tc_ic->ic_stats.is_crypto_tkipdemic++;
-
-		hdrlen = ieee80211_hdrsize(wh);
-
+		ic->ic_stats.is_crypto_tkipdemic++;
+		
 		michael_mic(ctx, k->wk_rxmic,
 			skb, hdrlen, skb->len - (hdrlen + tkip.ic_miclen), mic);
 		if (memcmp(mic, skb->data + skb->len - tkip.ic_miclen, tkip.ic_miclen)) {
 			/* NB: 802.11 layer handles statistic and debug msg */
-			ieee80211_notify_michael_failure(ctx->tc_ic, wh,
-				k->wk_keyix);
+			ieee80211_notify_michael_failure(ic, wh, k->wk_keyix);
 			return 0;
 		}
 	}
@@ -856,7 +852,7 @@ tkip_encrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 		skb->len - (hdrlen + tkip.ic_header + tkip.ic_trailer),
 		icv);
 
-	key->wk_keytsc++;		/* XXX wrap at 48 bits */
+	key->wk_keytsc++;
 	if ((u16)(key->wk_keytsc) == 0)
 		ctx->tx_phase1_done = 0;
 	return 1;
