@@ -1822,6 +1822,8 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		sc->sc_tx_timer = 5;
 		mod_timer(&ic->ic_slowtimo, jiffies + HZ);
 	}
+	if (skb)
+		dev_kfree_skb(skb);
 	return ret;	/* NB: return !0 only in a ``hard error condition'' */
 #undef CLEANUP
 }
