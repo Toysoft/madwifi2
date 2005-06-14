@@ -458,7 +458,7 @@ ieee80211_sysctl_register(struct ieee80211com *ic)
 	const char *cp;
 	int i, space;
 
-	space = 5*sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
+	space = 7*sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	ic->ic_sysctls = kmalloc(space, GFP_KERNEL);
 	if (ic->ic_sysctls == NULL) {
 		printk("%s: no memory for sysctl table!\n", __func__);
@@ -473,19 +473,24 @@ ieee80211_sysctl_register(struct ieee80211com *ic)
 	ic->ic_sysctls[0].child = &ic->ic_sysctls[2];
 	/* [1] is NULL terminator */
 	ic->ic_sysctls[2].ctl_name = CTL_AUTO;
-	for (cp = ic->ic_dev->name; *cp && !isdigit(*cp); cp++)
-		;
-	snprintf(ic->ic_procname, sizeof(ic->ic_procname), "wlan%s", cp);
-	ic->ic_sysctls[2].procname = ic->ic_procname;
+	ic->ic_sysctls[2].procname = "wlan";
 	ic->ic_sysctls[2].mode = 0555;
 	ic->ic_sysctls[2].child = &ic->ic_sysctls[4];
 	/* [3] is NULL terminator */
+	ic->ic_sysctls[4].ctl_name = CTL_AUTO;
+	for (cp = ic->ic_dev->name; *cp && !isdigit(*cp); cp++)
+		;
+	strncpy(ic->ic_procname, ic->ic_dev->name, sizeof(ic->ic_procname));
+	ic->ic_sysctls[4].procname = ic->ic_procname;
+	ic->ic_sysctls[4].mode = 0555;
+	ic->ic_sysctls[4].child = &ic->ic_sysctls[6];
+	/* [5] is NULL terminator */
 	/* copy in pre-defined data */
-	memcpy(&ic->ic_sysctls[4], ieee80211_sysctl_template,
+	memcpy(&ic->ic_sysctls[6], ieee80211_sysctl_template,
 		sizeof(ieee80211_sysctl_template));
 
 	/* add in dynamic data references */
-	for (i = 4; ic->ic_sysctls[i].ctl_name; i++)
+	for (i = 6; ic->ic_sysctls[i].ctl_name; i++)
 		if (ic->ic_sysctls[i].extra1 == NULL)
 			ic->ic_sysctls[i].extra1 = ic;
 
