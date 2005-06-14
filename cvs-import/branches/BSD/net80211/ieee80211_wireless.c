@@ -1582,14 +1582,14 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 	case IEEE80211_PARAM_INACT_INIT:
 		ic->ic_inact_init = value / IEEE80211_INACT_WAIT;
 		break;
-	case IEEE80211_PARAM_ADHOC:
+	case IEEE80211_PARAM_IBSS:
 		if (!ic->ic_media.ifm_cur)
 			return -EINVAL;
 		memset(&ifr, 0, sizeof(ifr));
 		/* NB: remove any fixed-rate at the same time */
 		ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media &~
 			(IFM_OMASK | IFM_TMASK);
-		if (value) {
+		if (value==0) {
 			// IFM_FLAG0 signals adhoc demo mode
 			ifr.ifr_media |= (IFM_IEEE80211_ADHOC|IFM_FLAG0);
 		}
@@ -1730,8 +1730,8 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 	case IEEE80211_PARAM_INACT_INIT:
 		param[0] = ic->ic_inact_init * IEEE80211_INACT_WAIT;
 		break;
-	case IEEE80211_PARAM_ADHOC:
-		param[0] = (ic->ic_opmode == IEEE80211_M_AHDEMO);
+	case IEEE80211_PARAM_IBSS:
+		param[0] = (ic->ic_opmode == IEEE80211_M_IBSS);
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -2305,10 +2305,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "inact_init" },
 	{ IEEE80211_PARAM_INACT_INIT,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_inact_init" },
-	{ IEEE80211_PARAM_ADHOC,
-	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "adhoc" },
-	{ IEEE80211_PARAM_ADHOC,
-	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_adhoc" },
+	{ IEEE80211_PARAM_IBSS,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ibss" },
+	{ IEEE80211_PARAM_IBSS,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ibss" },
 	{ IEEE80211_PARAM_RESET,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },
 #endif /* WIRELESS_EXT >= 12 */
