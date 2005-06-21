@@ -102,6 +102,7 @@ enum {
 };
 
 static int	ath_init(struct net_device *);
+static void	ath_init_keycache(struct ath_softc *);
 static int	ath_reset(struct net_device *);
 static void	ath_fatal_tasklet(TQUEUE_ARG);
 static void	ath_bstuck_tasklet(TQUEUE_ARG);
@@ -335,7 +336,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah;
 	HAL_STATUS status;
-	int error = 0, i;
+	int error = 0;
 	u_int8_t csz;
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: devid 0x%x\n", __func__, devid);
@@ -412,20 +413,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * Reset the key cache since some parts do not
 	 * reset the contents on initial power up.
 	 */
-	for (i = 0; i < sc->sc_keymax; i++)
-		ath_hal_keyreset(ah, i);
-	/*
-	 * Mark key cache slots associated with global keys
-	 * as in use.  If we knew TKIP was not to be used we
-	 * could leave the +32, +64, and +32+64 slots free.
-	 * XXX only for splitmic.
-	 */
-	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
-		setbit(sc->sc_keymap, i);
-		setbit(sc->sc_keymap, i+32);
-		setbit(sc->sc_keymap, i+64);
-		setbit(sc->sc_keymap, i+32+64);
-	}
+	ath_init_keycache(sc);
 
 	/*
 	 * Collect the channel list using the default country
@@ -1031,6 +1019,47 @@ ath_chan2flags(struct ieee80211com *ic, struct ieee80211_channel *chan)
 #undef N
 }
 
+/*
+ * Reset the key cache 
+ * This also cleans up state on mode changes
+ */
+static void
+ath_init_keycache(struct ath_softc *sc)
+{
+	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211_node *ni;
+	int i;
+	
+	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s\n", __func__);
+	
+	for (i = 0; i < sc->sc_keymax; i++) {
+		ath_hal_keyreset(ah, i);
+		clrbit(sc->sc_keymap, i);
+		/* remove any left over node references */
+		ni = sc->sc_keyixmap[i];
+		if (ni != NULL) {
+			DPRINTF(sc, ATH_DEBUG_KEYCACHE, 
+				"%s: removing node %s from keycache\n",
+				__func__, ether_sprintf(ni->ni_macaddr));
+			sc->sc_keyixmap[i] = NULL;
+			ni->ni_ucastkey.wk_keyix = IEEE80211_KEYIX_NONE;
+			ieee80211_free_node(ni);
+		}
+	}
+	/*
+	 * Mark key cache slots associated with global keys
+	 * as in use.  If we knew TKIP was not to be used we
+	 * could leave the +32, +64, and +32+64 slots free.
+	 * XXX only for splitmic.
+	 */
+	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
+		setbit(sc->sc_keymap, i);
+		setbit(sc->sc_keymap, i+32);
+		setbit(sc->sc_keymap, i+64);
+		setbit(sc->sc_keymap, i+32+64);
+	}
+}
+
 static int
 ath_init(struct net_device *dev)
 {
@@ -1080,6 +1109,11 @@ ath_init(struct net_device *dev)
 	 * but it's best done after a reset.
 	 */
 	ath_update_txpow(sc);
+
+	/* 
+	 * reset keycache
+	 */
+	ath_init_keycache(sc);
 
 	/*
 	 * Setup the hardware after reset: the key cache
@@ -2146,11 +2180,13 @@ ath_key_delete(struct ieee80211com *ic, const struct ieee80211_key *k)
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s: delete key %u\n", __func__, keyix);
 
 	ath_hal_keyreset(ah, keyix);
+
         /*
          * Check the key->node map and flush any ref.
          */
         ni = sc->sc_keyixmap[keyix];
         if (ni != NULL) {
+		ni->ni_ucastkey.wk_keyix = IEEE80211_KEYIX_NONE;
                 ieee80211_free_node(ni);
                 sc->sc_keyixmap[keyix] = NULL;
         }
@@ -3834,6 +3870,9 @@ rx_accept:
                          * Fast path: node is present in the key map;
                          * grab a reference for processing the frame.
                          */
+			DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s: node %s in keymap\n", 
+				__func__, ether_sprintf(ni->ni_macaddr));
+			
                         an = ATH_NODE(ieee80211_ref_node(ni));
                         ATH_RSSI_LPF(an->an_avgrssi, ds->ds_rxstat.rs_rssi);
                         type = ieee80211_input(ic, skb, ni,
