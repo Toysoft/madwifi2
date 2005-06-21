@@ -874,7 +874,6 @@ static void
 node_cleanup(struct ieee80211_node *ni)
 {
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
-#define KEY_UNDEFINED(k)        ((k).wk_cipher == &ieee80211_cipher_none)
 	struct ieee80211com *ic = ni->ni_ic;
 	int qlen;
 	u_int i;
@@ -917,9 +916,11 @@ node_cleanup(struct ieee80211_node *ni)
 			kfree_skb(ni->ni_rxfrag[i]);
 			ni->ni_rxfrag[i] = NULL;
 		}
-	if(!KEY_UNDEFINED(ni->ni_ucastkey))
-	    ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
-#undef KEY_UNDEFINED
+	/*
+	 * always call ieee80211_crypto_delkey, to give the driver a chance 
+	 * to update it's keycache
+	 */
+	ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
 #undef N
 }
 
@@ -1126,10 +1127,22 @@ ieee80211_find_rxnode(struct ieee80211com *ic,
 	/* XXX check ic_bss first in station mode */
 	/* XXX 4-address frames? */
 	IEEE80211_NODE_LOCK(nt);
-	if (IS_CTL(wh) && !IS_PSPOLL(wh) /*&& !IS_RTS(ah)*/)
+	if (IS_CTL(wh) && !IS_PSPOLL(wh) /*&& !IS_RTS(ah)*/) {
 		ni = _ieee80211_find_node(nt, wh->i_addr1);
-	else
+		if (ni == NULL) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
+				"%s: %s not found\n", __func__,
+				ether_sprintf(wh->i_addr1));
+		}
+	}
+	else {
 		ni = _ieee80211_find_node(nt, wh->i_addr2);
+		if (ni == NULL) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
+				"%s: %s not found\n", __func__,
+				ether_sprintf(wh->i_addr2));
+		}
+	}
 	IEEE80211_NODE_UNLOCK(nt);
 
 	return (ni != NULL ? ni : ieee80211_ref_node(ic->ic_bss));
@@ -1623,6 +1636,7 @@ ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 	printf("\tfails %u inact %u txrate %u\n",
 		ni->ni_fails, ni->ni_inact, ni->ni_txrate);
 }
+EXPORT_SYMBOL(ieee80211_dump_node);
 
 void
 ieee80211_dump_nodes(struct ieee80211_node_table *nt)
