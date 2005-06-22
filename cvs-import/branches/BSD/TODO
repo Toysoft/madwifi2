@@ -11,8 +11,6 @@ HIGH PRIO:
 - implement "right" iwconfig ath0 key open / restricted behaviour
     - authentication mode open / shared key
     - accept unencrypted frames
-- AIFS and CWMIN are set wrong on the beacon queue.  They should be zero 
-  for AP mode but CWMIN should be 2x for adhoc mode (check the spec).
 - check if private crypto tkip implementation works for cards without hardware 
   crypto support (SWMIC, SWCRYPT).
 - duration in 802.11 frames is 0
@@ -21,7 +19,7 @@ LOW PRIO:
 
 - define commonly used macros global
 - cleanup code
-- remove redundand definitions which have been copied from FreeBSD
+- remove redundant definitions which have been copied from FreeBSD
     - e.g.: struct ether_header
 - consistent configuration either thru sysctl or iwpriv commands
     - i'd suggest iwpriv (br1)
@@ -30,7 +28,7 @@ LOW PRIO:
     
 LONG TERM:
 
-- integration with linux ieee 802.11 stack (work in progress)
+- integration with linux ieee80211 stack (work in progress)
 - inclusion into linux kernel
 
 IDEAS:
