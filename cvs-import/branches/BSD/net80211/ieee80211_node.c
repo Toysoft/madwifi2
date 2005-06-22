@@ -1294,15 +1294,18 @@ ieee80211_find_node_with_ssid(struct ieee80211_node_table *nt,
 	}
 	if (ni != NULL) {
 		ieee80211_ref_node(ni);	/* mark referenced */
-		IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
 #ifdef IEEE80211_DEBUG_REFCNT
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
 			"%s (%s:%u) %p<%s> refcnt %d\n", __func__,
 			func, line,
-#else
-			"%s %p<%s> refcnt %d\n", __func__,
-#endif
 			ni, ether_sprintf(ni->ni_macaddr),
 			ieee80211_node_refcnt(ni));
+#else
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
+			"%s %p<%s> refcnt %d\n", __func__,
+			ni, ether_sprintf(ni->ni_macaddr),
+			ieee80211_node_refcnt(ni));
+#endif
 	}
 	IEEE80211_NODE_UNLOCK(nt);
 	return ni;
