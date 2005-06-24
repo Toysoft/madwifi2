@@ -1036,13 +1036,14 @@ ath_reset(struct net_device *dev)
 	ath_hal_intrset(ah, 0);		/* disable interrupts */
 	ath_draintxq(sc);		/* stop xmit side */
 	ath_stoprecv(sc);		/* stop recv side */
-	/* Setup max txpower */
-	ath_hal_settxpower(ah, ic->ic_bss->ni_txpower);
 
 	/* NB: indicate channel change so we do a full reset */
 	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
 			dev->name, __func__, hal_status_desc[status], status);
+	/* Setup max txpower */
+	ath_hal_settxpower(ah, ic->ic_bss->ni_txpower);
+
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
 			dev->name, __func__);
