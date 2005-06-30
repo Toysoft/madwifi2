@@ -773,7 +773,10 @@ ieee80211_decap(struct ieee80211com *ic, struct sk_buff *skb, int hdrlen)
 	// TODO: use linux llc.h ..., same for ieee80211_encap()
 	
 	if (skb->len < hdrlen + sizeof(*llc)) {
-                /* XXX stat, msg */
+                /* stat is done outside */
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+			"%s: frame too short\n", __func__);
+		dev_kfree_skb(skb);
                 return NULL;
         }
 	memcpy(&wh, skb->data, hdrlen);
