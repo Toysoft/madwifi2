@@ -989,12 +989,12 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 				ic->ic_state = ostate;	/* stay RUN */
 				break;
 			case IEEE80211_FC0_SUBTYPE_DEAUTH:
-				ieee80211_sta_leave(ic, ni);
 				if (ic->ic_roaming == IEEE80211_ROAMING_AUTO) {
 					/* try to reauth */
 					IEEE80211_SEND_MGMT(ic, ni,
 					    IEEE80211_FC0_SUBTYPE_AUTH, 1);
 				}
+				ieee80211_sta_leave(ic, ni);
 				break;
 			}
 			break;
@@ -1013,11 +1013,11 @@ ieee80211_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg
 			    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 0);
 			break;
 		case IEEE80211_S_RUN:
-			ieee80211_sta_leave(ic, ni);
 			if (ic->ic_roaming == IEEE80211_ROAMING_AUTO) {
 				IEEE80211_SEND_MGMT(ic, ni,
 				    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 1);
 			}
+			ieee80211_sta_leave(ic, ni);
 			break;
 		}
 		break;
