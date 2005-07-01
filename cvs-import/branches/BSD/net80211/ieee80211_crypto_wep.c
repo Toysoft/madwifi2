@@ -209,7 +209,6 @@ wep_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 static int
 wep_enmic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
-
 	return 1;
 }
 
