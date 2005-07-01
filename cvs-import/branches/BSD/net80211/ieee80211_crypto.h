@@ -206,7 +206,7 @@ static inline void
 ieee80211_crypto_resetkey(struct ieee80211com *ic,
 	struct ieee80211_key *k, u_int16_t ix)
 {
-	k->wk_cipher = &ieee80211_cipher_none;;
+	k->wk_cipher = &ieee80211_cipher_none;
 	k->wk_private = k->wk_cipher->ic_attach(ic, k);
 	k->wk_keyix = ix;
 	k->wk_flags = IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
@@ -220,5 +220,6 @@ extern	void ieee80211_notify_replay_failure(struct ieee80211com *,
 		u_int64_t rsc);
 extern	void ieee80211_notify_michael_failure(struct ieee80211com *,
 		const struct ieee80211_frame *, u_int keyix);
+
 #endif /* defined(__KERNEL__) || defined(_KERNEL) */
 #endif /* _NET80211_IEEE80211_CRYPTO_H_ */

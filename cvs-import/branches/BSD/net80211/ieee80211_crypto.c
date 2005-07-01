@@ -65,18 +65,24 @@ null_key_alloc(struct ieee80211com *ic, const struct ieee80211_key *k)
 {
 	return IEEE80211_KEYIX_NONE;
 }
+
 static int
 null_key_delete(struct ieee80211com *ic, const struct ieee80211_key *k)
 {
 	return 1;
 }
-static 	int
+
+static int
 null_key_set(struct ieee80211com *ic, const struct ieee80211_key *k,
 	     const u_int8_t mac[IEEE80211_ADDR_LEN])
 {
 	return 1;
 }
-static void null_key_update(struct ieee80211com *ic) {}
+
+static void 
+null_key_update(struct ieee80211com *ic) 
+{
+}
 
 /*
  * Write-arounds for common operations.
