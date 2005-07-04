@@ -426,8 +426,7 @@ ieee80211_ioctl_siwencode(struct ieee80211com *ic,
 		 * the key state should have been updated above.
 		 */
 		if (wepchange && ic->ic_roaming == IEEE80211_ROAMING_AUTO)
-			//error = -(*ic->ic_init)(ic->ic_dev);
-			error = -(*ic->ic_reset)(ic->ic_dev);
+			error = -(*ic->ic_init)(ic->ic_dev);
 	}
 	return error;
 }
