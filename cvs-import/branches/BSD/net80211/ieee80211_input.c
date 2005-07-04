@@ -2336,28 +2336,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 			FREE(ni->ni_challenge, M_DEVBUF);
 			ni->ni_challenge = NULL;
 		}
-#if 1
-		/* XXX 
-		 * this is the old code which is not standard compliant.
-		 * it is still here because we run into problems when WEP
-		 * is activated later after running unencrypted: when a 
-		 * STA associates while WEP is turned off, a CLR key is set 
-		 * up and the keycache is used. when WEP is activated later
-		 * the stale keycache is still used for received frames of 
-		 * this STA which causes frames to be decrypted wrongly.
-		 * i don't know how to get rid of the old keycache entry yet.
-		 * 
-		 * checking the privacy bits like this prevents the STA to be
-		 * associated when the AP is without WEP
-		 */
-               if ((capinfo & IEEE80211_CAPINFO_ESS) == 0 ||
-                   (capinfo & IEEE80211_CAPINFO_PRIVACY) ^
-                   (ic->ic_flags & IEEE80211_F_PRIVACY)) {
-#else
-		/* XXX: should do it like this: */
 		/* NB: 802.11 spec says to ignore station's privacy bit */
 		if ((capinfo & IEEE80211_CAPINFO_ESS) == 0) {
-#endif
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 			    "[%s] deny %s request, capability mismatch 0x%x\n",
 			    ether_sprintf(wh->i_addr2),
