@@ -13,7 +13,14 @@ HIGH PRIO:
     - accept unencrypted frames
 - check if private crypto tkip implementation works for cards without hardware 
   crypto support (SWMIC, SWCRYPT).
-- duration in 802.11 frames is 0
+- duration in 802.11 frames is always 0
+- when a wrong WEP key is configured, the hardware decryption does not fail
+  but results in bogus packets 
+    - cause HAL_RXERR_DECRYPT is ignored
+- a/b -> g mode changes: KASSERT failures in ieee80211_node_leave_11g
+- bandwidth with 2 cards (one in, one out) is only 1/2 of possible rate
+    - may be a locking problem
+
 
 LOW PRIO:
 
@@ -25,11 +32,13 @@ LOW PRIO:
     - i'd suggest iwpriv (br1)
 - antenna reconfiguration in ad-hoc mode does not affect beacons
   if it is done after the beacon is set up (the IBSS is started)
-    
+
+
 LONG TERM:
 
 - integration with linux ieee80211 stack (work in progress)
 - inclusion into linux kernel
+
 
 IDEAS:
 
@@ -37,3 +46,4 @@ IDEAS:
 - write a userspace tool to control all the things wireless_tools do but
   furthermore also things which are not supported by them
     - e.g.: wme + parameters, beacon interval, ack/cts timeouts...
+
