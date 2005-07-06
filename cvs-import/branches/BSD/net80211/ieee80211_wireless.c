@@ -1599,7 +1599,7 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
 	case IEEE80211_PARAM_RESET:
-		ic->ic_reset(ic->ic_dev);
+		ic->ic_init(ic->ic_dev);
 		break;
 	default:
 		retv = EOPNOTSUPP;
