@@ -17,7 +17,6 @@ HIGH PRIO:
 - when a wrong WEP key is configured, the hardware decryption does not fail
   but results in bogus packets 
     - cause HAL_RXERR_DECRYPT is ignored
-- a/b -> g mode changes: KASSERT failures in ieee80211_node_leave_11g
 - bandwidth with 2 cards (one in, one out) is only 1/2 of possible rate
     - may be a locking problem
 
