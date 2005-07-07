@@ -429,14 +429,16 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			goto out;
 		}
 
+		/* don't try to decap Null data frames */
+		if (subtype == IEEE80211_FC0_SUBTYPE_NODATA) {
+			goto out;
+		}
+		
 		/*
 		 * Finally, strip the 802.11 header.
 		 */
 		skb = ieee80211_decap(ic, skb, hdrspace);
 		if (skb == NULL) {
-			/* don't count Null data frames as errors */
-			if (subtype == IEEE80211_FC0_SUBTYPE_NODATA)
-				goto out;
 			IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_INPUT,
 			    ni->ni_macaddr, "data", "%s", "decap error");
 			ic->ic_stats.is_rx_decap++;
