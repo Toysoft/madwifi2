@@ -4467,6 +4467,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		, ctsrate		/* rts/cts rate */
 		, ctsduration		/* rts/cts duration */
 	);
+	bf->bf_flags = flags;
 	/*
 	 * Setup the multi-rate retry state only when we're
 	 * going to use it.  This assumes ath_hal_setuptxdesc
@@ -4638,7 +4639,9 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			/*
 			 * Hand the descriptor to the rate control algorithm.
 			 */
-			ath_rate_tx_complete(sc, an, ds);
+			if ((ds->ds_txstat.ts_status & HAL_TXERR_FILT) == 0 &&
+			    (bf->bf_flags & HAL_TXDESC_NOACK) == 0)
+				ath_rate_tx_complete(sc, an, ds);
 			/*
 			 * Reclaim reference to node.
 			 *
