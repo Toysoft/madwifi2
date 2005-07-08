@@ -1694,7 +1694,11 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 		 * have priority over normal data frames.
 		 */
 		IF_DEQUEUE(&ic->ic_mgtq, skb0);
+		
 		if (skb0 == NULL) {
+			/*
+			 * data frames
+			 */
 			if (counter++ > 200)
 			    DPRINTF(sc, ATH_DEBUG_FATAL, "%s (%s): endlessloop (data) (counter=%i)\n", __func__, dev->name, counter);
 
@@ -1787,6 +1791,9 @@ ath_start(struct sk_buff *skb, struct net_device *dev)
 			 */
 			skb0 = skb;
 		} else {
+			/*
+			 * management frames
+			 */
 			cb = (struct ieee80211_cb *)skb0->cb;
 			ni = cb->ni;
 
