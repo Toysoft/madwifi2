@@ -170,6 +170,7 @@ struct ath_node {
 struct ath_buf {
 	STAILQ_ENTRY(ath_buf)	bf_list;
 	//int			bf_nseg;
+	int			bf_flags;	/* tx descriptor flags */
 	struct ath_desc		*bf_desc;	/* virtual addr of desc */
 	dma_addr_t		bf_daddr;	/* physical addr of desc */
 	struct sk_buff		*bf_skb;	/* skbuff for buf */
