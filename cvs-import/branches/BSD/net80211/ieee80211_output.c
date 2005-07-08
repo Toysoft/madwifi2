@@ -437,6 +437,7 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211_key *key;
 	struct llc *llc;
 	int hdrsize, datalen, addqos;
+	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
 
 	KASSERT(skb->len >= sizeof(eh), ("no ethernet header!"));
 	memcpy(&eh, skb->data, sizeof(struct ether_header));
@@ -531,6 +532,8 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 	case IEEE80211_M_MONITOR:
 		goto bad;
 	}
+	if (cb->flags & M_MORE_DATA)
+		wh->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
 	if (addqos) {
 		struct ieee80211_qosframe *qwh =
 			(struct ieee80211_qosframe *) wh;
@@ -1599,7 +1602,6 @@ ieee80211_pwrsave(struct ieee80211com *ic, struct ieee80211_node *ni,
 	 */
 	/* XXX handle overflow? */
 	age = ((ni->ni_intval * ic->ic_lintval) << 2) / 1024; /* TU -> secs */
-	// TODO: required? cb->ni = ni;
 	_IEEE80211_NODE_SAVEQ_ENQUEUE(ni, skb, qlen, age);
 	IEEE80211_NODE_SAVEQ_UNLOCK(ni);
 

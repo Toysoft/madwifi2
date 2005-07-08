@@ -204,6 +204,7 @@ typedef spinlock_t acl_lock_t;
 #define	M_LINK0		M_PROTO1		/* WEP requested */
 #define	M_PWR_SAV	M_PROTO4		/* bypass PS handling */
 #define	M_HASFCS	M_PROTO5		/* WEP included? */
+#define	M_MORE_DATA	M_PROTO6		/* more data frames to follow */
 
 /*
  * Encode WME access control bits in the PROTO flags.

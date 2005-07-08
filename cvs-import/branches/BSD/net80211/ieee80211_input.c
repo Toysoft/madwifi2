@@ -141,11 +141,11 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int8_t *bssid;
 	u_int16_t rxseq;
 	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
-	// TODO: where is cb->flags set?
 
 	KASSERT(ni != NULL, ("null node"));
 	ni->ni_inact = ni->ni_inact_reload;
 
+	/* cb->flags is never set for ath, but leave it here for diff reduction */
 	/* trim CRC here so WEP can find its own CRC at the end of packet. */
 	if (cb->flags & M_HASFCS) {
 		skb_trim(skb, IEEE80211_CRC_LEN);
@@ -2642,6 +2642,7 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 {
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb;
+	struct ieee80211_cb *cb;
 
 	if (enable) {
 		if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT) == 0)
@@ -2681,12 +2682,12 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		/* 
 		 * If this is the last packet, turn off the TIM bit.
 		 * If there are more packets, set the more packets bit
-		 * in the packet dispatched to the station.
+		 * in the skb so ieee80211_encap will mark the 802.11
+		 * head to indicate more data frames will follow.
 		 */
 		if (qlen != 0) {
-			struct ieee80211_frame_min *wh =
-				(struct ieee80211_frame_min *)skb->data;
-			wh->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
+			cb = (struct ieee80211_cb *)skb->cb;
+			cb->flags |= M_MORE_DATA;
 		}
 		/* XXX need different driver interface */
 		/* XXX bypasses q max */
@@ -2705,6 +2706,7 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 	struct ieee80211_node *ni, struct sk_buff *skb0)
 {
 	struct ieee80211_frame_min *wh;
+	struct ieee80211_cb *cb;
 	struct net_device *dev = ic->ic_dev;
 	struct sk_buff *skb;
 	u_int16_t aid;
@@ -2750,12 +2752,12 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 	 * in the packet dispatched to the station; otherwise
 	 * turn off the TIM bit.
 	 */
+	cb = (struct ieee80211_cb *)skb->cb;
 	if (qlen != 0) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER,
 		    "[%s] recv ps-poll, send packet, %u still queued\n",
 		    ether_sprintf(ni->ni_macaddr), qlen);
-		wh = (struct ieee80211_frame_min *) skb->data;
-		wh->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
+		cb->flags |= M_MORE_DATA;
 	} else {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER,
 		    "[%s] recv ps-poll, send packet, queue empty\n",
@@ -2764,7 +2766,7 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 			ic->ic_set_tim(ic, ni, 0);
 	}
 	/* bypass PS handling */
-	((struct ieee80211_cb *)skb->cb)->flags |= M_PWR_SAV;
+	cb->flags |= M_PWR_SAV;
 
 	(*dev->hard_start_xmit)(skb, dev);
 }
