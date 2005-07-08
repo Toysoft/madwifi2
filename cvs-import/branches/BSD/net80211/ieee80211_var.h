@@ -213,10 +213,11 @@ struct ieee80211com {
 #define	IEEE80211_ADDR_COPY(dst,src)	memcpy(dst,src,IEEE80211_ADDR_LEN)
 
 /* ic_flags */
-/* NB: bits 0x6f available */
+/* NB: bits 0xf available */
 /* NB: this is intentionally setup to be IEEE80211_CAPINFO_PRIVACY */
 #define	IEEE80211_F_PRIVACY	0x00000010	/* CONF: privacy enabled */
-#define	IEEE80211_F_SSCAN	0x00000020	/* STATUS: saved scan results */
+#define	IEEE80211_F_PUREG	0x00000020	/* CONF: 11g w/o 11b sta's */
+#define	IEEE80211_F_SSCAN	0x00000040	/* STATUS: saved scan results */
 #define	IEEE80211_F_SCAN	0x00000080	/* STATUS: scanning */
 #define	IEEE80211_F_ASCAN	0x00000100	/* STATUS: active scan */
 #define	IEEE80211_F_SIBSS	0x00000200	/* STATUS: start IBSS */

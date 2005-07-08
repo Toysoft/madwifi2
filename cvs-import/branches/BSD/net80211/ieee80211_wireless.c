@@ -1598,6 +1598,15 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		}
 		retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
 		break;
+	case IEEE80211_PARAM_PUREG:
+		if (value)
+		 	ic->ic_flags |= IEEE80211_F_PUREG;
+		else
+			ic->ic_flags &= ~IEEE80211_F_PUREG;
+		/* NB: reset only if we're operating on an 11g channel */
+		if (ic->ic_curmode == IEEE80211_MODE_11G)
+			retv = ENETRESET;
+		break;
 	case IEEE80211_PARAM_RESET:
 		ic->ic_init(ic->ic_dev);
 		break;
@@ -1731,6 +1740,9 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_IBSS:
 		param[0] = (ic->ic_opmode == IEEE80211_M_IBSS);
+		break;
+	case IEEE80211_PARAM_PUREG:
+		param[0] = (ic->ic_flags & IEEE80211_F_PUREG) != 0;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -2305,6 +2317,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ibss" },
 	{ IEEE80211_PARAM_IBSS,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ibss" },
+	{ IEEE80211_PARAM_PUREG,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "pureg" },
+	{ IEEE80211_PARAM_PUREG,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_pureg" },
 	{ IEEE80211_PARAM_RESET,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },
 #endif /* WIRELESS_EXT >= 12 */
