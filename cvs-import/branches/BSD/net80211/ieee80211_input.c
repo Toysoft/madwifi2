@@ -907,6 +907,15 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
 			if (ni == NULL)
 				return;
 		}
+		else if ((ni->ni_flags & IEEE80211_NODE_AREF) == 0)
+			ieee80211_ref_node(ni);
+		/*
+		 * Mark the node as referenced to reflect that it's
+		 * reference count has been bumped to insure it remains
+		 * after the transaction completes.
+		 */
+		ni->ni_flags |= IEEE80211_NODE_AREF;
+		
 		IEEE80211_SEND_MGMT(ic, ni, IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_DEBUG | IEEE80211_MSG_AUTH,
 		    "[%s] station authenticated (open)\n",
@@ -1086,8 +1095,16 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 				}
 				allocbs = 1;
 			} else {
+				if ((ni->ni_flags & IEEE80211_NODE_AREF) == 0)
+					ieee80211_ref_node(ni);
 				allocbs = 0;
 			}
+			/*
+			 * Mark the node as referenced to reflect that it's
+			 * reference count has been bumped to insure it remains
+			 * after the transaction completes.
+			 */
+			ni->ni_flags |= IEEE80211_NODE_AREF;
 			ni->ni_rssi = rssi;
 			ni->ni_rstamp = rstamp;
 			if (!alloc_challenge(ic, ni)) {
