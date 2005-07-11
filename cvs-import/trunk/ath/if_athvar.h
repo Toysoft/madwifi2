@@ -7,7 +7,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer,
-    without modification.
+ *    without modification.
  * 2. Redistributions in binary form must reproduce at minimum a disclaimer
  *    similar to the "NO WARRANTY" disclaimer below ("Disclaimer") and any
  *    redistribution must be conditioned upon including a substantially
@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id$
+ * $FreeBSD: src/sys/dev/ath/if_athvar.h,v 1.20 2005/01/24 20:31:24 sam Exp $
  */
 
 /*
@@ -43,12 +43,17 @@
 #define _DEV_ATH_ATHVAR_H
 
 #include "ah.h"
+#include "../net80211/ieee80211_radiotap.h"
 #include "if_athioctl.h"
 #include "if_athrate.h"
 
 #ifdef CONFIG_NET_WIRELESS
 #include <linux/wireless.h>
 #endif
+
+#ifndef ARPHRD_IEEE80211_RADIOTAP
+#define ARPHRD_IEEE80211_RADIOTAP 803 /* IEEE 802.11 + radiotap header */
+#endif /* ARPHRD_IEEE80211_RADIOTAP */
 
 /*
  * Deduce if tasklets are available.  If not then
@@ -120,8 +125,24 @@ typedef void irqreturn_t;
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define	ATH_TXDESC	1		/* number of descriptors per buffer */
+#define ATH_BCBUF       1               /* number of beacon buffers */
 #define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
 #define	ATH_TXINTR_PERIOD 5		/* max number of batched tx descriptors */
+
+#define ATH_BEACON_AIFS_DEFAULT  0      /* default aifs for ap beacon q */
+#define ATH_BEACON_CWMIN_DEFAULT 0      /* default cwmin for ap beacon q */
+#define ATH_BEACON_CWMAX_DEFAULT 0      /* default cwmax for ap beacon q */
+
+/*
+ * The key cache is used for h/w cipher state and also for
+ * tracking station state such as the current tx antenna.
+ * We also setup a mapping table between key cache slot indices
+ * and station state to short-circuit node lookups on rx.
+ * Different parts have different size key caches.  We handle
+ * up to ATH_KEYMAX entries (could dynamically allocate state).
+ */
+#define ATH_KEYMAX      128             /* max key cache size we handle */
+#define ATH_KEYBYTES    (ATH_KEYMAX/NBBY)       /* storage space in bytes */
 
 /* driver-specific node state */
 struct ath_node {
@@ -132,8 +153,8 @@ struct ath_node {
 	HAL_NODE_STATS	an_halstats;	/* rssi statistics used by hal */
 	/* variable-length rate control state follows */
 };
-#define	ATH_NODE(_n)	((struct ath_node *)(_n))
-#define ATH_NODE_CONST(_n)	((const struct ath_node *)(_n))
+#define	ATH_NODE(ni)	((struct ath_node *)(ni))
+#define	ATH_NODE_CONST(ni)	((const struct ath_node *)(ni))
 
 #define ATH_RSSI_LPF_LEN	10
 #define ATH_RSSI_DUMMY_MARKER	0x127
@@ -148,12 +169,15 @@ struct ath_node {
 
 struct ath_buf {
 	STAILQ_ENTRY(ath_buf)	bf_list;
+	//int			bf_nseg;
+	int			bf_flags;	/* tx descriptor flags */
 	struct ath_desc		*bf_desc;	/* virtual addr of desc */
 	dma_addr_t		bf_daddr;	/* physical addr of desc */
 	struct sk_buff		*bf_skb;	/* skbuff for buf */
 	dma_addr_t		bf_skbaddr;	/* physical addr of skb data */
 	struct ieee80211_node	*bf_node;	/* pointer to the node */
 };
+typedef STAILQ_HEAD(, ath_buf) ath_bufhead;
 
 struct ath_hal;
 struct ath_desc;
@@ -175,9 +199,22 @@ struct ath_txq {
 	u_int32_t		*axq_link;	/* link ptr in last TX desc */
 	STAILQ_HEAD(, ath_buf)	axq_q;		/* transmit queue */
 	spinlock_t		axq_lock;	/* lock on q and link */
+	/*
+	 * State for patching up CTS when bursting.
+	 */
+	struct	ath_buf		*axq_linkbuf;	/* va of last buffer */
+	struct	ath_desc	*axq_lastdsWithCTS;
+						/* first desc of last descriptor
+						 * that contains CTS 
+						 */
+	struct	ath_desc	*axq_gatingds;	/* final desc of the gating desc
+						 * that determines whether
+						 * lastdsWithCTS has been DMA'ed
+						 * or not
+						 */
 };
 
-#define	ATH_TXQ_LOCK_INIT(_tq)		spin_lock_init(&(_tq)->axq_lock)
+#define	ATH_TXQ_LOCK_INIT(_sc, _tq)	spin_lock_init(&(_tq)->axq_lock)
 #define	ATH_TXQ_LOCK_DESTROY(_tq)	
 #define	ATH_TXQ_LOCK(_tq)		spin_lock(&(_tq)->axq_lock)
 #define	ATH_TXQ_UNLOCK(_tq)		spin_unlock(&(_tq)->axq_lock)
@@ -197,10 +234,13 @@ struct ath_txq {
 
 struct ath_softc {
 	struct net_device	sc_dev;		/* NB: must be first */
+	struct net_device	sc_rawdev;	/* live monitor device */
 	struct semaphore	sc_lock;	/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats	sc_stats;	/* private statistics */
 	struct ieee80211com	sc_ic;		/* IEEE 802.11 common */
+	int			sc_regdomain;
+	int			sc_countrycode;
 	int			sc_debug;
 	void			(*sc_recv_mgmt)(struct ieee80211com *,
 					struct sk_buff *,
@@ -208,66 +248,101 @@ struct ath_softc {
 					int, int, u_int32_t);
 	int			(*sc_newstate)(struct ieee80211com *,
 					enum ieee80211_state, int);
-	void 			(*sc_node_cleanup)(struct ieee80211com *,
-					struct ieee80211_node *);
-	void			(*sc_node_copy)(struct ieee80211com *,
-					struct ieee80211_node *,
-					const struct ieee80211_node *);
-	struct ath_hal		*sc_ah;		/* Atheros HAL */
-	struct ath_ratectrl	*sc_rc;		/* tx rate control support */
-	unsigned int		sc_invalid : 1,	/* being detached */
-				sc_mrretry : 1,	/* multi-rate retry support */
-				sc_softled : 1,	/* enable LED gpio status */
-				sc_splitmic: 1,	/* split TKIP MIC keys */
-				sc_needmib : 1,	/* enable MIB stats intr */
-				sc_hasdiversity : 1,/* rx diversity available */
-				sc_diversity : 1;/* enable rx diversity */
-						/* rate tables */
-	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
-	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
-	enum ieee80211_phymode	sc_curmode;	/* current phy mode */
-	HAL_CHANNEL		sc_curchan;	/* current h/w channel */
-	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
-	u_int8_t		sc_hwmap[32];	/* h/w rate ix to IEEE table */
-	u_int8_t		sc_protrix;	/* protection rate index */
-	u_int8_t		sc_txantenna;	/* tx antenna (fixed or auto) */
-	HAL_INT			sc_imask;	/* interrupt mask copy */
-	u_int			sc_keymax;	/* size of key cache */
-	u_int8_t		sc_keymap[16];	/* bit map of key cache use */
-
-	u_int32_t		sc_beacons;
-	u_int16_t		sc_ledstate;
-	u_int16_t		sc_ledpin;	/* GPIO pin for LED */
-
+	void 			(*sc_node_free)(struct ieee80211_node *);
 	void			*sc_bdev;	/* associated bus device */
 	struct ath_desc		*sc_desc;	/* TX/RX descriptors */
 	size_t			sc_desc_len;	/* size of TX/RX descriptors */
 	u_int16_t		sc_cachelsz;	/* cache line size */
 	dma_addr_t		sc_desc_daddr;	/* DMA (physical) address */
+	struct ath_hal		*sc_ah;		/* Atheros HAL */
+	struct ath_ratectrl	*sc_rc;		/* tx rate control support */
+	void			(*sc_setdefantenna)(struct ath_softc *, u_int);
+	unsigned int		sc_invalid : 1,	/* disable hardware accesses */
+				sc_mrretry : 1,	/* multi-rate retry support */
+				sc_softled : 1,	/* enable LED gpio status */
+				sc_splitmic: 1,	/* split TKIP MIC keys */
+				sc_needmib : 1,	/* enable MIB stats intr */
+				sc_hasdiversity : 1,/* rx diversity available */
+				sc_diversity : 1,/* enable rx diversity */
+				sc_hasveol : 1,	/* tx VEOL support */
+				sc_hastpc  : 1,	/* per-packet TPC support */
+				sc_ledstate: 1,	/* LED on/off state */
+				sc_blinking: 1,	/* LED blink operation active */
+				sc_endblink: 1,	/* finish LED blink operation */
+				sc_mcastkey: 1, /* mcast key cache search */
+				sc_hasclrkey:1, /* CLR key supported */
+				sc_rawdev_enabled : 1;  /* enable sc_rawdev */
+						/* rate tables */
+	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
+	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
+	enum ieee80211_phymode	sc_curmode;	/* current phy mode */
+	u_int16_t		sc_curtxpow;	/* current tx power limit */
+	HAL_CHANNEL		sc_curchan;	/* current h/w channel */
+	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
+	struct {
+		u_int8_t	ieeerate;	/* IEEE rate */
+		u_int8_t	rxflags;	/* radiotap rx flags */
+		u_int8_t	txflags;	/* radiotap tx flags */
+		u_int16_t	ledon;		/* softled on time */
+		u_int16_t	ledoff;		/* softled off time */
+	} sc_hwmap[32];				/* h/w rate ix mappings */
+	u_int8_t		sc_protrix;	/* protection rate index */
+	u_int			sc_txantenna;	/* tx antenna (fixed or auto) */
+	HAL_INT			sc_imask;	/* interrupt mask copy */
+	u_int			sc_keymax;	/* size of key cache */
+	u_int8_t                sc_keymap[ATH_KEYBYTES];/* key use bit map */
+	struct ieee80211_node   *sc_keyixmap[ATH_KEYMAX];/* key ix->node map */
 
-	struct tq_struct	sc_fataltq;	/* fatal error intr tasklet */
+	u_int			sc_ledpin;	/* GPIO pin for driving LED */
+	u_int			sc_ledon;	/* pin setting for LED on */
+	u_int			sc_ledidle;	/* idle polling interval */
+	int			sc_ledevent;	/* time of last LED event */
+	u_int8_t		sc_rxrate;	/* current rx rate for LED */
+	u_int8_t		sc_txrate;	/* current tx rate for LED */
+	u_int16_t		sc_ledoff;	/* off time for current blink */
+	struct timer_list	sc_ledtimer;	/* led off timer */
+	u_int32_t               sc_rxfilter;
+
+	union {
+		struct ath_tx_radiotap_header th;
+		u_int8_t	pad[64];
+	} u_tx_rt;
+	int			sc_tx_th_len;
+	union {
+		struct ath_rx_radiotap_header th;
+		u_int8_t	pad[64];
+	} u_rx_rt;
+	int			sc_rx_th_len;
+
+	struct tq_struct	sc_fataltq;	/* fatal int tasklet */
+	struct tq_struct	sc_radartq;	/* Radar detection */
 
 	int			sc_rxbufsize;	/* rx size based on mtu */
-	STAILQ_HEAD(, ath_buf)	sc_rxbuf;	/* receive buffer */
+	ath_bufhead		sc_rxbuf;	/* receive buffer */
 	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
 	struct tq_struct	sc_rxtq;	/* rx intr tasklet */
 	struct tq_struct	sc_rxorntq;	/* rxorn intr tasklet */
 	u_int8_t		sc_defant;	/* current default antenna */
 	u_int8_t		sc_rxotherant;	/* rx's on non-default antenna*/
 
-	STAILQ_HEAD(, ath_buf)	sc_txbuf;	/* tx buffer queue */
+	ath_bufhead		sc_txbuf;	/* transmit buffer */
 	spinlock_t		sc_txbuflock;	/* txbuf lock */
+	int			sc_tx_timer;	/* transmit timeout */
 	u_int			sc_txqsetup;	/* h/w queues setup */
 	u_int			sc_txintrperiod;/* tx interrupt batching */
 	struct ath_txq		sc_txq[HAL_NUM_TX_QUEUES];
-	struct ath_txq		*sc_ac2q[5];	/* WME AC -> h/w qnum */ 
+	struct ath_txq		*sc_ac2q[5];	/* WME AC -> h/w q map */ 
 	struct tq_struct	sc_txtq;	/* tx intr tasklet */
 
+	ath_bufhead		sc_bbuf;	/* beacon buffers */
 	u_int			sc_bhalq;	/* HAL q for outgoing beacons */
-	struct ath_buf		*sc_bcbuf;	/* beacon buffer */
+	u_int			sc_bmisscount;	/* missed beacon transmits */
+	u_int32_t		sc_ant_tx[8];	/* recent tx frames/antenna */
+	struct ath_txq		*sc_cabq;	/* tx q for cab frames */
 	struct ath_buf		*sc_bufptr;	/* allocated buffer ptr */
 	struct ieee80211_beacon_offsets sc_boff;/* dynamic update state */
 	struct tq_struct	sc_bmisstq;	/* bmiss intr tasklet */
+	struct tq_struct	sc_bstuckq;	/* stuck beacon processing */
 	enum {
 		OK,				/* no change needed */
 		UPDATE,				/* update pending */
@@ -285,6 +360,14 @@ struct ath_softc {
 #endif
 };
 
+#define	ATH_LOCK_INIT(_sc) \
+	init_MUTEX(&(_sc)->sc_lock)
+#define	ATH_LOCK_DESTROY(_sc)
+#define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
+#define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
+#define	ATH_LOCK_ASSERT(_sc)
+//TODO:	KASSERT(spin_is_locked(&(_sc)->sc_lock), ("buf not locked!"))
+
 #define	ATH_TXQ_SETUP(sc, i)	((sc)->sc_txqsetup & (1<<i))
 
 #define	ATH_TXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_txbuflock)
@@ -295,11 +378,6 @@ struct ath_softc {
 #define	ATH_TXBUF_UNLOCK_BH(_sc)	spin_unlock_bh(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_ASSERT(_sc) \
 	KASSERT(spin_is_locked(&(_sc)->sc_txbuflock), ("txbuf not locked!"))
-
-#define	ATH_LOCK_INIT(_sc)		init_MUTEX(&(_sc)->sc_lock)
-#define	ATH_LOCK_DESTROY(_sc)
-#define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
-#define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
 
 int	ath_attach(u_int16_t, struct net_device *);
 int	ath_detach(struct net_device *);
@@ -317,10 +395,6 @@ void	ath_sysctl_unregister(void);
  */
 #define	ath_hal_reset(_ah, _opmode, _chan, _outdoor, _pstatus) \
 	((*(_ah)->ah_reset)((_ah), (_opmode), (_chan), (_outdoor), (_pstatus)))
-#define ath_hal_settxpower(_ah, _txpower) \
-	((*(ah)->ah_setTxPowerLimit)((_ah), (_txpower)))
-#define ath_hal_gettxpowlimit(_ah, _ppow) \
-        (ath_hal_getcapability(_ah, HAL_CAP_TXPOW, 1, _ppow) == HAL_OK)
 #define	ath_hal_getratetable(_ah, _mode) \
 	((*(_ah)->ah_getRateTable)((_ah), (_mode)))
 #define	ath_hal_getmac(_ah, _mac) \
@@ -371,6 +445,8 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_setTxDP)((_ah), (_q), (_bufaddr)))
 #define	ath_hal_gettxbuf(_ah, _q) \
 	((*(_ah)->ah_getTxDP)((_ah), (_q)))
+#define	ath_hal_numtxpending(_ah, _q) \
+	((*(_ah)->ah_numTxPending)((_ah), (_q)))
 #define	ath_hal_getrxbuf(_ah) \
 	((*(_ah)->ah_getRxDP)((_ah)))
 #define	ath_hal_txstart(_ah, _q) \
@@ -410,8 +486,10 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_resetTxQueue)((_ah), (_q)))
 #define	ath_hal_releasetxqueue(_ah, _q) \
 	((*(_ah)->ah_releaseTxQueue)((_ah), (_q)))
-#define	ath_hal_hasveol(_ah) \
-	((*(_ah)->ah_hasVEOL)((_ah)))
+#define	ath_hal_gettxqueueprops(_ah, _q, _qi) \
+	((*(_ah)->ah_getTxQueueProps)((_ah), (_q), (_qi)))
+#define	ath_hal_settxqueueprops(_ah, _q, _qi) \
+	((*(_ah)->ah_setTxQueueProps)((_ah), (_q), (_qi)))
 #define	ath_hal_getrfgain(_ah) \
 	((*(_ah)->ah_getRfGain)((_ah)))
 #define	ath_hal_getdefantenna(_ah) \
@@ -454,6 +532,42 @@ void	ath_sysctl_unregister(void);
 	(ath_hal_getcapability(_ah, HAL_CAP_DIVERSITY, 1, NULL) == HAL_OK)
 #define	ath_hal_setdiversity(_ah, _v) \
 	ath_hal_setcapability(_ah, HAL_CAP_DIVERSITY, 1, _v, NULL)
+#define	ath_hal_getdiag(_ah, _pv) \
+	(ath_hal_getcapability(_ah, HAL_CAP_DIAG, 0, _pv) == HAL_OK)
+#define	ath_hal_setdiag(_ah, _v) \
+	ath_hal_setcapability(_ah, HAL_CAP_DIAG, 0, _v, NULL)
+#define	ath_hal_getnumtxqueues(_ah, _pv) \
+	(ath_hal_getcapability(_ah, HAL_CAP_NUM_TXQUEUES, 0, _pv) == HAL_OK)
+#define	ath_hal_hasveol(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_VEOL, 0, NULL) == HAL_OK)
+#define	ath_hal_hastxpowlimit(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TXPOW, 0, NULL) == HAL_OK)
+#define	ath_hal_settxpowlimit(_ah, _pow) \
+	((*(_ah)->ah_setTxPowerLimit)((_ah), (_pow)))
+#define	ath_hal_gettxpowlimit(_ah, _ppow) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TXPOW, 1, _ppow) == HAL_OK)
+#define	ath_hal_getmaxtxpow(_ah, _ppow) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TXPOW, 2, _ppow) == HAL_OK)
+#define	ath_hal_gettpscale(_ah, _scale) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TXPOW, 3, _scale) == HAL_OK)
+#define	ath_hal_settpscale(_ah, _v) \
+	ath_hal_setcapability(_ah, HAL_CAP_TXPOW, 3, _v, NULL)
+#define	ath_hal_hastpc(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TPC, 0, NULL) == HAL_OK)
+#define	ath_hal_gettpc(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TPC, 1, NULL) == HAL_OK)
+#define	ath_hal_settpc(_ah, _v) \
+	ath_hal_setcapability(_ah, HAL_CAP_TPC, 1, _v, NULL)
+#define	ath_hal_hasbursting(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_BURST, 0, NULL) == HAL_OK)
+#ifdef notyet
+#define ath_hal_hasmcastkeysearch(_ah) \
+        (ath_hal_getcapability(_ah, HAL_CAP_MCAST_KEYSRCH, 0, NULL) == HAL_OK)
+#define ath_hal_getmcastkeysearch(_ah) \
+        (ath_hal_getcapability(_ah, HAL_CAP_MCAST_KEYSRCH, 1, NULL) == HAL_OK)
+#else
+#define ath_hal_getmcastkeysearch(_ah)  0
+#endif
 
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
@@ -473,6 +587,10 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last), (_ds0)))
 #define	ath_hal_txprocdesc(_ah, _ds) \
 	((*(_ah)->ah_procTxDesc)((_ah), (_ds)))
+#define	ath_hal_updateCTSForBursting(_ah, _ds, _prevds, _prevdsWithCTS, \
+		_gatingds,  _txOpLimit, _ctsDuration) \
+	((*(_ah)->ah_updateCTSForBursting)((_ah), (_ds), (_prevds), \
+		(_prevdsWithCTS), (_gatingds), (_txOpLimit), (_ctsDuration)))
 
 #define ath_hal_gpioCfgOutput(_ah, _gpio) \
         ((*(_ah)->ah_gpioCfgOutput)((_ah), (_gpio)))

@@ -116,19 +116,8 @@ ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 EXPORT_SYMBOL(ath_rate_node_cleanup);
 
 void
-ath_rate_node_copy(struct ath_softc *sc,
-	struct ath_node *dst, const struct ath_node *src)
-{
-	struct onoe_node *odst = ATH_NODE_ONOE(dst);
-	const struct onoe_node *osrc = (const struct onoe_node *)&src[1];
-
-	memcpy(odst, osrc, sizeof(struct onoe_node));
-}
-EXPORT_SYMBOL(ath_rate_node_copy);
-
-void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
-	HAL_BOOL shortPreamble, size_t frameLen,
+	int shortPreamble, size_t frameLen,
 	u_int8_t *rix, int *try0, u_int8_t *txrate)
 {
 	struct onoe_node *on = ATH_NODE_ONOE(an);
@@ -144,14 +133,31 @@ EXPORT_SYMBOL(ath_rate_findrate);
 
 void
 ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
-	struct ath_desc *ds, HAL_BOOL shortPreamble, u_int8_t rix)
+	struct ath_desc *ds, int shortPreamble, u_int8_t rix)
 {
 	struct onoe_node *on = ATH_NODE_ONOE(an);
 
+	u_int8_t rate1, rate2, rate3, try1, try2, try3;
+	
+	if (shortPreamble) {
+		rate1 = on->on_tx_rate1sp;
+		rate2 = on->on_tx_rate2sp;
+		rate3 = on->on_tx_rate3sp;
+	} else {
+		rate1 = on->on_tx_rate1;
+		rate2 = on->on_tx_rate2;
+		rate3 = on->on_tx_rate3;
+	}
+		
+	/* setting try to 0 seems to bypass this rate */
+	try1 = (rate1 == 0) ? 0 : 2;
+	try2 = (rate2 == 0) ? 0 : 2;
+	try3 = (rate3 == 0) ? 0 : 2;
+	
 	ath_hal_setupxtxdesc(sc->sc_ah, ds
-		, on->on_tx_rate1sp, 2	/* series 1 */
-		, on->on_tx_rate2sp, 2	/* series 2 */
-		, on->on_tx_rate3sp, 2	/* series 3 */
+		, rate1, try1	/* series 1 */
+		, rate2, try2	/* series 2 */
+		, rate3, try3	/* series 3 */
 	);
 }
 EXPORT_SYMBOL(ath_rate_setupxtxdesc);
@@ -308,6 +314,13 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 #undef RATE
 }
 
+static void
+ath_rate_cb(void *arg, struct ieee80211_node *ni)
+{
+	struct ath_softc *sc = arg;
+	ath_rate_update(sc, ni, 0);
+}
+
 /*
  * Reset the rate control state for each 802.11 state transition.
  */
@@ -340,8 +353,7 @@ ath_rate_newstate(struct ath_softc *sc, enum ieee80211_state state)
 		 * For any other operating mode we want to reset the
 		 * tx rate state of each node.
 		 */
-		TAILQ_FOREACH(ni, &ic->ic_node, ni_list)
-			ath_rate_update(sc, ni, 0);	/* use lowest rate */
+		ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, sc);
 		ath_rate_update(sc, ic->ic_bss, 0);
 	}
 	if (ic->ic_fixed_rate == -1 && state == IEEE80211_S_RUN) {
@@ -444,7 +456,7 @@ ath_ratectl(unsigned long data)
 		if (ic->ic_opmode == IEEE80211_M_STA)
 			ath_rate_ctl(sc, ic->ic_bss);	/* NB: no reference */
 		else
-			ieee80211_iterate_nodes(ic, ath_rate_ctl, sc);
+			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_ctl, sc);
 	}
 	interval = ath_rateinterval;
 	if (ic->ic_opmode == IEEE80211_M_STA)
@@ -486,6 +498,14 @@ static	int minpercent = 0;			/* 0% */
 static	int maxint = 0x7fffffff;		/* 32-bit big */
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
+
+#ifdef CONFIG_SYSCTL
+void
+ath_rate_dynamic_sysctl_register(struct ath_softc *sc)
+{
+}
+EXPORT_SYMBOL(ath_rate_dynamic_sysctl_register);
+#endif /* CONFIG_SYSCTL */
 
 /*
  * Static (i.e. global) sysctls.

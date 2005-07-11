@@ -1,4 +1,3 @@
-/*	$NetBSD: ieee80211_proto.h,v 1.3 2003/10/13 04:23:56 dyoung Exp $	*/
 /*-
  * Copyright (c) 2001 Atsushi Onoe
  * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
@@ -30,7 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net80211/ieee80211_proto.h,v 1.4 2003/08/19 22:17:03 sam Exp $
+ * $FreeBSD: src/sys/net80211/ieee80211_proto.h,v 1.9 2005/01/24 20:38:26 sam Exp $
  */
 #ifndef _NET80211_IEEE80211_PROTO_H_
 #define _NET80211_IEEE80211_PROTO_H_
@@ -44,7 +43,7 @@ enum ieee80211_state {
 	IEEE80211_S_SCAN	= 1,	/* scanning */
 	IEEE80211_S_AUTH	= 2,	/* try to authenticate */
 	IEEE80211_S_ASSOC	= 3,	/* try to assoc */
-	IEEE80211_S_RUN		= 4,	/* associated */
+	IEEE80211_S_RUN		= 4	/* associated */
 };
 #define	IEEE80211_S_MAX		(IEEE80211_S_RUN+1)
 
@@ -62,25 +61,37 @@ struct ieee80211_cb {
 	struct ieee80211_node	*ni;
 	struct ieee80211_key	*key;
 	u_int8_t		flags;
+	int			age;
 };
 
 extern	const char *ieee80211_mgt_subtype_name[];
-extern	const char *ieee80211_ctl_subtype_name[];
+extern	const char *ieee80211_phymode_name[];
 
-extern	void ieee80211_proto_attach(struct ieee80211com *);
-extern	void ieee80211_proto_detach(struct ieee80211com *);
+void ieee80211_proto_attach(struct ieee80211com *);
+void ieee80211_proto_detach(struct ieee80211com *);
 
 struct ieee80211_node;
-extern	void ieee80211_input(struct ieee80211com *, struct sk_buff *,
+int ieee80211_input(struct ieee80211com *, struct sk_buff *,
 		struct ieee80211_node *, int, u_int32_t);
-extern	void ieee80211_recv_mgmt(struct ieee80211com *, struct sk_buff *,
+void ieee80211_recv_mgmt(struct ieee80211com *, struct sk_buff *,
 		struct ieee80211_node *, int, int, u_int32_t);
-extern	int ieee80211_send_mgmt(struct ieee80211com *, struct ieee80211_node *,
+int ieee80211_send_nulldata(struct ieee80211com *,
+		struct ieee80211_node *);
+int ieee80211_send_mgmt(struct ieee80211com *, struct ieee80211_node *,
 		int, int);
-extern	void ieee80211_pwrsave(struct ieee80211com *, struct ieee80211_node *, 
+int ieee80211_classify(struct ieee80211com *, struct sk_buff *,
+		struct ieee80211_node *);
+struct sk_buff *ieee80211_encap(struct ieee80211com *, struct sk_buff *,
+		struct ieee80211_node *);	// TODO: ieee80211_node ** ??
+void ieee80211_pwrsave(struct ieee80211com *, struct ieee80211_node *, 
 		struct sk_buff *);
-extern	struct sk_buff *ieee80211_encap(struct ieee80211com *, struct sk_buff *,
-		struct ieee80211_node **);
+
+void ieee80211_reset_erp(struct ieee80211com *);
+void ieee80211_set_shortslottime(struct ieee80211com *, int onoff);
+int ieee80211_iserp_rateset(struct ieee80211com *,
+		struct ieee80211_rateset *);
+void ieee80211_set11gbasicrates(struct ieee80211_rateset *,
+		enum ieee80211_phymode);
 
 /*
  * Return the size of the 802.11 header for a management or data frame.
@@ -134,10 +145,10 @@ struct ieee80211_authenticator {
 	void	(*ia_node_leave)(struct ieee80211com *,
 				struct ieee80211_node *);
 };
-extern	void ieee80211_authenticator_register(int type,
+void ieee80211_authenticator_register(int type,
 		const struct ieee80211_authenticator *);
-extern	void ieee80211_authenticator_unregister(int type);
-extern	const struct ieee80211_authenticator *
+void ieee80211_authenticator_unregister(int type);
+const struct ieee80211_authenticator *
 		ieee80211_authenticator_get(int auth);
 
 struct eapolcom;
@@ -151,11 +162,11 @@ struct ieee80211_authenticator_backend {
 	int	(*iab_attach)(struct eapolcom *);
 	void	(*iab_detach)(struct eapolcom *);
 };
-extern	void ieee80211_authenticator_backend_register(
-		const struct ieee80211_authenticator_backend *);
-extern	void ieee80211_authenticator_backend_unregister(
-		const struct ieee80211_authenticator_backend *);
-extern	const struct ieee80211_authenticator_backend *
+void ieee80211_authenticator_backend_register(
+	const struct ieee80211_authenticator_backend *);
+void ieee80211_authenticator_backend_unregister(
+	const struct ieee80211_authenticator_backend *);
+const struct ieee80211_authenticator_backend *
 	ieee80211_authenticator_backend_get(const char *name);
 
 /*
@@ -177,26 +188,64 @@ struct ieee80211_aclator {
 	int	(*iac_setpolicy)(struct ieee80211com *, int);
 	int	(*iac_getpolicy)(struct ieee80211com *);
 };
-extern	void ieee80211_aclator_register(const struct ieee80211_aclator *);
-extern	void ieee80211_aclator_unregister(const struct ieee80211_aclator *);
-extern	const struct ieee80211_aclator *ieee80211_aclator_get(const char *name);
+void ieee80211_aclator_register(const struct ieee80211_aclator *);
+void ieee80211_aclator_unregister(const struct ieee80211_aclator *);
+const struct ieee80211_aclator *ieee80211_aclator_get(const char *name);
 
 /* flags for ieee80211_fix_rate() */
 #define	IEEE80211_F_DOSORT	0x00000001	/* sort rate list */
 #define	IEEE80211_F_DOFRATE	0x00000002	/* use fixed rate */
 #define	IEEE80211_F_DONEGO	0x00000004	/* calc negotiated rate */
 #define	IEEE80211_F_DODEL	0x00000008	/* delete ignore rate */
-extern	int ieee80211_fix_rate(struct ieee80211com *,
+int ieee80211_fix_rate(struct ieee80211com *,
 		struct ieee80211_node *, int);
 
-extern	int ieee80211_iserp_rateset(struct ieee80211com *,
-		struct ieee80211_rateset *);
+/*
+ * WME/WMM support.
+ */
+struct wmeParams {
+	u_int8_t	wmep_acm;
+	u_int8_t	wmep_aifsn;
+	u_int8_t	wmep_logcwmin;		/* log2(cwmin) */
+	u_int8_t	wmep_logcwmax;		/* log2(cwmax) */
+	u_int8_t	wmep_txopLimit;
+	u_int8_t	wmep_noackPolicy;	/* 0 (ack), 1 (no ack) */
+};
+#define	IEEE80211_TXOP_TO_US(_txop)	((_txop)<<5)
+#define	IEEE80211_US_TO_TXOP(_us)	((_us)>>5)
+
+struct chanAccParams {
+	u_int8_t	cap_info;		/* version of the current set */
+	struct wmeParams cap_wmeParams[WME_NUM_AC];
+};
+
+struct ieee80211_wme_state {
+	u_int	wme_flags;
+#define	WME_F_AGGRMODE	0x00000001	/* STATUS: WME agressive mode */
+	u_int	wme_hipri_traffic;	/* VI/VO frames in beacon interval */
+	u_int	wme_hipri_switch_thresh;/* agressive mode switch thresh */
+	u_int	wme_hipri_switch_hysteresis;/* agressive mode switch hysteresis */
+
+	struct wmeParams wme_params[4];		/* from assoc resp for each AC*/
+	struct chanAccParams wme_wmeChanParams;	/* WME params applied to self */
+	struct chanAccParams wme_wmeBssChanParams;/* WME params bcast to stations */
+	struct chanAccParams wme_chanParams;	/* params applied to self */
+	struct chanAccParams wme_bssChanParams;	/* params bcast to stations */
+
+	int	(*wme_update)(struct ieee80211com *);
+};
+
+void ieee80211_wme_initparams(struct ieee80211com *);
+void ieee80211_wme_updateparams(struct ieee80211com *);
+void ieee80211_wme_updateparams_locked(struct ieee80211com *);
+
 #define	ieee80211_new_state(_ic, _nstate, _arg) \
 	(((_ic)->ic_newstate)((_ic), (_nstate), (_arg)))
-extern	void ieee80211_print_essid(const u_int8_t *, int);
-extern	void ieee80211_dump_pkt(const u_int8_t *, int, int, int);
+void ieee80211_print_essid(const u_int8_t *, int);
+void ieee80211_dump_pkt(const u_int8_t *, int, int, int);
 
 extern	const char *ieee80211_state_name[IEEE80211_S_MAX];
+extern	const char *ieee80211_wme_acnames[];
 
 /*
  * Beacon frames constructed by ieee80211_beacon_alloc
@@ -206,6 +255,7 @@ extern	const char *ieee80211_state_name[IEEE80211_S_MAX];
 struct ieee80211_beacon_offsets {
 	u_int16_t	*bo_caps;	/* capabilities */
 	u_int8_t	*bo_tim;	/* start of atim/dtim */
+	u_int8_t	*bo_wme;	/* start of WME parameters */
 	u_int8_t	*bo_trailer;	/* start of fixed-size trailer */
 	u_int16_t	bo_tim_len;	/* atim/dtim length in bytes */
 	u_int16_t	bo_trailer_len;	/* trailer length in bytes */
@@ -214,16 +264,16 @@ extern	struct sk_buff *ieee80211_beacon_alloc(struct ieee80211com *,
 		struct ieee80211_node *, struct ieee80211_beacon_offsets *);
 extern	int ieee80211_beacon_update(struct ieee80211com *,
 		struct ieee80211_node *, struct ieee80211_beacon_offsets *,
-		struct sk_buff **);
+		struct sk_buff *, int broadcast);
 
 /*
  * Notification methods called from the 802.11 state machine.
  * Note that while these are defined here, their implementation
  * is OS-specific.
  */
-extern	void ieee80211_notify_node_join(struct ieee80211com *,
+void ieee80211_notify_node_join(struct ieee80211com *,
 		struct ieee80211_node *, int newassoc);
-extern	void ieee80211_notify_node_leave(struct ieee80211com *,
+void ieee80211_notify_node_leave(struct ieee80211com *,
 		struct ieee80211_node *);
-extern	void ieee80211_notify_scan_done(struct ieee80211com *);
+void ieee80211_notify_scan_done(struct ieee80211com *);
 #endif /* _NET80211_IEEE80211_PROTO_H_ */

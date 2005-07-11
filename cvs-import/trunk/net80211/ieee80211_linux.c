@@ -67,6 +67,7 @@ if_printf(struct net_device *dev, const char *fmt, ...)
 
 	printk("%s: %s", dev->name, buf);
 }
+EXPORT_SYMBOL(if_printf);
 
 /*
  * Allocate and setup a management frame of the specified
@@ -110,7 +111,6 @@ skb_queue_drain(struct sk_buff_head *q)
 {
 	struct sk_buff *skb;
 	unsigned long flags;
-
 	spin_lock_irqsave(&q->lock, flags);
 	while ((skb = __skb_dequeue(q)) != NULL)
 		dev_kfree_skb(skb);
@@ -149,22 +149,46 @@ ieee80211_notify_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, i
 {
 	union iwreq_data wreq;
 
+	memset(&wreq, 0, sizeof(wreq));
 	if (ni == ic->ic_bss) {
 		if (newassoc)
 			netif_carrier_on(ic->ic_dev);
-		memset(&wreq, 0, sizeof(wreq));
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
-	} else if (newassoc) {
-		/* fire off wireless event only for new station */
-		memset(&wreq, 0, sizeof(wreq));
+	} else {
+		/* fire off wireless for new and reassoc station
+		 * please note that this is ok atm because there is no
+		 * difference in handling in hostapd.
+		 * If needed we will change to use an IWEVCUSTOM event.
+		 */
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, IWEVREGISTERED, &wreq, NULL);
 	}
 }
 
+void
+ieee80211_notify_traffic_statistic(struct ieee80211com *ic,
+	struct ieee80211_node *ni)
+{
+	static const char * tag = "STA-TRAFFIC-STAT";
+	union iwreq_data wrqu;
+	char buf[128]; /* max message < 125 byte */
+
+	snprintf(buf, sizeof(buf), "%s\nmac=%s\n"
+		"rx_packets=%u\ntx_packets=%u\n"
+		"rx_bytes=%u\ntx_bytes=%u\n",
+		tag, ether_sprintf(ni->ni_macaddr),
+		ni->ni_stats.ns_rx_data, ni->ni_stats.ns_tx_data,
+		(u_int32_t)ni->ni_stats.ns_rx_bytes,
+		(u_int32_t)ni->ni_stats.ns_tx_bytes);
+ 
+	memset(&wrqu, 0, sizeof(wrqu));
+	wrqu.data.length = strlen(buf);
+	wireless_send_event(ic->ic_dev, IWEVCUSTOM, &wrqu, buf);
+}
+ 
 void
 ieee80211_notify_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
@@ -176,6 +200,8 @@ ieee80211_notify_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 		wreq.ap_addr.sa_family = ARPHRD_ETHER;
 		wireless_send_event(ic->ic_dev, SIOCGIWAP, &wreq, NULL);
 	} else {
+		/* sending message about last traffic statistics of station */
+		ieee80211_notify_traffic_statistic(ic, ni);
 		/* fire off wireless event station leaving */
 		memset(&wreq, 0, sizeof(wreq));
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
@@ -190,7 +216,7 @@ ieee80211_notify_scan_done(struct ieee80211com *ic)
 	union iwreq_data wreq;
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_SCAN,
-		("%s: notify scan done\n", ic->ic_dev->name));
+		"%s: notify scan done\n", ic->ic_dev->name);
 
 	/* dispatch wireless event indicating scan completed */
 	wreq.data.length = 0;
@@ -208,9 +234,9 @@ ieee80211_notify_replay_failure(struct ieee80211com *ic,
 	char buf[128];
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		("[%s] %s replay detected <rsc %llu, csc %llu>\n",
+		"[%s] %s replay detected <rsc %llu, csc %llu>\n",
 		ether_sprintf(wh->i_addr2), k->wk_cipher->ic_name,
-		rsc, k->wk_keyrsc));
+		rsc, k->wk_keyrsc);
 
 	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
 		return;
@@ -234,8 +260,8 @@ ieee80211_notify_michael_failure(struct ieee80211com *ic,
 	char buf[128];
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_CRYPTO,
-		("[%s] Michael MIC verification failed <keyidx %d>\n",
-	       ether_sprintf(wh->i_addr2), keyix));
+		"[%s] Michael MIC verification failed <keyidx %d>\n",
+	       ether_sprintf(wh->i_addr2), keyix);
 	ic->ic_stats.is_rx_tkipmic++;
 
 	if (ic->ic_dev == NULL)		/* NB: for cipher test modules */
@@ -257,21 +283,25 @@ EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 static int
 proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 {
-	TAILQ_HEAD(, ieee80211_node) *head = arg;
-	char *p = page;
+	char buf[1024];
+	char *p = buf;
 	struct ieee80211_node *ni;
+	struct ieee80211_node_table *nt = &ic->ic_sta;
 	struct ieee80211_rateset *rs;
 	int i;
+	u_int16_t temp;
 
-	IEEE80211_NODE_LOCK_BH(ic);
-	TAILQ_FOREACH(ni, head, ni_list) {
+	IEEE80211_NODE_LOCK(nt);
+	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		/* Assume each node needs 300 bytes */ 
-		if (p - page > space - 300)
+		if (p - buf > space - 300)
 			break;
-
+		
 		p += sprintf(p, "\nmacaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
-		p += sprintf(p, "  rssi: %d dBm\n",
-			(*ic->ic_node_getrssi)(ic, ni));
+		if (ni == ic->ic_bss)
+			p += sprintf(p, "BSS\n");
+		p += sprintf(p, "  rssi: %d dBm ;", ic->ic_node_getrssi(ni));
+		p += sprintf(p, "refcnt: %d\n", ieee80211_node_refcnt(ni));
 
 		p += sprintf(p, "  capinfo:");
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_ESS)
@@ -292,6 +322,8 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 			p += sprintf(p, " shortpreamble");
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME)
 			p += sprintf(p, " shortslot");
+		if (ni->ni_capinfo & IEEE80211_CAPINFO_RSN)
+			p += sprintf(p, " rsn");
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_DSSSOFDM)
 			p += sprintf(p, " dsssofdm");
 		p += sprintf(p, "\n");
@@ -313,6 +345,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 
 		rs = &ni->ni_rates;
 		if (ni->ni_txrate >= 0 && ni->ni_txrate < rs->rs_nrates) {
+
 			p += sprintf(p, "  txrate: ");
 			for (i = 0; i < rs->rs_nrates; i++) {
 				p += sprintf(p, "%s%d%sMbps",
@@ -327,14 +360,28 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 			p += sprintf(p, "  txrate: %d ? (rs_nrates: %d)\n",
 					ni->ni_txrate, ni->ni_rates.rs_nrates);
 
-		p += sprintf(p, "  txseq: %d  rxseq: %d\n",
-				ni->ni_txseq, ni->ni_rxseq);
-		p += sprintf(p, "  fails: %d  inact: %d\n",
-				ni->ni_fails, ni->ni_inact);
+		p += sprintf(p, "  txpower %d vlan %d\n",
+			ni->ni_txpower,
+			ni->ni_vlan);
 
+		p += sprintf(p, "  txseq: %d  rxseq: %d fragno %d rxfragstamp %d\n",
+				ni->ni_txseqs[0],
+				ni->ni_rxseqs[0] >> IEEE80211_SEQ_SEQ_SHIFT,
+				ni->ni_rxseqs[0] & IEEE80211_SEQ_FRAG_MASK,
+				ni->ni_rxfragstamp);
+
+		if (ic->ic_opmode == IEEE80211_M_IBSS || ni->ni_associd != 0)
+			temp = ic->ic_inact_run;
+		else if (ieee80211_node_is_authorized(ni))
+			temp = ic->ic_inact_auth;
+		else
+			temp = ic->ic_inact_init;
+		temp = (temp - ni->ni_inact) * IEEE80211_INACT_WAIT;
+		p += sprintf(p, "  fails: %d  inact: %d\n",
+				ni->ni_fails, temp);
 	}
-	IEEE80211_NODE_UNLOCK_BH(ic);
-	return (p - page);
+	IEEE80211_NODE_UNLOCK(nt);
+	return copy_to_user(page, buf, p - buf) ? 0 : (p - buf);
 }
 
 static int
@@ -345,11 +392,20 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_stations, ctl, write, filp, buffer,
 	int len = *lenp;
 
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP &&
-	    ic->ic_opmode != IEEE80211_M_IBSS)
+	    ic->ic_opmode != IEEE80211_M_IBSS &&
+	    ic->ic_opmode != IEEE80211_M_AHDEMO)
 		return -EINVAL;
+#if	LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
 	if (len && filp->f_pos == 0) {
-		*lenp = proc_read_node(buffer, len, ic, &ic->ic_node);
+#else
+	if (len && ppos != NULL && *ppos == 0) {
+#endif
+		*lenp = proc_read_node(buffer, len, ic, &ic->ic_sta);
+#if	LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
 		filp->f_pos += *lenp;
+#else
+		*ppos += *lenp;
+#endif
 	} else {
 		*lenp = 0;
 	}
@@ -371,9 +427,9 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
 				lenp, ppos);
 		if (ret == 0)
-			ic->msg_enable = val;
+			ic->ic_debug = val;
 	} else {
-		val = ic->msg_enable;
+		val = ic->ic_debug;
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
 				lenp, ppos);
 	}
@@ -402,7 +458,7 @@ ieee80211_sysctl_register(struct ieee80211com *ic)
 	const char *cp;
 	int i, space;
 
-	space = 5*sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
+	space = 7*sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	ic->ic_sysctls = kmalloc(space, GFP_KERNEL);
 	if (ic->ic_sysctls == NULL) {
 		printk("%s: no memory for sysctl table!\n", __func__);
@@ -417,19 +473,24 @@ ieee80211_sysctl_register(struct ieee80211com *ic)
 	ic->ic_sysctls[0].child = &ic->ic_sysctls[2];
 	/* [1] is NULL terminator */
 	ic->ic_sysctls[2].ctl_name = CTL_AUTO;
-	for (cp = ic->ic_dev->name; *cp && !isdigit(*cp); cp++)
-		;
-	snprintf(ic->ic_procname, sizeof(ic->ic_procname), "wlan%s", cp);
-	ic->ic_sysctls[2].procname = ic->ic_procname;
+	ic->ic_sysctls[2].procname = "wlan";
 	ic->ic_sysctls[2].mode = 0555;
 	ic->ic_sysctls[2].child = &ic->ic_sysctls[4];
 	/* [3] is NULL terminator */
+	ic->ic_sysctls[4].ctl_name = CTL_AUTO;
+	for (cp = ic->ic_dev->name; *cp && !isdigit(*cp); cp++)
+		;
+	strncpy(ic->ic_procname, ic->ic_dev->name, sizeof(ic->ic_procname));
+	ic->ic_sysctls[4].procname = ic->ic_procname;
+	ic->ic_sysctls[4].mode = 0555;
+	ic->ic_sysctls[4].child = &ic->ic_sysctls[6];
+	/* [5] is NULL terminator */
 	/* copy in pre-defined data */
-	memcpy(&ic->ic_sysctls[4], ieee80211_sysctl_template,
+	memcpy(&ic->ic_sysctls[6], ieee80211_sysctl_template,
 		sizeof(ieee80211_sysctl_template));
 
 	/* add in dynamic data references */
-	for (i = 4; ic->ic_sysctls[i].ctl_name; i++)
+	for (i = 6; ic->ic_sysctls[i].ctl_name; i++)
 		if (ic->ic_sysctls[i].extra1 == NULL)
 			ic->ic_sysctls[i].extra1 = ic;
 

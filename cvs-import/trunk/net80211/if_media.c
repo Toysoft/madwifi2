@@ -192,8 +192,11 @@ ifmedia_set(struct ifmedia *ifm, int target)
  * Device-independent media ioctl support function.
  */
 int
-ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
-	struct ifmedia *ifm, u_long cmd)
+ifmedia_ioctl(dev, ifr, ifm, cmd)
+	struct net_device *dev;
+	struct ifreq *ifr;
+	struct ifmedia *ifm;
+	u_long cmd;
 {
 	struct ifmedia_entry *match;
 	struct ifmediareq *ifmr = (struct ifmediareq *) ifr;

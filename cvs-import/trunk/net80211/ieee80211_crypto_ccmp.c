@@ -63,9 +63,9 @@ static	void ccmp_detach(struct ieee80211_key *);
 static	int ccmp_setkey(struct ieee80211_key *);
 static	int ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb,
 		u_int8_t keyid);
-static	int ccmp_decap(struct ieee80211_key *, struct sk_buff *);
-static	int ccmp_enmic(struct ieee80211_key *, struct sk_buff *);
-static	int ccmp_demic(struct ieee80211_key *, struct sk_buff *);
+static	int ccmp_decap(struct ieee80211_key *, struct sk_buff *, int);
+static	int ccmp_enmic(struct ieee80211_key *, struct sk_buff *, int);
+static	int ccmp_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 static const struct ieee80211_cipher ccmp = {
 	.ic_name	= "AES-CCM",
@@ -131,8 +131,8 @@ ccmp_setkey(struct ieee80211_key *k)
 
 	if (k->wk_keylen != (128/NBBY)) {
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("%s: Invalid key length %u, expecting %u\n",
-			__func__, k->wk_keylen, 128/NBBY));
+			"%s: Invalid key length %u, expecting %u\n",
+			__func__, k->wk_keylen, 128/NBBY);
 		return 0;
 	}
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
@@ -146,10 +146,12 @@ ccmp_setkey(struct ieee80211_key *k)
 static int
 ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 {
+	struct ccmp_ctx *ctx = k->wk_private;
+	struct ieee80211com *ic = ctx->cc_ic;
 	u_int8_t *ivp;
 	int hdrlen;
 
-	hdrlen = ieee80211_hdrsize(skb->data);
+	hdrlen = ieee80211_hdrspace(ic, skb->data);
 
 	/*
 	 * Copy down 802.11 header and add the IV, KeyID, and ExtIV.
@@ -182,7 +184,7 @@ ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
  * Add MIC to the frame as needed.
  */
 static int
-ccmp_enmic(struct ieee80211_key *k, struct sk_buff *skb)
+ccmp_enmic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
 
 	return 1;
@@ -202,28 +204,26 @@ READ_6(u_int8_t b0, u_int8_t b1, u_int8_t b2, u_int8_t b3, u_int8_t b4, u_int8_t
  * is also verified.
  */
 static int
-ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb)
+ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 {
 	struct ccmp_ctx *ctx = k->wk_private;
 	struct ieee80211_frame *wh;
 	u_int8_t *ivp;
 	u_int64_t pn;
-	int hdrlen;
 
 	/*
 	 * Header should have extended IV and sequence number;
 	 * verify the former and validate the latter.
 	 */
 	wh = (struct ieee80211_frame *)skb->data;
-	hdrlen = ieee80211_hdrsize(wh);
 	ivp = skb->data + hdrlen;
 	if ((ivp[IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV) == 0) {
 		/*
 		 * No extended IV; discard frame.
 		 */
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] Missing ExtIV for AES-CCM cipher\n",
-			ether_sprintf(wh->i_addr2)));
+			"[%s] Missing ExtIV for AES-CCM cipher\n",
+			ether_sprintf(wh->i_addr2));
 		ctx->cc_ic->ic_stats.is_rx_ccmpformat++;
 		return 0;
 	}
@@ -268,7 +268,7 @@ ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb)
  * Verify and strip MIC from the frame.
  */
 static int
-ccmp_demic(struct ieee80211_key *k, struct sk_buff *skb)
+ccmp_demic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
 	return 1;
 }
@@ -422,9 +422,9 @@ ccmp_encrypt(struct ieee80211_key *key, struct sk_buff *skb, int hdrlen)
 	if (skb_tailroom(skb) < ccmp.ic_trailer) {
 		/* NB: should not happen */
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] No room for %s MIC, tailroom %u\n",
+			"[%s] No room for %s MIC, tailroom %u\n",
 			ether_sprintf(wh->i_addr1), ccmp.ic_name,
-			skb_tailroom(skb)));
+			skb_tailroom(skb));
 		/* XXX statistic */
 		return 0;
 	}
@@ -494,8 +494,8 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct sk_buff *skb, int h
 
 	if (memcmp(mic, a, ccmp.ic_trailer) != 0) {
 		IEEE80211_DPRINTF(ctx->cc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] AES-CCM decrypt failed; MIC mismatch\n",
-			ether_sprintf(wh->i_addr2)));
+			"[%s] AES-CCM decrypt failed; MIC mismatch\n",
+			ether_sprintf(wh->i_addr2));
 		ctx->cc_ic->ic_stats.is_rx_ccmpmic++;
 		return 0;
 	}

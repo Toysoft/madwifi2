@@ -35,4 +35,4 @@
  *
  * $Id$
  */
-#define	ATH_PCI_VERSION	"0.9.4.12"
+#define	ATH_PCI_VERSION	"0.9.6.0"

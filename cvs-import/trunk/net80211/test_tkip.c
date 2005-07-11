@@ -320,7 +320,7 @@ init_crypto_tkip_test(void)
 
 	memset(&ic, 0, sizeof(ic));
 	if (debug)
-		ic.msg_enable = IEEE80211_MSG_CRYPTO;
+		ic.ic_debug = IEEE80211_MSG_CRYPTO;
 	ieee80211_crypto_attach(&ic);
 
 	tkip_test(&ic);

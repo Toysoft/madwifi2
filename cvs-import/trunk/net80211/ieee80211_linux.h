@@ -30,23 +30,56 @@
 #define _NET80211_IEEE80211_LINUX_H_
 
 /*
+ * Beacon locking definitions.
+ */
+typedef spinlock_t ieee80211_beacon_lock_t;
+#define	IEEE80211_BEACON_LOCK_INIT(_ic, _name) \
+	spin_lock_init(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_LOCK_DESTROY(_ic)
+#define	IEEE80211_BEACON_LOCK(_ic)	   spin_lock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_UNLOCK(_ic)	   spin_unlock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_LOCK_BH(_ic)	   spin_lock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_UNLOCK_BH(_ic)	   spin_unlock_bh(&(_ic)->ic_beaconlock)
+/* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
+#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+#define	IEEE80211_BEACON_LOCK_ASSERT(_ic) \
+	KASSERT(spin_is_locked(&(_ic)->ic_beaconlock), ("BEACONLOCK not locked!"))
+#else
+#define	IEEE80211_BEACON_LOCK_ASSERT(_ic)
+#endif
+
+/*
  * Node locking definitions.
+ * TODO: should i use irqsave?
  */
 typedef rwlock_t ieee80211_node_lock_t;
-#define	IEEE80211_NODE_LOCK_INIT(_ic, _name)	rwlock_init(&(_ic)->ic_nodelock)
-#define	IEEE80211_NODE_LOCK_DESTROY(_ic)
-#define	IEEE80211_NODE_LOCK(_ic)	write_lock(&(_ic)->ic_nodelock)
-#define	IEEE80211_NODE_UNLOCK(_ic)	write_unlock(&(_ic)->ic_nodelock)
-#define	IEEE80211_NODE_LOCK_BH(_ic)	write_lock_bh(&(_ic)->ic_nodelock)
-#define	IEEE80211_NODE_UNLOCK_BH(_ic)	write_unlock_bh(&(_ic)->ic_nodelock)
+#define	IEEE80211_NODE_LOCK_INIT(_nt, _name) rwlock_init(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_LOCK_DESTROY(_nt)
+#define	IEEE80211_NODE_LOCK(_nt)	write_lock(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_UNLOCK(_nt)	write_unlock(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_LOCK_BH(_nt)	write_lock_bh(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_UNLOCK_BH(_nt)	write_unlock_bh(&(_nt)->nt_nodelock)
 /* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
 #if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(rwlock_is_locked)
-#define	IEEE80211_NODE_LOCK_ASSERT(_ic) \
-	KASSERT(rwlock_is_locked(&(_ic)->ic_nodelock), \
-		("802.11 node not locked!"))
+#define IEEE80211_NODE_LOCK_ASSERT(_nt) \
+        KASSERT(rwlock_is_locked(&(_nt)->nt_nodelock), \
+                ("802.11 node not locked!"))
 #else
-#define	IEEE80211_NODE_LOCK_ASSERT(_ic)
+#define IEEE80211_NODE_LOCK_ASSERT(_nt)
 #endif
+
+/*
+ * Node table scangen locking definitions.
+ */
+typedef rwlock_t ieee80211_scan_lock_t;
+#define	IEEE80211_SCAN_LOCK_INIT(_nt, _name) \
+	rwlock_init(&(_nt)->nt_scanlock)
+#define	IEEE80211_SCAN_LOCK_DESTROY(_nt)
+#define	IEEE80211_SCAN_LOCK(_nt)		write_lock(&(_nt)->nt_scanlock)
+#define	IEEE80211_SCAN_UNLOCK(_nt)		write_unlock(&(_nt)->nt_scanlock)
+#define	IEEE80211_SCAN_LOCK_BH(_nt)		write_lock_bh(&(_nt)->nt_scanlock)
+#define	IEEE80211_SCAN_UNLOCK_BH(_nt)		write_unlock_bh(&(_nt)->nt_scanlock)
+#define	IEEE80211_SCAN_LOCK_ASSERT(_nt)
 
 /*
  * 802.1x state locking definitions.
@@ -57,12 +90,56 @@ typedef spinlock_t eapol_lock_t;
 #define	EAPOL_LOCK(_ec)			spin_lock_bh(&(_ec)->ec_lock)
 #define	EAPOL_UNLOCK(_ec)		spin_unlock_bh(&(_ec)->ec_lock)
 /* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
-#if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
+#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT))
 #define	EAPOL_LOCK_ASSERT(_ec) \
 	KASSERT(spin_is_locked(&(_ec)->ec_lock), ("EAPOL not locked!"))
 #else
 #define	EAPOL_LOCK_ASSERT(_ec)
 #endif
+
+/*
+ * Per-node power-save queue definitions.
+ * TODO: use what? spin_lock_irqsave, write_lock or write_lock_irqsave?
+ *
+*/
+
+#define IEEE80211_NODE_SAVEQ_INIT(_ni, _name) do {              \
+        spin_lock_init(&(_ni)->ni_savedq.lock);			\
+} while (0)
+#define IEEE80211_NODE_SAVEQ_DESTROY(_ni)
+#define IEEE80211_NODE_SAVEQ_QLEN(_ni)				\
+        _IF_QLEN(&(_ni)->ni_savedq)
+#define IEEE80211_NODE_SAVEQ_LOCK(_ni) do {			\
+        IF_LOCK(&(_ni)->ni_savedq);				\
+} while (0)
+#define IEEE80211_NODE_SAVEQ_UNLOCK(_ni) do {			\
+        IF_UNLOCK(&(_ni)->ni_savedq);                           \
+} while (0)
+#define IEEE80211_NODE_SAVEQ_DEQUEUE(_ni, _skb, _qlen) do {	\
+        IEEE80211_NODE_SAVEQ_LOCK(_ni);                         \
+        IF_DEQUEUE(&(_ni)->ni_savedq, _skb);			\
+        (_qlen) = IEEE80211_NODE_SAVEQ_QLEN(_ni);               \
+        IEEE80211_NODE_SAVEQ_UNLOCK(_ni);                       \
+} while (0)
+#define IEEE80211_NODE_SAVEQ_DRAIN(_ni, _qlen) do {             \
+        IEEE80211_NODE_SAVEQ_LOCK(_ni);                         \
+        (_qlen) = IEEE80211_NODE_SAVEQ_QLEN(_ni);               \
+        _IF_DRAIN(&(_ni)->ni_savedq);                           \
+        IEEE80211_NODE_SAVEQ_UNLOCK(_ni);                       \
+} while (0)
+/* XXX could be optimized */
+#define _IEEE80211_NODE_SAVEQ_DEQUEUE_HEAD(_ni, _skb) do {	\
+        IF_DEQUEUE(&(_ni)->ni_savedq, _skb);			\
+} while (0)
+#define	_IEEE80211_NODE_SAVEQ_ENQUEUE(_ni, _skb, _qlen, _age) { \
+	skb_queue_tail(&(_ni)->ni_savedq, (_skb));		\
+	(_age) -= M_AGE_GET(&(_ni)->ni_savedq.next);		\
+	M_AGE_SET((_skb), (_age));				\
+	/* N.B.: qlen is incremented in skb_queue_tail() */	\
+	(_qlen) = ((_ni)->ni_savedq.qlen);			\
+} while (0)
+
+// TODO: check NODE_SAVEQ_ENQUEUE regarding age
 
 /*
  * 802.1x MAC ACL database locking definitions.
@@ -79,8 +156,6 @@ typedef spinlock_t acl_lock_t;
 #else
 #define	ACL_LOCK_ASSERT(_as)
 #endif
-
-#define	M_LINK0		0x01		/* frame needs WEP encryption */
 
 /*
  * Node reference counting definitions.
@@ -102,12 +177,72 @@ typedef spinlock_t acl_lock_t;
 	atomic_dec_and_test(&(_ni)->ni_refcnt)
 #define	ieee80211_node_refcnt(_ni)	(_ni)->ni_refcnt.counter
 
+/*
+ * control buffer flags.
+ */
+#define M_EXT           0x0001  /* has associated external storage */
+#define M_PKTHDR        0x0002  /* start of record */
+#define M_EOR           0x0004  /* end of record */
+#define M_RDONLY        0x0008  /* associated data is marked read-only */
+#define M_PROTO1        0x0010  /* protocol-specific */
+#define M_PROTO2        0x0020  /* protocol-specific */
+#define M_PROTO3        0x0040  /* protocol-specific */
+#define M_PROTO4        0x0080  /* protocol-specific */
+#define M_PROTO5        0x0100  /* protocol-specific */
+#define M_PROTO6        0x4000  /* protocol-specific (avoid M_BCAST conflict) */
+#define M_FREELIST      0x8000  /* mbuf is on the free list */
+
+/*
+ * pkthdr flags (also stored in cb).
+ */
+#define M_BCAST         0x0200  /* send/received as link-level broadcast */
+#define M_MCAST         0x0400  /* send/received as link-level multicast */
+#define M_FRAG          0x0800  /* packet is a fragment of a larger packet */
+#define M_FIRSTFRAG     0x1000  /* packet is first fragment */
+#define M_LASTFRAG      0x2000  /* packet is last fragment */
+
+#define	M_LINK0		M_PROTO1		/* WEP requested */
+#define	M_PWR_SAV	M_PROTO4		/* bypass PS handling */
+#define	M_HASFCS	M_PROTO5		/* WEP included? */
+#define	M_MORE_DATA	M_PROTO6		/* more data frames to follow */
+
+/*
+ * Encode WME access control bits in the PROTO flags.
+ * This is safe since it's passed directly in to the
+ * driver and there's no chance someone else will clobber
+ * them on us.
+ */
+#define	M_WME_AC_MASK	(M_PROTO2|M_PROTO3)
+/* XXX 5 is wrong if M_PROTO* are redefined */
+#define	M_WME_AC_SHIFT	5
+
+#define	M_WME_SETAC(skb, ac) \
+	(((struct ieee80211_cb *)skb->cb)->flags = \
+		(((struct ieee80211_cb *)skb->cb)->flags &~ M_WME_AC_MASK) | \
+		((ac) << M_WME_AC_SHIFT))
+#define	M_WME_GETAC(skb) \
+	((((struct ieee80211_cb *)skb->cb)->flags >> M_WME_AC_SHIFT) & 0x3)
+
+/*
+ * Mbufs on the power save queue are tagged with an age and
+ * timed out.  We reuse the hardware checksum field in the
+ * mbuf packet header to store this data.
+ */
+#define M_AGE_SET(skb,v)          (((struct ieee80211_cb *)skb->cb)->age = v)
+#define M_AGE_GET(skb)            (((struct ieee80211_cb *)skb->cb)->age)
+#define M_AGE_SUB(skb,adj)        (((struct ieee80211_cb *)skb->cb)->age -= adj)
+
+
 #define	le16toh(_x)	le16_to_cpu(_x)
 #define	htole16(_x)	cpu_to_le16(_x)
 #define	le32toh(_x)	le32_to_cpu(_x)
 #define	htole32(_x)	cpu_to_le32(_x)
 #define	be32toh(_x)	be32_to_cpu(_x)
 #define	htobe32(_x)	cpu_to_be32(_x)
+#define	le64toh(_x)	le64_to_cpu(_x)
+#define	htole64(_x)	cpu_to_le64(_x)
+
+#define uintptr_t	unsigned long
 
 /*
  * Linux has no equivalents to malloc types so null these out.
@@ -148,9 +283,18 @@ extern	const char *ether_sprintf(const u_int8_t *);
 extern	struct sk_buff *ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen);
 #define	IF_ENQUEUE(_q,_skb)	skb_queue_tail(_q,_skb)
 #define	IF_DEQUEUE(_q,_skb)	(_skb = skb_dequeue(_q))
+#define IF_LOCK(_q)		spin_lock_bh(&(_q)->lock)
+#define IF_UNLOCK(_q)		spin_unlock_bh(&(_q)->lock)
+#define	_IF_DRAIN(_q)		__skb_queue_purge(_q)	// without lock
+#define	IF_DRAIN(_q)		skb_queue_purge(_q)	// with lock
 #define	_IF_QLEN(_q)		skb_queue_len(_q)
-#define	IF_DRAIN(_q)		skb_queue_drain(_q)
+#define _IF_QFULL(_q)		(_IF_QLEN(_q) >= IEEE80211_PS_MAX_QUEUE)
+#define _IF_POLL(_q, _skb)	((_skb) = skb_peek(_q))	// TODO: peek or peek_tail
+#define IF_POLL(_q, skb)	_IF_POLL(_q, skb)
+#define _IF_DROP(_q)
+#define IF_LOCK_ASSERT(_q)
 extern	void skb_queue_drain(struct sk_buff_head *q);
+
 
 extern	struct net_device_stats *ieee80211_getstats(struct net_device *);
 
@@ -161,7 +305,7 @@ extern	struct net_device_stats *ieee80211_getstats(struct net_device *);
 			__func__); \
 		_err;							\
 	}
-#define	_MOD_DEC_USE(_m)		module_put(_m)
+#define	_MOD_DEC_USE(_m)	module_put(_m)
 #else
 #define	_MOD_INC_USE(_m, _err)	MOD_INC_USE_COUNT
 #define	_MOD_DEC_USE(_m)	MOD_DEC_USE_COUNT

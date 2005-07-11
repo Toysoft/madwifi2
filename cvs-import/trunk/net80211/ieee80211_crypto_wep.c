@@ -54,9 +54,9 @@ static	void *wep_attach(struct ieee80211com *, struct ieee80211_key *);
 static	void wep_detach(struct ieee80211_key *);
 static	int wep_setkey(struct ieee80211_key *);
 static	int wep_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t keyid);
-static	int wep_decap(struct ieee80211_key *, struct sk_buff *);
-static	int wep_enmic(struct ieee80211_key *, struct sk_buff *);
-static	int wep_demic(struct ieee80211_key *, struct sk_buff *);
+static	int wep_decap(struct ieee80211_key *, struct sk_buff *, int);
+static	int wep_enmic(struct ieee80211_key *, struct sk_buff *, int);
+static	int wep_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 static const struct ieee80211_cipher wep = {
 	.ic_name	= "WEP",
@@ -137,11 +137,12 @@ static int
 wep_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 {
 	struct wep_ctx *ctx = k->wk_private;
+	struct ieee80211com *ic = ctx->wc_ic;
 	u_int32_t iv;
 	u_int8_t *ivp;
 	int hdrlen;
 
-	hdrlen = ieee80211_hdrsize(skb->data);
+	hdrlen = ieee80211_hdrspace(ic, skb->data);
 
 	/*
 	 * Copy down 802.11 header and add the IV + KeyID.
@@ -206,9 +207,8 @@ wep_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
  * Add MIC to the frame as needed.
  */
 static int
-wep_enmic(struct ieee80211_key *k, struct sk_buff *skb)
+wep_enmic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
-
 	return 1;
 }
 
@@ -218,14 +218,12 @@ wep_enmic(struct ieee80211_key *k, struct sk_buff *skb)
  * the specified key.
  */
 static int
-wep_decap(struct ieee80211_key *k, struct sk_buff *skb)
+wep_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 {
 	struct wep_ctx *ctx = k->wk_private;
 	struct ieee80211_frame *wh;
-	int hdrlen;
 
 	wh = (struct ieee80211_frame *)skb->data;
-	hdrlen = ieee80211_hdrsize(wh);
 
 	/*
 	 * Check if the device handled the decrypt in hardware.
@@ -235,8 +233,8 @@ wep_decap(struct ieee80211_key *k, struct sk_buff *skb)
 	if ((k->wk_flags & IEEE80211_KEY_SWCRYPT) &&
 	    !wep_decrypt(k, skb, hdrlen)) {
 		IEEE80211_DPRINTF(ctx->wc_ic, IEEE80211_MSG_CRYPTO,
-		    ("[%s] WEP ICV mismatch on decrypt\n",
-		    ether_sprintf(wh->i_addr2)));
+		    "[%s] WEP ICV mismatch on decrypt\n",
+		    ether_sprintf(wh->i_addr2));
 		ctx->wc_ic->ic_stats.is_rx_wepfail++;
 		return 0;
 	}
@@ -255,7 +253,7 @@ wep_decap(struct ieee80211_key *k, struct sk_buff *skb)
  * Verify and strip MIC from the frame.
  */
 static int
-wep_demic(struct ieee80211_key *k, struct sk_buff *skb)
+wep_demic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
 	return 1;
 }
@@ -320,9 +318,9 @@ wep_encrypt(struct ieee80211_key *key, struct sk_buff *skb, int hdrlen)
 			(struct ieee80211_frame *) skb->data;
 		/* NB: should not happen */
 		IEEE80211_DPRINTF(ctx->wc_ic, IEEE80211_MSG_CRYPTO,
-			("[%s] No room for %s ICV, tailroom %u\n",
+			"[%s] No room for %s ICV, tailroom %u\n",
 			ether_sprintf(wh->i_addr1), wep.ic_name,
-			skb_tailroom(skb)));
+			skb_tailroom(skb));
 		/* XXX statistic */
 		return 0;
 	}
