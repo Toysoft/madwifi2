@@ -998,15 +998,29 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
-		("unexpect operating mode %u", ic->ic_opmode));
+		("unexpected operating mode %u", ic->ic_opmode));
 	if (ic->ic_state == IEEE80211_S_RUN) {
-		/*
-		 * Rather than go directly to scan state, try to
-		 * reassociate first.  If that fails then the state
-		 * machine will drop us into scanning after timing
-		 * out waiting for a probe response.
-		 */
-		ieee80211_new_state(ic, IEEE80211_S_ASSOC, -1);
+		if ((ic->ic_bss->ni_flags & IEEE80211_NODE_BMISS) == 0) {
+			/* first time: flag the node and send probe request */
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"%s: beacons missed - flag and send probe request\n", 
+				__func__);
+			ic->ic_bss->ni_flags |= IEEE80211_NODE_BMISS;
+			IEEE80211_SEND_MGMT(ic, ic->ic_bss,
+				IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
+		}
+		else {
+			/* second time in a row, try to reassoc */
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"%s: beacons missed again - reassoc\n", __func__);
+			/*
+			 * Rather than go directly to scan state, try to
+			 * reassociate first.  If that fails then the state
+			 * machine will drop us into scanning after timing
+			 * out waiting for a probe response.
+			 */
+			ieee80211_new_state(ic, IEEE80211_S_ASSOC, -1);
+		}
 	}
 }
 
