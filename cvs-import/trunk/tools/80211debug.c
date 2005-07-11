@@ -194,15 +194,14 @@ main(int argc, char *argv[])
 			if (argc < 2)
 				errx(1, "missing interface name for -i option");
 			ifname = argv[2];
-			if (strncmp(ifname, "ath", 3) != 0)
-				errx(2, "huh, this is for ath devices?");
 			argc -= 2, argv += 2;
-		} else if (strcmp(argv[1], "-?") == 0)
+		} else if ((strcmp(argv[1], "-?") == 0) ||
+		           (strcmp(argv[1], "--help") == 0))
 			usage();
 	}
 
 #ifdef __linux__
-	snprintf(oid, sizeof(oid), "net.wlan%s.debug", ifname+3);
+	snprintf(oid, sizeof(oid), "net.wlan.%s.debug", ifname);
 #else
 	snprintf(oid, sizeof(oid), "net.wlan.%s.debug", ifname+3);
 #endif

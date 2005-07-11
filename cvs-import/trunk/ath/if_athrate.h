@@ -34,7 +34,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id$
+ * $FreeBSD: src/sys/dev/ath/if_athrate.h,v 1.2 2004/12/31 22:41:45 sam Exp $
  */
 #ifndef _ATH_RATECTRL_H_
 #define _ATH_RATECTRL_H_
@@ -84,6 +84,14 @@ struct ath_ratectrl {
 struct ath_ratectrl *ath_rate_attach(struct ath_softc *);
 void	ath_rate_detach(struct ath_ratectrl *);
 
+#ifdef CONFIG_SYSCTL
+/*
+ * Allow rate control module to register dynamic sysctls, after
+ * dev->name is filled in; Modules are expected to unregister dynamic
+ * sysctls in ath_rate_detach().
+ */
+void    ath_rate_dynamic_sysctl_register(struct ath_softc *);
+#endif /* CONFIG_SYSCTL */
 
 /*
  * State storage handling.
@@ -97,12 +105,6 @@ void	ath_rate_node_init(struct ath_softc *, struct ath_node *);
  * Cleanup any per-node state prior to the node being reclaimed.
  */
 void	ath_rate_node_cleanup(struct ath_softc *, struct ath_node *);
-/*
- * Copy per-node state; currently used only to duplicate bss on
- * station association.
- */
-void	ath_rate_node_copy(struct ath_softc *,
-		struct ath_node *, const struct ath_node *);
 /*
  * Update rate control state on station associate/reassociate 
  * (when operating as an ap or for nodes discovered when operating
@@ -127,14 +129,14 @@ void	ath_rate_newstate(struct ath_softc *, enum ieee80211_state);
  * can be transmitted with multi-rate retry.
  */
 void	ath_rate_findrate(struct ath_softc *, struct ath_node *,
-		HAL_BOOL shortPreamble, size_t frameLen,
+		int shortPreamble, size_t frameLen,
 		u_int8_t *rix, int *try0, u_int8_t *txrate);
 /*
  * Setup any extended (multi-rate) descriptor state for a data packet.
  * The rate index returned by ath_rate_findrate is passed back in.
  */
 void	ath_rate_setupxtxdesc(struct ath_softc *, struct ath_node *,
-		struct ath_desc *, HAL_BOOL shortPreamble, u_int8_t rix);
+		struct ath_desc *, int shortPreamble, u_int8_t rix);
 /*
  * Update rate control state for a packet associated with the
  * supplied transmit descriptor.  The routine is invoked both

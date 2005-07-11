@@ -32,6 +32,8 @@
 #define	EXPORT_SYMTAB
 #endif
 
+__FBSDID("$FreeBSD: src/sys/net80211/ieee80211_acl.c,v 1.3 2004/12/31 22:42:38 sam Exp $");
+
 /*
  * IEEE 802.11 MAC ACL support.
  *
@@ -77,7 +79,7 @@ struct aclstate {
 
 /* simple hash is enough for variation of macaddr */
 #define	ACL_HASH(addr)	\
-	(((u_int8_t *)(addr))[IEEE80211_ADDR_LEN - 1] % ACL_HASHSIZE)
+	(((const u_int8_t *)(addr))[IEEE80211_ADDR_LEN - 1] % ACL_HASHSIZE)
 
 MALLOC_DEFINE(M_80211_ACL, "acl", "802.11 station acl");
 
@@ -167,8 +169,7 @@ acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 	MALLOC(new, struct acl *, sizeof(struct acl), M_80211_ACL, M_NOWAIT | M_ZERO);
 	if (new == NULL) {
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
-			("ACL: add %s failed, no memory\n",
-			ether_sprintf(mac)));
+			"ACL: add %s failed, no memory\n", ether_sprintf(mac));
 		/* XXX statistic */
 		return ENOMEM;
 	}
@@ -180,8 +181,8 @@ acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 			ACL_UNLOCK(as);
 			FREE(new, M_80211_ACL);
 			IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
-				("ACL: add %s failed, already present\n",
-				ether_sprintf(mac)));
+				"ACL: add %s failed, already present\n",
+				ether_sprintf(mac));
 			return EEXIST;
 		}
 	}
@@ -191,7 +192,7 @@ acl_add(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 	ACL_UNLOCK(as);
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
-		("ACL: add %s\n", ether_sprintf(mac)));
+		"ACL: add %s\n", ether_sprintf(mac));
 	return 0;
 }
 
@@ -208,8 +209,8 @@ acl_remove(struct ieee80211com *ic, const u_int8_t mac[IEEE80211_ADDR_LEN])
 	ACL_UNLOCK(as);
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
-		("ACL: remove %s%s\n", ether_sprintf(mac),
-		acl == NULL ? ", not present" : ""));
+		"ACL: remove %s%s\n", ether_sprintf(mac),
+		acl == NULL ? ", not present" : "");
 
 	return (acl == NULL ? ENOENT : 0);
 }
@@ -220,7 +221,7 @@ acl_free_all(struct ieee80211com *ic)
 	struct aclstate *as = ic->ic_as;
 	struct acl *acl;
 
-	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL, ("ACL: free all\n"));
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL, "ACL: %s\n", "free all");
 
 	ACL_LOCK(as);
 	while ((acl = TAILQ_FIRST(&as->as_list)) != NULL)
@@ -236,7 +237,7 @@ acl_setpolicy(struct ieee80211com *ic, int policy)
 	struct aclstate *as = ic->ic_as;
 
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_ACL,
-		("ACL: set policy to %u\n", policy));
+		"ACL: set policy to %u\n", policy);
 
 	switch (policy) {
 	case IEEE80211_MACCMD_POLICY_OPEN:

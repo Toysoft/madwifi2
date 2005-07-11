@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $FreeBSD: src/sys/dev/ath/if_athioctl.h,v 1.5 2003/12/28 07:00:32 sam Exp $
+ * $FreeBSD: src/sys/dev/ath/if_athioctl.h,v 1.9 2004/12/31 22:41:45 sam Exp $
  */
 
 /*
@@ -46,18 +46,24 @@ struct ath_stats {
 	u_int32_t	ast_watchdog;	/* device reset by watchdog */
 	u_int32_t	ast_hardware;	/* fatal hardware error interrupts */
 	u_int32_t	ast_bmiss;	/* beacon miss interrupts */
+	u_int32_t	ast_bstuck;	/* beacon stuck interrupts */
 	u_int32_t	ast_rxorn;	/* rx overrun interrupts */
 	u_int32_t	ast_rxeol;	/* rx eol interrupts */
 	u_int32_t	ast_txurn;	/* tx underrun interrupts */
 	u_int32_t	ast_mib;	/* mib interrupts */
+	u_int32_t	ast_intrcoal;	/* interrupts coalesced */
+	u_int32_t	ast_tx_packets;	/* packet sent on the interface */
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
 	u_int32_t	ast_tx_invalid;	/* frames discarded 'cuz device gone */
-	u_int32_t	ast_tx_qstop;	/* tx queue stopped 'cuz full */
+	u_int32_t	ast_tx_qstop;	/* output stopped 'cuz no buffer */
 	u_int32_t	ast_tx_encap;	/* tx encapsulation failed */
 	u_int32_t	ast_tx_nonode;	/* tx failed 'cuz no node */
 	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer (data) */
 	u_int32_t	ast_tx_nobufmgt;/* tx failed 'cuz no tx buffer (mgmt)*/
+	u_int32_t	ast_tx_linear;	/* tx linearized to cluster */
+	u_int32_t	ast_tx_nodata;	/* tx discarded empty frame */
+	u_int32_t	ast_tx_busdma;	/* tx failed for dma resrcs */
 	u_int32_t	ast_tx_xretries;/* tx failed 'cuz too many retries */
 	u_int32_t	ast_tx_fifoerr;	/* tx failed 'cuz FIFO underrun */
 	u_int32_t	ast_tx_filtered;/* tx failed 'cuz xmit filtered */
@@ -70,21 +76,26 @@ struct ath_stats {
 	u_int32_t	ast_tx_shortpre;/* tx frames with short preamble */
 	u_int32_t	ast_tx_altrate;	/* tx frames with alternate rate */
 	u_int32_t	ast_tx_protect;	/* tx frames with protection */
+	u_int32_t       ast_tx_ctsburst;/* tx frames with cts and bursting */
+	u_int32_t       ast_tx_ctsext;  /* tx frames with cts extension */
+	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skb */
+	u_int32_t	ast_rx_busdma;	/* rx setup failed for dma resrcs */
 	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
 	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
 	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
 	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
 	u_int32_t	ast_rx_badmic;	/* rx failed 'cuz MIC failure */
-	u_int32_t	ast_rx_phyerr;	/* rx PHY error summary count */
+	u_int32_t	ast_rx_phyerr;	/* rx failed 'cuz of PHY err */
 	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
 	u_int32_t	ast_rx_tooshort;/* rx discarded 'cuz frame too short */
 	u_int32_t	ast_rx_toobig;	/* rx discarded 'cuz frame too large */
-	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
+	u_int32_t	ast_rx_packets;	/* packet recv on the interface */
 	u_int32_t	ast_rx_mgt;	/* management frames received */
-	u_int32_t	ast_rx_ctl;	/* control frames received */
+	u_int32_t	ast_rx_ctl;	/* rx discarded 'cuz ctl frame */
 	int8_t		ast_tx_rssi;	/* tx rssi of last ack */
 	int8_t		ast_rx_rssi;	/* rx rssi from histogram */
-	u_int32_t	ast_be_nobuf;	/* no skbuff available for beacon */
+	u_int32_t	ast_be_xmit;	/* beacons transmitted */
+	u_int32_t	ast_be_nobuf;	/* beacon setup failed 'cuz no skb */
 	u_int32_t	ast_per_cal;	/* periodic calibration calls */
 	u_int32_t	ast_per_calfail;/* periodic calibration failed */
 	u_int32_t	ast_per_rfgain;	/* periodic calibration rfgain reset */
@@ -110,6 +121,52 @@ struct ath_diag {
 	u_int	ad_out_size;
 
 };
+
+/*
+ * Radio capture format.
+ */
+#define ATH_RX_RADIOTAP_PRESENT (		\
+	(1 << IEEE80211_RADIOTAP_FLAGS)		| \
+	(1 << IEEE80211_RADIOTAP_RATE)		| \
+	(1 << IEEE80211_RADIOTAP_CHANNEL)	| \
+	(1 << IEEE80211_RADIOTAP_ANTENNA)	| \
+	(1 << IEEE80211_RADIOTAP_DB_ANTSIGNAL)	| \
+	(1 << IEEE80211_RADIOTAP_RX_FLAGS)	| \
+	0)
+
+struct ath_rx_radiotap_header {
+	struct ieee80211_radiotap_header wr_ihdr;
+	u_int8_t	wr_flags;		/* XXX for padding */
+	u_int8_t	wr_rate;
+	u_int16_t	wr_chan_freq;
+	u_int16_t	wr_chan_flags;
+	u_int8_t	wr_antenna;
+	u_int8_t	wr_antsignal;
+	u_int16_t       wr_rx_flags;
+};
+
+#define ATH_TX_RADIOTAP_PRESENT (		\
+	(1 << IEEE80211_RADIOTAP_FLAGS)		| \
+	(1 << IEEE80211_RADIOTAP_RATE)		| \
+	(1 << IEEE80211_RADIOTAP_DBM_TX_POWER)	| \
+	(1 << IEEE80211_RADIOTAP_ANTENNA)	| \
+	(1 << IEEE80211_RADIOTAP_TX_FLAGS)	| \
+	(1 << IEEE80211_RADIOTAP_RTS_RETRIES)	| \
+	(1 << IEEE80211_RADIOTAP_DATA_RETRIES)	| \
+	0)
+
+struct ath_tx_radiotap_header {
+	struct ieee80211_radiotap_header wt_ihdr;
+	u_int8_t	wt_flags;		/* XXX for padding */
+	u_int8_t	wt_rate;
+	u_int8_t	wt_txpower;
+	u_int8_t	wt_antenna;
+	u_int16_t       wt_tx_flags;
+	u_int8_t        wt_rts_retries;
+	u_int8_t        wt_data_retries;
+
+};
+
 
 #ifdef __linux__
 #define	SIOCGATHSTATS	(SIOCDEVPRIVATE+0)
