@@ -1980,6 +1980,15 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				ni->ni_dtim_count = ie->tim_count;
 				ni->ni_dtim_period = ie->tim_period;
 			}
+			if (ni->ni_flags & IEEE80211_NODE_BMISS) {
+				IEEE80211_DPRINTF(ic, IEEE80211_MSG_INPUT,
+					"[%s] received %s after beacon miss - clear\n",
+					ether_sprintf(ni->ni_bssid),
+					(subtype == IEEE80211_FC0_SUBTYPE_BEACON) ?
+						"beacon" : "probe response");
+				ni->ni_flags &= ~IEEE80211_NODE_BMISS;
+				ic->ic_mgt_timer = 0;
+			}
 			/* NB: don't need the rest of this */
 			if ((ic->ic_flags & IEEE80211_F_SCAN) == 0)
 				return;
