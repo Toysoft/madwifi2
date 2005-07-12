@@ -49,12 +49,12 @@ DIRS=	${ATH_HAL} ${ATH_RATE} ${WLAN} ${ATH}
 all: configcheck
 	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS}; do \
-		(cd $$i; make) || exit 1; \
+		$(MAKE) -C $$i || exit 1; \
 	done
 
 install:
 	for i in ${DIRS}; do \
-		(cd $$i; make install) || exit 1; \
+		$(MAKE) -C $$i install || exit 1; \
 	done
 	@if [ -z $(DESTDIR) ]; then \
 	    /sbin/depmod -ae ; \
@@ -79,7 +79,7 @@ release:
 
 clean:
 	for i in ${DIRS}; do \
-		(cd $$i; make clean); \
+		$(MAKE) -C $$i clean; \
 	done
 	rm -rf ${SYMBOLSDIR}
 
