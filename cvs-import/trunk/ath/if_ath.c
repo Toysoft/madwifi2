@@ -996,21 +996,15 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
 	KASSERT(ic->ic_opmode == IEEE80211_M_STA,
 		("unexpected operating mode %u", ic->ic_opmode));
+
 	if (ic->ic_state == IEEE80211_S_RUN) {
-		if ((ic->ic_bss->ni_flags & IEEE80211_NODE_BMISS) == 0) {
-			/* first time: flag the node and send probe request */
-			DPRINTF(sc, ATH_DEBUG_BEACON,
-				"%s: beacons missed - flag and send probe request\n", 
-				__func__);
-			ic->ic_bss->ni_flags |= IEEE80211_NODE_BMISS;
-			IEEE80211_SEND_MGMT(ic, ic->ic_bss,
-				IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
-		}
-		else {
-			/* second time in a row, try to reassoc */
+		if (sc->sc_bmisscount >= 1) {
+			/*
+			 * we have already missed beacons before and did not receive
+			 * a probe response or beacon in the mean time
+			 */
 			DPRINTF(sc, ATH_DEBUG_BEACON,
 				"%s: beacons missed again - reassoc\n", __func__);
 			/*
@@ -1020,6 +1014,15 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 			 * out waiting for a probe response.
 			 */
 			ieee80211_new_state(ic, IEEE80211_S_ASSOC, -1);
+		}
+		else {
+			/* first time: increment bmisscount and send probe request */
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"%s: beacons missed - send probe request\n", 
+				__func__);
+			sc->sc_bmisscount++;
+			IEEE80211_SEND_MGMT(ic, ic->ic_bss,
+				IEEE80211_FC0_SUBTYPE_PROBE_REQ, 0);
 		}
 	}
 }
@@ -2887,6 +2890,7 @@ ath_beacon_config(struct ath_softc *sc)
 		ath_hal_intrset(ah, 0);
 		ath_hal_beacontimers(ah, &bs);
 		sc->sc_imask |= HAL_INT_BMISS;
+		sc->sc_bmisscount = 0;
 		ath_hal_intrset(ah, sc->sc_imask);
 	} else { /* IBSS or HOSTAP */
 		ath_hal_intrset(ah, 0);
@@ -3584,6 +3588,21 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				    "tstamp %llx\n", rstamp, tsf,
 				    ni->ni_tstamp.tsf);
 				ieee80211_ibss_merge(ic, ni);
+			}
+		}
+		if (ic->ic_opmode == IEEE80211_M_STA &&
+		    ic->ic_state == IEEE80211_S_RUN &&
+		    sc->sc_bmisscount > 0) {
+			struct ieee80211_frame *wh;
+			wh = (struct ieee80211_frame *) skb->data;
+			if (IEEE80211_ADDR_EQ(wh->i_addr2, ic->ic_bss->ni_bssid)) {
+				DPRINTF(sc, ATH_DEBUG_BEACON,
+					"[%s] received %s after beacon miss - clear\n",
+					ether_sprintf(wh->i_addr2),
+					(subtype == IEEE80211_FC0_SUBTYPE_BEACON) ?
+						"beacon" : "probe response");
+				sc->sc_bmisscount = 0;
+				ic->ic_mgt_timer = 0;
 			}
 		}
 		break;
