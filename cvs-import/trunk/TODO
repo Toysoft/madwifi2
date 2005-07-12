@@ -1,5 +1,5 @@
 HIGH PRIO:
-
+==========
 - allow sending of management packets in other states than IEEE80211_S_RUN
   (e.g. PROBE_REQUESTS in IEEE80211_S_SCAN state)
 - check locking (especially the macros in ieee80211_linux.h)
@@ -19,10 +19,13 @@ HIGH PRIO:
     - cause HAL_RXERR_DECRYPT is ignored
 - bandwidth with 2 cards (one in, one out) is only 1/2 of possible rate
     - may be a locking problem
+- correct fix for !IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_bssid) in 
+  ieee80211_input.c (line 1986). it's disabled now because it breaks
+  re-association
 
 
 LOW PRIO:
-
+========
 - define commonly used macros global
 - cleanup code
 - remove redundant definitions which have been copied from FreeBSD
@@ -34,13 +37,13 @@ LOW PRIO:
 
 
 LONG TERM:
-
+==========
 - integration with linux ieee80211 stack (work in progress)
 - inclusion into linux kernel
 
 
 IDEAS:
-
+======
 - generate a Configure script to create a Makefile fitting the build environment
 - write a userspace tool to control all the things wireless_tools do but
   furthermore also things which are not supported by them
