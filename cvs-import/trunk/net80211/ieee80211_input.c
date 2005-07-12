@@ -151,8 +151,6 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		skb_trim(skb, IEEE80211_CRC_LEN);
 		cb->flags &= ~M_HASFCS;
 	}
-	KASSERT(skb->len >= sizeof(struct ieee80211_frame_min),
-		("frame length too short: %u", skb->len));
 
 	type = -1;	/* undefined */	
 
