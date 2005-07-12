@@ -286,7 +286,7 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 	char buf[1024];
 	char *p = buf;
 	struct ieee80211_node *ni;
-	struct ieee80211_node_table *nt = &ic->ic_sta;
+	struct ieee80211_node_table *nt = (struct ieee80211_node_table *)arg;
 	struct ieee80211_rateset *rs;
 	int i;
 	u_int16_t temp;
@@ -412,6 +412,29 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_stations, ctl, write, filp, buffer,
 	return 0;
 }
 
+static int
+IEEE80211_SYSCTL_DECL(ieee80211_sysctl_scan, ctl, write, filp, buffer,
+		lenp, ppos)
+{
+	struct ieee80211com *ic = ctl->extra1;
+	int len = *lenp;
+
+#if	LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
+	if (len && filp->f_pos == 0) {
+#else
+	if (len && ppos != NULL && *ppos == 0) {
+#endif
+		*lenp = proc_read_node(buffer, len, ic, &ic->ic_scan);
+#if	LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
+		filp->f_pos += *lenp;
+#else
+		*ppos += *lenp;
+#endif
+	} else {
+		*lenp = 0;
+	}
+	return 0;
+}
 
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
@@ -448,6 +471,11 @@ static const ctl_table ieee80211_sysctl_template[] = {
 	  .procname	= "associated_sta",
 	  .mode		= 0444,
 	  .proc_handler	= ieee80211_sysctl_stations
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "scan_table",
+	  .mode		= 0444,
+	  .proc_handler	= ieee80211_sysctl_scan
 	},
 	{ 0 }
 };
