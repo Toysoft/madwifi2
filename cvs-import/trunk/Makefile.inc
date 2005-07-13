@@ -111,7 +111,7 @@ endif
 #
 # Note: '\044' used instead of '$' in order to avoid make complaining like
 # "Recursive variable `KERNELRELEASE' references itself (eventually)."
-KERNELRELEASE ?= $(shell echo -e 'foo:\n\t@echo \044(KERNELRELEASE)\ninclude Makefile' | make -C $(KERNELPATH) -s -f-)
+KERNELRELEASE ?= $(shell echo -e 'madwifi_$$_`date +%s`:\n\t@echo \044(KERNELRELEASE)\ninclude Makefile' | make -C $(KERNELPATH) -s -f-)
 
 # KERNELCONF is the name of the file that holds the configuration
 # of the target kernel.
