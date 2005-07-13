@@ -125,7 +125,7 @@ static void	ath_updateslot(struct net_device *);
 static int	ath_beaconq_setup(struct ath_hal *);
 static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
 static void	ath_beacon_setup(struct ath_softc *, struct ath_buf *);
-static void	ath_beacon_tasklet(struct net_device *);
+static void	ath_beacon_send(struct net_device *);
 static void	ath_beacon_free(struct ath_softc *);
 static void	ath_beacon_config(struct ath_softc *);
 static void	ath_descdma_cleanup(struct ath_softc *sc, ath_bufhead *);
@@ -900,7 +900,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 				* this is too slow to meet timing constraints
 				* under load.
 				*/
-				ath_beacon_tasklet(dev);
+				ath_beacon_send(dev);
 			}
 			if (status & HAL_INT_RXEOL) {
 				/*
@@ -2585,9 +2585,13 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
  * Transmit a beacon frame at SWBA.  Dynamic updates to the
  * frame contents are done as needed and the slot time is
  * also adjusted based on current state.
+ *
+ * this is usually called from interrupt context (ath_intr())
+ * but also from ath_beacon_config() in IBSS mode which in turn
+ * can be called from a tasklet and user context
  */
 static void
-ath_beacon_tasklet(struct net_device *dev)
+ath_beacon_send(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ath_buf *bf = STAILQ_FIRST(&sc->sc_bbuf);
@@ -2949,7 +2953,7 @@ ath_beacon_config(struct ath_softc *sc)
 		 * ibss mode load it once here.
 		 */
 		if (ic->ic_opmode == IEEE80211_M_IBSS && sc->sc_hasveol)
-			ath_beacon_tasklet(&sc->sc_dev);
+			ath_beacon_send(&sc->sc_dev);
 	}
 #undef TSF_TO_TU
 }
