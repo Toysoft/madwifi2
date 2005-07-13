@@ -1581,7 +1581,6 @@ ieee80211_pwrsave(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	IEEE80211_NODE_SAVEQ_LOCK(ni);
 	if (_IF_QFULL(&ni->ni_savedq)) {
-		_IF_DROP(&ni->ni_savedq);
 		IEEE80211_NODE_SAVEQ_UNLOCK(ni);
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_ANY,
 			"[%s] pwr save q overflow (max size %d)\n",
