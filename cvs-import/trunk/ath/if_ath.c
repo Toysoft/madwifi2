@@ -1224,7 +1224,21 @@ ath_stop(struct net_device *dev)
 		 * (and system).  This varies by chip and is mostly an
 		 * issue with newer parts that go to sleep more quickly.
 		 */
-		ath_hal_setpower(sc->sc_ah, HAL_PM_FULL_SLEEP, 0);
+		if (sc->sc_ah->ah_macVersion >= 7 && sc->sc_ah->ah_macRev >= 8) {
+			/*
+			 * XXX
+			 * don't put newer MAC revisions > 7.8 to sleep because
+			 * of the above mentioned problems
+			 */
+			DPRINTF(sc, ATH_DEBUG_RESET,
+				"%s: mac version > 7.8, not putting device to sleep\n",
+				__func__);
+		}
+		else {
+			DPRINTF(sc, ATH_DEBUG_RESET,
+				"%s: putting device to full sleep\n", __func__);
+			ath_hal_setpower(sc->sc_ah, HAL_PM_FULL_SLEEP, 0);
+		}
 	}
 	ATH_UNLOCK(sc);
 	return error;
