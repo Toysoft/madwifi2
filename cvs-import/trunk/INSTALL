@@ -1,7 +1,7 @@
-MADWIFI: Multimode Atheros Driver for WiFi on Linux (BSD branch)
+MADWIFI: Multimode Atheros Driver for WiFi on Linux
 ================================================================
 
-* Copyright (c) 2002-2004 Sam Leffler.  All rights reserved.
+* Copyright (c) 2002-2005 Sam Leffler.  All rights reserved.
 
 
 Requirements
@@ -70,9 +70,9 @@ trouble% make TARGET="x86_64-elf" TOOLPREFIX="" LINUX_DIR=/usr/src/linux
 
 
 Madwifi currently provides three different rate control algorithms,
-ONOE, AMRR and SAMPLE. ONOE is used by default. In order to make madwifi
-use AMRR instead, you have to specify that via the ATH_RATE
-environment variable; e.g.
+ONOE, AMRR and SAMPLE. SAMPLE is the most advanced one and is used
+by default. In order to make madwifi use AMRR instead, you have to 
+specify that via the ATH_RATE environment variable; e.g.
 
 trouble% export ATH_RATE=ath_rate/amrr
 trouble% make
