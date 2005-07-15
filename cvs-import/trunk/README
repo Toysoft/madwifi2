@@ -8,16 +8,12 @@ WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
 WARNING: USE AT YOUR OWN RISK!
 
 
-MADWIFI: Multimode Atheros Driver for WiFi on Linux (BSD branch)
+MADWIFI: Multimode Atheros Driver for WiFi on Linux
 ================================================================
 
 * Copyright (c) 2002-2005 Sam Leffler.  All rights reserved.
 
 Read the file COPYRIGHT for the complete copyright.
-
-NOTE: This file describes the contents of the "BSD branch" of the
-      MADWIFI project. This branch is used to import recent
-      changes from the FreeBSD Atheros driver.
 
 This software contains a Linux kernel driver for Atheros-based
 Wireless LAN devices.  The driver supports station, AP, adhoc, and
