@@ -72,6 +72,7 @@ const char *progname;
 #define	IEEE80211_MSG_WPA	0x00001000	/* WPA/RSN protocol */
 #define	IEEE80211_MSG_ACL	0x00000800	/* ACL handling */
 #define	IEEE80211_MSG_WME	0x00000400	/* WME protocol */
+#define	IEEE80211_MSG_MLME	0x00000200	/* MLME handling */
 
 static struct {
 	const char	*name;
@@ -98,6 +99,7 @@ static struct {
 	{ "wpa",	IEEE80211_MSG_WPA },
 	{ "acl",	IEEE80211_MSG_ACL },
 	{ "wme",	IEEE80211_MSG_WME },
+	{ "mlme",	IEEE80211_MSG_MLME },
 };
 
 static u_int

@@ -354,6 +354,7 @@ ieee80211_anyhdrspace(struct ieee80211com *ic, const void *data)
 #define	IEEE80211_MSG_WPA	0x00001000	/* WPA/RSN protocol */
 #define	IEEE80211_MSG_ACL	0x00000800	/* ACL handling */
 #define	IEEE80211_MSG_WME	0x00000400	/* WME protocol */
+#define	IEEE80211_MSG_MLME	0x00000200	/* MLME handling */
 
 #define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
 
