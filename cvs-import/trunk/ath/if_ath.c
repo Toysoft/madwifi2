@@ -1261,7 +1261,7 @@ ath_reset(struct net_device *dev)
 	HAL_STATUS status;
 	int opmode;
 	
-	if_printf(dev, "resetting\n");
+	DPRINTF(sc, ATH_DEBUG_RESET, "%s: resetting\n", dev->name);
 	
 	/*
 	 * Convert to a HAL channel description with the flags
@@ -5160,7 +5160,8 @@ ath_calibrate(unsigned long arg)
 		 * to load new gain values.
 		 */
 		sc->sc_stats.ast_per_rfgain++;
-		if_printf(dev, "calibration, need reset\n");
+		DPRINTF(sc, ATH_DEBUG_RESET,
+			"%s: calibration, resetting\n", dev->name);
 		ath_reset(dev);
 	}
 	if (!ath_hal_calibrate(ah, &sc->sc_curchan)) {
