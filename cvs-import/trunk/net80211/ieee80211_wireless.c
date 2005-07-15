@@ -1923,14 +1923,21 @@ ieee80211_ioctl_delkey(struct ieee80211com *ic, struct iw_request_info *info,
 	if (dk->idk_keyix == (u_int8_t) IEEE80211_KEYIX_NONE) {
 		struct ieee80211_node *ni =
 			ieee80211_find_node(&ic->ic_sta, dk->idk_macaddr);
-		if (ni == NULL)
+		if (ni == NULL) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+				"%s: node not found\n", __func__);
 			return -EINVAL;		/* XXX */
+		}
 		/* XXX error return */
 		ieee80211_crypto_delkey(ic, &ni->ni_ucastkey);
 		ieee80211_free_node(ni);
 	} else {
-		if (kid >= IEEE80211_WEP_NKID)
+		if (kid >= IEEE80211_WEP_NKID) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+				"%s: key id %d >= %d\n", __func__,
+				kid, IEEE80211_WEP_NKID);
 			return -EINVAL;
+		}
 		/* XXX error return */
 		ieee80211_crypto_delkey(ic, &ic->ic_nw_keys[kid]);
 	}
@@ -1963,6 +1970,8 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 
 	switch (mlme->im_op) {
 	case IEEE80211_MLME_ASSOC:
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+			"%s: assoc\n", __func__);
                 if (ic->ic_opmode != IEEE80211_M_STA)
                         return EINVAL;
                 /* XXX must be in S_SCAN state? */
@@ -1981,15 +1990,23 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			 */
 			ni = ieee80211_find_node(&ic->ic_scan, mlme->im_macaddr);
 		}
-		if (ni == NULL)
+		if (ni == NULL) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+				"%s: node not found\n", __func__);
 			return EINVAL;
+		}
 		if (!ieee80211_sta_join(ic, ni)) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+				"%s: join failed\n", __func__);
 			ieee80211_free_node(ni);
 			return EINVAL;
 		}
 		break;
 	case IEEE80211_MLME_DISASSOC:
 	case IEEE80211_MLME_DEAUTH:
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+			"%s: %s\n", __func__,
+			(mlme->im_op == IEEE80211_MLME_DISASSOC ? "disassoc" : "deauth"));
 		switch (ic->ic_opmode) {
 		case IEEE80211_M_STA:
 			/* XXX not quite right */
@@ -2000,8 +2017,11 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			/* NB: the broadcast address means do 'em all */
 			if (!IEEE80211_ADDR_EQ(mlme->im_macaddr, ic->ic_dev->broadcast)) {
 				if ((ni = ieee80211_find_node(&ic->ic_sta,
-						mlme->im_macaddr)) == NULL)
+						mlme->im_macaddr)) == NULL) {
+					IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+						"%s: node not found\n", __func__);
 					return EINVAL;
+				}
 				domlme(mlme, ni);
 				ieee80211_free_node(ni);
 			} else {
@@ -2015,11 +2035,17 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_MLME_AUTHORIZE:
 	case IEEE80211_MLME_UNAUTHORIZE:
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+			"%s: %sauthorize\n", __func__,
+			(mlme->im_op == IEEE80211_MLME_UNAUTHORIZE ? "un" : ""));
 		if (ic->ic_opmode != IEEE80211_M_HOSTAP)
 			return -EINVAL;
 		ni = ieee80211_find_node(&ic->ic_sta, mlme->im_macaddr);
-		if (ni == NULL)
+		if (ni == NULL) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+				"%s: node not found\n", __func__);
 			return -EINVAL;
+		}
 		if (mlme->im_op == IEEE80211_MLME_AUTHORIZE)
 			ieee80211_node_authorize(ic, ni);
 		else
@@ -2027,13 +2053,19 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 		ieee80211_free_node(ni);
 		break;
 	case IEEE80211_MLME_CLEAR_STATS:
+		IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+			"%s: clear stats\n", __func__);
 		if (ic->ic_opmode != IEEE80211_M_HOSTAP)
-		    return -EINVAL;
+			return -EINVAL;
 		ni = ieee80211_find_node(&ic->ic_sta, mlme->im_macaddr);
-		if (ni == NULL)
-		    return -EINVAL;
+		if (ni == NULL) {
+			IEEE80211_DPRINTF(ic, IEEE80211_MSG_MLME,
+				"%s: node not found\n", __func__);
+			return -EINVAL;
+		}
 		/* clear statistics */
 		memset(&ni->ni_stats, 0, sizeof(struct ieee80211_nodestats));
+		ieee80211_free_node(ni);
 		break;
 	default:
 		return -EINVAL;
