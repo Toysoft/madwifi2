@@ -1853,7 +1853,8 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				wpa = frm;
 				break;
 			case IEEE80211_ELEMID_VENDOR:
-				if (iswpaoui(frm))
+				/* don't override RSN wpa element */
+				if (iswpaoui(frm) && !wpa)
 					wpa = frm;
 				else if (iswmeparam(frm) || iswmeinfo(frm))
 					wme = frm;
