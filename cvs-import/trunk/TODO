@@ -15,13 +15,15 @@ HIGH PRIO:
   crypto support (SWMIC, SWCRYPT).
 - duration in 802.11 frames is always 0
 - when a wrong WEP key is configured, the hardware decryption does not fail
-  but results in bogus packets 
+  but results in bogus packets (often "sap" packets in tcpdump)
     - cause HAL_RXERR_DECRYPT is ignored
 - bandwidth with 2 cards (one in, one out) is only 1/2 of possible rate
     - may be a locking problem
 - correct fix for !IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_bssid) in 
   ieee80211_input.c (line 1986). it's disabled now because it breaks
   re-association
+- report both RSN and WPA IEs in scan results for wpa_supplicant
+    - at the moment RSN is preferred over WPA if both are present
 
 
 LOW PRIO:
@@ -38,7 +40,7 @@ LOW PRIO:
 
 LONG TERM:
 ==========
-- integration with linux ieee80211 stack (work in progress)
+- integration with the upcoming linux ieee80211 stack
 - inclusion into linux kernel
 
 
