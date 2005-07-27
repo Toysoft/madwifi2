@@ -171,8 +171,7 @@ static struct iw_statistics *ath_iw_getstats(struct net_device *);
 static struct iw_handler_def ath_iw_handler_def;
 #endif
 static void	ath_setup_stationkey(struct ieee80211_node *);
-static void	ath_newassoc(struct ieee80211com *,
-			struct ieee80211_node *, int);
+static void	ath_newassoc(struct ieee80211_node *, int);
 static int	ath_getchannels(struct net_device *, u_int cc,
 			HAL_BOOL outdoor, HAL_BOOL xchanmode);
 static void	ath_led_event(struct ath_softc *, int);
@@ -647,8 +646,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * all parts.  We're a bit pedantic here as all parts
 	 * support a global cap.
 	 */
-	sc->sc_hastpc = ath_hal_hastpc(ah);
-	if (sc->sc_hastpc || ath_hal_hastxpowlimit(ah))
+	if (ath_hal_hastpc(ah) || ath_hal_hastxpowlimit(ah))
 		ic->ic_caps |= IEEE80211_C_TXPMGT;
 
 	/*
@@ -672,10 +670,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/*
 	 * Query the hal about antenna support.
 	 */
-	if (ath_hal_hasdiversity(ah)) {
-		sc->sc_hasdiversity = 1;
-		sc->sc_diversity = ath_hal_getdiversity(ah);
-	}
 	sc->sc_defant = ath_hal_getdefantenna(ah);
 
 	/*
@@ -1080,6 +1074,11 @@ ath_init(struct net_device *dev)
 	 * but it's best done after a reset.
 	 */
 	ath_update_txpow(sc);
+	/*
+	 * Likewise this is set during reset so update
+	 * state cached in the driver.
+	 */
+	sc->sc_diversity = ath_hal_getdiversity(ah);
 
 	/*
 	 * Setup the hardware after reset: the key cache
@@ -1250,6 +1249,7 @@ ath_reset(struct net_device *dev)
 		if_printf(dev, "%s: unable to reset hardware: '%s' (%u)\n",
 			__func__, hal_status_desc[status], status);
 	ath_update_txpow(sc);		/* update tx power state */
+	sc->sc_diversity = ath_hal_getdiversity(ah);
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		if_printf(dev, "%s: unable to start recv logic\n", __func__);
 	/*
@@ -2604,12 +2604,12 @@ ath_beacon_tasklet(struct net_device *dev)
 			DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: stuck beacon time (%u missed)\n",
 			__func__, sc->sc_bmisscount);
-                        ATH_SCHEDULE_TQUEUE(&sc->sc_bstuckq, &needmark);
+			ATH_SCHEDULE_TQUEUE(&sc->sc_bstuckq, &needmark);
                 }
 		return;
 	}
 	if (sc->sc_bmisscount != 0) {
-		DPRINTF(sc, ATH_DEBUG_BEACON,
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: resume beacon xmit after %u misses\n",
 			__func__, sc->sc_bmisscount);
 		sc->sc_bmisscount = 0;
@@ -3569,7 +3569,7 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				    "ibss merge, rstamp %u tsf %llx "
 				    "tstamp %llx\n", rstamp, tsf,
 				    ni->ni_tstamp.tsf);
-				ieee80211_ibss_merge(ic, ni);
+				ieee80211_ibss_merge(ni);
 			}
 		}
 		break;
@@ -5051,6 +5051,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		}
 		sc->sc_curchan = hchan;
 		ath_update_txpow(sc);		/* update tx power state */
+		sc->sc_diversity = ath_hal_getdiversity(ah);
 
 		/*
 		 * Re-enable rx framework.
@@ -5308,8 +5309,9 @@ ath_setup_stationkey(struct ieee80211_node *ni)
  * param tells us if this is the first time or not.
  */
 static void
-ath_newassoc(struct ieee80211com *ic, struct ieee80211_node *ni, int isnew)
+ath_newassoc(struct ieee80211_node *ni, int isnew)
 {
+	struct ieee80211com *ic = ni->ni_ic;
 	struct ath_softc *sc = ic->ic_dev->priv;
 
 	ath_rate_newassoc(sc, ATH_NODE(ni), isnew);
@@ -6208,9 +6210,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				ath_setdefantenna(sc, val);
 				break;
 			case ATH_DIVERSITY:
-				/* XXX validate? */
-				if (!sc->sc_hasdiversity)
-					return -EINVAL;
+    				/* XXX validate? */
 				sc->sc_diversity = val;
 				ath_hal_setdiversity(ah, val);
 				break;
@@ -6224,8 +6224,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
                                 break;
                         case ATH_TPC:
                                 /* XXX validate? */
-                                if (!sc->sc_hastpc)
-                                        return -EINVAL;
                                 ath_hal_settpc(ah, val);
                                 break;
                         case ATH_TXPOWLIMIT:
