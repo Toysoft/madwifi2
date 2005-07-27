@@ -72,6 +72,61 @@ doprint(struct ieee80211com *ic, int subtype)
 #endif
 
 /*
+ * Set the direction field and address fields of an outgoing
+ * non-QoS frame.  Note this should be called early on in
+ * constructing a frame as it sets i_fc[1]; other bits can
+ * then be or'd in.
+ */
+static void
+ieee80211_send_setup(struct ieee80211com *ic,
+	struct ieee80211_node *ni,
+	struct ieee80211_frame *wh,
+	int type,
+	const u_int8_t sa[IEEE80211_ADDR_LEN],
+	const u_int8_t da[IEEE80211_ADDR_LEN],
+	const u_int8_t bssid[IEEE80211_ADDR_LEN])
+{
+#define WH4(wh) ((struct ieee80211_frame_addr4 *)wh)
+	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | type;
+	if ((type & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA) {
+		switch (ic->ic_opmode) {
+		case IEEE80211_M_STA:
+			wh->i_fc[1] = IEEE80211_FC1_DIR_TODS;
+			IEEE80211_ADDR_COPY(wh->i_addr1, bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr2, sa);
+			IEEE80211_ADDR_COPY(wh->i_addr3, da);
+			break;
+		case IEEE80211_M_IBSS:
+		case IEEE80211_M_AHDEMO:
+			wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
+			IEEE80211_ADDR_COPY(wh->i_addr1, da);
+			IEEE80211_ADDR_COPY(wh->i_addr2, sa);
+			IEEE80211_ADDR_COPY(wh->i_addr3, bssid);
+			break;
+		case IEEE80211_M_HOSTAP:
+			wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
+			IEEE80211_ADDR_COPY(wh->i_addr1, da);
+			IEEE80211_ADDR_COPY(wh->i_addr2, bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr3, sa);
+			break;
+		case IEEE80211_M_MONITOR:       /* NB: to quiet compiler */
+			break;
+		}
+	} else {
+		wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
+		IEEE80211_ADDR_COPY(wh->i_addr1, da);
+		IEEE80211_ADDR_COPY(wh->i_addr2, sa);
+		IEEE80211_ADDR_COPY(wh->i_addr3, bssid);
+	}
+	*(u_int16_t *)&wh->i_dur[0] = 0;
+	/* NB: use non-QoS tid */
+	*(u_int16_t *)&wh->i_seq[0] =
+	    htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
+	    ni->ni_txseqs[0]++;
+#undef WH4
+}
+
+/*
  * Send a management frame to the specified node.  The node pointer
  * must have a reference as the pointer will be passed to the driver
  * and potentially held for a long time.  If the frame is successfully
@@ -101,30 +156,9 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
-	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT | type;
-	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
-	*(u_int16_t *)wh->i_dur = 0;
-	*(u_int16_t *)wh->i_seq =
-	    htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
-	ni->ni_txseqs[0]++;
-	/*
-	 * Hack.  When sending PROBE_REQ frames while scanning we
-	 * explicitly force a broadcast rather than (as before) clobber
-	 * ni_macaddr and ni_bssid.  This is stopgap, we need a way
-	 * to communicate this directly rather than do something
-	 * implicit based on surrounding state.
-	 */
-	if (type == IEEE80211_FC0_SUBTYPE_PROBE_REQ &&
-	    (ic->ic_flags & IEEE80211_F_SCAN)) {
-		IEEE80211_ADDR_COPY(wh->i_addr1, dev->broadcast);
-		IEEE80211_ADDR_COPY(wh->i_addr2, ic->ic_myaddr);
-		IEEE80211_ADDR_COPY(wh->i_addr3, dev->broadcast);
-	} else {
-		IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_macaddr);
-		IEEE80211_ADDR_COPY(wh->i_addr2, ic->ic_myaddr);
-		IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
-	}
-
+	ieee80211_send_setup(ic, ni, wh,
+		IEEE80211_FC0_TYPE_MGT | type,
+		ic->ic_myaddr, ni->ni_macaddr, ni->ni_bssid);
 	if ((cb->flags & M_LINK0) != 0 && ni->ni_challenge != NULL) {
 		cb->flags &= ~M_LINK0;
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_AUTH,
@@ -154,8 +188,9 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
  * Send a null data frame to the specified node.
  */
 int
-ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
+ieee80211_send_nulldata(struct ieee80211_node *ni)
 {
+	struct ieee80211com *ic = ni->ni_ic;
 	struct net_device *dev = ic->ic_dev;
 	struct sk_buff *skb;
 	struct ieee80211_frame *wh;
@@ -174,21 +209,22 @@ ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
-	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
-		IEEE80211_FC0_SUBTYPE_NODATA;
-	*(u_int16_t *)wh->i_dur = 0;
-	*(u_int16_t *)wh->i_seq =
-	    htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
-	ni->ni_txseqs[0]++;
-
-	/* XXX WDS */
-	wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
-	IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_macaddr);
-	IEEE80211_ADDR_COPY(wh->i_addr2, ni->ni_bssid);
-	IEEE80211_ADDR_COPY(wh->i_addr3, ic->ic_myaddr);
+	ieee80211_send_setup(ic, ni, wh,
+	    IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_NODATA,
+	    ic->ic_myaddr, ni->ni_macaddr, ni->ni_bssid);
+	/* NB: power management bit is never sent by an AP */
+	if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT) &&
+	    ic->ic_opmode != IEEE80211_M_HOSTAP)
+		wh->i_fc[1] |= IEEE80211_FC1_PWR_MGT;
 	skb_trim(skb, sizeof(struct ieee80211_frame));
 
 	IEEE80211_NODE_STAT(ni, tx_data);
+    
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_DEBUG | IEEE80211_MSG_DUMPPKTS,
+		"[%s] send null data frame on channel %u, pwr mgt %s\n",
+		ether_sprintf(ni->ni_macaddr),
+		ieee80211_chan2ieee(ic, ni->ni_chan),
+		wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "ena" : "dis");
 
 	IF_ENQUEUE(&ic->ic_mgtq, skb);		/* cheat */
 	(*dev->hard_start_xmit)(NULL, dev);
@@ -909,6 +945,94 @@ ieee80211_add_wme_param(u_int8_t *frm, struct ieee80211_wme_state *wme)
 }
 #undef WME_OUI_BYTES
 
+ /*
+  * Send a probe request frame with the specified ssid
+  * and any optional information element data.
+  */
+int
+ieee80211_send_probereq(struct ieee80211_node *ni,
+	    const u_int8_t sa[IEEE80211_ADDR_LEN],
+	    const u_int8_t da[IEEE80211_ADDR_LEN],
+	    const u_int8_t bssid[IEEE80211_ADDR_LEN],
+    	    const u_int8_t *ssid, size_t ssidlen,
+	    const void *optie, size_t optielen)
+{
+	struct ieee80211com *ic = ni->ni_ic;
+	enum ieee80211_phymode mode;
+	struct ieee80211_frame *wh;
+	struct sk_buff *skb;
+	struct ieee80211_cb *cb;
+	u_int8_t *frm;
+
+	/*
+	 * Hold a reference on the node so it doesn't go away until after
+	 * the xmit is complete all the way in the driver.  On error we
+	 * will remove our reference.
+	 */
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_NODE,
+		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
+		__func__, __LINE__,
+		ni, ether_sprintf(ni->ni_macaddr),
+		ieee80211_node_refcnt(ni)+1);
+	ieee80211_ref_node(ni);
+
+	/*
+	 * prreq frame format
+	 *      [tlv] ssid
+	 *      [tlv] supported rates
+	 *      [tlv] extended supported rates
+	 *      [tlv] user-specified ie's
+	 */
+	skb = ieee80211_getmgtframe(&frm, 
+		    2 + IEEE80211_NWID_LEN
+		  + 2 + IEEE80211_RATE_SIZE
+		  + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+		  + (optie != NULL ? optielen : 0)
+	    );
+	if (skb == NULL) {
+		ic->ic_stats.is_tx_nobuf++;
+		ieee80211_free_node(ni);
+		return ENOMEM;
+	}
+
+	frm = ieee80211_add_ssid(frm, ssid, ssidlen);
+	mode = ieee80211_chan2mode(ic, ni->ni_chan);
+	frm = ieee80211_add_rates(frm, &ic->ic_sup_rates[mode]);
+	frm = ieee80211_add_xrates(frm, &ic->ic_sup_rates[mode]);
+
+	if (optie != NULL) {
+		memcpy(frm, optie, optielen);
+		frm += optielen;
+	}
+	skb_trim(skb, frm - skb->data);
+
+	if (skb == NULL)
+		return ENOMEM;
+	cb = (struct ieee80211_cb *)skb->cb;
+	KASSERT(cb->ni == NULL, ("cb->ni not null"));
+	cb->ni = ni;
+
+	wh = (struct ieee80211_frame *)
+		skb_push(skb, sizeof(struct ieee80211_frame));
+	ieee80211_send_setup(ic, ni, wh,
+		IEEE80211_FC0_TYPE_MGT | IEEE80211_FC0_SUBTYPE_PROBE_REQ,
+		sa, da, bssid);
+	/* XXX power management? */
+
+	IEEE80211_NODE_STAT(ni, tx_probereq);
+	IEEE80211_NODE_STAT(ni, tx_mgmt);
+	
+	IEEE80211_DPRINTF(ic, IEEE80211_MSG_DEBUG | IEEE80211_MSG_DUMPPKTS,
+		    "[%s] send probe req on channel %u\n",
+		    ether_sprintf(wh->i_addr1),
+		    ieee80211_chan2ieee(ic, ni->ni_chan));
+
+	IF_ENQUEUE(&ic->ic_mgtq, skb);
+	(*skb->dev->hard_start_xmit)(NULL, skb->dev);
+
+	return 0;
+}
+
 /*
  * Send a management frame.  The node is for the destination (or ic_bss
  * when in station mode).  Nodes other than ic_bss have their reference
@@ -921,7 +1045,6 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 #define	senderr(_x, _v)	do { ic->ic_stats._v++; ret = _x; goto bad; } while (0)
 	struct sk_buff *skb;
 	u_int8_t *frm;
-	enum ieee80211_phymode mode;
 	u_int16_t capinfo;
 	int has_challenge, is_shared_key, ret, timer, status;
 
@@ -941,38 +1064,6 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	timer = 0;
 	switch (type) {
-	case IEEE80211_FC0_SUBTYPE_PROBE_REQ:
-		/*
-		 * prreq frame format
-		 *	[tlv] ssid
-		 *	[tlv] supported rates
-		 *	[tlv] extended supported rates
-		 *	[tlv] user-specified ie's
-		 */
-		skb = ieee80211_getmgtframe(&frm,
-			 2 + IEEE80211_NWID_LEN
-		       + 2 + IEEE80211_RATE_SIZE
-		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
-		       + (ic->ic_opt_ie != NULL ? ic->ic_opt_ie_len : 0)
-		);
-		if (skb == NULL)
-			senderr(ENOMEM, is_tx_nobuf);
-
-		frm = ieee80211_add_ssid(frm, ic->ic_des_essid, ic->ic_des_esslen);
-		mode = ieee80211_chan2mode(ic, ni->ni_chan);
-		frm = ieee80211_add_rates(frm, &ic->ic_sup_rates[mode]);
-		frm = ieee80211_add_xrates(frm, &ic->ic_sup_rates[mode]);
-		if (ic->ic_opt_ie != NULL) {
-			memcpy(frm, ic->ic_opt_ie, ic->ic_opt_ie_len);
-			frm += ic->ic_opt_ie_len;
-		}
-		skb_trim(skb, frm - skb->data);
-
-		IEEE80211_NODE_STAT(ni, tx_probereq);
-		if (ic->ic_opmode == IEEE80211_M_STA)
-			timer = IEEE80211_TRANS_WAIT;
-		break;
-
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 		/*
 		 * probe response frame format
@@ -1134,7 +1225,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		IEEE80211_NODE_STAT(ni, tx_deauth);
 		IEEE80211_NODE_STAT_SET(ni, tx_deauth_code, arg);
 
-		ieee80211_node_unauthorize(ic, ni);	/* port closed */
+		ieee80211_node_unauthorize(ni);		/* port closed */
 		break;
 
 	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
@@ -1610,6 +1701,6 @@ ieee80211_pwrsave(struct ieee80211com *ic, struct ieee80211_node *ni,
 		ether_sprintf(ni->ni_macaddr), qlen);
 
 	if (qlen == 1)
-		ic->ic_set_tim(ic, ni, 1);
+		ic->ic_set_tim(ni, 1);
 }
 EXPORT_SYMBOL(ieee80211_pwrsave);
