@@ -24,6 +24,7 @@ HIGH PRIO:
   re-association
 - report both RSN and WPA IEs in scan results for wpa_supplicant
     - at the moment RSN is preferred over WPA if both are present
+- suspend/resume
 
 
 LOW PRIO:
