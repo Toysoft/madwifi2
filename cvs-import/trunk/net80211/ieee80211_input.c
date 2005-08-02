@@ -2273,12 +2273,23 @@ ieee80211_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				break;
 			/* XXX verify only one of RSN and WPA ie's? */
 			case IEEE80211_ELEMID_RSN:
-				wpa = frm;
+				if (ic->ic_flags & IEEE80211_F_WPA2)
+					wpa = frm;
+				else
+					IEEE80211_DPRINTF(ic,
+						IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
+						"[%s] ignoring RSN IE in association request\n",
+						ether_sprintf(wh->i_addr2));
 				break;
 			case IEEE80211_ELEMID_VENDOR:
 				if (iswpaoui(frm)) {
 					if (ic->ic_flags & IEEE80211_F_WPA1)
 						wpa = frm;
+					else
+						IEEE80211_DPRINTF(ic,
+							IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
+							"[%s] ignoring WPA IE in association request\n",
+							ether_sprintf(wh->i_addr2));
 				} else if (iswmeinfo(frm))
 					wme = frm;
 				/* XXX Atheros OUI support */
