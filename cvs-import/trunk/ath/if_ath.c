@@ -2324,6 +2324,11 @@ ath_calcrxfilter(struct ath_softc *sc, enum ieee80211_state state)
 	    state == IEEE80211_S_SCAN)
 		rfilt |= HAL_RX_FILTER_BEACON;
 
+	if (sc->sc_rawdev_enabled && (sc->sc_rawdev.flags & IFF_UP)) {
+            /* if the rawdev is up, accept all normal packets */
+	    rfilt |= (HAL_RX_FILTER_CONTROL | HAL_RX_FILTER_BEACON | HAL_RX_FILTER_PROM |
+		      HAL_RX_FILTER_PROBEREQ);
+	}
 	rfilt |= sc->sc_rxfilter;
 
 	return rfilt;
