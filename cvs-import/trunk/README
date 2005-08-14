@@ -241,17 +241,14 @@ documentation for its' setup.
 Live Monitoring and Writing Raw 802.11 Packets
 ==============================================
 The driver can be used in a live "monitor" mode via the ath0raw
-device. To turn on the device you must use the following sysctl:
-sysctl -w dev.ath0.rawdev=1
-This will create a ath0raw device. You must run "ifconfig ath0raw up"
-to begin receiveing packets on it. You can send packets to the device and 
+device. To turn on the device you must run the following:
+sysctl -w dev.ath0.rawdev=1      # create ath0raw
+ifconfig ath0raw up              # start receiving packets on ath0raw
+This will create a ath0raw device. You can send packets to the device and 
 they will be sent directly to the card, bypassing any state machine.
-You can also specify a filter of the received packets. For instance,
-to receive all packets, including those not passing the CRC check, run
-sysctl -w dev.ath0.rxfilter=0x1ff
 Finally, you can choose to receive packets on ath0raw in a number of 
 different packet formats:
-sysctl -w dev.ath0.rawdev_type=0 # normal 802.11 frames
+sysctl -w dev.ath0.rawdev_type=0 # normal 802.11 frames (default)
 sysctl -w dev.ath0.rawdev_type=1 # prism headers + 802.11
 sysctl -w dev.ath0.rawdev_type=2 # radiotap + 802.11
 
