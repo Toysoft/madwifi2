@@ -1608,6 +1608,9 @@ ieee80211_ioctl_setparam(struct ieee80211com *ic, struct iw_request_info *info,
 		if (ic->ic_curmode == IEEE80211_MODE_11G)
 			retv = ENETRESET;
 		break;
+	case IEEE80211_PARAM_WDSONLY:
+		ic->ic_wdsonly = value;
+		break;
 	case IEEE80211_PARAM_RESET:
 		ic->ic_init(ic->ic_dev);
 		break;
@@ -1744,6 +1747,9 @@ ieee80211_ioctl_getparam(struct ieee80211com *ic, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_PUREG:
 		param[0] = (ic->ic_flags & IEEE80211_F_PUREG) != 0;
+		break;
+	case IEEE80211_PARAM_WDSONLY:
+		param[0] = ic->ic_wdsonly;
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -2231,6 +2237,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"delmac" },
 	{ IEEE80211_IOCTL_CHANLIST,
 	  IW_PRIV_TYPE_CHANLIST | IW_PRIV_SIZE_FIXED, 0,"chanlist" },
+	{ IEEE80211_IOCTL_WDSADD,
+	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"wdsadd" },
+	{ IEEE80211_IOCTL_WDSDEL,
+	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"wdsdel" },
 #if WIRELESS_EXT >= 12
 	{ IEEE80211_IOCTL_SETPARAM,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "setparam" },
@@ -2354,6 +2364,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "pureg" },
 	{ IEEE80211_PARAM_PUREG,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_pureg" },
+	{ IEEE80211_PARAM_WDSONLY,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wdsonly" },
+	{ IEEE80211_PARAM_WDSONLY,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_wdsonly" },
 	{ IEEE80211_PARAM_RESET,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "reset" },
 #endif /* WIRELESS_EXT >= 12 */

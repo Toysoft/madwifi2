@@ -147,6 +147,9 @@ struct ieee80211_node {
 	int			ni_txrate;	/* index to ni_rates[] */
 	struct sk_buff_head	ni_savedq;	/* ps-poll queue */
 	struct ieee80211_nodestats ni_stats;	/* per-node statistics */
+	struct net_device	*ni_wdsdev; /* WDS device */
+	int			ni_wdsonly; /* only WDS traffic is allowed */
+	struct net_device_stats ni_wdsstats; /* wds traffic statistics */
 };
 MALLOC_DECLARE(M_80211_NODE);
 

@@ -72,6 +72,7 @@
 
 #define	IEEE80211_PS_SLEEP	0x1	/* STA is in power saving mode */
 #define	IEEE80211_PS_MAX_QUEUE	50	/* maximum saved packets */
+#define IEEE80211_WDS_MAXNODES	10	/* max wds nodes per dev in protocol stack */
 
 #define	IEEE80211_MS_TO_TU(x)	(((x) * 1000) / 1024)
 #define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
@@ -207,6 +208,12 @@ struct ieee80211com {
 
 	struct timer_list	ic_radar_reanimate;	/* reanimation timer after stopping all channels after redar detection */
 	u_int32_t ic_channelList[IEEE80211_CHAN_MAX];
+	/* wds peers mac addresses */
+	u_int8_t		ic_wdspeers[IEEE80211_WDS_MAXNODES][IEEE80211_ADDR_LEN];
+	/* wds devices */
+	struct net_device	*ic_wdsdev[IEEE80211_WDS_MAXNODES];
+	/* only wds traffic is allowed */
+	int			ic_wdsonly;
 };
 
 #define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
