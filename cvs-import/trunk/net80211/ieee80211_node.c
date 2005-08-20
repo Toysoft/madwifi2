@@ -963,6 +963,7 @@ ieee80211_setup_node(struct ieee80211_node_table *nt,
 
 	IEEE80211_ADDR_COPY(ni->ni_macaddr, macaddr);
 	hash = IEEE80211_NODE_HASH(macaddr);
+	ni->ni_wdsdev = NULL;
 	skb_queue_head_init(&ni->ni_savedq);
 	ieee80211_node_initref(ni);		/* mark referenced */
 	ni->ni_chan = IEEE80211_CHAN_ANYC;
@@ -1017,6 +1018,39 @@ ieee80211_dup_bss(struct ieee80211_node_table *nt, const u_int8_t *macaddr)
 		ic->ic_stats.is_rx_nodealloc++;
 	return ni;
 }
+
+struct ieee80211_node *
+ieee80211_add_wds_node(struct ieee80211_node_table *nt
+		, const u_int8_t *macaddr, struct net_device *dev)
+{
+	struct ieee80211_node *ni;
+	struct ieee80211com *ic;
+	ni = ieee80211_dup_bss(nt,macaddr);
+	if(ni) {
+		ic = ni->ni_ic;
+		ni->ni_wdsdev = dev;
+		ni->ni_capinfo = ic->ic_bss->ni_capinfo;
+		ic->ic_newassoc(ic,ni,1);
+	}
+	return ni;
+}
+EXPORT_SYMBOL(ieee80211_add_wds_node);
+
+
+int
+ieee80211_del_wds_node(struct ieee80211_node_table *nt
+		, const u_int8_t *macaddr)
+{
+	struct ieee80211_node *ni;
+	ni = ieee80211_find_node(nt, macaddr);
+	if(ni==NULL) {
+		return -EINVAL;
+	}
+	ieee80211_free_node(ni);
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_del_wds_node);
+
 
 static struct ieee80211_node *
 #ifdef IEEE80211_DEBUG_REFCNT
@@ -1509,6 +1543,9 @@ restart:
 		 * of time and regardless reclaiming our state is wrong.
 		 */
 		if (ni == ic->ic_bss)
+			continue;
+		/* WDS is not really stations */
+		if (ni->ni_wdsdev)
 			continue;
 		ni->ni_inact--;
 		if (ni->ni_associd != 0) {

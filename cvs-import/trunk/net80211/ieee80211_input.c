@@ -134,6 +134,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 #define	HAS_SEQ(type)	((type & 0x4) == 0)
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_frame *wh;
+	struct ieee80211_frame_addr4 *wh4;
 	struct ieee80211_key *key;
 	struct ether_header *eh;
 	int len, hdrspace;
@@ -141,6 +142,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int8_t *bssid;
 	u_int16_t rxseq;
 	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
+	int isaddr4;
 
 	KASSERT(ni != NULL, ("null node"));
 	ni->ni_inact = ni->ni_inact_reload;
@@ -185,6 +187,13 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 	}
 
 	dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
+	if (dir == IEEE80211_FC1_DIR_DSTODS) {
+		isaddr4 = 1;
+		wh4 = (struct ieee80211_frame_addr4*)wh;
+	} else {
+		isaddr4 = 0;
+		wh4 = NULL;
+	}
 	type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 	subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
 	if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
@@ -270,7 +279,11 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				tid++;
 			} else
 				tid = 0;
-			rxseq = le16toh(*(u_int16_t *)wh->i_seq);
+			if(isaddr4) {
+				rxseq = le16toh(*(u_int16_t *)wh4->i_seq);
+			} else {
+				rxseq = le16toh(*(u_int16_t *)wh->i_seq);
+			}
 			if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
 			    SEQ_LEQ(rxseq, ni->ni_rxseqs[tid])) {
 				/* duplicate, discard */
@@ -337,7 +350,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			/* XXX no power-save support */
 			break;
 		case IEEE80211_M_HOSTAP:
-			if (dir != IEEE80211_FC1_DIR_TODS) {
+			if (!isaddr4 && dir != IEEE80211_FC1_DIR_TODS) {
 				ic->ic_stats.is_rx_wrongdir++;
 				goto out;
 			}
@@ -351,7 +364,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				ic->ic_stats.is_rx_notassoc++;
 				goto err;
 			}
-			if (ni->ni_associd == 0) {
+			if (!isaddr4 && ni->ni_associd == 0) {
 				IEEE80211_DISCARD(ic, IEEE80211_MSG_INPUT,
 				    wh, "data", "%s", "unassoc src");
 				IEEE80211_SEND_MGMT(ic, ni,
@@ -444,7 +457,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 			goto err;
 		}
 		eh = (struct ether_header *) skb->data;
-		if (!ieee80211_node_is_authorized(ni)) {
+		if (!ieee80211_node_is_authorized(ni)&&(!ni->ni_wdsdev)) {
 			/*
 			 * Deny any non-PAE frames received prior to
 			 * authorization.  For open/shared-key
@@ -489,7 +502,7 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 
 		/* perform as a bridge within the AP */
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
-		    (ic->ic_flags & IEEE80211_F_NOBRIDGE) == 0) {
+		    (ic->ic_flags & IEEE80211_F_NOBRIDGE) == 0 && !isaddr4) {
 			struct sk_buff *skb1 = NULL;
 
 			if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
@@ -534,6 +547,20 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 				dev_queue_xmit(skb1);			// NB: send directly to iface
 			}
 		}
+		if(isaddr4) {
+			if(ni->ni_wdsdev) {
+				dev = ni->ni_wdsdev;
+				/* skb is sure not NULL here */
+				ni->ni_wdsstats.rx_packets++;
+				ni->ni_wdsstats.rx_bytes+=skb->len;
+			} else {
+				/* weird, wds but from station */
+				IEEE80211_DISCARD(ic, IEEE80211_MSG_INPUT,
+						wh, "data", "%s", "unknown src");
+				ic->ic_stats.is_rx_wrongbss++;
+				goto err;
+			}
+		}
 		if (skb != NULL) {
 			skb->dev = dev;
 			skb->protocol = eth_type_trans(skb, dev);
@@ -548,6 +575,10 @@ ieee80211_input(struct ieee80211com *ic, struct sk_buff *skb,
 		return IEEE80211_FC0_TYPE_DATA;
 
 	case IEEE80211_FC0_TYPE_MGT:
+		if(ni->ni_wdsdev||ic->ic_wdsonly) {
+			ic->ic_stats.is_rx_mgtdiscard++;
+			goto out;
+		}
 		IEEE80211_NODE_STAT(ni, rx_mgmt);
 		if (dir != IEEE80211_FC1_DIR_NODS) {
 			ic->ic_stats.is_rx_wrongdir++;
@@ -646,7 +677,9 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 	struct sk_buff *skb, int hdrspace)
 {
 	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+	struct ieee80211_frame_addr4 *wh4 = (struct ieee80211_frame_addr4 *) skb->data;
 	struct ieee80211_frame *lwh;
+	struct ieee80211_frame_addr4 *lwh4;
 	u_int16_t rxseq;
 	u_int8_t fragno;
 	u_int8_t more_frag = wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG;
@@ -654,7 +687,11 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 
 	KASSERT(!IEEE80211_IS_MULTICAST(wh->i_addr1), ("multicast fragm?"));
 
-	rxseq = le16toh(*(u_int16_t *)wh->i_seq);
+	if((wh->i_fc[1] & IEEE80211_FC1_DIR_MASK)==IEEE80211_FC1_DIR_DSTODS) {
+		rxseq = le16toh(*(u_int16_t *)wh4->i_seq);
+	} else {
+		rxseq = le16toh(*(u_int16_t *)wh->i_seq);
+	}
 	fragno = rxseq & IEEE80211_SEQ_FRAG_MASK;
 
 	/* Quick way out, if there's nothing to defragment */
@@ -690,7 +727,12 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 		u_int16_t last_rxseq;
 
 		lwh = (struct ieee80211_frame *) skbfrag->data;
-		last_rxseq = le16toh(*(u_int16_t *)lwh->i_seq);
+		if((lwh->i_fc[1] & IEEE80211_FC1_DIR_MASK)==IEEE80211_FC1_DIR_DSTODS) {
+			lwh4 = (struct ieee80211_frame_addr4 *)lwh;
+			last_rxseq = le16toh(*(u_int16_t *)lwh4->i_seq);
+		} else {
+			last_rxseq = le16toh(*(u_int16_t *)lwh->i_seq);
+		}
 		/* NB: check seq # and frag together */
 		if (rxseq != last_rxseq+1 ||
 		    !IEEE80211_ADDR_EQ(wh->i_addr1, lwh->i_addr1) ||
@@ -722,15 +764,13 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 			 * (IEEE80211_MAX_LEN + cacheline size)
 			 * but maybe it's better to double check here
 			 */
-			if (skb->end - skb->head < ic->ic_dev->mtu +
-				sizeof(struct ieee80211_frame)) {
+			if (skb->end - skb->head < ic->ic_dev->mtu+hdrspace) {
 				/*
 				 * This should also linearize the skbuff
 				 * TODO: not 100% sure
 				 */
 				skbfrag = skb_copy_expand(skb, 0,
-					(ic->ic_dev->mtu +
-					 sizeof(struct ieee80211_frame))
+					(ic->ic_dev->mtu+hdrspace)
 				         - (skb->end - skb->head), GFP_ATOMIC);
 				dev_kfree_skb(skb);
 			}
@@ -750,7 +790,12 @@ ieee80211_defrag(struct ieee80211com *ic, struct ieee80211_node *ni,
 			skb->len - hdrspace);
 		/* track last seqnum and fragno */
 		lwh = (struct ieee80211_frame *) skbfrag->data;
-		*(u_int16_t *) lwh->i_seq = *(u_int16_t *) wh->i_seq;
+		if((lwh->i_fc[1] & IEEE80211_FC1_DIR_MASK)==IEEE80211_FC1_DIR_DSTODS) {
+			lwh4 = (struct ieee80211_frame_addr4 *) lwh;
+			*(u_int16_t *) lwh4->i_seq = *(u_int16_t *) wh4->i_seq;
+		} else {
+			*(u_int16_t *) lwh->i_seq = *(u_int16_t *) wh->i_seq;
+		}
 		/* we're done with the fragment */
 		dev_kfree_skb(skb);
 	}
