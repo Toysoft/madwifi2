@@ -722,9 +722,7 @@ ieee80211_end_scan(struct ieee80211com *ic)
 			ni->ni_fails++;
 #if 1
 			if (ni->ni_fails++ > 2) {
-				IEEE80211_NODE_LOCK(nt);
 				node_reclaim(nt, ni);
-				IEEE80211_NODE_UNLOCK(nt);
 			}
 #endif
 			continue;
