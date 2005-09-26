@@ -283,17 +283,20 @@ EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 static int
 proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 {
-	char buf[1024];
-	char *p = buf;
+	char *buf;
+	char *p;
 	struct ieee80211_node *ni;
 	struct ieee80211_node_table *nt = (struct ieee80211_node_table *)arg;
 	struct ieee80211_rateset *rs;
 	int i;
 	u_int16_t temp;
 
+	buf = kmalloc(space,GFP_KERNEL);
+	if(buf==NULL) return 0;
+	p = buf;
 	IEEE80211_NODE_LOCK(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
-		/* Assume each node needs 300 bytes */ 
+		/* Assume each node needs 300 bytes */
 		if (p - buf > space - 300)
 			break;
 		
@@ -381,7 +384,9 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 				ni->ni_fails, temp);
 	}
 	IEEE80211_NODE_UNLOCK(nt);
-	return copy_to_user(page, buf, p - buf) ? 0 : (p - buf);
+	i = copy_to_user(page, buf, p - buf);
+	kfree(buf);
+       	return i ? 0 : (p - buf);
 }
 
 static int
