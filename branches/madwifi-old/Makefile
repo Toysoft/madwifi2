@@ -58,7 +58,7 @@ install:
 	done
 	@if [ -z $(DESTDIR) ]; then \
 	    /sbin/depmod -ae ; \
-	elif [ -f $(SYSTEMMAP) ]; then \
+	elif [ -f $(SYSTEMMAP) -a -z "$(NO_DEPMOD)" ]; then \
 	    /sbin/depmod -ae -b $(DESTDIR) -F $(SYSTEMMAP) $(KERNELRELEASE) ; \
 	else \
 	    echo "Don't forget to run \"depmod -ae\" on the target system."; \
@@ -93,6 +93,7 @@ info:
 	fi	
 	@echo "KERNELRELEASE: $(KERNELRELEASE)"
 	@echo "KERNELPATH   : $(KERNELPATH)"
+	@echo "KERNELSRC    : $(KERNELSRC)"
 	@echo "KERNELCONF   : $(KERNELCONF)"
 	@echo "MODULEPATH   : $(MODULEPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"

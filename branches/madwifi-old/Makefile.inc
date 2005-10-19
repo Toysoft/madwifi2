@@ -53,7 +53,10 @@ OS=		linux
 # to override the default setting.
 #
 ifeq ($(TARGET),)
+TARGET=		$(shell uname -m)-elf
+ifeq ($(TARGET),i686-elf)
 TARGET=		i386-elf
+endif
 endif
 
 # BUS defines the bus type to which the wireless devices is attached.
@@ -66,10 +69,12 @@ endif
 # DESTDIR is used as path prefix during installation.
 DESTDIR ?=
 
-# KERNELPATH is the path to the target kernel's build/source area.
-# This is used to obtain the kernel configuration and include files.
+# KERNELPATH is the path to the target kernel's build area.
+# KERNELSRC is the path to the target kernel's source tree area.
+# By default, KERNELSRC is the same as KERNELPATH.  Those variables
+# are used to obtain the kernel configuration and include files.
 # If automatic determination doesn't work as desired, you have to
-# manually set it, for example with:
+# manually set them, for example with:
 # make KERNELPATH=/path/to/kernel/source
 
 # TOOLPATH is the path which contains the crosscompile toolchain (?)
@@ -82,23 +87,35 @@ TARGET :=	mipsisa32-be-elf
 ifndef KERNELPATH
 $(error KERNELPATH must be defined for bus type AHB.)
 endif
+KERNELSRC ?= $(KERNELPATH)
 ifndef TOOLPATH
 $(error TOOLPATH must be defined for bus type AHB.)
 endif
 
 else
 
-KERNELPATH ?= $(firstword $(wildcard $(DESTDIR)/lib/modules/$(shell uname -r)/build /usr/src/linux))
+# Path to the Linux kernel source tree.
+KERNELSRC ?= $(KERNELPATH)
+KERNELSRC ?= $(shell readlink -f /lib/modules/`uname -r`/source)
 
-ifeq ($(KERNELPATH),)
-$(error KERNELPATH must be defined)
-endif
+# Path to the Linux kernel build tree.  If the kernel was compiled
+# outside source directory, this should be the path to the output
+# directory.  By default, this Makefile tries to find the kernel you are
+# currently running.
+KERNELPATH ?= $(shell readlink -f /lib/modules/`uname -r`/build)
+KERNELPATH ?= $(shell readlink -f /lib/modules/`uname -r`/source)
+KERNELPATH ?= /usr/src/linux
 
 endif
 
 # sanity check: does KERNELPATH exist?
 ifeq ($(wildcard $(KERNELPATH)),)
 $(error KERNELPATH: $(KERNELPATH) does not exist)
+endif
+
+# sanity check: does KERNELSRC exist?
+ifeq ($(wildcard $(KERNELSRC)),)
+$(error KERNELSRC: $(KERNELSRC) does not exist)
 endif
 
 # KERNELRELEASE is the target kernel's version.  If KERNELRELEASE
@@ -111,7 +128,7 @@ endif
 #
 # Note: '\044' used instead of '$' in order to avoid make complaining like
 # "Recursive variable `KERNELRELEASE' references itself (eventually)."
-KERNELRELEASE ?= $(shell echo -e 'madwifi_$$_`date +%s`:\n\t@echo \044(KERNELRELEASE)\ninclude Makefile' | make -C $(KERNELPATH) -s -f-)
+KERNELRELEASE ?= $(shell echo -e 'madwifi_$$_`date +%s`:\n\t@echo \044(KERNELRELEASE)\ninclude Makefile' | make -C $(KERNELSRC) -s -f- dot-config=0)
 
 # KERNELCONF is the name of the file that holds the configuration
 # of the target kernel.
@@ -137,7 +154,7 @@ endif
 
 # WIRELESSEXT contains information about the version of the wireless
 # extensions that are available in the target kernel
-WIRELESSEXT ?=	$(shell cat $(KERNELPATH)/include/linux/wireless.h | grep "\#define WIRELESS_EXT" | cut -f2)
+WIRELESSEXT ?=	$(shell cat $(KERNELSRC)/include/linux/wireless.h | grep "\#define WIRELESS_EXT" | cut -f2)
 
 # Some settings that depend on actual kernel release
 ifneq ($(findstring 2.6,$(KERNELRELEASE)),)

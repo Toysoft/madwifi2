@@ -30,8 +30,8 @@ BINDIR=	/usr/local/bin
 
 include ${DEPTH}/Makefile.inc
 
-ALL_INSTALL=	athstats 80211stats athdebug 80211debug
-ALL=	${ALL_INSTALL} athkey athchans athctrl
+ALL_INSTALL=	athstats 80211stats athdebug 80211debug athctrl
+ALL=	${ALL_INSTALL} athkey athchans
 
 all:	${ALL}
 
