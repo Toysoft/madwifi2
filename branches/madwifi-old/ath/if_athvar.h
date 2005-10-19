@@ -264,6 +264,7 @@ struct ath_softc {
 				sc_needmib : 1,	/* enable MIB stats intr */
 				sc_hasdiversity : 1,/* rx diversity available */
 				sc_diversity : 1,/* enable rx diversity */
+				sc_lockslottime : 1,/* lock slot time value */
 				sc_hasveol : 1,	/* tx VEOL support */
 				sc_hastpc  : 1,	/* per-packet TPC support */
 				sc_ledstate: 1,	/* LED on/off state */

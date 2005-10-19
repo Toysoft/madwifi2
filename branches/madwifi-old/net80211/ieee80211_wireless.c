@@ -1836,6 +1836,7 @@ ieee80211_ioctl_setkey(struct ieee80211com *ic, struct iw_request_info *info,
 			return -EINVAL;
 		wk = &ic->ic_nw_keys[kid];
 		ni = NULL;
+		ik->ik_flags |= IEEE80211_KEY_GROUP;
 	}
 	error = 0;
 	ieee80211_key_update_begin(ic);
@@ -2054,9 +2055,9 @@ ieee80211_ioctl_setmlme(struct ieee80211com *ic, struct iw_request_info *info,
 			return -ENOENT;
 		}
 		if (mlme->im_op == IEEE80211_MLME_AUTHORIZE)
-			ieee80211_node_authorize(ic, ni);
+			ieee80211_node_authorize(ni);
 		else
-			ieee80211_node_unauthorize(ic, ni);
+			ieee80211_node_unauthorize(ni);
 		ieee80211_free_node(ni);
 		break;
 	case IEEE80211_MLME_CLEAR_STATS:

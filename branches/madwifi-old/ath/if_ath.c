@@ -171,8 +171,7 @@ static struct iw_statistics *ath_iw_getstats(struct net_device *);
 static struct iw_handler_def ath_iw_handler_def;
 #endif
 static void	ath_setup_stationkey(struct ieee80211_node *);
-static void	ath_newassoc(struct ieee80211com *,
-			struct ieee80211_node *, int);
+static void	ath_newassoc(struct ieee80211_node *, int);
 static int	ath_getchannels(struct net_device *, u_int cc,
 			HAL_BOOL outdoor, HAL_BOOL xchanmode);
 static void	ath_led_event(struct ath_softc *, int);
@@ -581,7 +580,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
  	dev->change_mtu = &ath_change_mtu;
 	dev->tx_queue_len = ATH_TXBUF;			/* TODO? 1 for mgmt frame */
 #ifdef CONFIG_NET_WIRELESS
+# if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
 	dev->get_wireless_stats = ath_iw_getstats;
+# endif
 	ieee80211_ioctl_iwsetup(&ath_iw_handler_def);
 	dev->wireless_handlers = &ath_iw_handler_def;
 #endif /* CONFIG_NET_WIRELESS */
@@ -2384,6 +2385,8 @@ ath_mode_init(struct net_device *dev)
 
 /*
  * Set the slot time based on the current setting.
+ * This is called by ath_updateslot below and when a non-ERP node
+ * joins the network.
  */
 static void
 ath_setslottime(struct ath_softc *sc)
@@ -2391,10 +2394,16 @@ ath_setslottime(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 
+	/* If the user has asked to lock the slot-time, ignore the
+	 * slot time adjustment. This is useful in longer-range networks
+	 * that require a slot time larger than the standard ones. -TvE
+	 */
+	if (!sc->sc_lockslottime) {
 	if (ic->ic_flags & IEEE80211_F_SHSLOT)
 		ath_hal_setslottime(ah, HAL_SLOT_TIME_9);
 	else
 		ath_hal_setslottime(ah, HAL_SLOT_TIME_20);
+	}
 	sc->sc_updateslot = OK;
 }
 
@@ -3438,7 +3447,9 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 			DPRINTF(sc, ATH_DEBUG_RECV,
 				"%s: prism not enough headroom %d/%d\n",
 				__func__, skb_headroom(skb), 
-				sizeof(wlan_ng_prism2_header));
+				(int)sizeof(wlan_ng_prism2_header));
+			/* we use a cast to (int) instead of %zd for backwards
+			 * compatibility with old kernel versions */
 			goto bad;
 		}
 		ph = (wlan_ng_prism2_header *)
@@ -3510,7 +3521,9 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 			DPRINTF(sc, ATH_DEBUG_RECV,
 				"%s: radiotap not enough headroom %d/%d\n",
 				__func__, skb_headroom(skb), 
-				sizeof(struct ath_rx_radiotap_header));
+				(int)sizeof(struct ath_rx_radiotap_header));
+			/* we use a cast to (int) instead of %zd for backwards
+			 * compatibility with old kernel versions */
 			goto bad;
 		}
 		th = (struct ath_rx_radiotap_header  *) skb_push(skb, sizeof(struct ath_rx_radiotap_header));
@@ -3610,7 +3623,7 @@ ath_recv_mgmt(struct ieee80211com *ic, struct sk_buff *skb,
 				    "ibss merge, rstamp %u tsf %llx "
 				    "tstamp %llx\n", rstamp, tsf,
 				    ni->ni_tstamp.tsf);
-				ieee80211_ibss_merge(ic, ni);
+				ieee80211_ibss_merge(ni);
 			}
 		}
 		if (ic->ic_opmode == IEEE80211_M_STA &&
@@ -4346,7 +4359,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 				rix = ic->ic_fixed_rate;
 				try0 = ATH_TXMAXTRY; //XXX: should be configurabe
 				if (shortPreamble)
-					txrate = rt->info[rix].shortPreamble;
+					txrate = rt->info[rix].rateCode | rt->info[rix].shortPreamble;
 				else
 					txrate = rt->info[rix].rateCode;
 			}
@@ -5365,8 +5378,9 @@ ath_setup_stationkey(struct ieee80211_node *ni)
  * param tells us if this is the first time or not.
  */
 static void
-ath_newassoc(struct ieee80211com *ic, struct ieee80211_node *ni, int isnew)
+ath_newassoc(struct ieee80211_node *ni, int isnew)
 {
+	struct ieee80211com *ic = ni->ni_ic;
 	struct ath_softc *sc = ic->ic_dev->priv;
 
 	ath_rate_newassoc(sc, ATH_NODE(ni), isnew);
@@ -5961,6 +5975,9 @@ static const iw_handler ath_priv_handlers[] = {
 
 static struct iw_handler_def ath_iw_handler_def = {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
+        .get_wireless_stats	= ath_iw_getstats,
+# endif
 	.standard		= (iw_handler *) ath_handlers,
 	.num_standard		= N(ath_handlers),
 	.private		= (iw_handler *) ath_priv_handlers,
@@ -6211,6 +6228,7 @@ enum {
 	ATH_RAWDEV_TYPE = 19,
 	ATH_RXFILTER	= 20,
 	ATH_RADARSIM	= 21,
+	ATH_LOCKSLOTTIME= 22,
 };
 
 static int
@@ -6232,6 +6250,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			case ATH_SLOTTIME:
 				if (!ath_hal_setslottime(ah, val))
 					ret = -EINVAL;
+				break;
+			case ATH_LOCKSLOTTIME:
+				sc->sc_lockslottime = val != 0;
 				break;
 			case ATH_ACKTIMEOUT:
 				if (!ath_hal_setacktimeout(ah, val))
@@ -6341,6 +6362,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 		case ATH_SLOTTIME:
 			val = ath_hal_getslottime(ah);
 			break;
+		case ATH_LOCKSLOTTIME:
+			val = sc->sc_lockslottime;
+			break;
 		case ATH_ACKTIMEOUT:
 			val = ath_hal_getacktimeout(ah);
 			break;
@@ -6425,6 +6449,11 @@ static	int maxint = 0x7fffffff;		/* 32-bit big */
 static const ctl_table ath_sysctl_template[] = {
 	{ .ctl_name	= ATH_SLOTTIME,
 	  .procname	= "slottime",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
+	{ .ctl_name	= ATH_LOCKSLOTTIME,
+	  .procname	= "lockslottime",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
@@ -6580,6 +6609,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 #endif
 	sc->sc_txantenna = 0;		/* default to auto-selection */
 	sc->sc_txintrperiod = ATH_TXINTR_PERIOD;
+	sc->sc_lockslottime = 0;
 }
 
 static void
