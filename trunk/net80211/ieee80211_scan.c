@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 #include <linux/interrupt.h>
+#include <linux/delay.h>
 
 #include "if_media.h"
 

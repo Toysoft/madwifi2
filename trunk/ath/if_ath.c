@@ -5718,8 +5718,8 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 	struct ath_txq *txq;
 
 	if (ac >= N(sc->sc_ac2q)) {
-		printk("%s: AC %u out of range, max %zu!\n",
-			sc->sc_dev->name, ac, N(sc->sc_ac2q));
+		printk("%s: AC %u out of range, max %u!\n",
+		       sc->sc_dev->name, ac, (unsigned)N(sc->sc_ac2q));
 		return 0;
 	}
 	txq = ath_txq_setup(sc, HAL_TX_QUEUE_DATA, haltype);
@@ -8132,13 +8132,13 @@ ath_update_txpow(struct ath_softc *sc)
 	if (sc->sc_curtxpow != ic->ic_txpowlimit) {
 		ath_hal_settxpowlimit(ah, ic->ic_txpowlimit);
 		/* read back in case value is clamped */
-		ath_hal_gettxpowlimit(ah, &txpow);
+		(void)ath_hal_gettxpowlimit(ah, &txpow);
 		ic->ic_txpowlimit = sc->sc_curtxpow = txpow;
 	}
 	/*
 	 * Fetch max tx power level for status requests.
 	 */
-	ath_hal_getmaxtxpow(sc->sc_ah, &txpow);
+	(void)ath_hal_getmaxtxpow(sc->sc_ah, &txpow);
 	/* XXX locking/move to net80211 */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next)
 		vap->iv_bss->ni_txpower = txpow;
