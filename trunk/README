@@ -1,6 +1,19 @@
 $Id: README,v 1.26 2004/08/18 17:50:41 samleffler Exp $
 
 
+
+
+HEADSUP: IF YOU DIDN'T DO SO BY NOW, READ THE FILE
+HEADSUP:
+HEADSUP:               README_FIRST
+HEADSUP:
+HEADSUP: BEFORE YOU CONTINUE READING THIS FILE! THIS
+HEADSUP: IS EVEN MORE TRUE IF YOU ARE ALREADY USED TO
+HEADSUP: OLD VERSIONS OF MADWIFI!
+
+
+
+
 ================================================================
 MADWIFI: Multimode Atheros Driver for WiFi on Linux (VAP branch)
 ================================================================
