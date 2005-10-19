@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include "if_media.h"
 

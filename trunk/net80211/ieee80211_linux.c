@@ -444,31 +444,31 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		.msgcode	= DIDmsg_lnxind_wlansniffrm,
 		.msglen		= sizeof(wlan_ng_prism2_header),
 
-		.hosttime.did	= DIDmsg_lnxind_wlansniffrm_hosttime,
-		.hosttime.len	= 4,
+		.hosttime	= { .did = DIDmsg_lnxind_wlansniffrm_hosttime,
+				    .len = 4},
 
-		.mactime.did	= DIDmsg_lnxind_wlansniffrm_mactime,
-		.mactime.len	= 4,
+		.mactime	= { .did = DIDmsg_lnxind_wlansniffrm_mactime,
+				    .len = 4},
 
-		.istx.did	= DIDmsg_lnxind_wlansniffrm_istx,
-		.istx.len	= 4,
-		.istx.data	= P80211ENUM_truth_false,
+		.istx		= { .did = DIDmsg_lnxind_wlansniffrm_istx,
+				    .len = 4,
+				    .data = P80211ENUM_truth_false},
 
-		.frmlen.did	= DIDmsg_lnxind_wlansniffrm_frmlen,
-		.frmlen.len	= 4,
+		.frmlen		= { .did = DIDmsg_lnxind_wlansniffrm_frmlen,
+				    .len = 4},
 
-		.channel.did	= DIDmsg_lnxind_wlansniffrm_channel,
-		.channel.len	= 4,
+		.channel	= { .did = DIDmsg_lnxind_wlansniffrm_channel,
+				    .len = 4},
 
-		.rssi.did	= DIDmsg_lnxind_wlansniffrm_rssi,
-		.rssi.status	= P80211ENUM_msgitem_status_no_value,
-		.rssi.len	= 4,
+		.rssi		= { .did = DIDmsg_lnxind_wlansniffrm_rssi,
+				    .status = P80211ENUM_msgitem_status_no_value,
+				    .len = 4},
 
-		.signal.did	= DIDmsg_lnxind_wlansniffrm_signal,
-		.signal.len	= 4,
+		.signal		= { .did = DIDmsg_lnxind_wlansniffrm_signal,
+				    .len = 4},
 
-		.rate.did	= DIDmsg_lnxind_wlansniffrm_rate,
-		.rate.len	= 4,
+		.rate		= { .did = DIDmsg_lnxind_wlansniffrm_rate,
+				    .len = 4},
 	};
 	struct ieee80211vap *vap, *next;
 	wlan_ng_prism2_header *ph;
