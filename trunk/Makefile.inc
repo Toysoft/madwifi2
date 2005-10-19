@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -43,12 +43,12 @@ endif
 # other locales sometimes cause trouble
 export LC_ALL = POSIX
 
-#
+# OS is the target operating system. Currently only Linux is supported.
 OS=		linux
-#
+
 # TARGET defines the target platform ISA per GNU rules.
 # It must match one of the target platforms supported by
-# the HAL.  To set the set of target platforms look at
+# the HAL.  To see the set of target platforms look at
 # hal/linux/*.inc.  You can set this in the environment
 # to override the default setting.
 #
@@ -59,59 +59,87 @@ endif
 # BUS defines the bus type to which the wireless devices is attached.
 # Currently, the valid BUS types are PCI and AHB.  If BUS is not
 # defined, then, we assume the bus type is PCI
-
 ifndef BUS
 BUS=		PCI
 endif
 
-# If we are AHB bus type, then we need the kernel path for the target
-# kernel sources.
+# DESTDIR is used as path prefix during installation.
+DESTDIR ?=
+
+# KERNELPATH is the path to the target kernel's build/source area.
+# This is used to obtain the kernel configuration and include files.
+# If automatic determination doesn't work as desired, you have to
+# manually set it, for example with:
+# make KERNELPATH=/path/to/kernel/source
+
+# TOOLPATH is the path which contains the crosscompile toolchain (?)
 
 ifeq ($(strip ${BUS}),AHB)
-TARGET=		mipsisa32-be-elf
+# Bus type AHB forces the target platform to be mipsisa32.
+TARGET :=	mipsisa32-be-elf
 
+# Bus type AHB requires KERNELPATH and TOOLPATH to be set manually.
 ifndef KERNELPATH
 $(error KERNELPATH must be defined for bus type AHB.)
 endif
-
 ifndef TOOLPATH
 $(error TOOLPATH must be defined for bus type AHB.)
 endif
 
-KERNELCONF=	${KERNELPATH}/.config
+else
 
-ifndef KERNELRELEASE
-VERSION := $(strip $(shell head -n 1 ${KERNELPATH}/Makefile | cut -f 2 -d'='))
-PATCHLEVEL := $(strip $(shell head -n 2 ${KERNELPATH}/Makefile | tail -1 | cut -f 2 -d'='))
-SUBVERSION := $(strip $(shell head -n 3 ${KERNELPATH}/Makefile | tail -1 | cut -f 2 -d'='))
-KERNELRELEASE := $(strip ${VERSION}.${PATCHLEVEL}.${SUBVERSION}${EXTRAVERSION})
-endif
+KERNELPATH ?= $(firstword $(wildcard $(DESTDIR)/lib/modules/$(shell uname -r)/build /usr/src/linux))
 
-ifndef MODULEPATH
-MODULEPATH :=   ${KERNELPATH}/arch/mips/ar531x/ROOTDISK/rootdir/lib/modules/${KERNELRELEASE}/net
+ifeq ($(KERNELPATH),)
+$(error KERNELPATH must be defined)
 endif
 
 endif
 
-#
-NM=		nm
-AWK=		awk
+# sanity check: does KERNELPATH exist?
+ifeq ($(wildcard $(KERNELPATH)),)
+$(error KERNELPATH: $(KERNELPATH) does not exist)
+endif
 
-# Path to the Linux kernel, include files, etc.
-#
 # KERNELRELEASE is the target kernel's version.  If KERNELRELEASE
 # is not set in the environment then it is taken from the running
 # system.
+# To determine the correct version a mini-Makefile is piped to make
+# which includes the Makefile in KERNELPATH and prints out the version.
+# This is done to come by problems recently introduced with some distros
+# and newer kernel releases.
 #
-# KERNELPATH is the path to the target kernel's build/source area.
-# This is used to obtain the kernel configuration and include files.
-# If KERNELPATH is not set in the environment then it is derived
-# from KERNELRELEASE.
-#
-ifeq ($(KERNELRELEASE),)
-KERNELRELEASE =	$(shell uname -r)
+# Note: '\044' used instead of '$' in order to avoid make complaining like
+# "Recursive variable `KERNELRELEASE' references itself (eventually)."
+KERNELRELEASE ?= $(shell echo -e 'madwifi_$$_`date +%s`:\n\t@echo \044(KERNELRELEASE)\ninclude Makefile' | make -C $(KERNELPATH) -s -f-)
+
+# KERNELCONF is the name of the file that holds the configuration
+# of the target kernel.
+KERNELCONF ?=	${KERNELPATH}/.config
+
+# sanity check: does KERNELCONF exist?
+ifeq ($(wildcard $(KERNELCONF)),)
+$(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
 
+# SYSTEMMAP is the name of the System.map file for the target
+# kernel. This will be needed when DESTDIR is defined in order
+# to run depmod properly.
+SYSTEMMAP ?= 	${KERNELPATH}/System.map
+
+# MODULEPATH nominates the directory where the modules will be
+# installed to
+ifeq ($(strip ${BUS}),AHB)
+MODULEPATH := 	${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERNELRELEASE}/net
+else
+MODULEPATH ?=	/lib/modules/${KERNELRELEASE}/net
+endif
+
+# WIRELESSEXT contains information about the version of the wireless
+# extensions that are available in the target kernel
+WIRELESSEXT ?=	$(shell cat $(KERNELPATH)/include/linux/wireless.h | grep "\#define WIRELESS_EXT" | cut -f2)
+
+# Some settings that depend on actual kernel release
 ifneq ($(findstring 2.6,$(KERNELRELEASE)),)
 export-objs	:=
 list-multi	:=
@@ -120,17 +148,8 @@ else
 KMODSUF		:= o
 endif
 
-ifeq ($(KERNELPATH),)
-KERNELPATH=	/lib/modules/${KERNELRELEASE}/build
-endif
-
-ifeq ($(DESTDIR),)
-DESTDIR=
-endif
-
-ifeq ($(MODULEPATH),)
-MODULEPATH=	/lib/modules/${KERNELRELEASE}/net
-endif
+NM=		nm
+AWK=		awk
 
 #
 # Path to the HAL source code.
@@ -166,3 +185,5 @@ endif
 
 include ${HAL}/public/${TARGET}.inc
 include ${obj}/${DEPTH}/BuildCaps.inc
+
+SYMBOLSDIR=${DEPTH}/symbols

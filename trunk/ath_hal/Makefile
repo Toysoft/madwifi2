@@ -81,10 +81,11 @@ install: all
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	rm -f *~ *.o *.ko *.mod.c
-	rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+	-rm -rf .tmp_versions
 # remove the files we copied to this dir
-	rm -f ah_osdep.c opt_ah.h hal.o
+	-rm -f ah_osdep.c opt_ah.h hal.o
 
 ath_hal.o: ${ath_hal-objs}
 	$(LD) $(LDOPTS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)
