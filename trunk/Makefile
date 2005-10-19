@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -50,14 +50,15 @@ include Makefile.inc
 # NB: the order is important here
 DIRS=	${ATH_HAL} ${ATH_RATE} ${WLAN} ${ATH}
 
-all:
+all: configcheck
+	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS}; do \
-		(cd $$i; make) || exit 1; \
+		$(MAKE) -C $$i || exit 1; \
 	done
 
 install:
 	for i in ${DIRS}; do \
-		(cd $$i; make install) || exit 1; \
+		$(MAKE) -C $$i install || exit 1; \
 	done
 ifeq ($(DESTDIR),)
 	(export MODULEPATH=${MODULEPATH}; depmod -ae)
@@ -77,6 +78,83 @@ release:
 	rm -rf $${DIR}
 
 clean:
-	for i in ${DIRS}; do \
-		(cd $$i; make clean); \
+	for i in ${DIRS} ./tools; do \
+		$(MAKE) -C $$i clean; \
 	done
+	rm -rf ${SYMBOLSDIR}
+
+info:
+	@echo "The following settings will be used for compilation:"
+	@echo "TARGET       : $(TARGET)"
+	@echo "OS           : $(OS)"
+	@echo "BUS          : $(BUS)"
+	@if [ ! -z "$(TOOLPATH)" ]; then \
+	    @echo "TOOLPATH     : $(TOOLPATH)"; \
+	fi	
+	@echo "KERNELRELEASE: $(KERNELRELEASE)"
+	@echo "KERNELPATH   : $(KERNELPATH)"
+	@echo "KERNELCONF   : $(KERNELCONF)"
+	@echo "MODULEPATH   : $(MODULEPATH)"
+	@echo "KMODSUF      : $(KMODSUF)"
+	@if [ ! -z "$(DESTDIR)" ]; then \
+	    echo "DESTDIR      : $(DESTDIR)"; \
+	    echo "SYSTEMMAP    : $(SYSTEMMAP)"; \
+	fi
+	@echo "WIRELESSEXT  : $(WIRELESSEXT)"
+
+dotconfig:
+	@#
+	@# check if kernel configuration file is available
+	@#	
+	@if [ ! -f $(KERNELCONF) ]; then \
+	    echo "You need to configure your kernel."; \
+	    exit 1; \
+	fi
+
+# new targets should be inserted ABOVE this line in order to avoid
+# problems with the included kernel configuration file below.
+include $(KERNELCONF)
+
+configcheck: dotconfig
+	@echo -n "Checking if all requirements are met... "
+	
+	@# check version of kernel and wireless.h
+	@echo $(KERNELRELEASE) | grep -q -i '^[2-9]\.[4-9]\.' || { \
+	    echo "FAILED"; \
+	    echo "Only kernel versions 2.4.x and above are supported."; \
+	    echo "You have $(KERNELRELEASE)."; \
+	    exit 1; \
+	}
+	
+	@if [ "$(WIRELESSEXT)" -lt 14 ]; then \
+	    echo "FAILED"; \
+	    echo "Wireless extensions v14 or better is needed."; \
+	    echo "You have v$(WIRELESSEXT)."; \
+	    exit 1; \
+	fi
+	
+	@# check kernel configuration
+	@if [ -z "$(CONFIG_SYSCTL)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable sysctl support."; \
+	    exit 1; \
+	fi
+	@if [ -z "$(CONFIG_NET_RADIO)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable wireless extensions."; \
+	    exit 1; \
+	fi
+	@if [ -z "$(CONFIG_CRYPTO)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable crypto API."; \
+	    exit 1; \
+	fi
+	
+	@# some other sanity checks
+	@if [ ! -d $(ATH_RATE) ]; then \
+	    echo "FAILED"; \
+	    echo "Selected rate control $(ATH_RATE) not available."; \
+	    exit 1; \
+	fi
+		
+	@echo "ok."

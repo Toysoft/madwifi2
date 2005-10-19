@@ -71,6 +71,7 @@ install: all
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+	-rm -rf .tmp_versions
 
 ath_rate_amrr.o: ${ath_rate_amrr-objs}
 	$(LD) $(LDOPTS) -o ath_rate_amrr.$(KMODSUF) -r $(ath_rate_amrr-objs)

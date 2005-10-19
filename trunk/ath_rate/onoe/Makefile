@@ -76,6 +76,7 @@ install: all
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+	-rm -rf .tmp_versions
 
 ath_rate_onoe.o: ${ath_rate_onoe-objs}
 	$(LD) $(LDOPTS) -o ath_rate_onoe.$(KMODSUF) -r $(ath_rate_onoe-objs)

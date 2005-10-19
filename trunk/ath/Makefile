@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -90,6 +90,7 @@ install: all
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
+	-rm -rf .tmp_versions
 
 ath_${BUSNAME}.o: ${ath_${BUSNAME}-objs}
 	$(LD) $(LDOPTS) -o ath_${BUSNAME}.$(KMODSUF) -r $(ath_${BUSNAME}-objs)
