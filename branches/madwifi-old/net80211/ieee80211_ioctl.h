@@ -35,6 +35,8 @@
 #ifndef _NET80211_IEEE80211_IOCTL_H_
 #define _NET80211_IEEE80211_IOCTL_H_
 
+#include <net80211/_ieee80211.h>
+
 /*
  * IEEE 802.11 ioctls.
  */
