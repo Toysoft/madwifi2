@@ -119,6 +119,7 @@ main(int argc, char *argv[])
 		
 		printf("Setting distance on interface %s to %i meters\n", device, distance);
 		setsysctrl(device, "slottime", slottime);
+		setsysctrl(device, "lockslottime", 1);
 		setsysctrl(device, "acktimeout", acktimeout);
 		setsysctrl(device, "ctstimeout", ctstimeout);
 	}else{

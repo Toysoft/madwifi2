@@ -331,10 +331,12 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 			p += sprintf(p, " dsssofdm");
 		p += sprintf(p, "\n");
 
+		if(ni->ni_chan == IEEE80211_CHAN_ANYC) {
+			p += sprintf(p, "  freq: ? MHz (channel ?)\n  opmode: ?\n");
+		} else {
 		p += sprintf(p, "  freq: %d MHz (channel %d)\n",
 			ni->ni_chan->ic_freq,
 			ieee80211_mhz2ieee(ni->ni_chan->ic_freq, 0));
-
 		p += sprintf(p, "  opmode:");
 		if (IEEE80211_IS_CHAN_A(ni->ni_chan))
 			p += sprintf(p, " a");
@@ -345,10 +347,10 @@ proc_read_node(char *page, int space, struct ieee80211com *ic, void *arg)
 		if (IEEE80211_IS_CHAN_G(ni->ni_chan))
 			p += sprintf(p, " g");
 		p += sprintf(p, "\n");
+		}
 
 		rs = &ni->ni_rates;
 		if (ni->ni_txrate >= 0 && ni->ni_txrate < rs->rs_nrates) {
-
 			p += sprintf(p, "  txrate: ");
 			for (i = 0; i < rs->rs_nrates; i++) {
 				p += sprintf(p, "%s%d%sMbps",

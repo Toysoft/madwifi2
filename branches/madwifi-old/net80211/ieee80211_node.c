@@ -74,8 +74,7 @@ static void ieee80211_free_allnodes(struct ieee80211_node_table *);
 static void ieee80211_timeout_scan_candidates(struct ieee80211_node_table *);
 static void ieee80211_timeout_stations(struct ieee80211_node_table *);
 
-static void ieee80211_set_tim(struct ieee80211com *,
-		struct ieee80211_node *, int set);
+static void ieee80211_set_tim(struct ieee80211_node *, int set);
 
 static void ieee80211_node_table_init(struct ieee80211com *,
 	struct ieee80211_node_table *, const char *, int,
@@ -203,15 +202,17 @@ ieee80211_node_detach(struct ieee80211com *ic)
  */
 
 void
-ieee80211_node_authorize(struct ieee80211com *ic, struct ieee80211_node *ni)
+ieee80211_node_authorize(struct ieee80211_node *ni)
 {
+	struct ieee80211com *ic = ni->ni_ic;
+
 	ni->ni_flags |= IEEE80211_NODE_AUTH;
 	ni->ni_inact_reload = ic->ic_inact_run;
 }
 EXPORT_SYMBOL(ieee80211_node_authorize);
 
 void
-ieee80211_node_unauthorize(struct ieee80211com *ic, struct ieee80211_node *ni)
+ieee80211_node_unauthorize(struct ieee80211_node *ni)
 {
 	ni->ni_flags &= ~IEEE80211_NODE_AUTH;
 }
@@ -760,8 +761,9 @@ ieee80211_end_scan(struct ieee80211com *ic)
  * Return !0 if the BSSID changed, 0 otherwise.
  */
 int
-ieee80211_ibss_merge(struct ieee80211com *ic, struct ieee80211_node *ni)
+ieee80211_ibss_merge(struct ieee80211_node *ni)
 {
+	struct ieee80211com *ic = ni->ni_ic;
 
 	if (ni == ic->ic_bss ||
 	    IEEE80211_ADDR_EQ(ni->ni_bssid, ic->ic_bss->ni_bssid)) {
@@ -896,7 +898,7 @@ node_cleanup(struct ieee80211_node *ni)
 	 */
 	IEEE80211_NODE_SAVEQ_DRAIN(ni, qlen);
 	if (qlen != 0 && ic->ic_set_tim != NULL)
-		ic->ic_set_tim(ic, ni, 0);
+		ic->ic_set_tim(ni, 0);
 
 	ni->ni_associd = 0;
 	if (ni->ni_challenge != NULL) {
@@ -1028,7 +1030,7 @@ ieee80211_add_wds_node(struct ieee80211_node_table *nt
 		ic = ni->ni_ic;
 		ni->ni_wdsdev = dev;
 		ni->ni_capinfo = ic->ic_bss->ni_capinfo;
-		ic->ic_newassoc(ic,ni,1);
+		ic->ic_newassoc(ni,1);
 	}
 	return ni;
 }
@@ -1124,9 +1126,9 @@ ieee80211_fakeup_adhoc_node(struct ieee80211_node_table *nt,
 		/* XXX no rate negotiation; just dup */
 		ni->ni_rates = ic->ic_bss->ni_rates;
 		if (ic->ic_newassoc != NULL)
-			ic->ic_newassoc(ic, ni, 1);
+			ic->ic_newassoc(ni, 1);
 		/* XXX not right for 802.1x/WPA */
-		ieee80211_node_authorize(ic, ni);
+		ieee80211_node_authorize(ni);
 	}
 	return ni;
 }
@@ -1581,7 +1583,7 @@ IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER, "[%s] discard frame, age %u\n", ether
 					IEEE80211_NODE_STAT_ADD(ni,
 						ps_discard, discard);
 					if (IEEE80211_NODE_SAVEQ_QLEN(ni) == 0)
-						ic->ic_set_tim(ic, ni, 0);
+						ic->ic_set_tim(ni, 0);
 				}
 			}
 			/*
@@ -1596,7 +1598,7 @@ IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER, "[%s] discard frame, age %u\n", ether
 				    "[%s] probe station due to inactivity\n",
 				    ether_sprintf(ni->ni_macaddr));
 				IEEE80211_NODE_UNLOCK(nt);
-				ieee80211_send_nulldata(ic, ni);
+				ieee80211_send_nulldata(ni);
 				/* XXX stat? */
 				goto restart;
 			}
@@ -1799,7 +1801,7 @@ ieee80211_node_join(struct ieee80211com *ic, struct ieee80211_node *ni, int resp
 
 	/* give driver a chance to setup state like ni_txrate */
 	if (ic->ic_newassoc != NULL)
-		ic->ic_newassoc(ic, ni, newassoc);
+		ic->ic_newassoc(ni, newassoc);
 	ni->ni_inact_reload = ic->ic_inact_auth;
 	ni->ni_inact = ni->ni_inact_reload;
 	IEEE80211_SEND_MGMT(ic, ni, resp, IEEE80211_STATUS_SUCCESS);
@@ -1983,9 +1985,11 @@ EXPORT_SYMBOL(ieee80211_getrssi);
  * Indicate whether there are frames queued for a station in power-save mode.
  */
 static void
-ieee80211_set_tim(struct ieee80211com *ic, struct ieee80211_node *ni, int set)
+ieee80211_set_tim(struct ieee80211_node *ni, int set)
 {
+	struct ieee80211com *ic = ni->ni_ic;
 	u_int16_t aid;
+	unsigned long flags;
 
 	KASSERT(ic->ic_opmode == IEEE80211_M_HOSTAP ||
 		ic->ic_opmode == IEEE80211_M_IBSS,
@@ -1995,7 +1999,7 @@ ieee80211_set_tim(struct ieee80211com *ic, struct ieee80211_node *ni, int set)
 	KASSERT(aid < ic->ic_max_aid,
 		("bogus aid %u, max %u", aid, ic->ic_max_aid));
 
-	IEEE80211_BEACON_LOCK(ic);
+	IEEE80211_BEACON_LOCK(ic, flags);
 	if (set != (isset(ic->ic_tim_bitmap, aid) != 0)) {
 		if (set) {
 			setbit(ic->ic_tim_bitmap, aid);
@@ -2006,7 +2010,7 @@ ieee80211_set_tim(struct ieee80211com *ic, struct ieee80211_node *ni, int set)
 		}
 		ic->ic_flags |= IEEE80211_F_TIMUPDATE;
 	}
-	IEEE80211_BEACON_UNLOCK(ic);
+	IEEE80211_BEACON_UNLOCK(ic, flags);
 }
 EXPORT_SYMBOL(ieee80211_set_tim);
 

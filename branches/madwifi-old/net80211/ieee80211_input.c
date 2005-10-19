@@ -968,7 +968,7 @@ ieee80211_auth_open(struct ieee80211com *ic, struct ieee80211_frame *wh,
 		 * authorized at this point so traffic can flow.
 		 */
 		if (ni->ni_authmode != IEEE80211_AUTH_8021X)
-			ieee80211_node_authorize(ic, ni);
+			ieee80211_node_authorize(ni);
 		break;
 
 	case IEEE80211_M_STA:
@@ -1191,7 +1191,7 @@ ieee80211_auth_shared(struct ieee80211com *ic, struct ieee80211_frame *wh,
 			    IEEE80211_MSG_DEBUG | IEEE80211_MSG_AUTH,
 			    "[%s] station authenticated (shared key)\n",
 			    ether_sprintf(ni->ni_macaddr));
-			ieee80211_node_authorize(ic, ni);
+			ieee80211_node_authorize(ni);
 			break;
 		default:
 			IEEE80211_DISCARD_MAC(ic, IEEE80211_MSG_AUTH,
@@ -2732,7 +2732,7 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 	 */
 	if (IEEE80211_NODE_SAVEQ_QLEN(ni) == 0) {
 		if (ic->ic_set_tim != NULL)
-			ic->ic_set_tim(ic, ni, 0);      /* just in case */
+			ic->ic_set_tim(ni, 0);      /* just in case */
 		return;
 	}
 	IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER,
@@ -2760,7 +2760,7 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		//IF_ENQUEUE(&ic->ic_dev->if_snd, skb);
 	}
 	if (ic->ic_set_tim != NULL)
-		ic->ic_set_tim(ic, ni, 0);
+		ic->ic_set_tim(ni, 0);
 }
 
 /*
@@ -2806,10 +2806,10 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 		IEEE80211_DPRINTF(ic, IEEE80211_MSG_POWER,
 		    "[%s] recv ps-poll, but queue empty\n",
 		    ether_sprintf(wh->i_addr2));
-		ieee80211_send_nulldata(ic, ni);
+		ieee80211_send_nulldata(ni);
 		ic->ic_stats.is_ps_qempty++;	/* XXX node stat */
 		if (ic->ic_set_tim != NULL)
-			ic->ic_set_tim(ic, ni, 0);      /* just in case */
+			ic->ic_set_tim(ni, 0);      /* just in case */
 		return;
 	}
 	/* 
@@ -2828,7 +2828,7 @@ ieee80211_recv_pspoll(struct ieee80211com *ic,
 		    "[%s] recv ps-poll, send packet, queue empty\n",
 		    ether_sprintf(ni->ni_macaddr));
 		if (ic->ic_set_tim != NULL)
-			ic->ic_set_tim(ic, ni, 0);
+			ic->ic_set_tim(ni, 0);
 	}
 	/* bypass PS handling */
 	cb->flags |= M_PWR_SAV;

@@ -154,8 +154,9 @@ ieee80211_mgmt_output(struct ieee80211com *ic, struct ieee80211_node *ni,
  * Send a null data frame to the specified node.
  */
 int
-ieee80211_send_nulldata(struct ieee80211com *ic, struct ieee80211_node *ni)
+ieee80211_send_nulldata(struct ieee80211_node *ni)
 {
+	struct ieee80211com *ic = ni->ni_ic;
 	struct net_device *dev = ic->ic_dev;
 	struct sk_buff *skb;
 	struct ieee80211_frame *wh;
@@ -571,7 +572,6 @@ ieee80211_encap(struct ieee80211com *ic, struct sk_buff *skb,
 		struct ieee80211_qosframe *qwh;
 		struct ieee80211_qosframe_addr4 *qwh4;
 		u_int8_t *i_qos;
-		u_int8_t *i_fc;
 		int ac, tid;
 
 		if(wdsdev) {
@@ -781,7 +781,9 @@ ieee80211_setup_wpa_ie(struct ieee80211com *ic, u_int8_t *ie)
 	ie[1] = frm - ie - 2;
 	KASSERT(ie[1]+2 <= (int)sizeof(struct ieee80211_ie_wpa),
 		("WPA IE too big, %u > %u",
-		ie[1]+2, sizeof(struct ieee80211_ie_wpa)));
+		ie[1]+2, (int)sizeof(struct ieee80211_ie_wpa)));
+		/* we use a cast to (int) instead of %zu for backwards
+		 * compatibility with old kernel versions */
 	return frm;
 #undef ADDSHORT
 #undef ADDSELECTOR
@@ -865,7 +867,9 @@ ieee80211_setup_rsn_ie(struct ieee80211com *ic, u_int8_t *ie)
 	ie[1] = frm - ie - 2;
 	KASSERT(ie[1]+2 <= (int)sizeof(struct ieee80211_ie_wpa),
 		("RSN IE too big, %u > %u",
-		ie[1]+2, sizeof(struct ieee80211_ie_wpa)));
+		ie[1]+2, (int)sizeof(struct ieee80211_ie_wpa)));
+	/* we use a cast to (int) instead of %zu for backwards
+	 * compatibility with old kernel versions */
 	return frm;
 #undef ADDSELECTOR
 #undef ADDSHORT
@@ -1177,7 +1181,7 @@ ieee80211_send_mgmt(struct ieee80211com *ic, struct ieee80211_node *ni,
 		IEEE80211_NODE_STAT(ni, tx_deauth);
 		IEEE80211_NODE_STAT_SET(ni, tx_deauth_code, arg);
 
-		ieee80211_node_unauthorize(ic, ni);	/* port closed */
+		ieee80211_node_unauthorize(ni);	/* port closed */
 		break;
 
 	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
@@ -1478,8 +1482,9 @@ ieee80211_beacon_update(struct ieee80211com *ic, struct ieee80211_node *ni,
 {
 	int len_changed = 0;
 	u_int16_t capinfo;
+	unsigned long flags;
 
-	IEEE80211_BEACON_LOCK(ic);
+	IEEE80211_BEACON_LOCK(ic, flags);
 	/* XXX faster to recalculate entirely or just changes? */
 	if (ic->ic_opmode == IEEE80211_M_IBSS)
 		capinfo = IEEE80211_CAPINFO_IBSS;
@@ -1605,7 +1610,7 @@ ieee80211_beacon_update(struct ieee80211com *ic, struct ieee80211_node *ni,
 		else
 			tie->tim_bitctl &= ~1;
 	}
-	IEEE80211_BEACON_UNLOCK(ic);
+	IEEE80211_BEACON_UNLOCK(ic, flags);
 
 	return len_changed;
 }
@@ -1652,6 +1657,6 @@ ieee80211_pwrsave(struct ieee80211com *ic, struct ieee80211_node *ni,
 		ether_sprintf(ni->ni_macaddr), qlen);
 
 	if (qlen == 1)
-		ic->ic_set_tim(ic, ni, 1);
+		ic->ic_set_tim(ni, 1);
 }
 EXPORT_SYMBOL(ieee80211_pwrsave);

@@ -36,10 +36,8 @@ typedef spinlock_t ieee80211_beacon_lock_t;
 #define	IEEE80211_BEACON_LOCK_INIT(_ic, _name) \
 	spin_lock_init(&(_ic)->ic_beaconlock)
 #define	IEEE80211_BEACON_LOCK_DESTROY(_ic) /* not necessary */
-#define	IEEE80211_BEACON_LOCK(_ic)	   spin_lock_bh(&(_ic)->ic_beaconlock)
-#define	IEEE80211_BEACON_UNLOCK(_ic)	   spin_unlock_bh(&(_ic)->ic_beaconlock)
-#define	IEEE80211_BEACON_LOCK_BH(_ic)	   spin_lock_bh(&(_ic)->ic_beaconlock)
-#define	IEEE80211_BEACON_UNLOCK_BH(_ic)	   spin_unlock_bh(&(_ic)->ic_beaconlock)
+#define	IEEE80211_BEACON_LOCK(_ic, flags)	   spin_lock_irqsave(&(_ic)->ic_beaconlock, flags)
+#define	IEEE80211_BEACON_UNLOCK(_ic, flags)	   spin_unlock_irqrestore(&(_ic)->ic_beaconlock, flags)
 /* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
 #if defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)
 #define	IEEE80211_BEACON_LOCK_ASSERT(_ic) \
