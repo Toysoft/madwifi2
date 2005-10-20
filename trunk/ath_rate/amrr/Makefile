@@ -53,6 +53,13 @@ list-multi	:= ath_rate_onoe.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 
+ifneq ($(MAKING_MODULES),1)
+obj-$(CONFIG_RATE_AMRR) := $(ath_rate_amrr-objs)
+ifeq ($(findstring 2.6,$(KERNELRELEASE)),)
+O_TARGET		:= $(obj-m)
+endif
+endif
+
 INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH} -I${obj}/${WLAN} \
 	-I${obj}/${DEPTH}
 

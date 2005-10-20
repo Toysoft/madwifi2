@@ -53,7 +53,9 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 ifneq ($(MAKING_MODULES),1)
 obj-$(CONFIG_RATE_SAMPLE) := $(ath_rate_sample-objs)
-O_TARGET := ath_rate_sample.o
+ifeq ($(findstring 2.6,$(KERNELRELEASE)),)
+O_TARGET		:= $(obj-m)
+endif
 endif
 
 INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH} -I${obj}/${WLAN} \

@@ -34,7 +34,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath_rate/onoe/Makefile#3 $
+# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath_rate/onoe/Makefile $
 #
 
 #
@@ -55,7 +55,9 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 ifneq ($(MAKING_MODULES),1)
 obj-$(CONFIG_RATE_ONOE) := $(ath_rate_onoe-objs)
-O_TARGET := ath_rate_onoe.o
+ifeq ($(findstring 2.6,$(KERNELRELEASE)),)
+O_TARGET		:= $(obj-m)
+endif
 endif
 
 INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH} -I${obj}/${WLAN} \
