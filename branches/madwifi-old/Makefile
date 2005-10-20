@@ -44,7 +44,7 @@ DEPTH=	.
 include Makefile.inc
 
 # NB: the order is important here
-DIRS=	${ATH_HAL} ${ATH_RATE} ${WLAN} ${ATH}
+DIRS=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
 
 all: configcheck
 	mkdir -p ${SYMBOLSDIR}
