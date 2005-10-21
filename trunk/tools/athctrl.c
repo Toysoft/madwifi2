@@ -85,7 +85,7 @@ static void usage(void)
 int
 main(int argc, char *argv[])
 {
-	char device[5];
+	char device[6];
 	int distance = -1;
 	int c;
 
