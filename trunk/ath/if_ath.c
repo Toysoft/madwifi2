@@ -1714,7 +1714,7 @@ ath_init(struct net_device *dev)
 	 */
 	ath_stop_locked(dev);
 
-#if ATH_CAP_TPC
+#ifdef ATH_CAP_TPC
 	ath_hal_setcapability(sc->sc_ah, HAL_CAP_TPC, 0, 1, NULL);
 #endif
 
