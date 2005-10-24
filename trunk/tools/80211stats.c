@@ -48,6 +48,8 @@
 #include <netinet/ether.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <signal.h>
 #include <unistd.h>
 
