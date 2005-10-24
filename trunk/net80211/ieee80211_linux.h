@@ -168,6 +168,11 @@ typedef spinlock_t acl_lock_t;
 #define	ACL_LOCK_ASSERT(_as)
 #endif
 
+/* __skb_append got a third parameter in 2.6.14 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+#define __skb_append(a,b,c)	__skb_append(a,b)
+#endif
+
 /*
  * Per-node power-save queue definitions.  Beware of control
  * flow with IEEE80211_NODE_SAVEQ_LOCK/IEEE80211_NODE_SAVEQ_UNLOCK.
@@ -193,7 +198,7 @@ typedef spinlock_t acl_lock_t;
 	struct sk_buff *tail = skb_peek_tail(&(_ni)->ni_savedq);\
 	if (tail != NULL) {					\
 		_age -= M_AGE_GET(tail);			\
-		__skb_append(tail, _skb);			\
+		__skb_append(tail, _skb, &(_ni)->ni_savedq);	\
 	} else { 						\
 		__skb_queue_head(&(_ni)->ni_savedq, _skb);	\
 	}							\
