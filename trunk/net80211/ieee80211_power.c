@@ -232,7 +232,7 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 	tail = skb_peek_tail(&ni->ni_savedq);
 	if (tail != NULL) {
 		age -= M_AGE_GET(tail);
-		__skb_append(tail, skb);
+		__skb_append(tail, skb, &ni->ni_savedq);
 	} else {
 		__skb_queue_head(&ni->ni_savedq, skb);
 	}

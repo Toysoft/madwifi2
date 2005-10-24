@@ -5,6 +5,8 @@
 #ifndef _NET_IF_ATH_PROTO_H_
 #define _NET_IF_ATH_PROTO_H_
 
+#include "ah_osdep.h"
+
 /*
  * Atheros proprietary protocol info.
  */
