@@ -43,9 +43,10 @@
 #include <sys/types.h>
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 #include <getopt.h>
-#include <string.h>
 
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 
