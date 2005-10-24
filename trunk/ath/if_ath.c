@@ -9083,6 +9083,8 @@ ath_announce(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	u_int modes, cc;
 
+	printk("SVN $Revision$\n");
+
 	printk("%s: mac %d.%d phy %d.%d", dev->name,
 		ah->ah_macVersion, ah->ah_macRev,
 		ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf);
