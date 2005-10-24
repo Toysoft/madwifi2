@@ -254,19 +254,29 @@ static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 
 static	int countrycode = -1;
-MODULE_PARM(countrycode, "i");
-MODULE_PARM_DESC(countrycode, "Override default country code");
 static	int outdoor = -1;
-MODULE_PARM(outdoor, "i");
-MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 static	int xchanmode = -1;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
+MODULE_PARM(countrycode, "i");
+MODULE_PARM(outdoor, "i");
 MODULE_PARM(xchanmode, "i");
+#else
+module_param(countrycode, int, 0);
+module_param(outdoor, int, 0);
+module_param(xchanmode, int, 0);
+#endif
+MODULE_PARM_DESC(countrycode, "Override default country code");
+MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 
 #ifdef AR_DEBUG
 
 int	ath_debug = 0;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
 MODULE_PARM(ath_debug, "i");
+#else
+module_param(ath_debug, int, 0);
+#endif
 MODULE_PARM_DESC(ath_debug, "Load-time debug output enable");
 
 #define	IFF_DUMPPKTS(sc, _m) \
