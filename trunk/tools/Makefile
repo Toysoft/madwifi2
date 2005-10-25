@@ -28,14 +28,22 @@ DEPTH=	..
 
 BINDIR=	/usr/local/bin
 
-include ${DEPTH}/Makefile.inc
+#
+# Path to the HAL source code.
+#
+ifeq ($(HAL),)
+HAL=   ${DEPTH}/hal
+endif
+
+INCS=  -include ${DEPTH}/include/compat.h
+
 
 ALL=	athstats 80211stats athkey athchans athctrl \
 	athdebug 80211debug wlanconfig
 
 all:	${ALL}
 
-INCS+=	-I. -I${HAL} -I${HAL}/linux -I${ATH_HAL} -I${WLAN} -I${DEPTH}
+INCS+=	-I. -I${HAL} -I${DEPTH}
 CFLAGS=	${INCS} -g
 LDFLAGS=
 
