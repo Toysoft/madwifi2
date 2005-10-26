@@ -48,7 +48,7 @@ export EXTRAVERSION
 include Makefile.inc
 
 # NB: the order is important here
-DIRS=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
+DIRS=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH} tools
 
 all: configcheck
 	mkdir -p ${SYMBOLSDIR}
@@ -78,7 +78,7 @@ release:
 	rm -rf $${DIR}
 
 clean:
-	for i in ${DIRS} ./tools; do \
+	for i in ${DIRS}; do \
 		$(MAKE) -C $$i clean; \
 	done
 	rm -rf ${SYMBOLSDIR}
