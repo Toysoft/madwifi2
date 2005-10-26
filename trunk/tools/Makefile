@@ -55,6 +55,8 @@ athstats: athstats.c
 	${CC} -o 80211stats ${CFLAGS} ${LDFLAGS} 80211stats.c
 athkey: athkey.c
 	${CC} -o athkey ${CFLAGS} ${LDFLAGS} athkey.c
+athchans: athchans.c
+	${CC} -o athchans ${CFLAGS} ${LDFLAGS} athchans.c
 athctrl: athctrl.c
 	${CC} -o athctrl ${CFLAGS} ${LDFLAGS} athctrl.c
 athdebug: athdebug.c
@@ -66,12 +68,11 @@ wlanconfig: wlanconfig.c
 install: ${ALL}
 	cp athstats ${DESTDIR}${BINDIR}
 	cp athdebug ${DESTDIR}${BINDIR}
+	cp athkey ${DESTDIR}${BINDIR}
+	cp athchans ${DESTDIR}${BINDIR}
+	cp athctrl ${DESTDIR}${BINDIR}
 	cp 80211stats ${DESTDIR}${BINDIR}
-	-rm ${DESTDIR}/${BINDIR}/wlanstats
-	ln ${DESTDIR}/${BINDIR}/80211stats ${DESTDIR}/${BINDIR}/wlanstats
 	cp 80211debug ${DESTDIR}${BINDIR}
-	-rm ${DESTDIR}/${BINDIR}/wlandebug
-	ln ${DESTDIR}/${BINDIR}/80211debug ${DESTDIR}/${BINDIR}/wlandebug
 	cp wlanconfig ${DESTDIR}${BINDIR}
 
 clean:
