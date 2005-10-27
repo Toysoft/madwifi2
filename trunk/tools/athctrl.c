@@ -50,6 +50,7 @@
 #include <stdlib.h>
 #include <err.h>
 
+#include <net/if.h>
 
 static int
 setsysctrl(const char *dev, const char *control , u_long value)
@@ -85,7 +86,7 @@ static void usage(void)
 int
 main(int argc, char *argv[])
 {
-	char device[6];
+	char device[IFNAMSIZ + 1];
 	int distance = -1;
 	int c;
 
