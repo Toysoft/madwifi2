@@ -655,13 +655,11 @@ EXPORT_SYMBOL(ath_rate_newassoc);
 static void
 ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 {
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_node *an = ATH_NODE(ni);
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	struct ieee80211vap *vap = ni->ni_vap;
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
-	const struct ieee80211_rateset *rs;
-	int r, x, y;
+	int x, y;
 	int srate;
 	sn->num_rates = 0;
 
@@ -705,10 +703,8 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * the node.  We know the rate is there because the
 		 * rate set is checked when the station associates.
 		 */
-		rs = &ic->ic_sup_rates[ic->ic_curmode];
-		r = rs->rs_rates[vap->iv_fixed_rate] & IEEE80211_RATE_VAL;
 		/* NB: the rate set is assumed sorted */
-		for (; srate >= 0 && sn->rates[srate].rate != r; srate--)
+		for (; srate >= 0 && (ni->ni_rates.rs_rates[srate] & IEEE80211_RATE_VAL) != vap->iv_fixed_rate; srate--)
 			;
 
 		KASSERT(srate >= 0,
