@@ -49,6 +49,10 @@
 #include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
 #include <net/iw_handler.h>
 
+#if WIRELESS_EXT < 14
+#error "Wireless extensions v14 or better is needed."
+#endif
+
 #include <asm/uaccess.h>
 
 #include "if_media.h"
