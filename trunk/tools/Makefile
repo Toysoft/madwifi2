@@ -26,7 +26,9 @@
 #
 DEPTH=	..
 
-BINDIR=	/usr/local/bin
+BINDIR ?= /usr/local/bin
+MANDIR ?= /usr/local/man
+STRIP ?= strip
 
 #
 # Path to the HAL source code.
@@ -65,15 +67,15 @@ wlanconfig: wlanconfig.c
 	${CC} -o wlanconfig ${CFLAGS} ${LDFLAGS} wlanconfig.c
 80211debug: 80211debug.c
 	${CC} -o 80211debug ${CFLAGS} ${LDFLAGS} 80211debug.c
+
 install: ${ALL}
-	cp athstats ${DESTDIR}${BINDIR}
-	cp athdebug ${DESTDIR}${BINDIR}
-	cp athkey ${DESTDIR}${BINDIR}
-	cp athchans ${DESTDIR}${BINDIR}
-	cp athctrl ${DESTDIR}${BINDIR}
-	cp 80211stats ${DESTDIR}${BINDIR}
-	cp 80211debug ${DESTDIR}${BINDIR}
-	cp wlanconfig ${DESTDIR}${BINDIR}
+	install -d ${DESTDIR}${BINDIR}
+	for i in ${ALL}; do \
+		install $$i ${DESTDIR}${BINDIR}/$$i; \
+		${STRIP} ${DESTDIR}${BINDIR}/$$i; \
+	done
+	install -d ${DESTDIR}${MANDIR}/man8
+	install ./man/* ${DESTDIR}${MANDIR}/man8
 
 clean:
 	rm -f ${ALL} core a.out

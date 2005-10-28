@@ -56,12 +56,7 @@ all: configcheck
 		$(MAKE) -C $$i || exit 1; \
 	done
 
-MANDIR?=usr/local/man
-install_man:
-	install -d ${DESTDIR}/${MANDIR}/man8
-	cp docs/man/* ${DESTDIR}/${MANDIR}/man8
-
-install: install_man
+install:
 	for i in ${DIRS}; do \
 		$(MAKE) -C $$i install || exit 1; \
 	done
