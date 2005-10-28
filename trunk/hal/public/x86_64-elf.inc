@@ -42,7 +42,7 @@
 
 #
 ifndef TOOLPREFIX
-TOOLPREFIX=	/pub/gnu/bin/x86_64-linux-
+TOOLPREFIX=
 endif
 #
 CC=	${TOOLPREFIX}gcc
