@@ -397,7 +397,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			}
 			if (timlen != bo->bo_tim_len) {
 				/* copy up/down trailer */
-				int trailer_adjust = (int)(tie->tim_bitmap+timlen) - (int)(bo->bo_tim_trailer);
+				int trailer_adjust = (tie->tim_bitmap+timlen) - (bo->bo_tim_trailer);
 				memmove(tie->tim_bitmap+timlen, bo->bo_tim_trailer,
 					bo->bo_tim_trailerlen);
 				bo->bo_tim_trailer = tie->tim_bitmap+timlen;

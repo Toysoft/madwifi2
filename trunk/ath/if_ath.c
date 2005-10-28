@@ -2503,7 +2503,7 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
 	const u_int8_t mac0[IEEE80211_ADDR_LEN],
 	struct ieee80211_node *bss)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	static const u_int8_t ciphermap[] = {
 		HAL_CIPHER_WEP,		/* IEEE80211_CIPHER_WEP */
 		HAL_CIPHER_TKIP,	/* IEEE80211_CIPHER_TKIP */
@@ -2564,7 +2564,7 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
 static u_int16_t
 key_alloc_2pair(struct ath_softc *sc)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	u_int i, keyix;
 
 	KASSERT(sc->sc_splitmic, ("key cache !split"));
@@ -2615,7 +2615,7 @@ key_alloc_2pair(struct ath_softc *sc)
 static u_int16_t
 key_alloc_single(struct ath_softc *sc)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	u_int i, keyix;
 
 	/* XXX try i,i+32,i+64,i+32+64 to minimize key pair conflicts */
@@ -4725,7 +4725,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 					"%s: skbuff alloc of size %u failed\n",
 					__func__,
 					sc->sc_rxbufsize
-					+ sizeof(wlan_ng_prism2_header)
+					+ (int)sizeof(wlan_ng_prism2_header)
 					+ sc->sc_cachelsz -1);
  				sc->sc_stats.ast_rx_nobuf++;
  				return ENOMEM;
@@ -5303,7 +5303,7 @@ ath_grppoll_txq_update(struct ath_softc *sc, int period)
 static void 
 ath_grppoll_txq_setup(struct ath_softc *sc, int qtype, int period)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_TXQ_INFO qi;
 	int qnum;
@@ -5609,7 +5609,7 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 static struct ath_txq *
 ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_TXQ_INFO qi;
 	int qnum;
@@ -5724,7 +5724,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 static int
 ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	struct ath_txq *txq;
 
 	if (ac >= N(sc->sc_ac2q)) {
@@ -6686,8 +6686,8 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	HAL_STATUS status;
 	int uapsdq = 0;
 
-	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %d (%p), link %p\n", __func__,
-		txq->axq_qnum, (caddr_t) ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
+	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %d (0x%x), link %p\n", __func__,
+		txq->axq_qnum, ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
 		txq->axq_link);
 
 	if (txq == sc->sc_uapsdq) {
@@ -7040,9 +7040,9 @@ ath_tx_stopdma(struct ath_softc *sc, struct ath_txq *txq)
 	struct ath_hal *ah = sc->sc_ah;
 
 	(void) ath_hal_stoptxdma(ah, txq->axq_qnum);
-	DPRINTF(sc, ATH_DEBUG_RESET, "%s: tx queue [%u] %p, link %p\n",
+	DPRINTF(sc, ATH_DEBUG_RESET, "%s: tx queue [%u] 0x%x, link %p\n",
 	    __func__, txq->axq_qnum,
-	    (caddr_t) ath_hal_gettxbuf(ah, txq->axq_qnum), txq->axq_link);
+	    ath_hal_gettxbuf(ah, txq->axq_qnum), txq->axq_link);
 }
 
 /*
@@ -7057,8 +7057,8 @@ ath_draintxq(struct ath_softc *sc)
 	/* XXX return value */
 	if (!sc->sc_invalid) {
 		(void) ath_hal_stoptxdma(ah, sc->sc_bhalq);
-		DPRINTF(sc, ATH_DEBUG_RESET, "%s: beacon queue %p\n", __func__,
-		    (caddr_t) ath_hal_gettxbuf(ah, sc->sc_bhalq));
+		DPRINTF(sc, ATH_DEBUG_RESET, "%s: beacon queue 0x%x\n",
+		    __func__, ath_hal_gettxbuf(ah, sc->sc_bhalq));
 		for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
 			if (ATH_TXQ_SETUP(sc, i))
 				ath_tx_stopdma(sc, &sc->sc_txq[i]);
@@ -7091,8 +7091,8 @@ ath_stoprecv(struct ath_softc *sc)
 	if (sc->sc_debug & (ATH_DEBUG_RESET | ATH_DEBUG_FATAL)) {
 		struct ath_buf *bf;
 
-		printk("ath_stoprecv: rx queue %p, link %p\n",
-		    (caddr_t) ath_hal_getrxbuf(ah), sc->sc_rxlink);
+		printk("ath_stoprecv: rx queue 0x%x, link %p\n",
+		    ath_hal_getrxbuf(ah), sc->sc_rxlink);
 		STAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
 			struct ath_desc *ds = bf->bf_desc;
 			HAL_STATUS status = ath_hal_rxprocdesc(ah, ds,
@@ -8279,7 +8279,7 @@ ath_rate_setup(struct net_device *dev, u_int mode)
 static void
 ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	/* NB: on/off times from the Atheros NDIS driver, w/ permission */
 	static const struct {
 		u_int		rate;		/* tx/rx 802.11 rate */

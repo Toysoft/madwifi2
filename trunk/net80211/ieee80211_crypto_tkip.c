@@ -642,7 +642,7 @@ wep_encrypt(u8 *key, struct sk_buff *skb0, u_int off, size_t data_len)
 		}
 		if (skb->next == NULL) {
 			KASSERT(data_len == 0,
-			    ("missing data, data_len %u", data_len));
+			    ("missing data, data_len %u", (int)data_len));
 			break;
 		}
 		skb = skb->next;
@@ -876,7 +876,7 @@ michael_mic(struct tkip_ctx *ctx, const u8 *key,
 			KASSERT(skb->len >= sizeof(uint32_t) - space,
 				("not enough data in following buffer, "
 				"skb len %u need %u\n", skb->len,
-				sizeof(uint32_t) - space));
+				(int)sizeof(uint32_t) - space));
 			switch (space) {
 			case 1:
 				l ^= get_le32_split(data[0], data_next[0],
