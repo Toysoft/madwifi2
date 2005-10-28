@@ -101,17 +101,12 @@ ifeq ($(wildcard $(KERNELPATH)),)
 $(error KERNELPATH: $(KERNELPATH) does not exist)
 endif
 
-# KERNELRELEASE is the target kernel's version.  If KERNELRELEASE
-# is not set in the environment then it is taken from the running
-# system.
-# To determine the correct version a mini-Makefile is piped to make
-# which includes the Makefile in KERNELPATH and prints out the version.
-# This is done to come by problems recently introduced with some distros
-# and newer kernel releases.
-#
-# Note: '\044' used instead of '$' in order to avoid make complaining like
-# "Recursive variable `KERNELRELEASE' references itself (eventually)."
-KERNELRELEASE ?= $(shell echo -e 'madwifi_$$_`date +%s`:\n\t@echo \044(KERNELRELEASE)\ninclude Makefile' | make -C $(KERNELPATH) -s -f-)
+# KERNELRELEASE is the target kernel's version.  It's always taken from
+# the kernel build tree.  Kernel Makefile doesn't always know the exact
+# kernel version (especially for vendor stock kernels), so we get it
+# from linux/version.h instead.
+KERNELRELEASE = $(shell sed -ne 's/"//g;s/^\#define UTS_RELEASE //p' \
+		  $(KERNELPATH)/include/linux/version.h)
 
 # KERNELCONF is the name of the file that holds the configuration
 # of the target kernel.
