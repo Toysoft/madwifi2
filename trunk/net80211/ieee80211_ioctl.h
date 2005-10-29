@@ -54,7 +54,7 @@ struct ieee80211_nodestats {
 	u_int64_t	ns_rx_beacons;		/* rx beacon frames */
 	u_int32_t	ns_rx_proberesp;	/* rx probe response frames */
 
-	u_int32_t	ns_rx_dup;		/* rx discard due to it's a dup */
+	u_int32_t	ns_rx_dup;		/* rx discard because it's a dup */
 	u_int32_t	ns_rx_noprivacy;	/* rx w/ wep but privacy off */
 	u_int32_t	ns_rx_wepfail;		/* rx wep processing failed */
 	u_int32_t	ns_rx_demicfail;	/* rx demic failed */

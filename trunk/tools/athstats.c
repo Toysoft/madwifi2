@@ -119,9 +119,9 @@ printstats(FILE *fd, const struct ath_stats *stats)
 	STAT(tx_shortpre, "tx frames with short preamble");
 	STAT(tx_altrate, "tx frames with an alternate rate");
 	STAT(tx_protect, "tx frames with 11g protection");
-	STAT(rx_orn, "rx failed due to of desc overrun");
-	STAT(rx_crcerr, "rx failed due to of bad CRC");
-	STAT(rx_fifoerr, "rx failed due to of FIFO overrun");
+	STAT(rx_orn, "rx failed due to desc overrun");
+	STAT(rx_crcerr, "rx failed due to bad CRC");
+	STAT(rx_fifoerr, "rx failed due to FIFO overrun");
 	STAT(rx_badcrypt, "rx failed due to decryption");
 	STAT(rx_badmic, "rx failed due to MIC failure");
 	STAT(rx_tooshort, "rx failed due to frame too short");

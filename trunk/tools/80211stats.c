@@ -72,7 +72,7 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_wrongbss,	"rx from wrong bssid");
 	STAT(rx_dup,		"rx discard due to it's a dup");
 	STAT(rx_wrongdir,	"rx w/ wrong direction");
-	STAT(rx_mcastecho,	"rx discard due to of mcast echo");
+	STAT(rx_mcastecho,	"rx discard due to mcast echo");
 	STAT(rx_notassoc,	"rx discard due to sta !assoc");
 	STAT(rx_noprivacy,	"rx w/ wep but privacy off");
 	STAT(rx_unencrypted,	"rx w/o wep and privacy on");
@@ -93,7 +93,7 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_auth_unsupported,"rx w/ unsupported auth alg");
 	STAT(rx_auth_fail,	"rx sta auth failure");
 	STAT(rx_auth_countermeasures,
-		"rx sta auth failure due to of TKIP countermeasures");
+		"rx sta auth failure due to TKIP countermeasures");
 	STAT(rx_assoc_bss,	"rx assoc from wrong bssid");
 	STAT(rx_assoc_notauth,	"rx assoc w/o auth");
 	STAT(rx_assoc_capmismatch,"rx assoc w/ cap mismatch");
@@ -116,15 +116,15 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_tkipformat,	"rx format bad (TKIP)");
 	STAT(rx_tkipmic,	"rx MIC check failed (TKIP)");
 	STAT(rx_tkipicv,	"rx ICV check failed (TKIP)");
-	STAT(rx_badcipher,	"rx failed due to of bad cipher/key type");
+	STAT(rx_badcipher,	"rx failed due to bad cipher/key type");
 	STAT(rx_nocipherctx,	"rx failed due to key/cipher ctx not setup");
-	STAT(rx_acl,		"rx discard due to of acl policy");
+	STAT(rx_acl,		"rx discard due to acl policy");
 	STAT(rx_ffcnt,		"rx fast frames");
 	STAT(rx_badathtnl,   	"rx fast frame failed due to bad tunnel header");
 	STAT(tx_nobuf,		"tx failed for lack of sk_buffer");
 	STAT(tx_nonode,		"tx failed for no node");
 	STAT(tx_unknownmgt,	"tx of unknown mgt frame");
-	STAT(tx_badcipher,	"tx failed due to of bad ciper/key type");
+	STAT(tx_badcipher,	"tx failed due to bad ciper/key type");
 	STAT(tx_nodefkey,	"tx failed due to no defkey");
 	STAT(tx_noheadroom,	"tx failed due to no space for crypto hdrs");
 	STAT(tx_ffokcnt,	"tx atheros fast frames successful");
@@ -136,7 +136,7 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(crypto_tkip,	"tkip crypto done in s/w");
 	STAT(crypto_tkipenmic,	"tkip tx MIC done in s/w");
 	STAT(crypto_tkipdemic,	"tkip rx MIC done in s/w");
-	STAT(crypto_tkipcm,	"tkip dropped frames due to of countermeasures");
+	STAT(crypto_tkipcm,	"tkip dropped frames due to countermeasures");
 	STAT(crypto_ccmp,	"ccmp crypto done in s/w");
 	STAT(crypto_wep,	"wep crypto done in s/w");
 	STAT(crypto_setkey_cipher,"setkey failed due to cipher rejected data");

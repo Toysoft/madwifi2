@@ -1239,7 +1239,7 @@ ieee80211_find_txnode(struct ieee80211vap *vap, const u_int8_t *mac)
 	if (vap->iv_opmode == IEEE80211_M_STA || IEEE80211_IS_MULTICAST(mac))
 		return ieee80211_ref_node(vap->iv_bss);
 
-	/* XXX can't hold lock across dup_bss due to of recursive locking */
+	/* XXX can't hold lock across dup_bss due to recursive locking */
 	nt = &vap->iv_ic->ic_sta;
 	IEEE80211_NODE_LOCK_BH(nt);
 	ni = _ieee80211_find_node(nt, mac);
