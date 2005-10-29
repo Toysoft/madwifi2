@@ -1562,7 +1562,7 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 				chanflags = IEEE80211_CHAN_2GHZ;
 	
 			memset(&chanlist[0], 0, sizeof(chanlist));  
-			/* XXX not right 'cuz of duplicate entries */
+			/* XXX not right due to of duplicate entries */
 			for (i = 0; i < ic->ic_nchans; i++) {
 				c = &ic->ic_channels[i];
 	

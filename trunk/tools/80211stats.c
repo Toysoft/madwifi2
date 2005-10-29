@@ -70,10 +70,10 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_badversion,	"rx frame with bad version");
 	STAT(rx_tooshort,	"rx frame too short");
 	STAT(rx_wrongbss,	"rx from wrong bssid");
-	STAT(rx_dup,		"rx discard 'cuz dup");
+	STAT(rx_dup,		"rx discard due to it's a dup");
 	STAT(rx_wrongdir,	"rx w/ wrong direction");
-	STAT(rx_mcastecho,	"rx discard 'cuz mcast echo");
-	STAT(rx_notassoc,	"rx discard 'cuz sta !assoc");
+	STAT(rx_mcastecho,	"rx discard due to of mcast echo");
+	STAT(rx_notassoc,	"rx discard due to sta !assoc");
 	STAT(rx_noprivacy,	"rx w/ wep but privacy off");
 	STAT(rx_unencrypted,	"rx w/o wep and privacy on");
 	STAT(rx_wepfail,	"rx wep processing failed");
@@ -93,7 +93,7 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_auth_unsupported,"rx w/ unsupported auth alg");
 	STAT(rx_auth_fail,	"rx sta auth failure");
 	STAT(rx_auth_countermeasures,
-		"rx sta auth failure 'cuz of TKIP countermeasures");
+		"rx sta auth failure due to of TKIP countermeasures");
 	STAT(rx_assoc_bss,	"rx assoc from wrong bssid");
 	STAT(rx_assoc_notauth,	"rx assoc w/o auth");
 	STAT(rx_assoc_capmismatch,"rx assoc w/ cap mismatch");
@@ -107,7 +107,7 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_ahdemo_mgt,
 		"rx discard mgmt frame received in ahdoc demo mode");
 	STAT(rx_bad_auth,	"rx bad authentication request");
-	STAT(rx_unauth,		"rx discard 'cuz port unauthorized");
+	STAT(rx_unauth,		"rx discard due to port unauthorized");
 	STAT(rx_badkeyid,	"rx w/ incorrect keyid");
 	STAT(rx_ccmpreplay,	"rx seq# violation (CCMP)");
 	STAT(rx_ccmpformat,	"rx format bad (CCMP)");
@@ -116,17 +116,17 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(rx_tkipformat,	"rx format bad (TKIP)");
 	STAT(rx_tkipmic,	"rx MIC check failed (TKIP)");
 	STAT(rx_tkipicv,	"rx ICV check failed (TKIP)");
-	STAT(rx_badcipher,	"rx failed 'cuz bad cipher/key type");
-	STAT(rx_nocipherctx,	"rx failed 'cuz key/cipher ctx not setup");
-	STAT(rx_acl,		"rx discard 'cuz acl policy");
+	STAT(rx_badcipher,	"rx failed due to of bad cipher/key type");
+	STAT(rx_nocipherctx,	"rx failed due to key/cipher ctx not setup");
+	STAT(rx_acl,		"rx discard due to of acl policy");
 	STAT(rx_ffcnt,		"rx fast frames");
-	STAT(rx_badathtnl,   	"rx fast frame failed 'cuz bad tunnel header");
+	STAT(rx_badathtnl,   	"rx fast frame failed due to bad tunnel header");
 	STAT(tx_nobuf,		"tx failed for lack of sk_buffer");
 	STAT(tx_nonode,		"tx failed for no node");
 	STAT(tx_unknownmgt,	"tx of unknown mgt frame");
-	STAT(tx_badcipher,	"tx failed 'cuz bad ciper/key type");
-	STAT(tx_nodefkey,	"tx failed 'cuz no defkey");
-	STAT(tx_noheadroom,	"tx failed 'cuz no space for crypto hdrs");
+	STAT(tx_badcipher,	"tx failed due to of bad ciper/key type");
+	STAT(tx_nodefkey,	"tx failed due to no defkey");
+	STAT(tx_noheadroom,	"tx failed due to no space for crypto hdrs");
 	STAT(tx_ffokcnt,	"tx atheros fast frames successful");
 	STAT(tx_fferrcnt,	"tx atheros fast frames failed");
 	STAT(scan_active,	"active scans started");
@@ -136,17 +136,17 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(crypto_tkip,	"tkip crypto done in s/w");
 	STAT(crypto_tkipenmic,	"tkip tx MIC done in s/w");
 	STAT(crypto_tkipdemic,	"tkip rx MIC done in s/w");
-	STAT(crypto_tkipcm,	"tkip dropped frames 'cuz of countermeasures");
+	STAT(crypto_tkipcm,	"tkip dropped frames due to of countermeasures");
 	STAT(crypto_ccmp,	"ccmp crypto done in s/w");
 	STAT(crypto_wep,	"wep crypto done in s/w");
-	STAT(crypto_setkey_cipher,"setkey failed 'cuz cipher rejected data");
-	STAT(crypto_setkey_nokey,"setkey failed 'cuz no key index");
+	STAT(crypto_setkey_cipher,"setkey failed due to cipher rejected data");
+	STAT(crypto_setkey_nokey,"setkey failed due to no key index");
 	STAT(crypto_delkey,	"driver key delete failed");
-	STAT(crypto_badcipher,	"setkey failed 'cuz unknown cipher");
-	STAT(crypto_nocipher,	"setkey failed 'cuz cipher module unavailable");
-	STAT(crypto_attachfail,	"setkey failed 'cuz cipher attach failed");
+	STAT(crypto_badcipher,	"setkey failed due to unknown cipher");
+	STAT(crypto_nocipher,	"setkey failed due to cipher module unavailable");
+	STAT(crypto_attachfail,	"setkey failed due to cipher attach failed");
 	STAT(crypto_swfallback,	"crypto fell back to s/w implementation");
-	STAT(crypto_keyfail,	"setkey faied 'cuz driver key alloc failed");
+	STAT(crypto_keyfail,	"setkey faied due to driver key alloc failed");
 #undef STAT
 #undef N
 }
