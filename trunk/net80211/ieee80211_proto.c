@@ -1079,7 +1079,7 @@ ieee80211_dturbo_switch(struct ieee80211com *ic, int newflags)
 	ic->ic_prevchan = ic->ic_curchan;
 	ic->ic_curchan = chan;
 	ic->ic_set_channel(ic);
-	/* NB: do not need to reset ERP state due to we're in sta mode */
+	/* NB: do not need to reset ERP state because in sta mode */
 }
 EXPORT_SYMBOL(ieee80211_dturbo_switch);
 #endif /* ATH_SUPERG_DYNTURBO */

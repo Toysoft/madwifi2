@@ -54,7 +54,7 @@ struct ath_stats {
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
 	u_int32_t	ast_tx_invalid;	/* frames discarded due to is device gone */
-	u_int32_t	ast_tx_qstop;	/* tx queue stopped due to it's full */
+	u_int32_t	ast_tx_qstop;	/* tx queue stopped because it's full */
 	u_int32_t	ast_tx_encap;	/* tx encapsulation failed */
 	u_int32_t	ast_tx_nonode;	/* tx failed due to of no node */
 	u_int32_t	ast_tx_nobuf;	/* tx failed due to of no tx buffer (data) */
