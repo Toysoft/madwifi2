@@ -83,11 +83,18 @@ Create a station mode VAP, using wifi0 as the underlying device. The interface w
 \fBwlanconfig ath0 wlandev wifi0 wlanmode sta
 Create a station mode VAP (ath0) using wifi0 as the underlying device. The MAC address will be the same as the underlying device.
 .TP
+\fBwlanconfig ath0 create wlandev wifi0 wlanmode ap 
+.RS 0
+\fBwlanconfig ath1 create wlandev wifi0 wlanmode sta nosbeacon 
+.RS 7
+\fRCreate both an AP and a station mode interface.
+.RS -7
+.TP
 \fBwlanconfig ath0 destroy
 Destroy VAP ath0.
 .TP
 \fBwlanconfig ath0 list scan
-Scan for stations.
+Scan for local stations and access points.
 .PP
 .SH "AUTHOR"
 This manual page was written by Matt Foster <mattfoster@clara.co.uk>, using information from the Atheros user documentation, and MadWiFi users mailing list.
