@@ -224,6 +224,7 @@ struct ieee80211_cb {
 #define	M_FF		0x02			/* fast frame */
 #define	M_PWR_SAV	0x04			/* bypass power save handling */
 #define M_UAPSD		0x08			/* frame flagged for u-apsd handling */
+#define M_RAW           0x10
 	struct sk_buff		*next;		/* fast frame sk_buf chain */
 };
 

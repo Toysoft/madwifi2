@@ -219,6 +219,16 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 #endif
 		goto bad;
 	}
+
+        if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+                cb = (struct ieee80211_cb *) skb->cb;
+                cb->flags = M_RAW;
+                cb->ni = ni;
+                cb->next = NULL;
+                skb->dev = parent;
+                (void) dev_queue_xmit(skb);
+                return 0;
+        }
 	if (ic->ic_flags & IEEE80211_F_SCAN)		/* cancel bg scan */
 		ieee80211_cancel_scan(vap);
 	/* 
