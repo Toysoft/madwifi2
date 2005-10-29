@@ -54,7 +54,7 @@ struct ieee80211_nodestats {
 	u_int64_t	ns_rx_beacons;		/* rx beacon frames */
 	u_int32_t	ns_rx_proberesp;	/* rx probe response frames */
 
-	u_int32_t	ns_rx_dup;		/* rx discard 'cuz dup */
+	u_int32_t	ns_rx_dup;		/* rx discard due to it's a dup */
 	u_int32_t	ns_rx_noprivacy;	/* rx w/ wep but privacy off */
 	u_int32_t	ns_rx_wepfail;		/* rx wep processing failed */
 	u_int32_t	ns_rx_demicfail;	/* rx demic failed */
@@ -74,12 +74,12 @@ struct ieee80211_nodestats {
 	u_int32_t	ns_tx_probereq;		/* tx probe request frames */
 	u_int32_t	ns_tx_uapsd;		/* tx on uapsd queue */
 
-	u_int32_t	ns_tx_novlantag;	/* tx discard 'cuz no tag */
-	u_int32_t	ns_tx_vlanmismatch;	/* tx discard 'cuz bad tag */
+	u_int32_t	ns_tx_novlantag;	/* tx discard due to no tag */
+	u_int32_t	ns_tx_vlanmismatch;	/* tx discard due to of bad tag */
 
 	u_int32_t	ns_tx_eosplost;		/* uapsd EOSP retried out */
 
-	u_int32_t	ns_ps_discard;		/* ps discard 'cuz of age */
+	u_int32_t	ns_ps_discard;		/* ps discard due to of age */
 
 	u_int32_t	ns_uapsd_triggers;	/* uapsd triggers */
 
@@ -102,10 +102,10 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_badversion;	/* rx frame with bad version */
 	u_int32_t	is_rx_tooshort;		/* rx frame too short */
 	u_int32_t	is_rx_wrongbss;		/* rx from wrong bssid */
-	u_int32_t	is_rx_dup;		/* rx discard 'cuz dup */
+	u_int32_t	is_rx_dup;		/* rx discard due to it's a dup */
 	u_int32_t	is_rx_wrongdir;		/* rx w/ wrong direction */
-	u_int32_t	is_rx_mcastecho;	/* rx discard 'cuz mcast echo */
-	u_int32_t	is_rx_notassoc;		/* rx discard 'cuz sta !assoc */
+	u_int32_t	is_rx_mcastecho;	/* rx discard due to of mcast echo */
+	u_int32_t	is_rx_notassoc;		/* rx discard due to sta !assoc */
 	u_int32_t	is_rx_noprivacy;	/* rx w/ wep but privacy off */
 	u_int32_t	is_rx_unencrypted;	/* rx w/o wep and privacy on */
 	u_int32_t	is_rx_wepfail;		/* rx wep processing failed */
@@ -124,7 +124,7 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_ssidmismatch;	/* rx frame ssid mismatch  */
 	u_int32_t	is_rx_auth_unsupported;	/* rx w/ unsupported auth alg */
 	u_int32_t	is_rx_auth_fail;	/* rx sta auth failure */
-	u_int32_t	is_rx_auth_countermeasures;/* rx auth discard 'cuz CM */
+	u_int32_t	is_rx_auth_countermeasures;/* rx auth discard due to CM */
 	u_int32_t	is_rx_assoc_bss;	/* rx assoc from wrong bssid */
 	u_int32_t	is_rx_assoc_notauth;	/* rx assoc w/o auth */
 	u_int32_t	is_rx_assoc_capmismatch;/* rx assoc w/ cap mismatch */
@@ -146,17 +146,17 @@ struct ieee80211_stats {
 	u_int32_t	is_rx_tkipformat;	/* rx format bad (TKIP) */
 	u_int32_t	is_rx_tkipmic;		/* rx MIC check failed (TKIP) */
 	u_int32_t	is_rx_tkipicv;		/* rx ICV check failed (TKIP) */
-	u_int32_t	is_rx_badcipher;	/* rx failed 'cuz key type */
-	u_int32_t	is_rx_nocipherctx;	/* rx failed 'cuz key !setup */
-	u_int32_t	is_rx_acl;		/* rx discard 'cuz acl policy */
+	u_int32_t	is_rx_badcipher;	/* rx failed due to of key type */
+	u_int32_t	is_rx_nocipherctx;	/* rx failed due to key !setup */
+	u_int32_t	is_rx_acl;		/* rx discard due to of acl policy */
 	u_int32_t	is_rx_ffcnt;		/* rx fast frames */
 	u_int32_t	is_rx_badathtnl;   	/* driver key alloc failed */
 	u_int32_t	is_tx_nobuf;		/* tx failed for lack of buf */
 	u_int32_t	is_tx_nonode;		/* tx failed for no node */
 	u_int32_t	is_tx_unknownmgt;	/* tx of unknown mgt frame */
-	u_int32_t	is_tx_badcipher;	/* tx failed 'cuz key type */
-	u_int32_t	is_tx_nodefkey;		/* tx failed 'cuz no defkey */
-	u_int32_t	is_tx_noheadroom;	/* tx failed 'cuz no space */
+	u_int32_t	is_tx_badcipher;	/* tx failed due to of key type */
+	u_int32_t	is_tx_nodefkey;		/* tx failed due to no defkey */
+	u_int32_t	is_tx_noheadroom;	/* tx failed due to no space */
 	u_int32_t	is_tx_ffokcnt;		/* tx fast frames sent success */
 	u_int32_t	is_tx_fferrcnt;		/* tx fast frames sent success */
 	u_int32_t	is_scan_active;		/* active scans started */

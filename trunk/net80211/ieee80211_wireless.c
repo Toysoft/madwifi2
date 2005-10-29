@@ -3515,7 +3515,7 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ucastciphers" },
 	{ IEEE80211_PARAM_UCASTCIPHERS,
 	/*
-	 * NB: can't use "get_ucastciphers" 'cuz iwpriv command names
+	 * NB: can't use "get_ucastciphers" due to iwpriv command names
 	 *     must be <IFNAMESIZ which is 16.
 	 */
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_uciphers" },

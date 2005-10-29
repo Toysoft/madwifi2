@@ -514,7 +514,7 @@ struct ath_softc {
 				sc_xrgrppoll: 1,/* xr group polls are active */
 				sc_syncbeacon:1,/* sync/resync beacon timers */
 				sc_hasclrkey: 1,/* CLR key supported */
-				sc_devstopped:1,/* stopped 'cuz no tx bufs */
+				sc_devstopped:1,/* stopped due to of no tx bufs */
 				sc_stagbeacons:1,/* use staggered beacons */
 				sc_rtasksched:1, /* radar task is scheduled */
 				sc_dfswait:1,    /* waiting on channel for radar detect */

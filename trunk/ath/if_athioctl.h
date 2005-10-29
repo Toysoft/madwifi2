@@ -53,34 +53,34 @@ struct ath_stats {
 	u_int32_t	ast_tx_packets;	/* packet sent on the interface */
 	u_int32_t	ast_tx_mgmt;	/* management frames transmitted */
 	u_int32_t	ast_tx_discard;	/* frames discarded prior to assoc */
-	u_int32_t	ast_tx_invalid;	/* frames discarded 'cuz device gone */
-	u_int32_t	ast_tx_qstop;	/* tx queue stopped 'cuz full */
+	u_int32_t	ast_tx_invalid;	/* frames discarded due to is device gone */
+	u_int32_t	ast_tx_qstop;	/* tx queue stopped due to it's full */
 	u_int32_t	ast_tx_encap;	/* tx encapsulation failed */
-	u_int32_t	ast_tx_nonode;	/* tx failed 'cuz no node */
-	u_int32_t	ast_tx_nobuf;	/* tx failed 'cuz no tx buffer (data) */
-	u_int32_t	ast_tx_nobufmgt;/* tx failed 'cuz no tx buffer (mgmt)*/
-	u_int32_t	ast_tx_xretries;/* tx failed 'cuz too many retries */
-	u_int32_t	ast_tx_fifoerr;	/* tx failed 'cuz FIFO underrun */
-	u_int32_t	ast_tx_filtered;/* tx failed 'cuz xmit filtered */
+	u_int32_t	ast_tx_nonode;	/* tx failed due to of no node */
+	u_int32_t	ast_tx_nobuf;	/* tx failed due to of no tx buffer (data) */
+	u_int32_t	ast_tx_nobufmgt;/* tx failed due to of no tx buffer (mgmt)*/
+	u_int32_t	ast_tx_xretries;/* tx failed due to of too many retries */
+	u_int32_t	ast_tx_fifoerr;	/* tx failed due to of FIFO underrun */
+	u_int32_t	ast_tx_filtered;/* tx failed due to xmit filtered */
 	u_int32_t	ast_tx_shortretry;/* tx on-chip retries (short) */
 	u_int32_t	ast_tx_longretry;/* tx on-chip retries (long) */
-	u_int32_t	ast_tx_badrate;	/* tx failed 'cuz bogus xmit rate */
+	u_int32_t	ast_tx_badrate;	/* tx failed due to of bogus xmit rate */
 	u_int32_t	ast_tx_noack;	/* tx frames with no ack marked */
 	u_int32_t	ast_tx_rts;	/* tx frames with rts enabled */
 	u_int32_t	ast_tx_cts;	/* tx frames with cts enabled */
 	u_int32_t	ast_tx_shortpre;/* tx frames with short preamble */
 	u_int32_t	ast_tx_altrate;	/* tx frames with alternate rate */
 	u_int32_t	ast_tx_protect;	/* tx frames with protection */
-	u_int32_t	ast_rx_orn;	/* rx failed 'cuz of desc overrun */
-	u_int32_t	ast_rx_crcerr;	/* rx failed 'cuz of bad CRC */
-	u_int32_t	ast_rx_fifoerr;	/* rx failed 'cuz of FIFO overrun */
-	u_int32_t	ast_rx_badcrypt;/* rx failed 'cuz decryption */
-	u_int32_t	ast_rx_badmic;	/* rx failed 'cuz MIC failure */
+	u_int32_t	ast_rx_orn;	/* rx failed due to of desc overrun */
+	u_int32_t	ast_rx_crcerr;	/* rx failed due to of bad CRC */
+	u_int32_t	ast_rx_fifoerr;	/* rx failed due to of FIFO overrun */
+	u_int32_t	ast_rx_badcrypt;/* rx failed due to of decryption */
+	u_int32_t	ast_rx_badmic;	/* rx failed due to of MIC failure */
 	u_int32_t	ast_rx_phyerr;	/* rx PHY error summary count */
 	u_int32_t	ast_rx_phy[32];	/* rx PHY error per-code counts */
-	u_int32_t	ast_rx_tooshort;/* rx discarded 'cuz frame too short */
-	u_int32_t	ast_rx_toobig;	/* rx discarded 'cuz frame too large */
-	u_int32_t	ast_rx_nobuf;	/* rx setup failed 'cuz no skbuff */
+	u_int32_t	ast_rx_tooshort;/* rx discarded due to frame too short */
+	u_int32_t	ast_rx_toobig;	/* rx discarded due to frame too large */
+	u_int32_t	ast_rx_nobuf;	/* rx setup failed due to of no skbuff */
 	u_int32_t	ast_rx_packets;	/* packet recv on the interface */
 	u_int32_t	ast_rx_mgt;	/* management frames received */
 	u_int32_t	ast_rx_ctl;	/* control frames received */
