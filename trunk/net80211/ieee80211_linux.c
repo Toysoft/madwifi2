@@ -471,50 +471,46 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				    .len = 4},
 	};
 	struct ieee80211vap *vap, *next;
-	wlan_ng_prism2_header *ph;
-
-	ph = (wlan_ng_prism2_header *)
-		skb_push(skb, sizeof(wlan_ng_prism2_header));
-	*ph = template;
-
-	ph->hosttime.data = jiffies;
-	ph->mactime.data = mactime;
-	ph->frmlen.data = skb->len - sizeof(wlan_ng_prism2_header);
-	/* XXX no way to pass channel flag state */
-	ph->channel.data = ieee80211_chan2ieee(ic, ic->ic_curchan);
-	ph->rssi.data = rssi;
-	ph->signal.data = signal;
-	ph->rate.data = rate;
-
 	/* XXX locking */
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
 		struct sk_buff *skb1;
-		struct net_device *dev;
+		struct net_device *dev = vap->iv_dev;
 
 		next = TAILQ_NEXT(vap, iv_next);
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
 		    vap->iv_state != IEEE80211_S_RUN)
 			continue;
-		/* look ahead for another monitor mode vap */
-		while (next != NULL && next->iv_opmode != IEEE80211_M_MONITOR)
-			next = TAILQ_NEXT(next, iv_next);
-		if (next != NULL) {
-			skb1 = skb_copy(skb, GFP_ATOMIC);
-			if (skb1 == NULL) {
-				/* XXX stat+msg */
-				continue;
-			}
-		} else {
-			skb1 = skb;
-			skb = NULL;
+		
+		skb1 = skb_copy(skb, GFP_ATOMIC);
+		if (skb1 == NULL) {
+			/* XXX stat+msg */
+			continue;
 		}
+		wlan_ng_prism2_header *ph = (wlan_ng_prism2_header *) skb1->data;
+		
+		if (skb_headroom(skb1) < sizeof(wlan_ng_prism2_header)) {
+			dev_kfree_skb(skb1);
+			return;
+		}
+		
+		ph = (wlan_ng_prism2_header *)
+			skb_push(skb1, sizeof(wlan_ng_prism2_header));
+		*ph = template;
+		
+		ph->hosttime.data = jiffies;
+		ph->mactime.data = mactime;
+		ph->frmlen.data = skb->len - sizeof(wlan_ng_prism2_header);
+		/* XXX no way to pass channel flag state */
+		ph->channel.data = ieee80211_chan2ieee(ic, ic->ic_curchan);
+		ph->rssi.data = rssi;
+		ph->signal.data = signal;
+		ph->rate.data = rate;
 
-		dev = vap->iv_dev;		/* NB: deliver to wlanX */
 
-		ph = (wlan_ng_prism2_header *) skb1->data;
+
 		strncpy(ph->devname, dev->name, sizeof(ph->devname));
 
-		skb1->dev = dev;
+		skb1->dev = dev; /* NB: deliver to wlanX */
 		skb1->mac.raw = skb1->data;
 		skb1->ip_summed = CHECKSUM_NONE;
 		skb1->pkt_type = PACKET_OTHERHOST;
@@ -525,8 +521,6 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		vap->iv_devstats.rx_packets++;
 		vap->iv_devstats.rx_bytes += skb1->len;
 	}
-	if (skb != NULL)			/* no vaps, reclaim skb */
-		dev_kfree_skb(skb);
 }
 EXPORT_SYMBOL(ieee80211_input_monitor);
 
