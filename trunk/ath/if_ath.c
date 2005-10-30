@@ -1983,7 +1983,71 @@ ath_desc_swap(struct ath_desc *ds)
 #endif
 }
 
+/*
+ * Insert a buffer on a txq 
+ * 
+ */
+static inline void
+ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
+		 struct ath_txq *txq, struct ath_buf *bf, 
+		 struct ath_desc *lastds, int framelen)
+{
+	struct ath_hal *ah = sc->sc_ah;
 
+	/*
+	 * Insert the frame on the outbound list and
+	 * pass it on to the hardware.
+	 */
+	ATH_TXQ_LOCK_BH(txq);
+	if (ni && ni->ni_vap && txq == &ATH_VAP(ni->ni_vap)->av_mcastq) {
+		/*
+		 * The CAB queue is started from the SWBA handler since
+		 * frames only go out on DTIM and to avoid possible races.
+		 */
+		ath_hal_intrset(ah, sc->sc_imask & ~HAL_INT_SWBA);
+		ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
+		DPRINTF(sc,ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n", __func__, txq->axq_depth);
+		if (txq->axq_link != NULL) {
+#ifdef AH_NEED_DESC_SWAP
+			*txq->axq_link = cpu_to_le32(bf->bf_daddr);
+#else
+			*txq->axq_link = bf->bf_daddr;
+#endif
+			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: link[%u](%p)=%llx (%p)\n",
+				__func__,
+				txq->axq_qnum, txq->axq_link,
+				ito64(bf->bf_daddr), bf->bf_desc);
+		}
+		txq->axq_link = &lastds->ds_link;
+		ath_hal_intrset(ah, sc->sc_imask);
+	} else {
+		ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
+		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n", __func__, txq->axq_depth);
+		if (txq->axq_link == NULL) {
+			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
+			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: TXDP[%u] = %llx (%p)\n",
+				__func__,
+				txq->axq_qnum, ito64(bf->bf_daddr), bf->bf_desc);
+		} else {
+#ifdef AH_NEED_DESC_SWAP
+			*txq->axq_link = cpu_to_le32(bf->bf_daddr);
+#else
+			*txq->axq_link = bf->bf_daddr;
+#endif
+			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: link[%u] (%p)=%llx (%p)\n",
+				__func__,
+				txq->axq_qnum, txq->axq_link,
+				ito64(bf->bf_daddr), bf->bf_desc);
+		}
+		txq->axq_link = &lastds->ds_link;
+		ath_hal_txstart(ah, txq->axq_qnum);
+		sc->sc_dev->trans_start = jiffies;
+	}
+	ATH_TXQ_UNLOCK_BH(txq);
+
+	sc->sc_devstats.tx_packets++;
+	sc->sc_devstats.tx_bytes += framelen;
+}
 
 int 
 ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb) 
@@ -5906,72 +5970,6 @@ ath_wme_update(struct ieee80211com *ic)
 	    !ath_txq_update(sc, sc->sc_ac2q[WME_AC_BK], WME_AC_BK) ||
 	    !ath_txq_update(sc, sc->sc_ac2q[WME_AC_VI], WME_AC_VI) ||
 	    !ath_txq_update(sc, sc->sc_ac2q[WME_AC_VO], WME_AC_VO) ? EIO : 0;
-}
-
-/*
- * Insert a buffer on a txq 
- * 
- */
-static inline void
-ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
-		 struct ath_txq *txq, struct ath_buf *bf, 
-		 struct ath_desc *lastds, int framelen)
-{
-	struct ath_hal *ah = sc->sc_ah;
-
-	/*
-	 * Insert the frame on the outbound list and
-	 * pass it on to the hardware.
-	 */
-	ATH_TXQ_LOCK_BH(txq);
-	if (ni && ni->ni_vap && txq == &ATH_VAP(ni->ni_vap)->av_mcastq) {
-		/*
-		 * The CAB queue is started from the SWBA handler since
-		 * frames only go out on DTIM and to avoid possible races.
-		 */
-		ath_hal_intrset(ah, sc->sc_imask & ~HAL_INT_SWBA);
-		ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
-		DPRINTF(sc,ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n", __func__, txq->axq_depth);
-		if (txq->axq_link != NULL) {
-#ifdef AH_NEED_DESC_SWAP
-			*txq->axq_link = cpu_to_le32(bf->bf_daddr);
-#else
-			*txq->axq_link = bf->bf_daddr;
-#endif
-			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: link[%u](%p)=%llx (%p)\n",
-				__func__,
-				txq->axq_qnum, txq->axq_link,
-				ito64(bf->bf_daddr), bf->bf_desc);
-		}
-		txq->axq_link = &lastds->ds_link;
-		ath_hal_intrset(ah, sc->sc_imask);
-	} else {
-		ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
-		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n", __func__, txq->axq_depth);
-		if (txq->axq_link == NULL) {
-			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
-			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: TXDP[%u] = %llx (%p)\n",
-				__func__,
-				txq->axq_qnum, ito64(bf->bf_daddr), bf->bf_desc);
-		} else {
-#ifdef AH_NEED_DESC_SWAP
-			*txq->axq_link = cpu_to_le32(bf->bf_daddr);
-#else
-			*txq->axq_link = bf->bf_daddr;
-#endif
-			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: link[%u] (%p)=%llx (%p)\n",
-				__func__,
-				txq->axq_qnum, txq->axq_link,
-				ito64(bf->bf_daddr), bf->bf_desc);
-		}
-		txq->axq_link = &lastds->ds_link;
-		ath_hal_txstart(ah, txq->axq_qnum);
-		sc->sc_dev->trans_start = jiffies;
-	}
-	ATH_TXQ_UNLOCK_BH(txq);
-
-	sc->sc_devstats.tx_packets++;
-	sc->sc_devstats.tx_bytes += framelen;
 }
 
 /*
