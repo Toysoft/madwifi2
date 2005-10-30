@@ -914,10 +914,16 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 			ic_opmode = opmode;
 		break;
 	case IEEE80211_M_IBSS:
-	case IEEE80211_M_MONITOR:
 		if (sc->sc_nvaps != 0)		/* only one */
 			return NULL;
 		ic_opmode = opmode;
+		break;
+	case IEEE80211_M_MONITOR:
+		if ((sc->sc_nvaps != 0) && (ic->ic_opmode != IEEE80211_M_MONITOR)){
+			ic_opmode = ic->ic_opmode;
+		} else {
+			ic_opmode = opmode;
+		}
 		break;
 	case IEEE80211_M_HOSTAP:
 	case IEEE80211_M_WDS:
@@ -962,14 +968,15 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	/*
 	 * Change the interface type for monitor mode.
 	 */
-	if (ic_opmode == IEEE80211_M_MONITOR)
+	if (opmode == IEEE80211_M_MONITOR) {
 		dev->type = ARPHRD_IEEE80211_PRISM;
+	}
 	if ((flags & IEEE80211_CLONE_BSSID) &&
 	    sc->sc_nvaps != 0 && opmode != IEEE80211_M_WDS && sc->sc_hasbmask) {
-        struct ieee80211vap *v;
+		struct ieee80211vap *v;
 		int id_mask, id;
-
-        /*
+		
+		/*
 		 * Hardware supports the bssid mask and a unique
 		 * bssid was requested.  Assign a new mac address
 		 * and expand our bssid mask to cover the active
@@ -977,19 +984,19 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		 */
 		KASSERT(sc->sc_nvaps <= ATH_BCBUF,
 			("too many virtual ap's: %d", sc->sc_nvaps));
-
-        /* do a full search to mark all the allocated vaps */
-        id_mask = 0;
-        TAILQ_FOREACH(v, &ic->ic_vaps, iv_next)
-            id_mask |= (1 << ATH_GET_VAP_ID(v->iv_myaddr));
-
-        for (id = 0; id < ATH_BCBUF; id++) {
-            /* get the first available slot */
-            if ((id_mask & (1 << id)) == 0) {
-                ATH_SET_VAP_BSSID(vap->iv_myaddr, id);
-                break;
-            }
-        }
+		
+		/* do a full search to mark all the allocated vaps */
+		id_mask = 0;
+		TAILQ_FOREACH(v, &ic->ic_vaps, iv_next)
+			id_mask |= (1 << ATH_GET_VAP_ID(v->iv_myaddr));
+		
+		for (id = 0; id < ATH_BCBUF; id++) {
+			/* get the first available slot */
+			if ((id_mask & (1 << id)) == 0) {
+				ATH_SET_VAP_BSSID(vap->iv_myaddr, id);
+				break;
+			}
+		}
 	}
 	avp->av_bslot = -1;
 	STAILQ_INIT(&avp->av_mcastq.axq_q);
@@ -1047,6 +1054,8 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	sc->sc_nvaps++;
 	if (opmode == IEEE80211_M_STA)
 		sc->sc_nstavaps++;
+	else if (opmode == IEEE80211_M_MONITOR)
+		sc->sc_nmonvaps++;
 
 #ifdef ATH_SUPERG_XR
 	if ( vap->iv_flags & IEEE80211_F_XR ) {
@@ -1116,6 +1125,8 @@ ath_vap_delete(struct ieee80211vap *vap)
 		sc->sc_nstavaps--;
 		if (sc->sc_nostabeacons)
 			sc->sc_nostabeacons = 0;
+	} else if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+		sc->sc_nmonvaps--;
 	}
 	ieee80211_vap_detach(vap);
 	/* NB: memory is reclaimed through dev->destructor callback */
@@ -4821,7 +4832,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 
 	skb = bf->bf_skb;
 	if (skb == NULL) {
- 		if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
+ 		if (sc->sc_nmonvaps > 0) {
  			u_int off;
  			/*
  			 * Allocate buffer for monitor mode with space for the
@@ -4909,13 +4920,8 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	int len = ds->ds_rxstat.rs_datalen;
 	struct ieee80211_frame *wh;
 	u_int32_t tsf;
-
-	skb->protocol = ETH_P_CONTROL;
-	skb->pkt_type = PACKET_OTHERHOST;
-	skb_put(skb, len);
 
 	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
 		("data padding not enabled?"));
@@ -4948,9 +4954,6 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ieee80211_input_monitor(ic, skb, tsf,
 		0, ds->ds_rxstat.rs_rssi,
 		sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
-
-	sc->sc_devstats.rx_packets++;
-	sc->sc_devstats.rx_bytes += len;
 }
 
 /*
@@ -5186,12 +5189,16 @@ rx_accept:
 		sc->sc_devstats.rx_packets++;
 		sc->sc_devstats.rx_bytes += len;
 
-		if (ic->ic_opmode == IEEE80211_M_MONITOR) {
+
+		skb_put(skb, len - IEEE80211_CRC_LEN);
+		skb->protocol = ETH_P_CONTROL;		/* XXX */
+
+		if (sc->sc_nmonvaps > 0) {
 			/*
-			 * Monitor mode: discard anything shorter than
-			 * an ack or cts, clean the skbuff, fabricate
-			 * the Prism header existing tools expect,
-			 * and dispatch.
+			 * Some vap is in monitor mode.  Discard
+			 * anything shorter than an ack or cts, clean
+			 * the skbuff, fabricate the Prism header
+			 * existing tools expect, and dispatch.
 			 */
 			if (len < IEEE80211_ACK_LEN) {
 				DPRINTF(sc, ATH_DEBUG_RECV,
@@ -5201,7 +5208,11 @@ rx_accept:
 				goto rx_next;
 			}
 			ath_rx_capture(dev, ds, skb);
-			goto rx_next;
+			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
+				/* no other vaps need the packet */
+				dev_kfree_skb(skb);
+				goto rx_next;
+			}
 		}
 
 		/*
@@ -5219,8 +5230,6 @@ rx_accept:
 		/*
 		 * Normal receive.
 		 */
-		skb_put(skb, len - IEEE80211_CRC_LEN);
-		skb->protocol = ETH_P_CONTROL;		/* XXX */
 
 		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV)) {
 			ieee80211_dump_pkt(ic, skb->data, len,

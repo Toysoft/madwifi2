@@ -545,6 +545,7 @@ struct ath_softc {
 	u_int32_t		sc_dfstesttime;	/* Time to stay off chan during dfs test */
 	u_int16_t		sc_nvaps;	/* # of active virtual ap's */
 	u_int8_t		sc_nstavaps;	/* # of active station vaps */
+	u_int8_t		sc_nmonvaps;	/* # of monitor vaps */
 	u_int8_t		sc_nbcnvaps;	/* # of vaps sending beacons */
 	u_int			sc_fftxqmin;	/* aggregation threshold */
 	HAL_INT			sc_imask;	/* interrupt mask copy */
