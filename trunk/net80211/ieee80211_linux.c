@@ -475,7 +475,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
 		struct sk_buff *skb1;
 		struct net_device *dev = vap->iv_dev;
-
+		wlan_ng_prism2_header *ph;
 		next = TAILQ_NEXT(vap, iv_next);
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
 		    vap->iv_state != IEEE80211_S_RUN)
@@ -486,8 +486,6 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			/* XXX stat+msg */
 			continue;
 		}
-		wlan_ng_prism2_header *ph = (wlan_ng_prism2_header *) skb1->data;
-		
 		if (skb_headroom(skb1) < sizeof(wlan_ng_prism2_header)) {
 			dev_kfree_skb(skb1);
 			return;
