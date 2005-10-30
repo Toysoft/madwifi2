@@ -1,19 +1,4 @@
 $Id: README,v 1.26 2004/08/18 17:50:41 samleffler Exp $
-
-
-
-
-HEADSUP: IF YOU DIDN'T DO SO BY NOW, READ THE FILE
-HEADSUP:
-HEADSUP:               README_FIRST
-HEADSUP:
-HEADSUP: BEFORE YOU CONTINUE READING THIS FILE! THIS
-HEADSUP: IS EVEN MORE TRUE IF YOU ARE ALREADY USED TO
-HEADSUP: OLD VERSIONS OF MADWIFI!
-
-
-
-
 ================================================================
 MADWIFI: Multimode Atheros Driver for WiFi on Linux (VAP branch)
 ================================================================
@@ -22,27 +7,11 @@ MADWIFI: Multimode Atheros Driver for WiFi on Linux (VAP branch)
 
 Read the file COPYRIGHT for the complete copyright.
 
-
-
-WARNING: THIS IS A BETA DISTRIBUTION.  THIS SOFTWARE HAS KNOWN PROBLEMS AND
-WARNING: LIMITATIONS THAT WILL BE CORRECTED BEFORE A PRODUCTION RELEASE.
-WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTORYS YOUR DISK
-WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
-WARNING: USE AT YOUR OWN RISK!
-
-
-CAVEAT:  This file doesn't lie, but is a bit old and needs to be rewritten.
-
-
 This software contains a Linux kernel driver for Atheros-based
 Wireless LAN devices.  The driver supports station, AP, adhoc, and
 monitor modes of operation.  The Atheros driver depends on a
 device-independent implementation of the 802.11 protocols that
-originated in the BSD community (NetBSD in particular).  You will
-find a small amount of BSD-ish glue code that exists mainly to
-minimize diffs with the BSD variants However as much as possible
-this is "native Linux code" that tries to conform to Linux style
-and operation.
+originated in the BSD community (NetBSD in particular).  
 
 The driver functions as a normal network device and uses the Wireless
 Extensions API.  As such normal Linux tools can and should be used
@@ -80,9 +49,7 @@ to operate outside the approved power levels and frequency channels.
 This makes it difficult to open-source code that enforces limits on
 the power levels, frequency channels and other parameters of the radio
 transmitter.  See
-
 http://ftp.fcc.gov/Bureaus/Engineering_Technology/Orders/2001/fcc01264.pdf
-
 for the specific FCC regulation.  Because the module is provided in a
 binary-only form it is marked "Proprietary"; this means when you load
 it you will see messages that your system is now "tainted".
@@ -122,7 +89,7 @@ These parts have been incorporated in a variety of retail products
 including cardbus cards from DLink, Linksys, Netgear, Orinoco,
 Proxim, and 3Com; and mini-pci cards from some of these same vendors.
 In addition many laptop vendors use Atheros mini-pci cards for their
-builtin wireless support.  For an up-to-date list of cards based
+built-in wireless support.  For an up-to-date list of cards based
 on Atheros parts visit:
 
 http://customerproducts.atheros.com/customerproducts
@@ -313,36 +280,44 @@ version of Linux; e.g. building for 2.6 after building for 2.4.
 Using the driver
 ================
 The driver should support any Atheros-based cardbus or pci device.
-Management is done using the normal Linux tools such as ifconfig,
-iwconfig, and iwpriv.
+This version of the driver is managed and controlled by the usual
+Linux tools (ifconfig, iwconfig, iwpriv) plus the wlanconfig tool
+included with the driver in the tools directory.
 
-To use this software in ``station mode'' (i.e. as a client) just
-bring the interface up and the driver will scan for all access
-points in all supported frequency bands supported by the hardware.
-Specifically for 5210-based devices scanning will happen in the
-5Ghz (11a) range, for 5211-based devices scanning will happen over
-both 2Ghz (11b) and 5GHz frequencies (11a).  For 5212-based devices
-the driver will scan both 2Ghz and 5GHz ranges and also look for
-11g devices in the 2Ghz range.  To restrict operation you can either
-select a mode (e.g. 11b) using iwpriv or, more commonly, select the
-AP based on SSID and/or channel.
+First, run "modprobe ath_pci" or the equivalent using "insmod".  When
+the driver is successfully loaded it creates a device named "wifi0"
+The output from iwconfig should look like this:
 
-NOTE: You must mark the interface ``up'' with, e.g. ifconfig ath0 up
-      before scanning for access points with iwlist.
+    lo      no wireless extensions.
+    wifi0   no wireless extensions.
 
-To use this software in ``hostap mode'' you need to configure it
-with iwconfig and you will probably want to lock the operating mode
-to one of 11a, 11b, or 11g if you have a multi-mode card (if you
-do not lock the mode then the driver will select a mode for you;
-usually 11a).  In addition you will need to configure the system to
-bridge frames to a wired LAN or similar.
+This driver uses wifi%d only as a placeholder for the phyical device, 
+and will create one wifi device for each wireless NIC in the system.  
+These wifi devices will reject ifconfig and iwconfig commands.
 
-NOTE: adhoc mode is known to not work reliably.
+The next step is to bring one or more ath%d device into existence.
+All of the usual commands - ifconfig, iwconfig, iwpriv - should operate
+on the ath%d devices as expected with exceptions noted below.
 
-Wireless tools cribsheet:
+Here is one example, but for more information, see the man page for
+wlanconfig. It is installed when you run "make install".
 
-iwlist ath0 scan		list AP's the driver has scanned
-iwconfig ath0 essid "foo"	set the ssid to foo
+Station mode:
+
+    wlanconfig ath0 create wlandev wifi0 wlanmode sta
+    iwconfig ath0 essid ANY
+    ifconfig ath0 up
+
+This will create a device named ath0 to be associated with wireless
+device wifi0 and set it to be a station. The iwconfig command will set
+the device to choose any available essid, and then ifconfig up will
+start the device and begin scanning so that you can begin to send
+packets over the interface.
+
+
+You can lock the operating mode to one of 11a, 11b, or 11g if you have
+a multi-mode card (if you do not lock the mode then the driver will
+select a mode for you; usually 11a).  You can use the following commands:
 iwpriv ath0 mode 1		lock operation to 11a only
 iwpriv ath0 mode 2		lock operation to 11b only
 iwpriv ath0 mode 3		lock operation to 11g only
@@ -370,7 +345,6 @@ will give a running display of the most interesting statistics sampled
 every 1 second.  Running athstats without any options will display a
 summary of all non-zero statistics from the time the driver was loaded.
 By default the ath0 device is used; to override this use the -i option.
-
 
 Security/Crpto Support
 ======================
@@ -428,11 +402,6 @@ Known Problems
 [All these problems are to be fixed in future revisions.]
 
 1. Adhoc mode is broken; symptoms are intermittent operation.
-2. Performance in lossy environments is suboptimal.  The algorithm used to
-   select the rate for transmitted packets is very simplistic.  There is no
-   software retransmit; only hardware retransmit is used.  Contributors are
-   encouraged to replace the existing rate control algorithm with a better
-   one (hint: all the information needed is available in the driver).
 
 Acknowledgements
 ================
