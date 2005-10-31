@@ -57,6 +57,9 @@ TARGET=		$(shell uname -m)-elf
 ifeq ($(TARGET),i686-elf)
 TARGET=		i386-elf
 endif
+ifeq ($(TARGET),ppc-elf)
+TARGET=		powerpc-be-elf
+endif
 endif
 
 # BUS defines the bus type to which the wireless devices is attached.
