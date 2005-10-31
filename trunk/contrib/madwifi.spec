@@ -14,8 +14,8 @@
 
 Summary: A linux device driver for Atheros chipsets (ar5210, ar5211, ar5212).
 Name: madwifi
-Version: 0.0.20051021
-Release: 2
+Version: 0.1223.20051030
+Release: 3
 License: GPL2
 Group: System Environment/Kernel
 URL: http://sourceforge.net/projects/madwifi/
@@ -38,7 +38,7 @@ PCI or MiniPCI - that use Atheros chipsets (ar5210, ar5211, ar5212).
 Summary: A linux device driver for Atheros chipsets (ar5210, ar5211, ar5212).
 Group: System Environment/Kernel
 Requires: kernel = %{mykversion}
-Release: 1_%{mykrelver}
+Release: 2_%{mykrelver}
 
 %description module
 This package contains the Multiband Atheros Driver for WiFi, A linux
@@ -84,6 +84,7 @@ rm -rf %{buildroot}
 %files
 %doc COPYRIGHT README
 %attr(0755,root,root) /usr/local/bin/*
+%attr(0644,root,root) /usr/local/man/*
 
 %files module
 %defattr(-,root,root,-)
@@ -91,6 +92,9 @@ rm -rf %{buildroot}
 
 #
 %changelog
+* Sun Oct 30 2005  Patrick Pichon <Patrick.Pichon@laposte.net>
+- Add Man pages
+
 * Mon Oct 24 2005  Lyonel Vincent <>
 - Fix the --rebuild option.
 
