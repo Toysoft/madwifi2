@@ -140,7 +140,7 @@ static void     ath_beacon_dturbo_config(struct ieee80211vap *, u_int32_t);
 static void     ath_turbo_switch_mode(unsigned long);
 static int      ath_check_beacon_done(struct ath_softc *sc);
 #endif
-static void	ath_beacon_tasklet(struct ath_softc *, int *needmark);
+static void	ath_beacon_send(struct ath_softc *, int *needmark);
 static void	ath_beacon_start_adhoc(struct ath_softc *,
 			struct ieee80211vap *);
 static void	ath_beacon_return(struct ath_softc *, struct ath_buf *);
@@ -1555,7 +1555,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 * this is too slow to meet timing constraints
 			 * under load.
 			 */
-			ath_beacon_tasklet(sc, &needmark);
+			ath_beacon_send(sc, &needmark);
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -3824,7 +3824,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
  * the slot time is also adjusted based on current state.
  */
 static void
-ath_beacon_tasklet(struct ath_softc *sc, int *needmark)
+ath_beacon_send(struct ath_softc *sc, int *needmark)
 {
 #define	TSF_TO_TU(_h,_l) \
 	((((u_int32_t)(_h)) << 22) | (((u_int32_t)(_l)) >> 10))
