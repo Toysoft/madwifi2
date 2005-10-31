@@ -85,10 +85,11 @@ endif
 
 else
 
-KERNELPATH ?= $(firstword $(wildcard $(DESTDIR)/lib/modules/$(shell uname -r)/build /usr/src/linux))
+KERNELPATH ?= $(shell readlink -f /lib/modules/`uname -r`/build)
 
 ifeq ($(KERNELPATH),)
-$(error KERNELPATH must be defined)
+KERNELPATH = /usr/src/linux
+$(warning Default KERNELPATH not found, using $(KERNELPATH))
 endif
 
 endif
