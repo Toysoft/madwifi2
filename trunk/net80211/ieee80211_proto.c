@@ -377,11 +377,13 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 	printf("\n");
 	if (len > 0) {
 		for (i = 0; i < len; i++) {
-			if ((i & 1) == 0)
+			if ((i%8) == 0)
 				printf(" ");
-			printf("%02x", buf[i]);
+			if ((i%16) == 0)
+				printf("\n");
+			printf("%02x ", buf[i]);
 		}
-		printf("\n");
+		printf("\n\n");
 	}
 }
 EXPORT_SYMBOL(ieee80211_dump_pkt);
