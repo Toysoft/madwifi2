@@ -1,4 +1,3 @@
-$Id: README,v 1.26 2004/08/18 17:50:41 samleffler Exp $
 ================================================================
 MADWIFI: Multimode Atheros Driver for WiFi on Linux (VAP branch)
 ================================================================
@@ -7,6 +6,16 @@ MADWIFI: Multimode Atheros Driver for WiFi on Linux (VAP branch)
 
 Read the file COPYRIGHT for the complete copyright.
 
+
+WARNING: THIS IS A BETA DISTRIBUTION.  THIS SOFTWARE HAS KNOWN PROBLEMS AND
+WARNING: LIMITATIONS THAT WILL BE CORRECTED BEFORE A PRODUCTION RELEASE.
+WARNING: DON'T BLAME US IF THE SOFTWARE EATS YOUR SYSTEM, DESTROYS YOUR DISK
+WARNING: OR MAKES YOUR CORN-FLAKES SOGGY.
+WARNING: USE AT YOUR OWN RISK!
+
+
+Introduction
+============
 This software contains a Linux kernel driver for Atheros-based
 Wireless LAN devices.  The driver supports station, AP, adhoc, and
 monitor modes of operation.  The Atheros driver depends on a
@@ -18,8 +27,9 @@ Extensions API.  As such normal Linux tools can and should be used
 with it.  Where the wireless extensions are lacking private ioctls
 have been added.
 
-There is only one driver included here; it supports both miniPCI
-and Cardbus devices.  The driver can be built as a module or linked
+There is only one driver included here; it supports PCI, miniPCI
+and Cardbus devices - USB devices are currently not supported by
+this driver!  The driver can be built as a module or linked
 directly into the kernel.  Note however that the net80211 layer is
 device-independent; there is no reason it cannot be used with any
 802.11 device (in fact on BSD systems this is the case).
@@ -54,26 +64,14 @@ for the specific FCC regulation.  Because the module is provided in a
 binary-only form it is marked "Proprietary"; this means when you load
 it you will see messages that your system is now "tainted".
 
+A detailed discussion of the pros and cons of this design can be found
+at http://madwifi.org/wiki/HAL
+
 If you wish to use this driver on a platform for which an ath_hal
 module is not already provided please contact the author.  Note that
 this is only necessary for new _architectures_; the HAL is not tied to
 any specific version of Linux--in fact the identical HAL binary code
 is used unchanged with other operating systems.
-
-
-Compatibility
-=============
-This driver requires the following support in your kernel:
-
-o Wireless Extensions versions 14 or later (version 16 preferred)
-o Sysctl support
-o Crypto API support including the HMAC algorithm and the MD5 algorithm
-  if you want the 802.1x authenticator (AES support is used if present,
-  otherwise the AES-CCMP cipher module falls back to a private implementation)
-
-Most testing has been done with kernel versions 2.6.0 and later and
-versions 2.4.25 and 2.4.26.  Expect some rough edges if you
-deviate from that combo.  
 
 Atheros Hardware
 ================
@@ -89,10 +87,14 @@ These parts have been incorporated in a variety of retail products
 including cardbus cards from DLink, Linksys, Netgear, Orinoco,
 Proxim, and 3Com; and mini-pci cards from some of these same vendors.
 In addition many laptop vendors use Atheros mini-pci cards for their
-built-in wireless support.  For an up-to-date list of cards based
-on Atheros parts visit:
+built-in wireless support.
 
+For an up-to-date list of cards based on Atheros parts visit:
 http://customerproducts.atheros.com/customerproducts
+
+A list of products that have been reported to be supported by MadWifi
+can be found here:
+http://madwifi.org/wiki/Compatibility
 
 In general, if a device is identified as ``11a only'' it is almost
 certain to contain an Atheros 5210 part in it.  Most retail a+b
@@ -106,183 +108,17 @@ vendor id is 0x168c; e.g.
 but beware that come vendors use alternate vendor id's (e.g 3Com, IBM).
 The file hal/ah_devid.h has a list of known PCI id's.
 
-
 Building the driver
 ===================
-The driver is built using the Linux kernel build mechanism.  This
-means you must have some part of the kernel source distribution
-installed on the machine where you want to build the driver.  In
-particular, the kernel include files and configuration must be
-available as well as the build scripts.  If you built your kernel
-from source then this will be present.  Otherwise you may need to
-install some materials from your distribution.
-
-Most people can just type:
-
-trouble% make
-
-at the top level to build all the modules for the system where you
-are building.  If you installed your kernel sources as the super-user
-then this may fail because of permission problems.  In that case
-you either need to change the permission/ownership of the kernel
-sources or build the driver as the super-user.
-
-Otherwise, if this does not work or if you want to cross-compile
-the code for a different system then you will need to explicitly
-specify the location where the kernel sources are located, e.g.:
-
-trouble% make KERNELPATH=/usr/src/linux-2.6.3
-
-Note that you can also specify this path by setting an environment
-variable; e.g.
-
-trouble% export KERNELPATH=/usr/src/linux-2.6.3
-trouble% make
-
-You can also just specify a kernel version using the KERNELRELEASE
-variable.  In that case the kernel sources are automatically searched
-for in /lib/modules/$KERNELRELEASE/build.
-
-
-This distribution includes support for a variety of target platforms.
-Because of the binary nature of the HAL not all platforms are
-supported (the list grows as time permits).  The supported target
-platforms can be found with:
-
-trouble% ls hal/linux/*.inc
-hal/linux/Makefile.inc          hal/linux/mips1-le-elf.inc
-hal/linux/arm9-le-thumb-elf.inc hal/linux/mipsisa32-be-elf.inc
-hal/linux/armv4-be-elf.inc      hal/linux/mipsisa32-le-elf.inc
-hal/linux/armv4-le-elf.inc      hal/linux/powerpc-be-eabi.inc
-hal/linux/i386-elf.inc          hal/linux/powerpc-le-eabi.inc
-hal/linux/mips-be-elf.inc       hal/linux/sh4-le-elf.inc
-hal/linux/mips-le-elf.inc       hal/linux/xscale-be-elf.inc
-hal/linux/mips1-be-elf.inc
-
-A target specifies the CPU architecture, byte order, and the ABI/file
-format.  Consult the contents of the .inc file to find out what the
-target platform is and what toolchain was used to build the HAL object
-module.  Beware of mixing toolchains; many target platforms require that
-the HAL and driver be built with the same toolchain (i.e. compiler,
-assembler, and loader).  If you want to override the default toolchain
-specified in the .inc file you can do that by editing the .inc file
-or by specifying environment variables.
-
-For example, the file for xscale-be-elf is:
-
-#
-# Compilation configuration for building big-endian XScale/arm-elf.
-#
-
-#
-# Built with GNU cross-devel tools:
-#
-# PREFIX=/pub/gnu
-# BINUTILS=binutils-2.14
-# GCC=gcc-3.3.2
-# target=arm-elf
-#
-# ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
-# ${GCC}/configure --target=$target   --prefix=${PREFIX} \
-#	--enable-languages=c   --with-gnu-as --with-gnu-ld \
-#	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
-#
-ifndef TOOLPREFIX
-TOOLPREFIX=	/pub/gnu/bin/arm-elf-
-endif
-#
-CC=	${TOOLPREFIX}gcc
-LD=	${TOOLPREFIX}ld
-STRIP=	${TOOLPREFIX}strip
-OBJCOPY=${TOOLPREFIX}objcopy
-NM=	${TOOLPREFIX}nm
-
-LDOPTS=	-EB
-COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+= -march=armv4 -mbig-endian -fno-strict-aliasing -fno-common -mapcs-32 \
-	-mtune=xscale  -mshort-load-bytes -msoft-float
-
-The first set of definitions specify the location and name of the
-programs used to build the software.  The rest of the file defines
-the compilation options for the target platform.  The latter should
-usually not be changed because they were the options used to build
-the binary HAL module, but TOOLPREFIX is unlikely to be right for
-your system and you will want to change it; e.g
-
-trouble% export TOOLPREFIX=/usr/local/bin/arm-elf-
-
-to use programs installed in /usr/local/bin.  Note that mixing different
-versions of the GNU tools may not work.  The .inc file for each target
-platform specifies the exact toolchains used, including where they
-were obtained (if pre-built).
-
-The build system is designed to support cross-building without any
-modification to the distribution files.  If you cannot do what you
-need by setting environment variables please send patches to show
-where things failed to do the right thing.
-
-
-Building the software will generate numerous loadable modules:
-
-Linux 2.6
-    ath/ath_pci.ko (Atheros driver for PCI/Cardbus devices),
-    ath_hal/ath_hal.ko (Atheros HAL), and
-    net80211/wlan.ko (802.11 support layer)
-    net80211/wlan_wep.ko (WEP cipher support)
-    net80211/wlan_tkip.ko (TKIP cipher support)
-    net80211/wlan_ccmp.ko (AES-CCMP cipher support)
-    net80211/wlan_auth.ko (802.1x authenticator)
-    net80211/wlan_radius.ko (RADIUS client for 802.1x authenticator)
-    net80211/wlan_acl.ko (MAC ACL support for AP operation)
-
-Linux 2.4
-    ath/ath_pci.o (Atheros driver for PCI/Cardbus devices),
-    ath_hal/ath_hal.o (Atheros HAL), and
-    net80211/wlan.o (802.11 support layer)
-    net80211/wlan_wep.o (WEP cipher support)
-    net80211/wlan_tkip.o (TKIP cipher support)
-    net80211/wlan_ccmp.o (AES-CCMP cipher support)
-    net80211/wlan_auth.o (802.1x authenticator)
-    net80211/wlan_radius.o (RADIUS client for 802.1x authenticator)
-    net80211/wlan_acl.o (MAC ACL support for AP operation)
-
-The first three files must be loaded either manually or by the
-system, e.g. through the hotplug or card manager support.  The
-remaining modules are loaded by the wlan module as needed.  To
-manually load the modules you can use insmod or modprobe; e.g.
-
-Linux 2.6
-    insmod wlan/wlan.ko
-    insmod ath_hal/ath_hal.ko
-    insmod driver/ath_pci.ko
-
-Linux 2.4
-    insmod wlan/wlan.o
-    insmod ath_hal/ath_hal.o
-    insmod driver/ath_pci.o
-
-(note you must load the wlan and ath_hal modules first as the driver
-depends on them).  More likely though you will want to install the
-modules so the system will load them for you as needed:
-
-    make install
-
-(doing this is also necessary for the wlan module to locate those modules
-it loads on demand).  To complete installation you may need to modify
-your system's configuration files so the necessary modules are loaded
-when an Atheros device is recognized.  The exact procedure varies from
-system to system.
-
-
-Note that you MUST do a "make clean" before compiling for a different
-version of Linux; e.g. building for 2.6 after building for 2.4.
+The procedure to build the driver is described in the file INSTALL.
 
 Using the driver
 ================
-The driver should support any Atheros-based cardbus or pci device.
+The driver should support any Atheros-based Cardbus or PCI device.
 This version of the driver is managed and controlled by the usual
-Linux tools (ifconfig, iwconfig, iwpriv) plus the wlanconfig tool
-included with the driver in the tools directory.
+Linux tools (ifconfig, iwconfig, iwpriv) plus the wlanconfig tool,
+which is included with the driver in the tools directory and gets
+installed on your system with make install.
 
 First, run "modprobe ath_pci" or the equivalent using "insmod".  When
 the driver is successfully loaded it creates a device named "wifi0"
@@ -304,9 +140,9 @@ wlanconfig. It is installed when you run "make install".
 
 Station mode:
 
-    wlanconfig ath0 create wlandev wifi0 wlanmode sta
-    iwconfig ath0 essid ANY
-    ifconfig ath0 up
+wlanconfig ath0 create wlandev wifi0 wlanmode sta
+iwconfig ath0 essid ANY
+ifconfig ath0 up
 
 This will create a device named ath0 to be associated with wireless
 device wifi0 and set it to be a station. The iwconfig command will set
@@ -335,6 +171,10 @@ ath driver look in ath/if_ath.c (search for ATH_DEBUG).  Beware that
 enabling some debugging msgs can affect the operation of the software
 by slowing it down too much.
 
+A more comfortable way to manipulate the debug settings is to make use of
+athdebug and 80211debug tools. Call them with the parameter "-h" to learn
+how they are used, or refer to the appropriate man pages.
+
 In addition the programs tools/athstats and tools/80211stats can
 be very useful in understanding what is going on.  In particular,
 something like:
@@ -346,8 +186,8 @@ every 1 second.  Running athstats without any options will display a
 summary of all non-zero statistics from the time the driver was loaded.
 By default the ath0 device is used; to override this use the -i option.
 
-Security/Crpto Support
-======================
+Security/Crypto Support
+=======================
 All Atheros devices implement fixed/shared key WEP in hardware.  Newer
 Atheros hardware is capable of much more (e.g. AES, TKIP and Michael).
 When hardware support is not available for a cipher the net80211 layer
@@ -373,29 +213,26 @@ iwpriv ath0 authmode 1		# open authenticatoin
 iwpriv ath0 authmode 2		# shared key authentication
 iwpriv ath0 authmode 3		# 802.1x authentication
 
-To use the 802.1x authenticator you must configure the RADIUS client
-support for communication with the backend server.  This is done
-using sysctl's; e.g.
+To use the 802.1x authenticator you must install and configure the hostapd
+program from the same place you got wpa_supplicant from. Consult the hostapd
+documentation for further information.
 
-sysctl -w net.8021x.radius.clientaddr=10.3.0.177
-sysctl -w net.8021x.radius.serveraddr=10.3.0.251
-# XXX sysctl appends a '\n' to the string so avoid it!
-#sysctl -w net.8021x.radius.secret=radius123
-echo -n radius123 > /proc/sys/net/8021x/radius/secret
+Live Monitoring and Writing Raw 802.11 Packets
+==============================================
+The driver can be used in a live "monitor" mode via the ath0raw
+device. To turn on the device you must run the following:
 
-For the moment you must also specify a master WEP key for the
-authenticator to use in constructing the group transmit key; e.g.
+sysctl -w dev.ath0.rawdev=1      # create ath0raw
+ifconfig ath0raw up              # start receiving packets on ath0raw
 
-iwconfig ath0 key aabbccddee0011223344aabbcc556677 [2]
+This will create a ath0raw device. You can send packets to the device and 
+they will be sent directly to the card, bypassing any state machine.
+Finally, you can choose to receive packets on ath0raw in a number of 
+different packet formats:
 
-The length of this key is also used for the length of generated
-keys.  This mechanism will change when WPA authenticator support
-is added.
-
-Note that the 802.1x authenticator is lightly tested and has been
-somewhat neglected while the WPA supplicant support has been
-developed.  Consider it experimental.
-
+sysctl -w dev.ath0.rawdev_type=0 # normal 802.11 frames (default)
+sysctl -w dev.ath0.rawdev_type=1 # prism headers + 802.11
+sysctl -w dev.ath0.rawdev_type=2 # radiotap + 802.11
 
 Known Problems
 ==============
@@ -403,37 +240,30 @@ Known Problems
 
 1. Adhoc mode is broken; symptoms are intermittent operation.
 
-Acknowledgements
-================
-This work could not have been done without the support of Atheros
-and in particular the efforts of Greg Chesson.  Comments from David
-Miller were helpful in cleaning up some of the roughest edges in
-early versions of the driver.
+Other issues might be mentioned in our ticket tracker:
+http://madwifi.org/report/1
 
-Many people have contributed fixes and improvements to this software
-including:
+Getting Support
+===============
+User support is provided via the madwifi-users mailing list, which can be
+reached at:
 
-Joerg Albert	  Mathieu Lacage    Henry Qian	      giova+mwfdev@fagl
-Vivien Chappelier Eric Lammerts	    Mark Rakes	      Stephen Walton
-Tong Chia	  Stephane Laroche  Michael Renzmann  Dale Whitfield
-Joachim Gleissner Georg Lukas	    Paul Stewart      Alexander Wirtz
-Guy Erb		  Tom Marshall	    D. Stolte	      Kevin Yu
-Kristian Hoffmann Nick Moss	    Bindu Therthala
-William S. Kish	  Nick Petroni	    Carl Thompson
+    madwifi-users@lists.sourceforge.net
 
-(Apologies to anyone whose name was unintentionally left off.)
+Contact this mailing list if you need help in getting your installation up
+and running. It is suggested that you subscribe to the list prior to sending
+your request (see below).
 
-Feedback and Contributions
-==========================
-This project is hosted at http://madwifi.sourceforge.net.  Fixes and
-enhancements are encouraged.  Please send all bug reports about this
-driver to:
+We also offer an IRC channel that might be a better help in urgent cases.
 
-	madwifi-users@lists.sourceforge.net
+Learn more about the different ways to get support by visiting:
 
-When sending a problem report be sure to include the version of the
-driver and the part identification the driver prints to the console when
-the module is loaded.  For example,
+    http://madwifi.org/wiki/Support
+
+
+When sending a support request or problem report be sure to include the
+version of the driver and the part identification the driver prints to the
+console when the module is loaded.  For example:
 
 ath_hal: 0.8.2.0
 wlan: 0.7.0.0
@@ -450,3 +280,13 @@ This says the HAL module is version 0.8.2, the wlan module is version
 
 We will try to respond in a timely manner but understand this software
 is provided as-is; i.e. with no promise of support.
+
+
+Feedback and Contributions
+==========================
+Reports about reproducable bugs, feature requests and patches should be
+submitted in the form of a trouble ticket:
+
+    http://madwifi.org/newticket
+        
+Fixes and enhancements are encouraged. 

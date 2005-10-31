@@ -1,0 +1,53 @@
+Acknowledgements
+================
+This work could not have been done without the support of Atheros
+and in particular the efforts of Greg Chesson.  Comments from David
+Miller were helpful in cleaning up some of the roughest edges in
+early versions of the driver.
+
+Many people have contributed fixes and improvements to this software,
+including (in no particular order):
+
+Joerg Albert
+Mathieu Lacage
+Henry Qian
+giova+mwfdev@fagl
+Vivien Chappelier
+Eric Lammerts
+Mark Rakes
+Stephen Walton
+Tong Chia
+Stephane Laroche
+Michael Renzmann
+Dale Whitfield
+Joachim Gleissner
+Georg Lukas
+Paul Stewart
+Alexander Wirtz
+Guy Erb
+Tom Marshall
+D. Stolte
+Kevin Yu
+Kristian Hoffmann
+Nick Moss
+Bindu Therthala
+William S. Kish
+Nick Petroni
+Carl Thompson
+Thorsten von Eicken
+Jouni Malinen
+Satish Balay
+Richard Dawe
+Bruno Randolf
+Sebastian Weitzel
+Rajendra Singh
+Tai-hwa Liang
+Divy Le Ray
+John Bicket
+Takayuki Kaiso
+Owen Stampflee
+Kel Modderman
+Matt Foster
+
+Apologies to anyone whose name was unintentionally left off.
+Please let us know if you think your name should be mentioned here!
