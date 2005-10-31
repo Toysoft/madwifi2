@@ -55,7 +55,7 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 ifneq ($(MAKING_MODULES),1)
 obj-$(CONFIG_RATE_ONOE) := $(ath_rate_onoe-objs)
-ifeq ($(findstring 2.6,$(KERNELRELEASE)),)
+ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
 O_TARGET		:= $(obj-m)
 endif
 endif

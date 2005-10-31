@@ -39,7 +39,7 @@ DEPTH=	..
 
 obj-m		+= ath_hal.o
 ath_hal-objs	:= ah_osdep.o hal.o
-ifeq ($(findstring 2.6,$(KERNELRELEASE)),)
+ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
 export-objs	:= ah_osdep.o
 list-multi	:= ath_hal.o
 endif
@@ -48,7 +48,7 @@ endif
 
 ifneq ($(MAKING_MODULES),1)
 obj-$(CONFIG_ATHEROS_HAL) := ah_osdep.o hal.o
-ifeq ($(findstring 2.6,$(KERNELRELEASE)),)
+ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
 O_TARGET	:= ath_hal.o
 endif
 endif
