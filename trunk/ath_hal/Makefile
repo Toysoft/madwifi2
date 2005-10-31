@@ -1,6 +1,6 @@
 # $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath_hal/Makefile#9 $
 #
-# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without

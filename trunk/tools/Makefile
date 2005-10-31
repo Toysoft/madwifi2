@@ -1,6 +1,6 @@
 #	$FreeBSD: src/tools/tools/ath/Makefile,v 1.3 2003/12/07 21:38:44 sam Exp $
 #
-# Copyright (c) 2002-2004	Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2005	Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
