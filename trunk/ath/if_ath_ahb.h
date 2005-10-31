@@ -91,7 +91,7 @@
 #define AR531X_BD_MAGIC 0x35333131   /* "5311", for all 531x platforms */
 
 /* set bus cachesize in 4B word units */
-static inline void bus_dma_sync_single(void *hwdev,
+static __inline void bus_dma_sync_single(void *hwdev,
 				dma_addr_t dma_handle,
 				size_t size, int direction)
 {
@@ -101,7 +101,7 @@ static inline void bus_dma_sync_single(void *hwdev,
     dma_cache_wback_inv(addr, size);
 }
 
-static inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
+static __inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
 								 size_t size, int direction)
 {
     unsigned long addr = (unsigned long) ptr;
@@ -111,7 +111,7 @@ static inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
     return __pa(ptr);
 }
 
-static inline void bus_unmap_single(void *hwdev, dma_addr_t dma_addr,
+static __inline void bus_unmap_single(void *hwdev, dma_addr_t dma_addr,
 			     size_t size, int direction)
 {
     if (direction != BUS_DMA_TODEVICE) {

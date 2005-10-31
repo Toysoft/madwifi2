@@ -185,7 +185,7 @@ static void	ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
 static int	ath_chan_set(struct ath_softc *, struct ieee80211_channel *);
 static void	ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
 static void	ath_draintxq(struct ath_softc *);
-static inline void ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
+static __inline void ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
 				    struct ath_txq *txq, struct ath_buf *bf, 
 				    struct ath_desc *lastds, int framelen);
 static void	ath_stoprecv(struct ath_softc *);
@@ -2008,7 +2008,7 @@ ath_desc_swap(struct ath_desc *ds)
  * Insert a buffer on a txq 
  * 
  */
-static inline void
+static __inline void
 ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
 		 struct ath_txq *txq, struct ath_buf *bf, 
 		 struct ath_desc *lastds, int framelen)
@@ -6100,7 +6100,7 @@ ath_get_ivlen(struct ieee80211_key *k)
 /*
  * Get transmit rate index using rate in Kbps
  */
-static inline int
+static __inline int
 ath_tx_findindex(const HAL_RATE_TABLE *rt, int rate)
 {
     int i;
