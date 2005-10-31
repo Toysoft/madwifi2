@@ -1954,8 +1954,8 @@ ath_reset(struct net_device *dev)
 	ath_stoprecv(sc);		/* stop recv side */
 	/* NB: indicate channel change so we do a full reset */
 	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_TRUE, &status))
-		printk("%s: %s: unable to reset hardware; hal status %u\n",
-			dev->name, __func__, status);
+		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
+			dev->name, __func__, hal_status_desc[status], status);
 	ath_update_txpow(sc);		/* update tx power state */
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
