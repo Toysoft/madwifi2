@@ -2724,12 +2724,27 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				break;
 			/* XXX verify only one of RSN and WPA ie's? */
 			case IEEE80211_ELEMID_RSN:
-				wpa = frm;
+				if (vap->iv_flags & IEEE80211_F_WPA2)
+					wpa = frm;
+				else
+					IEEE80211_DPRINTF(vap,
+						IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
+						"[%s] ignoring RSN IE in association request\n",
+						ether_sprintf(wh->i_addr2));
 				break;
 			case IEEE80211_ELEMID_VENDOR:
-				if (iswpaoui(frm)) {
+				/* don't override RSN element
+				 * XXX: actually the driver should report both WPA versions,
+				 * so wpa_supplicant can choose and also detect downgrade attacks
+                                 */
+				if (iswpaoui(frm) && !wpa) {
 					if (vap->iv_flags & IEEE80211_F_WPA1)
 						wpa = frm;
+					else
+						IEEE80211_DPRINTF(vap,
+							IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
+							"[%s] ignoring WPA IE in association request\n",
+							ether_sprintf(wh->i_addr2));
 				} else if (iswmeinfo(frm))
 					wme = frm;
 				else if (isatherosoui(frm))
