@@ -2099,8 +2099,8 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
   
   bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
                                   skb->data, pktlen, BUS_DMA_TODEVICE);
-  DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %x\n",
-          __func__, skb, skb->data, skb->len, bf->bf_skbaddr);
+  DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %llx\n",
+          __func__, skb, skb->data, skb->len, ito64(bf->bf_skbaddr));
   
   
   bf->bf_skb = skb;
