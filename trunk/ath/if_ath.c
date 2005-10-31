@@ -72,6 +72,7 @@
 #endif
 
 #define	AR_DEBUG
+
 #include "if_athrate.h"
 #include "net80211/if_athproto.h"
 #include "if_athvar.h"
@@ -87,7 +88,7 @@
 
 extern	void bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz);
 
-/* unalligned little endian access */
+/* unaligned little endian access */
 #define LE_READ_2(p)							\
 	((u_int16_t)							\
 	 ((((u_int8_t *)(p))[0]      ) | (((u_int8_t *)(p))[1] <<  8)))
@@ -256,6 +257,26 @@ static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static	int countrycode = -1;
 static	int outdoor = -1;
 static	int xchanmode = -1;
+
+static const char *hal_status_desc[] = {
+	"No error",
+	"No hardware present or device not yet supported",
+	"Memory allocation failed",
+	"Hardware didn't respond as expected",
+	"EEPROM magic number invalid",
+	"EEPROM version invalid",
+	"EEPROM unreadable",
+	"EEPROM checksum invalid",
+	"EEPROM read problem",
+	"EEPROM mac address invalid",
+	"EEPROM size not supported",
+	"Attempt to change write-locked EEPROM",
+	"Invalid parameter to function",
+	"Hardware revision not supported",
+	"Hardware self-test failed",
+	"Operation incomplete"
+};
+
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
 MODULE_PARM(countrycode, "i");
 MODULE_PARM(outdoor, "i");
@@ -394,13 +415,13 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 */
 	ah = _ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
-		printk(KERN_ERR "%s: unable to attach hardware; HAL status %u\n",
-			dev->name, status);
+		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
+			dev->name, hal_status_desc[status], status);
 		error = ENXIO;
 		goto bad;
 	}
 	if (ah->ah_abi != HAL_ABI_VERSION) {
-		printk(KERN_ERR "%s: HAL ABI msmatch; "
+		printk(KERN_ERR "%s: HAL ABI mismatch; "
 			"driver expects 0x%x, HAL reports 0x%x\n",
 			dev->name, HAL_ABI_VERSION, ah->ah_abi);
 		error = ENXIO;		/* XXX */
