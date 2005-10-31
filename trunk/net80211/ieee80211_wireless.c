@@ -3808,6 +3808,9 @@ static struct iw_handler_def ieee80211_iw_handler_def = {
 	.num_private		= N(ieee80211_priv_handlers),
 	.private_args		= (struct iw_priv_args *) ieee80211_priv_args,
 	.num_private_args	= N(ieee80211_priv_args),
+#if WIRELESS_EXT >= 17
+	.get_wireless_stats	= ieee80211_iw_getstats,
+#endif
 #undef N
 };
 
@@ -3974,7 +3977,9 @@ ieee80211_ioctl_vattach(struct ieee80211vap *vap)
 	struct net_device *dev = vap->iv_dev;
 
 	dev->do_ioctl = ieee80211_ioctl;
+#if IW_HANDLER_VERSION < 7
 	dev->get_wireless_stats = ieee80211_iw_getstats;
+#endif
 	dev->wireless_handlers = &ieee80211_iw_handler_def;
 }
 
