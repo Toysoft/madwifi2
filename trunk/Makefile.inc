@@ -129,7 +129,7 @@ MODULEPATH ?=	/lib/modules/${KERNELRELEASE}/net
 endif
 
 # Some settings that depend on actual kernel release
-ifneq ($(findstring 2.6,$(KERNELRELEASE)),)
+ifneq ($(filter-out 2.4%,$(KERNELRELEASE)),)
 export-objs	:=
 list-multi	:=
 KMODSUF		:= ko
