@@ -55,8 +55,6 @@ endif
 
 include $(obj)/${DEPTH}/Makefile.inc
 
-UUDECODE?=uudecode
-
 INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH_HAL} -I${obj}/${DEPTH}
 
 EXTRA_CFLAGS+= ${INCS} ${COPTS}
