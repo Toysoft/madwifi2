@@ -28,7 +28,8 @@ DEPTH=	..
 
 BINDIR ?= /usr/local/bin
 MANDIR ?= /usr/local/man
-STRIP ?= strip
+STRIP ?= ${TOOLPREFIX}strip
+CC = ${TOOLPREFIX}gcc
 
 #
 # Path to the HAL source code.
