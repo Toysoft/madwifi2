@@ -189,7 +189,7 @@ sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp, size_t n
 int
 main(int argc, char *argv[])
 {
-	const char *ifname = "wifi0";
+	const char *ifname = "ath0";
 	const char *cp, *tp;
 	const char *sep;
 	int c, op, i;
@@ -212,7 +212,7 @@ main(int argc, char *argv[])
 	}
 
 #ifdef __linux__
-	snprintf(oid, sizeof(oid), "dev.%s.debug", ifname);
+	snprintf(oid, sizeof(oid), "net.%s.debug", ifname);
 #else
 	snprintf(oid, sizeof(oid), "dev.wlan.%s.debug", ifname+4);
 #endif
