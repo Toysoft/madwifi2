@@ -201,7 +201,7 @@ static void
 usage(void)
 {
 	fprintf(stderr, "usage: wlanconfig wlanX create wlandev wifiX\n");
-	fprintf(stderr, "            wlanmode [sta|adhoc|ap|monitor] [bssid | -bssid] [nosbeacon]\n");
+	fprintf(stderr, "            wlanmode [sta|adhoc|ap|monitor|wds] [bssid | -bssid] [nosbeacon]\n");
 	fprintf(stderr, "usage: wlanconfig wlanX destroy\n");
 	fprintf(stderr, "usage: wlanconfig wlanX list [active|ap|caps|chan|freq|keys|scan|sta|wme]\n");
 	exit(-1);
