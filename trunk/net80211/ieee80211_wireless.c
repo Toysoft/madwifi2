@@ -2796,6 +2796,81 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 }
 
 static int
+ieee80211_ioctl_wdsmac(struct net_device *dev, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct sockaddr *sa = (struct sockaddr *)extra;
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ieee80211_node *ni;
+
+	if (!IEEE80211_ADDR_NULL(vap->wds_mac)) {
+		printk("%s: Device already has WDS mac address attached, remove first\n", dev->name);
+		goto wdsmac_fail;
+	}
+
+	memcpy(vap->wds_mac, sa->sa_data, IEEE80211_ADDR_LEN);
+
+	ni = ieee80211_alloc_node(&ic->ic_sta, vap, vap->wds_mac);
+	if (ni != NULL) {
+		if (ieee80211_add_wds_addr(&ic->ic_sta, ni, vap->wds_mac, 1) == 0)
+			ieee80211_node_authorize(ni);
+		else
+			goto wdsmac_fail;
+	}
+	else
+		goto wdsmac_fail;
+
+	printk("%s: Added WDS MAC: %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", dev->name,
+		vap->wds_mac[0], vap->wds_mac[1], vap->wds_mac[2],
+		vap->wds_mac[3], vap->wds_mac[4], vap->wds_mac[5]);
+
+	return 0;
+
+wdsmac_fail:
+
+	printk("%s: Failed to add WDS MAC: %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", dev->name,
+		sa->sa_data[0], sa->sa_data[1], sa->sa_data[2],
+		sa->sa_data[3], sa->sa_data[4], sa->sa_data[5]);
+
+	return -1;
+}
+
+static int
+ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
+		   	 void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct sockaddr *sa = (struct sockaddr *)extra;
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ieee80211_node *ni;
+
+	/* WDS Mac address filed already? */
+	if (IEEE80211_ADDR_NULL(vap->wds_mac)) {
+		return 0;
+	}
+
+	/* Compare suplied MAC address with WDS MAC of this interface 
+	 * remove when mac address is known
+	 */
+	if (memcmp(vap->wds_mac, sa->sa_data, IEEE80211_ADDR_LEN) == 0)
+	{
+		ni = ieee80211_find_wds_node(&ic->ic_sta,vap->wds_mac);
+		if(ni) {
+		 ieee80211_free_node(ni); /* Decr ref count */
+		}
+		memset(vap->wds_mac, 0x00, IEEE80211_ADDR_LEN);
+		return 0;			 
+	}
+
+	printk("%s: WDS MAC address (%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x) not known by this interface\n", dev->name,
+		sa->sa_data[0], sa->sa_data[1], sa->sa_data[2],
+		sa->sa_data[3], sa->sa_data[4], sa->sa_data[5]);
+
+	return -1;
+}
+
+static int
 ieee80211_ioctl_addmac(struct net_device *dev, struct iw_request_info *info,
 		   	 void *w, char *extra)
 {
@@ -3423,6 +3498,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"addmac" },
 	{ IEEE80211_IOCTL_DELMAC,
 	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"delmac" },
+	{ IEEE80211_IOCTL_WDSADDMAC,
+	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"wds_add" },
+	{ IEEE80211_IOCTL_WDSDELMAC,
+	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"wds_del" },
 	{ IEEE80211_IOCTL_SETCHANLIST,
 	  IW_PRIV_TYPE_CHANLIST | IW_PRIV_SIZE_FIXED, 0,"setchanlist" },
 	{ IEEE80211_IOCTL_GETCHANLIST,
@@ -3799,6 +3878,8 @@ static const iw_handler ieee80211_priv_handlers[] = {
 	(iw_handler) ieee80211_ioctl_chanswitch,	/* SIOCWFIRSTPRIV+16 */
 	(iw_handler) ieee80211_ioctl_setmode,		/* SIOCWFIRSTPRIV+17 */
 	(iw_handler) ieee80211_ioctl_getmode,		/* SIOCWFIRSTPRIV+18 */
+	(iw_handler) ieee80211_ioctl_wdsmac,		/* SIOCWFIRSTPRIV+19 */
+	(iw_handler) ieee80211_ioctl_wdsdelmac,		/* SIOCWFIRSTPRIV+20 */
 };
 static struct iw_handler_def ieee80211_iw_handler_def = {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))

@@ -224,6 +224,7 @@ void	ieee80211_sta_leave(struct ieee80211_node *);
 
 #define WDS_AGING_TIME  600   /* 10 minutes */ 
 #define WDS_AGING_COUNT 2 
+#define WDS_AGING_STATIC 0xffff
 #define WDS_AGING_TIMER_VAL (WDS_AGING_TIME/2)
 
 struct ieee80211_wds_addr {
@@ -291,7 +292,7 @@ struct ieee80211_node *ieee80211_find_txnode(
 		struct ieee80211vap *, const u_int8_t *);
 #endif
 int	ieee80211_add_wds_addr(struct ieee80211_node_table *,
-			       struct ieee80211_node *, const u_int8_t *);
+			       struct ieee80211_node *, const u_int8_t *, u_int8_t);
 void	ieee80211_remove_wds_addr(struct ieee80211_node_table *,
 							  const u_int8_t *);
 void	ieee80211_del_wds_node(struct ieee80211_node_table *,
