@@ -364,9 +364,12 @@ struct ieee80211vap {
 	struct ieee80211_nsparams iv_nsparams;	/* new state parameters for tasklet for stajoin1 */
 	struct IEEE80211_TQ_STRUCT iv_stajoin1tq; /* tasklet for newstate action called from stajoin1tq */
 	unsigned int		iv_nsdone;	/* Done with scheduled newstate tasklet */
+	uint8_t	wds_mac[IEEE80211_ADDR_LEN];
 };
 MALLOC_DECLARE(M_80211_VAP);
 
+#define	IEEE80211_ADDR_NULL(a1)	(memcmp(a1, "\x00\x00\x00\x00\x00\x00", \
+	IEEE80211_ADDR_LEN) == 0)
 #define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
 #define	IEEE80211_ADDR_COPY(dst,src)	memcpy(dst,src,IEEE80211_ADDR_LEN)
 

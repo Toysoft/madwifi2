@@ -70,7 +70,6 @@ static	void ieee80211_set_multicast_list(struct net_device *);
 
 MALLOC_DEFINE(M_80211_VAP, "80211vap", "802.11 vap state");
 
-
 /*
  * Country Code Table for code-to-string conversion.
  */
@@ -518,6 +517,8 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 
 	ieee80211_node_latevattach(vap);	/* XXX move into vattach */
 	ieee80211_power_latevattach(vap);	/* XXX move into vattach */
+
+	memset(vap->wds_mac, 0x00, IEEE80211_ADDR_LEN);
 
 	(void) ieee80211_media_setup(ic, &vap->iv_media,
 		vap->iv_caps, media_change, media_status);

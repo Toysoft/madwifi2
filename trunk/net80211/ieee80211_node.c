@@ -850,7 +850,7 @@ EXPORT_SYMBOL(ieee80211_alloc_node);
 /* Add wds address to the node table */
 int
 ieee80211_add_wds_addr(struct ieee80211_node_table *nt,
-		       struct ieee80211_node *ni, const u_int8_t *macaddr)
+		       struct ieee80211_node *ni, const u_int8_t *macaddr, u_int8_t wds_static)
 {
 	int hash;
 	struct ieee80211_wds_addr *wds;
@@ -861,7 +861,10 @@ ieee80211_add_wds_addr(struct ieee80211_node_table *nt,
 		/* XXX msg */
 		return 1;
 	}
-	wds->wds_agingcount = WDS_AGING_COUNT;
+	if (wds_static)
+		wds->wds_agingcount = WDS_AGING_STATIC;
+	else
+		wds->wds_agingcount = WDS_AGING_COUNT;
 	hash = IEEE80211_NODE_HASH(macaddr);
 	IEEE80211_ADDR_COPY(wds->wds_macaddr, macaddr);
 	ieee80211_ref_node(ni);		/* Reference node */
@@ -875,7 +878,7 @@ EXPORT_SYMBOL(ieee80211_add_wds_addr);
 
 /* remove wds address from the wds hash table */
 void
-ieee80211_remove_wds_addr(struct ieee80211_node_table *nt, 
+ieee80211_remove_wds_addr(struct ieee80211_node_table *nt,
 					   const u_int8_t *macaddr)
 {
 	int hash;
@@ -928,13 +931,15 @@ ieee80211_node_wds_ageout(unsigned long data)
 	IEEE80211_NODE_LOCK_BH(nt);
 	for (hash=0; hash<IEEE80211_NODE_HASHSIZE; hash++) {
 		LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
-			if (!wds->wds_agingcount) {
-				ieee80211_free_node(wds->wds_ni);  /* Decrement ref count */
-				LIST_REMOVE(wds, wds_hash);
-				FREE(wds, M_80211_WDS);
-			} else {
-				wds->wds_agingcount--;
-			}
+			if (wds->wds_agingcount != WDS_AGING_STATIC) {
+				if (!wds->wds_agingcount) {
+					ieee80211_free_node(wds->wds_ni);  /* Decrement ref count */
+					LIST_REMOVE(wds, wds_hash);
+					FREE(wds, M_80211_WDS);
+				} else {
+					wds->wds_agingcount--;
+				}
+		    }
 		}
 	}
 	IEEE80211_NODE_UNLOCK_BH(nt);
@@ -1017,7 +1022,8 @@ _ieee80211_find_wds_node(struct ieee80211_node_table *nt,
 	LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
 		if (IEEE80211_ADDR_EQ(wds->wds_macaddr, macaddr)) {
 			ni = wds->wds_ni;
-			wds->wds_agingcount = WDS_AGING_COUNT; /* reset the aging count */
+			if (wds->wds_agingcount != WDS_AGING_STATIC)
+				wds->wds_agingcount = WDS_AGING_COUNT; /* reset the aging count */
 			ieee80211_ref_node(ni);
 			return ni;
 		}

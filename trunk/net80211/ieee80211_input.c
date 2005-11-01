@@ -463,10 +463,10 @@ ieee80211_input(struct ieee80211_node *ni,
 						station. remove the reference to  the previous statation add 
 						reference to the new one */
 					 (void) ieee80211_remove_wds_addr(nt,wh4->i_addr4);
-					 ieee80211_add_wds_addr(nt, ni, wh4->i_addr4);
+					 ieee80211_add_wds_addr(nt, ni, wh4->i_addr4, 0);
 				 }
 				 if (ni_wds == NULL) {
-					 ieee80211_add_wds_addr(nt, ni, wh4->i_addr4);
+					 ieee80211_add_wds_addr(nt, ni, wh4->i_addr4, 0);
 				 } else
 					 ieee80211_free_node(ni_wds); /* Decr ref count */
 			 }

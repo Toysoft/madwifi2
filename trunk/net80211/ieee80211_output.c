@@ -236,7 +236,11 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	 * things like power save.
 	 */
 	eh = (struct ether_header *)skb->data;
-	ni = ieee80211_find_txnode(vap, eh->ether_dhost);
+	if (vap->iv_opmode == IEEE80211_M_WDS)
+		ni = ieee80211_find_txnode(vap, vap->wds_mac);
+	else
+		ni = ieee80211_find_txnode(vap, eh->ether_dhost);
+
 	if (ni == NULL) {
 		/* NB: ieee80211_find_txnode does stat+msg */
 		goto bad;
@@ -831,7 +835,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 				 if(ni_wds) {
 					 ieee80211_free_node(ni_wds); /* Decr ref count */
 				 } else {
-					 ieee80211_add_wds_addr(nt, ni, eh.ether_shost);
+					 ieee80211_add_wds_addr(nt, ni, eh.ether_shost, 0);
 				 }
 			}
 		}
