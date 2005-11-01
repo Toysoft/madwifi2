@@ -606,7 +606,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * include them when checking the txq setup mask.
 	 */
 	switch (sc->sc_txqsetup &~ ((1<<sc->sc_cabq->axq_qnum) |
-				(1<<sc->sc_uapsdq->axq_qnum))) {
+				(sc->sc_uapsdq ? (1<<sc->sc_uapsdq->axq_qnum) : 0))) {
 	case 0x01:
 		ATH_INIT_TQUEUE(&sc->sc_txtq, ath_tx_tasklet_q0, dev);
 		break;
