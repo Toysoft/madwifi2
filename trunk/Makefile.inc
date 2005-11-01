@@ -164,7 +164,7 @@ ATH=	${DEPTH}/ath
 # Path to the rate control algorithm.
 #
 ifeq ($(ATH_RATE),)
-ATH_RATE=	ath_rate/onoe
+ATH_RATE=	ath_rate/sample
 endif
 
 COPTS+=	-Werror
