@@ -101,21 +101,45 @@ info:
 	    echo "SYSTEMMAP    : $(SYSTEMMAP)"; \
 	fi
 
-dotconfig:
-	@#
+sanitycheck:
+	@echo -n "Checking requirements... "
+	
 	@# check if kernel configuration file is available
-	@#	
 	@if [ ! -f $(KERNELCONF) ]; then \
+	    echo "FAILED"; \
+	    echo "'$(KERNELCONF)' not found."; \
 	    echo "You need to configure your kernel."; \
 	    exit 1; \
 	fi
+	
+	@# check if specified rate control is available
+	@if [ ! -d $(ATH_RATE) ]; then \
+	    echo "FAILED"; \
+	    echo "Selected rate control $(ATH_RATE) not available."; \
+	    exit 1; \
+	fi
+	
+	@# see if uudecode is available
+	@if [ -z "$(UUDECODE)" ]; then \
+	    echo "FAILED"; \
+	    echo "The 'uudecode' tool was not found on your system. Please make sure"; \
+	    echo "it is installed in your PATH, then try again."; \
+	    exit 1; \
+	fi
+	
+	@echo "ok."
+	
+	@# check if there are modules left from an old installation
+	@# might cause make to abort the build
+	@chmod a+x scripts/find-madwifi-modules.sh
+	@scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
 
 # new targets should be inserted ABOVE this line in order to avoid
 # problems with the included kernel configuration file below.
 include $(KERNELCONF)
 
-configcheck: dotconfig
-	@echo -n "Checking if all requirements are met... "
+configcheck: sanitycheck
+	@echo -n "Checking kernel configuration... "
 	
 	@# check version of kernel and wireless.h
 	@echo $(KERNELRELEASE) | grep -q -i '^[2-9]\.[4-9]\.' || { \
@@ -142,11 +166,4 @@ configcheck: dotconfig
 	    exit 1; \
 	fi
 	
-	@# some other sanity checks
-	@if [ ! -d $(ATH_RATE) ]; then \
-	    echo "FAILED"; \
-	    echo "Selected rate control $(ATH_RATE) not available."; \
-	    exit 1; \
-	fi
-		
 	@echo "ok."

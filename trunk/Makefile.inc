@@ -139,6 +139,8 @@ endif
 
 NM=		nm
 AWK=		awk
+UUDECODE ?= $(shell which uudecode 2>/dev/null)
+
 
 #
 # Path to the HAL source code.
