@@ -78,7 +78,7 @@ that install kernels with names like '2.6.10-4-686' while the
 kernel-source is only called 2.6.10 for example.  If you still need to
 use the KERNELRELEASE option, please report it.
 
-In some cases you make need to specify the target architecture as the
+In some cases you may need to specify the target architecture as the
 TARGET variable.  More information about how to determine the supported
 platforms can be found below.
 
