@@ -1781,9 +1781,9 @@ ieee80211_node_leave_11g(struct ieee80211_node *ni)
 	 * If a long slot station do the slot time bookkeeping.
 	 */
 	if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) == 0) {
-		KASSERT(ic->ic_longslotsta > 0,
-		    ("bogus long slot station count %d", ic->ic_longslotsta));
-		ic->ic_longslotsta--;
+		/* this can be 0 on mode changes from B -> G */
+		if (ic->ic_longslotsta > 0)
+			ic->ic_longslotsta--;
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
 		    "long slot time station leaves, count now %d",
 		    ic->ic_longslotsta);
@@ -1805,9 +1805,9 @@ ieee80211_node_leave_11g(struct ieee80211_node *ni)
 	 * If a non-ERP station do the protection-related bookkeeping.
 	 */
 	if ((ni->ni_flags & IEEE80211_NODE_ERP) == 0) {
-		KASSERT(ic->ic_nonerpsta > 0,
-		    ("bogus non-ERP station count %d", ic->ic_nonerpsta));
-		ic->ic_nonerpsta--;
+		/* this can be 0 on mode changes from B -> G */
+		if (ic->ic_nonerpsta > 0)
+			ic->ic_nonerpsta--;
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
 		    "non-ERP station leaves, count now %d", ic->ic_nonerpsta);
 		if (ic->ic_nonerpsta == 0) {
