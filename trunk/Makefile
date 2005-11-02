@@ -57,6 +57,10 @@ all: configcheck
 	done
 
 install:
+	@# check if there are modules left from an old installation
+	@# might cause make to abort the build
+	sh scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
+
 	for i in ${DIRS}; do \
 		$(MAKE) -C $$i install || exit 1; \
 	done
@@ -126,10 +130,6 @@ sanitycheck:
 	    echo "it is installed in your PATH, then try again."; \
 	    exit 1; \
 	fi
-	
-	@# check if there are modules left from an old installation
-	@# might cause make to abort the build
-	sh scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
 	
 	@echo "ok."
 
