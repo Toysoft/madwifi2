@@ -1633,7 +1633,7 @@ ieee80211_add_doth(u_int8_t *frm, struct ieee80211com *ic)
 	*frm++ = ic->ic_bsschan->ic_minpower;
 	*frm++ = ic->ic_bsschan->ic_maxpower;
 
-#if WRONG
+#ifdef WRONG
 	/*
 	 * Supported Channels IE
 	 */
