@@ -127,12 +127,11 @@ sanitycheck:
 	    exit 1; \
 	fi
 	
-	@echo "ok."
-	
 	@# check if there are modules left from an old installation
 	@# might cause make to abort the build
-	@chmod a+x scripts/find-madwifi-modules.sh
-	@scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
+	sh scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
+	
+	@echo "ok."
 
 # new targets should be inserted ABOVE this line in order to avoid
 # problems with the included kernel configuration file below.
