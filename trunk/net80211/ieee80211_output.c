@@ -1633,14 +1633,23 @@ ieee80211_add_doth(u_int8_t *frm, struct ieee80211com *ic)
 	*frm++ = ic->ic_bsschan->ic_minpower;
 	*frm++ = ic->ic_bsschan->ic_maxpower;
 
+#if WRONG
 	/*
 	 * Supported Channels IE
 	 */
 	*frm++ = IEEE80211_ELEMID_SUPPCHAN;
+	
+	/* XXX
+	 * THIS IS WRONG! check 802.11h chapter 7.3.2.19
+	 * we should send channel_number/number_of_channels pairs
+	 * for each subband, not a bitmap
+	 */
 	*frm++ = IEEE80211_SUPPCHAN_LEN;
 	memcpy(frm, ic->ic_chan_avail, IEEE80211_SUPPCHAN_LEN);
-
 	return frm + IEEE80211_SUPPCHAN_LEN;
+#endif
+
+	return frm;
 }
 
 /*
