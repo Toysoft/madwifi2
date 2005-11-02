@@ -2923,7 +2923,6 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		ieee80211_deliver_l2uf(ni);
 		ieee80211_node_join(ni, resp);
 #ifdef ATH_SUPERG_XR
-
 		if(ni->ni_prev_vap && ni->ni_vap != ni->ni_prev_vap &&
 		   ni->ni_vap->iv_ath_cap & IEEE80211_ATHC_XR) {
 			/* 
