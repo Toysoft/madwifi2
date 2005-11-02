@@ -46,3 +46,4 @@ grep -w -E "$PATTERN" > /dev/null 2>&1 && {
     esac
 }
 
+exit 0
