@@ -137,6 +137,9 @@ typedef void irqreturn_t;
 #define ATH_DFS_WAIT_POLL_PERIOD 2	/* 2 seconds */
 #define	ATH_DFS_TEST_RETURN_PERIOD 15	/* 15 seconds */
 
+#define	ATH_LONG_CALINTERVAL	30	/* 30 seconds between calibrations */
+#define	ATH_SHORT_CALINTERVAL	1	/* 1 second between calibrations */
+
 /*
  * Maximum acceptable MTU
  * MAXFRAMEBODY - WEP - QOS - RSN/WPA:
@@ -354,22 +357,10 @@ struct ath_descdma {
 	struct ath_buf		*dd_bufptr;	/* associated buffers */
 };
 
-#ifdef ATH_TX99_DIAG
-struct ath_txrx99 {
-	u_int32_t		tx99mode;	      /* tx99 mode  */
-	u_int32_t		prefetch;	      /* prefetch   */
-	u_int32_t		txpower;	      /* tx power   */
-	u_int32_t		txrate;	          /* tx rate    */
-	u_int32_t		rx99mode;	      /* rx99 mode  */
-	void 			*prev_hard_start;
-	void 			*prev_mgt_start;
-	u_int32_t 		imask;
-};
-#endif
-
 struct ath_hal;
 struct ath_desc;
 struct ath_ratectrl;
+struct ath_tx99;
 struct proc_dir_entry;
 
 /*
@@ -396,13 +387,6 @@ struct ath_txq {
 	 * State for patching up CTS when bursting.
 	 */
 	struct	ath_buf		*axq_linkbuf;	/* virtual addr of last buffer*/
-	struct	ath_desc	*axq_lastdsWithCTS;	/* first desc of the last descriptor 
-							 * that contains CTS 
-							 */
-	struct	ath_desc	*axq_gatingds;	/* final desc of the gating desc 
-						 * that determines whether lastdsWithCTS has 
-						 * been DMA'ed or not
-						 */
 	/*
 	 * Staging queue for frames awaiting a fast-frame pairing.
 	 */
@@ -487,6 +471,7 @@ struct ath_softc {
 	void			*sc_bdev;	/* associated bus device */
 	struct ath_hal		*sc_ah;		/* Atheros HAL */
 	struct ath_ratectrl	*sc_rc;		/* tx rate control support */
+	struct ath_tx99		*sc_tx99; 	/* tx99 support */
 	void			(*sc_setdefantenna)(struct ath_softc *, u_int);
 	unsigned int		sc_invalid : 1,	/* being detached */
 				sc_mrretry : 1,	/* multi-rate retry support */
@@ -525,6 +510,7 @@ struct ath_softc {
 	const HAL_RATE_TABLE	*sc_xr_rates; /* XR rate table */
 	const HAL_RATE_TABLE	*sc_half_rates; /* half rate table */
 	const HAL_RATE_TABLE	*sc_quarter_rates; /* quarter rate table */
+	HAL_OPMODE		sc_opmode;	/* current hal operating mode */
 	enum ieee80211_phymode	sc_curmode;	/* current phy mode */
 	u_int16_t		sc_curtxpow;	/* current tx power limit */
 	u_int16_t		sc_curaid;	/* current association id */
@@ -636,10 +622,6 @@ struct ath_softc {
 	u_int32_t               sc_dturbo_bw_base;    /* bandwidth threshold */
 	u_int32_t               sc_dturbo_bw_turbo;   /* bandwidth threshold */
 #endif
-
-#ifdef ATH_TX99_DIAG
-	struct ath_txrx99	sc_txrx99; 
-#endif
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
@@ -746,8 +728,8 @@ void	ath_sysctl_unregister(void);
 	((*(_ah)->ah_startTxDma)((_ah), (_q)))
 #define	ath_hal_setchannel(_ah, _chan) \
 	((*(_ah)->ah_setChannel)((_ah), (_chan)))
-#define	ath_hal_calibrate(_ah, _chan) \
-	((*(_ah)->ah_perCalibration)((_ah), (_chan)))
+#define	ath_hal_calibrate(_ah, _chan, _isIQdone) \
+	((*(_ah)->ah_perCalibration)((_ah), (_chan), (_isIQdone)))
 #define	ath_hal_setledstate(_ah, _state) \
 	((*(_ah)->ah_setLedState)((_ah), (_state)))
 #define	ath_hal_beaconinit(_ah, _nextb, _bperiod) \

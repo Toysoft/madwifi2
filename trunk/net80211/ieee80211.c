@@ -947,6 +947,9 @@ media_status(enum ieee80211_opmode opmode, const struct ieee80211_channel *chan)
 	switch (opmode) {
 	case IEEE80211_M_STA:
 		break;
+	case IEEE80211_M_AHDEMO:
+		status |= IFM_IEEE80211_ADHOC | IFM_FLAG0;
+		break;
 	case IEEE80211_M_IBSS:
 		status |= IFM_IEEE80211_ADHOC;
 		break;
@@ -956,7 +959,6 @@ media_status(enum ieee80211_opmode opmode, const struct ieee80211_channel *chan)
 	case IEEE80211_M_MONITOR:
 		status |= IFM_IEEE80211_MONITOR;
 		break;
-	case IEEE80211_M_AHDEMO:
 	case IEEE80211_M_WDS:
 		/* should not come here */
 		break;

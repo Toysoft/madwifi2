@@ -33,7 +33,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/ah_devid.h#17 $
+ * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/ah_devid.h#18 $
  */
 
 #ifndef _DEV_ATH_DEVID_H_
@@ -70,6 +70,7 @@
 #define AR5212_AR2313_REV8      0x0058          /* AR2313 WMAC (AP43-030) */
 #define AR5212_AR2315_REV6      0x0086          /* AR2315 WMAC (AP51-Light) */
 #define AR5212_AR2315_REV7      0x0087          /* AR2315 WMAC (AP51-Full) */
+#define AR5212_AR2317_REV1      0x0091          /* AR2317 WMAC (AP61) */
 
 /* AR5212 compatible devid's also attach to 5212 */
 #define	AR5212_DEVID_0014	0x0014
