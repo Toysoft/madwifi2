@@ -201,7 +201,7 @@ static void
 usage(void)
 {
 	fprintf(stderr, "usage: wlanconfig wlanX create wlandev wifiX\n");
-	fprintf(stderr, "            wlanmode [sta|adhoc|ap|monitor|wds] [bssid | -bssid] [nosbeacon]\n");
+	fprintf(stderr, "            wlanmode [sta|adhoc|ap|monitor|wds|ahdemo] [bssid | -bssid] [nosbeacon]\n");
 	fprintf(stderr, "usage: wlanconfig wlanX destroy\n");
 	fprintf(stderr, "usage: wlanconfig wlanX list [active|ap|caps|chan|freq|keys|scan|sta|wme]\n");
 	exit(-1);
@@ -210,16 +210,19 @@ usage(void)
 static int
 getopmode(const char *s)
 {
-	if (streq(s, "sta"))
+	if (streq(s, "sta") || streq(s, "managed"))
 		return IEEE80211_M_STA;
-	if (streq(s, "ibss") || streq(s, "adhoc"))
+	if (streq(s, "ibss") || streq(s, "adhoc") || streq(s, "ad-hoc"))
 		return IEEE80211_M_IBSS;
 	if (streq(s, "mon"))
 		return IEEE80211_M_MONITOR;
-	if (streq(s, "ap") || streq(s, "hostap"))
+	if (streq(s, "ap") || streq(s, "hostap") || streq(s, "master"))
 		return IEEE80211_M_HOSTAP;
 	if (streq(s, "wds"))
 		return IEEE80211_M_WDS;
+	if (streq(s, "ahdemo"))
+		return IEEE80211_M_AHDEMO;
+	
 	errx(1, "unknown operating mode %s", s);
 	/*NOTREACHED*/
 	return -1;

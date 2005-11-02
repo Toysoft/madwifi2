@@ -484,8 +484,8 @@ ieee80211_ioctl_siwap(struct net_device *dev,
 	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
 	struct ieee80211vap *vap = dev->priv;
 
-	/* NB: should only be set when in STA mode */
-	if (vap->iv_opmode != IEEE80211_M_STA)
+	/* NB: should not be set when in AP mode */
+	if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 		return -EINVAL;
 	IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
 	/* looks like a zero address disables */
