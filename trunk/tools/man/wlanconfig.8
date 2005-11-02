@@ -29,6 +29,9 @@ Show information about connected peers, keys, channels etc.
 .PP
 .SH "AVAILABLE MODES"
 .TP
+.B ahdemo
+Create the station in ad-hoc demo (aka pseudo IBSS) mode.
+.TP
 .B adhoc
 Create the station in ad-hoc mode.
 .TP
@@ -40,6 +43,9 @@ Create the station in monitor mode.
 .TP
 .B sta
 Create the VAP in station mode.
+.TP
+.B wds
+Create the station in WDS mode.
 .PP
 .SH "OPTIONS"
 .TP
@@ -95,6 +101,31 @@ Destroy VAP ath0.
 .TP
 \fBwlanconfig ath0 list scan
 Scan for local stations and access points.
+.TP
+\fBwlanconfig ath0 create wlandev wifi0 wlanmode ap
+.RS 0
+\fBwlanconfig ath1 create wlandev wifi0 wlanmode wds
+.RS 0
+\fBiwconfig ath0 essid "Normal atheros AP" channel 1
+.RS 0
+\fBiwpriv ath1 wds_add <mac of the peer wds ap>
+.RS 0
+\fBiwpriv ath1 wds 1
+.RS 0
+\fBifconfig ath1 up
+.RS 0
+\fBifconfig ath0 up
+.RS 0
+\fBbrctl addbr br0
+.RS 0
+\fBbrctl addif br0 ath1
+.RS 0
+\fBbrctl addif br0 ath0
+.RS 0
+\fBifconfig br0 up
+.RS 7
+\fRCreate a WDS bridge. See http://madwifi.org/ for more information.
+.RS -7
 .PP
 .SH "AUTHOR"
 This manual page was written by Matt Foster <mattfoster@clara.co.uk>, using information from the Atheros user documentation, and MadWiFi users mailing list.
