@@ -2488,6 +2488,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 
 	case IEEE80211_FC0_SUBTYPE_PROBE_REQ:
 		if (vap->iv_opmode == IEEE80211_M_STA ||
+		    vap->iv_opmode == IEEE80211_M_AHDEMO ||
 		    vap->iv_state != IEEE80211_S_RUN) {
 			vap->iv_stats.is_rx_mgtdiscard++;
 			return;
