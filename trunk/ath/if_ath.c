@@ -247,6 +247,7 @@ static int ath_descdma_setup(struct ath_softc *sc,
 static void ath_descdma_cleanup(struct ath_softc *sc,
 				struct ath_descdma *dd, ath_bufhead *head, int dir);
 static void ath_check_dfs_clear(unsigned long );
+static const char* ath_get_hal_status_desc(HAL_STATUS status);
 
 static	int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
@@ -419,7 +420,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ah = _ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
-			dev->name, hal_status_desc[status], status);
+			dev->name, ath_get_hal_status_desc(status), status);
 		error = ENXIO;
 		goto bad;
 	}
@@ -1798,8 +1799,9 @@ ath_init(struct net_device *dev)
 	sc->sc_curchan.channel = ic->ic_curchan->ic_freq;
 	sc->sc_curchan.channelFlags = ath_chan2flags(ic->ic_curchan);
 	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_FALSE, &status)) {
-		printk("%s: unable to reset hardware; hal status %u "
-			"(freq %u flags 0x%x)\n", dev->name, status,
+		printk("%s: unable to reset hardware: '%s' (HAL status %u) "
+			"(freq %u flags 0x%x)\n", dev->name,
+			ath_get_hal_status_desc(status), status,
 			sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
 		error = -EIO;
 		goto done;
@@ -1975,7 +1977,7 @@ ath_reset(struct net_device *dev)
 	/* NB: indicate channel change so we do a full reset */
 	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
-			dev->name, __func__, hal_status_desc[status], status);
+			dev->name, __func__, ath_get_hal_status_desc(status), status);
 	ath_update_txpow(sc);		/* update tx power state */
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
@@ -7374,10 +7376,12 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		}
 
 		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
-			printk("%s: %s: unable to reset channel %u (%uMhz) "					"flags 0x%x hal status %u\n",
+			printk("%s: %s: unable to reset channel %u (%uMhz) "
+				"flags 0x%x '%s' (HAL status %u)\n",
 				dev->name, __func__,
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq,
-			        hchan.channelFlags, status);
+			        hchan.channelFlags,
+				ath_get_hal_status_desc(status), status);
 			return EIO;
 		}
 		sc->sc_curchan = hchan;
@@ -9288,3 +9292,12 @@ ath_sysctl_unregister(void)
 		unregister_sysctl_table(ath_sysctl_header);
 }
 #endif /* CONFIG_SYSCTL */
+
+static const char* 
+ath_get_hal_status_desc(HAL_STATUS status)
+{
+	if (status > 0 && status < sizeof(hal_status_desc)/sizeof(char *))
+		return hal_status_desc[status];
+	else
+		return "";
+}
