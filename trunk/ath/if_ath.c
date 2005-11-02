@@ -86,6 +86,10 @@
 #include "if_ath_ahb.h"
 #endif			/* AHB BUS */
 
+#ifdef ATH_TX99_DIAG
+#include "ath_tx99.h"
+#endif
+
 extern	void bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz);
 
 /* unaligned little endian access */
@@ -237,10 +241,6 @@ static void	ath_dynamic_sysctl_register(struct ath_softc *);
 static void	ath_dynamic_sysctl_unregister(struct ath_softc *);
 #endif /* CONFIG_SYSCTL */
 static void	ath_announce(struct net_device *);
-#ifdef ATH_TX99_DIAG
-static int ath_tx99ctl(int mode,int val,struct ath_softc *sc);
-static int ath_rx99ctl(int mode,int val,struct ath_softc *sc);
-#endif
 static int ath_descdma_setup(struct ath_softc *sc,
 				 struct ath_descdma *dd, ath_bufhead *head,
 				 const char *name, int nbuf, int ndesc);
@@ -248,7 +248,10 @@ static void ath_descdma_cleanup(struct ath_softc *sc,
 				struct ath_descdma *dd, ath_bufhead *head, int dir);
 static void ath_check_dfs_clear(unsigned long );
 
-static	int ath_calinterval = 30;		/* calibrate every 30 secs */
+static	int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
+								 * calibrate every 30 secs in steady state
+								 * but check every second at first.
+								 */
 static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
@@ -683,6 +686,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/* XXX not right but it's not used anywhere important */
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
+	sc->sc_opmode = HAL_M_STA;
 	/* 
 	 * Set the Atheros Advanced Capabilities from station config before 
 	 * starting 802.11 state machine.  Currently, set only fast-frames 
@@ -711,6 +715,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		  IEEE80211_C_IBSS		/* ibss, nee adhoc, mode */
 		| IEEE80211_C_HOSTAP		/* hostap mode */
 		| IEEE80211_C_MONITOR		/* monitor mode */
+		| IEEE80211_C_AHDEMO		/* adhoc demo mode */
 		| IEEE80211_C_SHPREAMBLE	/* short preamble supported */
 		| IEEE80211_C_SHSLOT		/* short slot time supported */
 		| IEEE80211_C_WPA		/* capable of WPA1+WPA2 */
@@ -847,6 +852,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 #endif /* CONFIG_SYSCTL */
 	ieee80211_announce(ic);
 	ath_announce(dev);
+#ifdef ATH_TX99_DIAG
+	printk("%s: TX99 support enabled\n", dev->name);
+#endif
 	return 0;
 bad3:
 	ieee80211_ifdetach(ic);
@@ -894,6 +902,10 @@ ath_detach(struct net_device *dev)
 	 */
 	ieee80211_ifdetach(&sc->sc_ic);
 
+#ifdef ATH_TX99_DIAG
+	if (sc->sc_tx99 != NULL)
+		sc->sc_tx99->detach(sc->sc_tx99);
+#endif
 	ath_rate_detach(sc->sc_rc);
 	ath_desc_free(sc);
 	ath_tx_cleanup(sc);
@@ -904,10 +916,6 @@ ath_detach(struct net_device *dev)
 #endif /* CONFIG_SYSCTL */
 	ATH_LOCK_DESTROY(sc);
 	unregister_netdev(dev);
-#ifdef ATH_TX99_DIAG
-        ath_tx99ctl(0,0,NULL);
-        ath_rx99ctl(0,0,NULL);
-#endif
 	return 0;
 }
 
@@ -939,12 +947,13 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 			return NULL;
 		ic_opmode = opmode;
 		break;
+	case IEEE80211_M_AHDEMO:
 	case IEEE80211_M_MONITOR:
-		if ((sc->sc_nvaps != 0) && (ic->ic_opmode != IEEE80211_M_MONITOR)){
+		if (sc->sc_nvaps != 0 && ic->ic_opmode != opmode) {
+			/* preserve existing mode */
 			ic_opmode = ic->ic_opmode;
-		} else {
+		} else
 			ic_opmode = opmode;
-		}
 		break;
 	case IEEE80211_M_HOSTAP:
 	case IEEE80211_M_WDS:
@@ -1077,6 +1086,15 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		sc->sc_nstavaps++;
 	else if (opmode == IEEE80211_M_MONITOR)
 		sc->sc_nmonvaps++;
+	/*
+	 * Adhoc demo mode is a pseudo mode; to the hal it's
+	 * just ibss mode and the driver doesn't use management
+	 * frames.  Other modes carry over directly to the hal.
+	 */
+	if (ic->ic_opmode == IEEE80211_M_AHDEMO)
+		sc->sc_opmode = HAL_M_IBSS;
+	else
+		sc->sc_opmode = ic->ic_opmode;		/* NB: compatible */
 
 #ifdef ATH_SUPERG_XR
 	if ( vap->iv_flags & IEEE80211_F_XR ) {
@@ -1779,7 +1797,7 @@ ath_init(struct net_device *dev)
 	 */
 	sc->sc_curchan.channel = ic->ic_curchan->ic_freq;
 	sc->sc_curchan.channelFlags = ath_chan2flags(ic->ic_curchan);
-	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_FALSE, &status)) {
+	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_FALSE, &status)) {
 		printk("%s: unable to reset hardware; hal status %u "
 			"(freq %u flags 0x%x)\n", dev->name, status,
 			sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
@@ -1808,12 +1826,6 @@ ath_init(struct net_device *dev)
 		error = -EIO;
 		goto done;
 	}
-#ifdef ATH_TX99_DIAG
-	/* reset the tx99 state */
-	sc->sc_txrx99.tx99mode=0;
-	if(sc->sc_txrx99.rx99mode)
-         		ath_rx99ctl(1,0,sc);
-#endif
 	/*
 	 * Enable interrupts.
 	 */
@@ -1836,6 +1848,10 @@ ath_init(struct net_device *dev)
 	ath_chan_change(sc, ic->ic_curchan);
 	dev->flags |= IFF_RUNNING;		/* we are ready to go */
 	ieee80211_start_running(ic);		/* start all vap's */
+#ifdef ATH_TX99_DIAG
+	if (sc->sc_tx99 != NULL)
+		sc->sc_tx99->start(sc->sc_tx99);
+#endif
 done:
 	ATH_UNLOCK(sc);
 	return error;
@@ -1867,6 +1883,10 @@ ath_stop_locked(struct net_device *dev)
 		 * Note that some of this work is not possible if the
 		 * hardware is gone (invalid).
 		 */
+#ifdef ATH_TX99_DIAG
+		if (sc->sc_tx99 != NULL)
+			sc->sc_tx99->stop(sc->sc_tx99);
+#endif
 		netif_stop_queue(dev);	/* XXX re-enabled by ath_newstate */
 		dev->flags &= ~IFF_RUNNING;	/* NB: avoid recursion */
 		ieee80211_stop_running(ic);	/* stop all vap's */
@@ -1953,7 +1973,7 @@ ath_reset(struct net_device *dev)
 	ath_draintxq(sc);		/* stop xmit side */
 	ath_stoprecv(sc);		/* stop recv side */
 	/* NB: indicate channel change so we do a full reset */
-	if (!ath_hal_reset(ah, ic->ic_opmode, &sc->sc_curchan, AH_TRUE, &status))
+	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
 			dev->name, __func__, hal_status_desc[status], status);
 	ath_update_txpow(sc);		/* update tx power state */
@@ -3088,7 +3108,7 @@ ath_calcrxfilter(struct ath_softc *sc)
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP && (dev->flags & IFF_PROMISC))
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (ic->ic_opmode == IEEE80211_M_STA ||
-	    ic->ic_opmode == IEEE80211_M_IBSS ||
+	    sc->sc_opmode == HAL_M_IBSS ||	/* NB: AHDEMO too */
 	    (sc->sc_nostabeacons) || sc->sc_scanning)
 		rfilt |= HAL_RX_FILTER_BEACON;
 	return rfilt;
@@ -6702,22 +6722,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			   , ds			/* first descriptor */
 		);
 
-	/* XXXAPSD: can't do this, but codepath will be removed */
-	if (!M_FLAG_GET(skb, M_UAPSD) && (flags & (HAL_TXDESC_RTSENA | HAL_TXDESC_CTSENA))) {
-		if (!ath_hal_updateCTSForBursting(ah, ds
-		     , (txq->axq_linkbuf) ? txq->axq_linkbuf->bf_desc : NULL
-		     , txq->axq_lastdsWithCTS
-		     , txq->axq_gatingds
-		     , IEEE80211_TXOP_TO_US(ic->ic_chanParams.cap_wmeParams[skb->priority].wmep_txopLimit)
-		     , ath_hal_computetxtime(ah, rt, IEEE80211_ACK_LEN, cix, AH_TRUE))) {
-		     	ATH_TXQ_LOCK_BH(txq);
-		     	txq->axq_lastdsWithCTS = ds;
-			/* set gating Desc to final desc */
-			txq->axq_gatingds = (struct ath_desc *)txq->axq_link;
-			ATH_TXQ_UNLOCK_BH(txq);
-		}
-	}
-
 	/* NB: The desc swap function becomes void, 
 	 * if descriptor swapping is not enabled
 	 */
@@ -6741,21 +6745,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			, skbtmp->next == NULL	/* last segment */
 			, ds			/* first descriptor */
 		);
-		/* XXXAPSD: cannot do this yet, since needs txq. BUT going to remove this codepath... */
-		if (!M_FLAG_GET(skb, M_UAPSD) && (flags & (HAL_TXDESC_RTSENA | HAL_TXDESC_CTSENA))) {
-			if (!ath_hal_updateCTSForBursting(ah, ds
-			     , (txq->axq_linkbuf) ? txq->axq_linkbuf->bf_desc : NULL
-			     , txq->axq_lastdsWithCTS
-			     , txq->axq_gatingds
-			     , IEEE80211_TXOP_TO_US(ic->ic_wme.wme_chanParams.cap_wmeParams[skb->priority].wmep_txopLimit)
-			     , ath_hal_computetxtime(ah, rt, IEEE80211_ACK_LEN, cix, AH_TRUE))) {
-			     	ATH_TXQ_LOCK_BH(txq);
-			     	txq->axq_lastdsWithCTS = ds;
-				/* set gating Desc to final desc */
-			     	txq->axq_gatingds = (struct ath_desc *)txq->axq_link;
-				ATH_TXQ_UNLOCK_BH(txq);
-			}
-		}
 
 		/* NB: The desc swap function becomes void, 
 		 * if descriptor swapping is not enabled
@@ -6865,12 +6854,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			else
 				ATH_TXQ_UNLOCK(txq);
 			break;
-		}
-		if (bf->bf_desc == txq->axq_lastdsWithCTS) {
-			txq->axq_lastdsWithCTS = NULL;
-		}
-		if (ds == txq->axq_gatingds) {
-			txq->axq_gatingds = NULL;
 		}
 
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
@@ -7390,7 +7373,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 						ic->ic_coverageclass, 0);
 		}
 
-		if (!ath_hal_reset(ah, ic->ic_opmode, &hchan, AH_TRUE, &status)) {
+		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
 			printk("%s: %s: unable to reset channel %u (%uMhz) "					"flags 0x%x hal status %u\n",
 				dev->name, __func__,
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq,
@@ -7461,6 +7444,7 @@ ath_calibrate(unsigned long arg)
 	struct ieee80211com *ic = &sc->sc_ic;
 	HAL_CHANNEL *chans;
 	u_int32_t nchans;
+	HAL_BOOL isIQdone = AH_FALSE;
 
 	sc->sc_stats.ast_per_cal++;
 
@@ -7475,7 +7459,7 @@ ath_calibrate(unsigned long arg)
 		sc->sc_stats.ast_per_rfgain++;
 		ath_reset(dev);
 	}
-	if (!ath_hal_calibrate(ah, &sc->sc_curchan)) {
+	if (!ath_hal_calibrate(ah, &sc->sc_curchan, &isIQdone)) {
 		DPRINTF(sc, ATH_DEBUG_ANY,
 			"%s: calibration of channel %u failed\n",
 			__func__, sc->sc_curchan.channel);
@@ -7507,6 +7491,11 @@ ath_calibrate(unsigned long arg)
 		}
 		kfree(chans);
 	}
+
+	if (isIQdone == AH_TRUE)
+		ath_calinterval = ATH_LONG_CALINTERVAL;
+	else
+		ath_calinterval = ATH_SHORT_CALINTERVAL;
 
 	sc->sc_cal_ch.expires = jiffies + (ath_calinterval * HZ);
 	add_timer(&sc->sc_cal_ch);
@@ -8803,60 +8792,6 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	ATH_UNLOCK(sc);
 	return error;
 }
-
-#ifdef ATH_TX99_DIAG
-static int
-ath_rx99ctl(int mode,int val,struct ath_softc *sc)
-{
-	static void (*rx99ctl) (struct ath_softc *,int)=NULL;
- 	if(!mode) {
-		if(rx99ctl) {
-			inter_module_put("rx99ctl");
-            rx99ctl=NULL;
-		}
-		return 0;
-	}
-	if(!rx99ctl) {
-		rx99ctl = inter_module_get_request("rx99ctl","ath_tx99");
-		if(!rx99ctl)
-		{
-			printk("Could not load the module ath_tx99 \n");
-
-		}
-	}
-	if(rx99ctl) {
-		rx99ctl(sc,val);
-	}
-    return 0;
-}
-
-static int
-ath_tx99ctl(int mode,int val,struct ath_softc *sc)
-{
-	static void (*tx99ctl) (struct ath_softc *,int,ath_callback,ath_callback)=NULL;
-    if(!mode) {
-		if(tx99ctl) {
-			inter_module_put("tx99ctl");
-            tx99ctl=NULL;
-		}
-		return 0;
-	}
-	if(!tx99ctl) {
-		tx99ctl = inter_module_get_request("tx99ctl","ath_tx99");
-		if(!tx99ctl)
-		{
-			printk("Could not load the module ath_tx99 \n");
-
-		}
-	}
-	if(tx99ctl) {
-		if(sc->sc_txrx99.txpower == 0)
-			sc->sc_txrx99.txpower=60;
-		tx99ctl(sc,val,ath_draintxq,ath_stoprecv);
-	}
-    return 0;
-}
-#endif /* ATH_TX99_DIAG */
 
 #ifdef CONFIG_SYSCTL
 /*

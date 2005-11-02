@@ -33,7 +33,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/ah.h#119 $
+ * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/ah.h#122 $
  */
 
 #ifndef _ATH_AH_H_
@@ -113,6 +113,7 @@ typedef enum {
 	HAL_CAP_WME_TKIPMIC 	= 22,   /* hardware can support TKIP MIC when WMM is turned on */
 	HAL_CAP_CHAN_HALFRATE 	= 23,	/* hardware can support half rate channels */
 	HAL_CAP_CHAN_QUARTERRATE = 24,	/* hardware can support quarter rate channels */
+	HAL_CAP_RFSILENT	= 25,	/* hardware has rfsilent support  */
 } HAL_CAPABILITY_TYPE;
 
 /* 
@@ -493,7 +494,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x05071100	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x05091300	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -518,7 +519,7 @@ struct ath_hal {
 				HAL_STATUS *status);
 	HAL_BOOL  __ahdecl(*ah_phyDisable)(struct ath_hal *);
 	void	  __ahdecl(*ah_setPCUConfig)(struct ath_hal *);
-	HAL_BOOL  __ahdecl(*ah_perCalibration)(struct ath_hal*, HAL_CHANNEL *);
+	HAL_BOOL  __ahdecl(*ah_perCalibration)(struct ath_hal*, HAL_CHANNEL *, HAL_BOOL *);
 	HAL_BOOL  __ahdecl(*ah_setTxPowerLimit)(struct ath_hal *, u_int32_t);
 
 	void	  __ahdecl(*ah_arEnable)(struct ath_hal *);
@@ -736,7 +737,7 @@ extern HAL_BOOL __ahdecl ath_hal_ispublicsafetysku(struct ath_hal *);
  * Convert between IEEE channel number and channel frequency
  * using the specified channel flags; e.g. CHANNEL_2GHZ.
  */
-extern	u_int __ahdecl ath_hal_mhz2ieee(struct ath_hal *, u_int mhz, u_int flags);
+extern	int __ahdecl ath_hal_mhz2ieee(struct ath_hal *, u_int mhz, u_int flags);
 
 /*
  * Return a version string for the HAL release.
