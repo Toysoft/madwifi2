@@ -1,6 +1,7 @@
 #!/bin/sh
 
-function usage {
+function usage ()
+{
     echo "Purpose:"
     echo "Locate all madwifi-related kernel modules in a given directory"
     echo "(including all its subdirectories)."
@@ -19,11 +20,8 @@ fi
 
 SEARCH=$1
 
-if [ ! -d "$SEARCH" ]; then
-    echo "ERROR: $1 is no valid directory" >&2
-    exit 1
-fi
-
+function probe_for_existing_madwifi ()
+{
 PATTERN="^.*\/(ath_(hal|pci|rate_(onoe|amrr|sample))\.k?o)|(wlan(_(acl|ccmp|scan_(ap|sta)|tkip|wep|xauth))?\.k?o)$"
 
 find $SEARCH -type f -regex '.*\.k?o' | \
@@ -31,7 +29,7 @@ grep -w -E "$PATTERN" > /dev/null 2>&1 && {
     echo
     echo "WARNING:"
     echo "It seems that there are modules left from previous MadWifi installations."
-    echo "You should consider to remove them before you continue, else you might"
+    echo "You should consider removing them before you continue, or else you might"
     echo "experience problems during operation."
     echo
     
@@ -45,5 +43,12 @@ grep -w -E "$PATTERN" > /dev/null 2>&1 && {
 		;;
     esac
 }
+}
+
+if [ ! -d "$SEARCH" ]; then
+	break
+else
+	probe_for_existing_madwifi
+fi
 
 exit 0
