@@ -378,7 +378,9 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
  * and an explicit _BYTE_ORDER.  Sorry, BSD got there first--define
  * things in the BSD way...
  */
+#undef _LITTLE_ENDIAN
 #define	_LITTLE_ENDIAN	1234	/* LSB first: i386, vax */
+#undef _BIG_ENDIAN
 #define	_BIG_ENDIAN	4321	/* MSB first: 68000, ibm, net */
 #include <asm/byteorder.h>
 #if defined(__LITTLE_ENDIAN)
