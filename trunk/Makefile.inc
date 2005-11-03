@@ -56,7 +56,7 @@ TARGET ?= $(shell uname -m | sed -e s/i.86/i386/ -e s/ppc/powerpc-be/)-elf
 # TOOLPREFIX is a string that is prepended to all toolchain executables,
 # such as gcc, ld, as, objcopy etc.  This is used for cross-compiling.
 # Default is native compilation.
-TOOLPREFIX ?= ""
+TOOLPREFIX ?= $(CROSS_COMPILE)
 
 # BUS defines the bus type to which the wireless devices is attached.
 # Currently, the valid BUS types are PCI and AHB.  If BUS is not
