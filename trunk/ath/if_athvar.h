@@ -622,6 +622,7 @@ struct ath_softc {
 	u_int32_t               sc_dturbo_bw_base;    /* bandwidth threshold */
 	u_int32_t               sc_dturbo_bw_turbo;   /* bandwidth threshold */
 #endif
+	u_int			sc_slottimeconf;      /* manual override for slottime */
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
