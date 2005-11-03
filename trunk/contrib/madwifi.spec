@@ -1,8 +1,8 @@
-#
-# --define 'kernel kernel-version'
-
+## $Id: $
 # Build the madwifi-module on the last kernel-devel installed package.
 # Need to implement it for smp kernel.
+# However, if you want to build for a dedicated kernel version you can use
+# --define 'kernel kernel-version'
 %{!?kernel: %{expand: %%define        kernel          %(rpm -q kernel-devel --qf %%{version}-%%{release}\\n | sort | tail -1)}}
 #
 %define       mykversion        %(echo %{kernel} | sed -e s/smp// -)
@@ -14,37 +14,66 @@
 
 Summary: A linux device driver for Atheros chipsets (ar5210, ar5211, ar5212).
 Name: madwifi
-Version: 0.1223.20051030
-Release: 3
+Version: 0.SVNREL.DDAY
+Release: 4
 License: GPL2
 Group: System Environment/Kernel
-URL: http://sourceforge.net/projects/madwifi/
+URL: http://madwifi.org
 Source0: %{name}.%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: /sbin/depmod
 Requires: %{name}-module >= %{version}
-BuildRequires: /usr/bin/uudecode
+#BuildRequires: /usr/bin/uudecode
+BuildRequires: sharutils
 BuildRequires: /sbin/depmod
 #BuildRequires: kernel-devel
 BuildRequires:  /lib/modules/%{mykversion}/build/Makefile
 
 
 %description 
-This package contains the Multiband Atheros Driver for WiFi, A linux
-device driver for 802.11a/b/g universal NIC cards - either Cardbus,
-PCI or MiniPCI - that use Atheros chipsets (ar5210, ar5211, ar5212).
+This software contains a Linux kernel driver for Atheros-based
+Wireless LAN devices.  The driver supports station, AP, adhoc, and
+monitor modes of operation.  The Atheros driver depends on a
+device-independent implementation of the 802.11 protocols that
+originated in the BSD community (NetBSD in particular).
+The driver functions as a normal network device and uses the Wireless
+Extensions API.  As such normal Linux tools can and should be used
+with it.  Where the wireless extensions are lacking private ioctls
+have been added.
+There is only one driver included here; it supports PCI, miniPCI
+and Cardbus devices - USB devices are currently not supported by
+this driver!  The driver can be built as a module or linked
+directly into the kernel.  Note however that the net80211 layer is
+device-independent; there is no reason it cannot be used with any
+802.11 device (in fact on BSD systems this is the case).
+There are currently 3 "programming generations" of Atheros 802.11
+wireless devices (some of these have multiple hardware implementations
+but otherwise appear identical to users):
+5210    supports 11a only
+5211    supports both 11a and 11b
+5212    supports 11a, 11b, and 11g
 
 %package module
 Summary: A linux device driver for Atheros chipsets (ar5210, ar5211, ar5212).
 Group: System Environment/Kernel
 Requires: kernel = %{mykversion}
-Release: 2_%{mykrelver}
+Release: 4_%{mykrelver}
 
 %description module
-This package contains the Multiband Atheros Driver for WiFi, A linux
-device driver for 802.11a/b/g universal NIC cards - either Cardbus,
-PCI or MiniPCI - that use Atheros chipsets (ar5210, ar5211, ar5212).
-
+This software is broken into multiple modules.  The Atheros-specific
+device support is found in the ath_pci module; it should be loaded
+when an Atheros wireless device is recognized.  The ath_pci module
+requires an additional device specific module, ath_hal, which is
+described more below.  In addition the driver requires the wlan
+module which contains the 802.11 state machine, protocol support,
+and other device-independent support needed by any 802.11 device.
+This code is derived from work that first appeared in NetBSD and
+then FreeBSD.  The wlan module may also force the loading of
+additional modules for crypto support (wlan_wep, wlan_tkip, wlan_ccmp,
+etc.), for MAC-based ACL support (wlan_acl), and for 802.1x
+authenticator support (wlan_auth, wlan_radius)).  The latter modules
+are only used when operating as an AP.  The crypto modules are
+loaded when keys of that type are created.
 
 %prep 
 %setup -q 
@@ -65,11 +94,15 @@ export KERNELRELEASE=%{mykversion}
 export KERNELPATH=/lib/modules/%{mykversion}/build
 export KERNELCONF=/lib/modules/%{mykversion}/build/.config
 export MODULEPATH=/lib/modules/%{mykversion}/net
+
 rm -rf %{buildroot}
-# export ATH_RATE=ath_rate/onoe
+
 make info
-make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversion}/build
 mkdir -p  %{buildroot}/usr/local/bin
+mkdir -p  %{buildroot}/$MODULEPATH
+mkdir -p  %{buildroot}/usr/share/madwifi
+
+make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversion}/build
 cd tools ; make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversion}/build BINDIR=/usr/local/bin  ; cd ..
 
 %post  module
@@ -82,7 +115,8 @@ cd tools ; make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversio
 rm -rf %{buildroot}
 
 %files
-%doc COPYRIGHT README
+%doc COPYRIGHT README INSTALL THANKS 
+%doc docs/*
 %attr(0755,root,root) /usr/local/bin/*
 %attr(0644,root,root) /usr/local/man/*
 
@@ -92,6 +126,13 @@ rm -rf %{buildroot}
 
 #
 %changelog
+* Thu Nov 3 2005  Patrick Pichon <Patrick.Pichon@laposte.net>
+- Incorporate the changes made on the Makefile
+- Cleaning on the Description fields
+- Changing the URL to the new madwifi.org's one.
+- Install under /usr/share/doc/madwifi-release the  INSTALL and THANKS files
+- Install under /usr/share/doc/madwifi-release the docs files.
+
 * Sun Oct 30 2005  Patrick Pichon <Patrick.Pichon@laposte.net>
 - Add Man pages
 
