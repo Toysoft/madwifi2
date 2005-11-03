@@ -51,7 +51,10 @@ OS=		linux
 # host machine architecture. You can override TARGET on the make command
 # line or in the environment. See hal/linux/*.inc for the list of
 # supported targets.
+$(warning SUBDIRS=$(SUBDIRS))
+ifneq ($(SUBDIRS),)
 TARGET ?= $(shell uname -m | sed -e s/i.86/i386/ -e s/ppc/powerpc-be/)-elf
+endif
 
 # TOOLPREFIX is a string that is prepended to all toolchain executables,
 # such as gcc, ld, as, objcopy etc.  This is used for cross-compiling.
@@ -179,7 +182,9 @@ ifeq ($(strip ${BUS}),AHB)
 INCS+= -isystem ${TOOLPATH}/include
 endif
 
+ifdef TARGET
 include ${HAL}/public/${TARGET}.inc
+endif
 include ${obj}/${DEPTH}/BuildCaps.inc
 
 SYMBOLSDIR=${DEPTH}/symbols
