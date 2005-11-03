@@ -1,4 +1,6 @@
-# /bin/sh
+#! /bin/sh
+
+set -e
 
 #
 # Shell script to integrate madwifi sources into a Linux
@@ -91,9 +93,9 @@ MKDIR ${DST_HAL}/linux
 INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.c
 INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.h
 # XXX copy only target or use arch? 
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.inc
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.opt_ah.h
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/*.hal.o.uu
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/public/*.inc
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/public/*.opt_ah.h
+INSTALL ${DST_HAL}/linux ${SRC_HAL}/public/*.hal.o.uu
 if [ -d ${SRC_HAL}/ar5212 ]; then
 	MKDIR ${DST_HAL}/ar5212
 	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212desc.h
