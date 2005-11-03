@@ -3188,7 +3188,9 @@ ath_setslottime(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 
-	if (ic->ic_flags & IEEE80211_F_SHSLOT)
+	if (sc->sc_slottimeconf > 0) /* manual override */
+		ath_hal_setslottime(ah, sc->sc_slottimeconf);
+	else if (ic->ic_flags & IEEE80211_F_SHSLOT)
 		ath_hal_setslottime(ah, HAL_SLOT_TIME_9);
 	else
 		ath_hal_setslottime(ah, HAL_SLOT_TIME_20);
@@ -8849,8 +8851,16 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 		if (ret == 0) {
 			switch (ctl->ctl_name) {
 			case ATH_SLOTTIME:
-				if (!ath_hal_setslottime(ah, val))
-					ret = -EINVAL;
+				if (val > 0) {
+					if (!ath_hal_setslottime(ah, val))
+						ret = -EINVAL;
+					else
+						sc->sc_slottimeconf = val;
+				} else {
+					/* disable manual override */
+					sc->sc_slottimeconf = 0;
+					ath_setslottime(sc);
+				}
 				break;
 			case ATH_ACKTIMEOUT:
 				if (!ath_hal_setacktimeout(ah, val))
