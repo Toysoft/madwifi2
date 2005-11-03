@@ -972,7 +972,7 @@ media_status(enum ieee80211_opmode opmode, const struct ieee80211_channel *chan)
 		status |= IFM_IEEE80211_MONITOR;
 		break;
 	case IEEE80211_M_WDS:
-		/* should not come here */
+		status |= IFM_IEEE80211_WDS;
 		break;
 	}
 	if (IEEE80211_IS_CHAN_A(chan)) {

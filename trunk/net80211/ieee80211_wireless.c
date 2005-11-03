@@ -509,8 +509,11 @@ ieee80211_ioctl_giwap(struct net_device *dev,
 		IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_des_bssid);
 	else {
 		static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
-		if(vap->iv_state == IEEE80211_S_RUN) 
-			IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bss->ni_bssid);
+		if(vap->iv_state == IEEE80211_S_RUN)
+			if (vap->iv_opmode != IEEE80211_M_WDS) 
+				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bss->ni_bssid);
+			else
+				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->wds_mac);
 		else
 			IEEE80211_ADDR_COPY(&ap_addr->sa_data, zero_bssid);
 	}

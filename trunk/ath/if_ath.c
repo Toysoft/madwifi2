@@ -1082,7 +1082,10 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		ieee80211_media_change, ieee80211_media_status);
 
 	ic->ic_opmode = ic_opmode;
-	sc->sc_nvaps++;
+	
+	if (opmode != IEEE80211_M_WDS)
+		sc->sc_nvaps++;
+		
 	if (opmode == IEEE80211_M_STA)
 		sc->sc_nstavaps++;
 	else if (opmode == IEEE80211_M_MONITOR)
@@ -1124,7 +1127,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_vap *avp = ATH_VAP(vap);
-
+	int decrease = 1;
 	KASSERT(vap->iv_state == IEEE80211_S_INIT, ("vap not stopped"));
 
 	if (dev->flags & IFF_RUNNING) {
@@ -1167,10 +1170,13 @@ ath_vap_delete(struct ieee80211vap *vap)
 			sc->sc_nostabeacons = 0;
 	} else if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 		sc->sc_nmonvaps--;
+	} else if (vap->iv_opmode == IEEE80211_M_WDS) {
+		decrease = 0;
 	}
 	ieee80211_vap_detach(vap);
 	/* NB: memory is reclaimed through dev->destructor callback */
-	sc->sc_nvaps--;
+	if (decrease)
+		sc->sc_nvaps--;
 
 #ifdef ATH_SUPERG_XR 
 	/*
@@ -7590,7 +7596,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211_node *ni;
+	struct ieee80211_node *ni, *wds_ni;
 	int i, error, stamode;
 	u_int32_t rfilt=0;
 	struct ieee80211vap *tmpvap;
@@ -7745,6 +7751,25 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			 */
 			sc->sc_dturbo =
 				(ni->ni_ath_flags & IEEE80211_ATHC_TURBOP) != 0;
+			break;
+		case IEEE80211_M_WDS:
+			wds_ni = ieee80211_find_txnode(vap, vap->wds_mac);
+			if (wds_ni) {
+				/* XXX no rate negotiation; just dup */
+				wds_ni->ni_rates = vap->iv_bss->ni_rates;
+				/* Depending on the sequence of bring-ing up devices
+				 * it's possible the rates of the root bss isn't
+				 * filled yet. 
+				 */
+				if (vap->iv_ic->ic_newassoc != NULL && 
+				    wds_ni->ni_rates.rs_nrates != 0) {
+					/* Fill in the rates based on our own rates
+					 * we rely on the rate selection mechanism
+					 * to find out which rates actually work!
+					 */
+					vap->iv_ic->ic_newassoc(wds_ni, 1);
+				}
+			}
 			break;
 		default:
 			break;
