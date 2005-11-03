@@ -26,6 +26,12 @@
 #
 DEPTH=	..
 
+# TOOLPREFIX is a string that is prepended to all toolchain executables,
+# such as gcc, ld, as, objcopy etc.  This is used for cross-compiling.
+# Default is native compilation.  You can define CROSS_COMPILE instead -
+# it's a more traditional name.
+TOOLPREFIX ?= $(CROSS_COMPILE)
+
 BINDIR ?= /usr/local/bin
 MANDIR ?= /usr/local/man
 STRIP ?= ${TOOLPREFIX}strip
