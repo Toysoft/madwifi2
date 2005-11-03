@@ -274,6 +274,15 @@ ieee80211_mhz2ieee(u_int freq)
 	return (freq - 5000) / 5;
 }
 
+/*
+ * Convert RSSI to dBm.
+ */
+static u_int
+rssi2dbm(u_int rssi)
+{
+	return rssi - 95;
+}
+
 typedef u_int8_t uint8_t;
 
 static int
@@ -503,12 +512,13 @@ list_stations(const char *ifname)
 	if (len < sizeof(struct ieee80211req_sta_info))
 		return;
 
-	printf("%-17.17s %4s %4s %4s %4s %4s %6s %6s %4s %5s %3s %8s %8s\n"
+	printf("%-17.17s %4s %4s %4s %4s %4s %4s %6s %6s %4s %5s %3s %8s %8s\n"
 		, "ADDR"
 		, "AID"
 		, "CHAN"
 		, "RATE"
 		, "RSSI"
+		, "DBM"
 		, "IDLE"
 		, "TXSEQ"
 		, "RXSEQ"
@@ -525,12 +535,13 @@ list_stations(const char *ifname)
 
 		si = (struct ieee80211req_sta_info *) cp;
 		vp = (u_int8_t *)(si+1);
-		printf("%s %4u %4d %3dM %4d %4d %6d %6d %-4.4s %-5.5s %3x %8x %8s"
+		printf("%s %4u %4d %3dM %4d %4d %4d %6d %6d %-4.4s %-5.5s %3x %8x %8s"
 			, ieee80211_ntoa(si->isi_macaddr)
 			, IEEE80211_AID(si->isi_associd)
 			, ieee80211_mhz2ieee(si->isi_freq)
 			, (si->isi_rates[si->isi_txrate] & IEEE80211_RATE_VAL)/2
 			, si->isi_rssi
+			, rssi2dbm(si->isi_rssi)
 			, si->isi_inact
 			, si->isi_txseqs[0]
 			, si->isi_rxseqs[0]
