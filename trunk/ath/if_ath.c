@@ -3621,7 +3621,8 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	struct sk_buff *skb = bf->bf_skb;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
-	int flags, antenna;
+	int flags;
+	int antenna = sc->sc_txantenna;
 	const HAL_RATE_TABLE *rt;
 	u_int8_t rix, rate;
 	int ctsrate=0;
@@ -3643,21 +3644,22 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		ds->ds_link = bf->bf_daddr;	/* self-linked */
 		flags |= HAL_TXDESC_VEOL;
 		/*
-		 * Let hardware handle antenna switching.
+		 * Let hardware handle antenna switching if txantenna is not set
 		 */
-		antenna = 0;
 	} else {
 		ds->ds_link = 0;
 		/*
-		 * Switch antenna every beacon.
+		 * Switch antenna every beacon if txantenna is not set
 		 * Should only switch every beacon period, not for every
 		 * SWBA's
 		 * XXX assumes two antenna
 		 */
-		if (sc->sc_stagbeacons)
-			antenna = ((sc->sc_stats.ast_be_xmit / sc->sc_nbcnvaps) & 1 ? 2 : 1);
-		else
-			antenna = (sc->sc_stats.ast_be_xmit & 1 ? 2 : 1);
+		if (antenna == 0) {
+			if (sc->sc_stagbeacons)
+				antenna = ((sc->sc_stats.ast_be_xmit / sc->sc_nbcnvaps) & 1 ? 2 : 1);
+			else
+				antenna = (sc->sc_stats.ast_be_xmit & 1 ? 2 : 1);
+		}
 	}
 
 	ds->ds_data = bf->bf_skbaddr;
