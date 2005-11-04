@@ -435,31 +435,4 @@ void	ieee80211_ioctl_vdetach(struct ieee80211vap *);
 struct ifreq;
 int	ieee80211_ioctl_create_vap(struct ieee80211com *, struct ifreq *);
 
-/*
- * For packet capture, define the same physical layer packet header 
- * structure as used in the wlan-ng driver 
- */
-typedef struct {
-	u_int32_t did;
-	u_int16_t status;
-	u_int16_t len;
-	u_int32_t data;
-} p80211item_uint32_t;
-typedef struct {
-	u_int32_t msgcode;
-	u_int32_t msglen;
-#define WLAN_DEVNAMELEN_MAX 16
-	u_int8_t devname[WLAN_DEVNAMELEN_MAX];
-	p80211item_uint32_t hosttime;
-	p80211item_uint32_t mactime;
-	p80211item_uint32_t channel;
-	p80211item_uint32_t rssi;
-	p80211item_uint32_t sq;
-	p80211item_uint32_t signal;
-	p80211item_uint32_t noise;
-	p80211item_uint32_t rate;
-	p80211item_uint32_t istx;
-	p80211item_uint32_t frmlen;
-} wlan_ng_prism2_header;
-
 #endif /* _NET80211_IEEE80211_LINUX_H_ */
