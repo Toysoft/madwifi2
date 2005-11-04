@@ -6017,7 +6017,8 @@ ath_wme_update(struct ieee80211com *ic)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
 
-	ath_txq_update(sc, sc->sc_uapsdq, WME_AC_VO);
+	if (sc->sc_uapsdq)
+		ath_txq_update(sc, sc->sc_uapsdq, WME_AC_VO);
 
 	return !ath_txq_update(sc, sc->sc_ac2q[WME_AC_BE], WME_AC_BE) ||
 	    !ath_txq_update(sc, sc->sc_ac2q[WME_AC_BK], WME_AC_BK) ||
@@ -7063,7 +7064,7 @@ ath_tx_tasklet_q0123(TQUEUE_ARG data)
 	if (sc->sc_xrtxq && txqactive(sc->sc_ah, sc->sc_xrtxq->axq_qnum))
 		ath_tx_processq(sc, sc->sc_xrtxq);
 #endif
-	if (txqactive(sc->sc_ah, sc->sc_uapsdq->axq_qnum))
+	if (sc->sc_uapsdq && txqactive(sc->sc_ah, sc->sc_uapsdq->axq_qnum))
 		ath_tx_processq(sc, sc->sc_uapsdq);
 
 	netif_wake_queue(dev);
