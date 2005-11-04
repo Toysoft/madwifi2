@@ -52,6 +52,7 @@
 #include "if_ethersubr.h"
 
 #include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_monitor.h>
 
 /*
  * Print a console message with the device name prepended.
@@ -324,6 +325,34 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 }
 #endif /* IEEE80211_DEBUG */
 
+static int
+IEEE80211_SYSCTL_DECL(ieee80211_sysctl_dev_type, ctl, write, filp, buffer,
+		lenp, ppos)
+{
+	struct ieee80211vap *vap = ctl->extra1;
+	u_int val;
+	int ret;
+
+	ctl->data = &val;
+	ctl->maxlen = sizeof(val);
+	if (write) {
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+				lenp, ppos);
+		if (ret == 0 && vap->iv_opmode == IEEE80211_M_MONITOR) {
+			if (val == ARPHRD_IEEE80211_RADIOTAP ||
+			    val == ARPHRD_IEEE80211 ||
+			    val == ARPHRD_IEEE80211_PRISM) {
+				vap->iv_dev->type = val;
+			}
+		}
+	} else {
+		val = vap->iv_dev->type;
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+				lenp, ppos);
+	}
+	return ret;
+}
+
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
 static const ctl_table ieee80211_sysctl_template[] = {
@@ -334,6 +363,11 @@ static const ctl_table ieee80211_sysctl_template[] = {
 	  .proc_handler	= ieee80211_sysctl_debug
 	},
 #endif
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "dev_type",
+	  .mode		= 0644,
+	  .proc_handler	= ieee80211_sysctl_dev_type
+	},
 	/* NB: must be last entry before NULL */
 	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "%parent",
@@ -415,112 +449,6 @@ ether_sprintf(const u_int8_t *mac)
 	return etherbuf;
 }
 EXPORT_SYMBOL(ether_sprintf);		/* XXX */
-
-enum {
-	DIDmsg_lnxind_wlansniffrm		= 0x00000044,
-	DIDmsg_lnxind_wlansniffrm_hosttime	= 0x00010044,
-	DIDmsg_lnxind_wlansniffrm_mactime	= 0x00020044,
-	DIDmsg_lnxind_wlansniffrm_channel	= 0x00030044,
-	DIDmsg_lnxind_wlansniffrm_rssi		= 0x00040044,
-	DIDmsg_lnxind_wlansniffrm_sq		= 0x00050044,
-	DIDmsg_lnxind_wlansniffrm_signal	= 0x00060044,
-	DIDmsg_lnxind_wlansniffrm_noise		= 0x00070044,
-	DIDmsg_lnxind_wlansniffrm_rate		= 0x00080044,
-	DIDmsg_lnxind_wlansniffrm_istx		= 0x00090044,
-	DIDmsg_lnxind_wlansniffrm_frmlen	= 0x000A0044
-};
-enum {
-	P80211ENUM_msgitem_status_no_value	= 0x00
-};
-enum {
-	P80211ENUM_truth_false			= 0x00
-};
-
-void
-ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	u_int32_t mactime, u_int32_t rssi, u_int32_t signal, u_int32_t rate)
-{
-	static const wlan_ng_prism2_header template = {
-		.msgcode	= DIDmsg_lnxind_wlansniffrm,
-		.msglen		= sizeof(wlan_ng_prism2_header),
-
-		.hosttime	= { .did = DIDmsg_lnxind_wlansniffrm_hosttime,
-				    .len = 4},
-
-		.mactime	= { .did = DIDmsg_lnxind_wlansniffrm_mactime,
-				    .len = 4},
-
-		.istx		= { .did = DIDmsg_lnxind_wlansniffrm_istx,
-				    .len = 4,
-				    .data = P80211ENUM_truth_false},
-
-		.frmlen		= { .did = DIDmsg_lnxind_wlansniffrm_frmlen,
-				    .len = 4},
-
-		.channel	= { .did = DIDmsg_lnxind_wlansniffrm_channel,
-				    .len = 4},
-
-		.rssi		= { .did = DIDmsg_lnxind_wlansniffrm_rssi,
-				    .status = P80211ENUM_msgitem_status_no_value,
-				    .len = 4},
-
-		.signal		= { .did = DIDmsg_lnxind_wlansniffrm_signal,
-				    .len = 4},
-
-		.rate		= { .did = DIDmsg_lnxind_wlansniffrm_rate,
-				    .len = 4},
-	};
-	struct ieee80211vap *vap, *next;
-	/* XXX locking */
-	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
-		struct sk_buff *skb1;
-		struct net_device *dev = vap->iv_dev;
-		wlan_ng_prism2_header *ph;
-		next = TAILQ_NEXT(vap, iv_next);
-		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
-		    vap->iv_state != IEEE80211_S_RUN)
-			continue;
-		
-		skb1 = skb_copy(skb, GFP_ATOMIC);
-		if (skb1 == NULL) {
-			/* XXX stat+msg */
-			continue;
-		}
-		if (skb_headroom(skb1) < sizeof(wlan_ng_prism2_header)) {
-			dev_kfree_skb(skb1);
-			return;
-		}
-		
-		ph = (wlan_ng_prism2_header *)
-			skb_push(skb1, sizeof(wlan_ng_prism2_header));
-		*ph = template;
-		
-		ph->hosttime.data = jiffies;
-		ph->mactime.data = mactime;
-		ph->frmlen.data = skb->len - sizeof(wlan_ng_prism2_header);
-		/* XXX no way to pass channel flag state */
-		ph->channel.data = ieee80211_chan2ieee(ic, ic->ic_curchan);
-		ph->rssi.data = rssi;
-		ph->signal.data = signal;
-		ph->rate.data = rate;
-
-
-
-		strncpy(ph->devname, dev->name, sizeof(ph->devname));
-
-		skb1->dev = dev; /* NB: deliver to wlanX */
-		skb1->mac.raw = skb1->data;
-		skb1->ip_summed = CHECKSUM_NONE;
-		skb1->pkt_type = PACKET_OTHERHOST;
-		skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
-
-		netif_rx(skb1);
-
-		vap->iv_devstats.rx_packets++;
-		vap->iv_devstats.rx_bytes += skb1->len;
-	}
-}
-EXPORT_SYMBOL(ieee80211_input_monitor);
 
 /*
  * Module glue.
