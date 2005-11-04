@@ -228,6 +228,7 @@ struct ieee80211_cb {
 	struct sk_buff		*next;		/* fast frame sk_buf chain */
 };
 
+
 #define M_FLAG_SET(_skb, _flag) \
 	(((struct ieee80211_cb *)(_skb)->cb)->flags |= (_flag))
 #define	M_FLAG_CLR(_skb, _flag) \
@@ -460,13 +461,5 @@ typedef struct {
 	p80211item_uint32_t istx;
 	p80211item_uint32_t frmlen;
 } wlan_ng_prism2_header;
-
-/*
- * Dispatch an skb to monitor-mode vap's.  The skb is assumed
- * to have space at the front to push a wlan_ng_prims2_header.
- */
-void	ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
-		u_int32_t mactime, u_int32_t rssi, u_int32_t signal,
-		u_int32_t rate);
 
 #endif /* _NET80211_IEEE80211_LINUX_H_ */

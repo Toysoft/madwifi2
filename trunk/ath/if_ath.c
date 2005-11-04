@@ -66,6 +66,7 @@
 
 #include <net80211/ieee80211_radiotap.h>
 #include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_monitor.h>
 
 #ifdef USE_HEADERLEN_RESV
 #include <net80211/if_llc.h>
@@ -2098,106 +2099,128 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	sc->sc_devstats.tx_bytes += framelen;
 }
 
+static int 
+dot11_to_ratecode(struct ath_softc *sc, const HAL_RATE_TABLE *rt, int dot11) {
+	int index = sc->sc_rixmap[dot11 & IEEE80211_RATE_VAL];
+	if (index >= 0 && index < rt->rateCount) {
+		return rt->info[index].rateCode;
+	}
+	return rt->info[sc->sc_minrateix].rateCode;
+}
+
+
 int 
 ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb) 
 {
-  struct ath_softc *sc = dev->priv;
+	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
-  const HAL_RATE_TABLE *rt;
-  int pktlen;
-  int hdrlen;
-  HAL_PKT_TYPE atype;
-  u_int flags;
-  int keyix;
-  int try0;
-  u_int8_t antenna, txrate;
-  struct ath_txq *txq=NULL;
-  struct ath_desc *ds=NULL;
-  struct ieee80211_frame *wh; 
-
-  wh = (struct ieee80211_frame *) skb->data;
-  try0 = ATH_TXMAXTRY;
-  rt = sc->sc_currates;
-  txrate = rt->info[sc->sc_minrateix].rateCode;
-  hdrlen = ieee80211_anyhdrsize(wh);
-  pktlen = skb->len + IEEE80211_CRC_LEN;
-
-  keyix = HAL_TXKEYIX_INVALID;
-  flags = HAL_TXDESC_INTREQ | HAL_TXDESC_CLRDMASK;		/* XXX needed for crypto errs */
-  
-  bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
-                                  skb->data, pktlen, BUS_DMA_TODEVICE);
-  DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %llx\n",
-          __func__, skb, skb->data, skb->len, ito64(bf->bf_skbaddr));
-  
-  
-  bf->bf_skb = skb;
-  bf->bf_node = NULL;
-
+	struct ieee80211_phy_params *ph = (struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
+	const HAL_RATE_TABLE *rt;
+	int pktlen;
+	int hdrlen;
+	HAL_PKT_TYPE atype;
+	u_int flags;
+	int keyix;
+	int try0;
+	int power;
+	u_int8_t antenna, txrate;
+	struct ath_txq *txq=NULL;
+	struct ath_desc *ds=NULL;
+	struct ieee80211_frame *wh; 
+	
+	wh = (struct ieee80211_frame *) skb->data;
+	try0 = ATH_TXMAXTRY;
+	rt = sc->sc_currates;
+	txrate = dot11_to_ratecode(sc, rt, ph->rate0);
+	power = ph->power > 60 ? 60 : ph->power;
+	hdrlen = ieee80211_anyhdrsize(wh);
+	pktlen = skb->len + IEEE80211_CRC_LEN;
+	
+	keyix = HAL_TXKEYIX_INVALID;
+	flags = HAL_TXDESC_INTREQ | HAL_TXDESC_CLRDMASK;		/* XXX needed for crypto errs */
+	
+	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
+					skb->data, pktlen, BUS_DMA_TODEVICE);
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %llx\n",
+		__func__, skb, skb->data, skb->len, ito64(bf->bf_skbaddr));
+	
+	
+	bf->bf_skb = skb;
+	bf->bf_node = NULL;
+	
 #ifdef ATH_SUPERG_FF
-  bf->bf_numdesc = 1;
+	bf->bf_numdesc = 1;
 #endif
-  
-  /* setup descriptors */
-  ds = bf->bf_desc;
-  rt = sc->sc_currates;
-  KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-  
+	
+	/* setup descriptors */
+	ds = bf->bf_desc;
+	rt = sc->sc_currates;
+	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
+	
+	
+	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
+		sc->sc_stats.ast_tx_noack++;
+		try0 = 1;
+	}
+	atype = HAL_PKT_TYPE_NORMAL;		/* default */
+	txq = sc->sc_ac2q[skb->priority & 0x3];
+	
+	
+	flags |= HAL_TXDESC_INTREQ;
+	antenna = sc->sc_txantenna;
+	
+	/* XXX check return value? */
+	ath_hal_setuptxdesc(ah, ds
+			    , pktlen		/* packet length */
+			    , hdrlen	        /* header length */
+			    , atype		/* Atheros packet type */
+			    , power         /* txpower */
+			    , txrate, try0	/* series 0 rate/tries */
+			    , keyix		/* key cache index */
+			    , antenna		/* antenna mode */
+			    , flags		/* flags */
+			    , 0		/* rts/cts rate */
+			    , 0		/* rts/cts duration */
+			    , 0		/* comp icv len */
+			    , 0		/* comp iv len */
+			    , ATH_COMP_PROC_NO_COMP_NO_CCS		/* comp scheme */
+			    );
 
-  if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-    flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
-    sc->sc_stats.ast_tx_noack++;
-  }
-  atype = HAL_PKT_TYPE_NORMAL;		/* default */
-  txq = sc->sc_ac2q[skb->priority & 0x3];
-  
 
-  flags |= HAL_TXDESC_INTREQ;
-  antenna = sc->sc_txantenna;
-
-  /* XXX check return value? */
-  ath_hal_setuptxdesc(ah, ds
-                      , pktlen		/* packet length */
-                      , hdrlen	        /* header length */
-                      , atype		/* Atheros packet type */
-                      , 60              /* txpower */
-                      , txrate, try0	/* series 0 rate/tries */
-                      , keyix		/* key cache index */
-                      , antenna		/* antenna mode */
-                      , flags		/* flags */
-                      , 0		/* rts/cts rate */
-                      , 0		/* rts/cts duration */
-                      , 0		/* comp icv len */
-                      , 0		/* comp iv len */
-                      , ATH_COMP_PROC_NO_COMP_NO_CCS		/* comp scheme */
-                      );
-
-  bf->bf_flags = flags;			/* record for post-processing */
-  
-
-  ds->ds_link = 0;
-  ds->ds_data = bf->bf_skbaddr;
-  
-  ath_hal_filltxdesc(ah, ds
-                     , skb->len		/* segment length */
-                     , AH_TRUE		/* first segment */
-                     , AH_TRUE		/* last segment */
-                     , ds			/* first descriptor */
-                     );
-  
-  /* NB: The desc swap function becomes void, 
-   * if descriptor swapping is not enabled
-   */
-  ath_desc_swap(ds);
-  
-  DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
-	    __func__, M_FLAG_GET(skb, M_UAPSD) ? 0 : txq->axq_qnum, ds->ds_link, ds->ds_data,
-          ds->ds_ctl0, ds->ds_ctl1, ds->ds_hw[0], ds->ds_hw[1]);
-  
-  
-  
-  ath_tx_txqaddbuf(sc, NULL, txq, bf, ds, pktlen);
-  return 0;
+	if (ph->try1) {
+		ath_hal_setupxtxdesc(sc->sc_ah, ds
+				     , dot11_to_ratecode(sc, rt, ph->rate1), ph->try1 /* series 1 */
+				     , dot11_to_ratecode(sc, rt, ph->rate2), ph->try2 /* series 2 */
+				     , dot11_to_ratecode(sc, rt, ph->rate3), ph->try3 /* series 3 */
+				     );	
+	}
+	bf->bf_flags = flags;			/* record for post-processing */
+	
+	
+	ds->ds_link = 0;
+	ds->ds_data = bf->bf_skbaddr;
+	
+	ath_hal_filltxdesc(ah, ds
+			   , skb->len		/* segment length */
+			   , AH_TRUE		/* first segment */
+			   , AH_TRUE		/* last segment */
+			   , ds			/* first descriptor */
+			   );
+	
+	/* NB: The desc swap function becomes void, 
+	 * if descriptor swapping is not enabled
+	 */
+	ath_desc_swap(ds);
+	
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
+		__func__, M_FLAG_GET(skb, M_UAPSD) ? 0 : txq->axq_qnum, ds->ds_link, ds->ds_data,
+		ds->ds_ctl0, ds->ds_ctl1, ds->ds_hw[0], ds->ds_hw[1]);
+	
+	
+	
+	ath_tx_txqaddbuf(sc, NULL, txq, bf, ds, pktlen);
+	return 0;
 }
 
 #ifdef ATH_SUPERG_FF

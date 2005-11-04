@@ -71,7 +71,8 @@ wlan-objs	:= if_media.o \
 		   ieee80211.o ieee80211_beacon.o ieee80211_crypto.o \
 		   ieee80211_crypto_none.o ieee80211_input.o ieee80211_node.o \
 		   ieee80211_output.o ieee80211_power.o ieee80211_proto.o \
-		   ieee80211_scan.o ieee80211_wireless.o ieee80211_linux.o
+		   ieee80211_scan.o ieee80211_wireless.o ieee80211_linux.o \
+		   ieee80211_monitor.o
 wlan_wep-objs	:= ieee80211_crypto_wep.o
 wlan_tkip-objs	:= ieee80211_crypto_tkip.o
 wlan_ccmp-objs	:= ieee80211_crypto_ccmp.o
@@ -88,7 +89,7 @@ export-objs	:= if_media.o \
 		   ieee80211_scan.o ieee80211_wireless.o ieee80211_linux.o \
 		   ieee80211_crypto_wep.o ieee80211_crypto_tkip.o \
 		   ieee80211_crypto_ccmp.o ieee80211_xauth.o \
-		   ieee80211_scan_sta.o ieee80211_scan_ap.o
+		   ieee80211_monitor.o ieee80211_scan_sta.o ieee80211_scan_ap.o
 list-multi	:= $(MOD_INSTALL)
 endif
 

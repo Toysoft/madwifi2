@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211_output.c,v 1.15 2004/12/31 22:42:
 #include "if_media.h"
 
 #include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_monitor.h>
 #include <net80211/if_athproto.h>
 
 #ifdef IEEE80211_DEBUG
@@ -221,11 +222,8 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	}
 
         if (vap->iv_opmode == IEEE80211_M_MONITOR) {
-                cb = (struct ieee80211_cb *) skb->cb;
-                cb->flags = M_RAW;
-                cb->ni = ni;
-                cb->next = NULL;
-                skb->dev = parent;
+		ieee80211_monitor_encap(ic, skb);
+		skb->dev = parent;
                 (void) dev_queue_xmit(skb);
                 return 0;
         }
