@@ -135,6 +135,7 @@ struct ieee80211_node {
 
 	/* hardware */
 	u_int32_t		ni_rstamp;	/* recv timestamp */
+	u_int32_t		ni_last_rx;	/* recv jiffies */
 	u_int8_t		ni_rssi;	/* recv ssi */
 
 	/* header */

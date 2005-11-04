@@ -331,9 +331,14 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 
 		if (ni->ni_vap == vap &&
 		    0 != memcmp(vap->iv_myaddr, ni->ni_macaddr, IEEE80211_ADDR_LEN)) {
+			struct timespec t;
+			jiffies_to_timespec(jiffies - ni->ni_last_rx, &t);
 			p += sprintf(p, "macaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
 			p += sprintf(p, " rssi %d\n", ni->ni_rssi);
-			p += sprintf(p, " last_rx %d\n", ni->ni_rstamp);
+			
+			p += sprintf(p, " last_rx %ld.%06ld\n", 
+				     t.tv_sec, t.tv_nsec / 1000);
+
 		}
         }
         //IEEE80211_NODE_UNLOCK(nt);                                                                             
@@ -431,10 +436,6 @@ static struct file_operations proc_ieee80211_ops = {
         .open = proc_ieee80211_open,
         .release = proc_ieee80211_close,
 };
-
-
-
-
 
 #ifdef IEEE80211_DEBUG
 static int
