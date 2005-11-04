@@ -33,7 +33,14 @@
 #define ARPHRD_IEEE80211_RADIOTAP 803 /* IEEE 802.11 + radiotap header */
 #endif /* ARPHRD_IEEE80211_RADIOTAP */
 
+#ifndef ARPHRD_IEEE80211_ATHDESC
+#define ARPHRD_IEEE80211_ATHDESC 804 /* IEEE 802.11 + atheros descriptor */
+#endif /* ARPHRD_IEEE80211_RADIOTAP */
+
+#define ATHDESC_HEADER_SIZE 32
+
 #include <net80211/ieee80211_radiotap.h>
+#include <hal/ah_desc.h>
 struct ieee80211_phy_params {
 	u_int8_t rate0;
 	u_int8_t rate1;
@@ -138,8 +145,7 @@ struct ath_tx_radiotap_header {
  * to have space at the front to push a wlan_ng_prims2_header.
  */
 void	ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
-		u_int32_t mactime, u_int32_t rssi, u_int32_t signal,
-		u_int32_t rate);
+				struct ath_desc *ds, int tx, u_int32_t mactime, u_int32_t rate);
 
 
 void    ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb);

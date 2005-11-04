@@ -4974,7 +4974,9 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	if (skb == NULL) {
  		if (sc->sc_nmonvaps > 0) {
  			u_int off;
-			int extra = A_MAX(sizeof(wlan_ng_prism2_header), sizeof(struct ath_rx_radiotap_header));
+			int extra = A_MAX(sizeof(struct ath_rx_radiotap_header), 
+					  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
+						
  			/*
  			 * Allocate buffer for monitor mode with space for the
 			 * wlan-ng style physical layer header at the start.
@@ -5092,9 +5094,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		tsf -= 0x8000;
 	tsf = ds->ds_rxstat.rs_tstamp | (tsf &~ 0x7fff);
 
-	ieee80211_input_monitor(ic, skb, tsf,
-		0, ds->ds_rxstat.rs_rssi,
-		sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
+	ieee80211_input_monitor(ic, skb, ds, 0, tsf, sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
 }
 
 /*

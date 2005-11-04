@@ -99,9 +99,12 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
 
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	u_int32_t mactime, u_int32_t rssi, u_int32_t signal, u_int32_t rate)
+			struct ath_desc *ds, int tx, u_int32_t mactime, u_int32_t rate)
 {
 	struct ieee80211vap *vap, *next;
+	u_int32_t signal = 0;
+	signal = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
+	
 	/* XXX locking */
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
 		struct sk_buff *skb1;
@@ -165,7 +168,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
 			ph->rssi.status = 0;
 			ph->rssi.len = 4;
-			ph->rssi.data = rssi;
+			ph->rssi.data = 0;
 			
 			ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
 			ph->noise.status = 0;
@@ -205,6 +208,14 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			th->wr_antsignal = signal;
 			th->wr_rx_flags = 0;
 			break;
+		}
+		case ARPHRD_IEEE80211_ATHDESC: {
+			if (skb_headroom(skb1) < ATHDESC_HEADER_SIZE) {
+				dev_kfree_skb(skb1);
+				skb1 = NULL;
+				break;
+			}
+			memcpy(skb_push(skb1, ATHDESC_HEADER_SIZE), ds, ATHDESC_HEADER_SIZE);
 		}
 		default: break;
 		}
