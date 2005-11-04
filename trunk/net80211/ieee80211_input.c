@@ -315,6 +315,7 @@ ieee80211_input(struct ieee80211_node *ni,
 		}
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
+		ni->ni_last_rx = jiffies;
 		if (HAS_SEQ(type)) {
 			u_int8_t tid;
 			if (IEEE80211_QOS_HAS_SEQ(wh)) {
@@ -1359,6 +1360,7 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			ni->ni_flags |= IEEE80211_NODE_AREF;
 			ni->ni_rssi = rssi;
 			ni->ni_rstamp = rstamp;
+			ni->ni_last_rx = jiffies;
 			if (!alloc_challenge(ni)) {
 				/* NB: don't return error so they rexmit */
 				return;
@@ -2481,6 +2483,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			if (ni != NULL) {
 				ni->ni_rssi = rssi;
 				ni->ni_rstamp = rstamp;
+				ni->ni_last_rx = jiffies;
 			}
 		}
 		break;
@@ -2565,6 +2568,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		    "%s", "recv probe req");
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
+		ni->ni_last_rx = jiffies;
 		rate = ieee80211_setup_rates(ni, rates, xrates,
 			  IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE
 			| IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
@@ -2870,6 +2874,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
+		ni->ni_last_rx = jiffies;
 		ni->ni_intval = bintval;
 		ni->ni_capinfo = capinfo;
 		ni->ni_chan = ic->ic_curchan;
