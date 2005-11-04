@@ -273,6 +273,8 @@ struct ieee80211vap {
 #ifdef CONFIG_SYSCTL
 	struct ctl_table_header	*iv_sysctl_header;
 	struct ctl_table	*iv_sysctls;
+	struct proc_dir_entry   *iv_proc_stations;
+	struct proc_dir_entry   *iv_proc;
 #endif
 	struct vlan_group	*iv_vlgrp;	/* vlan group state */
 
