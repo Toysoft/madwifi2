@@ -4974,19 +4974,20 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	if (skb == NULL) {
  		if (sc->sc_nmonvaps > 0) {
  			u_int off;
+			int extra = A_MAX(sizeof(wlan_ng_prism2_header), sizeof(struct ath_rx_radiotap_header));
  			/*
  			 * Allocate buffer for monitor mode with space for the
 			 * wlan-ng style physical layer header at the start.
  			 */
  			skb = dev_alloc_skb(sc->sc_rxbufsize +
-					    sizeof(wlan_ng_prism2_header) +
+					    extra + 
 					    sc->sc_cachelsz - 1);
  			if (skb == NULL) {
  				DPRINTF(sc, ATH_DEBUG_ANY,
 					"%s: skbuff alloc of size %u failed\n",
 					__func__,
 					sc->sc_rxbufsize
-					+ (int)sizeof(wlan_ng_prism2_header)
+					+ extra
 					+ sc->sc_cachelsz -1);
  				sc->sc_stats.ast_rx_nobuf++;
  				return ENOMEM;

@@ -54,25 +54,6 @@
 
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_monitor.h>
-enum {
-	DIDmsg_lnxind_wlansniffrm		= 0x00000044,
-	DIDmsg_lnxind_wlansniffrm_hosttime	= 0x00010044,
-	DIDmsg_lnxind_wlansniffrm_mactime	= 0x00020044,
-	DIDmsg_lnxind_wlansniffrm_channel	= 0x00030044,
-	DIDmsg_lnxind_wlansniffrm_rssi		= 0x00040044,
-	DIDmsg_lnxind_wlansniffrm_sq		= 0x00050044,
-	DIDmsg_lnxind_wlansniffrm_signal	= 0x00060044,
-	DIDmsg_lnxind_wlansniffrm_noise		= 0x00070044,
-	DIDmsg_lnxind_wlansniffrm_rate		= 0x00080044,
-	DIDmsg_lnxind_wlansniffrm_istx		= 0x00090044,
-	DIDmsg_lnxind_wlansniffrm_frmlen	= 0x000A0044
-};
-enum {
-	P80211ENUM_msgitem_status_no_value	= 0x00
-};
-enum {
-	P80211ENUM_truth_false			= 0x00
-};
 
 
 void
@@ -120,42 +101,11 @@ void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int32_t mactime, u_int32_t rssi, u_int32_t signal, u_int32_t rate)
 {
-	static const wlan_ng_prism2_header template = {
-		.msgcode	= DIDmsg_lnxind_wlansniffrm,
-		.msglen		= sizeof(wlan_ng_prism2_header),
-
-		.hosttime	= { .did = DIDmsg_lnxind_wlansniffrm_hosttime,
-				    .len = 4},
-
-		.mactime	= { .did = DIDmsg_lnxind_wlansniffrm_mactime,
-				    .len = 4},
-
-		.istx		= { .did = DIDmsg_lnxind_wlansniffrm_istx,
-				    .len = 4,
-				    .data = P80211ENUM_truth_false},
-
-		.frmlen		= { .did = DIDmsg_lnxind_wlansniffrm_frmlen,
-				    .len = 4},
-
-		.channel	= { .did = DIDmsg_lnxind_wlansniffrm_channel,
-				    .len = 4},
-
-		.rssi		= { .did = DIDmsg_lnxind_wlansniffrm_rssi,
-				    .status = P80211ENUM_msgitem_status_no_value,
-				    .len = 4},
-
-		.signal		= { .did = DIDmsg_lnxind_wlansniffrm_signal,
-				    .len = 4},
-
-		.rate		= { .did = DIDmsg_lnxind_wlansniffrm_rate,
-				    .len = 4},
-	};
 	struct ieee80211vap *vap, *next;
 	/* XXX locking */
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
 		struct sk_buff *skb1;
 		struct net_device *dev = vap->iv_dev;
-		wlan_ng_prism2_header *ph;
 		next = TAILQ_NEXT(vap, iv_next);
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
 		    vap->iv_state != IEEE80211_S_RUN)
@@ -166,38 +116,110 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			/* XXX stat+msg */
 			continue;
 		}
-		if (skb_headroom(skb1) < sizeof(wlan_ng_prism2_header)) {
-			dev_kfree_skb(skb1);
-			return;
+
+		switch (vap->iv_dev->type) {
+		case ARPHRD_IEEE80211:
+			break;
+		case ARPHRD_IEEE80211_PRISM: {
+			wlan_ng_prism2_header *ph;
+			if (skb_headroom(skb1) < sizeof(wlan_ng_prism2_header)) {
+				dev_kfree_skb(skb1);
+				skb1 = NULL;
+				break;
+			}
+			
+			ph = (wlan_ng_prism2_header *)
+				skb_push(skb1, sizeof(wlan_ng_prism2_header));
+			memset(ph, 0, sizeof(wlan_ng_prism2_header));
+			
+			ph->msgcode = DIDmsg_lnxind_wlansniffrm;
+			ph->msglen = sizeof(wlan_ng_prism2_header);
+			strncpy(ph->devname, dev->name, sizeof(ph->devname));
+			
+			ph->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
+			ph->hosttime.status = 0;
+			ph->hosttime.len = 4;
+			ph->hosttime.data = jiffies;
+			/* Pass up tsf clock in mactime */
+			ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
+			ph->mactime.status = 0;
+			ph->mactime.len = 4;
+			ph->mactime.data = mactime;
+			
+			ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
+			ph->istx.status = 0;
+			ph->istx.len = 4;
+			ph->istx.data = P80211ENUM_truth_false;
+			
+			ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
+			ph->frmlen.status = 0;
+			ph->frmlen.len = 4;
+			ph->frmlen.data = skb->len - sizeof(wlan_ng_prism2_header);
+			
+			ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
+			ph->channel.status = 0;
+			ph->channel.len = 4;
+			ph->channel.data = ieee80211_mhz2ieee(ic->ic_curchan->ic_freq, 
+							      ic->ic_curchan->ic_flags);
+			
+			ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
+			ph->rssi.status = 0;
+			ph->rssi.len = 4;
+			ph->rssi.data = rssi;
+			
+			ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
+			ph->noise.status = 0;
+			ph->noise.len = 4;
+			ph->noise.data = -95;
+			
+			ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
+			ph->signal.status = 0;
+			ph->signal.len = 4;
+			ph->signal.data = signal;
+			
+			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
+			ph->rate.status = 0;
+			ph->rate.len = 4;
+			ph->rate.data = rate;
+			break;
 		}
-		
-		ph = (wlan_ng_prism2_header *)
-			skb_push(skb1, sizeof(wlan_ng_prism2_header));
-		*ph = template;
-		
-		ph->hosttime.data = jiffies;
-		ph->mactime.data = mactime;
-		ph->frmlen.data = skb->len - sizeof(wlan_ng_prism2_header);
-		/* XXX no way to pass channel flag state */
-		ph->channel.data = ieee80211_chan2ieee(ic, ic->ic_curchan);
-		ph->rssi.data = rssi;
-		ph->signal.data = signal;
-		ph->rate.data = rate;
+		case ARPHRD_IEEE80211_RADIOTAP: {
+			struct ath_rx_radiotap_header *th;
+			if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {
+				dev_kfree_skb(skb1);
+				skb1 = NULL;
+				break;
+			}
 
-
-
-		strncpy(ph->devname, dev->name, sizeof(ph->devname));
-
-		skb1->dev = dev; /* NB: deliver to wlanX */
-		skb1->mac.raw = skb1->data;
-		skb1->ip_summed = CHECKSUM_NONE;
-		skb1->pkt_type = PACKET_OTHERHOST;
-		skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
-
-		netif_rx(skb1);
-
-		vap->iv_devstats.rx_packets++;
-		vap->iv_devstats.rx_bytes += skb1->len;
+			th = (struct ath_rx_radiotap_header *) skb_push(skb1, 
+									sizeof(struct ath_rx_radiotap_header));
+			memset(th, 0, sizeof(struct ath_rx_radiotap_header));
+			th->wr_ihdr.it_version = 0;
+			th->wr_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
+			th->wr_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
+			th->wr_flags = 0;
+			th->wr_rate = rate;
+			th->wr_chan_freq = 0;
+			th->wr_chan_flags = 0;
+			th->wr_antenna = 0;
+			th->wr_antsignal = signal;
+			th->wr_rx_flags = 0;
+			break;
+		}
+		default: break;
+		}
+		if (skb1) {
+			skb1->dev = dev; /* NB: deliver to wlanX */
+			skb1->mac.raw = skb1->data;
+			skb1->ip_summed = CHECKSUM_NONE;
+			skb1->pkt_type = PACKET_OTHERHOST;
+			skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
+			
+			netif_rx(skb1);
+			
+			vap->iv_devstats.rx_packets++;
+			vap->iv_devstats.rx_bytes += skb1->len;
+		}
 	}
 }
 EXPORT_SYMBOL(ieee80211_input_monitor);
