@@ -780,7 +780,7 @@ ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state newstate)
 			/*
 			 * Sync rates for associated stations and neighbors.
 			 */
-			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, 0);
+			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, NULL);
 		}
 		ath_rate_newassoc(ic->ic_dev->priv, ATH_NODE(vap->iv_bss), 1);
 	}

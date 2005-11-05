@@ -120,14 +120,14 @@ typedef void irqreturn_t;
  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8)
 #define	ATH_SYSCTL_DECL(f, ctl, write, filp, buffer, lenp, ppos) \
-	f(ctl_table *ctl, int write, struct file *filp, void *buffer, \
-		size_t *lenp)
+	f(ctl_table *ctl, int write, struct file *filp, \
+	  void __user *buffer, size_t *lenp)
 #define	ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos) \
 	proc_dointvec(ctl, write, filp, buffer, lenp)
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,8) */
 #define	ATH_SYSCTL_DECL(f, ctl, write, filp, buffer, lenp, ppos) \
-	f(ctl_table *ctl, int write, struct file *filp, void *buffer,\
-		size_t *lenp, loff_t *ppos)
+	f(ctl_table *ctl, int write, struct file *filp, \
+	  void __user *buffer, size_t *lenp, loff_t *ppos)
 #define	ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos) \
 	proc_dointvec(ctl, write, filp, buffer, lenp, ppos)
 #endif
@@ -446,7 +446,7 @@ struct ath_vap {
 	STAILQ_CONCAT(&(_tqd)->axq_q,&(_tqs)->axq_q); \
 	(_tqs)->axq_depth=0; \
 	(_tqs)->axq_totalqueued = 0; \
-	(_tqs)->axq_linkbuf = 0; \
+	(_tqs)->axq_linkbuf = NULL; \
 	(_tqs)->axq_link = NULL; \
 } while (0)
 
@@ -657,7 +657,7 @@ void	ath_resume(struct net_device *);
 void	ath_suspend(struct net_device *);
 void	ath_shutdown(struct net_device *);
 irqreturn_t ath_intr(int irq, void *dev_id, struct pt_regs *regs);
-int	ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void *addr);
+int	ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr);
 void	bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz);
 #ifdef CONFIG_SYSCTL
 void	ath_sysctl_register(void);
