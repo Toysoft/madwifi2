@@ -69,10 +69,11 @@ endif
 # DESTDIR is used as path prefix during installation.
 DESTDIR ?=
 
-# KERNELPATH is the path to the target kernel's build/source area.
-# This is used to obtain the kernel configuration and include files.
-# If automatic determination doesn't work as desired, you have to
-# manually set it, for example with:
+# KERNELPATH is the path to the Linux kernel build tree.  Unless a
+# separate build directory was used for the kernel build, it's the same
+# as the kernel source tree.  KERNELPATH is used to access the kernel
+# configuration, include files and the build system.  To build for
+# another kernel, set KERNELPATH manually, for example with:
 # make KERNELPATH=/path/to/kernel/source
 
 # TOOLPATH is the path which contains the crosscompile toolchain (?)
@@ -91,6 +92,9 @@ endif
 
 else
 
+# The default KERNELPATH points to the directory where the currently
+# running kernel was compiled.  Note that the configuration and the
+# version of the kernel tree might have changed since then.
 KERNELPATH ?= $(shell readlink -f /lib/modules/`uname -r`/build)
 
 ifeq ($(KERNELPATH),)
