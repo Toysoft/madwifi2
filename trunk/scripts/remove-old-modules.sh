@@ -12,6 +12,8 @@ then
 	exit 1
 fi
 
+QUIET=$1
+
 SCRIPTS=$(dirname $0)
 if [[ -z $SCRIPTS ]]
 then
@@ -37,14 +39,14 @@ function unload_madwifi ()
 			continue
 		fi
 	done
-	
+
 	if [[ ${UNLOADED} ]]
 	then
 		echo "Successfully unloaded: $UNLOADED"
 	else
 		echo "No modules were unloaded."
 	fi
-	
+
 	if [[ ${FAILED} ]]
 	then
 		echo
@@ -73,48 +75,56 @@ then
 	echo "Old MadWifi modules found"
 	echo
 	while true; do
-		read -p "List old MadWifi modules? [y],n "
-               	case ${REPLY} in
+		if [ "$QUIET" = "noask" ]; then
+			REPLY="y"
+		else
+			read -p "List old MadWifi modules? [y],n "
+		fi
+		case ${REPLY} in
 			n|N)
-				break
-				;;
-                       	
+			break
+			;;
+
 			y|Y) 	
-				for m in ${OLD_MODULES}; do
-					echo ${m}
-				done
-				break
-				;;
-                               
+			for m in ${OLD_MODULES}; do
+				echo ${m}
+			done
+			break
+			;;
+
 			*) 
-				continue
-				;;
-               	esac
+			continue
+			;;
+		esac
 	done
-	
+
 	while true; do
-		read -p "Remove old MadWifi modules? [y],n "
-               	case ${REPLY} in
+		if [ "$QUIET" = "noask" ]; then
+			REPLY="y"
+		else
+			read -p "Remove old MadWifi modules? [y],n "
+		fi
+		case ${REPLY} in
 			n|N)
-				exit 1
-				;;
-                       	
+			exit 1
+			;;
+
 			y|Y) 	
-				if [[ ${KERNVER} == $(uname -r) ]]
-				then
-					unload_madwifi
-				fi
-				rm -f ${OLD_MODULES} || exit 1
-				echo
-				echo "Old modules removed"
-				echo
-				exit 0
-				;;
-                               
+			if [[ ${KERNVER} == $(uname -r) ]]
+			then
+				unload_madwifi
+			fi
+			rm -f ${OLD_MODULES} || exit 1
+			echo
+			echo "Old modules removed"
+			echo
+			exit 0
+			;;
+
 			*) 
-				continue
-				;;
-               	esac
+			continue
+			;;
+		esac
 	done
 else
 	echo
