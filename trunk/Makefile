@@ -67,6 +67,12 @@ install:
 ifeq ($(DESTDIR),)
 	(export MODULEPATH=${MODULEPATH}; depmod -ae)
 endif
+	echo "KERNELRELEASE=$(KERNELRELEASE)" > ./install.log
+	echo "DESTDIR=$(DESTDIR)" >> ./install.log
+	
+uninstall:
+	./scripts/remove-old-modules.sh
+	./scripts/remove-old-tools.sh
 
 FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
 	README release.h share net80211 ath_rate

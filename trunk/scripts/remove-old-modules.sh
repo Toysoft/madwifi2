@@ -4,20 +4,31 @@
 #
 # Author: Kel Modderman
 
-if [[ ${UID} != 0 ]]
+if (($UID))
 then
+	echo
 	echo "You must run this script as root."
+	echo
 	exit 1
 fi
 
-KERNVER=${KERNELRELEASE:-"$(uname -r)"}
-KERNDIR=/lib/modules/${KERNVER}
+SCRIPTS=$(dirname $0)
+if [[ -z $SCRIPTS ]]
+then
+	SCRIPTS=.
+fi
+
+[[ -r ${SCRIPTS}/../install.log ]] && source ${SCRIPTS}/../install.log
+
+DEST="${DESTDIR}"
+KERNVER="${KERNELRELEASE:-$(uname -r)}"
+MODDIR="${DEST}/lib/modules/${KERNVER}"
 
 function unload_madwifi ()
 {
 	unset UNLOADED FAILED
 	# Tweaked to circumvent inter-module dependencies
-	for m in ath{_pci,_{rate{_{amrr,onoe,sample}}},_hal} wlan{_{wep,tkip,ccmp,acl,xauth,scan{_{sta,ap}}},}; do
+	for m in ath{_pci,_rate_{amrr,onoe,sample},_hal} wlan{_{wep,tkip,ccmp,acl,xauth,scan_{sta,ap}},}; do
 		if grep -q ^${m} /proc/modules
 		then
 			UNLOADED="${UNLOADED}${m} "
@@ -27,85 +38,87 @@ function unload_madwifi ()
 		fi
 	done
 	
-	if [[ -z ${UNLOADED} ]]
+	if [[ ${UNLOADED} ]]
 	then
-		echo "No modules were unloaded."
-	else
 		echo "Successfully unloaded: $UNLOADED"
+	else
+		echo "No modules were unloaded."
 	fi
 	
-	if [[ -n ${FAILED} ]]
+	if [[ ${FAILED} ]]
 	then
+		echo
 		echo "Failed to unload: ${FAILED}"
 		echo "Please run $0 again"
+		echo
 		exit 1
 	fi
 }
 
 function find_old_madwifi ()
 {
-	if [[ ! -d ${KERNDIR} ]]
+	if [[ ! -d ${MODDIR} ]]
 	then
-		echo "Module directory for target kernel release cannot be found."
-		exit 1
-	else
-		for m in ath{_{pci,hal},_{rate{_{amrr,onoe,sample}}}} wlan{,_{wep,tkip,ccmp,acl,xauth,scan{_{sta,ap}}}}; do
-			find "${KERNDIR}" -type f -name ${m}.*o
-		done
+		break
+	else	
+		PATTERN="^.*\/(ath_(hal|pci|rate_(onoe|amrr|sample))\.k?o)|(wlan(_(acl|ccmp|scan_(ap|sta)|tkip|wep|xauth))?\.k?o)$"
+		find ${MODDIR} -type f -regex '.*\.k?o' | grep -w -E "${PATTERN}"
 	fi
 }
 
-function rm_previous_madwifi ()
-{
-	OLD_MODULES="$(find_old_madwifi)"
-	if [[ -n ${OLD_MODULES} ]]
-	then
-		echo "Old MadWifi modules found at ${KERNDIR}"
-		while true; do
-			read -p "List old MadWifi modules? [y],n "
-                	case ${REPLY} in
-				n)
-					break
-					;;
-                        	
-				y) 	
-					for m in ${OLD_MODULES}; do
-						echo ${m}
-					done
-					break
-					;;
-                                
-				*) 
-					continue
-					;;
-                	esac
-		done
-		
-		while true; do
-			read -p "Remove old MadWifi modules? [y],n "
-                	case ${REPLY} in
-				n)
-					exit 1
-					;;
-                        	
-				y) 	
-					if [[ ${KERNVER} == "$(uname -r)" ]]
-					then
-						unload_madwifi
-					fi
-					echo "Removing modules."
-					rm -f ${OLD_MODULES} && exit 0 || exit 1
-					;;
-                                
-				*) 
-					continue
-					;;
-                	esac
-		done
-	else
-		echo "No MadWifi modules found at ${KERNDIR}"
-		exit 0
-	fi
-}
-
-rm_previous_madwifi
+OLD_MODULES=$(find_old_madwifi)
+if [[ ${OLD_MODULES} ]]
+then
+	echo
+	echo "Old MadWifi modules found"
+	echo
+	while true; do
+		read -p "List old MadWifi modules? [y],n "
+               	case ${REPLY} in
+			n|N)
+				break
+				;;
+                       	
+			y|Y) 	
+				for m in ${OLD_MODULES}; do
+					echo ${m}
+				done
+				break
+				;;
+                               
+			*) 
+				continue
+				;;
+               	esac
+	done
+	
+	while true; do
+		read -p "Remove old MadWifi modules? [y],n "
+               	case ${REPLY} in
+			n|N)
+				exit 1
+				;;
+                       	
+			y|Y) 	
+				if [[ ${KERNVER} == $(uname -r) ]]
+				then
+					unload_madwifi
+				fi
+				rm -f ${OLD_MODULES} || exit 1
+				echo
+				echo "Old modules removed"
+				echo
+				exit 0
+				;;
+                               
+			*) 
+				continue
+				;;
+               	esac
+	done
+else
+	echo
+	echo "No MadWifi modules found"
+	echo
+	exit 0
+fi
