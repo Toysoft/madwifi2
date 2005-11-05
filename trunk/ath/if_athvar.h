@@ -657,6 +657,8 @@ void	ath_resume(struct net_device *);
 void	ath_suspend(struct net_device *);
 void	ath_shutdown(struct net_device *);
 irqreturn_t ath_intr(int irq, void *dev_id, struct pt_regs *regs);
+int	ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void *addr);
+void	bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz);
 #ifdef CONFIG_SYSCTL
 void	ath_sysctl_register(void);
 void	ath_sysctl_unregister(void);

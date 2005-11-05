@@ -304,7 +304,7 @@ ieee80211_load_module(const char *modname)
 #define MAX_PROC_IEEE80211_SIZE 16383
 #define PROC_IEEE80211_PERM 0644
 
-struct proc_dir_entry *proc_madwifi;
+static struct proc_dir_entry *proc_madwifi;
 static int proc_madwifi_count = 0;
 
 struct proc_ieee80211_priv {

@@ -91,8 +91,6 @@
 #include "ath_tx99.h"
 #endif
 
-extern	void bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz);
-
 /* unaligned little endian access */
 #define LE_READ_2(p)							\
 	((u_int16_t)							\
@@ -297,7 +295,7 @@ MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 
 #ifdef AR_DEBUG
 
-int	ath_debug = 0;
+static int	ath_debug = 0;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
 MODULE_PARM(ath_debug, "i");
 #else
@@ -1121,7 +1119,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	return vap;
 }
 
-void
+static void
 ath_vap_delete(struct ieee80211vap *vap)
 {
 	struct net_device *dev = vap->iv_ic->ic_dev;
@@ -1243,7 +1241,7 @@ ath_shutdown(struct net_device *dev)
 	ath_stop(dev);
 }
 
-void
+static void
 ath_uapsd_processtriggers(struct ath_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
@@ -2109,7 +2107,7 @@ dot11_to_ratecode(struct ath_softc *sc, const HAL_RATE_TABLE *rt, int dot11) {
 }
 
 
-int 
+static int 
 ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb) 
 {
 	struct ath_softc *sc = dev->priv;
@@ -8796,8 +8794,6 @@ bad:
 		kfree(outdata);
 	return error;
 }
-
-extern	int ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void *addr);
 
 static int
 ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
