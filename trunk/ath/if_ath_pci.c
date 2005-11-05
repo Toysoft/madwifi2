@@ -213,7 +213,7 @@ bad4:
 bad3:
 	free_netdev(dev);
 bad2:
-	iounmap((void *) mem);
+	iounmap((void __iomem *) mem);
 bad1:
 	release_mem_region(phymem, pci_resource_len(pdev, 0));
 bad:
@@ -229,7 +229,7 @@ ath_pci_remove(struct pci_dev *pdev)
 	ath_detach(dev);
 	if (dev->irq)
 		free_irq(dev->irq, dev);
-	iounmap((void *) dev->mem_start);
+	iounmap((void __iomem *) dev->mem_start);
 	release_mem_region(pci_resource_start(pdev, 0),
 			   pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
@@ -302,7 +302,7 @@ static char *dev_info = "ath_pci";
 #include <linux/ethtool.h>
 
 int
-ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void *addr)
+ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr)
 {
 	struct ethtool_drvinfo info;
 
