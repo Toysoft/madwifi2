@@ -71,8 +71,8 @@ endif
 	echo "DESTDIR=$(DESTDIR)" >> ./install.log
 	
 uninstall:
-	./scripts/remove-old-modules.sh
-	./scripts/remove-old-tools.sh
+	sh scripts/remove-old-modules.sh
+	sh scripts/remove-old-tools.sh
 
 FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
 	README release.h share net80211 ath_rate
