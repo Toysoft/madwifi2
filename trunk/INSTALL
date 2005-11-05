@@ -48,18 +48,14 @@ Most people can just type:
 
 trouble% make
 
-at the top level to build all the modules for the system where you
-are building.  If you installed your kernel sources as the super-user
-then this may fail because of permission problems.  In that case
-you either need to change the permission/ownership of the kernel
-sources or build the driver as the super-user.
+in the top-level madwifi source directory to build all the modules for
+the currently running system.
 
 You MUST do a "make clean" before compiling for a different
 version of Linux; e.g. building for 2.6 after building for 2.4.
 
-If this does not work or if you want to cross-compile the code for a
-different system then you will need to explicitly specify the location
-where the kernel sources are located, e.g.:
+If you want to compile madwifi for a different kernel, you need to
+specify the location of the kernel build tree, e.g.:
 
 trouble% make KERNELPATH=/usr/src/linux-2.6.3
 
@@ -73,14 +69,11 @@ If the kernel was built outside the source directory, KERNELPATH should
 point to the output directory, not to the sources.
 
 In rare cases you may also need to specify the kernel version using the
-KERNELRELEASE variable.  This used to be necessary for distributions
-that install kernels with names like '2.6.10-4-686' while the
-kernel-source is only called 2.6.10 for example.  If you still need to
-use the KERNELRELEASE option, please report it.
-
-In some cases you may need to specify the target architecture as the
-TARGET variable.  More information about how to determine the supported
-platforms can be found below.
+KERNELRELEASE variable.  This used to be necessary for the kernels that
+had their exact version set during compilation.  For instance, some
+distribution could ship a '2.6.10-4-686' kernel compiled from 2.6.10
+sources.  If you still need to use the KERNELRELEASE option, please
+report it.
 
 
 Madwifi currently provides three different rate control algorithms,
@@ -113,13 +106,20 @@ hal/linux/mips-le-elf.inc       hal/linux/xscale-be-elf.inc
 hal/linux/mips1-be-elf.inc
 
 A target specifies the CPU architecture, byte order, and the ABI/file
-format.  Consult the contents of the .inc file to find out what the
-target platform is and what toolchain was used to build the HAL object
-module.  Beware of mixing toolchains; many target platforms require that
-the HAL and driver be built with the same toolchain (i.e. compiler,
-assembler, and loader).  If you want to override the default toolchain
-specified in the .inc file you can do that by editing the .inc file
-or by specifying environment variables.
+format.  For most popular platforms, the build system will find the
+appropriate files.  When cross-compiling or compiling for less common
+platforms, the target platform should be specified using the TARGET
+variable, e.g:
+
+trouble% make TARGET=armv4-le-elf
+
+Consult the contents of the .inc file to find out what the target
+platform is and what toolchain was used to build the HAL object module. 
+Beware of mixing toolchains; many target platforms require that the HAL
+and driver be built with the same toolchain (i.e. compiler, assembler,
+and loader).  If you want to override the default toolchain specified in
+the .inc file you can do that by editing the .inc file or by specifying
+environment variables.
 
 For example, the file for xscale-be-elf is:
 
@@ -160,7 +160,7 @@ programs used to build the software.  The rest of the file defines
 the compilation options for the target platform.  The latter should
 usually not be changed because they were the options used to build
 the binary HAL module, but TOOLPREFIX is unlikely to be right for
-your system and you will want to change it; e.g
+your system and you will want to change it; e.g.
 
 trouble% export TOOLPREFIX=/usr/local/bin/arm-elf-
 
@@ -248,4 +248,4 @@ Further information on how to work with the driver can be found in the
 file README. In addition, the project's wiki has a lot of valuable
 information:
 
-http://madwifi.org
+http://madwifi.org/
