@@ -2217,7 +2217,7 @@ cap2cipher(int flag)
 	return -1;
 }
 
-int
+static int
 ieee80211_ioctl_getmode(struct net_device *dev, struct iw_request_info *info,
 			void *w, char *extra)
 {
@@ -2256,7 +2256,7 @@ ieee80211_ioctl_getmode(struct net_device *dev, struct iw_request_info *info,
 	return (copy_to_user(wri->pointer, mode, 6) ? -EFAULT : 0);
 }
 
-int
+static int
 ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 			void *w, char *extra)
 {
@@ -3454,7 +3454,7 @@ ieee80211_ioctl_getstainfo(struct net_device *dev, struct iwreq *iwr)
 	return (error ? -EFAULT : 0);
 }
 
-int
+static int
 ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 			void *w, char *extra)
 {
