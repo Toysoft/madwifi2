@@ -18,6 +18,8 @@ then
 	SCRIPTS=.
 fi
 
+QUIET=$1
+
 [[ -r ${SCRIPTS}/../tools/install.log ]] && source ${SCRIPTS}/../tools/install.log
 
 DEST="${DESTDIR}"
@@ -58,8 +60,12 @@ then
 	echo "Old MadWifi tools found"
 	echo
 	while true; do
-		read -p "List old MadWifi tools? [y],n "
-               	case ${REPLY} in
+		if [ "$QUIET" = "noask" ]; then
+			REPLY='y'
+		else
+			read -p "List old MadWifi tools? [y],n "
+		fi
+		case ${REPLY} in
 			n|N)
 				break
 				;;
@@ -78,8 +84,12 @@ then
 	done
 	
 	while true; do
-		read -p "Remove old MadWifi tools? [y],n "
-               	case ${REPLY} in
+		if [ "$QUIET" = "noask" ]; then
+			REPLY='y'
+		else
+			read -p "Remove old MadWifi tools? [y],n "
+		fi
+		case ${REPLY} in
 			n|N)
 				exit 1
 				;;
