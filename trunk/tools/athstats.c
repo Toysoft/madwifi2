@@ -55,6 +55,8 @@
 #include <stdlib.h>
 #include <err.h>
 
+#define __user
+
 #include "ah_desc.h"
 #include "if_athioctl.h"
 
