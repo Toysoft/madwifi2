@@ -345,8 +345,8 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
         return (p - buf);
 }
 
-static int
-proc_ieee80211_read(struct file *file, char *buf, size_t len, loff_t *offset)
+static ssize_t
+proc_ieee80211_read(struct file *file, char __user *buf, size_t len, loff_t *offset)
 {
      loff_t pos = *offset;
      struct proc_ieee80211_priv *pv = (struct proc_ieee80211_priv *) file->private_data;
@@ -396,8 +396,8 @@ static int proc_ieee80211_open(struct inode *inode, struct file *file) {
 }
 
 
-static int
-proc_ieee80211_write(struct file *file, const char *buf, size_t len, loff_t *offset)
+static ssize_t
+proc_ieee80211_write(struct file *file, const char __user *buf, size_t len, loff_t *offset)
 {
      loff_t pos = *offset;
      struct proc_ieee80211_priv *pv = (struct proc_ieee80211_priv *) file->private_data;
