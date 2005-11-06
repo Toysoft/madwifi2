@@ -12,8 +12,6 @@ then
 	exit 1
 fi
 
-QUIET=$1
-
 SCRIPTS=$(dirname $0)
 if [[ -z $SCRIPTS ]]
 then
@@ -75,11 +73,8 @@ then
 	echo "Old MadWifi modules found"
 	echo
 	while true; do
-		if [ "$QUIET" = "noask" ]; then
-			REPLY="y"
-		else
-			read -p "List old MadWifi modules? [y],n "
-		fi
+		echo -n "List old MadWifi modules? [y],n "
+		read REPLY
 		case ${REPLY} in
 			n|N)
 				break
@@ -99,11 +94,8 @@ then
 	done
 
 	while true; do
-		if [ "$QUIET" = "noask" ]; then
-			REPLY="y"
-		else
-			read -p "Remove old MadWifi modules? [y],n "
-		fi
+		echo -n "Remove old MadWifi modules? [y],n "
+		read REPLY
 		case ${REPLY} in
 			n|N)
 				exit 1
