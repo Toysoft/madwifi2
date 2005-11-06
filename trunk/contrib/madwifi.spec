@@ -2,24 +2,31 @@
 # Build the madwifi-module on the last kernel-devel installed package.
 # Need to implement it for smp kernel.
 # However, if you want to build for a dedicated kernel version you can use
-# --define 'kernel kernel-version'
-%{!?kernel: %{expand: %%define        kernel          %(rpm -q kernel-devel --qf %%{version}-%%{release}\\n | sort | tail -1)}}
 #
-%define       mykversion        %(echo %{kernel} | sed -e s/smp// -)
-%define       mykrelver         %(echo %{mykversion} | tr -s '-' '_')
-
+# --define 'kernel kernel-version'
+#
+# Get the last kernel-devel available on the machine.
+%{!?kernel: %{expand: %%define        kernel          %(rpm -q kernel-devel --qf %%{version}-%%{release}\\n | sort | tail -1)}}
 %if %(echo %{kernel} | grep -c smp)
       %{expand:%%define myksmp -smp}
 %endif
+#
+%define       mykversion        %(echo %{kernel} | sed -e s/smp// -)
+%define       mykrelver         %(echo %{mykversion} | tr -s '-' '_')
+# Define based on the tar ball extract.
+# Those two variable will be instanced during the tarball generation
+%define       svnversion        SVNREL
+%define       dateversion       DDAY
 
 Summary: A linux device driver for Atheros chipsets (ar5210, ar5211, ar5212).
 Name: madwifi
-Version: 0.SVNREL.DDAY
+#Version: 0.%{svnversion}.%{dateversion}
+Version: trunk.r%{svnversion}.%{dateversion}
 Release: 4
 License: GPL2
 Group: System Environment/Kernel
 URL: http://madwifi.org
-Source0: %{name}.%{version}.tar.bz2
+Source0: http://snapshots.madwifi.org/%{name}-trunk-r%{svnversion}-%{dateversion}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: /sbin/depmod
 Requires: %{name}-module >= %{version}
