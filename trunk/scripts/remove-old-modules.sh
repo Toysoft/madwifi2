@@ -82,19 +82,19 @@ then
 		fi
 		case ${REPLY} in
 			n|N)
-			break
-			;;
+				break
+				;;
 
 			y|Y) 	
-			for m in ${OLD_MODULES}; do
-				echo ${m}
-			done
-			break
-			;;
+				for m in ${OLD_MODULES}; do
+					echo ${m}
+				done
+				break
+				;;
 
 			*) 
-			continue
-			;;
+				continue
+				;;
 		esac
 	done
 
@@ -106,24 +106,24 @@ then
 		fi
 		case ${REPLY} in
 			n|N)
-			exit 1
-			;;
+				exit 1
+				;;
 
 			y|Y) 	
-			if [[ ${KERNVER} == $(uname -r) ]]
-			then
-				unload_madwifi
-			fi
-			rm -f ${OLD_MODULES} || exit 1
-			echo
-			echo "Old modules removed"
-			echo
-			exit 0
+				if [[ ${KERNVER} == $(uname -r) ]]
+				then
+					unload_madwifi
+				fi
+				rm -f ${OLD_MODULES} || exit 1
+				echo
+				echo "Old modules removed"
+				echo
+				exit 0
 			;;
 
 			*) 
-			continue
-			;;
+				continue
+				;;
 		esac
 	done
 else
