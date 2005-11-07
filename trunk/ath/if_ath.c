@@ -8821,6 +8821,11 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		else
 			error = ath_ioctl_diag(sc, (struct ath_diag *) ifr);
 		break;
+#if 0
+/* Looks like a backdoor for DoS that is not used legitimately by any
+ * tools.  Pointer to user data is dereferenced by the kernel code.
+ * There is no permission check.  Commented out until the author is
+ * found and the purpose of this code is clarified. */
 	case SIOCGATHRADARSIG:
 		radarSigType = (int32_t *) ifr->ifr_data;
 		switch(radarSigType[0]) {
@@ -8830,6 +8835,7 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		}
 		error= 0;
 		break;
+#endif
 	case SIOCETHTOOL:
 		if (copy_from_user(&cmd, ifr->ifr_data, sizeof(cmd)))
 			error = -EFAULT;
