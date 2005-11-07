@@ -8800,7 +8800,9 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
+#if 0
 	u_int32_t *radarSigType;
+#endif
 	int error;
 
 	ATH_LOCK(sc);
