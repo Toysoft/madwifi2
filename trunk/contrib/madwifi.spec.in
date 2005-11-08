@@ -15,25 +15,22 @@
 %define       mykrelver         %(echo %{mykversion} | tr -s '-' '_')
 # Define based on the tar ball extract.
 # Those two variable will be instanced during the tarball generation
-%define       svnversion        SVNREL
-%define       dateversion       DDAY
-
+%define       revision       @@SVNREL@@
+%define       snapshot       @@DDAY@@
+%define       branch         @@BRANCH@@
 Summary: A linux device driver for Atheros chipsets (ar5210, ar5211, ar5212).
 Name: madwifi
-#Version: 0.%{svnversion}.%{dateversion}
-Version: trunk.r%{svnversion}.%{dateversion}
-Release: 4
+Version: 0.%{revision}.%{snapshot}
+Release: 5
 License: GPL2
 Group: System Environment/Kernel
 URL: http://madwifi.org
-Source0: http://snapshots.madwifi.org/%{name}-trunk-r%{svnversion}-%{dateversion}.tar.gz
+Source0: http://snapshots.madwifi.org/%{name}-%{branch}-r%{revision}-%{snapshot}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: /sbin/depmod
 Requires: %{name}-module >= %{version}
-#BuildRequires: /usr/bin/uudecode
 BuildRequires: sharutils
 BuildRequires: /sbin/depmod
-#BuildRequires: kernel-devel
 BuildRequires:  /lib/modules/%{mykversion}/build/Makefile
 
 
@@ -83,7 +80,8 @@ are only used when operating as an AP.  The crypto modules are
 loaded when keys of that type are created.
 
 %prep 
-%setup -q 
+#%setup -q 
+%setup -q -n %{name}-%{branch}-r%{revision}-%{snapshot}
 find . -name Makefile\* | xargs perl -pi -e's,/sbin/depmod,: /sbin/depmod,'
 
 %build 
