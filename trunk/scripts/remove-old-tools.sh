@@ -1,107 +1,98 @@
-#!/bin/bash
+#!/bin/sh
 # Purpose: provide support for removing tools and manpages from previous
 # MadWifi installations.
 #
 # Author: Kel Modderman
 
-if (($UID))
-then
+if [ $(id -u) != 0 ]; then
 	echo
 	echo "You must run this script as root."
 	echo
 	exit 1
 fi
 
+QUIET=${1}
+
 SCRIPTS=$(dirname $0)
-if [[ -z $SCRIPTS ]]
-then
+if [ -z "$SCRIPTS" ]; then
 	SCRIPTS=.
 fi
 
-[[ -r ${SCRIPTS}/../tools/install.log ]] && source ${SCRIPTS}/../tools/install.log
+if [ -r "${SCRIPTS}"/../tools/install.log ]; then
+	. ${SCRIPTS}/../tools/install.log
+fi
 
 DEST="${DESTDIR}"
 BIN="${BINDIR:-/usr/local/bin}"
 BINPATH="${DEST}${BIN}"
 MAN="${MANDIR:-/usr/local/man}"
 MANPATH="${DEST}${MAN}/man8"
+TOOLS="athstats 80211stats athkey athchans athctrl athdebug 80211debug wlanconfig"
 
-# Last space is important!
-TOOLS="athstats 80211stats athkey athchans athctrl athdebug 80211debug wlanconfig "
+REGEX_TOOLS=$(echo ${TOOLS} | sed 's/\ /\\|/g')
+REGEX_MAN=$(echo ${TOOLS} | sed 's/\ /\.8\\|/g')
+FOUND_TOOLS=$(find ${BINPATH} -type f -regex ".*\(${REGEX_TOOLS}\)" 2>/dev/null)
+FOUND_MAN=$(find ${MANPATH} -type f -regex ".*\(${REGEX_MAN}.8\)" 2>/dev/null)
 
-function find_tools ()
-{
-if [[ ! -d ${BINPATH} ]]
-then
-	break
-else
-	for t in ${TOOLS}; do
-		if [[ -e ${BINPATH}/${t} ]]
-		then
-			echo "${BINPATH}/${t}"
-		fi
-	done
-fi
-
-if [[ ! -d ${MANPATH} ]]
-then
-	break
-else
-	find ${MANPATH} -type f -regex ".*\(${TOOLS// /.8\|}\)" 2>/dev/null
-fi
-}
-
-FOUND_TOOLS=$(find_tools)
-if [[ ${FOUND_TOOLS} ]]
-then
-	echo
-	echo "Old MadWifi tools found"
-	echo
-	while true; do
-		echo -n "List old MadWifi tools? [y],n "
-		read REPLY
-		case ${REPLY} in
-			n|N)
-				break
-				;;
-     	
-			y|Y) 	
-				for t in ${FOUND_TOOLS}; do
-					echo ${t}
-				done
-				break
-				;;
-                                
-			*) 
-				continue
-				;;
-               	esac
-	done
-	
-	while true; do
-		echo -n "Remove old MadWifi tools? [y],n "
-		read REPLY
-		case ${REPLY} in
-			n|N)
-				exit 1
-				;;
-                       	
-			y|Y) 	
-				rm -f ${FOUND_TOOLS} || exit 1
-				echo
-				echo "Old tools removed"
-				echo
-				exit 0
-				;;
+# This subshell ignores blank space of empty var's
+FOUND=$(echo ${FOUND_TOOLS} ${FOUND_MAN})
+if [ -n "${FOUND}" ]; then
+	if [ "${QUIET}" = "noask" ]; then
+		rm -f ${FOUND} || exit 1
+	else
+		echo
+		echo "Old MadWifi tools found"
+		echo
+		while true; do
+			echo -n "List old MadWifi tools? [y],n "
+			read REPLY
+			case ${REPLY} in
+				n|N|[Nn][Oo])
+					break
+					;;
+     		
+				y|Y|[Yy][Ee][Ss]) 	
+					for t in ${FOUND}; do
+						echo ${t}
+					done
+					echo
+					break
+					;;
+	                                
+				*) 
+					continue
+					;;
+	               	esac
+		done
+		
+		while true; do
+			echo -n "Remove old MadWifi tools? [y],n "
+			read REPLY
+			case ${REPLY} in
+				n|N|[Nn][Oo])
+					exit 1
+					;;
+	                       	
+				y|Y|[Yy][Ee][Ss]) 	
+					rm -f ${FOUND} || exit 1
+					echo
+					echo "Removed old MadWifi tools"
+					echo
+					break
+					;;
                                
-			*) 
-				continue
-				;;
-               	esac
-	done
+				*) 
+					continue
+					;;
+        	       	esac
+		done
+	fi	
 else
-	echo
-	echo "No old tools found."
-	echo
-	exit 0
+	if [ "${QUIET}" != "noask" ]; then
+		echo
+		echo "No old MadWifi tools found."
+		echo
+	fi
 fi
+
+exit 0
