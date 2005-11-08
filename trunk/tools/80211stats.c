@@ -44,7 +44,7 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <linux/wireless.h>
+#include <iwlib.h>
 #include <netinet/ether.h>
 
 #include <stdio.h>
