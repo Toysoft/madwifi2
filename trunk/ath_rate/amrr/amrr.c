@@ -60,6 +60,7 @@
 #include <net80211/if_media.h>
 #include <net80211/ieee80211_var.h>
 
+#include "if_athrate.h"
 #include "if_athvar.h"
 #include "ah_desc.h"
 
@@ -101,8 +102,8 @@ EXPORT_SYMBOL(ath_rate_node_cleanup);
 
 void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
-	HAL_BOOL shortPreamble, size_t frameLen,
-	u_int8_t *rix, int *try0, u_int8_t *txrate)
+		  int shortPreamble, size_t frameLen,
+		  u_int8_t *rix, int *try0, u_int8_t *txrate)
 {
 	struct amrr_node *amn = ATH_NODE_AMRR(an);
 
@@ -117,7 +118,7 @@ EXPORT_SYMBOL(ath_rate_findrate);
 
 void
 ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
-	struct ath_desc *ds, HAL_BOOL shortPreamble, u_int8_t rix)
+	struct ath_desc *ds, int shortPreamble, u_int8_t rix)
 {
 	struct amrr_node *amn = ATH_NODE_AMRR(an);
 
@@ -268,11 +269,11 @@ static void
 ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 {
 #define	RATE(_ix)	(ni->ni_rates.rs_rates[(_ix)] & IEEE80211_RATE_VAL)
-	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
 	int srate;
 
 	KASSERT(ni->ni_rates.rs_nrates > 0, ("no rates"));
-	if (ic->ic_fixed_rate == -1) {
+	if (vap->iv_fixed_rate == -1) {
 		/*
 		 * No fixed rate is requested. For 11b start with
 		 * the highest negotiated rate; otherwise, for 11g
@@ -297,15 +298,11 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * the node.  We know the rate is there because the
 		 * rate set is checked when the station associates.
 		 */
-		const struct ieee80211_rateset *rs =
-			&ic->ic_sup_rates[ic->ic_curmode];
-		int r = rs->rs_rates[ic->ic_fixed_rate] & IEEE80211_RATE_VAL;
-		/* NB: the rate set is assumed sorted */
 		srate = ni->ni_rates.rs_nrates - 1;
-		for (; srate >= 0 && RATE(srate) != r; srate--)
+		for (; srate >= 0 && RATE(srate) != vap->iv_fixed_rate; srate--)
 			;
 		KASSERT(srate >= 0,
-			("fixed rate %d not in rate set", ic->ic_fixed_rate));
+			("fixed rate %d not in rate set", vap->iv_fixed_rate));
 	}
 	ath_rate_update(sc, ni, srate);
 #undef RATE
@@ -314,17 +311,18 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 static void
 ath_rate_cb(void *arg, struct ieee80211_node *ni)
 {
-	ath_rate_update(ni->ni_ic->ic_ifp->if_softc, ni, (int)(uintptr_t) arg);
+	ath_rate_update(ni->ni_ic->ic_dev->priv, ni, (long) arg);
 }
 
 /*
  * Reset the rate control state for each 802.11 state transition.
  */
 void
-ath_rate_newstate(struct ath_softc *sc, enum ieee80211_state state)
+ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state state)
 {
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ath_softc *sc = ic->ic_dev->priv;
 	struct amrr_softc *asc = (struct amrr_softc *) sc->sc_rc;
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni;
 
 	if (state == IEEE80211_S_INIT) {
@@ -336,7 +334,7 @@ ath_rate_newstate(struct ath_softc *sc, enum ieee80211_state state)
 		 * Reset local xmit state; this is really only
 		 * meaningful when operating in station mode.
 		 */
-		ni = ic->ic_bss;
+		ni = vap->iv_bss;
 		if (state == IEEE80211_S_RUN) {
 			ath_rate_ctl_start(sc, ni);
 		} else {
@@ -350,9 +348,9 @@ ath_rate_newstate(struct ath_softc *sc, enum ieee80211_state state)
 		 * tx rate state of each node.
 		 */
 		ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, NULL);
-		ath_rate_update(sc, ic->ic_bss, 0);
+		ath_rate_update(sc, vap->iv_bss, 0);
 	}
-	if (ic->ic_fixed_rate == -1 && state == IEEE80211_S_RUN) {
+	if (vap->iv_fixed_rate == -1 && state == IEEE80211_S_RUN) {
 		int interval;
 		/*
 		 * Start the background rate control thread if we
@@ -452,10 +450,14 @@ ath_ratectl(unsigned long data)
 	if (dev->flags & IFF_RUNNING) {
 		sc->sc_stats.ast_rate_calls++;
 
-		if (ic->ic_opmode == IEEE80211_M_STA)
-			ath_rate_ctl(sc, ic->ic_bss);	/* NB: no reference */
-		else
+		if (ic->ic_opmode == IEEE80211_M_STA) {
+			struct ieee80211vap *tmpvap;
+			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
+				ath_rate_ctl(sc, tmpvap->iv_bss);	/* NB: no reference */
+			}
+		} else {
 			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_ctl, sc);
+		}
 	}
 	interval = ath_rateinterval;
 	if (ic->ic_opmode == IEEE80211_M_STA)
