@@ -86,7 +86,9 @@ ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb)
 		}
                 break;
 	}
-		
+	case ARPHRD_IEEE80211_ATHDESC: {
+		skb_pull(skb, ATHDESC_HEADER_SIZE);
+	}		
 	default: break;
 	}
 
@@ -152,7 +154,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
 			ph->istx.status = 0;
 			ph->istx.len = 4;
-			ph->istx.data = P80211ENUM_truth_false;
+			ph->istx.data = tx ? P80211ENUM_truth_true : P80211ENUM_truth_false;
 			
 			ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
 			ph->frmlen.status = 0;
@@ -187,30 +189,52 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			break;
 		}
 		case ARPHRD_IEEE80211_RADIOTAP: {
-			struct ath_rx_radiotap_header *th;
-			if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {
-				dev_kfree_skb(skb1);
-				skb1 = NULL;
-				break;
+			if (tx) {
+				struct ath_tx_radiotap_header *th;
+				if (skb_headroom(skb1) < sizeof(struct ath_tx_radiotap_header)) {
+					printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
+					dev_kfree_skb(skb1);
+					skb1 = NULL;
+					break;
+				}
+				
+				th = (struct ath_tx_radiotap_header *) skb_push(skb1, 
+										sizeof(struct ath_tx_radiotap_header));
+				memset(th, 0, sizeof(struct ath_tx_radiotap_header));
+				th->wt_ihdr.it_version = 0;
+				th->wt_ihdr.it_len = sizeof(struct ath_tx_radiotap_header);
+				th->wt_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
+				th->wt_flags = 0;
+				th->wt_rate = rate;
+				th->wt_txpower = 0;
+				th->wt_antenna = 0;
+			} else {
+				struct ath_rx_radiotap_header *th;
+				if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {
+					printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
+					dev_kfree_skb(skb1);
+					skb1 = NULL;
+					break;
+				}
+				
+				th = (struct ath_rx_radiotap_header *) skb_push(skb1, 
+										sizeof(struct ath_rx_radiotap_header));
+				memset(th, 0, sizeof(struct ath_rx_radiotap_header));
+				th->wr_ihdr.it_version = 0;
+				th->wr_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
+				th->wr_ihdr.it_present = ATH_RX_RADIOTAP_PRESENT;
+				th->wr_flags = 0;
+				th->wr_rate = rate;
+				th->wr_chan_freq = 0;
+				th->wr_chan_flags = 0;
+				th->wr_antenna = 0;
+				th->wr_antsignal = signal;
 			}
-
-			th = (struct ath_rx_radiotap_header *) skb_push(skb1, 
-									sizeof(struct ath_rx_radiotap_header));
-			memset(th, 0, sizeof(struct ath_rx_radiotap_header));
-			th->wr_ihdr.it_version = 0;
-			th->wr_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
-			th->wr_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
-			th->wr_flags = 0;
-			th->wr_rate = rate;
-			th->wr_chan_freq = 0;
-			th->wr_chan_flags = 0;
-			th->wr_antenna = 0;
-			th->wr_antsignal = signal;
-			th->wr_rx_flags = 0;
 			break;
 		}
 		case ARPHRD_IEEE80211_ATHDESC: {
 			if (skb_headroom(skb1) < ATHDESC_HEADER_SIZE) {
+				printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
 				dev_kfree_skb(skb1);
 				skb1 = NULL;
 				break;

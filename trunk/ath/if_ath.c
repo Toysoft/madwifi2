@@ -5095,6 +5095,40 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	ieee80211_input_monitor(ic, skb, ds, 0, tsf, sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
 }
 
+
+static void
+ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
+{
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	int extra = A_MAX(sizeof(struct ath_tx_radiotap_header), 
+			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
+	/*                                                                      
+         * release the owner of this skb since we're basically                  
+         * recycling it                                                         
+         */
+        if (atomic_read(&skb->users) != 1) {
+                struct sk_buff *skb2 = skb;
+                skb = skb_copy(skb, GFP_ATOMIC);
+                if (skb == NULL) {
+			printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
+                        dev_kfree_skb(skb2);
+                        return;
+                }
+                kfree_skb(skb2);
+        } else {
+                skb_orphan(skb);
+        }
+
+	if (skb_headroom(skb) < extra &&
+	    pskb_expand_head(skb, extra, 0, GFP_ATOMIC)) {
+		printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
+		goto done;
+	}
+	ieee80211_input_monitor(ic, skb, ds, 1, 0, sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate);
+ done:
+	dev_kfree_skb(skb);
+}
 /*
  * Extend 15-bit time stamp from rx descriptor to
  * a full 64-bit TSF using the current h/w TSF.
@@ -6989,19 +7023,19 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			skbfree = skb;
 			skb = skb->next;
 			DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, skbfree);
-			dev_kfree_skb(skbfree);
+			ath_tx_capture(sc->sc_dev, ds, skbfree);
 			for (i=1; i<bf->bf_numdesc; i++) {
 				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i-1], bf->bf_skb->len, BUS_DMA_TODEVICE);
 				skbfree = skb;
 				skb = skb->next;
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, skbfree);
-				dev_kfree_skb(skbfree);
+				ath_tx_capture(sc->sc_dev, ds, skbfree);
 			}
 		}
 		bf->bf_numdesc = 0;
 #else
 		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
-		dev_kfree_skb(bf->bf_skb);
+		ath_tx_capture(sc->sc_dev, ds, skbfree);
 #endif
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
