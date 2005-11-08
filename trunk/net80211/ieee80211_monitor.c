@@ -56,6 +56,68 @@
 #include <net80211/ieee80211_monitor.h>
 
 
+
+static int
+ratecode_to_dot11(int ratecode) {
+        switch (ratecode) {
+                /* a */
+        case 0x0b: return 12;
+        case 0x0f: return 18;
+        case 0x0a: return 24;
+        case 0x0e: return 36;
+        case 0x09: return 48;
+        case 0x0d: return 72;
+        case 0x08: return 96;
+        case 0x0c: return 108;
+
+        case 0x1b: return 2;
+        case 0x1a: return 4;
+        case 0x1e: return 4;
+        case 0x19: return 11;
+        case 0x1d: return 11;
+        case 0x18: return 22;
+        case 0x1c: return 22;
+        }
+        return 0;
+}
+struct ar5212_openbsd_desc {
+	/*
+         * tx_control_0
+         */
+        u_int32_t       frame_len:12;
+        u_int32_t       reserved_12_15:4;
+        u_int32_t       xmit_power:6;
+        u_int32_t       rts_cts_enable:1;
+        u_int32_t       veol:1;
+        u_int32_t       clear_dest_mask:1;
+        u_int32_t       ant_mode_xmit:4;
+        u_int32_t       inter_req:1;
+        u_int32_t       encrypt_key_valid:1;
+        u_int32_t       cts_enable:1;
+
+	u_int32_t r1;
+
+	/*
+	 * tx_control_2
+	 */
+        u_int32_t       rts_duration:15;
+        u_int32_t       duration_update_enable:1;
+        u_int32_t       xmit_tries0:4;
+        u_int32_t       xmit_tries1:4;
+        u_int32_t       xmit_tries2:4;
+        u_int32_t       xmit_tries3:4;
+
+        /*
+         * tx_control_3
+         */
+        u_int32_t       xmit_rate0:5;
+        u_int32_t       xmit_rate1:5;
+        u_int32_t       xmit_rate2:5;
+        u_int32_t       xmit_rate3:5;
+        u_int32_t       rts_cts_rate:5;
+        u_int32_t       reserved_25_31:7;
+};
+
 void
 ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb) 
 {
@@ -87,7 +149,20 @@ ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb)
                 break;
 	}
 	case ARPHRD_IEEE80211_ATHDESC: {
-		skb_pull(skb, ATHDESC_HEADER_SIZE);
+		if (skb->len > ATHDESC_HEADER_SIZE) {
+			struct ar5212_openbsd_desc *desc = (struct ar5212_openbsd_desc *) 
+				(skb->data + 8);
+			ph->power = desc->xmit_power;
+			ph->rate0 = ratecode_to_dot11(desc->xmit_rate0);
+			ph->rate1 = ratecode_to_dot11(desc->xmit_rate1);
+			ph->rate2 = ratecode_to_dot11(desc->xmit_rate2);
+			ph->rate3 = ratecode_to_dot11(desc->xmit_rate3);
+			ph->try0 = desc->xmit_tries0;
+			ph->try1 = desc->xmit_tries1;
+			ph->try2 = desc->xmit_tries2;
+			ph->try3 = desc->xmit_tries3;
+			skb_pull(skb, ATHDESC_HEADER_SIZE);
+		}
 	}		
 	default: break;
 	}
