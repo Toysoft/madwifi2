@@ -48,6 +48,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <ctype.h>
 #include <getopt.h>
 
@@ -282,8 +283,6 @@ rssi2dbm(u_int rssi)
 {
 	return rssi - 95;
 }
-
-typedef u_int8_t uint8_t;
 
 static int
 getmaxrate(uint8_t rates[15], uint8_t nrates)
