@@ -499,7 +499,9 @@ struct ieee80211req_scan_result {
  * NB: Even-numbered ioctl numbers have set semantics and are privileged!
  *     (regardless of the incorrect comment in wireless.h!)
  */
+#ifdef __KERNEL__
 #include <linux/if.h>
+#endif
 #define	IEEE80211_IOCTL_SETPARAM	(SIOCIWFIRSTPRIV+0)
 #define	IEEE80211_IOCTL_GETPARAM	(SIOCIWFIRSTPRIV+1)
 #define	IEEE80211_IOCTL_SETKEY		(SIOCIWFIRSTPRIV+2)
