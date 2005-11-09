@@ -174,7 +174,7 @@ vap_create(struct ifreq *ifr)
 
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
-		err(1, "socket(SOCK_DRAGM)");
+		err(1, "socket(SOCK_DGRAM)");
 	strncpy(oname, ifr->ifr_name, IFNAMSIZ);
 	if (ioctl(s, SIOC80211IFCREATE, ifr) < 0)
 		err(1, "ioctl");
@@ -191,7 +191,7 @@ vap_destroy(const char *ifname)
 
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
-		err(1, "socket(SOCK_DRAGM)");
+		err(1, "socket(SOCK_DGRAM)");
 	memset(&ifr, 0, sizeof(ifr));
 	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
 	if (ioctl(s, SIOC80211IFDESTROY, &ifr) < 0)
@@ -499,7 +499,7 @@ list_stations(const char *ifname)
 
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
-		err(1, "socket(SOCK_DRAGM)");
+		err(1, "socket(SOCK_DGRAM)");
 
 	(void) memset(&iwr, 0, sizeof(iwr));
 	(void) strncpy(iwr.ifr_name, ifname, sizeof(iwr.ifr_name));
@@ -813,7 +813,7 @@ getsocket(void)
 	if (s < 0) {
 		s = socket(AF_INET, SOCK_DGRAM, 0);
 		if (s < 0)
-			err(1, "socket(SOCK_DRAGM)");
+			err(1, "socket(SOCK_DGRAM)");
 	}
 	return s;
 }
