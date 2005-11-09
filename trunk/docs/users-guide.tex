@@ -90,7 +90,7 @@ interpreted in Hz.  For frequency values, the suffix \mytt{k},
 \mytt{M}, or \mytt{G} can be appended to the value to specify
 Kilohertz, Megahertz, and Gigahertz, e.g., \mytt{2.412G},\mytt{2412M},
 and \mytt{2412000000} are all the same frequency.  Setting the channel
-to a specific value will overide the private \mytt{mode} control
+to a specific value will override the private \mytt{mode} control
 described in Section~\ref{sec:iwprivs}.
 
 
@@ -226,7 +226,7 @@ retry, thus this parameter is meaningless.
 
 \subsection{Using \mytt{wlanconfig}}
 \label{sec:wlanconfig}
-The current MadWifi driver supports multiple AP's and concurrent
+The current MadWifi driver supports multiple APs and concurrent
 AP/Station mode operation on the same device.  The devices are
 restricted to using the same underlying hardware, thus are limited to
 coexisting on the same channel and using the same physical layer
@@ -235,7 +235,7 @@ features.  Each instance of an AP or station is called a Virtual AP
 station mode, and Monitor mode.  Every VAP has an associated
 underlying base device which is created when the driver is loaded.
 
-Creating and destroying VAP's are done through the \mytt{wlanconfig}
+Creating and destroying VAPs are done through the \mytt{wlanconfig}
 tool found in the MadWifi tools directory.  Running the
 \mytt{wlanconfig} utility with no arguments returns a brief help
 line.  The format of the \mytt{wlanconfig} command takes two forms:
@@ -261,7 +261,7 @@ device \mytt{ath2} is registered, regardless of whether \mytt{ath1}
 exists.
 
 The \clival{Base Device} is the underlying wireless network device
-name created whent eh driver is loaded.  The MadWifi driver creates
+name created when the driver is loaded.  The MadWifi driver creates
 \mytt{wifi0}, \mytt{wifi1}, etc.\ as the underlying devices.  By
 specifying the \clival{Base Device}, the VAP is created with the
 \clival{Base Device} as the parent device.
@@ -305,7 +305,7 @@ VAP is different.  However, if the \mytt{-bssid} flag is used, then
 the MAC address of the underlying wireless device is cloned for the
 VAP being created.
 
-To destroy a vap, the \mytt{wlanconfig} command is used with the
+To destroy a VAP, the \mytt{wlanconfig} command is used with the
 \mytt{destroy} parameter.  In this case, the full device name must be
 used, i.e.\ you must specify the entire name, not just the device
 prefix.
@@ -321,11 +321,11 @@ prefix.
   Note that no other VAPs can be created since the we are assuming
   this is the first VAP created on \mytt{wifi0}.  Since this is the
   first VAP created, we only need to specify \mytt{ath}, not
-  \mytt{ath0}.  However, the following comannd would also be correct:
+  \mytt{ath0}.  However, the following command would also be correct:
   \bv
   \cmd{wlanconfig ath0 create wlandev wifi0 wlanmode sta}
   \ev
-  The MAC address of the station VAP is the same as the underying
+  The MAC address of the station VAP is the same as the underlying
   device's MAC address since it is the first VAP created.
 \end{example}
 \begin{example}
@@ -1026,8 +1026,8 @@ their associated actions.
   \begin{tabular}{|l|l|} \hline
     Argument & Action \\ \hline
     0 & No ACL checking is performed \\
-    1 & Only allow ACL's in the ACL list \\
-    2 & Only deny ACL's in the ACL list \\
+    1 & Only allow ACLs in the ACL list \\
+    2 & Only deny ACLs in the ACL list \\
     3 & Flush the ACL database \\
     4 & Remove the ACL policy \\ \hline
   \end{tabular}
@@ -1493,7 +1493,7 @@ Stations, enabling 4 address parsing results in the station passing up
 \emph{any} packet received in a 4 address from to the network layer.
 Also, any unicast packet not destined for the AP which is passed to
 the station by the network layer will be sent in 4 address mode.  For
-AP's, enabling 4 address parsing will result in the AP forwarding
+APs, enabling 4 address parsing will result in the AP forwarding
 packets to any MAC address from which it has received a 4 address
 packet.  Passing a value of 1 will enable 4 address parsing.  Passing
 a value of 0 will disable 4 address parsing.
@@ -1544,7 +1544,7 @@ the driver.
 \subsubsection{\mytt{coverageclass} - Set Coverage Class for AP}
 \argdesc{1}{0}{0}{Yes}
 This commands sets the coverage class for AP. Coverage class determines the
-airpropagation time used in BSS operation. The coverageclass value can be 
+air propagation time used in BSS operation. The coverageclass value can be 
 between 0 to 31. The coverageclass value is sent by AP via country IE
 element in beacon.
 \begin{example}
@@ -1689,7 +1689,7 @@ displayed.
 \bv
 \clicmd{ap\_service} $<$\clival{start}$|$\clival{stop}$|$\clival{restart}$>$
 \ev
-The \clicmd{ap\_sevice} script is used to start, stop and restart the
+The \clicmd{ap\_service} script is used to start, stop and restart the
 Linux AP service without rebooting the entire AP. Besides configuring
 WLAN using CLI commands, it's also responsible for configuring
 network functions such as bridging and VLAN.
@@ -1731,8 +1731,8 @@ The supported ACL modes and their actions are listed in Table ~\ref{tab:acl}.
   \begin{tabular}{|l|l|} \hline
     ACL Mode & Actions \\ \hline
     Open & No ACL checking is performed \\
-    Allow & Only allow ACL's in the ACL list \\
-    Deny & Only deny ACL's in the ACL list \\
+    Allow & Only allow ACLs in the ACL list \\
+    Deny & Only deny ACLs in the ACL list \\
     Flush & Flush the ACL database \\
     Disable & Remove the ACL policy \\ \hline
   \end{tabular}
@@ -1893,7 +1893,7 @@ of length from 8 to 63 characters, or a 256-bit key in hexadecimal form.
 \clicmd{set} \cliparam{power} $<$\clival{full}$|$\clival{min}$>$
 \ev
 This commands set the Tx Power of the current radio. The tx power can be set to a specific 
-\clival{value} in dB, or to the maximum or minum by \clival{full} or \clival{min}.
+\clival{value} in dB, or to the maximum or minimum by \clival{full} or \clival{min}.
 
 \subsubsection{Port VLAN ID}
 \bv
@@ -1902,7 +1902,7 @@ This commands set the Tx Power of the current radio. The tx power can be set to 
 \ev
 This command set the default port VLAN Id. When \cliparam{vlan} is enable but \cliparam{pvid}
 is not set for a BSS. This BSS will be added to the guest VLAN. Traffic from guest VLAN will
-be propagated to distrution system un-tagged.
+be propagated to distribution system untagged.
 
 \subsubsection{RADIUS Server Configuration}
 \bv
@@ -1937,7 +1937,7 @@ it's up to the AP to select the best data rate.
 \clicmd{set} \cliparam{repeater} \clival{param} \clival{value}\\
 \ev
 The command \mytt{set repeater enable} works as follows: it first deletes
-all the old VAP's on this WLAN. Then creates a STA VAP and an AP VAP.
+all the old VAPs on this WLAN, then creates a STA VAP and an AP VAP.
 The \cliparam{wds} mode is enabled implicitly on the STA VAP.
 
 To let the STA VAP associate to the remote AP, use the command
@@ -1946,10 +1946,10 @@ use command \mytt{set repeater ssid} instead.
 
 For other parameters, you can use command \mytt{set repeater param value},
 in which \cliparam{param} and \clival{value} are exactly the same as in
-a normal CLI command. But with \cliparam{repeater} before them, every paramter
-is actually set twice, once on STA, once on AP.
+a normal CLI command. But with \cliparam{repeater} before them, every
+parameter is actually set twice, once on STA, once on AP.
 
-The command \mytt{set repeater disable} will just delete all VAP's.
+The command \mytt{set repeater disable} will just delete all VAPs.
 
 For an example of how to set up a Linux repeater, 
 please refer to section ~\ref{sec:cli-repeater-example}
@@ -1965,7 +1965,7 @@ The \clival{ssid-text} can be no longer than 32 characters.
 \bv
 \clicmd{get} \cliparam{sta}
 \ev
-This command will display the assoication table.
+This command will display the association table.
 
 \subsubsection{Enable/Disable VLAN}
 \bv
@@ -2055,14 +2055,14 @@ Network". The desired IP address for the AP is 192.168.0.20.
   \cmd{iwconfig ath0 essid "Atheros Wireless Network" channel 36}\\
   \cmd{brctl addbr br0}\\
   \cmd{brctl addif br0 eth0}\\
-  \cmd{bcrtl addif ath0}\\
+  \cmd{brctl addif ath0}\\
   \cmd{brctl setfd br0 1}\\
   \cmd{ifconfig ath0 up}\\
   \cmd{ifconfig eth0 up}\\
   \cmd{ifconfig br0 192.168.0.20 up}
 \end{example}
 
-\subsubsection{Single AP with \mytt{hostapd} on an Automtically Chosen
+\subsubsection{Single AP with \mytt{hostapd} on an Automatically Chosen
   Channel}
 In this example, we configure a single MadWifi AP in 802.11g using the
 auto channel select.  The AP will use WPA-PSK via \mytt{hostapd}.
@@ -2083,7 +2083,7 @@ file.  The AP will have an IP address of 192.168.0.20.
   \mytt{debug=0}\\
   \mytt{eapol\_key\_index\_workaround=0}\\
   \mytt{dump\_file=/tmp/hostapd.dump.0.0}\\
-  \mytt{ssid="Atheros Wilress Network"}\\
+  \mytt{ssid="Atheros Wireless Network"}\\
   \mytt{wpa=1}\\
   \mytt{wpa\_passphrase=mypassphrase}\\
   \mytt{wpa\_key\_mgmt=WPA-PSK}\\
@@ -2098,7 +2098,7 @@ file.  The AP will have an IP address of 192.168.0.20.
   \cmd{iwpriv ath0 mode 11g}\\
   \cmd{brctl addbr br0}\\
   \cmd{brctl addif br0 eth0}\\
-  \cmd{bcrtl addif ath0}\\\
+  \cmd{brctl addif ath0}\\\
   \cmd{brctl setfd br0 1}\\
   \cmd{ifconfig ath0 up}\\
   \cmd{ifconfig eth0 up}\\
@@ -2134,11 +2134,11 @@ station will have an IP address of 192.168.0.100.
   \ev
 \end{example}
 
-\subsection{Three AP's on a Preselected Channel}
+\subsection{Three APs on a Preselected Channel}
 In this section, we give an example on how to configure a three
-MadWifi AP's in 802.11a on channel 36 with essid's
+MadWifi APs in 802.11a on channel 36 with essid's
 \mytt{"Atheros\_AP1"}, \mytt{"Atheros\_AP2"}, and
-\mytt{"Atherso\_AP3"}. All three AP's are bridged together.  The
+\mytt{"Atheros\_AP3"}. All three APs are bridged together.  The
 desired IP address for the AP is 192.168.0.20.
 
 \begin{example}
@@ -2153,9 +2153,9 @@ desired IP address for the AP is 192.168.0.20.
   \cmd{iwconfig ath2 essid "Atheros\_AP3"}\\
   \cmd{brctl addbr br0}\\
   \cmd{brctl addif br0 eth0}\\
-  \cmd{bcrtl addif ath0}\\
-  \cmd{bcrtl addif ath1}\\
-  \cmd{bcrtl addif ath2}\\
+  \cmd{brctl addif ath0}\\
+  \cmd{brctl addif ath1}\\
+  \cmd{brctl addif ath2}\\
   \cmd{brctl setfd br0 1}\\
   \cmd{ifconfig ath0 up}\\
   \cmd{ifconfig ath1 up}\\
@@ -2169,9 +2169,9 @@ In this section, we give an example on how to configure MadWifi as a
 repeater operating with a single wireless device (e.g., \mytt{wifi0}).
 We assume there is an existing AP with an SSID of
 \mytt{Atheros\_Base\_AP}.  We wish to ``repeat'' this AP using our
-device.  To do this, we will create two VAP's.  The first VAP will be
+device.  To do this, we will create two VAPs.  The first VAP will be
 an AP VAP which will serve all the clients in our range.  The second
-VAP will be a station VAP used to assocation with the existing AP
+VAP will be a station VAP used to association with the existing AP
 named \mytt{Atheros\_Base\_AP}.  In order to have both a station and
 AP VAP coexist on one base device (e.g., \mytt{wifi0}), the AP VAP
 must be created first followed by the station VAP with the
@@ -2196,13 +2196,13 @@ existing AP understands how to handle 4 address frames.
   \cmd{iwpriv ath0 wds 1}\\
   \cmd{iwpriv ath1 wds 1}\\
   \cmd{ifconfig ath1 up}\\
-  Now, wait for assocation.\\
+  Now, wait for association.\\
   \cmd{ifconfig ath0 up}\\
   \cmd{ifconfig eth0 up}\\
   \cmd{brctl addbr br0}\\
   \cmd{brctl addif br0 eth0}\\
-  \cmd{bcrtl addif ath0}\\
-  \cmd{bcrtl addif ath1}\\
+  \cmd{brctl addif ath0}\\
+  \cmd{brctl addif ath1}\\
   \cmd{brctl setfd br0 1}\\
   \cmd{ifconfig br0 up}
 \end{example}
@@ -2221,10 +2221,10 @@ Thus, we are assuming that wireless device \mytt{wifi0} is capable of
 operating in the 802.11a band, and \mytt{wifi1} is capable of
 operating in the 802.11b band.  
 
-To do this, we will create two VAP's.  The VAP associated with
-\mytt{wifi0} will be a station VAP and the VAP assocaited with
+To do this, we will create two VAPs.  The VAP associated with
+\mytt{wifi0} will be a station VAP and the VAP associated with
 \mytt{wifi1} will be the AP VAP.  Note, the order of creation does not
-matter now since the VAP's are on different wireless devices.  The AP
+matter now since the VAPs are on different wireless devices.  The AP
 VAP must serve all the clients in our range and forward their traffic
 to the base AP via 4 address format.  
 
@@ -2244,8 +2244,8 @@ and will have the IP address of 192.168.0.20.
   \cmd{ifconfig eth0 up}\\
   \cmd{brctl addbr br0}\\
   \cmd{brctl addif br0 eth0}\\
-  \cmd{bcrtl addif ath0}\\
-  \cmd{bcrtl addif ath1}\\
+  \cmd{brctl addif ath0}\\
+  \cmd{brctl addif ath1}\\
   \cmd{brctl setfd br0 1}\\
   \cmd{ifconfig br0 192.168.0.20 up}
 \end{example}
@@ -2266,7 +2266,7 @@ channel selection in the 802.11a band and will have an ssid of
   \cmd{ifconfig eth0 up}\\
   \cmd{brctl addbr br0}\\
   \cmd{brctl addif br0 eth0}\\
-  \cmd{bcrtl addif ath0}\\
+  \cmd{brctl addif ath0}\\
   \cmd{brctl setfd br0 1}\\
   \cmd{ifconfig br0 192.168.0.20 up}
 \end{example}
@@ -2344,7 +2344,7 @@ testing broadcast), you need to enable \mytt{ALLMULTI} flag on STA.
 Currently there is no specific mode called ``WBR''. The P2P or P2MP bridge
 is configured using standard STA and AP, and partly leveraging Linux's
 native bridging functionalities. The basic idea is to set up on AP as root
-AP, and set up other AP's as STA or ``wirless client mode''. The let every
+AP, and set up other APs as STA or ``wireless client mode''. The let every
 AP in client mode associate to root AP. The WLAN driver will make forwarding
 decisions on the wireless media, and Linux native bridging layer will
 make forwarding decisions on the ethernet side.
@@ -2393,7 +2393,7 @@ wireless client.
 After wireless client is up, use \mytt{get sta} command to check for 
 association. Once it's associated, the P2P bridge is up and running.
 
-To configure P2MP, just set up another wireless client and repeate
+To configure P2MP, just set up another wireless client and repeat
 the example above.
 
 
