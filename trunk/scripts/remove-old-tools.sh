@@ -60,7 +60,7 @@ if [ -n "${FOUND}" ]; then
 		
 		while true; do
 			echo
-			echo -n "[l]ist, [r]emove, e[x]it (l,r,[x]) ? "
+			echo -n "[l]ist, [r]emove, [i]gnore, e[x]it (l,r,i,[x]) ? "
 			echo
 			read REPLY
 			case ${REPLY} in
@@ -76,7 +76,14 @@ if [ -n "${FOUND}" ]; then
 					echo
 					exit 0
 					;;
-	                                
+	                        
+				i|I)
+					echo
+					echo "Ignoring old tools"
+					echo
+					exit 0
+					;;
+
 				*) 
 					exit 1
 					;;
