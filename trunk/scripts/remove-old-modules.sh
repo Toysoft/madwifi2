@@ -4,15 +4,6 @@
 #
 # Author: Kel Modderman
 
-if [ $(id -u) != 0 ]; then
-	echo
-	echo "You must run this script as root."
-	echo
-	exit 1
-fi
-
-QUIET=${1}
-
 SCRIPTS=$(dirname $0)
 if [ -z "$SCRIPTS" ]; then
 	SCRIPTS=.
@@ -22,59 +13,64 @@ if [ -r "${SCRIPTS}"/../install.log ]; then
 	. ${SCRIPTS}/../install.log
 fi
 
-DEST="${DESTDIR}"
-KERNVER="${KERNELRELEASE:-$(uname -r)}"
-MODDIR="${DEST}/lib/modules/${KERNVER}"
+DEST=${DESTDIR}
+KERNVER=${KERNELRELEASE:-$(uname -r)}
+MODDIR=${DEST}/lib/modules/${KERNVER}
 
-PATTERN="^.*\/(ath_(hal|pci|rate_(onoe|amrr|sample))\.k?o)|(wlan(_(acl|ccmp|scan_(ap|sta)|tkip|wep|xauth))?\.k?o)$"
-OLD_MODULES=$(find ${MODDIR} -type f -regex '.*\.k?o' | grep -w -E "${PATTERN}")
+while [ "$#" -gt 0 ]; do
+	case ${1} in
+		*.o|*.ko)
+			OLD_MODULES="${OLD_MODULES}${1} "
+			shift
+			;;
+		
+		noask)
+			QUIET="noask"
+			shift
+			;;
+
+		*)
+			echo
+			echo "Bad input: ${1}"
+			echo
+			exit 1
+			;;
+	esac
+done
+
+if [ -z "${OLD_MODULES}" ];then
+	PATTERN="^.*\/(ath_(hal|pci|rate_(onoe|amrr|sample))\.k?o)|(wlan(_(acl|ccmp|scan_(ap|sta)|tkip|wep|xauth))?\.k?o)$"
+	OLD_MODULES=$(find ${MODDIR} -type f -regex '.*\.k?o' 2>/dev/null | grep -w -E "${PATTERN}")
+fi
+
 if [ -n "${OLD_MODULES}" ]; then
 	if [ "${QUIET}" = "noask" ]; then
 		rm -f ${OLD_MODULES} || exit 1
 	else
 		echo
-		echo "Old MadWifi modules found"
-		echo
+		echo "Old MadWifi modules found. Remove them?"
+		
 		while true; do
-			echo -n "List old MadWifi modules? [y],n "
+			echo
+			echo -n "[l]ist, [r]emove, e[x]it (l,r,[x]) ? "
+			echo
 			read REPLY
 			case ${REPLY} in
-				n|N|[Nn][Oo])
-					break
-					;;
-	
-				y|Y|[Yy][Ee][Ss]) 	
-					for m in ${OLD_MODULES}; do
-						echo ${m}
-					done
-					echo
-					break
-					;;
-	
-				*) 
+				l|L)
+					for m in ${OLD_MODULES}; do echo ${m}; done
 					continue
 					;;
-			esac
-		done
 	
-		while true; do
-			echo -n "Remove old MadWifi modules? [y],n "
-			read REPLY
-			case ${REPLY} in
-				n|N|[Nn][Oo])
-					exit 1
-					;;
-	
-				y|Y|[Yy][Ee][Ss]) 	
+				r|R) 	
 					rm -f ${OLD_MODULES} || exit 1
 					echo
 					echo "Removed old MadWifi modules"
 					echo
 					break
-				;;
+					;;
 	
 				*) 
-					continue
+					exit 1
 					;;
 			esac
 		done

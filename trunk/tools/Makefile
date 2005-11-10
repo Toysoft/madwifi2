@@ -76,6 +76,7 @@ wlanconfig: wlanconfig.c
 	${CC} -o 80211debug ${CFLAGS} ${LDFLAGS} 80211debug.c
 
 install: ${ALL}
+	sh ${DEPTH}/scripts/find-madwifi-tools.sh ${DESTDIR}${BINDIR} ${DESTDIR}${MANDIR}
 	install -d ${DESTDIR}${BINDIR}
 	for i in ${ALL}; do \
 		install $$i ${DESTDIR}${BINDIR}/$$i; \
