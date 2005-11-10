@@ -47,7 +47,6 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <iwlib.h>
 
 #include <stdio.h>
 #include <signal.h>
@@ -57,6 +56,7 @@
 
 #define __user
 
+#include "wireless_copy.h"
 #include "ah_desc.h"
 #include "if_athioctl.h"
 
