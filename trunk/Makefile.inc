@@ -176,6 +176,10 @@ ATH=	${DEPTH}/ath
 ifeq ($(ATH_RATE),)
 ATH_RATE=	ath_rate/sample
 endif
+#
+# Path to the userspace utilities. 
+# 
+TOOLS=  ${DEPTH}/tools 
 
 COPTS+=	-Werror
 INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
