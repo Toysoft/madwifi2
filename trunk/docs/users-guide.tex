@@ -6,9 +6,9 @@
 \newcommand{\cmd}[1]{{\texttt{myprompt\# #1}}}
 \newcommand{\argdesc}[4]{\begin{description}
 \itemsep -6pt
-\item \textit{Number Input Arguments:} #1
-\item \textit{Number Returned Arguments:} #2
-\item \textit{Default value:} #3
+\item \textit{Number of Input Arguments:} #1
+\item \textit{Number of Returned Arguments:} #2
+\item \textit{Default Value:} #3
 \item \textit{Resets State Machine After Command:} #4
 \end{description}
 }
@@ -72,28 +72,26 @@ change need to be specified.  Unspecified parameters will not be
 modified.  Each parameter is described below.
 
 \subsubsection{\mytt{essid} - ESSID or Network Name}
-This parameter sets the ESSID or Network Name to the value \clival{X}.  In
-station mode, the driver will attempt to join the network with the
-same ESSID.  In AP mode, the driver will use \clival{X} as the essid.
+Set the ESSID (also known as network name) to the given value.  In
+station mode, the driver will attempt to join the network with the same
+ESSID.  In AP mode, the driver will use the parameter as the ESSID.
 \begin{example}
   The following command sets the ssid to ``Atheros Wireless
   Network'' on \mytt{ath0}:
   \bv
-  \cmd{iwconfig ath0 essid ``Atheros Wireless Network''}\\
+  \cmd{iwconfig ath0 essid "Atheros Wireless Network"}\\
   \ev
 \end{example}
 
 \subsubsection{\mytt{freq}/\mytt{channel} - RF Frequency or Channel}
-This parameter sets the frequency or channel of the device.  Values
+Set the frequency or channel of the device to the given value.  Values
 below 1000 are interpreted as channel numbers.  Values above 1000 are
-interpreted in Hz.  For frequency values, the suffix \mytt{k},
-\mytt{M}, or \mytt{G} can be appended to the value to specify
-Kilohertz, Megahertz, and Gigahertz, e.g., \mytt{2.412G},\mytt{2412M},
-and \mytt{2412000000} are all the same frequency.  Setting the channel
-to a specific value will override the private \mytt{mode} control
-described in Section~\ref{sec:iwprivs}.
-
-
+interpreted as frequency measured in Hz.  For frequency values, the
+suffix \mytt{k}, \mytt{M}, or \mytt{G} can be appended to the value to
+specify kilohertz, Megahertz, and Gigahertz, so that \mytt{2.412G},
+\mytt{2412M}, and \mytt{2412000000} refer to the same frequency. 
+Setting the channel to a specific value will override the private
+\mytt{mode} control described in Section~\ref{sec:iwprivs}.
 \begin{example}
   The following command sets the operating frequency to 5.2GHz:
   \bv
@@ -107,34 +105,31 @@ described in Section~\ref{sec:iwprivs}.
   \ev
 \end{example}
 
-\subsubsection{\mytt{sens} - Set the Sensitivity Threshold}
-This parameter sets the sensitivity threshold which is the lowest
-signal level for which packets are received to \clival{S}.  Currently,
-this threshold is not implemented and any returned value is
-meaningless.
+\subsubsection{\mytt{sens} - Sensitivity Threshold}
+Set the sensitivity threshold to the given value.  This is the lowest
+signal strength at which the packets are received.  Currently, this
+threshold is not implemented and any returned value is meaningless.
 
 \subsubsection{\mytt{ap} - Use a Specific AP}
-This parameter sets the device to only associate to the AP given by
-\clival{A}.  The value \clival{A} is the MAC address of the desired
-AP.  Other valid values for \clival{A} are \clival{any}, \clival{auto}, and
-\clival{off}.
+Specify which AP the device should associate with.  The supplied value
+should be the MAC address of the desired AP or any of the keywords
+\clival{any}, \clival{auto}, or \clival{off}.
 \begin{example}
-  The following command sets the \mytt{ath0} device to use the AP with
-  the MAC address 00:03:7f:03:a0:0d.
+  The following command instructs the \mytt{ath0} device to associate
+  with the AP that has MAC address 00:03:7f:03:a0:0d.
   \bv
   \cmd{iwconfig ath0 ap 00:03:7f:03:a0:0d}
   \ev
 \end{example}
 
-\subsubsection{\mytt{rate} - Fix the Data Transmit Rate}
-This parameter is used to set the bit rate for cards supporting
-multiple bit rates.  The value \clival{R} is specified in bits/second
-and the values can be suffixed by \mytt{k}, \mytt{M}, or \mytt{G} for
-kilobits, megabits, and gigabits.  The value \mytt{auto} is also valid
-and will causes the device to use the bit rate selected by the rate
-control module.  By specifying a bit rate followed by \mytt{auto}, the driver
-will automatically select all bit rates lower than or equal two the
-value preceding \mytt{auto}.
+\subsubsection{\mytt{rate} - Set the Data Transmit Rate}
+Set the bit rate for transmitted packets.  The value is specified in
+bits per second and the values can be suffixed by \mytt{k}, \mytt{M}, or
+\mytt{G} for kilobits, megabits, and gigabits respectively.  The value
+\mytt{auto} is also valid and causes the device to use the bit rate
+selected by the rate control module.  It's also possible to supply the
+bit rate followed by \mytt{auto}, in which case the driver will
+automatically select from the bit rates not exceeding that rate.
 \begin{example}
   The following commands sets the maximum bit rate to 36Mbs.  Thus,
   the driver will automatically select the best rate less than or
@@ -145,10 +140,10 @@ value preceding \mytt{auto}.
 \end{example}
 
 \subsubsection{\mytt{rts} - Set the RTS/CTS Threshold}
-This parameter sets the minimum packet size for which the device sends
-an RTS using the RTS/CTS handshake.  The value \clival{RT} is the
-threshold.  If \clival{RT} is set to either \clival{off} or the
-maximum packet size, RTS/CTS is disabled.
+Set the minimum packet size for which the device sends an RTS using the
+RTS/CTS handshake.  The parameter is the threshold in bytes or the
+\clival{off} keyword.  If it's set to \clival{off} or the maximum packet
+size, RTS/CTS will be disabled.
 \begin{example}
   The following command sets the minimum packet size to use the
   RTS/CTS handshake to 40.
@@ -158,8 +153,8 @@ maximum packet size, RTS/CTS is disabled.
 \end{example}
 
 \subsubsection{\mytt{frag} - Set the Fragmentation Threshold}
-This parameter sets the maximum fragment size.  By setting
-\clival{FT} to \clival{off}, fragmentation is disabled.
+Set the maximum fragment size.  The parameter is either the threshold in
+bytes, or the \clival{off} keyword, which disables fragmentation.
 \begin{example}
   The following command sets \mytt{ath0} to fragment all packets to at
   most 512 bytes.
@@ -168,24 +163,24 @@ This parameter sets the maximum fragment size.  By setting
   \ev
 \end{example}
 
-\subsubsection{\mytt{key/enc} - Manipulate WEP Encryption Keys and
-  Mode}
+\subsubsection{\mytt{key/enc} - Manipulate WEP Encryption Keys and Mode}
 This parameter is used to manipulate the WEP key and authentication
-mode.  The \mytt{key} parameter can be used to set the key, change the
-key, select active keys, enable and disable WEP, and set the
-authentication mode.  Up to 4 keys can be stored in the driver.  Each
-instance of the \mytt{key} command manipulates only one key.  Thus, to
-change all 4 keys, 4 separate commands must be used.
+mode.  It can be used to set the key, change the key, select the active
+key, enable and disable WEP, and set the authentication mode.  The
+driver can store up to 4 keys.  Each instance of the \mytt{key} command
+manipulates only one key.  Thus, to change all 4 keys, 4 separate
+commands must be used.
 
-To select which key is active, use ``[\mytt{index}]'' for \clival{K}
-where \mytt{index} is the desired key number.  To change the key
-value, \clival{K} is just the new key value in hexadecimal.  If an
+The key value can be specified as is in the hexadecimal form.  If an
 ASCII string is used for the key value, perpend ``\mytt{s:}'' to the
-key.  To change a key other than the current key, perpend the key with
-``[\mytt{index}]'' where index is the number of the key you wish to
-change.  Including the values \mytt{open} or \mytt{restricted} in
-\clival{K} changes the authentication mode between open authentication
-and restricted authentication.  To disable WEP, \clival{K} should be \mytt{off}.
+key.  To change a key other than the current key, prepend
+``[\mytt{index}]'' to the key value, where \mytt{index} is the number of
+the key you wish to change.  To select which key is active, use
+``[\mytt{index}]'' without supplying any keys, where \mytt{index} is the
+desired key number.   Including the keywords \mytt{open} or
+\mytt{restricted} changes the authentication mode between open
+authentication and restricted authentication.  Use the \mytt{off}
+keyword to disable WEP.
 \begin{example}
   The following command sets the default key to be key 3:
   \bv
@@ -208,9 +203,11 @@ and restricted authentication.  To disable WEP, \clival{K} should be \mytt{off}.
 \end{example}
 
 \subsubsection{\mytt{txpower} - Set Transmit Power}
-This parameter sets the transmit power for data packets to \clival{W}
-dBm.  The value \clival{W} can also be \clival{auto} and \clival{off}
-where \clival{auto} uses automatic power control.
+Set the transmit power for data packets.  Bare numbers are interpreted
+as values in dBm.  If the number is followed by \clival{mW}, the value
+is interpreted in milliwatts.  The value can also be \clival{auto} for
+automatic power control and \clival{off} for disabling the radio
+transmission.
 \begin{example}
   The following command sets all data packets to transmit at either 30
   dBm or the maximum allowed in the current regulatory domain:
@@ -231,16 +228,16 @@ AP/Station mode operation on the same device.  The devices are
 restricted to using the same underlying hardware, thus are limited to
 coexisting on the same channel and using the same physical layer
 features.  Each instance of an AP or station is called a Virtual AP
-(or VAP). Each VAP can be in either AP mode, Station Mode, ``special''
-station mode, and Monitor mode.  Every VAP has an associated
-underlying base device which is created when the driver is loaded.
+(or VAP). Each VAP can be in either AP mode, station mode, ``special''
+station mode, and monitor mode.  Every VAP has an associated
+underlying base device, which is created when the driver is loaded.
 
 Creating and destroying VAPs are done through the \mytt{wlanconfig}
 tool found in the MadWifi tools directory.  Running the
 \mytt{wlanconfig} utility with no arguments returns a brief help
 line.  The format of the \mytt{wlanconfig} command takes two forms:
 \bv
-\mytt{wlanconfig} \clival{VAP} \mytt{ create wlandev}
+\mytt{wlanconfig} \clival{VAP} \mytt{create wlandev}
 \clival{Base Device} \mytt{wlanmode} \clival{mode}
 [\mytt{bssid}$\|$\mytt{-bssid}] [\mytt{nosbeacon}]\\
 \mytt{wlanconfig} \clival{VAP} \mytt{destroy}
@@ -311,9 +308,9 @@ used, i.e.\ you must specify the entire name, not just the device
 prefix.
 
 \begin{example}
-  Once the driver is loaded, if we wish to use the system as only a
-  station, then we would create a single station VAP.  The following
-  command creates a single station VAP name \mytt{ath0} on device
+  If we wish to use the system as a station only, we would create a
+  single station VAP once the driver is loaded.  The following
+  command creates a single station VAP named \mytt{ath0} on device
   \mytt{wifi0}:
   \bv
   \cmd{wlanconfig ath create wlandev wifi0 wlanmode sta}
@@ -341,11 +338,11 @@ prefix.
 \end{example}
 \begin{example}
   Now, we wish to create two AP VAPs on device \mytt{wifi0}.  Both
-  devices will have a the same MAC address which is cloned fro the
-  underlying device.  The first VAP will be \mytt{ath0} and the second
-  VAP will be \mytt{ath1}.
+  devices will have a the same MAC address cloned from the underlying
+  device.  The first VAP will be \mytt{ath0} and the second VAP will
+  be \mytt{ath1}.
   \bv
-  \cmd{wlanconfig ath create wlandev wifi0 wlanmode ap -bssid}
+  \cmd{wlanconfig ath create wlandev wifi0 wlanmode ap -bssid}\\
   \cmd{wlanconfig ath create wlandev wifi0 wlanmode ap -bssid}
   \ev
 \end{example}
@@ -354,21 +351,21 @@ prefix.
   will be \mytt{ath0} and \mytt{ath2} and the station VAP will be
   \mytt{ath1}.
   \bv
-  \cmd{wlanconfig ath create wlandev wifi0 wlanmode ap}
-  \cmd{wlanconfig ath create wlandev wifi0 wlanmode sta nosbeacon}
+  \cmd{wlanconfig ath create wlandev wifi0 wlanmode ap}\\
+  \cmd{wlanconfig ath create wlandev wifi0 wlanmode sta nosbeacon}\\
   \cmd{wlanconfig ath create wlandev wifi0 wlanmode ap}
   \ev
 \end{example}
 \begin{example}
   Now, we wish to destroy a VAP (regardless of its operating mode).
-  We assume there is a current VAP named \mytt{ath0} which is the one
+  We assume that there is a VAP named \mytt{ath0}, and it's the one
   we wish to destroy.
   \bv
   \cmd{wlanconfig ath0 destroy}
   \ev
 \end{example}
 
-\subsection{Private (non-standard) Driver Commands}
+\subsection{Private (Driver Specific) Driver Commands}
 \label{sec:iwprivs}
 The following is a list of the private commands which are accessible
 using \mytt{iwpriv}.  The general syntax of \mytt{iwpriv} is
@@ -376,15 +373,13 @@ using \mytt{iwpriv}.  The general syntax of \mytt{iwpriv} is
 \mytt{iwpriv} \textit{device} [\textit{command}]
 [\textit{parameters}].
 \ev
-The entire list of \mytt{iwpriv} commands can be found by issuing an
+The entire list of \mytt{iwpriv} commands can be found by running
 \mytt{iwpriv} to a device without any command.  The resulting list of
 commands has several columns.  The number of parameters allowed for
 each command is listed.  Parameters are classified as either ``set''
 or ``get'' parameters.  ``Set'' parameters are parameters which the
 user supplies to the driver.  ``Get'' parameters are parameters which
 the driver returns to the user.
-
-\subsection{List of \mytt{iwpriv} Commands}
 
 \subsubsection{\mytt{setoptie} - Set Optional Information Element}
 \argdesc{1}{0}{??}{??}
@@ -396,12 +391,11 @@ This commands gets the optional information element.  The information
 element is returned as 256 bytes.
 
 \subsubsection{\mytt{mode} - Set Wireless Mode}
-\argdesc{1}{0}{auto mode}{Yes}
-This command sets the wireless mode to one of the modes described in
-Table~\ref{tab:mode}.  Up to 6 characters or a single number are
-accepted as the mode.  The 6 character mode names are given in the
-left column in Table~\ref{tab:mode}.  The corresponding mode number is
-given in the middle column.
+\argdesc{1}{0}{auto}{Yes}
+This command sets the wireless mode, i.e. the frequency band and the
+protocol used.  The mode can be specified either by name or by number. 
+The allowed mode names and corresponding numbers are given in
+Table~\ref{tab:mode}.
 \begin{table}[h*]
   \centering
   \begin{tabular}{|l|l|l|} \hline
@@ -409,10 +403,9 @@ given in the middle column.
     auto & 0 & Auto select operating mode \\
     11a & 1 & 802.11a (5GHz) mode (54Mbps) \\
     11b & 2 & 802.11b (2.4GHz) mode (11Mbps) \\
-    11g & 3 & 802.11g (2.4GHz) mode with 802.11b compatibility
-    (54Mbps) \\
-    fh  & 4 & 80211 FH mode \\
-    11adt/111at & 5 & 802.11a (5GHz) Dynamic turbo mode \\
+    11g & 3 & 802.11g (2.4GHz) mode with 802.11b compatibility (54Mbps) \\
+    fh & 4 & 802.11 frequency hopping mode \\
+    11adt/111at & 5 & 802.11a (5GHz) dynamic turbo mode \\
     11gdt/11gt & 6 & 802.11g (2GHz) dynamic turbo mode (108Mbps) \\
     11ast & 7 & 802.11a (5GHz) static turbo mode \\ \hline
   \end{tabular}
@@ -1625,8 +1618,8 @@ or
 \bv
 \mytt{wlan[wlan\_index] -> }
 \ev
-If only one index is in the prompt, it could be either that there's no BSS
-created for this WLAN, or there's no BSS currently selected. To select a BSS
+If only one index is in the prompt, it could be either that there is no BSS
+created for this WLAN, or there is no BSS currently selected. To select a BSS
 within the same WLAN, use \mytt{config bss bss\_index}.
 
 \subsubsection{Reading the AP Configuration}
@@ -2047,7 +2040,7 @@ The ethernet device is assumed to be \mytt{eth0}.
 
 \subsection{Single AP on a Preselected Channel}
 In this section, we give an example on how to configure a single
-MadWifi AP in 802.11a on channel 36 with essid "Atheros Wireless
+MadWifi AP in 802.11a on channel 36 with ESSID "Atheros Wireless
 Network". The desired IP address for the AP is 192.168.0.20.
 \begin{example}
   \cmd{wlanconfig ath create wlandev wifi0 wlanmode ap}\\
@@ -2136,7 +2129,7 @@ station will have an IP address of 192.168.0.100.
 
 \subsection{Three APs on a Preselected Channel}
 In this section, we give an example on how to configure a three
-MadWifi APs in 802.11a on channel 36 with essid's
+MadWifi APs in 802.11a on channel 36 with ESSIDs
 \mytt{"Atheros\_AP1"}, \mytt{"Atheros\_AP2"}, and
 \mytt{"Atheros\_AP3"}. All three APs are bridged together.  The
 desired IP address for the AP is 192.168.0.20.
@@ -2342,8 +2335,8 @@ testing broadcast), you need to enable \mytt{ALLMULTI} flag on STA.
 
 \subsection{Linux P2P/P2MP Bridge}
 Currently there is no specific mode called ``WBR''. The P2P or P2MP bridge
-is configured using standard STA and AP, and partly leveraging Linux's
-native bridging functionalities. The basic idea is to set up on AP as root
+is configured using standard STA and AP, partly leveraging Linux native
+bridging facilities. The basic idea is to set up on AP as root
 AP, and set up other APs as STA or ``wireless client mode''. The let every
 AP in client mode associate to root AP. The WLAN driver will make forwarding
 decisions on the wireless media, and Linux native bridging layer will
