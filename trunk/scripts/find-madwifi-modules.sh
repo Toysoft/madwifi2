@@ -38,7 +38,7 @@ if [ -n "${OLD_MODULES}" ]; then
 	echo "WARNING:"
 	echo "It seems that there are modules left from previous MadWifi installations."
 	echo "You should consider removing them before you continue, or else you might"
-	echo "experience problems during operation."
+	echo "experience problems during operation. Remove old modules?"
 	
 	while true; do
 		echo

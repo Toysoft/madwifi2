@@ -52,7 +52,7 @@ if [ -n "${OLD_MODULES}" ]; then
 		
 		while true; do
 			echo
-			echo -n "[l]ist, [r]emove, e[x]it (l,r,[x]) ? "
+			echo -n "[l]ist, [r]emove, [i]gnore, e[x]it (l,r,i,[x]) ? "
 			echo
 			read REPLY
 			case ${REPLY} in
@@ -67,6 +67,13 @@ if [ -n "${OLD_MODULES}" ]; then
 					echo "Removed old MadWifi modules"
 					echo
 					break
+					;;
+
+				i|I)
+					echo
+					echo "Ignoring old modules"
+					echo
+					exit 0
 					;;
 	
 				*) 
