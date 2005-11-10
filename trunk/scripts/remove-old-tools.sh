@@ -4,15 +4,6 @@
 #
 # Author: Kel Modderman
 
-if [ $(id -u) != 0 ]; then
-	echo
-	echo "You must run this script as root."
-	echo
-	exit 1
-fi
-
-QUIET=${1}
-
 SCRIPTS=$(dirname $0)
 if [ -z "$SCRIPTS" ]; then
 	SCRIPTS=.
@@ -22,69 +13,74 @@ if [ -r "${SCRIPTS}"/../tools/install.log ]; then
 	. ${SCRIPTS}/../tools/install.log
 fi
 
-DEST="${DESTDIR}"
-BIN="${BINDIR:-/usr/local/bin}"
-BINPATH="${DEST}${BIN}"
-MAN="${MANDIR:-/usr/local/man}"
-MANPATH="${DEST}${MAN}/man8"
+DEST=${DESTDIR}
+BIN=${BINDIR:-/usr/local/bin}
+BINPATH=${DEST}${BIN}
+MAN=${MANDIR:-/usr/local/man}
+MANPATH=${DEST}${MAN}/man8
 TOOLS="athstats 80211stats athkey athchans athctrl athdebug 80211debug wlanconfig"
 
-REGEX_TOOLS=$(echo ${TOOLS} | sed 's/\ /\\|/g')
-REGEX_MAN=$(echo ${TOOLS} | sed 's/\ /\.8\\|/g')
-FOUND_TOOLS=$(find ${BINPATH} -type f -regex ".*\(${REGEX_TOOLS}\)" 2>/dev/null)
-FOUND_MAN=$(find ${MANPATH} -type f -regex ".*\(${REGEX_MAN}.8\)" 2>/dev/null)
 
-# This subshell ignores blank space of empty var's
-FOUND=$(echo ${FOUND_TOOLS} ${FOUND_MAN})
+while [ "$#" -gt 0 ]; do
+	case ${1} in
+		*ath*|*80211*|*wlanconfig*)
+			FOUND="${FOUND}${1} "
+			shift
+			;;
+		
+		noask)
+			QUIET="noask"
+			shift
+			;;
+
+		*)
+			echo
+			echo "Bad input: ${1}"
+			echo
+			exit 1
+			;;
+	esac
+done
+
+if [ -z "${FOUND}" ]; then
+	REGEX_TOOLS=$(echo ${TOOLS} | sed 's/\ /\\|/g')
+	REGEX_MAN=$(echo ${TOOLS} | sed 's/\ /\.8\\|/g').8
+	FOUND_TOOLS=$(find ${BINPATH} -type f -regex ".*\(${REGEX_TOOLS}\)" 2>/dev/null)
+	FOUND_MAN=$(find ${MANPATH} -type f -regex ".*\(${REGEX_MAN}\)" 2>/dev/null)
+	# This subshell ignores blank space of empty var's
+	FOUND=$(echo ${FOUND_TOOLS} ${FOUND_MAN})
+fi
+
 if [ -n "${FOUND}" ]; then
 	if [ "${QUIET}" = "noask" ]; then
 		rm -f ${FOUND} || exit 1
 	else
 		echo
-		echo "Old MadWifi tools found"
-		echo
-		while true; do
-			echo -n "List old MadWifi tools? [y],n "
-			read REPLY
-			case ${REPLY} in
-				n|N|[Nn][Oo])
-					break
-					;;
-     		
-				y|Y|[Yy][Ee][Ss]) 	
-					for t in ${FOUND}; do
-						echo ${t}
-					done
-					echo
-					break
-					;;
-	                                
-				*) 
-					continue
-					;;
-	               	esac
-		done
+		echo "Old MadWifi tools found. Remove them?"
 		
 		while true; do
-			echo -n "Remove old MadWifi tools? [y],n "
+			echo
+			echo -n "[l]ist, [r]emove, e[x]it (l,r,[x]) ? "
+			echo
 			read REPLY
 			case ${REPLY} in
-				n|N|[Nn][Oo])
-					exit 1
+				l|L)
+					for t in ${FOUND}; do echo ${t}; done
+					continue
 					;;
-	                       	
-				y|Y|[Yy][Ee][Ss]) 	
+     		
+				r|R) 	
 					rm -f ${FOUND} || exit 1
 					echo
 					echo "Removed old MadWifi tools"
 					echo
-					break
+					exit 0
 					;;
-                               
+	                                
 				*) 
-					continue
+					exit 1
 					;;
-        	       	esac
+	               	esac
 		done
 	fi	
 else
