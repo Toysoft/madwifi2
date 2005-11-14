@@ -2,7 +2,7 @@
 .SH "NAME"
 \fBwlanconfig\fP \- Create, destroy and manipulate madwifi VAPs
 .SH "SYNOPSIS"
-\fBwlanconfig <vap> create wlandev <base device> mode <mode>
+\fBwlanconfig <vap> create wlandev <base device> wlanmode <mode>
 .TP
 \fBwlanconfig <vap> destroy
 .TP
@@ -18,7 +18,7 @@ underlying base device which is created when the driver is loaded.
 .PP
 .SH "ARGUMENTS"
 .TP
-.B <vap> create wlandev <base device> mode <mode> [bssid|-bssid] [nosbeacon]
+.B <vap> create wlandev <base device> wlanmode <mode> [bssid|-bssid] [nosbeacon]
 Create the interface <vap> using the specified <base device> and <mode>. <vap> can either be a full interface name (e.g. 'ath0'), or just the suffix (e.g. 'ath'), in which case, the kernel will automatically append the next vacant integer.
 .TP
 .B <vap> destroy
