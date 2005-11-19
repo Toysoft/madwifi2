@@ -101,7 +101,7 @@ if [ -n "${OLD_MODULES}" ]; then
 			echo "Please run $0 again"
 			echo
 			exit 1
-		elif [ -n "${UNLOADED}" ] && [ "${QUIET}" != "noask" ]; then
+		elif [ -n "${UNLOADED}" -a "${QUIET}" != "noask" ]; then
 			echo "Successfully unloaded MadWifi modules"
 			echo "[ ${UNLOADED}]"
 			echo
