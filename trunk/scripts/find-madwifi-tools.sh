@@ -38,7 +38,7 @@ if [ -d "${MANPATH}" ]; then
 	FOUND_MAN=$(find ${MANPATH} -type f -regex ".*\(${REGEX_MAN}\)" 2>/dev/null)
 fi
 
-if [ -n "${BINPATH}" ] || [ -n "${MANPATH}" ]; then
+if [ -n "${BINPATH}" -o -n "${MANPATH}" ]; then
 	FOUND=$(echo ${FOUND_TOOLS} ${FOUND_MAN})
 fi
 
