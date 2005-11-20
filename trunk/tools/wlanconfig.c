@@ -845,7 +845,7 @@ do80211priv(struct iwreq *iwr, const char *ifname, int op, void *data, size_t le
 {
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 
-	memset(iwr, 0, sizeof(iwr));
+	memset(iwr, 0, sizeof(struct iwreq));
 	strncpy(iwr->ifr_name, ifname, IFNAMSIZ);
 	if (len < IFNAMSIZ) {
 		/*
