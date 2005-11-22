@@ -106,6 +106,7 @@ ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen)
 	return skb;
 }
 
+#if 0
 /*
  * Drain a queue of sk_buff's.
  */
@@ -117,6 +118,7 @@ __skb_queue_drain(struct sk_buff_head *q)
 	while ((skb = __skb_dequeue(q)) != NULL)
 		dev_kfree_skb(skb);
 }
+#endif
 
 #if IEEE80211_VLAN_TAG_USED
 /*
