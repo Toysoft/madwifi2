@@ -96,10 +96,16 @@ main(int argc, char *argv[])
 {
 	const char *ifname, *cmd;
 
-	if (argc < 3)
+	if (argc < 2)
 		usage();
 
 	ifname = argv[1];
+
+	if (argc == 2) {
+		ieee80211_status(ifname);
+		return 0;
+	}
+
 	cmd = argv[2];
 	if (streq(cmd, "create")) {
 		struct ieee80211_clone_params cp;
@@ -161,7 +167,7 @@ main(int argc, char *argv[])
 		} else				/* NB: for compatibility */
 			list_stations(ifname);
 	} else
-		ieee80211_status(ifname);
+		usage();
 
 	return 0;
 }
