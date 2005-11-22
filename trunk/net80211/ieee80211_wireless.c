@@ -1567,18 +1567,16 @@ ieee80211_convert_mode(const char *mode)
 
 static int
 ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
-		   	 void *w, char *extra)
+		   	struct iw_point *wri, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-	struct iw_point *wri;
 	struct ifreq ifr;
 	char s[6];		/* big enough for ``11adt'' */
 	int retv,mode,ifr_mode;
 
 	if (ic->ic_media.ifm_cur == NULL)
 		return -EINVAL;
-	wri = (struct iw_point *) extra;
 	if (wri->length > sizeof(s))		/* silently truncate */
 		wri->length = sizeof(s);
 	if (copy_from_user(s, wri->pointer, wri->length))
@@ -3862,27 +3860,36 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) ieee80211_ioctl_giwpower,		/* SIOCGIWPOWER */
 };
 static const iw_handler ieee80211_priv_handlers[] = {
-	(iw_handler) ieee80211_ioctl_setparam,		/* SIOCWFIRSTPRIV+0 */
-	(iw_handler) ieee80211_ioctl_getparam,		/* SIOCWFIRSTPRIV+1 */
-	(iw_handler) ieee80211_ioctl_setkey,		/* SIOCWFIRSTPRIV+2 */
-	(iw_handler) ieee80211_ioctl_setwmmparams,	/* SIOCWFIRSTPRIV+3 */
-	(iw_handler) ieee80211_ioctl_delkey,		/* SIOCWFIRSTPRIV+4 */
-	(iw_handler) ieee80211_ioctl_getwmmparams,	/* SIOCWFIRSTPRIV+5 */
-	(iw_handler) ieee80211_ioctl_setmlme,		/* SIOCWFIRSTPRIV+6 */
-	(iw_handler) ieee80211_ioctl_getchaninfo,	/* SIOCWFIRSTPRIV+7 */
-	(iw_handler) ieee80211_ioctl_setoptie,		/* SIOCWFIRSTPRIV+8 */
-	(iw_handler) ieee80211_ioctl_getoptie,		/* SIOCWFIRSTPRIV+9 */
-	(iw_handler) ieee80211_ioctl_addmac,		/* SIOCWFIRSTPRIV+10 */
-	(iw_handler) ieee80211_ioctl_getscanresults,	/* SIOCWFIRSTPRIV+11 */
-	(iw_handler) ieee80211_ioctl_delmac,		/* SIOCWFIRSTPRIV+12 */
-	(iw_handler) ieee80211_ioctl_getchanlist,	/* SIOCWFIRSTPRIV+13 */
-	(iw_handler) ieee80211_ioctl_setchanlist,	/* SIOCWFIRSTPRIV+14 */
-	(iw_handler) NULL,				/* SIOCWFIRSTPRIV+15 */
-	(iw_handler) ieee80211_ioctl_chanswitch,	/* SIOCWFIRSTPRIV+16 */
-	(iw_handler) ieee80211_ioctl_setmode,		/* SIOCWFIRSTPRIV+17 */
-	(iw_handler) ieee80211_ioctl_getmode,		/* SIOCWFIRSTPRIV+18 */
-	(iw_handler) ieee80211_ioctl_wdsmac,		/* SIOCWFIRSTPRIV+19 */
-	(iw_handler) ieee80211_ioctl_wdsdelmac,		/* SIOCWFIRSTPRIV+20 */
+	(iw_handler) ieee80211_ioctl_setparam,		/* SIOCIWFIRSTPRIV+0 */
+	(iw_handler) ieee80211_ioctl_getparam,		/* SIOCIWFIRSTPRIV+1 */
+	(iw_handler) ieee80211_ioctl_setmode,		/* SIOCIWFIRSTPRIV+2 */
+	(iw_handler) ieee80211_ioctl_getmode,		/* SIOCIWFIRSTPRIV+3 */
+	(iw_handler) ieee80211_ioctl_setwmmparams,	/* SIOCIWFIRSTPRIV+4 */
+	(iw_handler) ieee80211_ioctl_getwmmparams,	/* SIOCIWFIRSTPRIV+5 */
+	(iw_handler) ieee80211_ioctl_setchanlist,	/* SIOCIWFIRSTPRIV+6 */
+	(iw_handler) ieee80211_ioctl_getchanlist,	/* SIOCIWFIRSTPRIV+7 */
+	(iw_handler) ieee80211_ioctl_chanswitch,	/* SIOCIWFIRSTPRIV+8 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+9 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+10 */
+	(iw_handler) ieee80211_ioctl_getscanresults,	/* SIOCIWFIRSTPRIV+11 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+12 */
+	(iw_handler) ieee80211_ioctl_getchaninfo,	/* SIOCIWFIRSTPRIV+13 */
+	(iw_handler) ieee80211_ioctl_setoptie,		/* SIOCIWFIRSTPRIV+14 */
+	(iw_handler) ieee80211_ioctl_getoptie,		/* SIOCIWFIRSTPRIV+15 */
+	(iw_handler) ieee80211_ioctl_setmlme,		/* SIOCIWFIRSTPRIV+16 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+17 */
+	(iw_handler) ieee80211_ioctl_setkey,		/* SIOCIWFIRSTPRIV+18 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+19 */
+	(iw_handler) ieee80211_ioctl_delkey,		/* SIOCIWFIRSTPRIV+20 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+21 */
+	(iw_handler) ieee80211_ioctl_addmac,		/* SIOCIWFIRSTPRIV+22 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+23 */
+	(iw_handler) ieee80211_ioctl_delmac,		/* SIOCIWFIRSTPRIV+24 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+25 */
+	(iw_handler) ieee80211_ioctl_wdsmac,		/* SIOCIWFIRSTPRIV+26 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+27 */
+	(iw_handler) ieee80211_ioctl_wdsdelmac,		/* SIOCIWFIRSTPRIV+28 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+29 */
 };
 static struct iw_handler_def ieee80211_iw_handler_def = {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
