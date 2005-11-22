@@ -1085,8 +1085,10 @@ ieee80211com_media_change(struct net_device *dev)
 	IEEE80211_LOCK(ic);
 	if (ic->ic_curmode != newphymode) {		/* change phy mode */
 		error = ieee80211_setmode(ic, newphymode);
-		if (error != 0)
+		if (error != 0) {
+			IEEE80211_UNLOCK(ic);
 			return error;
+		}
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			/* reset WME state */
 			ieee80211_wme_initparams_locked(vap);
