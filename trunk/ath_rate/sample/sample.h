@@ -259,7 +259,7 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 		int ctsduration = 0;
 
 		if (!rt->info[cix].rateKbps) {
-			printk(KERN_WARNING "cix %d (%d) bad ratekbps %d mode %u",
+			printk(KERN_WARNING "cix %d (%d) bad ratekbps %d mode %u\n",
 			       cix, rt->info[cix].dot11Rate,
 			       rt->info[cix].rateKbps,
 			       sc->sc_curmode);
