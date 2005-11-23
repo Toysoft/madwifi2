@@ -550,7 +550,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		error = EIO;
 		goto bad2;
 	}
-	/* NB: insure BK queue is the lowest priority h/w queue */
+	/* NB: ensure BK queue is the lowest priority h/w queue */
 	if (!ath_tx_setup(sc, WME_AC_BK, HAL_WME_AC_BK)) {
 		printk(KERN_ERR "%s: unable to setup xmit queue for %s traffic!\n",
 			dev->name, ieee80211_wme_acnames[WME_AC_BK]);
@@ -891,7 +891,7 @@ ath_detach(struct net_device *dev)
 	/*
 	 * NB: the order of these is important:
 	 * o call the 802.11 layer before detaching the hal to
-	 *   insure callbacks into the driver to delete global
+	 *   ensure callbacks into the driver to delete global
 	 *   key cache entries can be handled
 	 * o reclaim the tx queue data structures after calling
 	 *   the 802.11 layer as we'll get called back to reclaim
@@ -1558,7 +1558,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 * Figure out the reason(s) for the interrupt.  Note
 	 * that the hal returns a pseudo-ISR that may include
 	 * bits we haven't explicitly enabled so we mask the
-	 * value to insure we only process bits we requested.
+	 * value to ensure we only process bits we requested.
 	 */
 	ath_hal_getisr(ah, &status);		/* NB: clears ISR too */
 	DPRINTF(sc, ATH_DEBUG_INTR, "%s: status 0x%x\n", __func__, status);
@@ -3837,7 +3837,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 
 	/*
 	 * Enable the CAB queue before the beacon queue to
-	 * insure cab frames are triggered by this beacon.
+	 * ensure cab frames are triggered by this beacon.
 	 */
 	if (avp->av_boff.bo_tim[4] & 1)	{	/* NB: only at DTIM */
 		struct ath_txq *cabq = sc->sc_cabq;
@@ -4271,7 +4271,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 
 		/*
 		 * Calculate sleep duration.  The configuration is
-		 * given in ms.  We insure a multiple of the beacon
+		 * given in ms.  We ensure a multiple of the beacon
 		 * period is used.  Also, if the sleep duration is
 		 * greater than the DTIM period then it makes senses
 		 * to make it a multiple of that.
@@ -5029,13 +5029,13 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	 * not get overrun under high load (as can happen with a
 	 * 5212 when ANI processing enables PHY error frames).
 	 *
-	 * To insure the last descriptor is self-linked we create
+	 * To ensure the last descriptor is self-linked we create
 	 * each descriptor as self-linked and add it to the end.  As
 	 * each additional descriptor is added the previous self-linked
 	 * entry is ``fixed'' naturally.  This should be safe even
 	 * if DMA is happening.  When processing RX interrupts we
 	 * never remove/process the last, self-linked, entry on the
-	 * descriptor list.  This insures the hardware always has
+	 * descriptor list.  This ensures the hardware always has
 	 * someplace to write a new frame.
 	 */
 	ds = bf->bf_desc;
@@ -6400,7 +6400,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %x\n",
 		__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
 #else /* ATH_SUPERG_FF case */
-	/* NB: insure skb->len had been updated for each skb so we don't need pktlen */
+	/* NB: ensure skb->len had been updated for each skb so we don't need pktlen */
 	{
 		struct sk_buff *skbtmp = skb;
 		int i=0;
@@ -6714,7 +6714,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * descriptors when the h/w hits an EOL condition or
 	 * when the descriptor is specifically marked to generate
 	 * an interrupt.  We periodically mark descriptors in this
-	 * way to insure timely replenishing of the supply needed
+	 * way to ensure timely replenishing of the supply needed
 	 * for sending frames.  Defering interrupts reduces system
 	 * load and potentially allows more concurrent work to be
 	 * done but if done to aggressively can cause senders to

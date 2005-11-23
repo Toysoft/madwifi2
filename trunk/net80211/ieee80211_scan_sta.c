@@ -796,7 +796,7 @@ sta_update_notseen(struct sta_table *st)
 		/*
 		 * If seen the reset and don't bump the count;
 		 * otherwise bump the ``not seen'' count.  Note
-		 * that this insures that stations for which we
+		 * that this ensures that stations for which we
 		 * see frames while not scanning but not during
 		 * this scan will not be penalized.
 		 */
@@ -963,7 +963,7 @@ sta_roam_check(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 		    "%s: currssi %d currate %u roamrssi %d roamrate %u\n",
 		    __func__, curRssi, curRate, roamRssi, roamRate);
 	} else {
-		curRate = roamRate;		/* NB: insure compare below fails */
+		curRate = roamRate;		/* NB: ensure compare below fails */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_ROAM,
 		    "%s: currssi %d roamrssi %d\n", __func__, curRssi, roamRssi);
 	}

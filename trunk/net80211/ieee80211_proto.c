@@ -434,7 +434,7 @@ ieee80211_fix_rate(struct ieee80211_node *ni, int flags)
 					/*
 					 * Overwrite with the supported rate
 					 * value so any basic rate bit is set.
-					 * This insures that response we send
+					 * This ensures that response we send
 					 * to stations have the necessary basic
 					 * rate bit set.
 					 */
@@ -996,7 +996,7 @@ EXPORT_SYMBOL(ieee80211_start_running);
  * Stop a vap.  We force it down using the state machine
  * then mark it's device not running.  If this is the last
  * vap running on the underlying device then we close it
- * too to insure it will be properly initialized when the
+ * too to ensure it will be properly initialized when the
  * next vap is brought up.
  */
 int

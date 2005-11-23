@@ -1492,7 +1492,7 @@ ieee80211_ioctl_giwscan(struct net_device *dev,
 	req.end_buf = extra + IW_SCAN_MAX_DATA;
 
 	/*
-	 * Do two passes to insure WPA/non-WPA scan candidates
+	 * Do two passes to ensure WPA/non-WPA scan candidates
 	 * are sorted to the front.  This is a hack to deal with
 	 * the wireless extensions capping scan results at
 	 * IW_SCAN_MAX_DATA bytes.  In densely populated environments
@@ -1581,7 +1581,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 		wri->length = sizeof(s);
 	if (copy_from_user(s, wri->pointer, wri->length))
 		return -EINVAL;
-	s[sizeof(s)-1] = '\0';			/* insure null termination */
+	s[sizeof(s)-1] = '\0';			/* ensure null termination */
 	mode = ieee80211_convert_mode(s);
 	if (mode < 0)
 		return -EINVAL;

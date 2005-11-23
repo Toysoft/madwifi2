@@ -184,7 +184,7 @@ ieee80211_crypto_enmic(struct ieee80211vap *vap,
 
 /* 
  * Reset key state to an unused state.  The crypto
- * key allocation mechanism insures other state (e.g.
+ * key allocation mechanism ensures other state (e.g.
  * key data) is properly setup before a key is used.
  */
 static __inline void

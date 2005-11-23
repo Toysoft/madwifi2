@@ -222,7 +222,7 @@ EXPORT_SYMBOL(ieee80211_node_unauthorize);
 
 /*
  * Set/change the channel.  The rate set is also updated
- * to insure a consistent view by drivers.
+ * to ensure a consistent view by drivers.
  */
 static __inline void
 ieee80211_node_set_chan(struct ieee80211com *ic, struct ieee80211_node *ni)
@@ -718,7 +718,7 @@ node_alloc(struct ieee80211_node_table *nt,struct ieee80211vap *vap)
  * Reclaim any resources in a node and reset any critical
  * state.  Typically nodes are free'd immediately after,
  * but in some cases the storage may be reused so we need
- * to insure consistent state (should probably fix that).
+ * to ensure consistent state (should probably fix that).
  */
 static void
 node_cleanup(struct ieee80211_node *ni)
@@ -1906,7 +1906,7 @@ done:
 	/*
 	 * Remove the node from any table it's recorded in and
 	 * drop the caller's reference.  Removal from the table
-	 * is important to insure the node is not reprocessed
+	 * is important to ensure the node is not reprocessed
 	 * for inactivity.
 	 */
 	if (nt != NULL) {

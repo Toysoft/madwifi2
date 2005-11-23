@@ -101,7 +101,7 @@ ap_flush(struct ieee80211_scan_state *ss)
 	struct ap_state *as = ss->ss_priv;
 
 	memset(as->as_maxrssi, 0, sizeof(as->as_maxrssi));
-	ss->ss_last = 0;		/* insure no channel will be picked */
+	ss->ss_last = 0;		/* ensure no channel will be picked */
 	return 0;
 }
 
