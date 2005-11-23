@@ -92,7 +92,7 @@ export MODULEPATH=/lib/modules/%{mykversion}/net
 export COPTS="-I /lib/modules/%{mykversion}/build/include/ $COPTS"
 # export ATH_RATE=ath_rate/onoe
 make 
-cd tools ; make all ; cd ..
+# cd tools ; make all ; cd ..
 
 %install 
 export KERNELRELEASE=%{mykversion}
@@ -102,13 +102,13 @@ export MODULEPATH=/lib/modules/%{mykversion}/net
 
 rm -rf %{buildroot}
 
-make info
+# make info
 mkdir -p  %{buildroot}/usr/local/bin
 mkdir -p  %{buildroot}/$MODULEPATH
 mkdir -p  %{buildroot}/usr/share/madwifi
 
 make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversion}/build
-cd tools ; make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversion}/build BINDIR=/usr/local/bin  ; cd ..
+# cd tools ; make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversion}/build BINDIR=/usr/local/bin  ; cd ..
 
 %post  module
 /sbin/depmod -ae %{mykversion}
