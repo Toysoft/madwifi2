@@ -2819,17 +2819,15 @@ ieee80211_ioctl_wdsmac(struct net_device *dev, struct iw_request_info *info,
 	else
 		goto wdsmac_fail;
 
-	printk("%s: Added WDS MAC: %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", dev->name,
-		vap->wds_mac[0], vap->wds_mac[1], vap->wds_mac[2],
-		vap->wds_mac[3], vap->wds_mac[4], vap->wds_mac[5]);
+	printk("%s: Added WDS MAC: %s\n", dev->name,
+	       ether_sprintf(vap->wds_mac));
 
 	return 0;
 
 wdsmac_fail:
 
-	printk("%s: Failed to add WDS MAC: %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", dev->name,
-		sa->sa_data[0], sa->sa_data[1], sa->sa_data[2],
-		sa->sa_data[3], sa->sa_data[4], sa->sa_data[5]);
+	printk("%s: Failed to add WDS MAC: %s\n", dev->name,
+		ether_sprintf(sa->sa_data));
 
 	return -1;
 }
@@ -2861,9 +2859,8 @@ ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
 		return 0;			 
 	}
 
-	printk("%s: WDS MAC address (%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x) not known by this interface\n", dev->name,
-		sa->sa_data[0], sa->sa_data[1], sa->sa_data[2],
-		sa->sa_data[3], sa->sa_data[4], sa->sa_data[5]);
+	printk("%s: WDS MAC address %s is not known by this interface\n",
+	       dev->name, ether_sprintf(sa->sa_data));
 
 	return -1;
 }
