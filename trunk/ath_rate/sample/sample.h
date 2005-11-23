@@ -206,7 +206,7 @@ static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
 	if (!rt->info[rix].rateKbps) {
-		printk(KERN_WARNING "rix %d (%d) bad ratekbps %d mode %u",
+		printk(KERN_WARNING "rix %d (%d) bad ratekbps %d mode %u\n",
 		       rix, rt->info[rix].dot11Rate,
 		       rt->info[rix].rateKbps,
 		       sc->sc_curmode);
