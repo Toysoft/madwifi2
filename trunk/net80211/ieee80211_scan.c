@@ -285,7 +285,7 @@ scan_restart_pwrsav(unsigned long arg)
 
 	ieee80211_sta_pwrsave(vap, 1);
 	/*
-	 * Use an initial 1ms delay to insure the null
+	 * Use an initial 1ms delay to ensure the null
 	 * data frame has a chance to go out.
 	 * XXX 1ms is a lot, better to trigger scan
 	 * on tx complete.

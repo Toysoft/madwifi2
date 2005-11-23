@@ -66,14 +66,14 @@ INSTALL ${DST_ATH} ${FILES}
 INSTALL ${DST_ATH} ${SRC_ATH}/Kconfig
 INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 
-# NB: use leading '_' to insure it's built before the driver
+# NB: use leading '_' to ensure it's built before the driver
 DST_ATH_HAL=${WIRELESS}/_ath_hal
 MKDIR ${DST_ATH_HAL}
 echo "Copy ath_hal bits..."
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/Kconfig
 INSTALLX ${DST_ATH_HAL}/Makefile ${SRC_ATH_HAL}/Makefile.kernel
 
-# NB: use leading '_' to insure it's built before the driver
+# NB: use leading '_' to ensure it's built before the driver
 DST_ATH_RATE=${WIRELESS}/_ath_rate
 MKDIR ${DST_ATH_RATE}
 echo "Copy $SRC_ATH_RATE bits..."

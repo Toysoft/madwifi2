@@ -541,7 +541,7 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 EXPORT_SYMBOL(ieee80211_send_qosnulldata);
 
 /*
- * Insure there is sufficient headroom and tailroom to
+ * Ensure there is sufficient headroom and tailroom to
  * encapsulate the 802.11 data frame.  If room isn't
  * already there, reallocate so there is enough space.
  * Drivers and cipher modules assume we have done the
@@ -574,7 +574,7 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 		 * being used we assume the hardware/driver will deal
 		 * with any padding (on the fly, without needing to
 		 * expand the frame contents).	When software crypto
-		 * is used we need to insure room is available at the
+		 * is used we need to ensure room is available at the
 		 * front and back and also for any per-MSDU additions.
 		 */
 		/* XXX belongs in crypto code? */
@@ -766,7 +766,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	skb_pull(skb, sizeof(struct ether_header));
 
 	/*
-	 * Insure space for additional headers.	 First identify
+	 * Ensure space for additional headers.	 First identify
 	 * transmit key to use in calculating any buffer adjustments
 	 * required.  This is also used below to do privacy
 	 * encapsulation work.	Then calculate the 802.11 header

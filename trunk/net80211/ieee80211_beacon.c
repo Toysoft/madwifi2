@@ -369,7 +369,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			 * new bits.  Otherwise we need to move any trailing
 			 * data to make room.  Note that we know there is
 			 * contiguous space because ieee80211_beacon_allocate
-			 * insures there is space in the mbuf to write a
+			 * ensures there is space in the mbuf to write a
 			 * maximal-size virtual bitmap (based on ic_max_aid).
 			 */
 			/*

@@ -821,7 +821,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 		return skb;
 
 	/*
-	 * Remove frag to insure it doesn't get reaped by timer.
+	 * Remove frag to ensure it doesn't get reaped by timer.
 	 */
 	if (ni->ni_table == NULL) {
 		/*
@@ -1163,7 +1163,7 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			(void) ieee80211_ref_node(ni);
 		/*
 		 * Mark the node as referenced to reflect that it's
-		 * reference count has been bumped to insure it remains
+		 * reference count has been bumped to ensure it remains
 		 * after the transaction completes.
 		 */
 		ni->ni_flags |= IEEE80211_NODE_AREF;
@@ -1354,7 +1354,7 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			}
 			/*
 			 * Mark the node as referenced to reflect that it's
-			 * reference count has been bumped to insure it remains
+			 * reference count has been bumped to ensure it remains
 			 * after the transaction completes.
 			 */
 			ni->ni_flags |= IEEE80211_NODE_AREF;
@@ -2103,7 +2103,7 @@ ieee80211_parse_dothparams(struct ieee80211vap *vap, u_int8_t *frm,
 		/* XXX doesn't stop management frames */
 		/* XXX who restarts the queue? */
 		/* NB: for now, error here is non-catastrophic.
-		 *     in the future we may need to insure we
+		 *     in the future we may need to ensure we
 		 *     stop xmit on this channel.
 		 */
 		netif_stop_queue(ic->ic_dev);
