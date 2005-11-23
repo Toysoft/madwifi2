@@ -53,27 +53,28 @@ ALL=	athstats 80211stats athkey athchans athctrl \
 all:	${ALL}
 
 INCS+=	-I. -I${HAL} -I${DEPTH}
-CFLAGS=	${INCS} -g
+CFLAGS=	-g -O2 -Wall
+ALL_CFLAGS= ${CFLAGS} ${INCS}
 LDFLAGS=
 
 all:	${ALL}
 
 athstats: athstats.c
-	${CC} -o athstats ${CFLAGS} -I../ath ${LDFLAGS} athstats.c
+	${CC} -o athstats ${ALL_CFLAGS} -I../ath ${LDFLAGS} athstats.c
 80211stats: 80211stats.c
-	${CC} -o 80211stats ${CFLAGS} ${LDFLAGS} 80211stats.c
+	${CC} -o 80211stats ${ALL_CFLAGS} ${LDFLAGS} 80211stats.c
 athkey: athkey.c
-	${CC} -o athkey ${CFLAGS} ${LDFLAGS} athkey.c
+	${CC} -o athkey ${ALL_CFLAGS} ${LDFLAGS} athkey.c
 athchans: athchans.c
-	${CC} -o athchans ${CFLAGS} ${LDFLAGS} athchans.c
+	${CC} -o athchans ${ALL_CFLAGS} ${LDFLAGS} athchans.c
 athctrl: athctrl.c
-	${CC} -o athctrl ${CFLAGS} ${LDFLAGS} athctrl.c
+	${CC} -o athctrl ${ALL_CFLAGS} ${LDFLAGS} athctrl.c
 athdebug: athdebug.c
-	${CC} -o athdebug ${CFLAGS} ${LDFLAGS} athdebug.c
+	${CC} -o athdebug ${ALL_CFLAGS} ${LDFLAGS} athdebug.c
 wlanconfig: wlanconfig.c
-	${CC} -o wlanconfig ${CFLAGS} ${LDFLAGS} wlanconfig.c
+	${CC} -o wlanconfig ${ALL_CFLAGS} ${LDFLAGS} wlanconfig.c
 80211debug: 80211debug.c
-	${CC} -o 80211debug ${CFLAGS} ${LDFLAGS} 80211debug.c
+	${CC} -o 80211debug ${ALL_CFLAGS} ${LDFLAGS} 80211debug.c
 
 install: ${ALL}
 	sh ${DEPTH}/scripts/find-madwifi-tools.sh ${DESTDIR}${BINDIR} ${DESTDIR}${MANDIR}
