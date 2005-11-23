@@ -2217,41 +2217,40 @@ cap2cipher(int flag)
 
 static int
 ieee80211_ioctl_getmode(struct net_device *dev, struct iw_request_info *info,
-			void *w, char *extra)
+			struct iw_point *wri, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-	struct iw_point *wri = (struct iw_point *)extra;
 	struct ifmediareq imr;
-	char mode[8];
 
 	ic->ic_media.ifm_status(ic->ic_dev, &imr);
 	switch (IFM_MODE(imr.ifm_active)) {
 	case IFM_IEEE80211_11A:
-		strcpy(mode,"11a");
+		strcpy(extra, "11a");
 		break;
 	case IFM_IEEE80211_11B:
-		strcpy(mode,"11b");
+		strcpy(extra, "11b");
 		break;
 	case IFM_IEEE80211_11G:
-		strcpy(mode,"11g");
+		strcpy(extra, "11g");
 		break;
 	case IFM_IEEE80211_FH:
-		strcpy(mode,"FH");
+		strcpy(extra, "FH");
 		break;
 	case IFM_AUTO:
-		strcpy(mode,"auto");
+		strcpy(extra, "auto");
 		break;
 	default:
 		return -EINVAL;
 	}
 	if (ic->ic_media.ifm_media & IFM_IEEE80211_TURBO) {
 		if (vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)
-			strcat(mode,"T");
+			strcat(extra, "T");
 		else
-			strcat(mode,"ST");
+			strcat(extra, "ST");
 	}
-	return (copy_to_user(wri->pointer, mode, 6) ? -EFAULT : 0);
+	wri->length = strlen(extra);
+	return 0;
 }
 
 static int
