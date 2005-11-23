@@ -2473,10 +2473,9 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 
 static int
 ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
-		   	 void *w, char *extra)
+		   	 struct iw_point *wri, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
-	union iwreq_data *u = w;
 	void *ie;
 
 	/*
@@ -2487,37 +2486,36 @@ ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
 	 */
 	if (vap->iv_opmode != IEEE80211_M_STA)
 		return -EINVAL;
-	/* NB: data.length is validated by the wireless extensions code */
-	MALLOC(ie, void *, u->data.length, M_DEVBUF, M_WAITOK);
+	/* NB: wri->length is validated by the wireless extensions code */
+	MALLOC(ie, void *, wri->length, M_DEVBUF, M_WAITOK);
 	if (ie == NULL)
 		return -ENOMEM;
-	memcpy(ie, extra, u->data.length);
+	memcpy(ie, extra, wri->length);
 	/* XXX sanity check data? */
 	if (vap->iv_opt_ie != NULL)
 		FREE(vap->iv_opt_ie, M_DEVBUF);
 	vap->iv_opt_ie = ie;
-	vap->iv_opt_ie_len = u->data.length;
+	vap->iv_opt_ie_len = wri->length;
 #ifdef ATH_SUPERG_XR
 	/* set the same params on the xr vap device if exists */
 	if(vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR) )
-		ieee80211_ioctl_setoptie(vap->iv_xrvap->iv_dev,info,w,extra);
+		ieee80211_ioctl_setoptie(vap->iv_xrvap->iv_dev,info,wri,extra);
 #endif
 	return 0;
 }
 
 static int
 ieee80211_ioctl_getoptie(struct net_device *dev, struct iw_request_info *info,
-		   	 void *w, char *extra)
+		   	 struct iw_point *wri, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
-	union iwreq_data *u = w;
 
-	if (vap->iv_opt_ie == NULL)
-		return -EINVAL;
-	if (u->data.length < vap->iv_opt_ie_len)
-		return -EINVAL;
-	u->data.length = vap->iv_opt_ie_len;
-	memcpy(extra, vap->iv_opt_ie, u->data.length);
+	if (vap->iv_opt_ie == NULL) {
+		wri->length = 0;
+		return 0;
+	}
+	wri->length = vap->iv_opt_ie_len;
+	memcpy(extra, vap->iv_opt_ie, vap->iv_opt_ie_len);
 	return 0;
 }
 
