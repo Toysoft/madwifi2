@@ -62,6 +62,13 @@
 #define	SIOCG80211STATS	(SIOCDEVPRIVATE+2)
 #endif
 
+/* printf modifier for u_int64_t */
+#ifdef _LP64
+#define INT64FMT "%lu"
+#else
+#define INT64FMT "%llu"
+#endif
+
 static void
 printstats(FILE *fd, const struct ieee80211_stats *stats)
 {
@@ -180,11 +187,11 @@ print_sta_stats(FILE *fd, const u_int8_t macaddr[IEEE80211_ADDR_LEN])
 	STAT(rx_data, "%u");
 	STAT(rx_mgmt, "%u");
 	STAT(rx_ctrl, "%u");
-	STAT(rx_beacons, "%llu");
+	STAT(rx_beacons, INT64FMT);
 	STAT(rx_proberesp, "%u");
 	STAT(rx_ucast, "%u");
 	STAT(rx_mcast, "%u");
-	STAT(rx_bytes, "%llu");
+	STAT(rx_bytes, INT64FMT);
 	STAT(rx_dup, "%u");
 	STAT(rx_noprivacy, "%u");
 	STAT(rx_wepfail, "%u");
@@ -204,7 +211,7 @@ print_sta_stats(FILE *fd, const u_int8_t macaddr[IEEE80211_ADDR_LEN])
 	STAT(tx_probereq, "%u");
 	STAT(tx_ucast, "%u");
 	STAT(tx_mcast, "%u");
-	STAT(tx_bytes, "%llu");
+	STAT(tx_bytes, INT64FMT);
 	STAT(tx_novlantag, "%u");
 	STAT(tx_vlanmismatch, "%u");
 	fprintf(fd, "\n");
