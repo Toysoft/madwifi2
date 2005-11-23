@@ -223,7 +223,7 @@ getifstats(const char *ifname, u_long *iframes, u_long *oframes)
 				*tp++ = '\0';
 				if (strcmp(cp, ifname) != 0)
 					continue;
-				sscanf(tp, "%*llu %lu %*u %*u %*u %*u %*u %*u %*llu %lu",
+				sscanf(tp, "%*u %lu %*u %*u %*u %*u %*u %*u %*u %lu",
 					iframes, oframes);
 				fclose(fd);
 				return 1;
