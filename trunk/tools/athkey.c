@@ -50,6 +50,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <err.h>
 
 #include "wireless_copy.h"
 #include "net80211/ieee80211.h"
@@ -127,7 +128,7 @@ digittoint(int c)
 }
 
 static int
-getdata(const char *arg, u_int8_t *data, size_t maxlen)
+getdata(const char *arg, u_int8_t *data, int maxlen)
 {
 	const char *cp = arg;
 	int len;
@@ -207,7 +208,6 @@ main(int argc, char *argv[])
 	const char *ifname = "wifi0";
 	struct ieee80211req_key setkey;
 	struct ieee80211req_del_key delkey;
-	const char *cp;
 	int c, keyix;
 	int op = IEEE80211_IOCTL_SETKEY;
 

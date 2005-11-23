@@ -61,7 +61,7 @@ setsysctrl(const char *dev, const char *control , u_long value)
 	snprintf(buffer, sizeof(buffer),"/proc/sys/dev/%s/%s",dev,control);
 	fd = fopen(buffer, "w");
 	if (fd != NULL) {
-		fprintf(fd,"%i",value);
+		fprintf(fd,"%li",value);
 	}
 	return 0;
 }
@@ -125,4 +125,5 @@ main(int argc, char *argv[])
 	}else{
 		usage();
 	}
+	return 0;
 }

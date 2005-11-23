@@ -50,6 +50,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <err.h>
 
 #include "wireless_copy.h"
 #include "net80211/ieee80211.h"
@@ -133,7 +134,6 @@ main(int argc, char *argv[])
 {
 	const char *ifname = "wifi0";
 	struct ieee80211req_chanlist chanlist;
-	const char *cp;
 	int c;
 
 	progname = argv[0];
@@ -158,16 +158,16 @@ main(int argc, char *argv[])
 		switch (sscanf(argv[0], "%u-%u", &first, &last)) {
 		case 1:
 			if (first > MAXCHAN)
-				errx(-1, "%s: channel %u out of range, max %u",
+				errx(-1, "%s: channel %u out of range, max %lu",
 					progname, first, MAXCHAN);
 			setbit(chanlist.ic_channels, first);
 			break;
 		case 2:
 			if (first > MAXCHAN)
-				errx(-1, "%s: channel %u out of range, max %u",
+				errx(-1, "%s: channel %u out of range, max %lu",
 					progname, first, MAXCHAN);
 			if (last > MAXCHAN)
-				errx(-1, "%s: channel %u out of range, max %u",
+				errx(-1, "%s: channel %u out of range, max %lu",
 					progname, last, MAXCHAN);
 			if (first > last)
 				errx(-1, "%s: void channel range, %u > %u",
