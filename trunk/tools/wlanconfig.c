@@ -50,6 +50,7 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <err.h>
 
 #include "wireless_copy.h"
 #include "net80211/ieee80211.h"
@@ -83,7 +84,6 @@ static void usage(void);
 static int getopmode(const char *);
 static int getflag(const char *);
 static int get80211param(const char *ifname, int param, void * data, size_t len);
-static int set80211priv(const char *ifname, int op, void *data, size_t len);
 static int get80211priv(const char *ifname, int op, void *data, size_t len);
 static const char *getstamode(u_int8_t opmode);
 
@@ -252,21 +252,6 @@ getflag(const char  *s)
 }
 
 /*
- * Convert IEEE channel number to MHz frequency.
- */
-static u_int
-ieee80211_ieee2mhz(u_int chan)
-{
-	if (chan == 14)
-		return 2484;
-	if (chan < 14)			/* 0-13 */
-		return 2407 + chan*5;
-	if (chan < 27)			/* 15-26 */
-		return 2512 + ((chan-15)*20);
-	return 5000 + (chan*5);
-}
-
-/*
  * Convert MHz frequency to IEEE channel number.
  */
 static u_int
@@ -392,11 +377,11 @@ printie(const char* tag, const uint8_t *ie, size_t ielen, int maxlen)
  * to hexadecimal.  If the result is truncated then replace the last
  * three characters with "...".
  */
-static size_t
+static int
 copy_essid(char buf[], size_t bufsize, const u_int8_t *essid, size_t essid_len)
 {
 	const u_int8_t *p; 
-	size_t maxlen;
+	int maxlen;
 	int i;
 
 	if (essid_len > bufsize)
@@ -586,7 +571,6 @@ static void
 list_scan(const char *ifname)
 {
 	uint8_t buf[24*1024];
-	struct iwreq iwr;
 	char ssid[14];
 	uint8_t *cp;
 	int len;
@@ -899,14 +883,6 @@ do80211priv(struct iwreq *iwr, const char *ifname, int op, void *data, size_t le
 	}
 	return 0;
 #undef N
-}
-
-static int
-set80211priv(const char *ifname, int op, void *data, size_t len)
-{
-	struct iwreq iwr;
-
-	return do80211priv(&iwr, ifname, op, data, len);
 }
 
 static int

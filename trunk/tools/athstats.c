@@ -43,6 +43,8 @@
  * (default interface is wifi0).  If interval is specified a rolling output
  * is displayed every interval seconds.
  */
+#define _BSD_SOURCE
+
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
@@ -52,6 +54,8 @@
 #include <signal.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <unistd.h>
 #include <err.h>
 
 #define __user
@@ -264,7 +268,6 @@ main(int argc, char *argv[])
 	strncpy(ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 	if (argc > 1) {
 		u_long interval = strtoul(argv[1], NULL, 0);
-		u_long off;
 		int line, omask;
 		u_int rate, rssi;
 		struct ath_stats cur, total;
@@ -302,7 +305,7 @@ main(int argc, char *argv[])
 				err(1, ifr.ifr_name);
 			if (!getifstats(ifr.ifr_name, &icur, &ocur))
 				err(1, ifr.ifr_name);
-			printf("%8u %8u %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
+			printf("%8lu %8lu %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
 				, (icur - itot) -
 					(cur.ast_rx_mgt - total.ast_rx_mgt)
 				, ocur - otot
@@ -325,7 +328,7 @@ main(int argc, char *argv[])
 				err(1, ifr.ifr_name);
 			if (!getifstats(ifr.ifr_name, &itot, &otot))
 				err(1, ifr.ifr_name);
-			printf("%8u %8u %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
+			printf("%8lu %8lu %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
 				, itot - total.ast_rx_mgt
 				, otot
 				, total.ast_tx_altrate

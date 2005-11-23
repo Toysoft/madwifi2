@@ -51,6 +51,7 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <err.h>
 
 #include "wireless_copy.h"
 #include "net80211/ieee80211.h"
@@ -179,7 +180,7 @@ print_sta_stats(FILE *fd, const u_int8_t macaddr[IEEE80211_ADDR_LEN])
 	STAT(rx_data, "%u");
 	STAT(rx_mgmt, "%u");
 	STAT(rx_ctrl, "%u");
-	STAT(rx_beacons, "%u");
+	STAT(rx_beacons, "%llu");
 	STAT(rx_proberesp, "%u");
 	STAT(rx_ucast, "%u");
 	STAT(rx_mcast, "%u");
@@ -222,7 +223,7 @@ print_sta_stats(FILE *fd, const u_int8_t macaddr[IEEE80211_ADDR_LEN])
 	STAT(tx_auth, "%u");
 	STAT(tx_auth_fail, "%u");
 	STAT(tx_deauth, "%u");
-	STAT(tx_deauth_code, "%llu");
+	STAT(tx_deauth_code, "%u");
 	STAT(tx_disassoc, "%u");
 	STAT(tx_disassoc_code, "%u");
 	STAT(psq_drops, "%u");
@@ -253,7 +254,7 @@ main(int argc, char *argv[])
 			strncpy(ifr.ifr_name, optarg, sizeof (ifr.ifr_name));
 			break;
 		default:
-			errx(1, "usage: %s [-a] [-i device] [mac...]\n");
+			errx(1, "usage: 80211stats [-a] [-i device] [mac...]\n");
 			/*NOTREACHED*/
 		}
 
@@ -296,4 +297,5 @@ main(int argc, char *argv[])
 				print_sta_stats(stdout, ea->ether_addr_octet);
 		}
 	}
+	return 0;
 }
