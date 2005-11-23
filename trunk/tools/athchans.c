@@ -128,7 +128,7 @@ usage(void)
 	exit(-1);
 }
 
-#define	MAXCHAN	(sizeof(struct ieee80211req_chanlist) * NBBY)
+#define	MAXCHAN	((int)(sizeof(struct ieee80211req_chanlist) * NBBY))
 int
 main(int argc, char *argv[])
 {
@@ -158,16 +158,16 @@ main(int argc, char *argv[])
 		switch (sscanf(argv[0], "%u-%u", &first, &last)) {
 		case 1:
 			if (first > MAXCHAN)
-				errx(-1, "%s: channel %u out of range, max %lu",
+				errx(-1, "%s: channel %u out of range, max %u",
 					progname, first, MAXCHAN);
 			setbit(chanlist.ic_channels, first);
 			break;
 		case 2:
 			if (first > MAXCHAN)
-				errx(-1, "%s: channel %u out of range, max %lu",
+				errx(-1, "%s: channel %u out of range, max %u",
 					progname, first, MAXCHAN);
 			if (last > MAXCHAN)
-				errx(-1, "%s: channel %u out of range, max %lu",
+				errx(-1, "%s: channel %u out of range, max %u",
 					progname, last, MAXCHAN);
 			if (first > last)
 				errx(-1, "%s: void channel range, %u > %u",
