@@ -347,8 +347,11 @@ get_jiffies_64(void)
 	return (u_int64_t) jiffies;		/* XXX not right */
 }
 #endif
-/* XXX not in 2.6.6 but is in 2.6.10; might have appeared earlier */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10) && LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29)
+
+/* msecs_to_jiffies appeared in 2.6.7 and 2.4.29 */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) && \
+      LINUX_VERSION_CODE < KERNEL_VERSION(2,6,7)) || \
+     LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29)
 static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 {
 	return (m * HZ + 999) / 1000;
