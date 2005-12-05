@@ -285,6 +285,7 @@ MODULE_PARM(countrycode, "i");
 MODULE_PARM(outdoor, "i");
 MODULE_PARM(xchanmode, "i");
 #else
+#include <linux/moduleparam.h>
 module_param(countrycode, int, 0);
 module_param(outdoor, int, 0);
 module_param(xchanmode, int, 0);
