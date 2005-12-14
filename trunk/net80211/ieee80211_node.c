@@ -646,6 +646,8 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	ni->ni_rssi = se->se_rssi;
 	if (se->se_wpa_ie != NULL)
 		ieee80211_saveie(&ni->ni_wpa_ie, se->se_wpa_ie);
+	if (se->se_rsn_ie != NULL)
+		ieee80211_saveie(&ni->ni_rsn_ie, se->se_rsn_ie);
 	if (se->se_wme_ie != NULL)
 		ieee80211_saveie(&ni->ni_wme_ie, se->se_wme_ie);
 	if (se->se_ath_ie != NULL)
@@ -791,6 +793,8 @@ node_free(struct ieee80211_node *ni)
 	ic->ic_node_cleanup(ni);
 	if (ni->ni_wpa_ie != NULL)
 		FREE(ni->ni_wpa_ie, M_DEVBUF);
+	if (ni->ni_rsn_ie != NULL)
+		FREE(ni->ni_rsn_ie, M_DEVBUF);
 	if (ni->ni_wme_ie != NULL)
 		FREE(ni->ni_wme_ie, M_DEVBUF);
 	if (ni->ni_ath_ie != NULL)
@@ -1177,6 +1181,8 @@ ieee80211_add_neighbor(struct ieee80211vap *vap,
 			ieee80211_saveie(&ni->ni_wme_ie, sp->wme);
 		if (sp->wpa != NULL)
 			ieee80211_saveie(&ni->ni_wpa_ie, sp->wpa);
+		if (sp->rsn != NULL)
+			ieee80211_saveie(&ni->ni_rsn_ie, sp->rsn);
 		if (sp->ath != NULL)
 			ieee80211_saveath(ni, sp->ath);
 

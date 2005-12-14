@@ -1640,7 +1640,7 @@ wpa_keymgmt(u_int8_t *sel)
  */
 static int
 ieee80211_parse_wpa(struct ieee80211vap *vap, u_int8_t *frm,
-	struct ieee80211_rsnparms *rsn, const struct ieee80211_frame *wh)
+	struct ieee80211_rsnparms *rsn_parm, const struct ieee80211_frame *wh)
 {
 	u_int8_t len = frm[1];
 	u_int32_t w;
@@ -1676,12 +1676,12 @@ ieee80211_parse_wpa(struct ieee80211vap *vap, u_int8_t *frm,
 	frm += 2, len -= 2;
 
 	/* multicast/group cipher */
-	w = wpa_cipher(frm, &rsn->rsn_mcastkeylen);
-	if (w != rsn->rsn_mcastcipher) {
+	w = wpa_cipher(frm, &rsn_parm->rsn_mcastkeylen);
+	if (w != rsn_parm->rsn_mcastcipher) {
 		IEEE80211_DISCARD_IE(vap,
 		    IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
 		    wh, "WPA", "mcast cipher mismatch; got %u, expected %u",
-		    w, rsn->rsn_mcastcipher);
+		    w, rsn_parm->rsn_mcastcipher);
 		return IEEE80211_REASON_IE_INVALID;
 	}
 	frm += 4, len -= 4;
@@ -1698,10 +1698,10 @@ ieee80211_parse_wpa(struct ieee80211vap *vap, u_int8_t *frm,
 	}
 	w = 0;
 	for (; n > 0; n--) {
-		w |= 1<<wpa_cipher(frm, &rsn->rsn_ucastkeylen);
+		w |= 1<<wpa_cipher(frm, &rsn_parm->rsn_ucastkeylen);
 		frm += 4, len -= 4;
 	}
-	w &= rsn->rsn_ucastcipherset;
+	w &= rsn_parm->rsn_ucastcipherset;
 	if (w == 0) {
 		IEEE80211_DISCARD_IE(vap,
 		    IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
@@ -1709,9 +1709,9 @@ ieee80211_parse_wpa(struct ieee80211vap *vap, u_int8_t *frm,
 		return IEEE80211_REASON_IE_INVALID;
 	}
 	if (w & (1<<IEEE80211_CIPHER_TKIP))
-		rsn->rsn_ucastcipher = IEEE80211_CIPHER_TKIP;
+		rsn_parm->rsn_ucastcipher = IEEE80211_CIPHER_TKIP;
 	else
-		rsn->rsn_ucastcipher = IEEE80211_CIPHER_AES_CCM;
+		rsn_parm->rsn_ucastcipher = IEEE80211_CIPHER_AES_CCM;
 
 	/* key management algorithms */
 	n = LE_READ_2(frm);
@@ -1728,7 +1728,7 @@ ieee80211_parse_wpa(struct ieee80211vap *vap, u_int8_t *frm,
 		w |= wpa_keymgmt(frm);
 		frm += 4, len -= 4;
 	}
-	w &= rsn->rsn_keymgmtset;
+	w &= rsn_parm->rsn_keymgmtset;
 	if (w == 0) {
 		IEEE80211_DISCARD_IE(vap,
 		    IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
@@ -1736,12 +1736,12 @@ ieee80211_parse_wpa(struct ieee80211vap *vap, u_int8_t *frm,
 		return IEEE80211_REASON_IE_INVALID;
 	}
 	if (w & WPA_ASE_8021X_UNSPEC)
-		rsn->rsn_keymgmt = WPA_ASE_8021X_UNSPEC;
+		rsn_parm->rsn_keymgmt = WPA_ASE_8021X_UNSPEC;
 	else
-		rsn->rsn_keymgmt = WPA_ASE_8021X_PSK;
+		rsn_parm->rsn_keymgmt = WPA_ASE_8021X_PSK;
 
 	if (len > 2)		/* optional capabilities */
-		rsn->rsn_caps = LE_READ_2(frm);
+		rsn_parm->rsn_caps = LE_READ_2(frm);
 
 	return 0;
 }
@@ -1808,7 +1808,7 @@ rsn_keymgmt(u_int8_t *sel)
  */
 static int
 ieee80211_parse_rsn(struct ieee80211vap *vap, u_int8_t *frm,
-	struct ieee80211_rsnparms *rsn, const struct ieee80211_frame *wh)
+	struct ieee80211_rsnparms *rsn_parm, const struct ieee80211_frame *wh)
 {
 	u_int8_t len = frm[1];
 	u_int32_t w;
@@ -1843,12 +1843,12 @@ ieee80211_parse_rsn(struct ieee80211vap *vap, u_int8_t *frm,
 	frm += 2, len -= 2;
 
 	/* multicast/group cipher */
-	w = rsn_cipher(frm, &rsn->rsn_mcastkeylen);
-	if (w != rsn->rsn_mcastcipher) {
+	w = rsn_cipher(frm, &rsn_parm->rsn_mcastkeylen);
+	if (w != rsn_parm->rsn_mcastcipher) {
 		IEEE80211_DISCARD_IE(vap,
 		    IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
 		    wh, "RSN", "mcast cipher mismatch; got %u, expected %u",
-		    w, rsn->rsn_mcastcipher);
+		    w, rsn_parm->rsn_mcastcipher);
 		return IEEE80211_REASON_IE_INVALID;
 	}
 	frm += 4, len -= 4;
@@ -1865,10 +1865,10 @@ ieee80211_parse_rsn(struct ieee80211vap *vap, u_int8_t *frm,
 	}
 	w = 0;
 	for (; n > 0; n--) {
-		w |= 1<<rsn_cipher(frm, &rsn->rsn_ucastkeylen);
+		w |= 1<<rsn_cipher(frm, &rsn_parm->rsn_ucastkeylen);
 		frm += 4, len -= 4;
 	}
-	w &= rsn->rsn_ucastcipherset;
+	w &= rsn_parm->rsn_ucastcipherset;
 	if (w == 0) {
 		IEEE80211_DISCARD_IE(vap,
 		    IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
@@ -1876,9 +1876,9 @@ ieee80211_parse_rsn(struct ieee80211vap *vap, u_int8_t *frm,
 		return IEEE80211_REASON_IE_INVALID;
 	}
 	if (w & (1<<IEEE80211_CIPHER_TKIP))
-		rsn->rsn_ucastcipher = IEEE80211_CIPHER_TKIP;
+		rsn_parm->rsn_ucastcipher = IEEE80211_CIPHER_TKIP;
 	else
-		rsn->rsn_ucastcipher = IEEE80211_CIPHER_AES_CCM;
+		rsn_parm->rsn_ucastcipher = IEEE80211_CIPHER_AES_CCM;
 
 	/* key management algorithms */
 	n = LE_READ_2(frm);
@@ -1895,7 +1895,7 @@ ieee80211_parse_rsn(struct ieee80211vap *vap, u_int8_t *frm,
 		w |= rsn_keymgmt(frm);
 		frm += 4, len -= 4;
 	}
-	w &= rsn->rsn_keymgmtset;
+	w &= rsn_parm->rsn_keymgmtset;
 	if (w == 0) {
 		IEEE80211_DISCARD_IE(vap,
 		    IEEE80211_MSG_ELEMID | IEEE80211_MSG_WPA,
@@ -1903,13 +1903,13 @@ ieee80211_parse_rsn(struct ieee80211vap *vap, u_int8_t *frm,
 		return IEEE80211_REASON_IE_INVALID;
 	}
 	if (w & RSN_ASE_8021X_UNSPEC)
-		rsn->rsn_keymgmt = RSN_ASE_8021X_UNSPEC;
+		rsn_parm->rsn_keymgmt = RSN_ASE_8021X_UNSPEC;
 	else
-		rsn->rsn_keymgmt = RSN_ASE_8021X_PSK;
+		rsn_parm->rsn_keymgmt = RSN_ASE_8021X_PSK;
 
 	/* optional RSN capabilities */
 	if (len > 2)
-		rsn->rsn_caps = LE_READ_2(frm);
+		rsn_parm->rsn_caps = LE_READ_2(frm);
 	/* XXXPMKID */
 
 	return 0;
@@ -2200,7 +2200,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_frame *wh;
 	u_int8_t *frm, *efrm;
-	u_int8_t *ssid, *rates, *xrates, *wpa, *wme, *ath;
+	u_int8_t *ssid, *rates, *xrates, *wpa, *rsn, *wme, *ath;
 	u_int8_t rate;
 	int reassoc, resp, allocbs;
 	u_int8_t qosinfo;
@@ -2298,7 +2298,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				scan.erp = frm[2];
 				break;
 			case IEEE80211_ELEMID_RSN:
-				scan.wpa = frm;
+				scan.rsn = frm;
 				break;
 			case IEEE80211_ELEMID_VENDOR:
 				if (iswpaoui(frm))
@@ -2673,7 +2673,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
 	case IEEE80211_FC0_SUBTYPE_REASSOC_REQ: {
 		u_int16_t capinfo, bintval;
-		struct ieee80211_rsnparms rsn;
+		struct ieee80211_rsnparms rsn_parm;
 		u_int8_t reason;
 
 		if (vap->iv_opmode != IEEE80211_M_HOSTAP ||
@@ -2715,7 +2715,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		bintval = le16toh(*(u_int16_t *)frm);	frm += 2;
 		if (reassoc)
 			frm += 6;	/* ignore current AP info */
-		ssid = rates = xrates = wpa = wme = ath = NULL;
+		ssid = rates = xrates = wpa = rsn = wme = ath = NULL;
 		while (frm < efrm) {
 			switch (*frm) {
 			case IEEE80211_ELEMID_SSID:
@@ -2730,7 +2730,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			/* XXX verify only one of RSN and WPA ie's? */
 			case IEEE80211_ELEMID_RSN:
 				if (vap->iv_flags & IEEE80211_F_WPA2)
-					wpa = frm;
+					rsn = frm;
 				else
 					IEEE80211_DPRINTF(vap,
 						IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
@@ -2789,7 +2789,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			return;	
 		}
 				
-		if (wpa != NULL) {
+		if (rsn != NULL) {
 			/*
 			 * Parse WPA information element.  Note that
 			 * we initialize the param block from the node
@@ -2797,11 +2797,11 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 * our defaults.  The resulting parameters are
 			 * installed below after the association is assured.
 			 */
-			rsn = ni->ni_rsn;
-			if (wpa[0] != IEEE80211_ELEMID_RSN)
-				reason = ieee80211_parse_wpa(vap, wpa, &rsn, wh);
+			rsn_parm = ni->ni_rsn;
+			if (rsn[0] != IEEE80211_ELEMID_RSN)
+				reason = ieee80211_parse_wpa(vap, rsn, &rsn_parm, wh);
 			else
-				reason = ieee80211_parse_rsn(vap, wpa, &rsn, wh);
+				reason = ieee80211_parse_rsn(vap, rsn, &rsn_parm, wh);
 			if (reason != 0) {
 				IEEE80211_SEND_MGMT(ni,
 				    IEEE80211_FC0_SUBTYPE_DEAUTH, reason);
@@ -2814,10 +2814,10 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			    IEEE80211_MSG_ASSOC | IEEE80211_MSG_WPA,
 			    wh->i_addr2,
 			    "%s ie: mc %u/%u uc %u/%u key %u caps 0x%x",
-			    wpa[0] != IEEE80211_ELEMID_RSN ?  "WPA" : "RSN",
-			    rsn.rsn_mcastcipher, rsn.rsn_mcastkeylen,
-			    rsn.rsn_ucastcipher, rsn.rsn_ucastkeylen,
-			    rsn.rsn_keymgmt, rsn.rsn_caps);
+			    rsn[0] != IEEE80211_ELEMID_RSN ?  "WPA" : "RSN",
+			    rsn_parm.rsn_mcastcipher, rsn_parm.rsn_mcastkeylen,
+			    rsn_parm.rsn_ucastcipher, rsn_parm.rsn_ucastkeylen,
+			    rsn_parm.rsn_keymgmt, rsn_parm.rsn_caps);
 		}
 		/* discard challenge after association */
 		if (ni->ni_challenge != NULL) {
@@ -2886,7 +2886,6 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 * node as using WPA and record information element
 			 * for applications that require it.
 			 */
-			ni->ni_rsn = rsn;
 			ieee80211_saveie(&ni->ni_wpa_ie, wpa);
 		} else if (ni->ni_wpa_ie != NULL) {
 			/*
@@ -2894,6 +2893,21 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 */
 			FREE(ni->ni_wpa_ie, M_DEVBUF);
 			ni->ni_wpa_ie = NULL;
+		}
+		if (rsn != NULL) {
+			/*
+			 * Record WPA/RSN parameters for station, mark
+			 * node as using WPA and record information element
+			 * for applications that require it.
+			 */
+			ni->ni_rsn = rsn_parm;
+			ieee80211_saveie(&ni->ni_rsn_ie, rsn);
+		} else if (ni->ni_rsn_ie != NULL) {
+			/*
+			 * Flush any state from a previous association.
+			 */
+			FREE(ni->ni_rsn_ie, M_DEVBUF);
+			ni->ni_rsn_ie = NULL;
 		}
 		if (wme != NULL) {
 			/*

@@ -144,6 +144,7 @@ struct ieee80211_scanparams {
 	u_int8_t	*xrates;
 	u_int8_t	*doth;
 	u_int8_t	*wpa;
+	u_int8_t	*rsn;
 	u_int8_t	*wme;
 	u_int8_t	*ath;
 };
@@ -172,7 +173,8 @@ struct ieee80211_scan_entry {
 	u_int8_t	se_erp;		/* ERP from beacon/probe resp */
 	int8_t		se_rssi;	/* avg'd recv ssi */
 	u_int8_t	se_dtimperiod;	/* DTIM period */
-	u_int8_t	*se_wpa_ie;	/* captured WPA/RSN ie */
+	u_int8_t	*se_wpa_ie;	/* captured WPA ie */
+	u_int8_t	*se_rsn_ie;	/* captured RSN ie */
 	u_int8_t	*se_wme_ie;	/* captured WME ie */
 	u_int8_t	*se_ath_ie;	/* captured Atheros ie */
 	u_int		se_age;		/* age of entry (0 on create) */
