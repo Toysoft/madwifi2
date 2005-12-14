@@ -1608,8 +1608,10 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 	if ((!retv || retv == ENETRESET) &&  mode != vap->iv_des_mode) {
 		ieee80211_scan_flush(ic);	/* NB: could optimize */
 		vap->iv_des_mode = mode;
-		if (IS_UP_AUTO(vap))
+		if (IS_UP_AUTO(vap)) {
+			ieee80211_cancel_scan(vap);
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
+		}
 		retv = 0;
 	}
 #ifdef ATH_SUPERG_XR
