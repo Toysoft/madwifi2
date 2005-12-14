@@ -1813,6 +1813,8 @@ ath_init(struct net_device *dev)
 		goto done;
 	}
 
+	if (sc->sc_softled)
+		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 	/*
 	 * This is needed only to setup initial state
 	 * but it's best done after a reset.
@@ -1902,7 +1904,9 @@ ath_stop_locked(struct net_device *dev)
 			ath_hal_intrset(ah, 0);
 			if (sc->sc_softled) {
 				del_timer(&sc->sc_ledtimer);
-				ath_hal_gpioset(ah, sc->sc_ledpin, 1);
+				ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
+				sc->sc_blinking=0;
+				sc->sc_ledstate=1;
 			}
 		}
 		ath_draintxq(sc);
@@ -1913,6 +1917,9 @@ ath_stop_locked(struct net_device *dev)
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);		/* XXX needed? */
 	}
+	if (sc->sc_softled)
+		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
+	
 	return 0;
 }
 
@@ -1988,6 +1995,9 @@ ath_reset(struct net_device *dev)
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
 			dev->name, __func__);
+	if (sc->sc_softled)
+		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
+
 	/*
 	 * We may be doing a reset in response to an ioctl
 	 * that changes the channel so update any state that
@@ -7452,6 +7462,10 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 				ath_get_hal_status_desc(status), status);
 			return EIO;
 		}
+
+		if (sc->sc_softled)
+			ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
+		
 		sc->sc_curchan = hchan;
 		ath_update_txpow(sc);		/* update tx power state */
 
@@ -8964,9 +8978,8 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			case ATH_SOFTLED:
 				if (val != sc->sc_softled) {
 					if (val)
-						ath_hal_gpioCfgOutput(ah,
-							sc->sc_ledpin);
-					ath_hal_gpioset(ah, sc->sc_ledpin,!val);
+						ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
+					ath_hal_gpioset(ah, sc->sc_ledpin,!sc->sc_ledon);
 					sc->sc_softled = val;
 				}
 				break;
