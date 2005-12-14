@@ -12,6 +12,7 @@
 # Those two variable will be instanced during the tarball generation
 %define       revision       @@SVNREL@@
 %define       snapshot       @@DDAY@@
+# branch is not used yet.
 %define       branch         @@BRANCH@@
 Summary: A linux device driver for Atheros chipsets (ar5210, ar5211, ar5212).
 Name: madwifi
@@ -20,7 +21,9 @@ Release: 6
 License: GPL2
 Group: System Environment/Kernel
 URL: http://madwifi.org
-Source0: http://snapshots.madwifi.org/%{name}-%{branch}-r%{revision}-%{snapshot}.tar.gz
+#Source0: http://snapshots.madwifi.org/%{name}-%{branch}-r%{revision}-%{snapshot}.tar.gz
+# Changes accordingly to the new rule :  madwifi-ng-r<revision>-<generation date>.tar.gz
+Source0: http://snapshots.madwifi.org/madwifi-ng/%{name}-ng-r%{revision}-%{snapshot}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: /sbin/depmod
 Requires: %{name}-module >= %{version}
@@ -76,7 +79,8 @@ loaded when keys of that type are created.
 
 %prep 
 #%setup -q 
-%setup -q -n %{name}-%{branch}-r%{revision}-%{snapshot}
+#%setup -q -n %{name}-%{branch}-r%{revision}-%{snapshot}
+%setup -q -n %{name}-ng-r%{revision}-%{snapshot}
 find . -name Makefile\* | xargs perl -pi -e's,/sbin/depmod,: /sbin/depmod,'
 
 %build 
@@ -126,6 +130,11 @@ rm -rf %{buildroot}
 
 #
 %changelog
+* Wed Dec 14 2005  Patrick Pichon <Patrick.Pichon@laposte.net>
+- Update accordingly to the new file name rule:  madwifi-ng-r<revision>-<generation date>.tar.gz
+- 'branch' tag is not use yet. 'ng' is hardcoded as part of the file name
+- Change the computation to target the latest kernel-devel env.
+
 * Thu Nov 3 2005  Patrick Pichon <Patrick.Pichon@laposte.net>
 - Incorporate the changes made on the Makefile
 - Cleaning on the Description fields
