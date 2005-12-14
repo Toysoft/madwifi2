@@ -1432,17 +1432,24 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	iwe.u.data.length = strlen(buf);
 	current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, buf);
 
-	if (se->se_wpa_ie != NULL) {
+	if (se->se_rsn_ie != NULL) {
 		static const char rsn_leader[] = "rsn_ie=";
+
+		memset(&iwe, 0, sizeof(iwe));
+		iwe.cmd = IWEVCUSTOM;
+		if (se->se_rsn_ie[0] == IEEE80211_ELEMID_RSN)
+			iwe.u.data.length = encode_ie(buf, sizeof(buf),
+				se->se_rsn_ie, se->se_rsn_ie[1]+2,
+				rsn_leader, sizeof(rsn_leader)-1);
+		if (iwe.u.data.length != 0)
+			current_ev = iwe_stream_add_point(current_ev, end_buf,
+				&iwe, buf);
+	}
+	if (se->se_wpa_ie != NULL) {
 		static const char wpa_leader[] = "wpa_ie=";
 
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVCUSTOM;
-		if (se->se_wpa_ie[0] == IEEE80211_ELEMID_RSN)
-			iwe.u.data.length = encode_ie(buf, sizeof(buf),
-				se->se_wpa_ie, se->se_wpa_ie[1]+2,
-				rsn_leader, sizeof(rsn_leader)-1);
-		else
 			iwe.u.data.length = encode_ie(buf, sizeof(buf),
 				se->se_wpa_ie, se->se_wpa_ie[1]+2,
 				wpa_leader, sizeof(wpa_leader)-1);

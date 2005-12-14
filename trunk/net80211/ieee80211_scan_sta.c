@@ -272,6 +272,7 @@ found:
 	}
 	saveie(&ise->se_wme_ie, sp->wme);
 	saveie(&ise->se_wpa_ie, sp->wpa);
+	saveie(&ise->se_rsn_ie, sp->rsn);
 	saveie(&ise->se_ath_ie, sp->ath);
 
 	/* clear failure count after STA_FAIL_AGE passes */

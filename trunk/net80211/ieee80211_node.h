@@ -122,7 +122,8 @@ struct ieee80211_node {
 	u_int16_t		ni_txpower;	/* current transmit power */
 	u_int16_t		ni_vlan;	/* vlan tag */
 	u_int32_t		*ni_challenge;	/* shared-key challenge */
-	u_int8_t		*ni_wpa_ie;	/* captured WPA/RSN ie */
+	u_int8_t		*ni_wpa_ie;	/* captured WPA ie */
+	u_int8_t		*ni_rsn_ie;	/* captured RSN ie */
 	u_int8_t		*ni_wme_ie;	/* captured WME ie */
 	u_int8_t		*ni_ath_ie;	/* captured Atheros ie */
 	u_int16_t		ni_txseqs[17];	/* tx seq per-tid */
