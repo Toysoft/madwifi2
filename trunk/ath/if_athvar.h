@@ -878,6 +878,10 @@ void	ath_sysctl_unregister(void);
 	(ath_hal_getcapability(_ah, HAL_CAP_TSF_ADJUST, 1, NULL) == HAL_OK)
 #define	ath_hal_settsfadjust(_ah, _v) \
 	ath_hal_setcapability(_ah, HAL_CAP_TSF_ADJUST, 1, _v, NULL)
+#define ath_hal_setrfsilent(_ah, _v) \
+        ath_hal_setcapability(_ah, HAL_CAP_RFSILENT, 1, _v, NULL)
+#define ath_hal_hasrfsilent(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_RFSILENT, 0, NULL) == HAL_OK)
 
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
