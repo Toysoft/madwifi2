@@ -369,7 +369,7 @@ proc_ieee80211_read(struct file *file, char __user *buf, size_t len, loff_t *off
 
 static int proc_ieee80211_open(struct inode *inode, struct file *file) {
      struct proc_ieee80211_priv *pv = NULL;
-     struct proc_dir_entry *dp = PDE(inode);
+     struct proc_dir_entry *dp = (struct proc_dir_entry *) inode->u.generic_ip;
      struct ieee80211vap *vap = dp->data;
 
      if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv), GFP_KERNEL)))
