@@ -257,6 +257,7 @@ static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 
+static  int rfkill = -1;
 static	int countrycode = -1;
 static	int outdoor = -1;
 static	int xchanmode = -1;
@@ -284,15 +285,18 @@ static const char *hal_status_desc[] = {
 MODULE_PARM(countrycode, "i");
 MODULE_PARM(outdoor, "i");
 MODULE_PARM(xchanmode, "i");
+MODULE_PARM(rfkill, "i");
 #else
 #include <linux/moduleparam.h>
 module_param(countrycode, int, 0);
 module_param(outdoor, int, 0);
 module_param(xchanmode, int, 0);
+module_param(rfkill, int, 0);
 #endif
 MODULE_PARM_DESC(countrycode, "Override default country code");
 MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
+MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
 
 #ifdef AR_DEBUG
 
@@ -497,6 +501,11 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 
 	ic->ic_country_code = ath_countrycode;
 	ic->ic_country_outdoor = ath_outdoor;
+
+        if(rfkill != -1) {
+	   printk(KERN_INFO "ath_pci: switching rfkill capability %s\n", rfkill ? "on" : "off");	
+	   ath_hal_setrfsilent(ah, rfkill);
+	}
 
 	/*
 	 * Setup rate tables for all potential media types.
