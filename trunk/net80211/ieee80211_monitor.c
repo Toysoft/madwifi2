@@ -205,6 +205,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		if (vap->iv_monitor_txf_len && tx) {
 			/* truncate transmit feedback packets */
 			skb_trim(skb1, vap->iv_monitor_txf_len);
+			skb1->nh.raw = skb1->data;
 		}
 		switch (vap->iv_dev->type) {
 		case ARPHRD_IEEE80211:
