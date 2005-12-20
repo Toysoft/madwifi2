@@ -186,13 +186,17 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
 		struct sk_buff *skb1;
 		struct net_device *dev = vap->iv_dev;
-		struct ieee80211_frame *wh;
-		u_int8_t dir;
+		struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
+		u_int8_t dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
+
 		next = TAILQ_NEXT(vap, iv_next);
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
 		    vap->iv_state != IEEE80211_S_RUN)
 			continue;
-		
+		if (vap->iv_monitor_nods_only && dir != IEEE80211_FC1_DIR_NODS) {
+			/* don't rx fromds, tods, or dstods packets */
+			continue;
+		}		    
 		skb1 = skb_copy(skb, GFP_ATOMIC);
 		if (skb1 == NULL) {
 			/* XXX stat+msg */
@@ -202,12 +206,6 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			/* truncate transmit feedback packets */
 			skb_trim(skb1, vap->iv_monitor_txf_len);
 		}
-		wh = (struct ieee80211_frame *)skb->data;
-		dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
-		if (vap->iv_monitor_nods_only && dir != IEEE80211_FC1_DIR_NODS) {
-			/* don't rx fromds, tods, or dstods packets */
-			continue;
-		}		    
 		switch (vap->iv_dev->type) {
 		case ARPHRD_IEEE80211:
 			break;
