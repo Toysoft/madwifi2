@@ -48,20 +48,30 @@ export EXTRAVERSION
 include Makefile.inc
 
 # NB: the order is important here
-DIRS=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH} ${TOOLS}
+DIRS_MODULES=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
+DIRS=	${DIRS_MODULES} ${TOOLS}
 
-all: configcheck
+all: modules tools
+
+modules: configcheck
 	mkdir -p ${SYMBOLSDIR}
-	for i in ${DIRS}; do \
+	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i || exit 1; \
 	done
 
-install:
+# conflicts with the 'tools' subdirectory
+.PHONY: tools
+tools:
+	$(MAKE) -C ${TOOLS} all || exit 1
+
+install: install-modules install-tools
+
+install-modules: modules
 	@# check if there are modules left from an old installation
 	@# might cause make to abort the build
 	sh scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
 
-	for i in ${DIRS}; do \
+	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i install || exit 1; \
 	done
 ifeq ($(DESTDIR),)
@@ -69,7 +79,10 @@ ifeq ($(DESTDIR),)
 endif
 	echo "KERNELRELEASE=$(KERNELRELEASE)" > ./install.log
 	echo "DESTDIR=$(DESTDIR)" >> ./install.log
-	
+
+install-tools: tools
+	$(MAKE) -C ${TOOLS} install || exit 1
+
 uninstall:
 	sh scripts/remove-old-modules.sh
 	sh scripts/remove-old-tools.sh
