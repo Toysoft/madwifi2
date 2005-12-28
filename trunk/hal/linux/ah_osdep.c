@@ -33,7 +33,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/linux/ah_osdep.c#45 $
+ * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/linux/ah_osdep.c#46 $
  */
 #include "opt_ah.h"
 
@@ -545,6 +545,7 @@ EXPORT_SYMBOL(ath_hal_init_channels);
 EXPORT_SYMBOL(ath_hal_getwirelessmodes);
 EXPORT_SYMBOL(ath_hal_computetxtime);
 EXPORT_SYMBOL(ath_hal_mhz2ieee);
+EXPORT_SYMBOL(ath_hal_process_noisefloor);
 
 static int __init
 init_ath_hal(void)

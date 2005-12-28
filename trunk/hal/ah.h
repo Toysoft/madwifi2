@@ -33,7 +33,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/ah.h#122 $
+ * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/ah.h#128 $
  */
 
 #ifndef _ATH_AH_H_
@@ -114,6 +114,8 @@ typedef enum {
 	HAL_CAP_CHAN_HALFRATE 	= 23,	/* hardware can support half rate channels */
 	HAL_CAP_CHAN_QUARTERRATE = 24,	/* hardware can support quarter rate channels */
 	HAL_CAP_RFSILENT	= 25,	/* hardware has rfsilent support  */
+	HAL_CAP_TPC_ACK		= 26,	/* ack txpower with per-packet tpc */
+	HAL_CAP_TPC_CTS		= 27,	/* cts txpower with per-packet tpc */
 } HAL_CAPABILITY_TYPE;
 
 /* 
@@ -237,10 +239,10 @@ typedef enum {
 } HAL_RX_FILTER;
 
 typedef enum {
-	HAL_PM_UNDEFINED	= 0,
-	HAL_PM_AWAKE		= 1,
-	HAL_PM_FULL_SLEEP	= 2,
-	HAL_PM_NETWORK_SLEEP	= 3
+	HAL_PM_AWAKE		= 0,
+	HAL_PM_FULL_SLEEP	= 1,
+	HAL_PM_NETWORK_SLEEP	= 2,
+	HAL_PM_UNDEFINED	= 3
 } HAL_POWER_MODE;
 
 /*
@@ -267,9 +269,17 @@ typedef enum {
 	HAL_INT_SWBA	= 0x00010000,
 	HAL_INT_BMISS	= 0x00040000,
 	HAL_INT_BNR	= 0x00100000,	/* Non-common mapping */
+	HAL_INT_TIM	= 0x00200000,	/* Non-common mapping */
+	HAL_INT_DTIM	= 0x00400000,	/* Non-common mapping */
+	HAL_INT_DTIMSYNC= 0x00800000,	/* Non-common mapping */
 	HAL_INT_GPIO	= 0x01000000,
+	HAL_INT_CABEND	= 0x02000000,	/* Non-common mapping */
 	HAL_INT_FATAL	= 0x40000000,	/* Non-common mapping */
 	HAL_INT_GLOBAL	= 0x80000000,	/* Set/clear IER */
+	HAL_INT_BMISC	= HAL_INT_TIM
+			| HAL_INT_DTIM
+			| HAL_INT_DTIMSYNC
+			| HAL_INT_CABEND,
 
 	/* Interrupt bits that map directly to ISR/IMR bits */
 	HAL_INT_COMMON  = HAL_INT_RXNOFRM
@@ -494,7 +504,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x05091300	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x05120700	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -546,10 +556,6 @@ struct ath_hal {
 	u_int32_t __ahdecl(*ah_numTxPending)(struct ath_hal *, u_int q);
 	HAL_BOOL  __ahdecl(*ah_startTxDma)(struct ath_hal*, u_int);
 	HAL_BOOL  __ahdecl(*ah_stopTxDma)(struct ath_hal*, u_int);
-	HAL_BOOL  __ahdecl(*ah_updateCTSForBursting)(struct ath_hal *,
-				struct ath_desc *, struct ath_desc *,
-				struct ath_desc *, struct ath_desc *,
-				u_int32_t, u_int32_t);
 	HAL_BOOL  __ahdecl(*ah_setupTxDesc)(struct ath_hal *, struct ath_desc *,
 				u_int pktLen, u_int hdrLen,
 				HAL_PKT_TYPE type, u_int txPower,
@@ -653,6 +659,8 @@ struct ath_hal {
 	HAL_BOOL  __ahdecl(*ah_setPowerMode)(struct ath_hal*,
 				HAL_POWER_MODE mode, int setChip);
 	HAL_POWER_MODE __ahdecl(*ah_getPowerMode)(struct ath_hal*);
+	int16_t   __ahdecl(*ah_getChanNoise)(struct ath_hal *, HAL_CHANNEL *);
+
 
 	/* Beacon Management Functions */
 	void	  __ahdecl(*ah_beaconInit)(struct ath_hal *,
@@ -709,6 +717,12 @@ extern	HAL_BOOL __ahdecl ath_hal_init_channels(struct ath_hal *,
 		u_int8_t *regclassids, u_int maxregids, u_int *nregids,
 		HAL_CTRY_CODE cc, u_int16_t modeSelect,
 		HAL_BOOL enableOutdoor, HAL_BOOL enableExtendedChannels);
+
+/*
+ * Calibrate noise floor data following a channel scan or similar.
+ * This must be called prior retrieving noise floor data.
+ */
+extern	void __ahdecl ath_hal_process_noisefloor(struct ath_hal *ah);
 
 /*
  * Return bit mask of wireless modes supported by the hardware.

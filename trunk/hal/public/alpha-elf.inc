@@ -63,4 +63,9 @@ STRIP=	${TOOLPREFIX}strip
 OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
+#
+# Force register read/write operations to go through a function.
+#
+AH_REGOPS_FUNC=1
+
 COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN

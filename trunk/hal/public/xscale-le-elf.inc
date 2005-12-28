@@ -74,5 +74,4 @@ NM=	${TOOLPREFIX}nm
 LDOPTS=	-EL
 COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN -DAH_REGOPS_FUNC
 COPTS+= -march=armv4 -mlittle-endian -fno-strict-aliasing -fno-common \
-	-mapcs-32 -mtune=xscale $(call cc-option,-mshort-load-bytes, \
-	$(call cc-option,-malignment-traps,)) -msoft-float -mfp=2
+	-mapcs-32 -mtune=xscale  -mshort-load-bytes -msoft-float -mfp=2
