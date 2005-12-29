@@ -75,7 +75,7 @@ install-modules: modules
 		$(MAKE) -C $$i install || exit 1; \
 	done
 ifeq ($(DESTDIR),)
-	(export MODULEPATH=${MODULEPATH}; depmod -ae)
+	(export MODULEPATH=${MODULEPATH}; /sbin/depmod -ae)
 endif
 	echo "KERNELRELEASE=$(KERNELRELEASE)" > ./install.log
 	echo "DESTDIR=$(DESTDIR)" >> ./install.log
