@@ -95,11 +95,13 @@ else
 # The default KERNELPATH points to the directory where the currently
 # running kernel was compiled.  Note that the configuration and the
 # version of the kernel tree might have changed since then.
-KERNELPATH ?= $(shell readlink -f /lib/modules/`uname -r`/build)
-
-ifeq ($(KERNELPATH),)
+ifndef KERNELPATH
+ifeq ($(wildcard $(shell echo /lib/modules/`uname -r`/build)),)
 KERNELPATH = /usr/src/linux
 $(warning Default KERNELPATH not found, using $(KERNELPATH))
+else
+KERNELPATH := $(shell cd /lib/modules/`uname -r`/build && pwd)
+endif
 endif
 
 endif
@@ -112,9 +114,13 @@ endif
 # KERNELRELEASE is the target kernel's version.  It's always taken from
 # the kernel build tree.  Kernel Makefile doesn't always know the exact
 # kernel version (especially for vendor stock kernels), so we get it
-# from linux/version.h instead.
-KERNELRELEASE = $(shell sed -ne 's/"//g;s/^\#define UTS_RELEASE //p' \
-		  $(KERNELPATH)/include/linux/version.h)
+# from <linux/version.h> instead. But simply grepping it from version.h
+# doesn't work, since some distributions have multiple UTS_RELEASE
+# in that file.
+# This trick has been inspired by the lm_sensors project.
+ifndef KERNELRELEASE
+KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(DEPTH)/kernelversion.c | grep uts_release | cut -f2 -d'"')
+endif
 
 # KERNELCONF is the name of the file that holds the configuration
 # of the target kernel.
