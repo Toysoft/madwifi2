@@ -84,7 +84,7 @@ install: ${ALL}
 		${STRIP} ${DESTDIR}${BINDIR}/$$i; \
 	done
 	install -d ${DESTDIR}${MANDIR}/man8
-	install ./man/* ${DESTDIR}${MANDIR}/man8
+	install -m 0644 man/*.8 ${DESTDIR}${MANDIR}/man8
 	echo "DESTDIR=${DESTDIR}" > ./install.log
 	echo "BINDIR=${BINDIR}" >> ./install.log
 	echo "MANDIR=${MANDIR}" >> ./install.log
