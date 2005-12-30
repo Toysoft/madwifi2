@@ -1449,7 +1449,8 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				ieee80211_scan_assoc_success(ic,
 					ni->ni_macaddr);
 				ieee80211_notify_node_join(ni, 
-					arg == IEEE80211_FC0_SUBTYPE_ASSOC_RESP);
+					(arg == IEEE80211_FC0_SUBTYPE_ASSOC_RESP) | \
+					(arg == IEEE80211_FC0_SUBTYPE_REASSOC_RESP));
 			}
 			break;
 		}
