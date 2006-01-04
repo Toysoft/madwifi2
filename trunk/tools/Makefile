@@ -88,5 +88,13 @@ install: ${ALL}
 	echo "BINDIR=${BINDIR}" >> ./install.log
 	echo "MANDIR=${MANDIR}" >> ./install.log
 
+uninstall:
+	for i in ${ALL}; do \
+		rm -f ${DESTDIR}${BINDIR}/$$i; \
+	done
+	for i in ${ALL:=.8}; do \
+		rm -f ${DESTDIR}${MANDIR}/man8/$$i; \
+	done
+
 clean:
 	rm -f ${ALL} core a.out

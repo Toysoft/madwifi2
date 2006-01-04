@@ -85,7 +85,7 @@ install-tools: tools
 
 uninstall:
 	sh scripts/remove-old-modules.sh
-	sh scripts/remove-old-tools.sh
+	$(MAKE) -C ${TOOLS} uninstall
 
 FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
 	README release.h share net80211 ath_rate
