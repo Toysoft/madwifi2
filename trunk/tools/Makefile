@@ -84,9 +84,6 @@ install: ${ALL}
 	done
 	install -d ${DESTDIR}${MANDIR}/man8
 	install -m 0644 man/*.8 ${DESTDIR}${MANDIR}/man8
-	echo "DESTDIR=${DESTDIR}" > ./install.log
-	echo "BINDIR=${BINDIR}" >> ./install.log
-	echo "MANDIR=${MANDIR}" >> ./install.log
 
 uninstall:
 	for i in ${ALL}; do \
