@@ -259,7 +259,7 @@ ath_pci_resume(struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 	u32 val;
 
-	if (!pci_enable_device(pdev))
+	if (pci_enable_device(pdev))
 		return 1;
 	/* XXX - Should this return nonzero on fail? */
 	PCI_RESTORE_STATE(pdev,
