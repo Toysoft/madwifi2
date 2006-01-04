@@ -53,7 +53,7 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 ifneq ($(MAKING_MODULES),1)
 obj-$(CONFIG_RATE_SAMPLE) := $(ath_rate_sample-objs)
-ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
+ifdef LINUX24
 O_TARGET		:= $(obj-m)
 endif
 endif

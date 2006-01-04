@@ -144,8 +144,12 @@ else
 MODULEPATH ?=	/lib/modules/${KERNELRELEASE}/net
 endif
 
-# Some settings that depend on actual kernel release
-ifneq ($(filter-out 2.4%,$(KERNELRELEASE)),)
+# Recognize 2.4.x kernels to support the old build system
+ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
+LINUX24 = y
+endif
+
+ifndef LINUX24
 export-objs	:=
 list-multi	:=
 KMODSUF		:= ko

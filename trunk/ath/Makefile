@@ -58,7 +58,7 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 obj-m		+= ath_${BUSNAME}.o
 ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
-ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
+ifdef LINUX24
 export-objs	:= if_ath_${BUSNAME}.o
 list-multi	:= ath_${BUSNAME}.o
 endif
@@ -67,7 +67,7 @@ endif
 
 ifneq ($(MAKING_MODULES),1)
 obj-$(CONFIG_ATHEROS)	:= $(ath_${BUSNAME}-objs)
-ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
+ifdef LINUX24
 O_TARGET		:= $(obj-m)
 endif
 endif
