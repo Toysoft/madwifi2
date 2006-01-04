@@ -151,9 +151,9 @@ endif
 
 ifndef LINUX24
 export-objs	:=
-list-multi	:=
 KMODSUF		:= ko
 else
+list-multi	= $(obj-m)
 KMODSUF		:= o
 endif
 
