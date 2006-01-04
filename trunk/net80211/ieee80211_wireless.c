@@ -3929,7 +3929,6 @@ ieee80211_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		ieee80211_stop(vap->iv_dev);	/* force state before cleanup */
 		unit = vap->iv_unit;
 		vap->iv_ic->ic_vap_delete(vap);
-		ieee80211_delete_wlanunit(unit);
 		return 0;
 	case IEEE80211_IOCTL_GETKEY:
 		return ieee80211_ioctl_getkey(dev, (struct iwreq *) ifr);
@@ -4080,5 +4079,7 @@ ieee80211_ioctl_vattach(struct ieee80211vap *vap)
 void
 ieee80211_ioctl_vdetach(struct ieee80211vap *vap)
 {
+	if(isset(wlan_units, vap->iv_unit))
+		ieee80211_delete_wlanunit(vap->iv_unit);
 }
 #endif /* CONFIG_NET_WIRELESS */
