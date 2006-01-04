@@ -216,11 +216,13 @@ sta_add(struct ieee80211_scan_state *ss,
 	int hash;
 
 	hash = STA_HASH(macaddr);
-
-	spin_lock_bh(&st->st_lock);
+	spin_lock_bh(&st->st_lock);  
 	LIST_FOREACH(se, &st->st_hash[hash], se_hash)
-		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr))
-			goto found;
+		if(IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr) &&
+			sp->ssid[1] == se->base.se_ssid[1] && 
+			       !memcmp(se->base.se_ssid+2, sp->ssid+2, se->base.se_ssid[1]))
+				       goto found;
+
 	MALLOC(se, struct sta_entry *, sizeof(struct sta_entry),
 		M_80211_SCAN, M_NOWAIT | M_ZERO);
 	if (se == NULL) {
