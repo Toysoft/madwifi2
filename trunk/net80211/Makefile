@@ -85,7 +85,6 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 ifdef LINUX24
 export-objs	:= $(foreach m, $(MOD_INSTALL), $($(m:.o=-objs)))
-list-multi	:= $(MOD_INSTALL)
 endif
 
 # If building into kernel

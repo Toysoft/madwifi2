@@ -41,7 +41,6 @@ obj-m		+= ath_hal.o
 ath_hal-objs	:= ah_osdep.o hal.o
 ifdef LINUX24
 export-objs	:= ah_osdep.o
-list-multi	:= ath_hal.o
 endif
 
 # If building into kernel
