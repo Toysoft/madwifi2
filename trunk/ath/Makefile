@@ -58,9 +58,6 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 obj-m		+= ath_${BUSNAME}.o
 ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
-ifdef LINUX24
-export-objs	:= if_ath_${BUSNAME}.o
-endif
 
 # If building into kernel
 

@@ -83,10 +83,6 @@ wlan_scan_ap-objs := ieee80211_scan_ap.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 
-ifdef LINUX24
-export-objs	:= $(foreach m, $(MOD_INSTALL), $($(m:.o=-objs)))
-endif
-
 # If building into kernel
 # We only have one target, so all modules go into it I guess?
 ifneq ($(MAKING_MODULES),1)
