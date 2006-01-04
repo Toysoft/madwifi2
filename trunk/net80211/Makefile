@@ -81,7 +81,9 @@ wlan_xauth-objs	:= ieee80211_xauth.o
 wlan_scan_sta-objs :=ieee80211_scan_sta.o
 wlan_scan_ap-objs := ieee80211_scan_ap.o
 
-ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
+include $(obj)/${DEPTH}/Makefile.inc
+
+ifdef LINUX24
 export-objs	:= if_media.o \
 		   ieee80211.o ieee80211_beacon.o ieee80211_crypto.o \
 		   ieee80211_crypto_none.o ieee80211_input.o ieee80211_node.o \
@@ -93,13 +95,11 @@ export-objs	:= if_media.o \
 list-multi	:= $(MOD_INSTALL)
 endif
 
-include $(obj)/${DEPTH}/Makefile.inc
-
 # If building into kernel
 # We only have one target, so all modules go into it I guess?
 ifneq ($(MAKING_MODULES),1)
 obj-$(CONFIG_NET80211) += $(MOD_INSTALL)
-ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
+ifdef LINUX24
 O_TARGET := net80211.o
 endif
 endif
