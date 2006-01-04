@@ -84,14 +84,7 @@ wlan_scan_ap-objs := ieee80211_scan_ap.o
 include $(obj)/${DEPTH}/Makefile.inc
 
 ifdef LINUX24
-export-objs	:= if_media.o \
-		   ieee80211.o ieee80211_beacon.o ieee80211_crypto.o \
-		   ieee80211_crypto_none.o ieee80211_input.o ieee80211_node.o \
-		   ieee80211_output.o ieee80211_proto.o ieee80211_power.o \
-		   ieee80211_scan.o ieee80211_wireless.o ieee80211_linux.o \
-		   ieee80211_crypto_wep.o ieee80211_crypto_tkip.o \
-		   ieee80211_crypto_ccmp.o ieee80211_xauth.o \
-		   ieee80211_monitor.o ieee80211_scan_sta.o ieee80211_scan_ap.o
+export-objs	:= $(foreach m, $(MOD_INSTALL), $($(m:.o=-objs)))
 list-multi	:= $(MOD_INSTALL)
 endif
 
