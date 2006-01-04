@@ -39,9 +39,8 @@ DEPTH=	..
 
 obj-m		+= ath_hal.o
 ath_hal-objs	:= ah_osdep.o hal.o
-ifdef LINUX24
-export-objs	:= ah_osdep.o
-endif
+
+include $(obj)/${DEPTH}/Makefile.inc
 
 # If building into kernel
 
@@ -52,7 +51,9 @@ O_TARGET	:= ath_hal.o
 endif
 endif
 
-include $(obj)/${DEPTH}/Makefile.inc
+ifdef LINUX24
+export-objs	:= ah_osdep.o
+endif
 
 INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH_HAL} -I${obj}/${DEPTH}
 

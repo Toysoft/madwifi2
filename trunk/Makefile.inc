@@ -150,9 +150,9 @@ LINUX24 = y
 endif
 
 ifndef LINUX24
-export-objs	:=
 KMODSUF		:= ko
 else
+export-objs	= $(foreach m, $(obj-m), $($(m:.o=-objs)))
 list-multi	= $(obj-m)
 KMODSUF		:= o
 endif

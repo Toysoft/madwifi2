@@ -48,7 +48,6 @@ DEPTH=	../..
 
 obj-m		+= ath_rate_amrr.o
 ath_rate_amrr-objs	:= amrr.o
-export-objs	:= amrr.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 

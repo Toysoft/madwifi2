@@ -46,7 +46,6 @@ DEPTH=	../..
 
 obj-m		+= ath_rate_sample.o
 ath_rate_sample-objs	:= sample.o
-export-objs	:= sample.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 

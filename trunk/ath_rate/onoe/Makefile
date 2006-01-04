@@ -48,7 +48,6 @@ DEPTH=	../..
 
 obj-m		+= ath_rate_onoe.o
 ath_rate_onoe-objs	:= onoe.o
-export-objs	:= onoe.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 
