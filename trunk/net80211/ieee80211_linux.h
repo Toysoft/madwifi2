@@ -443,6 +443,6 @@ void	ieee80211_vlan_vdetach(struct ieee80211vap *);
 void	ieee80211_ioctl_vattach(struct ieee80211vap *);
 void	ieee80211_ioctl_vdetach(struct ieee80211vap *);
 struct ifreq;
-int	ieee80211_ioctl_create_vap(struct ieee80211com *, struct ifreq *);
+int	ieee80211_ioctl_create_vap(struct ieee80211com *, struct ifreq *, struct net_device *);
 
 #endif /* _NET80211_IEEE80211_LINUX_H_ */

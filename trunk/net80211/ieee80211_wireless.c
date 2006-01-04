@@ -1650,7 +1650,7 @@ ieee80211_setupxr(struct ieee80211vap *vap)
 			ieee80211_scan_flush(ic);	/* NB: could optimize */
 			 
 			vap->iv_xrvap = ic->ic_vap_create(ic, name, vap->iv_unit,
-											  IEEE80211_M_HOSTAP,IEEE80211_VAP_XR | IEEE80211_CLONE_BSSID);
+											  IEEE80211_M_HOSTAP,IEEE80211_VAP_XR | IEEE80211_CLONE_BSSID, dev);
 			vap->iv_xrvap->iv_fragthreshold = IEEE80211_XR_FRAG_THRESHOLD;
 			copy_des_ssid(vap->iv_xrvap, vap);
 			vap->iv_xrvap->iv_des_mode = vap->iv_des_mode;
@@ -4028,7 +4028,7 @@ ifc_name2unit(const char *name, int *unit)
  * outside our control (e.g. in the driver).
  */
 int
-ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr)
+ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct net_device *mdev)
 {
 	struct ieee80211_clone_params cp;
 	struct ieee80211vap *vap;
@@ -4053,7 +4053,7 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr)
 			return -EINVAL;
 		strncpy(name, cp.icp_name, sizeof(name));
 	}
-	vap = ic->ic_vap_create(ic, name, unit, cp.icp_opmode, cp.icp_flags);
+	vap = ic->ic_vap_create(ic, name, unit, cp.icp_opmode, cp.icp_flags, mdev);
 	if (vap == NULL) {
 		ieee80211_delete_wlanunit(unit);
 		return -EIO;

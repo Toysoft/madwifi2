@@ -211,7 +211,7 @@ struct ieee80211com {
 	/* virtual ap create/delete */
 	struct ieee80211vap 	*(*ic_vap_create)(struct ieee80211com *,
 				    const char *name, int unit,
-				    int opmode, int flags);
+				    int opmode, int flags, struct net_device *mdev);
 	void			(*ic_vap_delete)(struct ieee80211vap *);
 	/* send/recv 802.11 management frame */
 	int			(*ic_send_mgmt)(struct ieee80211_node *,
