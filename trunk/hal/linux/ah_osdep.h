@@ -153,17 +153,34 @@ __bswap32(u_int32_t _x)
  * register values are constants.
  */
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
-#define _OS_REG_WRITE(_ah, _reg, _val) do {				    \
-	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
-		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
-			__bswap32((_val));				    \
-	else								    \
-		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
+#if ( defined(CONFIG_PPC_PMAC) || defined(CONFIG_ARCH_IXP425) || defined(CONFIG_ARCH_IXP4XX)) /* ixp4xx or PowerPC architecture */
+
+#define _OS_REG_WRITE(_ah, _reg, _val) do {                                 \
+        if ( (_reg) >= 0x4000 && (_reg) < 0x5000)                           \
+            writel((_val), (volatile unsigned long)((_ah)->ah_sh + (_reg)));\
+        else                                                                \
+            writel(__bswap32(_val), (volatile unsigned long)((_ah)->ah_sh + (_reg))); \
 } while (0)
 #define _OS_REG_READ(_ah, _reg) \
-	(((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
-		__bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
-		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
+        (((_reg) >= 0x4000 && (_reg) < 0x5000) ?                            \
+            readl((volatile unsigned long)((_ah)->ah_sh + (_reg))) :        \
+            __bswap32(readl((volatile unsigned long)((_ah)->ah_sh + (_reg)))))
+
+#else  /* normal case */
+
+#define _OS_REG_WRITE(_ah, _reg, _val) do {                                 \
+        if ( (_reg) >= 0x4000 && (_reg) < 0x5000)                           \
+                *((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =          \
+                        __bswap32((_val));                                  \
+        else                                                                \
+                *((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
+} while (0)
+#define _OS_REG_READ(_ah, _reg) \
+        (((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
+                __bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
+                *((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
+
+#endif
 #else /* AH_LITTLE_ENDIAN */
 #define _OS_REG_WRITE(_ah, _reg, _val) do { \
 	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val); \
