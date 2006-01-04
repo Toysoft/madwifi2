@@ -107,7 +107,7 @@ enum {
 };
 
 static struct ieee80211vap *ath_vap_create(struct ieee80211com *,
-			const char *name, int unit, int opmode, int flags);
+			const char *name, int unit, int opmode, int flags, struct net_device *mdev);
 static void	ath_vap_delete(struct ieee80211vap *);
 static int	ath_init(struct net_device *);
 static int	ath_reset(struct net_device *);
@@ -931,7 +931,7 @@ ath_detach(struct net_device *dev)
 
 static struct ieee80211vap *
 ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
-	int opmode, int flags)
+	int opmode, int flags, struct net_device *mdev)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
 	struct net_device *dev;
@@ -1086,6 +1086,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	}
 	if (sc->sc_hastsfadd)
 		ath_hal_settsfadjust(sc->sc_ah, sc->sc_stagbeacons);
+	SET_NETDEV_DEV(dev, mdev->class_dev.dev);
 	/* complete setup */
 	(void) ieee80211_vap_attach(vap,
 		ieee80211_media_change, ieee80211_media_status);
@@ -8903,7 +8904,7 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			error = ath_ioctl_ethtool(sc, cmd, ifr->ifr_data);
 		break;
 	case SIOC80211IFCREATE:
-		error = ieee80211_ioctl_create_vap(ic, ifr); 
+		error = ieee80211_ioctl_create_vap(ic, ifr, dev); 
 		break;
 	default:
 		error = -EINVAL;
