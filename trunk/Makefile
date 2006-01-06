@@ -110,6 +110,7 @@ info:
 	@echo "The following settings will be used for compilation:"
 	@echo "TARGET       : $(TARGET)"
 	@echo "OS           : $(OS)"
+	@echo "ARCH         : $(ARCH)"
 	@echo "BUS          : $(BUS)"
 	@if [ ! -z "$(TOOLPATH)" ]; then \
 	    @echo "TOOLPATH     : $(TOOLPATH)"; \

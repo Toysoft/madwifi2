@@ -46,13 +46,6 @@ export LC_ALL = POSIX
 # OS is the target operating system. Currently only Linux is supported.
 OS=		linux
 
-# TARGET defines the target platform architecture. It must match one of
-# the target platforms supported by the HAL. The default target is the
-# host machine architecture. You can override TARGET on the make command
-# line or in the environment. See hal/linux/*.inc for the list of
-# supported targets.
-TARGET ?= $(shell uname -m | sed -e s/i.86/i386/ -e s/ppc/powerpc-be/)-elf
-
 # TOOLPREFIX is a string that is prepended to all toolchain executables,
 # such as gcc, ld, as, objcopy etc.  This is used for cross-compiling.
 # Default is native compilation.  You can define CROSS_COMPILE instead -
@@ -131,6 +124,20 @@ ifeq ($(wildcard $(KERNELCONF)),)
 $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
 
+# Determine target architecture of the kernel.
+ARCH ?= $(subst asm-,,$(notdir $(shell readlink $(KERNELPATH)/include/asm)))
+ifeq (,$(ARCH))
+$(error Cannot determine kernel architecture, please set ARCH)
+endif
+export ARCH
+
+# TARGET defines the target platform architecture. It must match one of
+# the target platforms supported by the HAL. The default target is the
+# host machine architecture. You can override TARGET on the make command
+# line or in the environment. See hal/linux/*.inc for the list of
+# supported targets.
+TARGET ?= $(shell echo $(ARCH) | sed -e s/powerpc/powerpc-be/)-elf
+
 # SYSTEMMAP is the name of the System.map file for the target
 # kernel. This will be needed when DESTDIR is defined in order
 # to run depmod properly.
@@ -196,6 +203,11 @@ INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
 
 ifeq ($(strip ${BUS}),AHB)
 INCS+= -isystem ${TOOLPATH}/include
+endif
+
+ifeq (,$(wildcard ${HAL}/public/${TARGET}.inc))
+TARGETS=$(basename $(notdir $(wildcard ${HAL}/public/*.inc)))
+$(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
 endif
 
 include ${HAL}/public/${TARGET}.inc
