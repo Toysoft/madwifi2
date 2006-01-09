@@ -888,6 +888,7 @@ ath_detach(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
 
+	HAL_INT tmp;
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
 	ath_stop(dev);
 
@@ -912,6 +913,12 @@ ath_detach(struct net_device *dev)
 	 */
 	ieee80211_ifdetach(&sc->sc_ic);
 
+	ath_hal_intrset(ah, 0);		/* disable further intr's */
+	ath_hal_getisr(ah, &tmp);	/* clear ISR */
+	if(dev->irq) {
+		free_irq(dev->irq, dev);
+		dev->irq = 0;
+	}
 #ifdef ATH_TX99_DIAG
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->detach(sc->sc_tx99);
@@ -925,6 +932,7 @@ ath_detach(struct net_device *dev)
 	ath_dynamic_sysctl_unregister(sc);
 #endif /* CONFIG_SYSCTL */
 	ATH_LOCK_DESTROY(sc);
+	dev->stop = NULL; /* prevent calling ath_stop again */
 	unregister_netdev(dev);
 	return 0;
 }
