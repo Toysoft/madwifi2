@@ -125,18 +125,17 @@ $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
 
 # Determine target architecture of the kernel.
-ARCH ?= $(subst asm-,,$(notdir $(shell readlink $(KERNELPATH)/include/asm)))
+ifeq (,$(ARCH))
+ARCH_TARGET=$(shell scripts/get_arch_target.sh $(KERNELCONF))
+ARCH = $(word 1,$(ARCH_TARGET))
+TARGET ?= $(word 2,$(ARCH_TARGET))
+endif
+
 ifeq (,$(ARCH))
 $(error Cannot determine kernel architecture, please set ARCH)
 endif
 export ARCH
-
-# TARGET defines the target platform architecture. It must match one of
-# the target platforms supported by the HAL. The default target is the
-# host machine architecture. You can override TARGET on the make command
-# line or in the environment. See hal/linux/*.inc for the list of
-# supported targets.
-TARGET ?= $(shell echo $(ARCH) | sed -e s/powerpc/powerpc-be/)-elf
+export TARGET
 
 # SYSTEMMAP is the name of the System.map file for the target
 # kernel. This will be needed when DESTDIR is defined in order
@@ -205,6 +204,11 @@ ifeq ($(strip ${BUS}),AHB)
 INCS+= -isystem ${TOOLPATH}/include
 endif
 
+# TARGET defines the target platform architecture. It must match one of
+# the target platforms supported by the HAL. The default target is the
+# host machine architecture. You can override TARGET on the make command
+# line or in the environment. See hal/linux/*.inc for the list of
+# supported targets.
 ifeq (,$(wildcard ${HAL}/public/${TARGET}.inc))
 TARGETS=$(basename $(notdir $(wildcard ${HAL}/public/*.inc)))
 $(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
