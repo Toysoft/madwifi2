@@ -221,6 +221,9 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 
+	cb = (struct ieee80211_cb *) skb->cb;
+	memset(cb, 0, sizeof(struct ieee80211_cb));
+	
         if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 		ieee80211_monitor_encap(ic, skb);
 		skb->dev = parent;
@@ -265,9 +268,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto reclaim;
 	}
 	M_FLAG_KEEP_ONLY(skb, M_UAPSD | M_PWR_SAV);
-	cb = (struct ieee80211_cb *) skb->cb;
 	cb->ni = ni;
-	cb->next = NULL;
 
 	vap->iv_devstats.tx_packets++;
 	vap->iv_devstats.tx_bytes += skb->len;
