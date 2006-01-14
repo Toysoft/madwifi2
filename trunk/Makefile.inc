@@ -126,7 +126,7 @@ endif
 
 # Determine target architecture of the kernel.
 ifeq (,$(ARCH))
-ARCH_TARGET=$(shell scripts/get_arch_target.sh $(KERNELCONF))
+ARCH_TARGET=$(shell ${DEPTH}/scripts/get_arch_target.sh $(KERNELCONF))
 ARCH = $(word 1,$(ARCH_TARGET))
 TARGET ?= $(word 2,$(ARCH_TARGET))
 endif
