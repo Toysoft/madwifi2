@@ -80,9 +80,9 @@ typedef void *TQUEUE_ARG;
 #else
 #include <linux/workqueue.h>
 #define ATH_SCHEDULE_TASK(t)		schedule_work((t))
-//#define ATH_INIT_SCHED_TASK(t, f, d)	(DECLARE_WORK((t), (f), (d)))
-#define ATH_INIT_SCHED_TASK(t, f, d)	do { memset(((void *) (t)),0,sizeof(struct work_struct)); \
-		PREPARE_WORK((t),((void (*)(void*))(f)),((void *) (d))); } while (0)
+
+#define ATH_INIT_SCHED_TASK(_t, _f, _d)	INIT_WORK((_t), (void (*)(void *))(_f), (void *)(_d));
+
 #define ATH_WORK_THREAD			work_struct
 #define	ATH_FLUSH_TASKS			flush_scheduled_work
 #endif /* KERNEL_VERSION < 2.5.41 */
