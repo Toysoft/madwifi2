@@ -365,7 +365,6 @@ ieee80211_reset_bss(struct ieee80211vap *vap)
 	if (obss != NULL) {
 		copy_bss(ni, obss);
 		ni->ni_intval = ic->ic_lintval;
-		ieee80211_free_node(obss);
 	}
 }
 
