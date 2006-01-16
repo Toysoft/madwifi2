@@ -66,7 +66,7 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
-install: all
+install:
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
 	${TOOLPREFIX}strip -S ath_rate_sample.$(KMODSUF)
 	cp ath_rate_sample.${KMODSUF} ${DESTDIR}/${MODULEPATH}

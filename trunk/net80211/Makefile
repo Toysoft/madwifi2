@@ -119,7 +119,7 @@ wlan_xauth.o:	$(wlan_xauth-objs)
 wlan_acl.o:	$(wlan_acl-objs)
 	$(LD) $(LDOPTS) -o wlan_acl.$(KMODSUF) -r $(wlan_acl-objs)
 
-install: all
+install:
 	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
 	for i in ${MOD_INSTALL}; do \
 		f=`basename $$i .o`; \
