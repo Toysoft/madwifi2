@@ -268,7 +268,8 @@ main(int argc, char *argv[])
 	strncpy(ifr.ifr_name, ifname, sizeof (ifr.ifr_name));
 	if (argc > 1) {
 		u_long interval = strtoul(argv[1], NULL, 0);
-		int line, omask;
+		int line;
+		sigset_t omask, nmask;
 		u_int rate, rssi;
 		struct ath_stats cur, total;
 		u_long icur, ocur;
@@ -343,10 +344,13 @@ main(int argc, char *argv[])
 			);
 		}
 		fflush(stdout);
-		omask = sigblock(sigmask(SIGALRM));
+		sigemptyset(&nmask);
+		sigaddset(&nmask,SIGALRM);
+		sigprocmask(SIG_BLOCK, &nmask, &omask);
+		sigemptyset(&nmask);
 		if (!signalled)
-			sigpause(0);
-		sigsetmask(omask);
+			sigsuspend(&nmask);
+		sigprocmask(SIG_SETMASK, &omask, NULL);
 		signalled = 0;
 		alarm(interval);
 		line++;
