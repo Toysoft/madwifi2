@@ -157,14 +157,14 @@ __bswap32(u_int32_t _x)
 
 #define _OS_REG_WRITE(_ah, _reg, _val) do {                                 \
         if ( (_reg) >= 0x4000 && (_reg) < 0x5000)                           \
-            writel((_val), (volatile unsigned long)((_ah)->ah_sh + (_reg)));\
+            writel((_val), (volatile u_int32_t *)((_ah)->ah_sh + (_reg)));\
         else                                                                \
-            writel(__bswap32(_val), (volatile unsigned long)((_ah)->ah_sh + (_reg))); \
+            writel(__bswap32(_val), (volatile u_int32_t *)((_ah)->ah_sh + (_reg))); \
 } while (0)
 #define _OS_REG_READ(_ah, _reg) \
         (((_reg) >= 0x4000 && (_reg) < 0x5000) ?                            \
-            readl((volatile unsigned long)((_ah)->ah_sh + (_reg))) :        \
-            __bswap32(readl((volatile unsigned long)((_ah)->ah_sh + (_reg)))))
+            readl((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) :        \
+            __bswap32(readl((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))))
 
 #else  /* normal case */
 
