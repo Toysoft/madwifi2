@@ -836,7 +836,7 @@ This command returns the current value of ???.
   \ev
 \end{example}
 
-\subsubsection{\mytt{roaming} - Set Roaming Mode}
+\subsubsection{\mytt{hostroaming} - Set Roaming Mode}
 \argdesc{1}{0}{Auto}{No}
 This command sets the roaming mode which is effectively who controls
 the operation (state transitions) of the 802.11 state machine when
@@ -862,19 +862,19 @@ modes.
 \begin{example}
   The following command sets the roaming mode to Auto on \mytt{ath0}.
   \bv
-  \cmd{iwpriv ath0 roaming 1}
+  \cmd{iwpriv ath0 hostroaming 1}
   \ev
 \end{example}
 
-\subsubsection{\mytt{get\_roaming} - Get Roaming Mode}
+\subsubsection{\mytt{get\_hostroaming} - Get Roaming Mode}
 \argdesc{0}{1}{N/A}{No}
 This command returns the roaming mode of the device.  The returned
 value corresponds to the modes given in Table~\ref{tab:roaming}.
 \begin{example}
   The following command returns the roaming mode of \mytt{ath0}:
   \bv
-  \cmd{iwpriv ath0 get\_roaming}\\
-  \mytt{ath0\hspace{32pt}get\_roaming:1}
+  \cmd{iwpriv ath0 get\_hostroaming}\\
+  \mytt{ath0\hspace{32pt}get\_hostroaming:1}
   \ev
 \end{example}
 
