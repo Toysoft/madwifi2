@@ -35,9 +35,9 @@
  */
 
 /*
- * wlanconfig wlanX create wlandev wifiX
+ * wlanconfig athX create wlandev wifiX
  *	wlanmode station | adhoc | ibss | ap | monitor [bssid | -bssid]
- * wlanconfig wlanX destroy
+ * wlanconfig athX destroy
  */
 #include <sys/types.h>
 #include <sys/file.h>
@@ -207,10 +207,10 @@ vap_destroy(const char *ifname)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: wlanconfig wlanX create wlandev wifiX\n");
+	fprintf(stderr, "usage: wlanconfig athX create wlandev wifiX\n");
 	fprintf(stderr, "            wlanmode [sta|adhoc|ap|monitor|wds|ahdemo] [bssid | -bssid] [nosbeacon]\n");
-	fprintf(stderr, "usage: wlanconfig wlanX destroy\n");
-	fprintf(stderr, "usage: wlanconfig wlanX list [active|ap|caps|chan|freq|keys|scan|sta|wme]\n");
+	fprintf(stderr, "usage: wlanconfig athX destroy\n");
+	fprintf(stderr, "usage: wlanconfig athX list [active|ap|caps|chan|freq|keys|scan|sta|wme]\n");
 	exit(-1);
 }
 
