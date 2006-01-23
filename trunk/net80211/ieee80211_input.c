@@ -2521,8 +2521,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 */
 		ssid = rates = xrates = ath = NULL;
 		while (frm < efrm) {
+			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
-				IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			case IEEE80211_ELEMID_SSID:
 				ssid = frm;
 				break;
@@ -3005,8 +3005,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 
 		rates = xrates = wme = NULL;
 		while (frm < efrm) {
+			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
-				IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			case IEEE80211_ELEMID_RATES:
 				rates = frm;
 				break;
