@@ -2251,6 +2251,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		scan.chan = scan.bchan;
 
 		while (frm < efrm) {
+			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
 			case IEEE80211_ELEMID_SSID:
 				scan.ssid = frm;
@@ -2322,6 +2323,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			}
 			frm += frm[1] + 2;
 		}
+		if(frm > efrm)
+			return;
 		IEEE80211_VERIFY_ELEMENT(scan.rates, IEEE80211_RATE_MAXSIZE);
 		IEEE80211_VERIFY_ELEMENT(scan.ssid, IEEE80211_NWID_LEN);
 #if IEEE80211_CHAN_MAX < 255
@@ -2519,6 +2522,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		ssid = rates = xrates = ath = NULL;
 		while (frm < efrm) {
 			switch (*frm) {
+				IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			case IEEE80211_ELEMID_SSID:
 				ssid = frm;
 				break;
@@ -2536,6 +2540,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			}
 			frm += frm[1] + 2;
 		}
+		if(frm > efrm)
+			return;
 		IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE);
 		IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN);
 		IEEE80211_VERIFY_SSID(vap->iv_bss, ssid);
@@ -2717,6 +2723,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			frm += 6;	/* ignore current AP info */
 		ssid = rates = xrates = wpa = rsn = wme = ath = NULL;
 		while (frm < efrm) {
+			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
 			case IEEE80211_ELEMID_SSID:
 				ssid = frm;
@@ -2758,6 +2765,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			}
 			frm += frm[1] + 2;
 		}
+		if(frm > efrm)
+			return;
 		IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE);
 		IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN);
 		IEEE80211_VERIFY_SSID(vap->iv_bss, ssid);
@@ -2997,6 +3006,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		rates = xrates = wme = NULL;
 		while (frm < efrm) {
 			switch (*frm) {
+				IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			case IEEE80211_ELEMID_RATES:
 				rates = frm;
 				break;
@@ -3010,7 +3020,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			}
 			frm += frm[1] + 2;
 		}
-
+		if(frm > efrm)
+			return;
 		IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE);
 		rate = ieee80211_setup_rates(ni, rates, xrates,
 				IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
