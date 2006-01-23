@@ -4065,6 +4065,37 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_create_vap);
+/*
+ * Create a virtual ap.  This is public as it must be implemented
+ * outside our control (e.g. in the driver).
+ * Must be called with rtnl_lock held
+ */
+int
+ieee80211_create_vap(struct ieee80211com *ic, char *name, struct net_device *mdev, int opmode, int opflags)
+{
+	struct ieee80211vap *vap;
+	int error, unit;
+	
+	if((error = ifc_name2unit(name, &unit)))
+		return error;
+
+	if (unit == -1) {
+		if((unit = ieee80211_new_wlanunit()) == -1)
+			return -EIO;		/* XXX */
+	} else {
+		if (!ieee80211_alloc_wlanunit(unit))
+			return -EINVAL;
+
+	}
+
+	if((vap = ic->ic_vap_create(ic, name, unit, opmode, opflags, mdev)) == NULL) {
+		ieee80211_delete_wlanunit(unit);
+		return -EIO;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(ieee80211_create_vap);
+
 
 void
 ieee80211_ioctl_vattach(struct ieee80211vap *vap)

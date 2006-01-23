@@ -377,9 +377,17 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	 IEEE80211_C_MONITOR)
 	struct ieee80211vap *vap = dev->priv;
 	struct net_device *parent = ic->ic_dev;
-
-	if (name != NULL)	/* XXX */
-		strncpy(dev->name, name, sizeof(dev->name));
+	int err;
+	
+	if (name != NULL) {	/* XXX */
+		if(strchr(name, '%')) {
+			if((err = dev_alloc_name(dev, name)) < 0) {
+				printk(KERN_ERR "can't alloc name %s\n", name);
+				return err;
+			}
+		} else
+			strncpy(dev->name, name, sizeof(dev->name));
+	}
 	dev->get_stats = ieee80211_getstats;
 	dev->open = ieee80211_open;
 	dev->stop = ieee80211_stop;

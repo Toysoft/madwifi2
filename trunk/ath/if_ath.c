@@ -57,7 +57,7 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/if_arp.h>
-
+#include <linux/rtnetlink.h>
 #include <asm/uaccess.h>
 
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
@@ -256,7 +256,7 @@ static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static	int ath_regdomain = 0;			/* regulatory domain */
 static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
-
+static  char *autocreate = NULL;
 static  int rfkill = -1;
 static	int countrycode = -1;
 static	int outdoor = -1;
@@ -286,18 +286,20 @@ MODULE_PARM(countrycode, "i");
 MODULE_PARM(outdoor, "i");
 MODULE_PARM(xchanmode, "i");
 MODULE_PARM(rfkill, "i");
+MODULE_PARM(autocreate, "s");
 #else
 #include <linux/moduleparam.h>
 module_param(countrycode, int, 0);
 module_param(outdoor, int, 0);
 module_param(xchanmode, int, 0);
 module_param(rfkill, int, 0);
+module_param(autocreate, charp, 0);
 #endif
 MODULE_PARM_DESC(countrycode, "Override default country code");
 MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
-
+MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
 #ifdef AR_DEBUG
 
 static int	ath_debug = 0;
@@ -389,6 +391,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	struct ath_hal *ah;
 	HAL_STATUS status;
 	int error = 0,i;
+	int autocreatemode = IEEE80211_M_STA;
 	u_int8_t csz;
 
 	sc->sc_debug = ath_debug;
@@ -865,6 +868,34 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 #ifdef ATH_TX99_DIAG
 	printk("%s: TX99 support enabled\n", dev->name);
 #endif
+	sc->sc_invalid = 0;
+
+	if(autocreate) {
+		if(!strcmp(autocreate, "none"))
+			autocreatemode = 0;
+		else if(!strcmp(autocreate, "sta"))
+			autocreatemode = IEEE80211_M_STA;
+		else if (!strcmp(autocreate, "ap"))
+			autocreatemode = IEEE80211_M_HOSTAP;
+		else if (!strcmp(autocreate, "adhoc"))
+			autocreatemode = IEEE80211_M_IBSS;
+		else if (!strcmp(autocreate, "ahdemo"))
+			autocreatemode = IEEE80211_M_AHDEMO;
+		else if (!strcmp(autocreate, "wds"))
+			autocreatemode = IEEE80211_M_WDS;
+		else if (!strcmp(autocreate, "monitor"))
+			autocreatemode = IEEE80211_M_MONITOR;
+		else 
+			printk(KERN_INFO "Unknown autocreate mode: %s\n", autocreate);
+	}
+	if(autocreatemode) {
+		rtnl_lock();
+	        error = ieee80211_create_vap(ic, "ath%d", dev, autocreatemode, IEEE80211_CLONE_BSSID);
+		rtnl_unlock();
+		if(error)
+			printk(KERN_ERR "%s: autocreation of vap failed: %d\n", dev->name, error);
+	}
+
 	return 0;
 bad3:
 	ieee80211_ifdetach(ic);
