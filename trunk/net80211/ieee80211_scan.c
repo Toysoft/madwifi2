@@ -188,10 +188,14 @@ static const struct ieee80211_scanner *scanners[IEEE80211_SCANNER_MAX];
 const struct ieee80211_scanner *
 ieee80211_scanner_get(enum ieee80211_opmode mode)
 {
+	int err;
 	if (mode >= IEEE80211_SCANNER_MAX)
 		return NULL;
-	if (scanners[mode] == NULL)
-		ieee80211_load_module(scan_modnames[mode]);
+	if (scanners[mode] == NULL) {
+		err = ieee80211_load_module(scan_modnames[mode]);
+		if(scanners[mode] == NULL || err)
+			printk(KERN_WARNING "unable to load %s\n", scan_modnames[mode]);
+	}
 	return scanners[mode];
 }
 EXPORT_SYMBOL(ieee80211_scanner_get);

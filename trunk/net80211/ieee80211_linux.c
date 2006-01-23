@@ -297,8 +297,7 @@ EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 int
 ieee80211_load_module(const char *modname)
 {
-	request_module(modname);
-	return 0;
+	return in_atomic() ? -EINVAL : request_module(modname);
 }
 
 #ifdef CONFIG_SYSCTL
