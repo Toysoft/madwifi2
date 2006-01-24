@@ -125,9 +125,9 @@ $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
 
 # Determine target architecture of the kernel.
-ifeq (,$(ARCH))
+ifeq (,$(ARCH_TARGET))
 ARCH_TARGET=$(shell ${DEPTH}/scripts/get_arch_target.sh $(KERNELCONF))
-ARCH = $(word 1,$(ARCH_TARGET))
+ARCH ?= $(word 1,$(ARCH_TARGET))
 TARGET ?= $(word 2,$(ARCH_TARGET))
 endif
 
@@ -136,6 +136,7 @@ $(error Cannot determine kernel architecture, please set ARCH)
 endif
 export ARCH
 export TARGET
+export ARCH_TARGET
 
 # SYSTEMMAP is the name of the System.map file for the target
 # kernel. This will be needed when DESTDIR is defined in order
