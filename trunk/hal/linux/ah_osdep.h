@@ -155,16 +155,26 @@ __bswap32(u_int32_t _x)
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
 #if ( defined(CONFIG_PPC_PMAC) || defined(CONFIG_ARCH_IXP425) || defined(CONFIG_ARCH_IXP4XX)) /* ixp4xx or PowerPC architecture */
 
+/*
+ * In Linux 2.4, both long and pointer are OK as addresses for readl and
+ * writel, but some ARM ports require unsigned long.
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+typedef volatile unsigned long io_addr_t;
+#else
+typedef volatile void __iomem *io_addr_t;
+#endif
+
 #define _OS_REG_WRITE(_ah, _reg, _val) do {                                 \
         if ( (_reg) >= 0x4000 && (_reg) < 0x5000)                           \
-            writel((_val), (volatile u_int32_t *)((_ah)->ah_sh + (_reg)));\
+            writel((_val), (io_addr_t)((_ah)->ah_sh + (_reg)));\
         else                                                                \
-            writel(__bswap32(_val), (volatile u_int32_t *)((_ah)->ah_sh + (_reg))); \
+            writel(__bswap32(_val), (io_addr_t)((_ah)->ah_sh + (_reg))); \
 } while (0)
 #define _OS_REG_READ(_ah, _reg) \
         (((_reg) >= 0x4000 && (_reg) < 0x5000) ?                            \
-            readl((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) :        \
-            __bswap32(readl((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))))
+            readl((io_addr_t)((_ah)->ah_sh + (_reg))) :        \
+            __bswap32(readl((io_addr_t)((_ah)->ah_sh + (_reg)))))
 
 #else  /* normal case */
 
