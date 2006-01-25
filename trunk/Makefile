@@ -77,14 +77,12 @@ install-modules:
 ifeq ($(DESTDIR),)
 	(export MODULEPATH=${MODULEPATH}; /sbin/depmod -ae)
 endif
-	echo "KERNELRELEASE=$(KERNELRELEASE)" > ./install.log
-	echo "DESTDIR=$(DESTDIR)" >> ./install.log
 
 install-tools:
 	$(MAKE) -C ${TOOLS} install || exit 1
 
 uninstall:
-	sh scripts/remove-old-modules.sh
+	sh scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
 	$(MAKE) -C ${TOOLS} uninstall
 
 FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \

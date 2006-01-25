@@ -31,14 +31,16 @@ fi
 
 if [ -n "${OLD_MODULES}" ]; then
 	if [ "${QUIET}" = "noask" ]; then
-		sh ${SCRIPTS}/remove-old-modules.sh noask ${OLD_MODULES}
+		rm -f ${OLD_MODULES}
 		exit
 	fi
 	echo
 	echo "WARNING:"
 	echo "It seems that there are modules left from previous MadWifi installations."
-	echo "You should consider removing them before you continue, or else you might"
-	echo "experience problems during operation. Remove old modules?"
+	echo "If you are unistalling the MadWifi modules please press \"r\" to remove them."
+	echo "If you are installing new MadWifi modules, you should consider removing those"
+	echo "already installed, or else you may experience problems during operation."
+	echo "Remove old modules?"
 	
 	while true; do
 		echo
@@ -52,7 +54,7 @@ if [ -n "${OLD_MODULES}" ]; then
 				;;
 			
 			r|R)
-				sh ${SCRIPTS}/remove-old-modules.sh noask ${OLD_MODULES}
+				rm -f ${OLD_MODULES}
 				exit
 				;;
 		
@@ -60,8 +62,12 @@ if [ -n "${OLD_MODULES}" ]; then
 				exit 0
 				;;
 	
-			*)
+			x|X)
 				exit 1
+				;;
+
+			*)
+				continue
 				;;
 		esac
 	done
