@@ -870,10 +870,10 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 #endif
 	sc->sc_invalid = 0;
 
-	if(autocreate) {
-		if(!strcmp(autocreate, "none"))
-			autocreatemode = 0;
-		else if(!strcmp(autocreate, "sta"))
+	if (autocreate) {
+		if (!strcmp(autocreate, "none"))
+			autocreatemode = -1;
+		else if (!strcmp(autocreate, "sta"))
 			autocreatemode = IEEE80211_M_STA;
 		else if (!strcmp(autocreate, "ap"))
 			autocreatemode = IEEE80211_M_HOSTAP;
@@ -885,14 +885,18 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 			autocreatemode = IEEE80211_M_WDS;
 		else if (!strcmp(autocreate, "monitor"))
 			autocreatemode = IEEE80211_M_MONITOR;
-		else 
-			printk(KERN_INFO "Unknown autocreate mode: %s\n", autocreate);
+		else {
+			printk(KERN_INFO "Unknown autocreate mode: %s\n",
+				autocreate);
+			autocreatemode = -1;
+		}
 	}
-	if(autocreatemode) {
+	
+	if (autocreatemode != -1) {
 		rtnl_lock();
-	        error = ieee80211_create_vap(ic, "ath%d", dev, autocreatemode, IEEE80211_CLONE_BSSID);
+		error = ieee80211_create_vap(ic, "ath%d", dev, autocreatemode, IEEE80211_CLONE_BSSID);
 		rtnl_unlock();
-		if(error)
+		if (error)
 			printk(KERN_ERR "%s: autocreation of vap failed: %d\n", dev->name, error);
 	}
 
