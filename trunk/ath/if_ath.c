@@ -186,7 +186,6 @@ static void	ath_tx_tasklet(TQUEUE_ARG data);
 static void	ath_tx_timeout(struct net_device *);
 static void	ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
 static int	ath_chan_set(struct ath_softc *, struct ieee80211_channel *);
-static void	ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
 static void	ath_draintxq(struct ath_softc *);
 static __inline void ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
 				    struct ath_txq *txq, struct ath_buf *bf, 
