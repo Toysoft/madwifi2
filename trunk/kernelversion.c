@@ -5,4 +5,4 @@
  * Taken from the lm_sensors project.
  */
 #include <linux/version.h>
-char *uts_release=UTS_RELEASE;
+char *uts_release = UTS_RELEASE;

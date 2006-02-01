@@ -73,13 +73,13 @@
 static	int ath_hal_debug = 0;
 #endif
 
-int	ath_hal_dma_beacon_response_time = 2;	/* in TU's */
-int	ath_hal_sw_beacon_response_time = 10;	/* in TU's */
-int	ath_hal_additional_swba_backoff = 0;	/* in TU's */
+int ath_hal_dma_beacon_response_time = 2;	/* in TU's */
+int ath_hal_sw_beacon_response_time = 10;	/* in TU's */
+int ath_hal_additional_swba_backoff = 0;		/* in TU's */
 
 struct ath_hal *
 _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
-		HAL_BUS_TAG t, HAL_BUS_HANDLE h, void* s)
+	HAL_BUS_TAG t, HAL_BUS_HANDLE h, void* s)
 {
 	HAL_STATUS status;
 	struct ath_hal *ah = ath_hal_attach(devid, sc, t, h, &status);
@@ -158,11 +158,11 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
 #include "alq/alq.h"
 #include "ah_decode.h"
 
-static	struct alq *ath_hal_alq;
-static	int ath_hal_alq_emitdev;	/* need to emit DEVICE record */
-static	u_int ath_hal_alq_lost;		/* count of lost records */
-static	const char *ath_hal_logfile = "/tmp/ath_hal.log";
-static	u_int ath_hal_alq_qsize = 8*1024;
+static struct alq *ath_hal_alq;
+static int ath_hal_alq_emitdev;		/* need to emit DEVICE record */
+static u_int ath_hal_alq_lost;		/* count of lost records */
+static const char *ath_hal_logfile = "/tmp/ath_hal.log";
+static u_int ath_hal_alq_qsize = 8 * 1024;
 
 static int
 ath_hal_setlogging(int enable)
@@ -226,8 +226,7 @@ ath_hal_alq_get(struct ath_hal *ah)
 	if (ath_hal_alq_emitdev) {
 		ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
 		if (ale) {
-			struct athregrec *r =
-				(struct athregrec *) ale->ae_data;
+			struct athregrec *r = (struct athregrec *) ale->ae_data;
 			r->op = OP_DEVICE;
 			r->reg = 0;
 			r->val = ah->ah_devid;
@@ -390,7 +389,6 @@ EXPORT_SYMBOL(ath_hal_getuptime);
 /*
  * Allocate/free memory.
  */
-
 void * __ahdecl
 ath_hal_malloc(size_t size)
 {
@@ -399,7 +397,6 @@ ath_hal_malloc(size_t size)
 	if (p)
 		OS_MEMZERO(p, size);
 	return p;
-		
 }
 
 void __ahdecl
@@ -563,7 +560,7 @@ init_ath_hal(void)
 #ifdef CONFIG_SYSCTL
 	ath_hal_sysctl_register();
 #endif
-	return (0);
+	return 0;
 }
 module_init(init_ath_hal);
 
