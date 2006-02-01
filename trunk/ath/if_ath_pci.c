@@ -72,7 +72,7 @@
 struct ath_pci_softc {
 	struct ath_softc	aps_sc;
 #ifdef CONFIG_PM
-	u32			aps_pmstate[16];
+	u32	aps_pmstate[16];
 #endif
 };
 
@@ -85,10 +85,10 @@ static struct pci_device_id ath_pci_id_table[] __devinitdata = {
 	{ 0x168c, 0x0007, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0012, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0013, PCI_ANY_ID, PCI_ANY_ID },
-	{ 0xa727, 0x0013, PCI_ANY_ID, PCI_ANY_ID },	/* 3com */
-	{ 0x10b7, 0x0013, PCI_ANY_ID, PCI_ANY_ID },	/* 3com 3CRDAG675 */
-	{ 0x168c, 0x1014, PCI_ANY_ID, PCI_ANY_ID },	/* IBM minipci 5212 */
-	{ 0x168c, 0x101a, PCI_ANY_ID, PCI_ANY_ID },	/* some Griffin-Lite */
+	{ 0xa727, 0x0013, PCI_ANY_ID, PCI_ANY_ID }, /* 3com */
+	{ 0x10b7, 0x0013, PCI_ANY_ID, PCI_ANY_ID }, /* 3com 3CRDAG675 */
+	{ 0x168c, 0x1014, PCI_ANY_ID, PCI_ANY_ID }, /* IBM minipci 5212 */
+	{ 0x168c, 0x101a, PCI_ANY_ID, PCI_ANY_ID }, /* some Griffin-Lite */
 	{ 0x168c, 0x0015, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0016, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x0017, PCI_ANY_ID, PCI_ANY_ID },
@@ -113,7 +113,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	u32 val;
 
 	if (pci_enable_device(pdev))
-		return (-EIO);
+		return -EIO;
 
 	/* XXX 32-bit addressing only */
 	if (pci_set_dma_mask(pdev, 0xffffffff)) {
@@ -232,8 +232,7 @@ ath_pci_remove(struct pci_dev *pdev)
 	if (dev->irq)
 		free_irq(dev->irq, dev);
 	iounmap((void __iomem *) dev->mem_start);
-	release_mem_region(pci_resource_start(pdev, 0),
-			   pci_resource_len(pdev, 0));
+	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
 	free_netdev(dev);
 }
@@ -245,12 +244,11 @@ ath_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	ath_suspend(dev);
-	PCI_SAVE_STATE(pdev,
-		((struct ath_pci_softc *)dev->priv)->aps_pmstate);
+	PCI_SAVE_STATE(pdev, ((struct ath_pci_softc *)dev->priv)->aps_pmstate);
 	pci_disable_device(pdev);
 	if (pci_set_power_state(pdev, PCI_D3hot)); /* XXX: what? */
 
-	return (0);
+	return 0;
 }
 
 static int
@@ -258,12 +256,11 @@ ath_pci_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	u32 val;
-	if(pci_set_power_state(pdev, PCI_D0))
+	if (pci_set_power_state(pdev, PCI_D0))
 		return 1;
 
 	/* XXX - Should this return nonzero on fail? */
-	PCI_RESTORE_STATE(pdev,
-		((struct ath_pci_softc *)dev->priv)->aps_pmstate);
+	PCI_RESTORE_STATE(pdev,	((struct ath_pci_softc *)dev->priv)->aps_pmstate);
 
 	if (pci_enable_device(pdev))
 		return 1;
@@ -280,7 +277,7 @@ ath_pci_resume(struct pci_dev *pdev)
 		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
 	ath_resume(dev);
 
-	return (0);
+	return 0;
 }
 #endif /* CONFIG_PM */
 
@@ -316,12 +313,12 @@ ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr)
 		return -EOPNOTSUPP;
 	memset(&info, 0, sizeof(info));
 	info.cmd = cmd;
-	strncpy(info.driver, dev_info, sizeof(info.driver)-1);
-	strncpy(info.version, version, sizeof(info.version)-1);
+	strncpy(info.driver, dev_info, sizeof(info.driver) - 1);
+	strncpy(info.version, version, sizeof(info.version) - 1);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22)
 	/* include the device name so later versions of kudzu DTRT */
 	strncpy(info.bus_info, pci_name((struct pci_dev *)sc->sc_bdev),
-		sizeof(info.bus_info)-1);
+		sizeof(info.bus_info) - 1);
 #endif
 	return copy_to_user(addr, &info, sizeof(info)) ? -EFAULT : 0;
 }
