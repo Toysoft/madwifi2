@@ -1,6 +1,6 @@
 /*	$NetBSD: if_media.h,v 1.3 1997/03/26 01:19:27 thorpej Exp $	*/
 /* $FreeBSD: src/sys/net/if_media.h,v 1.18 2002/07/14 21:58:19 kbyanc Exp $ */
-/*	$Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/net80211/if_media.h#3 $	*/
+/*	$Id$	*/
 
 /*
  * Copyright (c) 1997
@@ -34,6 +34,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $Id$
  */
 
 #ifndef _NET_IF_MEDIA_H_

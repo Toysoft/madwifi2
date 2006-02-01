@@ -2,6 +2,8 @@
  * I have just removed kernel related headers and added some typedefs etc. to
  * make this easier to include into user space programs.
  * Jouni Malinen, 2005-03-12.
+ *
+ * $Id$
  */
 
 

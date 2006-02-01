@@ -1,6 +1,8 @@
 /*-
  * Copyright (c) 2004 Atheros Communications, Inc.
  * All rights reserved
+ *
+ * $Id$
  */
 #include "opt_ah.h"
 

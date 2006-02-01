@@ -26,9 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)queue.h	8.5 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/sys/queue.h,v 1.58 2004/04/07 04:19:49 imp Exp $
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/include/sys/queue.h#3 $
+ * $Id$
  */
 
 #ifndef _SYS_QUEUE_H_

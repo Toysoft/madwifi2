@@ -33,9 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/net80211/if_llc.h#1 $
- * $NetBSD: if_llc.h,v 1.12 1999/11/19 20:41:19 thorpej Exp $
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/net80211/if_llc.h#1 $
+ * $Id$
  */
 
 /*
@@ -69,9 +67,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	@(#)if_llc.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_llc.h,v 1.9 2002/09/23 06:25:08 alfred Exp $
  */
 
 #ifndef _NET_IF_LLC_H_

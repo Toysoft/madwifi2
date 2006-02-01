@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/include/compat.h#2 $
+ * $Id$
  */
 #ifndef _ATH_COMPAT_H_
 #define _ATH_COMPAT_H_
