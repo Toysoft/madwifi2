@@ -66,7 +66,7 @@
 #define	ONOE_DEBUG
 #ifdef ONOE_DEBUG
 enum {
-	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
+	ATH_DEBUG_RATE	= 0x00000010,	/* rate control */
 };
 #define	DPRINTF(sc, _fmt, ...) do {				\
 	if (sc->sc_debug & ATH_DEBUG_RATE)			\
@@ -95,14 +95,13 @@ enum {
  *
  * XXX this algorithm is flawed.
  */
-static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
-static	int ath_rate_raise = 10;		/* add credit threshold */
-static	int ath_rate_raise_threshold = 10;	/* rate ctl raise threshold */
+static int ath_rateinterval = 1000;		/* rate ctl interval (ms) */
+static int ath_rate_raise = 10;			/* add credit threshold */
+static int ath_rate_raise_threshold = 10;	/* rate ctl raise threshold */
 
-static void	ath_rate_update(struct ath_softc *, struct ieee80211_node *,
-			int rate);
-static void	ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
-static void	ath_rate_ctl(void *, struct ieee80211_node *);
+static void ath_rate_update(struct ath_softc *, struct ieee80211_node *, int);
+static void ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
+static void ath_rate_ctl(void *, struct ieee80211_node *);
 
 void
 ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
@@ -187,9 +186,9 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
 	DPRINTF(sc, "%s: set xmit rate for %s to %dM\n",
-	    __func__, ether_sprintf(ni->ni_macaddr),
-	    ni->ni_rates.rs_nrates > 0 ?
-		(ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL) / 2 : 0);
+		__func__, ether_sprintf(ni->ni_macaddr),
+		ni->ni_rates.rs_nrates > 0 ?
+			(ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL) / 2 : 0);
 
 	ni->ni_txrate = rate;
 	/*
@@ -201,8 +200,7 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 	 */
 	if (ni->ni_rates.rs_nrates == 0)
 		goto done;
-	on->on_tx_rix0 = sc->sc_rixmap[
-		ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
+	on->on_tx_rix0 = sc->sc_rixmap[ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
 	on->on_tx_rate0 = rt->info[on->on_tx_rix0].rateCode;
 	
 	on->on_tx_rate0sp = on->on_tx_rate0 |
@@ -217,31 +215,26 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 		 */
 		on->on_tx_try0 = 1 + 3;		/* 4 tries at rate 0 */
 		if (--rate >= 0) {
-			rix = sc->sc_rixmap[
-				ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
+			rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
 			on->on_tx_rate1 = rt->info[rix].rateCode;
 			on->on_tx_rate1sp = on->on_tx_rate1 |
 				rt->info[rix].shortPreamble;
-		} else {
+		} else
 			on->on_tx_rate1 = on->on_tx_rate1sp = 0;
-		}
 		if (--rate >= 0) {
-			rix = sc->sc_rixmap[
-				ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
+			rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
 			on->on_tx_rate2 = rt->info[rix].rateCode;
 			on->on_tx_rate2sp = on->on_tx_rate2 |
 				rt->info[rix].shortPreamble;
-		} else {
+		} else
 			on->on_tx_rate2 = on->on_tx_rate2sp = 0;
-		}
 		if (rate > 0) {
 			/* NB: only do this if we didn't already do it above */
 			on->on_tx_rate3 = rt->info[0].rateCode;
 			on->on_tx_rate3sp =
 				on->on_tx_rate3 | rt->info[0].shortPreamble;
-		} else {
+		} else
 			on->on_tx_rate3 = on->on_tx_rate3sp = 0;
-		}
 	} else {
 		on->on_tx_try0 = ATH_TXMAXTRY;	/* max tries at rate 0 */
 		on->on_tx_rate1 = on->on_tx_rate1sp = 0;
@@ -276,8 +269,7 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 			 * closest rate.
 			 */
 			/* NB: the rate set is assumed sorted */
-			for (; srate >= 0 && RATE(srate) > 72; srate--)
-				;
+			for (; srate >= 0 && RATE(srate) > 72; srate--);
 			KASSERT(srate >= 0, ("bogus rate set"));
 		}
 	} else {
@@ -290,8 +282,7 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 		 */
 		/* NB: the rate set is assumed sorted */
 		srate = ni->ni_rates.rs_nrates - 1;
-		for (; srate >= 0 && RATE(srate) != vap->iv_fixed_rate; srate--)
-			;
+		for (; srate >= 0 && RATE(srate) != vap->iv_fixed_rate; srate--);
 		KASSERT(srate >= 0,
 			("fixed rate %d not in rate set", vap->iv_fixed_rate));
 	}
@@ -438,10 +429,10 @@ ath_rate_detach(struct ath_ratectrl *arc)
 }
 EXPORT_SYMBOL(ath_rate_detach);
 
-static	int minrateinterval = 500;		/* 500ms */
-static	int maxpercent = 100;			/* 100% */
-static	int minpercent = 0;			/* 0% */
-static	int maxint = 0x7fffffff;		/* 32-bit big */
+static int minrateinterval = 500;	/* 500ms */
+static int maxpercent = 100;		/* 100% */
+static int minpercent = 0;		/* 0% */
+static int maxint = 0x7fffffff;		/* 32-bit big */
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
