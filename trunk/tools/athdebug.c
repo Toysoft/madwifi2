@@ -129,7 +129,8 @@ usage(void)
 
 #ifdef __linux__
 static int
-sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
+sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp,
+	size_t newlen)
 {
 	char oidcopy[1024], *oid;
 	char path[1024];
@@ -141,8 +142,7 @@ sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp, size_t n
 	do {
 		char *cp, *tp;
 
-		for (cp = oid; *cp != '\0' && *cp != '.'; cp++)
-			;
+		for (cp = oid; *cp != '\0' && *cp != '.'; cp++);
 		if (*cp == '.')
 			*cp++ = '\0';
 		tp = strchr(path, '\0');
@@ -191,7 +191,8 @@ main(int argc, char *argv[])
 			if (argc < 2)
 				errx(1, "missing interface name for -i option");
 			ifname = argv[2];
-			argc -= 2, argv += 2;
+			argc -= 2;
+			argv += 2;
 		} else if (strcmp(argv[1], "-?") == 0)
 			usage();
 	}
@@ -231,7 +232,7 @@ main(int argc, char *argv[])
 						bit = strtoul(cp, NULL, 0);
 					else
 						errx(1, "unknown flag %.*s",
-						     (int)(tp-cp), cp);
+							(int)(tp-cp), cp);
 				}
 				ndebug = bit;
 			}
