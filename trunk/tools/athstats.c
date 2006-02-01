@@ -281,19 +281,18 @@ main(int argc, char *argv[])
 		signalled = 0;
 		alarm(interval);
 	banner:
-		printf("%8s %8s %7s %7s %7s %6s %6s %6s %7s %4s %4s"
-			, "input"
-			, "output"
-			, "altrate"
-			, "short"
-			, "long"
-			, "xretry"
-			, "crcerr"
-			, "crypt"
-			, "phyerr"
-			, "rssi"
-			, "rate"
-		);
+		printf("%8s %8s %7s %7s %7s %6s %6s %6s %7s %4s %4s",
+			"input",
+			"output",
+			"altrate",
+			"short",
+			"long",
+			"xretry",
+			"crcerr",
+			"crypt",
+			"phyerr",
+			"rssi",
+			"rate");
 		putchar('\n');
 		fflush(stdout);
 		line = 0;
@@ -306,20 +305,19 @@ main(int argc, char *argv[])
 				err(1, ifr.ifr_name);
 			if (!getifstats(ifr.ifr_name, &icur, &ocur))
 				err(1, ifr.ifr_name);
-			printf("%8lu %8lu %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
-				, (icur - itot) -
-					(cur.ast_rx_mgt - total.ast_rx_mgt)
-				, ocur - otot
-				, cur.ast_tx_altrate - total.ast_tx_altrate
-				, cur.ast_tx_shortretry - total.ast_tx_shortretry
-				, cur.ast_tx_longretry - total.ast_tx_longretry
-				, cur.ast_tx_xretries - total.ast_tx_xretries
-				, cur.ast_rx_crcerr - total.ast_rx_crcerr
-				, cur.ast_rx_badcrypt - total.ast_rx_badcrypt
-				, cur.ast_rx_phyerr - total.ast_rx_phyerr
-				, rssi
-				, rate
-			);
+			printf("%8lu %8lu %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n",
+				(icur - itot) -
+					(cur.ast_rx_mgt - total.ast_rx_mgt),
+				ocur - otot,
+				cur.ast_tx_altrate - total.ast_tx_altrate,
+				cur.ast_tx_shortretry - total.ast_tx_shortretry,
+				cur.ast_tx_longretry - total.ast_tx_longretry,
+				cur.ast_tx_xretries - total.ast_tx_xretries,
+				cur.ast_rx_crcerr - total.ast_rx_crcerr,
+				cur.ast_rx_badcrypt - total.ast_rx_badcrypt,
+				cur.ast_rx_phyerr - total.ast_rx_phyerr,
+				rssi,
+				rate);
 			total = cur;
 			itot = icur;
 			otot = ocur;
@@ -329,19 +327,18 @@ main(int argc, char *argv[])
 				err(1, ifr.ifr_name);
 			if (!getifstats(ifr.ifr_name, &itot, &otot))
 				err(1, ifr.ifr_name);
-			printf("%8lu %8lu %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n"
-				, itot - total.ast_rx_mgt
-				, otot
-				, total.ast_tx_altrate
-				, total.ast_tx_shortretry
-				, total.ast_tx_longretry
-				, total.ast_tx_xretries
-				, total.ast_rx_crcerr
-				, total.ast_rx_badcrypt
-				, total.ast_rx_phyerr
-				, rssi
-				, rate
-			);
+			printf("%8lu %8lu %7u %7u %7u %6u %6u %6u %7u %4u %3uM\n",
+				itot - total.ast_rx_mgt,
+				otot,
+				total.ast_tx_altrate,
+				total.ast_tx_shortretry,
+				total.ast_tx_longretry,
+				total.ast_tx_xretries,
+				total.ast_rx_crcerr,
+				total.ast_rx_badcrypt,
+				total.ast_rx_phyerr,
+				rssi,
+				rate);
 		}
 		fflush(stdout);
 		sigemptyset(&nmask);

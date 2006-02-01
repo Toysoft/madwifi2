@@ -38,7 +38,7 @@
 
 /*
  * 80211debug [-i interface] flags
- * (default interface is wlan0).
+ * (default interface is ath0).
  */
 #include <sys/types.h>
 
@@ -135,7 +135,8 @@ usage(void)
 
 #ifdef __linux__
 static int
-sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
+sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp,
+	void *newp, size_t newlen)
 {
 	char oidcopy[1024], *oid;
 	char path[1024];
@@ -147,8 +148,7 @@ sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp, size_t n
 	do {
 		char *cp, *tp;
 
-		for (cp = oid; *cp != '\0' && *cp != '.'; cp++)
-			;
+		for (cp = oid; *cp != '\0' && *cp != '.'; cp++);
 		if (*cp == '.')
 			*cp++ = '\0';
 		tp = strchr(path, '\0');
@@ -188,9 +188,8 @@ main(int argc, char *argv[])
 	char oid[256];
 
 	progname = argv[0];
-	if (argc == 1) {
+	if (argc == 1)
 	    usage();
-	}
 	if (argc > 1) {
 		if (strcmp(argv[1], "-i") == 0) {
 			if (argc < 2)
@@ -236,7 +235,7 @@ main(int argc, char *argv[])
 						bit = strtoul(cp, NULL, 0);
 					else
 						errx(1, "unknown flag %.*s",
-						     (int)(tp-cp), cp);
+							(int)(tp-cp), cp);
 				}
 				ndebug = bit;
 			}

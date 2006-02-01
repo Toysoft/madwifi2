@@ -60,7 +60,6 @@
 /*
  * These are taken from ieee80211_node.h
  */
-
 #define IEEE80211_NODE_TURBOP	0x0001		/* Turbo prime enable */
 #define IEEE80211_NODE_COMP	0x0002		/* Compresssion enable */
 #define IEEE80211_NODE_FF	0x0004          /* Fast Frame capable */
@@ -71,25 +70,25 @@
 #define	streq(a,b)	(strncasecmp(a,b,sizeof(b)-1) == 0)
 
 static void vap_create(struct ifreq *);
-static void vap_destroy(const char *ifname);
-static void list_stations(const char *ifname);
-static void list_scan(const char *ifname);
-static void list_channels(const char *ifname, int allchans);
-static void list_keys(const char *ifname);
-static void list_capabilities(const char *ifname);
-static void list_wme(const char *ifname);
-static void ieee80211_status(const char *ifname);
+static void vap_destroy(const char *);
+static void list_stations(const char *);
+static void list_scan(const char *);
+static void list_channels(const char *, int);
+static void list_keys(const char *);
+static void list_capabilities(const char *);
+static void list_wme(const char *);
+static void ieee80211_status(const char *);
 
 static void usage(void);
 static int getopmode(const char *);
 static int getflag(const char *);
-static int get80211param(const char *ifname, int param, void * data, size_t len);
-static int get80211priv(const char *ifname, int op, void *data, size_t len);
-static const char *getstamode(u_int8_t opmode);
+static int get80211param(const char *, int, void *, size_t);
+static int get80211priv(const char *, int, void *, size_t);
+static const char *getstamode(u_int8_t);
 
-size_t strlcat(char *dst, const char *src, size_t siz);
+size_t strlcat(char *, const char *, size_t);
 
-int	verbose = 0;
+int verbose = 0;
 
 int
 main(int argc, char *argv[])
@@ -125,12 +124,14 @@ main(int argc, char *argv[])
 				if (argc < 5)
 					usage();
 				cp.icp_opmode = (u_int16_t) getopmode(argv[4]);
-				argc--, argv++;
+				argc--;
+				argv++;
 			} else if (strcmp(argv[3], "wlandev") == 0) {
 				if (argc < 5)
 					usage();
 				strncpy(ifr.ifr_name, argv[4], IFNAMSIZ);
-				argc--, argv++;
+				argc--;
+				argv++;
 			} else {
 				int flag = getflag(argv[3]);
 				if (flag < 0)
@@ -138,15 +139,16 @@ main(int argc, char *argv[])
 				else
 					cp.icp_flags |= flag;
 			}
-			argc--, argv++;
+			argc--;
+			argv++;
 		}
 		if (ifr.ifr_name[0] == '\0')
 			errx(1, "no device specified with wlandev");
 		ifr.ifr_data = (void *) &cp;
 		vap_create(&ifr);
-	} else if (streq(cmd, "destroy")) {
+	} else if (streq(cmd, "destroy"))
 		vap_destroy(ifname);
-	} else if (streq(cmd, "list")) {
+	else if (streq(cmd, "list")) {
 		if (argc > 3) {
 			const char *arg = argv[3];
 
@@ -404,15 +406,15 @@ copy_essid(char buf[], size_t bufsize, const u_int8_t *essid, size_t essid_len)
 		bufsize -= 2;
 		p = essid;
 		for (i = 0; i < maxlen && bufsize >= 2; i++) {
-			sprintf(&buf[2+2*i], "%02x", *p++);
+			sprintf(&buf[2 + 2 * i], "%02x", *p++);
 			bufsize -= 2;
 		}
-		maxlen = 2+2*i;
+		maxlen = 2 + 2 * i;
 	} else {			/* printable, truncate as needed */
 		memcpy(buf, essid, maxlen);
 	}
 	if (maxlen != essid_len)
-		memcpy(buf+maxlen-3, "...", 3);
+		memcpy(buf+maxlen - 3, "...", 3);
 	return maxlen;
 }
 
@@ -427,19 +429,19 @@ copy_essid(char buf[], size_t bufsize, const u_int8_t *essid, size_t essid_len)
 static int __inline
 iswpaoui(const u_int8_t *frm)
 {
-	return frm[1] > 3 && LE_READ_4(frm+2) == ((WPA_OUI_TYPE<<24)|WPA_OUI);
+	return frm[1] > 3 && LE_READ_4(frm + 2) == ((WPA_OUI_TYPE << 24) | WPA_OUI);
 }
 
 static int __inline
 iswmeoui(const u_int8_t *frm)
 {
-	return frm[1] > 3 && LE_READ_4(frm+2) == ((WME_OUI_TYPE<<24)|WME_OUI);
+	return frm[1] > 3 && LE_READ_4(frm + 2) == ((WME_OUI_TYPE << 24) | WME_OUI);
 }
 
 static int __inline
 isatherosoui(const u_int8_t *frm)
 {
-	return frm[1] > 3 && LE_READ_4(frm+2) == ((ATH_OUI_TYPE<<24)|ATH_OUI);
+	return frm[1] > 3 && LE_READ_4(frm + 2) == ((ATH_OUI_TYPE << 24) | ATH_OUI);
 }
 
 static void
@@ -449,23 +451,23 @@ printies(const u_int8_t *vp, int ielen, int maxcols)
 		switch (vp[0]) {
 		case IEEE80211_ELEMID_VENDOR:
 			if (iswpaoui(vp))
-				printie(" WPA", vp, 2+vp[1], maxcols);
+				printie(" WPA", vp, 2 + vp[1], maxcols);
 			else if (iswmeoui(vp))
-				printie(" WME", vp, 2+vp[1], maxcols);
+				printie(" WME", vp, 2 + vp[1], maxcols);
 			else if (isatherosoui(vp))
-				printie(" ATH", vp, 2+vp[1], maxcols);
+				printie(" ATH", vp, 2 + vp[1], maxcols);
 			else
-				printie(" VEN", vp, 2+vp[1], maxcols);
+				printie(" VEN", vp, 2 + vp[1], maxcols);
 			break;
 		case IEEE80211_ELEMID_RSN:
-			printie(" RSN", vp, 2+vp[1], maxcols);
+			printie(" RSN", vp, 2 + vp[1], maxcols);
 			break;
 		default:
-			printie(" ???", vp, 2+vp[1], maxcols);
+			printie(" ???", vp, 2 + vp[1], maxcols);
 			break;
 		}
-		ielen -= 2+vp[1];
-		vp += 2+vp[1];
+		ielen -= 2 + vp[1];
+		vp += 2 + vp[1];
 	}
 }
 
@@ -502,22 +504,21 @@ list_stations(const char *ifname)
 	if (len < sizeof(struct ieee80211req_sta_info))
 		return;
 
-	printf("%-17.17s %4s %4s %4s %4s %4s %4s %6s %6s %4s %5s %3s %8s %8s\n"
-		, "ADDR"
-		, "AID"
-		, "CHAN"
-		, "RATE"
-		, "RSSI"
-		, "DBM"
-		, "IDLE"
-		, "TXSEQ"
-		, "RXSEQ"
-		, "CAPS"
-		, "ACAPS"
-		, "ERP"
-		, "STATE"
-		, "MODE"
-	);
+	printf("%-17.17s %4s %4s %4s %4s %4s %4s %6s %6s %4s %5s %3s %8s %8s\n",
+		"ADDR",
+		"AID",
+		"CHAN",
+		"RATE",
+		"RSSI",
+		"DBM",
+		"IDLE",
+		"TXSEQ",
+		"RXSEQ",
+		"CAPS",
+		"ACAPS",
+		"ERP",
+		"STATE",
+		"MODE");
 	cp = buf;
 	do {
 		struct ieee80211req_sta_info *si;
@@ -525,26 +526,26 @@ list_stations(const char *ifname)
 
 		si = (struct ieee80211req_sta_info *) cp;
 		vp = (u_int8_t *)(si+1);
-		printf("%s %4u %4d %3dM %4d %4d %4d %6d %6d %-4.4s %-5.5s %3x %8x %8s"
-			, ieee80211_ntoa(si->isi_macaddr)
-			, IEEE80211_AID(si->isi_associd)
-			, ieee80211_mhz2ieee(si->isi_freq)
-			, (si->isi_rates[si->isi_txrate] & IEEE80211_RATE_VAL)/2
-			, si->isi_rssi
-			, rssi2dbm(si->isi_rssi)
-			, si->isi_inact
-			, si->isi_txseqs[0]
-			, si->isi_rxseqs[0]
-		        , getcaps(si->isi_capinfo)
-		        , getathcaps(si->isi_athflags)
-			   , si->isi_erp
-			, si->isi_state
-			, getstamode(si->isi_opmode)
-		);
+		printf("%s %4u %4d %3dM %4d %4d %4d %6d %6d %-4.4s %-5.5s %3x %8x %8s",
+			ieee80211_ntoa(si->isi_macaddr),
+			IEEE80211_AID(si->isi_associd),
+			ieee80211_mhz2ieee(si->isi_freq),
+			(si->isi_rates[si->isi_txrate] & IEEE80211_RATE_VAL) / 2,
+			si->isi_rssi,
+			rssi2dbm(si->isi_rssi),
+			si->isi_inact,
+			si->isi_txseqs[0],
+			si->isi_rxseqs[0],
+		        getcaps(si->isi_capinfo),
+		        getathcaps(si->isi_athflags),
+			si->isi_erp,
+			si->isi_state,
+			getstamode(si->isi_opmode));
 		printies(vp, si->isi_ie_len, 24);
 		printf("\n");
 		if (si->isi_uapsd) {
-			printf("                   UAPSD QoSInfo: 0x%02x, ", si->isi_uapsd);
+			printf("                   UAPSD QoSInfo: 0x%02x, ",
+				si->isi_uapsd);
 			printf("(VO,VI,BE,BK) = (%d,%d,%d,%d), MaxSpLimit = %s\n",
 				   WME_UAPSD_AC_ENABLED(WME_AC_VO, si->isi_uapsd) ? 1 : 0,
 				   WME_UAPSD_AC_ENABLED(WME_AC_VI, si->isi_uapsd) ? 1 : 0,
@@ -552,10 +553,10 @@ list_stations(const char *ifname)
 				   WME_UAPSD_AC_ENABLED(WME_AC_BK, si->isi_uapsd) ? 1 : 0,
 				   WME_UAPSD_MAXSP(si->isi_uapsd) == 1 ? "2" :
 				   WME_UAPSD_MAXSP(si->isi_uapsd) == 2 ? "4" :
-				   WME_UAPSD_MAXSP(si->isi_uapsd) == 3 ? "6" : "NoLimit"
-				   );
+				   WME_UAPSD_MAXSP(si->isi_uapsd) == 3 ? "6" : "NoLimit");
 		}
-		cp += si->isi_len, len -= si->isi_len;
+		cp += si->isi_len;
+		len -= si->isi_len;
 	} while (len >= sizeof(struct ieee80211req_sta_info));
 }
 
@@ -570,27 +571,26 @@ list_stations(const char *ifname)
 static void
 list_scan(const char *ifname)
 {
-	uint8_t buf[24*1024];
+	uint8_t buf[24 * 1024];
 	char ssid[14];
 	uint8_t *cp;
 	int len;
 
 	len = get80211priv(ifname, IEEE80211_IOCTL_SCAN_RESULTS,
-			    buf, sizeof(buf));
+		buf, sizeof(buf));
 	if (len == -1)
 		errx(1, "unable to get scan results");
 	if (len < sizeof(struct ieee80211req_scan_result))
 		return;
 
-	printf("%-14.14s  %-17.17s  %4s %4s  %-5s %3s %4s\n"
-		, "SSID"
-		, "BSSID"
-		, "CHAN"
-		, "RATE"
-		, "S:N"
-		, "INT"
-		, "CAPS"
-	);
+	printf("%-14.14s  %-17.17s  %4s %4s  %-5s %3s %4s\n",
+		"SSID",
+		"BSSID",
+		"CHAN",
+		"RATE",
+		"S:N",
+		"INT",
+		"CAPS");
 	cp = buf;
 	do {
 		struct ieee80211req_scan_result *sr;
@@ -598,17 +598,16 @@ list_scan(const char *ifname)
 
 		sr = (struct ieee80211req_scan_result *) cp;
 		vp = (u_int8_t *)(sr+1);
-		printf("%-14.*s  %s  %3d  %3dM %2d:%-2d  %3d %-4.4s"
-			, copy_essid(ssid, sizeof(ssid), vp, sr->isr_ssid_len)
-				, ssid
-			, ieee80211_ntoa(sr->isr_bssid)
-			, ieee80211_mhz2ieee(sr->isr_freq)
-			, getmaxrate(sr->isr_rates, sr->isr_nrates)
-			, (int8_t) sr->isr_rssi, sr->isr_noise
-			, sr->isr_intval
-			, getcaps(sr->isr_capinfo)
-		);
-		printies(vp + sr->isr_ssid_len, sr->isr_ie_len, 24);;
+		printf("%-14.*s  %s  %3d  %3dM %2d:%-2d  %3d %-4.4s",
+			copy_essid(ssid, sizeof(ssid), vp, sr->isr_ssid_len),
+			ssid,
+			ieee80211_ntoa(sr->isr_bssid),
+			ieee80211_mhz2ieee(sr->isr_freq),
+			getmaxrate(sr->isr_rates, sr->isr_nrates),
+			(int8_t) sr->isr_rssi, sr->isr_noise,
+			sr->isr_intval,
+			getcaps(sr->isr_capinfo));
+		printies(vp + sr->isr_ssid_len, sr->isr_ie_len, 24);
 		printf("\n");
 		cp += sr->isr_len, len -= sr->isr_len;
 	} while (len >= sizeof(struct ieee80211req_scan_result));
@@ -670,7 +669,7 @@ list_channels(const char *ifname, int allchans)
 		half++;
 	for (i = 0; i < achans.ic_nchans / 2; i++) {
 		print_chaninfo(&achans.ic_chans[i]);
-		print_chaninfo(&achans.ic_chans[half+i]);
+		print_chaninfo(&achans.ic_chans[half + i]);
 		printf("\n");
 	}
 	if (achans.ic_nchans % 2) {
@@ -713,8 +712,7 @@ printb(const char *s, unsigned v, const char *bits)
 				for (; (c = *bits) > 32; bits++)
 					putchar(c);
 			} else
-				for (; *bits > 32; bits++)
-					;
+				for (; *bits > 32; bits++);
 		}
 		putchar('>');
 	}
@@ -725,7 +723,8 @@ list_capabilities(const char *ifname)
 {
 	u_int32_t caps;
 
-	if (get80211param(ifname, IEEE80211_PARAM_DRIVER_CAPS, &caps, sizeof(caps)) < 0)
+	if (get80211param(ifname, IEEE80211_PARAM_DRIVER_CAPS, &caps,
+	    sizeof(caps)) < 0)
 		errx(1, "unable to get driver capabilities");
 	printb(ifname, caps, IEEE80211_C_BITS);
 	putchar('\n');

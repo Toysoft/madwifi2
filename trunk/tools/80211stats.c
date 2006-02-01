@@ -59,7 +59,7 @@
 #include "net80211/ieee80211_ioctl.h"
 
 #ifndef SIOCG80211STATS
-#define	SIOCG80211STATS	(SIOCDEVPRIVATE+2)
+#define	SIOCG80211STATS	(SIOCDEVPRIVATE + 2)
 #endif
 
 /* printf modifier for u_int64_t */
@@ -154,7 +154,7 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 	STAT(crypto_nocipher,	"setkey failed due to cipher module unavailable");
 	STAT(crypto_attachfail,	"setkey failed due to cipher attach failed");
 	STAT(crypto_swfallback,	"crypto fell back to s/w implementation");
-	STAT(crypto_keyfail,	"setkey faied due to driver key alloc failed");
+	STAT(crypto_keyfail,	"setkey failed due to driver key alloc failed");
 #undef STAT
 #undef N
 }

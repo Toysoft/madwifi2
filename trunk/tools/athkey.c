@@ -57,7 +57,7 @@
 #include "net80211/ieee80211_crypto.h"
 #include "net80211/ieee80211_ioctl.h"
 
-static	int s = -1;
+static int s = -1;
 const char *progname;
 
 static void
@@ -170,7 +170,7 @@ getdata(const char *arg, u_int8_t *data, int maxlen)
 				"%s: too much data in %s, max %u bytes\n",
 				progname, arg, maxlen);
 		}
-		data[len++] = (b0<<4) | b1;
+		data[len++] = (b0 << 4) | b1;
 	}
 	return len;
 }
@@ -241,14 +241,14 @@ main(int argc, char *argv[])
 	switch (op) {
 	case IEEE80211_IOCTL_DELKEY:
 		memset(&delkey, 0, sizeof(delkey));
-		delkey.idk_keyix = keyix-1;
+		delkey.idk_keyix = keyix - 1;
 		return set80211priv(ifname, op, &delkey, sizeof(delkey), 1);
 	case IEEE80211_IOCTL_SETKEY:
 		if (argc != 3 && argc != 4)
 			usage();
 		memset(&setkey, 0, sizeof(setkey));
 		setkey.ik_flags = IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
-		setkey.ik_keyix = keyix-1;
+		setkey.ik_keyix = keyix - 1;
 		setkey.ik_type = getcipher(argv[1]);
 		setkey.ik_keylen = getdata(argv[2], setkey.ik_keydata,
 			sizeof(setkey.ik_keydata));

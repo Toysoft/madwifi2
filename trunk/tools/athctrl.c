@@ -58,11 +58,10 @@ setsysctrl(const char *dev, const char *control , u_long value)
 	char buffer[256];
 	FILE * fd;
 
-	snprintf(buffer, sizeof(buffer),"/proc/sys/dev/%s/%s",dev,control);
+	snprintf(buffer, sizeof(buffer), "/proc/sys/dev/%s/%s", dev, control);
 	fd = fopen(buffer, "w");
-	if (fd != NULL) {
+	if (fd != NULL)
 		fprintf(fd,"%li",value);
-	}
 	return 0;
 }
 
@@ -76,9 +75,9 @@ static void usage(void)
         "\n"
         "options:\n"
         "   -h   show this usage\n"
-		"   -i   interface (default interface is wifi0)\n"
+	"   -i   interface (default interface is wifi0)\n"
         "   -d   specify the maximum distance of a sta or the distance\n"
-		"        of the master\n");
+	"        of the master\n");
 
     exit(1);
 }
@@ -93,37 +92,36 @@ main(int argc, char *argv[])
 	strncpy(device, "wifi0", sizeof (device));
 
 	for (;;) {
-        c = getopt(argc, argv, "d:i:h");
-        if (c < 0)
-            break;
-        switch (c) {
-        case 'h':
-            usage();
-            break;
-        case 'd':
+        	c = getopt(argc, argv, "d:i:h");
+        	if (c < 0)
+			break;
+        	switch (c) {
+        	case 'h':
+			usage();
+			break;
+        	case 'd':
 			distance = atoi(optarg);
-            break;
-        case 'i':
+			break;
+        	case 'i':
 			strncpy(device, optarg, sizeof (device));
-            break;
+			break;
+        	default:
+			usage();
+			break;
+        	}
+	}
 
-        default:
-            usage();
-            break;
-        }
-    }
-
-	if(distance >= 0){
-        int slottime = 9+(distance/300)+((distance%300)?1:0);
-		int acktimeout = slottime*2+3;
-		int ctstimeout = slottime*2+3;
+	if (distance >= 0) {
+        	int slottime = 9 + (distance / 300) + ((distance % 300) ? 1 : 0);
+		int acktimeout = slottime * 2 + 3;
+		int ctstimeout = slottime * 2 + 3;
 		
-		printf("Setting distance on interface %s to %i meters\n", device, distance);
+		printf("Setting distance on interface %s to %i meters\n",
+			device, distance);
 		setsysctrl(device, "slottime", slottime);
 		setsysctrl(device, "acktimeout", acktimeout);
 		setsysctrl(device, "ctstimeout", ctstimeout);
-	}else{
+	} else
 		usage();
-	}
 	return 0;
 }
