@@ -38,7 +38,7 @@
 
 /*
  * 80211stats [-i interface]
- * (default interface is wlan0).
+ * (default interface is wifi0).
  */
 #include <sys/types.h>
 #include <sys/file.h>
