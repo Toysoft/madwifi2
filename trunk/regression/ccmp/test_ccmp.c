@@ -598,7 +598,7 @@ runtest(struct ieee80211com *ic, struct ciphertest *t)
 	memcpy(key.wk_key, t->key, t->key_len);
 	key.wk_keylen = t->key_len;
 	key.wk_keyrsc = 0;
-	key.wk_keytsc = t->pn-1;	/* PN-1 since we do encap */
+	key.wk_keytsc = t->pn - 1;	/* PN-1 since we do encap */
 	if (!ieee80211_crypto_setkey(ic, &key, mac)) {
 		printk("FAIL: ieee80211_crypto_setkey failed\n");
 		goto bad;
@@ -609,19 +609,18 @@ runtest(struct ieee80211com *ic, struct ciphertest *t)
 	 */
 	cip = key.wk_cipher;
 	skb = dev_alloc_skb(t->plaintext_len +
-			cip->ic_header + cip->ic_trailer);
+		cip->ic_header + cip->ic_trailer);
 	if (skb == NULL) {
 		printk("FAIL: unable to allocate skbuff\n");
 		goto bad;
 	}
 	skb_reserve(skb, cip->ic_header);
-	memcpy(skb_put(skb, t->plaintext_len),
-		t->plaintext, t->plaintext_len);
+	memcpy(skb_put(skb, t->plaintext_len), t->plaintext, t->plaintext_len);
 
 	/*
 	 * Encrypt frame w/ MIC.
 	 */
-	if (!(*cip->ic_encap)(&key, skb, t->keyix<<6)) {
+	if (!(*cip->ic_encap)(&key, skb, t->keyix << 6)) {
 		printk("FAIL: ccmp encap failed\n");
 		goto bad;
 	}
@@ -678,18 +677,17 @@ bad:
 /*
  * Module glue.
  */
-
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless support: AES-CCMP cipher tester");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static	int tests = -1;
+static int tests = -1;
 MODULE_PARM(tests, "i");
 MODULE_PARM_DESC(tests, "Specify which tests to run");
 
-static	int debug = 0;
+static int debug = 0;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Enable IEEE80211_MSG_CRYPTO");
 
@@ -708,7 +706,7 @@ init_crypto_ccmp_test(void)
 	pass = 0;
 	total = 0;
 	for (i = 0; i < N(ccmptests); i++)
-		if (tests & (1<<i)) {
+		if (tests & (1 << i)) {
 			total++;
 			pass += runtest(&ic, &ccmptests[i]);
 		}

@@ -133,7 +133,7 @@ struct ciphertest {
 	const char	*name;
 	int		cipher;
 	int		keyix;
-	u_int8_t	iv[4];
+	u_int8_t		iv[4];
 	const u_int8_t	*key;
 	size_t		key_len;
 	const u_int8_t	*plaintext;
@@ -246,7 +246,7 @@ runtest(struct ieee80211com *ic, struct ciphertest *t)
 	 */
 	ctx = (struct wep_ctx_hw *) key.wk_private;
 	memcpy(&ctx->wc_iv, t->iv, sizeof(t->iv));	/* for encap/encrypt */
-	if (!(*cip->ic_encap)(&key, skb, t->keyix<<6)) {
+	if (!(*cip->ic_encap)(&key, skb, t->keyix << 6)) {
 		printk("FAIL: wep encap failed\n");
 		goto bad;
 	}
@@ -279,18 +279,17 @@ bad:
 /*
  * Module glue.
  */
-
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless support: WEP cipher tester");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static	int tests = -1;
+static int tests = -1;
 MODULE_PARM(tests, "i");
 MODULE_PARM_DESC(tests, "Specify which tests to run");
 
-static	int debug = 0;
+static int debug = 0;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Enable IEEE80211_MSG_CRYPTO");
 
@@ -308,7 +307,7 @@ init_crypto_wep_test(void)
 	pass = 0;
 	total = 0;
 	for (i = 0; i < N(weptests); i++)
-		if (tests & (1<<i)) {
+		if (tests & (1 << i)) {
 			total++;
 			pass += runtest(&ic, &weptests[i]);
 		}

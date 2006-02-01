@@ -166,7 +166,7 @@ tkip_test(struct ieee80211com *ic)
 	}
 
 	memcpy(key.wk_key, ref_key, sizeof(ref_key));
-	key.wk_keylen = 128/NBBY;
+	key.wk_keylen = 128 / NBBY;
 	key.wk_keyrsc = 0;
 	key.wk_keytsc = 0;
 	if (!ieee80211_crypto_setkey(ic, &key, mac)) {
@@ -181,7 +181,7 @@ tkip_test(struct ieee80211com *ic)
 	 */
 	cip = key.wk_cipher;
 	skb = dev_alloc_skb(sizeof(ref_plaintext) +
-			cip->ic_miclen + cip->ic_header + cip->ic_trailer);
+		cip->ic_miclen + cip->ic_header + cip->ic_trailer);
 	if (skb == NULL) {
 		printk("unable to allocate skbuff\n");
 		goto bad;
@@ -215,7 +215,7 @@ tkip_test(struct ieee80211com *ic)
 	/*
 	 * Encrypt frame w/ MIC.
 	 */
-	if (!(*cip->ic_encap)(&key, skb, 0<<6)) {
+	if (!(*cip->ic_encap)(&key, skb, 0 << 6)) {
 		printk("tkip encap failed\n");
 		goto bad;
 	}
@@ -302,14 +302,13 @@ bad:
 /*
  * Module glue.
  */
-
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless support: TKIP cipher tester");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static	int debug = 0;
+static int debug = 0;
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Enable IEEE80211_MSG_CRYPTO");
 
