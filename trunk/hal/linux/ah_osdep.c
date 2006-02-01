@@ -33,7 +33,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/linux/ah_osdep.c#46 $
+ * $Id$
  */
 #include "opt_ah.h"
 

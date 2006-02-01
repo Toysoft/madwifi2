@@ -33,6 +33,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath/version.h#2 $
+ * $Id$
  */
 #define	ATH_PCI_VERSION	"0.9.4.5"

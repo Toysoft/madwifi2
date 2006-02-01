@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath_rate/onoe/onoe.h#2 $
+ * $Id$
  */
 
 /*

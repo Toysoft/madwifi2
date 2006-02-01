@@ -1,7 +1,3 @@
-/*	$NetBSD: if_media.c,v 1.1 1997/03/17 02:55:15 thorpej Exp $	*/
-/* $FreeBSD: src/sys/net/if_media.c,v 1.17 2002/06/26 03:34:50 ken Exp $ */
-/*	$Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/net80211/if_media.c#2 $	*/
-
 /*
  * Copyright (c) 1997
  *	Jonathan Stone and Jason R. Thorpe.  All rights reserved.
@@ -34,6 +30,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $Id$
  */
 
 /*

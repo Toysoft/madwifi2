@@ -33,7 +33,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/ah_desc.h#22 $
+ * $Id$
  */
 
 #ifndef _DEV_ATH_DESC_H

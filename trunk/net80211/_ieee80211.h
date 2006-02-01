@@ -29,8 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net80211/_ieee80211.h,v 1.2 2004/12/31 22:42:38 sam Exp $
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/net80211/_ieee80211.h#19 $
+ * $Id$
  */
 #ifndef _NET80211__IEEE80211_H_
 #define _NET80211__IEEE80211_H_

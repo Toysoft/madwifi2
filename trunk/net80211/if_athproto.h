@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2004 Atheros Communications Inc.  All rights reserved.
+ *
+ * $Id$
  */
 
 #ifndef _NET_IF_ATH_PROTO_H_

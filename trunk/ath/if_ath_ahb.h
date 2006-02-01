@@ -2,6 +2,7 @@
  * Copyright (c) 2004 Atheros Communications, Inc.
  * All rights reserved.
  *
+ * $Id$
  */
 
 #ifndef _DEV_ATH_AHB_H_

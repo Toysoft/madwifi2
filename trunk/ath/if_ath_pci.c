@@ -34,7 +34,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath/if_ath_pci.c#9 $
+ * $Id$
  */
 #include "opt_ah.h"
 

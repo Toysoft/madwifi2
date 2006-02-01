@@ -3,6 +3,8 @@
  * some distributions have multiple UTS_RELEASE definitions in that
  * file.
  * Taken from the lm_sensors project.
+ *
+ * $Id$
  */
 #include <linux/version.h>
 char *uts_release = UTS_RELEASE;
