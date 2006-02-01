@@ -84,13 +84,9 @@ static	void ifmedia_printword(int);
  * Initialize if_media struct for a specific interface instance.
  */
 void
-ifmedia_init(
-	struct ifmedia *ifm,
-	int dontcare_mask,
-	ifm_change_cb_t change_callback,
-	ifm_stat_cb_t status_callback)
+ifmedia_init(struct ifmedia *ifm, int dontcare_mask,
+	ifm_change_cb_t change_callback, ifm_stat_cb_t status_callback)
 {
-
 	LIST_INIT(&ifm->ifm_list);
 	ifm->ifm_cur = NULL;
 	ifm->ifm_media = 0;
@@ -152,8 +148,7 @@ ifmedia_list_add(struct ifmedia *ifm, struct ifmedia_entry *lp, int count)
 	int i;
 
 	for (i = 0; i < count; i++)
-		ifmedia_add(ifm, lp[i].ifm_media, lp[i].ifm_data,
-		    lp[i].ifm_aux);
+		ifmedia_add(ifm, lp[i].ifm_media, lp[i].ifm_data, lp[i].ifm_aux);
 }
 
 /*
@@ -165,7 +160,6 @@ ifmedia_list_add(struct ifmedia *ifm, struct ifmedia_entry *lp, int count)
  */
 void
 ifmedia_set(struct ifmedia *ifm, int target)
-
 {
 	struct ifmedia_entry *match;
 
@@ -173,7 +167,7 @@ ifmedia_set(struct ifmedia *ifm, int target)
 
 	if (match == NULL) {
 		printk("ifmedia_set: no match for 0x%x/0x%x\n",
-		    target, ~ifm->ifm_mask);
+			target, ~ifm->ifm_mask);
 		panic("ifmedia_set");
 	}
 	ifm->ifm_cur = match;
@@ -200,10 +194,9 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 	int error = 0, sticky;
 
 	if (dev == NULL || ifr == NULL || ifm == NULL)
-		return(EINVAL);
+		return EINVAL;
 
 	switch (cmd) {
-
 	/*
 	 * Set the current media.
 	 */
@@ -217,12 +210,11 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 		if (match == NULL) {
 #ifdef IFMEDIA_DEBUG
 			if (ifmedia_debug) {
-				printk(
-				    "ifmedia_ioctl: no media found for 0x%x\n", 
-				    newmedia);
+				printk("ifmedia_ioctl: no media found for 0x%x\n", 
+					newmedia);
 			}
 #endif
-			return (ENXIO);
+			return ENXIO;
 		}
 
 		/*
@@ -271,7 +263,7 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 		kptr = NULL;		/* XXX gcc */
 
 		ifmr->ifm_active = ifmr->ifm_current = ifm->ifm_cur ?
-		    ifm->ifm_cur->ifm_media : IFM_NONE;
+			ifm->ifm_cur->ifm_media : IFM_NONE;
 		ifmr->ifm_mask = ifm->ifm_mask;
 		ifmr->ifm_status = 0;
 		(*ifm->ifm_status)(dev, ifmr);
@@ -313,9 +305,8 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 
 			if (ep != NULL)
 				error = E2BIG;	/* oops! */
-		} else {
+		} else
 			count = usermax;
-		}
 
 		/*
 		 * We do the copyout on E2BIG, because that's
@@ -326,7 +317,7 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 		sticky = error;
 		if ((error == 0 || error == E2BIG) && ifmr->ifm_count != 0) {
 			error = copy_to_user(ifmr->ifm_ulist,
-					     kptr, ifmr->ifm_count * sizeof(int));
+				kptr, ifmr->ifm_count * sizeof(int));
 		}
 
 		if (error == 0)
@@ -340,10 +331,10 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 	}
 
 	default:
-		return (EINVAL);
+		return EINVAL;
 	}
 
-	return (error);
+	return error;
 }
 
 /*
@@ -361,10 +352,9 @@ ifmedia_match(struct ifmedia *ifm, int target, int mask)
 	LIST_FOREACH(next, &ifm->ifm_list, ifm_list) {
 		if ((next->ifm_media & mask) == (target & mask)) {
 #if defined(IFMEDIA_DEBUG) || defined(DIAGNOSTIC)
-			if (match) {
+			if (match)
 				printk("ifmedia_match: multiple match for "
-				    "0x%x/0x%x\n", target, mask);
-			}
+					"0x%x/0x%x\n", target, mask);
 #endif
 			match = next;
 		}
@@ -410,7 +400,7 @@ struct ifmedia_description ifm_subtype_shared_descriptions[] =
 struct ifmedia_description ifm_shared_option_descriptions[] =
     IFM_SHARED_OPTION_DESCRIPTIONS;
 
-struct ifmedia_type_to_subtype {
+struct ifmedia_type_to_subtype {		/* XXX: right place for declaration? */
 	struct ifmedia_description *subtypes;
 	struct ifmedia_description *options;
 	struct ifmedia_description *modes;
@@ -418,26 +408,18 @@ struct ifmedia_type_to_subtype {
 
 /* must be in the same order as IFM_TYPE_DESCRIPTIONS */
 struct ifmedia_type_to_subtype ifmedia_types_to_subtypes[] = {
-	{
-	  &ifm_subtype_ethernet_descriptions[0],
+	{ &ifm_subtype_ethernet_descriptions[0],
 	  &ifm_subtype_ethernet_option_descriptions[0],
-	  NULL,
-	},
-	{
-	  &ifm_subtype_tokenring_descriptions[0],
+	  NULL, },
+	{ &ifm_subtype_tokenring_descriptions[0],
 	  &ifm_subtype_tokenring_option_descriptions[0],
-	  NULL,
-	},
-	{
-	  &ifm_subtype_fddi_descriptions[0],
+	  NULL, },
+	{ &ifm_subtype_fddi_descriptions[0],
 	  &ifm_subtype_fddi_option_descriptions[0],
-	  NULL,
-	},
-	{
-	  &ifm_subtype_ieee80211_descriptions[0],
+	  NULL, },
+	{ &ifm_subtype_ieee80211_descriptions[0],
 	  &ifm_subtype_ieee80211_option_descriptions[0],
-	  &ifm_subtype_ieee80211_mode_descriptions[0]
-	},
+	  &ifm_subtype_ieee80211_mode_descriptions[0] },
 };
 
 /*

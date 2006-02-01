@@ -62,18 +62,17 @@ const char *ieee80211_phymode_name[] = {
 };
 EXPORT_SYMBOL(ieee80211_phymode_name);
 
-static	void ieee80211com_media_status(struct net_device*, struct ifmediareq *);
-static	int ieee80211com_media_change(struct net_device *);
+static void ieee80211com_media_status(struct net_device*, struct ifmediareq *);
+static int ieee80211com_media_change(struct net_device *);
 static struct net_device_stats *ieee80211_getstats(struct net_device *);
-static	int ieee80211_change_mtu(struct net_device *, int);
-static	void ieee80211_set_multicast_list(struct net_device *);
+static int ieee80211_change_mtu(struct net_device *, int);
+static void ieee80211_set_multicast_list(struct net_device *);
 
 MALLOC_DEFINE(M_80211_VAP, "80211vap", "802.11 vap state");
 
 /*
  * Country Code Table for code-to-string conversion.
  */
-
 struct country_code_to_string{
 	u_int16_t	iso_code;	   
 	const char*	iso_name;
@@ -322,7 +321,7 @@ ieee80211_ifattach(struct ieee80211com *ic)
 
 	if (ic->ic_lintval == 0)
 		ic->ic_lintval = IEEE80211_BINTVAL_DEFAULT;
-	ic->ic_bmisstimeout = 7*ic->ic_lintval;	/* default 7 beacons */
+	ic->ic_bmisstimeout = 7 * ic->ic_lintval;	/* default 7 beacons */
 	IEEE80211_LOCK_INIT(ic, "ieee80211com");
 	IEEE80211_VAPS_LOCK_INIT(ic, "ieee80211com_vaps");
 	TAILQ_INIT(&ic->ic_vaps);
@@ -380,8 +379,8 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	int err;
 	
 	if (name != NULL) {	/* XXX */
-		if(strchr(name, '%')) {
-			if((err = dev_alloc_name(dev, name)) < 0) {
+		if (strchr(name, '%')) {
+			if ((err = dev_alloc_name(dev, name)) < 0) {
 				printk(KERN_ERR "can't alloc name %s\n", name);
 				return err;
 			}
@@ -418,13 +417,14 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	 * setup XR vap specific flags.
 	 * link the XR vap to its normal val.
 	 */
-	if(flags & IEEE80211_VAP_XR) {
+	if (flags & IEEE80211_VAP_XR) {
 		struct ieee80211vap *vapparent;
 		vap->iv_unit = -1;
 		vap->iv_flags = ic->ic_flags | IEEE80211_F_XR;	/* propagate common flags and add XR flag */
 		vap->iv_flags_ext = ic->ic_flags_ext;
 		TAILQ_FOREACH(vapparent, &ic->ic_vaps, iv_next)
-			if(vapparent->iv_unit == unit) break;
+			if (vapparent->iv_unit == unit)
+				break;
 		vap->iv_xrvap = vapparent;
 		vap->iv_ath_cap = vapparent->iv_ath_cap;
 		/* Default multicast rate to lowest possible 256 Kbps */
@@ -543,7 +543,8 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 	/* 
 	 * do not register XR vap device with OS.
 	 */
-	if(vap->iv_flags & IEEE80211_F_XR) return 0; 
+	if (vap->iv_flags & IEEE80211_F_XR)
+		return 0; 
 #endif
 
 	ieee80211_scanner_get(vap->iv_opmode);
@@ -585,7 +586,7 @@ ieee80211_vap_detach(struct ieee80211vap *vap)
 	/*
 	 *  XR vap is not registered.
 	 */
-	if(!(vap->iv_flags & IEEE80211_F_XR))
+	if (!(vap->iv_flags & IEEE80211_F_XR))
 #endif
 	/* NB: rtnl is held on entry so don't use unregister_netdev */
 	unregister_netdevice(dev);
@@ -605,9 +606,9 @@ ieee80211_mhz2ieee(u_int freq, u_int flags)
 			return (freq - 2407) / 5;
 		else
 			return 15 + ((freq - 2512) / 20);
-	} else if (flags & IEEE80211_CHAN_5GHZ) {	/* 5Ghz band */
+	} else if (flags & IEEE80211_CHAN_5GHZ)	/* 5Ghz band */
 		return (freq - 5000) / 5;
-	} else {				/* either, guess */
+	else {					/* either, guess */
 		if (freq == 2484)
 			return 14;
 		if (freq < 2484)
@@ -643,19 +644,19 @@ ieee80211_ieee2mhz(u_int chan, u_int flags)
 		if (chan == 14)
 			return 2484;
 		if (chan < 14)
-			return 2407 + chan*5;
+			return 2407 + chan * 5;
 		else
-			return 2512 + ((chan-15)*20);
-	} else if (flags & IEEE80211_CHAN_5GHZ) {/* 5Ghz band */
-		return 5000 + (chan*5);
-	} else {				/* either, guess */
+			return 2512 + ((chan - 15) * 20);
+	} else if (flags & IEEE80211_CHAN_5GHZ) /* 5Ghz band */
+		return 5000 + (chan * 5);
+	else {					/* either, guess */
 		if (chan == 14)
 			return 2484;
 		if (chan < 14)			/* 0-13 */
-			return 2407 + chan*5;
+			return 2407 + chan * 5;
 		if (chan < 27)			/* 15-26 */
-			return 2512 + ((chan-15)*20);
-		return 5000 + (chan*5);
+			return 2512 + ((chan - 15) * 20);
+		return 5000 + (chan * 5);
 	}
 }
 EXPORT_SYMBOL(ieee80211_ieee2mhz);
@@ -799,11 +800,12 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 	struct ieee80211vap *vap;
 	int i;
 
-	if_printf(dev,"Radar found on channel %d (%d MHz)\n",ichan->ic_ieee, ichan->ic_freq);
+	if_printf(dev, "Radar found on channel %d (%d MHz)\n",
+		ichan->ic_ieee, ichan->ic_freq);
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/* Mark the channel in the ic_chan list */
 		if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
-			for (i=0;i<ic->ic_nchans; i++) {
+			for (i = 0; i < ic->ic_nchans; i++) {
 				c = &ic->ic_channels[i];
 				if (c->ic_freq != ichan->ic_freq)
 					continue;
@@ -837,10 +839,12 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 					 * No running/scanning VAP was found, so they're all in
 					 * INIT state, no channel change needed
 					 */
-					if(!vap) return;
+					if (!vap)
+						return;
 					/* is it really Scanning */
 					/* XXX race condition ?? */
-					if(ic->ic_flags & IEEE80211_F_SCAN) return;
+					if (ic->ic_flags & IEEE80211_F_SCAN)
+						return;
 					/* it is not scanning , but waiting for ath driver to move the vap to RUN */
 				}
 
@@ -875,8 +879,8 @@ ieee80211_dfs_test_return(struct ieee80211com *ic, u_int8_t ieeeChan)
 	struct net_device *dev = ic->ic_dev;
 
 	/* Return to the original channel we were on before the test mute */
-	if_printf(dev,"Returning to channel %d\n", ieeeChan);
-	printk ("Returning to chan %d\n",ieeeChan);
+	if_printf(dev, "Returning to channel %d\n", ieeeChan);
+	printk("Returning to chan %d\n", ieeeChan);
 	ic->ic_chanchange_chan = ieeeChan;
 	ic->ic_chanchange_tbtt = IEEE80211_RADAR_11HCOUNT;
 	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
@@ -1081,7 +1085,7 @@ ieee80211com_media_change(struct net_device *dev)
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
 	    newphymode == IEEE80211_MODE_AUTO) {
 		for (j = IEEE80211_MODE_11A; j < IEEE80211_MODE_MAX; j++)
-			if (ic->ic_modecaps & (1<<j)) {
+			if (ic->ic_modecaps & (1 << j)) {
 				newphymode = j;
 				break;
 			}
@@ -1151,7 +1155,7 @@ checkrate(struct ieee80211com *ic, enum ieee80211_phymode mode, int rate)
 		 * In autoselect mode search for the rate.
 		 */
 		for (i = IEEE80211_MODE_11A; i < IEEE80211_MODE_MAX; i++) {
-			if ((ic->ic_modecaps & (1<<i)) &&
+			if ((ic->ic_modecaps & (1 << i)) &&
 			    findrate(ic, i, rate) != -1)
 				return 1;
 		}
@@ -1348,7 +1352,7 @@ ieee80211_rate2media(struct ieee80211com *ic, int rate, enum ieee80211_phymode m
 		{  72 | IFM_IEEE80211_11G, IFM_IEEE80211_OFDM36 },
 		{  96 | IFM_IEEE80211_11G, IFM_IEEE80211_OFDM48 },
 		{ 108 | IFM_IEEE80211_11G, IFM_IEEE80211_OFDM54 },
-		/* NB: OFDM72 doesn't realy exist so we don't handle it */
+		/* NB: OFDM72 doesn't really exist so we don't handle it */
 	};
 	u_int mask, i;
 
@@ -1435,14 +1439,12 @@ ieee80211_getstats(struct net_device *dev)
 	/* update according to private statistics */
 	stats->tx_errors = vap->iv_stats.is_tx_nodefkey
 			 + vap->iv_stats.is_tx_noheadroom
-			 + vap->iv_stats.is_crypto_enmicfail
-			 ;
+			 + vap->iv_stats.is_crypto_enmicfail;
 	stats->tx_dropped = vap->iv_stats.is_tx_nobuf
 			+ vap->iv_stats.is_tx_nonode
 			+ vap->iv_stats.is_tx_unknownmgt
 			+ vap->iv_stats.is_tx_badcipher
-			+ vap->iv_stats.is_tx_nodefkey
-			;
+			+ vap->iv_stats.is_tx_nodefkey;
 	stats->rx_errors = vap->iv_stats.is_rx_tooshort
 			+ vap->iv_stats.is_rx_wepfail
 			+ vap->iv_stats.is_rx_decap
@@ -1450,8 +1452,7 @@ ieee80211_getstats(struct net_device *dev)
 			+ vap->iv_stats.is_rx_decryptcrc
 			+ vap->iv_stats.is_rx_ccmpmic
 			+ vap->iv_stats.is_rx_tkipmic
-			+ vap->iv_stats.is_rx_tkipicv
-			;
+			+ vap->iv_stats.is_rx_tkipicv;
 	stats->rx_crc_errors = 0;
 
 	return stats;
@@ -1511,11 +1512,12 @@ void
 ieee80211_build_countryie(struct ieee80211com *ic)
 {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
-	int i, j, chanflags;
+	int i, j, chanflags, found;
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_channel *c;
 	u_int8_t chanlist[IEEE80211_CHAN_MAX + 1];
 	u_int8_t chancnt = 0;
+	u_int8_t *cur_runlen, *cur_chan, *cur_pow, prevchan;
 
 	/*
 	 * Fill in country IE.
@@ -1523,22 +1525,22 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 	memset(&ic->ic_country_ie, 0, sizeof(ic->ic_country_ie));  
 	ic->ic_country_ie.country_id = IEEE80211_ELEMID_COUNTRY;
 	ic->ic_country_ie.country_len = 0; /* init needed by following code */
-	{
-		int found = 0;
-		for (i=0; i < N(country_strings); i++) {
-			if (country_strings[i].iso_code == ic->ic_country_code) {
-				ic->ic_country_ie.country_str[0] = country_strings[i].iso_name[0];
-				ic->ic_country_ie.country_str[1] = country_strings[i].iso_name[1];
-				found = 1;
-				break;
-			}
+
+	/* initialize country IE */
+	found = 0;
+	for (i = 0; i < N(country_strings); i++) {
+		if (country_strings[i].iso_code == ic->ic_country_code) {
+			ic->ic_country_ie.country_str[0] = country_strings[i].iso_name[0];
+			ic->ic_country_ie.country_str[1] = country_strings[i].iso_name[1];
+			found = 1;
+			break;
 		}
-		if (!found) {
-			if_printf(dev, "bad country string ignored: %d\n",
-					  ic->ic_country_code);
-				ic->ic_country_ie.country_str[0] = ' ';
-				ic->ic_country_ie.country_str[1] = ' ';			
-		}
+	}
+	if (!found) {
+		if_printf(dev, "bad country string ignored: %d\n",
+			ic->ic_country_code);
+		ic->ic_country_ie.country_str[0] = ' ';
+		ic->ic_country_ie.country_str[1] = ' ';			
 	}
 
 	/* 
@@ -1555,94 +1557,92 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 	/* 
 	 * runlength encoded channel max tx power info.
 	 */
-	{
-		u_int8_t *cur_runlen = &ic->ic_country_ie.country_triplet[1];
-		u_int8_t *cur_chan = &ic->ic_country_ie.country_triplet[0];
-		u_int8_t *cur_pow = &ic->ic_country_ie.country_triplet[2];
-		u_int8_t prevchan = 0;
-		ic->ic_country_ie.country_len = 3; /* invalid, but just initialize */
-		if ((ic->ic_flags_ext & IEEE80211_FEXT_REGCLASS) && ic->ic_nregclass) {
-			/* Add regulatory triplets.
-		 	* chan/no_of_chans/tx power triplet is overridden as
-		 	* as follows:
-		 	* cur_chan == REGULATORY EXTENSION ID.
-		 	* cur_runlen = Regulatory class.
-		 	* cur_pow = coverage class.
-		 	*/
-			for (i=0; i < ic->ic_nregclass; i++) {
-				*cur_chan = IEEE80211_REG_EXT_ID;
-				*cur_runlen = ic->ic_regclassids[i];
-				*cur_pow = ic->ic_coverageclass;
+	cur_runlen = &ic->ic_country_ie.country_triplet[1];
+	cur_chan = &ic->ic_country_ie.country_triplet[0];
+	cur_pow = &ic->ic_country_ie.country_triplet[2];
+	prevchan = 0;
+	ic->ic_country_ie.country_len = 3; /* invalid, but just initialize */
+
+	if ((ic->ic_flags_ext & IEEE80211_FEXT_REGCLASS) && ic->ic_nregclass) {
+		/* Add regulatory triplets.
+	 	* chan/no_of_chans/tx power triplet is overridden as
+	 	* as follows:
+	 	* cur_chan == REGULATORY EXTENSION ID.
+	 	* cur_runlen = Regulatory class.
+	 	* cur_pow = coverage class.
+	 	*/
+		for (i=0; i < ic->ic_nregclass; i++) {
+			*cur_chan = IEEE80211_REG_EXT_ID;
+			*cur_runlen = ic->ic_regclassids[i];
+			*cur_pow = ic->ic_coverageclass;
 	
+			cur_runlen +=3;
+			cur_chan += 3;
+			cur_pow += 3;
+			ic->ic_country_ie.country_len += 3;
+		}
+	} else {
+		if ((ic->ic_curmode == IEEE80211_MODE_11A) || 
+		    (ic->ic_curmode == IEEE80211_MODE_TURBO_A))
+			chanflags = IEEE80211_CHAN_5GHZ;
+		else 
+			chanflags = IEEE80211_CHAN_2GHZ;
+	
+		memset(&chanlist[0], 0, sizeof(chanlist));  
+		/* XXX not right due to duplicate entries */
+		for (i = 0; i < ic->ic_nchans; i++) {
+			c = &ic->ic_channels[i];
+	
+			/* Does channel belong to current operation mode */
+			if (!(c->ic_flags & chanflags))
+				continue;
+
+			/* Skip previously reported channels */
+			for (j = 0; j < chancnt; j++)
+				if (c->ic_ieee == chanlist[j])
+					break;
+			
+			if (j != chancnt) /* found a match */
+				continue;
+
+			chanlist[chancnt] = c->ic_ieee;
+			chancnt++;
+	
+			/* Skip turbo channels */
+			if (IEEE80211_IS_CHAN_TURBO(c))
+				continue;
+	
+			/* Skip half/quarter rate channels */
+			if (IEEE80211_IS_CHAN_HALF(c) || 
+			    IEEE80211_IS_CHAN_QUARTER(c))
+				continue;
+	
+			if (*cur_runlen == 0) {
+				(*cur_runlen)++;
+				*cur_pow = c->ic_maxregpower;
+				*cur_chan = c->ic_ieee;
+				prevchan = c->ic_ieee;
+				ic->ic_country_ie.country_len += 3;
+			} else if (*cur_pow == c->ic_maxregpower &&
+			    c->ic_ieee == prevchan + 1) {
+				(*cur_runlen)++;
+				prevchan = c->ic_ieee;
+			} else {
 				cur_runlen +=3;
 				cur_chan += 3;
 				cur_pow += 3;
+				(*cur_runlen)++;
+				*cur_pow = c->ic_maxregpower;
+				*cur_chan = c->ic_ieee;
+				prevchan = c->ic_ieee;
 				ic->ic_country_ie.country_len += 3;
 			}
-		} else {
-			if ((ic->ic_curmode == IEEE80211_MODE_11A) || 
-				(ic->ic_curmode == IEEE80211_MODE_TURBO_A))
-				chanflags = IEEE80211_CHAN_5GHZ;
-			else 
-				chanflags = IEEE80211_CHAN_2GHZ;
-	
-			memset(&chanlist[0], 0, sizeof(chanlist));  
-			/* XXX not right due to duplicate entries */
-			for (i = 0; i < ic->ic_nchans; i++) {
-				c = &ic->ic_channels[i];
-	
-				/* Does channel belong to current operation mode */
-				if (!(c->ic_flags & chanflags))
-					continue;
-
-				/* Skip previously reported channels */
-				for (j=0; j < chancnt; j++) {
-					if (c->ic_ieee == chanlist[j])
-						break;
-				}
-			
-				if (j != chancnt) /* found a match */
-					continue;
-
-				chanlist[chancnt] = c->ic_ieee;
-				chancnt++;
-	
-				/* Skip turbo channels */
-				if (IEEE80211_IS_CHAN_TURBO(c))
-					continue;
-	
-				/* Skip half/quarter rate channels */
-				if (IEEE80211_IS_CHAN_HALF(c) || 
-						IEEE80211_IS_CHAN_QUARTER(c))
-					continue;
-	
-				if (*cur_runlen == 0) {
-					(*cur_runlen)++;
-					*cur_pow = c->ic_maxregpower;
-					*cur_chan = c->ic_ieee;
-					prevchan = c->ic_ieee;
-					ic->ic_country_ie.country_len += 3;
-				} else if (*cur_pow == c->ic_maxregpower &&
-			    			c->ic_ieee == prevchan + 1) {
-					(*cur_runlen)++;
-					prevchan = c->ic_ieee;
-				} else {
-					cur_runlen +=3;
-					cur_chan += 3;
-					cur_pow += 3;
-					(*cur_runlen)++;
-					*cur_pow = c->ic_maxregpower;
-					*cur_chan = c->ic_ieee;
-					prevchan = c->ic_ieee;
-					ic->ic_country_ie.country_len += 3;
-				}
-			}
 		}
-
-		/* pad */
-		if (ic->ic_country_ie.country_len & 1)
-			ic->ic_country_ie.country_len++;
 	}
+
+	/* pad */
+	if (ic->ic_country_ie.country_len & 1)
+		ic->ic_country_ie.country_len++;
 
 #if 0
 	ic->ic_country_ie.country_len=8;

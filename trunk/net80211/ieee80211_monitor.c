@@ -58,7 +58,8 @@
 
 
 static int
-ratecode_to_dot11(int ratecode) {
+ratecode_to_dot11(int ratecode)
+{
         switch (ratecode) {
                 /* a */
         case 0x0b: return 12;
@@ -80,49 +81,51 @@ ratecode_to_dot11(int ratecode) {
         }
         return 0;
 }
+
 struct ar5212_openbsd_desc {
 	/*
-         * tx_control_0
-         */
-        u_int32_t       frame_len:12;
-        u_int32_t       reserved_12_15:4;
-        u_int32_t       xmit_power:6;
-        u_int32_t       rts_cts_enable:1;
-        u_int32_t       veol:1;
-        u_int32_t       clear_dest_mask:1;
-        u_int32_t       ant_mode_xmit:4;
-        u_int32_t       inter_req:1;
-        u_int32_t       encrypt_key_valid:1;
-        u_int32_t       cts_enable:1;
+	 * tx_control_0
+	 */
+	u_int32_t frame_len:12;
+	u_int32_t reserved_12_15:4;
+	u_int32_t xmit_power:6;
+	u_int32_t rts_cts_enable:1;
+	u_int32_t veol:1;
+	u_int32_t clear_dest_mask:1;
+	u_int32_t ant_mode_xmit:4;
+	u_int32_t inter_req:1;
+	u_int32_t encrypt_key_valid:1;
+	u_int32_t cts_enable:1;
 
 	u_int32_t r1;
 
 	/*
 	 * tx_control_2
 	 */
-        u_int32_t       rts_duration:15;
-        u_int32_t       duration_update_enable:1;
-        u_int32_t       xmit_tries0:4;
-        u_int32_t       xmit_tries1:4;
-        u_int32_t       xmit_tries2:4;
-        u_int32_t       xmit_tries3:4;
+	u_int32_t rts_duration:15;
+	u_int32_t duration_update_enable:1;
+	u_int32_t xmit_tries0:4;
+	u_int32_t xmit_tries1:4;
+	u_int32_t xmit_tries2:4;
+	u_int32_t xmit_tries3:4;
 
-        /*
-         * tx_control_3
-         */
-        u_int32_t       xmit_rate0:5;
-        u_int32_t       xmit_rate1:5;
-        u_int32_t       xmit_rate2:5;
-        u_int32_t       xmit_rate3:5;
-        u_int32_t       rts_cts_rate:5;
-        u_int32_t       reserved_25_31:7;
+	/*
+	 * tx_control_3
+	 */
+	u_int32_t xmit_rate0:5;
+	u_int32_t xmit_rate1:5;
+	u_int32_t xmit_rate2:5;
+	u_int32_t xmit_rate3:5;
+	u_int32_t rts_cts_rate:5;
+	u_int32_t reserved_25_31:7;
 };
 
 void
 ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb) 
 {
 	struct ieee80211_cb *cb = (struct ieee80211_cb *) skb->cb;
-	struct ieee80211_phy_params *ph = (struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
+	struct ieee80211_phy_params *ph =
+		(struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
 	cb = (struct ieee80211_cb *) skb->cb;
 	cb->flags = M_RAW;
 	cb->ni = NULL;
@@ -137,8 +140,8 @@ ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb)
 	switch (skb->dev->type) {
 	case ARPHRD_IEEE80211: break;
 	case ARPHRD_IEEE80211_PRISM: {
-		wlan_ng_prism2_header *wh = NULL;
-		wh = (wlan_ng_prism2_header *) skb->data;
+		wlan_ng_prism2_header *wh = 
+			(wlan_ng_prism2_header *) skb->data;
 		/* does it look like there is a prism header here? */
 		if (skb->len > sizeof (wlan_ng_prism2_header) &&
                     wh->msgcode == DIDmsg_lnxind_wlansniffrm &&
@@ -150,8 +153,8 @@ ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb)
 	}
 	case ARPHRD_IEEE80211_ATHDESC: {
 		if (skb->len > ATHDESC_HEADER_SIZE) {
-			struct ar5212_openbsd_desc *desc = (struct ar5212_openbsd_desc *) 
-				(skb->data + 8);
+			struct ar5212_openbsd_desc *desc =
+				(struct ar5212_openbsd_desc *) (skb->data + 8);
 			ph->power = desc->xmit_power;
 			ph->rate0 = ratecode_to_dot11(desc->xmit_rate0);
 			ph->rate1 = ratecode_to_dot11(desc->xmit_rate1);
@@ -163,8 +166,10 @@ ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb)
 			ph->try3 = desc->xmit_tries3;
 			skb_pull(skb, ATHDESC_HEADER_SIZE);
 		}
+		break;
 	}		
-	default: break;
+	default:
+		break;
 	}
 
 	if (!ph->rate0) {
@@ -176,7 +181,7 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
 
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-			struct ath_desc *ds, int tx, u_int32_t mactime, u_int32_t rate)
+	struct ath_desc *ds, int tx, u_int32_t mactime, u_int32_t rate)
 {
 	struct ieee80211vap *vap, *next;
 	u_int32_t signal = 0;
@@ -193,7 +198,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
 		    vap->iv_state != IEEE80211_S_RUN)
 			continue;
-		if (vap->iv_monitor_nods_only && dir != IEEE80211_FC1_DIR_NODS) {
+		if (vap->iv_monitor_nods_only &&
+		    dir != IEEE80211_FC1_DIR_NODS) {
 			/* don't rx fromds, tods, or dstods packets */
 			continue;
 		}		    
@@ -249,8 +255,9 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
 			ph->channel.status = 0;
 			ph->channel.len = 4;
-			ph->channel.data = ieee80211_mhz2ieee(ic->ic_curchan->ic_freq, 
-							      ic->ic_curchan->ic_flags);
+			ph->channel.data =
+				ieee80211_mhz2ieee(ic->ic_curchan->ic_freq, 
+					ic->ic_curchan->ic_flags);
 			
 			ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
 			ph->rssi.status = 0;
@@ -284,7 +291,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				}
 				
 				th = (struct ath_tx_radiotap_header *) skb_push(skb1, 
-										sizeof(struct ath_tx_radiotap_header));
+					sizeof(struct ath_tx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_version = 0;
 				th->wt_ihdr.it_len = sizeof(struct ath_tx_radiotap_header);
@@ -303,7 +310,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				}
 				
 				th = (struct ath_rx_radiotap_header *) skb_push(skb1, 
-										sizeof(struct ath_rx_radiotap_header));
+					sizeof(struct ath_rx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_rx_radiotap_header));
 				th->wr_ihdr.it_version = 0;
 				th->wr_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
@@ -325,8 +332,10 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				break;
 			}
 			memcpy(skb_push(skb1, ATHDESC_HEADER_SIZE), ds, ATHDESC_HEADER_SIZE);
+			break;
 		}
-		default: break;
+		default:
+			break;
 		}
 		if (skb1) {
 			skb1->dev = dev; /* NB: deliver to wlanX */
@@ -343,4 +352,3 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	}
 }
 EXPORT_SYMBOL(ieee80211_input_monitor);
-

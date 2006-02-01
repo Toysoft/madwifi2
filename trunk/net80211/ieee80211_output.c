@@ -65,10 +65,8 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211_output.c,v 1.15 2004/12/31 22:42:
 static __inline int
 doprint(struct ieee80211vap *vap, int subtype)
 {
-	switch (subtype) {
-	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
+	if (subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
 		return (vap->iv_opmode == IEEE80211_M_IBSS);
-	}
 	return 1;
 }
 #endif
@@ -84,7 +82,7 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ether_header *eh = (struct ether_header *) skb->data;
-	int v_wme_ac=0, d_wme_ac=0;
+	int v_wme_ac = 0, d_wme_ac = 0;
 
 	/* default priority */
 	skb->priority = WME_AC_BE;
@@ -165,16 +163,15 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 		d_wme_ac = WME_AC_BE;
 	}
 	skb->priority = d_wme_ac;
-	if (v_wme_ac > d_wme_ac) {
+	if (v_wme_ac > d_wme_ac)
 		skb->priority = v_wme_ac;
-	}
 
 	/* Applying ACM policy */
 	if (vap->iv_opmode == IEEE80211_M_STA) {
 		struct ieee80211com *ic = ni->ni_ic;
 
-		while (skb->priority != WME_AC_BK 
-		    && ic->ic_wme.wme_wmeBssChanParams.cap_wmeParams[skb->priority].wmep_acm) {
+		while (skb->priority != WME_AC_BK &&
+		    ic->ic_wme.wme_wmeBssChanParams.cap_wmeParams[skb->priority].wmep_acm) {
 			switch (skb->priority) {
 			case WME_AC_BE:
 				skb->priority = WME_AC_BK;
@@ -257,8 +254,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		/* U-APSD power save queue */
 		/* XXXAPSD: assuming triggerable means deliverable */
 		M_FLAG_SET(skb, M_UAPSD);
-	}
-	else if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT) && !M_PWR_SAV_GET(skb)) {
+	} else if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT) && !M_PWR_SAV_GET(skb)) {
 		/*
 		 * Station in power save mode; stick the frame
 		 * on the sta's power save queue and continue.
@@ -280,18 +276,18 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	 * broadcast/multicast  packets need to be sent on XR vap in addition to
 	 * normal vap.
 	 */
-	if(vap->iv_xrvap && ni == vap->iv_bss && vap->iv_xrvap->iv_sta_assoc) {
+	if (vap->iv_xrvap && ni == vap->iv_bss &&
+	    vap->iv_xrvap->iv_sta_assoc) {
 		struct sk_buff *skb1;
 		ni = ieee80211_find_txnode(vap->iv_xrvap, eh->ether_dhost);
 		skb1 = skb_clone(skb,GFP_ATOMIC);
-		if(skb1) {
+		if (skb1) {
 			cb = (struct ieee80211_cb *) skb1->cb;
 			cb->ni = ni;
 			cb->flags = 0;
 			cb->next = NULL;
 			(void) dev_queue_xmit(skb1);
 		}
-
 	}
 #endif
 	(void) dev_queue_xmit(skb);
@@ -410,11 +406,11 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 	if ((ieee80211_msg_debug(vap) && doprint(vap, type)) ||
 	    ieee80211_msg_dumppkts(vap)) {
 		printf("[%s] send %s on channel %u\n",
-		    ether_sprintf(wh->i_addr1),
-		    ieee80211_mgt_subtype_name[
-			(type & IEEE80211_FC0_SUBTYPE_MASK) >>
-				IEEE80211_FC0_SUBTYPE_SHIFT],
-		    ieee80211_chan2ieee(ic, ic->ic_curchan));
+			ether_sprintf(wh->i_addr1),
+			ieee80211_mgt_subtype_name[
+				(type & IEEE80211_FC0_SUBTYPE_MASK) >>
+					IEEE80211_FC0_SUBTYPE_SHIFT],
+		    	ieee80211_chan2ieee(ic, ic->ic_curchan));
 	}
 #endif
 	IEEE80211_NODE_STAT(ni, tx_mgmt);
@@ -463,10 +459,10 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 	IEEE80211_NODE_STAT(ni, tx_data);
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG | IEEE80211_MSG_DUMPPKTS,
-	    "[%s] send null data frame on channel %u, pwr mgt %s\n",
-	    ether_sprintf(ni->ni_macaddr),
-	    ieee80211_chan2ieee(ic, ic->ic_curchan),
-	    wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "ena" : "dis");
+		"[%s] send null data frame on channel %u, pwr mgt %s\n",
+		ether_sprintf(ni->ni_macaddr),
+		ieee80211_chan2ieee(ic, ic->ic_curchan),
+		wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "ena" : "dis");
 
 	/* XXX assign some priority; this probably is wrong */
 	skb->priority = WME_AC_BE;
@@ -503,15 +499,15 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 	cb->ni = ni;
 
 	skb->priority = ac;
-	qwh = (struct ieee80211_qosframe *) skb_push(skb, sizeof(struct ieee80211_qosframe));
+	qwh = (struct ieee80211_qosframe *)skb_push(skb, sizeof(struct ieee80211_qosframe));
 
 	qwh = (struct ieee80211_qosframe *)skb->data;
 
 	ieee80211_send_setup(vap, ni, (struct ieee80211_frame *)qwh,
-			     IEEE80211_FC0_TYPE_DATA,
-			     vap->iv_myaddr, /* SA */ 
-			     ni->ni_macaddr, /* DA */
-			     ni->ni_bssid);
+		IEEE80211_FC0_TYPE_DATA,
+		vap->iv_myaddr, /* SA */ 
+		ni->ni_macaddr, /* DA */
+		ni->ni_bssid);
 	
 	qwh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
 		IEEE80211_FC0_SUBTYPE_QOS_NULL;
@@ -522,9 +518,8 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 	/* map from access class/queue to 11e header priority value */
 	tid = WME_AC_TO_TID(ac);
 	qwh->i_qos[0] = tid & IEEE80211_QOS_TID;
-	if (ic->ic_wme.wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy) {
+	if (ic->ic_wme.wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy)
 		qwh->i_qos[0] |= (1 << IEEE80211_QOS_ACKPOLICY_S) & IEEE80211_QOS_ACKPOLICY;
-	}
 	qwh->i_qos[1] = 0;
 	
 	IEEE80211_NODE_STAT(ni, tx_data);
@@ -551,7 +546,7 @@ EXPORT_SYMBOL(ieee80211_send_qosnulldata);
  */
 static struct sk_buff *
 ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
-			struct ieee80211_key *key, struct sk_buff *skb, int ismulticast)
+	struct ieee80211_key *key, struct sk_buff *skb, int ismulticast)
 {
 	/* XXX pre-calculate per node? */
 	int need_headroom = LLC_SNAPFRAMELEN + hdrsize + IEEE80211_ADDR_LEN;
@@ -562,8 +557,8 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 	struct sk_buff *skb2 = NULL;
 
 	if (isff) {
-		need_headroom += sizeof(struct athl2p_tunnel_hdr) + ATH_FF_MAX_HDR_PAD
-			+ inter_headroom;
+		need_headroom += sizeof(struct athl2p_tunnel_hdr) + ATH_FF_MAX_HDR_PAD +
+			inter_headroom;
 		skb2 = skb->next;
 	}
 #endif
@@ -588,12 +583,12 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 		** then allocate the additional tailroom for SW MIC computation.
 		*/
 		if (skb->len > vap->iv_fragthreshold &&
-		    ! ismulticast &&
-			cip->ic_cipher == IEEE80211_CIPHER_TKIP)
-			    need_tailroom += cip->ic_miclen;
+		    !ismulticast &&
+		    cip->ic_cipher == IEEE80211_CIPHER_TKIP)
+			need_tailroom += cip->ic_miclen;
 		else
 			if (key->wk_flags & IEEE80211_KEY_SWMIC)
-			    need_tailroom += cip->ic_miclen;
+				need_tailroom += cip->ic_miclen;
 	}
 
 	skb = skb_unshare(skb, GFP_ATOMIC);
@@ -602,7 +597,8 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 	if (isff) {
 		if (skb == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
-							  "%s: cannot unshare for encapsulation\n", __func__);
+				"%s: cannot unshare for encapsulation\n",
+				__func__);
 			vap->iv_stats.is_tx_nobuf++;
 			dev_kfree_skb(skb2);
 
@@ -616,7 +612,8 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 			dev_kfree_skb(tmp);
 			if (skb == NULL) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
-								  "%s: cannot expand storage (head1)\n", __func__);
+					"%s: cannot expand storage (head1)\n",
+					__func__);
 				vap->iv_stats.is_tx_nobuf++;
 				dev_kfree_skb(skb2);
 				return NULL;
@@ -631,10 +628,11 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 
 			/* FFXXX: this path needs testing */
 			if (pskb_expand_head(skb2, inter_headroom - skb_headroom(skb2),
-								 need_tailroom - skb_tailroom(skb2), GFP_ATOMIC)) {
+			    need_tailroom - skb_tailroom(skb2), GFP_ATOMIC)) {
 				dev_kfree_skb(skb2);
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
-								  "%s: cannot expand storage (tail2)\n", __func__);
+					"%s: cannot expand storage (tail2)\n",
+					__func__);
 				vap->iv_stats.is_tx_nobuf++;
 				/* this shouldn't happen, but don't send first ff either */
 				dev_kfree_skb(skb);
@@ -647,7 +645,8 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 			dev_kfree_skb(tmp);
 			if (skb2 == NULL) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
-								  "%s: cannot expand storage (head2)\n", __func__);
+					"%s: cannot expand storage (head2)\n",
+					__func__);
 				vap->iv_stats.is_tx_nobuf++;
 				/* this shouldn't happen, but don't send first ff either */
 				dev_kfree_skb(skb);
@@ -660,14 +659,14 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 #endif /* ATH_SUPERG_FF */
 	if (skb == NULL) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
-		    "%s: cannot unshare for encapsulation\n", __func__);
+			"%s: cannot unshare for encapsulation\n", __func__);
 		vap->iv_stats.is_tx_nobuf++;
 	} else if (skb_tailroom(skb) < need_tailroom) {
 		if (pskb_expand_head(skb, need_headroom - skb_headroom(skb),
 			need_tailroom - skb_tailroom(skb), GFP_ATOMIC)) {
 			dev_kfree_skb(skb);
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
-			    "%s: cannot expand storage (tail)\n", __func__);
+				"%s: cannot expand storage (tail)\n", __func__);
 			vap->iv_stats.is_tx_nobuf++;
 			skb = NULL;
 		}
@@ -677,7 +676,7 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 		dev_kfree_skb(tmp);
 		if (skb == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
-			    "%s: cannot expand storage (head)\n", __func__);
+				"%s: cannot expand storage (head)\n", __func__);
 			vap->iv_stats.is_tx_nobuf++;
 		}
 	}
@@ -699,9 +698,8 @@ ieee80211_crypto_getucastkey(struct ieee80211vap *vap, struct ieee80211_node *ni
 		    KEY_UNDEFINED(vap->iv_nw_keys[vap->iv_def_txkey]))
 			return NULL;
 		return &vap->iv_nw_keys[vap->iv_def_txkey];
-	} else {
+	} else
 		return &ni->ni_ucastkey;
-	}
 }
 
 /*
@@ -752,11 +750,13 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	
 	if (isff) {
 #if 0
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG, "%s: handling fast-frame skb (%p)\n", __func__, skb);
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
+			"%s: handling fast-frame skb (%p)\n", __func__, skb);
 #endif
 		skb2 = skb->next;
 		if (skb2 == NULL) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG, "%s: fast-frame error, only 1 skb\n", __func__);
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
+				"%s: fast-frame error, only 1 skb\n", __func__);
 			goto bad;
 		}
 		memcpy(&eh2, skb2->data, sizeof(struct ether_header));
@@ -786,9 +786,9 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			key = ieee80211_crypto_getmcastkey(vap, ni);
 		if (key == NULL && eh.ether_type != htons(ETHERTYPE_PAE)) {
 			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO,
-					   eh.ether_dhost,
-					   "no default transmit key (%s) deftxkey %u",
-			    __func__, vap->iv_def_txkey);
+				eh.ether_dhost,
+				"no default transmit key (%s) deftxkey %u",
+				__func__, vap->iv_def_txkey);
 			vap->iv_stats.is_tx_nodefkey++;
 		}
 	} else
@@ -806,14 +806,14 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		break;
 	case IEEE80211_M_WDS:
 		hdrsize += IEEE80211_ADDR_LEN;
-		use4addr=1;
+		use4addr = 1;
 		ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
 		break;
 	case IEEE80211_M_HOSTAP:
 		if (!IEEE80211_ADDR_EQ(eh.ether_dhost, ni->ni_macaddr) &&
 		    !IEEE80211_IS_MULTICAST(eh.ether_dhost)) {
 			hdrsize += IEEE80211_ADDR_LEN;
-			use4addr=1;
+			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
 		}
 		else
@@ -823,22 +823,20 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		if ((!IEEE80211_ADDR_EQ(eh.ether_shost, vap->iv_myaddr)) &&
 		    (vap->iv_flags_ext & IEEE80211_FEXT_WDS)) {
 			hdrsize += IEEE80211_ADDR_LEN;
-			use4addr=1;
+			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
 			/* add a wds entry to the station vap */ 
-			if(IEEE80211_IS_MULTICAST(eh.ether_dhost)) {
-				 struct ieee80211_node_table *nt;
-				 struct ieee80211_node *ni_wds=NULL;
-				 nt = &ic->ic_sta;
-				 ni_wds = ieee80211_find_wds_node(nt,eh.ether_shost);
-				 if(ni_wds) {
-					 ieee80211_free_node(ni_wds); /* Decr ref count */
-				 } else {
-					 ieee80211_add_wds_addr(nt, ni, eh.ether_shost, 0);
-				 }
+			if (IEEE80211_IS_MULTICAST(eh.ether_dhost)) {
+				struct ieee80211_node_table *nt;
+				struct ieee80211_node *ni_wds = NULL;
+				nt = &ic->ic_sta;
+				ni_wds = ieee80211_find_wds_node(nt, eh.ether_shost);
+				if (ni_wds)
+					ieee80211_free_node(ni_wds); /* Decr ref count */
+				else
+					ieee80211_add_wds_addr(nt, ni, eh.ether_shost, 0);
 			}
-		}
-		else
+		} else
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_bssid);
 		break;
 	default:
@@ -865,7 +863,9 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		/* in case header adjustments altered skb2 */
 		skb2 = skb->next;
 		if (skb2 == NULL) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG, "%s: skb (%p) hdr adjust dropped 2nd skb\n", __func__, skb);
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
+				"%s: skb (%p) hdr adjust dropped 2nd skb\n",
+				__func__, skb);
 			goto bad;
 		}
 
@@ -900,7 +900,9 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 
 		llc = (struct llc *) skb_push(skb2, LLC_SNAPFRAMELEN);
 		if (llc == NULL) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG, "%s: failed to push llc for 2nd skb (%p)\n", __func__, skb);
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
+				"%s: failed to push llc for 2nd skb (%p)\n",
+				__func__, skb);
 			return NULL;
 		}
 		llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
@@ -912,7 +914,9 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 
 		eh_inter = (struct ether_header *) skb_push(skb2, sizeof(struct ether_header));
 		if (eh_inter == NULL) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG, "%s: failed to push eth hdr for 2nd skb (%p)\n", __func__, skb);
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
+				"%s: failed to push eth hdr for 2nd skb (%p)\n",
+				__func__, skb);
 			return NULL;
 		}
 
@@ -998,9 +1002,8 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			goto bad;
 		}
 	}
-	if (IEEE80211_VAP_IS_SLEEPING(vap)) {
-		wh->i_fc[1] |= IEEE80211_FC1_PWR_MGT;		
-	}
+	if (IEEE80211_VAP_IS_SLEEPING(vap))
+		wh->i_fc[1] |= IEEE80211_FC1_PWR_MGT;
 	if (addqos) {
 		struct ieee80211_qosframe *qwh =
 			(struct ieee80211_qosframe *) wh;
@@ -1013,24 +1016,23 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		/* map from access class/queue to 11e header priority value */
 		tid = WME_AC_TO_TID(skb->priority);
 		qos[0] = tid & IEEE80211_QOS_TID;
-		if (ic->ic_wme.wme_wmeChanParams.cap_wmeParams[skb->priority].wmep_noackPolicy) {
+		if (ic->ic_wme.wme_wmeChanParams.cap_wmeParams[skb->priority].wmep_noackPolicy)
 			qos[0] |= (1 << IEEE80211_QOS_ACKPOLICY_S) & IEEE80211_QOS_ACKPOLICY;
-		}
 		qos[1] = 0;
 		qwh->i_fc[0] |= IEEE80211_FC0_SUBTYPE_QOS;
 
 		*(u_int16_t *)&wh->i_seq[0] =
-		    htole16(ni->ni_txseqs[tid] << IEEE80211_SEQ_SEQ_SHIFT);
+			htole16(ni->ni_txseqs[tid] << IEEE80211_SEQ_SEQ_SHIFT);
 		ni->ni_txseqs[tid]++;
 	} else {
 		*(u_int16_t *)wh->i_seq =
-		    htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
+			htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
 		ni->ni_txseqs[0]++;
 	}
 
 	/* Is transmit fragmentation needed? */
 	if (skb->len > vap->iv_fragthreshold &&
-	    ! IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+	    !IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 		int pktlen, skbcnt, tailsize, ciphdrsize;
 		struct ieee80211_cipher *cip;
 
@@ -1048,13 +1050,13 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		fragcnt = *framecnt = 
 			((pktlen - (hdrsize_nopad + ciphdrsize)) / pdusize) +
 			(((pktlen - (hdrsize_nopad + ciphdrsize)) % 
-			  pdusize == 0) ? 0 : 1);
+				pdusize == 0) ? 0 : 1);
 
 		/*
-		** Allocate sk_buff for each subsequent fragment; First fragment
-		** reuses input skb.
-		*/
-		for (skbcnt = 1; skbcnt < fragcnt; ++skbcnt) {
+		 * Allocate sk_buff for each subsequent fragment; First fragment
+		 * reuses input skb.
+		 */
+		for (skbcnt = 1; skbcnt < fragcnt; skbcnt++) {
 			tskb = dev_alloc_skb(hdrsize + ciphdrsize + pdusize + tailsize);
 			if (tskb == NULL)
 				break;
@@ -1076,16 +1078,16 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		 */
 		if (eh.ether_type != __constant_htons(ETHERTYPE_PAE) ||
 		    ((vap->iv_flags & IEEE80211_F_WPA) &&
-		     (vap->iv_opmode == IEEE80211_M_STA ?
-		      !KEY_UNDEFINED(*key) : !KEY_UNDEFINED(ni->ni_ucastkey)))) {
+		    (vap->iv_opmode == IEEE80211_M_STA ?
+		    !KEY_UNDEFINED(*key) : !KEY_UNDEFINED(ni->ni_ucastkey)))) {
 			int force_swmic = (fragcnt > 1) ? 1 : 0;
 
 			wh->i_fc[1] |= IEEE80211_FC1_WEP;
 
 			if (!ieee80211_crypto_enmic(vap, key, skb, force_swmic)) {
 				IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_OUTPUT,
-				    eh.ether_dhost,
-				    "%s", "enmic failed, discard frame");
+					eh.ether_dhost,
+					"%s", "enmic failed, discard frame");
 				vap->iv_stats.is_crypto_enmicfail++;
 				goto bad;
 			}
@@ -1107,7 +1109,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		*(u_int16_t *)&wh->i_seq[0] |= 
 			htole16((fragnum & IEEE80211_SEQ_FRAG_MASK) <<
 				IEEE80211_SEQ_FRAG_SHIFT);
-		++fragnum;
+		fragnum++;
 
 		offset = hdrsize + pdusize;
 		datalen = (skb->len - hdrsize) - pdusize;
@@ -1117,15 +1119,15 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 
 		for (tskb = framelist; tskb != NULL; tskb = tskb->next) {
 			/*
-			** Copy WLAN header into each frag header skb
-			*/
+			 * Copy WLAN header into each frag header skb
+			 */
 			twh = (struct ieee80211_frame *) skb_put(tskb, hdrsize);
 			memcpy((void *) twh, (void *) wh, hdrsize);
 
 			*(u_int16_t *)&twh->i_seq[0] |=
 				htole16((fragnum & IEEE80211_SEQ_FRAG_MASK) <<
 					IEEE80211_SEQ_FRAG_SHIFT);
-			++fragnum;
+			fragnum++;
 
 			if (pdusize <= datalen)
 				pdulen = pdusize;
@@ -1133,12 +1135,12 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 				pdulen = datalen;
 
 			/*
-			** Copy fragment payload from input skb.
-			** Doing copies isn't intuitive from 
-			** a performance perspective, however,
-			** for this case, it is believed to be 
-			** more efficient than cloning skbs.
-			*/
+			 * Copy fragment payload from input skb.
+			 * Doing copies isn't intuitive from 
+			 * a performance perspective, however,
+			 * for this case, it is believed to be 
+			 * more efficient than cloning skbs.
+			 */
 			pdu = skb_put(tskb, pdulen);
 			memcpy(pdu, (void *) skb->data+offset, pdulen);
 
@@ -1150,10 +1152,9 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		}
 
 		twh->i_fc[1] &= ~IEEE80211_FC1_MORE_FRAG;
-		skb_trim(skb,hdrsize + pdusize);
+		skb_trim(skb, hdrsize + pdusize);
 		skb->next = framelist;
-	}
-	else {
+	} else {
 		IEEE80211_NODE_STAT(ni, tx_data);
 		IEEE80211_NODE_STAT_ADD(ni, tx_bytes, datalen);
 	}
@@ -1175,7 +1176,7 @@ bad:
 	if (skb != NULL) {
 #ifdef ATH_SUPERG_FF
 		/* FFXXX: rather specific to ff case of only 2 skbs chained */
-		if (skb->next){
+		if (skb->next) {
 			dev_kfree_skb(skb->next);
 			skb->next = NULL;
 		}
@@ -1320,11 +1321,11 @@ ieee80211_setup_wpa_ie(struct ieee80211vap *vap, u_int8_t *ie)
 	/* unicast cipher list */
 	selcnt = frm;
 	ADDSHORT(frm, 0);			/* selector count */
-	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_AES_CCM)) {
+	if (rsn->rsn_ucastcipherset & (1 << IEEE80211_CIPHER_AES_CCM)) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_AES_CCM]);
 	}
-	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
+	if (rsn->rsn_ucastcipherset & (1 << IEEE80211_CIPHER_TKIP)) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
 	}
@@ -1347,9 +1348,9 @@ ieee80211_setup_wpa_ie(struct ieee80211vap *vap, u_int8_t *ie)
 
 	/* calculate element length */
 	ie[1] = frm - ie - 2;
-	KASSERT(ie[1]+2 <= sizeof(struct ieee80211_ie_wpa),
+	KASSERT(ie[1] + 2 <= sizeof(struct ieee80211_ie_wpa),
 		("WPA IE too big, %u > %u",
-		ie[1]+2, (int)sizeof(struct ieee80211_ie_wpa)));
+		ie[1] + 2, (int)sizeof(struct ieee80211_ie_wpa)));
 	return frm;
 #undef ADDSHORT
 #undef ADDSELECTOR
@@ -1403,11 +1404,11 @@ ieee80211_setup_rsn_ie(struct ieee80211vap *vap, u_int8_t *ie)
 	/* unicast cipher list */
 	selcnt = frm;
 	ADDSHORT(frm, 0);			/* selector count */
-	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_AES_CCM)) {
+	if (rsn->rsn_ucastcipherset & (1 << IEEE80211_CIPHER_AES_CCM)) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_AES_CCM]);
 	}
-	if (rsn->rsn_ucastcipherset & (1<<IEEE80211_CIPHER_TKIP)) {
+	if (rsn->rsn_ucastcipherset & (1 << IEEE80211_CIPHER_TKIP)) {
 		selcnt[0]++;
 		ADDSELECTOR(frm, cipher_suite[IEEE80211_CIPHER_TKIP]);
 	}
@@ -1430,9 +1431,9 @@ ieee80211_setup_rsn_ie(struct ieee80211vap *vap, u_int8_t *ie)
 
 	/* calculate element length */
 	ie[1] = frm - ie - 2;
-	KASSERT(ie[1]+2 <= sizeof(struct ieee80211_ie_wpa),
+	KASSERT(ie[1] + 2 <= sizeof(struct ieee80211_ie_wpa),
 		("RSN IE too big, %u > %u",
-		ie[1]+2, (int)sizeof(struct ieee80211_ie_wpa)));
+		ie[1] + 2, (int)sizeof(struct ieee80211_ie_wpa)));
 	return frm;
 #undef ADDSELECTOR
 #undef ADDSHORT
@@ -1476,9 +1477,8 @@ ieee80211_add_wme(u_int8_t *frm, struct ieee80211_node *ni)
 	switch (vap->iv_opmode) {
 	case IEEE80211_M_HOSTAP:
 		*frm = wme->wme_bssChanParams.cap_info_count;
-		if (IEEE80211_VAP_UAPSD_ENABLED(vap)) {
+		if (IEEE80211_VAP_UAPSD_ENABLED(vap))
 			*frm |= WME_CAPINFO_UAPSD_EN;
-		}
 		frm++;
 		break;
 	case IEEE80211_M_STA:
@@ -1498,7 +1498,7 @@ ieee80211_add_wme(u_int8_t *frm, struct ieee80211_node *ni)
  */
 u_int8_t *
 ieee80211_add_wme_param(u_int8_t *frm, struct ieee80211_wme_state *wme,
-						int uapsd_enable)
+	int uapsd_enable)
 {
 #define	SM(_v, _f)	(((_v) << _f##_S) & _f)
 #define	ADDSHORT(frm, v) do {			\
@@ -1517,21 +1517,18 @@ ieee80211_add_wme_param(u_int8_t *frm, struct ieee80211_wme_state *wme,
 	*frm++ = WME_PARAM_OUI_SUBTYPE;		/* OUI subtype */
 	*frm++ = WME_VERSION;			/* protocol version */
 	*frm = wme->wme_bssChanParams.cap_info_count;
-	if (uapsd_enable) {
+	if (uapsd_enable)
 		*frm |= WME_CAPINFO_UAPSD_EN;
-	}
 	frm++;
 	*frm++ = 0;                             /* reserved field */
 	for (i = 0; i < WME_NUM_AC; i++) {
 		const struct wmeParams *ac =
 		       &wme->wme_bssChanParams.cap_wmeParams[i];
-		*frm++ = SM(i, WME_PARAM_ACI)
-		       | SM(ac->wmep_acm, WME_PARAM_ACM)
-		       | SM(ac->wmep_aifsn, WME_PARAM_AIFSN)
-		       ;
-		*frm++ = SM(ac->wmep_logcwmax, WME_PARAM_LOGCWMAX)
-		       | SM(ac->wmep_logcwmin, WME_PARAM_LOGCWMIN)
-		       ;
+		*frm++ = SM(i, WME_PARAM_ACI) |
+			SM(ac->wmep_acm, WME_PARAM_ACM) |
+			SM(ac->wmep_aifsn, WME_PARAM_AIFSN);
+		*frm++ = SM(ac->wmep_logcwmax, WME_PARAM_LOGCWMAX) |
+			SM(ac->wmep_logcwmin, WME_PARAM_LOGCWMIN);
 		ADDSHORT(frm, ac->wmep_txopLimit);
 	}
 
@@ -1545,12 +1542,12 @@ ieee80211_add_wme_param(u_int8_t *frm, struct ieee80211_wme_state *wme,
 /*
  * Add an Atheros Advanaced Capability element to a frame
  */
-
 u_int8_t *
 ieee80211_add_athAdvCap(u_int8_t *frm, u_int8_t capability, u_int16_t defaultKey)
 {
 	static const u_int8_t oui[6] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
-					((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE, ATH_OUI_SUBTYPE, ATH_OUI_VERSION};
+		((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE,
+		ATH_OUI_SUBTYPE, ATH_OUI_VERSION};
 	struct ieee80211_ie_athAdvCap *ie = (struct ieee80211_ie_athAdvCap *) frm;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
@@ -1561,7 +1558,7 @@ ieee80211_add_athAdvCap(u_int8_t *frm, u_int8_t capability, u_int16_t defaultKey
 
 	/* Setup default key index in little endian byte order */
 	*frm++ = (defaultKey & 0xff);
-	*frm++ = ((defaultKey >> 8)& 0xff);
+	*frm++ = ((defaultKey >> 8) & 0xff);
 	ie->athAdvCap_len = frm - &ie->athAdvCap_oui[0];
 
 	return frm;
@@ -1570,13 +1567,12 @@ ieee80211_add_athAdvCap(u_int8_t *frm, u_int8_t capability, u_int16_t defaultKey
 /*
  * Add XR IE element to a frame
  */
-
 #ifdef ATH_SUPERG_XR
 u_int8_t *
 ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 {
 	static const u_int8_t oui[3] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
-					((ATH_OUI >> 16) & 0xff)};
+		((ATH_OUI >> 16) & 0xff)};
 	struct ieee80211_xr_param *ie = (struct ieee80211_xr_param *) frm;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
@@ -1590,10 +1586,10 @@ ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 	*frm++ = 0;
 
 	/* copy the BSSIDs */
-	if(vap->iv_flags & IEEE80211_F_XR) {
-		IEEE80211_ADDR_COPY(frm,vap->iv_xrvap->iv_bss->ni_bssid);
+	if (vap->iv_flags & IEEE80211_F_XR) {
+		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
-		IEEE80211_ADDR_COPY(frm,vap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
 		*(u_int16_t *)frm = htole16(vap->iv_xrvap->iv_bss->ni_intval);
 		frm += 2;
@@ -1602,9 +1598,9 @@ ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 		*frm++ = vap->iv_xrvap->iv_ath_cap;
 		*frm++ = vap->iv_ath_cap; 
 	} else {
-		IEEE80211_ADDR_COPY(frm,vap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
-		IEEE80211_ADDR_COPY(frm,vap->iv_xrvap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
 		*(u_int16_t *)frm = htole16(vap->iv_bss->ni_intval);
 		frm += 2;
@@ -1680,7 +1676,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
 		__func__, __LINE__,
 		ni, ether_sprintf(ni->ni_macaddr),
-		ieee80211_node_refcnt(ni)+1);
+		ieee80211_node_refcnt(ni) + 1);
 	ieee80211_ref_node(ni);
 
 	/*
@@ -1690,12 +1686,10 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	 *	[tlv] extended supported rates
 	 *	[tlv] user-specified ie's
 	 */
-	skb = ieee80211_getmgtframe(&frm,
-		 2 + IEEE80211_NWID_LEN
-	       + 2 + IEEE80211_RATE_SIZE
-	       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
-	       + (optie != NULL ? optielen : 0)
-	);
+	skb = ieee80211_getmgtframe(&frm, 2 + IEEE80211_NWID_LEN + 
+	       2 + IEEE80211_RATE_SIZE + 
+	       2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) + 
+	       (optie != NULL ? optielen : 0));
 	if (skb == NULL) {
 		vap->iv_stats.is_tx_nobuf++;
 		ieee80211_free_node(ni);
@@ -1727,9 +1721,9 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	IEEE80211_NODE_STAT(ni, tx_mgmt);
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG | IEEE80211_MSG_DUMPPKTS,
-	    "[%s] send probe req on channel %u\n",
-	    ether_sprintf(wh->i_addr1),
-	    ieee80211_chan2ieee(ic, ic->ic_curchan));
+		"[%s] send probe req on channel %u\n",
+		ether_sprintf(wh->i_addr1),
+		ieee80211_chan2ieee(ic, ic->ic_curchan));
 
 	(void) ic->ic_mgtstart(ic, skb);
 	return 0;
@@ -1785,27 +1779,23 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *	[tlv] WME
 		 *      [tlv] Atheros Advanced Capabilities
 		 */
-		skb = ieee80211_getmgtframe(&frm,
-			 8
-		       + sizeof(u_int16_t)
-		       + sizeof(u_int16_t)
-		       + 2 + IEEE80211_NWID_LEN
-		       + 2 + IEEE80211_RATE_SIZE
-		       + 7	/* max(7,3) */
-		       + 6
-		       + 3
-		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
-		/* XXX allocate max size */
-		       + ic->ic_country_ie.country_len + 2
-		       + 3
-		       /* XXX !WPA1+WPA2 fits w/o a cluster */
-		       + (vap->iv_flags & IEEE80211_F_WPA ?
-				2*sizeof(struct ieee80211_ie_wpa) : 0)
-		       + sizeof(struct ieee80211_wme_param)
-		       + sizeof(struct ieee80211_ie_athAdvCap)
+		skb = ieee80211_getmgtframe(&frm, 8 +
+			sizeof(u_int16_t) + sizeof(u_int16_t) +
+			2 + IEEE80211_NWID_LEN +
+			2 + IEEE80211_RATE_SIZE +
+			7 +	/* max(7,3) */
+			6 + 3 + 2 +
+			(IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
+			/* XXX allocate max size */
+		 	ic->ic_country_ie.country_len + 2 + 3 +
+			/* XXX !WPA1+WPA2 fits w/o a cluster */
+			(vap->iv_flags & IEEE80211_F_WPA ?
+				2 * sizeof(struct ieee80211_ie_wpa) : 0) +
+			sizeof(struct ieee80211_wme_param) + 
+			sizeof(struct ieee80211_ie_athAdvCap)
 #ifdef ATH_SUPERG_XR
-		       + (vap->iv_ath_cap & IEEE80211_ATHC_XR ?	/* XR */
-			     sizeof(struct ieee80211_xr_param) : 0)
+			+ (vap->iv_ath_cap & IEEE80211_ATHC_XR ?	/* XR */
+				sizeof(struct ieee80211_xr_param) : 0)
 #endif
 		);
 		if (skb == NULL)
@@ -1830,7 +1820,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		frm += 2;
 
 		frm = ieee80211_add_ssid(frm, vap->iv_bss->ni_essid,
-				vap->iv_bss->ni_esslen);
+			vap->iv_bss->ni_esslen);
 		frm = ieee80211_add_rates(frm, &ni->ni_rates);
 
 		if (ic->ic_phytype == IEEE80211_T_FH) {
@@ -1839,9 +1829,9 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
                         *frm++ = ni->ni_fhdwell & 0x00ff;
                         *frm++ = (ni->ni_fhdwell >> 8) & 0x00ff;
                         *frm++ = IEEE80211_FH_CHANSET(
-			    ieee80211_chan2ieee(ic, ic->ic_curchan));
+				ieee80211_chan2ieee(ic, ic->ic_curchan));
                         *frm++ = IEEE80211_FH_CHANPAT(
-			    ieee80211_chan2ieee(ic, ic->ic_curchan));
+				ieee80211_chan2ieee(ic, ic->ic_curchan));
                         *frm++ = ni->ni_fhindex;
 		} else {
 			*frm++ = IEEE80211_ELEMID_DSPARMS;
@@ -1852,12 +1842,12 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (vap->iv_opmode == IEEE80211_M_IBSS) {
 			*frm++ = IEEE80211_ELEMID_IBSSPARMS;
 			*frm++ = 2;
-			*frm++ = 0; *frm++ = 0;		/* TODO: ATIM window */
+			*frm++ = 0;
+			*frm++ = 0;		/* TODO: ATIM window */
 		}
 		if ((ic->ic_flags & IEEE80211_F_DOTH) ||
-			(ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE)) {
+		    (ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE))
 			frm = ieee80211_add_country(frm, ic);
-		}
 		if (ic->ic_flags & IEEE80211_F_DOTH) {
 			*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 			*frm++ = 1;
@@ -1870,13 +1860,13 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
 		if (vap->iv_flags & IEEE80211_F_WME)
 			frm = ieee80211_add_wme_param(frm, &ic->ic_wme,
-										  IEEE80211_VAP_UAPSD_ENABLED(vap));
+				IEEE80211_VAP_UAPSD_ENABLED(vap));
 		if (vap->iv_bss && vap->iv_bss->ni_ath_flags)
 			frm = ieee80211_add_athAdvCap(frm, vap->iv_bss->ni_ath_flags,
-					vap->iv_bss->ni_ath_defkeyindex); 
+				vap->iv_bss->ni_ath_defkeyindex); 
 #ifdef ATH_SUPERG_XR
-		if(vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
-			frm = ieee80211_add_xr_param(frm,vap);
+		if (vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
+			frm = ieee80211_add_xr_param(frm, vap);
 #endif
 		skb_trim(skb, frm - skb->data);
 		break;
@@ -1885,8 +1875,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		status = arg >> 16;
 		arg &= 0xffff;
 		has_challenge = ((arg == IEEE80211_AUTH_SHARED_CHALLENGE ||
-		    arg == IEEE80211_AUTH_SHARED_RESPONSE) &&
-		    ni->ni_challenge != NULL);
+			arg == IEEE80211_AUTH_SHARED_RESPONSE) &&
+			ni->ni_challenge != NULL);
 
 		/*
 		 * Deduce whether we're doing open authentication or
@@ -1896,35 +1886,33 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 * request and configured to use shared key.
 		 */
 		is_shared_key = has_challenge ||
-		     arg >= IEEE80211_AUTH_SHARED_RESPONSE ||
-		     (arg == IEEE80211_AUTH_SHARED_REQUEST &&
-		      vap->iv_bss->ni_authmode == IEEE80211_AUTH_SHARED);
+			arg >= IEEE80211_AUTH_SHARED_RESPONSE ||
+			(arg == IEEE80211_AUTH_SHARED_REQUEST &&
+			vap->iv_bss->ni_authmode == IEEE80211_AUTH_SHARED);
 
-		skb = ieee80211_getmgtframe(&frm,
-			  3 * sizeof(u_int16_t)
-			+ (has_challenge && status == IEEE80211_STATUS_SUCCESS ?
-				sizeof(u_int16_t)+IEEE80211_CHALLENGE_LEN : 0)
-		);
+		skb = ieee80211_getmgtframe(&frm, 3 * sizeof(u_int16_t) + 
+			(has_challenge && status == IEEE80211_STATUS_SUCCESS ?
+				sizeof(u_int16_t)+IEEE80211_CHALLENGE_LEN : 0));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
 		((u_int16_t *)frm)[0] =
-		    (is_shared_key) ? htole16(IEEE80211_AUTH_ALG_SHARED)
-		                    : htole16(IEEE80211_AUTH_ALG_OPEN);
+			(is_shared_key) ? htole16(IEEE80211_AUTH_ALG_SHARED)
+				: htole16(IEEE80211_AUTH_ALG_OPEN);
 		((u_int16_t *)frm)[1] = htole16(arg);	/* sequence number */
-		((u_int16_t *)frm)[2] = htole16(status);/* status */
+		((u_int16_t *)frm)[2] = htole16(status);	/* status */
 
 		if (has_challenge && status == IEEE80211_STATUS_SUCCESS) {
 			((u_int16_t *)frm)[3] =
-			    htole16((IEEE80211_CHALLENGE_LEN << 8) |
-			    IEEE80211_ELEMID_CHALLENGE);
+				htole16((IEEE80211_CHALLENGE_LEN << 8) |
+					IEEE80211_ELEMID_CHALLENGE);
 			memcpy(&((u_int16_t *)frm)[4], ni->ni_challenge,
-			    IEEE80211_CHALLENGE_LEN);
+				IEEE80211_CHALLENGE_LEN);
 			if (arg == IEEE80211_AUTH_SHARED_RESPONSE) {
 				struct ieee80211_cb *cb =
 					(struct ieee80211_cb *)skb->cb;
 				IEEE80211_NOTE(vap, IEEE80211_MSG_AUTH, ni,
-				    "request encrypt frame (%s)", __func__);
+					"request encrypt frame (%s)", __func__);
 				cb->flags |= M_LINK0; /* WEP-encrypt, please */
 			}
 		}
@@ -1941,7 +1929,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 	case IEEE80211_FC0_SUBTYPE_DEAUTH:
 		IEEE80211_NOTE(vap, IEEE80211_MSG_AUTH, ni,
-		    "send station deauthenticate (reason %d)", arg);
+			"send station deauthenticate (reason %d)", arg);
 		skb = ieee80211_getmgtframe(&frm, sizeof(u_int16_t));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
@@ -1969,19 +1957,15 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *      [tlv] Atheros advanced capabilities
 		 *	[tlv] user-specified ie's
 		 */
-		skb = ieee80211_getmgtframe(&frm,
-			 sizeof(u_int16_t)
-		       + sizeof(u_int16_t)
-		       + IEEE80211_ADDR_LEN
-		       + 2 + IEEE80211_NWID_LEN
-		       + 2 + IEEE80211_RATE_SIZE
-		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
-		       + 4
-		       + 2 + IEEE80211_SUPPCHAN_LEN
-		       + sizeof(struct ieee80211_ie_wme)
-		       + sizeof(struct ieee80211_ie_athAdvCap)
-		       + (vap->iv_opt_ie != NULL ? vap->iv_opt_ie_len : 0)
-		);
+		skb = ieee80211_getmgtframe(&frm, sizeof(u_int16_t) + 
+			sizeof(u_int16_t) + IEEE80211_ADDR_LEN +
+			2 + IEEE80211_NWID_LEN +
+			2 + IEEE80211_RATE_SIZE +
+			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
+			4 + 2 + IEEE80211_SUPPCHAN_LEN +
+			sizeof(struct ieee80211_ie_wme) +
+			sizeof(struct ieee80211_ie_athAdvCap) +
+			(vap->iv_opt_ie != NULL ? vap->iv_opt_ie_len : 0));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -2026,16 +2010,15 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 				vap->iv_ath_cap);
 
 			/* Setup default key index for static wep case */
-                        def_keyindex = IEEE80211_INVAL_DEFKEY;
+			def_keyindex = IEEE80211_INVAL_DEFKEY;
 			if (((vap->iv_flags & IEEE80211_F_WPA) == 0) &&
 			    (ni->ni_authmode != IEEE80211_AUTH_8021X) &&
-                            (vap->iv_def_txkey != IEEE80211_KEYIX_NONE)) {
-                                def_keyindex = vap->iv_def_txkey;
-                        }
+                            (vap->iv_def_txkey != IEEE80211_KEYIX_NONE))
+				def_keyindex = vap->iv_def_txkey;
 
 			frm = ieee80211_add_athAdvCap(frm,
-					ni->ni_ath_flags & vap->iv_ath_cap,
-					def_keyindex); 
+				ni->ni_ath_flags & vap->iv_ath_cap,
+				def_keyindex); 
 		}
 		if (vap->iv_opt_ie != NULL) {
 			memcpy(frm, vap->iv_opt_ie, vap->iv_opt_ie_len);
@@ -2058,15 +2041,12 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *      [tlv] WME (if enabled and STA enabled)
 		 *      [tlv] Atheros Advanced Capabilities 
 		 */
-		skb = ieee80211_getmgtframe(&frm,
-		       sizeof(capinfo)
-		       + sizeof(u_int16_t)
-		       + sizeof(u_int16_t)
-		       + 2 + IEEE80211_RATE_SIZE
-		       + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
-		       + sizeof(struct ieee80211_wme_param)
-		       + (vap->iv_ath_cap ? sizeof(struct ieee80211_ie_athAdvCap):0)
-		);
+		skb = ieee80211_getmgtframe(&frm, sizeof(capinfo) +
+			sizeof(u_int16_t) + sizeof(u_int16_t) +
+			2 + IEEE80211_RATE_SIZE +
+			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
+			sizeof(struct ieee80211_wme_param) +
+			(vap->iv_ath_cap ? sizeof(struct ieee80211_ie_athAdvCap):0));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -2095,11 +2075,11 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
 		if ((vap->iv_flags & IEEE80211_F_WME) && ni->ni_wme_ie != NULL)
 			frm = ieee80211_add_wme_param(frm, &ic->ic_wme,
-						      IEEE80211_VAP_UAPSD_ENABLED(vap));
-		if(vap->iv_ath_cap)
+				IEEE80211_VAP_UAPSD_ENABLED(vap));
+		if (vap->iv_ath_cap)
 			frm = ieee80211_add_athAdvCap(frm, 
-					vap->iv_ath_cap & ni->ni_ath_flags,
-					ni->ni_ath_defkeyindex); 
+				vap->iv_ath_cap & ni->ni_ath_flags,
+				ni->ni_ath_defkeyindex); 
 
 		skb_trim(skb, frm - skb->data);
 		break;
@@ -2118,14 +2098,14 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 	default:
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,
-		    "invalid mgmt frame type %u", type);
+			"invalid mgmt frame type %u", type);
 		senderr(EINVAL, is_tx_unknownmgt);
 		/* NOTREACHED */
 	}
 
 	ieee80211_mgmt_output(ni, skb, type);
 	if (timer)
-		mod_timer(&vap->iv_mgtsend, jiffies + timer*HZ);
+		mod_timer(&vap->iv_mgtsend, jiffies + timer * HZ);
 	return 0;
 bad:
 	ieee80211_free_node(ni);
@@ -2173,7 +2153,8 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
  * constructs and returns a contention free frames.
  * currently used for Group poll in XR mode.
  */
-struct sk_buff *ieee80211_getcfframe(struct ieee80211vap *vap, int type)
+struct sk_buff *
+ieee80211_getcfframe(struct ieee80211vap *vap, int type)
 {
 	u_int8_t *frm;
 	struct sk_buff *skb;
@@ -2183,17 +2164,15 @@ struct sk_buff *ieee80211_getcfframe(struct ieee80211vap *vap, int type)
 
 
 	skb = ieee80211_getmgtframe(&frm,0);
-	if (skb == NULL) {
+	if (skb == NULL)
 		return NULL;
-	}
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
-	if(type == IEEE80211_FC0_SUBTYPE_CFPOLL) { 
+	if (type == IEEE80211_FC0_SUBTYPE_CFPOLL) { 
 		wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
 		wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA | type;
 		*(u_int16_t *)wh->i_dur = htole16(0x8000);
-	}
-	else if(type == IEEE80211_FC0_SUBTYPE_CF_END) { 
+	} else if (type == IEEE80211_FC0_SUBTYPE_CF_END) { 
 		wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
 		wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL | type;
 		*(u_int16_t *)wh->i_dur = 0;

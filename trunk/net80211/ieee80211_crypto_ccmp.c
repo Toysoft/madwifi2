@@ -59,14 +59,13 @@ struct ccmp_ctx {
 	struct crypto_tfm   *cc_tfm;
 };
 
-static	void *ccmp_attach(struct ieee80211vap *, struct ieee80211_key *);
-static	void ccmp_detach(struct ieee80211_key *);
-static	int ccmp_setkey(struct ieee80211_key *);
-static	int ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb,
-		u_int8_t keyid);
-static	int ccmp_decap(struct ieee80211_key *, struct sk_buff *, int);
-static	int ccmp_enmic(struct ieee80211_key *, struct sk_buff *, int);
-static	int ccmp_demic(struct ieee80211_key *, struct sk_buff *, int);
+static void *ccmp_attach(struct ieee80211vap *, struct ieee80211_key *);
+static void ccmp_detach(struct ieee80211_key *);
+static int ccmp_setkey(struct ieee80211_key *);
+static int ccmp_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t);
+static int ccmp_decap(struct ieee80211_key *, struct sk_buff *, int);
+static int ccmp_enmic(struct ieee80211_key *, struct sk_buff *, int);
+static int ccmp_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 static const struct ieee80211_cipher ccmp = {
 	.ic_name	= "AES-CCM",
@@ -84,9 +83,8 @@ static const struct ieee80211_cipher ccmp = {
 	.ic_demic	= ccmp_demic,
 };
 
-static	int ccmp_encrypt(struct ieee80211_key *, struct sk_buff *, int hdrlen);
-static	int ccmp_decrypt(struct ieee80211_key *, u_int64_t pn,
-		struct sk_buff *, int hdrlen);
+static int ccmp_encrypt(struct ieee80211_key *, struct sk_buff *, int);
+static int ccmp_decrypt(struct ieee80211_key *, u_int64_t, struct sk_buff *, int);
 
 static void *
 ccmp_attach(struct ieee80211vap *vap, struct ieee80211_key *k)
@@ -131,10 +129,10 @@ ccmp_setkey(struct ieee80211_key *k)
 {
 	struct ccmp_ctx *ctx = k->wk_private;
 
-	if (k->wk_keylen != (128/NBBY)) {
+	if (k->wk_keylen != (128 / NBBY)) {
 		IEEE80211_DPRINTF(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
 			"%s: Invalid key length %u, expecting %u\n",
-			__func__, k->wk_keylen, 128/NBBY);
+			__func__, k->wk_keylen, 128 / NBBY);
 		return 0;
 	}
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
@@ -188,7 +186,6 @@ ccmp_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 static int
 ccmp_enmic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
-
 	return 1;
 }
 
@@ -226,13 +223,13 @@ ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 		 * No extended IV; discard frame.
 		 */
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
-		    "%s", "Missing ExtIV for AES-CCM cipher");
+			"%s", "Missing ExtIV for AES-CCM cipher");
 		vap->iv_stats.is_rx_ccmpformat++;
 		return 0;
 	}
-	tid=0;
+	tid = 0;
 	if (IEEE80211_QOS_HAS_SEQ(wh)) 
-			tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
+		tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
 	/* NB: assume IEEEE80211_WEP_MINLEN covers the extended IV */ 
 	pn = READ_6(ivp[0], ivp[1], ivp[4], ivp[5], ivp[6], ivp[7]);
 	if (pn <= k->wk_keyrsc[tid]) {
@@ -434,8 +431,8 @@ ccmp_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb0->data;
 	struct sk_buff *skb;
 	int data_len, i;
-	uint8_t aad[2 * AES_BLOCK_LEN], b0[AES_BLOCK_LEN], b[AES_BLOCK_LEN],
-		e[AES_BLOCK_LEN], s0[AES_BLOCK_LEN];
+	uint8_t aad[2 * AES_BLOCK_LEN], b0[AES_BLOCK_LEN], b[AES_BLOCK_LEN];
+	uint8_t e[AES_BLOCK_LEN], s0[AES_BLOCK_LEN];
 	uint8_t *mic, *pos;
 	u_int space;
 
@@ -451,8 +448,8 @@ ccmp_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 	if (skb_tailroom(skb) < ccmp.ic_trailer) {
 		/* NB: should not happen */
 		IEEE80211_NOTE_MAC(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
-		    wh->i_addr1, "No room for %s MIC, tailroom %u",
-		    ccmp.ic_name, skb_tailroom(skb));
+			wh->i_addr1, "No room for %s MIC, tailroom %u",
+			ccmp.ic_name, skb_tailroom(skb));
 		/* XXX statistic */
 		return 0;
 	}
@@ -504,9 +501,9 @@ ccmp_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 				("not enough data in following buffer, "
 				"skb len %u need %u\n", skb->len, space_next));
 
-			xor_block(b+space, pos_next, space_next);
+			xor_block(b + space, pos_next, space_next);
 			CCMP_ENCRYPT(i, b, b0, pos, e, space);
-			xor_block(pos_next, e+space, space_next);
+			xor_block(pos_next, e + space, space_next);
 			data_len -= len;
 			/* XXX could check for data_len <= 0 */
 			i++;
@@ -578,7 +575,8 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct sk_buff *skb0, int 
 			space = data_len;
 		while (space >= AES_BLOCK_LEN) {
 			CCMP_DECRYPT(i, b, b0, pos, a, AES_BLOCK_LEN);
-			pos += AES_BLOCK_LEN, space -= AES_BLOCK_LEN;
+			pos += AES_BLOCK_LEN;
+			space -= AES_BLOCK_LEN;
 			data_len -= AES_BLOCK_LEN;
 			i++;
 		}
@@ -625,9 +623,9 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct sk_buff *skb0, int 
 
 	if (memcmp(mic, a, ccmp.ic_trailer) != 0) {
 		IEEE80211_NOTE_MAC(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
-		    wh->i_addr2,
-		    "AES-CCM decrypt failed; MIC mismatch (keyix %u, rsc %llu)",
-		    key->wk_keyix, pn);
+			wh->i_addr2,
+			"AES-CCM decrypt failed; MIC mismatch (keyix %u, rsc %llu)",
+			key->wk_keyix, pn);
 		ctx->cc_vap->iv_stats.is_rx_ccmpmic++;
 		return 0;
 	}

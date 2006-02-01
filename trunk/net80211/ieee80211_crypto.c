@@ -54,11 +54,10 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211_crypto.c,v 1.7 2004/12/31 22:42:3
 /*
  * Table of registered cipher modules.
  */
-static	const struct ieee80211_cipher *ciphers[IEEE80211_CIPHER_MAX];
+static const struct ieee80211_cipher *ciphers[IEEE80211_CIPHER_MAX];
 
-static	int _ieee80211_crypto_delkey(struct ieee80211vap *,
-		struct ieee80211_key *,
-		struct ieee80211_node *);
+static int _ieee80211_crypto_delkey(struct ieee80211vap *,
+	struct ieee80211_key *, struct ieee80211_node *);
 
 /*
  * Default "null" key management routines.
@@ -70,21 +69,26 @@ null_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 }
 static int
 null_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k,
-					struct ieee80211_node *ni)
+	struct ieee80211_node *ni)
 {
 	return 1;
 }
-static 	int
+static int
 null_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k,
-	     const u_int8_t mac[IEEE80211_ADDR_LEN])
+	const u_int8_t mac[IEEE80211_ADDR_LEN])
 {
 	return 1;
 }
-static void null_key_update(struct ieee80211vap *vap) {}
+static void null_key_update(struct ieee80211vap *vap)
+{
+}
 
 #ifdef ATH_SUPERG_COMP
-static void null_comp_set(struct ieee80211vap *vap, struct ieee80211_node *ni, 
-								int en) {}
+static void
+null_comp_set(struct ieee80211vap *vap, struct ieee80211_node *ni, 
+	int en)
+{
+}
 #endif
 
 /*
@@ -106,15 +110,13 @@ cipher_attach(struct ieee80211vap *vap, struct ieee80211_key *key)
  * Wrappers for driver key management methods.
  */
 static __inline int
-dev_key_alloc(struct ieee80211vap *vap,
-	const struct ieee80211_key *key)
+dev_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *key)
 {
 	return vap->iv_key_alloc(vap, key);
 }
 
 static __inline int
-dev_key_delete(struct ieee80211vap *vap,
-	const struct ieee80211_key *key,
+dev_key_delete(struct ieee80211vap *vap,	const struct ieee80211_key *key,
 	struct ieee80211_node *ni)
 {
 	return vap->iv_key_delete(vap, key, ni);
@@ -334,14 +336,14 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 		if ((vap->iv_caps & IEEE80211_C_TKIPMIC) == 0) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 				"%s: no h/w support for TKIP MIC, falling back to s/w\n",
-			 __func__);        
+				__func__);        
 			flags |= IEEE80211_KEY_SWMIC;
-        }
-		else if (((vap->iv_caps & IEEE80211_C_WME_TKIPMIC) == 0) &&
-				 (vap->iv_flags & IEEE80211_F_WME)) {
+        	} else if (((vap->iv_caps & IEEE80211_C_WME_TKIPMIC) == 0) &&
+		    (vap->iv_flags & IEEE80211_F_WME)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-			  "%s: no h/w support for TKIP MIC when WMM is turned on, falling back to s/w\n",
-			__func__);
+				"%s: no h/w support for TKIP MIC when WMM is turned on,"
+				" falling back to s/w\n",
+				__func__);
 			flags |= IEEE80211_KEY_SWMIC;            
 		}
 	}
@@ -355,7 +357,7 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 	if (key->wk_cipher != cip || key->wk_flags != flags) {
 again:
 		/*
-		 * Fillin the flags so cipher modules can see s/w
+		 * Fill in the flags so cipher modules can see s/w
 		 * crypto requirements and potentially allocate
 		 * different state and/or attach different method
 		 * pointers.
@@ -404,9 +406,9 @@ again:
 			if ((key->wk_flags & IEEE80211_KEY_SWCRYPT) == 0) {
 				vap->iv_stats.is_crypto_swfallback++;
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-				    "%s: no h/w resources for cipher %s, "
-				    "falling back to s/w\n", __func__,
-				    cip->ic_name);
+					"%s: no h/w resources for cipher %s, "
+					"falling back to s/w\n",
+					__func__, cip->ic_name);
 				oflags = key->wk_flags;
 				flags |= IEEE80211_KEY_SWCRYPT;
 				if (cipher == IEEE80211_CIPHER_TKIP)
@@ -415,8 +417,8 @@ again:
 			}
 			vap->iv_stats.is_crypto_keyfail++;
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-			    "%s: unable to setup cipher %s\n",
-			    __func__, cip->ic_name);
+				"%s: unable to setup cipher %s\n",
+				__func__, cip->ic_name);
 			return 0;
 		}
 	}
@@ -430,17 +432,17 @@ EXPORT_SYMBOL(ieee80211_crypto_newkey);
  */
 static int
 _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
-						struct ieee80211_node *ni)
+	struct ieee80211_node *ni)
 {
 	u_int16_t keyix;
 
 	KASSERT(key->wk_cipher != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-	    "%s: %s keyix %u flags 0x%x tsc %llu len %u\n",
-	    __func__, key->wk_cipher->ic_name,
-	    key->wk_keyix, key->wk_flags,
-	    key->wk_keytsc, key->wk_keylen);
+		"%s: %s keyix %u flags 0x%x tsc %llu len %u\n",
+		__func__, key->wk_cipher->ic_name,
+		key->wk_keyix, key->wk_flags,
+		key->wk_keytsc, key->wk_keylen);
 
 	keyix = key->wk_keyix;
 	if (keyix != IEEE80211_KEYIX_NONE) {
@@ -450,8 +452,8 @@ _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 		/* XXX key cache */
 		if (!dev_key_delete(vap, key, ni)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-			    "%s: driver did not delete key index %u\n",
-			    __func__, keyix);
+				"%s: driver did not delete key index %u\n",
+				__func__, keyix);
 			vap->iv_stats.is_crypto_delkey++;
 			/* XXX recovery? */
 		}
@@ -467,20 +469,18 @@ _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
  */
 int
 ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key, 
-						struct ieee80211_node *ni)
+	struct ieee80211_node *ni)
 {
 	int status;
 
 #ifdef ATH_SUPERG_COMP
 	/* if valid node entry is present cleanup the compression state */
-	if (ni) {
+	if (ni)
 		dev_comp_set(vap, ni, 0);
-	}
 #endif
 	ieee80211_key_update_begin(vap);
 	status = _ieee80211_crypto_delkey(vap, key, ni);
 	ieee80211_key_update_end(vap);
-
 
 	return status;
 }
@@ -510,8 +510,8 @@ EXPORT_SYMBOL(ieee80211_crypto_delglobalkeys);
  */
 int
 ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
-		const u_int8_t macaddr[IEEE80211_ADDR_LEN],
-		struct ieee80211_node *ni)
+	const u_int8_t macaddr[IEEE80211_ADDR_LEN],
+	struct ieee80211_node *ni)
 {
 	const struct ieee80211_cipher *cip = key->wk_cipher;
 	int ret;
@@ -519,10 +519,10 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	KASSERT(cip != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-	    "%s: %s keyix %u flags 0x%x mac %s  tsc %llu len %u\n",
-	    __func__, cip->ic_name, key->wk_keyix,
-	    key->wk_flags, ether_sprintf(macaddr),
-	    key->wk_keytsc, key->wk_keylen);
+		"%s: %s keyix %u flags 0x%x mac %s  tsc %llu len %u\n",
+		__func__, cip->ic_name, key->wk_keyix,
+		key->wk_flags, ether_sprintf(macaddr),
+		key->wk_keytsc, key->wk_keylen);
 
 	/*
 	 * Give cipher a chance to validate key contents.
@@ -530,16 +530,16 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	 */
 	if (!cip->ic_setkey(key)) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-		    "%s: cipher %s rejected key index %u len %u flags 0x%x\n",
-		    __func__, cip->ic_name, key->wk_keyix,
-		    key->wk_keylen, key->wk_flags);
+			"%s: cipher %s rejected key index %u len %u flags 0x%x\n",
+			__func__, cip->ic_name, key->wk_keyix,
+			key->wk_keylen, key->wk_flags);
 		vap->iv_stats.is_crypto_setkey_cipher++;
 		return 0;
 	}
 	if (key->wk_keyix == IEEE80211_KEYIX_NONE) {
 		/* XXX nothing allocated, should not happen */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-		    "%s: no key index; should not happen!\n", __func__);
+			"%s: no key index; should not happen!\n", __func__);
 		vap->iv_stats.is_crypto_setkey_nokey++;
 		return 0;
 	}
@@ -547,9 +547,8 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 #ifdef ATH_SUPERG_COMP
 	if (ret && ni) {
                /* Enable decompression only receive key entries */
-                if (key->wk_flags & IEEE80211_KEY_RECV) {
+                if (key->wk_flags & IEEE80211_KEY_RECV)
 			dev_comp_set(vap, ni, 1);
-                }
 	}
 #endif
 
@@ -580,9 +579,9 @@ ieee80211_crypto_encap(struct ieee80211_node *ni, struct sk_buff *skb)
 	    ni->ni_ucastkey.wk_cipher == &ieee80211_cipher_none) {
 		if (vap->iv_def_txkey == IEEE80211_KEYIX_NONE) {
 			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO,
-			    wh->i_addr1,
-			    "no default transmit key (%s) deftxkey %u",
-			    __func__, vap->iv_def_txkey);
+				wh->i_addr1,
+				"no default transmit key (%s) deftxkey %u",
+				__func__, vap->iv_def_txkey);
 			vap->iv_stats.is_tx_nodefkey++;
 			return NULL;
 		}
@@ -599,12 +598,12 @@ ieee80211_crypto_encap(struct ieee80211_node *ni, struct sk_buff *skb)
 		 * have allocated enough space for all headers.
 		 */
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr1,
-		    "%s: malformed packet for cipher %s; headroom %u",
-		    __func__, cip->ic_name, skb_headroom(skb));
+			"%s: malformed packet for cipher %s; headroom %u",
+			__func__, cip->ic_name, skb_headroom(skb));
 		vap->iv_stats.is_tx_noheadroom++;
 		return NULL;
 	}
-	return (cip->ic_encap(k, skb, keyid<<6) ? k : NULL);
+	return (cip->ic_encap(k, skb, keyid << 6) ? k : NULL);
 }
 EXPORT_SYMBOL(ieee80211_crypto_encap);
 

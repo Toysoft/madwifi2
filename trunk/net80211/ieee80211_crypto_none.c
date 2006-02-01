@@ -44,13 +44,13 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211_crypto_none.c,v 1.3 2004/12/31 22
 
 #include <net80211/ieee80211_var.h>
 
-static	void *none_attach(struct ieee80211vap *, struct ieee80211_key *);
-static	void none_detach(struct ieee80211_key *);
-static	int none_setkey(struct ieee80211_key *);
-static	int none_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t);
-static	int none_decap(struct ieee80211_key *, struct sk_buff *, int);
-static	int none_enmic(struct ieee80211_key *, struct sk_buff *, int);
-static	int none_demic(struct ieee80211_key *, struct sk_buff *, int);
+static void *none_attach(struct ieee80211vap *, struct ieee80211_key *);
+static void none_detach(struct ieee80211_key *);
+static int none_setkey(struct ieee80211_key *);
+static int none_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t);
+static int none_decap(struct ieee80211_key *, struct sk_buff *, int);
+static int none_enmic(struct ieee80211_key *, struct sk_buff *, int);
+static int none_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 const struct ieee80211_cipher ieee80211_cipher_none = {
 	.ic_name	= "NONE",
@@ -100,7 +100,7 @@ none_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 	 * happen, at least, when changing keys.
 	 */
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr1,
-	    "key id %u is not set (encap)", keyid>>6);
+		"key id %u is not set (encap)", keyid>>6);
 	vap->iv_stats.is_tx_badcipher++;
 	return 0;
 }
@@ -120,7 +120,7 @@ none_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 	 */
 	/* XXX useful to know dst too */
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
-	    "key id %u is not set (decap)", ivp[IEEE80211_WEP_IVLEN] >> 6);
+		"key id %u is not set (decap)", ivp[IEEE80211_WEP_IVLEN] >> 6);
 	vap->iv_stats.is_rx_badkeyid++;
 	return 0;
 }
