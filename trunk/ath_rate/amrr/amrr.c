@@ -76,15 +76,14 @@
 #define	DPRINTF(sc, _fmt, ...)
 #endif
 
-static	int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
-static	int ath_rate_max_success_threshold = 10;
-static	int ath_rate_min_success_threshold = 1;
+static int ath_rateinterval = 1000;		/* rate ctl interval (ms)  */
+static int ath_rate_max_success_threshold = 10;
+static int ath_rate_min_success_threshold = 1;
 
-static void	ath_ratectl(unsigned long);
-static void	ath_rate_update(struct ath_softc *, struct ieee80211_node *,
-			int rate);
-static void	ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
-static void	ath_rate_ctl(void *, struct ieee80211_node *);
+static void ath_ratectl(unsigned long);
+static void ath_rate_update(struct ath_softc *, struct ieee80211_node *, int);
+static void ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
+static void ath_rate_ctl(void *, struct ieee80211_node *);
 
 void
 ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
@@ -102,8 +101,8 @@ EXPORT_SYMBOL(ath_rate_node_cleanup);
 
 void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
-		  int shortPreamble, size_t frameLen,
-		  u_int8_t *rix, int *try0, u_int8_t *txrate)
+	int shortPreamble, size_t frameLen,
+	u_int8_t *rix, int *try0, u_int8_t *txrate)
 {
 	struct amrr_node *amn = ATH_NODE_AMRR(an);
 
@@ -197,9 +196,9 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
 	DPRINTF(sc, "%s: set xmit rate for %s to %dM\n",
-	    __func__, ether_sprintf(ni->ni_macaddr),
-	    ni->ni_rates.rs_nrates > 0 ?
-		(ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL) / 2 : 0);
+		__func__, ether_sprintf(ni->ni_macaddr),
+		ni->ni_rates.rs_nrates > 0 ?
+			(ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL) / 2 : 0);
 
 	ni->ni_txrate = rate;
 	/*
@@ -210,8 +209,8 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 	 * lowest hardware rate.
 	 */
 	if (ni->ni_rates.rs_nrates > 0) {
-		amn->amn_tx_rix0 = sc->sc_rixmap[
-					       ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
+		amn->amn_tx_rix0 =
+			sc->sc_rixmap[ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
 		amn->amn_tx_rate0 = rt->info[amn->amn_tx_rix0].rateCode;
 		amn->amn_tx_rate0sp = amn->amn_tx_rate0 |
 			rt->info[amn->amn_tx_rix0].shortPreamble;
@@ -221,8 +220,7 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 			amn->amn_tx_try2 = 1;
 			amn->amn_tx_try3 = 1;
 			if (--rate >= 0) {
-				rix = sc->sc_rixmap[
-						    ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
+				rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
 				amn->amn_tx_rate1 = rt->info[rix].rateCode;
 				amn->amn_tx_rate1sp = amn->amn_tx_rate1 |
 					rt->info[rix].shortPreamble;
@@ -230,8 +228,7 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 				amn->amn_tx_rate1 = amn->amn_tx_rate1sp = 0;
 			}
 			if (--rate >= 0) {
-				rix = sc->sc_rixmap[
-						    ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
+				rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
 				amn->amn_tx_rate2 = rt->info[rix].rateCode;
 				amn->amn_tx_rate2sp = amn->amn_tx_rate2 |
 					rt->info[rix].shortPreamble;
@@ -241,8 +238,8 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 			if (rate > 0) {
 				/* NB: only do this if we didn't already do it above */
 				amn->amn_tx_rate3 = rt->info[0].rateCode;
-				amn->amn_tx_rate3sp =
-					amn->amn_tx_rate3 | rt->info[0].shortPreamble;
+				amn->amn_tx_rate3sp = amn->amn_tx_rate3 |
+					rt->info[0].shortPreamble;
 			} else {
 				amn->amn_tx_rate3 = amn->amn_tx_rate3sp = 0;
 			}
@@ -259,7 +256,7 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 			amn->amn_tx_rate3 = amn->amn_tx_rate3sp = 0;
 		}
 	}
-	node_reset (amn);
+	node_reset(amn);
 }
 
 /*
@@ -286,8 +283,7 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 			 * closest rate.
 			 */
 			/* NB: the rate set is assumed sorted */
-			for (; srate >= 0 && RATE(srate) > 72; srate--)
-				;
+			for (; srate >= 0 && RATE(srate) > 72; srate--);
 			KASSERT(srate >= 0, ("bogus rate set"));
 		}
 	} else {
@@ -299,8 +295,7 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * rate set is checked when the station associates.
 		 */
 		srate = ni->ni_rates.rs_nrates - 1;
-		for (; srate >= 0 && RATE(srate) != vap->iv_fixed_rate; srate--)
-			;
+		for (; srate >= 0 && RATE(srate) != vap->iv_fixed_rate; srate--);
 		KASSERT(srate >= 0,
 			("fixed rate %d not in rate set", vap->iv_fixed_rate));
 	}
@@ -335,11 +330,10 @@ ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state state)
 		 * meaningful when operating in station mode.
 		 */
 		ni = vap->iv_bss;
-		if (state == IEEE80211_S_RUN) {
+		if (state == IEEE80211_S_RUN)
 			ath_rate_ctl_start(sc, ni);
-		} else {
+		else
 			ath_rate_update(sc, ni, 0);
-		}
 	} else {
 		/*
 		 * When operating as a station the node table holds
@@ -374,16 +368,11 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 	struct amrr_node *amn = ATH_NODE_AMRR(ATH_NODE (ni));
 	int old_rate;
 
-#define is_success(amn) \
-(amn->amn_tx_try1_cnt  < (amn->amn_tx_try0_cnt/10))
-#define is_enough(amn) \
-(amn->amn_tx_try0_cnt > 10)
-#define is_failure(amn) \
-(amn->amn_tx_try1_cnt > (amn->amn_tx_try0_cnt/3))
-#define is_max_rate(ni) \
-((ni->ni_txrate + 1) >= ni->ni_rates.rs_nrates)
-#define is_min_rate(ni) \
-(ni->ni_txrate == 0)
+#define is_success(amn) (amn->amn_tx_try1_cnt  < (amn->amn_tx_try0_cnt / 10))
+#define is_enough(amn)  (amn->amn_tx_try0_cnt > 10)
+#define is_failure(amn) (amn->amn_tx_try1_cnt > (amn->amn_tx_try0_cnt / 3))
+#define is_max_rate(ni) ((ni->ni_txrate + 1) >= ni->ni_rates.rs_nrates)
+#define is_min_rate(ni) (ni->ni_txrate == 0)
 
 	old_rate = ni->ni_txrate;
   
@@ -393,39 +382,38 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 		 amn->amn_tx_try2_cnt,
 		 amn->amn_tx_try3_cnt,
 		 amn->amn_success_threshold);
-  	if (is_success (amn) && is_enough (amn)) {
+  	if (is_success(amn) && is_enough(amn)) {
 		amn->amn_success++;
 		if (amn->amn_success == amn->amn_success_threshold &&
-  		    !is_max_rate (ni)) {
+  		    !is_max_rate(ni)) {
   			amn->amn_recovery = 1;
   			amn->amn_success = 0;
   			ni->ni_txrate++;
-			DPRINTF (sc, "increase rate to %d\n", ni->ni_txrate);
-  		} else {
+			DPRINTF(sc, "increase rate to %d\n", ni->ni_txrate);
+  		} else
 			amn->amn_recovery = 0;
-		}
-  	} else if (is_failure (amn)) {
+  	} else if (is_failure(amn)) {
   		amn->amn_success = 0;
-  		if (!is_min_rate (ni)) {
+  		if (!is_min_rate(ni)) {
   			if (amn->amn_recovery) {
   				/* recovery failure. */
   				amn->amn_success_threshold *= 2;
-  				amn->amn_success_threshold = min (amn->amn_success_threshold,
+  				amn->amn_success_threshold = min(amn->amn_success_threshold,
 								  (u_int)ath_rate_max_success_threshold);
- 				DPRINTF (sc, "decrease rate recovery thr: %d\n", amn->amn_success_threshold);
+ 				DPRINTF(sc, "decrease rate recovery thr: %d\n",
+					amn->amn_success_threshold);
   			} else {
   				/* simple failure. */
  				amn->amn_success_threshold = ath_rate_min_success_threshold;
- 				DPRINTF (sc, "decrease rate normal thr: %d\n", amn->amn_success_threshold);
+ 				DPRINTF(sc, "decrease rate normal thr: %d\n",
+					amn->amn_success_threshold);
   			}
 			amn->amn_recovery = 0;
   			ni->ni_txrate--;
-   		} else {
+   		} else
 			amn->amn_recovery = 0;
-		}
-
    	}
-	if (is_enough (amn) || old_rate != ni->ni_txrate) {
+	if (is_enough(amn) || old_rate != ni->ni_txrate) {
 		/* reset counters. */
 		amn->amn_tx_try0_cnt = 0;
 		amn->amn_tx_try1_cnt = 0;
@@ -433,9 +421,8 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 		amn->amn_tx_try3_cnt = 0;
 		amn->amn_tx_failure_cnt = 0;
 	}
-	if (old_rate != ni->ni_txrate) {
+	if (old_rate != ni->ni_txrate)
 		ath_rate_update(sc, ni, ni->ni_txrate);
-	}
 }
 
 static void
@@ -443,7 +430,7 @@ ath_ratectl(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct ath_softc *sc = dev->priv;
-	struct amrr_softc *asc = (struct amrr_softc *) sc->sc_rc;
+	struct amrr_softc *asc = (struct amrr_softc *)sc->sc_rc;
 	struct ieee80211com *ic = &sc->sc_ic;
 	int interval;
 
@@ -455,9 +442,8 @@ ath_ratectl(unsigned long data)
 			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
 				ath_rate_ctl(sc, tmpvap->iv_bss);	/* NB: no reference */
 			}
-		} else {
+		} else
 			ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_ctl, sc);
-		}
 	}
 	interval = ath_rateinterval;
 	if (ic->ic_opmode == IEEE80211_M_STA)
@@ -493,9 +479,9 @@ ath_rate_detach(struct ath_ratectrl *arc)
 }
 EXPORT_SYMBOL(ath_rate_detach);
 
-static	int minrateinterval = 500;		/* 500ms */
-static	int maxint = 0x7fffffff;		/* 32-bit big */
-static  int min_threshold = 1;
+static int minrateinterval = 500;	/* 500ms */
+static int maxint = 0x7fffffff;		/* 32-bit big */
+static int min_threshold = 1;
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
