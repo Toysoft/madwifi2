@@ -50,14 +50,14 @@ __FBSDID("$FreeBSD$");
 #include <net80211/ieee80211_var.h>
 
 struct ap_state {
-	int	as_maxrssi[IEEE80211_CHAN_MAX];
-	struct IEEE80211_TQ_STRUCT	as_actiontq;	/* tasklet for "action" */
+	int as_maxrssi[IEEE80211_CHAN_MAX];
+	struct IEEE80211_TQ_STRUCT as_actiontq;	/* tasklet for "action" */
 	struct ieee80211_scan_entry as_selbss;	/* selected bss for action tasklet */
 	int (*as_action)(struct ieee80211vap *, const struct ieee80211_scan_entry *);
 };
 
 static int ap_flush(struct ieee80211_scan_state *);
-static void action_tasklet(IEEE80211_TQUEUE_ARG data);
+static void action_tasklet(IEEE80211_TQUEUE_ARG);
 
 /*
  * Attach prior to any scanning work.
@@ -247,10 +247,8 @@ ap_cancel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
  * Record max rssi on channel.
  */
 static int
-ap_add(struct ieee80211_scan_state *ss,
-	const struct ieee80211_scanparams *sp,
-	const struct ieee80211_frame *wh,
-	int subtype, int rssi, int rstamp)
+ap_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
+	const struct ieee80211_frame *wh, int subtype, int rssi, int rstamp)
 {
 	struct ap_state *as = ss->ss_priv;
 	struct ieee80211vap *vap = ss->ss_vap;
@@ -312,9 +310,9 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 		chan = ieee80211_chan2ieee(ic, ss->ss_chans[i]);
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-		    "%s: channel %u rssi %d bestchan %d bestchan rssi %d\n",
-		    __func__, chan, as->as_maxrssi[chan],
-		    bestchan, bestchan != -1 ? as->as_maxrssi[bestchan] : 0);
+			"%s: channel %u rssi %d bestchan %d bestchan rssi %d\n",
+			__func__, chan, as->as_maxrssi[chan],
+			bestchan, bestchan != -1 ? as->as_maxrssi[bestchan] : 0);
 
 		if (as->as_maxrssi[chan] == 0) {
 			bestchan = chan;
@@ -329,7 +327,7 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 	if (bestchan == -1) {
 		/* no suitable channel, should not happen */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-		    "%s: no suitable channel! (should not happen)\n", __func__);
+			"%s: no suitable channel! (should not happen)\n", __func__);
 		/* XXX print something? */
 		return 0;			/* restart scan */
 	} else {
@@ -396,7 +394,7 @@ ap_assoc_fail(struct ieee80211_scan_state *ss,
  */
 static int
 ap_default_action(struct ieee80211vap *vap,
-		  const struct ieee80211_scan_entry *se)
+	const struct ieee80211_scan_entry *se)
 {
 	ieee80211_create_ibss(vap, se->se_chan);
 	return 1;
@@ -415,7 +413,6 @@ action_tasklet(IEEE80211_TQUEUE_ARG data)
 /*
  * Module glue.
  */
-
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless support: default ap scanner");
 #ifdef MODULE_LICENSE

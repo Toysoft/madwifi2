@@ -67,7 +67,7 @@ enum {
 struct acl {
 	TAILQ_ENTRY(acl)	acl_list;
 	LIST_ENTRY(acl)		acl_hash;
-	u_int8_t		acl_macaddr[IEEE80211_ADDR_LEN];
+	u_int8_t			acl_macaddr[IEEE80211_ADDR_LEN];
 };
 struct aclstate {
 	acl_lock_t		as_lock;
@@ -82,7 +82,7 @@ struct aclstate {
 
 MALLOC_DEFINE(M_80211_ACL, "acl", "802.11 station acl");
 
-static	void acl_free_all_locked(struct aclstate *);
+static void acl_free_all_locked(struct aclstate *);
 
 static int
 acl_attach(struct ieee80211vap *vap)
@@ -229,7 +229,6 @@ acl_free_all_locked(struct aclstate *as)
 static int
 acl_free_all(struct ieee80211vap *vap)
 {
-
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_ACL, "ACL: %s\n", "free all");
 
 	acl_free_all_locked(vap->iv_as);

@@ -88,8 +88,8 @@ EXPORT_SYMBOL(ieee80211_wme_acnames);
 
 static int ieee80211_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 static void ieee80211_tx_timeout(unsigned long);
-static void ieee80211_start_xrvap(unsigned long data);
-void	ieee80211_auth_setup(void);
+static void ieee80211_start_xrvap(unsigned long);
+void ieee80211_auth_setup(void);
 
 void
 ieee80211_proto_attach(struct ieee80211com *ic)
@@ -115,7 +115,6 @@ ieee80211_proto_detach(struct ieee80211com *ic)
 void
 ieee80211_proto_vattach(struct ieee80211vap *vap)
 {
-
 #ifdef notdef
 	vap->iv_rtsthreshold = IEEE80211_RTS_DEFAULT;
 #else
@@ -136,7 +135,6 @@ ieee80211_proto_vattach(struct ieee80211vap *vap)
 void
 ieee80211_proto_vdetach(struct ieee80211vap *vap)
 {
-
 	/*
 	 * This should not be needed as we detach when reseting
 	 * the state but be conservative here since the
@@ -255,7 +253,7 @@ EXPORT_SYMBOL(ieee80211_authenticator_backend_get);
  * Very simple-minded ACL module support.
  */
 /* XXX just one for now */
-static	const struct ieee80211_aclator *acl = NULL;
+static const struct ieee80211_aclator *acl = NULL;
 
 void
 ieee80211_aclator_register(const struct ieee80211_aclator *iac)
@@ -346,8 +344,8 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 		break;
 	case IEEE80211_FC0_TYPE_MGT:
 		printf(" %s", ieee80211_mgt_subtype_name[
-		    (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK)
-		    >> IEEE80211_FC0_SUBTYPE_SHIFT]);
+			(wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK)
+			>> IEEE80211_FC0_SUBTYPE_SHIFT]);
 		break;
 	default:
 		printf(" type#%d", wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
@@ -377,9 +375,9 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 	printf("\n");
 	if (len > 0) {
 		for (i = 0; i < len; i++) {
-			if ((i%8) == 0)
+			if ((i % 8) == 0)
 				printf(" ");
-			if ((i%16) == 0)
+			if ((i % 16) == 0)
 				printf("\n");
 			printf("%02x ", buf[i]);
 		}
@@ -652,62 +650,62 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 	paramType *pPhyParam, *pBssPhyParam;
 
 	static struct phyParamType phyParamForAC_BE[IEEE80211_MODE_MAX] = {
-	/* IEEE80211_MODE_AUTO  */ {          3,                4,                6,                  0,              0 },    
-	/* IEEE80211_MODE_11A   */ {          3,                4,                6,                  0,              0 },
-	/* IEEE80211_MODE_11B   */ {          3,                5,                7,                  0,              0 },
-	/* IEEE80211_MODE_11G   */ {          3,                4,                6,                  0,              0 },
-	/* IEEE80211_MODE_FH    */ {          3,                5,                7,                  0,              0 },
-	/* IEEE80211_MODE_TURBO */ {          2,                3,                5,                  0,              0 },
-	/* IEEE80211_MODE_TURBO */ {          2,                3,                5,                  0,              0 }};
+	/* IEEE80211_MODE_AUTO  */ { 3, 4,  6,   0, 0 },    
+	/* IEEE80211_MODE_11A   */ { 3, 4,  6,   0, 0 },
+	/* IEEE80211_MODE_11B   */ { 3, 5,  7,   0, 0 },
+	/* IEEE80211_MODE_11G   */ { 3, 4,  6,   0, 0 },
+	/* IEEE80211_MODE_FH    */ { 3, 5,  7,   0, 0 },
+	/* IEEE80211_MODE_TURBO */ { 2, 3,  5,   0, 0 },
+	/* IEEE80211_MODE_TURBO */ { 2, 3,  5,   0, 0 }};
 	static struct phyParamType phyParamForAC_BK[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ {          7,                4,               10,                 0,              0 },
-        /* IEEE80211_MODE_11A   */ {          7,                4,               10,                 0,              0 },
-        /* IEEE80211_MODE_11B   */ {          7,                5,               10,                 0,              0 },
-        /* IEEE80211_MODE_11G   */ {          7,                4,               10,                 0,              0 },
-	/* IEEE80211_MODE_FH    */ {          7,                5,               10,                 0,              0 },
-	/* IEEE80211_MODE_TURBO */ {          7,                3,               10,                 0,              0 },
-	/* IEEE80211_MODE_TURBO */ {          7,                3,               10,                 0,              0 }};
+        /* IEEE80211_MODE_AUTO  */ { 7, 4, 10,   0, 0 },
+        /* IEEE80211_MODE_11A   */ { 7, 4, 10,   0, 0 },
+        /* IEEE80211_MODE_11B   */ { 7, 5, 10,   0, 0 },
+        /* IEEE80211_MODE_11G   */ { 7, 4, 10,   0, 0 },
+	/* IEEE80211_MODE_FH    */ { 7, 5, 10,   0, 0 },
+	/* IEEE80211_MODE_TURBO */ { 7, 3, 10,   0, 0 },
+	/* IEEE80211_MODE_TURBO */ { 7, 3, 10,   0, 0 }};
 	static struct phyParamType phyParamForAC_VI[IEEE80211_MODE_MAX] = {
-	/* IEEE80211_MODE_AUTO  */ {          1,                3,               4,                  94,              0 },
-	/* IEEE80211_MODE_11A   */ {          1,                3,               4,                  94,              0 },
-	/* IEEE80211_MODE_11B   */ {          1,                4,               5,                 188,              0 },
-	/* IEEE80211_MODE_11G   */ {          1,                3,               4,                  94,              0 },
-	/* IEEE80211_MODE_FH    */ {          1,                4,               5,                 188,              0 },
-	/* IEEE80211_MODE_TURBO */ {          1,                2,               3,                  94,              0 },
-	/* IEEE80211_MODE_TURBO */ {          1,                2,               3,                  94,              0 }};
+	/* IEEE80211_MODE_AUTO  */ { 1, 3,  4,  94, 0 },
+	/* IEEE80211_MODE_11A   */ { 1, 3,  4,  94, 0 },
+	/* IEEE80211_MODE_11B   */ { 1, 4,  5, 188, 0 },
+	/* IEEE80211_MODE_11G   */ { 1, 3,  4,  94, 0 },
+	/* IEEE80211_MODE_FH    */ { 1, 4,  5, 188, 0 },
+	/* IEEE80211_MODE_TURBO */ { 1, 2,  3,  94, 0 },
+	/* IEEE80211_MODE_TURBO */ { 1, 2,  3,  94, 0 }};
 	static struct phyParamType phyParamForAC_VO[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ {          1,                2,               3,                  47,              0 },
-	/* IEEE80211_MODE_11A   */ {          1,                2,               3,                  47,              0 },
-        /* IEEE80211_MODE_11B   */ {          1,                3,               4,                 102,              0 },
-        /* IEEE80211_MODE_11G   */ {          1,                2,               3,                  47,              0 },
-	/* IEEE80211_MODE_FH    */ {          1,                3,               4,                 102,              0 },
-        /* IEEE80211_MODE_TURBO */ {          1,                2,               2,                  47,              0 },
-        /* IEEE80211_MODE_TURBO */ {          1,                2,               2,                  47,              0 }};
+        /* IEEE80211_MODE_AUTO  */ { 1, 2,  3,  47, 0 },
+	/* IEEE80211_MODE_11A   */ { 1, 2,  3,  47, 0 },
+        /* IEEE80211_MODE_11B   */ { 1, 3,  4, 102, 0 },
+        /* IEEE80211_MODE_11G   */ { 1, 2,  3,  47, 0 },
+	/* IEEE80211_MODE_FH    */ { 1, 3,  4, 102, 0 },
+        /* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 },
+        /* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 }};
 
 	static struct phyParamType bssPhyParamForAC_BE[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ {          3,                4,              10,                  0,              0 },
-        /* IEEE80211_MODE_11A   */ {          3,                4,              10,                  0,              0 },
-        /* IEEE80211_MODE_11B   */ {          3,                5,              10,                  0,              0 },
-        /* IEEE80211_MODE_11G   */ {          3,                4,              10,                  0,              0 },
-        /* IEEE80211_MODE_FH    */ {          3,                5,              10,                  0,              0 },
-        /* IEEE80211_MODE_TURBO */ {          2,                3,              10,                  0,              0 },
-        /* IEEE80211_MODE_TURBO */ {          2,                3,              10,                  0,              0 }};
+        /* IEEE80211_MODE_AUTO  */ { 3, 4, 10,   0, 0 },
+        /* IEEE80211_MODE_11A   */ { 3, 4, 10,   0, 0 },
+        /* IEEE80211_MODE_11B   */ { 3, 5, 10,   0, 0 },
+        /* IEEE80211_MODE_11G   */ { 3, 4, 10,   0, 0 },
+        /* IEEE80211_MODE_FH    */ { 3, 5, 10,   0, 0 },
+        /* IEEE80211_MODE_TURBO */ { 2, 3, 10,   0, 0 },
+        /* IEEE80211_MODE_TURBO */ { 2, 3, 10,   0, 0 }};
 	static struct phyParamType bssPhyParamForAC_VI[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ {          2,                3,               4,                  94,              0 },
-        /* IEEE80211_MODE_11A   */ {          2,                3,               4,                  94,              0 },
-        /* IEEE80211_MODE_11B   */ {          2,                4,               5,                 188,              0 },
-        /* IEEE80211_MODE_11G   */ {          2,                3,               4,                  94,              0 },
-        /* IEEE80211_MODE_FH    */ {          2,                4,               5,                 188,              0 },
-        /* IEEE80211_MODE_TURBO */ {          2,                2,               3,                  94,              0 },
-        /* IEEE80211_MODE_TURBO */ {          2,                2,               3,                  94,              0 }};
+        /* IEEE80211_MODE_AUTO  */ { 2, 3,  4,  94, 0 },
+        /* IEEE80211_MODE_11A   */ { 2, 3,  4,  94, 0 },
+        /* IEEE80211_MODE_11B   */ { 2, 4,  5, 188, 0 },
+        /* IEEE80211_MODE_11G   */ { 2, 3,  4,  94, 0 },
+        /* IEEE80211_MODE_FH    */ { 2, 4,  5, 188, 0 },
+        /* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 },
+        /* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 }};
 	static struct phyParamType bssPhyParamForAC_VO[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ {          2,                2,               3,                  47,              0 },    
-        /* IEEE80211_MODE_11A   */ {          2,                2,               3,                  47,              0 },
-        /* IEEE80211_MODE_11B   */ {          2,                3,               4,                 102,              0 },
-        /* IEEE80211_MODE_11G   */ {          2,                2,               3,                  47,              0 },
-        /* IEEE80211_MODE_FH    */ {          2,                3,               4,                 102,              0 },
-	/* IEEE80211_MODE_TURBO */ {          1,                2,               2,                  47,              0 },
-	/* IEEE80211_MODE_TURBO */ {          1,                2,               2,                  47,              0 }};
+        /* IEEE80211_MODE_AUTO  */ { 2, 2,  3,  47, 0 },    
+        /* IEEE80211_MODE_11A   */ { 2, 2,  3,  47, 0 },
+        /* IEEE80211_MODE_11B   */ { 2, 3,  4, 102, 0 },
+        /* IEEE80211_MODE_11G   */ { 2, 2,  3,  47, 0 },
+        /* IEEE80211_MODE_FH    */ { 2, 3,  4, 102, 0 },
+	/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 },
+	/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 }};
 
 	int i;
 
@@ -747,24 +745,38 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 		}
 	
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_acm = pPhyParam->acm;
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_aifsn = pPhyParam->aifsn;	
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmin = pPhyParam->logcwmin;	
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmax = pPhyParam->logcwmax;		
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_txopLimit = pPhyParam->txopLimit;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_acm =
+				pPhyParam->acm;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_aifsn =
+				pPhyParam->aifsn;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmin =
+				pPhyParam->logcwmin;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmax =
+				pPhyParam->logcwmax;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_txopLimit =
+				pPhyParam->txopLimit;
 		} else {
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_acm = pBssPhyParam->acm;
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_aifsn = pBssPhyParam->aifsn;	
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmin = pBssPhyParam->logcwmin;	
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmax = pBssPhyParam->logcwmax;		
-			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_txopLimit = pBssPhyParam->txopLimit;
-
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_acm =
+				pBssPhyParam->acm;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_aifsn =
+				pBssPhyParam->aifsn;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmin =
+				pBssPhyParam->logcwmin;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmax =
+				pBssPhyParam->logcwmax;
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_txopLimit =
+				pBssPhyParam->txopLimit;
 		}	
-		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_acm = pBssPhyParam->acm;
-		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_aifsn = pBssPhyParam->aifsn;	
-		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmin = pBssPhyParam->logcwmin;	
-		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmax = pBssPhyParam->logcwmax;		
-		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_txopLimit = pBssPhyParam->txopLimit;
+		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_acm =
+			pBssPhyParam->acm;
+		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_aifsn =
+			pBssPhyParam->aifsn;
+		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmin =
+			pBssPhyParam->logcwmin;
+		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmax =
+			pBssPhyParam->logcwmax;
+		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_txopLimit =
+			pBssPhyParam->txopLimit;
 	}
 	/* NB: check ic_bss to avoid NULL deref on initial attach */
 	if (vap->iv_bss != NULL) {
@@ -786,12 +798,12 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 {
 	static const struct { u_int8_t aifsn; u_int8_t logcwmin; u_int8_t logcwmax; u_int16_t txopLimit;}
 	phyParam[IEEE80211_MODE_MAX] = {
-          /* IEEE80211_MODE_AUTO  */ {          2,                4,               10, 			64 },	
-          /* IEEE80211_MODE_11A   */ {          2,                4,               10, 			64 },
-          /* IEEE80211_MODE_11B   */ {          2,                5,               10, 			64 },
-          /* IEEE80211_MODE_11G   */ {          2,                4,               10,			64 },
-          /* IEEE80211_MODE_FH    */ {          2,                5,               10,			64 },
-          /* IEEE80211_MODE_TURBO */ {          1,                3,               10,			64 }};
+          /* IEEE80211_MODE_AUTO  */ { 2, 4, 10, 64 },	
+          /* IEEE80211_MODE_11A   */ { 2, 4, 10, 64 },
+          /* IEEE80211_MODE_11B   */ { 2, 5, 10, 64 },
+          /* IEEE80211_MODE_11G   */ { 2, 4, 10, 64 },
+          /* IEEE80211_MODE_FH    */ { 2, 5, 10, 64 },
+          /* IEEE80211_MODE_TURBO */ { 1, 3, 10, 64 }};
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_wme_state *wme = &ic->ic_wme;
 	enum ieee80211_phymode mode;
@@ -800,22 +812,22 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
        	/* set up the channel access parameters for the physical device */
 
 	for (i = 0; i < WME_NUM_AC; i++) {
-		wme->wme_chanParams.cap_wmeParams[i].wmep_aifsn 
-				= wme->wme_wmeChanParams.cap_wmeParams[i].wmep_aifsn;
-		wme->wme_chanParams.cap_wmeParams[i].wmep_logcwmin 
-				= wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmin;
-		wme->wme_chanParams.cap_wmeParams[i].wmep_logcwmax 
-				= wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmax;
-		wme->wme_chanParams.cap_wmeParams[i].wmep_txopLimit 
-				= wme->wme_wmeChanParams.cap_wmeParams[i].wmep_txopLimit;
-		wme->wme_bssChanParams.cap_wmeParams[i].wmep_aifsn 
-				= wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_aifsn;
-		wme->wme_bssChanParams.cap_wmeParams[i].wmep_logcwmin 
-				= wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmin;
-		wme->wme_bssChanParams.cap_wmeParams[i].wmep_logcwmax 
-				= wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmax;
-		wme->wme_bssChanParams.cap_wmeParams[i].wmep_txopLimit 
-				= wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_txopLimit;
+		wme->wme_chanParams.cap_wmeParams[i].wmep_aifsn =
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_aifsn;
+		wme->wme_chanParams.cap_wmeParams[i].wmep_logcwmin =
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmin;
+		wme->wme_chanParams.cap_wmeParams[i].wmep_logcwmax =
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_logcwmax;
+		wme->wme_chanParams.cap_wmeParams[i].wmep_txopLimit =
+			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_txopLimit;
+		wme->wme_bssChanParams.cap_wmeParams[i].wmep_aifsn =
+			wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_aifsn;
+		wme->wme_bssChanParams.cap_wmeParams[i].wmep_logcwmin =
+			wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmin;
+		wme->wme_bssChanParams.cap_wmeParams[i].wmep_logcwmax =
+			wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_logcwmax;
+		wme->wme_bssChanParams.cap_wmeParams[i].wmep_txopLimit =
+			wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_txopLimit;
 	}
 
 	/*
@@ -834,24 +846,30 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 	     (vap->iv_bss->ni_flags & IEEE80211_NODE_QOS) == 0) ||
 	    (vap->iv_flags & IEEE80211_F_WME) == 0) {
 		struct ieee80211vap *tmpvap;
-		u_int8_t burstEnabled=0;
+		u_int8_t burstEnabled = 0;
 		/* check if bursting  enabled on at least one vap */
 		TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
-			if(tmpvap->iv_ath_cap & IEEE80211_ATHC_BURST) {
-				burstEnabled=1;
+			if (tmpvap->iv_ath_cap & IEEE80211_ATHC_BURST) {
+				burstEnabled = 1;
 				break;
 			}
 		}
-		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_aifsn = phyParam[mode].aifsn;
-		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin = phyParam[mode].logcwmin;
-		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmax = phyParam[mode].logcwmax;		
-		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_txopLimit 
-				= burstEnabled ? phyParam[mode].txopLimit : 0;
-		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_aifsn = phyParam[mode].aifsn;
-		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin = phyParam[mode].logcwmin;
-		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmax = phyParam[mode].logcwmax;
-		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_txopLimit 
-				= burstEnabled ? phyParam[mode].txopLimit : 0;		
+		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_aifsn =
+			phyParam[mode].aifsn;
+		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin =
+			phyParam[mode].logcwmin;
+		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmax =
+			phyParam[mode].logcwmax;		
+		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_txopLimit =
+			burstEnabled ? phyParam[mode].txopLimit : 0;
+		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_aifsn =
+			phyParam[mode].aifsn;
+		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin =
+			phyParam[mode].logcwmin;
+		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmax =
+			phyParam[mode].logcwmax;
+		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_txopLimit =
+			burstEnabled ? phyParam[mode].txopLimit : 0;		
 	}
 	
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
@@ -866,9 +884,9 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 			/* IEEE80211_MODE_TURBO_G */ 3
 		};
 
-		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin 
-			= wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin 
-			= logCwMin[mode];
+		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin =
+			wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin =
+			logCwMin[mode];
 	}
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {	/* XXX ibss? */
 		/*
@@ -876,7 +894,7 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 		 * set number so associated stations load the new values.
 		 */
 		wme->wme_bssChanParams.cap_info_count =
-			(wme->wme_bssChanParams.cap_info_count+1) & WME_QOSINFO_COUNT;
+			(wme->wme_bssChanParams.cap_info_count + 1) & WME_QOSINFO_COUNT;
 		vap->iv_flags |= IEEE80211_F_WMEUPDATE;
 	}
 
@@ -1021,7 +1039,7 @@ ieee80211_stop(struct net_device *dev)
 	/*
 	 * also stop the XR vap. 
 	 */
-	if(vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR)) {
+	if (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR)) {
 		ieee80211_stop(vap->iv_xrvap->iv_dev);
 		del_timer(&vap->iv_xrvapstart);
 		vap->iv_xrvap->iv_dev->flags = dev->flags;
@@ -1066,16 +1084,16 @@ ieee80211_dturbo_switch(struct ieee80211com *ic, int newflags)
 	chan = ieee80211_find_channel(ic, ic->ic_bsschan->ic_freq, newflags);
 	if (chan == NULL) {		/* XXX should not happen */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
-		    "%s: no channel with freq %u flags 0x%x\n",
-		    __func__, ic->ic_bsschan->ic_freq, newflags);
+			"%s: no channel with freq %u flags 0x%x\n",
+			__func__, ic->ic_bsschan->ic_freq, newflags);
 		return;
 	}
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
-	    "%s: %s -> %s (freq %u flags 0x%x)\n", __func__,
-	    ieee80211_phymode_name[ieee80211_chan2mode(ic->ic_bsschan)],
-	    ieee80211_phymode_name[ieee80211_chan2mode(chan)],
-	    chan->ic_freq, chan->ic_flags);
+		"%s: %s -> %s (freq %u flags 0x%x)\n", __func__,
+		ieee80211_phymode_name[ieee80211_chan2mode(ic->ic_bsschan)],
+		ieee80211_phymode_name[ieee80211_chan2mode(chan)],
+		chan->ic_freq, chan->ic_flags);
 
 	ic->ic_bsschan = chan;
 	ic->ic_prevchan = ic->ic_curchan;
@@ -1118,7 +1136,7 @@ ieee80211_beacon_miss(struct ieee80211com *ic)
 			 */
 			if (IEEE80211_ATH_CAP(vap, vap->iv_bss, IEEE80211_ATHC_TURBOP))
 				ieee80211_dturbo_switch(ic,
-				    ic->ic_bsschan->ic_flags ^ IEEE80211_CHAN_TURBO);
+					ic->ic_bsschan->ic_flags ^ IEEE80211_CHAN_TURBO);
 #endif /* ATH_SUPERG_DYNTURBO */
 			/*
 			 * Try to reassociate before scanning for a new ap.
@@ -1158,9 +1176,9 @@ ieee80211_tx_timeout(unsigned long arg)
 	struct ieee80211vap *vap = (struct ieee80211vap *) arg;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
-	    "%s: state %s%s\n", __func__,
-	    ieee80211_state_name[vap->iv_state],
-	    vap->iv_ic->ic_flags & IEEE80211_F_SCAN ? ", scan active" : "");
+		"%s: state %s%s\n", __func__,
+		ieee80211_state_name[vap->iv_state],
+		vap->iv_ic->ic_flags & IEEE80211_F_SCAN ? ", scan active" : "");
 
 	if (vap->iv_state != IEEE80211_S_INIT &&
 	    (vap->iv_ic->ic_flags & IEEE80211_F_SCAN) == 0) {
@@ -1232,8 +1250,8 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			switch (vap->iv_opmode) {
 			case IEEE80211_M_STA:
 				IEEE80211_SEND_MGMT(ni,
-				    IEEE80211_FC0_SUBTYPE_DISASSOC,
-				    IEEE80211_REASON_ASSOC_LEAVE);
+					IEEE80211_FC0_SUBTYPE_DISASSOC,
+					IEEE80211_REASON_ASSOC_LEAVE);
 				ieee80211_sta_leave(ni);
 				break;
 			case IEEE80211_M_HOSTAP:
@@ -1248,8 +1266,8 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			switch (vap->iv_opmode) {
 			case IEEE80211_M_STA:
 				IEEE80211_SEND_MGMT(ni,
-				    IEEE80211_FC0_SUBTYPE_DEAUTH,
-				    IEEE80211_REASON_AUTH_LEAVE);
+					IEEE80211_FC0_SUBTYPE_DEAUTH,
+					IEEE80211_REASON_AUTH_LEAVE);
 				break;
 			case IEEE80211_M_HOSTAP:
 				ieee80211_iterate_nodes(&ic->ic_sta,
@@ -1350,11 +1368,11 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			case IEEE80211_FC0_SUBTYPE_AUTH:
 				/* ??? */
 				IEEE80211_SEND_MGMT(ni,
-				    IEEE80211_FC0_SUBTYPE_AUTH, 2);
+					IEEE80211_FC0_SUBTYPE_AUTH, 2);
 				break;
 			case IEEE80211_FC0_SUBTYPE_DEAUTH:
 				IEEE80211_SEND_MGMT(ni,
-				    IEEE80211_FC0_SUBTYPE_AUTH, 1);
+					IEEE80211_FC0_SUBTYPE_AUTH, 1);
 				break;
 			}
 			break;
@@ -1362,7 +1380,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			switch (arg) {
 			case IEEE80211_FC0_SUBTYPE_AUTH:
 				IEEE80211_SEND_MGMT(ni,
-				    IEEE80211_FC0_SUBTYPE_AUTH, 2);
+					IEEE80211_FC0_SUBTYPE_AUTH, 2);
 				vap->iv_state = ostate;	/* stay RUN */
 				break;
 			case IEEE80211_FC0_SUBTYPE_DEAUTH:
@@ -1370,7 +1388,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				if (ic->ic_roaming == IEEE80211_ROAMING_AUTO) {
 					/* try to reauth */
 					IEEE80211_SEND_MGMT(ni,
-					    IEEE80211_FC0_SUBTYPE_AUTH, 1);
+						IEEE80211_FC0_SUBTYPE_AUTH, 1);
 				}
 				break;
 			}
@@ -1390,15 +1408,15 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_ASSOC:
 			IEEE80211_SEND_MGMT(ni,
-			    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 0);
+				IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 0);
 			break;
 		case IEEE80211_S_RUN:
 			ieee80211_sta_leave(ni);
 			if (ic->ic_roaming == IEEE80211_ROAMING_AUTO) {
 				/* NB: caller specifies ASSOC/REASSOC by arg */
 				IEEE80211_SEND_MGMT(ni, arg ?
-				    IEEE80211_FC0_SUBTYPE_REASSOC_REQ :
-				    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 0);
+					IEEE80211_FC0_SUBTYPE_REASSOC_REQ :
+					IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 0);
 			}
 			break;
 		}
@@ -1431,15 +1449,15 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		case IEEE80211_S_ASSOC:		/* infra mode */
 			KASSERT(ni->ni_txrate < ni->ni_rates.rs_nrates,
 				("%s: bogus xmit rate %u setup\n", __func__,
-					ni->ni_txrate));
+				ni->ni_txrate));
 #ifdef IEEE80211_DEBUG
 			if (ieee80211_msg_debug(vap)) {
 				ieee80211_note(vap, "%s with %s ssid ",
-				    (vap->iv_opmode == IEEE80211_M_STA ?
-				    "associated" : "synchronized "),
-				    ether_sprintf(ni->ni_bssid));
+					(vap->iv_opmode == IEEE80211_M_STA ?
+					"associated" : "synchronized "),
+					ether_sprintf(ni->ni_bssid));
 				ieee80211_print_essid(vap->iv_bss->ni_essid,
-				    ni->ni_esslen);
+					ni->ni_esslen);
 				printf(" channel %d start %uMb\n",
 					ieee80211_chan2ieee(ic, ic->ic_curchan),
 					IEEE80211_RATE2MBS(ni->ni_rates.rs_rates[ni->ni_txrate]));
@@ -1477,9 +1495,8 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		    vap->iv_auth->ia_attach != NULL) {
 			/* XXX check failure */
 			vap->iv_auth->ia_attach(vap);
-		} else if (vap->iv_auth->ia_detach != NULL) {
+		} else if (vap->iv_auth->ia_detach != NULL)
 			vap->iv_auth->ia_detach(vap);
-		}
 		/*
 		 * When 802.1x is not in use mark the port authorized
 		 * at this point so traffic can flow.
@@ -1490,8 +1507,9 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		/*
 		 * fire a timer to bring up XR vap if configured.
 		 */
-		if(ostate != IEEE80211_S_RUN	&& vap->iv_xrvap 
-		   && !(vap->iv_flags & IEEE80211_F_XR)) {
+		if (ostate != IEEE80211_S_RUN &&
+		    vap->iv_xrvap &&
+		    !(vap->iv_flags & IEEE80211_F_XR)) {
 			vap->iv_xrvapstart.function = ieee80211_start_xrvap;
 			vap->iv_xrvapstart.data = (unsigned long) vap->iv_xrvap;
 			mod_timer(&vap->iv_xrvapstart,jiffies+HZ); /* start xr vap on next second */
@@ -1502,18 +1520,16 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			 * have the bssid initialized and the XR vap will use the
 			 * invalid bssid in XRIE of its beacon.
 			 */
-			if(vap->iv_xrvap->iv_flags_ext & IEEE80211_FEXT_SCAN_PENDING) 
-						vap->iv_xrvap->iv_flags_ext &= ~IEEE80211_FEXT_SCAN_PENDING;
+			if (vap->iv_xrvap->iv_flags_ext & IEEE80211_FEXT_SCAN_PENDING) 
+				vap->iv_xrvap->iv_flags_ext &= ~IEEE80211_FEXT_SCAN_PENDING;
 		}
 		/*
 		 * when an XR vap transitions to RUN state,
 		 * normal vap needs to update the XR IE
 		 * with the xr vaps MAC address.
 		 */
-		if(vap->iv_flags & IEEE80211_F_XR) { 
+		if (vap->iv_flags & IEEE80211_F_XR)
 			vap->iv_xrvap->iv_flags |= IEEE80211_F_XRUPDATE; 
-		}
-		
 #endif
 		break;
 	}	
@@ -1539,8 +1555,8 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 					if (tmpvap->iv_state == IEEE80211_S_RUN)
 						nrunning++;
 					else if (tmpvap->iv_state == IEEE80211_S_SCAN ||
-							 tmpvap->iv_state == IEEE80211_S_AUTH || /* STA in WDS/Repeater */
-							 tmpvap->iv_state == IEEE80211_S_ASSOC)
+					    tmpvap->iv_state == IEEE80211_S_AUTH || /* STA in WDS/Repeater */
+					    tmpvap->iv_state == IEEE80211_S_ASSOC)
 						nscanning++;
 				}
 			}
@@ -1557,8 +1573,11 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 			} else if (nscanning && !nrunning) {
 				/* when someone is scanning and no one is running, set
 				 * the scan pending flag. Don't go through state machine */
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE, "%s: %s -> %s with SCAN_PENDING\n", __func__,
-								  ieee80211_state_name[ostate], ieee80211_state_name[ostate]);
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
+					"%s: %s -> %s with SCAN_PENDING\n",
+					__func__,
+					ieee80211_state_name[ostate],
+					ieee80211_state_name[ostate]);
 				vap->iv_flags_ext |= IEEE80211_FEXT_SCAN_PENDING;
 			}
 		} else {
@@ -1610,12 +1629,13 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
  * start the XR vap .
  * called from a timer when normal vap enters RUN state .
  */
-static void ieee80211_start_xrvap(unsigned long data)
+static void
+ieee80211_start_xrvap(unsigned long data)
 {
 	struct ieee80211vap *vap = (struct ieee80211vap *)data;
 	/* make sure that the normal vap is still in RUN state */
-	if(vap->iv_xrvap->iv_state == IEEE80211_S_RUN)
-	ieee80211_init(vap->iv_dev, 0);
+	if (vap->iv_xrvap->iv_state == IEEE80211_S_RUN)
+		ieee80211_init(vap->iv_dev, 0);
 }
 
 #endif

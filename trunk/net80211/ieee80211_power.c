@@ -155,7 +155,7 @@ ieee80211_node_saveq_age(struct ieee80211_node *ni)
 		IEEE80211_NODE_SAVEQ_UNLOCK(ni);
 
 		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-		    "discard %u frames for age", discard);
+			"discard %u frames for age", discard);
 		IEEE80211_NODE_STAT_ADD(ni, ps_discard, discard);
 	}
 	return discard;
@@ -211,8 +211,8 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 		IEEE80211_NODE_STAT(ni,psq_drops);
 		spin_unlock_irqrestore(&ni->ni_savedq.lock, flags);
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,
-		    "pwr save q overflow, drops %d (size %d)",
-		    ni->ni_stats.ns_psq_drops, IEEE80211_PS_MAX_QUEUE);
+			"pwr save q overflow, drops %d (size %d)",
+			ni->ni_stats.ns_psq_drops, IEEE80211_PS_MAX_QUEUE);
 #ifdef IEEE80211_DEBUG
 		if (ieee80211_msg_dumppkts(vap))
 			ieee80211_dump_pkt(ni->ni_ic, skb->data, skb->len, -1, -1);
@@ -233,15 +233,14 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 	if (tail != NULL) {
 		age -= M_AGE_GET(tail);
 		__skb_append(tail, skb, &ni->ni_savedq);
-	} else {
+	} else
 		__skb_queue_head(&ni->ni_savedq, skb);
-	}
 	M_AGE_SET(skb, age);
 	qlen = skb_queue_len(&ni->ni_savedq);
 	spin_unlock_irqrestore(&ni->ni_savedq.lock, flags);
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-	    "save frame, %u now queued", qlen);
+		"save frame, %u now queued", qlen);
 
 	if (qlen == 1 && vap->iv_set_tim != NULL)
 		vap->iv_set_tim(ni, 1);
@@ -264,7 +263,8 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 			vap->iv_ps_sta++;
 		ni->ni_flags |= IEEE80211_NODE_PWR_MGT;
 		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-		    "power save mode on, %u sta's in ps mode", vap->iv_ps_sta);
+			"power save mode on, %u sta's in ps mode",
+			vap->iv_ps_sta);
 		return;
 	}
 
@@ -272,7 +272,7 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		vap->iv_ps_sta--;
 	ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-	    "power save mode off, %u sta's in ps mode", vap->iv_ps_sta);
+		"power save mode off, %u sta's in ps mode", vap->iv_ps_sta);
 	/* XXX if no stations in ps mode, flush mc frames */
 
 	/*
@@ -284,7 +284,8 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		return;
 	}
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-	    "flush ps queue, %u packets queued", IEEE80211_NODE_SAVEQ_QLEN(ni));
+		"flush ps queue, %u packets queued",
+		IEEE80211_NODE_SAVEQ_QLEN(ni));
 	for (;;) {
 		struct sk_buff *skb;
 		int qlen;
@@ -306,11 +307,10 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		 * device. XR vap has a net device which is not registered with
 		 * OS. 
 		 */
-		if (vap->iv_flags & IEEE80211_F_XR) {
+		if (vap->iv_flags & IEEE80211_F_XR)
 			skb->dev = vap->iv_xrvap->iv_dev;
-		} else {
+		else
 			skb->dev = vap->iv_dev;		/* XXX? unnecessary */
-		}
 #else
 		skb->dev = vap->iv_dev;		/* XXX? unnecessary */
 #endif
@@ -332,7 +332,7 @@ ieee80211_sta_pwrsave(struct ieee80211vap *vap, int enable)
 		return;
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-	    "sta power save mode %s", enable ? "on" : "off");
+		"sta power save mode %s", enable ? "on" : "off");
 	if (!enable) {
 		ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
 		ieee80211_send_nulldata(ieee80211_ref_node(ni));
@@ -345,7 +345,7 @@ ieee80211_sta_pwrsave(struct ieee80211vap *vap, int enable)
 		qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
 		if (qlen != 0) {
 			IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-			    "flush ps queue, %u packets queued", qlen);
+				"flush ps queue, %u packets queued", qlen);
 			for (;;) {
 				struct sk_buff *skb;
 

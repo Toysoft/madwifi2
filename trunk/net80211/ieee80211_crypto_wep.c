@@ -46,13 +46,13 @@ __FBSDID("$FreeBSD: src/sys/net80211/ieee80211_crypto_wep.c,v 1.5 2004/12/31 22:
 
 #include <net80211/ieee80211_var.h>
 
-static	void *wep_attach(struct ieee80211vap *, struct ieee80211_key *);
-static	void wep_detach(struct ieee80211_key *);
-static	int wep_setkey(struct ieee80211_key *);
-static	int wep_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t keyid);
-static	int wep_decap(struct ieee80211_key *, struct sk_buff *, int);
-static	int wep_enmic(struct ieee80211_key *, struct sk_buff *, int);
-static	int wep_demic(struct ieee80211_key *, struct sk_buff *, int);
+static void *wep_attach(struct ieee80211vap *, struct ieee80211_key *);
+static void wep_detach(struct ieee80211_key *);
+static int wep_setkey(struct ieee80211_key *);
+static int wep_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t);
+static int wep_decap(struct ieee80211_key *, struct sk_buff *, int);
+static int wep_enmic(struct ieee80211_key *, struct sk_buff *, int);
+static int wep_demic(struct ieee80211_key *, struct sk_buff *, int);
 
 static const struct ieee80211_cipher wep = {
 	.ic_name	= "WEP",
@@ -69,8 +69,8 @@ static const struct ieee80211_cipher wep = {
 	.ic_demic	= wep_demic,
 };
 
-static	int wep_encrypt(struct ieee80211_key *, struct sk_buff *, int hdrlen);
-static	int wep_decrypt(struct ieee80211_key *, struct sk_buff *, int hdrlen);
+static int wep_encrypt(struct ieee80211_key *, struct sk_buff *, int);
+static int wep_decrypt(struct ieee80211_key *, struct sk_buff *, int);
 
 struct wep_ctx {
 	struct ieee80211vap *wc_vap;	/* for diagnostics + statistics */
@@ -112,7 +112,7 @@ wep_detach(struct ieee80211_key *k)
 static int
 wep_setkey(struct ieee80211_key *k)
 {
-	return k->wk_keylen >= 40/NBBY;
+	return k->wk_keylen >= 40 / NBBY;
 }
 
 #ifndef _BYTE_ORDER
@@ -198,7 +198,6 @@ wep_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
 static int
 wep_enmic(struct ieee80211_key *k, struct sk_buff *skb, int force)
 {
-
 	return 1;
 }
 
@@ -224,7 +223,7 @@ wep_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 	if ((k->wk_flags & IEEE80211_KEY_SWCRYPT) &&
 	    !wep_decrypt(k, skb, hdrlen)) {
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
-		    "%s", "WEP ICV mismatch on decrypt");
+			"%s", "WEP ICV mismatch on decrypt");
 		vap->iv_stats.is_rx_wepfail++;
 		return 0;
 	}
@@ -360,9 +359,9 @@ wep_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 				    (const struct ieee80211_frame *) skb0->data;
 #endif
 				IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO,
-				    wh->i_addr2,
-				    "out of data for WEP (data_len %lu)",
-				    (unsigned long) data_len);
+					wh->i_addr2,
+					"out of data for WEP (data_len %lu)",
+					(unsigned long) data_len);
 				return 0;
 			}
 			break;
@@ -380,8 +379,8 @@ wep_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 #endif
 		/* NB: should not happen */
 		IEEE80211_NOTE_MAC(ctx->wc_vap, IEEE80211_MSG_CRYPTO,
-		    wh->i_addr1, "no room for %s ICV, tailroom %u",
-		    wep.ic_name, skb_tailroom(skb));
+			wh->i_addr1, "no room for %s ICV, tailroom %u",
+			wep.ic_name, skb_tailroom(skb));
 		/* XXX statistic */
 		return 0;
 	}
@@ -460,9 +459,9 @@ wep_decrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 					(const struct ieee80211_frame *) skb0->data;
 #endif
 				IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO,
-				    wh->i_addr2,
-				    "out of data for WEP (data_len %lu)",
-				    (unsigned long) data_len);
+					wh->i_addr2,
+					"out of data for WEP (data_len %lu)",
+					(unsigned long) data_len);
 				return 0;
 			}
 			break;

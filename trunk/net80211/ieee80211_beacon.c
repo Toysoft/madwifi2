@@ -53,13 +53,12 @@
  *       When we move regdomain code out to separate .h/.c files
  *       this should go to that .h file.
  */
-struct ieee80211_channel *
-ieee80211_doth_findchan(struct ieee80211vap *vap, u_int8_t chan);
+struct ieee80211_channel *ieee80211_doth_findchan(struct ieee80211vap *, u_int8_t);
 
 
 static u_int8_t *
 ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets *bo,
-		      u_int8_t *frm)
+	u_int8_t *frm)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
@@ -124,7 +123,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	bo->bo_tim_trailer = frm;
 
 	if ((ic->ic_flags & IEEE80211_F_DOTH) || 
-		(ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE)) {
+	    (ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE)) {
 		frm = ieee80211_add_country(frm, ic);
 	}
 	if (ic->ic_flags & IEEE80211_F_DOTH) {
@@ -148,11 +147,11 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	bo->bo_ath_caps = frm;
 	if (vap->iv_bss && vap->iv_bss->ni_ath_flags)
 		frm = ieee80211_add_athAdvCap(frm, vap->iv_bss->ni_ath_flags,
-					vap->iv_bss->ni_ath_defkeyindex);
+			vap->iv_bss->ni_ath_defkeyindex);
 	bo->bo_xr = frm;
 #ifdef ATH_SUPERG_XR
-	if(vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
-		frm=ieee80211_add_xr_param(frm,vap);
+	if (vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
+		frm = ieee80211_add_xr_param(frm, vap);
 #endif
 	bo->bo_tim_trailerlen = frm - bo->bo_tim_trailer;
 	bo->bo_chanswitch_trailerlen = frm - bo->bo_chanswitch;
@@ -223,7 +222,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	skb = ieee80211_getmgtframe(&frm, pktlen);
 	if (skb == NULL) {
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,
-		    "%s: cannot get buf; size %u", __func__, pktlen);
+			"%s: cannot get buf; size %u", __func__, pktlen);
 		vap->iv_stats.is_tx_nobuf++;
 		return NULL;
 	}
@@ -235,7 +234,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
-	    IEEE80211_FC0_SUBTYPE_BEACON;
+		IEEE80211_FC0_SUBTYPE_BEACON;
 	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
 	*(u_int16_t *)wh->i_dur = 0;
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
@@ -261,14 +260,16 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 
 	IEEE80211_BEACON_LOCK(ic);
 
-	if ((ic->ic_flags & IEEE80211_F_DOTH) && (vap->iv_flags & IEEE80211_F_CHANSWITCH) &&
-		(vap->iv_chanchange_count == ic->ic_chanchange_tbtt)) {
+	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
+	    (vap->iv_flags & IEEE80211_F_CHANSWITCH) &&
+	    (vap->iv_chanchange_count == ic->ic_chanchange_tbtt)) {
 		u_int8_t *frm;
 		struct ieee80211_channel *c;
 
 		vap->iv_chanchange_count = 0;
 
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, "%s: reinit beacon\n", __func__);
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+			"%s: reinit beacon\n", __func__);
 
 		/* 
 		 * NB: ic_bsschan is in the DSPARMS beacon IE, so must set this
@@ -276,7 +277,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		 */
 		c = ieee80211_doth_findchan(vap, ic->ic_chanchange_chan);
 		if (c == NULL) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, "%s: find channel failure\n", __func__);
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				"%s: find channel failure\n", __func__);
 			return 0;
 		}
 		ic->ic_bsschan = c;
@@ -330,8 +332,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			if (wme->wme_hipri_traffic >
 			    wme->wme_hipri_switch_thresh) {
 				IEEE80211_NOTE(vap, IEEE80211_MSG_WME, ni,
-				    "%s: traffic %u, disable aggressive mode",
-				    __func__, wme->wme_hipri_traffic);
+					"%s: traffic %u, disable aggressive mode",
+					__func__, wme->wme_hipri_traffic);
 				wme->wme_flags &= ~WME_F_AGGRMODE;
 				ieee80211_wme_updateparams_locked(vap);
 				wme->wme_hipri_traffic =
@@ -342,8 +344,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			if (wme->wme_hipri_traffic <=
 			    wme->wme_hipri_switch_thresh) {
 				IEEE80211_NOTE(vap, IEEE80211_MSG_WME, ni,
-				    "%s: traffic %u, enable aggressive mode",
-				    __func__, wme->wme_hipri_traffic);
+					"%s: traffic %u, enable aggressive mode",
+					__func__, wme->wme_hipri_traffic);
 				wme->wme_flags |= WME_F_AGGRMODE;
 				ieee80211_wme_updateparams_locked(vap);
 				wme->wme_hipri_traffic = 0;
@@ -397,7 +399,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			}
 			if (timlen != bo->bo_tim_len) {
 				/* copy up/down trailer */
-				int trailer_adjust = (tie->tim_bitmap+timlen) - (bo->bo_tim_trailer);
+				int trailer_adjust =
+					(tie->tim_bitmap+timlen) - (bo->bo_tim_trailer);
 				memmove(tie->tim_bitmap+timlen, bo->bo_tim_trailer,
 					bo->bo_tim_trailerlen);
 				bo->bo_tim_trailer = tie->tim_bitmap+timlen;
@@ -423,8 +426,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			vap->iv_flags &= ~IEEE80211_F_TIMUPDATE;
 
 			IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-			    "%s: TIM updated, pending %u, off %u, len %u",
-			    __func__, vap->iv_ps_pending, timoff, timlen);
+				"%s: TIM updated, pending %u, off %u, len %u",
+				__func__, vap->iv_ps_pending, timoff, timlen);
 		}
 		/* count down DTIM period */
 		if (tie->tim_count == 0)
@@ -437,7 +440,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		else
 			tie->tim_bitctl &= ~1;
 
-		if ((ic->ic_flags & IEEE80211_F_DOTH) && (ic->ic_flags & IEEE80211_F_CHANSWITCH)) {
+		if ((ic->ic_flags & IEEE80211_F_DOTH) &&
+		    (ic->ic_flags & IEEE80211_F_CHANSWITCH)) {
 
 			if (!vap->iv_chanchange_count) {
 				vap->iv_flags |= IEEE80211_F_CHANSWITCH;
@@ -465,17 +469,17 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				skb_put(skb, IEEE80211_CHANSWITCHANN_BYTES);
 				len_changed = 1;
 			}
-			else {
+			else
 				bo->bo_chanswitch[4]--;
-			}
 			vap->iv_chanchange_count++;
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, "%s: CHANSWITCH IE, change in %d\n",
-					  __func__, bo->bo_chanswitch[4]);
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				"%s: CHANSWITCH IE, change in %d\n",
+				__func__, bo->bo_chanswitch[4]);
 		}
 #ifdef ATH_SUPERG_XR
-		if(vap->iv_flags & IEEE80211_F_XRUPDATE) {
-			if(vap->iv_xrvap)
-			(void) ieee80211_add_xr_param(bo->bo_xr,vap);
+		if (vap->iv_flags & IEEE80211_F_XRUPDATE) {
+			if (vap->iv_xrvap)
+				(void) ieee80211_add_xr_param(bo->bo_xr, vap);
 			vap->iv_flags &= ~IEEE80211_F_XRUPDATE;
 		}
 #endif
@@ -486,9 +490,9 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	}
 	/* if it is a mode change beacon for dynamic turbo case */
 	if (((ic->ic_ath_cap & IEEE80211_ATHC_BOOST) != 0) ^
-		IEEE80211_IS_CHAN_TURBO(ic->ic_curchan))
-		 ieee80211_add_athAdvCap(bo->bo_ath_caps, vap->iv_bss->ni_ath_flags,
-					vap->iv_bss->ni_ath_defkeyindex);
+	    IEEE80211_IS_CHAN_TURBO(ic->ic_curchan))
+		ieee80211_add_athAdvCap(bo->bo_ath_caps, vap->iv_bss->ni_ath_flags,
+			vap->iv_bss->ni_ath_defkeyindex);
 	IEEE80211_BEACON_UNLOCK(ic);
 
 	return len_changed;

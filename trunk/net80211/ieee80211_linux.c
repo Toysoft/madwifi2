@@ -194,9 +194,8 @@ ieee80211_notify_node_join(struct ieee80211_node *ni, int newassoc)
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 #ifdef ATH_SUPERG_XR
-	if(vap->iv_flags & IEEE80211_F_XR) {
-		dev = vap->iv_xrvap->iv_dev;
-	}
+		if (vap->iv_flags & IEEE80211_F_XR)
+			dev = vap->iv_xrvap->iv_dev;
 #endif
 		wireless_send_event(dev, SIOCGIWAP, &wreq, NULL);
 	} else {
@@ -204,9 +203,8 @@ ieee80211_notify_node_join(struct ieee80211_node *ni, int newassoc)
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 #ifdef ATH_SUPERG_XR
-	if(vap->iv_flags & IEEE80211_F_XR) {
-		dev = vap->iv_xrvap->iv_dev;
-	}
+		if (vap->iv_flags & IEEE80211_F_XR)
+			dev = vap->iv_xrvap->iv_dev;
 #endif
 		wireless_send_event(dev, IWEVREGISTERED, &wreq, NULL);
 	}
@@ -252,19 +250,20 @@ ieee80211_notify_replay_failure(struct ieee80211vap *vap,
 	const struct ieee80211_frame *wh, const struct ieee80211_key *k,
 	u_int64_t rsc)
 {
-	static const char * tag = "MLME-REPLAYFAILURE.indication";
+	static const char *tag = "MLME-REPLAYFAILURE.indication";
 	struct net_device *dev = vap->iv_dev;
 	union iwreq_data wrqu;
-	char buf[128];
+	char buf[128];		/* XXX */
 
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
-	    "%s replay detected <keyix %d, rsc %llu >",
-	    k->wk_cipher->ic_name, k->wk_keyix, rsc );
+		"%s replay detected <keyix %d, rsc %llu >",
+		k->wk_cipher->ic_name, k->wk_keyix, rsc );
 
 	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
 	snprintf(buf, sizeof(buf), "%s(keyid=%d %scast addr=%s)", tag,
-	    k->wk_keyix, IEEE80211_IS_MULTICAST(wh->i_addr1) ?  "broad" : "uni",
-	    ether_sprintf(wh->i_addr1));
+		k->wk_keyix,
+		IEEE80211_IS_MULTICAST(wh->i_addr1) ?  "broad" : "uni",
+		ether_sprintf(wh->i_addr1));
 	memset(&wrqu, 0, sizeof(wrqu));
 	wrqu.data.length = strlen(buf);
 	wireless_send_event(dev, IWEVCUSTOM, &wrqu, buf);
@@ -278,16 +277,16 @@ ieee80211_notify_michael_failure(struct ieee80211vap *vap,
 	static const char *tag = "MLME-MICHAELMICFAILURE.indication";
 	struct net_device *dev = vap->iv_dev;
 	union iwreq_data wrqu;
-	char buf[128];
+	char buf[128];		/* XXX */
 
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
-	    "Michael MIC verification failed <keyix %d>", keyix);
+		"Michael MIC verification failed <keyix %d>", keyix);
 	vap->iv_stats.is_rx_tkipmic++;
 
 	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
 	snprintf(buf, sizeof(buf), "%s(keyid=%d %scast addr=%s)", tag,
-	    keyix, IEEE80211_IS_MULTICAST(wh->i_addr1) ?  "broad" : "uni",
-	    ether_sprintf(wh->i_addr1));
+		keyix, IEEE80211_IS_MULTICAST(wh->i_addr1) ?  "broad" : "uni",
+		ether_sprintf(wh->i_addr1));
 	memset(&wrqu, 0, sizeof(wrqu));
 	wrqu.data.length = strlen(buf);
 	wireless_send_event(dev, IWEVCUSTOM, &wrqu, buf);
@@ -308,6 +307,7 @@ ieee80211_load_module(const char *modname)
 static struct proc_dir_entry *proc_madwifi;
 static int proc_madwifi_count = 0;
 
+/* XXX: Not the right place for such a declaration */
 struct proc_ieee80211_priv {
      int rlen;
      int max_rlen;
@@ -317,6 +317,7 @@ struct proc_ieee80211_priv {
      int max_wlen;
      char *wbuf;
 };
+
 static int
 proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 {
@@ -349,86 +350,90 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 static ssize_t
 proc_ieee80211_read(struct file *file, char __user *buf, size_t len, loff_t *offset)
 {
-     loff_t pos = *offset;
-     struct proc_ieee80211_priv *pv = (struct proc_ieee80211_priv *) file->private_data;
+	loff_t pos = *offset;
+	struct proc_ieee80211_priv *pv = (struct proc_ieee80211_priv *) file->private_data;
 
-     if (!pv->rbuf)
-          return -EINVAL;
-     if (pos < 0)
-          return -EINVAL;
-     if (pos > pv->rlen)
-          return -EFAULT;
-     if (len > pv->rlen - pos)
-          len = pv->rlen - pos;
-     if (copy_to_user(buf, pv->rbuf + pos, len))
-          return -EFAULT;
-     *offset = pos + len;
-     return len;
+	if (!pv->rbuf)
+		return -EINVAL;
+	if (pos < 0)
+		return -EINVAL;
+	if (pos > pv->rlen)
+		return -EFAULT;
+	if (len > pv->rlen - pos)
+		len = pv->rlen - pos;
+	if (copy_to_user(buf, pv->rbuf + pos, len))
+		return -EFAULT;
+	*offset = pos + len;
+	return len;
 }
 
-static int proc_ieee80211_open(struct inode *inode, struct file *file) {
-     struct proc_ieee80211_priv *pv = NULL;
-     struct proc_dir_entry *dp = PDE(inode);
-     struct ieee80211vap *vap = dp->data;
+static int
+proc_ieee80211_open(struct inode *inode, struct file *file)
+{
+	struct proc_ieee80211_priv *pv = NULL;
+	struct proc_dir_entry *dp = PDE(inode);
+	struct ieee80211vap *vap = dp->data;
 
-     if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv), GFP_KERNEL)))
-          return -ENOMEM;
-     /* intially allocate both read and write buffers */
-     pv = (struct proc_ieee80211_priv *) file->private_data;
-     memset(pv, 0, sizeof(struct proc_ieee80211_priv));
-     pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
-     if (!pv->rbuf) {
-             kfree(pv);
-          return -ENOMEM;
-     }
-     pv->wbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
-     if (!pv->wbuf) {
-             vfree(pv->rbuf);
-             kfree(pv);
-          return -ENOMEM;
-     }
-     memset(pv->wbuf, 0, MAX_PROC_IEEE80211_SIZE);
-     memset(pv->rbuf, 0, MAX_PROC_IEEE80211_SIZE);
-     pv->max_wlen = MAX_PROC_IEEE80211_SIZE;
-     pv->max_rlen = MAX_PROC_IEEE80211_SIZE;
-     /* now read the data into the buffer */
-     pv->rlen = proc_read_nodes(vap, pv->rbuf, MAX_PROC_IEEE80211_SIZE);
-     return 0;
+	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv), GFP_KERNEL)))
+		return -ENOMEM;
+	/* intially allocate both read and write buffers */
+	pv = (struct proc_ieee80211_priv *) file->private_data;
+	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
+	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
+	if (!pv->rbuf) {
+		kfree(pv);
+		return -ENOMEM;
+	}
+	pv->wbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
+	if (!pv->wbuf) {
+		vfree(pv->rbuf);
+		kfree(pv);
+		return -ENOMEM;
+	}
+	memset(pv->wbuf, 0, MAX_PROC_IEEE80211_SIZE);
+	memset(pv->rbuf, 0, MAX_PROC_IEEE80211_SIZE);
+	pv->max_wlen = MAX_PROC_IEEE80211_SIZE;
+	pv->max_rlen = MAX_PROC_IEEE80211_SIZE;
+	/* now read the data into the buffer */
+	pv->rlen = proc_read_nodes(vap, pv->rbuf, MAX_PROC_IEEE80211_SIZE);
+	return 0;
 }
-
 
 static ssize_t
 proc_ieee80211_write(struct file *file, const char __user *buf, size_t len, loff_t *offset)
 {
-     loff_t pos = *offset;
-     struct proc_ieee80211_priv *pv = (struct proc_ieee80211_priv *) file->private_data;
+	loff_t pos = *offset;
+	struct proc_ieee80211_priv *pv =
+		(struct proc_ieee80211_priv *) file->private_data;
 
-     if (!pv->wbuf)
-          return -EINVAL;
-     if (pos < 0)
-          return -EINVAL;
-     if (pos >= pv->max_wlen)
-          return 0;
-     if (len > pv->max_wlen - pos)
-          len = pv->max_wlen - pos;
-     if (copy_from_user(pv->wbuf + pos, buf, len))
-          return -EFAULT;
-     if (pos + len > pv->wlen)
-          pv->wlen = pos + len;
-     *offset = pos + len;
+	if (!pv->wbuf)
+		return -EINVAL;
+	if (pos < 0)
+		return -EINVAL;
+	if (pos >= pv->max_wlen)
+		return 0;
+	if (len > pv->max_wlen - pos)
+		len = pv->max_wlen - pos;
+	if (copy_from_user(pv->wbuf + pos, buf, len))
+		return -EFAULT;
+	if (pos + len > pv->wlen)
+		pv->wlen = pos + len;
+	*offset = pos + len;
 
-     return len;
+	return len;
 }
-static int proc_ieee80211_close(struct inode *inode, struct file *file) {
 
-	struct proc_ieee80211_priv *pv = (struct proc_ieee80211_priv *) file->private_data;
+static int
+proc_ieee80211_close(struct inode *inode, struct file *file)
+{
+	struct proc_ieee80211_priv *pv =
+		(struct proc_ieee80211_priv *) file->private_data;
 	if (pv->rbuf)
 		vfree(pv->rbuf);
 	if (pv->wbuf)
 		vfree(pv->wbuf);
 	kfree(pv);
-     return 0;
-
+	return 0;
 }
 
 static struct file_operations proc_ieee80211_ops = {
@@ -441,7 +446,7 @@ static struct file_operations proc_ieee80211_ops = {
 #ifdef IEEE80211_DEBUG
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
-		lenp, ppos)
+	lenp, ppos)
 {
 	struct ieee80211vap *vap = ctl->extra1;
 	u_int val;
@@ -451,13 +456,13 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 	ctl->maxlen = sizeof(val);
 	if (write) {
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-				lenp, ppos);
+			lenp, ppos);
 		if (ret == 0)
 			vap->iv_debug = val;
 	} else {
 		val = vap->iv_debug;
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-				lenp, ppos);
+			lenp, ppos);
 	}
 	return ret;
 }
@@ -465,7 +470,7 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_dev_type, ctl, write, filp, buffer,
-		lenp, ppos)
+	lenp, ppos)
 {
 	struct ieee80211vap *vap = ctl->extra1;
 	u_int val;
@@ -475,7 +480,7 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_dev_type, ctl, write, filp, buffer,
 	ctl->maxlen = sizeof(val);
 	if (write) {
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-				lenp, ppos);
+			lenp, ppos);
 		if (ret == 0 && vap->iv_opmode == IEEE80211_M_MONITOR) {
 			if (val == ARPHRD_IEEE80211_RADIOTAP ||
 			    val == ARPHRD_IEEE80211 ||
@@ -487,13 +492,13 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_dev_type, ctl, write, filp, buffer,
 	} else {
 		val = vap->iv_dev->type;
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-				lenp, ppos);
+			lenp, ppos);
 	}
 	return ret;
 }
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_nods_only, ctl, write, filp, buffer,
-		lenp, ppos)
+	lenp, ppos)
 {
 	struct ieee80211vap *vap = ctl->extra1;
 	u_int val;
@@ -503,20 +508,19 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_nods_only, ctl, write, filp, buff
 	ctl->maxlen = sizeof(val);
 	if (write) {
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-				lenp, ppos);
-		if (ret == 0) {
+			lenp, ppos);
+		if (ret == 0)
 			vap->iv_monitor_nods_only = val;
-		}
 	} else {
 		val = vap->iv_monitor_nods_only;
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-						     lenp, ppos);
+			lenp, ppos);
 	}
 	return ret;
 }
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_txf_len, ctl, write, filp, buffer,
-		lenp, ppos)
+	lenp, ppos)
 {
 	struct ieee80211vap *vap = ctl->extra1;
 	u_int val;
@@ -526,14 +530,13 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_txf_len, ctl, write, filp, buffer
 	ctl->maxlen = sizeof(val);
 	if (write) {
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-				lenp, ppos);
-		if (ret == 0) {
+			lenp, ppos);
+		if (ret == 0)
 			vap->iv_monitor_txf_len = val;
-		}
 	} else {
 		val = vap->iv_monitor_txf_len;
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
-				lenp, ppos);
+			lenp, ppos);
 	}
 	return ret;
 }
@@ -578,7 +581,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 {
 	int i, space;
 
-	space = 5*sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
+	space = 5 * sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	vap->iv_sysctls = kmalloc(space, GFP_KERNEL);
 	if (vap->iv_sysctls == NULL) {
 		printk("%s: no memory for sysctl table!\n", __func__);
@@ -617,27 +620,22 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 		vap->iv_sysctls = NULL;
 	}
 
+	if (!proc_madwifi && proc_net != NULL) {
+		proc_madwifi = proc_mkdir("madwifi", proc_net);
+		if (!proc_madwifi)
+			printk(KERN_WARNING "Failed to mkdir /proc/net/madwifi\n");
+	}
 
-	if (!proc_madwifi) {
-                if (proc_net != NULL) {
-                        proc_madwifi = proc_mkdir("madwifi", proc_net);
-                        if (!proc_madwifi) {
-                                printk(KERN_WARNING "Failed to mkdir /proc/net/madwifi\n");
-                        }
-                }
-        }
-
-        if (proc_madwifi) {
-                proc_madwifi_count++;
-                vap->iv_proc = proc_mkdir(vap->iv_dev->name, proc_madwifi);
-                if (vap->iv_proc) {
-                        vap->iv_proc_stations = create_proc_entry("associated_sta",
-								  PROC_IEEE80211_PERM, vap->iv_proc);
-                        vap->iv_proc_stations->data = vap;
-                        vap->iv_proc_stations->proc_fops = &proc_ieee80211_ops;
-                }
-        }
-
+	if (proc_madwifi) {
+		proc_madwifi_count++;
+		vap->iv_proc = proc_mkdir(vap->iv_dev->name, proc_madwifi);
+		if (vap->iv_proc) {
+			vap->iv_proc_stations = create_proc_entry("associated_sta",
+				PROC_IEEE80211_PERM, vap->iv_proc);
+			vap->iv_proc_stations->data = vap;
+			vap->iv_proc_stations->proc_fops = &proc_ieee80211_ops;
+		}
+	}
 }
 
 void
@@ -657,11 +655,10 @@ ieee80211_sysctl_vdetach(struct ieee80211vap *vap)
 		remove_proc_entry(vap->iv_dev->name, proc_madwifi);
 		if (proc_madwifi_count == 1) {
 			remove_proc_entry("madwifi", proc_net);
-                        proc_madwifi = NULL;
+			proc_madwifi = NULL;
 		}
-                proc_madwifi_count--;
+		proc_madwifi_count--;
 	}
-
 }
 #endif /* CONFIG_SYSCTL */
 
@@ -671,7 +668,7 @@ ieee80211_sysctl_vdetach(struct ieee80211vap *vap)
 const char*
 ether_sprintf(const u_int8_t *mac)
 {
-	static char etherbuf[18];
+	static char etherbuf[18]; 	/* XXX */
 	snprintf(etherbuf, sizeof(etherbuf), "%02x:%02x:%02x:%02x:%02x:%02x",
 		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 	return etherbuf;
@@ -682,8 +679,8 @@ EXPORT_SYMBOL(ether_sprintf);		/* XXX */
  * Module glue.
  */
 #include "version.h"
-static	char *version = WLAN_VERSION " (Atheros/multi-bss)";
-static	char *dev_info = "wlan";
+static char *version = WLAN_VERSION " (Atheros/multi-bss)";
+static char *dev_info = "wlan";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
