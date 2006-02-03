@@ -8376,20 +8376,52 @@ static void
 ath_update_txpow(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct net_device *dev = ic->ic_dev;
 	struct ieee80211vap *vap;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t txpow;
-
-	if (sc->sc_curtxpow != ic->ic_txpowlimit) {
-		ath_hal_settxpowlimit(ah, ic->ic_txpowlimit);
-		/* read back in case value is clamped */
-		(void)ath_hal_gettxpowlimit(ah, &txpow);
-		ic->ic_txpowlimit = sc->sc_curtxpow = txpow;
-	}
+#ifndef ATH_CAP_TPC
+	u_int32_t txpowlimit;
+#endif
+	
 	/*
-	 * Fetch max tx power level for status requests.
+	 * Search vap changing max tx power
+	 * and set max tx power limit
 	 */
-	(void)ath_hal_getmaxtxpow(sc->sc_ah, &txpow);
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+		if (ic->ic_txpowlimit != vap->iv_bss->ni_txpower) {
+#ifdef ATH_CAP_TPC
+			ic->ic_txpowlimit = vap->iv_bss->ni_txpower;
+#else
+			ath_hal_settxpowlimit(ah, vap->iv_bss->ni_txpower);
+#endif
+			break;
+		}
+	}
+	
+	/*
+	 * Check and set max tx power limit.
+	 */
+	(void)ath_hal_getmaxtxpow(ah, &txpow);
+#ifdef ATH_CAP_TPC
+	if (ic->ic_txpowlimit > txpow)
+		ic->ic_txpowlimit = txpow;
+	txpow = sc->sc_curtxpow = ic->ic_txpowlimit;
+#else
+	(void)ath_hal_gettxpowlimit(ah, &txpowlimit);
+	if (txpow != txpowlimit) {
+		/*
+		 * Fix inconsistencies
+		 */
+		ath_hal_settxpowlimit(ah, txpow);
+		(void)ath_hal_gettxpowlimit(ah, &txpowlimit);
+		if (txpow != txpowlimit)
+			printk(KERN_ERR "%s: unable to set max tx power limit,"
+				"max=%d limit=%d\n", dev->name, txpow,
+				txpowlimit);
+	}
+	ic->ic_txpowlimit = sc->sc_curtxpow = txpow;
+#endif
 	/* XXX locking/move to net80211 */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next)
 		vap->iv_bss->ni_txpower = txpow;
