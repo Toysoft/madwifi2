@@ -61,8 +61,12 @@ setsysctrl(const char *dev, const char *control , u_long value)
 
 	snprintf(buffer, sizeof(buffer), "/proc/sys/dev/%s/%s", dev, control);
 	fd = fopen(buffer, "w");
-	if (fd != NULL)
-		fprintf(fd,"%li",value);
+	if (fd != NULL) {
+		fprintf(fd, "%li", value);
+		fclose(fd);
+	} else
+		fprintf(stderr, "Could not open %s for writing!\n", buffer);
+	
 	return 0;
 }
 
