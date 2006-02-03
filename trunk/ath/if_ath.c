@@ -246,7 +246,8 @@ static void	ath_descdma_cleanup(struct ath_softc *sc,
 				struct ath_descdma *dd, ath_bufhead *head, int dir);
 static void	ath_check_dfs_clear(unsigned long );
 static const char* ath_get_hal_status_desc(HAL_STATUS status);
-
+static int ath_rcv_dev_event(struct notifier_block *, unsigned long, void *);
+	
 static	int	ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
 								 * but check every second at first.
@@ -278,6 +279,10 @@ static const char *hal_status_desc[] = {
 	"Hardware revision not supported",
 	"Hardware self-test failed",
 	"Operation incomplete"
+};
+
+static struct notifier_block ath_event_block = {
+        .notifier_call = ath_rcv_dev_event
 };
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
@@ -9251,13 +9256,28 @@ static void
 ath_dynamic_sysctl_register(struct ath_softc *sc)
 {
 	int i, space;
-
+	char *dev_name = NULL;
+	
 	space = 5 * sizeof(struct ctl_table) + sizeof(ath_sysctl_template);
 	sc->sc_sysctls = kmalloc(space, GFP_KERNEL);
 	if (sc->sc_sysctls == NULL) {
 		printk("%s: no memory for sysctl table!\n", __func__);
 		return;
 	}
+	
+	/* 
+	 * We want to reserve space for the name of the device seperate
+	 * to the net_device structure, because when the name is changed
+	 * it is changed in the net_device structure and the message given
+	 * out.  Thus we won't know what the name used to be if we rely
+	 * on it.
+	 */
+	dev_name = kmalloc((strlen(sc->sc_dev->name) + 1) * sizeof(char), GFP_KERNEL);
+	if (dev_name == NULL) {
+		printk("%s: no memory for device name storage!\n", __func__);
+		return;
+	}
+	strncpy(dev_name, sc->sc_dev->name, strlen(sc->sc_dev->name) + 1);
 
 	/* setup the table */
 	memset(sc->sc_sysctls, 0, space);
@@ -9267,7 +9287,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	sc->sc_sysctls[0].child = &sc->sc_sysctls[2];
 	/* [1] is NULL terminator */
 	sc->sc_sysctls[2].ctl_name = CTL_AUTO;
-	sc->sc_sysctls[2].procname = sc->sc_dev->name;
+	sc->sc_sysctls[2].procname = dev_name;
 	sc->sc_sysctls[2].mode = 0555;
 	sc->sc_sysctls[2].child = &sc->sc_sysctls[4];
 	/* [3] is NULL terminator */
@@ -9300,6 +9320,10 @@ ath_dynamic_sysctl_unregister(struct ath_softc *sc)
 	if (sc->sc_sysctl_header) {
 		unregister_sysctl_table(sc->sc_sysctl_header);
 		sc->sc_sysctl_header = NULL;
+	}
+	if (sc->sc_sysctls[2].procname) {
+		kfree(sc->sc_sysctls[2].procname);
+		sc->sc_sysctls[2].procname = NULL;
 	}
 	if (sc->sc_sysctls) {
 		kfree(sc->sc_sysctls);
@@ -9437,6 +9461,7 @@ ath_sysctl_register(void)
 	static int initialized = 0;
 
 	if (!initialized) {
+	        register_netdevice_notifier(&ath_event_block);
 		ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
 		initialized = 1;
 	}
@@ -9445,6 +9470,7 @@ ath_sysctl_register(void)
 void
 ath_sysctl_unregister(void)
 {
+	unregister_netdevice_notifier(&ath_event_block);
 	if (ath_sysctl_header)
 		unregister_sysctl_table(ath_sysctl_header);
 }
@@ -9457,4 +9483,27 @@ ath_get_hal_status_desc(HAL_STATUS status)
 		return hal_status_desc[status];
 	else
 		return "";
+}
+
+static int
+ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
+	void *ptr)
+{
+#ifdef CONFIG_SYSCTL
+	struct net_device *dev = (struct net_device *) ptr;
+	struct ath_softc *sc = (struct ath_softc *) dev->priv;
+
+	if (!dev || !sc || dev->open != &ath_init)
+		return 0;
+
+        switch (event) {
+        case NETDEV_CHANGENAME:
+		ath_dynamic_sysctl_unregister(sc);
+		ath_dynamic_sysctl_register(sc);
+		return NOTIFY_DONE;
+        default:
+	        break;
+        }
+#endif /* CONFIG_SYSCTL */
+        return 0;
 }

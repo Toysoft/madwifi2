@@ -582,13 +582,25 @@ void
 ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 {
 	int i, space;
-
+	char *devname = NULL;
+	
 	space = 5 * sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	vap->iv_sysctls = kmalloc(space, GFP_KERNEL);
 	if (vap->iv_sysctls == NULL) {
 		printk("%s: no memory for sysctl table!\n", __func__);
 		return;
 	}
+
+	/*
+	 * Reserve space for the device name outside the net_device structure
+	 * so that if the name changes we know what it used to be. 
+	 */
+	devname = kmalloc((strlen(vap->iv_dev->name) + 1) * sizeof(char), GFP_KERNEL);
+	if (devname == NULL) {
+		printk("%s: no memory for VAP name!\n", __func__);
+		return;
+	}
+	strncpy(devname, vap->iv_dev->name, strlen(vap->iv_dev->name) + 1);
 
 	/* setup the table */
 	memset(vap->iv_sysctls, 0, space);
@@ -598,7 +610,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 	vap->iv_sysctls[0].child = &vap->iv_sysctls[2];
 	/* [1] is NULL terminator */
 	vap->iv_sysctls[2].ctl_name = CTL_AUTO;
-	vap->iv_sysctls[2].procname = vap->iv_dev->name;/* XXX bad idea? */
+	vap->iv_sysctls[2].procname = devname; /* XXX bad idea? */
 	vap->iv_sysctls[2].mode = 0555;
 	vap->iv_sysctls[2].child = &vap->iv_sysctls[4];
 	/* [3] is NULL terminator */
@@ -647,19 +659,25 @@ ieee80211_sysctl_vdetach(struct ieee80211vap *vap)
 		unregister_sysctl_table(vap->iv_sysctl_header);
 		vap->iv_sysctl_header = NULL;
 	}
-	if (vap->iv_sysctls) {
-		kfree(vap->iv_sysctls);
-		vap->iv_sysctls = NULL;
-	}
 
 	if (vap->iv_proc) {
 		remove_proc_entry("associated_sta", vap->iv_proc);
-		remove_proc_entry(vap->iv_dev->name, proc_madwifi);
+		remove_proc_entry(vap->iv_proc->name, proc_madwifi);
 		if (proc_madwifi_count == 1) {
 			remove_proc_entry("madwifi", proc_net);
 			proc_madwifi = NULL;
 		}
 		proc_madwifi_count--;
+	}
+
+	if (vap->iv_sysctls[2].procname) {
+		kfree(vap->iv_sysctls[2].procname);
+		vap->iv_sysctls[2].procname = NULL;
+	}
+	
+	if (vap->iv_sysctls) {
+		kfree(vap->iv_sysctls);
+		vap->iv_sysctls = NULL;
 	}
 }
 #endif /* CONFIG_SYSCTL */
@@ -676,6 +694,37 @@ ether_sprintf(const u_int8_t *mac)
 	return etherbuf;
 }
 EXPORT_SYMBOL(ether_sprintf);		/* XXX */
+
+/* Function to handle the device event notifications.
+ * If the event is a NETDEV_CHANGENAME, and is for an interface
+ * we are taking care of, then we want to remove its existing 
+ * proc entries (which now have the wrong names) and add
+ * new, correct, entries.
+ */
+static int
+ieee80211_rcv_dev_event(struct notifier_block *this, unsigned long event,
+	void *ptr)
+{
+#ifdef CONFIG_SYSCTL
+	struct net_device *dev = (struct net_device *) ptr;
+	if (!dev || dev->open != &ieee80211_open)
+		return 0;
+
+        switch (event) {
+        case NETDEV_CHANGENAME:
+		ieee80211_sysctl_vdetach(dev->priv);
+		ieee80211_sysctl_vattach(dev->priv);
+		return NOTIFY_DONE;
+	default:
+		break;
+        }
+#endif /* CONFIG_SYSCTL */
+        return 0;
+}
+
+static struct notifier_block ieee80211_event_block = {
+        .notifier_call = ieee80211_rcv_dev_event
+};
 
 /*
  * Module glue.
@@ -695,6 +744,7 @@ extern	void ieee80211_auth_setup(void);
 static int __init
 init_wlan(void)
 {
+  	register_netdevice_notifier(&ieee80211_event_block);
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 	return 0;
 }
@@ -703,6 +753,7 @@ module_init(init_wlan);
 static void __exit
 exit_wlan(void)
 {
+  	unregister_netdevice_notifier(&ieee80211_event_block);
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_wlan);
