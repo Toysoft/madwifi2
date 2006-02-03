@@ -308,6 +308,13 @@ ieee80211_input(struct ieee80211_node *ni,
 				vap->iv_stats.is_rx_wrongbss++;
 				goto out;
 			}
+			if (!IEEE80211_ADDR_EQ(wh->i_addr2, vap->wds_mac)) {
+				/* not interested in */
+				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+					wh->i_addr2, NULL, "%s", "not from DS");
+				vap->iv_stats.is_rx_wrongbss++;
+				goto out;	
+			}
 			break;
 		default:
 			/* XXX catch bad values */
@@ -682,6 +689,13 @@ ieee80211_input(struct ieee80211_node *ni,
 		return IEEE80211_FC0_TYPE_DATA;
 
 	case IEEE80211_FC0_TYPE_MGT:
+		/*
+		 * WDS opmode do not support managment frames
+		 */
+		if (vap->iv_opmode == IEEE80211_M_WDS) {
+			vap->iv_stats.is_rx_mgtdiscard++;
+			goto out;
+		}
 		IEEE80211_NODE_STAT(ni, rx_mgmt);
 		if (dir != IEEE80211_FC1_DIR_NODS) {
 			vap->iv_stats.is_rx_wrongdir++;

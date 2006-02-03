@@ -968,6 +968,12 @@ ieee80211_init(struct net_device *dev, int forcescan)
 				ieee80211_new_state(vap, IEEE80211_S_ASSOC, 1);
 		} else {
 			/*
+			 * When the old state is running the vap must 
+			 * be brought to init.
+			 */
+			if (vap->iv_state == IEEE80211_S_RUN)
+				ieee80211_new_state(vap, IEEE80211_S_INIT, -1); 		
+			/*
 			 * For monitor+wds modes there's nothing to do but
 			 * start running.  Otherwise, if this is the first
 			 * vap to be brought up, start a scan which may be
@@ -976,7 +982,6 @@ ieee80211_init(struct net_device *dev, int forcescan)
 			 */
 			if (vap->iv_opmode == IEEE80211_M_MONITOR ||
 			    vap->iv_opmode == IEEE80211_M_WDS) {
-				vap->iv_state = IEEE80211_S_INIT;	/* XXX*/
 				ieee80211_new_state(vap, IEEE80211_S_RUN, -1);
 			} else
 				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
@@ -1436,6 +1441,23 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				 * scan and startup immediately.
 				 */
 				ieee80211_create_ibss(vap, ic->ic_curchan);
+
+				/*
+				 * In wds mode allocate and initialize peer node
+				 */				
+				if (vap->iv_opmode == IEEE80211_M_WDS) {
+					struct ieee80211_node *wds_ni;
+					wds_ni = ieee80211_alloc_node(&ic->ic_sta, vap, vap->wds_mac);
+					if (wds_ni != NULL) {
+						if (ieee80211_add_wds_addr(&ic->ic_sta, wds_ni, vap->wds_mac, 1) == 0) {
+							ieee80211_node_authorize(wds_ni);
+							wds_ni->ni_chan = vap->iv_bss->ni_chan;
+							wds_ni->ni_capinfo = ni->ni_capinfo;
+							wds_ni->ni_associd = 1;
+							wds_ni->ni_ath_flags = vap->iv_ath_cap;
+						}
+					}
+				}
 				break;
 			}
 			/* fall thru... */
