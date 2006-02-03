@@ -186,12 +186,12 @@ static const char *scan_modnames[IEEE80211_SCANNER_MAX] = {
 static const struct ieee80211_scanner *scanners[IEEE80211_SCANNER_MAX];
 
 const struct ieee80211_scanner *
-ieee80211_scanner_get(enum ieee80211_opmode mode)
+ieee80211_scanner_get(enum ieee80211_opmode mode, int tryload)
 {
 	int err;
 	if (mode >= IEEE80211_SCANNER_MAX)
 		return NULL;
-	if (scanners[mode] == NULL) {
+	if (scanners[mode] == NULL && tryload) {
 		err = ieee80211_load_module(scan_modnames[mode]);
 		if (scanners[mode] == NULL || err)
 			printk(KERN_WARNING "unable to load %s\n", scan_modnames[mode]);
@@ -372,7 +372,7 @@ ieee80211_start_scan(struct ieee80211vap *vap, int flags, u_int duration,
 	const struct ieee80211_scanner *scan;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
 
-	scan = ieee80211_scanner_get(vap->iv_opmode);
+	scan = ieee80211_scanner_get(vap->iv_opmode, 0);
 	if (scan == NULL) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: no scanner support for mode %u\n",

@@ -547,7 +547,7 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 		return 0; 
 #endif
 
-	ieee80211_scanner_get(vap->iv_opmode);
+	ieee80211_scanner_get(vap->iv_opmode, 1);
 
 	/* NB: rtnl is held on entry so don't use register_netdev */
 	if (register_netdevice(dev)) {
