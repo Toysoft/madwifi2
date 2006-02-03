@@ -1286,7 +1286,13 @@ EXPORT_SYMBOL(ieee80211_setmode);
 enum ieee80211_phymode
 ieee80211_chan2mode(const struct ieee80211_channel *chan)
 {
-
+	/*
+	 * Callers should handle this case properly, rather than
+	 * just relying that this function returns a sane value.
+	 * XXX Probably needs to be revised.
+	 */
+	KASSERT(chan != IEEE80211_CHAN_ANYC, ("channel not setup"));
+	
 	if (IEEE80211_IS_CHAN_108G(chan))
 		return IEEE80211_MODE_TURBO_G;
 	else if (IEEE80211_IS_CHAN_TURBO(chan))
