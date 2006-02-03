@@ -400,7 +400,8 @@ init_ahb(void)
  * Module glue.
  */
 #include "version.h"
-static char *version = ATH_PCI_VERSION " (Atheros/multi-bss)";
+#include "svnversion.h"
+static char *version = ATH_PCI_VERSION " (svn " SVNVERSION ")";
 static char *dev_info = "ath_ahb";
 
 #include <linux/ethtool.h>

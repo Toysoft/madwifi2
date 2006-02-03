@@ -730,7 +730,8 @@ static struct notifier_block ieee80211_event_block = {
  * Module glue.
  */
 #include "version.h"
-static char *version = WLAN_VERSION " (Atheros/multi-bss)";
+#include "svnversion.h"
+static char *version = WLAN_VERSION " (svn " SVNVERSION ")";
 static char *dev_info = "wlan";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");

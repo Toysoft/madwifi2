@@ -103,8 +103,8 @@ enum {
  *
  */
 
-
-static char *version = "1.2";
+#include "svnversion.h"
+static char *version = "1.2 (svn " SVNVERSION ")";
 static char *dev_info = "ath_rate_sample";
 
 
