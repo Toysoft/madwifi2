@@ -223,11 +223,10 @@ struct ieee80211_scanner {
 				const struct ieee80211_scan_entry *);
 };
 const struct ieee80211_scanner *
-ieee80211_scanner_get(enum ieee80211_opmode mode);
+ieee80211_scanner_get(enum ieee80211_opmode mode, int tryload);
 void	ieee80211_scanner_register(enum ieee80211_opmode,
 		const struct ieee80211_scanner *);
 void	ieee80211_scanner_unregister(enum ieee80211_opmode,
 		const struct ieee80211_scanner *);
 void	ieee80211_scanner_unregister_all(const struct ieee80211_scanner *);
-const struct ieee80211_scanner *ieee80211_scanner_get(enum ieee80211_opmode);
 #endif /* _NET80211_IEEE80211_SCAN_H_ */
