@@ -2787,34 +2787,24 @@ ieee80211_ioctl_wdsmac(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct sockaddr *sa = (struct sockaddr *)extra;
 	struct ieee80211com *ic = vap->iv_ic;
-	struct ieee80211_node *ni;
 
 	if (!IEEE80211_ADDR_NULL(vap->wds_mac)) {
-		printk("%s: Device already has WDS mac address attached, remove first\n", dev->name);
-		goto wdsmac_fail;
+		printk("%s: Failed to add WDS MAC: %s\n", dev->name,
+			ether_sprintf(sa->sa_data));
+		printk("%s: Device already has WDS mac address attached,"
+			" remove first\n", dev->name);
+		return -1;
 	}
 
 	memcpy(vap->wds_mac, sa->sa_data, IEEE80211_ADDR_LEN);
 
-	ni = ieee80211_alloc_node(&ic->ic_sta, vap, vap->wds_mac);
-	if (ni != NULL) {
-		if (ieee80211_add_wds_addr(&ic->ic_sta, ni, vap->wds_mac, 1) == 0)
-			ieee80211_node_authorize(ni);
-		else
-			goto wdsmac_fail;
-	} else
-		goto wdsmac_fail;
-
 	printk("%s: Added WDS MAC: %s\n", dev->name,
 		ether_sprintf(vap->wds_mac));
 
+	if (IS_UP(vap->iv_dev))
+		return -ic->ic_reset(ic->ic_dev);
+
 	return 0;
-
-wdsmac_fail:
-	printk("%s: Failed to add WDS MAC: %s\n", dev->name,
-		ether_sprintf(sa->sa_data));
-
-	return -1;
 }
 
 static int
@@ -2824,7 +2814,6 @@ ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct sockaddr *sa = (struct sockaddr *)extra;
 	struct ieee80211com *ic = vap->iv_ic;
-	struct ieee80211_node *ni;
 
 	/* WDS Mac address filed already? */
 	if (IEEE80211_ADDR_NULL(vap->wds_mac))
@@ -2834,10 +2823,9 @@ ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
 	 * remove when mac address is known
 	 */
 	if (memcmp(vap->wds_mac, sa->sa_data, IEEE80211_ADDR_LEN) == 0) {
-		ni = ieee80211_find_wds_node(&ic->ic_sta, vap->wds_mac);
-		if (ni)
-			ieee80211_free_node(ni); /* Decr ref count */
 		memset(vap->wds_mac, 0x00, IEEE80211_ADDR_LEN);
+		if (IS_UP(vap->iv_dev))
+			return -ic->ic_reset(ic->ic_dev);
 		return 0;			 
 	}
 
@@ -3299,10 +3287,11 @@ get_sta_space(void *arg, struct ieee80211_node *ni)
 	struct ieee80211vap *vap = ni->ni_vap;
 	size_t ielen;
 
-	if (vap != req->vap && vap != req->vap->iv_xrvap)		/* only entries for this vap */
+	if (vap != req->vap && vap != req->vap->iv_xrvap)	/* only entries for this vap */
 		return;
-	if (vap->iv_opmode == IEEE80211_M_HOSTAP &&
-	    ni->ni_associd == 0)	/* only associated stations */
+	if ((vap->iv_opmode == IEEE80211_M_HOSTAP ||
+	     vap->iv_opmode == IEEE80211_M_WDS) &&
+	    ni->ni_associd == 0)				/* only associated stations or a WDS peer */
 		return;
 	req->space += sta_space(ni, &ielen);
 }
