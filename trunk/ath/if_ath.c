@@ -6774,7 +6774,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	} 
 #endif
 
-	if (ismcast) {
+	/*
+	 * sc_txantenna == 0 means transmit diversity mode.
+	 * sc_txantenna == 1 or sc_txantenna == 2 means the user has selected
+	 * the first or second antenna port.
+	 * If the user has set the txantenna, use it for multicast frames too.
+	 */
+	if (ismcast && !sc->sc_txantenna) {
 		antenna = sc->sc_mcastantenna + 1;
 		sc->sc_mcastantenna = (sc->sc_mcastantenna + 1) & 0x1;
 	} else
@@ -8972,24 +8978,43 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				}
 				break;
 			case ATH_LEDPIN:
+				/* XXX validate? */
 				sc->sc_ledpin = val;
 				break;
 			case ATH_DEBUG:
 				sc->sc_debug = val;
 				break;
 			case ATH_TXANTENNA:
-				/* XXX validate? */
-				sc->sc_txantenna = val;
+				/*
+				 * antenna can be:
+				 * 0 = transmit diversity
+				 * 1 = antenna port 1
+				 * 2 = antenna port 2
+				 */
+				if (val < 0 || val > 2)
+					return -EINVAL;
+				else
+					sc->sc_txantenna = val;
 				break;
 			case ATH_RXANTENNA:
-				/* XXX validate? */
-				if (val <= 2)
-					ath_setdefantenna(sc, val);
+				/*
+				 * antenna can be:
+				 * 0 = receive diversity
+				 * 1 = antenna port 1
+				 * 2 = antenna port 2
+				 */
+				if (val < 0 || val > 2)
+					return -EINVAL;
 				else
-					ret = -EINVAL;
+					ath_setdefantenna(sc, val);
 				break;
 			case ATH_DIVERSITY:
-				/* XXX validate? */
+				/*
+				 * 0 = disallow use of diversity
+				 * 1 = allow use of diversity
+				 */
+				if (val < 0 || val > 1)
+					return -EINVAL;
 				/* Don't enable diversity if XR is enabled */
 				if (((!sc->sc_hasdiversity) || (sc->sc_xrtxq != NULL)) && val)
 					return -EINVAL;
@@ -8997,9 +9022,11 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				ath_hal_setdiversity(ah, val);
 				break;
 			case ATH_TXINTRPERIOD:
+				/* XXX: validate? */
 				sc->sc_txintrperiod = val;
 				break;
 			case ATH_FFTXQMIN:
+				/* XXX valiate? */
 				sc->sc_fftxqmin = val;
 				break;
 			case ATH_TKIPMIC: {
