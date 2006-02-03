@@ -1128,6 +1128,15 @@ ieee80211_ioctl_giwretry(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+#ifdef ATH_CAP_TPC
+static void
+set_node_txpower(void *arg, struct ieee80211_node *ni)
+{
+	struct iw_param *rrq = (struct iw_param *)arg;
+	ni->ni_txpower = 2*rrq->value;
+}
+#endif
+
 static int
 ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 	struct iw_param *rrq, char *extra)
@@ -1154,14 +1163,24 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 			return -EOPNOTSUPP;
 		if (rrq->flags != IW_TXPOW_DBM)
 			return -EOPNOTSUPP;
-		vap->iv_bss->ni_txpower = 2*rrq->value;
-		ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
+		if (ic->ic_bsschan != IEEE80211_CHAN_ANYC) {
+			if (ic->ic_bsschan->ic_maxregpower >= rrq->value) {
+			        vap->iv_bss->ni_txpower = 2 * rrq->value;
+				ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
+			} else
+				return -EOPNOTSUPP;
+		} else
+			return -EOPNOTSUPP;
 	} else {
 		if (!fixed)		/* no change */
 			return 0;
 		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
 	}
 done:
+#ifdef ATH_CAP_TPC
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next)
+		ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, rrq);
+#endif
 	return IS_UP(ic->ic_dev) ? -ic->ic_reset(ic->ic_dev) : 0;
 }
 
@@ -1172,7 +1191,7 @@ ieee80211_ioctl_giwtxpow(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 
-	rrq->value = vap->iv_bss->ni_txpower/2;
+	rrq->value = vap->iv_bss->ni_txpower / 2;
 	rrq->fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED) != 0;
 	rrq->disabled = (rrq->fixed && rrq->value == 0);
 	rrq->flags = IW_TXPOW_DBM;
@@ -1183,7 +1202,7 @@ struct waplistreq {	/* XXX: not the right place for declaration? */
 	struct ieee80211vap *vap;
 	struct sockaddr addr[IW_MAX_AP];
 	struct iw_quality qual[IW_MAX_AP];
-	int	i;
+	int i;
 };
 
 static void
@@ -1216,7 +1235,7 @@ ieee80211_ioctl_iwaplist(struct net_device *dev, struct iw_request_info *info,
 	ieee80211_scan_iterate(ic, waplist_cb, &req);
 
 	data->length = req.i;
-	memcpy(extra, &req.addr, req.i*sizeof(req.addr[0]));
+	memcpy(extra, &req.addr, req.i * sizeof(req.addr[0]));
 	data->flags = 1;		/* signal quality present (sort of) */
 	memcpy(extra + req.i * sizeof(req.addr[0]), &req.qual,
 		req.i * sizeof(req.qual[0]));
