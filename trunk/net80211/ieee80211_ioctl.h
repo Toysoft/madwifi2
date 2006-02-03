@@ -232,14 +232,17 @@ struct ieee80211req_del_key {
  * ap (to effect a station).
  */
 struct ieee80211req_mlme {
-	u_int8_t	im_op;		/* operation to perform */
+	u_int8_t	im_op;			/* operation to perform */
 #define	IEEE80211_MLME_ASSOC		1	/* associate station */
 #define	IEEE80211_MLME_DISASSOC		2	/* disassociate station */
 #define	IEEE80211_MLME_DEAUTH		3	/* deauthenticate station */
 #define	IEEE80211_MLME_AUTHORIZE	4	/* authorize station */
 #define	IEEE80211_MLME_UNAUTHORIZE	5	/* unauthorize station */
-	u_int16_t	im_reason;	/* 802.11 reason code */
+#define IEEE80211_MLME_CLEAR_STATS	6	/* clear station statistic */
+	u_int8_t	im_ssid_len;		/* length of optional ssid */
+	u_int16_t im_reason;		/* 802.11 reason code */
 	u_int8_t	im_macaddr[IEEE80211_ADDR_LEN];
+	u_int8_t	im_ssid[IEEE80211_NWID_LEN];
 };
 
 /* 
