@@ -500,7 +500,8 @@ MODULE_DESCRIPTION("Atsushi Onoe's rate control algorithm for Atheros devices");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static char *version = "1.0";
+#include "svnversion.h"
+static char *version = "1.0 (svn " SVNVERSION ")";
 static char *dev_info = "ath_rate_onoe";
 
 static int __init

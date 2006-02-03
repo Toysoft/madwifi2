@@ -552,7 +552,8 @@ MODULE_DESCRIPTION("AMRR Rate control algorithm");
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
-static char *version = "0.1";
+#include "svnversion.h"
+static char *version = "0.1 (svn " SVNVERSION ")";
 static char *dev_info = "ath_rate_amrr";
 
 static int __init

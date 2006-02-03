@@ -51,13 +51,23 @@ include Makefile.inc
 DIRS_MODULES=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
 DIRS=	${DIRS_MODULES} ${TOOLS}
 
-all: modules tools
+all: svnversion.h modules tools
 
 modules: configcheck
 	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i || exit 1; \
 	done
+
+.PHONY: svnversion.h
+svnversion.h:
+	echo -n '#define SVNVERSION "' > $@
+	if [ -d .svn ]; then \
+		echo -n "$(shell svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//')" >> $@; \
+	else \
+		echo -n "$(shell date +%F)" >> $@; \
+	fi
+	echo '"' >> $@
 
 # conflicts with the 'tools' subdirectory
 .PHONY: tools
@@ -103,6 +113,7 @@ clean:
 		$(MAKE) -C $$i clean; \
 	done
 	rm -rf ${SYMBOLSDIR}
+	rm -f svnversion.h
 
 info:
 	@echo "The following settings will be used for compilation:"
