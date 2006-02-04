@@ -952,6 +952,85 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 }
 
 static int
+ieee80211_ioctl_setspy(struct net_device *dev, struct iw_request_info *info,
+	struct iw_point *data, char *extra)
+{
+	/* save the list of node addresses */
+	struct ieee80211vap *vap = dev->priv;
+	struct sockaddr address[IW_MAX_SPY];
+	unsigned int number = data->length;
+	int i;
+
+	if (number > IW_MAX_SPY)
+		return -E2BIG;
+	
+	/* get the addresses into the driver */
+	if (data->pointer) {
+		if (copy_from_user(address, data->pointer,
+		    sizeof(struct sockaddr) * number))
+			return -EFAULT;
+        } else
+		return -EFAULT;
+
+	/* copy the MAC addresses into a list */
+	if (number > 0) {
+		/* extract the MAC addresses */
+		for (i = 0; i < number; i++)
+			memcpy(&vap->iv_spy.mac[i * IEEE80211_ADDR_LEN],
+				address[i].sa_data, IEEE80211_ADDR_LEN);
+	}
+	vap->iv_spy.num = number;
+
+	return 0;
+}
+
+static int
+ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
+	struct iw_point *data, char *extra)
+{
+	/*
+	 * locate nodes by mac (ieee80211_find_node()),
+	 * copy out rssi, set updated flag appropriately
+	 */
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211_node_table *nt = &vap->iv_ic->ic_sta;
+	struct ieee80211_node *ni;
+	struct sockaddr *address;
+	struct iw_quality *spy_stat;
+	unsigned int number = vap->iv_spy.num;
+	int i;
+
+	address = (struct sockaddr *) extra;
+	spy_stat = (struct iw_quality *) (extra + number * sizeof(struct sockaddr));
+
+	for (i = 0; i < number; i++) {
+		memcpy(address[i].sa_data, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN],
+			IEEE80211_ADDR_LEN);
+		address[i].sa_family = AF_PACKET;
+	}
+
+	/* locate a node, copy its rssi value, convert to dBm */
+	for(i = 0; i < number; i++) {
+		ni = ieee80211_find_node(nt, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]);
+		if (ni && (ni->ni_vap == vap)) { /* check we are associated w/ this vap */
+			spy_stat[i].qual = ni->ni_rssi;
+			spy_stat[i].noise = 161; /* -95dBm */
+			spy_stat[i].level = spy_stat[i].qual + spy_stat[i].noise;
+			spy_stat[i].updated = IW_QUAL_NOISE_UPDATED |
+				IW_QUAL_QUAL_UPDATED |
+				IW_QUAL_LEVEL_UPDATED; 
+		} else 
+			spy_stat[i].updated = IW_QUAL_QUAL_INVALID |
+				IW_QUAL_LEVEL_INVALID |
+				IW_QUAL_NOISE_INVALID;
+	}
+
+	/* copy results to userspace */
+	data->length = number;
+	return 0;
+}
+
+static int
 ieee80211_ioctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 	__u32 *mode, char *extra)
 {
@@ -3782,8 +3861,8 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) NULL /* kernel code */,		/* SIOCGIWPRIV */
 	(iw_handler) NULL /* not used */,		/* SIOCSIWSTATS */
 	(iw_handler) NULL /* kernel code */,		/* SIOCGIWSTATS */
-	(iw_handler) NULL,				/* SIOCSIWSPY */
-	(iw_handler) NULL,				/* SIOCGIWSPY */
+	(iw_handler) ieee80211_ioctl_setspy,		/* SIOCSIWSPY */
+	(iw_handler) ieee80211_ioctl_getspy,		/* SIOCGIWSPY */
 	(iw_handler) NULL,				/* -- hole -- */
 	(iw_handler) NULL,				/* -- hole -- */
 	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
