@@ -263,6 +263,12 @@ struct ieee80211_nsparams {
 	int			result;
 };
 
+#define IW_MAX_SPY 8
+struct ieee80211_spy {
+        u_int8_t mac[IW_MAX_SPY * IEEE80211_ADDR_LEN];
+        u_int8_t num;
+};
+
 struct ieee80211vap {
 	struct net_device	*iv_dev;	/* associated device */
 	struct net_device_stats	iv_devstats;	/* interface statistics */
@@ -370,6 +376,7 @@ struct ieee80211vap {
 	struct IEEE80211_TQ_STRUCT iv_stajoin1tq; /* tasklet for newstate action called from stajoin1tq */
 	unsigned int		iv_nsdone;	/* Done with scheduled newstate tasklet */
 	uint8_t	wds_mac[IEEE80211_ADDR_LEN];
+	struct ieee80211_spy    iv_spy;         /* IWSPY support */
 };
 MALLOC_DECLARE(M_80211_VAP);
 
