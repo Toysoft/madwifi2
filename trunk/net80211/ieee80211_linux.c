@@ -298,7 +298,22 @@ EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 int
 ieee80211_load_module(const char *modname)
 {
-	return request_module(modname);
+	int rv;
+	
+	rv = request_module(modname);
+	
+	if (rv < 0)
+		printk(KERN_ERR "couldn't load module '%s' (%d)\n",
+			modname, rv);
+	/*
+	 * XXX Further checking needed if module has been loaded successfully:
+	 *
+	 * "Note that a successful module load does not mean the module did not
+	 * then unload and exit on an error of its own. Callers must check that
+	 * the service they requested is now available not blindly invoke it."
+	 * http://kernelnewbies.org/documents/kdoc/kernel-api/r7338.html
+	 */
+	return rv;
 }
 
 #ifdef CONFIG_SYSCTL
