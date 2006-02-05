@@ -2914,6 +2914,28 @@ ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
 	return -1;
 }
 
+/*
+ * kick associated station with the given MAC address.
+ */
+static int
+ieee80211_ioctl_kickmac(struct net_device *dev, struct iw_request_info *info,
+	void *w, char *extra)
+{
+	struct sockaddr *sa = (struct sockaddr *)extra;
+	struct ieee80211req_mlme mlme;
+	
+	if (sa->sa_family != ARPHRD_ETHER)
+		return -EINVAL;
+
+	/* Setup a MLME request for disassociation of the given MAC */
+	mlme.im_op = IEEE80211_MLME_DISASSOC;
+	mlme.im_reason = IEEE80211_REASON_UNSPECIFIED;
+	IEEE80211_ADDR_COPY(&(mlme.im_macaddr), sa->sa_data);
+
+	/* Send the MLME request and return the result. */
+	return ieee80211_ioctl_setmlme(dev, info, w, (char *)&mlme);
+}
+
 static int
 ieee80211_ioctl_addmac(struct net_device *dev, struct iw_request_info *info,
 	void *w, char *extra)
@@ -3537,6 +3559,8 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"addmac" },
 	{ IEEE80211_IOCTL_DELMAC,
 	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"delmac" },
+	{ IEEE80211_IOCTL_KICKMAC,
+	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0, "kickmac"},
 	{ IEEE80211_IOCTL_WDSADDMAC,
 	  IW_PRIV_TYPE_ADDR | IW_PRIV_SIZE_FIXED | 1, 0,"wds_add" },
 	{ IEEE80211_IOCTL_WDSDELMAC,
@@ -3928,6 +3952,8 @@ static const iw_handler ieee80211_priv_handlers[] = {
 	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+27 */
 	(iw_handler) ieee80211_ioctl_wdsdelmac,		/* SIOCIWFIRSTPRIV+28 */
 	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+29 */
+	(iw_handler) ieee80211_ioctl_kickmac,		/* SIOCIWFIRSTPRIV+30 */
+	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+31 */
 };
 static struct iw_handler_def ieee80211_iw_handler_def = {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
