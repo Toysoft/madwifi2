@@ -80,8 +80,8 @@ enum {
 };
 
 static struct {
-	const char	*name;
-	u_int		bit;
+	const char *name;
+	u_int bit;
 } flags[] = {
 	{ "xmit",	ATH_DEBUG_XMIT },
 	{ "xmit_desc",	ATH_DEBUG_XMIT_DESC },

@@ -39,7 +39,7 @@ static struct ath_ahb_softc *sclist[2] = {NULL, NULL};
 static u_int8_t num_activesc = 0;
 
 static struct ar531x_boarddata *ar5312_boardConfig = NULL;
-static char *radioConfig=NULL;
+static char *radioConfig = NULL;
 
 static int
 ar5312_get_board_config(void)

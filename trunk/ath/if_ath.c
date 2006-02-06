@@ -107,160 +107,154 @@ enum {
 };
 
 static struct ieee80211vap *ath_vap_create(struct ieee80211com *,
-			const char *name, int unit, int opmode, int flags, struct net_device *mdev);
-static void	ath_vap_delete(struct ieee80211vap *);
-static int	ath_init(struct net_device *);
-static int	ath_reset(struct net_device *);
-static void	ath_fatal_tasklet(TQUEUE_ARG);
-static void	ath_rxorn_tasklet(TQUEUE_ARG);
-static void	ath_bmiss_tasklet(TQUEUE_ARG);
-static void	ath_bstuck_tasklet(TQUEUE_ARG);
-static void	ath_radar_task(TQUEUE_ARG data);
-static void	ath_dfs_test_return(unsigned long);
+	const char *, int, int, int, struct net_device *);
+static void ath_vap_delete(struct ieee80211vap *);
+static int ath_init(struct net_device *);
+static int ath_reset(struct net_device *);
+static void ath_fatal_tasklet(TQUEUE_ARG);
+static void ath_rxorn_tasklet(TQUEUE_ARG);
+static void ath_bmiss_tasklet(TQUEUE_ARG);
+static void ath_bstuck_tasklet(TQUEUE_ARG);
+static void ath_radar_task(TQUEUE_ARG);
+static void ath_dfs_test_return(unsigned long);
 
-static int	ath_stop_locked(struct net_device *);
-static int	ath_stop(struct net_device *);
+static int ath_stop_locked(struct net_device *);
+static int ath_stop(struct net_device *);
 #if 0
-static void	ath_initkeytable(struct ath_softc *);
+static void ath_initkeytable(struct ath_softc *);
 #endif
-static int	ath_key_alloc(struct ieee80211vap *,
-			const struct ieee80211_key *);
-static int	ath_key_delete(struct ieee80211vap *,
-			const struct ieee80211_key *,
-			struct ieee80211_node *);
-static int	ath_key_set(struct ieee80211vap *, const struct ieee80211_key *,
-			const u_int8_t mac[IEEE80211_ADDR_LEN]);
-static void	ath_key_update_begin(struct ieee80211vap *);
-static void	ath_key_update_end(struct ieee80211vap *);
-static void	ath_mode_init(struct net_device *);
-static void	ath_setslottime(struct ath_softc *);
-static void	ath_updateslot(struct net_device *);
-static int	ath_beaconq_setup(struct ath_hal *);
-static int	ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
+static int ath_key_alloc(struct ieee80211vap *, const struct ieee80211_key *);
+static int ath_key_delete(struct ieee80211vap *, const struct ieee80211_key *,
+	struct ieee80211_node *);
+static int ath_key_set(struct ieee80211vap *, const struct ieee80211_key *,
+	const u_int8_t mac[IEEE80211_ADDR_LEN]);
+static void ath_key_update_begin(struct ieee80211vap *);
+static void ath_key_update_end(struct ieee80211vap *);
+static void ath_mode_init(struct net_device *);
+static void ath_setslottime(struct ath_softc *);
+static void ath_updateslot(struct net_device *);
+static int ath_beaconq_setup(struct ath_hal *);
+static int ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
 #ifdef ATH_SUPERG_DYNTURBO
-static void	ath_beacon_dturbo_update(struct ieee80211vap *vap, int *, u_int8_t);
-static void	ath_beacon_dturbo_config(struct ieee80211vap *, u_int32_t);
-static void	ath_turbo_switch_mode(unsigned long);
-static int	ath_check_beacon_done(struct ath_softc *sc);
+static void ath_beacon_dturbo_update(struct ieee80211vap *, int *, u_int8_t);
+static void ath_beacon_dturbo_config(struct ieee80211vap *, u_int32_t);
+static void ath_turbo_switch_mode(unsigned long);
+static int ath_check_beacon_done(struct ath_softc *);
 #endif
-static void	ath_beacon_send(struct ath_softc *, int *needmark);
-static void	ath_beacon_start_adhoc(struct ath_softc *,
-			struct ieee80211vap *);
-static void	ath_beacon_return(struct ath_softc *, struct ath_buf *);
-static void	ath_beacon_free(struct ath_softc *);
-static void	ath_beacon_config(struct ath_softc *, struct ieee80211vap *);
-static int	ath_desc_alloc(struct ath_softc *);
-static void	ath_desc_free(struct ath_softc *);
-static void	ath_desc_swap(struct ath_desc *);
-static struct ieee80211_node *ath_node_alloc(struct ieee80211_node_table *, struct ieee80211vap *vap);
-static void	ath_node_cleanup(struct ieee80211_node *);
-static void	ath_node_free(struct ieee80211_node *);
-static u_int8_t	ath_node_getrssi(const struct ieee80211_node *);
-static int	ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
-static void	ath_recv_mgmt(struct ieee80211_node *, struct sk_buff *,
-			int subtype, int rssi, u_int32_t rstamp);
-static void	ath_setdefantenna(struct ath_softc *sc, u_int antenna);
-static struct ath_txq *ath_txq_setup(struct ath_softc*, int qtype, int subtype);
-static void	ath_rx_tasklet(TQUEUE_ARG data);
-static int	ath_hardstart(struct sk_buff *, struct net_device *);
-static int	ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb);
+static void ath_beacon_send(struct ath_softc *, int *);
+static void ath_beacon_start_adhoc(struct ath_softc *, struct ieee80211vap *);
+static void ath_beacon_return(struct ath_softc *, struct ath_buf *);
+static void ath_beacon_free(struct ath_softc *);
+static void ath_beacon_config(struct ath_softc *, struct ieee80211vap *);
+static int ath_desc_alloc(struct ath_softc *);
+static void ath_desc_free(struct ath_softc *);
+static void ath_desc_swap(struct ath_desc *);
+static struct ieee80211_node *ath_node_alloc(struct ieee80211_node_table *,
+	struct ieee80211vap *);
+static void ath_node_cleanup(struct ieee80211_node *);
+static void ath_node_free(struct ieee80211_node *);
+static u_int8_t ath_node_getrssi(const struct ieee80211_node *);
+static int ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
+static void ath_recv_mgmt(struct ieee80211_node *, struct sk_buff *, int,
+	int, u_int32_t);
+static void ath_setdefantenna(struct ath_softc *, u_int);
+static struct ath_txq *ath_txq_setup(struct ath_softc *, int, int);
+static void ath_rx_tasklet(TQUEUE_ARG);
+static int ath_hardstart(struct sk_buff *, struct net_device *);
+static int ath_mgtstart(struct ieee80211com *, struct sk_buff *);
 #ifdef ATH_SUPERG_COMP
-static u_int32_t ath_get_icvlen(struct ieee80211_key *k);
-static u_int32_t ath_get_ivlen(struct ieee80211_key *k);
-static void	ath_setup_comp(struct ieee80211_node *, int);
-static void	ath_comp_set(struct ieee80211vap *, struct ieee80211_node *ni,
-				int en);	
+static u_int32_t ath_get_icvlen(struct ieee80211_key *);
+static u_int32_t ath_get_ivlen(struct ieee80211_key *);
+static void ath_setup_comp(struct ieee80211_node *, int);
+static void ath_comp_set(struct ieee80211vap *, struct ieee80211_node *, int);	
 #endif
-static int	ath_tx_setup(struct ath_softc *, int ac, int haltype);
-static int	ath_wme_update(struct ieee80211com *);
-static void	ath_uapsd_flush(struct ieee80211_node *);
-static void	ath_tx_cleanupq(struct ath_softc *, struct ath_txq *);
-static void	ath_tx_cleanup(struct ath_softc *);
-static void	ath_tx_uapsdqueue(struct ath_softc *, struct ath_node *, struct ath_buf *);
+static int ath_tx_setup(struct ath_softc *, int, int);
+static int ath_wme_update(struct ieee80211com *);
+static void ath_uapsd_flush(struct ieee80211_node *);
+static void ath_tx_cleanupq(struct ath_softc *, struct ath_txq *);
+static void ath_tx_cleanup(struct ath_softc *);
+static void ath_tx_uapsdqueue(struct ath_softc *, struct ath_node *,
+	struct ath_buf *);
 
-static int	ath_tx_start(struct net_device *, struct ieee80211_node *,
-			     struct ath_buf *, struct sk_buff *, int);
-static void	ath_tx_tasklet_q0(TQUEUE_ARG data);
-static void	ath_tx_tasklet_q0123(TQUEUE_ARG data);
-static void	ath_tx_tasklet(TQUEUE_ARG data);
-static void	ath_tx_timeout(struct net_device *);
-static void	ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
-static int	ath_chan_set(struct ath_softc *, struct ieee80211_channel *);
-static void	ath_draintxq(struct ath_softc *);
-static __inline void ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
-				    struct ath_txq *txq, struct ath_buf *bf, 
-				    struct ath_desc *lastds, int framelen);
-static void	ath_stoprecv(struct ath_softc *);
-static int	ath_startrecv(struct ath_softc *);
-static void	ath_flushrecv(struct ath_softc *);
-static void	ath_chan_change(struct ath_softc *, struct ieee80211_channel *);
-static void	ath_calibrate(unsigned long);
-static int	ath_newstate(struct ieee80211vap *, enum ieee80211_state, int);
+static int ath_tx_start(struct net_device *, struct ieee80211_node *,
+	struct ath_buf *, struct sk_buff *, int);
+static void ath_tx_tasklet_q0(TQUEUE_ARG);
+static void ath_tx_tasklet_q0123(TQUEUE_ARG);
+static void ath_tx_tasklet(TQUEUE_ARG);
+static void ath_tx_timeout(struct net_device *);
+static void ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
+static int ath_chan_set(struct ath_softc *, struct ieee80211_channel *);
+static void ath_draintxq(struct ath_softc *);
+static __inline void ath_tx_txqaddbuf(struct ath_softc *, struct ieee80211_node *,
+	struct ath_txq *, struct ath_buf *, struct ath_desc *, int);
+static void ath_stoprecv(struct ath_softc *);
+static int ath_startrecv(struct ath_softc *);
+static void ath_flushrecv(struct ath_softc *);
+static void ath_chan_change(struct ath_softc *, struct ieee80211_channel *);
+static void ath_calibrate(unsigned long);
+static int ath_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 
-static void	ath_scan_start(struct ieee80211com *);
-static void	ath_scan_end(struct ieee80211com *);
-static void	ath_set_channel(struct ieee80211com *);
-static void	ath_set_coverageclass(struct ieee80211com *);
-static u_int	ath_mhz2ieee(struct ieee80211com *, u_int freq, u_int flags);
+static void ath_scan_start(struct ieee80211com *);
+static void ath_scan_end(struct ieee80211com *);
+static void ath_set_channel(struct ieee80211com *);
+static void ath_set_coverageclass(struct ieee80211com *);
+static u_int ath_mhz2ieee(struct ieee80211com *, u_int, u_int);
 #ifdef ATH_SUPERG_FF
-static int	athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
-				    struct ath_node *an, struct sk_buff *skb, u_int16_t fragthreshold, int *flushq);
+static int athff_can_aggregate(struct ath_softc *, struct ether_header *,
+	struct ath_node *, struct sk_buff *, u_int16_t, int *);
 #endif
 static struct net_device_stats *ath_getstats(struct net_device *);
-static void	ath_setup_stationkey(struct ieee80211_node *);
-static void 	ath_setup_stationwepkey(struct ieee80211_node *);
-static void 	ath_setup_keycacheslot(struct ath_softc *,
-			struct ieee80211_node *);
-static void	ath_newassoc(struct ieee80211_node *, int);
-static int	ath_getchannels(struct net_device *, u_int cc,
-			HAL_BOOL outdoor, HAL_BOOL xchanmode);
-static void	ath_led_event(struct ath_softc *, int);
-static void	ath_update_txpow(struct ath_softc *);
+static void ath_setup_stationkey(struct ieee80211_node *);
+static void ath_setup_stationwepkey(struct ieee80211_node *);
+static void ath_setup_keycacheslot(struct ath_softc *, struct ieee80211_node *);
+static void ath_newassoc(struct ieee80211_node *, int);
+static int ath_getchannels(struct net_device *, u_int, HAL_BOOL, HAL_BOOL);
+static void ath_led_event(struct ath_softc *, int);
+static void ath_update_txpow(struct ath_softc *);
 
-static int	ath_set_mac_address(struct net_device *, void *);
-static int	ath_change_mtu(struct net_device *, int);
-static int	ath_ioctl(struct net_device *, struct ifreq *, int);
+static int ath_set_mac_address(struct net_device *, void *);
+static int ath_change_mtu(struct net_device *, int);
+static int ath_ioctl(struct net_device *, struct ifreq *, int);
 
-static int	ath_rate_setup(struct net_device *, u_int mode);
-static void	ath_setup_subrates(struct net_device *dev);
+static int ath_rate_setup(struct net_device *, u_int);
+static void ath_setup_subrates(struct net_device *);
 #ifdef ATH_SUPERG_XR
-static int	ath_xr_rate_setup(struct net_device *);
-static void	ath_grppoll_txq_setup(struct ath_softc *sc, int qtype, int period);
-static void	ath_grppoll_start(struct ieee80211vap *vap, int pollcount);
-static void	ath_grppoll_stop(struct ieee80211vap *vap);
-static u_int8_t	ath_node_move_data(const struct ieee80211_node *);
-static void	ath_grppoll_txq_update(struct ath_softc *sc, int period);
-static void	ath_grppoll_period_update(struct ath_softc *sc);
+static int ath_xr_rate_setup(struct net_device *);
+static void ath_grppoll_txq_setup(struct ath_softc *, int, int);
+static void ath_grppoll_start(struct ieee80211vap *, int);
+static void ath_grppoll_stop(struct ieee80211vap *);
+static u_int8_t ath_node_move_data(const struct ieee80211_node *);
+static void ath_grppoll_txq_update(struct ath_softc *, int);
+static void ath_grppoll_period_update(struct ath_softc *);
 #endif
-static void	ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
+static void ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 
 #ifdef CONFIG_SYSCTL
-static void	ath_dynamic_sysctl_register(struct ath_softc *);
-static void	ath_dynamic_sysctl_unregister(struct ath_softc *);
+static void ath_dynamic_sysctl_register(struct ath_softc *);
+static void ath_dynamic_sysctl_unregister(struct ath_softc *);
 #endif /* CONFIG_SYSCTL */
-static void	ath_announce(struct net_device *);
-static int	ath_descdma_setup(struct ath_softc *sc,
-				 struct ath_descdma *dd, ath_bufhead *head,
-				 const char *name, int nbuf, int ndesc);
-static void	ath_descdma_cleanup(struct ath_softc *sc,
-				struct ath_descdma *dd, ath_bufhead *head, int dir);
-static void	ath_check_dfs_clear(unsigned long );
-static const char* ath_get_hal_status_desc(HAL_STATUS status);
+static void ath_announce(struct net_device *);
+static int ath_descdma_setup(struct ath_softc *, struct ath_descdma *,
+	ath_bufhead *, const char *, int, int);
+static void ath_descdma_cleanup(struct ath_softc *, struct ath_descdma *,
+	ath_bufhead *, int);
+static void ath_check_dfs_clear(unsigned long);
+static const char *ath_get_hal_status_desc(HAL_STATUS status);
 static int ath_rcv_dev_event(struct notifier_block *, unsigned long, void *);
 	
-static	int	ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
+static int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
 								 * but check every second at first.
 								 */
-static	int ath_countrycode = CTRY_DEFAULT;	/* country code */
-static	int ath_regdomain = 0;			/* regulatory domain */
-static	int ath_outdoor = AH_FALSE;		/* enable outdoor use */
-static	int ath_xchanmode = AH_TRUE;		/* enable extended channels */
-static  char *autocreate = NULL;
-static  int rfkill = -1;
-static	int countrycode = -1;
-static	int outdoor = -1;
-static	int xchanmode = -1;
+static int ath_countrycode = CTRY_DEFAULT;	/* country code */
+static int ath_regdomain = 0;			/* regulatory domain */
+static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
+static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
+static char *autocreate = NULL;
+static int rfkill = -1;
+static int countrycode = -1;
+static int outdoor = -1;
+static int xchanmode = -1;
 
 static const char *hal_status_desc[] = {
 	"No error",
@@ -316,8 +310,8 @@ MODULE_PARM_DESC(ath_debug, "Load-time debug output enable");
 
 #define	IFF_DUMPPKTS(sc, _m) \
 	((sc->sc_debug & _m))
-static	void ath_printrxbuf(struct ath_buf *bf, int);
-static	void ath_printtxbuf(struct ath_buf *bf, int);
+static void ath_printrxbuf(struct ath_buf *, int);
+static void ath_printtxbuf(struct ath_buf *, int);
 enum {
 	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
 	ATH_DEBUG_XMIT_DESC	= 0x00000002,	/* xmit descriptors */
