@@ -67,6 +67,28 @@
 #define	RESCAN	1
 
 /*
+ * Compatibility definition of statistics flags
+ * (bitmask in (struct iw_quality *)->updated)
+ */
+#ifndef IW_QUAL_QUAL_UPDATED
+#define IW_QUAL_QUAL_UPDATED	0x01	/* Value was updated since last read */
+#define IW_QUAL_LEVEL_UPDATED	0x02
+#define IW_QUAL_NOISE_UPDATED	0x04
+#define IW_QUAL_QUAL_INVALID	0x10	/* Driver doesn't provide value */
+#define IW_QUAL_LEVEL_INVALID	0x20
+#define IW_QUAL_NOISE_INVALID	0x40
+#endif /* IW_QUAL_QUAL_UPDATED */
+
+#ifndef IW_QUAL_ALL_UPDATED
+#define IW_QUAL_ALL_UPDATED \
+	(IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_UPDATED)
+#endif
+#ifndef IW_QUAL_ALL_INVALID
+#define IW_QUAL_ALL_INVALID \
+	(IW_QUAL_QUAL_INVALID | IW_QUAL_LEVEL_INVALID | IW_QUAL_NOISE_INVALID)
+#endif
+
+/*
  * Units are in db above the noise floor. That means the
  * rssi values reported in the tx/rx descriptors in the
  * driver are the SNR expressed in db.
@@ -92,9 +114,9 @@ set_quality(struct iw_quality *iq, u_int rssi)
 
 	iq->noise = 161;		/* -95dBm */
 	iq->level = iq->noise + iq->qual;
-	iq->updated = 7;
+	iq->updated = IW_QUAL_ALL_UPDATED;
 }
-
+	
 static struct iw_statistics *
 ieee80211_iw_getstats(struct net_device *dev)
 {
@@ -1010,19 +1032,13 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	/* locate a node, copy its rssi value, convert to dBm */
-	for(i = 0; i < number; i++) {
+	for (i = 0; i < number; i++) {
 		ni = ieee80211_find_node(nt, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]);
-		if (ni && (ni->ni_vap == vap)) { /* check we are associated w/ this vap */
-			spy_stat[i].qual = ni->ni_rssi;
-			spy_stat[i].noise = 161; /* -95dBm */
-			spy_stat[i].level = spy_stat[i].qual + spy_stat[i].noise;
-			spy_stat[i].updated = IW_QUAL_NOISE_UPDATED |
-				IW_QUAL_QUAL_UPDATED |
-				IW_QUAL_LEVEL_UPDATED; 
-		} else 
-			spy_stat[i].updated = IW_QUAL_QUAL_INVALID |
-				IW_QUAL_LEVEL_INVALID |
-				IW_QUAL_NOISE_INVALID;
+		/* check we are associated w/ this vap */
+		if (ni && (ni->ni_vap == vap))
+			set_quality(&spy_stat[i], ni->ni_rssi);
+		else 
+			spy_stat[i].updated = IW_QUAL_ALL_INVALID;
 	}
 
 	/* copy results to userspace */
