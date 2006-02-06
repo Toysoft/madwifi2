@@ -74,8 +74,8 @@ MALLOC_DEFINE(M_80211_VAP, "80211vap", "802.11 vap state");
  * Country Code Table for code-to-string conversion.
  */
 struct country_code_to_string{
-	u_int16_t	iso_code;	   
-	const char*	iso_name;
+	u_int16_t iso_code;	   
+	const char *iso_name;
 };
 
 /*

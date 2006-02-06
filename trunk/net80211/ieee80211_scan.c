@@ -55,14 +55,14 @@
 struct scan_state {
 	struct ieee80211_scan_state base;	/* public state */
 
-	u_int		ss_iflags;		/* flags used internally */
+	u_int ss_iflags;				/* flags used internally */
 #define	ISCAN_MINDWELL 	0x0001		/* min dwell time reached */
 #define	ISCAN_DISCARD	0x0002		/* discard rx'd frames */
 #define	ISCAN_CANCEL	0x0004		/* cancel current scan */
 #define	ISCAN_START	0x0008		/* 1st time through next_scan */
-	unsigned long	ss_chanmindwell;	/* min dwell on curchan */
-	unsigned long	ss_scanend;		/* time scan must stop */
-	u_int		ss_duration;		/* duration for next scan */
+	unsigned long ss_chanmindwell;		/* min dwell on curchan */
+	unsigned long ss_scanend;		/* time scan must stop */
+	u_int ss_duration;			/* duration for next scan */
 	struct tasklet_struct ss_pwrsav;	/* sta ps ena tasklet */
 	struct timer_list ss_scan_timer;	/* scan timer */
 };

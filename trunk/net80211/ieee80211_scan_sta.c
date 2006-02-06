@@ -59,7 +59,7 @@
  * o after STA_FAILS_AGE seconds we clear the failure count
  */
 #define	STA_FAILS_MAX	2		/* assoc failures before ignored */
-#define	STA_FAILS_AGE	(2*60)		/* time before clearing fails (secs) */
+#define	STA_FAILS_AGE	(2 * 60)	/* time before clearing fails (secs) */
 #define	STA_PURGE_SCANS	2		/* age for purging entries (scans) */
 
 /* XXX tunable */
@@ -111,7 +111,7 @@ struct sta_table {
 static void sta_flush_table(struct sta_table *);
 static int match_bss(struct ieee80211vap *, const struct ieee80211_scan_state *,
 	const struct sta_entry *);
-static void action_tasklet(IEEE80211_TQUEUE_ARG data);
+static void action_tasklet(IEEE80211_TQUEUE_ARG);
 
 /*
  * Attach prior to any scanning work.

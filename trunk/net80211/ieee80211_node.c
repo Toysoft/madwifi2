@@ -65,7 +65,8 @@
 
 static int ieee80211_sta_join1(struct ieee80211_node *);
 
-static struct ieee80211_node *node_alloc(struct ieee80211_node_table *,struct ieee80211vap *);
+static struct ieee80211_node *node_alloc(struct ieee80211_node_table *,
+	struct ieee80211vap *);
 static void node_cleanup(struct ieee80211_node *);
 static void node_free(struct ieee80211_node *);
 static u_int8_t node_getrssi(const struct ieee80211_node *);

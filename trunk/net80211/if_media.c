@@ -71,11 +71,11 @@
  * 	Useful for debugging newly-ported  drivers.
  */
 
-struct ifmedia_entry *ifmedia_match(struct ifmedia *ifm, int flags, int mask);
+struct ifmedia_entry *ifmedia_match(struct ifmedia *, int, int);
 
 #ifdef IFMEDIA_DEBUG
-int	ifmedia_debug = 0;
-static	void ifmedia_printword(int);
+int ifmedia_debug = 0;
+static void ifmedia_printword(int);
 #endif
 
 /*

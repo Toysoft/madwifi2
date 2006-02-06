@@ -75,7 +75,7 @@ static int wep_decrypt(struct ieee80211_key *, struct sk_buff *, int);
 struct wep_ctx {
 	struct ieee80211vap *wc_vap;	/* for diagnostics + statistics */
 	struct ieee80211com *wc_ic;	/* for diagnostics */
-	u_int32_t	wc_iv;		/* initial vector for crypto */
+	u_int32_t wc_iv;			/* initial vector for crypto */
 };
 
 static void *

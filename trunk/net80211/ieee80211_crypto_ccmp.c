@@ -58,7 +58,7 @@
 struct ccmp_ctx {
 	struct ieee80211vap *cc_vap;	/* for diagnostics + statistics */
 	struct ieee80211com *cc_ic;
-	struct crypto_tfm   *cc_tfm;
+	struct crypto_tfm *cc_tfm;
 };
 
 static void *ccmp_attach(struct ieee80211vap *, struct ieee80211_key *);

@@ -65,15 +65,15 @@ enum {
 #define	ACL_HASHSIZE	32
 
 struct acl {
-	TAILQ_ENTRY(acl)	acl_list;
-	LIST_ENTRY(acl)		acl_hash;
-	u_int8_t			acl_macaddr[IEEE80211_ADDR_LEN];
+	TAILQ_ENTRY(acl) acl_list;
+	LIST_ENTRY(acl) acl_hash;
+	u_int8_t acl_macaddr[IEEE80211_ADDR_LEN];
 };
 struct aclstate {
-	acl_lock_t		as_lock;
-	int			as_policy;
-	TAILQ_HEAD(, acl)	as_list;	/* list of all ACL's */
-	ATH_LIST_HEAD(, acl)	as_hash[ACL_HASHSIZE];
+	acl_lock_t as_lock;
+	int as_policy;
+	TAILQ_HEAD(, acl) as_list;	/* list of all ACL's */
+	ATH_LIST_HEAD(, acl) as_hash[ACL_HASHSIZE];
 };
 
 /* simple hash is enough for variation of macaddr */
