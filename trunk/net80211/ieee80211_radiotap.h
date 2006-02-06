@@ -1,6 +1,3 @@
-/* $FreeBSD: src/sys/net80211/ieee80211_radiotap.h,v 1.4 2004/12/08 17:26:47 sam Exp $ */
-/* $NetBSD: ieee80211_radiotap.h,v 1.3 2003/11/16 09:02:42 dyoung Exp $ */
-
 /*-
  * Copyright (c) 2003, 2004 David Young.  All rights reserved.
  *
@@ -56,18 +53,18 @@
 
 /* The radio capture header precedes the 802.11 header. */
 struct ieee80211_radiotap_header {
-	u_int8_t	it_version;	/* Version 0. Only increases
+	u_int8_t it_version;		/* Version 0. Only increases
 					 * for drastic changes,
 					 * introduction of compatible
 					 * new fields does not count.
 					 */
-	u_int8_t	it_pad;
-	u_int16_t       it_len;         /* length of the whole
+	u_int8_t it_pad;
+	u_int16_t it_len;		/* length of the whole
 					 * header in bytes, including
 					 * it_version, it_pad,
 					 * it_len, and data fields.
 					 */
-	u_int32_t       it_present;     /* A bitmap telling which
+	u_int32_t it_present;		/* A bitmap telling which
 					 * fields are present. Set bit 31
 					 * (0x80000000) to extend the
 					 * bitmap by another 32 bits.

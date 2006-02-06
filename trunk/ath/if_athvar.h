@@ -73,9 +73,11 @@ typedef void *TQUEUE_ARG;
 #include <linux/tqueue.h>
 #define ATH_WORK_THREAD			tq_struct
 #define ATH_SCHEDULE_TASK(t)		schedule_task((t))
-#define ATH_INIT_SCHED_TASK(t, f, d)	do { memset((t),0,sizeof(struct tq_struct)); \
-						(t)->routine = (void (*)(void*)) (f); \
-						(t)->data=(void *) (d); } while (0)
+#define ATH_INIT_SCHED_TASK(t, f, d) do { 	\
+	memset((t),0,sizeof(struct tq_struct)); 	\
+	(t)->routine = (void (*)(void*)) (f); 	\
+	(t)->data=(void *) (d); 		\
+} while (0)
 #define ATH_FLUSH_TASKS			flush_scheduled_tasks
 #else
 #include <linux/workqueue.h>
@@ -132,13 +134,13 @@ typedef void irqreturn_t;
 	proc_dointvec(ctl, write, filp, buffer, lenp, ppos)
 #endif
 
-#define	ATH_TIMEOUT		1000
+#define	ATH_TIMEOUT	1000
 
-#define ATH_DFS_WAIT_POLL_PERIOD 2	/* 2 seconds */
-#define	ATH_DFS_TEST_RETURN_PERIOD 15	/* 15 seconds */
+#define ATH_DFS_WAIT_POLL_PERIOD	2	/* 2 seconds */
+#define	ATH_DFS_TEST_RETURN_PERIOD	15	/* 15 seconds */
 
-#define	ATH_LONG_CALINTERVAL	30	/* 30 seconds between calibrations */
-#define	ATH_SHORT_CALINTERVAL	1	/* 1 second between calibrations */
+#define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between calibrations */
+#define	ATH_SHORT_CALINTERVAL		1	/* 1 second between calibrations */
 
 /*
  * Maximum acceptable MTU
@@ -154,17 +156,16 @@ typedef void irqreturn_t;
 #define	ATH_BCBUF	4		/* number of beacon buffers */
 
 /* free buffer threshold to restart net dev */
-#define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF/20) 
+#define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20) 
 
 #define TAIL_DROP_COUNT 50             /* maximum number of queued frames allowed */
 
 /*
  * dynamic turbo specific macros.
  */
-
-#define ATH_TURBO_UP_THRESH 750000 /* bytes/sec */ 
-#define ATH_TURBO_DN_THRESH 1000000 /* bytes/sec */ 
-#define ATH_TURBO_PERIOD_HOLD 1 /*in seconds */ 
+#define ATH_TURBO_UP_THRESH	750000	/* bytes/sec */ 
+#define ATH_TURBO_DN_THRESH 	1000000	/* bytes/sec */ 
+#define ATH_TURBO_PERIOD_HOLD	1 	/* in seconds */ 
 
 /*
  * The only case where we see skbuff chains is due to FF aggregation in
@@ -196,45 +197,45 @@ typedef void irqreturn_t;
 
 /* XR specific macros */
 
-#define XR_DEFAULT_GRPPOLL_RATE_STR "0.25 1 1 3 3 6 6 20"
-#define GRPPOLL_RATE_STR_LEN  64 
-#define XR_SLOT_DELAY         30      // in usec
-#define XR_AIFS               0
-#define XR_NUM_RATES          5
-#define XR_NUM_SUP_RATES      8
+#define XR_DEFAULT_GRPPOLL_RATE_STR 	"0.25 1 1 3 3 6 6 20"
+#define GRPPOLL_RATE_STR_LEN 	64 
+#define XR_SLOT_DELAY		30      /* in usec */
+#define XR_AIFS			0
+#define XR_NUM_RATES		5
+#define XR_NUM_SUP_RATES	8
 /* XR uplink should have same cwmin/cwmax value */
-#define XR_CWMIN_CWMAX              7
+#define XR_CWMIN_CWMAX	7
 
-#define XR_DATA_AIFS    3
-#define XR_DATA_CWMIN   31 
-#define XR_DATA_CWMAX   1023 
+#define XR_DATA_AIFS	3
+#define XR_DATA_CWMIN	31 
+#define XR_DATA_CWMAX	1023 
 
 /* pick the threshold so that we meet most of the regulatory constraints */
-#define XR_FRAGMENTATION_THRESHOLD            540
-#define XR_TELEC_FRAGMENTATION_THRESHOLD      442
+#define XR_FRAGMENTATION_THRESHOLD		540
+#define XR_TELEC_FRAGMENTATION_THRESHOLD	442
 
-#define XR_MAX_GRP_POLL_PERIOD             1000 /* Maximum Group Poll Periodicity */
+#define XR_MAX_GRP_POLL_PERIOD		1000	/* Maximum Group Poll Periodicity */
 
-#define XR_DEFAULT_POLL_INTERVAL          100 
-#define XR_MIN_POLL_INTERVAL              30 
-#define XR_MAX_POLL_INTERVAL              1000 
-#define XR_DEFAULT_POLL_COUNT             32 
-#define XR_MIN_POLL_COUNT                 16 
-#define XR_MAX_POLL_COUNT                 64 
-#define XR_POLL_UPDATE_PERIOD             10 /* number of xr beacons */  
-#define XR_GRPPOLL_PERIOD_FACTOR          5 /* factor used in calculating grp poll interval */
-#define XR_4MS_FRAG_THRESHOLD            128 /* fragmentation threshold for 4msec frame limit  */
+#define XR_DEFAULT_POLL_INTERVAL	100 
+#define XR_MIN_POLL_INTERVAL		30 
+#define XR_MAX_POLL_INTERVAL		1000 
+#define XR_DEFAULT_POLL_COUNT		32 
+#define XR_MIN_POLL_COUNT		16 
+#define XR_MAX_POLL_COUNT		64 
+#define XR_POLL_UPDATE_PERIOD		10	/* number of XR beacons */  
+#define XR_GRPPOLL_PERIOD_FACTOR	5	/* factor used in calculating grp poll interval */
+#define XR_4MS_FRAG_THRESHOLD		128	/* fragmentation threshold for 4msec frame limit  */
 
 /*
  * Maximum Values in ms for group poll periodicty
  */
-#define GRP_POLL_PERIOD_NO_XR_STA_MAX       100
-#define GRP_POLL_PERIOD_XR_STA_MAX          30
+#define GRP_POLL_PERIOD_NO_XR_STA_MAX	100
+#define GRP_POLL_PERIOD_XR_STA_MAX	30
 
  /*
  * Percentage of the configured poll periodicity
  */
-#define GRP_POLL_PERIOD_FACTOR_XR_STA     30  /* When XR Stations associated freq is 30% higher */
+#define GRP_POLL_PERIOD_FACTOR_XR_STA	30	/* When XR Stations associated freq is 30% higher */
 
 #define A_MAX(a,b) ((a) > (b) ? (a) : (b))
 
@@ -247,13 +248,13 @@ typedef void irqreturn_t;
  */
 #define GRP_POLL_PERIOD_NO_XR_STA(sc) (sc->sc_xrpollint)
 #define GRP_POLL_PERIOD_XR_STA(sc)                                                   \
-        A_MAX(GRP_POLL_PERIOD_FACTOR_XR_STA * (sc->sc_xrpollint / 100),GRP_POLL_PERIOD_XR_STA_MAX)
+        A_MAX(GRP_POLL_PERIOD_FACTOR_XR_STA * (sc->sc_xrpollint / 100), GRP_POLL_PERIOD_XR_STA_MAX)
 
 /*
  * When there are no XR STAs and a valid double chirp is received then the Group Polls are
  * transmitted for 10 seconds from the time of the last valid double double-chirp
  */
-#define NO_XR_STA_GRPPOLL_TX_DUR    10000
+#define NO_XR_STA_GRPPOLL_TX_DUR	10000
 
 
 /*
@@ -265,30 +266,31 @@ typedef void irqreturn_t;
  * up to ATH_KEYMAX entries (could dynamically allocate state).
  */
 #define	ATH_KEYMAX	128		/* max key cache size we handle */
-#define	ATH_KEYBYTES	(ATH_KEYMAX/NBBY)	/* storage space in bytes */
+#define	ATH_KEYBYTES	(ATH_KEYMAX / NBBY)	/* storage space in bytes */
 #define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
 #define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
 struct ath_buf;
 typedef STAILQ_HEAD(, ath_buf) ath_bufhead;
+
 /* driver-specific node state */
 struct ath_node {
-	struct ieee80211_node an_node;	/* base class */
-	u_int16_t	an_decomp_index; /* decompression mask index */
-	u_int32_t	an_avgrssi;	/* average rssi over all rx frames */
-	u_int8_t	an_prevdatarix;	/* rate ix of last data frame */
-	u_int16_t	an_minffrate;	/* mimum rate in kbps for ff to aggragate */
-	HAL_NODE_STATS	an_halstats;	/* rssi statistics used by hal */
-	struct ath_buf	*an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
-	ath_bufhead	an_uapsd_q;	/* U-APSD delivery queue */
-	int		an_uapsd_qdepth; /* U-APSD delivery queue depth */
-	ath_bufhead	an_uapsd_overflowq; /* U-APSD overflow queue (for > MaxSp frames) */
-	int		an_uapsd_overflowqdepth; /* U-APSD overflow queue depth */
-	spinlock_t	an_uapsd_lock;	/* U-APSD deleivery queue lock */
-	unsigned long	an_uapsd_lockflags; /* U-APSD cli flags for lock */
+	struct ieee80211_node an_node;		/* base class */
+	u_int16_t an_decomp_index; 		/* decompression mask index */
+	u_int32_t an_avgrssi;			/* average rssi over all rx frames */
+	u_int8_t	an_prevdatarix;			/* rate ix of last data frame */
+	u_int16_t an_minffrate;			/* mimum rate in kbps for ff to aggragate */
+	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
+	struct ath_buf *an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
+	ath_bufhead an_uapsd_q;			/* U-APSD delivery queue */
+	int an_uapsd_qdepth; 			/* U-APSD delivery queue depth */
+	ath_bufhead an_uapsd_overflowq; 	/* U-APSD overflow queue (for > MaxSp frames) */
+	int an_uapsd_overflowqdepth; 		/* U-APSD overflow queue depth */
+	spinlock_t an_uapsd_lock; 		/* U-APSD deleivery queue lock */
+	unsigned long an_uapsd_lockflags; 	/* U-APSD cli flags for lock */
 	/* variable-length rate control state follows */
 };
-#define	ATH_NODE(_n)	((struct ath_node *)(_n))
-#define	ATH_NODE_CONST(ni)	((const struct ath_node *)(ni))
+#define	ATH_NODE(_n)			((struct ath_node *)(_n))
+#define	ATH_NODE_CONST(ni)		((const struct ath_node *)(ni))
 #define ATH_NODE_UAPSD_LOCK_INIT(_an)	spin_lock_init(&(_an)->an_uapsd_lock)
 #define ATH_NODE_UAPSD_LOCK(_an) 	spin_lock(&(_an)->an_uapsd_lock)
 #define ATH_NODE_UAPSD_UNLOCK(_an)	spin_unlock(&(_an)->an_uapsd_lock)
@@ -306,30 +308,31 @@ struct ath_node {
     	x = ATH_LPF_RSSI((x), ATH_RSSI_IN((y)), ATH_RSSI_LPF_LEN);	\
 } while (0)
 
-#define	ATH_ANTENNA_DIFF	2	/* Num farmes difference in
-					   tx to flip default recv
-					   antenna */
+#define	ATH_ANTENNA_DIFF	2	/* Num frames difference in
+					 * tx to flip default recv
+					 * antenna
+					 */
 
 struct ath_buf {
 	/* FFXXX: convert both list types to TAILQ to save a field? */
-	STAILQ_ENTRY(ath_buf)	bf_list;
+	STAILQ_ENTRY(ath_buf) bf_list;
 #ifdef ATH_SUPERG_FF
-	TAILQ_ENTRY(ath_buf)	bf_stagelist;	/* fast-frame staging list */
+	TAILQ_ENTRY(ath_buf) bf_stagelist;	/* fast-frame staging list */
 #endif
-	struct ath_desc		*bf_desc;	/* virtual addr of desc */
-	dma_addr_t		bf_daddr;	/* physical addr of desc */
-	struct sk_buff		*bf_skb;	/* skbuff for buf */
-	dma_addr_t		bf_skbaddr;	/* physical addr of skb data */
-	struct ieee80211_node	*bf_node;	/* pointer to the node */
-	u_int32_t		bf_status;	/* status flags */
+	struct ath_desc	*bf_desc;		/* virtual addr of desc */
+	dma_addr_t bf_daddr;			/* physical addr of desc */
+	struct sk_buff *bf_skb;			/* skbuff for buf */
+	dma_addr_t bf_skbaddr;			/* physical addr of skb data */
+	struct ieee80211_node *bf_node;		/* pointer to the node */
+	u_int32_t bf_status;			/* status flags */
 #ifdef ATH_SUPERG_FF
 	/* XXX: combine this with bf_skbaddr if it ever changes to accomodate
 	 *      multiple segments.
 	 */
-	u_int32_t		bf_queueage; /* "age" of txq when this buffer placed on stageq */
-	u_int16_t		bf_numdesc;	/* number of descs used */
-	u_int16_t		bf_flags;	/* tx descriptor flags */
-	dma_addr_t		bf_skbaddrff[ATH_TXDESC-1]; /* extra addrs for ff */
+	u_int32_t bf_queueage; 			/* "age" of txq when this buffer placed on stageq */
+	u_int16_t bf_numdesc;			/* number of descs used */
+	u_int16_t bf_flags;			/* tx descriptor flags */
+	dma_addr_t bf_skbaddrff[ATH_TXDESC-1]; 	/* extra addrs for ff */
 #endif
 };
 
@@ -340,8 +343,7 @@ struct ath_buf {
  * currently bf_status is the only one requires that
  * requires reset.
  */
-#define ATH_RXBUF_RESET(bf) \
-            bf->bf_status=0
+#define ATH_RXBUF_RESET(bf)	bf->bf_status=0
 
 /* XXX: only managed for rx at the moment */
 #define ATH_BUFSTATUS_DONE	0x00000001	/* hw processing complete, desc processed by hal */
@@ -350,11 +352,11 @@ struct ath_buf {
  * DMA state for tx/rx descriptors.
  */
 struct ath_descdma {
-	const char*		dd_name;
-	struct ath_desc		*dd_desc;	/* descriptors */
-	dma_addr_t		dd_desc_paddr;	/* physical addr of dd_desc */
-	size_t			dd_desc_len;	/* size of dd_desc */
-	struct ath_buf		*dd_bufptr;	/* associated buffers */
+	const char *dd_name;
+	struct ath_desc	*dd_desc;	/* descriptors */
+	dma_addr_t dd_desc_paddr;	/* physical addr of dd_desc */
+	size_t dd_desc_len;		/* size of dd_desc */
+	struct ath_buf *dd_bufptr;	/* associated buffers */
 };
 
 struct ath_hal;
@@ -373,41 +375,40 @@ struct proc_dir_entry;
  * hardware queue).
  */
 struct ath_txq {
-	u_int			axq_qnum;	/* hardware q number */
-	u_int32_t		*axq_link;	/* link ptr in last TX desc */
-	STAILQ_HEAD(, ath_buf)	axq_q;		/* transmit queue */
-	spinlock_t		axq_lock;	/* lock on q and link */
-	unsigned long		axq_lockflags;	/* intr state when must cli */
-	u_int			axq_depth;	/* queue depth */
-	u_int32_t		axq_totalqueued;/* total ever queued */
-	u_int			axq_intrcnt;	/* count to determine if descriptor
-						 * should generate int on this txq.
-						 */
+	u_int axq_qnum;			/* hardware q number */
+	u_int32_t *axq_link;		/* link ptr in last TX desc */
+	STAILQ_HEAD(, ath_buf) axq_q;	/* transmit queue */
+	spinlock_t axq_lock;		/* lock on q and link */
+	unsigned long axq_lockflags;	/* intr state when must cli */
+	u_int axq_depth;			/* queue depth */
+	u_int32_t axq_totalqueued;	/* total ever queued */
+	u_int axq_intrcnt;		/* count to determine if descriptor
+					 * should generate int on this txq.
+					 */
 	/*
 	 * State for patching up CTS when bursting.
 	 */
-	struct	ath_buf		*axq_linkbuf;	/* virtual addr of last buffer*/
+	struct	ath_buf	*axq_linkbuf;	/* virtual addr of last buffer*/
 	/*
 	 * Staging queue for frames awaiting a fast-frame pairing.
 	 */
 	TAILQ_HEAD(axq_headtype, ath_buf) axq_stageq;
 
         /* scratch compression buffer */
-        char                    *axq_compbuf;   /* scratch comp buffer */
-        dma_addr_t              axq_compbufp;  /* scratch comp buffer (phys)*/
-        u_int                   axq_compbufsz; /* scratch comp buffer size */
+        char *axq_compbuf;		/* scratch comp buffer */
+        dma_addr_t axq_compbufp;	/* scratch comp buffer (phys)*/
+        u_int axq_compbufsz;		/* scratch comp buffer size */
 };
 
 /* driver-specific vap state */
 struct ath_vap {
 	struct ieee80211vap av_vap;	/* base class */
-	int		(*av_newstate)(struct ieee80211vap *,
-					enum ieee80211_state, int);
+	int (*av_newstate)(struct ieee80211vap *, enum ieee80211_state, int);
 	/* XXX beacon state */
-	struct ath_buf	*av_bcbuf;	/* beacon buffer */
+	struct ath_buf *av_bcbuf;	/* beacon buffer */
 	struct ieee80211_beacon_offsets av_boff;/* dynamic update state */
-	int		av_bslot;	/* beacon slot index */
-	struct ath_txq	av_mcastq;	/* multicast transmit queue */
+	int av_bslot;			/* beacon slot index */
+	struct ath_txq av_mcastq;	/* multicast transmit queue */
 	u_int8_t	av_dfswait_run;
 };
 #define	ATH_VAP(_v)	((struct ath_vap *)(_v))
@@ -458,171 +459,170 @@ struct ath_vap {
 #define	BSTUCK_THRESH	3	/* # of stuck beacons before resetting NB: this is a guess*/
 
 struct ath_softc {
-	struct ieee80211com	sc_ic;		/* NB: must be first */
-	struct net_device*	sc_dev;
-	struct semaphore	sc_lock;	/* dev-level lock */
+	struct ieee80211com sc_ic;		/* NB: must be first */
+	struct net_device *sc_dev;
+	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
-	struct ath_stats	sc_stats;	/* private statistics */
-	int			sc_debug;
-	void			(*sc_recv_mgmt)(struct ieee80211_node *,
-					struct sk_buff *, int, int, u_int32_t);
-	void 			(*sc_node_cleanup)(struct ieee80211_node *);
-	void 			(*sc_node_free)(struct ieee80211_node *);
-	void			*sc_bdev;	/* associated bus device */
-	struct ath_hal		*sc_ah;		/* Atheros HAL */
-	struct ath_ratectrl	*sc_rc;		/* tx rate control support */
-	struct ath_tx99		*sc_tx99; 	/* tx99 support */
-	void			(*sc_setdefantenna)(struct ath_softc *, u_int);
-	unsigned int		sc_invalid : 1,	/* being detached */
-				sc_mrretry : 1,	/* multi-rate retry support */
-				sc_softled : 1,	/* enable LED gpio status */
-				sc_splitmic: 1,	/* split TKIP MIC keys */
-				sc_needmib : 1,	/* enable MIB stats intr */
-				sc_hasdiversity : 1,/* rx diversity available */
-				sc_diversity : 1, /* enable rx diversity */
-				sc_olddiversity : 1, /* diversity setting before XR enable */	       
-				sc_hasveol : 1,	/* tx VEOL support */
-				sc_hastpc  : 1,	/* per-packet TPC support */
-				sc_dturbo  : 1,	/* dynamic turbo capable */
-				sc_dturbo_switch: 1,/* turbo switch mode*/
-				sc_dturbo_hold  : 1,/* dynamic turbo hold state */
-				sc_rate_recn_state  : 1,/* dynamic turbo state recmded by ratectrl */
-				sc_ignore_ar: 1,/* ignore AR during transision*/
-				sc_ledstate: 1,	/* LED on/off state */
-				sc_blinking: 1,	/* LED blink operation active */
-				sc_beacons : 1,	/* beacons running */
-				sc_hasbmask: 1,	/* bssid mask support */
-				sc_mcastkey: 1,	/* mcast key cache search */
-				sc_hastsfadd:1,	/* tsf adjust support */
-				sc_scanning: 1,	/* scanning active */
-				sc_nostabeacons: 1, /* no beacons for station */
-				sc_xrgrppoll: 1,/* xr group polls are active */
-				sc_syncbeacon:1,/* sync/resync beacon timers */
-				sc_hasclrkey: 1,/* CLR key supported */
-				sc_devstopped:1,/* stopped due to of no tx bufs */
-				sc_stagbeacons:1,/* use staggered beacons */
-				sc_rtasksched:1, /* radar task is scheduled */
-				sc_dfswait:1,    /* waiting on channel for radar detect */
-				sc_dfstest:1;	/* Test timer in progress */
-						/* rate tables */
-	const HAL_RATE_TABLE	*sc_rates[IEEE80211_MODE_MAX];
-	const HAL_RATE_TABLE	*sc_currates;	/* current rate table */
-	const HAL_RATE_TABLE	*sc_xr_rates; /* XR rate table */
-	const HAL_RATE_TABLE	*sc_half_rates; /* half rate table */
-	const HAL_RATE_TABLE	*sc_quarter_rates; /* quarter rate table */
-	HAL_OPMODE		sc_opmode;	/* current hal operating mode */
-	enum ieee80211_phymode	sc_curmode;	/* current phy mode */
-	u_int16_t		sc_curtxpow;	/* current tx power limit */
-	u_int16_t		sc_curaid;	/* current association id */
-	HAL_CHANNEL		sc_curchan;	/* current h/w channel */
-	u_int8_t		sc_curbssid[IEEE80211_ADDR_LEN];
-	u_int8_t		sc_rixmap[256];	/* IEEE to h/w rate table ix */
+	struct ath_stats	sc_stats;		/* private statistics */
+	int sc_debug;
+	void (*sc_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int, int, u_int32_t);
+	void (*sc_node_cleanup)(struct ieee80211_node *);
+	void (*sc_node_free)(struct ieee80211_node *);
+	void *sc_bdev;				/* associated bus device */
+	struct ath_hal *sc_ah;			/* Atheros HAL */
+	struct ath_ratectrl *sc_rc;		/* tx rate control support */
+	struct ath_tx99 *sc_tx99; 		/* tx99 support */
+	void (*sc_setdefantenna)(struct ath_softc *, u_int);
+	unsigned int 	sc_invalid:1,		/* being detached */
+			sc_mrretry:1,		/* multi-rate retry support */
+			sc_softled:1,		/* enable LED gpio status */
+			sc_splitmic:1,		/* split TKIP MIC keys */
+			sc_needmib:1,		/* enable MIB stats intr */
+			sc_hasdiversity:1,	/* rx diversity available */
+			sc_diversity:1, 	/* enable rx diversity */
+			sc_olddiversity:1, 	/* diversity setting before XR enable */	       
+			sc_hasveol:1,		/* tx VEOL support */
+			sc_hastpc:1,		/* per-packet TPC support */
+			sc_dturbo:1,		/* dynamic turbo capable */
+			sc_dturbo_switch:1,	/* turbo switch mode*/
+			sc_dturbo_hold:1,	/* dynamic turbo hold state */
+			sc_rate_recn_state:1,	/* dynamic turbo state recmded by ratectrl */
+			sc_ignore_ar:1,		/* ignore AR during transision*/
+			sc_ledstate:1,		/* LED on/off state */
+			sc_blinking:1,		/* LED blink operation active */
+			sc_beacons:1,		/* beacons running */
+			sc_hasbmask:1,		/* bssid mask support */
+			sc_mcastkey:1,		/* mcast key cache search */
+			sc_hastsfadd:1,		/* tsf adjust support */
+			sc_scanning:1,		/* scanning active */
+			sc_nostabeacons:1,	/* no beacons for station */
+			sc_xrgrppoll:1,		/* xr group polls are active */
+			sc_syncbeacon:1,	/* sync/resync beacon timers */
+			sc_hasclrkey:1,		/* CLR key supported */
+			sc_devstopped:1,	/* stopped due to of no tx bufs */
+			sc_stagbeacons:1,	/* use staggered beacons */
+			sc_rtasksched:1, 	/* radar task is scheduled */
+			sc_dfswait:1,    	/* waiting on channel for radar detect */
+			sc_dfstest:1;		/* Test timer in progress */
+	/* rate tables */
+	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
+	const HAL_RATE_TABLE *sc_currates;	/* current rate table */
+	const HAL_RATE_TABLE *sc_xr_rates;	/* XR rate table */
+	const HAL_RATE_TABLE *sc_half_rates;	/* half rate table */
+	const HAL_RATE_TABLE *sc_quarter_rates;	/* quarter rate table */
+	HAL_OPMODE sc_opmode;			/* current hal operating mode */
+	enum ieee80211_phymode sc_curmode;	/* current phy mode */
+	u_int16_t sc_curtxpow;			/* current tx power limit */
+	u_int16_t sc_curaid;			/* current association id */
+	HAL_CHANNEL sc_curchan;			/* current h/w channel */
+	u_int8_t sc_curbssid[IEEE80211_ADDR_LEN];
+	u_int8_t	sc_rixmap[256];			/* IEEE to h/w rate table ix */
 	struct {
-		u_int8_t	ieeerate;	/* IEEE rate */
-		u_int8_t	flags;		/* radiotap flags */
-		u_int16_t	ledon;		/* softled on time */
-		u_int16_t	ledoff;		/* softled off time */
+		u_int8_t	ieeerate;		/* IEEE rate */
+		u_int8_t	flags;			/* radiotap flags */
+		u_int16_t ledon;			/* softled on time */
+		u_int16_t ledoff;		/* softled off time */
 	} sc_hwmap[32];				/* h/w rate ix mappings */
-	u_int8_t		sc_minrateix;	/* min h/w rate index */
-	u_int8_t		sc_protrix;	/* protection rate index */
-	u_int8_t		sc_mcastantenna;/* Multicast antenna number */
-	u_int8_t		sc_txantenna;	/* data tx antenna (fixed or auto) */
-	u_int8_t		sc_dfstest_ieeechan;	/* IEEE channel number to return to after a dfs mute test */
-	u_int32_t		sc_dfstesttime;	/* Time to stay off chan during dfs test */
-	u_int16_t		sc_nvaps;	/* # of active virtual ap's */
-	u_int8_t		sc_nstavaps;	/* # of active station vaps */
-	u_int8_t		sc_nmonvaps;	/* # of monitor vaps */
-	u_int8_t		sc_nbcnvaps;	/* # of vaps sending beacons */
-	u_int			sc_fftxqmin;	/* aggregation threshold */
-	HAL_INT			sc_imask;	/* interrupt mask copy */
-	u_int			sc_keymax;	/* size of key cache */
-	u_int8_t		sc_keymap[ATH_KEYBYTES];/* key use bit map */
-	struct ieee80211_node	*sc_keyixmap[ATH_KEYMAX];/* key ix->node map */
-	u_int8_t		sc_bssidmask[IEEE80211_ADDR_LEN];
+	u_int8_t sc_minrateix;			/* min h/w rate index */
+	u_int8_t sc_protrix;			/* protection rate index */
+	u_int8_t sc_mcastantenna;		/* Multicast antenna number */
+	u_int8_t sc_txantenna;			/* data tx antenna (fixed or auto) */
+	u_int8_t sc_dfstest_ieeechan;		/* IEEE channel number to return to after a dfs mute test */
+	u_int32_t sc_dfstesttime;		/* Time to stay off chan during dfs test */
+	u_int16_t sc_nvaps;			/* # of active virtual ap's */
+	u_int8_t sc_nstavaps;			/* # of active station vaps */
+	u_int8_t sc_nmonvaps;			/* # of monitor vaps */
+	u_int8_t sc_nbcnvaps;			/* # of vaps sending beacons */
+	u_int sc_fftxqmin;			/* aggregation threshold */
+	HAL_INT sc_imask;			/* interrupt mask copy */
+	u_int sc_keymax;				/* size of key cache */
+	u_int8_t sc_keymap[ATH_KEYBYTES];	/* key use bit map */
+	struct ieee80211_node *sc_keyixmap[ATH_KEYMAX];/* key ix->node map */
+	u_int8_t sc_bssidmask[IEEE80211_ADDR_LEN];
 
-	u_int			sc_ledpin;	/* GPIO pin for driving LED */
-	u_int			sc_ledon;	/* pin setting for LED on */
-	u_int			sc_ledidle;	/* idle polling interval */
-	int			sc_ledevent;	/* time of last LED event */
-	u_int8_t		sc_rxrate;	/* current rx rate for LED */
-	u_int8_t		sc_txrate;	/* current tx rate for LED */
-	u_int16_t		sc_ledoff;	/* off time for current blink */
-	struct timer_list	sc_ledtimer;	/* led off timer */
-	struct timer_list	sc_dfswaittimer;/* dfs wait timer */
-	struct timer_list	sc_dfstesttimer;/* dfs mute test timer */
+	u_int sc_ledpin;				/* GPIO pin for driving LED */
+	u_int sc_ledon;				/* pin setting for LED on */
+	u_int sc_ledidle;			/* idle polling interval */
+	int sc_ledevent;				/* time of last LED event */
+	u_int8_t sc_rxrate;			/* current rx rate for LED */
+	u_int8_t sc_txrate;			/* current tx rate for LED */
+	u_int16_t sc_ledoff;			/* off time for current blink */
+	struct timer_list sc_ledtimer;		/* led off timer */
+	struct timer_list sc_dfswaittimer;	/* dfs wait timer */
+	struct timer_list sc_dfstesttimer;	/* dfs mute test timer */
 
-	struct ATH_TQ_STRUCT	sc_fataltq;	/* fatal error intr tasklet */
+	struct ATH_TQ_STRUCT sc_fataltq;	/* fatal error intr tasklet */
 
-	int			sc_rxbufsize;	/* rx size based on mtu */
-	struct ath_descdma	sc_rxdma;	/* RX descriptors */
-	ath_bufhead		sc_rxbuf;	/* receive buffer */
-	struct ath_buf		*sc_rxbufcur;	/* current rx buffer */
-	u_int32_t		*sc_rxlink;	/* link ptr in last RX desc */
-	spinlock_t		sc_rxbuflock; 
-	unsigned long		sc_rxbuflockflags;
-	struct ATH_TQ_STRUCT	sc_rxtq;	/* rx intr tasklet */
-	struct ATH_TQ_STRUCT	sc_rxorntq;	/* rxorn intr tasklet */
-	u_int8_t		sc_defant;	/* current default antenna */
-	u_int8_t		sc_rxotherant;	/* rx's on non-default antenna*/
-	u_int16_t		sc_cachelsz;	/* cache line size */
+	int sc_rxbufsize;			/* rx size based on mtu */
+	struct ath_descdma sc_rxdma;		/* RX descriptors */
+	ath_bufhead sc_rxbuf;			/* receive buffer */
+	struct ath_buf *sc_rxbufcur;		/* current rx buffer */
+	u_int32_t *sc_rxlink;			/* link ptr in last RX desc */
+	spinlock_t sc_rxbuflock; 
+	unsigned long sc_rxbuflockflags;
+	struct ATH_TQ_STRUCT sc_rxtq;		/* rx intr tasklet */
+	struct ATH_TQ_STRUCT sc_rxorntq;	/* rxorn intr tasklet */
+	u_int8_t sc_defant;			/* current default antenna */
+	u_int8_t sc_rxotherant;			/* rx's on non-default antenna*/
+	u_int16_t sc_cachelsz;			/* cache line size */
 
-	struct ath_descdma	sc_txdma;	/* TX descriptors */
-	ath_bufhead		sc_txbuf;	/* transmit buffer */
-	spinlock_t		sc_txbuflock;	/* txbuf lock */
-	u_int			sc_txqsetup;	/* h/w queues setup */
-	u_int			sc_txintrperiod;/* tx interrupt batching */
-	struct ath_txq		sc_txq[HAL_NUM_TX_QUEUES];
-	struct ath_txq		*sc_ac2q[WME_NUM_AC];	/* WME AC -> h/w qnum */ 
-	struct ATH_TQ_STRUCT	sc_txtq;	/* tx intr tasklet */
-	u_int8_t		sc_grppoll_str[GRPPOLL_RATE_STR_LEN];  
-	struct ath_descdma	sc_bdma;	/* beacon descriptors */
-	ath_bufhead		sc_bbuf;	/* beacon buffers */
-	u_int			sc_bhalq;	/* HAL q for outgoing beacons */
-	u_int			sc_bmisscount;	/* missed beacon transmits */
-	u_int32_t		sc_ant_tx[8];	/* recent tx frames/antenna */
-	struct ath_txq		*sc_cabq;	/* tx q for cab frames */
-	struct ath_txq		sc_grpplq;	/* tx q for XR group polls */
-	struct ath_txq		*sc_xrtxq;	/* tx q for XR data */
-	struct ath_descdma	sc_grppolldma;	/* TX descriptors for grppoll */
-	ath_bufhead		sc_grppollbuf;	/* transmit buffers for grouppoll  */
-	u_int16_t		sc_xrpollint;	/* xr poll interval */
-	u_int16_t		sc_xrpollcount;	/* xr poll count */
-	struct ath_txq		*sc_uapsdq;	/* tx q for uapsd */
-	struct ATH_TQ_STRUCT	sc_bmisstq;	/* bmiss intr tasklet */
-	struct ATH_TQ_STRUCT	sc_bstucktq;	/* beacon stuck intr tasklet */
+	struct ath_descdma sc_txdma;		/* TX descriptors */
+	ath_bufhead sc_txbuf;			/* transmit buffer */
+	spinlock_t sc_txbuflock;		/* txbuf lock */
+	u_int sc_txqsetup;			/* h/w queues setup */
+	u_int sc_txintrperiod;			/* tx interrupt batching */
+	struct ath_txq sc_txq[HAL_NUM_TX_QUEUES];
+	struct ath_txq *sc_ac2q[WME_NUM_AC];	/* WME AC -> h/w qnum */ 
+	struct ATH_TQ_STRUCT sc_txtq;		/* tx intr tasklet */
+	u_int8_t sc_grppoll_str[GRPPOLL_RATE_STR_LEN];  
+	struct ath_descdma sc_bdma;		/* beacon descriptors */
+	ath_bufhead sc_bbuf;			/* beacon buffers */
+	u_int sc_bhalq;				/* HAL q for outgoing beacons */
+	u_int sc_bmisscount;			/* missed beacon transmits */
+	u_int32_t sc_ant_tx[8];			/* recent tx frames/antenna */
+	struct ath_txq *sc_cabq;			/* tx q for cab frames */
+	struct ath_txq sc_grpplq;		/* tx q for XR group polls */
+	struct ath_txq *sc_xrtxq;		/* tx q for XR data */
+	struct ath_descdma sc_grppolldma;	/* TX descriptors for grppoll */
+	ath_bufhead sc_grppollbuf;		/* transmit buffers for grouppoll  */
+	u_int16_t sc_xrpollint;			/* xr poll interval */
+	u_int16_t sc_xrpollcount;		/* xr poll count */
+	struct ath_txq *sc_uapsdq;		/* tx q for uapsd */
+	struct ATH_TQ_STRUCT sc_bmisstq;	/* bmiss intr tasklet */
+	struct ATH_TQ_STRUCT sc_bstucktq;	/* beacon stuck intr tasklet */
 	enum {
 		OK,				/* no change needed */
 		UPDATE,				/* update pending */
 		COMMIT				/* beacon sent, commit change */
 	} sc_updateslot;			/* slot time update fsm */
-	int			sc_slotupdate;	/* slot to next advance fsm */
-	struct ieee80211vap	*sc_bslot[ATH_BCBUF];/* beacon xmit slots */
-	int			sc_bnext;	/* next slot for beacon xmit */
+	int sc_slotupdate;			/* slot to next advance fsm */
+	struct ieee80211vap *sc_bslot[ATH_BCBUF];/* beacon xmit slots */
+	int sc_bnext;				/* next slot for beacon xmit */
 
-	struct timer_list	sc_cal_ch;	/* calibration timer */
-	HAL_NODE_STATS		sc_halstats;	/* station-mode rssi stats */
-	struct ATH_WORK_THREAD	sc_radartask;	/* Schedule task for DFS handling */
+	struct timer_list sc_cal_ch;		/* calibration timer */
+	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
+	struct ATH_WORK_THREAD sc_radartask;	/* Schedule task for DFS handling */
 
 #ifdef CONFIG_SYSCTL
-	struct ctl_table_header	*sc_sysctl_header;
-	struct ctl_table	*sc_sysctls;
+	struct ctl_table_header *sc_sysctl_header;
+	struct ctl_table *sc_sysctls;
 #endif
 
-	u_int16_t		sc_reapcount;  /* # of tx buffers reaped after net dev stopped */
+	u_int16_t sc_reapcount;  		/* # of tx buffers reaped after net dev stopped */
 
 #ifdef ATH_SUPERG_DYNTURBO
-	struct timer_list	sc_dturbo_switch_mode;	/* AP scan timer */
-	u_int32_t               sc_dturbo_tcount;     /* beacon intval count */
-	u_int32_t               sc_dturbo_hold_max; /* hold count before switching to base*/
-	u_int16_t               sc_dturbo_hold_count; /* hold count before switching to base*/
-	u_int16_t               sc_dturbo_turbo_tmin;  /* min turbo count */
-	u_int32_t               sc_dturbo_bytes;      /* bandwidth stats */ 
-	u_int32_t               sc_dturbo_base_tmin;  /* min time in base */
-	u_int32_t               sc_dturbo_turbo_tmax; /* max time in turbo */
-	u_int32_t               sc_dturbo_bw_base;    /* bandwidth threshold */
-	u_int32_t               sc_dturbo_bw_turbo;   /* bandwidth threshold */
+	struct timer_list sc_dturbo_switch_mode;/* AP scan timer */
+	u_int32_t sc_dturbo_tcount;		/* beacon intval count */
+	u_int32_t sc_dturbo_hold_max;		/* hold count before switching to base*/
+	u_int16_t sc_dturbo_hold_count;		/* hold count before switching to base*/
+	u_int16_t sc_dturbo_turbo_tmin;		/* min turbo count */
+	u_int32_t sc_dturbo_bytes;		/* bandwidth stats */ 
+	u_int32_t sc_dturbo_base_tmin;		/* min time in base */
+	u_int32_t sc_dturbo_turbo_tmax;		/* max time in turbo */
+	u_int32_t sc_dturbo_bw_base;		/* bandwidth threshold */
+	u_int32_t sc_dturbo_bw_turbo;		/* bandwidth threshold */
 #endif
-	u_int			sc_slottimeconf;      /* manual override for slottime */
+	u_int sc_slottimeconf;			/* manual override for slottime */
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
@@ -651,17 +651,17 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
 #define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
 
-int	ath_attach(u_int16_t, struct net_device *);
-int	ath_detach(struct net_device *);
-void	ath_resume(struct net_device *);
-void	ath_suspend(struct net_device *);
-void	ath_shutdown(struct net_device *);
-irqreturn_t ath_intr(int irq, void *dev_id, struct pt_regs *regs);
-int	ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr);
-void	bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz);
+int ath_attach(u_int16_t, struct net_device *);
+int ath_detach(struct net_device *);
+void ath_resume(struct net_device *);
+void ath_suspend(struct net_device *);
+void ath_shutdown(struct net_device *);
+irqreturn_t ath_intr(int, void *, struct pt_regs *);
+int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
+void bus_read_cachesize(struct ath_softc *, u_int8_t *);
 #ifdef CONFIG_SYSCTL
-void	ath_sysctl_register(void);
-void	ath_sysctl_unregister(void);
+void ath_sysctl_register(void);
+void ath_sysctl_unregister(void);
 #endif /* CONFIG_SYSCTL */
 
 /*

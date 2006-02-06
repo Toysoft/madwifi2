@@ -17,24 +17,24 @@
  * Atheros proprietary SuperG defines.
  */
 
-#define ATH_ETH_TYPE  0x88bd
-#define ATH_SNAP_ORGCODE_0 0x00
-#define ATH_SNAP_ORGCODE_1 0x03
-#define ATH_SNAP_ORGCODE_2 0x7f
+#define ATH_ETH_TYPE  		0x88bd
+#define ATH_SNAP_ORGCODE_0	0x00
+#define ATH_SNAP_ORGCODE_1	0x03
+#define ATH_SNAP_ORGCODE_2	0x7f
 
 struct athl2p_tunnel_hdr {
 #if (AH_BYTE_ORDER == AH_LITTLE_ENDIAN)
-	u_int32_t  offset	: 11,
-	seqNum       		: 11,
-	optHdrLen32  		: 2,
-	frameType    		: 2,
-	proto        		: 6;
+	u_int32_t offset:11,
+	seqNum:11,
+	optHdrLen32:2,
+	frameType:2,
+	proto:6;
 #else /* big endian */
-	u_int32_t  proto	: 6,
-	frameType    		: 2,
-	optHdrLen32  		: 2,
-	seqNum       		: 11,
-	offset       		: 11;
+	u_int32_t proto:6,
+	frameType:2,
+	optHdrLen32:2,
+	seqNum:11,
+	offset:11;
 #endif
 } __packed;
 
@@ -79,7 +79,7 @@ struct athl2p_tunnel_hdr {
  * placed on the FF staging queue. this value should be >=3 due to interaction
  * with HW compression.
  */
-#define ATH_FF_TXQMIN 3
+#define ATH_FF_TXQMIN		3
 
 /* 
  * default maximum age an ath_buf is allowed to remain on the staging queue.
@@ -87,12 +87,12 @@ struct athl2p_tunnel_hdr {
  * was placed on the staging queue, that ath_buf on the staging queue will be
  * flushed.
  */
-#define ATH_FF_STAGEQAGEMAX 5
+#define ATH_FF_STAGEQAGEMAX	5
 
 /*
  * Reserve enough buffer header length to avoid reallocation on fast-frame
  * rx and tx.
  */
-#define USE_HEADERLEN_RESV 1
+#define USE_HEADERLEN_RESV	1
 
 #endif /* _NET_IF_ATH_PROTO_H_ */

@@ -42,7 +42,7 @@
 #include <linux/interrupt.h>
 #ifdef DECLARE_TASKLET			/* native tasklets */
 #define IEEE80211_TQ_STRUCT tasklet_struct
-#define IEEE80211_INIT_TQUEUE(a,b,c)		tasklet_init((a),(b),(unsigned long)(c))
+#define IEEE80211_INIT_TQUEUE(a,b,c)	tasklet_init((a),(b),(unsigned long)(c))
 #define IEEE80211_SCHEDULE_TQUEUE(a)	tasklet_schedule((a))
 #define IEEE80211_CANCEL_TQUEUE(a)	if (!in_interrupt()) tasklet_kill((a))
 typedef unsigned long IEEE80211_TQUEUE_ARG;
@@ -127,7 +127,7 @@ typedef rwlock_t ieee80211_node_lock_t;
 #define	IEEE80211_NODE_UNLOCK(_nt)	write_unlock(&(_nt)->nt_nodelock)
 #define	IEEE80211_NODE_LOCK_BH(_nt)	write_lock_bh(&(_nt)->nt_nodelock)
 #define	IEEE80211_NODE_UNLOCK_BH(_nt)	write_unlock_bh(&(_nt)->nt_nodelock)
-/* NB: beware, *_is_locked() are boguly defined for UP+!PREEMPT */
+/* NB: beware, *_is_locked() are bogusly defined for UP+!PREEMPT */
 #if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(rwlock_is_locked)
 #define	IEEE80211_NODE_LOCK_ASSERT(_nt) \
 	KASSERT(rwlock_is_locked(&(_nt)->nt_nodelock), \
@@ -217,15 +217,15 @@ typedef spinlock_t acl_lock_t;
  *     8 bytes so we reserve/avoid it.
  */
 struct ieee80211_cb {
-	u_int8_t		vlan[8];	/* reserve for vlan tag info */
-	struct ieee80211_node	*ni;
-	u_int32_t		flags;
+	u_int8_t vlan[8];			/* reserve for vlan tag info */
+	struct ieee80211_node *ni;
+	u_int32_t flags;
 #define	M_LINK0		0x01			/* frame needs WEP encryption */
 #define	M_FF		0x02			/* fast frame */
 #define	M_PWR_SAV	0x04			/* bypass power save handling */
 #define M_UAPSD		0x08			/* frame flagged for u-apsd handling */
 #define M_RAW           0x10
-	struct sk_buff		*next;		/* fast frame sk_buf chain */
+	struct sk_buff *next;			/* fast frame sk_buf chain */
 };
 
 
@@ -255,7 +255,7 @@ struct ieee80211_cb {
 struct ieee80211com;
 struct ieee80211vap;
 
-int	ieee80211_load_module(const char *);
+int ieee80211_load_module(const char *);
 
 /*
  * Node reference counting definitions.
@@ -267,14 +267,10 @@ int	ieee80211_load_module(const char *);
  *				is the last reference, otherwise 0
  * ieee80211_node_refcnt	reference count for printing (only)
  */
-#define ieee80211_node_initref(_ni) \
-	atomic_set(&(_ni)->ni_refcnt, 1)
-#define ieee80211_node_incref(_ni) \
-	atomic_inc(&(_ni)->ni_refcnt)
-#define	ieee80211_node_decref(_ni) \
-	atomic_dec(&(_ni)->ni_refcnt)
-#define	ieee80211_node_dectestref(_ni) \
-	atomic_dec_and_test(&(_ni)->ni_refcnt)
+#define ieee80211_node_initref(_ni)	atomic_set(&(_ni)->ni_refcnt, 1)
+#define ieee80211_node_incref(_ni)	atomic_inc(&(_ni)->ni_refcnt)
+#define	ieee80211_node_decref(_ni)	atomic_dec(&(_ni)->ni_refcnt)
+#define	ieee80211_node_dectestref(_ni)	atomic_dec_and_test(&(_ni)->ni_refcnt)
 #define	ieee80211_node_refcnt(_ni)	(_ni)->ni_refcnt.counter
 
 #define	le16toh(_x)	le16_to_cpu(_x)
@@ -314,8 +310,8 @@ ieee80211_malloc(size_t size, int flags)
  */
 #define	printf	printk
 struct ieee80211com;
-extern	void if_printf(struct net_device *, const char *, ...);
-extern	const char *ether_sprintf(const u_int8_t *);
+extern void if_printf(struct net_device *, const char *, ...);
+extern const char *ether_sprintf(const u_int8_t *);
 
 /*
  * Queue write-arounds and support routines.
@@ -420,8 +416,8 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 	proc_dointvec(ctl, write, filp, buffer, lenp, ppos)
 #endif
 
-void	ieee80211_sysctl_vattach(struct ieee80211vap *);
-void	ieee80211_sysctl_vdetach(struct ieee80211vap *);
+void ieee80211_sysctl_vattach(struct ieee80211vap *);
+void ieee80211_sysctl_vdetach(struct ieee80211vap *);
 #endif /* CONFIG_SYSCTL */
 
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
@@ -433,16 +429,18 @@ void	ieee80211_sysctl_vdetach(struct ieee80211vap *);
 #else
 #define IEEE80211_VLAN_TAG_USED 0
 #endif
-void	ieee80211_vlan_vattach(struct ieee80211vap *);
-void	ieee80211_vlan_vdetach(struct ieee80211vap *);
+void ieee80211_vlan_vattach(struct ieee80211vap *);
+void ieee80211_vlan_vdetach(struct ieee80211vap *);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 #define	free_netdev(dev)	kfree(dev)
 #endif
 
-void	ieee80211_ioctl_vattach(struct ieee80211vap *);
-void	ieee80211_ioctl_vdetach(struct ieee80211vap *);
+void ieee80211_ioctl_vattach(struct ieee80211vap *);
+void ieee80211_ioctl_vdetach(struct ieee80211vap *);
 struct ifreq;
-int	ieee80211_ioctl_create_vap(struct ieee80211com *, struct ifreq *, struct net_device *);
-int	ieee80211_create_vap(struct ieee80211com *ic, char *name, struct net_device *mdev, int opmode, int opflags);
+int ieee80211_ioctl_create_vap(struct ieee80211com *, struct ifreq *,
+	struct net_device *);
+int ieee80211_create_vap(struct ieee80211com *, char *, struct net_device *,
+	int, int);
 #endif /* _NET80211_IEEE80211_LINUX_H_ */

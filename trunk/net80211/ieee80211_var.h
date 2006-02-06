@@ -109,35 +109,35 @@
 struct ieee80211vap;
 
 struct ieee80211com {
-	struct net_device	*ic_dev;	/* associated device */
-	ieee80211com_lock_t	ic_comlock;	/* state update lock */
-	ieee80211com_lock_t ic_vapslock; /* vap state machine lock */
+	struct net_device *ic_dev;		/* associated device */
+	ieee80211com_lock_t ic_comlock;		/* state update lock */
+	ieee80211com_lock_t ic_vapslock; 	/* vap state machine lock */
 	TAILQ_HEAD(, ieee80211vap) ic_vaps;	/* list of vap instances */
-	enum ieee80211_phytype	ic_phytype;	/* XXX wrong for multi-mode */
-	enum ieee80211_opmode	ic_opmode;	/* operation mode */
-	struct ifmedia		ic_media;	/* interface media config */
-	u_int8_t		ic_myaddr[IEEE80211_ADDR_LEN];
-	struct timer_list	ic_inact;	/* mgmt/inactivity timer */
+	enum ieee80211_phytype ic_phytype;	/* XXX wrong for multi-mode */
+	enum ieee80211_opmode ic_opmode;	/* operation mode */
+	struct ifmedia ic_media;			/* interface media config */
+	u_int8_t ic_myaddr[IEEE80211_ADDR_LEN];
+	struct timer_list ic_inact;		/* mgmt/inactivity timer */
 
-	u_int32_t		ic_flags;	/* state flags */
-	u_int32_t		ic_flags_ext;	/* extension of state flags */
-	u_int32_t		ic_caps;	/* capabilities */
-	u_int8_t		ic_ath_cap;	/* Atheros adv. capablities */
-	u_int8_t		ic_promisc;	/* vap's needing promisc mode */
-	u_int8_t		ic_allmulti;	/* vap's needing all multicast*/
-	u_int8_t		ic_nopened;	/* vap's been opened */
+	u_int32_t ic_flags;			/* state flags */
+	u_int32_t ic_flags_ext;			/* extension of state flags */
+	u_int32_t ic_caps;			/* capabilities */
+	u_int8_t ic_ath_cap;			/* Atheros adv. capablities */
+	u_int8_t ic_promisc;			/* vap's needing promisc mode */
+	u_int8_t ic_allmulti;			/* vap's needing all multicast*/
+	u_int8_t ic_nopened;			/* vap's been opened */
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211_rateset ic_sup_xr_rates;
 	struct ieee80211_rateset ic_sup_half_rates;
 	struct ieee80211_rateset ic_sup_quarter_rates;
-	u_int16_t		ic_modecaps;	/* set of mode capabilities */
-	u_int16_t		ic_curmode;	/* current mode */
-	u_int16_t		ic_lintval;	/* beacon interval */
-	u_int16_t		ic_holdover;	/* PM hold over duration */
-	u_int16_t		ic_bmisstimeout;/* beacon miss threshold (ms) */
-	u_int16_t		ic_txpowlimit;	/* global tx power limit */
-	u_int16_t		ic_uapsdmaxtriggers; /* max triggers that could arrive */
-	u_int8_t		ic_coverageclass; /* coverage class */
+	u_int16_t ic_modecaps;			/* set of mode capabilities */
+	u_int16_t ic_curmode;			/* current mode */
+	u_int16_t ic_lintval;			/* beacon interval */
+	u_int16_t ic_holdover;			/* PM hold over duration */
+	u_int16_t ic_bmisstimeout;		/* beacon miss threshold (ms) */
+	u_int16_t ic_txpowlimit; 		/* global tx power limit */
+	u_int16_t ic_uapsdmaxtriggers; 		/* max triggers that could arrive */
+	u_int8_t ic_coverageclass; 		/* coverage class */
 
 	/*
 	 * Channel state:
@@ -159,23 +159,23 @@ struct ieee80211com {
 	 *    lookups when switching back+forth between two channels
 	 *    (e.g. for dynamic turbo)
 	 */
-	int			ic_nchans;	/* # entries in ic_channels */
+	int ic_nchans;				/* # entries in ic_channels */
 	struct ieee80211_channel ic_channels[IEEE80211_CHAN_MAX+1];
-	u_int8_t		ic_chan_avail[IEEE80211_CHAN_BYTES];
-	u_int8_t		ic_chan_active[IEEE80211_CHAN_BYTES];
+	u_int8_t ic_chan_avail[IEEE80211_CHAN_BYTES];
+	u_int8_t ic_chan_active[IEEE80211_CHAN_BYTES];
 	struct ieee80211_channel *ic_curchan;	/* current channel */
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
 	struct ieee80211_channel *ic_prevchan;	/* previous channel */
 
 	/* regulatory class ids */
-	u_int 			ic_nregclass;  /* # entries in ic_regclassids */
-	u_int8_t		ic_regclassids[IEEE80211_REGCLASSIDS_MAX];
+	u_int ic_nregclass;			/* # entries in ic_regclassids */
+	u_int8_t ic_regclassids[IEEE80211_REGCLASSIDS_MAX];
 
 	/* scan-related state */
 	struct ieee80211_scan_state *ic_scan;	/* scan state */
 	enum ieee80211_roamingmode ic_roaming;	/* roaming mode */
-	unsigned long		ic_lastdata;	/* time of last data frame */
-	unsigned long		ic_lastscan;	/* time last scan completed */
+	unsigned long ic_lastdata;		/* time of last data frame */
+	unsigned long ic_lastscan;		/* time last scan completed */
 
 	/* NB: this is the union of all vap stations/neighbors */
 	struct ieee80211_node_table ic_sta;	/* stations/neighbors */
@@ -185,18 +185,18 @@ struct ieee80211com {
 
 	/* XXX multi-bss: can per-vap be done/make sense? */
 	enum ieee80211_protmode	ic_protmode;	/* 802.11g protection mode */
-	u_int16_t		ic_nonerpsta;	/* # non-ERP stations */
-	u_int16_t		ic_longslotsta;	/* # long slot time stations */
-	u_int16_t		ic_sta_assoc;	/* stations associated */
-	u_int16_t		ic_dt_sta_assoc;/* dturbo capable stations */
-	u_int16_t		ic_xr_sta_assoc;/* XR stations associated */
+	u_int16_t ic_nonerpsta;			/* # non-ERP stations */
+	u_int16_t ic_longslotsta;		/* # long slot time stations */
+	u_int16_t ic_sta_assoc;			/* stations associated */
+	u_int16_t ic_dt_sta_assoc;		/* dturbo capable stations */
+	u_int16_t ic_xr_sta_assoc;		/* XR stations associated */
 	
 	/*
 	 * Spectrum Management.
 	 */
-	u_int16_t		ic_country_code;
-	int 			ic_country_outdoor;
-	struct ieee80211_ie_country	ic_country_ie; /* country info element */
+	u_int16_t ic_country_code;
+	int ic_country_outdoor;
+	struct ieee80211_ie_country ic_country_ie; /* country info element */
 	/* 
 	 *  current channel max power, used to compute Power Constraint IE.
 	 *
@@ -204,53 +204,48 @@ struct ieee80211com {
 	 *     be detected dynamically, we cannot maintain a table (i.e., will not
 	 *     know value until change to channel and detect).
 	 */
-	u_int8_t		ic_curchanmaxpwr;
-	u_int8_t		ic_chanchange_tbtt;
-	u_int8_t		ic_chanchange_chan;
+	u_int8_t ic_curchanmaxpwr;
+	u_int8_t ic_chanchange_tbtt;
+	u_int8_t ic_chanchange_chan;
 
 	/* virtual ap create/delete */
-	struct ieee80211vap 	*(*ic_vap_create)(struct ieee80211com *,
-				    const char *name, int unit,
-				    int opmode, int flags, struct net_device *mdev);
-	void			(*ic_vap_delete)(struct ieee80211vap *);
+	struct ieee80211vap *(*ic_vap_create)(struct ieee80211com *,
+		const char *, int, int, int, struct net_device *);
+	void (*ic_vap_delete)(struct ieee80211vap *);
 	/* send/recv 802.11 management frame */
-	int			(*ic_send_mgmt)(struct ieee80211_node *,
-				    int, int);
-	void			(*ic_recv_mgmt)(struct ieee80211_node *,
-				    struct sk_buff *, int, int, u_int32_t);
+	int (*ic_send_mgmt)(struct ieee80211_node *, int, int);
+	void (*ic_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int,
+		int, u_int32_t);
 	/* send management frame to driver, like hardstart */
-	int			(*ic_mgtstart)(struct ieee80211com *,
-					struct sk_buff *);
+	int (*ic_mgtstart)(struct ieee80211com *, struct sk_buff *);
 	/* reset device state after 802.11 parameter/state change */
-	int			(*ic_init)(struct net_device *);
-	int			(*ic_reset)(struct net_device *);
+	int (*ic_init)(struct net_device *);
+	int (*ic_reset)(struct net_device *);
 	/* update device state for 802.11 slot time change */
-	void			(*ic_updateslot)(struct net_device *);
+	void (*ic_updateslot)(struct net_device *);
 	/* new station association callback/notification */
-	void			(*ic_newassoc)(struct ieee80211_node *, int);
+	void (*ic_newassoc)(struct ieee80211_node *, int);
 	/* node state management */
-	struct ieee80211_node*	(*ic_node_alloc)(struct ieee80211_node_table *,struct ieee80211vap *);
-	void			(*ic_node_free)(struct ieee80211_node *);
-	void			(*ic_node_cleanup)(struct ieee80211_node *);
-	u_int8_t		(*ic_node_getrssi)(
-				    const struct ieee80211_node *);
-	u_int8_t		(*ic_node_move_data)(
-				    const struct ieee80211_node *);
+	struct ieee80211_node *(*ic_node_alloc)(struct ieee80211_node_table *,
+		struct ieee80211vap *);
+	void (*ic_node_free)(struct ieee80211_node *);
+	void (*ic_node_cleanup)(struct ieee80211_node *);
+	u_int8_t (*ic_node_getrssi)(const struct ieee80211_node *);
+	u_int8_t (*ic_node_move_data)(const struct ieee80211_node *);
 
 	/* scanning support */
-	void			(*ic_scan_start)(struct ieee80211com *);
-	void			(*ic_scan_end)(struct ieee80211com *);
-	void			(*ic_set_channel)(struct ieee80211com *);
+	void (*ic_scan_start)(struct ieee80211com *);
+	void (*ic_scan_end)(struct ieee80211com *);
+	void (*ic_set_channel)(struct ieee80211com *);
 
 	/* u-apsd support */
-	void			(*ic_uapsd_flush)(struct ieee80211_node *);
+	void (*ic_uapsd_flush)(struct ieee80211_node *);
 
 	/* set coverage class */
-	void			(*ic_set_coverageclass)(struct ieee80211com *);
+	void (*ic_set_coverageclass)(struct ieee80211com *);
 
 	/* mhz to ieee conversion */
-	u_int 			(*ic_mhz2ieee) (struct ieee80211com *, u_int freq, u_int flags);
-
+	u_int (*ic_mhz2ieee)(struct ieee80211com *, u_int, u_int);
 };
 
 struct vlan_group;
@@ -258,9 +253,9 @@ struct eapolcom;
 struct ieee80211_aclator;
 
 struct ieee80211_nsparams {
-	enum ieee80211_state	newstate;
-	int			arg;
-	int			result;
+	enum ieee80211_state newstate;
+	int arg;
+	int result;
 };
 
 #define IW_MAX_SPY 8
@@ -270,113 +265,108 @@ struct ieee80211_spy {
 };
 
 struct ieee80211vap {
-	struct net_device	*iv_dev;	/* associated device */
+	struct net_device *iv_dev;		/* associated device */
 	struct net_device_stats	iv_devstats;	/* interface statistics */
-	struct ifmedia		iv_media;	/* interface media config */
+	struct ifmedia iv_media;			/* interface media config */
 #ifdef CONFIG_NET_WIRELESS
-	struct iw_statistics	iv_iwstats;	/* wireless statistics block */
+	struct iw_statistics iv_iwstats;		/* wireless statistics block */
 #endif
 #ifdef CONFIG_SYSCTL
 	struct ctl_table_header	*iv_sysctl_header;
-	struct ctl_table	*iv_sysctls;
-	struct proc_dir_entry   *iv_proc_stations;
-	struct proc_dir_entry   *iv_proc;
+	struct ctl_table *iv_sysctls;
+	struct proc_dir_entry *iv_proc_stations;
+	struct proc_dir_entry *iv_proc;
 #endif
-	struct vlan_group	*iv_vlgrp;	/* vlan group state */
+	struct vlan_group *iv_vlgrp;		/* vlan group state */
 
 	TAILQ_ENTRY(ieee80211vap) iv_next;	/* list of vap instances */
-	u_int			iv_unit;	/* virtual AP unit */
-	struct ieee80211com	*iv_ic;		/* back ptr to common state */
-	u_int32_t		iv_debug;	/* debug msg flags */
-	struct ieee80211_stats	iv_stats;	/* statistics */
+	u_int iv_unit;				/* virtual AP unit */
+	struct ieee80211com *iv_ic;		/* back ptr to common state */
+	u_int32_t iv_debug;			/* debug msg flags */
+	struct ieee80211_stats iv_stats;		/* statistics */
 
-	int                     iv_monitor_nods_only; /* in monitor mode only nods traffic */
-	int                     iv_monitor_txf_len;   /* in monitor mode, truncate tx packets */
+	int iv_monitor_nods_only;		/* in monitor mode only nods traffic */
+	int iv_monitor_txf_len;			/* in monitor mode, truncate tx packets */
 
-	int			(*iv_newstate)(struct ieee80211vap *,
-				    enum ieee80211_state, int);
-	u_int8_t		iv_myaddr[IEEE80211_ADDR_LEN];
-	u_int32_t		iv_flags;	/* state flags */
-	u_int32_t		iv_flags_ext;	/* extension of state flags */
-	u_int32_t		iv_caps;	/* capabilities */
-	u_int8_t		iv_ath_cap;	/* Atheros adv. capablities */
-	enum ieee80211_opmode	iv_opmode;	/* operation mode */
-	enum ieee80211_state	iv_state;	/* state machine state */
-	struct timer_list	iv_mgtsend;	/* mgmt frame response timer */
+	int (*iv_newstate)(struct ieee80211vap *, enum ieee80211_state, int);
+	u_int8_t iv_myaddr[IEEE80211_ADDR_LEN];
+	u_int32_t iv_flags;			/* state flags */
+	u_int32_t iv_flags_ext;			/* extension of state flags */
+	u_int32_t iv_caps;			/* capabilities */
+	u_int8_t iv_ath_cap;			/* Atheros adv. capablities */
+	enum ieee80211_opmode iv_opmode;	/* operation mode */
+	enum ieee80211_state iv_state;		/* state machine state */
+	struct timer_list iv_mgtsend;		/* mgmt frame response timer */
 						/* inactivity timer settings */
-	int			iv_inact_init;	/* setting for new station */
-	int			iv_inact_auth;	/* auth but not assoc setting */
-	int			iv_inact_run;	/* authorized setting */
-	int			iv_inact_probe;	/* inactive probe time */
+	int iv_inact_init;			/* setting for new station */
+	int iv_inact_auth;			/* auth but not assoc setting */
+	int iv_inact_run;			/* authorized setting */
+	int iv_inact_probe;			/* inactive probe time */
 
-	int			iv_des_nssid;	/* # desired ssids */
+	int iv_des_nssid;			/* # desired ssids */
 	struct ieee80211_scan_ssid iv_des_ssid[1];/* desired ssid table */
-	u_int8_t		iv_des_bssid[IEEE80211_ADDR_LEN];
+	u_int8_t iv_des_bssid[IEEE80211_ADDR_LEN];
 	struct ieee80211_channel *iv_des_chan;	/* desired channel */
-	u_int16_t		iv_des_mode;	/* desired mode */
-	int			iv_nicknamelen;	/* XXX junk */
-	u_int8_t		iv_nickname[IEEE80211_NWID_LEN];
-	u_int			iv_bgscanidle;	/* bg scan idle threshold */
-	u_int			iv_bgscanintvl;	/* bg scan min interval */
-	u_int			iv_scanvalid;	/* scan cache valid threshold */
-	struct ieee80211_roam	iv_roam;	/* sta-mode roaming state */
+	u_int16_t iv_des_mode;			/* desired mode */
+	int iv_nicknamelen;			/* XXX junk */
+	u_int8_t	 iv_nickname[IEEE80211_NWID_LEN];
+	u_int iv_bgscanidle;			/* bg scan idle threshold */
+	u_int iv_bgscanintvl;			/* bg scan min interval */
+	u_int iv_scanvalid;			/* scan cache valid threshold */
+	struct ieee80211_roam iv_roam;		/* sta-mode roaming state */
 
-	u_int32_t		*iv_aid_bitmap;	/* association id map */
-	u_int16_t		iv_max_aid;
-	u_int16_t		iv_sta_assoc;	/* stations associated */
-	u_int16_t		iv_ps_sta;	/* stations in power save */
-	u_int16_t		iv_ps_pending;	/* ps sta's w/ pending frames */
-	u_int8_t		*iv_tim_bitmap;	/* power-save stations w/ data*/
-	u_int16_t		iv_tim_len;	/* ic_tim_bitmap size (bytes) */
-	u_int8_t		iv_dtim_period;	/* DTIM period */
-	u_int8_t		iv_dtim_count;	/* DTIM count from last bcn */
+	u_int32_t *iv_aid_bitmap;		/* association id map */
+	u_int16_t iv_max_aid;
+	u_int16_t iv_sta_assoc;			/* stations associated */
+	u_int16_t iv_ps_sta;			/* stations in power save */
+	u_int16_t iv_ps_pending;			/* ps sta's w/ pending frames */
+	u_int8_t *iv_tim_bitmap;			/* power-save stations w/ data*/
+	u_int16_t iv_tim_len;			/* ic_tim_bitmap size (bytes) */
+	u_int8_t iv_dtim_period;			/* DTIM period */
+	u_int8_t iv_dtim_count;			/* DTIM count from last bcn */
 						/* set/unset aid pwrsav state */
-	void			(*iv_set_tim)(struct ieee80211_node *, int);
-	u_int8_t		iv_uapsdinfo;	/* sta mode QoS Info flags */
-	struct ieee80211_node	*iv_bss;	/* information for this node */
-	int			iv_fixed_rate;	/* 802.11 rate or -1 */
-	u_int16_t		iv_rtsthreshold;
-	u_int16_t		iv_fragthreshold;
-	u_int16_t		iv_txmin;	/* min tx retry count */
-	u_int16_t		iv_txmax;	/* max tx retry count */
-	u_int16_t		iv_txlifetime;	/* tx lifetime */
-	int			iv_inact_timer;	/* inactivity timer wait */
-	void			*iv_opt_ie;	/* user-specified IE's */
-	u_int16_t		iv_opt_ie_len;	/* length of ni_opt_ie */
-	u_int16_t		iv_def_txkey;	/* default/group tx key index */
-	struct ieee80211_key	iv_nw_keys[IEEE80211_WEP_NKID];
-	int			(*iv_key_alloc)(struct ieee80211vap *,
-				    const struct ieee80211_key *);
-	int			(*iv_key_delete)(struct ieee80211vap *, 
-				    const struct ieee80211_key *,
-				    struct ieee80211_node *);
-	int			(*iv_key_set)(struct ieee80211vap *,
-				    const struct ieee80211_key *,
-				    const u_int8_t mac[IEEE80211_ADDR_LEN]);
-	void			(*iv_key_update_begin)(struct ieee80211vap *);
-	void			(*iv_key_update_end)(struct ieee80211vap *);
+	void (*iv_set_tim)(struct ieee80211_node *, int);
+	u_int8_t iv_uapsdinfo;			/* sta mode QoS Info flags */
+	struct ieee80211_node *iv_bss;		/* information for this node */
+	int iv_fixed_rate;			/* 802.11 rate or -1 */
+	u_int16_t iv_rtsthreshold;
+	u_int16_t iv_fragthreshold;
+	u_int16_t iv_txmin;			/* min tx retry count */
+	u_int16_t iv_txmax;			/* max tx retry count */
+	u_int16_t iv_txlifetime;			/* tx lifetime */
+	int iv_inact_timer;			/* inactivity timer wait */
+	void *iv_opt_ie;			/* user-specified IE's */
+	u_int16_t iv_opt_ie_len;			/* length of ni_opt_ie */
+	u_int16_t iv_def_txkey;			/* default/group tx key index */
+	struct ieee80211_key iv_nw_keys[IEEE80211_WEP_NKID];
+	int (*iv_key_alloc)(struct ieee80211vap *, const struct ieee80211_key *);
+	int (*iv_key_delete)(struct ieee80211vap *, const struct ieee80211_key *,
+		struct ieee80211_node *);
+	int (*iv_key_set)(struct ieee80211vap *, const struct ieee80211_key *,
+		const u_int8_t mac[IEEE80211_ADDR_LEN]);
+	void (*iv_key_update_begin)(struct ieee80211vap *);
+	void (*iv_key_update_end)(struct ieee80211vap *);
 #ifdef ATH_SUPERG_COMP
-	void			(*iv_comp_set)(struct ieee80211vap *,
-				    struct ieee80211_node *, int);
+	void (*iv_comp_set)(struct ieee80211vap *, struct ieee80211_node *, int);
 #endif
 	const struct ieee80211_authenticator *iv_auth;/* authenticator glue */
-	void			*iv_ec;		/* private auth state */
-	struct ieee80211vap *iv_xrvap; /* pointer to XR VAP , if XR is enabled */
-	u_int16_t		iv_xrbcnwait;	/* SWBA count incremented until it reaches XR_BECON_FACTOR */
-	struct timer_list	iv_xrvapstart;	/* timer to start xr */
-	u_int8_t		iv_chanchange_count; /* 11h counter for channel change */
-	int                     iv_mcast_rate; /* Multicast rate (Kbps) */
+	void *iv_ec;				/* private auth state */
+	struct ieee80211vap *iv_xrvap;		/* pointer to XR VAP , if XR is enabled */
+	u_int16_t iv_xrbcnwait;			/* SWBA count incremented until it reaches XR_BECON_FACTOR */
+	struct timer_list iv_xrvapstart;	/* timer to start xr */
+	u_int8_t iv_chanchange_count; 		/* 11h counter for channel change */
+	int iv_mcast_rate; 			/* Multicast rate (Kbps) */
 
 	const struct ieee80211_aclator *iv_acl;	/* aclator glue */
-	void			*iv_as;		/* private aclator state */
+	void *iv_as;				/* private aclator state */
 
-	struct timer_list	iv_swbmiss;	/* software beacon miss timer */
-	u_int16_t		iv_swbmiss_period; /* software beacon miss timer period */
+	struct timer_list iv_swbmiss;		/* software beacon miss timer */
+	u_int16_t iv_swbmiss_period; 		/* software beacon miss timer period */
 	struct ieee80211_nsparams iv_nsparams;	/* new state parameters for tasklet for stajoin1 */
 	struct IEEE80211_TQ_STRUCT iv_stajoin1tq; /* tasklet for newstate action called from stajoin1tq */
-	unsigned int		iv_nsdone;	/* Done with scheduled newstate tasklet */
+	unsigned int iv_nsdone;			/* Done with scheduled newstate tasklet */
 	uint8_t	wds_mac[IEEE80211_ADDR_LEN];
-	struct ieee80211_spy    iv_spy;         /* IWSPY support */
+	struct ieee80211_spy iv_spy;         	/* IWSPY support */
 };
 MALLOC_DECLARE(M_80211_VAP);
 
@@ -417,7 +407,7 @@ MALLOC_DECLARE(M_80211_VAP);
 #define	IEEE80211_F_DROPUNENC	0x02000000	/* CONF: drop unencrypted */
 #define	IEEE80211_F_COUNTERM	0x04000000	/* CONF: TKIP countermeasures */
 #define	IEEE80211_F_HIDESSID	0x08000000	/* CONF: hide SSID in beacon */
-#define IEEE80211_F_NOBRIDGE    0x10000000  /* CONF: disable internal bridge */
+#define IEEE80211_F_NOBRIDGE    0x10000000	/* CONF: disable internal bridge */
 #define	IEEE80211_F_WMEUPDATE	0x20000000	/* STATUS: update beacon wme */
 #define IEEE80211_F_DOTH	0x40000000	/* enable 11.h */
 #define IEEE80211_F_CHANSWITCH	0x80000000	/* force chanswitch */
@@ -425,7 +415,7 @@ MALLOC_DECLARE(M_80211_VAP);
 /* ic_flags_ext */
 #define	IEEE80211_FEXT_WDS	0x00000001	/* CONF: 4 addr allowed */
 #define IEEE80211_FEXT_COUNTRYIE 0x00000002	/* CONF: enable country IE */
-#define IEEE80211_FEXT_SCAN_PENDING 0x00000004 /* STATE: scan pending */
+#define IEEE80211_FEXT_SCAN_PENDING 0x00000004	/* STATE: scan pending */
 #define	IEEE80211_FEXT_BGSCAN	0x00000008	/* STATE: enable full bgscan completion */
 #define IEEE80211_FEXT_UAPSD	0x00000010	/* CONF: enable U-APSD */
 #define IEEE80211_FEXT_SLEEP	0x00000020	/* STATUS: sleeping */
@@ -433,7 +423,7 @@ MALLOC_DECLARE(M_80211_VAP);
 #define	IEEE80211_FEXT_MARKDFS	0x00000080	/* Enable marking of dfs interfernce */
 #define IEEE80211_FEXT_REGCLASS	0x00000100	/* CONF: send regclassids in country ie */
 #define IEEE80211_FEXT_ERPUPDATE 0x00000200	/* STATUS: update ERP element */
-#define IEEE80211_FEXT_SWBMISS 0x00000400 /* CONF: use software beacon timer */
+#define IEEE80211_FEXT_SWBMISS 0x00000400	/* CONF: use software beacon timer */
 
 #define IEEE80211_COM_UAPSD_ENABLE(_ic)		((_ic)->ic_flags_ext |= IEEE80211_FEXT_UAPSD)
 #define IEEE80211_COM_UAPSD_DISABLE(_ic)	((_ic)->ic_flags_ext &= ~IEEE80211_FEXT_UAPSD)
@@ -507,35 +497,32 @@ MALLOC_DECLARE(M_80211_VAP);
 	((ni)->ni_ath_flags & (vap)->iv_ath_cap & (bit))
 
 /* flags to VAP create function */
-#define IEEE80211_VAP_XR		0x10000	/* create a XR VAP without registering net device with OS*/
+#define IEEE80211_VAP_XR		0x10000	/* create a XR VAP without registering net device with OS */
 
-int	ieee80211_ifattach(struct ieee80211com *);
-void	ieee80211_ifdetach(struct ieee80211com *);
-int	ieee80211_vap_setup(struct ieee80211com *, struct net_device *,
-		const char *name, int unit, int opmode, int flags);
-int	ieee80211_vap_attach(struct ieee80211vap *,
-		ifm_change_cb_t, ifm_stat_cb_t);
-void	ieee80211_vap_detach(struct ieee80211vap *);
-void	ieee80211_mark_dfs(struct ieee80211com *, struct ieee80211_channel *);
-void	ieee80211_dfs_test_return(struct ieee80211com *, u_int8_t);
-void	ieee80211_announce(struct ieee80211com *);
-void	ieee80211_announce_channels(struct ieee80211com *);
-int	ieee80211_media_change(struct net_device *);
-void	ieee80211_media_status(struct net_device *, struct ifmediareq *);
-int	ieee80211_rate2media(struct ieee80211com*, int, enum ieee80211_phymode);
-int	ieee80211_media2rate(int);
-u_int	ieee80211_mhz2ieee(u_int, u_int);
-u_int	ieee80211_chan2ieee(struct ieee80211com *,
-		const struct ieee80211_channel *);
-u_int	ieee80211_ieee2mhz(u_int, u_int);
-struct ieee80211_channel *ieee80211_find_channel(struct ieee80211com *,
-		int freq, int flags);
-int	ieee80211_setmode(struct ieee80211com *, enum ieee80211_phymode);
-void	ieee80211_reset_erp(struct ieee80211com *, enum ieee80211_phymode);
+int ieee80211_ifattach(struct ieee80211com *);
+void ieee80211_ifdetach(struct ieee80211com *);
+int ieee80211_vap_setup(struct ieee80211com *, struct net_device *,
+	const char *, int, int, int);
+int ieee80211_vap_attach(struct ieee80211vap *, ifm_change_cb_t, ifm_stat_cb_t);
+void ieee80211_vap_detach(struct ieee80211vap *);
+void ieee80211_mark_dfs(struct ieee80211com *, struct ieee80211_channel *);
+void ieee80211_dfs_test_return(struct ieee80211com *, u_int8_t);
+void ieee80211_announce(struct ieee80211com *);
+void ieee80211_announce_channels(struct ieee80211com *);
+int ieee80211_media_change(struct net_device *);
+void ieee80211_media_status(struct net_device *, struct ifmediareq *);
+int ieee80211_rate2media(struct ieee80211com*, int, enum ieee80211_phymode);
+int ieee80211_media2rate(int);
+u_int ieee80211_mhz2ieee(u_int, u_int);
+u_int ieee80211_chan2ieee(struct ieee80211com *,	const struct ieee80211_channel *);
+u_int ieee80211_ieee2mhz(u_int, u_int);
+struct ieee80211_channel *ieee80211_find_channel(struct ieee80211com *, int, int);
+int ieee80211_setmode(struct ieee80211com *, enum ieee80211_phymode);
+void ieee80211_reset_erp(struct ieee80211com *, enum ieee80211_phymode);
 enum ieee80211_phymode ieee80211_chan2mode(const struct ieee80211_channel *);
-void 	ieee80211_build_countryie(struct ieee80211com *);
-int 	ieee80211_media_setup(struct ieee80211com *, struct ifmedia *,
-				u_int32_t, ifm_change_cb_t, ifm_stat_cb_t);
+void ieee80211_build_countryie(struct ieee80211com *);
+int ieee80211_media_setup(struct ieee80211com *, struct ifmedia *, u_int32_t,
+	ifm_change_cb_t, ifm_stat_cb_t);
 
 /* 
  * Key update synchronization methods.  XXX should not be visible.
@@ -627,11 +614,11 @@ ieee80211_anyhdrspace(struct ieee80211com *ic, const void *data)
 	if (ieee80211_msg(_vap, _m))					\
 		ieee80211_note_frame(_vap, _wh, _fmt, __VA_ARGS__);	\
 } while (0)
-void	ieee80211_note(struct ieee80211vap *vap, const char *fmt, ...);
-void	ieee80211_note_mac(struct ieee80211vap *vap,
-		const u_int8_t mac[IEEE80211_ADDR_LEN], const char *fmt, ...);
-void	ieee80211_note_frame(struct ieee80211vap *vap,
-		const struct ieee80211_frame *wh, const char *fmt, ...);
+void ieee80211_note(struct ieee80211vap *, const char *, ...);
+void ieee80211_note_mac(struct ieee80211vap *,
+	const u_int8_t mac[IEEE80211_ADDR_LEN], const char *, ...);
+void ieee80211_note_frame(struct ieee80211vap *,
+	const struct ieee80211_frame *, const char *, ...);
 #define	ieee80211_msg_debug(_vap) \
 	ieee80211_msg(_vap, IEEE80211_MSG_DEBUG)
 #define	ieee80211_msg_dumppkts(_vap) \

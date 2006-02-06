@@ -44,9 +44,9 @@
 
 /* per-device state */
 struct sample_softc {
-	struct ath_ratectrl arc;	/* base state */
-	int ath_smoothing_rate;     /* ewma percentage (out of 100) */
-	int ath_sample_rate;        /* send a different bit-rate 1/X packets */
+	struct ath_ratectrl arc; 	/* base state */
+	int ath_smoothing_rate; 		/* ewma percentage (out of 100) */
+	int ath_sample_rate; 		/* send a different bit-rate 1/X packets */
 
 #ifdef CONFIG_SYSCTL
 	struct ctl_table_header *sysctl_header;
@@ -70,7 +70,7 @@ struct rate_stats {
 	int tries;
 	int total_packets;
 	int packets_acked;
-	unsigned perfect_tx_time; /* transmit time for 0 retries */
+	unsigned perfect_tx_time; 	/* transmit time for 0 retries */
 	int last_tx;
 };
 
@@ -119,175 +119,72 @@ struct ar5212_desc {
 	/*
 	 * tx_control_0
 	 */
-	u_int32_t	frame_len:12;
-	u_int32_t	reserved_12_15:4;
-	u_int32_t	xmit_power:6;
-	u_int32_t	rts_cts_enable:1;
-	u_int32_t	veol:1;
-	u_int32_t	clear_dest_mask:1;
-	u_int32_t	ant_mode_xmit:4;
-	u_int32_t	inter_req:1;
-	u_int32_t	encrypt_key_valid:1;
-	u_int32_t	cts_enable:1;
+	u_int32_t frame_len:12;
+	u_int32_t reserved_12_15:4;
+	u_int32_t xmit_power:6;
+	u_int32_t rts_cts_enable:1;
+	u_int32_t veol:1;
+	u_int32_t clear_dest_mask:1;
+	u_int32_t ant_mode_xmit:4;
+	u_int32_t inter_req:1;
+	u_int32_t encrypt_key_valid:1;
+	u_int32_t cts_enable:1;
 
 	/*
 	 * tx_control_1
 	 */
-	u_int32_t	buf_len:12;
-	u_int32_t	more:1;
-	u_int32_t	encrypt_key_index:7;
-	u_int32_t	frame_type:4;
-	u_int32_t	no_ack:1;
-	u_int32_t	comp_proc:2;
-	u_int32_t	comp_iv_len:2;
-	u_int32_t	comp_icv_len:2;
-	u_int32_t	reserved_31:1;
+	u_int32_t buf_len:12;
+	u_int32_t more:1;
+	u_int32_t encrypt_key_index:7;
+	u_int32_t frame_type:4;
+	u_int32_t no_ack:1;
+	u_int32_t comp_proc:2;
+	u_int32_t comp_iv_len:2;
+	u_int32_t comp_icv_len:2;
+	u_int32_t reserved_31:1;
 
 	/*
 	 * tx_control_2
 	 */
-	u_int32_t	rts_duration:15;
-	u_int32_t	duration_update_enable:1;
-	u_int32_t	xmit_tries0:4;
-	u_int32_t	xmit_tries1:4;
-	u_int32_t	xmit_tries2:4;
-	u_int32_t	xmit_tries3:4;
+	u_int32_t rts_duration:15;
+	u_int32_t duration_update_enable:1;
+	u_int32_t xmit_tries0:4;
+	u_int32_t xmit_tries1:4;
+	u_int32_t xmit_tries2:4;
+	u_int32_t xmit_tries3:4;
 
 	/*
 	 * tx_control_3
 	 */
-	u_int32_t	xmit_rate0:5;
-	u_int32_t	xmit_rate1:5;
-	u_int32_t	xmit_rate2:5;
-	u_int32_t	xmit_rate3:5;
-	u_int32_t	rts_cts_rate:5;
-	u_int32_t	reserved_25_31:7;
+	u_int32_t xmit_rate0:5;
+	u_int32_t xmit_rate1:5;
+	u_int32_t xmit_rate2:5;
+	u_int32_t xmit_rate3:5;
+	u_int32_t rts_cts_rate:5;
+	u_int32_t reserved_25_31:7;
 
 	/*
 	 * tx_status_0
 	 */
-	u_int32_t	frame_xmit_ok:1;
-	u_int32_t	excessive_retries:1;
-	u_int32_t	fifo_underrun:1;
-	u_int32_t	filtered:1;
-	u_int32_t	rts_fail_count:4;
-	u_int32_t	data_fail_count:4;
-	u_int32_t	virt_coll_count:4;
-	u_int32_t	send_timestamp:16;
+	u_int32_t frame_xmit_ok:1;
+	u_int32_t excessive_retries:1;
+	u_int32_t fifo_underrun:1;
+	u_int32_t filtered:1;
+	u_int32_t rts_fail_count:4;
+	u_int32_t data_fail_count:4;
+	u_int32_t virt_coll_count:4;
+	u_int32_t send_timestamp:16;
 
 	/*
 	 * tx_status_1
 	 */
-	u_int32_t	done:1;
-	u_int32_t	seq_num:12;
-	u_int32_t	ack_sig_strength:8;
-	u_int32_t	final_ts_index:2;
-	u_int32_t	comp_success:1;
-	u_int32_t	xmit_antenna:1;
-	u_int32_t	reserved_25_31_x:7;
+	u_int32_t done:1;
+	u_int32_t seq_num:12;
+	u_int32_t ack_sig_strength:8;
+	u_int32_t final_ts_index:2;
+	u_int32_t comp_success:1;
+	u_int32_t xmit_antenna:1;
+	u_int32_t reserved_25_31_x:7;
 } __packed;
 
-/*
- * Calculate the transmit duration of a frame.
- */
-static unsigned calc_usecs_unicast_packet(struct ath_softc *sc,
-				int length, 
-				int rix, int short_retries, int long_retries) {
-	const HAL_RATE_TABLE *rt = sc->sc_currates;
-	int rts, cts;
-	
-	unsigned t_slot = 20;
-	unsigned t_difs = 50; 
-	unsigned t_sifs = 10; 
-	struct ieee80211com *ic = &sc->sc_ic;
-	int tt = 0;
-	int x = 0;
-	int cw = WIFI_CW_MIN;
-	int cix = rt->info[rix].controlRate;
-	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-
-	if (!rt->info[rix].rateKbps) {
-		printk(KERN_WARNING "rix %d (%d) bad ratekbps %d mode %u\n",
-		       rix, rt->info[rix].dot11Rate,
-		       rt->info[rix].rateKbps,
-		       sc->sc_curmode);
-
-		return 0;
-	}
-	/* 
-	 * XXX getting mac/phy level timings should be fixed for turbo
-	 * rates, and there is probably a way to get this from the
-	 * hal...
-	 */
-	switch (rt->info[rix].phy) {
-	case IEEE80211_T_OFDM:
-		t_slot = 9;
-		t_sifs = 16;
-		t_difs = 28;
-		/* fall through */
-	case IEEE80211_T_TURBO:
-		t_slot = 9;
-		t_sifs = 8;
-		t_difs = 28;
-		break;
-	case IEEE80211_T_DS:
-		/* fall through to default */
-	default:
-		/* pg 205 ieee.802.11.pdf */
-		t_slot = 20;
-		t_difs = 50;
-		t_sifs = 10;
-	}
-
-	rts = cts = 0;
-
-	if ((ic->ic_flags & IEEE80211_F_USEPROT) &&
-	    rt->info[rix].phy == IEEE80211_T_OFDM) {
-		if (ic->ic_protmode == IEEE80211_PROT_RTSCTS)
-			rts = 1;
-		else if (ic->ic_protmode == IEEE80211_PROT_CTSONLY)
-			cts = 1;
-
-		cix = rt->info[sc->sc_protrix].controlRate;
-	}
-
-	if (0 /*length > ic->ic_rtsthreshold */) {
-		rts = 1;
-	}
-
-	if (rts || cts) {
-		int ctsrate = rt->info[cix].rateCode;
-		int ctsduration = 0;
-
-		if (!rt->info[cix].rateKbps) {
-			printk(KERN_WARNING "cix %d (%d) bad ratekbps %d mode %u\n",
-			       cix, rt->info[cix].dot11Rate,
-			       rt->info[cix].rateKbps,
-			       sc->sc_curmode);
-			return 0;
-		}
-		
-
-		ctsrate |= rt->info[cix].shortPreamble;
-		if (rts)		/* SIFS + CTS */
-			ctsduration += rt->info[cix].spAckDuration;
-
-		ctsduration += ath_hal_computetxtime(sc->sc_ah,
-						     rt, length, rix, AH_TRUE);
-
-		if (cts)	/* SIFS + ACK */
-			ctsduration += rt->info[cix].spAckDuration;
-
-		tt += (short_retries + 1) * ctsduration;
-	}
-	tt += t_difs;
-	tt += (long_retries+1)*(t_sifs + rt->info[rix].spAckDuration);
-	tt += (long_retries+1)*ath_hal_computetxtime(sc->sc_ah, rt, length, 
-						rix, AH_TRUE);
-	for (x = 0; x <= short_retries + long_retries; x++) {
-		cw = MIN(WIFI_CW_MAX, (cw + 1) * 2);
-		tt += (t_slot * cw/2);
-	}
-	return tt;
-}
 #endif /* _DEV_ATH_RATE_SAMPLE_H */

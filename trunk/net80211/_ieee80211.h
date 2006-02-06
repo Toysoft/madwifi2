@@ -77,12 +77,12 @@ enum ieee80211_protmode {
  */
 enum ieee80211_authmode {
 	IEEE80211_AUTH_NONE	= 0,
-	IEEE80211_AUTH_OPEN	= 1,		/* open */
-	IEEE80211_AUTH_SHARED	= 2,		/* shared-key */
-	IEEE80211_AUTH_8021X	= 3,		/* 802.1x */
-	IEEE80211_AUTH_AUTO	= 4,		/* auto-select/accept */
+	IEEE80211_AUTH_OPEN	= 1,	/* open */
+	IEEE80211_AUTH_SHARED	= 2,	/* shared-key */
+	IEEE80211_AUTH_8021X	= 3,	/* 802.1x */
+	IEEE80211_AUTH_AUTO	= 4,	/* auto-select/accept */
 	/* NB: these are used only for ioctls */
-	IEEE80211_AUTH_WPA	= 5,		/* WPA/RSN w/ 802.1x/PSK */
+	IEEE80211_AUTH_WPA	= 5,	/* WPA/RSN w/ 802.1x/PSK */
 };
 
 /*
@@ -115,19 +115,18 @@ enum ieee80211_scanmode {
  * Channels are specified by frequency and attributes.
  */
 struct ieee80211_channel {
-	u_int16_t	ic_freq;	/* setting in Mhz */
-	u_int16_t	ic_flags;	/* see below */
-	u_int8_t	ic_ieee;	/* IEEE channel number */
-	int8_t		ic_maxregpower;	/* maximum regulatory tx power in dBm */
-	int8_t		ic_maxpower;	/* maximum tx power in dBm */
-	int8_t		ic_minpower;	/* minimum tx power in dBm */
+	u_int16_t ic_freq;	/* setting in Mhz */
+	u_int16_t ic_flags;	/* see below */
+	u_int8_t ic_ieee;	/* IEEE channel number */
+	int8_t ic_maxregpower;	/* maximum regulatory tx power in dBm */
+	int8_t ic_maxpower;	/* maximum tx power in dBm */
+	int8_t ic_minpower;	/* minimum tx power in dBm */
 };
 
 #define	IEEE80211_CHAN_MAX	255
 #define	IEEE80211_CHAN_BYTES	32	/* howmany(IEEE80211_CHAN_MAX, NBBY) */
 #define	IEEE80211_CHAN_ANY	0xffff	/* token for ``any channel'' */
-#define	IEEE80211_CHAN_ANYC \
-	((struct ieee80211_channel *) IEEE80211_CHAN_ANY)
+#define	IEEE80211_CHAN_ANYC 	((struct ieee80211_channel *) IEEE80211_CHAN_ANY)
 
 #define	IEEE80211_RADAR_11HCOUNT	1
 #define	IEEE80211_RADAR_TEST_MUTE_CHAN	36	/* Move to channel 36 for mute test */
@@ -215,10 +214,10 @@ struct ieee80211_channel {
 	(((_c)->ic_flags & IEEE80211_CHAN_QUARTER) != 0)
 
 /* ni_chan encoding for FH phy */
-#define	IEEE80211_FH_CHANMOD	80
-#define	IEEE80211_FH_CHAN(set,pat)	(((set)-1)*IEEE80211_FH_CHANMOD+(pat))
-#define	IEEE80211_FH_CHANSET(chan)	((chan)/IEEE80211_FH_CHANMOD+1)
-#define	IEEE80211_FH_CHANPAT(chan)	((chan)%IEEE80211_FH_CHANMOD)
+#define	IEEE80211_FH_CHANMOD		80
+#define	IEEE80211_FH_CHAN(set,pat)	(((set) - 1) * IEEE80211_FH_CHANMOD + (pat))
+#define	IEEE80211_FH_CHANSET(chan)	((chan) / IEEE80211_FH_CHANMOD + 1)
+#define	IEEE80211_FH_CHANPAT(chan)	((chan) % IEEE80211_FH_CHANMOD)
 
 /*
  * 802.11 rate set.
@@ -227,18 +226,18 @@ struct ieee80211_channel {
 #define	IEEE80211_RATE_MAXSIZE	15		/* max rates we'll handle */
 
 struct ieee80211_rateset {
-	u_int8_t		rs_nrates;
-	u_int8_t		rs_rates[IEEE80211_RATE_MAXSIZE];
+	u_int8_t rs_nrates;
+	u_int8_t rs_rates[IEEE80211_RATE_MAXSIZE];
 };
 
 struct ieee80211_roam {
-	int8_t			rssi11a;	/* rssi thresh for 11a bss */
-	int8_t			rssi11b;	/* for 11g sta in 11b bss */
-	int8_t			rssi11bOnly;	/* for 11b sta */
-	u_int8_t		pad1;
-	u_int8_t		rate11a;	/* rate thresh for 11a bss */
-	u_int8_t		rate11b;	/* for 11g sta in 11b bss */
-	u_int8_t		rate11bOnly;	/* for 11b sta */
-	u_int8_t		pad2;
+	int8_t rssi11a;		/* rssi thresh for 11a bss */
+	int8_t rssi11b;		/* for 11g sta in 11b bss */
+	int8_t rssi11bOnly;	/* for 11b sta */
+	u_int8_t pad1;
+	u_int8_t rate11a;	/* rate thresh for 11a bss */
+	u_int8_t rate11b;	/* for 11g sta in 11b bss */
+	u_int8_t rate11bOnly;	/* for 11b sta */
+	u_int8_t pad2;
 };
 #endif /* _NET80211__IEEE80211_H_ */

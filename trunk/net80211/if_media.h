@@ -56,12 +56,12 @@
  */
 
 struct ifmediareq {
-	char	ifm_name[IFNAMSIZ];	/* if name, e.g. "en0" */
-	int	ifm_current;		/* current media options */
-	int	ifm_mask;		/* don't care mask */
-	int	ifm_status;		/* media status */
-	int	ifm_active;		/* active options */
-	int	ifm_count;		/* # entries in ifm_ulist array */
+	char ifm_name[IFNAMSIZ];	/* if name, e.g. "en0" */
+	int ifm_current;			/* current media options */
+	int ifm_mask;			/* don't care mask */
+	int ifm_status;			/* media status */
+	int ifm_active;			/* active options */
+	int ifm_count;			/* # entries in ifm_ulist array */
 	int __user *ifm_ulist;		/* media words */
 };
 #define	SIOCSIFMEDIA	_IOWR('i', 55, struct ifreq)	/* set net media */
@@ -76,16 +76,16 @@ struct ifmediareq {
  */
 struct net_device;
 typedef	int (*ifm_change_cb_t)(struct net_device *);
-typedef	void (*ifm_stat_cb_t)(struct net_device *, struct ifmediareq *req);
+typedef	void (*ifm_stat_cb_t)(struct net_device *, struct ifmediareq *);
 
 /*
  * In-kernel representation of a single supported media type.
  */
 struct ifmedia_entry {
 	LIST_ENTRY(ifmedia_entry) ifm_list;
-	int	ifm_media;	/* description of this media attachment */
-	int	ifm_data;	/* for driver-specific use */
-	void	*ifm_aux;	/* for driver-specific use */
+	int ifm_media;		/* description of this media attachment */
+	int ifm_data;		/* for driver-specific use */
+	void *ifm_aux;		/* for driver-specific use */
 };
 
 /*
@@ -93,34 +93,31 @@ struct ifmedia_entry {
  * It is used to keep general media state.
  */
 struct ifmedia {
-	int	ifm_mask;	/* mask of changes we don't care about */
-	int	ifm_media;	/* current user-set media word */
+	int ifm_mask;			/* mask of changes we don't care about */
+	int ifm_media;			/* current user-set media word */
 	struct ifmedia_entry *ifm_cur;	/* currently selected media */
 	ATH_LIST_HEAD(, ifmedia_entry) ifm_list; /* list of all supported media */
 	ifm_change_cb_t	ifm_change;	/* media change driver callback */
-	ifm_stat_cb_t	ifm_status;	/* media status driver callback */
+	ifm_stat_cb_t ifm_status;	/* media status driver callback */
 };
 
 /* Initialize an interface's struct if_media field. */
-void	ifmedia_init(struct ifmedia *ifm, int dontcare_mask,
-	    ifm_change_cb_t change_callback, ifm_stat_cb_t status_callback);
+void ifmedia_init(struct ifmedia *, int, ifm_change_cb_t, ifm_stat_cb_t);
 
 /* Remove all mediums from a struct ifmedia.  */
-void	ifmedia_removeall( struct ifmedia *ifm);
+void ifmedia_removeall(struct ifmedia *);
 
 /* Add one supported medium to a struct ifmedia. */
-void	ifmedia_add(struct ifmedia *ifm, int mword, int data, void *aux);
+void ifmedia_add(struct ifmedia *, int, int, void *);
 
 /* Add an array (of ifmedia_entry) media to a struct ifmedia. */
-void	ifmedia_list_add(struct ifmedia *mp, struct ifmedia_entry *lp,
-	    int count);
+void ifmedia_list_add(struct ifmedia *, struct ifmedia_entry *, int);
 
 /* Set default media type on initialization. */
-void	ifmedia_set(struct ifmedia *ifm, int mword);
+void ifmedia_set(struct ifmedia *, int);
 
 /* Common ioctl function for getting/setting media, called by driver. */
-int	ifmedia_ioctl(struct net_device *, struct ifreq *ifr,
-	    struct ifmedia *ifm, u_long cmd);
+int ifmedia_ioctl(struct net_device *, struct ifreq *, struct ifmedia *, u_long);
 
 #endif /*_KERNEL */
 
@@ -265,14 +262,14 @@ int	ifmedia_ioctl(struct net_device *, struct ifreq *ifr,
 /*
  * Macros to extract various bits of information from the media word.
  */
-#define	IFM_TYPE(x)         ((x) & IFM_NMASK)
-#define	IFM_SUBTYPE(x)      ((x) & IFM_TMASK)
-#define	IFM_TYPE_OPTIONS(x) ((x) & IFM_OMASK)
-#define	IFM_INST(x)         (((x) & IFM_IMASK) >> IFM_ISHIFT)
-#define	IFM_OPTIONS(x)	((x) & (IFM_OMASK|IFM_GMASK))
-#define	IFM_MODE(x)	    ((x) & IFM_MMASK)
+#define	IFM_TYPE(x)		((x) & IFM_NMASK)
+#define	IFM_SUBTYPE(x)		((x) & IFM_TMASK)
+#define	IFM_TYPE_OPTIONS(x)	((x) & IFM_OMASK)
+#define	IFM_INST(x)		(((x) & IFM_IMASK) >> IFM_ISHIFT)
+#define	IFM_OPTIONS(x)		((x) & (IFM_OMASK|IFM_GMASK))
+#define	IFM_MODE(x)		((x) & IFM_MMASK)
 
-#define	IFM_INST_MAX	IFM_INST(IFM_IMASK)
+#define	IFM_INST_MAX		IFM_INST(IFM_IMASK)
 
 /*
  * Macro to create a media word.

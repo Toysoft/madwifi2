@@ -31,14 +31,14 @@
 
 
 #ifndef ARPHRD_IEEE80211_RADIOTAP
-#define ARPHRD_IEEE80211_RADIOTAP 803 /* IEEE 802.11 + radiotap header */
+#define ARPHRD_IEEE80211_RADIOTAP	803 /* IEEE 802.11 + radiotap header */
 #endif /* ARPHRD_IEEE80211_RADIOTAP */
 
 #ifndef ARPHRD_IEEE80211_ATHDESC
-#define ARPHRD_IEEE80211_ATHDESC 804 /* IEEE 802.11 + atheros descriptor */
+#define ARPHRD_IEEE80211_ATHDESC	804 /* IEEE 802.11 + atheros descriptor */
 #endif /* ARPHRD_IEEE80211_RADIOTAP */
 
-#define ATHDESC_HEADER_SIZE 32
+#define ATHDESC_HEADER_SIZE	32
 
 #include <net80211/ieee80211_radiotap.h>
 #include <hal/ah_desc.h>
@@ -117,12 +117,12 @@ typedef struct {
 
 struct ath_rx_radiotap_header {
         struct ieee80211_radiotap_header wr_ihdr;
-        u_int8_t        wr_flags;               /* XXX for padding */
-        u_int8_t        wr_rate;
-        u_int16_t       wr_chan_freq;
-        u_int16_t       wr_chan_flags;
-        u_int8_t        wr_antenna;
-        u_int8_t        wr_antsignal;
+        u_int8_t wr_flags;			/* XXX for padding */
+        u_int8_t wr_rate;
+        u_int16_t wr_chan_freq;
+        u_int16_t wr_chan_flags;
+        u_int8_t wr_antenna;
+        u_int8_t wr_antsignal;
 };
 
 #define ATH_TX_RADIOTAP_PRESENT (               \
@@ -133,21 +133,21 @@ struct ath_rx_radiotap_header {
         0)
 struct ath_tx_radiotap_header {
         struct ieee80211_radiotap_header wt_ihdr;
-        u_int8_t        wt_flags;               /* XXX for padding */
-        u_int8_t        wt_rate;
-        u_int8_t        wt_txpower;
-        u_int8_t        wt_antenna;
+        u_int8_t wt_flags;               	/* XXX for padding */
+        u_int8_t wt_rate;
+        u_int8_t wt_txpower;
+        u_int8_t wt_antenna;
 };
 
 /*
  * Dispatch an skb to monitor-mode vap's.  The skb is assumed
  * to have space at the front to push a wlan_ng_prims2_header.
  */
-void	ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
-				struct ath_desc *ds, int tx, u_int32_t mactime, u_int32_t rate);
+void ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
+	struct ath_desc *, int, u_int32_t, u_int32_t);
 
 
-void    ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb);
+void ieee80211_monitor_encap(struct ieee80211com *, struct sk_buff *);
 
 
 #endif /* _NET80211_IEEE80211_MONITOR_H_ */

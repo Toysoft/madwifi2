@@ -49,16 +49,16 @@
  * should be used only if non-zero.
  */
 struct ath_tx_status {
-	u_int16_t	ts_seqnum;	/* h/w assigned sequence number */
-	u_int16_t	ts_tstamp;	/* h/w assigned timestamp */
-	u_int8_t	ts_status;	/* frame status, 0 => xmit ok */
-	u_int8_t	ts_rate;	/* h/w transmit rate index */
+	u_int16_t ts_seqnum;		/* h/w assigned sequence number */
+	u_int16_t ts_tstamp;		/* h/w assigned timestamp */
+	u_int8_t ts_status;		/* frame status, 0 => xmit ok */
+	u_int8_t ts_rate;		/* h/w transmit rate index */
 #define	HAL_TXSTAT_ALTRATE	0x80	/* alternate xmit rate used */
-	int8_t		ts_rssi;	/* tx ack RSSI */
-	u_int8_t	ts_shortretry;	/* # short retries */
-	u_int8_t	ts_longretry;	/* # long retries */
-	u_int8_t	ts_virtcol;	/* virtual collision count */
-	u_int8_t	ts_antenna;	/* antenna information */
+	int8_t ts_rssi;			/* tx ack RSSI */
+	u_int8_t ts_shortretry;		/* # short retries */
+	u_int8_t ts_longretry;		/* # long retries */
+	u_int8_t ts_virtcol;		/* virtual collision count */
+	u_int8_t ts_antenna;		/* antenna information */
 };
 
 #define	HAL_TXERR_XRETRY	0x01	/* excessive retries */
@@ -80,21 +80,21 @@ struct ath_tx_status {
  * Note that the receive timestamp is expanded using the TSF to
  * 15 bits (regardless of what the h/w provides directly).
  *
- * rx_rssi is in units of dbm above the noise floor.  This value
+ * rs_rssi is in units of dbm above the noise floor.  This value
  * is measured during the preamble and PLCP; i.e. with the initial
  * 4us of detection.  The noise floor is typically a consistent
  * -96dBm absolute power in a 20MHz channel.
  */
 struct ath_rx_status {
-	u_int16_t	rs_datalen;	/* rx frame length */
-	u_int16_t	rs_tstamp;	/* h/w assigned timestamp */
-	u_int8_t	rs_status;	/* rx status, 0 => recv ok */
-	u_int8_t	rs_phyerr;	/* phy error code */
-	int8_t		rs_rssi;	/* rx frame RSSI */
-	u_int8_t	rs_keyix;	/* key cache index */
-	u_int8_t	rs_rate;	/* h/w receive rate index */
-	u_int8_t	rs_antenna;	/* antenna information */
-	u_int8_t	rs_more;	/* more descriptors follow */
+	u_int16_t rs_datalen;	/* rx frame length */
+	u_int16_t rs_tstamp;	/* h/w assigned timestamp */
+	u_int8_t rs_status;	/* rx status, 0 => recv ok */
+	u_int8_t rs_phyerr;	/* phy error code */
+	int8_t rs_rssi;		/* rx frame RSSI */
+	u_int8_t rs_keyix;	/* key cache index */
+	u_int8_t rs_rate;	/* h/w receive rate index */
+	u_int8_t rs_antenna;	/* antenna information */
+	u_int8_t rs_more;	/* more descriptors follow */
 };
 
 #define	HAL_RXERR_CRC		0x01	/* CRC error on frame */
@@ -128,9 +128,9 @@ enum {
 };
 
 /* value found in rs_keyix to mark invalid entries */
-#define	HAL_RXKEYIX_INVALID	((u_int8_t) -1)
+#define	HAL_RXKEYIX_INVALID	((u_int8_t) - 1)
 /* value used to specify no encryption key for xmit */
-#define	HAL_TXKEYIX_INVALID	((u_int) -1)
+#define	HAL_TXKEYIX_INVALID	((u_int) - 1)
 
 /* XXX rs_antenna definitions */
 
@@ -148,19 +148,19 @@ struct ath_desc {
 	 * the hardware and managed by the HAL.  Drivers
 	 * should not touch those elements marked opaque.
 	 */
-	u_int32_t	ds_link;	/* phys address of next descriptor */
-	u_int32_t	ds_data;	/* phys address of data buffer */
-	u_int32_t	ds_ctl0;	/* opaque DMA control 0 */
-	u_int32_t	ds_ctl1;	/* opaque DMA control 1 */
-	u_int32_t	ds_hw[4];	/* opaque h/w region */
+	u_int32_t ds_link;		/* phys address of next descriptor */
+	u_int32_t ds_data;		/* phys address of data buffer */
+	u_int32_t ds_ctl0;		/* opaque DMA control 0 */
+	u_int32_t ds_ctl1;		/* opaque DMA control 1 */
+	u_int32_t ds_hw[4];		/* opaque h/w region */
 	/*
 	 * The remaining definitions are managed by software;
 	 * these are valid only after the rx/tx process descriptor
 	 * methods return a non-EINPROGRESS  code.
 	 */
 	union {
-		struct ath_tx_status tx;/* xmit status */
-		struct ath_rx_status rx;/* recv status */
+		struct ath_tx_status tx;	/* xmit status */
+		struct ath_rx_status rx;	/* recv status */
 	} ds_us;
 	void		*ds_vdata;	/* virtual addr of data buffer */
 } __packed;
