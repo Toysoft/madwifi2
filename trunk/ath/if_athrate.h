@@ -77,14 +77,14 @@ struct ath_desc;
 struct ieee80211vap;
 
 struct ath_ratectrl {
-	size_t	arc_space;	/* space required for per-node state */
-	size_t	arc_vap_space;	/* space required for per-vap state */
+	size_t arc_space;	/* space required for per-node state */
+	size_t arc_vap_space;	/* space required for per-vap state */
 };
 /*
  * Attach/detach a rate control module.
  */
 struct ath_ratectrl *ath_rate_attach(struct ath_softc *);
-void	ath_rate_detach(struct ath_ratectrl *);
+void ath_rate_detach(struct ath_ratectrl *);
 
 
 /*
@@ -94,24 +94,23 @@ void	ath_rate_detach(struct ath_ratectrl *);
  * Initialize per-node state already allocated for the specified
  * node; this space can be assumed initialized to zero.
  */
-void	ath_rate_node_init(struct ath_softc *, struct ath_node *);
+void ath_rate_node_init(struct ath_softc *, struct ath_node *);
 /*
  * Cleanup any per-node state prior to the node being reclaimed.
  */
-void	ath_rate_node_cleanup(struct ath_softc *, struct ath_node *);
+void ath_rate_node_cleanup(struct ath_softc *, struct ath_node *);
 /*
  * Update rate control state on station associate/reassociate 
  * (when operating as an ap or for nodes discovered when operating
  * in ibss mode).
  */
-void	ath_rate_newassoc(struct ath_softc *, struct ath_node *,
-		int isNewAssociation);
+void ath_rate_newassoc(struct ath_softc *, struct ath_node *, int);
 /*
  * Update/reset rate control state for 802.11 state transitions.
  * Important mostly as the analog to ath_rate_newassoc when operating
  * in station mode.
  */
-void	ath_rate_newstate(struct ieee80211vap *, enum ieee80211_state);
+void ath_rate_newstate(struct ieee80211vap *, enum ieee80211_state);
 
 /*
  * Transmit handling.
@@ -122,21 +121,20 @@ void	ath_rate_newstate(struct ieee80211vap *, enum ieee80211_state);
  * and ath_rate_setupxtxdesc will be called after deciding if the frame
  * can be transmitted with multi-rate retry.
  */
-void	ath_rate_findrate(struct ath_softc *, struct ath_node *,
-		int shortPreamble, size_t frameLen,
-		u_int8_t *rix, int *try0, u_int8_t *txrate);
+void ath_rate_findrate(struct ath_softc *, struct ath_node *, int, size_t,
+	u_int8_t *, int *, u_int8_t *);
 /*
  * Setup any extended (multi-rate) descriptor state for a data packet.
  * The rate index returned by ath_rate_findrate is passed back in.
  */
-void	ath_rate_setupxtxdesc(struct ath_softc *, struct ath_node *,
-		struct ath_desc *, int shortPreamble, u_int8_t rix);
+void ath_rate_setupxtxdesc(struct ath_softc *, struct ath_node *,
+	struct ath_desc *, int, u_int8_t);
 /*
  * Update rate control state for a packet associated with the
  * supplied transmit descriptor.  The routine is invoked both
  * for packets that were successfully sent and for those that
  * failed (consult the descriptor for details).
  */
-void	ath_rate_tx_complete(struct ath_softc *, struct ath_node *,
-		const struct ath_desc *);
+void ath_rate_tx_complete(struct ath_softc *, struct ath_node *,
+	const struct ath_desc *);
 #endif /* _ATH_RATECTRL_H_ */

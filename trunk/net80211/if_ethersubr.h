@@ -42,18 +42,18 @@
 #define	ETHER_ADDR_LEN		6	/* length of an Ethernet address */
 #define	ETHER_TYPE_LEN		2	/* length of the Ethernet type field */
 #define	ETHER_CRC_LEN		4	/* length of the Ethernet CRC */
-#define	ETHER_HDR_LEN		(ETHER_ADDR_LEN*2+ETHER_TYPE_LEN)
+#define	ETHER_HDR_LEN		(ETHER_ADDR_LEN * 2 + ETHER_TYPE_LEN)
 #define	ETHER_MAX_LEN		1518
 
-#define	ETHERMTU	(ETHER_MAX_LEN-ETHER_HDR_LEN-ETHER_CRC_LEN)
+#define	ETHERMTU	(ETHER_MAX_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
 
 /*
  * Structure of a 10Mb/s Ethernet header.
  */
 struct	ether_header {
-	u_char	ether_dhost[ETHER_ADDR_LEN];
-	u_char	ether_shost[ETHER_ADDR_LEN];
-	u_short	ether_type;
+	u_char ether_dhost[ETHER_ADDR_LEN];
+	u_char ether_shost[ETHER_ADDR_LEN];
+	u_short ether_type;
 } __packed;
 
 #ifndef ETHERTYPE_PAE

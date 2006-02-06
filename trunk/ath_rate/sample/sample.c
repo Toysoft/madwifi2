@@ -146,6 +146,109 @@ rate_to_ndx(struct sample_node *sn, int rate)
 	return -1;
 }
 
+/*
+ * Calculate the transmit duration of a frame.
+ */
+static unsigned
+calc_usecs_unicast_packet(struct ath_softc *sc, int length, 
+	int rix, int short_retries, int long_retries)
+{
+	const HAL_RATE_TABLE *rt = sc->sc_currates;
+	int rts, cts;
+	
+	unsigned t_slot = 20;
+	unsigned t_difs = 50; 
+	unsigned t_sifs = 10; 
+	struct ieee80211com *ic = &sc->sc_ic;
+	int tt = 0;
+	int x = 0;
+	int cw = WIFI_CW_MIN;
+	int cix = rt->info[rix].controlRate;
+	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
+
+	if (!rt->info[rix].rateKbps) {
+		printk(KERN_WARNING "rix %d (%d) bad ratekbps %d mode %u\n",
+		       rix, rt->info[rix].dot11Rate,
+		       rt->info[rix].rateKbps,
+		       sc->sc_curmode);
+
+		return 0;
+	}
+	/* 
+	 * XXX getting mac/phy level timings should be fixed for turbo
+	 * rates, and there is probably a way to get this from the
+	 * hal...
+	 */
+	switch (rt->info[rix].phy) {
+	case IEEE80211_T_OFDM:
+		t_slot = 9;
+		t_sifs = 16;
+		t_difs = 28;
+		/* fall through */
+	case IEEE80211_T_TURBO:
+		t_slot = 9;
+		t_sifs = 8;
+		t_difs = 28;
+		break;
+	case IEEE80211_T_DS:
+		/* fall through to default */
+	default:
+		/* pg 205 ieee.802.11.pdf */
+		t_slot = 20;
+		t_difs = 50;
+		t_sifs = 10;
+	}
+
+	rts = cts = 0;
+
+	if ((ic->ic_flags & IEEE80211_F_USEPROT) &&
+	    rt->info[rix].phy == IEEE80211_T_OFDM) {
+		if (ic->ic_protmode == IEEE80211_PROT_RTSCTS)
+			rts = 1;
+		else if (ic->ic_protmode == IEEE80211_PROT_CTSONLY)
+			cts = 1;
+
+		cix = rt->info[sc->sc_protrix].controlRate;
+	}
+
+	if (0 /*length > ic->ic_rtsthreshold */)
+		rts = 1;
+
+	if (rts || cts) {
+		int ctsrate = rt->info[cix].rateCode;
+		int ctsduration = 0;
+
+		if (!rt->info[cix].rateKbps) {
+			printk(KERN_WARNING "cix %d (%d) bad ratekbps %d mode %u\n",
+			       cix, rt->info[cix].dot11Rate,
+			       rt->info[cix].rateKbps,
+			       sc->sc_curmode);
+			return 0;
+		}
+		
+
+		ctsrate |= rt->info[cix].shortPreamble;
+		if (rts)		/* SIFS + CTS */
+			ctsduration += rt->info[cix].spAckDuration;
+
+		ctsduration += ath_hal_computetxtime(sc->sc_ah,
+						     rt, length, rix, AH_TRUE);
+
+		if (cts)	/* SIFS + ACK */
+			ctsduration += rt->info[cix].spAckDuration;
+
+		tt += (short_retries + 1) * ctsduration;
+	}
+	tt += t_difs;
+	tt += (long_retries+1)*(t_sifs + rt->info[rix].spAckDuration);
+	tt += (long_retries+1)*ath_hal_computetxtime(sc->sc_ah, rt, length, 
+						rix, AH_TRUE);
+	for (x = 0; x <= short_retries + long_retries; x++) {
+		cw = MIN(WIFI_CW_MAX, (cw + 1) * 2);
+		tt += (t_slot * cw / 2);
+	}
+	return tt;
+}
 
 void
 ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)

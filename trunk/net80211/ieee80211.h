@@ -38,17 +38,17 @@
  * 802.11 protocol definitions.
  */
 
-#define	IEEE80211_ADDR_LEN	6		/* size of 802.11 address */
+#define	IEEE80211_ADDR_LEN		6		/* size of 802.11 address */
 /* is 802.11 address multicast/broadcast? */
 #define	IEEE80211_IS_MULTICAST(_a)	(*(_a) & 0x01)
 
 /* IEEE 802.11 PLCP header */
 struct ieee80211_plcp_hdr {
-	u_int16_t	i_sfd;
-	u_int8_t	i_signal;
-	u_int8_t	i_service;
-	u_int16_t	i_length;
-	u_int16_t	i_crc;
+	u_int16_t i_sfd;
+	u_int8_t i_signal;
+	u_int8_t i_service;
+	u_int16_t i_length;
+	u_int16_t i_crc;
 } __packed;
 
 #define IEEE80211_PLCP_SFD      0xF3A0 
@@ -58,59 +58,59 @@ struct ieee80211_plcp_hdr {
  * generic definitions for IEEE 802.11 frames
  */
 struct ieee80211_frame {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr3[IEEE80211_ADDR_LEN];
-	u_int8_t	i_seq[2];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr3[IEEE80211_ADDR_LEN];
+	u_int8_t i_seq[2];
 	/* possibly followed by addr4[IEEE80211_ADDR_LEN]; */
 	/* see below */
 } __packed;
 
 struct ieee80211_qosframe {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr3[IEEE80211_ADDR_LEN];
-	u_int8_t	i_seq[2];
-	u_int8_t	i_qos[2];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr3[IEEE80211_ADDR_LEN];
+	u_int8_t i_seq[2];
+	u_int8_t i_qos[2];
 	/* possibly followed by addr4[IEEE80211_ADDR_LEN]; */
 	/* see below */
 } __packed;
 
 struct ieee80211_qoscntl {
-	u_int8_t	i_qos[2];
+	u_int8_t i_qos[2];
 };
 
 struct ieee80211_frame_addr4 {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr3[IEEE80211_ADDR_LEN];
-	u_int8_t	i_seq[2];
-	u_int8_t	i_addr4[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr3[IEEE80211_ADDR_LEN];
+	u_int8_t i_seq[2];
+	u_int8_t i_addr4[IEEE80211_ADDR_LEN];
 } __packed;
 
 
 struct ieee80211_qosframe_addr4 {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr3[IEEE80211_ADDR_LEN];
-	u_int8_t	i_seq[2];
-	u_int8_t	i_addr4[IEEE80211_ADDR_LEN];
-	u_int8_t	i_qos[2];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr3[IEEE80211_ADDR_LEN];
+	u_int8_t i_seq[2];
+	u_int8_t i_addr4[IEEE80211_ADDR_LEN];
+	u_int8_t i_qos[2];
 } __packed;
 
 struct ieee80211_ctlframe_addr2 {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_aidordur[2]; /* AID or duration */
-	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_aidordur[2]; /* AID or duration */
+	u_int8_t i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr2[IEEE80211_ADDR_LEN];
 } __packed;
 
 #define	IEEE80211_FC0_VERSION_MASK		0x03
@@ -357,10 +357,10 @@ enum CountryCode {
  */
 #define IEEE80211_COUNTRY_MAX_TRIPLETS (83)
 struct ieee80211_ie_country {
-	u_int8_t	country_id;
-	u_int8_t	country_len;
-	u_int8_t	country_str[3];
-	u_int8_t	country_triplet[IEEE80211_COUNTRY_MAX_TRIPLETS*3];
+	u_int8_t country_id;
+	u_int8_t country_len;
+	u_int8_t country_str[3];
+	u_int8_t country_triplet[IEEE80211_COUNTRY_MAX_TRIPLETS * 3];
 } __packed;
 
 /* does frame have QoS sequence control data */
@@ -374,41 +374,41 @@ struct ieee80211_ie_country {
  * WME/802.11e information element.
  */
 struct ieee80211_ie_wme {
-	u_int8_t	wme_id;		/* IEEE80211_ELEMID_VENDOR */
-	u_int8_t	wme_len;	/* length in bytes */
-	u_int8_t	wme_oui[3];	/* 0x00, 0x50, 0xf2 */
-	u_int8_t	wme_type;	/* OUI type */
-	u_int8_t	wme_subtype;	/* OUI subtype */
-	u_int8_t	wme_version;	/* spec revision */
-	u_int8_t	wme_info;	/* QoS info */
+	u_int8_t wme_id;		/* IEEE80211_ELEMID_VENDOR */
+	u_int8_t wme_len;	/* length in bytes */
+	u_int8_t wme_oui[3];	/* 0x00, 0x50, 0xf2 */
+	u_int8_t wme_type;	/* OUI type */
+	u_int8_t wme_subtype;	/* OUI subtype */
+	u_int8_t wme_version;	/* spec revision */
+	u_int8_t wme_info;	/* QoS info */
 } __packed;
 
 /*
  * WME/802.11e Tspec Element
  */
 struct ieee80211_wme_tspec {
-	u_int8_t	ts_id;
-	u_int8_t	ts_len;
-	u_int8_t	ts_oui[3];
-	u_int8_t	ts_oui_type;
-	u_int8_t	ts_oui_subtype;
-	u_int8_t	ts_version;
-	u_int8_t	ts_tsinfo[3];
-	u_int8_t	ts_nom_msdu[2];
-	u_int8_t	ts_max_msdu[2];
-	u_int8_t	ts_min_svc[4];
-	u_int8_t	ts_max_svc[4];
-	u_int8_t	ts_inactv_intv[4];
-	u_int8_t	ts_susp_intv[4];
-	u_int8_t	ts_start_svc[4];
-	u_int8_t	ts_min_rate[4];
-	u_int8_t	ts_mean_rate[4];
-	u_int8_t	ts_max_burst[4];
-	u_int8_t	ts_min_phy[4];
-	u_int8_t	ts_peak_rate[4];
-	u_int8_t	ts_delay[4];
-	u_int8_t	ts_surplus[2];
-	u_int8_t	ts_medium_time[2];
+	u_int8_t ts_id;
+	u_int8_t ts_len;
+	u_int8_t ts_oui[3];
+	u_int8_t ts_oui_type;
+	u_int8_t ts_oui_subtype;
+	u_int8_t ts_version;
+	u_int8_t ts_tsinfo[3];
+	u_int8_t ts_nom_msdu[2];
+	u_int8_t ts_max_msdu[2];
+	u_int8_t ts_min_svc[4];
+	u_int8_t ts_max_svc[4];
+	u_int8_t ts_inactv_intv[4];
+	u_int8_t ts_susp_intv[4];
+	u_int8_t ts_start_svc[4];
+	u_int8_t ts_min_rate[4];
+	u_int8_t ts_mean_rate[4];
+	u_int8_t ts_max_burst[4];
+	u_int8_t ts_min_phy[4];
+	u_int8_t ts_peak_rate[4];
+	u_int8_t ts_delay[4];
+	u_int8_t ts_surplus[2];
+	u_int8_t ts_medium_time[2];
 } __packed;
 
 /*
@@ -416,9 +416,9 @@ struct ieee80211_wme_tspec {
  */
 
 struct ieee80211_wme_acparams {
-	u_int8_t	acp_aci_aifsn;
-	u_int8_t	acp_logcwminmax;
-	u_int16_t	acp_txop;
+	u_int8_t acp_aci_aifsn;
+	u_int8_t acp_logcwminmax;
+	u_int16_t acp_txop;
 } __packed;
 
 #define IEEE80211_WME_PARAM_LEN 24
@@ -452,14 +452,14 @@ struct ieee80211_wme_acparams {
  */
 
 struct ieee80211_wme_param {
-	u_int8_t	param_id;
-	u_int8_t	param_len;
-	u_int8_t	param_oui[3];
-	u_int8_t	param_oui_type;
-	u_int8_t	param_oui_sybtype;
-	u_int8_t	param_version;
-	u_int8_t	param_qosInfo;
-	u_int8_t	param_reserved;
+	u_int8_t param_id;
+	u_int8_t param_len;
+	u_int8_t param_oui[3];
+	u_int8_t param_oui_type;
+	u_int8_t param_oui_sybtype;
+	u_int8_t param_version;
+	u_int8_t param_qosInfo;
+	u_int8_t param_reserved;
 	struct ieee80211_wme_acparams	params_acParams[WME_NUM_AC];
 } __packed;
 
@@ -484,32 +484,32 @@ struct ieee80211_wme_param {
  * Atheros Advanced Capability information element.
  */
 struct ieee80211_ie_athAdvCap {
-	u_int8_t	athAdvCap_id;		/* IEEE80211_ELEMID_VENDOR */
-	u_int8_t	athAdvCap_len;		/* length in bytes */
-	u_int8_t	athAdvCap_oui[3];	/* 0x00, 0x03, 0x7f */
-	u_int8_t	athAdvCap_type;		/* OUI type */
-	u_int8_t	athAdvCap_subtype;	/* OUI subtype */
-	u_int8_t	athAdvCap_version;	/* spec revision */
-	u_int8_t	athAdvCap_capability;	/* Capability info */
-	u_int16_t	athAdvCap_defKeyIndex;
+	u_int8_t athAdvCap_id;		/* IEEE80211_ELEMID_VENDOR */
+	u_int8_t athAdvCap_len;		/* length in bytes */
+	u_int8_t athAdvCap_oui[3];	/* 0x00, 0x03, 0x7f */
+	u_int8_t athAdvCap_type;		/* OUI type */
+	u_int8_t athAdvCap_subtype;	/* OUI subtype */
+	u_int8_t athAdvCap_version;	/* spec revision */
+	u_int8_t athAdvCap_capability;	/* Capability info */
+	u_int16_t athAdvCap_defKeyIndex;
 } __packed;
 
 /*
  * Atheros XR information element.
  */
 struct ieee80211_xr_param {
-	u_int8_t	param_id;
-	u_int8_t	param_len;
-	u_int8_t	param_oui[3];
-	u_int8_t	param_oui_type;
-	u_int8_t	param_oui_sybtype;
-	u_int8_t	param_version;
-	u_int8_t	param_Info;
-	u_int8_t	param_base_bssid[IEEE80211_ADDR_LEN];
-	u_int8_t	param_xr_bssid[IEEE80211_ADDR_LEN];
-	u_int16_t	param_xr_beacon_interval;
-	u_int8_t	param_base_ath_capability;
-	u_int8_t	param_xr_ath_capability;
+	u_int8_t param_id;
+	u_int8_t param_len;
+	u_int8_t param_oui[3];
+	u_int8_t param_oui_type;
+	u_int8_t param_oui_sybtype;
+	u_int8_t param_version;
+	u_int8_t param_Info;
+	u_int8_t param_base_bssid[IEEE80211_ADDR_LEN];
+	u_int8_t param_xr_bssid[IEEE80211_ADDR_LEN];
+	u_int16_t param_xr_beacon_interval;
+	u_int8_t param_base_ath_capability;
+	u_int8_t param_xr_ath_capability;
 } __packed;
 
 /* Atheros capabilities */
@@ -526,10 +526,10 @@ struct ieee80211_xr_param {
  * Management Notification Frame
  */
 struct ieee80211_mnf {
-	u_int8_t	mnf_category;
-	u_int8_t	mnf_action;
-	u_int8_t	mnf_dialog;
-	u_int8_t	mnf_status;
+	u_int8_t mnf_category;
+	u_int8_t mnf_action;
+	u_int8_t mnf_dialog;
+	u_int8_t mnf_status;
 } __packed;
 #define	MNF_SETUP_REQ	0
 #define	MNF_SETUP_RESP	1
@@ -539,48 +539,48 @@ struct ieee80211_mnf {
  * Control frames.
  */
 struct ieee80211_frame_min {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_addr1[IEEE80211_ADDR_LEN];
-	u_int8_t	i_addr2[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_addr1[IEEE80211_ADDR_LEN];
+	u_int8_t i_addr2[IEEE80211_ADDR_LEN];
 	/* FCS */
 } __packed;
 
 struct ieee80211_frame_rts {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_ra[IEEE80211_ADDR_LEN];
-	u_int8_t	i_ta[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_ra[IEEE80211_ADDR_LEN];
+	u_int8_t i_ta[IEEE80211_ADDR_LEN];
 	/* FCS */
 } __packed;
 
 struct ieee80211_frame_cts {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_ra[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_ra[IEEE80211_ADDR_LEN];
 	/* FCS */
 } __packed;
 
 struct ieee80211_frame_ack {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];
-	u_int8_t	i_ra[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];
+	u_int8_t i_ra[IEEE80211_ADDR_LEN];
 	/* FCS */
 } __packed;
 
 struct ieee80211_frame_pspoll {
-	u_int8_t	i_fc[2];
-	u_int8_t	i_aid[2];
-	u_int8_t	i_bssid[IEEE80211_ADDR_LEN];
-	u_int8_t	i_ta[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_aid[2];
+	u_int8_t i_bssid[IEEE80211_ADDR_LEN];
+	u_int8_t i_ta[IEEE80211_ADDR_LEN];
 	/* FCS */
 } __packed;
 
 struct ieee80211_frame_cfend {		/* NB: also CF-End+CF-Ack */
-	u_int8_t	i_fc[2];
-	u_int8_t	i_dur[2];	/* should be zero */
-	u_int8_t	i_ra[IEEE80211_ADDR_LEN];
-	u_int8_t	i_bssid[IEEE80211_ADDR_LEN];
+	u_int8_t i_fc[2];
+	u_int8_t i_dur[2];	/* should be zero */
+	u_int8_t i_ra[IEEE80211_ADDR_LEN];
+	u_int8_t i_bssid[IEEE80211_ADDR_LEN];
 	/* FCS */
 } __packed;
 
@@ -623,19 +623,19 @@ typedef u_int8_t *ieee80211_mgt_beacon_t;
  * 802.11i/WPA information element (maximally sized).
  */
 struct ieee80211_ie_wpa {
-	u_int8_t	wpa_id;		/* IEEE80211_ELEMID_VENDOR */
-	u_int8_t	wpa_len;	/* length in bytes */
-	u_int8_t	wpa_oui[3];	/* 0x00, 0x50, 0xf2 */
-	u_int8_t	wpa_type;	/* OUI type */
-	u_int16_t	wpa_version;	/* spec revision */
-	u_int32_t	wpa_mcipher[1];	/* multicast/group key cipher */
-	u_int16_t	wpa_uciphercnt;	/* # pairwise key ciphers */
-	u_int32_t	wpa_uciphers[8];/* ciphers */
-	u_int16_t	wpa_authselcnt;	/* authentication selector cnt*/
-	u_int32_t	wpa_authsels[8];/* selectors */
-	u_int16_t	wpa_caps;	/* 802.11i capabilities */
-	u_int16_t	wpa_pmkidcnt;	/* 802.11i pmkid count */
-	u_int16_t	wpa_pmkids[8];	/* 802.11i pmkids */
+	u_int8_t wpa_id;			/* IEEE80211_ELEMID_VENDOR */
+	u_int8_t wpa_len;		/* length in bytes */
+	u_int8_t wpa_oui[3];		/* 0x00, 0x50, 0xf2 */
+	u_int8_t wpa_type;		/* OUI type */
+	u_int16_t wpa_version;		/* spec revision */
+	u_int32_t wpa_mcipher[1];	/* multicast/group key cipher */
+	u_int16_t wpa_uciphercnt;	/* # pairwise key ciphers */
+	u_int32_t wpa_uciphers[8];	/* ciphers */
+	u_int16_t wpa_authselcnt;	/* authentication selector cnt*/
+	u_int32_t wpa_authsels[8];	/* selectors */
+	u_int16_t wpa_caps;		/* 802.11i capabilities */
+	u_int16_t wpa_pmkidcnt;		/* 802.11i pmkid count */
+	u_int16_t wpa_pmkids[8];		/* 802.11i pmkids */
 } __packed;
 
 /*

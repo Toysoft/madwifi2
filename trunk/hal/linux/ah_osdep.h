@@ -108,7 +108,7 @@ extern void * __ahdecl ath_hal_memcpy(void *, const void *, size_t);
 #endif
 
 struct ath_hal;
-extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
+extern u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 #define	OS_GETUPTIME(_ah)	ath_hal_getuptime(_ah)
 
 /*
@@ -204,9 +204,9 @@ typedef volatile void __iomem *io_addr_t;
 #define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
 #define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
 
-extern	void __ahdecl ath_hal_reg_write(struct ath_hal *ah,
-		u_int reg, u_int32_t val);
-extern	u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
+extern void __ahdecl ath_hal_reg_write(struct ath_hal *ah,
+	u_int reg, u_int32_t val);
+extern u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 #else
 /* inline register operations */
 #define OS_REG_WRITE(_ah, _reg, _val)	_OS_REG_WRITE(_ah, _reg, _val)
@@ -227,11 +227,11 @@ extern	void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
  *     up in the function.
  *
  * NB: These are intentionally not marked __ahdecl since they are
- *     compiled with the default calling convetion and are not called
+ *     compiled with the default calling convention and are not called
  *     from within the HAL.
  */
-extern	struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
-		HAL_BUS_TAG, HAL_BUS_HANDLE, void* status);
-extern	void ath_hal_detach(struct ath_hal *);
+extern struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
+	HAL_BUS_TAG, HAL_BUS_HANDLE, void* status);
+extern void ath_hal_detach(struct ath_hal *);
 
 #endif /* _ATH_AH_OSDEP_H_ */
