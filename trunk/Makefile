@@ -64,6 +64,8 @@ svnversion.h:
 	echo -n '#define SVNVERSION "' > $@
 	if [ -d .svn ]; then \
 		echo -n "$(shell svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//')" >> $@; \
+	elif [ -s SNAPSHOT ]; then \
+		echo -n "$(shell sed -e '/^Revision: */!d;s///;q' SNAPSHOT)" >> $@; \
 	else \
 		echo -n "$(shell date +%F)" >> $@; \
 	fi
