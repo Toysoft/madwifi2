@@ -51,9 +51,9 @@ include Makefile.inc
 DIRS_MODULES=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
 DIRS=	${DIRS_MODULES} ${TOOLS}
 
-all: svnversion.h modules tools
+all: modules tools
 
-modules: configcheck
+modules: configcheck svnversion.h 
 	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i || exit 1; \
