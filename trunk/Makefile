@@ -49,7 +49,6 @@ include Makefile.inc
 
 # NB: the order is important here
 DIRS_MODULES=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
-DIRS=	${DIRS_MODULES} ${TOOLS}
 
 all: modules tools
 
@@ -111,9 +110,10 @@ release:
 	rm -rf $${DIR}
 
 clean:
-	for i in ${DIRS}; do \
+	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i clean; \
 	done
+	-$(MAKE) -C ${TOOLS} clean
 	rm -rf ${SYMBOLSDIR}
 	rm -f svnversion.h
 
