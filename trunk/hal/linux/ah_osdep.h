@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2004 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2006 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -108,7 +108,7 @@ extern void * __ahdecl ath_hal_memcpy(void *, const void *, size_t);
 #endif
 
 struct ath_hal;
-extern u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
+extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 #define	OS_GETUPTIME(_ah)	ath_hal_getuptime(_ah)
 
 /*
@@ -153,44 +153,17 @@ __bswap32(u_int32_t _x)
  * register values are constants.
  */
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
-#if ( defined(CONFIG_PPC_PMAC) || defined(CONFIG_ARCH_IXP425) || defined(CONFIG_ARCH_IXP4XX)) /* ixp4xx or PowerPC architecture */
-
-/*
- * In Linux 2.4, both long and pointer are OK as addresses for readl and
- * writel, but some ARM ports require unsigned long.
- */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-typedef volatile unsigned long io_addr_t;
-#else
-typedef volatile void __iomem *io_addr_t;
-#endif
-
-#define _OS_REG_WRITE(_ah, _reg, _val) do {                                 \
-        if ( (_reg) >= 0x4000 && (_reg) < 0x5000)                           \
-            writel((_val), (io_addr_t)((_ah)->ah_sh + (_reg)));\
-        else                                                                \
-            writel(__bswap32(_val), (io_addr_t)((_ah)->ah_sh + (_reg))); \
+#define _OS_REG_WRITE(_ah, _reg, _val) do {				    \
+	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
+			__bswap32((_val));				    \
+	else								    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
 } while (0)
 #define _OS_REG_READ(_ah, _reg) \
-        (((_reg) >= 0x4000 && (_reg) < 0x5000) ?                            \
-            readl((io_addr_t)((_ah)->ah_sh + (_reg))) :        \
-            __bswap32(readl((io_addr_t)((_ah)->ah_sh + (_reg)))))
-
-#else  /* normal case */
-
-#define _OS_REG_WRITE(_ah, _reg, _val) do {                                 \
-        if ( (_reg) >= 0x4000 && (_reg) < 0x5000)                           \
-                *((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =          \
-                        __bswap32((_val));                                  \
-        else                                                                \
-                *((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
-} while (0)
-#define _OS_REG_READ(_ah, _reg) \
-        (((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
-                __bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
-                *((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
-
-#endif
+	(((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
+		__bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
 #else /* AH_LITTLE_ENDIAN */
 #define _OS_REG_WRITE(_ah, _reg, _val) do { \
 	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val); \
@@ -204,9 +177,9 @@ typedef volatile void __iomem *io_addr_t;
 #define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
 #define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
 
-extern void __ahdecl ath_hal_reg_write(struct ath_hal *ah,
-	u_int reg, u_int32_t val);
-extern u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
+extern	void __ahdecl ath_hal_reg_write(struct ath_hal *ah,
+		u_int reg, u_int32_t val);
+extern	u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 #else
 /* inline register operations */
 #define OS_REG_WRITE(_ah, _reg, _val)	_OS_REG_WRITE(_ah, _reg, _val)
@@ -227,11 +200,11 @@ extern	void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
  *     up in the function.
  *
  * NB: These are intentionally not marked __ahdecl since they are
- *     compiled with the default calling convention and are not called
+ *     compiled with the default calling convetion and are not called
  *     from within the HAL.
  */
-extern struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
-	HAL_BUS_TAG, HAL_BUS_HANDLE, void* status);
-extern void ath_hal_detach(struct ath_hal *);
+extern	struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
+		HAL_BUS_TAG, HAL_BUS_HANDLE, void* status);
+extern	void ath_hal_detach(struct ath_hal *);
 
 #endif /* _ATH_AH_OSDEP_H_ */

@@ -3546,7 +3546,7 @@ ath_beaconq_setup(struct ath_hal *ah)
 	qi.tqi_cwmin = 0;
 	qi.tqi_cwmax = 0;
 #ifdef ATH_SUPERG_DYNTURBO
-	qi.tqi_qflags = TXQ_FLAG_TXDESCINT_ENABLE;
+	qi.tqi_qflags = HAL_TXQ_TXDESCINT_ENABLE;
 #endif
 	/* NB: don't enable any interrupts */
 	return ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_BEACON, &qi);
@@ -5992,9 +5992,9 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 	 * based intr on the EOSP frames.
 	 */
 	if (qtype == HAL_TX_QUEUE_UAPSD)
-		qi.tqi_qflags = TXQ_FLAG_TXDESCINT_ENABLE;
+		qi.tqi_qflags = HAL_TXQ_TXDESCINT_ENABLE;
 	else
-		qi.tqi_qflags = TXQ_FLAG_TXEOLINT_ENABLE | TXQ_FLAG_TXDESCINT_ENABLE;
+		qi.tqi_qflags = HAL_TXQ_TXEOLINT_ENABLE | HAL_TXQ_TXDESCINT_ENABLE;
 	qnum = ath_hal_setuptxqueue(ah, qtype, &qi);
 	if (qnum == -1) {
 		/*
