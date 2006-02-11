@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2002-2004 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2006 Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/public/xscale-le-elf.inc#16 $
+# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/public/xscale-le-elf.inc#17 $
 #
 
 #
@@ -73,6 +73,5 @@ NM=	${TOOLPREFIX}nm
 
 LDOPTS=	-EL
 COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN -DAH_REGOPS_FUNC
-COPTS+= -mlittle-endian -fno-strict-aliasing -fno-common \
-	-mapcs-32 -mtune=xscale $(call cc-option,-mshort-load-bytes, \
- 	$(call cc-option,-malignment-traps,)) -msoft-float -mfp=2
+COPTS+= -march=armv4 -mlittle-endian -fno-strict-aliasing -fno-common \
+	-mapcs-32 -mtune=xscale  -mshort-load-bytes -msoft-float -mfp=2

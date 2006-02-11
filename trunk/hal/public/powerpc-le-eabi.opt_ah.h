@@ -5,4 +5,3 @@
 #define AH_SUPPORT_5112	1
 #define AH_SUPPORT_2413	1
 #define AH_SUPPORT_5413	1
-#define AH_SUPPORT_DFS	1

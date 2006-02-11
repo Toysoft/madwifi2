@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2006 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -116,13 +116,14 @@ typedef enum {
 	HAL_CAP_RFSILENT	= 25,	/* hardware has rfsilent support  */
 	HAL_CAP_TPC_ACK		= 26,	/* ack txpower with per-packet tpc */
 	HAL_CAP_TPC_CTS		= 27,	/* cts txpower with per-packet tpc */
+	HAL_CAP_11D		= 28,   /* 11d beacon support for changing cc */
 } HAL_CAPABILITY_TYPE;
 
 /* 
  * "States" for setting the LED.  These correspond to
  * the possible 802.11 operational states and there may
  * be a many-to-one mapping between these states and the
- * actual hardware states for the LED's (i.e. the hardware
+ * actual hardware state for the LED's (i.e. the hardware
  * may have fewer states).
  */
 typedef enum {
@@ -167,38 +168,106 @@ typedef enum {
  * operational parameters.
  */
 typedef enum {
-	TXQ_FLAG_TXOKINT_ENABLE	    = 0x0001,    /* enable TXOK interrupt */
-	TXQ_FLAG_TXERRINT_ENABLE    = 0x0001,    /* enable TXERR interrupt */
-	TXQ_FLAG_TXDESCINT_ENABLE   = 0x0002,    /* enable TXDESC interrupt */
-	TXQ_FLAG_TXEOLINT_ENABLE    = 0x0004,    /* enable TXEOL interrupt */
-	TXQ_FLAG_TXURNINT_ENABLE    = 0x0008,    /* enable TXURN interrupt */
-	TXQ_FLAG_BACKOFF_DISABLE    = 0x0010,    /* disable Post Backoff  */
-	TXQ_FLAG_COMPRESSION_ENABLE = 0x0020,    /* compression enabled */
-	TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE = 0x0040, /* enable ready time
-							expiry policy */
-	TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = 0x0080, /* enable backoff while
-							sending fragment burst*/
+	/*
+	 * Per queue interrupt enables.  When set the associated
+	 * interrupt may be delivered for packets sent through
+	 * the queue.  Without these enabled no interrupts will
+	 * be delivered for transmits through the queue.
+	 */
+	HAL_TXQ_TXOKINT_ENABLE	   = 0x0001,	/* enable TXOK interrupt */
+	HAL_TXQ_TXERRINT_ENABLE	   = 0x0001,	/* enable TXERR interrupt */
+	HAL_TXQ_TXDESCINT_ENABLE   = 0x0002,	/* enable TXDESC interrupt */
+	HAL_TXQ_TXEOLINT_ENABLE	   = 0x0004,	/* enable TXEOL interrupt */
+	HAL_TXQ_TXURNINT_ENABLE	   = 0x0008,	/* enable TXURN interrupt */
+	/*
+	 * Enable hardware compression for packets sent through
+	 * the queue.  The compression buffer must be setup and
+	 * packets must have a key entry marked in the tx descriptor.
+	 */
+	HAL_TXQ_COMPRESSION_ENABLE  = 0x0010,	/* enable h/w compression */
+	/*
+	 * Disable queue when veol is hit or ready time expires.
+	 * By default the queue is disabled only on reaching the
+	 * physical end of queue (i.e. a null link ptr in the
+	 * descriptor chain).
+	 */
+	HAL_TXQ_RDYTIME_EXP_POLICY_ENABLE = 0x0020,
+	/*
+	 * Schedule frames on delivery of a DBA (DMA Beacon Alert)
+	 * event.  Frames will be transmitted only when this timer
+	 * fires, e.g to transmit a beacon in ap or adhoc modes.
+	 */
+	HAL_TXQ_DBA_GATED	    = 0x0040,	/* schedule based on DBA */
+	/*
+	 * Each transmit queue has a counter that is incremented
+	 * each time the queue is enabled and decremented when
+	 * the list of frames to transmit is traversed (or when
+	 * the ready time for the queue expires).  This counter
+	 * must be non-zero for frames to be scheduled for
+	 * transmission.  The following controls disable bumping
+	 * this counter under certain conditions.  Typically this
+	 * is used to gate frames based on the contents of another
+	 * queue (e.g. CAB traffic may only follow a beacon frame).
+	 * These are meaningful only when frames are scheduled
+	 * with a non-ASAP policy (e.g. DBA-gated).
+	 */
+	HAL_TXQ_CBR_DIS_QEMPTY	    = 0x0080,	/* disable on this q empty */
+	HAL_TXQ_CBR_DIS_BEMPTY	    = 0x0100,	/* disable on beacon q empty */
+
+	/*
+	 * Fragment burst backoff policy.  Normally the no backoff
+	 * is done after a successful transmission, the next fragment
+	 * is sent at SIFS.  If this flag is set backoff is done
+	 * after each fragment, regardless whether it was ack'd or
+	 * not, after the backoff count reaches zero a normal channel
+	 * access procedure is done before the next transmit (i.e.
+	 * wait AIFS instead of SIFS).
+	 */
+	HAL_TXQ_FRAG_BURST_BACKOFF_ENABLE = 0x00800000,
+	/*
+	 * Disable post-tx backoff following each frame.
+	 */
+	HAL_TXQ_BACKOFF_DISABLE	    = 0x00010000, /* disable post backoff  */
+	/*
+	 * DCU arbiter lockout control.  This controls how
+	 * lower priority tx queues are handled with respect to
+	 * to a specific queue when multiple queues have frames
+	 * to send.  No lockout means lower priority queues arbitrate
+	 * concurrently with this queue.  Intra-frame lockout
+	 * means lower priority queues are locked out until the
+	 * current frame transmits (e.g. including backoffs and bursting).
+	 * Global lockout means nothing lower can arbitrary so
+	 * long as there is traffic activity on this queue (frames,
+	 * backoff, etc).
+	 */
+	HAL_TXQ_ARB_LOCKOUT_INTRA   = 0x00020000, /* intra-frame lockout */
+	HAL_TXQ_ARB_LOCKOUT_GLOBAL  = 0x00040000, /* full lockout s */
+
+	HAL_TXQ_IGNORE_VIRTCOL	    = 0x00080000, /* ignore virt collisions */
+	HAL_TXQ_SEQNUM_INC_DIS	    = 0x00100000, /* disable seqnum increment */
 } HAL_TX_QUEUE_FLAGS;
 
 typedef struct {
-	u_int32_t tqi_ver;		/* hal TXQ version */
+	u_int32_t	tqi_ver;		/* hal TXQ version */
 	HAL_TX_QUEUE_SUBTYPE tqi_subtype;	/* subtype if applicable */
-	HAL_TX_QUEUE_FLAGS tqi_qflags;	/* flags (see above) */
-	u_int32_t tqi_priority;		/* (not used) */
-	u_int32_t tqi_aifs;		/* aifs */
-	u_int32_t tqi_cwmin;		/* cwMin */
-	u_int32_t tqi_cwmax;		/* cwMax */
-	u_int16_t tqi_shretry;		/* rts retry limit */
-	u_int16_t tqi_lgretry;		/* long retry limit (not used)*/
-	u_int32_t tqi_cbrPeriod;
-	u_int32_t tqi_cbrOverflowLimit;
-	u_int32_t tqi_burstTime;
-	u_int32_t tqi_readyTime;
-	u_int32_t tqi_compBuf; 		/* compression buffer phys addr */
+	HAL_TX_QUEUE_FLAGS tqi_qflags;		/* flags (see above) */
+	u_int32_t	tqi_priority;		/* (not used) */
+	u_int32_t	tqi_aifs;		/* aifs */
+	u_int32_t	tqi_cwmin;		/* cwMin */
+	u_int32_t	tqi_cwmax;		/* cwMax */
+	u_int16_t	tqi_shretry;		/* rts retry limit */
+	u_int16_t	tqi_lgretry;		/* long retry limit (not used)*/
+	u_int32_t	tqi_cbrPeriod;		/* CBR period (us) */
+	u_int32_t	tqi_cbrOverflowLimit;	/* threshold for CBROVF int */
+	u_int32_t	tqi_burstTime;		/* max burst duration (us) */
+	u_int32_t	tqi_readyTime;		/* frame schedule time (us) */
+	u_int32_t	tqi_compBuf;		/* comp buffer phys addr */
 } HAL_TXQ_INFO;
 
+#define HAL_TQI_NONVAL 0xffff
+
 /* token to use for aifs, cwmin, cwmax */
-#define	HAL_TXQ_USEDEFAULT	((u_int32_t) - 1)
+#define	HAL_TXQ_USEDEFAULT	((u_int32_t) -1)
 
 /* compression definitions */
 #define HAL_COMP_BUF_MAX_SIZE           9216            /* 9K */
@@ -307,12 +376,12 @@ typedef enum {
  * Channels are specified by frequency.
  */
 typedef struct {
-	u_int16_t channel;		/* setting in Mhz */
-	u_int16_t channelFlags;		/* see below */
-	u_int8_t privFlags;
-	int8_t maxRegTxPower;		/* max regulatory tx power in dBm */
-	int8_t maxTxPower;		/* max true tx power in 0.25 dBm */
-	int8_t minTxPower;		/* min true tx power in 0.25 dBm */
+	u_int16_t	channel;	/* setting in Mhz */
+	u_int16_t	channelFlags;	/* see below */
+	u_int8_t	privFlags;
+	int8_t		maxRegTxPower;	/* max regulatory tx power in dBm */
+	int8_t		maxTxPower;	/* max true tx power in 0.25 dBm */
+	int8_t		minTxPower;	/* min true tx power in 0.25 dBm */
 } HAL_CHANNEL;
 
 /* channelFlags */
@@ -360,11 +429,11 @@ typedef struct {
 #define HAL_ANTENNA_MAX_MODE  3
 
 typedef struct {
-	u_int32_t ackrcv_bad;
-	u_int32_t rts_bad;
-	u_int32_t rts_good;
-	u_int32_t fcs_bad;
-	u_int32_t beacons;
+	u_int32_t	ackrcv_bad;
+	u_int32_t	rts_bad;
+	u_int32_t	rts_good;
+	u_int32_t	fcs_bad;
+	u_int32_t	beacons;
 } HAL_MIB_STATS;
 
 typedef u_int16_t HAL_CTRY_CODE;		/* country code */
@@ -394,27 +463,27 @@ enum {
 };
 
 typedef struct {
-	int rateCount;				/* NB: for proper padding */
-	u_int8_t	rateCodeToIndex[32];		/* back mapping */
+	int		rateCount;		/* NB: for proper padding */
+	u_int8_t	rateCodeToIndex[32];	/* back mapping */
 	struct {
-		u_int8_t valid;			/* valid for rate control use */
-		u_int8_t phy;			/* CCK/OFDM/XR */
-		u_int16_t rateKbps;		/* transfer rate in kbs */
-		u_int8_t rateCode;		/* rate for h/w descriptors */
-		u_int8_t shortPreamble;		/* mask for enabling short
+		u_int8_t	valid;		/* valid for rate control use */
+		u_int8_t	phy;		/* CCK/OFDM/XR */
+		u_int16_t	rateKbps;	/* transfer rate in kbs */
+		u_int8_t	rateCode;	/* rate for h/w descriptors */
+		u_int8_t	shortPreamble;	/* mask for enabling short
 						 * preamble in CCK rate code */
-		u_int8_t dot11Rate;		/* value for supported rates
+		u_int8_t	dot11Rate;	/* value for supported rates
 						 * info element of MLME */
-		u_int8_t controlRate;		/* index of next lower basic
+		u_int8_t	controlRate;	/* index of next lower basic
 						 * rate; used for dur. calcs */
-		u_int16_t lpAckDuration;		/* long preamble ACK duration */
-		u_int16_t spAckDuration;		/* short preamble ACK duration*/
+		u_int16_t	lpAckDuration;	/* long preamble ACK duration */
+		u_int16_t	spAckDuration;	/* short preamble ACK duration*/
 	} info[32];
 } HAL_RATE_TABLE;
 
 typedef struct {
-	u_int rs_count;				/* number of valid entries */
-	u_int8_t rs_rates[32];			/* rates */
+	u_int		rs_count;		/* number of valid entries */
+	u_int8_t	rs_rates[32];		/* rates */
 } HAL_RATE_SET;
 
 typedef enum {
@@ -431,11 +500,11 @@ typedef enum {
 } HAL_OPMODE;
 
 typedef struct {
-	u_int8_t kv_type;		/* one of HAL_CIPHER */
-	u_int8_t kv_pad;
-	u_int16_t kv_len;		/* length in bits */
-	u_int8_t kv_val[16];		/* enough for 128-bit keys */
-	u_int8_t kv_mic[8];		/* TKIP MIC key */
+	u_int8_t	kv_type;		/* one of HAL_CIPHER */
+	u_int8_t	kv_pad;
+	u_int16_t	kv_len;			/* length in bits */
+	u_int8_t	kv_val[16];		/* enough for 128-bit keys */
+	u_int8_t	kv_mic[8];		/* TKIP MIC key */
 } HAL_KEYVAL;
 
 typedef enum {
@@ -462,19 +531,19 @@ enum {
  * coexist with a PCF-capable AP.
  */
 typedef struct {
-	u_int32_t bs_nexttbtt;			/* next beacon in TU */
-	u_int32_t bs_nextdtim;			/* next DTIM in TU */
-	u_int32_t bs_intval;			/* beacon interval+flags */
+	u_int32_t	bs_nexttbtt;		/* next beacon in TU */
+	u_int32_t	bs_nextdtim;		/* next DTIM in TU */
+	u_int32_t	bs_intval;		/* beacon interval+flags */
 #define	HAL_BEACON_PERIOD	0x0000ffff	/* beacon interval period */
 #define	HAL_BEACON_ENA		0x00800000	/* beacon xmit enable */
 #define	HAL_BEACON_RESET_TSF	0x01000000	/* clear TSF */
-	u_int32_t bs_dtimperiod;
-	u_int16_t bs_cfpperiod;			/* CFP period in TU */
-	u_int16_t bs_cfpmaxduration;		/* max CFP duration in TU */
-	u_int32_t bs_cfpnext;			/* next CFP in TU */
-	u_int16_t bs_timoffset;			/* byte offset to TIM bitmap */
-	u_int16_t bs_bmissthreshold;		/* beacon miss threshold */
-	u_int32_t bs_sleepduration;		/* max sleep duration */
+	u_int32_t	bs_dtimperiod;
+	u_int16_t	bs_cfpperiod;		/* CFP period in TU */
+	u_int16_t	bs_cfpmaxduration;	/* max CFP duration in TU */
+	u_int32_t	bs_cfpnext;		/* next CFP in TU */
+	u_int16_t	bs_timoffset;		/* byte offset to TIM bitmap */
+	u_int16_t	bs_bmissthreshold;	/* beacon miss threshold */
+	u_int32_t	bs_sleepduration;	/* max sleep duration */
 } HAL_BEACON_STATE;
 
 /*
@@ -482,12 +551,12 @@ typedef struct {
  * optimizing signal quality and other operational aspects.
  */
 typedef struct {
-	u_int32_t ns_avgbrssi;			/* average beacon rssi */
-	u_int32_t ns_avgrssi;			/* average data rssi */
-	u_int32_t ns_avgtxrssi;			/* average tx rssi */
+	u_int32_t	ns_avgbrssi;	/* average beacon rssi */
+	u_int32_t	ns_avgrssi;	/* average data rssi */
+	u_int32_t	ns_avgtxrssi;	/* average tx rssi */
 } HAL_NODE_STATS;
 
-#define	HAL_RSSI_EP_MULTIPLIER	(1 << 7)	/* pow2 to optimize out * and / */
+#define	HAL_RSSI_EP_MULTIPLIER	(1<<7)	/* pow2 to optimize out * and / */
 
 struct ath_desc;
 
@@ -502,158 +571,180 @@ struct ath_desc;
  * ABI version number.
  */
 struct ath_hal {
-	u_int32_t ah_magic;		/* consistency check magic number */
-	u_int32_t ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x05120700	/* YYMMDDnn */
-	u_int16_t ah_devid;		/* PCI device ID */
-	u_int16_t ah_subvendorid;	/* PCI subvendor ID */
-	HAL_SOFTC ah_sc;			/* back pointer to driver/os state */
-	HAL_BUS_TAG ah_st;		/* params for register r+w */
-	HAL_BUS_HANDLE ah_sh;
-	HAL_CTRY_CODE ah_countryCode;
+	u_int32_t	ah_magic;	/* consistency check magic number */
+	u_int32_t	ah_abi;		/* HAL ABI version */
+#define	HAL_ABI_VERSION	0x05122200	/* YYMMDDnn */
+	u_int16_t	ah_devid;	/* PCI device ID */
+	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
+	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
+	HAL_BUS_TAG	ah_st;		/* params for register r+w */
+	HAL_BUS_HANDLE	ah_sh;
+	HAL_CTRY_CODE	ah_countryCode;
 
-	u_int32_t ah_macVersion;		/* MAC version id */
-	u_int16_t ah_macRev;		/* MAC revision */
-	u_int16_t ah_phyRev;		/* PHY revision */
+	u_int32_t	ah_macVersion;	/* MAC version id */
+	u_int16_t	ah_macRev;	/* MAC revision */
+	u_int16_t	ah_phyRev;	/* PHY revision */
 	/* NB: when only one radio is present the rev is in 5Ghz */
-	u_int16_t ah_analog5GhzRev;	/* 5GHz radio revision */
-	u_int16_t ah_analog2GhzRev;	/* 2GHz radio revision */
-	u_int8_t ah_decompMask[HAL_DECOMP_MASK_SIZE]; /* decomp mask array */
-	const HAL_RATE_TABLE *__ahdecl(*ah_getRateTable)(struct ath_hal *, u_int);
-	void __ahdecl(*ah_detach)(struct ath_hal *);
+	u_int16_t	ah_analog5GhzRev;/* 5GHz radio revision */
+	u_int16_t	ah_analog2GhzRev;/* 2GHz radio revision */
+	u_int8_t        ah_decompMask[HAL_DECOMP_MASK_SIZE]; /* decomp mask array */
+	const HAL_RATE_TABLE *__ahdecl(*ah_getRateTable)(struct ath_hal *,
+				u_int mode);
+	void	  __ahdecl(*ah_detach)(struct ath_hal*);
 
 	/* Reset functions */
-	HAL_BOOL __ahdecl(*ah_reset)(struct ath_hal *, HAL_OPMODE, HAL_CHANNEL *,
-		HAL_BOOL, HAL_STATUS *);
-	HAL_BOOL __ahdecl(*ah_phyDisable)(struct ath_hal *);
-	void __ahdecl(*ah_setPCUConfig)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_perCalibration)(struct ath_hal *, HAL_CHANNEL *,
-		HAL_BOOL *);
-	HAL_BOOL __ahdecl(*ah_setTxPowerLimit)(struct ath_hal *, u_int32_t);
+	HAL_BOOL  __ahdecl(*ah_reset)(struct ath_hal *, HAL_OPMODE,
+				HAL_CHANNEL *, HAL_BOOL bChannelChange,
+				HAL_STATUS *status);
+	HAL_BOOL  __ahdecl(*ah_phyDisable)(struct ath_hal *);
+	void	  __ahdecl(*ah_setPCUConfig)(struct ath_hal *);
+	HAL_BOOL  __ahdecl(*ah_perCalibration)(struct ath_hal*, HAL_CHANNEL *, HAL_BOOL *);
+	HAL_BOOL  __ahdecl(*ah_setTxPowerLimit)(struct ath_hal *, u_int32_t);
 
-	void __ahdecl(*ah_arEnable)(struct ath_hal *);
-	void __ahdecl(*ah_arDisable)(struct ath_hal *);
-	void __ahdecl(*ah_arReset)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_radarHaveEvent)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_processDfs)(struct ath_hal *, HAL_CHANNEL *);
-	u_int32_t __ahdecl(*ah_dfsNolCheck)(struct ath_hal *, HAL_CHANNEL *,
-		u_int32_t);
-	HAL_BOOL __ahdecl(*ah_radarWait)(struct ath_hal *, HAL_CHANNEL *);
+	void	  __ahdecl(*ah_arEnable)(struct ath_hal *);
+	void	  __ahdecl(*ah_arDisable)(struct ath_hal *);
+	void	  __ahdecl(*ah_arReset)(struct ath_hal *);
+	HAL_BOOL  __ahdecl(*ah_radarHaveEvent)(struct ath_hal *);
+	HAL_BOOL  __ahdecl(*ah_processDfs)(struct ath_hal *, HAL_CHANNEL *);
+	u_int32_t __ahdecl(*ah_dfsNolCheck)(struct ath_hal *, HAL_CHANNEL *, u_int32_t);
+	HAL_BOOL  __ahdecl(*ah_radarWait)(struct ath_hal *, HAL_CHANNEL *);
 
 	/* Transmit functions */
-	HAL_BOOL __ahdecl(*ah_updateTxTrigLevel)(struct ath_hal *, HAL_BOOL);
-	int __ahdecl(*ah_setupTxQueue)(struct ath_hal *, HAL_TX_QUEUE,
-		const HAL_TXQ_INFO *);
-	HAL_BOOL __ahdecl(*ah_setTxQueueProps)(struct ath_hal *, int, 
-		const HAL_TXQ_INFO *);
-	HAL_BOOL __ahdecl(*ah_getTxQueueProps)(struct ath_hal *, int, 
-		HAL_TXQ_INFO *);
-	HAL_BOOL __ahdecl(*ah_releaseTxQueue)(struct ath_hal *, u_int);
-	HAL_BOOL __ahdecl(*ah_resetTxQueue)(struct ath_hal *, u_int);
-	u_int32_t __ahdecl(*ah_getTxDP)(struct ath_hal *, u_int);
-	HAL_BOOL __ahdecl(*ah_setTxDP)(struct ath_hal *, u_int, u_int32_t);
-	u_int32_t __ahdecl(*ah_numTxPending)(struct ath_hal *, u_int);
-	HAL_BOOL __ahdecl(*ah_startTxDma)(struct ath_hal *, u_int);
-	HAL_BOOL __ahdecl(*ah_stopTxDma)(struct ath_hal *, u_int);
-	HAL_BOOL __ahdecl(*ah_setupTxDesc)(struct ath_hal *, struct ath_desc *,
-		u_int, u_int, HAL_PKT_TYPE, u_int, u_int, u_int, u_int, u_int,
-		u_int, u_int, u_int, u_int, u_int, u_int);
-	HAL_BOOL __ahdecl(*ah_setupXTxDesc)(struct ath_hal *, struct ath_desc *,
-		u_int, u_int, u_int, u_int, u_int, u_int);
-	HAL_BOOL __ahdecl(*ah_fillTxDesc)(struct ath_hal *, struct ath_desc *,
-		u_int, HAL_BOOL, HAL_BOOL, const struct ath_desc *);
-	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc *);
-	void __ahdecl(*ah_getTxIntrQueue)(struct ath_hal *, u_int32_t *);
-	void __ahdecl(*ah_reqTxIntrDesc)(struct ath_hal *, struct ath_desc *);
+	HAL_BOOL  __ahdecl(*ah_updateTxTrigLevel)(struct ath_hal*,
+				HAL_BOOL incTrigLevel);
+	int	  __ahdecl(*ah_setupTxQueue)(struct ath_hal *, HAL_TX_QUEUE,
+				const HAL_TXQ_INFO *qInfo);
+	HAL_BOOL  __ahdecl(*ah_setTxQueueProps)(struct ath_hal *, int q, 
+				const HAL_TXQ_INFO *qInfo);
+	HAL_BOOL  __ahdecl(*ah_getTxQueueProps)(struct ath_hal *, int q, 
+				HAL_TXQ_INFO *qInfo);
+	HAL_BOOL  __ahdecl(*ah_releaseTxQueue)(struct ath_hal *ah, u_int q);
+	HAL_BOOL  __ahdecl(*ah_resetTxQueue)(struct ath_hal *ah, u_int q);
+	u_int32_t __ahdecl(*ah_getTxDP)(struct ath_hal*, u_int);
+	HAL_BOOL  __ahdecl(*ah_setTxDP)(struct ath_hal*, u_int, u_int32_t txdp);
+	u_int32_t __ahdecl(*ah_numTxPending)(struct ath_hal *, u_int q);
+	HAL_BOOL  __ahdecl(*ah_startTxDma)(struct ath_hal*, u_int);
+	HAL_BOOL  __ahdecl(*ah_stopTxDma)(struct ath_hal*, u_int);
+	HAL_BOOL  __ahdecl(*ah_setupTxDesc)(struct ath_hal *, struct ath_desc *,
+				u_int pktLen, u_int hdrLen,
+				HAL_PKT_TYPE type, u_int txPower,
+				u_int txRate0, u_int txTries0,
+				u_int keyIx, u_int antMode, u_int flags,
+				u_int rtsctsRate, u_int rtsctsDuration,
+				u_int compicvLen, u_int compivLen,
+				u_int comp);
+	HAL_BOOL  __ahdecl(*ah_setupXTxDesc)(struct ath_hal *, struct ath_desc*,
+				u_int txRate1, u_int txTries1,
+				u_int txRate2, u_int txTries2,
+				u_int txRate3, u_int txTries3);
+	HAL_BOOL  __ahdecl(*ah_fillTxDesc)(struct ath_hal *, struct ath_desc *,
+				u_int segLen, HAL_BOOL firstSeg,
+				HAL_BOOL lastSeg, const struct ath_desc *);
+	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc*);
+	void	   __ahdecl(*ah_getTxIntrQueue)(struct ath_hal *, u_int32_t *);
+	void	   __ahdecl(*ah_reqTxIntrDesc)(struct ath_hal *, struct ath_desc*);
 
 	/* Receive Functions */
-	u_int32_t __ahdecl(*ah_getRxDP)(struct ath_hal *);
-	void __ahdecl(*ah_setRxDP)(struct ath_hal *, u_int32_t);
-	void __ahdecl(*ah_enableReceive)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_stopDmaReceive)(struct ath_hal *);
-	void __ahdecl(*ah_startPcuReceive)(struct ath_hal *);
-	void __ahdecl(*ah_stopPcuReceive)(struct ath_hal *);
-	void __ahdecl(*ah_setMulticastFilter)(struct ath_hal *, u_int32_t,
-		u_int32_t);
-	HAL_BOOL __ahdecl(*ah_setMulticastFilterIndex)(struct ath_hal *, u_int32_t);
-	HAL_BOOL __ahdecl(*ah_clrMulticastFilterIndex)(struct ath_hal *, u_int32_t);
-	u_int32_t __ahdecl(*ah_getRxFilter)(struct ath_hal *);
-	void __ahdecl(*ah_setRxFilter)(struct ath_hal *, u_int32_t);
-	HAL_BOOL __ahdecl(*ah_setupRxDesc)(struct ath_hal *, struct ath_desc *,
-		u_int32_t, u_int);
+	u_int32_t __ahdecl(*ah_getRxDP)(struct ath_hal*);
+	void	  __ahdecl(*ah_setRxDP)(struct ath_hal*, u_int32_t rxdp);
+	void	  __ahdecl(*ah_enableReceive)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_stopDmaReceive)(struct ath_hal*);
+	void	  __ahdecl(*ah_startPcuReceive)(struct ath_hal*);
+	void	  __ahdecl(*ah_stopPcuReceive)(struct ath_hal*);
+	void	  __ahdecl(*ah_setMulticastFilter)(struct ath_hal*,
+				u_int32_t filter0, u_int32_t filter1);
+	HAL_BOOL  __ahdecl(*ah_setMulticastFilterIndex)(struct ath_hal*,
+				u_int32_t index);
+	HAL_BOOL  __ahdecl(*ah_clrMulticastFilterIndex)(struct ath_hal*,
+				u_int32_t index);
+	u_int32_t __ahdecl(*ah_getRxFilter)(struct ath_hal*);
+	void	  __ahdecl(*ah_setRxFilter)(struct ath_hal*, u_int32_t);
+	HAL_BOOL  __ahdecl(*ah_setupRxDesc)(struct ath_hal *, struct ath_desc *,
+				u_int32_t size, u_int flags);
 	HAL_STATUS __ahdecl(*ah_procRxDesc)(struct ath_hal *, struct ath_desc *,
-		u_int32_t, struct ath_desc *, u_int64_t);
-	void __ahdecl(*ah_rxMonitor)(struct ath_hal *, const HAL_NODE_STATS *,
-		HAL_CHANNEL *);
-	void __ahdecl(*ah_procMibEvent)(struct ath_hal *, const HAL_NODE_STATS *);
+				u_int32_t phyAddr, struct ath_desc *next,
+				u_int64_t tsf);
+	void	  __ahdecl(*ah_rxMonitor)(struct ath_hal *,
+				const HAL_NODE_STATS *, HAL_CHANNEL *);
+	void	  __ahdecl(*ah_procMibEvent)(struct ath_hal *,
+				const HAL_NODE_STATS *);
 
 	/* Misc Functions */
 	HAL_STATUS __ahdecl(*ah_getCapability)(struct ath_hal *,
-		HAL_CAPABILITY_TYPE, u_int32_t, u_int32_t *);
-	HAL_BOOL __ahdecl(*ah_setCapability)(struct ath_hal *,
-		HAL_CAPABILITY_TYPE, u_int32_t, u_int32_t, HAL_STATUS *);
-	HAL_BOOL __ahdecl(*ah_getDiagState)(struct ath_hal *, int, const void *,
-		u_int32_t, void **, u_int32_t *);
-	void __ahdecl(*ah_getMacAddress)(struct ath_hal *, u_int8_t *);
-	HAL_BOOL __ahdecl(*ah_setMacAddress)(struct ath_hal *, const u_int8_t *);
-	void __ahdecl(*ah_getBssIdMask)(struct ath_hal *, u_int8_t *);
-	HAL_BOOL __ahdecl(*ah_setBssIdMask)(struct ath_hal *, const u_int8_t *);
-	HAL_BOOL __ahdecl(*ah_setRegulatoryDomain)(struct ath_hal *,
-		u_int16_t, HAL_STATUS *);
-	void __ahdecl(*ah_setLedState)(struct ath_hal *, HAL_LED_STATE);
-	void __ahdecl(*ah_writeAssocid)(struct ath_hal *, const u_int8_t *,
-		u_int16_t);
-	HAL_BOOL __ahdecl(*ah_gpioCfgOutput)(struct ath_hal *, u_int32_t);
-	HAL_BOOL __ahdecl(*ah_gpioCfgInput)(struct ath_hal *, u_int32_t);
-	u_int32_t __ahdecl(*ah_gpioGet)(struct ath_hal *, u_int32_t);
-	HAL_BOOL __ahdecl(*ah_gpioSet)(struct ath_hal *,	u_int32_t, u_int32_t);
-	void __ahdecl(*ah_gpioSetIntr)(struct ath_hal *, u_int, u_int32_t);
-	u_int32_t __ahdecl(*ah_getTsf32)(struct ath_hal *);
-	u_int64_t __ahdecl(*ah_getTsf64)(struct ath_hal *);
-	void __ahdecl(*ah_resetTsf)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_detectCardPresent)(struct ath_hal *);
-	void __ahdecl(*ah_updateMibCounters)(struct ath_hal *, HAL_MIB_STATS *);
-	HAL_RFGAIN __ahdecl(*ah_getRfGain)(struct ath_hal *);
-	u_int __ahdecl(*ah_getDefAntenna)(struct ath_hal *);
-	void __ahdecl(*ah_setDefAntenna)(struct ath_hal *, u_int);
-	HAL_BOOL __ahdecl(*ah_setSlotTime)(struct ath_hal *, u_int);
-	u_int __ahdecl(*ah_getSlotTime)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_setAckTimeout)(struct ath_hal *, u_int);
-	u_int __ahdecl(*ah_getAckTimeout)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_setCTSTimeout)(struct ath_hal *, u_int);
-	u_int __ahdecl(*ah_getCTSTimeout)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_setDecompMask)(struct ath_hal *, u_int16_t, int);
-	void __ahdecl(*ah_setCoverageClass)(struct ath_hal *, u_int8_t, int);
+				HAL_CAPABILITY_TYPE, u_int32_t capability,
+				u_int32_t *result);
+	HAL_BOOL   __ahdecl(*ah_setCapability)(struct ath_hal *,
+				HAL_CAPABILITY_TYPE, u_int32_t capability,
+				u_int32_t setting, HAL_STATUS *);
+	HAL_BOOL   __ahdecl(*ah_getDiagState)(struct ath_hal *, int request,
+				const void *args, u_int32_t argsize,
+				void **result, u_int32_t *resultsize);
+	void	  __ahdecl(*ah_getMacAddress)(struct ath_hal *, u_int8_t *);
+	HAL_BOOL  __ahdecl(*ah_setMacAddress)(struct ath_hal *, const u_int8_t*);
+	void	  __ahdecl(*ah_getBssIdMask)(struct ath_hal *, u_int8_t *);
+	HAL_BOOL  __ahdecl(*ah_setBssIdMask)(struct ath_hal *, const u_int8_t*);
+	HAL_BOOL  __ahdecl(*ah_setRegulatoryDomain)(struct ath_hal*,
+				u_int16_t, HAL_STATUS *);
+	void	  __ahdecl(*ah_setLedState)(struct ath_hal*, HAL_LED_STATE);
+	void	  __ahdecl(*ah_writeAssocid)(struct ath_hal*,
+				const u_int8_t *bssid, u_int16_t assocId);
+	HAL_BOOL  __ahdecl(*ah_gpioCfgOutput)(struct ath_hal *, u_int32_t gpio);
+	HAL_BOOL  __ahdecl(*ah_gpioCfgInput)(struct ath_hal *, u_int32_t gpio);
+	u_int32_t __ahdecl(*ah_gpioGet)(struct ath_hal *, u_int32_t gpio);
+	HAL_BOOL  __ahdecl(*ah_gpioSet)(struct ath_hal *,
+				u_int32_t gpio, u_int32_t val);
+	void	  __ahdecl(*ah_gpioSetIntr)(struct ath_hal*, u_int, u_int32_t);
+	u_int32_t __ahdecl(*ah_getTsf32)(struct ath_hal*);
+	u_int64_t __ahdecl(*ah_getTsf64)(struct ath_hal*);
+	void	  __ahdecl(*ah_resetTsf)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_detectCardPresent)(struct ath_hal*);
+	void	  __ahdecl(*ah_updateMibCounters)(struct ath_hal*,
+				HAL_MIB_STATS*);
+	HAL_RFGAIN __ahdecl(*ah_getRfGain)(struct ath_hal*);
+	u_int	  __ahdecl(*ah_getDefAntenna)(struct ath_hal*);
+	void	  __ahdecl(*ah_setDefAntenna)(struct ath_hal*, u_int);
+	HAL_BOOL  __ahdecl(*ah_setSlotTime)(struct ath_hal*, u_int);
+	u_int	  __ahdecl(*ah_getSlotTime)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_setAckTimeout)(struct ath_hal*, u_int);
+	u_int	  __ahdecl(*ah_getAckTimeout)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_setCTSTimeout)(struct ath_hal*, u_int);
+	u_int	  __ahdecl(*ah_getCTSTimeout)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_setDecompMask)(struct ath_hal*, u_int16_t, int);
+	void	  __ahdecl(*ah_setCoverageClass)(struct ath_hal*, u_int8_t, int);
 
 
 	/* Key Cache Functions */
-	u_int32_t __ahdecl(*ah_getKeyCacheSize)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_resetKeyCacheEntry)(struct ath_hal *, u_int16_t);
-	HAL_BOOL __ahdecl(*ah_isKeyCacheEntryValid)(struct ath_hal *, u_int16_t);
-	HAL_BOOL __ahdecl(*ah_setKeyCacheEntry)(struct ath_hal *, u_int16_t,
-		const HAL_KEYVAL *, const u_int8_t *, int);
-	HAL_BOOL __ahdecl(*ah_setKeyCacheEntryMac)(struct ath_hal *, u_int16_t,
-		const u_int8_t *);
+	u_int32_t __ahdecl(*ah_getKeyCacheSize)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_resetKeyCacheEntry)(struct ath_hal*, u_int16_t);
+	HAL_BOOL  __ahdecl(*ah_isKeyCacheEntryValid)(struct ath_hal *,
+				u_int16_t);
+	HAL_BOOL  __ahdecl(*ah_setKeyCacheEntry)(struct ath_hal*,
+				u_int16_t, const HAL_KEYVAL *,
+				const u_int8_t *, int);
+	HAL_BOOL  __ahdecl(*ah_setKeyCacheEntryMac)(struct ath_hal*,
+				u_int16_t, const u_int8_t *);
 
 	/* Power Management Functions */
-	HAL_BOOL __ahdecl(*ah_setPowerMode)(struct ath_hal *, HAL_POWER_MODE mode,
-		int);
-	HAL_POWER_MODE __ahdecl(*ah_getPowerMode)(struct ath_hal *);
-	int16_t __ahdecl(*ah_getChanNoise)(struct ath_hal *, HAL_CHANNEL *);
+	HAL_BOOL  __ahdecl(*ah_setPowerMode)(struct ath_hal*,
+				HAL_POWER_MODE mode, int setChip);
+	HAL_POWER_MODE __ahdecl(*ah_getPowerMode)(struct ath_hal*);
+	int16_t   __ahdecl(*ah_getChanNoise)(struct ath_hal *, HAL_CHANNEL *);
 
 
 	/* Beacon Management Functions */
-	void __ahdecl(*ah_beaconInit)(struct ath_hal *, u_int32_t, u_int32_t);
-	void __ahdecl(*ah_setStationBeaconTimers)(struct ath_hal *,
-		const HAL_BEACON_STATE *);
-	void __ahdecl(*ah_resetStationBeaconTimers)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_waitForBeaconDone)(struct ath_hal *, HAL_BUS_ADDR);
+	void	  __ahdecl(*ah_beaconInit)(struct ath_hal *,
+				u_int32_t nexttbtt, u_int32_t intval);
+	void	  __ahdecl(*ah_setStationBeaconTimers)(struct ath_hal*,
+				const HAL_BEACON_STATE *);
+	void	  __ahdecl(*ah_resetStationBeaconTimers)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_waitForBeaconDone)(struct ath_hal *,
+				HAL_BUS_ADDR);
 
 	/* Interrupt functions */
-	HAL_BOOL __ahdecl(*ah_isInterruptPending)(struct ath_hal *);
-	HAL_BOOL __ahdecl(*ah_getPendingInterrupts)(struct ath_hal *, HAL_INT *);
-	HAL_INT __ahdecl(*ah_getInterrupts)(struct ath_hal *);
-	HAL_INT __ahdecl(*ah_setInterrupts)(struct ath_hal *, HAL_INT);
+	HAL_BOOL  __ahdecl(*ah_isInterruptPending)(struct ath_hal*);
+	HAL_BOOL  __ahdecl(*ah_getPendingInterrupts)(struct ath_hal*, HAL_INT*);
+	HAL_INT	  __ahdecl(*ah_getInterrupts)(struct ath_hal*);
+	HAL_INT	  __ahdecl(*ah_setInterrupts)(struct ath_hal*, HAL_INT);
 };
 
 /* 
@@ -661,7 +752,7 @@ struct ath_hal {
  * and return a printable description for any Atheros hardware.
  * AH_NULL is returned if the ID's do not describe Atheros hardware.
  */
-extern const char *__ahdecl ath_hal_probe(u_int16_t vendorid, u_int16_t devid);
+extern	const char *__ahdecl ath_hal_probe(u_int16_t vendorid, u_int16_t devid);
 
 /*
  * Attach the HAL for use with the specified device.  The device is
@@ -676,8 +767,16 @@ extern const char *__ahdecl ath_hal_probe(u_int16_t vendorid, u_int16_t devid);
  * null (AH_NULL) reference will be returned and a status code will
  * be returned if the status parameter is non-zero.
  */
-extern struct ath_hal * __ahdecl ath_hal_attach(u_int16_t devid, HAL_SOFTC,
-	HAL_BUS_TAG, HAL_BUS_HANDLE, HAL_STATUS *status);
+extern	struct ath_hal * __ahdecl ath_hal_attach(u_int16_t devid, HAL_SOFTC,
+		HAL_BUS_TAG, HAL_BUS_HANDLE, HAL_STATUS* status);
+
+/*
+ * Set the Vendor ID for Vendor SKU's which can modify the
+ * channel properties returned by ath_hal_init_channels.
+ * Return AH_TRUE if set succeeds
+ */
+
+extern  HAL_BOOL __ahdecl ath_hal_setvendor(struct ath_hal *, u_int32_t );
 
 /*
  * Return a list of channels available for use with the hardware.
@@ -690,35 +789,35 @@ extern struct ath_hal * __ahdecl ath_hal_attach(u_int16_t devid, HAL_SOFTC,
  * number of channels returned.  If a problem occurred or there were
  * no channels that met the criteria then AH_FALSE is returned.
  */
-extern HAL_BOOL __ahdecl ath_hal_init_channels(struct ath_hal *,
-	HAL_CHANNEL *chans, u_int maxchans, u_int *nchans,
-	u_int8_t *regclassids, u_int maxregids, u_int *nregids,
-	HAL_CTRY_CODE cc, u_int16_t modeSelect, HAL_BOOL enableOutdoor,
-	HAL_BOOL enableExtendedChannels);
+extern	HAL_BOOL __ahdecl ath_hal_init_channels(struct ath_hal *,
+		HAL_CHANNEL *chans, u_int maxchans, u_int *nchans,
+		u_int8_t *regclassids, u_int maxregids, u_int *nregids,
+		HAL_CTRY_CODE cc, u_int16_t modeSelect,
+		HAL_BOOL enableOutdoor, HAL_BOOL enableExtendedChannels);
 
 /*
  * Calibrate noise floor data following a channel scan or similar.
  * This must be called prior retrieving noise floor data.
  */
-extern void __ahdecl ath_hal_process_noisefloor(struct ath_hal *ah);
+extern	void __ahdecl ath_hal_process_noisefloor(struct ath_hal *ah);
 
 /*
  * Return bit mask of wireless modes supported by the hardware.
  */
-extern u_int __ahdecl ath_hal_getwirelessmodes(struct ath_hal *, HAL_CTRY_CODE);
+extern	u_int __ahdecl ath_hal_getwirelessmodes(struct ath_hal*, HAL_CTRY_CODE);
 
 /*
  * Return rate table for specified mode (11a, 11b, 11g, etc).
  */
-extern const HAL_RATE_TABLE * __ahdecl ath_hal_getratetable(struct ath_hal *,
-	u_int mode);
+extern	const HAL_RATE_TABLE * __ahdecl ath_hal_getratetable(struct ath_hal *,
+		u_int mode);
 
 /*
  * Calculate the transmit duration of a frame.
  */
 extern u_int16_t __ahdecl ath_hal_computetxtime(struct ath_hal *,
-	const HAL_RATE_TABLE *rates, u_int32_t frameLen,
-	u_int16_t rateix, HAL_BOOL shortPreamble);
+		const HAL_RATE_TABLE *rates, u_int32_t frameLen,
+		u_int16_t rateix, HAL_BOOL shortPreamble);
 
 /*
  * Return if device is public safety.
@@ -729,15 +828,14 @@ extern HAL_BOOL __ahdecl ath_hal_ispublicsafetysku(struct ath_hal *);
  * Convert between IEEE channel number and channel frequency
  * using the specified channel flags; e.g. CHANNEL_2GHZ.
  */
-extern int __ahdecl ath_hal_mhz2ieee(struct ath_hal *, u_int mhz, u_int flags);
+extern	int __ahdecl ath_hal_mhz2ieee(struct ath_hal *, u_int mhz, u_int flags);
 
 /*
  * Return a version string for the HAL release.
  */
-extern char ath_hal_version[];
-
+extern	char ath_hal_version[];
 /*
  * Return a NULL-terminated array of build/configuration options.
  */
-extern const char *ath_hal_buildopts[];
+extern	const char* ath_hal_buildopts[];
 #endif /* _ATH_AH_H_ */
