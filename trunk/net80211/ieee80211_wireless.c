@@ -3423,12 +3423,13 @@ get_sta_info(void *arg, struct ieee80211_node *ni)
 	size_t ielen, len;
 	u_int8_t *cp;
 
-	if (vap != req->vap && vap != req->vap->iv_xrvap)		/* only entries for this vap (or) xrvap */
+	if (vap != req->vap && vap != req->vap->iv_xrvap)	/* only entries for this vap (or) xrvap */
 		return;
-	if (vap->iv_opmode == IEEE80211_M_HOSTAP &&
-	    ni->ni_associd == 0)	/* only associated stations */
+	if ((vap->iv_opmode == IEEE80211_M_HOSTAP ||
+	     vap->iv_opmode == IEEE80211_M_WDS) &&
+	    ni->ni_associd == 0)				/* only associated stations or a WDS peer */
 		return;
-	if (ni->ni_chan == IEEE80211_CHAN_ANYC)	/* XXX bogus entry */
+	if (ni->ni_chan == IEEE80211_CHAN_ANYC)			/* XXX bogus entry */
 		return;
 	len = sta_space(ni, &ielen);
 	if (len > req->space)
