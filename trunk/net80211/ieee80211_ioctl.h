@@ -280,6 +280,7 @@ struct ieee80211req_chaninfo {
 struct ieee80211req_wpaie {
 	u_int8_t	wpa_macaddr[IEEE80211_ADDR_LEN];
 	u_int8_t	wpa_ie[IEEE80211_MAX_OPT_IE];
+	u_int8_t	rsn_ie[IEEE80211_MAX_OPT_IE];
 };
 
 /*

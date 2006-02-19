@@ -3231,6 +3231,12 @@ ieee80211_ioctl_getwpaie(struct net_device *dev, struct iwreq *iwr)
 			ielen = sizeof(wpaie.wpa_ie);
 		memcpy(wpaie.wpa_ie, ni->ni_wpa_ie, ielen);
 	}
+	if (ni->ni_rsn_ie != NULL) {
+		int ielen = ni->ni_rsn_ie[1] + 2;
+		if (ielen > sizeof(wpaie.rsn_ie))
+			ielen = sizeof(wpaie.rsn_ie);
+		memcpy(wpaie.rsn_ie, ni->ni_rsn_ie, ielen);
+	}
 	ieee80211_free_node(ni);
 	return (copy_to_user(iwr->u.data.pointer, &wpaie, sizeof(wpaie)) ?
 		-EFAULT : 0);
@@ -3271,6 +3277,8 @@ static size_t
 scan_space(const struct ieee80211_scan_entry *se, int *ielen)
 {
 	*ielen = 0;
+	if (se->se_rsn_ie != NULL)
+		*ielen += 2 + se->se_rsn_ie[1];
 	if (se->se_wpa_ie != NULL)
 		*ielen += 2 + se->se_wpa_ie[1];
 	if (se->se_wme_ie != NULL)
@@ -3325,6 +3333,10 @@ get_scan_result(void *arg, const struct ieee80211_scan_entry *se)
 	cp = (u_int8_t *)(sr + 1);
 	memcpy(cp, se->se_ssid + 2, sr->isr_ssid_len);
 	cp += sr->isr_ssid_len;
+	if (se->se_rsn_ie != NULL) {
+		memcpy(cp, se->se_rsn_ie, 2 + se->se_rsn_ie[1]);
+		cp += 2 + se->se_rsn_ie[1];
+	}
 	if (se->se_wpa_ie != NULL) {
 		memcpy(cp, se->se_wpa_ie, 2 + se->se_wpa_ie[1]);
 		cp += 2 + se->se_wpa_ie[1];
@@ -3387,6 +3399,8 @@ static size_t
 sta_space(const struct ieee80211_node *ni, size_t *ielen)
 {
 	*ielen = 0;
+	if (ni->ni_rsn_ie != NULL)
+		*ielen += 2+ni->ni_rsn_ie[1];
 	if (ni->ni_wpa_ie != NULL)
 		*ielen += 2+ni->ni_wpa_ie[1];
 	if (ni->ni_wme_ie != NULL)
@@ -3477,6 +3491,10 @@ get_sta_info(void *arg, struct ieee80211_node *ni)
 	si->isi_inact = (si->isi_inact - ni->ni_inact) * IEEE80211_INACT_WAIT;
 
 	cp = (u_int8_t *)(si+1);
+	if (ni->ni_rsn_ie != NULL) {
+		memcpy(cp, ni->ni_rsn_ie, 2 + ni->ni_rsn_ie[1]);
+		cp += 2 + ni->ni_rsn_ie[1];
+        }
 	if (ni->ni_wpa_ie != NULL) {
 		memcpy(cp, ni->ni_wpa_ie, 2 + ni->ni_wpa_ie[1]);
 		cp += 2 + ni->ni_wpa_ie[1];
