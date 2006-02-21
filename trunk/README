@@ -120,45 +120,100 @@ Linux tools (ifconfig, iwconfig, iwpriv) plus the wlanconfig tool,
 which is included with the driver in the tools directory and gets
 installed on your system with make install.
 
-First, run "modprobe ath_pci" or the equivalent using "insmod".  When
-the driver is successfully loaded it creates a device named "wifi0"
-The output from iwconfig should look like this:
+First, run "modprobe ath_pci" or the equivalent using "insmod". When
+the driver is successfully loaded it creates two devices, named
+"wifi0" and "ath0". The output from iwconfig should look like this:
 
     lo      no wireless extensions.
+    
     wifi0   no wireless extensions.
+    
+    ath0    IEEE 802.11b  ESSID:""
+            Mode:Managed  Channel:0  Access Point: Not-Associated
+	    Bit Rate:0 kb/s   Tx-Power:50 dBm   Sensitivity=0/3
+	    Retry:off   RTS thr:off   Fragment thr:off
+	    Power Management:off
+	    Link Quality=0/94  Signal level=-95 dBm  Noise level=-95 dBm
+	    Rx invalid nwid:0  Rx invalid crypt:0  Rx invalid frag:0
+	    Tx excessive retries:0  Invalid misc:0   Missed beacon:0
+
 
 This driver uses wifi%d only as a placeholder for the phyical device, 
 and will create one wifi device for each wireless NIC in the system.  
-These wifi devices will reject ifconfig and iwconfig commands.
+These wifi devices will reject ifconfig and iwconfig commands. The
+wifi interface provides indicates the existance of a physical Madwifi
+device, but is not of any functional interest other than as a target
+for VAP creation via wlanconfig (see Virtual AP section below).
 
-The next step is to bring one or more ath%d device into existence.
-All of the usual commands - ifconfig, iwconfig, iwpriv - should operate
-on the ath%d devices as expected with exceptions noted below.
+By default, an ath%d Managed mode interface is also created. This
+device is a "virtual ap" (VAP) of the wifi%d physical device, and is
+configurable by the standard networking tools  - ifconfig, iwconfig,
+iwpriv. 
 
-Here is one example, but for more information, see the man page for
-wlanconfig. It is installed when you run "make install".
+The autocreation function can be manipulated to automatically create
+any one of the other supported device types by using the
+autocreate=mode option when the ath_pci module is first loaded. The
+following example will cause ath%d to be in Master mode:
 
-Station mode:
+modprobe ath_pci autocreate=ap
 
-wlanconfig ath0 create wlandev wifi0 wlanmode sta
-iwconfig ath0 essid ANY
-ifconfig ath0 up
+Autocreation can be disabled:
 
-This will create a device named ath0 to be associated with wireless
-device wifi0 and set it to be a station. The iwconfig command will set
-the device to choose any available essid, and then ifconfig up will
-start the device and begin scanning so that you can begin to send
-packets over the interface.
+modprobe ath_pci autocreate=none
 
+Please see the following link for more information:
+http://madwifi.org/wiki/UserDocs/autocreate
 
-You can lock the operating mode to one of 11a, 11b, or 11g if you have
-a multi-mode card (if you do not lock the mode then the driver will
-select a mode for you; usually 11a).  You can use the following commands:
+Virtual AP's (VAP's) and wlanconfig
+===================================
+An interesting feauture of Madwifi is Virtual AP (VAP) mode, which
+allows the operation of multiple concurrent (virtual) access points,
+and concurrent interfaces running in both AP and station mode. To 
+manipulate VAP's, Madwifi comes with a tool called wlanconfig which
+is used to create and destroy VAPS with various different modes.
+
+The following examples assume that the "autocreate=none" option has
+been parsed to the module at load time. This allows fine control over
+management of VAP's, as the creation of a Managed mode station should
+be delayed until all other required VAP's are first created, as only
+one sta mode VAP can exist per physical device.
+
+To create an access point, use:
+
+wlanconfig ath0 create wlandev wifi0 wlanmode ap
+
+To create an access point and a station, use:
+
+wlanconfig ath0 create wlandev wifi0 wlanmode ap
+wlanconfig ath1 create wlandev wifi0 wlanmode sta nosbeacon
+
+To create APs which share a single MAC address, use the -bssid flag
+when creating the VAPs:
+
+wlanconfig ath0 create wlandev wifi0 wlanmode ap -bssid
+wlanconfig ath1 create wlandev wifi0 wlanmode ap -bssid
+
+Finally, to destroy a VAP, issue the command:
+
+wlanconfig ath0 destroy
+
+For more information about Virtual AP's, please refer to the
+users-guide document distributed with the Madwifi source code.
+
+For more information about wlanconfig, see its manpage, it is
+installed when you run "make install".
+
+Operating Mode
+==============
+To lock the operating mode to one of 11a, 11b, or 11g if you have
+a multi-mode card, issue one of the following commands:
 iwpriv ath0 mode 1		lock operation to 11a only
 iwpriv ath0 mode 2		lock operation to 11b only
 iwpriv ath0 mode 3		lock operation to 11g only
 iwpriv ath0 mode 0		autoselect from 11a/b/g (default)
 
+Debugging
+=========
 There are some debugging mechanisms for the curious/masochistic:
 
 sysctl -w dev.ath.debug=0xXXX	enable console msgs from the driver
@@ -185,6 +240,9 @@ will give a running display of the most interesting statistics sampled
 every 1 second.  Running athstats without any options will display a
 summary of all non-zero statistics from the time the driver was loaded.
 By default the ath0 device is used; to override this use the -i option.
+
+A wiki page describes common Madwifi debugging methods here:
+http://madwifi.org/wiki/DevDocs/AthDebug
 
 Security/Crypto Support
 =======================
