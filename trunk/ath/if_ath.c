@@ -6814,7 +6814,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * we don't use it.
 	 */
 	if (try0 != ATH_TXMAXTRY)
-		ath_rate_setupxtxdesc(sc, an, ds, shortPreamble, rix);
+		ath_rate_setupxtxdesc(sc, an, ds, shortPreamble, skb->len, rix);
 
 #ifndef ATH_SUPERG_FF
 	ds->ds_link = 0;

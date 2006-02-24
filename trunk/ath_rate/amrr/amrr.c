@@ -118,7 +118,7 @@ EXPORT_SYMBOL(ath_rate_findrate);
 
 void
 ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
-	struct ath_desc *ds, int shortPreamble, u_int8_t rix)
+	struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
 {
 	struct amrr_node *amn = ATH_NODE_AMRR(an);
 
