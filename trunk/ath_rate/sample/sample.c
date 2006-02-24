@@ -472,15 +472,14 @@ EXPORT_SYMBOL(ath_rate_findrate);
 
 void
 ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
-	struct ath_desc *ds, int shortPreamble, u_int8_t rix)
+	struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	int rateCode = -1;
-	int frame_size = 0;
 	int size_bin = 0;
 	int ndx = 0;
 
-	size_bin = size_to_bin(frame_size);	// TODO: it's correct that frame_size alway 0 ?
+	size_bin = size_to_bin(frame_size);
 	ndx = sn->current_rate[size_bin]; /* retry at the current bit-rate */
 	
 	if (!sn->stats[size_bin][ndx].packets_acked)
