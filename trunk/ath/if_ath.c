@@ -5096,25 +5096,7 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	struct ieee80211_frame *wh;
 	u_int32_t tsf;
 
-	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
-		("data padding not enabled?"));
-	/* Remove pad bytes */
-	wh = (struct ieee80211_frame *) skb->data;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) {
-		int headersize = ieee80211_hdrsize(wh);
-		int padbytes = roundup(headersize, 4) - headersize;
-
-		/*
-		 * Copy up 802.11 header and strip h/w padding.
-		 */
-		if (padbytes > 0) {
-			memmove(skb->data + padbytes, skb->data, headersize);
-			skb_pull(skb, padbytes);
-		}
-	}
-
-	/* Pass up tsf clock in mactime */
-	/*
+	/* Pass up tsf clock in mactime
 	 * Rx descriptor has the low 15 bits of the tsf at
 	 * the time the frame was received.  Use the current
 	 * tsf to extend this to 32 bits.
@@ -5124,8 +5106,26 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		tsf -= 0x8000;
 	tsf = ds->ds_rxstat.rs_tstamp | (tsf &~ 0x7fff);
 
-	ieee80211_input_monitor(ic, skb, ds, 0, tsf,
-		sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
+	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
+		("data padding not enabled?"));
+
+	wh = (struct ieee80211_frame *) skb->data;
+	if (IEEE80211_QOS_HAS_SEQ(wh)) {
+		struct sk_buff *skb1 = skb_copy(skb, GFP_ATOMIC);
+		/* Remove hw pad bytes */
+		int headersize = ieee80211_hdrsize(wh);
+		int padbytes = roundup(headersize, 4) - headersize;
+		if (padbytes > 0) {
+			memmove(skb1->data + padbytes, skb1->data, headersize);
+			skb_pull(skb1, padbytes);
+		}
+		ieee80211_input_monitor(ic, skb1, ds, 0, tsf,
+					sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
+		dev_kfree_skb(skb1);
+	} else {
+		ieee80211_input_monitor(ic, skb, ds, 0, tsf,
+					sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
+	}
 }
 
 
