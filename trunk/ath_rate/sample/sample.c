@@ -372,6 +372,13 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	int ndx, size_bin, mrr, best_ndx, change_rates;
 	unsigned average_tx_time;
 
+	if (sn->num_rates <= 0) {
+		printk(KERN_WARNING "%s: no rates for %s?\n",
+		       dev_info, 
+		       ether_sprintf(an->an_node.ni_macaddr));
+		return;
+	}
+
 	mrr = sc->sc_mrretry && !(ic->ic_flags & IEEE80211_F_USEPROT) && ENABLE_MRR;
 	size_bin = size_to_bin(frameLen);
 	best_ndx = best_rate_ndx(sn, size_bin, !mrr);
@@ -459,7 +466,11 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 		}
 	}
 
-	KASSERT(ndx >= 0 && ndx < sn->num_rates, ("ndx is %d", ndx));
+	KASSERT(ndx >= 0 && ndx < sn->num_rates, 
+		("%s: bad ndx (%d/%d) for %s?\n",
+		 dev_info, ndx, sn->num_rates, 
+		 ether_sprintf(an->an_node.ni_macaddr)));
+		
 
 	*rix = sn->rates[ndx].rix;
 	if (shortPreamble)
