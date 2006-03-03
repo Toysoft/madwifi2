@@ -625,9 +625,10 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 
 		/* second skb with header and tail adjustments possible */
 		if (skb_tailroom(skb2) < need_tailroom) {
-
-			/* FFXXX: this path needs testing */
-			if (pskb_expand_head(skb2, inter_headroom - skb_headroom(skb2),
+			int n = 0;
+			if (inter_headroom > skb_headroom(skb2)) 
+				n = inter_headroom - skb_headroom(skb2);
+			if (pskb_expand_head(skb2, n,
 			    need_tailroom - skb_tailroom(skb2), GFP_ATOMIC)) {
 				dev_kfree_skb(skb2);
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
@@ -662,7 +663,10 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 			"%s: cannot unshare for encapsulation\n", __func__);
 		vap->iv_stats.is_tx_nobuf++;
 	} else if (skb_tailroom(skb) < need_tailroom) {
-		if (pskb_expand_head(skb, need_headroom - skb_headroom(skb),
+		int n = 0;
+		if (inter_headroom > skb_headroom(skb2))
+			n = inter_headroom - skb_headroom(skb2);
+		if (pskb_expand_head(skb, n,
 			need_tailroom - skb_tailroom(skb), GFP_ATOMIC)) {
 			dev_kfree_skb(skb);
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
