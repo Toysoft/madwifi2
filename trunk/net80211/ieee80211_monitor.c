@@ -296,7 +296,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					sizeof(struct ath_tx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_version = 0;
-				th->wt_ihdr.it_len = sizeof(struct ath_tx_radiotap_header);
+				th->wt_ihdr.it_len = cpu_to_le16(sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
 				th->wt_flags = 0;
 				th->wt_rate = rate;
@@ -315,7 +315,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					sizeof(struct ath_rx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_rx_radiotap_header));
 				th->wr_ihdr.it_version = 0;
-				th->wr_ihdr.it_len = sizeof(struct ath_rx_radiotap_header);
+				th->wr_ihdr.it_len = cpu_to_le16(sizeof(struct ath_rx_radiotap_header));
 				th->wr_ihdr.it_present = ATH_RX_RADIOTAP_PRESENT;
 				th->wr_flags = 0;
 				th->wr_rate = rate;
