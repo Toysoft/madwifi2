@@ -264,7 +264,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
 			ph->rssi.status = 0;
 			ph->rssi.len = 4;
-			ph->rssi.data = 0;
+			ph->rssi.data = signal;
 			
 			ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
 			ph->noise.status = 0;
