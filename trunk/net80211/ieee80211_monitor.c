@@ -323,6 +323,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wr_chan_flags = 0;
 				th->wr_antenna = 0;
 				th->wr_antsignal = signal;
+				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
+				       IEEE80211_CRC_LEN);
 			}
 			break;
 		}
@@ -340,6 +342,10 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			break;
 		}
 		if (skb1) {
+			if (!tx) {
+				/* Remove FCS from end of rx frames*/
+				skb_trim(skb1, skb1->len - IEEE80211_CRC_LEN);
+			}
 			skb1->dev = dev; /* NB: deliver to wlanX */
 			skb1->mac.raw = skb1->data;
 			skb1->ip_summed = CHECKSUM_NONE;
