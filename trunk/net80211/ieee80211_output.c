@@ -666,8 +666,8 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 		vap->iv_stats.is_tx_nobuf++;
 	} else if (skb_tailroom(skb) < need_tailroom) {
 		int n = 0;
-		if (inter_headroom > skb_headroom(skb2))
-			n = inter_headroom - skb_headroom(skb2);
+		if (need_headroom > skb_headroom(skb2))
+			n = need_headroom - skb_headroom(skb2);
 		if (pskb_expand_head(skb, n,
 			need_tailroom - skb_tailroom(skb), GFP_ATOMIC)) {
 			dev_kfree_skb(skb);
