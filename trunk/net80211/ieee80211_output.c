@@ -654,7 +654,9 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 				skb = NULL;
 			}
 		}
-		skb->next = skb2;
+		if (skb) {
+			skb->next = skb2;
+		}
 		return skb;
 	}
 #endif /* ATH_SUPERG_FF */
