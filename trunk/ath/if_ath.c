@@ -5395,9 +5395,6 @@ rx_accept:
 		sc->sc_devstats.rx_bytes += len;
 
 
-		skb_put(skb, len - IEEE80211_CRC_LEN);
-		skb->protocol = ETH_P_CONTROL;		/* XXX */
-
 		if (sc->sc_nmonvaps > 0) {
 			/*
 			 * Some vap is in monitor mode.  Discard
@@ -5419,6 +5416,9 @@ rx_accept:
 				goto rx_next;
 			}
 		}
+
+		skb_put(skb, len - IEEE80211_CRC_LEN);
+		skb->protocol = ETH_P_CONTROL;		/* XXX */
 
 		/*
 		 * From this point on we assume the frame is at least
