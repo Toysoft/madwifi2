@@ -517,6 +517,7 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 	int ndx3, int tries3,
 	int short_tries, int tries, int status)
 {
+	const HAL_RATE_TABLE *rt = sc->sc_currates;
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	struct sample_softc *ssc = ATH_SOFTC_SAMPLE(sc);
 	int tt = 0;
