@@ -529,6 +529,13 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 	size = bin_to_size(size_bin);
 	rate = sn->rates[ndx0].rate;
 
+	if (!rt->info[ndx0].rateKbps) {
+		/* 
+		 * sometimes we get feedback back for packets we didn't send. 
+		 * just ignore these packets.
+		 */
+		return;
+	}
 	tt += calc_usecs_unicast_packet(sc, size, sn->rates[ndx0].rix, 
 		short_tries-1, 
 		MIN(tries0, tries) - 1);
