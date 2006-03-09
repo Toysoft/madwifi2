@@ -5394,6 +5394,8 @@ rx_accept:
 		sc->sc_devstats.rx_packets++;
 		sc->sc_devstats.rx_bytes += len;
 
+		skb_put(skb, len);
+		skb->protocol = ETH_P_CONTROL;		/* XXX */
 
 		if (sc->sc_nmonvaps > 0) {
 			/*
@@ -5417,8 +5419,8 @@ rx_accept:
 			}
 		}
 
-		skb_put(skb, len - IEEE80211_CRC_LEN);
-		skb->protocol = ETH_P_CONTROL;		/* XXX */
+		/* remove the crc */
+		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 
 		/*
 		 * From this point on we assume the frame is at least
