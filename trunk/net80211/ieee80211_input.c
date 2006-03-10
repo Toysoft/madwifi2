@@ -228,15 +228,21 @@ ieee80211_input(struct ieee80211_node *ni,
 			if (type == IEEE80211_FC0_TYPE_DATA &&
 			    ni == vap->iv_bss) {
 				/*
-				 * Fake up a node for this newly discovered
-				 * member of the IBSS.  This should probably
-				 * done after an ACL check.
+				 * Try to find sender in local node table.
 				 */
-				ni = ieee80211_fakeup_adhoc_node(vap,
-						wh->i_addr2);
+				ni = ieee80211_find_node(ni->ni_table, wh->i_addr2);
 				if (ni == NULL) {
-					/* NB: stat kept for alloc failure */
-					goto err;
+					/*
+					 * Fake up a node for this newly discovered
+					 * member of the IBSS.  This should probably
+					 * done after an ACL check.
+					 */
+					ni = ieee80211_fakeup_adhoc_node(vap,
+							wh->i_addr2);
+					if (ni == NULL) {
+						/* NB: stat kept for alloc failure */
+						goto err;
+					}
 				}
 			}
 			break;
