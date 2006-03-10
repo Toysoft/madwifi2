@@ -2502,10 +2502,35 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
 			} else {
 				/*
-				 * Record tsf for potential resync.
+				 * Copy data from beacon to neighbor table.
+				 * Some of this information might change after
+				 * ieee80211_add_neighbor(), so we just copy
+				 * everything over to be safe.
 				 */
+				ni->ni_esslen = scan.ssid[1];
+				memcpy(ni->ni_essid, scan.ssid + 2, scan.ssid[1]);
+				IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 				memcpy(ni->ni_tstamp.data, scan.tstamp,
 					sizeof(ni->ni_tstamp));
+				ni->ni_intval = scan.bintval;
+				ni->ni_capinfo = scan.capinfo;
+				ni->ni_chan = ic->ic_curchan;
+				ni->ni_fhdwell = scan.fhdwell;
+				ni->ni_fhindex = scan.fhindex;
+				ni->ni_erp = scan.erp;
+				ni->ni_timoff = scan.timoff;
+				if (scan.wme != NULL)
+					ieee80211_saveie(&ni->ni_wme_ie, scan.wme);
+				if (scan.wpa != NULL)
+					ieee80211_saveie(&ni->ni_wpa_ie, scan.wpa);
+				if (scan.rsn != NULL)
+					ieee80211_saveie(&ni->ni_rsn_ie, scan.rsn);
+				if (scan.ath != NULL)
+					ieee80211_saveath(ni, scan.ath);
+
+				/* NB: must be after ni_chan is setup */
+				ieee80211_setup_rates(ni, scan.rates,
+					scan.xrates, IEEE80211_F_DOSORT);
 			}
 			if (ni != NULL) {
 				ni->ni_rssi = rssi;
