@@ -1,6 +1,6 @@
 .TH "ATHDEBUG" "8" "February 2006" "" ""
 .SH "NAME"
-\fBathdebug\fp \- control the debug output from the madwifi device subsystem
+\fBathdebug\fP \- control the debug output from the madwifi device subsystem
 .SH "SYNOPSIS"
 .B athdebug
 [-i device] +/\- bitmap
@@ -19,9 +19,9 @@ Display usage and list all debug flags.
 .TP
 .B \-i device
 The madwifi device to apply the settings to. If no interface is specified, 
-\fBathdebug\fp defaults to wifi0.
+\fBathdebug\fP defaults to wifi0.
 .TP
-.B \-/+ bitmap
+.B +/\- bitmap
 Set (+) or clear (-) a debug flag.
 .PP
 .SH "BITMAP ALIASES"
@@ -44,7 +44,7 @@ Set (+) or clear (-) a debug flag.
 \- reset processing and inititalization
 .br
 .BI mode
-\- mode init and changes
+\- mode initialization and changes
 .br
 .BI beacon
 \- beacon handling
@@ -80,7 +80,7 @@ Set (+) or clear (-) a debug flag.
 .br
 .BI fatal
 fatal errors
-,br
+.br
 .PP
 .SH "EXAMPLES"
 .TP
