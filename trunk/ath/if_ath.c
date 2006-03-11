@@ -3182,6 +3182,9 @@ ath_calcrxfilter(struct ath_softc *sc)
 	    sc->sc_opmode == HAL_M_IBSS ||	/* NB: AHDEMO too */
 	    (sc->sc_nostabeacons) || sc->sc_scanning)
 		rfilt |= HAL_RX_FILTER_BEACON;
+	if (sc->sc_nmonvaps > 0) 
+		rfilt |= (HAL_RX_FILTER_CONTROL | HAL_RX_FILTER_BEACON | 
+			  HAL_RX_FILTER_PROBEREQ | HAL_RX_FILTER_PROM);
 	return rfilt;
 #undef RX_FILTER_PRESERVE
 }
