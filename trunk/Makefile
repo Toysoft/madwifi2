@@ -60,15 +60,14 @@ modules: configcheck svnversion.h
 
 .PHONY: svnversion.h
 svnversion.h:
-	echo -n '#define SVNVERSION "' > $@
 	if [ -d .svn ]; then \
-		echo -n "$(shell svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//')" >> $@; \
+		ver=`svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'`; \
 	elif [ -s SNAPSHOT ]; then \
-		echo -n "$(shell sed -e '/^Revision: */!d;s///;q' SNAPSHOT)" >> $@; \
+		ver=`sed -e '/^Revision: */!d;s///;q' SNAPSHOT`; \
 	else \
-		echo -n "$(shell date +%F)" >> $@; \
-	fi
-	echo '"' >> $@
+		ver=`date +%F`; \
+	fi; \
+	echo "#define SVNVERSION \"$$ver\"" > $@
 
 # conflicts with the 'tools' subdirectory
 .PHONY: tools
