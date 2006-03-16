@@ -1028,11 +1028,18 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	default:
 		return NULL;
 	}
+
+	if (sc->sc_nvaps >= ATH_BCBUF) {
+		printk(KERN_WARNING "too many virtual ap's (already got %d)\n", sc->sc_nvaps);
+		return NULL;
+	}
+
 	dev = alloc_etherdev(sizeof(struct ath_vap) + sc->sc_rc->arc_vap_space);
 	if (dev == NULL) {
 		/* XXX msg */
 		return NULL;
 	}
+	
 	avp = dev->priv;
 	ieee80211_vap_setup(ic, dev, name, unit, opmode, flags);
 	/* override with driver methods */
@@ -1064,8 +1071,6 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		 * and expand our bssid mask to cover the active
 		 * virtual ap's with distinct addresses.
 		 */
-		KASSERT(sc->sc_nvaps <= ATH_BCBUF,
-			("too many virtual ap's: %d", sc->sc_nvaps));
 		
 		/* do a full search to mark all the allocated vaps */
 		id_mask = 0;
