@@ -1599,7 +1599,7 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 					"%s: %s -> %s with SCAN_PENDING\n",
 					__func__,
 					ieee80211_state_name[ostate],
-					ieee80211_state_name[ostate]);
+					ieee80211_state_name[nstate]);
 				vap->iv_flags_ext |= IEEE80211_FEXT_SCAN_PENDING;
 			}
 		} else {
