@@ -464,6 +464,7 @@ struct ath_softc {
 	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats	sc_stats;		/* private statistics */
+	int devid;
 	int sc_debug;
 	void (*sc_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int, int, u_int32_t);
 	void (*sc_node_cleanup)(struct ieee80211_node *);
@@ -503,7 +504,8 @@ struct ath_softc {
 			sc_stagbeacons:1,	/* use staggered beacons */
 			sc_rtasksched:1, 	/* radar task is scheduled */
 			sc_dfswait:1,    	/* waiting on channel for radar detect */
-			sc_dfstest:1;		/* Test timer in progress */
+			sc_dfstest:1,		/* Test timer in progress */
+		        sc_ackrate:1;           /* send acks at high bitrate */
 	/* rate tables */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE *sc_currates;	/* current rate table */

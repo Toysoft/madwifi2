@@ -110,6 +110,7 @@ static struct ieee80211vap *ath_vap_create(struct ieee80211com *,
 	const char *, int, int, int, struct net_device *);
 static void ath_vap_delete(struct ieee80211vap *);
 static int ath_init(struct net_device *);
+static int ath_set_ack_bitrate(struct ath_softc *, int);
 static int ath_reset(struct net_device *);
 static void ath_fatal_tasklet(TQUEUE_ARG);
 static void ath_rxorn_tasklet(TQUEUE_ARG);
@@ -390,6 +391,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	int autocreatemode = IEEE80211_M_STA;
 	u_int8_t csz;
 
+	sc->devid = devid;
 	sc->sc_debug = ath_debug;
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: devid 0x%x\n", __func__, devid);
 
@@ -1901,6 +1903,7 @@ ath_init(struct net_device *dev)
 	 * immediately call back to us to send mgmt frames.
 	 */
 	ath_chan_change(sc, ic->ic_curchan);
+	ath_set_ack_bitrate(sc, sc->sc_ackrate);
 	dev->flags |= IFF_RUNNING;		/* we are ready to go */
 	ieee80211_start_running(ic);		/* start all vap's */
 #ifdef ATH_TX99_DIAG
@@ -2005,6 +2008,72 @@ ath_stop(struct net_device *dev)
 	return error;
 }
 
+static int 
+ar_device(int devid)
+{
+	switch (devid) {
+	case AR5210_DEFAULT:
+	case AR5210_PROD:
+	case AR5210_AP:
+		return 5210;
+	case AR5211_DEFAULT:
+	case AR5311_DEVID:
+	case AR5211_LEGACY:
+	case AR5211_FPGA11B:
+		return 5211;
+	case AR5212_DEFAULT:
+	case AR5212_DEVID:
+	case AR5212_FPGA:
+	case AR5212_DEVID_IBM:
+	case AR5212_AR5312_REV2:
+	case AR5212_AR5312_REV7:
+	case AR5212_AR2313_REV8:
+	case AR5212_AR2315_REV6:
+	case AR5212_AR2315_REV7:
+	case AR5212_AR2317_REV1:
+	case AR5212_DEVID_0014:
+	case AR5212_DEVID_0015:
+	case AR5212_DEVID_0016:
+	case AR5212_DEVID_0017:
+	case AR5212_DEVID_0018:
+	case AR5212_DEVID_0019:
+	case AR5212_AR2413:
+	case AR5212_AR5413:
+	case AR5212_AR5424:
+	case AR5212_DEVID_FF19:
+		return 5212;
+	case AR5213_SREV_1_0:
+	case AR5213_SREV_REG:
+	case AR_SUBVENDOR_ID_NOG:
+	case AR_SUBVENDOR_ID_NEW_A:
+		return 5213;
+	default: 
+		return 0; /* unknown */
+	}
+}
+
+
+static int 
+ath_set_ack_bitrate(struct ath_softc *sc, int high) 
+{
+	struct ath_hal *ah = sc->sc_ah;
+	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
+		/* set ack to be sent at low bit-rate */
+		/* registers taken from the openbsd 5212 hal */
+#define AR5K_AR5212_STA_ID1                     0x8004
+#define AR5K_AR5212_STA_ID1_ACKCTS_6MB          0x01000000
+#define AR5K_AR5212_STA_ID1_BASE_RATE_11B       0x02000000
+		u_int32_t v = AR5K_AR5212_STA_ID1_BASE_RATE_11B | AR5K_AR5212_STA_ID1_ACKCTS_6MB;
+		if (high) {
+			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) & ~v);
+		} else {
+			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) | v);
+		}
+		return 0;
+	}
+	return 1;
+}
+
 /*
  * Reset the hardware w/o losing operational state.  This is
  * basically a more efficient way of doing ath_stop, ath_init,
@@ -2052,7 +2121,7 @@ ath_reset(struct net_device *dev)
 	if (sc->sc_beacons)
 		ath_beacon_config(sc, NULL);	/* restart beacons */
 	ath_hal_intrset(ah, sc->sc_imask);
-
+	ath_set_ack_bitrate(sc, sc->sc_ackrate);
 	netif_wake_queue(dev);		/* restart xmit */
 #ifdef ATH_SUPERG_XR
 	/*
@@ -8974,6 +9043,7 @@ enum {
 	ATH_TKIPMIC		= 19,
 	ATH_XR_POLL_PERIOD 	= 20,
 	ATH_XR_POLL_COUNT 	= 21,
+	ATH_ACKRATE             = 22,
 };
 
 static int
@@ -9099,6 +9169,10 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_xrpollcount = val;
 				break;
 #endif
+			case ATH_ACKRATE:
+				sc->sc_ackrate = val;
+				ath_set_ack_bitrate(sc, sc->sc_ackrate);
+				break;
 			default:
 				return -EINVAL;
 			}
@@ -9155,6 +9229,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val=sc->sc_xrpollcount;
 			break;
 #endif
+		case ATH_ACKRATE:
+			val = sc->sc_ackrate;
+			break;
 		default:
 			return -EINVAL;
 		}
@@ -9253,6 +9330,11 @@ static const ctl_table ath_sysctl_template[] = {
 	  .proc_handler	= ath_sysctl_halparam
 	},
 #endif
+	{ .ctl_name	= ATH_ACKRATE,
+	  .procname	= "ackrate",
+	  .mode		= 0644,
+	  .proc_handler	= ath_sysctl_halparam
+	},
 	{ 0 }
 };
 
