@@ -149,7 +149,7 @@ void ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
 	struct ath_desc *, int, u_int32_t, u_int32_t);
 
 
-void ieee80211_monitor_encap(struct ieee80211com *, struct sk_buff *);
+void ieee80211_monitor_encap(struct ieee80211vap *, struct sk_buff *);
 
 
 #endif /* _NET80211_IEEE80211_MONITOR_H_ */
