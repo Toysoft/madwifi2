@@ -410,13 +410,26 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 		} else {
 			change_rates = 0;
 			if (!sn->packets_sent[size_bin] || best_ndx == -1) {
-				/* no packet has been sent successfully yet */
+				/* no packet has been sent successfully yet, so
+				 * pick an rssi-appropriate bit-rate. We know if
+				 * the rssi is very low that the really high
+				 * bit rates will not work.
+				 */
+				int initial_rate = 72;
+				if (an->an_avgrssi > 50) {
+					initial_rate = 108; /* 54 mbps */
+				} else if (an->an_avgrssi > 30) {
+					initial_rate = 72; /* 36 mbps */
+				} else {
+					initial_rate = 22; /* 11 mbps */
+				}
+
 				for (ndx = sn->num_rates-1; ndx > 0; ndx--) {
 					/* 
-					 * pick the highest rate <= 36 Mbps
+					 * pick the highest rate <= initial_rate/2 Mbps
 					 * that hasn't failed.
 					 */
-					if (sn->rates[ndx].rate <= 72 && 
+					if (sn->rates[ndx].rate <= initial_rate && 
 					    sn->stats[size_bin][ndx].successive_failures == 0)
 						break;
 				}
