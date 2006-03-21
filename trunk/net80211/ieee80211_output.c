@@ -222,7 +222,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	memset(cb, 0, sizeof(struct ieee80211_cb));
 	
         if (vap->iv_opmode == IEEE80211_M_MONITOR) {
-		ieee80211_monitor_encap(ic, skb);
+		ieee80211_monitor_encap(vap, skb);
 		skb->dev = parent;
                 (void) dev_queue_xmit(skb);
                 return 0;

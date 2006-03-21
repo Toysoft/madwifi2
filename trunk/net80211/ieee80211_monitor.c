@@ -123,7 +123,7 @@ struct ar5212_openbsd_desc {
 };
 
 void
-ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb) 
+ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb) 
 {
 	struct ieee80211_cb *cb = (struct ieee80211_cb *) skb->cb;
 	struct ieee80211_phy_params *ph =
@@ -134,8 +134,8 @@ ieee80211_monitor_encap(struct ieee80211com *ic, struct sk_buff *skb)
 	cb->next = NULL;
 	memset(ph, 0, sizeof(struct ieee80211_phy_params));
 
-	/* defaults */
-	ph->rate0 = 2;
+	/* send at a static rate if it is configured */
+	ph->rate0 = vap->iv_fixed_rate > 0 ? vap->iv_fixed_rate : 2;
 	ph->try0 = 11;
 	ph->power = 60;
 
