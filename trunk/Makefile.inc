@@ -88,20 +88,15 @@ else
 # The default KERNELPATH points to the directory where the currently
 # running kernel was compiled.  Note that the configuration and the
 # version of the kernel tree might have changed since then.
-ifndef KERNELPATH
-ifeq ($(wildcard $(shell echo /lib/modules/`uname -r`/build)),)
-KERNELPATH = /usr/src/linux
-$(warning Default KERNELPATH not found, using $(KERNELPATH))
-else
-KERNELPATH := $(shell cd /lib/modules/`uname -r`/build && pwd)
-endif
-endif
-
-endif
-
-# sanity check: does KERNELPATH exist?
 ifeq ($(wildcard $(KERNELPATH)),)
-$(error KERNELPATH: $(KERNELPATH) does not exist)
+KERNELPATH = /lib/modules/$(shell uname -r)/build
+# sanity check: does KERNELPATH exist?
+ifeq ($(shell cd $(KERNELPATH) && pwd),)
+$(error $(KERNELPATH) is missing, please set KERNELPATH)
+endif
+export KERNELPATH
+endif
+
 endif
 
 # KERNELRELEASE is the target kernel's version.  It's always taken from
