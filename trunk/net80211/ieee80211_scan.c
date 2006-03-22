@@ -500,7 +500,7 @@ ieee80211_check_scan(struct ieee80211vap *vap, int flags, u_int duration,
 		 */
 		ss->ss_flags = flags;
 		ss->ss_duration = duration;
-		if (ss->ss_ops->scan_end(ss, vap, action, flags & IEEE80211_SCAN_KEEPMODE)) {
+		if (ss->ss_ops->scan_end(ss, ss->ss_vap, action, flags & IEEE80211_SCAN_KEEPMODE)) {
 			/* found an ap, just clear the flag */
 			ic->ic_flags &= ~IEEE80211_F_SCAN;
 			return 1;
