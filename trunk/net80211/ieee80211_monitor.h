@@ -42,6 +42,7 @@
 
 #include <net80211/ieee80211_radiotap.h>
 #include <hal/ah_desc.h>
+#include <ath/if_athvar.h>
 struct ieee80211_phy_params {
 	u_int8_t rate0;
 	u_int8_t rate1;
@@ -146,7 +147,7 @@ struct ath_tx_radiotap_header {
  * to have space at the front to push a wlan_ng_prims2_header.
  */
 void ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
-	struct ath_desc *, int, u_int32_t, u_int32_t);
+	struct ath_desc *, int, u_int32_t, struct ath_softc *);
 
 
 void ieee80211_monitor_encap(struct ieee80211vap *, struct sk_buff *);
