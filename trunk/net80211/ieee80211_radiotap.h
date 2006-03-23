@@ -187,6 +187,19 @@ enum ieee80211_radiotap_type {
 #define	IEEE80211_CHAN_DYN	0x0400	/* Dynamic CCK-OFDM channel */
 #define	IEEE80211_CHAN_GFSK	0x0800	/* GFSK channel (FHSS PHY) */
 #define	IEEE80211_CHAN_STURBO	0x2000	/* 11a static turbo channel only */
+
+/* Useful combinations of channel characteristics, borrowed from Ethereal */
+#define IEEE80211_CHAN_A \
+	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM)
+#define IEEE80211_CHAN_B \
+	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_CCK)
+#define IEEE80211_CHAN_G \
+	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_DYN)
+#define IEEE80211_CHAN_TA \
+	(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM | IEEE80211_CHAN_TURBO)
+#define IEEE80211_CHAN_TG \
+	(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_DYN  | IEEE80211_CHAN_TURBO)
+
 #endif /* !_KERNEL */
 
 /* For IEEE80211_RADIOTAP_FLAGS */
