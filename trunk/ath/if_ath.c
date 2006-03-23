@@ -5196,12 +5196,10 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 			memmove(skb1->data + padbytes, skb1->data, headersize);
 			skb_pull(skb1, padbytes);
 		}
-		ieee80211_input_monitor(ic, skb1, ds, 0, tsf,
-					sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
+		ieee80211_input_monitor(ic, skb1, ds, 0, tsf, sc);
 		dev_kfree_skb(skb1);
 	} else {
-		ieee80211_input_monitor(ic, skb, ds, 0, tsf,
-					sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate);
+		ieee80211_input_monitor(ic, skb, ds, 0, tsf, sc);
 	}
 }
 
@@ -5234,8 +5232,7 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
 		goto done;
 	}
-	ieee80211_input_monitor(ic, skb, ds, 1, 0,
-		sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate);
+	ieee80211_input_monitor(ic, skb, ds, 1, 0, sc);
  done:
 	dev_kfree_skb(skb);
 }

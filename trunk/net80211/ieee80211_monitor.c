@@ -56,6 +56,7 @@
 
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_monitor.h>
+#include <ath/if_athvar.h>
 
 
 
@@ -183,7 +184,7 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
 
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	struct ath_desc *ds, int tx, u_int32_t mactime, u_int32_t rate)
+	struct ath_desc *ds, int tx, u_int32_t mactime, struct ath_softc *sc) 
 {
 	struct ieee80211vap *vap, *next;
 	u_int32_t signal = 0;
@@ -279,7 +280,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 			ph->rate.status = 0;
 			ph->rate.len = 4;
-			ph->rate.data = rate;
+			ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
 			break;
 		}
 		case ARPHRD_IEEE80211_RADIOTAP: {
@@ -299,7 +300,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wt_ihdr.it_len = cpu_to_le16(sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
 				th->wt_flags = 0;
-				th->wt_rate = rate;
+				th->wt_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
 				th->wt_txpower = 0;
 				th->wt_antenna = 0;
 			} else {
@@ -318,9 +319,34 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wr_ihdr.it_len = cpu_to_le16(sizeof(struct ath_rx_radiotap_header));
 				th->wr_ihdr.it_present = ATH_RX_RADIOTAP_PRESENT;
 				th->wr_flags = 0;
-				th->wr_rate = rate;
-				th->wr_chan_freq = 0;
-				th->wr_chan_flags = 0;
+				th->wr_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+				th->wr_chan_freq = ic->ic_curchan->ic_freq;
+
+				/* Define the channel flags for radiotap */
+				switch(sc->sc_curmode) {
+					case IEEE80211_MODE_11A:
+						th->wr_chan_flags =
+							cpu_to_le16(IEEE80211_CHAN_A);
+						break;
+					case IEEE80211_MODE_TURBO_A:
+						th->wr_chan_flags = 
+							cpu_to_le16(IEEE80211_CHAN_TA);
+						break;
+					case IEEE80211_MODE_11B:
+						th->wr_chan_flags = 
+							cpu_to_le16(IEEE80211_CHAN_B);
+						break;
+					case IEEE80211_MODE_11G:
+						th->wr_chan_flags = IEEE80211_CHAN_G;
+						break;
+					case IEEE80211_MODE_TURBO_G:
+						th->wr_chan_flags = IEEE80211_CHAN_TG;
+						break;
+					default:
+						th->wr_chan_flags = 0; /* unknown */
+						break;
+				}
+
 				th->wr_antenna = 0;
 				th->wr_antsignal = signal;
 				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
