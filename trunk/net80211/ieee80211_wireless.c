@@ -970,6 +970,12 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	range->min_frag = 256;
 	range->max_frag = 2346;
 
+#if WIRELESS_EXT >= 18
+	/* report supported WPA/WPA2 capabilities to userspace */
+	range->enc_capa = IW_ENC_CAPA_WPA | IW_ENC_CAPA_WPA2 |
+               IW_ENC_CAPA_CIPHER_TKIP | IW_ENC_CAPA_CIPHER_CCMP;
+#endif
+	
 	return 0;
 }
 
