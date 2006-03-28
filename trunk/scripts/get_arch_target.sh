@@ -22,5 +22,6 @@ test "$CONFIG_CPU_XSCALE" && test "$CONFIG_CPU_BIG_ENDIAN" && report arm xscale-
 test "$CONFIG_CPU_XSCALE" && report arm xscale-le-elf
 test "$CONFIG_CPU_32v4" && test "$CONFIG_CPU_BIG_ENDIAN" && report arm armv4-be-elf
 test "$CONFIG_CPU_32v4" && report arm armv4-le-elf
-test "$CONFIG_MIPS32" && report mips mipsisa32-be-elf
+test "$CONFIG_MIPS" && test "$CONFIG_CPU_LITTLE_ENDIAN" && report mips mips1-le-elf
+test "$CONFIG_MIPS" && report mips mips1-be-elf
 report "" ""
