@@ -65,5 +65,5 @@ NM=	${TOOLPREFIX}nm
 
 LDOPTS=	-EL
 COPTS+=	-DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
-COPTS+=	-G 0 -EL -mno-abicalls -fno-pic -march=r4600 -Wa,--trap \
+COPTS+=	-G 0 -EL -mno-abicalls -fno-pic -Wa,--trap \
 	-fno-strict-aliasing -fno-common -fomit-frame-pointer -mlong-calls

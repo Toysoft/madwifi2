@@ -65,7 +65,7 @@ NM=	${TOOLPREFIX}nm
 
 LDOPTS+=	-EB
 COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+=	-G 0 -mno-abicalls -fno-pic -march=r4600 -Wa,--trap \
+COPTS+=	-G 0 -mno-abicalls -fno-pic -Wa,--trap \
 	-fno-strict-aliasing -fno-common -fomit-frame-pointer -mlong-calls \
 	-isystem ${KERNELPATH}/include
 
