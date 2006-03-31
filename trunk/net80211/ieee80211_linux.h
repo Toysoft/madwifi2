@@ -345,13 +345,46 @@ get_jiffies_64(void)
 #endif
 
 /* msecs_to_jiffies appeared in 2.6.7 and 2.4.29 */
+#include <linux/delay.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) && \
       LINUX_VERSION_CODE < KERNEL_VERSION(2,6,7)) || \
      LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29)
+
+/* The following definitions and inline functions are
+ * copied from the kernel src, include/linux/jiffies.h */
+
+#ifndef MSEC_PER_SEC
+#define MSEC_PER_SEC (1000L)
+#endif
+
+#ifndef MAX_JIFFY_OFFSET
+#define MAX_JIFFY_OFFSET ((~0UL >> 1)-1)
+#endif
+
+static __inline unsigned int jiffies_to_msecs(const unsigned long j)
+{
+#if HZ <= MSEC_PER_SEC && !(MSEC_PER_SEC % HZ)
+	return (MSEC_PER_SEC / HZ) * j;
+#elif HZ > MSEC_PER_SEC && !(HZ % MSEC_PER_SEC)
+	return (j + (HZ / MSEC_PER_SEC) - 1)/(HZ / MSEC_PER_SEC);
+#else
+	return (j * MSEC_PER_SEC) / HZ;
+#endif
+}
+
 static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 {
-	return (m * HZ + 999) / 1000;
+	if (m > jiffies_to_msecs(MAX_JIFFY_OFFSET))
+		return MAX_JIFFY_OFFSET;
+#if HZ <= MSEC_PER_SEC && !(MSEC_PER_SEC % HZ)
+	return (m + (MSEC_PER_SEC / HZ) - 1) / (MSEC_PER_SEC / HZ);
+#elif HZ > MSEC_PER_SEC && !(HZ % MSEC_PER_SEC)
+	return m * (HZ / MSEC_PER_SEC);
+#else
+	return (m * HZ + MSEC_PER_SEC - 1) / MSEC_PER_SEC;
+#endif
 }
+
 #endif
 
 #ifndef CLONE_KERNEL
