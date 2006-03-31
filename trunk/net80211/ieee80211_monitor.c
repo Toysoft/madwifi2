@@ -298,7 +298,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				memset(th, 0, sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_version = 0;
 				th->wt_ihdr.it_len = cpu_to_le16(sizeof(struct ath_tx_radiotap_header));
-				th->wt_ihdr.it_present = ATH_TX_RADIOTAP_PRESENT;
+				th->wt_ihdr.it_present = cpu_to_le32(ATH_TX_RADIOTAP_PRESENT);
 				th->wt_flags = 0;
 				th->wt_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
 				th->wt_txpower = 0;
@@ -317,10 +317,13 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				memset(th, 0, sizeof(struct ath_rx_radiotap_header));
 				th->wr_ihdr.it_version = 0;
 				th->wr_ihdr.it_len = cpu_to_le16(sizeof(struct ath_rx_radiotap_header));
-				th->wr_ihdr.it_present = ATH_RX_RADIOTAP_PRESENT;
-				th->wr_flags = 0;
+				th->wr_ihdr.it_present = cpu_to_le32(ATH_RX_RADIOTAP_PRESENT);
+
+				if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
+
 				th->wr_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
-				th->wr_chan_freq = ic->ic_curchan->ic_freq;
+				th->wr_chan_freq = cpu_to_le16(ic->ic_curchan->ic_freq);
 
 				/* Define the channel flags for radiotap */
 				switch(sc->sc_curmode) {
@@ -337,20 +340,25 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 							cpu_to_le16(IEEE80211_CHAN_B);
 						break;
 					case IEEE80211_MODE_11G:
-						th->wr_chan_flags = IEEE80211_CHAN_G;
+						th->wr_chan_flags = 
+							cpu_to_le16(IEEE80211_CHAN_G);
 						break;
 					case IEEE80211_MODE_TURBO_G:
-						th->wr_chan_flags = IEEE80211_CHAN_TG;
+						th->wr_chan_flags = 
+							cpu_to_le16(IEEE80211_CHAN_TG);
 						break;
 					default:
 						th->wr_chan_flags = 0; /* unknown */
 						break;
 				}
 
-				th->wr_antenna = 0;
+				th->wr_antenna = ds->ds_rxstat.rs_antenna;
 				th->wr_antsignal = signal;
 				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
 				       IEEE80211_CRC_LEN);
+				th->wr_fcs = cpu_to_le32(th->wr_fcs);
+				memcpy(&th->wr_tsft, &mactime, IEEE80211_TSF_LEN);
+				th->wr_tsft = cpu_to_le64(th->wr_tsft);
 			}
 			break;
 		}

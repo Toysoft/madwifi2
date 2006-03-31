@@ -901,4 +901,9 @@ enum {
  */
 #define IEEE80211_REG_EXT_ID		201
 
+/*
+ * IEEE 802.11 timer synchronization function (TSF) timestamp length
+ */
+#define IEEE80211_TSF_LEN		8
+
 #endif /* _NET80211_IEEE80211_H_ */
