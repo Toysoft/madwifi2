@@ -58,6 +58,7 @@
 #include "if_media.h"
 
 #include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_linux.h>
 
 #define	IS_UP(_dev) \
 	(((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
@@ -2147,7 +2148,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_BGSCAN_IDLE:
 		if (value >= IEEE80211_BGSCAN_IDLE_MIN)
-			vap->iv_bgscanidle = value * HZ / 1000;
+			vap->iv_bgscanidle = msecs_to_jiffies(value);
 		else
 			retv = EINVAL;
 		break;
@@ -2486,7 +2487,7 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 		param[0] = (vap->iv_flags & IEEE80211_F_BGSCAN) != 0;
 		break;
 	case IEEE80211_PARAM_BGSCAN_IDLE:
-		param[0] = vap->iv_bgscanidle * HZ / 1000; /* ms */
+		param[0] = jiffies_to_msecs(vap->iv_bgscanidle); /* ms */
 		break;
 	case IEEE80211_PARAM_BGSCAN_INTERVAL:
 		param[0] = vap->iv_bgscanintvl / HZ;	/* seconds */

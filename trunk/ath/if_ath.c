@@ -648,7 +648,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_blinking = 0;
 	sc->sc_ledstate = 1;
 	sc->sc_ledon = 0;			/* low true */
-	sc->sc_ledidle = (2700 * HZ) / 1000;	/* 2.7sec */
+	sc->sc_ledidle = msecs_to_jiffies(2700);	/* 2.7sec */
 	sc->sc_dfstesttime = ATH_DFS_TEST_RETURN_PERIOD;
 	init_timer(&sc->sc_ledtimer);
 	init_timer(&sc->sc_dfswaittimer);
@@ -1668,7 +1668,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 					 * noticeable with Windows clients.
 					 */
 					mod_timer(&sc->sc_dturbo_switch_mode,
-							  jiffies + ((HZ * 10) / 1000));
+							  jiffies + msecs_to_jiffies(10));
 				}
 			} 
 #endif
@@ -3585,7 +3585,7 @@ ath_turbo_switch_mode(unsigned long data)
 		/* 
 		 * beacon did not go out. reschedule tasklet.
 		 */
-		mod_timer(&sc->sc_dturbo_switch_mode, jiffies + ((HZ * 2) / 1000));
+		mod_timer(&sc->sc_dturbo_switch_mode, jiffies + msecs_to_jiffies(2));
 		return;
 	}
 
@@ -8660,8 +8660,8 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 	for (i = 0; i < 32; i++) {
 		u_int8_t ix = rt->rateCodeToIndex[i];
 		if (ix == 0xff) {
-			sc->sc_hwmap[i].ledon = (500 * HZ) / 1000;
-			sc->sc_hwmap[i].ledoff = (130 * HZ) / 1000;
+			sc->sc_hwmap[i].ledon = msecs_to_jiffies(500);
+			sc->sc_hwmap[i].ledoff = msecs_to_jiffies(130);
 			continue;
 		}
 		sc->sc_hwmap[i].ieeerate =
@@ -8675,8 +8675,8 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 				break;
 		/* NB: this uses the last entry if the rate isn't found */
 		/* XXX beware of overlow */
-		sc->sc_hwmap[i].ledon = (blinkrates[j].timeOn * HZ) / 1000;
-		sc->sc_hwmap[i].ledoff = (blinkrates[j].timeOff * HZ) / 1000;
+		sc->sc_hwmap[i].ledon = msecs_to_jiffies(blinkrates[j].timeOn);
+		sc->sc_hwmap[i].ledoff = msecs_to_jiffies(blinkrates[j].timeOff);
 	}
 	sc->sc_currates = rt;
 	sc->sc_curmode = mode;

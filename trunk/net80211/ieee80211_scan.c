@@ -136,7 +136,7 @@ ieee80211_scan_detach(struct ieee80211com *ic)
 void
 ieee80211_scan_vattach(struct ieee80211vap *vap)
 {
-	vap->iv_bgscanidle = (IEEE80211_BGSCAN_IDLE_DEFAULT * 1000) / HZ;
+	vap->iv_bgscanidle = msecs_to_jiffies(IEEE80211_BGSCAN_IDLE_DEFAULT);
 	vap->iv_bgscanintvl = IEEE80211_BGSCAN_INTVAL_DEFAULT * HZ;
 	vap->iv_scanvalid = SCAN_VALID_DEFAULT * HZ;
 	vap->iv_roam.rssi11a = ROAM_RSSI_11A_DEFAULT;
@@ -294,7 +294,7 @@ scan_restart_pwrsav(unsigned long arg)
 	 * XXX 1ms is a lot, better to trigger scan
 	 * on tx complete.
 	 */
-	delay = HZ / 1000;
+	delay = msecs_to_jiffies(1);
 	if (delay < 1)
 		delay = 1;
 	ic->ic_scan_start(ic);			/* notify driver */
