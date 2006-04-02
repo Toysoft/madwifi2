@@ -971,6 +971,29 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	range->min_frag = 256;
 	range->max_frag = 2346;
 
+#if WIRELESS_EXT >= 17
+	/* Event capability (kernel) */
+	IW_EVENT_CAPA_SET_KERNEL(range->event_capa);
+   
+	/* Event capability (driver) */
+	if (vap->iv_opmode == IEEE80211_M_STA ||
+		 vap->iv_opmode == IEEE80211_M_IBSS ||
+		 vap->iv_opmode == IEEE80211_M_AHDEMO) {
+		/* for now, only ibss, ahdemo, sta has this cap */
+		IW_EVENT_CAPA_SET(range->event_capa, SIOCGIWSCAN);
+	}
+
+	if (vap->iv_opmode == IEEE80211_M_STA) {
+		/* for sta only */
+		IW_EVENT_CAPA_SET(range->event_capa, SIOCGIWAP); 
+		IW_EVENT_CAPA_SET(range->event_capa, IWEVREGISTERED);
+		IW_EVENT_CAPA_SET(range->event_capa, IWEVEXPIRED);
+	}
+	
+	/* this is used for reporting replay failure, which is used by the different encoding schemes */
+	IW_EVENT_CAPA_SET(range->event_capa, IWEVCUSTOM);
+#endif
+
 #if WIRELESS_EXT >= 18
 	/* report supported WPA/WPA2 capabilities to userspace */
 	range->enc_capa = IW_ENC_CAPA_WPA | IW_ENC_CAPA_WPA2 |
