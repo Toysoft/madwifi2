@@ -4236,7 +4236,7 @@ ieee80211_ioctl_vattach(struct ieee80211vap *vap)
 void
 ieee80211_ioctl_vdetach(struct ieee80211vap *vap)
 {
-	if (isset(wlan_units, vap->iv_unit))
+	if ((vap->iv_unit != -1) && isset(wlan_units, vap->iv_unit))
 		ieee80211_delete_wlanunit(vap->iv_unit);
 }
 #endif /* CONFIG_NET_WIRELESS */
