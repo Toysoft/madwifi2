@@ -8378,8 +8378,8 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ichan->ic_freq = c->channel;
 		ichan->ic_flags = c->channelFlags;
 		ichan->ic_maxregpower = c->maxRegTxPower;	/* dBm */
-		ichan->ic_maxpower = c->maxTxPower / 4;		/* 1/4 dBm */
-		ichan->ic_minpower = c->minTxPower / 4;		/* 1/4 dBm */
+		ichan->ic_maxpower = c->maxTxPower;		    /* 1/4 dBm */
+		ichan->ic_minpower = c->minTxPower;		    /* 1/4 dBm */
 	}
 	ic->ic_nchans = nchan;
 	kfree(chans);
