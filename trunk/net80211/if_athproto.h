@@ -7,8 +7,6 @@
 #ifndef _NET_IF_ATH_PROTO_H_
 #define _NET_IF_ATH_PROTO_H_
 
-#include "ah_osdep.h"
-
 /*
  * Atheros proprietary protocol info.
  */
@@ -23,7 +21,7 @@
 #define ATH_SNAP_ORGCODE_2	0x7f
 
 struct athl2p_tunnel_hdr {
-#if (AH_BYTE_ORDER == AH_LITTLE_ENDIAN)
+#if (_BYTE_ORDER == _LITTLE_ENDIAN)
 	u_int32_t offset:11,
 	seqNum:11,
 	optHdrLen32:2,
