@@ -185,6 +185,10 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dev->irq = pdev->irq;
 	dev->mem_start = mem;
 	dev->mem_end = mem + pci_resource_len(pdev, 0);
+	/*
+	 * Don't leave arp type as ARPHRD_ETHER as this is no eth device
+	 */
+	dev->type = ARPHRD_IEEE80211;
 
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
