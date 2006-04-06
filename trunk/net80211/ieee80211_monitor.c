@@ -129,9 +129,6 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 	struct ieee80211_cb *cb = (struct ieee80211_cb *) skb->cb;
 	struct ieee80211_phy_params *ph =
 		(struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
-	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
-	u_int8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
-
 	cb->flags = M_RAW;
 	cb->ni = NULL;
 	cb->next = NULL;
@@ -139,22 +136,31 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 
 	/* send at a static rate if it is configured */
 	ph->rate0 = vap->iv_fixed_rate > 0 ? vap->iv_fixed_rate : 2;
-	/* don't retry conrol packets */
-	ph->try0 = (type == IEEE80211_FC0_TYPE_CTL) ? 1 : 11;
+	/* don't retry control packets */
+	ph->try0 = 11;
 	ph->power = 60;
 
 	switch (skb->dev->type) {
-	case ARPHRD_IEEE80211: break;
+	case ARPHRD_IEEE80211: {
+		struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
+			ph->try0 = 1;
+		break;
+	}
 	case ARPHRD_IEEE80211_PRISM: {
-		wlan_ng_prism2_header *wh = 
+		struct ieee80211_frame *wh = NULL;
+		wlan_ng_prism2_header *p2h = 
 			(wlan_ng_prism2_header *) skb->data;
 		/* does it look like there is a prism header here? */
 		if (skb->len > sizeof (wlan_ng_prism2_header) &&
-                    wh->msgcode == DIDmsg_lnxind_wlansniffrm &&
-		    wh->rate.did == DIDmsg_lnxind_wlansniffrm_rate) {
-                        ph->rate0 = wh->rate.data;
+                    p2h->msgcode == DIDmsg_lnxind_wlansniffrm &&
+		    p2h->rate.did == DIDmsg_lnxind_wlansniffrm_rate) {
+                        ph->rate0 = p2h->rate.data;
                         skb_pull(skb, sizeof(wlan_ng_prism2_header));
 		}
+		wh = (struct ieee80211_frame *) skb->data;
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
+			ph->try0 = 1;
                 break;
 	}
 	case ARPHRD_IEEE80211_ATHDESC: {
