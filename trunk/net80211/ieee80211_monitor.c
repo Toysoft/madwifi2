@@ -129,7 +129,9 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 	struct ieee80211_cb *cb = (struct ieee80211_cb *) skb->cb;
 	struct ieee80211_phy_params *ph =
 		(struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
-	cb = (struct ieee80211_cb *) skb->cb;
+	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+	u_int8_t type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+
 	cb->flags = M_RAW;
 	cb->ni = NULL;
 	cb->next = NULL;
@@ -137,7 +139,8 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 
 	/* send at a static rate if it is configured */
 	ph->rate0 = vap->iv_fixed_rate > 0 ? vap->iv_fixed_rate : 2;
-	ph->try0 = 11;
+	/* don't retry conrol packets */
+	ph->try0 = (type == IEEE80211_FC0_TYPE_CTL) ? 1 : 11;
 	ph->power = 60;
 
 	switch (skb->dev->type) {
