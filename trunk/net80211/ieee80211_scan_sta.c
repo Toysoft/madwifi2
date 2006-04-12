@@ -759,6 +759,7 @@ match_bss(struct ieee80211vap *vap,
 		fail |= 0x100;
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_msg(vap, IEEE80211_MSG_SCAN | IEEE80211_MSG_ROAM)) {
+		printf(" %03x", fail);
 		printf(" %c %s",
 			fail & 0x40 ? '=' : fail & 0x80 ? '^' : fail ? '-' : '+',
 			ether_sprintf(se->se_macaddr));
@@ -851,6 +852,9 @@ sta_pick_bss(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *selbss;
 
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, "%s Checking scan results\n",
+		__func__);
+
 	KASSERT(vap->iv_opmode == IEEE80211_M_STA,
 		("wrong mode %u", vap->iv_opmode));
 
@@ -890,8 +894,11 @@ notfound:
 	st->st_action = ss->ss_ops->scan_default;
 	if (action)
 		st->st_action = action;
-	if ((selbss = select_bss(ss, vap)) == NULL )
+	if ((selbss = select_bss(ss, vap)) == NULL ) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+			"%s: select_bss failed\n", __func__);
 		goto notfound;
+	}
 	st->st_selbss = selbss->base;
 
 	/* 

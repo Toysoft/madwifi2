@@ -408,6 +408,7 @@ MALLOC_DECLARE(M_80211_VAP);
 #define	IEEE80211_F_COUNTERM	0x04000000	/* CONF: TKIP countermeasures */
 #define	IEEE80211_F_HIDESSID	0x08000000	/* CONF: hide SSID in beacon */
 #define IEEE80211_F_NOBRIDGE    0x10000000	/* CONF: disable internal bridge */
+
 #define	IEEE80211_F_WMEUPDATE	0x20000000	/* STATUS: update beacon wme */
 #define IEEE80211_F_DOTH	0x40000000	/* enable 11.h */
 #define IEEE80211_F_CHANSWITCH	0x80000000	/* force chanswitch */
