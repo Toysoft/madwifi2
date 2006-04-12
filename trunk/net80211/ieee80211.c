@@ -605,11 +605,11 @@ ieee80211_mhz2ieee(u_int freq, u_int flags)
 		if ((freq >= 2412) && (freq < 2484)) /* don't number non-IEEE channels */
 			return (freq - 2407) / 5;
 		return 0;
-	} else if (flags & IEEE80211_CHAN_5GHZ)	/* 5Ghz band */
-		if ((freq >= 5150) && (freq <= 5825)) /* don't number non-IEEE channels */
+	} else if (flags & IEEE80211_CHAN_5GHZ)	{	/* 5Ghz band */
+		if ((freq >= 5150) && (freq <= 5825))	/* don't number non-IEEE channels */
 			return (freq - 5000) / 5;
 		return 0;
-	else {
+	} else {
 		/* something is fishy, don't do anything */
 		return 0;
 	}
