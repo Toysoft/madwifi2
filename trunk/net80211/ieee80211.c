@@ -600,22 +600,18 @@ u_int
 ieee80211_mhz2ieee(u_int freq, u_int flags)
 {
 	if (flags & IEEE80211_CHAN_2GHZ) {	/* 2GHz band */
-		if (freq == 2484)
+		if (freq == 2484)		/* Japan */
 			return 14;
-		if (freq < 2484)
+		if ((freq >= 2412) && (freq < 2484)) /* don't number non-IEEE channels */
 			return (freq - 2407) / 5;
-		else
-			return 15 + ((freq - 2512) / 20);
+		return 0;
 	} else if (flags & IEEE80211_CHAN_5GHZ)	/* 5Ghz band */
-		return (freq - 5000) / 5;
-	else {					/* either, guess */
-		if (freq == 2484)
-			return 14;
-		if (freq < 2484)
-			return (freq - 2407) / 5;
-		if (freq < 5000)
-			return 15 + ((freq - 2512) / 20);
-		return (freq - 5000) / 5;
+		if ((freq >= 5150) && (freq <= 5825)) /* don't number non-IEEE channels */
+			return (freq - 5000) / 5;
+		return 0;
+	else {
+		/* something is fishy, don't do anything */
+		return 0;
 	}
 }
 EXPORT_SYMBOL(ieee80211_mhz2ieee);
