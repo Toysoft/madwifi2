@@ -625,6 +625,8 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	 * XXX may not need all this stuff
 	 */
 	ni->ni_authmode = vap->iv_bss->ni_authmode;		/* inherit authmode from iv_bss */
+	/* inherit the WPA setup as well (structure copy!) */
+	ni->ni_rsn = vap->iv_bss->ni_rsn; 
 	IEEE80211_ADDR_COPY(ni->ni_bssid, se->se_bssid);
 	ni->ni_esslen = se->se_ssid[1];
 	memcpy(ni->ni_essid, se->se_ssid + 2, ni->ni_esslen);

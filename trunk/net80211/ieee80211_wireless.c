@@ -3596,6 +3596,764 @@ ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+#if WIRELESS_EXT >= 18
+static int
+ieee80211_ioctl_siwmlme(struct net_device *dev,
+	struct iw_request_info *info, struct iw_point *erq, char *data)
+{
+	struct ieee80211req_mlme mlme;
+	struct iw_mlme *wextmlme = (struct iw_mlme *)data;
+
+	memset(&mlme, 0, sizeof(mlme));
+
+	switch(wextmlme->cmd) {
+	case IW_MLME_DEAUTH:
+		mlme.im_op = IEEE80211_MLME_DEAUTH;
+		break;
+	case IW_MLME_DISASSOC:
+		mlme.im_op = IEEE80211_MLME_DISASSOC;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	mlme.im_reason = wextmlme->reason_code;
+
+	memcpy(mlme.im_macaddr, wextmlme->addr.sa_data, IEEE80211_ADDR_LEN);
+
+	return ieee80211_ioctl_setmlme(dev, NULL, NULL, (char*)&mlme);
+}
+
+
+static int
+ieee80211_ioctl_giwgenie(struct net_device *dev,
+	struct iw_request_info *info, struct iw_point *out, char *buf)
+{
+	struct ieee80211vap *vap = dev->priv;
+
+	if (out->length < vap->iv_opt_ie_len)
+		return -E2BIG;
+
+	return ieee80211_ioctl_getoptie(dev, info, out, buf);
+}
+
+static int
+ieee80211_ioctl_siwgenie(struct net_device *dev,
+	struct iw_request_info *info, struct iw_point *erq, char *data)
+{
+	return ieee80211_ioctl_setoptie(dev, info, erq, data);
+}
+
+
+static int
+siwauth_wpa_version(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int ver = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_WPA;
+
+	if ((ver & IW_AUTH_WPA_VERSION_WPA) && (ver & IW_AUTH_WPA_VERSION_WPA2))
+		args[1] = 3;
+	else if (ver & IW_AUTH_WPA_VERSION_WPA2)
+		args[1] = 2;
+	else if (ver & IW_AUTH_WPA_VERSION_WPA)
+		args[1] = 1;
+	else
+		args[1] = 0;
+
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+static int
+iwcipher2ieee80211cipher(int iwciph)
+{
+	switch(iwciph) {
+	case IW_AUTH_CIPHER_NONE:
+		return IEEE80211_CIPHER_NONE;
+	case IW_AUTH_CIPHER_WEP40:
+	case IW_AUTH_CIPHER_WEP104:
+		return IEEE80211_CIPHER_WEP;
+	case IW_AUTH_CIPHER_TKIP:
+		return IEEE80211_CIPHER_TKIP;
+	case IW_AUTH_CIPHER_CCMP:
+		return IEEE80211_CIPHER_AES_CCM;
+	}
+	return -1;
+}
+
+static int
+ieee80211cipher2iwcipher(int ieee80211ciph)
+{
+	switch(ieee80211ciph) {
+	case IEEE80211_CIPHER_NONE:
+		return IW_AUTH_CIPHER_NONE;
+	case IEEE80211_CIPHER_WEP:
+		return IW_AUTH_CIPHER_WEP104;
+	case IEEE80211_CIPHER_TKIP:
+		return IW_AUTH_CIPHER_TKIP;
+	case IEEE80211_CIPHER_AES_CCM:
+		return IW_AUTH_CIPHER_CCMP;
+	}
+	return -1;
+}
+
+/* TODO We don't enforce wep key lengths. */
+static int
+siwauth_cipher_pairwise(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int iwciph = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_UCASTCIPHER;
+	args[1] = iwcipher2ieee80211cipher(iwciph);
+	if (args[1] < 0) {
+		printk(KERN_WARNING "%s: unknown pairwise cipher %d\n", 
+		       dev->name, iwciph);
+		return -EINVAL;
+	}
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+/* TODO We don't enforce wep key lengths. */
+static int
+siwauth_cipher_group(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int iwciph = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_MCASTCIPHER;
+	args[1] = iwcipher2ieee80211cipher(iwciph);
+	if (args[1] < 0) {
+		printk(KERN_WARNING "%s: unknown group cipher %d\n", 
+		       dev->name, iwciph);
+		return -EINVAL;
+	}
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+static int
+siwauth_key_mgmt(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int iwkm = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_KEYMGTALGS;
+	args[1] = WPA_ASE_NONE;
+	if (iwkm & IW_AUTH_KEY_MGMT_802_1X) 
+		args[1] |= WPA_ASE_8021X_UNSPEC;
+	if (iwkm & IW_AUTH_KEY_MGMT_PSK)
+		args[1] |= WPA_ASE_8021X_PSK;
+
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+static int
+siwauth_tkip_countermeasures(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int args[2];
+	args[0] = IEEE80211_PARAM_COUNTERMEASURES;
+	args[1] = erq->value;
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+static int
+siwauth_drop_unencrypted(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int args[2];
+	args[0] = IEEE80211_PARAM_DROPUNENCRYPTED;
+	args[1] = erq->value;
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+
+static int
+siwauth_80211_auth_alg(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+#define VALID_ALGS_MASK (IW_AUTH_ALG_OPEN_SYSTEM|IW_AUTH_ALG_SHARED_KEY|IW_AUTH_ALG_LEAP)
+	int mode = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_AUTHMODE;
+
+	if (mode & ~VALID_ALGS_MASK) {
+		return -EINVAL;
+	}
+	if (mode & IW_AUTH_ALG_LEAP) {
+		args[1] = IEEE80211_AUTH_8021X;
+	} else if ((mode & IW_AUTH_ALG_SHARED_KEY) &&
+		   (mode & IW_AUTH_ALG_OPEN_SYSTEM)) {
+		args[1] = IEEE80211_AUTH_AUTO;
+	} else if (mode & IW_AUTH_ALG_SHARED_KEY) {
+		args[1] = IEEE80211_AUTH_SHARED;
+	} else {
+		args[1] = IEEE80211_AUTH_OPEN;
+	}
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+#undef VALID_ALGS_MASK
+}
+
+static int
+siwauth_wpa_enabled(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int enabled = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_WPA;
+	if (enabled) 
+		args[1] = 3; /* enable WPA1 and WPA2 */
+	else
+		args[1] = 0; /* disable WPA1 and WPA2 */
+
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+/*
+ * The wext API says that user space gets to decide whether EAPOL frames are 
+ * supposed to be encrypted or in cleartext.  The code in WPA supplicant 
+ * indicates that if the AP is using 802.1x authentication but not WPA for
+ * key mgmt the eapol frames should be encrypted.  However, even if I set
+ * up my AP (linkys WRT54G, fw 1.00.2) for that config, it sends eapol frames 
+ * in the clear.  I'm uncertain whether my AP is violating the specification, 
+ * or if wpa_supplicant is doing the wrong thing.  But if I let wpa_supplicant
+ * tell madwifi to drop unencrypted eapol frames, it breaks the authentication.
+ *
+ * Thus, madwifi ignores this parameter.
+ */
+static int
+siwauth_rx_unencrypted_eapol(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	return -EOPNOTSUPP;
+}
+
+static int
+siwauth_roaming_control(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int roam = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_ROAMING;
+	switch(roam) {
+	case IW_AUTH_ROAMING_ENABLE:
+		args[1] = IEEE80211_ROAMING_AUTO;
+		break;
+	case IW_AUTH_ROAMING_DISABLE:
+		args[1] = IEEE80211_ROAMING_MANUAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+static int
+siwauth_privacy_invoked(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int args[2];
+	args[0] = IEEE80211_PARAM_PRIVACY;
+	args[1] = erq->value;
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
+}
+
+/* 
+ * If this function is invoked it means someone is using the wireless extensions
+ * API instead of the private madwifi ioctls.  That's fine.  We translate their
+ * request into the format used by the private ioctls.  Note that the 
+ * iw_request_info and iw_param structures are not the same ones as the 
+ * private ioctl handler expects.  Luckily, the private ioctl handler doesn't
+ * do anything with those at the moment.  We pass NULL for those, because in 
+ * case someone does modify the ioctl handler to use those values, a null 
+ * pointer will be easier to debug than other bad behavior.
+ */
+static int
+ieee80211_ioctl_siwauth(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int rc = -EINVAL;
+
+	switch(erq->flags & IW_AUTH_INDEX) {
+	case IW_AUTH_WPA_VERSION:
+		rc = siwauth_wpa_version(dev, info, erq, buf);
+		break;
+	case IW_AUTH_CIPHER_PAIRWISE:
+		rc = siwauth_cipher_pairwise(dev, info, erq, buf);
+		break;
+	case IW_AUTH_CIPHER_GROUP:
+		rc = siwauth_cipher_group(dev, info, erq, buf);
+		break;
+	case IW_AUTH_KEY_MGMT:
+		rc = siwauth_key_mgmt(dev, info, erq, buf);
+		break;
+	case IW_AUTH_TKIP_COUNTERMEASURES:
+		rc = siwauth_tkip_countermeasures(dev, info, erq, buf);
+		break;
+	case IW_AUTH_DROP_UNENCRYPTED:
+		rc = siwauth_drop_unencrypted(dev, info, erq, buf);
+		break;
+	case IW_AUTH_80211_AUTH_ALG:
+		rc = siwauth_80211_auth_alg(dev, info, erq, buf);
+		break;
+	case IW_AUTH_WPA_ENABLED:
+		rc = siwauth_wpa_enabled(dev, info, erq, buf);
+		break;
+	case IW_AUTH_RX_UNENCRYPTED_EAPOL:
+		rc = siwauth_rx_unencrypted_eapol(dev, info, erq, buf);
+		break;
+	case IW_AUTH_ROAMING_CONTROL:
+		rc = siwauth_roaming_control(dev, info, erq, buf);
+		break;
+	case IW_AUTH_PRIVACY_INVOKED:
+		rc = siwauth_privacy_invoked(dev, info, erq, buf);
+		break;
+	default:
+		printk(KERN_WARNING "%s: unknown SIOCSIWAUTH flag %d\n",
+			dev->name, erq->flags);
+		break;
+	}
+
+	return rc;
+}
+
+static int
+giwauth_wpa_version(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int ver;
+	int rc;
+	int arg = IEEE80211_PARAM_WPA;
+
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+
+	switch(arg) {
+	case 1:
+	    	ver = IW_AUTH_WPA_VERSION_WPA;
+		break;
+	case 2:
+	    	ver = IW_AUTH_WPA_VERSION_WPA2;
+		break;
+	case 3:
+	    	ver = IW_AUTH_WPA_VERSION|IW_AUTH_WPA_VERSION_WPA2;
+		break;
+	default:
+		ver = IW_AUTH_WPA_VERSION_DISABLED;
+		break;
+	}
+
+	erq->value = ver;
+	return rc;
+}
+
+static int
+giwauth_cipher_pairwise(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int rc;
+	int arg = IEEE80211_PARAM_UCASTCIPHER;
+
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+
+	erq->value = ieee80211cipher2iwcipher(arg);
+	if (erq->value < 0)
+		return -EINVAL;
+	return 0;
+}
+
+
+static int
+giwauth_cipher_group(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int rc;
+	int arg = IEEE80211_PARAM_MCASTCIPHER;
+
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+
+	erq->value = ieee80211cipher2iwcipher(arg);
+	if (erq->value < 0)
+		return -EINVAL;
+	return 0;
+}
+
+static int
+giwauth_key_mgmt(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int arg;
+	int rc;
+
+	arg = IEEE80211_PARAM_KEYMGTALGS;
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc) 
+		return rc;
+	erq->value = 0;
+	if (arg & WPA_ASE_8021X_UNSPEC)
+		erq->value |= IW_AUTH_KEY_MGMT_802_1X;
+	if (arg & WPA_ASE_8021X_PSK)
+		erq->value |= IW_AUTH_KEY_MGMT_PSK;
+	return 0;
+}
+
+static int
+giwauth_tkip_countermeasures(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int arg;
+	int rc;
+
+	arg = IEEE80211_PARAM_COUNTERMEASURES;
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc) 
+		return rc;
+	erq->value = arg;
+	return 0;
+}
+
+static int
+giwauth_drop_unencrypted(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int arg;
+	int rc;
+	arg = IEEE80211_PARAM_DROPUNENCRYPTED;
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+	erq->value = arg;
+	return 0;
+}
+
+static int
+giwauth_80211_auth_alg(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int arg;
+	int rc;
+
+	arg = IEEE80211_PARAM_AUTHMODE;
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+
+	switch(arg) {
+	case IEEE80211_AUTH_NONE:
+	case IEEE80211_AUTH_OPEN:
+		erq->value = IW_AUTH_ALG_OPEN_SYSTEM;
+		break;
+	case IEEE80211_AUTH_SHARED:
+		erq->value = IW_AUTH_ALG_SHARED_KEY;
+		break;
+	case IEEE80211_AUTH_8021X:
+		erq->value = IW_AUTH_ALG_LEAP;
+		break;
+	case IEEE80211_AUTH_WPA:
+		erq->value = IW_AUTH_ALG_LEAP|IW_AUTH_ALG_SHARED_KEY;
+		break;
+	case IEEE80211_AUTH_AUTO:
+	default:
+		erq->value = IW_AUTH_ALG_SHARED_KEY|IW_AUTH_ALG_OPEN_SYSTEM|IW_AUTH_ALG_LEAP;
+		break;
+	}
+	return 0;
+}
+
+static int
+giwauth_wpa_enabled(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int rc;
+	int arg = IEEE80211_PARAM_WPA;
+
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+
+	erq->value = arg;
+	return 0;
+
+}
+
+static int
+giwauth_rx_unencrypted_eapol(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	return -EOPNOTSUPP;
+}
+
+static int
+giwauth_roaming_control(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int rc;
+	int arg;
+
+	arg = IEEE80211_PARAM_ROAMING;
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+
+	switch(arg) {
+	case IEEE80211_ROAMING_DEVICE:
+	case IEEE80211_ROAMING_AUTO:
+		erq->value = IW_AUTH_ROAMING_ENABLE;
+		break;
+	default:
+		erq->value = IW_AUTH_ROAMING_DISABLE;
+		break;
+	}
+
+	return 0;
+}
+
+static int
+giwauth_privacy_invoked(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int rc;
+	int arg;
+	arg = IEEE80211_PARAM_PRIVACY;
+	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
+	if (rc)
+		return rc;
+	erq->value = arg;
+	return 0;
+}
+
+static int
+ieee80211_ioctl_giwauth(struct net_device *dev,
+	struct iw_request_info *info, struct iw_param *erq, char *buf)
+{
+	int rc = -EOPNOTSUPP;
+
+	switch(erq->flags & IW_AUTH_INDEX) {
+	case IW_AUTH_WPA_VERSION:
+		rc = giwauth_wpa_version(dev, info, erq, buf);
+		break;
+	case IW_AUTH_CIPHER_PAIRWISE:
+		rc = giwauth_cipher_pairwise(dev, info, erq, buf);
+		break;
+	case IW_AUTH_CIPHER_GROUP:
+		rc = giwauth_cipher_group(dev, info, erq, buf);
+		break;
+	case IW_AUTH_KEY_MGMT:
+		rc = giwauth_key_mgmt(dev, info, erq, buf);
+		break;
+	case IW_AUTH_TKIP_COUNTERMEASURES:
+		rc = giwauth_tkip_countermeasures(dev, info, erq, buf);
+		break;
+	case IW_AUTH_DROP_UNENCRYPTED:
+		rc = giwauth_drop_unencrypted(dev, info, erq, buf);
+		break;
+	case IW_AUTH_80211_AUTH_ALG:
+		rc = giwauth_80211_auth_alg(dev, info, erq, buf);
+		break;
+	case IW_AUTH_WPA_ENABLED:
+		rc = giwauth_wpa_enabled(dev, info, erq, buf);
+		break;
+	case IW_AUTH_RX_UNENCRYPTED_EAPOL:
+		rc = giwauth_rx_unencrypted_eapol(dev, info, erq, buf);
+		break;
+	case IW_AUTH_ROAMING_CONTROL:
+		rc = giwauth_roaming_control(dev, info, erq, buf);
+		break;
+	case IW_AUTH_PRIVACY_INVOKED:
+		rc = giwauth_privacy_invoked(dev, info, erq, buf);
+		break;
+	default:
+		printk(KERN_WARNING "%s: unknown SIOCGIWAUTH flag %d\n",
+			dev->name, erq->flags);
+		break;
+	}
+
+	return rc;
+}
+
+/*
+ * Retrieve information about a key.  Open question: should we allow
+ * callers to retrieve unicast keys based on a supplied MAC address?
+ * The ipw2200 reference implementation doesn't, so we don't either.
+ */
+static int
+ieee80211_ioctl_giwencodeext(struct net_device *dev, 
+	struct iw_request_info *info, struct iw_point *erq, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct iw_encode_ext *ext;
+	struct ieee80211_key *wk;
+	int error;
+	int kid;
+	int max_key_len;
+	
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	max_key_len = erq->length - sizeof(*ext);
+	if (max_key_len < 0) 
+		return -EINVAL;
+	ext = (struct iw_encode_ext *)extra;
+
+	error = getiwkeyix(vap, erq, &kid);
+	if (error)
+		return -error;
+
+	wk = &vap->iv_nw_keys[kid];
+	if (wk->wk_keylen > max_key_len)
+		return -E2BIG;
+
+	erq->flags = kid+1;
+	memset(ext, 0, sizeof(*ext));
+
+	ext->key_len = wk->wk_keylen;
+	memcpy(ext->key, wk->wk_key, wk->wk_keylen);
+
+	/* flags */
+	if (wk->wk_flags & IEEE80211_KEY_GROUP)
+		ext->ext_flags |= IW_ENCODE_EXT_GROUP_KEY;
+
+	/* algorithm */
+	switch(wk->wk_cipher->ic_cipher) {
+	case IEEE80211_CIPHER_NONE:
+		ext->alg = IW_ENCODE_ALG_NONE;
+		erq->flags |= IW_ENCODE_DISABLED;
+		break;
+	case IEEE80211_CIPHER_WEP:
+		ext->alg = IW_ENCODE_ALG_WEP;
+		break;
+	case IEEE80211_CIPHER_TKIP:
+		ext->alg = IW_ENCODE_ALG_TKIP;
+		break;
+	case IEEE80211_CIPHER_AES_OCB:
+	case IEEE80211_CIPHER_AES_CCM:
+	case IEEE80211_CIPHER_CKIP:
+		ext->alg = IW_ENCODE_ALG_CCMP;
+		break;
+	default:
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int
+ieee80211_ioctl_siwencodeext(struct net_device *dev,
+	struct iw_request_info *info, struct iw_point *erq, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct iw_encode_ext *ext = (struct iw_encode_ext *)extra;
+	struct ieee80211req_key kr;
+	int error;
+	int kid;
+	error = getiwkeyix(vap, erq, &kid);
+	if (error)
+		return -error;
+
+	if (ext->key_len > (erq->length - sizeof(struct iw_encode_ext)))
+	   	return -EINVAL;
+
+	if (ext->alg == IW_ENCODE_ALG_NONE) {
+		/* convert to the format used by IEEE_80211_IOCTL_DELKEY */
+		struct ieee80211req_del_key dk;
+		
+		memset(&dk, 0, sizeof(dk));
+		dk.idk_keyix = kid;
+		memcpy(&dk.idk_macaddr, ext->addr.sa_data, IEEE80211_ADDR_LEN);
+
+		return ieee80211_ioctl_delkey(dev, NULL, NULL, (char*)&dk);
+	}
+
+	/* TODO This memcmp for the broadcast address seems hackish, but
+	 * mimics what wpa supplicant was doing.  The wpa supplicant comments
+	 * make it sound like they were having trouble with 
+	 * IEEE80211_IOCTL_SETKEY and static WEP keys.  It might be worth
+	 * figuring out what their trouble was so the rest of this function
+	 * can be implemented in terms of ieee80211_ioctl_setkey */
+	if (ext->alg == IW_ENCODE_ALG_WEP &&
+	    memcmp(ext->addr.sa_data, "\xff\xff\xff\xff\xff\xff", 
+		   IEEE80211_ADDR_LEN) == 0) {
+		/* convert to the format used by SIOCSIWENCODE.  The old
+		 * format just had the key in the extra buf, whereas the
+		 * new format has the key tacked on to the end of the
+		 * iw_encode_ext structure */
+		struct iw_request_info oldinfo;
+		struct iw_point olderq;
+		char *key;
+
+		memset(&oldinfo, 0, sizeof(oldinfo));
+		oldinfo.cmd = SIOCSIWENCODE;
+		oldinfo.flags = info->flags;
+
+		memset(&olderq, 0, sizeof(olderq));
+		olderq.flags = erq->flags;
+		olderq.pointer = ext->key;
+		olderq.length = ext->key_len;
+
+		key = ext->key;
+
+		return ieee80211_ioctl_siwencode(dev, &oldinfo, &olderq, key);
+	}
+
+	/* convert to the format used by IEEE_80211_IOCTL_SETKEY */
+	memset(&kr, 0, sizeof(kr));
+
+	switch(ext->alg) {
+	case IW_ENCODE_ALG_WEP:
+		kr.ik_type = IEEE80211_CIPHER_WEP;
+		break;
+	case IW_ENCODE_ALG_TKIP:
+		kr.ik_type = IEEE80211_CIPHER_TKIP;
+		break;
+	case IW_ENCODE_ALG_CCMP:
+		kr.ik_type = IEEE80211_CIPHER_AES_CCM;
+		break;
+	default:
+		printk(KERN_WARNING "%s: unknown algorithm %d\n",
+		       dev->name, ext->alg);
+		return -EINVAL;
+	}
+
+	kr.ik_keyix = kid;
+
+	if (ext->key_len > sizeof(kr.ik_keydata)) {
+		printk(KERN_WARNING "%s: key size %d is too large\n",
+		       dev->name, ext->key_len);
+		return -E2BIG;
+	}
+	memcpy(kr.ik_keydata, ext->key, ext->key_len);
+	kr.ik_keylen = ext->key_len;
+
+	kr.ik_flags = IEEE80211_KEY_RECV;
+
+	if (ext->ext_flags & IW_ENCODE_EXT_GROUP_KEY)
+		kr.ik_flags |= IEEE80211_KEY_GROUP;
+
+	if (ext->ext_flags & IW_ENCODE_EXT_SET_TX_KEY) {
+		kr.ik_flags |= IEEE80211_KEY_XMIT | IEEE80211_KEY_DEFAULT;
+		memcpy(kr.ik_macaddr, ext->addr.sa_data, IEEE80211_ADDR_LEN);
+	}
+
+	if (ext->ext_flags & IW_ENCODE_EXT_RX_SEQ_VALID) {
+		memcpy(&kr.ik_keyrsc, ext->rx_seq, sizeof(kr.ik_keyrsc));
+	}
+
+	return ieee80211_ioctl_setkey(dev, NULL, NULL, (char*)&kr);
+}
+#endif /* WIRELESS_EXT >= 18 */
+
 #define	IW_PRIV_TYPE_OPTIE	IW_PRIV_TYPE_BYTE | IEEE80211_MAX_OPT_IE
 #define	IW_PRIV_TYPE_KEY \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_key)
@@ -3956,7 +4714,11 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) NULL,				/* -- hole -- */
 	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
 	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
+#ifdef SIOCSIWMLME
+	(iw_handler) ieee80211_ioctl_siwmlme,		/* SIOCSIWMLME */
+#else
 	(iw_handler) NULL,				/* -- hole -- */
+#endif
 	(iw_handler) ieee80211_ioctl_iwaplist,		/* SIOCGIWAPLIST */
 #ifdef SIOCGIWSCAN
 	(iw_handler) ieee80211_ioctl_siwscan,		/* SIOCSIWSCAN */
@@ -3985,6 +4747,16 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) ieee80211_ioctl_giwencode,		/* SIOCGIWENCODE */
 	(iw_handler) ieee80211_ioctl_siwpower,		/* SIOCSIWPOWER */
 	(iw_handler) ieee80211_ioctl_giwpower,		/* SIOCGIWPOWER */
+	(iw_handler) NULL,				/* -- hole -- */
+	(iw_handler) NULL,				/* -- hole -- */
+#if WIRELESS_EXT >= 18
+	(iw_handler) ieee80211_ioctl_siwgenie,		/* SIOCSIWGENIE */
+	(iw_handler) ieee80211_ioctl_giwgenie,		/* SIOCGIWGENIE */
+	(iw_handler) ieee80211_ioctl_siwauth,		/* SIOCSIWAUTH */
+	(iw_handler) ieee80211_ioctl_giwauth,		/* SIOCGIWAUTH */
+	(iw_handler) ieee80211_ioctl_siwencodeext,	/* SIOCSIWENCODEEXT */
+	(iw_handler) ieee80211_ioctl_giwencodeext,	/* SIOCGIWENCODEEXT */
+#endif /* WIRELESS_EXT >= 18 */
 };
 static const iw_handler ieee80211_priv_handlers[] = {
 	(iw_handler) ieee80211_ioctl_setparam,		/* SIOCIWFIRSTPRIV+0 */
@@ -4239,4 +5011,5 @@ ieee80211_ioctl_vdetach(struct ieee80211vap *vap)
 	if ((vap->iv_unit != -1) && isset(wlan_units, vap->iv_unit))
 		ieee80211_delete_wlanunit(vap->iv_unit);
 }
+
 #endif /* CONFIG_NET_WIRELESS */
