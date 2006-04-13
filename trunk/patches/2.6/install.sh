@@ -121,6 +121,6 @@ MKDIR ${DST_NET80211}/compat/sys
 INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
 
 grep -q 'ath/Kconfig' ${WIRELESS}/Kconfig || \
-	PATCH ${WIRELESS}/Kconfig Kconfig.patch
+	cat Kconfig.ath >> ${WIRELESS}/Kconfig
 grep -q '_ath_hal' ${WIRELESS}/Makefile || \
-	PATCH ${WIRELESS}/Makefile Makefile.patch
+	cat Makefile.ath >> ${WIRELESS}/Makefile
