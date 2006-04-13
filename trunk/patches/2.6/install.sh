@@ -63,6 +63,7 @@ DST_ATH=${WIRELESS}/ath
 MKDIR ${DST_ATH}
 echo "Copy ath driver bits..."
 FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
+make -C ${DEPTH} svnversion.h
 INSTALL ${DST_ATH} ${FILES} ${DEPTH}/svnversion.h
 INSTALL ${DST_ATH} ${SRC_ATH}/Kconfig
 INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
