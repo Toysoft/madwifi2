@@ -61,14 +61,19 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 
 -include $(TOPDIR)/Rules.make
 
-all:	ah_osdep.c hal.o opt_ah.h
+all:	ah_osdep.c hal.obj opt_ah.h
+	echo "" > hal.c
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
+	cp -f hal.obj hal.o
+	touch hal.o
+	rm -f ath_hal.ko ath_hal.o ath_hal.mod.c ath_hal.mod.o
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
 ah_osdep.c: opt_ah.h
 	cp -f ${HAL}/${OS}/ah_osdep.c ah_osdep.c
 
-$(obj)/hal.o:
-	${UUDECODE} ${HAL}/public/${TARGET}.hal.o.uu
+$(obj)/hal.obj:
+	${UUDECODE} -o $@ ${HAL}/public/${TARGET}.hal.o.uu
 
 opt_ah.h: ${HAL}/public/${TARGET}.opt_ah.h
 	cp -f ${HAL}/public/${TARGET}.opt_ah.h opt_ah.h
@@ -79,11 +84,11 @@ install:
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f *~ *.o *.ko *.mod.c hal.c
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 	-rm -rf .tmp_versions
 # remove the files we copied to this dir
-	-rm -f ah_osdep.c opt_ah.h hal.o
+	-rm -f ah_osdep.c opt_ah.h hal.obj
 
 ath_hal.o: ${ath_hal-objs}
 	$(LD) $(LDOPTS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)
