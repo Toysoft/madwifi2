@@ -97,7 +97,8 @@ main(int argc, char *argv[])
 {
 	const char *ifname, *cmd;
 
-	if (argc < 2)
+	if (argc < 2 ||
+	  strncmp(argv[1],"-h",2) == 0 || strncmp(argv[1],"--h",3) == 0)
 		usage();
 
 	ifname = argv[1];
@@ -168,6 +169,8 @@ main(int argc, char *argv[])
 				list_capabilities(ifname);
 			else if (streq(arg, "wme"))
 				list_wme(ifname);
+			else
+				err(1, "unknown 'list' option: %s", arg);
 		} else				/* NB: for compatibility */
 			list_stations(ifname);
 	} else
@@ -504,7 +507,7 @@ list_stations(const char *ifname)
 		errx(1, "unable to get station information");
 	len = iwr.u.data.length;
 	if (len < sizeof(struct ieee80211req_sta_info))
-		return;
+		errx(1, "len < sizeof(struct ieee80211req_scan_result)");
 
 	printf("%-17.17s %4s %4s %4s %4s %4s %4s %6s %6s %4s %5s %3s %8s %8s\n",
 		"ADDR",
@@ -583,7 +586,7 @@ list_scan(const char *ifname)
 	if (len == -1)
 		errx(1, "unable to get scan results");
 	if (len < sizeof(struct ieee80211req_scan_result))
-		return;
+		errx(1, "len < sizeof(struct ieee80211req_scan_result)");
 
 	printf("%-14.14s  %-17.17s  %4s %4s  %-5s %3s %4s\n",
 		"SSID",
@@ -683,6 +686,12 @@ list_channels(const char *ifname, int allchans)
 static void
 list_keys(const char *ifname)
 {
+	char cmd[256];
+	puts("[list_keys not implemented (yet). Spawning iwlist...]");
+	strcpy(cmd,"iwlist ");
+	strcat(cmd,ifname);
+	strcat(cmd," key");
+	system(cmd);
 }
 
 #define	IEEE80211_C_BITS \
@@ -794,6 +803,11 @@ static void
 ieee80211_status(const char *ifname)
 {
 	/* XXX fill in */
+	char cmd[256];
+	puts("[status not implemented (yet). Spawning iwconfig...]");
+	strcpy(cmd,"iwconfig ");
+	strcat(cmd,ifname);
+	system(cmd);
 }
 
 static int
@@ -933,3 +947,4 @@ strlcat(char *dst, const char *src, size_t siz)
 
 	return(dlen + (s - src));	/* count does not include NUL */
 }
+
