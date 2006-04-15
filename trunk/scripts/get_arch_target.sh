@@ -9,7 +9,7 @@ report () {
 }
 
 test -r "$1" || report "" ""
-source "$1"
+. "$1"
 
 test "$CONFIG_X86_64" && report x86_64
 test "$CONFIG_X86" && report i386
