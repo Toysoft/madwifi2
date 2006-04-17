@@ -5737,7 +5737,6 @@ ath_grppoll_txq_setup(struct ath_softc *sc, int qtype, int period)
 	txq->axq_depth = 0;
 	txq->axq_totalqueued = 0;
 	txq->axq_intrcnt = 0;
-	txq->axq_linkbuf = NULL;
 	TAILQ_INIT(&txq->axq_stageq);
 	txq->axq_compbuf = compbuf;
 	txq->axq_compbufsz = compbufsz;
@@ -5984,7 +5983,6 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
-			txq->axq_linkbuf = NULL;
 			ATH_TXQ_UNLOCK(txq);
 			break;
 		}
@@ -6107,7 +6105,6 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 		txq->axq_depth = 0;
 		txq->axq_totalqueued = 0;
 		txq->axq_intrcnt = 0;
-		txq->axq_linkbuf = NULL;
 		TAILQ_INIT(&txq->axq_stageq);
 		txq->axq_compbuf = compbuf;
 		txq->axq_compbufsz = compbufsz;
@@ -7011,7 +7008,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
-			txq->axq_linkbuf = NULL;
 			if (uapsdq)
 				ATH_TXQ_UNLOCK_IRQ(txq);
 			else
@@ -7304,7 +7300,6 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
-			txq->axq_linkbuf = NULL;
 			ATH_TXQ_UNLOCK(txq);
 			break;
 		}

@@ -386,10 +386,6 @@ struct ath_txq {
 					 * should generate int on this txq.
 					 */
 	/*
-	 * State for patching up CTS when bursting.
-	 */
-	struct	ath_buf	*axq_linkbuf;	/* virtual addr of last buffer*/
-	/*
 	 * Staging queue for frames awaiting a fast-frame pairing.
 	 */
 	TAILQ_HEAD(axq_headtype, ath_buf) axq_stageq;
@@ -432,7 +428,6 @@ struct ath_vap {
 	STAILQ_INSERT_TAIL( &(_tq)->axq_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
 	(_tq)->axq_totalqueued++; \
-	(_tq)->axq_linkbuf = (_elm); \
 } while (0)
 #define ATH_TXQ_REMOVE_HEAD(_tq, _field) do { \
 	STAILQ_REMOVE_HEAD(&(_tq)->axq_q, _field); \
@@ -442,12 +437,10 @@ struct ath_vap {
 #define ATH_TXQ_MOVE_MCASTQ(_tqs,_tqd) do { \
 	(_tqd)->axq_depth += (_tqs)->axq_depth; \
 	(_tqd)->axq_totalqueued += (_tqs)->axq_totalqueued; \
-	(_tqd)->axq_linkbuf = (_tqs)->axq_linkbuf ; \
 	(_tqd)->axq_link = (_tqs)->axq_link; \
 	STAILQ_CONCAT(&(_tqd)->axq_q,&(_tqs)->axq_q); \
 	(_tqs)->axq_depth=0; \
 	(_tqs)->axq_totalqueued = 0; \
-	(_tqs)->axq_linkbuf = NULL; \
 	(_tqs)->axq_link = NULL; \
 } while (0)
 
