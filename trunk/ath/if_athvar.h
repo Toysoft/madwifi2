@@ -380,7 +380,7 @@ struct ath_txq {
 	STAILQ_HEAD(, ath_buf) axq_q;	/* transmit queue */
 	spinlock_t axq_lock;		/* lock on q and link */
 	unsigned long axq_lockflags;	/* intr state when must cli */
-	u_int axq_depth;			/* queue depth */
+	int axq_depth;			/* queue depth */
 	u_int32_t axq_totalqueued;	/* total ever queued */
 	u_int axq_intrcnt;		/* count to determine if descriptor
 					 * should generate int on this txq.
