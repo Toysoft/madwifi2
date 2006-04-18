@@ -41,10 +41,6 @@
 #
 DEPTH=	.
 
-# release tag versioning
--include $(KERNELPATH)/ath_version.mk
-export EXTRAVERSION
-
 include Makefile.inc
 
 # NB: the order is important here
@@ -95,10 +91,6 @@ uninstall:
 	sh scripts/find-madwifi-modules.sh $(DESTDIR)/lib/modules/$(KERNELRELEASE)
 	$(MAKE) -C ${TOOLS} uninstall
 
-FILES=	ath_hal COPYRIGHT ath include Makefile Makefile.inc \
-	README release.h share net80211 ath_rate
-HAL_TAG=ATH_HAL_20030802
-
 clean:
 	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i clean; \
@@ -129,14 +121,6 @@ info:
 sanitycheck:
 	@echo -n "Checking requirements... "
 	
-	@# check if kernel configuration file is available
-	@if [ ! -f $(KERNELCONF) ]; then \
-	    echo "FAILED"; \
-	    echo "'$(KERNELCONF)' not found."; \
-	    echo "You need to configure your kernel."; \
-	    exit 1; \
-	fi
-	
 	@# check if specified rate control is available
 	@if [ ! -d $(ATH_RATE) ]; then \
 	    echo "FAILED"; \
@@ -161,7 +145,7 @@ include $(KERNELCONF)
 configcheck: sanitycheck
 	@echo -n "Checking kernel configuration... "
 	
-	@# check version of kernel and wireless.h
+	@# check version of kernel
 	@echo $(KERNELRELEASE) | grep -q -i '^[2-9]\.[4-9]\.' || { \
 	    echo "FAILED"; \
 	    echo "Only kernel versions 2.4.x and above are supported."; \
@@ -175,11 +159,15 @@ configcheck: sanitycheck
 	    echo "Please enable sysctl support."; \
 	    exit 1; \
 	fi
+	
+	@# check wireless extensions support is enabled
 	@if [ -z "$(CONFIG_NET_RADIO)" ]; then \
 	    echo "FAILED"; \
 	    echo "Please enable wireless extensions."; \
 	    exit 1; \
 	fi
+	
+	@# check crypto support is enabled
 	@if [ -z "$(CONFIG_CRYPTO)" ]; then \
 	    echo "FAILED"; \
 	    echo "Please enable crypto API."; \
