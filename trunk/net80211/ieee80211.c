@@ -327,6 +327,8 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	TAILQ_INIT(&ic->ic_vaps);
 
 	ic->ic_txpowlimit = IEEE80211_TXPOWER_MAX;
+	ic->ic_txpowlimit = IEEE80211_TXPOWER_MIN;
+	ic->ic_newtxpowlimit = IEEE80211_TXPOWER_MAX;
 
 	ieee80211_crypto_attach(ic);
 	ieee80211_node_attach(ic);

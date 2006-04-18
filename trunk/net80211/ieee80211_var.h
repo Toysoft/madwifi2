@@ -53,7 +53,7 @@
 #include <net80211/ieee80211_proto.h>
 #include <net80211/ieee80211_scan.h>
 
-#define	IEEE80211_TXPOWER_MAX	100	/* .5 dbM (XXX units?) */
+#define	IEEE80211_TXPOWER_MAX	100	/* .5 dBm units */
 #define	IEEE80211_TXPOWER_MIN	0	/* kill radio */
 
 #define	IEEE80211_DTIM_MAX	15	/* max DTIM period */
@@ -135,7 +135,8 @@ struct ieee80211com {
 	u_int16_t ic_lintval;			/* beacon interval */
 	u_int16_t ic_holdover;			/* PM hold over duration */
 	u_int16_t ic_bmisstimeout;		/* beacon miss threshold (ms) */
-	u_int16_t ic_txpowlimit; 		/* global tx power limit */
+	u_int16_t ic_txpowlimit; 		/* global tx power limit (in 0.5 dBm) */
+	u_int16_t ic_newtxpowlimit; 		/* tx power limit to change to (in 0.5 dBm) */
 	u_int16_t ic_uapsdmaxtriggers; 		/* max triggers that could arrive */
 	u_int8_t ic_coverageclass; 		/* coverage class */
 

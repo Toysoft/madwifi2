@@ -119,7 +119,7 @@ struct ieee80211_node {
 	u_int16_t ni_ath_defkeyindex;		/* Atheros def key index */
 #define IEEE80211_INVAL_DEFKEY	0x7FFF
 	u_int16_t ni_associd;			/* assoc response */
-	u_int16_t ni_txpower;			/* current transmit power */
+	u_int16_t ni_txpower;			/* current transmit power (in 0.5 dBm) */
 	u_int16_t ni_vlan;			/* vlan tag */
 	u_int32_t *ni_challenge;			/* shared-key challenge */
 	u_int8_t *ni_wpa_ie;			/* captured WPA ie */

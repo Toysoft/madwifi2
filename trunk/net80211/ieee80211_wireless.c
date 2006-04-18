@@ -883,12 +883,22 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211_rateset *rs;
 	u_int8_t reported[IEEE80211_CHAN_BYTES];	/* XXX stack usage? */
 	int i, r;
+	int step = 0;
 
 	data->length = sizeof(struct iw_range);
 	memset(range, 0, sizeof(struct iw_range));
 
-	/* TODO: could fill num_txpower and txpower array with
-	 * something; however, there are 128 different values.. */
+	/* txpower (128 values, but will print out only IW_MAX_TXPOWER) */
+#if WIRELESS_EXT >= 10
+	range->num_txpower = (ic->ic_txpowlimit >= 8) ? IW_MAX_TXPOWER : ic->ic_txpowlimit;
+	step = ic->ic_txpowlimit / (2 * (IW_MAX_TXPOWER - 1));
+ 
+	range->txpower[0] = 0;
+	for (i = 1; i < IW_MAX_TXPOWER; i++)
+		range->txpower[i] = (ic->ic_txpowlimit/2)
+			- (IW_MAX_TXPOWER - i - 1) * step;
+#endif
+
 
 	range->txpower_capa = IW_TXPOW_DBM;
 
@@ -1253,15 +1263,6 @@ ieee80211_ioctl_giwretry(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
-#ifdef ATH_CAP_TPC
-static void
-set_node_txpower(void *arg, struct ieee80211_node *ni)
-{
-	struct iw_param *rrq = (struct iw_param *)arg;
-	ni->ni_txpower = 2*rrq->value;
-}
-#endif
-
 static int
 ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 	struct iw_param *rrq, char *extra)
@@ -1289,23 +1290,31 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 		if (rrq->flags != IW_TXPOW_DBM)
 			return -EOPNOTSUPP;
 		if (ic->ic_bsschan != IEEE80211_CHAN_ANYC) {
-			if (ic->ic_bsschan->ic_maxregpower >= rrq->value) {
-			        vap->iv_bss->ni_txpower = 2 * rrq->value;
+			if (ic->ic_bsschan->ic_maxregpower >= rrq->value &&
+			    ic->ic_txpowlimit/2 >= rrq->value) {
+ 			        vap->iv_bss->ni_txpower = 2 * rrq->value;
+				ic->ic_newtxpowlimit = 2 * rrq->value;
+ 				ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
+ 			} else
+				return -EINVAL;
+		} else {
+			/*
+			 * No channel set yet
+			 */
+			if (ic->ic_txpowlimit/2 >= rrq->value) {
+				vap->iv_bss->ni_txpower = 2 * rrq->value;
+				ic->ic_newtxpowlimit = 2 * rrq->value;
 				ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
-			} else
-				return -EOPNOTSUPP;
-		} else
-			return -EOPNOTSUPP;
+			}
+			else
+				return -EINVAL;
+		}
 	} else {
 		if (!fixed)		/* no change */
 			return 0;
 		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
 	}
 done:
-#ifdef ATH_CAP_TPC
-	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next)
-		ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, rrq);
-#endif
 	return IS_UP(ic->ic_dev) ? -ic->ic_reset(ic->ic_dev) : 0;
 }
 

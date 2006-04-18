@@ -8443,59 +8443,66 @@ ath_led_event(struct ath_softc *sc, int event)
 }
 
 static void
+set_node_txpower(void *arg, struct ieee80211_node *ni)
+{
+	int *value = (int *)arg;
+	ni->ni_txpower = *value;
+}
+
+/* XXX: this function needs some locking to avoid being called twice/interrupted */
+static void
 ath_update_txpow(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct net_device *dev = ic->ic_dev;
-	struct ieee80211vap *vap;
+	struct ieee80211vap *vap = NULL;
 	struct ath_hal *ah = sc->sc_ah;
-	u_int32_t txpow;
-#ifndef ATH_CAP_TPC
-	u_int32_t txpowlimit;
-#endif
+	u_int32_t txpowlimit = 0;
+	u_int32_t maxtxpowlimit = 9999;
+	u_int32_t clamped_txpow = 0;
+
+	/*
+	 * Find the maxtxpow of the card and regulatory constraints
+	 */
+	(void)ath_hal_getmaxtxpow(ah, &txpowlimit);
+	ath_hal_settxpowlimit(ah, maxtxpowlimit);
+	(void)ath_hal_getmaxtxpow(ah, &maxtxpowlimit);
+	ic->ic_txpowlimit = maxtxpowlimit;
+	ath_hal_settxpowlimit(ah, txpowlimit);
+ 	
+ 	/*
+	 * Make sure the VAP's change is within limits, clamp it otherwise
+ 	 */
+	if (ic->ic_newtxpowlimit > ic->ic_txpowlimit)
+		clamped_txpow = ic->ic_txpowlimit;
+	else
+		clamped_txpow = ic->ic_newtxpowlimit;
 	
 	/*
-	 * Search vap changing max tx power
-	 * and set max tx power limit
+	 * Search for the VAP that needs a txpow change, if any
 	 */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		if (ic->ic_txpowlimit != vap->iv_bss->ni_txpower) {
 #ifdef ATH_CAP_TPC
-			ic->ic_txpowlimit = vap->iv_bss->ni_txpower;
-#else
-			ath_hal_settxpowlimit(ah, vap->iv_bss->ni_txpower);
-#endif
-			break;
+		if (ic->ic_newtxpowlimit == vap->iv_bss->ni_txpower) {
+			vap->iv_bss->ni_txpower = clamped_txpow;
+			ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
 		}
-	}
-	
-	/*
-	 * Check and set max tx power limit.
-	 */
-	(void)ath_hal_getmaxtxpow(ah, &txpow);
-#ifdef ATH_CAP_TPC
-	if (ic->ic_txpowlimit > txpow)
-		ic->ic_txpowlimit = txpow;
-	txpow = sc->sc_curtxpow = ic->ic_txpowlimit;
 #else
-	(void)ath_hal_gettxpowlimit(ah, &txpowlimit);
-	if (txpow != txpowlimit) {
-		/*
-		 * Fix inconsistencies
-		 */
-		ath_hal_settxpowlimit(ah, txpow);
-		(void)ath_hal_gettxpowlimit(ah, &txpowlimit);
-		if (txpow != txpowlimit)
-			printk(KERN_ERR "%s: unable to set max tx power limit,"
-				"max=%d limit=%d\n", dev->name, txpow,
-				txpowlimit);
-	}
-	ic->ic_txpowlimit = sc->sc_curtxpow = txpow;
+		vap->iv_bss->ni_txpower = clamped_txpow;
+		ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
 #endif
-	/* XXX locking/move to net80211 */
-	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next)
-		vap->iv_bss->ni_txpower = txpow;
+	}
+ 	
+	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
+
+#ifdef ATH_CAP_TPC
+	if (ic->ic_newtxpowlimit >= ic->ic_txpowlimit)
+		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
+#else
+	if (ic->ic_newtxpowlimit != ic->ic_txpowlimit)
+		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
+#endif
 }
+ 
 
 #ifdef ATH_SUPERG_XR
 static int
