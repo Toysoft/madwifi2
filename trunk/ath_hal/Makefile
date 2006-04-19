@@ -62,7 +62,7 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 -include $(TOPDIR)/Rules.make
 
 all:	ah_osdep.c hal.obj opt_ah.h
-	echo "" > hal.c
+	cp -f halstub.c hal.c
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 	cp -f hal.obj hal.o
 	touch hal.o
