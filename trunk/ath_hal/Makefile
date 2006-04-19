@@ -62,11 +62,8 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 -include $(TOPDIR)/Rules.make
 
 all:	ah_osdep.c hal.obj opt_ah.h
-	cp -f halstub.c hal.c
-	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} hal.o
 	cp -f hal.obj hal.o
-	touch hal.o
-	rm -f ath_hal.ko ath_hal.o ath_hal.mod.c ath_hal.mod.o
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
 ah_osdep.c: opt_ah.h
@@ -84,7 +81,7 @@ install:
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	-rm -f *~ *.o *.ko *.mod.c hal.c
+	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 	-rm -rf .tmp_versions
 # remove the files we copied to this dir
