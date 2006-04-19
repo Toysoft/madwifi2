@@ -1871,7 +1871,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			frm = ieee80211_add_athAdvCap(frm, vap->iv_bss->ni_ath_flags,
 				vap->iv_bss->ni_ath_defkeyindex); 
 #ifdef ATH_SUPERG_XR
-		if (vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
+		if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
 			frm = ieee80211_add_xr_param(frm, vap);
 #endif
 		skb_trim(skb, frm - skb->data);

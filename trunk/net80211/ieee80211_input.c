@@ -969,7 +969,7 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 	 * device. XR vap has a net device which is not registered with
 	 * OS. 
 	 */
-	if (vap->iv_flags & IEEE80211_F_XR)
+	if (vap->iv_xrvap && vap->iv_flags & IEEE80211_F_XR)
 		dev = vap->iv_xrvap->iv_dev;
 #endif
 

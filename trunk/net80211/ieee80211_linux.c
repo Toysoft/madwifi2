@@ -196,7 +196,7 @@ ieee80211_notify_node_join(struct ieee80211_node *ni, int newassoc)
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 #ifdef ATH_SUPERG_XR
-		if (vap->iv_flags & IEEE80211_F_XR)
+		if (vap->iv_xrvap && vap->iv_flags & IEEE80211_F_XR)
 			dev = vap->iv_xrvap->iv_dev;
 #endif
 		wireless_send_event(dev, SIOCGIWAP, &wreq, NULL);
@@ -205,7 +205,7 @@ ieee80211_notify_node_join(struct ieee80211_node *ni, int newassoc)
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_macaddr);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 #ifdef ATH_SUPERG_XR
-		if (vap->iv_flags & IEEE80211_F_XR)
+		if (vap->iv_xrvap && vap->iv_flags & IEEE80211_F_XR)
 			dev = vap->iv_xrvap->iv_dev;
 #endif
 		wireless_send_event(dev, IWEVREGISTERED, &wreq, NULL);
