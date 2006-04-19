@@ -307,7 +307,7 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		 * device. XR vap has a net device which is not registered with
 		 * OS. 
 		 */
-		if (vap->iv_flags & IEEE80211_F_XR)
+		if (vap->iv_xrvap && vap->iv_flags & IEEE80211_F_XR)
 			skb->dev = vap->iv_xrvap->iv_dev;
 		else
 			skb->dev = vap->iv_dev;		/* XXX? unnecessary */

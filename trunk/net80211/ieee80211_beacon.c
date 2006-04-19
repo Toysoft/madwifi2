@@ -150,7 +150,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 			vap->iv_bss->ni_ath_defkeyindex);
 	bo->bo_xr = frm;
 #ifdef ATH_SUPERG_XR
-	if (vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
+	if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
 		frm = ieee80211_add_xr_param(frm, vap);
 #endif
 	bo->bo_tim_trailerlen = frm - bo->bo_tim_trailer;
