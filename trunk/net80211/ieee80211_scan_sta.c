@@ -161,9 +161,9 @@ sta_flush(struct ieee80211_scan_state *ss)
 {
 	struct sta_table *st = ss->ss_priv;
 
-	spin_lock_bh(&st->st_lock);
+	spin_lock(&st->st_lock);
 	sta_flush_table(st);
-	spin_unlock_bh(&st->st_lock);
+	spin_unlock(&st->st_lock);
 	ss->ss_last = 0;
 	return 0;
 }
@@ -213,7 +213,7 @@ sta_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 	int hash;
 
 	hash = STA_HASH(macaddr);
-	spin_lock_bh(&st->st_lock);  
+	spin_lock(&st->st_lock);  
 	LIST_FOREACH(se, &st->st_hash[hash], se_hash)
 		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr) &&
 		    sp->ssid[1] == se->base.se_ssid[1] && 
@@ -223,7 +223,7 @@ sta_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 	MALLOC(se, struct sta_entry *, sizeof(struct sta_entry),
 		M_80211_SCAN, M_NOWAIT | M_ZERO);
 	if (se == NULL) {
-		spin_unlock_bh(&st->st_lock);
+		spin_unlock(&st->st_lock);
 		return 0;
 	}
 	se->se_scangen = st->st_scangen-1;
@@ -285,7 +285,7 @@ found:
 	se->se_seen = 1;
 	se->se_notseen = 0;
 
-	spin_unlock_bh(&st->st_lock);
+	spin_unlock(&st->st_lock);
 
 	/*
 	 * If looking for a quick choice and nothing's
@@ -788,8 +788,9 @@ static void
 sta_update_notseen(struct sta_table *st)
 {
 	struct sta_entry *se;
+	unsigned long stlockflags;
 
-	spin_lock_bh(&st->st_lock);
+	spin_lock_irqsave(&st->st_lock, stlockflags);
 	TAILQ_FOREACH(se, &st->st_entry, se_list) {
 		/*
 		 * If seen then reset and don't bump the count;
@@ -803,19 +804,20 @@ sta_update_notseen(struct sta_table *st)
 		else
 			se->se_notseen++;
 	}
-	spin_unlock_bh(&st->st_lock);
+	spin_unlock_irqrestore(&st->st_lock, stlockflags);
 }
 
 static void
 sta_dec_fails(struct sta_table *st)
 {
 	struct sta_entry *se;
+	unsigned long stlockflags;
 
-	spin_lock_bh(&st->st_lock);
+	spin_lock_irqsave(&st->st_lock, stlockflags);
 	TAILQ_FOREACH(se, &st->st_entry, se_list)
 		if (se->se_fails)
 			se->se_fails--;
-	spin_unlock_bh(&st->st_lock);
+	spin_unlock_irqrestore(&st->st_lock, stlockflags);
 }
 
 static struct sta_entry *
@@ -823,10 +825,11 @@ select_bss(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 {
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *se, *selbs = NULL;
+	unsigned long stlockflags;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN | IEEE80211_MSG_ROAM, " %s\n",
 		"macaddr          bssid         chan  rssi  rate flag  wep  essid");
-	spin_lock_bh(&st->st_lock);
+	spin_lock_irqsave(&st->st_lock, stlockflags);
 	TAILQ_FOREACH(se, &st->st_entry, se_list) {
 		if (match_bss(vap, ss, se) == 0) {
 			if (selbs == NULL)
@@ -835,7 +838,7 @@ select_bss(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 				selbs = se;
 		}
 	}
-	spin_unlock_bh(&st->st_lock);
+	spin_unlock_irqrestore(&st->st_lock, stlockflags);
 
 	return selbs;
 }
@@ -1055,7 +1058,7 @@ sta_iterate(struct ieee80211_scan_state *ss,
 	struct sta_entry *se;
 	u_int gen;
 
-	spin_lock_bh(&st->st_scanlock);
+	spin_lock(&st->st_scanlock);
 	gen = st->st_scangen++;
 restart:
 	spin_lock(&st->st_lock);
@@ -1071,7 +1074,7 @@ restart:
 	}
 	spin_unlock(&st->st_lock);
 
-	spin_unlock_bh(&st->st_scanlock);
+	spin_unlock(&st->st_scanlock);
 }
 
 static void
@@ -1240,7 +1243,7 @@ adhoc_pick_channel(struct ieee80211_scan_state *ss)
 	bestchan = NULL;
 	bestrssi = -1;
 
-	spin_lock_bh(&st->st_lock);
+	spin_lock(&st->st_lock);
 	for (i = 0; i < ss->ss_last; i++) {
 		c = ss->ss_chans[i];
 		maxrssi = 0;
@@ -1253,7 +1256,7 @@ adhoc_pick_channel(struct ieee80211_scan_state *ss)
 		if (bestchan == NULL || maxrssi < bestrssi)
 			bestchan = c;
 	}
-	spin_unlock_bh(&st->st_lock);
+	spin_unlock(&st->st_lock);
 
 	return bestchan;
 }

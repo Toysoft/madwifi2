@@ -50,7 +50,7 @@ typedef unsigned long IEEE80211_TQUEUE_ARG;
 #else					/* immediate work queue */
 #define IEEE80211_TQ_STRUCT tq_struct
 #define IEEE80211_INIT_TQUEUE(a,b,c)		INIT_TQUEUE(a,b,c)
-#define IEEE80211_SCHEDULE_TQUEUE(a) do {
+#define IEEE80211_SCHEDULE_TQUEUE(a) do { \
 	int __macro_needmark;		\
 	__macro_needmark |= queue_task((a), &tq_immediate);	\
 	if (__macro_needmark)		\
@@ -67,6 +67,8 @@ typedef void *IEEE80211_TQUEUE_ARG;
 
 /*
  * Beacon handler locking definitions.
+ * Beacon locking 
+ * UAPSD locking 
  */
 typedef spinlock_t ieee80211com_lock_t;
 #define	IEEE80211_LOCK_INIT(_ic, _name)				\
@@ -78,8 +80,12 @@ typedef spinlock_t ieee80211com_lock_t;
 #define	IEEE80211_UNLOCK_IRQ(_ic)					\
 	spin_unlock_irqrestore(&(_ic)->ic_comlock, __ilockflags);	\
 } while (0)
-#define IEEE80211_LOCK(_ic)	spin_lock_bh(&(_ic)->ic_comlock)
-#define IEEE80211_UNLOCK(_ic)	spin_unlock_bh(&(_ic)->ic_comlock)
+#define	IEEE80211_UNLOCK_IRQ_EARLY(_ic)					\
+	spin_unlock_irqrestore(&(_ic)->ic_comlock, __ilockflags);
+#define IEEE80211_LOCK_BH(_ic)	spin_lock_bh(&(_ic)->ic_comlock)
+#define IEEE80211_UNLOCK_BH(_ic) spin_unlock_bh(&(_ic)->ic_comlock)
+#define IEEE80211_LOCK(_ic)	spin_lock(&(_ic)->ic_comlock)
+#define IEEE80211_UNLOCK(_ic)	spin_unlock(&(_ic)->ic_comlock)
 
 /* NB: beware, spin_is_locked() is unusable for !SMP */
 #if defined(CONFIG_SMP)
@@ -92,8 +98,18 @@ typedef spinlock_t ieee80211com_lock_t;
 #define IEEE80211_VAPS_LOCK_INIT(_ic, _name)		\
 	spin_lock_init(&(_ic)->ic_vapslock)
 #define IEEE80211_VAPS_LOCK_DESTROY(_ic)
-#define IEEE80211_VAPS_LOCK(_ic)	spin_lock_bh(&(_ic)->ic_vapslock);
-#define IEEE80211_VAPS_UNLOCK(_ic)	spin_unlock_bh(&(_ic)->ic_vapslock);
+#define IEEE80211_VAPS_LOCK(_ic)	spin_lock(&(_ic)->ic_vapslock);
+#define IEEE80211_VAPS_UNLOCK(_ic)	spin_unlock(&(_ic)->ic_vapslock);
+#define IEEE80211_VAPS_LOCK_BH(_ic)	spin_lock_bh(&(_ic)->ic_vapslock);
+#define IEEE80211_VAPS_UNLOCK_BH(_ic)	spin_unlock_bh(&(_ic)->ic_vapslock);
+#define IEEE80211_VAPS_LOCK_IRQ(_ic)	do {	\
+	int _vaps_lockflags;			\
+	spin_lock_irqsave(&(_ic)->ic_vapslock, _vaps_lockflags);
+#define IEEE80211_VAPS_UNLOCK_IRQ(_ic)	\
+	spin_unlock_irqrestore(&(_ic)->ic_vapslock, _vaps_lockflags); \
+} while (0)
+#define IEEE80211_VAPS_UNLOCK_IRQ_EARLY(_ic)	spin_unlock_irqrestore(&(_ic)->ic_vapslock, _vaps_lockflags)
+
 
 /* NB: beware, spin_is_locked() is unusable for !SMP */
 #if defined(CONFIG_SMP)
@@ -103,34 +119,30 @@ typedef spinlock_t ieee80211com_lock_t;
 #define IEEE80211_VAPS_LOCK_ASSERT(_ic)
 #endif
 
-/*
- * Beacon locking definitions; piggyback on com lock.
- */
-#define	IEEE80211_BEACON_LOCK(_ic)	   IEEE80211_LOCK_IRQ(_ic)
-#define	IEEE80211_BEACON_UNLOCK(_ic)	   IEEE80211_UNLOCK_IRQ(_ic)
-#define	IEEE80211_BEACON_LOCK_ASSERT(_ic)  IEEE80211_LOCK_ASSERT(_ic)
-
-/*
- * UAPSD locking definitions; piggyback on com lock.
- */
-#define	IEEE80211_UAPSD_LOCK(_ic)	   IEEE80211_LOCK_IRQ(_ic)
-#define	IEEE80211_UAPSD_UNLOCK(_ic)	   IEEE80211_UNLOCK_IRQ(_ic)
-#define	IEEE80211_UAPSD_LOCK_ASSERT(_ic)   IEEE80211_LOCK_ASSERT(_ic)
 
 /*
  * Node locking definitions.
  */
-typedef rwlock_t ieee80211_node_lock_t;
-#define	IEEE80211_NODE_LOCK_INIT(_nt, _name)	rwlock_init(&(_nt)->nt_nodelock)
+typedef spinlock_t ieee80211_node_lock_t;
+#define	IEEE80211_NODE_LOCK_INIT(_nt, _name)	spin_lock_init(&(_nt)->nt_nodelock)
 #define	IEEE80211_NODE_LOCK_DESTROY(_nt)
-#define	IEEE80211_NODE_LOCK(_nt)	write_lock(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_UNLOCK(_nt)	write_unlock(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_LOCK_BH(_nt)	write_lock_bh(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_UNLOCK_BH(_nt)	write_unlock_bh(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_LOCK(_nt)	spin_lock(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_UNLOCK(_nt)	spin_unlock(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_LOCK_BH(_nt)	spin_lock_bh(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_UNLOCK_BH(_nt)	spin_unlock_bh(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_LOCK_IRQ(_nt)	do {	\
+	unsigned long __node_lockflags;		\
+	spin_lock_irqsave(&(_nt)->nt_nodelock, __node_lockflags);
+#define	IEEE80211_NODE_UNLOCK_IRQ(_nt)		\
+	spin_unlock_irqrestore(&(_nt)->nt_nodelock, __node_lockflags); \
+} while(0)
+#define	IEEE80211_NODE_UNLOCK_IRQ_EARLY(_nt)		\
+	spin_unlock_irqrestore(&(_nt)->nt_nodelock, __node_lockflags);
+
 /* NB: beware, *_is_locked() are bogusly defined for UP+!PREEMPT */
-#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(rwlock_is_locked)
+#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(spinlock_is_locked)
 #define	IEEE80211_NODE_LOCK_ASSERT(_nt) \
-	KASSERT(rwlock_is_locked(&(_nt)->nt_nodelock), \
+	KASSERT(spinlock_is_locked(&(_nt)->nt_nodelock), \
 		("802.11 node table not locked!"))
 #else
 #define	IEEE80211_NODE_LOCK_ASSERT(_nt)
@@ -144,6 +156,15 @@ typedef spinlock_t ieee80211_scan_lock_t;
 #define	IEEE80211_SCAN_LOCK_DESTROY(_nt)
 #define	IEEE80211_SCAN_LOCK_BH(_nt)	spin_lock_bh(&(_nt)->nt_scanlock)
 #define	IEEE80211_SCAN_UNLOCK_BH(_nt)	spin_unlock_bh(&(_nt)->nt_scanlock)
+#define	IEEE80211_SCAN_LOCK_IRQ(_nt)	do {	\
+	unsigned long __scan_lockflags;		\
+	spin_lock_irqsave(&(_nt)->nt_scanlock, __scan_lockflags);
+#define	IEEE80211_SCAN_UNLOCK_IRQ(_nt)		\
+	spin_unlock_irqrestore(&(_nt)->nt_scanlock, __scan_lockflags); \
+} while (0)
+#define	IEEE80211_SCAN_UNLOCK_IRQ_EARLY(_nt)		\
+	spin_unlock_irqrestore(&(_nt)->nt_scanlock, __scan_lockflags);
+
 /* NB: beware, spin_is_locked() is unusable for !SMP */
 #if defined(CONFIG_SMP)
 #define	IEEE80211_SCAN_LOCK_ASSERT(_nt) \
@@ -158,8 +179,11 @@ typedef spinlock_t ieee80211_scan_lock_t;
 typedef spinlock_t acl_lock_t;
 #define	ACL_LOCK_INIT(_as, _name)	spin_lock_init(&(_as)->as_lock)
 #define	ACL_LOCK_DESTROY(_as)
-#define	ACL_LOCK(_as)			spin_lock_bh(&(_as)->as_lock)
-#define	ACL_UNLOCK(_as)			spin_unlock_bh(&(_as)->as_lock)
+#define	ACL_LOCK(_as)			spin_lock(&(_as)->as_lock)
+#define	ACL_UNLOCK(_as)			spin_unlock(&(_as)->as_lock)
+#define	ACL_LOCK_BH(_as)		spin_lock_bh(&(_as)->as_lock)
+#define	ACL_UNLOCK_BH(_as)		spin_unlock_bh(&(_as)->as_lock)
+
 /* NB: beware, spin_is_locked() is unusable for !SMP */
 #if defined(CONFIG_SMP)
 #define	ACL_LOCK_ASSERT(_as) \
@@ -182,17 +206,21 @@ typedef spinlock_t acl_lock_t;
 } while (0)
 #define	IEEE80211_NODE_SAVEQ_DESTROY(_ni)
 #define	IEEE80211_NODE_SAVEQ_QLEN(_ni)	skb_queue_len(&(_ni)->ni_savedq)
-#define	IEEE80211_NODE_SAVEQ_LOCK(_ni) do {			\
+#define	IEEE80211_NODE_SAVEQ_LOCK(_ni) 				\
+	spin_lock(&(_ni)->ni_savedq.lock)
+#define	IEEE80211_NODE_SAVEQ_UNLOCK(_ni)			\
+	spin_unlock(&(_ni)->ni_savedq.lock)
+#define	IEEE80211_NODE_SAVEQ_LOCK_IRQ(_ni) do {			\
 	unsigned long __sqlockflags;				\
 	spin_lock_irqsave(&(_ni)->ni_savedq.lock, __sqlockflags);
-#define	IEEE80211_NODE_SAVEQ_UNLOCK(_ni)			\
+#define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(_ni)			\
 	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __sqlockflags);\
 } while (0)
+
+/* caller MUST lock IEEE80211_NODE_SAVEQ */
 #define	IEEE80211_NODE_SAVEQ_DEQUEUE(_ni, _skb, _qlen) do {	\
-	IEEE80211_NODE_SAVEQ_LOCK(_ni);				\
 	_skb = __skb_dequeue(&(_ni)->ni_savedq);		\
 	(_qlen) = skb_queue_len(&(_ni)->ni_savedq);		\
-	IEEE80211_NODE_SAVEQ_UNLOCK(_ni);			\
 } while (0)
 #define	_IEEE80211_NODE_SAVEQ_ENQUEUE(_ni, _skb, _qlen, _age) do {\
 	struct sk_buff *tail = skb_peek_tail(&(_ni)->ni_savedq);\

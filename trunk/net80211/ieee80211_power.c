@@ -112,7 +112,7 @@ ieee80211_node_saveq_drain(struct ieee80211_node *ni)
 	IEEE80211_NODE_SAVEQ_LOCK(ni);
 	qlen = skb_queue_len(&ni->ni_savedq);
 	while ((skb = __skb_dequeue(&ni->ni_savedq)) != NULL)
-		dev_kfree_skb(skb);
+		dev_kfree_skb_any(skb);
 	IEEE80211_NODE_SAVEQ_UNLOCK(ni);
 
 	return qlen;
@@ -147,7 +147,7 @@ ieee80211_node_saveq_age(struct ieee80211_node *ni)
 				"discard frame, age %u", M_AGE_GET(skb));
 
 			skb = __skb_dequeue(&ni->ni_savedq);
-			kfree_skb(skb);
+			dev_kfree_skb_any(skb);
 			discard++;
 		}
 		if (skb != NULL)
@@ -178,7 +178,7 @@ ieee80211_set_tim(struct ieee80211_node *ni, int set)
 	KASSERT(aid < vap->iv_max_aid,
 		("bogus aid %u, max %u", aid, vap->iv_max_aid));
 
-	IEEE80211_BEACON_LOCK(ni->ni_ic);
+	IEEE80211_LOCK(ni->ni_ic);
 	if (set != (isset(vap->iv_tim_bitmap, aid) != 0)) {
 		if (set) {
 			setbit(vap->iv_tim_bitmap, aid);
@@ -189,7 +189,7 @@ ieee80211_set_tim(struct ieee80211_node *ni, int set)
 		}
 		vap->iv_flags |= IEEE80211_F_TIMUPDATE;
 	}
-	IEEE80211_BEACON_UNLOCK(ni->ni_ic);
+	IEEE80211_UNLOCK(ni->ni_ic);
 }
 
 /*
@@ -290,7 +290,9 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		struct sk_buff *skb;
 		int qlen;
 
+		IEEE80211_NODE_SAVEQ_LOCK(ni);
 		IEEE80211_NODE_SAVEQ_DEQUEUE(ni, skb, qlen);
+		IEEE80211_NODE_SAVEQ_UNLOCK(ni);
 		if (skb == NULL)
 			break;
 		/* 

@@ -57,7 +57,7 @@
 #include <net80211/ieee80211_var.h>
 
 enum {
-	ACL_POLICY_OPEN		= 0,	/* open, don't check ACL's */
+	ACL_POLICY_OPEN		= 0,	/* open, don't check ACLs */
 	ACL_POLICY_ALLOW	= 1,	/* allow traffic from MAC */
 	ACL_POLICY_DENY		= 2,	/* deny traffic from MAC */
 };
@@ -69,10 +69,11 @@ struct acl {
 	LIST_ENTRY(acl) acl_hash;
 	u_int8_t acl_macaddr[IEEE80211_ADDR_LEN];
 };
+
 struct aclstate {
 	acl_lock_t as_lock;
 	int as_policy;
-	TAILQ_HEAD(, acl) as_list;	/* list of all ACL's */
+	TAILQ_HEAD(, acl) as_list;	/* list of all ACLs */
 	ATH_LIST_HEAD(, acl) as_hash[ACL_HASHSIZE];
 };
 
@@ -136,7 +137,6 @@ _find_acl(struct aclstate *as, const u_int8_t *macaddr)
 static void
 _acl_free(struct aclstate *as, struct acl *acl)
 {
-	ACL_LOCK_ASSERT(as);
 
 	TAILQ_REMOVE(&as->as_list, acl, acl_list);
 	LIST_REMOVE(acl, acl_hash);
@@ -220,18 +220,22 @@ acl_free_all_locked(struct aclstate *as)
 {
 	struct acl *acl;
 
-	ACL_LOCK(as);
+	ACL_LOCK_ASSERT(as);
+
 	while ((acl = TAILQ_FIRST(&as->as_list)) != NULL)
 		_acl_free(as, acl);
-	ACL_UNLOCK(as);
 }
 
 static int
 acl_free_all(struct ieee80211vap *vap)
 {
+	struct aclstate *as = vap->iv_as;
+
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_ACL, "ACL: %s\n", "free all");
 
+	ACL_LOCK(as);
 	acl_free_all_locked(vap->iv_as);
+	ACL_UNLOCK(as);
 
 	return 0;
 }

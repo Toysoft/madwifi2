@@ -191,6 +191,9 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(ieee80211_monitor_encap);
 
+/*
+ * Context: softIRQ (tasklet)
+ */
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ath_desc *ds, int tx, u_int32_t mactime, struct ath_softc *sc) 

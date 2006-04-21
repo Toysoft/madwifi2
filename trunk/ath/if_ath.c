@@ -1800,6 +1800,10 @@ ath_chan2flags(struct ieee80211_channel *chan)
 	return flags;
 }
 
+/*
+ * Context: process context
+ */
+
 static int
 ath_init(struct net_device *dev)
 {
@@ -1915,6 +1919,10 @@ done:
 	return error;
 }
 
+/* Caller must lock ATH_LOCK 
+ *
+ * Context: softIRQ
+ */ 
 static int
 ath_stop_locked(struct net_device *dev)
 {
@@ -2172,7 +2180,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	 * Insert the frame on the outbound list and
 	 * pass it on to the hardware.
 	 */
-	ATH_TXQ_LOCK_BH(txq);
+	ATH_TXQ_LOCK(txq);
 	if (ni && ni->ni_vap && txq == &ATH_VAP(ni->ni_vap)->av_mcastq) {
 		/*
 		 * The CAB queue is started from the SWBA handler since
@@ -2217,7 +2225,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 		ath_hal_txstart(ah, txq->axq_qnum);
 		sc->sc_dev->trans_start = jiffies;
 	}
-	ATH_TXQ_UNLOCK_BH(txq);
+	ATH_TXQ_UNLOCK(txq);
 
 	sc->sc_devstats.tx_packets++;
 	sc->sc_devstats.tx_bytes += framelen;
@@ -2363,27 +2371,28 @@ ath_ff_ageflushtestdone(struct ath_txq *txq, struct ath_buf *bf)
 	return 0;
 }
 
+/* Caller must not hold ATH_TXQ_LOCK and ATH_TXBUF_LOCK
+ *
+ * Context: softIRQ
+ */
 static void
 ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 	int (*ath_ff_flushdonetest)(struct ath_txq *txq, struct ath_buf *bf))
 {
-	struct ath_buf *bf_ff;
-	struct ieee80211_node *ni;
+	struct ath_buf *bf_ff = NULL;
+	struct ieee80211_node *ni = NULL;
 	int pktlen;
 	int framecnt;
 
-	/*
-	 * NB: using _BH style locking even though this function may be called
-	 *     at interrupt time (within tasklet or bh). This should be harmless
-	 *     and this function calls others (i.e., ath_tx_start()) which do
-	 *     the same.
-	 */
 	for (;;) {
-		ATH_TXQ_LOCK_BH(txq);
+		ATH_TXQ_LOCK(txq);
 
 		bf_ff = TAILQ_LAST(&txq->axq_stageq, axq_headtype);
 		if ((!bf_ff) || ath_ff_flushdonetest(txq, bf_ff))
+		{
+			ATH_TXQ_UNLOCK(txq);
 			break;
+		}
 
 		ni = bf_ff->bf_node;
 		KASSERT(ATH_NODE(ni)->an_tx_ffbuf[bf_ff->bf_skb->priority],
@@ -2391,7 +2400,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		ATH_NODE(ni)->an_tx_ffbuf[bf_ff->bf_skb->priority] = NULL;
 		TAILQ_REMOVE(&txq->axq_stageq, bf_ff, bf_stagelist);
 
-		ATH_TXQ_UNLOCK_BH(txq);
+		ATH_TXQ_UNLOCK(txq);
 
 		/* encap and xmit */
 		bf_ff->bf_skb = ieee80211_encap(ni, bf_ff->bf_skb, &framecnt);
@@ -2412,16 +2421,15 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		}
 		bf_ff->bf_node = NULL;
 
-		ATH_TXBUF_LOCK_BH(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
-		ATH_TXBUF_UNLOCK_BH(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
-	ATH_TXQ_UNLOCK_BH(txq);
 }
 #endif
 
 #define ATH_HARDSTART_GET_TX_BUF_WITH_LOCK				\
-	ATH_TXBUF_LOCK_BH(sc);						\
+	ATH_TXBUF_LOCK_IRQ(sc);						\
 	bf = STAILQ_FIRST(&sc->sc_txbuf);				\
 	if (bf != NULL) {						\
 		STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);		\
@@ -2436,7 +2444,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		sc->sc_devstopped = 1;					\
 		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL); 		\
 	}								\
-	ATH_TXBUF_UNLOCK_BH(sc);					\
+	ATH_TXBUF_UNLOCK_IRQ(sc);					\
 	if (bf == NULL) {		/* NB: should not happen */	\
 		DPRINTF(sc,ATH_DEBUG_XMIT,				\
 			"%s: discard, no xmit buf\n", __func__);	\
@@ -2447,6 +2455,8 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 /*
  * Transmit a data packet.  On failure caller is
  * assumed to reclaim the resources.
+ *
+ * Context: process context with BH's disabled
  */
 static int
 ath_hardstart(struct sk_buff *skb, struct net_device *dev)
@@ -2518,7 +2528,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/* NB: use this lock to protect an->an_ff_txbuf in athff_can_aggregate()
 	 *     call too.
 	 */
-	ATH_TXQ_LOCK_BH(txq);
+	ATH_TXQ_LOCK(txq);
 	if (athff_can_aggregate(sc, eh, an, skb, vap->iv_fragthreshold, &ff_flush)) {
 
 		if (an->an_tx_ffbuf[skb->priority]) { /* i.e., frame on the staging queue */
@@ -2528,7 +2538,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			TAILQ_REMOVE(&txq->axq_stageq, bf, bf_stagelist);
 			an->an_tx_ffbuf[skb->priority] = NULL;
 
-			ATH_TXQ_UNLOCK_BH(txq);
+			ATH_TXQ_UNLOCK(txq);
 
 			/*
 			 * chain skbs and add FF magic
@@ -2563,7 +2573,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 			TAILQ_INSERT_HEAD(&txq->axq_stageq, bf, bf_stagelist);
 
-			ATH_TXQ_UNLOCK_BH(txq);
+			ATH_TXQ_UNLOCK(txq);
 
 			return 0;
 		}
@@ -2574,7 +2584,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			TAILQ_REMOVE(&txq->axq_stageq, bf_ff, bf_stagelist);
 			an->an_tx_ffbuf[skb->priority] = NULL;
 
-			ATH_TXQ_UNLOCK_BH(txq);
+			ATH_TXQ_UNLOCK(txq);
 
 			/* encap and xmit */
 			bf_ff->bf_skb = ieee80211_encap(ni, bf_ff->bf_skb, &framecnt);
@@ -2604,9 +2614,9 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			}
 			bf_ff->bf_node = NULL;
 
-			ATH_TXBUF_LOCK_BH(sc);
+			ATH_TXBUF_LOCK(sc);
 			STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
-			ATH_TXBUF_UNLOCK_BH(sc);
+			ATH_TXBUF_UNLOCK(sc);
 			goto ff_flushdone;
 		}
 		/*
@@ -2616,9 +2626,9 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		else if (an->an_tx_ffbuf[skb->priority]) {
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
 				"%s: Out-Of-Order fast-frame\n", __func__);
-			ATH_TXQ_UNLOCK_BH(txq);
+			ATH_TXQ_UNLOCK(txq);
 		} else
-			ATH_TXQ_UNLOCK_BH(txq);
+			ATH_TXQ_UNLOCK(txq);
 
 	ff_flushdone:
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
@@ -2650,7 +2660,7 @@ ff_bypass:
 		**  Allocate 1 ath_buf for each frame given 1 was 
 		**  already alloc'd
 		*/
-		ATH_TXBUF_LOCK_BH(sc);
+		ATH_TXBUF_LOCK(sc);
 		for (bfcnt = 1; bfcnt < framecnt; ++bfcnt) {
 			if ((tbf = STAILQ_FIRST(&sc->sc_txbuf)) != NULL) {
 				STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
@@ -2672,11 +2682,11 @@ ff_bypass:
 					STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
 				}
 			}
-			ATH_TXBUF_UNLOCK_BH(sc);
+			ATH_TXBUF_UNLOCK(sc);
 			STAILQ_INIT(&bf_head);
 			goto hardstart_fail;
 		}
-		ATH_TXBUF_UNLOCK_BH(sc);
+		ATH_TXBUF_UNLOCK(sc);
 
 		while ((bf = STAILQ_FIRST(&bf_head)) != NULL && skb != NULL) {
 			int nextfraglen = 0;
@@ -2714,7 +2724,7 @@ ff_bypass:
 
 hardstart_fail:
 	if (!STAILQ_EMPTY(&bf_head)) {
-		ATH_TXBUF_LOCK_BH(sc);
+		ATH_TXBUF_LOCK(sc);
 		STAILQ_FOREACH_SAFE(tbf, &bf_head, bf_list, tempbf) {
 			tbf->bf_skb = NULL;
 			tbf->bf_node = NULL;
@@ -2723,7 +2733,7 @@ hardstart_fail:
 			if (ni != NULL)
 				ieee80211_free_node(ni);
 		}
-		ATH_TXBUF_UNLOCK_BH(sc);
+		ATH_TXBUF_UNLOCK(sc);
 	}
 	/* free sk_buffs */
 	while (skb) {
@@ -2741,6 +2751,8 @@ hardstart_fail:
  * Note that management frames come directly from the 802.11 layer
  * and do not honor the send queue flow control.  Need to investigate
  * using priority queueing so management frames can bypass data.
+ *
+ * Context: hwIRQ and softIRQ
  */
 static int
 ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
@@ -2763,7 +2775,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	/*
 	 * Grab a TX buffer and associated resources.
 	 */
-	ATH_TXBUF_LOCK_BH(sc);
+	ATH_TXBUF_LOCK_IRQ(sc);
 	bf = STAILQ_FIRST(&sc->sc_txbuf);
 	if (bf != NULL)
 		STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
@@ -2774,7 +2786,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 		sc->sc_devstopped=1;
 		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 	}
-	ATH_TXBUF_UNLOCK_BH(sc);
+	ATH_TXBUF_UNLOCK_IRQ(sc);
 	if (bf == NULL) {
 		printk("ath_mgtstart: discard, no xmit buf\n");
 		sc->sc_stats.ast_tx_nobufmgt++;
@@ -2803,11 +2815,12 @@ bad:
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
-		ATH_TXBUF_LOCK_BH(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		ATH_TXBUF_UNLOCK_BH(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
-	dev_kfree_skb(skb);
+	dev_kfree_skb_any(skb);
+	skb = NULL;
 	return error;
 }
 
@@ -3672,6 +3685,8 @@ ath_beaconq_config(struct ath_softc *sc)
 
 /*
  * Allocate and setup an initial beacon frame.
+ *
+ * Context: softIRQ
  */
 static int
 ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
@@ -4655,12 +4670,12 @@ ath_node_cleanup(struct ieee80211_node *ni)
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_q, bf_list);
 		bf->bf_desc->ds_link = (u_int32_t)NULL;
 
-		dev_kfree_skb(bf->bf_skb);
+		dev_kfree_skb_any(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
-		ATH_TXBUF_LOCK_BH(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		ATH_TXBUF_UNLOCK_BH(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 		ieee80211_free_node(ni);
 
 		an->an_uapsd_qdepth--;
@@ -4671,18 +4686,20 @@ ath_node_cleanup(struct ieee80211_node *ni)
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_overflowq, bf_list);
 		bf->bf_desc->ds_link = (u_int32_t)NULL;
 
-		dev_kfree_skb(bf->bf_skb);
+		dev_kfree_skb_any(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
-		ATH_TXBUF_LOCK_BH(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		ATH_TXBUF_UNLOCK_BH(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 		ieee80211_free_node(ni);
 
 		an->an_uapsd_overflowqdepth--;
 	}
 
+	ATH_NODE_UAPSD_LOCK_IRQ(an);
 	sc->sc_node_cleanup(ni);
+	ATH_NODE_UAPSD_UNLOCK_IRQ(an);
 }
 
 static void
@@ -5220,10 +5237,10 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		skb = skb_copy(skb, GFP_ATOMIC);
 		if (skb == NULL) {
 			printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
-				dev_kfree_skb(skb2);
+			dev_kfree_skb(skb2);
 			return;
 		}
-		kfree_skb(skb2);
+		dev_kfree_skb(skb2);
 	} else
 		skb_orphan(skb);
 
@@ -5483,12 +5500,14 @@ rx_accept:
 					"%s: runt packet %d\n", __func__, len);
 				sc->sc_stats.ast_rx_tooshort++;
 				dev_kfree_skb(skb);
+				skb = NULL;
 				goto rx_next;
 			}
 			ath_rx_capture(dev, ds, skb);
 			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
 				/* no other vaps need the packet */
 				dev_kfree_skb(skb);
+				skb = NULL;
 				goto rx_next;
 			}
 		}
@@ -5505,6 +5524,7 @@ rx_accept:
 				__func__, len);
 			sc->sc_stats.ast_rx_tooshort++;
 			dev_kfree_skb(skb);
+			skb = NULL;
 			goto rx_next;
 		}
 
@@ -5880,7 +5900,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap,int pollcount)
 						keyix = k->wk_keyix;
 				}
 			}
-			ATH_TXBUF_LOCK_BH(sc);					
+			ATH_TXBUF_LOCK_IRQ(sc);					
 			bf = STAILQ_FIRST(&sc->sc_grppollbuf);
 			if (bf != NULL)
 				STAILQ_REMOVE_HEAD(&sc->sc_grppollbuf, bf_list);
@@ -5893,7 +5913,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap,int pollcount)
 				DPRINTF(sc, ATH_DEBUG_XMIT, "%s: No more TxBufs left\n", __func__);
 				return;
 			}					
-			ATH_TXBUF_UNLOCK_BH(sc);
+			ATH_TXBUF_UNLOCK_IRQ(sc);
 			bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 				skb->data, skb->len, BUS_DMA_TODEVICE);
 			bf->bf_skb = skb;
@@ -6360,9 +6380,9 @@ ath_tx_uapsdqueue(struct ath_softc *sc, struct ath_node *an, struct ath_buf *bf)
 		lastbuf->bf_skb = NULL;
 		ieee80211_free_node(lastbuf->bf_node);
 		lastbuf->bf_node = NULL;
-		ATH_TXBUF_LOCK_BH(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, lastbuf, bf_list);
-		ATH_TXBUF_UNLOCK_BH(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 		
 		/*
 		 *  move oldest from overflow to delivery
@@ -6977,18 +6997,20 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 /*
  * Process completed xmit descriptors from the specified queue.
+ * Should only be called from tasklet context
  */
 static void
 ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 {
 	struct ath_hal *ah = sc->sc_ah;
-	struct ath_buf *bf;
-	struct ath_desc *ds;
-	struct ieee80211_node *ni;
-	struct ath_node *an;
+	struct ath_buf *bf = NULL;
+	struct ath_desc *ds = NULL;
+	struct ieee80211_node *ni = NULL;
+	struct ath_node *an = NULL;
 	int sr, lr;
 	HAL_STATUS status;
 	int uapsdq = 0;
+	unsigned long uapsdq_lockflags = 0;
 
 	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %d (0x%x), link %p\n", __func__,
 		txq->axq_qnum, ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
@@ -7001,7 +7023,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 
 	for (;;) {
 		if (uapsdq)
-			ATH_TXQ_LOCK_IRQ(txq);
+			ATH_TXQ_UAPSDQ_LOCK_IRQ(txq);
 		else
 			ATH_TXQ_LOCK(txq);
 		txq->axq_intrcnt = 0; /* reset periodic desc intr count */
@@ -7009,7 +7031,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		if (bf == NULL) {
 			txq->axq_link = NULL;
 			if (uapsdq)
-				ATH_TXQ_UNLOCK_IRQ(txq);
+				ATH_TXQ_UAPSDQ_UNLOCK_IRQ(txq);
 			else
 				ATH_TXQ_UNLOCK(txq);
 			break;
@@ -7029,7 +7051,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 #endif
 		if (status == HAL_EINPROGRESS) {
 			if (uapsdq)
-				ATH_TXQ_UNLOCK_IRQ(txq);
+				ATH_TXQ_UAPSDQ_UNLOCK_IRQ(txq);
 			else
 				ATH_TXQ_UNLOCK(txq);
 			break;
@@ -7037,7 +7059,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
 		if (uapsdq)
-			ATH_TXQ_UNLOCK_IRQ(txq);
+			ATH_TXQ_UAPSDQ_UNLOCK_IRQ(txq);
 		else
 			ATH_TXQ_UNLOCK(txq);
 
@@ -7152,7 +7174,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
-		ATH_TXBUF_LOCK(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 		if (sc->sc_devstopped) {
 			++sc->sc_reapcount;
@@ -7165,7 +7187,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			} else
 				ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 		}
-		ATH_TXBUF_UNLOCK(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
 #ifdef ATH_SUPERG_FF
 	/* flush ff staging queue if buffer low */
@@ -7279,10 +7301,13 @@ ath_tx_timeout(struct net_device *dev)
 
 	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
 		sc->sc_stats.ast_watchdog++;
-		ath_init(dev);
+		ath_reset(dev);	/* Avoid taking a semaphore in ath_init */
 	}
 }
 
+/* 
+ * Context: softIRQ and hwIRQ
+ */
 static void
 ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 {
@@ -7312,13 +7337,13 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 		skb = bf->bf_skb->next;
 		bus_unmap_single(sc->sc_bdev,
 			bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
-		dev_kfree_skb(bf->bf_skb);
+		dev_kfree_skb_any(bf->bf_skb);
 		i = 0;
 		while (skb) {
 			tskb = skb->next;
 			bus_unmap_single(sc->sc_bdev,
 				 bf->bf_skbaddrff[i++], skb->len, BUS_DMA_TODEVICE);
-			dev_kfree_skb(skb);
+			dev_kfree_skb_any(skb);
 			skb = tskb;
 		}
 		if (bf->bf_node)
@@ -7755,6 +7780,10 @@ ath_mhz2ieee(struct ieee80211com *ic, u_int freq, u_int flags)
  	return (ath_hal_mhz2ieee(sc->sc_ah, freq, flags));
 }
 
+
+/*
+ * Context: softIRQ and process context
+ */
 static int
 ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 {
@@ -8017,6 +8046,8 @@ bad:
  * CHANNEL_DFS_CLEAR flag on current channel.
  * if the flag is set and a vap is waiting for it ,push 
  * transition the vap to RUN state.
+ *
+ * Context: Timer (softIRQ)
  */
 static void 
 ath_check_dfs_clear(unsigned long data ) 
