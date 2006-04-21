@@ -277,7 +277,7 @@ struct ath_node {
 	struct ieee80211_node an_node;		/* base class */
 	u_int16_t an_decomp_index; 		/* decompression mask index */
 	u_int32_t an_avgrssi;			/* average rssi over all rx frames */
-	u_int8_t	an_prevdatarix;			/* rate ix of last data frame */
+	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
 	u_int16_t an_minffrate;			/* mimum rate in kbps for ff to aggragate */
 	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
 	struct ath_buf *an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
@@ -286,7 +286,6 @@ struct ath_node {
 	ath_bufhead an_uapsd_overflowq; 	/* U-APSD overflow queue (for > MaxSp frames) */
 	int an_uapsd_overflowqdepth; 		/* U-APSD overflow queue depth */
 	spinlock_t an_uapsd_lock; 		/* U-APSD deleivery queue lock */
-	unsigned long an_uapsd_lockflags; 	/* U-APSD cli flags for lock */
 	/* variable-length rate control state follows */
 };
 #define	ATH_NODE(_n)			((struct ath_node *)(_n))
@@ -294,8 +293,15 @@ struct ath_node {
 #define ATH_NODE_UAPSD_LOCK_INIT(_an)	spin_lock_init(&(_an)->an_uapsd_lock)
 #define ATH_NODE_UAPSD_LOCK(_an) 	spin_lock(&(_an)->an_uapsd_lock)
 #define ATH_NODE_UAPSD_UNLOCK(_an)	spin_unlock(&(_an)->an_uapsd_lock)
-#define ATH_NODE_UAPSD_LOCK_IRQ(_an)	spin_lock_irqsave(&(_an)->an_uapsd_lock, (_an)->an_uapsd_lockflags)
-#define ATH_NODE_UAPSD_UNLOCK_IRQ(_an)	spin_unlock_irqrestore(&(_an)->an_uapsd_lock, (_an)->an_uapsd_lockflags)
+#define ATH_NODE_UAPSD_LOCK_IRQ(_an)	do {	\
+	unsigned long __an_uapsd_lockflags;	\
+	spin_lock_irqsave(&(_an)->an_uapsd_lock, __an_uapsd_lockflags);
+#define ATH_NODE_UAPSD_UNLOCK_IRQ(_an)		\
+	spin_unlock_irqrestore(&(_an)->an_uapsd_lock, __an_uapsd_lockflags); \
+} while (0)
+#define ATH_NODE_UAPSD_UNLOCK_IRQ_EARLY(_an)		\
+	spin_unlock_irqrestore(&(_an)->an_uapsd_lock, __an_uapsd_lockflags);
+
 
 #define ATH_RSSI_LPF_LEN	10
 #define ATH_RSSI_DUMMY_MARKER	0x127
@@ -379,7 +385,6 @@ struct ath_txq {
 	u_int32_t *axq_link;		/* link ptr in last TX desc */
 	STAILQ_HEAD(, ath_buf) axq_q;	/* transmit queue */
 	spinlock_t axq_lock;		/* lock on q and link */
-	unsigned long axq_lockflags;	/* intr state when must cli */
 	int axq_depth;			/* queue depth */
 	u_int32_t axq_totalqueued;	/* total ever queued */
 	u_int axq_intrcnt;		/* count to determine if descriptor
@@ -420,8 +425,21 @@ struct ath_vap {
 #define	ATH_TXQ_UNLOCK(_tq)		spin_unlock(&(_tq)->axq_lock)
 #define	ATH_TXQ_LOCK_BH(_tq)		spin_lock_bh(&(_tq)->axq_lock)
 #define	ATH_TXQ_UNLOCK_BH(_tq)		spin_unlock_bh(&(_tq)->axq_lock)
-#define ATH_TXQ_LOCK_IRQ(_tq)		spin_lock_irqsave(&(_tq)->axq_lock, (_tq)->axq_lockflags) 
-#define ATH_TXQ_UNLOCK_IRQ(_tq)		spin_unlock_irqrestore(&(_tq)->axq_lock, (_tq)->axq_lockflags) 
+#define ATH_TXQ_LOCK_IRQ(_tq)		do {	\
+	unsigned long __axq_lockflags;		\
+	spin_lock_irqsave(&(_tq)->axq_lock, __axq_lockflags);
+#define ATH_TXQ_UNLOCK_IRQ(_tq)			\
+	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags); \
+} while (0)
+#define ATH_TXQ_UNLOCK_IRQ_EARLY(_tq)			\
+	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags);
+
+#define ATH_TXQ_UAPSDQ_LOCK_IRQ(_tq)	spin_lock_irqsave(&(_tq)->axq_lock, uapsdq_lockflags)
+#define ATH_TXQ_UAPSDQ_UNLOCK_IRQ(_tq)	spin_unlock_irqrestore(&(_tq)->axq_lock, uapsdq_lockflags)
+
+
+
+
 #define	ATH_TXQ_LOCK_ASSERT(_tq) \
 	KASSERT(spin_is_locked(&(_tq)->axq_lock), ("txq not locked!"))
 #define ATH_TXQ_INSERT_TAIL(_tq, _elm, _field) do { \
@@ -554,7 +572,6 @@ struct ath_softc {
 	struct ath_buf *sc_rxbufcur;		/* current rx buffer */
 	u_int32_t *sc_rxlink;			/* link ptr in last RX desc */
 	spinlock_t sc_rxbuflock; 
-	unsigned long sc_rxbuflockflags;
 	struct ATH_TQ_STRUCT sc_rxtq;		/* rx intr tasklet */
 	struct ATH_TQ_STRUCT sc_rxorntq;	/* rxorn intr tasklet */
 	u_int8_t sc_defant;			/* current default antenna */
@@ -629,8 +646,18 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_TXBUF_UNLOCK(_sc)		spin_unlock(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_BH(_sc)		spin_lock_bh(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_UNLOCK_BH(_sc)	spin_unlock_bh(&(_sc)->sc_txbuflock)
+#define	ATH_TXBUF_LOCK_IRQ(_sc)		do {	\
+	unsigned long __txbuflockflags;		\
+	spin_lock_irqsave(&(_sc)->sc_txbuflock, __txbuflockflags);
+#define	ATH_TXBUF_UNLOCK_IRQ(_sc)		\
+	spin_unlock_irqrestore(&(_sc)->sc_txbuflock, __txbuflockflags); \
+} while (0)
+#define	ATH_TXBUF_UNLOCK_IRQ_EARLY(_sc)		\
+	spin_unlock_irqrestore(&(_sc)->sc_txbuflock, __txbuflockflags);
+
 #define	ATH_TXBUF_LOCK_ASSERT(_sc) \
 	KASSERT(spin_is_locked(&(_sc)->sc_txbuflock), ("txbuf not locked!"))
+
 
 #define	ATH_RXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_rxbuflock)
 #define	ATH_RXBUF_LOCK_DESTROY(_sc)
@@ -638,9 +665,17 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_RXBUF_UNLOCK(_sc)		spin_unlock(&(_sc)->sc_rxbuflock)
 #define	ATH_RXBUF_LOCK_BH(_sc)		spin_lock_bh(&(_sc)->sc_rxbuflock)
 #define	ATH_RXBUF_UNLOCK_BH(_sc)	spin_unlock_bh(&(_sc)->sc_rxbuflock)
-#define	ATH_RXBUF_LOCK_IRQ(_sc)		spin_lock_irqsave(&(_sc)->sc_rxbuflock, (_sc)->sc_rxbuflockflags)
-#define	ATH_RXBUF_UNLOCK_IRQ(_sc)	spin_unlock_irqrestore(&(_sc)->sc_rxbuflock, (_sc)->sc_rxbuflockflags)
+#define	ATH_RXBUF_LOCK_IRQ(_sc)		do {	\
+	unsigned long __rxbuflockflags;		\
+	spin_lock_irqsave(&(_sc)->sc_rxbuflock, __rxbuflockflags);
+#define	ATH_RXBUF_UNLOCK_IRQ(_sc)		\
+	spin_unlock_irqrestore(&(_sc)->sc_rxbuflock, __rxbuflockflags); \
+} while (0)
+#define	ATH_RXBUF_UNLOCK_IRQ_EARLY(_sc)		\
+	spin_unlock_irqrestore(&(_sc)->sc_rxbuflock, __rxbuflockflags);
 
+
+/* Protects the device from concurrent accesses */
 #define	ATH_LOCK_INIT(_sc)		init_MUTEX(&(_sc)->sc_lock)
 #define	ATH_LOCK_DESTROY(_sc)
 #define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)

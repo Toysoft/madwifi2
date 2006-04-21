@@ -153,7 +153,7 @@ ieee80211_scan_vdetach(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	if (ss->ss_vap == vap) {
 		if (ic->ic_flags & IEEE80211_F_SCAN) {
 			del_timer(&SCAN_PRIVATE(ss)->ss_scan_timer);
@@ -164,7 +164,7 @@ ieee80211_scan_vdetach(struct ieee80211vap *vap)
 			ss->ss_ops = NULL;
 		}
 	}
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 }
 
 /*
@@ -381,7 +381,7 @@ ieee80211_start_scan(struct ieee80211vap *vap, int flags, u_int duration,
 		return 0;
 	}
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: %s scan, duration %lu, desired mode %s, %s%s%s%s\n",
@@ -430,7 +430,7 @@ ieee80211_start_scan(struct ieee80211vap *vap, int flags, u_int duration,
 			"%s: %s scan already in progress\n", __func__,
 			ss->ss_flags & IEEE80211_SCAN_ACTIVE ? "active" : "passive");
 	}
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 
 	/* NB: racey, does it matter? */
 	return (ic->ic_flags & IEEE80211_F_SCAN);
@@ -454,7 +454,7 @@ ieee80211_check_scan(struct ieee80211vap *vap, int flags, u_int duration,
 	 * Check if there's a list of scan candidates already.
 	 * XXX want more than the ap we're currently associated with
 	 */
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 		"%s: %s scan, duration %lu, desired mode %s, %s%s%s%s\n",
 		__func__,
@@ -492,7 +492,7 @@ ieee80211_check_scan(struct ieee80211vap *vap, int flags, u_int duration,
 			checkscanlist = 1;
 		}
 	}
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 	if (checkscanlist) {
 		/*
 		 * ss must be filled out so scan may be restarted "outside"
@@ -526,7 +526,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
 		u_int duration;
 		/*
@@ -584,7 +584,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 			"%s: %s scan already in progress\n", __func__,
 			ss->ss_flags & IEEE80211_SCAN_ACTIVE ? "active" : "passive");
 	}
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 
 	/* NB: racey, does it matter? */
 	return (ic->ic_flags & IEEE80211_F_SCAN);
@@ -600,7 +600,7 @@ ieee80211_cancel_scan(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	if (ic->ic_flags & IEEE80211_F_SCAN) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: cancel %s scan\n", __func__,
@@ -613,7 +613,7 @@ ieee80211_cancel_scan(struct ieee80211vap *vap)
 		/* force it to fire asap */
 		mod_timer(&SCAN_PRIVATE(ss)->ss_scan_timer, jiffies);
 	}
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 }
 
 /*
@@ -630,9 +630,9 @@ scan_next(unsigned long arg)
 	unsigned long maxdwell, scanend;
 	int scanning, scandone, i;
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	scanning = (ic->ic_flags & IEEE80211_F_SCAN) != 0;
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 	if (!scanning)			/* canceled */
 		return;
 

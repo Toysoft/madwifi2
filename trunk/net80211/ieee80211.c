@@ -420,7 +420,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	 * link the XR vap to its normal val.
 	 */
 	if (flags & IEEE80211_VAP_XR) {
-		struct ieee80211vap *vapparent;
+		struct ieee80211vap *vapparent = NULL;
 		vap->iv_unit = -1;
 		vap->iv_flags = ic->ic_flags | IEEE80211_F_XR;	/* propagate common flags and add XR flag */
 		vap->iv_flags_ext = ic->ic_flags_ext;
@@ -435,6 +435,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 		vap->iv_unit = unit;
 		vap->iv_flags = ic->ic_flags;		/* propagate common flags */
 		vap->iv_flags_ext = ic->ic_flags_ext;
+		vap->iv_xrvap = NULL;
 		vap->iv_ath_cap = ic->ic_ath_cap;
 		/* Default Multicast traffic to lowest rate of 1 Mbps*/
 		vap->iv_mcast_rate = 1000;
@@ -443,6 +444,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	vap->iv_unit = unit;
 	vap->iv_flags = ic->ic_flags;		/* propagate common flags */
 	vap->iv_flags_ext = ic->ic_flags_ext;
+	vap->iv_xrvap = NULL;
 	vap->iv_ath_cap = ic->ic_ath_cap;
 	/* Default Multicast traffic to lowest rate of 1000 Kbps*/
 	vap->iv_mcast_rate = 1000;
@@ -535,9 +537,9 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 	ieee80211_media_status(dev, &imr);
 	ifmedia_set(&vap->iv_media, imr.ifm_active);
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	TAILQ_INSERT_TAIL(&ic->ic_vaps, vap, iv_next);
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 
 	IEEE80211_ADDR_COPY(dev->dev_addr, vap->iv_myaddr);
 
@@ -567,11 +569,11 @@ ieee80211_vap_detach(struct ieee80211vap *vap)
 	struct net_device *dev = vap->iv_dev;
 
 	IEEE80211_CANCEL_TQUEUE(&vap->iv_stajoin1tq);
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	TAILQ_REMOVE(&ic->ic_vaps, vap, iv_next);
 	if (TAILQ_EMPTY(&ic->ic_vaps))		/* reset to supported mode */
 		ic->ic_opmode = IEEE80211_M_STA;
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 
 	ifmedia_removeall(&vap->iv_media);
 
@@ -1092,11 +1094,11 @@ ieee80211com_media_change(struct net_device *dev)
 	/*
 	 * Handle phy mode change.
 	 */
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	if (ic->ic_curmode != newphymode) {		/* change phy mode */
 		error = ieee80211_setmode(ic, newphymode);
 		if (error != 0) {
-			IEEE80211_UNLOCK(ic);
+			IEEE80211_UNLOCK_IRQ_EARLY(ic);
 			return error;
 		}
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
@@ -1113,7 +1115,7 @@ ieee80211com_media_change(struct net_device *dev)
 		}
 		error = ENETRESET;
 	}
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 
 #ifdef notdef
 	if (error == 0)
@@ -1479,7 +1481,7 @@ ieee80211_set_multicast_list(struct net_device *dev)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct net_device *parent = ic->ic_dev;
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	if (dev->flags & IFF_PROMISC) {
 		if ((vap->iv_flags & IEEE80211_F_PROMISC) == 0) {
 			vap->iv_flags |= IEEE80211_F_PROMISC;
@@ -1506,7 +1508,7 @@ ieee80211_set_multicast_list(struct net_device *dev)
 			parent->flags &= ~IFF_ALLMULTI;
 		}
 	}
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 
 	/* XXX merge multicast list into parent device */
 	parent->set_multicast_list(ic->ic_dev);

@@ -132,6 +132,8 @@ static unsigned short ath_eth_type_trans(struct sk_buff *, struct net_device *);
  * any units so long as values have consistent units and higher values
  * mean ``better signal''.  The receive timestamp is currently not used
  * by the 802.11 layer.
+ *
+ * Context: softIRQ (tasklet)
  */
 int
 ieee80211_input(struct ieee80211_node *ni,
@@ -500,12 +502,12 @@ ieee80211_input(struct ieee80211_node *ni,
 					ieee80211_node_pwrsave(ni, wh->i_fc[1] & IEEE80211_FC1_PWR_MGT);
 			} else if (ni->ni_flags & IEEE80211_NODE_PS_CHANGED) {
 				int pwr_save_changed = 0;
-				IEEE80211_UAPSD_LOCK(ic);
+				IEEE80211_LOCK_IRQ(ic);
 				if ((*(u_int16_t *)(&wh->i_seq[0])) == ni->ni_pschangeseq) {
 					ni->ni_flags &= ~IEEE80211_NODE_PS_CHANGED;
 					pwr_save_changed = 1;
 				}
-				IEEE80211_UAPSD_UNLOCK(ic);
+				IEEE80211_UNLOCK_IRQ(ic);
 				if (pwr_save_changed)
 					ieee80211_node_pwrsave(ni, wh->i_fc[1] & IEEE80211_FC1_PWR_MGT);
 			}
@@ -781,6 +783,9 @@ out:
 }
 EXPORT_SYMBOL(ieee80211_input);
 
+/*
+ * Context: softIRQ (tasklet)
+ */
 int
 ieee80211_input_all(struct ieee80211com *ic,
 	struct sk_buff *skb, int rssi, u_int32_t rstamp)
@@ -859,7 +864,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	 * not freed by the timer process while we use it.
 	 * XXX bogus
 	 */
-	IEEE80211_NODE_LOCK(ni->ni_table);
+	IEEE80211_NODE_LOCK_IRQ(ni->ni_table);
 
 	/*
 	 * Update the time stamp.  As a side effect, it
@@ -869,7 +874,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	 */
 	ni->ni_rxfragstamp = jiffies;
 
-	IEEE80211_NODE_UNLOCK(ni->ni_table);
+	IEEE80211_NODE_UNLOCK_IRQ(ni->ni_table);
 
 	/*
 	 * Validate that fragment is in order and
@@ -2215,6 +2220,10 @@ startbgscan(struct ieee80211vap *vap)
 		time_after(jiffies, ic->ic_lastdata + vap->iv_bgscanidle));
 }
 
+
+/*
+ * Context: SoftIRQ
+ */
 void
 ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	int subtype, int rssi, u_int32_t rstamp)
@@ -3264,7 +3273,9 @@ ieee80211_recv_pspoll(struct ieee80211_node *ni, struct sk_buff *skb0)
 	}
 
 	/* Okay, take the first queued packet and put it out... */
+	IEEE80211_NODE_SAVEQ_LOCK(ni);
 	IEEE80211_NODE_SAVEQ_DEQUEUE(ni, skb, qlen);
+	IEEE80211_NODE_SAVEQ_UNLOCK(ni);
 	if (skb == NULL) {
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_POWER, wh->i_addr2,
 			"%s", "recv ps-poll, but queue empty");

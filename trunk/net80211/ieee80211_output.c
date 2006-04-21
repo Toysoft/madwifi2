@@ -192,6 +192,9 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 	return 0;
 }
 
+/*
+ * Context: process context (BH's disabled)
+ */
 int
 ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 {
