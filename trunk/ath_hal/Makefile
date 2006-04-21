@@ -64,7 +64,7 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 all: hal.obj opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 	cp -f hal.obj hal.o
-	rm -f ath_hal.o
+	rm -f ath_hal.o ath_hal.ko ath_hal.mod.c ath_hal.mod.o
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
 $(obj)/hal.obj:
