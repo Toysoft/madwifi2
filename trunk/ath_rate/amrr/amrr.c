@@ -462,8 +462,9 @@ ath_rate_attach(struct ath_softc *sc)
 	if (asc == NULL)
 		return NULL;
 	asc->arc.arc_space = sizeof(struct amrr_node);
+	asc->arc.arc_vap_space = 0;
 	init_timer(&asc->timer);
-	asc->timer.data = (unsigned long) &sc->sc_dev;
+	asc->timer.data = (unsigned long) sc->sc_dev;
 	asc->timer.function = ath_ratectl;
 
 	return &asc->arc;
