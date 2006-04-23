@@ -467,6 +467,12 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 		ieee80211_chan2ieee(ic, ic->ic_curchan),
 		wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "ena" : "dis");
 
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
+		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
+		__func__, __LINE__,
+		ni, ether_sprintf(ni->ni_macaddr),
+		ieee80211_node_refcnt(ni));
+
 	/* XXX assign some priority; this probably is wrong */
 	skb->priority = WME_AC_BE;
 
@@ -533,6 +539,12 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 		M_FLAG_SET(skb, M_UAPSD);
 	}
 	
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
+		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
+		__func__, __LINE__,
+		ni, ether_sprintf(ni->ni_macaddr),
+		ieee80211_node_refcnt(ni));
+
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
 	
 	return 0;
@@ -1765,7 +1777,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
 		__func__, __LINE__,
 		ni, ether_sprintf(ni->ni_macaddr),
-		ieee80211_node_refcnt(ni)+1);
+		ieee80211_node_refcnt(ni) + 1);
 	ieee80211_ref_node(ni);
 
 	timer = 0;
@@ -2152,6 +2164,12 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 		IEEE80211_FC0_SUBTYPE_PS_POLL;
 	if (IEEE80211_VAP_IS_SLEEPING(ni->ni_vap))
 		wh->i_fc[1] |= IEEE80211_FC1_PWR_MGT;
+	
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
+		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
+		__func__, __LINE__,
+		ni, ether_sprintf(ni->ni_macaddr),
+		ieee80211_node_refcnt(ni));
 
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
 }

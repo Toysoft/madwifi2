@@ -2552,7 +2552,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			ATH_FF_MAGIC_PUT(skb);
 
 			/* decrement extra node reference made when an_tx_ffbuf[] was set */
-			ieee80211_free_node(ni);
+			//ieee80211_free_node(ni); /* XXX where was it set ? */
 
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
 				"%s: aggregating fast-frame\n", __func__);
@@ -2669,7 +2669,7 @@ ff_bypass:
 			else
 				break;
 			
-			ieee80211_node_incref(ni);
+			ieee80211_ref_node(ni);
 		}
 
 		if (bfcnt != framecnt) {
@@ -2728,13 +2728,15 @@ hardstart_fail:
 		STAILQ_FOREACH_SAFE(tbf, &bf_head, bf_list, tempbf) {
 			tbf->bf_skb = NULL;
 			tbf->bf_node = NULL;
-			STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
-
-			if (ni != NULL)
+			
+			if (ni != NULL) 
 				ieee80211_free_node(ni);
+
+			STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
 		}
 		ATH_TXBUF_UNLOCK(sc);
 	}
+
 	/* free sk_buffs */
 	while (skb) {
 		tskb = skb->next;
@@ -5580,7 +5582,7 @@ rx_accept:
 				if (keyix != IEEE80211_KEYIX_NONE &&
 				    sc->sc_keyixmap[keyix] == NULL)
 					sc->sc_keyixmap[keyix] = ieee80211_ref_node(ni);
-				ieee80211_free_node(ni);
+				ieee80211_free_node(ni); 
 			} else
 				type = ieee80211_input_all(ic, skb,
 					ds->ds_rxstat.rs_rssi,
@@ -6989,6 +6991,12 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 		return 0;
 	}
+	
+	
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, "%s: %p<%s> refcnt %d\n",
+		__func__, vap->iv_bss, ether_sprintf(vap->iv_bss->ni_macaddr),
+		ieee80211_node_refcnt(vap->iv_bss));
+
 
 	ath_tx_txqaddbuf(sc, ni, txq, bf, ds, pktlen);
 	return 0;
@@ -7123,7 +7131,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			 *     this is a DEAUTH message that was sent and the
 			 *     node was timed out due to inactivity.
 			 */
-			ieee80211_free_node(ni);
+			 ieee80211_free_node(ni); 
 		}
 
 		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr, 

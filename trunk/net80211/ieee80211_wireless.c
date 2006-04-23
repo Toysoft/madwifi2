@@ -1074,6 +1074,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	/* locate a node, copy its rssi value, convert to dBm */
 	for (i = 0; i < number; i++) {
 		ni = ieee80211_find_node(nt, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]);
+		/* TODO: free node ? */
 		/* check we are associated w/ this vap */
 		if (ni && (ni->ni_vap == vap))
 			set_quality(&spy_stat[i], ni->ni_rssi);

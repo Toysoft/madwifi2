@@ -484,7 +484,7 @@ ieee80211_input(struct ieee80211_node *ni,
 					 * reference to the previous station and add 
 					 * reference to the new one
 					 */
-					 (void) ieee80211_remove_wds_addr(nt,wh4->i_addr4);
+					 (void) ieee80211_remove_wds_addr(nt, wh4->i_addr4);
 					 ieee80211_add_wds_addr(nt, ni, wh4->i_addr4, 0);
 				}
 				if (ni_wds == NULL)
@@ -1144,6 +1144,10 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 				ni = ieee80211_dup_bss(vap, wh->i_addr2);
 				if (ni == NULL)
 					return;
+
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+				"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
+				ieee80211_node_refcnt(ni));
 			}
 			IEEE80211_SEND_MGMT(ni,	IEEE80211_FC0_SUBTYPE_AUTH,
 				(seq + 1) | (IEEE80211_STATUS_ALG<<16));
@@ -1174,9 +1178,14 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		}
 		/* always accept open authentication requests */
 		if (ni == vap->iv_bss) {
-			ni = ieee80211_dup_bss(vap, wh->i_addr2);
+			ni = ieee80211_dup_bss(vap, wh->i_addr2); 
 			if (ni == NULL)
 				return;
+
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+			"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
+			ieee80211_node_refcnt(ni));
+
 		} else if ((ni->ni_flags & IEEE80211_NODE_AREF) == 0)
 			(void) ieee80211_ref_node(ni);
 		/*
@@ -1364,6 +1373,11 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 					/* NB: no way to return an error */
 					return;
 				}
+
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+				"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
+				ieee80211_node_refcnt(ni));
+
 				allocbs = 1;
 			} else {
 				if ((ni->ni_flags & IEEE80211_NODE_AREF) == 0)
