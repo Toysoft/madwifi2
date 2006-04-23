@@ -500,7 +500,9 @@ static char *dev_info = "ath_rate_onoe";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Atsushi Onoe's rate control algorithm for Atheros devices");
+#ifdef MODULE_VERSION
 MODULE_VERSION("svn "SVNVERSION);
+#endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif

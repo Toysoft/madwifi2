@@ -751,7 +751,9 @@ static char *dev_info = "wlan";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
+#ifdef MODULE_VERSION
 MODULE_VERSION("svn "SVNVERSION);
+#endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif

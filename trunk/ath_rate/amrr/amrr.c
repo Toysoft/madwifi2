@@ -553,7 +553,9 @@ static char *dev_info = "ath_rate_amrr";
 
 MODULE_AUTHOR("INRIA, Mathieu Lacage");
 MODULE_DESCRIPTION("AMRR Rate control algorithm");
+#ifdef MODULE_VERSION
 MODULE_VERSION("svn "SVNVERSION);
+#endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
