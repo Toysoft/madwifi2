@@ -329,6 +329,7 @@ ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr)
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
+MODULE_VERSION("svn "SVNVERSION)
 MODULE_SUPPORTED_DEVICE("Atheros WLAN cards");
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");

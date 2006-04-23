@@ -494,15 +494,16 @@ static ctl_table ath_root_table[] = {
 };
 static struct ctl_table_header *ath_sysctl_header;
 
-MODULE_AUTHOR("Errno Consulting, Sam Leffler");
-MODULE_DESCRIPTION("Atsushi Onoe's rate control algorithm for Atheros devices");
-#ifdef MODULE_LICENSE
-MODULE_LICENSE("Dual BSD/GPL");
-#endif
-
 #include "svnversion.h"
 static char *version = "1.0 (svn " SVNVERSION ")";
 static char *dev_info = "ath_rate_onoe";
+
+MODULE_AUTHOR("Errno Consulting, Sam Leffler");
+MODULE_DESCRIPTION("Atsushi Onoe's rate control algorithm for Atheros devices");
+MODULE_VERSION("svn "SVNVERSION);
+#ifdef MODULE_LICENSE
+MODULE_LICENSE("Dual BSD/GPL");
+#endif
 
 static int __init
 init_ath_rate_onoe(void)
