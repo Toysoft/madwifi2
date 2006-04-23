@@ -938,7 +938,9 @@ EXPORT_SYMBOL(ath_rate_detach);
 
 MODULE_AUTHOR("John Bicket");
 MODULE_DESCRIPTION("SampleRate bit-rate selection algorithm for Atheros devices");
+#ifdef MODULE_VERSION
 MODULE_VERSION("svn "SVNVERSION);
+#endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");
 #endif
