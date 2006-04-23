@@ -107,6 +107,7 @@ ieee80211_node_detach(struct ieee80211com *ic)
 {
 	del_timer(&ic->ic_inact);
 	ieee80211_node_table_cleanup(&ic->ic_sta);
+
 }
 
 void
@@ -260,11 +261,22 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 		"%s: creating ibss on channel %u\n", __func__,
 		ieee80211_chan2ieee(ic, chan));
 
-	ni = ieee80211_alloc_node(&ic->ic_sta, vap, vap->iv_myaddr);
+	/* Check to see if we already have a node for this mac */
+	ni = ieee80211_find_node(&ic->ic_sta, vap->iv_myaddr);
 	if (ni == NULL) {
-		/* XXX recovery? */
-		return;
+		ni = ieee80211_alloc_node(&ic->ic_sta, vap, vap->iv_myaddr);
+		if (ni == NULL) {
+			/* XXX recovery? */
+			return;
+		}
 	}
+	else
+		ieee80211_free_node(ni);
+
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, "%s: %p<%s> refcnt %d\n",
+		__func__, vap->iv_bss, ether_sprintf(vap->iv_bss->ni_macaddr),
+		ieee80211_node_refcnt(ni));
+
 	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_myaddr);
 	ni->ni_esslen = vap->iv_des_ssid[0].len;
 	memcpy(ni->ni_essid, vap->iv_des_ssid[0].ssid, ni->ni_esslen);
@@ -347,8 +359,9 @@ ieee80211_reset_bss(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_node *ni, *obss;
 
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, "%s: old bss %p<%s>\n",
-		__func__, vap->iv_bss, ether_sprintf(vap->iv_bss->ni_macaddr));
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, "%s: old bss %p<%s> refcnt %d\n",
+		__func__, vap->iv_bss, ether_sprintf(vap->iv_bss->ni_macaddr),
+		ieee80211_node_refcnt(vap->iv_bss));
 
 	ieee80211_node_table_reset(&ic->ic_sta, vap);
 	/* XXX multi-bss wrong */
@@ -358,9 +371,15 @@ ieee80211_reset_bss(struct ieee80211vap *vap)
 	KASSERT(ni != NULL, ("unable to setup inital BSS node"));
 	obss = vap->iv_bss;
 	vap->iv_bss = ieee80211_ref_node(ni);
+
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, "%s: new bss %p<%s> refcnt %d\n",
+		__func__, vap->iv_bss, ether_sprintf(vap->iv_bss->ni_macaddr),
+		ieee80211_node_refcnt(vap->iv_bss));
+
 	if (obss != NULL) {
 		copy_bss(ni, obss);
 		ni->ni_intval = ic->ic_lintval;
+		ieee80211_free_node(obss);
 	}
 }
 
@@ -614,11 +633,15 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_node *ni;
 
-	ni = ieee80211_alloc_node(&ic->ic_sta, vap, se->se_macaddr);
+	ni = ieee80211_find_node(&ic->ic_sta, se->se_macaddr);
 	if (ni == NULL) {
-		/* XXX msg */
-		return 0;
-	}
+		ni = ieee80211_alloc_node(&ic->ic_sta, vap, se->se_macaddr);
+		if (ni == NULL) {
+			/* XXX msg */
+			return 0;
+		}
+	} else
+		ieee80211_free_node(ni);
 
 	/*
 	 * Expand scan state into node's format.
@@ -656,7 +679,11 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	ieee80211_setup_rates(ni, se->se_rates, se->se_xrates,
 		IEEE80211_F_DOSORT);
 
-	return ieee80211_sta_join1(ni);
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+	"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
+	ieee80211_node_refcnt(ni)+1);
+
+	return ieee80211_sta_join1(ieee80211_ref_node(ni));
 }
 EXPORT_SYMBOL(ieee80211_sta_join);
 
@@ -708,6 +735,7 @@ node_alloc(struct ieee80211_node_table *nt, struct ieee80211vap *vap)
 
 	MALLOC(ni, struct ieee80211_node *, sizeof(struct ieee80211_node),
 		M_80211_NODE, M_NOWAIT | M_ZERO);
+
 	return ni;
 }
 
@@ -824,7 +852,7 @@ ieee80211_alloc_node(struct ieee80211_node_table *nt,
 	int hash;
 	int i;
 
-	ni = ic->ic_node_alloc(nt,vap);
+	ni = ic->ic_node_alloc(nt, vap);
 	if (ni == NULL) {
 		/* XXX msg */
 		vap->iv_stats.is_rx_nodealloc++;
@@ -832,8 +860,9 @@ ieee80211_alloc_node(struct ieee80211_node_table *nt,
 	}
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-		"%s %p<%s> in %s table\n", __func__, ni,
-		ether_sprintf(macaddr), nt->nt_name);
+		"%s: %p<%s> in %s table, refcnt %d\n", __func__, ni,
+		ether_sprintf(macaddr), nt->nt_name,
+		ieee80211_node_refcnt(ni)+1);
 
 	IEEE80211_ADDR_COPY(ni->ni_macaddr, macaddr);
 	hash = IEEE80211_NODE_HASH(macaddr);
@@ -985,8 +1014,9 @@ ieee80211_tmp_node(struct ieee80211vap *vap, const u_int8_t *macaddr)
 
 	ni = ic->ic_node_alloc(&ic->ic_sta,vap);
 	if (ni != NULL) {
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-			"%s %p<%s>\n", __func__, ni, ether_sprintf(macaddr));
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+		"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(macaddr), 
+		ieee80211_node_refcnt(ni)+1);
 
 		IEEE80211_ADDR_COPY(ni->ni_macaddr, macaddr);
 		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
@@ -1007,7 +1037,6 @@ ieee80211_tmp_node(struct ieee80211vap *vap, const u_int8_t *macaddr)
 			ni->ni_rxfrag[i] = NULL;
 #undef N
 		ni->ni_challenge = NULL;
-
 	} else {
 		/* XXX msg */
 		vap->iv_stats.is_rx_nodealloc++;
@@ -1148,6 +1177,8 @@ EXPORT_SYMBOL(ieee80211_find_node);
  * Note that for the driver's benefit we we treat this like
  * an association so the driver has an opportunity to setup
  * it's private state.
+ *
+ * Caller must ieee80211_ref_node()
  */
 struct ieee80211_node *
 ieee80211_fakeup_adhoc_node(struct ieee80211vap *vap,
@@ -1163,6 +1194,10 @@ ieee80211_fakeup_adhoc_node(struct ieee80211vap *vap,
 			vap->iv_ic->ic_newassoc(ni, 1);
 		/* XXX not right for 802.1x/WPA */
 		ieee80211_node_authorize(ni);
+
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+		"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(macaddr), 
+		ieee80211_node_refcnt(ni));
 	}
 	return ni;
 }
@@ -1181,6 +1216,7 @@ ieee80211_add_neighbor(struct ieee80211vap *vap,	const struct ieee80211_frame *w
 	struct ieee80211_node *ni;
 
 	ni = ieee80211_dup_bss(vap, wh->i_addr2);	/* XXX alloc_node? */
+	/* TODO: not really putting itself in a table */
 	if (ni != NULL) {
 		ni->ni_esslen = sp->ssid[1];
 		memcpy(ni->ni_essid, sp->ssid + 2, sp->ssid[1]);
@@ -1209,6 +1245,10 @@ ieee80211_add_neighbor(struct ieee80211vap *vap,	const struct ieee80211_frame *w
 			ic->ic_newassoc(ni, 1);
 		/* XXX not right for 802.1x/WPA */
 		ieee80211_node_authorize(ni);
+
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+		"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
+		ieee80211_node_refcnt(ni));
 	}
 	return ni;
 }
@@ -1321,9 +1361,11 @@ _ieee80211_free_node(struct ieee80211_node *ni)
 	struct ieee80211_node_table *nt = ni->ni_table;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-		"%s %p<%s> in %s table\n", __func__, ni,
+		"%s: %p<%s> in %s table, refcnt %d\n", __func__, ni,
 		ether_sprintf(ni->ni_macaddr),
-		nt != NULL ? nt->nt_name : "<gone>");
+		nt != NULL ? nt->nt_name : "<gone>",
+		ieee80211_node_refcnt(ni));
+
 	if (vap->iv_aid_bitmap != NULL)
 		IEEE80211_AID_CLR(vap, ni->ni_associd);
 	if (nt != NULL) {
