@@ -3796,31 +3796,18 @@ siwauth_drop_unencrypted(struct net_device *dev,
 }
 
 
+/*
+ * The exact meaning of the IW_AUTH_ALG_* values is a little unclear.
+ * For example, wpa_supplicant uses IW_AUTH_ALG_OPEN_SYSTEM for WPA-PSK
+ * APs, unless you happen to set the auth_alg=SHARED option in your config
+ * file in which case it uses IW_AUTH_ALG_SHARED_KEY.  Fortunately,
+ * neither makes a any difference to madwifi, so for now we ignore it.
+ */
 static int
 siwauth_80211_auth_alg(struct net_device *dev,
 	struct iw_request_info *info, struct iw_param *erq, char *buf)
 {
-#define VALID_ALGS_MASK (IW_AUTH_ALG_OPEN_SYSTEM|IW_AUTH_ALG_SHARED_KEY|IW_AUTH_ALG_LEAP)
-	int mode = erq->value;
-	int args[2];
-
-	args[0] = IEEE80211_PARAM_AUTHMODE;
-
-	if (mode & ~VALID_ALGS_MASK) {
-		return -EINVAL;
-	}
-	if (mode & IW_AUTH_ALG_LEAP) {
-		args[1] = IEEE80211_AUTH_8021X;
-	} else if ((mode & IW_AUTH_ALG_SHARED_KEY) &&
-		   (mode & IW_AUTH_ALG_OPEN_SYSTEM)) {
-		args[1] = IEEE80211_AUTH_AUTO;
-	} else if (mode & IW_AUTH_ALG_SHARED_KEY) {
-		args[1] = IEEE80211_AUTH_SHARED;
-	} else {
-		args[1] = IEEE80211_AUTH_OPEN;
-	}
-	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
-#undef VALID_ALGS_MASK
+	return -EOPNOTSUPP;
 }
 
 static int
@@ -4066,34 +4053,7 @@ static int
 giwauth_80211_auth_alg(struct net_device *dev,
 	struct iw_request_info *info, struct iw_param *erq, char *buf)
 {
-	int arg;
-	int rc;
-
-	arg = IEEE80211_PARAM_AUTHMODE;
-	rc = ieee80211_ioctl_getparam(dev, NULL, NULL, (char*)&arg);
-	if (rc)
-		return rc;
-
-	switch(arg) {
-	case IEEE80211_AUTH_NONE:
-	case IEEE80211_AUTH_OPEN:
-		erq->value = IW_AUTH_ALG_OPEN_SYSTEM;
-		break;
-	case IEEE80211_AUTH_SHARED:
-		erq->value = IW_AUTH_ALG_SHARED_KEY;
-		break;
-	case IEEE80211_AUTH_8021X:
-		erq->value = IW_AUTH_ALG_LEAP;
-		break;
-	case IEEE80211_AUTH_WPA:
-		erq->value = IW_AUTH_ALG_LEAP|IW_AUTH_ALG_SHARED_KEY;
-		break;
-	case IEEE80211_AUTH_AUTO:
-	default:
-		erq->value = IW_AUTH_ALG_SHARED_KEY|IW_AUTH_ALG_OPEN_SYSTEM|IW_AUTH_ALG_LEAP;
-		break;
-	}
-	return 0;
+	return -EOPNOTSUPP;
 }
 
 static int

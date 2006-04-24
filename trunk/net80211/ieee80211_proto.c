@@ -957,19 +957,14 @@ ieee80211_init(struct net_device *dev, int forcescan)
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			/*
 			 * Try to be intelligent about clocking the state
-			 * machine.  
-			 *    If forcescan is set, caller wants us to re-scan
-			 * to find an appropriate ap.
-			 *    If we are in run state, we drop back down to
-			 * associate to reapply any new state and/or parameters.
-			 *    If we are in some other state, then we are going
-			 * to be able to automatically apply those parameters
-			 * real soon now, so we don't muck with the state
-			 * machine.
+			 * machine.  If we're currently in RUN state then
+			 * we should be able to apply any new state/parameters
+			 * simply by re-associating.  Otherwise we need to
+			 * re-scan to select an appropriate ap.
 			 */ 
-			if (forcescan)
+			if (vap->iv_state != IEEE80211_S_RUN || forcescan)
 				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
-			else if (vap->iv_state == IEEE80211_S_RUN)
+			else
 				ieee80211_new_state(vap, IEEE80211_S_ASSOC, 1);
 		} else {
 			/*
