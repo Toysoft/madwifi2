@@ -36,12 +36,12 @@
  * $Id$
  */
 
-#ifdef CONFIG_NET_WIRELESS
-
 /*
  * Wireless extensions support for 802.11 common code.
  */
 #include <linux/config.h>
+
+#ifdef CONFIG_NET_WIRELESS
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
