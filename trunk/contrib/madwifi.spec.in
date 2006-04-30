@@ -27,7 +27,6 @@ Source0: http://snapshots.madwifi.org/madwifi-ng/%{name}-ng-r%{revision}-%{snaps
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 Requires: /sbin/depmod
 Requires: %{name}-module >= %{version}
-BuildRequires: sharutils
 BuildRequires: /sbin/depmod
 BuildRequires:  /lib/modules/%{mykversion}/build/Makefile
 
