@@ -61,14 +61,11 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 
 -include $(TOPDIR)/Rules.make
 
-all: hal.obj opt_ah.h
+all: ${HAL}/public/${TARGET}.hal opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
-	cp -f hal.obj hal.o
+	cp -f ${HAL}/public/${TARGET}.hal hal.o
 	rm -f ath_hal.o ath_hal.ko ath_hal.mod.c ath_hal.mod.o
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
-
-$(obj)/hal.obj:
-	${UUDECODE} -o $@ ${HAL}/public/${TARGET}.hal.o.uu
 
 opt_ah.h: ${HAL}/public/${TARGET}.opt_ah.h
 	cp -f ${HAL}/public/${TARGET}.opt_ah.h opt_ah.h
@@ -83,7 +80,7 @@ clean:
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 	-rm -rf .tmp_versions
 # remove the files we copied to this dir
-	-rm -f opt_ah.h hal.obj
+	-rm -f opt_ah.h
 
 ath_hal.o: ${ath_hal-objs}
 	$(LD) $(LDOPTS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)
