@@ -128,14 +128,6 @@ sanitycheck:
 	    exit 1; \
 	fi
 	
-	@# see if uudecode is available
-	@if [ -z "$(UUDECODE)" ]; then \
-	    echo "FAILED"; \
-	    echo "The 'uudecode' tool was not found on your system. Please make sure"; \
-	    echo "it is installed in your PATH, then try again."; \
-	    exit 1; \
-	fi
-	
 	@echo "ok."
 
 # new targets should be inserted ABOVE this line in order to avoid
