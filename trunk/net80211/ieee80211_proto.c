@@ -1218,6 +1218,9 @@ sta_deauth(void *arg, struct ieee80211_node *ni)
 			IEEE80211_REASON_ASSOC_LEAVE);
 }
 
+/*
+ * Context: softIRQ (tasklet) and process
+ */
 int
 ieee80211_new_state(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 {
@@ -1225,9 +1228,9 @@ ieee80211_new_state(struct ieee80211vap *vap, enum ieee80211_state nstate, int a
 	int rc;
 
 	/* grab the lock so that only one vap can go through transistion at any time */
-	IEEE80211_VAPS_LOCK(ic);
+	IEEE80211_VAPS_LOCK_BH(ic);
 	rc = vap->iv_newstate(vap, nstate, arg);
-	IEEE80211_VAPS_UNLOCK(ic);
+	IEEE80211_VAPS_UNLOCK_BH(ic);
 	return rc;
 }
 
