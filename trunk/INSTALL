@@ -10,7 +10,6 @@ Read the file COPYRIGHT for the complete copyright.
 Requirements
 ============
 
-o uudecode tool (part of sharutils)
 o Kernel sources of the target kernel (some Linux distributions provide
   headers, makefiles and configuration data - it should suffice).
 o Wireless Extensions support (14 or later, 17 preferred) - option

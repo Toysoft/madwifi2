@@ -25,12 +25,6 @@ ifndef HAL_OBJDIR
 #
 # Use release version of HAL.
 #
-# NB: binary HAL's are distributed in a uuencode'd file; on some
-#     systems uuencode is not installed by default and you must
-#     specially install it from the sharutils package.
-#
-UUDECODE?=	uudecode
-
 HAL=		$(src)/../hal
 OPT_AH_H=	${HAL}/public/${TARGET}.opt_ah.h
 else
@@ -53,8 +47,8 @@ endif
 ##2.4##include $(TOPDIR)/Rules.make
 
 ifndef HAL_OBJDIR
-$(obj)/hal.o:	${HAL}/public/${TARGET}.hal.o.uu
-	${UUDECODE} -o $(obj)/hal.o < $<
+$(obj)/hal.o:	${HAL}/public/${TARGET}.hal
+	cp $< $(obj)/hal.o
 else
 $(obj)/hal.o:	${HAL_OBJDIR}/hal.o
 	cp ${HAL_OBJDIR}/hal.o $(obj)/hal.o
