@@ -507,7 +507,7 @@ list_stations(const char *ifname)
 		errx(1, "unable to get station information");
 	len = iwr.u.data.length;
 	if (len < sizeof(struct ieee80211req_sta_info))
-		errx(1, "len < sizeof(struct ieee80211req_scan_result)");
+		return;
 
 	printf("%-17.17s %4s %4s %4s %4s %4s %4s %6s %6s %4s %5s %3s %8s %8s\n",
 		"ADDR",
@@ -586,7 +586,7 @@ list_scan(const char *ifname)
 	if (len == -1)
 		errx(1, "unable to get scan results");
 	if (len < sizeof(struct ieee80211req_scan_result))
-		errx(1, "len < sizeof(struct ieee80211req_scan_result)");
+		return;
 
 	printf("%-14.14s  %-17.17s  %4s %4s  %-5s %3s %4s\n",
 		"SSID",
