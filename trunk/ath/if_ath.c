@@ -2262,7 +2262,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	struct ieee80211_frame *wh; 
 	
 	wh = (struct ieee80211_frame *) skb->data;
-	try0 = ATH_TXMAXTRY;
+	try0 = ph->try0;
 	rt = sc->sc_currates;
 	txrate = dot11_to_ratecode(sc, rt, ph->rate0);
 	power = ph->power > 60 ? 60 : ph->power;
