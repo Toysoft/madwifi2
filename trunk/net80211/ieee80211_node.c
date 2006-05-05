@@ -1245,6 +1245,18 @@ ieee80211_add_neighbor(struct ieee80211vap *vap,	const struct ieee80211_frame *w
 			ic->ic_newassoc(ni, 1);
 		/* XXX not right for 802.1x/WPA */
 		ieee80211_node_authorize(ni);
+		if (vap->iv_opmode == IEEE80211_M_AHDEMO) {
+			/*
+			 * Blindly propagate capabilities based on the
+			 * local configuration.  In particular this permits
+			 * us to use QoS to disable ACK's and to use short
+			 * preamble on 2.4G channels.
+			 */
+			if (vap->iv_flags & IEEE80211_F_WME)
+				ni->ni_flags |= IEEE80211_NODE_QOS;
+			if (vap->iv_flags & IEEE80211_F_SHPREAMBLE)
+				ni->ni_capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
+		}
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
 		"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
@@ -1512,11 +1524,15 @@ ieee80211_node_table_cleanup(struct ieee80211_node_table *nt)
 static void
 ieee80211_timeout_stations(struct ieee80211_node_table *nt)
 {
+	struct ieee80211com *ic = nt->nt_ic;
 	struct ieee80211_node *ni;
 	u_int gen;
+	int isadhoc;
 
+	isadhoc = (ic->ic_opmode == IEEE80211_M_IBSS ||
+		   ic->ic_opmode == IEEE80211_M_AHDEMO);
 	IEEE80211_SCAN_LOCK_IRQ(nt); 
-	gen = nt->nt_scangen++;
+	gen = ++nt->nt_scangen;
 restart:
 	IEEE80211_NODE_LOCK_IRQ(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
@@ -1528,7 +1544,8 @@ restart:
 		 * will be reclaimed when the last reference to them
 		 * goes away (when frame xmits complete).
 		 */
-		if ((ni->ni_flags & IEEE80211_NODE_AREF) == 0)
+		if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
+		    (ni->ni_flags & IEEE80211_NODE_AREF) == 0)
 			continue;
 		ni->ni_scangen = gen;
 		/*
@@ -1552,7 +1569,7 @@ restart:
 			continue;
 		}
 		ni->ni_inact--;
-		if (ni->ni_associd != 0) {
+		if (ni->ni_associd != 0 || isadhoc) {
 			struct ieee80211vap *vap = ni->ni_vap;
 			/*
 			 * Age frames on the power save queue.
@@ -1642,7 +1659,7 @@ ieee80211_iterate_nodes(struct ieee80211_node_table *nt, ieee80211_iter_func *f,
 	u_int gen;
 
 	IEEE80211_SCAN_LOCK_IRQ(nt);
-	gen = nt->nt_scangen++;
+	gen = ++nt->nt_scangen;
 restart:
 	IEEE80211_NODE_LOCK(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
@@ -1928,10 +1945,6 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 		"station with aid %d leaves (refcnt %u)",
 		IEEE80211_NODE_AID(ni), ieee80211_node_refcnt(ni));
 
-	KASSERT(vap->iv_opmode == IEEE80211_M_HOSTAP ||
-		vap->iv_opmode == IEEE80211_M_IBSS ||
-		vap->iv_opmode == IEEE80211_M_AHDEMO,
-		("unexpected operating mode %u", vap->iv_opmode));
 	/*
 	 * If node wasn't previously associated all
 	 * we need to do is reclaim the reference.
