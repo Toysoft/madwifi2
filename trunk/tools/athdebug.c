@@ -74,7 +74,11 @@ enum {
 	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
 	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
 	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
-	ATH_DEBUG_FF		= 0x00100000,	/* fast frames */
+	ATH_DEBUG_LED		= 0x00100000,	/* led management */
+	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
+	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamice turbo */
+	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
+	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
@@ -101,7 +105,11 @@ static struct {
 	{ "keycache",	ATH_DEBUG_KEYCACHE, "key cache management" },
 	{ "state",	ATH_DEBUG_STATE, "802.11 state transitions" },
 	{ "node",	ATH_DEBUG_NODE, "node management" },
+	{ "led",        ATH_DEBUG_LED, "led management" },
 	{ "ff",		ATH_DEBUG_FF, "fast frame handling" },
+	{ "turbo",	ATH_DEBUG_TURBO, "dynamic turbo handling" },
+	{ "uapsd",	ATH_DEBUG_UAPSD, "WME/UAPSD handling" },
+	{ "doth",	ATH_DEBUG_DOTH, "802.11h handling" },
 	{ "fatal",	ATH_DEBUG_FATAL, "fatal errors" },
 };
 
