@@ -37,15 +37,15 @@ endif
 
 DEPTH=	..
 
-obj-m		+= ath_hal.o
-ath_hal-objs	:= ah_osdep.o hal.o
-
 include $(obj)/${DEPTH}/Makefile.inc
+
+obj-m		+= ath_hal.o
+ath_hal-objs	:= ah_osdep.o ${TARGET}.hal.o
 
 # If building into kernel
 
 ifneq ($(MAKING_MODULES),1)
-obj-$(CONFIG_ATHEROS_HAL) := ah_osdep.o hal.o
+obj-$(CONFIG_ATHEROS_HAL) := ah_osdep.o ${TARGET}.hal.o
 ifdef LINUX24
 O_TARGET	:= ath_hal.o
 endif
@@ -64,8 +64,8 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 all: ${HAL}/public/${TARGET}.hal opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
-$(obj)/hal.o: ${HAL}/public/${TARGET}.hal
-	echo "deps_$@ :=" >$(obj)/.hal.o.cmd
+$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal
+	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
 	cp -f $< $@
 
 opt_ah.h: ${HAL}/public/${TARGET}.opt_ah.h
