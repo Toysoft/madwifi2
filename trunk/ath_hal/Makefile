@@ -63,9 +63,10 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 
 all: ${HAL}/public/${TARGET}.hal opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
-	cp -f ${HAL}/public/${TARGET}.hal hal.o
-	rm -f ath_hal.o ath_hal.ko ath_hal.mod.c ath_hal.mod.o
-	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
+
+$(obj)/hal.o: ${HAL}/public/${TARGET}.hal
+	echo "deps_$@ :=" >$(obj)/.hal.o.cmd
+	cp -f $< $@
 
 opt_ah.h: ${HAL}/public/${TARGET}.opt_ah.h
 	cp -f ${HAL}/public/${TARGET}.opt_ah.h opt_ah.h
