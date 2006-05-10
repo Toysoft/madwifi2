@@ -1962,7 +1962,8 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 		vap->iv_auth->ia_node_leave(ni);
 
 	IEEE80211_LOCK_IRQ(ic);
-	IEEE80211_AID_CLR(vap, ni->ni_associd);
+	if (vap->iv_aid_bitmap != NULL)
+		IEEE80211_AID_CLR(vap, ni->ni_associd);
 	ni->ni_associd = 0;
 	vap->iv_sta_assoc--;
 	ic->ic_sta_assoc--;
