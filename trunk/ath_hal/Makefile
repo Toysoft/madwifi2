@@ -41,6 +41,7 @@ include $(obj)/${DEPTH}/Makefile.inc
 
 obj-m		+= ath_hal.o
 ath_hal-objs	:= ah_osdep.o ${TARGET}.hal.o
+hostprogs-y	:= uudecode
 
 # If building into kernel
 
@@ -64,9 +65,9 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 all: opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
-$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu
+$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
 	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
-	uudecode -o $@ $<
+	$(obj)/uudecode -o $@ $<
 
 opt_ah.h: ${HAL}/public/${TARGET}.opt_ah.h
 	cp -f ${HAL}/public/${TARGET}.opt_ah.h opt_ah.h
@@ -77,7 +78,7 @@ install:
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	-rm -f *~ *.o *.ko *.mod.c
+	-rm -f *~ *.o *.ko *.mod.c uudecode
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 	-rm -rf .tmp_versions
 # remove the files we copied to this dir
