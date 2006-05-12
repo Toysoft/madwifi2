@@ -61,12 +61,12 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 
 -include $(TOPDIR)/Rules.make
 
-all: ${HAL}/public/${TARGET}.hal opt_ah.h
+all: opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
-$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal
+$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu
 	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
-	cp -f $< $@
+	uudecode -o $@ $<
 
 opt_ah.h: ${HAL}/public/${TARGET}.opt_ah.h
 	cp -f ${HAL}/public/${TARGET}.opt_ah.h opt_ah.h
