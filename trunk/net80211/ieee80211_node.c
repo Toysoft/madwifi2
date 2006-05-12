@@ -677,7 +677,7 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 
 	/* NB: must be after ni_chan is setup */
 	ieee80211_setup_rates(ni, se->se_rates, se->se_xrates,
-		IEEE80211_F_DOSORT);
+		IEEE80211_F_DOSORT | IEEE80211_F_DONEGO | IEEE80211_F_DODEL);
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
 	"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
@@ -1205,7 +1205,7 @@ ieee80211_fakeup_adhoc_node(struct ieee80211vap *vap,
 /*
  * Do node discovery in adhoc mode on receipt of a beacon
  * or probe response frame.  Note that for the driver's
- * benefit we we treat this like an association so the
+ * benefit we treat this like an association so the
  * driver has an opportunity to setup it's private state.
  */
 struct ieee80211_node *
