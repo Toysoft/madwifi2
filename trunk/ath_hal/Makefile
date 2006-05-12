@@ -65,6 +65,11 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 all: opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
+ifdef LINUX24
+$(obj)/uudecode: uudecode.c
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+endif
+
 $(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
 	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
 	$(obj)/uudecode -o $@ $<
