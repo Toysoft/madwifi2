@@ -536,11 +536,15 @@ ath_hal_sysctl_unregister(void)
 /*
  * Module glue.
  */
+#include "version.h"
 static char *dev_info = "ath_hal";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Atheros Hardware Access Layer (HAL)");
 MODULE_SUPPORTED_DEVICE("Atheros WLAN devices");
+#ifdef MODULE_VERSION
+MODULE_VERSION(ATH_HAL_VERSION);
+#endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Proprietary");
 #endif
