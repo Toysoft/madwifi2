@@ -4854,21 +4854,6 @@ ieee80211_new_wlanunit(void)
 }
 
 /*
- * Check if the specified unit number is available and, if
- * so, mark it in use.  Return 1 on success, 0 on failure.
- */
-static int
-ieee80211_alloc_wlanunit(u_int unit)
-{
-	/* NB: covered by rtnl_lock */
-	if (unit < sizeof(wlan_units)*NBBY && isclr(wlan_units, unit)) {
-		setbit(wlan_units, unit);
-		return 1;
-	} else
-		return 0;
-}
-
-/*
  * Reclaim the specified unit number.
  */
 static void
@@ -4881,29 +4866,6 @@ ieee80211_delete_wlanunit(u_int unit)
 }
 
 /*
- * Extract a unit number from an interface name.  If no unit
- * number is specified then -1 is returned for the unit number.
- * Return 0 on success or an error code.
- */
-static int
-ifc_name2unit(const char *name, int *unit)
-{
-	const char *cp;
-
-	for (cp = name; *cp != '\0' && !('0' <= *cp && *cp <= '9'); cp++);
-	if (*cp != '\0') {
-		*unit = 0;
-		for (; *cp != '\0'; cp++) {
-			if (!('0' <= *cp && *cp <= '9'))
-				return -EINVAL;
-			*unit = (*unit * 10) + (*cp - '0');
-		}
-	} else
-		*unit = -1;
-	return 0;
-}
-
-/*
  * Create a virtual ap.  This is public as it must be implemented
  * outside our control (e.g. in the driver).
  */
@@ -4913,26 +4875,18 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 	struct ieee80211_clone_params cp;
 	struct ieee80211vap *vap;
 	char name[IFNAMSIZ];
-	int error, unit;
+	int unit;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 	if (copy_from_user(&cp, ifr->ifr_data, sizeof(cp)))
 		return -EFAULT;
-	error = ifc_name2unit(cp.icp_name, &unit);
-	if (error)
-		return error;
-	if (unit == -1) {
-		unit = ieee80211_new_wlanunit();
-		if (unit == -1)
-			return -EIO;		/* XXX */
-		/* XXX verify name fits */
-		snprintf(name, sizeof(name), "%s%d", cp.icp_name, unit);
-	} else {
-		if (!ieee80211_alloc_wlanunit(unit))
-			return -EINVAL;
-		strncpy(name, cp.icp_name, sizeof(name));
-	}
+
+	unit = ieee80211_new_wlanunit();
+	if (unit == -1)
+		return -EIO;		/* XXX */
+	strncpy(name, cp.icp_name, sizeof(name));
+	
 	vap = ic->ic_vap_create(ic, name, unit, cp.icp_opmode, cp.icp_flags, mdev);
 	if (vap == NULL) {
 		ieee80211_delete_wlanunit(unit);
@@ -4954,18 +4908,10 @@ ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	struct net_device *mdev, int opmode, int opflags)
 {
 	struct ieee80211vap *vap;
-	int error, unit;
+	int unit;
 	
-	if ((error = ifc_name2unit(name, &unit)))
-		return error;
-
-	if (unit == -1) {
-		if ((unit = ieee80211_new_wlanunit()) == -1)
-			return -EIO;		/* XXX */
-	} else {
-		if (!ieee80211_alloc_wlanunit(unit))
-			return -EINVAL;
-	}
+	if ((unit = ieee80211_new_wlanunit()) == -1)
+		return -EIO;		/* XXX */
 
 	if ((vap = ic->ic_vap_create(ic, name, unit, opmode, opflags, mdev)) == NULL) {
 		ieee80211_delete_wlanunit(unit);

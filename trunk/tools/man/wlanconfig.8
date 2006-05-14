@@ -18,8 +18,8 @@ underlying base device which is created when the driver is loaded.
 .PP
 .SH "ARGUMENTS"
 .TP
-.B <vap> create wlandev <base device> wlanmode <mode> [bssid|-bssid] [nosbeacon]
-Create the interface <vap> using the specified <base device> and <mode>. <vap> can either be a full interface name (e.g. 'ath0'), or just the suffix (e.g. 'ath'), in which case, the kernel will automatically append the next vacant integer.
+.B <vap> create [nounit] wlandev <base device> wlanmode <mode> [bssid|-bssid] [nosbeacon]
+Create the interface <vap> using the specified <base device> and <mode>. <vap> can either be a full interface name (e.g. 'ath0'), or just the suffix (e.g. 'ath'), in which case, the kernel will automatically append the next vacant integer. [nounit] will turn off the automatic integer increments.
 .TP
 .B <vap> destroy
 Removes the given VAP interface. You must specify the full interface name. I.e 'ath0' rather than just 'ath'.
