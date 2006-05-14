@@ -46,6 +46,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +72,9 @@
 
 #define	streq(a,b)	(strncasecmp(a,b,sizeof(b)-1) == 0)
 
+static int if_split_name(const char *, char **, unsigned int *);
+static int proc_if_get_name(char *, char *, size_t);
+static int if_find_unit(const char *);
 static void vap_create(struct ifreq *);
 static void vap_destroy(const char *);
 static void list_stations(const char *);
@@ -96,6 +100,10 @@ int
 main(int argc, char *argv[])
 {
 	const char *ifname, *cmd;
+	unsigned char bnounit = 0;
+	char *if_base = NULL;
+	unsigned int unit_res = -1;
+	int res = 0;
 
 	if (argc < 2 ||
 	  strncmp(argv[1],"-h",2) == 0 || strncmp(argv[1],"--h",3) == 0)
@@ -135,6 +143,8 @@ main(int argc, char *argv[])
 				strncpy(ifr.ifr_name, argv[4], IFNAMSIZ);
 				argc--;
 				argv++;
+			} else if (strcmp(argv[3], "nounit" ) == 0) {
+				bnounit = 1;
 			} else {
 				int flag = getflag(argv[3]);
 				if (flag < 0)
@@ -147,11 +157,31 @@ main(int argc, char *argv[])
 		}
 		if (ifr.ifr_name[0] == '\0')
 			errx(1, "no device specified with wlandev");
+
+		res = if_split_name(cp.icp_name, &if_base, &unit_res);
+		if (res < 0) {
+			err(1, "if_split_name() - malloc");
+		} else if ((res == 0) && (bnounit == 0)) {
+			/* user gave a string only and using a unit */
+			unit_res = if_find_unit(if_base);
+
+			if (unit_res < 0) {
+				err(1, "if_find_unit - failed");
+			} else {
+				snprintf(cp.icp_name + strlen(if_base),
+					IFNAMSIZ - strlen(if_base), "%d", unit_res);
+			}
+		}
+
+		free(if_base);
+		if_base = NULL;
+
 		ifr.ifr_data = (void *) &cp;
 		vap_create(&ifr);
-	} else if (streq(cmd, "destroy"))
+		printf("%s\n", cp.icp_name);
+	} else if (streq(cmd, "destroy")) {
 		vap_destroy(ifname);
-	else if (streq(cmd, "list")) {
+	} else if (streq(cmd, "list")) {
 		if (argc > 3) {
 			const char *arg = argv[3];
 
@@ -179,21 +209,123 @@ main(int argc, char *argv[])
 	return 0;
 }
 
+// if_split_name - takes a name and splits it into the longest non-numeric only string
+// 		   including the first character plus the value of the longest numeric 
+// 		   string including the last character
+// 	returns  : < 0 on error
+// 		   0 on finding only a string
+// 		   1 on finding a numeric/unit at the end of the string
+//
+// 		   NOTE Allocates memory.
+static int if_split_name(const char *if_name, char **if_base_name, unsigned int *unit) {
+	int status = -1;
+	const char *p = NULL;
+	const char *l = NULL;
+
+	/*
+	 * Look for the unit from end to start
+	 */
+	l = if_name + strlen(if_name) - 1;
+	for (p = l; p >= if_name; --p) {
+		if (!isdigit(*p))
+			break;
+	}
+	
+	if (p < l) {
+		if (unit != NULL)
+			*unit = atoi(p + 1);
+		status = 1;
+	} else
+		status = 0;
+
+	/*
+	 * Wherever the unit began, one index before it is the ending of the string
+	 */
+	if (if_base_name != NULL) {
+		*if_base_name = malloc(p - if_name + 2);
+		if (*if_base_name != NULL) {
+			memset(*if_base_name, 0, p - if_name + 2);
+			strncpy(*if_base_name, if_name, p - if_name + 1);
+		} else
+			status = -1;
+	}
+
+	return status;
+}
+
+// *if_name must point to a memory location of at least IFNAMSIZ bytes
+static int proc_if_get_name(char *if_name, char *line, size_t line_sz) {
+	char	*p	= NULL;
+	char	*s	= NULL;
+	int	status	= -1;
+	
+	memset(if_name, 0, IFNAMSIZ);
+	
+	for (p = line; p - line < line_sz; ++p) {
+		if ((!isspace(*p)) && (s == NULL)) {
+			// First character
+			s = p;
+		} else if (isspace(*p) && (s != NULL)) {
+			// Sanity Check: no spaces in interface name
+			break;
+		} else if (*p == ':') {
+			// Copy everything up to the ':' - string is already zeroed
+			strncpy(if_name, s, p - s);
+			status = 0;
+			break;
+		}
+	}
+
+	return (status);
+}
+
+static int if_find_unit(const char *if_name) {
+	int	unit	= -1;
+	
+	FILE	*fh_proc_if	= NULL;
+	char	lin_buf[512];
+	char	if_cmp[IFNAMSIZ];
+
+	if ((fh_proc_if = fopen("/proc/net/dev", "r")) < 0) {
+		err(1, "fopen(/proc/net/dev)");
+	} else {
+		int i;
+		// Eat two header lines
+		for (i = 0; i < 2; ++i) {
+			fgets(lin_buf, sizeof(lin_buf), fh_proc_if);
+		}
+		while (fgets(lin_buf, sizeof(lin_buf), fh_proc_if) != NULL) {
+			char	*p	= NULL;
+			int	tmp	= -1;
+			
+			if (proc_if_get_name(if_cmp, lin_buf, sizeof(lin_buf)) < 0) {
+				err(1, "proc_if_get_name - malformed data from /proc/net/dev");
+			} else {
+				p = strstr(if_cmp, if_name);
+				if (p != NULL)
+					tmp = atoi(p + strlen(if_name));
+				if (unit < tmp)
+					unit = tmp;
+			}
+		}
+		fclose(fh_proc_if);
+	}
+
+	return (unit + 1);
+}
+
 static void
 vap_create(struct ifreq *ifr)
 {
-	char oname[IFNAMSIZ];
 	int s;
-
 	s = socket(AF_INET, SOCK_DGRAM, 0);
 	if (s < 0)
 		err(1, "socket(SOCK_DGRAM)");
-	strncpy(oname, ifr->ifr_name, IFNAMSIZ);
+
 	if (ioctl(s, SIOC80211IFCREATE, ifr) < 0)
 		err(1, "ioctl");
-	/* NB: print name of clone device when generated */
-	if (memcmp(oname, ifr->ifr_name, IFNAMSIZ) != 0)
-		printf("%s\n", ifr->ifr_name);
+
+	close(s);
 }
 
 static void
@@ -209,12 +341,13 @@ vap_destroy(const char *ifname)
 	strncpy(ifr.ifr_name, ifname, IFNAMSIZ);
 	if (ioctl(s, SIOC80211IFDESTROY, &ifr) < 0)
 		err(1, "ioctl");
+	close(s);
 }
 
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: wlanconfig athX create wlandev wifiX\n");
+	fprintf(stderr, "usage: wlanconfig athX create [nounit] wlandev wifiY\n");
 	fprintf(stderr, "            wlanmode [sta|adhoc|ap|monitor|wds|ahdemo] [bssid | -bssid] [nosbeacon]\n");
 	fprintf(stderr, "usage: wlanconfig athX destroy\n");
 	fprintf(stderr, "usage: wlanconfig athX list [active|ap|caps|chan|freq|keys|scan|sta|wme]\n");
@@ -508,6 +641,7 @@ list_stations(const char *ifname)
 	len = iwr.u.data.length;
 	if (len < sizeof(struct ieee80211req_sta_info))
 		return;
+	close(s);
 
 	printf("%-17.17s %4s %4s %4s %4s %4s %4s %6s %6s %4s %5s %3s %8s %8s\n",
 		"ADDR",
