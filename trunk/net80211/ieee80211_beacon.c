@@ -136,8 +136,6 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		bo->bo_erp = frm;
 		frm = ieee80211_add_erp(frm, ic);
 	}
-	if (vap->iv_flags & IEEE80211_F_WPA)
-		frm = ieee80211_add_wpa(frm, vap);
 	frm = ieee80211_add_xrates(frm, rs);
 	if (vap->iv_flags & IEEE80211_F_WME) {
 		bo->bo_wme = frm;
@@ -153,6 +151,8 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
 		frm = ieee80211_add_xr_param(frm, vap);
 #endif
+	if (vap->iv_flags & IEEE80211_F_WPA)
+		frm = ieee80211_add_wpa(frm, vap);
 	bo->bo_tim_trailerlen = frm - bo->bo_tim_trailer;
 	bo->bo_chanswitch_trailerlen = frm - bo->bo_chanswitch;
 

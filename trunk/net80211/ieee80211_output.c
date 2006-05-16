@@ -1874,8 +1874,6 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			*frm++ = 1;
 			*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
 		}
-		if (vap->iv_flags & IEEE80211_F_WPA)
-			frm = ieee80211_add_wpa(frm, vap);
 		if (IEEE80211_IS_CHAN_ANYG(ic->ic_curchan))
 			frm = ieee80211_add_erp(frm, ic);
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
@@ -1889,6 +1887,9 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
 			frm = ieee80211_add_xr_param(frm, vap);
 #endif
+		if (vap->iv_flags & IEEE80211_F_WPA)
+			frm = ieee80211_add_wpa(frm, vap);
+
 		skb_trim(skb, frm - skb->data);
 		break;
 
