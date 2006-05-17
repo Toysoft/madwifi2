@@ -594,7 +594,8 @@ findchannel(struct ieee80211com *ic, int ieee, int mode)
 			continue;
 		if (mode == IEEE80211_MODE_AUTO) {
 			/* ignore turbo channels for autoselect */
-			if (IEEE80211_IS_CHAN_TURBO(c))
+			if (!(ic->ic_ath_cap & IEEE80211_ATHC_TURBOP) &&
+			    IEEE80211_IS_CHAN_TURBO(c))
 				continue;
 			/*
 			 * XXX special-case 11b/g channels so we
