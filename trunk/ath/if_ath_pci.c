@@ -98,7 +98,12 @@ static struct pci_device_id ath_pci_id_table[] __devinitdata = {
 	{ 0x168c, 0x001b, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0x168c, 0x001c, PCI_ANY_ID, PCI_ANY_ID }, /* PCI Express 5424 */
 	{ 0x168c, 0x001d, PCI_ANY_ID, PCI_ANY_ID }, /* PCI Express ???  */
+	{ 0x168c, 0x9013, PCI_ANY_ID, PCI_ANY_ID }, /* sonicwall */
 	{ 0 }
+};
+
+static u16 ath_devidmap[][2] = {
+	{ 0x9013, 0x0013 }
 };
 
 static int
@@ -111,6 +116,8 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	const char *athname;
 	u_int8_t csz;
 	u32 val;
+	u16 vdevice;
+	int i;
 
 	if (pci_enable_device(pdev))
 		return -EIO;
@@ -202,10 +209,18 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bad3;
 	}
 
-	if (ath_attach(id->device, dev) != 0)
+	/* looking for device type from broken device id */
+	vdevice = id->device;
+	for(i=0;i<sizeof(ath_devidmap)/sizeof(ath_devidmap[0]);i++) {
+		if(id->device == ath_devidmap[i][0]) {
+			vdevice = ath_devidmap[i][1];
+			break;
+		}
+	}
+	if (ath_attach(vdevice, dev) != 0)
 		goto bad4;
 
-	athname = ath_hal_probe(id->vendor, id->device);
+	athname = ath_hal_probe(id->vendor, vdevice);
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
 		dev->name, athname ? athname : "Atheros ???", phymem, dev->irq);
 
