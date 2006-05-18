@@ -9,9 +9,8 @@ DEPTH=../..
 # source tree so it can be built statically.  Typically this
 # is done to simplify debugging with tools like kgdb.
 #
-KERNEL_VERSION=`uname -r | \
-		awk '{ split($0,a,"."); print a[1] "." a[2]; }'`
-KERNEL_PATH=${1:-/lib/modules/${KERNEL_VERSION}/build}
+KERNEL_VERSION=`uname -r`
+KERNEL_PATH=${1:-/lib/modules/${KERNEL_VERSION}/source}
 
 MKDIR()
 {
@@ -98,7 +97,7 @@ INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.h
 MKDIR ${DST_HAL}/public
 INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.inc
 INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.opt_ah.h
-INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.hal
+INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.hal.o.uu
 if [ -d ${SRC_HAL}/ar5212 ]; then
 	MKDIR ${DST_HAL}/ar5212
 	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212desc.h
