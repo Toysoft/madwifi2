@@ -2,10 +2,14 @@
 # Makefile for the Atheros WLAN driver.
 #
 
+##2.4##obj=.
 ##2.4##src=.
+##2.6##src:=$(srctree)/$(src)
+
+include $(src)/../BuildCaps.inc
 
 HAL=	$(src)/../hal
-ATH_HAL=$(src)/../_ath_hal
+ATH_HAL=$(obj)/../_ath_hal
 WLAN=	${src}/../net80211
 COMPAT=	${WLAN}/compat
 
