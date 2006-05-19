@@ -67,10 +67,15 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 
 	KASSERT(ic->ic_bsschan != IEEE80211_CHAN_ANYC, ("no bss chan"));
 
-	memset(frm, 0, 8);	/* XXX timestamp is set by hardware/driver */
+	/* XXX timestamp is set by hardware/driver */
+	memset(frm, 0, 8);
 	frm += 8;
+
+	/* beacon interval */
 	*(u_int16_t *)frm = htole16(ni->ni_intval);
 	frm += 2;
+
+	/* capability information */
 	if (vap->iv_opmode == IEEE80211_M_IBSS)
 		capinfo = IEEE80211_CAPINFO_IBSS;
 	else
@@ -87,6 +92,8 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	bo->bo_caps = (u_int16_t *)frm;
 	*(u_int16_t *)frm = htole16(capinfo);
 	frm += 2;
+
+	/* ssid */
 	*frm++ = IEEE80211_ELEMID_SSID;
 	if ((vap->iv_flags & IEEE80211_F_HIDESSID) == 0) {
 		*frm++ = ni->ni_esslen;
@@ -94,15 +101,21 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		frm += ni->ni_esslen;
 	} else
 		*frm++ = 0;
+	
+	/* supported rates */
 	frm = ieee80211_add_rates(frm, rs);
 
-	/* XXX better way to check this? */
+
+	/* XXX: better way to check this? */
+	/* XXX: how about DS ? */
 	if (!IEEE80211_IS_CHAN_FHSS(ic->ic_bsschan)) {
 		*frm++ = IEEE80211_ELEMID_DSPARMS;
 		*frm++ = 1;
 		*frm++ = ieee80211_chan2ieee(ic, ic->ic_bsschan);
 	}
 	bo->bo_tim = frm;
+
+	/* IBSS/TIM */
 	if (vap->iv_opmode == IEEE80211_M_IBSS) {
 		*frm++ = IEEE80211_ELEMID_IBSSPARMS;
 		*frm++ = 2;
@@ -122,37 +135,55 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	}
 	bo->bo_tim_trailer = frm;
 
+	/* country */
 	if ((ic->ic_flags & IEEE80211_F_DOTH) || 
 	    (ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE)) {
 		frm = ieee80211_add_country(frm, ic);
 	}
+
+	/* power constraint */
 	if (ic->ic_flags & IEEE80211_F_DOTH) {
 		*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 		*frm++ = 1;
 		*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
 	}
+
+	/* XXX: channel switch announcement ? */ 
 	bo->bo_chanswitch = frm;
+
+	/* ERP */
 	if (IEEE80211_IS_CHAN_ANYG(ic->ic_bsschan)) {
 		bo->bo_erp = frm;
 		frm = ieee80211_add_erp(frm, ic);
 	}
+
+	/* Ext. Supp. Rates */
 	frm = ieee80211_add_xrates(frm, rs);
+
+	/* WME */
 	if (vap->iv_flags & IEEE80211_F_WME) {
 		bo->bo_wme = frm;
 		frm = ieee80211_add_wme_param(frm, &ic->ic_wme, IEEE80211_VAP_UAPSD_ENABLED(vap));
 		vap->iv_flags &= ~IEEE80211_F_WMEUPDATE;
 	}
+
+	/* WPA 1+2 */
+	if (vap->iv_flags & IEEE80211_F_WPA)
+		frm = ieee80211_add_wpa(frm, vap);
+
+	/* athAdvCaps */
 	bo->bo_ath_caps = frm;
 	if (vap->iv_bss && vap->iv_bss->ni_ath_flags)
 		frm = ieee80211_add_athAdvCap(frm, vap->iv_bss->ni_ath_flags,
 			vap->iv_bss->ni_ath_defkeyindex);
+	
+	/* XR */
 	bo->bo_xr = frm;
 #ifdef ATH_SUPERG_XR
 	if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
 		frm = ieee80211_add_xr_param(frm, vap);
 #endif
-	if (vap->iv_flags & IEEE80211_F_WPA)
-		frm = ieee80211_add_wpa(frm, vap);
+	
 	bo->bo_tim_trailerlen = frm - bo->bo_tim_trailer;
 	bo->bo_chanswitch_trailerlen = frm - bo->bo_chanswitch;
 
@@ -182,12 +213,12 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	 *	[2] cabability information
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
-	 *	[3] parameter set (DS)
-	 *	[tlv] parameter set (IBSS/TIM)
-	 *	[tlv] country code, if present
+	 *	[7] FH/DS parameter set
+	 *	[tlv] IBSS/TIM parameter set
+	 *	[tlv] country code 
 	 *	[3] power constraint
 	 *	[5] channel switch announcement
-	 *	[tlv] extended rate phy (ERP)
+	 *	[3] extended rate phy (ERP)
 	 *	[tlv] extended supported rates
 	 *	[tlv] WME parameters
 	 *	[tlv] WPA/RSN parameters
@@ -199,20 +230,20 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	rs = &ni->ni_rates;
 	pktlen =   8					/* time stamp */
 		 + sizeof(u_int16_t)			/* beacon interval */
-		 + sizeof(u_int16_t)			/* capabilities */
+		 + sizeof(u_int16_t)			/* capability information */
 		 + 2 + ni->ni_esslen			/* ssid */
 	         + 2 + IEEE80211_RATE_SIZE		/* supported rates */
-	         + 2 + 1				/* DS parameters */
-		 + 2 + 4 + vap->iv_tim_len		/* DTIM/IBSSPARMS */
+	         + 7 					/* FH/DS parameters max(7,3) */
+		 + 2 + 4 + vap->iv_tim_len		/* IBSS/TIM parameter set*/
 		 + ic->ic_country_ie.country_len + 2	/* country code */
 	         + 3					/* power constraint */
-	         + 5					/* channel switch */
-		 + 2 + 1				/* ERP */
-	         + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+	         + 5					/* channel switch announcement */
+		 + 3					/* ERP */
+	         + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) /* Ext. Supp. Rates */
 		 + (vap->iv_caps & IEEE80211_C_WME ?	/* WME */
 			sizeof(struct ieee80211_wme_param) : 0)
 		 + (vap->iv_caps & IEEE80211_C_WPA ?	/* WPA 1+2 */
-			2*sizeof(struct ieee80211_ie_wpa) : 0)
+			2 * sizeof(struct ieee80211_ie_wpa) : 0)
 		 + sizeof(struct ieee80211_ie_athAdvCap)
 #ifdef ATH_SUPERG_XR
 		 + (ic->ic_ath_cap & IEEE80211_ATHC_XR ?	/* XR */
