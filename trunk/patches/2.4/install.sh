@@ -126,3 +126,13 @@ grep -q 'CONFIG_ATHEROS' ${WIRELESS}/Makefile || \
 DST_DOC=${KERNEL_PATH}/Documentation
 grep -q 'CONFIG_ATHEROS' ${DST_DOC}/Configure.help || \
 	PATCH ${DST_DOC}/Configure.help Configure.help.patch
+
+INSTALL ${WIRELESS} ${DEPTH}/BuildCaps.inc
+cat >>${WIRELESS}/BuildCaps.inc <<EOF
+
+ifdef CONFIG_CPU_BIG_ENDIAN
+EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
+else
+EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
+endif
+EOF

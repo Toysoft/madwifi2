@@ -127,3 +127,13 @@ grep -q 'ath/Kconfig' ${WIRELESS}/Kconfig || \
 	cat Kconfig.ath >> ${WIRELESS}/Kconfig
 grep -q '_ath_hal' ${WIRELESS}/Makefile || \
 	cat Makefile.ath >> ${WIRELESS}/Makefile
+
+INSTALL ${WIRELESS} ${DEPTH}/BuildCaps.inc
+cat >>${WIRELESS}/BuildCaps.inc <<EOF
+
+ifdef CONFIG_CPU_BIG_ENDIAN
+EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
+else
+EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
+endif
+EOF
