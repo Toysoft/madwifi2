@@ -1,5 +1,5 @@
 #
-# Makefile for Onoe's rate control algorithm.
+# Makefile for Atsushi Onoe's rate control algorithm.
 #
 # $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath_rate/onoe/Makefile.kernel#1 $
 #
