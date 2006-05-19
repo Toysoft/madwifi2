@@ -63,7 +63,8 @@ DST_ATH=${WIRELESS}/ath
 MKDIR ${DST_ATH}
 echo "Copy ath driver bits..."
 FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
-INSTALL ${DST_ATH} ${FILES}
+make -C ${DEPTH} svnversion.h
+INSTALL ${DST_ATH} ${FILES} ${DEPTH}/svnversion.h
 INSTALL ${DST_ATH} ${SRC_ATH}/Kconfig
 INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 
@@ -81,7 +82,7 @@ DST_ATH_RATE=${WIRELESS}/_ath_rate
 MKDIR ${DST_ATH_RATE}
 echo "Copy $SRC_ATH_RATE bits..."
 FILES=`ls ${SRC_ATH_RATE}/*.[ch] | sed '/mod.c/d'`
-INSTALL ${DST_ATH_RATE} ${FILES}
+INSTALL ${DST_ATH_RATE} ${FILES} ${DEPTH}/svnversion.h
 INSTALL ${DST_ATH_RATE} ${SRC_ATH_RATE}/Kconfig
 INSTALLX ${DST_ATH_RATE}/Makefile ${SRC_ATH_RATE}/Makefile.kernel
 
@@ -109,7 +110,7 @@ DST_NET80211=${WIRELESS}/net80211
 MKDIR ${DST_NET80211}
 echo "Copy net80211 bits..."
 FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
-INSTALL ${DST_NET80211} ${FILES}
+INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/svnversion.h
 INSTALL ${DST_NET80211} ${SRC_NET80211}/Kconfig
 INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
