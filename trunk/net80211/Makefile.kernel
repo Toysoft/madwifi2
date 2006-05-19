@@ -8,8 +8,7 @@
 
 include $(src)/../BuildCaps.inc
 
-##2.4##COMPAT=	compat
-##2.6##COMPAT=	drivers/net/wireless/net80211/compat
+COMPAT = $(src)/compat
 
 HAL = $(src)/../hal
 
