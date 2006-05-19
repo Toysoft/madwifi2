@@ -2,16 +2,23 @@
 # Makefile for the 802.11 NET80211 module.
 #
 
+##2.4##obj=.
 ##2.4##src=.
+##2.6##src:=$(srctree)/$(src)
+
+include $(src)/../BuildCaps.inc
 
 ##2.4##COMPAT=	compat
 ##2.6##COMPAT=	drivers/net/wireless/net80211/compat
+
+HAL = $(src)/../hal
 
 EXTRA_CFLAGS+= -DATH_SUPERG_FF=1
 EXTRA_CFLAGS+= -DATH_SUPERG_DYNTURBO=1
 EXTRA_CFLAGS+= -DATH_TURBO_SCAN=1
 
-EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${src}/..
+EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${src}/.. \
+	-I${HAL} -I${HAL}/linux
 
 #
 # There are two authenticator mechanisms: an in-kernel implementation

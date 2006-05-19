@@ -5,6 +5,9 @@
 #
 
 ##2.4##src=.
+##2.6##src:=$(srctree)/$(src)
+
+include $(src)/../BuildCaps.inc
 
 HAL=	$(src)/../hal
 ATH=	$(src)/../ath
