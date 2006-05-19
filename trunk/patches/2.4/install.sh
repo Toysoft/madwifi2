@@ -49,7 +49,7 @@ test -d ${SRC_NET80211} ||
 	{ echo "No net80211 directory ${SRC_NET80211}!"; exit 1; }
 SRC_ATH=${ATH:-${DEPTH}/ath}
 test -d ${SRC_ATH} || { echo "No ath directory ${SRC_ATH}!"; exit 1; }
-SRC_ATH_RATE=${ATH_RATE:-${DEPTH}/ath_rate/onoe}
+SRC_ATH_RATE=${DEPTH}/ath_rate
 test -d ${SRC_ATH_RATE} ||
 	{ echo "No rate control algorithm directory ${SRC_ATH_RATE}!"; exit 1; }
 SRC_COMPAT=${DEPTH}/include
@@ -81,10 +81,13 @@ INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/uudecode.c
 DST_ATH_RATE=${WIRELESS}/_ath_rate
 MKDIR ${DST_ATH_RATE}
 echo "Copy $SRC_ATH_RATE bits..."
-FILES=`ls ${SRC_ATH_RATE}/*.[ch] | sed '/mod.c/d'`
-INSTALL ${DST_ATH_RATE} ${FILES} ${DEPTH}/svnversion.h
-INSTALL ${DST_ATH_RATE} ${SRC_ATH_RATE}/Kconfig
-INSTALLX ${DST_ATH_RATE}/Makefile ${SRC_ATH_RATE}/Makefile.kernel
+RATEALGS="amrr onoe sample"
+for ralg in $RATEALGS; do
+	MKDIR ${DST_ATH_RATE}/$ralg
+	FILES=`ls ${SRC_ATH_RATE}/$ralg/*.[ch] | sed '/mod.c/d'`
+	INSTALL ${DST_ATH_RATE}/$ralg ${FILES}
+	INSTALLX ${DST_ATH_RATE}/$ralg/Makefile ${SRC_ATH_RATE}/$ralg/Makefile.kernel
+done
 
 DST_HAL=${WIRELESS}/hal
 MKDIR ${DST_HAL}
