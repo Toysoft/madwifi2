@@ -131,6 +131,8 @@ grep -q '_ath_hal' ${WIRELESS}/Makefile || \
 INSTALL ${WIRELESS} ${DEPTH}/BuildCaps.inc
 cat >>${WIRELESS}/BuildCaps.inc <<EOF
 
+EXTRA_CFLAGS += \$(COPTS)
+
 ifdef CONFIG_CPU_BIG_ENDIAN
 EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
 else
