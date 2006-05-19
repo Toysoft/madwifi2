@@ -72,7 +72,6 @@ INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 DST_ATH_HAL=${WIRELESS}/_ath_hal
 MKDIR ${DST_ATH_HAL}
 echo "Copy ath_hal bits..."
-INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/Kconfig
 INSTALLX ${DST_ATH_HAL}/Makefile ${SRC_ATH_HAL}/Makefile.kernel
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/ah_osdep.c
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/uudecode.c
@@ -117,7 +116,6 @@ MKDIR ${DST_NET80211}
 echo "Copy net80211 bits..."
 FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
 INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/svnversion.h
-INSTALL ${DST_NET80211} ${SRC_NET80211}/Kconfig
 INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
 MKDIR ${DST_NET80211}/compat
