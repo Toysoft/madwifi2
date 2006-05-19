@@ -72,6 +72,8 @@ MKDIR ${DST_ATH_HAL}
 echo "Copy ath_hal bits..."
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/Kconfig
 INSTALLX ${DST_ATH_HAL}/Makefile ${SRC_ATH_HAL}/Makefile.kernel
+INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/ah_osdep.c
+INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/uudecode.c
 
 # NB: use leading '_' to ensure it's built before the driver
 DST_ATH_RATE=${WIRELESS}/_ath_rate
