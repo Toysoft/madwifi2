@@ -1,11 +1,13 @@
 --- Makefile.orig	Tue Sep 28 13:07:41 2004
 +++ Makefile	Wed Sep 29 09:29:51 2004
-@@ -24,4 +24,20 @@
+@@ -24,4 +24,22 @@
  obj-$(CONFIG_AIRO)		+= airo.o
  obj-$(CONFIG_AIRO_CS)		+= airo_cs.o airo.o
  
 +subdir-$(CONFIG_ATHEROS_HAL)	+= _ath_hal
-+subdir-$(CONFIG_ATHEROS_RATE)	+= _ath_rate
++subdir-$(CONFIG_ATHEROS_RATE_SAMPLE)	+= _ath_rate/sample
++subdir-$(CONFIG_ATHEROS_RATE_ONOE)	+= _ath_rate/onoe
++subdir-$(CONFIG_ATHEROS_RATE_AMRR)	+= _ath_rate/amrr
 +subdir-$(CONFIG_ATHEROS)	+= ath
 +subdir-$(CONFIG_NET80211)	+= net80211
 +

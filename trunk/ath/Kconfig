@@ -5,7 +5,6 @@ config ATHEROS
 	tristate "Atheros PCI/Cardbus cards"
 	depends on PCI && NET_RADIO && EXPERIMENTAL && HOTPLUG
 	select ATHEROS_HAL
-	select ATHEROS_RATE
 	select NET80211
        ---help---
 	  Say Y here if you intend to attach an Atheros Cardbus or PCI
@@ -19,8 +18,41 @@ config ATHEROS
 	  To compile this driver as a module, choose M here: the module will be
 	  called ath_pci.  If unsure, say N.
 
-source "drivers/net/wireless/_ath_hal/Kconfig"
+choice
+	prompt "Atheros: Transmission Rate Control Algorithm"
+	depends on ATHEROS
+	default ATHEROS_RATE_SAMPLE
+	help
+	  Rate control algorithms determine how the transmission rate is
+	  selected based on the quality of the connection.
 
-source "drivers/net/wireless/_ath_rate/Kconfig"
+config ATHEROS_RATE_SAMPLE
+	bool "Sample"
+	help
+	  SampleRate chooses the bitrate it predicts will provide the
+	  most throughput based on estimates of the expected per-packet
+	  transmission time for each bitrate. SampleRate periodically
+	  sends packets at bitrates other than the current one to
+	  estimate when another bitrate will provide better performance.
+	  SampleRate switches to another bitrate when its estimated
+	  per-packet transmission time becomes smaller than the current
+	  bitrate's. SampleRate reduces the number of bitrates it must
+	  sample by eliminating those that could not perform better than
+	  the one currently being used. SampleRate also stops probing at
+	  a bitrate if it experiences several successive losses.
+
+config ATHEROS_RATE_ONOE
+	bool "Onoe"
+	help
+	  Use Atsushi Onoe's rate control algorithm.
+
+config ATHEROS_RATE_AMRR
+	bool "AMRR"
+	help
+	  Adaptive Multi Rate Retry control algorithm.
+
+endchoice
+
+source "drivers/net/wireless/_ath_hal/Kconfig"
 
 source "drivers/net/wireless/net80211/Kconfig"
