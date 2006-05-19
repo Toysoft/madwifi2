@@ -49,13 +49,6 @@ ath_rate_sample-objs	:= sample.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 
-ifneq ($(MAKING_MODULES),1)
-obj-$(CONFIG_RATE_SAMPLE) := $(ath_rate_sample-objs)
-ifdef LINUX24
-O_TARGET		:= $(obj-m)
-endif
-endif
-
 INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH} -I${obj}/${WLAN} \
 	-I${obj}/${DEPTH}
 

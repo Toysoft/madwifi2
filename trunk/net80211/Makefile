@@ -83,15 +83,6 @@ wlan_scan_ap-objs := ieee80211_scan_ap.o
 
 include $(obj)/${DEPTH}/Makefile.inc
 
-# If building into kernel
-# We only have one target, so all modules go into it I guess?
-ifneq ($(MAKING_MODULES),1)
-obj-$(CONFIG_NET80211) += $(MOD_INSTALL)
-ifdef LINUX24
-O_TARGET := net80211.o
-endif
-endif
-
 INCS+=	-I${HAL} -I${HAL}/${OS} -I$(obj)/${ATH_HAL} -I$(obj)/${WLAN} \
 	-I${obj}/${DEPTH}
 

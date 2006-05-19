@@ -43,15 +43,6 @@ obj-m		+= ath_hal.o
 ath_hal-objs	:= ah_osdep.o ${TARGET}.hal.o
 hostprogs-y	:= uudecode
 
-# If building into kernel
-
-ifneq ($(MAKING_MODULES),1)
-obj-$(CONFIG_ATHEROS_HAL) := ah_osdep.o ${TARGET}.hal.o
-ifdef LINUX24
-O_TARGET	:= ath_hal.o
-endif
-endif
-
 ifdef LINUX24
 export-objs	:= ah_osdep.o
 endif
