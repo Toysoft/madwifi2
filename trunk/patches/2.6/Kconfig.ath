@@ -1,3 +1,0 @@
-
-# Added by Madwifi
-source "drivers/net/wireless/ath/Kconfig"
