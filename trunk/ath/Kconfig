@@ -53,6 +53,8 @@ config ATHEROS_RATE_AMRR
 
 endchoice
 
-source "drivers/net/wireless/_ath_hal/Kconfig"
+config ATHEROS_HAL
+	tristate
 
-source "drivers/net/wireless/net80211/Kconfig"
+config NET80211
+	tristate
