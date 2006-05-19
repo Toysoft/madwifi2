@@ -30,7 +30,7 @@ else
 TARGET = $(ARCH)-elf
 endif
 
-EXTRA_CFLAGS+=	-I. -I${HAL}/.. -I${HAL} -I${HAL}/linux
+EXTRA_CFLAGS+=	-I. -I$(src) -I${HAL}/.. -I${HAL} -I${HAL}/linux
 
 ifndef HAL_OBJDIR
 #
