@@ -1,5 +1,5 @@
 #
-# Makefile for Sample's rate control algorithm.
+# Makefile for John Bicket's SampleRate control algorithm.
 #
 # $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath_rate/sample/Makefile.kernel#1 $
 #
