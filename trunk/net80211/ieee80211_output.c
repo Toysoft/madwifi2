@@ -1785,35 +1785,39 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 		/*
 		 * probe response frame format
-		 *	[8] time stamp
+	 	 *	[8] time stamp
 		 *	[2] beacon interval
-		 *	[2] cabability information
+		 *	[2] capability information
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
-		 *	[tlv] parameter set (FH/DS)
-		 *	[tlv] parameter set (IBSS)
-		 *	[tlv] extended rate phy (ERP)
-		 *	[tlv] extended supported rates
-		 *	[tlv] country (if present)
+		 *	[7] FH/DS parameter set
+		 *	[tlv] IBSS parameter set
+		 *	[tlv] country code 
 		 *	[3] power constraint
-		 *	[tlv] WPA
-		 *	[tlv] WME
-		 *      [tlv] Atheros Advanced Capabilities
+		 *	[3] extended rate phy (ERP)
+		 *	[tlv] extended supported rates
+		 *	[tlv] WME parameters
+		 *	[tlv] WPA/RSN parameters
+		 *	[tlv] Atheros Advanced Capabilities
+		 *	[tlv] AtherosXR parameters
 		 */
-		skb = ieee80211_getmgtframe(&frm, 8 +
-			sizeof(u_int16_t) + sizeof(u_int16_t) +
-			2 + IEEE80211_NWID_LEN +
-			2 + IEEE80211_RATE_SIZE +
-			7 +	/* max(7,3) */
-			6 + 3 + 2 +
-			(IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
+		skb = ieee80211_getmgtframe(&frm, 
+			  8
+			+ sizeof(u_int16_t)
+			+ sizeof(u_int16_t)
+			+ 2 + IEEE80211_NWID_LEN
+			+ 2 + IEEE80211_RATE_SIZE
+			+ 7 	/* max(7,3) */
 			/* XXX allocate max size */
-		 	ic->ic_country_ie.country_len + 2 + 3 +
+		 	+ 2 + ic->ic_country_ie.country_len
+			+ 3
+			+ 3
+			+ 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE)
+			+ sizeof(struct ieee80211_wme_param)
 			/* XXX !WPA1+WPA2 fits w/o a cluster */
-			(vap->iv_flags & IEEE80211_F_WPA ?
-				2 * sizeof(struct ieee80211_ie_wpa) : 0) +
-			sizeof(struct ieee80211_wme_param) + 
-			sizeof(struct ieee80211_ie_athAdvCap)
+			+ (vap->iv_flags & IEEE80211_F_WPA ?
+				2 * sizeof(struct ieee80211_ie_wpa) : 0)
+			+ sizeof(struct ieee80211_ie_athAdvCap)
 #ifdef ATH_SUPERG_XR
 			+ (vap->iv_ath_cap & IEEE80211_ATHC_XR ?	/* XR */
 				sizeof(struct ieee80211_xr_param) : 0)
@@ -1822,10 +1826,15 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
-		memset(frm, 0, 8);	/* timestamp should be filled later */
+		/* timestamp should be filled later */
+		memset(frm, 0, 8);	
 		frm += 8;
+
+		/* beacon interval */
 		*(u_int16_t *)frm = htole16(vap->iv_bss->ni_intval);
 		frm += 2;
+
+		/* cap. info */
 		if (vap->iv_opmode == IEEE80211_M_IBSS)
 			capinfo = IEEE80211_CAPINFO_IBSS;
 		else
@@ -1840,10 +1849,14 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		*(u_int16_t *)frm = htole16(capinfo);
 		frm += 2;
 
+		/* ssid */
 		frm = ieee80211_add_ssid(frm, vap->iv_bss->ni_essid,
 			vap->iv_bss->ni_esslen);
+
+		/* supported rates */
 		frm = ieee80211_add_rates(frm, &ni->ni_rates);
 
+		/* XXX: FH/DS parameter set, correct ? */
 		if (ic->ic_phytype == IEEE80211_T_FH) {
                         *frm++ = IEEE80211_ELEMID_FHPARMS;
                         *frm++ = 5;
@@ -1866,30 +1879,44 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			*frm++ = 0;
 			*frm++ = 0;		/* TODO: ATIM window */
 		}
+
+		/* country code */
 		if ((ic->ic_flags & IEEE80211_F_DOTH) ||
 		    (ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE))
 			frm = ieee80211_add_country(frm, ic);
+		
+		/* power constraint */
 		if (ic->ic_flags & IEEE80211_F_DOTH) {
 			*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 			*frm++ = 1;
 			*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
 		}
+		
+		/* ERP */
 		if (IEEE80211_IS_CHAN_ANYG(ic->ic_curchan))
 			frm = ieee80211_add_erp(frm, ic);
+
+		/* Ext. Supp. Rates */
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
+
+		/* WME */
 		if (vap->iv_flags & IEEE80211_F_WME)
 			frm = ieee80211_add_wme_param(frm, &ic->ic_wme,
 				IEEE80211_VAP_UAPSD_ENABLED(vap));
+		
+		/* WPA */
+		if (vap->iv_flags & IEEE80211_F_WPA)
+			frm = ieee80211_add_wpa(frm, vap);
+
+		/* AthAdvCaps */
 		if (vap->iv_bss && vap->iv_bss->ni_ath_flags)
 			frm = ieee80211_add_athAdvCap(frm, vap->iv_bss->ni_ath_flags,
 				vap->iv_bss->ni_ath_defkeyindex); 
 #ifdef ATH_SUPERG_XR
-		if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
+		/* XR params */
+		if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)
 			frm = ieee80211_add_xr_param(frm, vap);
 #endif
-		if (vap->iv_flags & IEEE80211_F_WPA)
-			frm = ieee80211_add_wpa(frm, vap);
-
 		skb_trim(skb, frm - skb->data);
 		break;
 
@@ -1912,8 +1939,9 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			(arg == IEEE80211_AUTH_SHARED_REQUEST &&
 			vap->iv_bss->ni_authmode == IEEE80211_AUTH_SHARED);
 
-		skb = ieee80211_getmgtframe(&frm, 3 * sizeof(u_int16_t) + 
-			(has_challenge && status == IEEE80211_STATUS_SUCCESS ?
+		skb = ieee80211_getmgtframe(&frm, 
+			3 * sizeof(u_int16_t)
+			+ (has_challenge && status == IEEE80211_STATUS_SUCCESS ?
 				sizeof(u_int16_t)+IEEE80211_CHALLENGE_LEN : 0));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
@@ -1972,19 +2000,21 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *	[6*] current AP address (reassoc only)
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
-		 *	[4] power capability
-		 *	[28] supported channels element
+		 *	[4] power capability (802.11h)
+		 *	[28] supported channels element (802.11h)
 		 *	[tlv] extended supported rates
 		 *	[tlv] WME [if enabled and AP capable]
 		 *      [tlv] Atheros advanced capabilities
 		 *	[tlv] user-specified ie's
 		 */
-		skb = ieee80211_getmgtframe(&frm, sizeof(u_int16_t) + 
-			sizeof(u_int16_t) + IEEE80211_ADDR_LEN +
+		skb = ieee80211_getmgtframe(&frm, 
+			sizeof(u_int16_t) + 
+			sizeof(u_int16_t) +
+			IEEE80211_ADDR_LEN +
 			2 + IEEE80211_NWID_LEN +
 			2 + IEEE80211_RATE_SIZE +
+			4 + (2 + IEEE80211_SUPPCHAN_LEN) +
 			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
-			4 + 2 + IEEE80211_SUPPCHAN_LEN +
 			sizeof(struct ieee80211_ie_wme) +
 			sizeof(struct ieee80211_ie_athAdvCap) +
 			(vap->iv_opt_ie != NULL ? vap->iv_opt_ie_len : 0));
@@ -2002,6 +2032,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 * NB: Some 11a AP's reject the request when
 		 *     short premable is set.
 		 */
+		/* Capability information */
 		if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
 		    IEEE80211_IS_CHAN_2GHZ(ic->ic_curchan))
 			capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
@@ -2011,20 +2042,29 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		*(u_int16_t *)frm = htole16(capinfo);
 		frm += 2;
 
+		/* listen interval */
 		*(u_int16_t *)frm = htole16(ic->ic_lintval);
 		frm += 2;
 
+		/* Current AP address */
 		if (type == IEEE80211_FC0_SUBTYPE_REASSOC_REQ) {
 			IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
 			frm += IEEE80211_ADDR_LEN;
 		}
+		/* ssid */
 		frm = ieee80211_add_ssid(frm, ni->ni_essid, ni->ni_esslen);
+		/* supported rates */
 		frm = ieee80211_add_rates(frm, &ni->ni_rates);
+		/* power capability/supported channels */
 		if (ic->ic_flags & IEEE80211_F_DOTH)
 			frm = ieee80211_add_doth(frm, ic);
+		/* ext. supp. rates */
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
+
+		/* wme */
 		if ((vap->iv_flags & IEEE80211_F_WME) && ni->ni_wme_ie != NULL)
 			frm = ieee80211_add_wme(frm, ni);
+		/* ath adv. cap */
 		if (ni->ni_ath_flags & vap->iv_ath_cap) {
 			IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
 				"Adding ath adv cap ie: ni_ath_flags = %02x, "
@@ -2042,6 +2082,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 				ni->ni_ath_flags & vap->iv_ath_cap,
 				def_keyindex); 
 		}
+
+		/* User-spec */
 		if (vap->iv_opt_ie != NULL) {
 			memcpy(frm, vap->iv_opt_ie, vap->iv_opt_ie_len);
 			frm += vap->iv_opt_ie_len;
@@ -2063,8 +2105,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *      [tlv] WME (if enabled and STA enabled)
 		 *      [tlv] Atheros Advanced Capabilities 
 		 */
-		skb = ieee80211_getmgtframe(&frm, sizeof(capinfo) +
-			sizeof(u_int16_t) + sizeof(u_int16_t) +
+		skb = ieee80211_getmgtframe(&frm, 
+			3 * sizeof(u_int16_t) +
 			2 + IEEE80211_RATE_SIZE +
 			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
 			sizeof(struct ieee80211_wme_param) +
@@ -2072,6 +2114,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
+		/* Capability Information */
 		capinfo = IEEE80211_CAPINFO_ESS;
 		if (vap->iv_flags & IEEE80211_F_PRIVACY)
 			capinfo |= IEEE80211_CAPINFO_PRIVACY;
@@ -2083,9 +2126,11 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		*(u_int16_t *)frm = htole16(capinfo);
 		frm += 2;
 
-		*(u_int16_t *)frm = htole16(arg);	/* status */
+		/* status */
+		*(u_int16_t *)frm = htole16(arg);
 		frm += 2;
 
+		/* Assoc ID */
 		if (arg == IEEE80211_STATUS_SUCCESS) {
 			*(u_int16_t *)frm = htole16(ni->ni_associd);
 			IEEE80211_NODE_STAT(ni, tx_assoc);
@@ -2093,11 +2138,18 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			IEEE80211_NODE_STAT(ni, tx_assoc_fail);
 		frm += 2;
 
+		/* supported rates */
 		frm = ieee80211_add_rates(frm, &ni->ni_rates);
+
+		/* ext. suppo. rates */
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
+
+		/* wme */
 		if ((vap->iv_flags & IEEE80211_F_WME) && ni->ni_wme_ie != NULL)
 			frm = ieee80211_add_wme_param(frm, &ic->ic_wme,
 				IEEE80211_VAP_UAPSD_ENABLED(vap));
+
+		/* athAdvCap */
 		if (vap->iv_ath_cap)
 			frm = ieee80211_add_athAdvCap(frm, 
 				vap->iv_ath_cap & ni->ni_ath_flags,
