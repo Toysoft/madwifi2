@@ -57,6 +57,7 @@ test -d ${SRC_COMPAT} || { echo "No compat directory ${SRC_COMPAT}!"; exit 1; }
 
 WIRELESS=${KERNEL_PATH}/drivers/net/wireless
 test -d ${WIRELESS} || { echo "No wireless directory ${WIRELESS}!"; exit 1; }
+test -f ${WIRELESS}/Kconfig || { echo "${WIRELESS}/Kconfig is missing!"; exit 1; }
 
 DST_ATH=${WIRELESS}/ath
 MKDIR ${DST_ATH}
