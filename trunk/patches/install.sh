@@ -1,16 +1,27 @@
 #! /bin/sh
-
-set -e
-
-DEPTH=../..
-
 #
 # Shell script to integrate madwifi sources into a Linux
 # source tree so it can be built statically.  Typically this
 # is done to simplify debugging with tools like kgdb.
 #
+
+set -e
+
+DEPTH=..
 KERNEL_VERSION=`uname -r`
-KERNEL_PATH=${1:-/lib/modules/${KERNEL_VERSION}/source}
+
+if test -n "$1"; then
+	KERNEL_PATH="$1"
+else if test -e /lib/modules/${KERNEL_VERSION}/source; then
+	KERNEL_PATH="/lib/modules/${KERNEL_VERSION}/source"
+else if test -e /lib/modules/${KERNEL_VERSION}/build; then
+	KERNEL_PATH="/lib/modules/${KERNEL_VERSION}/build"
+else
+	echo "Cannot guess kernel source location"
+	exit 1
+fi
+fi
+fi
 
 MKDIR()
 {
@@ -32,7 +43,11 @@ INSTALL()
 INSTALLX()
 {
 	DEST=$1; shift
-	sed -e '/^##2.4##/d' -e 's/^##2.6##//' $1 > $DEST
+	if test "$kbuild" = 2.6; then
+		sed -e '/^##2.4##/d' -e 's/^##2.6##//' $1 > $DEST
+	else
+		sed -e 's/^##2.4##//' -e '/^##2.6##/d' $1 > $DEST
+	fi
 }
 
 #
@@ -57,7 +72,18 @@ test -d ${SRC_COMPAT} || { echo "No compat directory ${SRC_COMPAT}!"; exit 1; }
 
 WIRELESS=${KERNEL_PATH}/drivers/net/wireless
 test -d ${WIRELESS} || { echo "No wireless directory ${WIRELESS}!"; exit 1; }
-test -f ${WIRELESS}/Kconfig || { echo "${WIRELESS}/Kconfig is missing!"; exit 1; }
+
+if test -f ${WIRELESS}/Kconfig; then
+	kbuild=2.6
+	kbuildconf=Kconfig
+else if test -f ${WIRELESS}/Config.in; then
+	kbuild=2.4
+	kbuildconf=Config.in
+else
+	echo "Kernel build system is not supported"
+	echo 1
+fi
+fi
 
 MADWIFI=${WIRELESS}/madwifi
 rm -rf ${MADWIFI}
@@ -114,7 +140,6 @@ if [ -d ${SRC_HAL}/ar5212 ]; then
 fi
 
 DST_NET80211=${MADWIFI}/net80211
-DST_DOC=${KERNEL_PATH}/Documentation
 MKDIR ${DST_NET80211}
 echo "Copy net80211 bits..."
 FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
@@ -127,13 +152,28 @@ INSTALL ${DST_NET80211}/compat ${SRC_COMPAT}/compat.h
 MKDIR ${DST_NET80211}/compat/sys
 INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
 
-INSTALL ${MADWIFI} Makefile
-INSTALL ${MADWIFI} Kconfig
+INSTALL ${MADWIFI} $kbuild/Makefile
+if test "$kbuild" = 2.6; then
+INSTALL ${MADWIFI} $kbuild/Kconfig
 sed -i '/madwifi/d;/^endmenu/i\
 source "drivers/net/wireless/madwifi/Kconfig"' ${WIRELESS}/Kconfig
 sed -i '$a\
 obj-$(CONFIG_ATHEROS) += madwifi/
 /madwifi/d;' ${WIRELESS}/Makefile
+else
+sed -i '$a\
+source drivers/net/wireless/madwifi/Config.in
+/madwifi/d' ${WIRELESS}/Config.in
+sed -i '/madwifi/d;/include/i\
+subdir-$(CONFIG_ATHEROS) += madwifi/\
+obj-$(CONFIG_ATHEROS) += madwifi/madwifi.o' ${WIRELESS}/Makefile
+fi
+
+DST_DOC=${KERNEL_PATH}/Documentation
+if test -f $kbuild/Configure.help.patch; then
+	grep -q 'CONFIG_ATHEROS' ${DST_DOC}/Configure.help || \
+		PATCH ${DST_DOC}/Configure.help Configure.help.patch
+fi
 
 INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
 cat >>${MADWIFI}/BuildCaps.inc <<EOF
