@@ -43,6 +43,9 @@ obj-m		+= ath_hal.o
 ath_hal-objs	:= ah_osdep.o ${TARGET}.hal.o
 hostprogs-y	:= uudecode
 
+# For older 2.6 kernels
+host-progs	:= $(hostprogs-y)
+
 ifdef LINUX24
 export-objs	:= ah_osdep.o
 endif
@@ -56,8 +59,10 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS}
 all: opt_ah.h
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
+ifdef LINUX24
 $(obj)/uudecode: $(obj)/uudecode.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+endif
 
 $(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
 	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
