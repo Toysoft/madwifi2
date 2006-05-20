@@ -166,7 +166,7 @@ sed -i '$a\
 source drivers/net/wireless/madwifi/Config.in
 /madwifi/d' ${WIRELESS}/Config.in
 sed -i '/madwifi/d;/include/i\
-subdir-$(CONFIG_ATHEROS) += madwifi/\
+subdir-$(CONFIG_ATHEROS) += madwifi\
 obj-$(CONFIG_ATHEROS) += madwifi/madwifi.o' ${WIRELESS}/Makefile
 fi
 
