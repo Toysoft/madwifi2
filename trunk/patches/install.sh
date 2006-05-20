@@ -106,7 +106,7 @@ INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/ah_osdep.c
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/uudecode.c
 
 # NB: use leading '_' to ensure it's built before the driver
-DST_ATH_RATE=${MADWIFI}/_ath_rate
+DST_ATH_RATE=${MADWIFI}/ath_rate
 MKDIR ${DST_ATH_RATE}
 echo "Copy $SRC_ATH_RATE bits..."
 RATEALGS="amrr onoe sample"
