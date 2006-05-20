@@ -127,7 +127,7 @@ INSTALL ${DST_NET80211}/compat ${SRC_COMPAT}/compat.h
 MKDIR ${DST_NET80211}/compat/sys
 INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
 
-INSTALL ${MADWIFI}/Makefile Makefile.ath
+INSTALL ${MADWIFI} Makefile
 INSTALL ${MADWIFI} Kconfig
 sed -i '/madwifi/d;/^endmenu/i\
 source "drivers/net/wireless/madwifi/Kconfig"' ${WIRELESS}/Kconfig
