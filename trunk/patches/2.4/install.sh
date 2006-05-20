@@ -59,26 +59,28 @@ WIRELESS=${KERNEL_PATH}/drivers/net/wireless
 test -d ${WIRELESS} || { echo "No wireless directory ${WIRELESS}!"; exit 1; }
 test -f ${WIRELESS}/Config.in || { echo "${WIRELESS}/Config.in is missing!"; exit 1; }
 
-DST_ATH=${WIRELESS}/ath
+MADWIFI=${WIRELESS}/madwifi
+rm -rf ${MADWIFI}
+MKDIR ${MADWIFI}
+
+DST_ATH=${MADWIFI}/ath
 MKDIR ${DST_ATH}
 echo "Copy ath driver bits..."
 FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
 make -C ${DEPTH} svnversion.h
 INSTALL ${DST_ATH} ${FILES} ${DEPTH}/svnversion.h
-INSTALL ${DST_ATH} ${SRC_ATH}/Kconfig
 INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 
 # NB: use leading '_' to ensure it's built before the driver
-DST_ATH_HAL=${WIRELESS}/_ath_hal
+DST_ATH_HAL=${MADWIFI}/_ath_hal
 MKDIR ${DST_ATH_HAL}
 echo "Copy ath_hal bits..."
-INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/Kconfig
 INSTALLX ${DST_ATH_HAL}/Makefile ${SRC_ATH_HAL}/Makefile.kernel
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/ah_osdep.c
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/uudecode.c
 
 # NB: use leading '_' to ensure it's built before the driver
-DST_ATH_RATE=${WIRELESS}/_ath_rate
+DST_ATH_RATE=${MADWIFI}/_ath_rate
 MKDIR ${DST_ATH_RATE}
 echo "Copy $SRC_ATH_RATE bits..."
 RATEALGS="amrr onoe sample"
@@ -89,7 +91,7 @@ for ralg in $RATEALGS; do
 	INSTALLX ${DST_ATH_RATE}/$ralg/Makefile ${SRC_ATH_RATE}/$ralg/Makefile.kernel
 done
 
-DST_HAL=${WIRELESS}/hal
+DST_HAL=${MADWIFI}/hal
 MKDIR ${DST_HAL}
 echo "Copy hal bits..."
 INSTALL ${DST_HAL} ${SRC_HAL}/ah.h
@@ -109,12 +111,11 @@ if [ -d ${SRC_HAL}/ar5212 ]; then
 	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212desc.h
 fi
 
-DST_NET80211=${WIRELESS}/net80211
+DST_NET80211=${MADWIFI}/net80211
 MKDIR ${DST_NET80211}
 echo "Copy net80211 bits..."
 FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
 INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/svnversion.h
-INSTALL ${DST_NET80211} ${SRC_NET80211}/Kconfig
 INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
 MKDIR ${DST_NET80211}/compat
@@ -123,16 +124,21 @@ INSTALL ${DST_NET80211}/compat ${SRC_COMPAT}/compat.h
 MKDIR ${DST_NET80211}/compat/sys
 INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
 
-grep -q 'CONFIG_ATHEROS' ${WIRELESS}/Config.in || \
-	PATCH ${WIRELESS}/Config.in Config.in.patch
-grep -q 'CONFIG_ATHEROS' ${WIRELESS}/Makefile || \
-	PATCH ${WIRELESS}/Makefile Makefile.patch
+INSTALL ${MADWIFI} Makefile
+INSTALL ${MADWIFI} Config.in
+sed -i '$a\
+source drivers/net/wireless/madwifi/Config.in
+/madwifi/d' ${WIRELESS}/Config.in
+sed -i '/madwifi/d;/include/i\
+subdir-$(CONFIG_ATHEROS) += madwifi/\
+obj-$(CONFIG_ATHEROS) += madwifi/madwifi.o' ${WIRELESS}/Makefile
+
 DST_DOC=${KERNEL_PATH}/Documentation
 grep -q 'CONFIG_ATHEROS' ${DST_DOC}/Configure.help || \
 	PATCH ${DST_DOC}/Configure.help Configure.help.patch
 
-INSTALL ${WIRELESS} ${DEPTH}/BuildCaps.inc
-cat >>${WIRELESS}/BuildCaps.inc <<EOF
+INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
+cat >>${MADWIFI}/BuildCaps.inc <<EOF
 
 EXTRA_CFLAGS += \$(COPTS)
 
