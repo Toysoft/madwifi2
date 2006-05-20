@@ -161,6 +161,7 @@ sed -i '$a\
 obj-$(CONFIG_ATHEROS) += madwifi/
 /madwifi/d;' ${WIRELESS}/Makefile
 else
+INSTALL ${MADWIFI} $kbuild/Config.in
 sed -i '$a\
 source drivers/net/wireless/madwifi/Config.in
 /madwifi/d' ${WIRELESS}/Config.in
