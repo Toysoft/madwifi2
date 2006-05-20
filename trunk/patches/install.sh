@@ -172,7 +172,7 @@ fi
 DST_DOC=${KERNEL_PATH}/Documentation
 if test -f $kbuild/Configure.help.patch; then
 	grep -q 'CONFIG_ATHEROS' ${DST_DOC}/Configure.help || \
-		PATCH ${DST_DOC}/Configure.help Configure.help.patch
+		PATCH ${DST_DOC}/Configure.help $kbuild/Configure.help.patch
 fi
 
 INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
