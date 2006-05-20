@@ -128,11 +128,12 @@ MKDIR ${DST_NET80211}/compat/sys
 INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
 
 INSTALL ${MADWIFI}/Makefile Makefile.ath
-INSTALL ${MADWIFI} ${SRC_ATH}/Kconfig
+INSTALL ${MADWIFI} Kconfig
 sed -i '/madwifi/d;/^endmenu/i\
 source "drivers/net/wireless/madwifi/Kconfig"' ${WIRELESS}/Kconfig
-sed -i '/madwifi/d;$i\
-obj-$(CONFIG_ATHEROS) += madwifi/' ${WIRELESS}/Makefile
+sed -i '$a\
+obj-$(CONFIG_ATHEROS) += madwifi/
+/madwifi/d;' ${WIRELESS}/Makefile
 
 INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
 cat >>${MADWIFI}/BuildCaps.inc <<EOF
