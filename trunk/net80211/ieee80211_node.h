@@ -180,7 +180,7 @@ MALLOC_DECLARE(M_80211_NODE);
 #define	IEEE80211_NODE_STAT_SET(ni,stat,v)	(ni->ni_stats.ns_##stat = v)
 
 #define WME_UAPSD_AC_CAN_TRIGGER(_ac, _ni) ( \
-		((ni)->ni_flags & IEEE80211_NODE_UAPSD_TRIG) && WME_UAPSD_AC_ENABLED((_ac), (_ni)->ni_uapsd) )
+		((_ni)->ni_flags & IEEE80211_NODE_UAPSD_TRIG) && WME_UAPSD_AC_ENABLED((_ac), (_ni)->ni_uapsd) )
 #define WME_UAPSD_NODE_MAXQDEPTH	8
 #define IEEE80211_NODE_UAPSD_USETIM(_ni) (((_ni)->ni_uapsd & 0xF) == 0xF )
 #define WME_UAPSD_NODE_INVALIDSEQ	0xffff
