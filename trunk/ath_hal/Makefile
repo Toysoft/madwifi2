@@ -77,7 +77,7 @@ install:
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${MODULEPATH}
 
 clean:
-	-rm -f *~ *.o *.ko *.mod.c uudecode
+	-rm -f *~ *.o *.ko *.mod.c uudecode .uudecode.cmd
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 	-rm -rf .tmp_versions
 # remove the files we copied to this dir
