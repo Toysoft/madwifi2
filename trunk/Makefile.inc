@@ -212,3 +212,20 @@ include ${HAL}/public/${TARGET}.inc
 include ${obj}/${DEPTH}/BuildCaps.inc
 
 SYMBOLSDIR=${DEPTH}/symbols
+
+
+# The following variables will affect developers only, and are used in the
+# make-release.bash script.
+#
+# RELEASE_TMP is used as a temporary store for the files needed to create the
+# release tarball. Packaging will take place in TMPDIR/madwifi-release.
+# Defaults to /tmp.
+RELEASE_TMP=/tmp
+
+# RELEASE_STORE is the (local) directory where the release tarball should be
+# stored in. Defaults to the parent directory of the working copy used to
+# create the release.
+RELEASE_STORE=..
+
+# expose these settings to make-release.bash
+export RELEASE_TMP RELEASE_STORE

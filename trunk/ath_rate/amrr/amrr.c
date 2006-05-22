@@ -547,14 +547,14 @@ static ctl_table ath_root_table[] = {
 };
 static struct ctl_table_header *ath_sysctl_header;
 
-#include "svnversion.h"
-static char *version = "0.1 (svn " SVNVERSION ")";
+#include "release.h"
+static char *version = "0.1 (" RELEASE_VERSION ")";
 static char *dev_info = "ath_rate_amrr";
 
 MODULE_AUTHOR("INRIA, Mathieu Lacage");
 MODULE_DESCRIPTION("AMRR Rate control algorithm");
 #ifdef MODULE_VERSION
-MODULE_VERSION("svn "SVNVERSION);
+MODULE_VERSION(RELEASE_VERSION);
 #endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");

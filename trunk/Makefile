@@ -46,9 +46,12 @@ include Makefile.inc
 # NB: the order is important here
 DIRS_MODULES=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
 
+# export for make-release.bash
+export ATH_HAL
+
 all: modules tools
 
-modules: configcheck svnversion.h 
+modules: configcheck svnversion.h
 	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i || exit 1; \
@@ -58,12 +61,11 @@ modules: configcheck svnversion.h
 svnversion.h:
 	if [ -d .svn ]; then \
 		ver=`svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'`; \
+		echo "#define SVNVERSION \"svn r$$ver\"" > $@; \
 	elif [ -s SNAPSHOT ]; then \
 		ver=`sed -e '/^Revision: */!d;s///;q' SNAPSHOT`; \
-	else \
-		ver=`date +%F`; \
+		echo "#define SVNVERSION \"svn r$$ver\"" > $@; \
 	fi; \
-	echo "#define SVNVERSION \"$$ver\"" > $@
 
 # conflicts with the 'tools' subdirectory
 .PHONY: tools
@@ -129,6 +131,10 @@ sanitycheck:
 	fi
 	
 	@echo "ok."
+
+.PHONY: release
+release:
+	sh scripts/make-release.bash
 
 # new targets should be inserted ABOVE this line in order to avoid
 # problems with the included kernel configuration file below.
