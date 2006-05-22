@@ -745,14 +745,14 @@ static struct notifier_block ieee80211_event_block = {
  * Module glue.
  */
 #include "version.h"
-#include "svnversion.h"
-static char *version = WLAN_VERSION " (svn " SVNVERSION ")";
+#include "release.h"
+static char *version = WLAN_VERSION " (" RELEASE_VERSION ")";
 static char *dev_info = "wlan";
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
 #ifdef MODULE_VERSION
-MODULE_VERSION("svn "SVNVERSION);
+MODULE_VERSION(RELEASE_VERSION);
 #endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");

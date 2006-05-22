@@ -35,4 +35,6 @@
  *
  * $Id$
  */
+#include "svnversion.h"
 #define	RELEASE_TYPE	"BETA"
+#define RELEASE_VERSION	SVNVERSION

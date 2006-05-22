@@ -103,8 +103,8 @@ enum {
  *
  */
 
-#include "svnversion.h"
-static char *version = "1.2 (svn " SVNVERSION ")";
+#include "release.h"
+static char *version = "1.2 (" RELEASE_VERSION ")";
 static char *dev_info = "ath_rate_sample";
 
 
@@ -939,7 +939,7 @@ EXPORT_SYMBOL(ath_rate_detach);
 MODULE_AUTHOR("John Bicket");
 MODULE_DESCRIPTION("SampleRate bit-rate selection algorithm for Atheros devices");
 #ifdef MODULE_VERSION
-MODULE_VERSION("svn "SVNVERSION);
+MODULE_VERSION(RELEASE_VERSION);
 #endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Dual BSD/GPL");

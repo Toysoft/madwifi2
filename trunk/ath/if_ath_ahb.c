@@ -400,8 +400,8 @@ init_ahb(void)
  * Module glue.
  */
 #include "version.h"
-#include "svnversion.h"
-static char *version = ATH_PCI_VERSION " (svn " SVNVERSION ")";
+#include "release.h"
+static char *version = ATH_PCI_VERSION " (" RELEASE_VERSION ")";
 static char *dev_info = "ath_ahb";
 
 #include <linux/ethtool.h>
@@ -423,7 +423,7 @@ ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr)
 MODULE_AUTHOR("Atheros Communications, Inc.");
 MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
 #ifdef MODULE_VERSION
-MODULE_VERSION("svn "SVNVERSION);
+MODULE_VERSION(RELEASE_VERSION);
 #endif
 MODULE_SUPPORTED_DEVICE("Atheros WLAN cards");
 #ifdef MODULE_LICENSE
