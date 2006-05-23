@@ -76,6 +76,24 @@ Charles Bovy
 Ian M. Rawley
 Beat Meier
 Alexander Warg
+Jiri Fojtasek
+Joshua Wright
+Dan Williams
+Aurelien Jarno
+Daniel Wu
+Paolo Cristiani
+"stiabhan"
+Elias Oltmanns
+Imre Kaloz
+Brian Eaton
+"paolo"
+Daniel J Blueman
+Digger Vermont
+Felix Fietkau
+Colubris Networks
+Matthew W. S. Bell
+Ivan S. Subrov
+Jochem Berndsen
 
 Apologies to anyone whose name was unintentionally left off.
 Please let us know if you think your name should be mentioned here!
@@ -90,8 +108,16 @@ We also would like to thank the following individuals and companies
 * Linux-Consulting, USA - http://www.linux-consulting.com
   madwifi.org domain name, DNS server maintainance
 
+* Netgate, USA - http://www.netgate.com
+  1U server (P3/850, 1GB RAM, 2x200GB HDD)
+
+  A special thanks goes to Will Herrick, who invested a lot of
+  personal time and money to pick up the server and ship it to
+  Germany!
+
 * true global communications GmbH, Germany - http://www.tgc.de
   Free server and bandwidth for madwifi.org
+
 
 To learn more about donations to our project visit:
 http://madwifi.org/wiki/Donations
