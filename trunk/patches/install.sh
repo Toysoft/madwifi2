@@ -94,7 +94,7 @@ MKDIR ${DST_ATH}
 echo "Copy ath driver bits..."
 FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
 make -C ${DEPTH} svnversion.h
-INSTALL ${DST_ATH} ${FILES} ${DEPTH}/svnversion.h
+INSTALL ${DST_ATH} ${FILES} ${DEPTH}/*.h
 INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 
 # NB: use leading '_' to ensure it's built before the driver
@@ -105,7 +105,6 @@ INSTALLX ${DST_ATH_HAL}/Makefile ${SRC_ATH_HAL}/Makefile.kernel
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/ah_osdep.c
 INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/uudecode.c
 
-# NB: use leading '_' to ensure it's built before the driver
 DST_ATH_RATE=${MADWIFI}/ath_rate
 MKDIR ${DST_ATH_RATE}
 echo "Copy $SRC_ATH_RATE bits..."
@@ -143,7 +142,7 @@ DST_NET80211=${MADWIFI}/net80211
 MKDIR ${DST_NET80211}
 echo "Copy net80211 bits..."
 FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
-INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/svnversion.h
+INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/*.h
 INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
 MKDIR ${DST_NET80211}/compat
