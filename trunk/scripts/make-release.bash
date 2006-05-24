@@ -107,7 +107,7 @@ fi
 
 
 # ask developer about the version of the new release
-reproot=$(svn info | grep Root | cut -d" " -f3)
+reproot=$(svn info | grep URL | cut -d" " -f2 | cut -d"/" -f1-3)
 latest=$(svn list $reproot/tags | grep -e "^release-" | cut -d"-" -f2 | cut -d"/" -f1 | sort | tail -n 1)
 
 echo
