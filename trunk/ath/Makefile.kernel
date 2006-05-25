@@ -34,11 +34,6 @@ else
 TARGET = $(ARCH)-elf
 endif
 
-EXTRA_CFLAGS+= -DATH_SUPERG_FF=1
-EXTRA_CFLAGS+= -DATH_SUPERG_DYNTURBO=1
-EXTRA_CFLAGS+= -DATH_SUPERG_SCAN=1
-EXTRA_CFLAGS+= -DATH_PHYERR_DIAG=1
-
 #
 # Select bus-specific code.  Note that this defaults to PCI.
 #

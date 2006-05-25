@@ -12,10 +12,6 @@ COMPAT = $(src)/compat
 
 HAL = $(src)/../hal
 
-EXTRA_CFLAGS+= -DATH_SUPERG_FF=1
-EXTRA_CFLAGS+= -DATH_SUPERG_DYNTURBO=1
-EXTRA_CFLAGS+= -DATH_TURBO_SCAN=1
-
 EXTRA_CFLAGS+=	-include ${COMPAT}/compat.h -I${COMPAT} -I${src}/.. \
 	-I${HAL} -I${HAL}/linux
 
