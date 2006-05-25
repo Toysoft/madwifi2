@@ -138,12 +138,12 @@ export ARCH_TARGET
 # to run depmod properly.
 SYSTEMMAP ?= 	${KERNELPATH}/System.map
 
-# MODULEPATH nominates the directory where the modules will be
+# KMODPATH nominates the directory where the modules will be
 # installed to
 ifeq ($(strip ${BUS}),AHB)
-MODULEPATH := 	${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERNELRELEASE}/net
+KMODPATH := 	${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERNELRELEASE}/net
 else
-MODULEPATH ?=	/lib/modules/${KERNELRELEASE}/net
+KMODPATH :=	/lib/modules/${KERNELRELEASE}/net
 endif
 
 # Recognize 2.4.x kernels to support the old build system

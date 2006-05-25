@@ -86,7 +86,7 @@ find . -name Makefile\* | xargs perl -pi -e's,/sbin/depmod,: /sbin/depmod,'
 export KERNELRELEASE=%{mykversion}
 export KERNELPATH=/lib/modules/%{mykversion}/build
 export KERNELCONF=/lib/modules/%{mykversion}/build/.config
-export MODULEPATH=/lib/modules/%{mykversion}/net
+export KMODPATH=/lib/modules/%{mykversion}/net
 export COPTS="-I /lib/modules/%{mykversion}/build/include/ $COPTS"
 # export ATH_RATE=ath_rate/onoe
 make 
@@ -96,13 +96,13 @@ make
 export KERNELRELEASE=%{mykversion}
 export KERNELPATH=/lib/modules/%{mykversion}/build
 export KERNELCONF=/lib/modules/%{mykversion}/build/.config
-export MODULEPATH=/lib/modules/%{mykversion}/net
+export KMODPATH=/lib/modules/%{mykversion}/net
 
 rm -rf %{buildroot}
 
 # make info
 mkdir -p  %{buildroot}/usr/local/bin
-mkdir -p  %{buildroot}/$MODULEPATH
+mkdir -p  %{buildroot}/$KMODPATH
 mkdir -p  %{buildroot}/usr/share/madwifi
 
 make install DESTDIR=%{buildroot} KERNELPATH=/lib/modules/%{mykversion}/build

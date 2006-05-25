@@ -60,9 +60,9 @@ all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
 install:
-	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
 	${TOOLPREFIX}strip -S ath_rate_sample.$(KMODSUF)
-	cp ath_rate_sample.${KMODSUF} ${DESTDIR}/${MODULEPATH}
+	cp ath_rate_sample.${KMODSUF} ${DESTDIR}/${KMODPATH}
 
 clean:
 	-rm -f *~ *.o *.ko *.mod.c

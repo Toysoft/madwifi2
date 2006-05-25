@@ -70,9 +70,9 @@ all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
 
 install:
-	test -d ${DESTDIR}/${MODULEPATH} || mkdir -p ${DESTDIR}/${MODULEPATH}
+	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
 	${TOOLPREFIX}strip -S ath_${BUSNAME}.$(KMODSUF)
-	cp ath_${BUSNAME}.${KMODSUF} ${DESTDIR}/${MODULEPATH}
+	cp ath_${BUSNAME}.${KMODSUF} ${DESTDIR}/${KMODPATH}
 
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
