@@ -10,7 +10,7 @@ include $(src)/../BuildCaps.inc
 
 HAL=	$(src)/../hal
 WLAN=	${src}/../net80211
-COMPAT=	${WLAN}/compat
+COMPAT=	${src}/../include
 
 #
 # Use ARCH to guess the target platform.
