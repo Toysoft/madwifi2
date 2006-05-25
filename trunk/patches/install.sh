@@ -56,9 +56,6 @@ INSTALLX()
 #
 SRC_HAL=${HAL:-${DEPTH}/hal}
 test -d ${SRC_HAL} || { echo "No hal directory ${SRC_HAL}!"; exit 1; }
-SRC_ATH_HAL=${ATH_HAL:-${DEPTH}/ath_hal}
-test -d ${SRC_ATH_HAL} ||
-	{ echo "No ath_hal directory ${SRC_ATH_HAL}!"; exit 1; }
 SRC_NET80211=${WLAN:-${DEPTH}/net80211}
 test -d ${SRC_NET80211} ||
 	{ echo "No net80211 directory ${SRC_NET80211}!"; exit 1; }
@@ -96,14 +93,6 @@ FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
 make -C ${DEPTH} svnversion.h
 INSTALL ${DST_ATH} ${FILES} ${DEPTH}/*.h
 INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
-
-# NB: use leading '_' to ensure it's built before the driver
-DST_ATH_HAL=${MADWIFI}/_ath_hal
-MKDIR ${DST_ATH_HAL}
-echo "Copy ath_hal bits..."
-INSTALLX ${DST_ATH_HAL}/Makefile ${SRC_ATH_HAL}/Makefile.kernel
-INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/ah_osdep.c
-INSTALL ${DST_ATH_HAL} ${SRC_ATH_HAL}/uudecode.c
 
 DST_ATH_RATE=${MADWIFI}/ath_rate
 MKDIR ${DST_ATH_RATE}

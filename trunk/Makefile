@@ -44,10 +44,7 @@ DEPTH=	.
 include Makefile.inc
 
 # NB: the order is important here
-DIRS_MODULES=	${ATH_HAL} ${WLAN} ${ATH_RATE} ${ATH}
-
-# export for make-release.bash
-export ATH_HAL
+DIRS_MODULES=	${WLAN} ${ATH_RATE} ${ATH}
 
 all: modules tools
 
