@@ -344,7 +344,6 @@ ieee80211_ioctl_siwrate(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ifreq ifr;
-	struct ifmediareq imr;
 	int rate, retv;
 
 	if (vap->iv_media.ifm_cur == NULL)
@@ -366,8 +365,6 @@ ieee80211_ioctl_siwrate(struct net_device *dev, struct iw_request_info *info,
 	ifmedia_removeall(&vap->iv_media);
 	(void) ieee80211_media_setup(ic, &vap->iv_media,
 		vap->iv_caps, vap->iv_media.ifm_change, vap->iv_media.ifm_status);
-	ieee80211_media_status(dev, &imr);
-	ifmedia_set(&vap->iv_media, imr.ifm_active);
 
 	retv = ifmedia_ioctl(vap->iv_dev, &ifr, &vap->iv_media, SIOCSIFMEDIA);
 	if (retv == ENETRESET)
