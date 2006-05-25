@@ -8,7 +8,7 @@
 
 include $(src)/../BuildCaps.inc
 
-COMPAT = $(src)/compat
+COMPAT = $(src)/../include
 
 HAL = $(src)/../hal
 

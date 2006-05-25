@@ -138,10 +138,11 @@ INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
 
 echo "Copying compatibility files"
-mkdir -p ${DST_NET80211}/compat
-INSTALL ${DST_NET80211}/compat ${SRC_COMPAT}/compat.h
-mkdir -p ${DST_NET80211}/compat/sys
-INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
+DST_COMPAT=${MADWIFI}/include
+mkdir -p ${DST_COMPAT}
+INSTALL ${DST_COMPAT} ${SRC_COMPAT}/*.h
+mkdir -p ${DST_COMPAT}/sys
+INSTALL ${DST_COMPAT}/sys ${SRC_COMPAT}/sys/*.h
 
 
 echo "Patching the build system"
