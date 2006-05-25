@@ -9,9 +9,30 @@
 include $(src)/../BuildCaps.inc
 
 HAL=	$(src)/../hal
-ATH_HAL=$(obj)/../_ath_hal
 WLAN=	${src}/../net80211
 COMPAT=	${WLAN}/compat
+
+#
+# Use ARCH to guess the target platform.
+#
+ifdef CONFIG_CPU_BIG_ENDIAN
+ENDIAN = be
+else
+ENDIAN = le
+endif
+
+TARGET-$(CONFIG_SPARC64) = sparc64-$(ENDIAN)-elf
+TARGET-$(CONFIG_PPC32) = powerpc-$(ENDIAN)-elf
+TARGET-$(CONFIG_CPU_SH4) = sh4-$(ENDIAN)-elf
+TARGET-$(CONFIG_CPU_XSCALE) = xscale-$(ENDIAN)-elf
+TARGET-$(CONFIG_CPU_32v4) = armv4-$(ENDIAN)-elf
+TARGET-$(CONFIG_MIPS) = mips1-$(ENDIAN)-elf
+
+ifdef TARGET-y
+TARGET = $(TARGET-y)
+else
+TARGET = $(ARCH)-elf
+endif
 
 EXTRA_CFLAGS+= -DATH_SUPERG_FF=1
 EXTRA_CFLAGS+= -DATH_SUPERG_DYNTURBO=1
@@ -29,17 +50,30 @@ BUSNAME=pci
 EXTRA_CFLAGS+= -DATH_PCI
 endif
 
-INCS=	-include ${COMPAT}/compat.h -I${COMPAT}
-EXTRA_CFLAGS+=	${INCS} -I${HAL} -I${HAL}/linux -I${ATH_HAL} -I${WLAN} \
-	-I${src}/..
+INCS = -include ${COMPAT}/compat.h -I${COMPAT} -I${HAL} -I${HAL}/linux \
+	-I${WLAN} -I${src}/.. -I${src}
 
-##2.6##obj-$(CONFIG_ATHEROS) += ath_${BUSNAME}.o
+EXTRA_CFLAGS += ${INCS} -DOPT_AH_H=\"${HAL}/public/${TARGET}.opt_ah.h\"
+
+##2.6##obj-$(CONFIG_ATHEROS) += ath_${BUSNAME}.o ath_hal.o
 ##2.6##ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
+##2.6##ath_hal-objs	:= ah_osdep.o ${TARGET}.hal.o
+
+##2.6##hostprogs-y := uudecode
+##2.6##host-progs := $(hostprogs-y)
 
 ##2.4##obj-$(CONFIG_ATHEROS) := if_ath.o if_ath_${BUSNAME}.o
+##2.4##obj-$(CONFIG_ATHEROS) += ah_osdep.o ${TARGET}.hal.o
 
-##2.4##O_TARGET := ath_${BUSNAME}.o
+##2.4##O_TARGET := ath_${BUSNAME}.o ath_hal.o
 ##2.4##include $(TOPDIR)/Rules.make
 
-##2.4##export-objs	:= if_ath_${BUSNAME}.o
-##2.4##list-multi	:= ath_${BUSNAME}.o
+##2.4##export-objs	:= if_ath_${BUSNAME}.o ah_osdep.o
+##2.4##list-multi	:= ath_${BUSNAME}.o ath_hal.o
+
+##2.4##$(obj)/uudecode: $(src)/uudecode.c
+##2.4##	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+
+$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
+	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
+	$(obj)/uudecode -o $@ $<

@@ -169,10 +169,6 @@ ifeq ($(HAL),)
 HAL=	${obj}/${DEPTH}/hal
 endif
 #
-# Path to the HAL build area.
-#
-ATH_HAL=${DEPTH}/ath_hal
-#
 # Path to the 802.11 include files.
 #
 WLAN=	${DEPTH}/net80211
