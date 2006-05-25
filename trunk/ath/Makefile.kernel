@@ -70,5 +70,5 @@ EXTRA_CFLAGS += ${INCS} -DOPT_AH_H=\"${HAL}/public/${TARGET}.opt_ah.h\"
 ##2.4##	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 $(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
-	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
-	$(obj)/uudecode -o $@ $<
+	$(Q)echo "deps_$@ :=" >$(@D)/.$(@F).cmd
+	$(Q)$(obj)/uudecode -o $@ $<

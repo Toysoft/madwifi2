@@ -84,8 +84,8 @@ $(obj)/uudecode: $(obj)/uudecode.c
 endif
 
 $(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
-	echo "deps_$@ :=" >$(@D)/.$(@F).cmd
-	$(obj)/uudecode -o $@ $<
+	$(Q)echo "deps_$@ :=" >$(@D)/.$(@F).cmd
+	$(Q)$(obj)/uudecode -o $@ $<
 
 install:
 	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
