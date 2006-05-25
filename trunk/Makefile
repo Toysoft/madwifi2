@@ -83,7 +83,7 @@ install-modules:
 		$(MAKE) -C $$i install || exit 1; \
 	done
 ifeq ($(DESTDIR),)
-	(export MODULEPATH=${MODULEPATH}; /sbin/depmod -ae)
+	(export KMODPATH=${KMODPATH}; /sbin/depmod -ae)
 endif
 
 install-tools:
@@ -113,7 +113,7 @@ info:
 	@echo "KERNELRELEASE: $(KERNELRELEASE)"
 	@echo "KERNELPATH   : $(KERNELPATH)"
 	@echo "KERNELCONF   : $(KERNELCONF)"
-	@echo "MODULEPATH   : $(MODULEPATH)"
+	@echo "KMODPATH     : $(KMODPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
 	@if [ ! -z "$(DESTDIR)" ]; then \
 	    echo "DESTDIR      : $(DESTDIR)"; \
