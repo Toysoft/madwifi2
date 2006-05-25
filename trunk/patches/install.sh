@@ -80,7 +80,7 @@ echo "Copying top-level files"
 MADWIFI=${WIRELESS}/madwifi
 rm -rf ${MADWIFI}
 mkdir -p ${MADWIFI}
-make -s -C ${DEPTH} svnversion.h
+make -s -C ${DEPTH} svnversion.h KERNELCONF=/dev/null ARCH=. TARGET=i386-elf
 INSTALL ${MADWIFI} ${FILES} ${DEPTH}/*.h
 INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
 cat >>${MADWIFI}/BuildCaps.inc <<EOF
