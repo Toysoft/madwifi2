@@ -23,12 +23,6 @@ fi
 fi
 fi
 
-MKDIR()
-{
-	DIR=$1
-	test -d $DIR || { echo "Creating $DIR"; mkdir $DIR; }
-}
-
 PATCH()
 {
 	patch -N $1 < $2
@@ -82,64 +76,75 @@ else
 fi
 fi
 
+echo "Copying top-level files"
 MADWIFI=${WIRELESS}/madwifi
 rm -rf ${MADWIFI}
-MKDIR ${MADWIFI}
+mkdir -p ${MADWIFI}
+make -s -C ${DEPTH} svnversion.h
+INSTALL ${MADWIFI} ${FILES} ${DEPTH}/*.h
+INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
+cat >>${MADWIFI}/BuildCaps.inc <<EOF
 
+EXTRA_CFLAGS += \$(COPTS)
+
+ifdef CONFIG_CPU_BIG_ENDIAN
+EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
+else
+EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
+endif
+EOF
+
+
+echo "Copying ath driver files"
 DST_ATH=${MADWIFI}/ath
-MKDIR ${DST_ATH}
-echo "Copy ath driver bits..."
+mkdir -p ${DST_ATH}
 FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
-make -C ${DEPTH} svnversion.h
-INSTALL ${DST_ATH} ${FILES} ${DEPTH}/*.h
+INSTALL ${DST_ATH} ${FILES}
 INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 
+
+echo "Copying ath_rate files"
 DST_ATH_RATE=${MADWIFI}/ath_rate
-MKDIR ${DST_ATH_RATE}
-echo "Copy $SRC_ATH_RATE bits..."
+mkdir -p ${DST_ATH_RATE}
 RATEALGS="amrr onoe sample"
 for ralg in $RATEALGS; do
-	MKDIR ${DST_ATH_RATE}/$ralg
+	mkdir -p ${DST_ATH_RATE}/$ralg
 	FILES=`ls ${SRC_ATH_RATE}/$ralg/*.[ch] | sed '/mod.c/d'`
 	INSTALL ${DST_ATH_RATE}/$ralg ${FILES}
 	INSTALLX ${DST_ATH_RATE}/$ralg/Makefile ${SRC_ATH_RATE}/$ralg/Makefile.kernel
 done
 
+echo "Copying Atheros HAL files"
 DST_HAL=${MADWIFI}/hal
-MKDIR ${DST_HAL}
-echo "Copy hal bits..."
+mkdir -p ${DST_HAL}
 INSTALL ${DST_HAL} ${SRC_HAL}/ah.h
 INSTALL ${DST_HAL} ${SRC_HAL}/ah_desc.h
 INSTALL ${DST_HAL} ${SRC_HAL}/ah_devid.h
 INSTALL ${DST_HAL} ${SRC_HAL}/version.h
-MKDIR ${DST_HAL}/linux
+mkdir -p ${DST_HAL}/linux
 INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.c
 INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.h
-# XXX copy only target or use arch? 
-MKDIR ${DST_HAL}/public
-INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.inc
+mkdir -p ${DST_HAL}/public
 INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.opt_ah.h
 INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.hal.o.uu
-if [ -d ${SRC_HAL}/ar5212 ]; then
-	MKDIR ${DST_HAL}/ar5212
-	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212desc.h
-	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212reg.h
-	INSTALL ${DST_HAL}/ar5212 ${SRC_HAL}/ar5212/ar5212phy.h
-fi
 
+
+echo "Copying net80211 files"
 DST_NET80211=${MADWIFI}/net80211
-MKDIR ${DST_NET80211}
-echo "Copy net80211 bits..."
+mkdir -p ${DST_NET80211}
 FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
 INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/*.h
 INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
-MKDIR ${DST_NET80211}/compat
-echo "Setting up compatibility bits..."
+
+echo "Copying compatibility files"
+mkdir -p ${DST_NET80211}/compat
 INSTALL ${DST_NET80211}/compat ${SRC_COMPAT}/compat.h
-MKDIR ${DST_NET80211}/compat/sys
+mkdir -p ${DST_NET80211}/compat/sys
 INSTALL ${DST_NET80211}/compat/sys ${SRC_COMPAT}/sys/*.h
 
+
+echo "Patching the build system"
 INSTALL ${MADWIFI} $kbuild/Makefile
 if test "$kbuild" = 2.6; then
 INSTALL ${MADWIFI} $kbuild/Kconfig
@@ -164,14 +169,5 @@ if test -f $kbuild/Configure.help.patch; then
 		PATCH ${DST_DOC}/Configure.help $kbuild/Configure.help.patch
 fi
 
-INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
-cat >>${MADWIFI}/BuildCaps.inc <<EOF
 
-EXTRA_CFLAGS += \$(COPTS)
-
-ifdef CONFIG_CPU_BIG_ENDIAN
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
-else
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
-endif
-EOF
+echo "Done"
