@@ -39,20 +39,31 @@
 #
 # Makefile for the HAL-based Atheros driver.
 #
+
+ifeq ($(obj),)
+obj=	.
+endif
+
 DEPTH=	.
 
-include Makefile.inc
+include $(obj)/Makefile.inc
 
 # NB: the order is important here
 DIRS_MODULES=	${WLAN} ${ATH_RATE} ${ATH}
 
+obj-y := ath/ $(ATH_RATE)/ net80211/
+
 all: modules tools
 
 modules: configcheck svnversion.h
+ifdef LINUX24
 	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i || exit 1; \
 	done
+else
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
+endif
 
 .PHONY: svnversion.h
 svnversion.h:
