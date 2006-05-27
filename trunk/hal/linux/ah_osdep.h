@@ -87,11 +87,6 @@ typedef	void *va_list;
 #define	__va_list	va_list 
 #define	OS_INLINE	__inline
 
-typedef void* HAL_SOFTC;
-typedef int HAL_BUS_TAG;
-typedef void* HAL_BUS_HANDLE;
-typedef u_int32_t HAL_BUS_ADDR;			/* XXX architecture dependent */
-
 /*
  * Delay n microseconds.
  */
@@ -116,6 +111,23 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
  */
 #define	AH_LITTLE_ENDIAN	1234
 #define	AH_BIG_ENDIAN		4321
+
+#ifndef AH_BYTE_ORDER
+/*
+ * When the .inc file is not available (e.g. when building
+ * in a kernel source tree); look for some other way to
+ * setup the host byte order.
+ */
+#ifdef __LITTLE_ENDIAN
+#define	AH_BYTE_ORDER	AH_LITTLE_ENDIAN
+#endif
+#ifdef __BIG_ENDIAN
+#define	AH_BYTE_ORDER	AH_BIG_ENDIAN
+#endif
+#ifndef AH_BYTE_ORDER
+#error "Do not know host byte order"
+#endif
+#endif /* AH_BYTE_ORDER */
 
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
 /*
