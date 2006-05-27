@@ -33,7 +33,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/hal/main/public/mipsisa32-be-elf.inc#26 $
+# $Id: //depot/sw/branches/sam_hal/public/mipsisa32-be-elf.inc#2 $
 #
 
 #
@@ -63,9 +63,14 @@ STRIP=	${TOOLPREFIX}strip
 OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
+#
+# Force register read/write operations to go through a function.
+#
+AH_REGOPS_FUNC=1
+
 LDOPTS+=	-EB
 COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+=	-G 0 -mno-abicalls -fno-pic -Wa,--trap \
+COPTS+=	-G 0 -mno-abicalls -fno-pic -march=r4600 -Wa,--trap \
 	-fno-strict-aliasing -fno-common -fomit-frame-pointer -mlong-calls \
 	-isystem ${KERNELPATH}/include
 

@@ -33,16 +33,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/branches/sam_hal/public/mips-be-elf.inc#2 $
+# $Id: //depot/sw/branches/sam_hal/public/mipsisa32-be-elf.inc#1 $
 #
 
 #
-# Configuration for building big-endian MIPS2 using the 5.01
-# linux-mips.org toolchain (manually moved to /pub/gnu from
-# /pub/gnu/local where rpm --prefix=/pub/gnu bogusly installs them).
+# Configuration for building big-endian MIPS2 for the AP61 SoC
+# using the 5.01 linux-mips.org toolchain (manually moved to
+# /pub/gnu from /pub/gnu/local where rpm --prefix=/pub/gnu
+# bogusly installs them).
 #
-# Known to work on:
-#	AMD Au1500
 
 #
 # http://www.linux-mips.org/toolchain.html
@@ -64,12 +63,7 @@ STRIP=	${TOOLPREFIX}strip
 OBJCOPY=${TOOLPREFIX}objcopy
 NM=	${TOOLPREFIX}nm
 
-#
-# Force register read/write operations to go through a function.
-#
-AH_REGOPS_FUNC=1
-
 LDOPTS=	-EB
 COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+=	-G 0 -EB -mno-abicalls -fno-pic -mips2 -Wa,--trap \
+COPTS+=	-G 0 -EB -mno-abicalls -fno-pic -mips32 -Wa,--trap \
 	-fno-strict-aliasing -fno-common -fomit-frame-pointer -mlong-calls
