@@ -22,6 +22,7 @@ ENDIAN = le
 endif
 
 TARGET-$(CONFIG_SPARC64) = sparc64-$(ENDIAN)-elf
+TARGET-$(CONFIG_SPARC) = sparc-$(ENDIAN)-elf
 TARGET-$(CONFIG_PPC32) = powerpc-$(ENDIAN)-elf
 TARGET-$(CONFIG_CPU_SH4) = sh4-$(ENDIAN)-elf
 TARGET-$(CONFIG_CPU_XSCALE) = xscale-$(ENDIAN)-elf
