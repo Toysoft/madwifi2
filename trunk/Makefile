@@ -57,12 +57,11 @@ all: modules tools
 
 modules: configcheck svnversion.h
 ifdef LINUX24
-	mkdir -p ${SYMBOLSDIR}
 	for i in ${DIRS_MODULES}; do \
 		$(MAKE) -C $$i || exit 1; \
 	done
 else
-	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 endif
 
 .PHONY: svnversion.h
@@ -106,8 +105,8 @@ clean:
 		$(MAKE) -C $$i clean; \
 	done
 	-$(MAKE) -C ${TOOLS} clean
-	rm -rf ${SYMBOLSDIR}
-	rm -f svnversion.h
+	rm -rf .tmp_versions
+	rm -f Modules.symvers svnversion.h
 
 info:
 	@echo "The following settings will be used for compilation:"

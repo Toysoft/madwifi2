@@ -207,8 +207,6 @@ endif
 include ${HAL}/public/${TARGET}.inc
 include ${obj}/${DEPTH}/BuildCaps.inc
 
-SYMBOLSDIR=${DEPTH}/symbols
-
 
 # The following variables will affect developers only, and are used in the
 # make-release.bash script.

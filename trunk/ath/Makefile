@@ -76,7 +76,7 @@ EXTRA_CFLAGS+= ${INCS} ${COPTS} -DOPT_AH_H=\"${HAL}/public/${TARGET}.opt_ah.h\"
 -include $(TOPDIR)/Rules.make
 
 all:
-	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) MODVERDIR=$(shell pwd)/${SYMBOLSDIR} modules
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
 ifdef LINUX24
 $(obj)/uudecode: $(obj)/uudecode.c
