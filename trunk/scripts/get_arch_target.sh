@@ -15,6 +15,7 @@ test "$CONFIG_X86_64" && report x86_64
 test "$CONFIG_X86" && report i386
 test "$CONFIG_ALPHA" && report alpha
 test "$CONFIG_SPARC64" && report sparc64 sparc64-be-elf
+test "$CONFIG_SPARC" && report sparc sparc-be-elf
 test "$CONFIG_PPC32" && test "$CONFIG_PPC_MERGE" && report powerpc powerpc-be-elf
 test "$CONFIG_PPC32" && report ppc powerpc-be-elf
 test "$CONFIG_CPU_SH4" && report sh sh4-le-elf
