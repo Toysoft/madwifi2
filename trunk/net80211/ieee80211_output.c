@@ -1714,7 +1714,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	if (skb == NULL) {
 		vap->iv_stats.is_tx_nobuf++;
 		ieee80211_free_node(ni);
-		return ENOMEM;
+		return -ENOMEM;
 	}
 
 	frm = ieee80211_add_ssid(frm, ssid, ssidlen);

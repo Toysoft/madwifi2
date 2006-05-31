@@ -186,7 +186,7 @@ getiwkeyix(struct ieee80211vap *vap, const struct iw_point* erq, int *kix)
 		*kix = kid;
 		return 0;
 	} else
-		return EINVAL;
+		return -EINVAL;
 }
 
 static int
@@ -203,8 +203,8 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 		 * set the default transmit key.
 		 */
 		error = getiwkeyix(vap, erq, &kid);
-		if (error)
-			return -error;
+		if (error < 0)
+			return error;
 		if (erq->length > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
 		/* XXX no way to install 0-length key */
@@ -303,8 +303,8 @@ ieee80211_ioctl_giwencode(struct net_device *dev, struct iw_request_info *info,
 
 	if (vap->iv_flags & IEEE80211_F_PRIVACY) {
 		error = getiwkeyix(vap, erq, &kid);
-		if (error != 0)
-			return -error;
+		if (error < 0)
+			return error;
 		k = &vap->iv_nw_keys[kid];
 		/* XXX no way to return cipher/key type */
 
@@ -367,9 +367,9 @@ ieee80211_ioctl_siwrate(struct net_device *dev, struct iw_request_info *info,
 		vap->iv_caps, vap->iv_media.ifm_change, vap->iv_media.ifm_status);
 
 	retv = ifmedia_ioctl(vap->iv_dev, &ifr, &vap->iv_media, SIOCSIFMEDIA);
-	if (retv == ENETRESET)
+	if (retv == -ENETRESET)
 		retv = IS_UP_AUTO(vap) ? ieee80211_open(vap->iv_dev) : 0;
-	return -retv;
+	return retv;
 }
 
 static int
@@ -428,7 +428,7 @@ ieee80211_ioctl_siwrts(struct net_device *dev, struct iw_request_info *info,
 	if (val != vap->iv_rtsthreshold) {
 		vap->iv_rtsthreshold = val;
 		if (IS_UP(vap->iv_dev))
-			return -ic->ic_reset(ic->ic_dev);
+			return ic->ic_reset(ic->ic_dev);
 	}
 	return 0;
 }
@@ -464,7 +464,7 @@ ieee80211_ioctl_siwfrag(struct net_device *dev,	struct iw_request_info *info,
 	if (val != vap->iv_fragthreshold) {
 		vap->iv_fragthreshold = val;
 		if (IS_UP(ic->ic_dev))
-			return -ic->ic_reset(ic->ic_dev);
+			return ic->ic_reset(ic->ic_dev);
 	}
 	return 0;
 }
@@ -836,7 +836,7 @@ ieee80211_ioctl_siwessid(struct net_device *dev, struct iw_request_info *info,
 			copy_des_ssid(vap->iv_xrvap, vap);
 	}
 #endif
-	return IS_UP_AUTO(vap) ? -ieee80211_init(vap->iv_dev, RESCAN) : 0;
+	return IS_UP_AUTO(vap) ? ieee80211_init(vap->iv_dev, RESCAN) : 0;
 }
 
 static int
@@ -1172,7 +1172,7 @@ ieee80211_ioctl_siwpower(struct net_device *dev, struct iw_request_info *info,
 		ic->ic_flags |= IEEE80211_F_PMGTON;
 	}
 done:
-	return IS_UP(ic->ic_dev) ? -ic->ic_reset(ic->ic_dev) : 0;
+	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
 static int
@@ -1228,7 +1228,7 @@ ieee80211_ioctl_siwretry(struct net_device *dev, struct iw_request_info *info,
 		return 0;
 	}
 done:
-	return IS_UP(vap->iv_dev) ? -ic->ic_reset(vap->iv_dev) : 0;
+	return IS_UP(vap->iv_dev) ? ic->ic_reset(vap->iv_dev) : 0;
 }
 
 static int
@@ -1314,7 +1314,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
 	}
 done:
-	return IS_UP(ic->ic_dev) ? -ic->ic_reset(ic->ic_dev) : 0;
+	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
 static int
@@ -2948,7 +2948,7 @@ ieee80211_ioctl_wdsmac(struct net_device *dev, struct iw_request_info *info,
 		ether_sprintf(vap->wds_mac));
 
 	if (IS_UP(vap->iv_dev))
-		return -ic->ic_reset(ic->ic_dev);
+		return ic->ic_reset(ic->ic_dev);
 
 	return 0;
 }
@@ -2971,7 +2971,7 @@ ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
 	if (memcmp(vap->wds_mac, sa->sa_data, IEEE80211_ADDR_LEN) == 0) {
 		memset(vap->wds_mac, 0x00, IEEE80211_ADDR_LEN);
 		if (IS_UP(vap->iv_dev))
-			return -ic->ic_reset(ic->ic_dev);
+			return ic->ic_reset(ic->ic_dev);
 		return 0;			 
 	}
 
@@ -3149,7 +3149,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 	switch (param[0]) {
         case IEEE80211_WMMPARAMS_CWMIN:
 		if (param[3] < 0 || param[3] > 15) 
-			return EINVAL;
+			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
 			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
@@ -3162,7 +3162,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		break;
 	case IEEE80211_WMMPARAMS_CWMAX:
 		if (param[3] < 0 || param[3] > 15) 
-			return EINVAL;
+			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
 			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
@@ -3175,7 +3175,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		break;
         case IEEE80211_WMMPARAMS_AIFS:
 		if (param[3] < 0 || param[3] > 15) 
-			return EINVAL;	
+			return -EINVAL;	
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
 			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
@@ -3188,7 +3188,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		break;
         case IEEE80211_WMMPARAMS_TXOPLIMIT:
 		if (param[3] < 0 || param[3] > 8192) 
-			return EINVAL;
+			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_txopLimit 
 				= IEEE80211_US_TO_TXOP(param[3]);
@@ -3205,7 +3205,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		break;
         case IEEE80211_WMMPARAMS_ACM:
 		if (!bss || param[3] < 0 || param[3] > 1) 
-			return EINVAL;
+			return -EINVAL;
         	/* ACM bit applies to BSS case only */
 		wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
 		if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
@@ -3213,7 +3213,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		break;
         case IEEE80211_WMMPARAMS_NOACKPOLICY:
 		if (bss || param[3] < 0 || param[3] > 1) 
-			return EINVAL;	
+			return -EINVAL;	
         	/* ack policy applies to non-BSS case only */
 		wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
 		wme->wme_chanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
@@ -4190,8 +4190,8 @@ ieee80211_ioctl_giwencodeext(struct net_device *dev,
 	ext = (struct iw_encode_ext *)extra;
 
 	error = getiwkeyix(vap, erq, &kid);
-	if (error)
-		return -error;
+	if (error < 0)
+		return error;
 
 	wk = &vap->iv_nw_keys[kid];
 	if (wk->wk_keylen > max_key_len)
@@ -4240,8 +4240,8 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 	int error;
 	int kid;
 	error = getiwkeyix(vap, erq, &kid);
-	if (error)
-		return -error;
+	if (error < 0)
+		return error;
 
 	if (ext->key_len > (erq->length - sizeof(struct iw_encode_ext)))
 	   	return -EINVAL;
