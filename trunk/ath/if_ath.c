@@ -300,8 +300,8 @@ MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
 MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
 
-#ifdef AR_DEBUG
 static int	ath_debug = 0;
+#ifdef AR_DEBUG
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
 MODULE_PARM(ath_debug, "i");
 #else
@@ -347,11 +347,11 @@ enum {
 	if (sc->sc_debug & ATH_DEBUG_KEYCACHE)			\
 		ath_keyprint(__func__, ix, hk, mac);		\
 } while (0)
-#else
+#else /* defined(AR_DEBUG) */
 #define	IFF_DUMPPKTS(sc, _m)	netif_msg_dumppkts(&sc->sc_ic)
 #define	DPRINTF(sc, _m, _fmt, ...)
 #define	KEYPRINTF(sc, k, ix, mac)
-#endif
+#endif /* defined(AR_DEBUG) */
 
 #define ATH_SETUP_XR_VAP(sc,vap,rfilt) \
 	do { \
