@@ -637,12 +637,11 @@ void ieee80211_note_frame(struct ieee80211vap *,
 	ieee80211_msg(_vap, IEEE80211_MSG_SCAN)
 #define	ieee80211_msg_assoc(_vap) \
 	ieee80211_msg(_vap, IEEE80211_MSG_ASSOC)
-#else
+#else /* IEEE80211_DEBUG */
 #define	IEEE80211_DPRINTF(_vap, _m, _fmt, ...)
+#define	IEEE80211_NOTE(_vap, _m, _wh, _fmt, ...)
 #define	IEEE80211_NOTE_FRAME(_vap, _m, _wh, _fmt, ...)
 #define	IEEE80211_NOTE_MAC(_vap, _m, _mac, _fmt, ...)
-#define	ieee80211_msg_dumppkts(_vap)	0
-#define	ieee80211_msg(_vap, _m)		0
-#endif
+#endif /* IEEE80211_DEBUG */
 
 #endif /* _NET80211_IEEE80211_VAR_H_ */
