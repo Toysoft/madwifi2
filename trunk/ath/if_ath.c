@@ -3723,7 +3723,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		DPRINTF(sc, ATH_DEBUG_BEACON, "%s: cannot get sk_buff\n",
 			__func__);
 		sc->sc_stats.ast_be_nobuf++;
-		return ENOMEM;
+		return -ENOMEM;
 	}
 
 	/*
@@ -5118,7 +5118,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 					__func__,
 					sc->sc_rxbufsize + extra + sc->sc_cachelsz - 1);
  				sc->sc_stats.ast_rx_nobuf++;
- 				return ENOMEM;
+ 				return -ENOMEM;
  			}
  			/*
 			 * Reserve space for the Prism header.
@@ -5142,7 +5142,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 					"%s: skbuff alloc of size %u failed\n",
 					__func__, sc->sc_rxbufsize);
 				sc->sc_stats.ast_rx_nobuf++;
-				return ENOMEM;
+				return -ENOMEM;
 			}
 		}
 		skb->dev = sc->sc_dev;
@@ -7466,7 +7466,7 @@ ath_startrecv(struct ath_softc *sc)
 	STAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
 		int error = ath_rxbuf_init(sc, bf);
 		ATH_RXBUF_RESET(bf);
-		if (error != 0)
+		if (error < 0)
 			return error;
 	}
 
@@ -7587,7 +7587,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq,
 			        hchan.channelFlags,
 				ath_get_hal_status_desc(status), status);
-			return EIO;
+			return -EIO;
 		}
 
 		if (sc->sc_softled)
@@ -7602,7 +7602,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		if (ath_startrecv(sc) != 0) {
 			printk("%s: %s: unable to restart recv logic\n",
 				dev->name, __func__);
-			return EIO;
+			return -EIO;
 		}
 
 		/*
@@ -7912,7 +7912,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			}
 
 			error = ath_beacon_alloc(sc, ni);
-			if (error != 0)
+			if (error < 0)
 				goto bad;
 			/* 
 			 * if the turbo flags have changed, then beacon and turbo
@@ -8084,7 +8084,7 @@ ath_check_dfs_clear(unsigned long data )
 				/* re alloc beacons to update new channel info */
 				int error;
 				error = ath_beacon_alloc(sc, vap->iv_bss);
-				if(error != 0) {
+				if(error < 0) {
 					/* XXX */
 					return;
 				}
@@ -8387,7 +8387,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
 	if (chans == NULL) {
 		printk("%s: unable to allocate channel table\n", dev->name);
-		return ENOMEM;
+		return -ENOMEM;
 	}
 	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
 	    ic->ic_regclassids, IEEE80211_REGCLASSIDS_MAX, &ic->ic_nregclass,
@@ -8399,7 +8399,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 			"regdomain likely %u country code %u\n",
 			dev->name, rd, cc);
 		kfree(chans);
-		return EINVAL;
+		return -EINVAL;
 	}
 	/*
 	 * Convert HAL channels to ieee80211 ones.
@@ -8900,7 +8900,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 	IEEE80211_ADDR_COPY(ic->ic_myaddr, mac->sa_data);
 	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
 	ath_hal_setmac(ah, dev->dev_addr);
-	error = -ath_reset(dev);
+	error = ath_reset(dev);
 	ATH_UNLOCK(sc);
 
 	return error;
@@ -8923,7 +8923,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
 	dev->mtu = mtu;
 	/* NB: the rx buffers may need to be reallocated */
 	tasklet_disable(&sc->sc_rxtq);
-	error = -ath_reset(dev);
+	error = ath_reset(dev);
 	tasklet_enable(&sc->sc_rxtq);
 	ATH_UNLOCK(sc);
 
