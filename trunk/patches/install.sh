@@ -39,16 +39,6 @@ INSTALL()
 	cp $* $DEST
 }
 
-INSTALLX()
-{
-	DEST=$1; shift
-	if test "$kbuild" = 2.6; then
-		sed -e '/^##2.4##/d' -e 's/^##2.6##//' $1 > $DEST
-	else
-		sed -e 's/^##2.4##//' -e '/^##2.6##/d' $1 > $DEST
-	fi
-}
-
 #
 # Location of various pieces.  These mimic what is in Makefile.inc
 # and can be overridden from the environment.
@@ -71,9 +61,11 @@ test -d ${WIRELESS} || die "No wireless directory ${WIRELESS}"
 if test -f ${WIRELESS}/Kconfig; then
 	kbuild=2.6
 	kbuildconf=Kconfig
+	makedef=LINUX26
 else if test -f ${WIRELESS}/Config.in; then
 	kbuild=2.4
 	kbuildconf=Config.in
+	makedef=LINUX24
 else
 	die "Kernel build system is not supported"
 fi
@@ -95,6 +87,8 @@ EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
 else
 EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
 endif
+
+$makedef := 1
 EOF
 
 
@@ -103,7 +97,7 @@ DST_ATH=${MADWIFI}/ath
 mkdir -p ${DST_ATH}
 FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
 INSTALL ${DST_ATH} ${FILES}
-INSTALLX ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
+INSTALL ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
 
 
 echo "Copying ath_rate files"
@@ -114,7 +108,7 @@ for ralg in $RATEALGS; do
 	mkdir -p ${DST_ATH_RATE}/$ralg
 	FILES=`ls ${SRC_ATH_RATE}/$ralg/*.[ch] | sed '/mod.c/d'`
 	INSTALL ${DST_ATH_RATE}/$ralg ${FILES}
-	INSTALLX ${DST_ATH_RATE}/$ralg/Makefile ${SRC_ATH_RATE}/$ralg/Makefile.kernel
+	INSTALL ${DST_ATH_RATE}/$ralg/Makefile ${SRC_ATH_RATE}/$ralg/Makefile.kernel
 done
 
 echo "Copying Atheros HAL files"
@@ -137,7 +131,7 @@ DST_NET80211=${MADWIFI}/net80211
 mkdir -p ${DST_NET80211}
 FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
 INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/*.h
-INSTALLX ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
+INSTALL ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
 
 
 echo "Copying compatibility files"
