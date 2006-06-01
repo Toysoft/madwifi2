@@ -13,7 +13,7 @@ die()
 	exit 1
 }
 
-DEPTH=..
+SRC=..
 KERNEL_VERSION=`uname -r`
 
 if test -n "$1"; then
@@ -28,31 +28,27 @@ fi
 fi
 fi
 
+test -d ${KERNEL_PATH} || die "No kernel directory ${KERNEL_PATH}"
+
 PATCH()
 {
 	patch -N $1 < $2
-}
-
-INSTALL()
-{
-	DEST=$1; shift
-	cp $* $DEST
 }
 
 #
 # Location of various pieces.  These mimic what is in Makefile.inc
 # and can be overridden from the environment.
 #
-SRC_HAL=${HAL:-${DEPTH}/hal}
+SRC_HAL=${HAL:-${SRC}/hal}
 test -d ${SRC_HAL} || die "No hal directory ${SRC_HAL}"
-SRC_NET80211=${WLAN:-${DEPTH}/net80211}
+SRC_NET80211=${WLAN:-${SRC}/net80211}
 test -d ${SRC_NET80211} || die "No net80211 directory ${SRC_NET80211}"
-SRC_ATH=${ATH:-${DEPTH}/ath}
+SRC_ATH=${ATH:-${SRC}/ath}
 test -d ${SRC_ATH} || die "No ath directory ${SRC_ATH}"
-SRC_ATH_RATE=${DEPTH}/ath_rate
+SRC_ATH_RATE=${SRC}/ath_rate
 test -d ${SRC_ATH_RATE} ||
 	die "No rate control algorithm directory ${SRC_ATH_RATE}"
-SRC_COMPAT=${DEPTH}/include
+SRC_COMPAT=${SRC}/include
 test -d ${SRC_COMPAT} || die "No compat directory ${SRC_COMPAT}"
 
 WIRELESS=${KERNEL_PATH}/drivers/net/wireless
@@ -75,9 +71,8 @@ echo "Copying top-level files"
 MADWIFI=${WIRELESS}/madwifi
 rm -rf ${MADWIFI}
 mkdir -p ${MADWIFI}
-make -s -C ${DEPTH} svnversion.h KERNELCONF=/dev/null ARCH=. TARGET=i386-elf
-INSTALL ${MADWIFI} ${FILES} ${DEPTH}/*.h
-INSTALL ${MADWIFI} ${DEPTH}/BuildCaps.inc
+make -s -C ${SRC} svnversion.h KERNELCONF=/dev/null ARCH=. TARGET=i386-elf
+cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
 cat >>${MADWIFI}/BuildCaps.inc <<EOF
 
 EXTRA_CFLAGS += \$(COPTS)
@@ -92,67 +87,38 @@ $makedef := 1
 EOF
 
 
-echo "Copying ath driver files"
-DST_ATH=${MADWIFI}/ath
-mkdir -p ${DST_ATH}
-FILES=`ls ${SRC_ATH}/*.[ch] | sed '/mod.c/d'`
-INSTALL ${DST_ATH} ${FILES}
-INSTALL ${DST_ATH}/Makefile ${SRC_ATH}/Makefile.kernel
+echo "Copying source files"
+FILES=`cd ${SRC} && find ath ath_rate hal include net80211 -name '*.[ch]'`
+for f in $FILES; do
+	case $f in
+		*.mod.c) continue;;
+	esac
+	mkdir -p `dirname ${MADWIFI}/$f`
+	cp -f ${SRC}/$f ${MADWIFI}/$f
+done
 
-
-echo "Copying ath_rate files"
-DST_ATH_RATE=${MADWIFI}/ath_rate
-mkdir -p ${DST_ATH_RATE}
-RATEALGS="amrr onoe sample"
-for ralg in $RATEALGS; do
-	mkdir -p ${DST_ATH_RATE}/$ralg
-	FILES=`ls ${SRC_ATH_RATE}/$ralg/*.[ch] | sed '/mod.c/d'`
-	INSTALL ${DST_ATH_RATE}/$ralg ${FILES}
-	INSTALL ${DST_ATH_RATE}/$ralg/Makefile ${SRC_ATH_RATE}/$ralg/Makefile.kernel
+echo "Copying makefiles"
+FILES=`cd ${SRC} && find . -name Makefile.kernel`
+for f in $FILES; do
+	cp -f ${SRC}/$f `dirname ${MADWIFI}/$f`/Makefile
 done
 
 echo "Copying Atheros HAL files"
 DST_HAL=${MADWIFI}/hal
-mkdir -p ${DST_HAL}
-INSTALL ${DST_HAL} ${SRC_HAL}/ah.h
-INSTALL ${DST_HAL} ${SRC_HAL}/ah_desc.h
-INSTALL ${DST_HAL} ${SRC_HAL}/ah_devid.h
-INSTALL ${DST_HAL} ${SRC_HAL}/version.h
-mkdir -p ${DST_HAL}/linux
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.c
-INSTALL ${DST_HAL}/linux ${SRC_HAL}/linux/ah_osdep.h
-mkdir -p ${DST_HAL}/public
-INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.opt_ah.h
-INSTALL ${DST_HAL}/public ${SRC_HAL}/public/*.hal.o.uu
-
-
-echo "Copying net80211 files"
-DST_NET80211=${MADWIFI}/net80211
-mkdir -p ${DST_NET80211}
-FILES=`ls ${SRC_NET80211}/*.[ch] | sed '/mod.c/d'`
-INSTALL ${DST_NET80211} ${FILES} ${DEPTH}/*.h
-INSTALL ${DST_NET80211}/Makefile ${SRC_NET80211}/Makefile.kernel
-
-
-echo "Copying compatibility files"
-DST_COMPAT=${MADWIFI}/include
-mkdir -p ${DST_COMPAT}
-INSTALL ${DST_COMPAT} ${SRC_COMPAT}/*.h
-mkdir -p ${DST_COMPAT}/sys
-INSTALL ${DST_COMPAT}/sys ${SRC_COMPAT}/sys/*.h
+cp -f ${SRC_HAL}/public/*.hal.o.uu ${DST_HAL}/public
 
 
 echo "Patching the build system"
-INSTALL ${MADWIFI} $kbuild/Makefile
+cp -f $kbuild/Makefile ${MADWIFI}
 if test "$kbuild" = 2.6; then
-INSTALL ${MADWIFI} $kbuild/Kconfig
+cp -f $kbuild/Kconfig ${MADWIFI}
 sed -i '/madwifi/d;/^endmenu/i\
 source "drivers/net/wireless/madwifi/Kconfig"' ${WIRELESS}/Kconfig
 sed -i '$a\
 obj-$(CONFIG_ATHEROS) += madwifi/
 /madwifi/d;' ${WIRELESS}/Makefile
 else
-INSTALL ${MADWIFI} $kbuild/Config.in
+cp -f $kbuild/Config.in ${MADWIFI}
 sed -i '$a\
 source drivers/net/wireless/madwifi/Config.in
 /madwifi/d' ${WIRELESS}/Config.in
