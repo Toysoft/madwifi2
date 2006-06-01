@@ -7,6 +7,12 @@
 
 set -e
 
+die()
+{
+	echo "FATAL ERROR: $1" >&2
+	exit 1
+}
+
 DEPTH=..
 KERNEL_VERSION=`uname -r`
 
@@ -17,8 +23,7 @@ else if test -e /lib/modules/${KERNEL_VERSION}/source; then
 else if test -e /lib/modules/${KERNEL_VERSION}/build; then
 	KERNEL_PATH="/lib/modules/${KERNEL_VERSION}/build"
 else
-	echo "Cannot guess kernel source location"
-	exit 1
+	die "Cannot guess kernel source location"
 fi
 fi
 fi
@@ -49,20 +54,19 @@ INSTALLX()
 # and can be overridden from the environment.
 #
 SRC_HAL=${HAL:-${DEPTH}/hal}
-test -d ${SRC_HAL} || { echo "No hal directory ${SRC_HAL}!"; exit 1; }
+test -d ${SRC_HAL} || die "No hal directory ${SRC_HAL}"
 SRC_NET80211=${WLAN:-${DEPTH}/net80211}
-test -d ${SRC_NET80211} ||
-	{ echo "No net80211 directory ${SRC_NET80211}!"; exit 1; }
+test -d ${SRC_NET80211} || die "No net80211 directory ${SRC_NET80211}"
 SRC_ATH=${ATH:-${DEPTH}/ath}
-test -d ${SRC_ATH} || { echo "No ath directory ${SRC_ATH}!"; exit 1; }
+test -d ${SRC_ATH} || die "No ath directory ${SRC_ATH}"
 SRC_ATH_RATE=${DEPTH}/ath_rate
 test -d ${SRC_ATH_RATE} ||
-	{ echo "No rate control algorithm directory ${SRC_ATH_RATE}!"; exit 1; }
+	die "No rate control algorithm directory ${SRC_ATH_RATE}"
 SRC_COMPAT=${DEPTH}/include
-test -d ${SRC_COMPAT} || { echo "No compat directory ${SRC_COMPAT}!"; exit 1; }
+test -d ${SRC_COMPAT} || die "No compat directory ${SRC_COMPAT}"
 
 WIRELESS=${KERNEL_PATH}/drivers/net/wireless
-test -d ${WIRELESS} || { echo "No wireless directory ${WIRELESS}!"; exit 1; }
+test -d ${WIRELESS} || die "No wireless directory ${WIRELESS}"
 
 if test -f ${WIRELESS}/Kconfig; then
 	kbuild=2.6
@@ -71,8 +75,7 @@ else if test -f ${WIRELESS}/Config.in; then
 	kbuild=2.4
 	kbuildconf=Config.in
 else
-	echo "Kernel build system is not supported"
-	echo 1
+	die "Kernel build system is not supported"
 fi
 fi
 
