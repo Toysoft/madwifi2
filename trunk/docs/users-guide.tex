@@ -1035,6 +1035,23 @@ their associated actions.
   \ev
 \end{example}
 
+\subsubsection{\mytt{kickmac} - Disassociate an associated station}
+\argdesc{1}{0}{N/A}{No}
+This command takes a single argument which is the MAC address of a 
+currently associated client. The client is immediately sent a disassociate
+frame (with an unspecified reason). There is nothing to prevent the
+client from immediately reassociating. If you are wishing to permanently
+remove a client from the access point you will need to also make use of the 
+\mytt{maccmd}, \mytt{addmac} and \mytt{delmac} commands to configure the 
+appropriate ACL entries.
+\begin{example}
+  The following command immediately disassociates the client with MAC
+  address 00:03:7f:03:42:3f.
+  \bv
+  \cmd{iwpriv ath0 kickmac 00:03:7f:03:42:3f}
+  \ev
+\end{example}
+
 \subsubsection{\mytt{wmm} - WMM Support Enable/Disable}
 \argdesc{1}{0}{Enabled}{Yes}
 This command enables or disables WMM support. Passing a value of 1 to
