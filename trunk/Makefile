@@ -114,7 +114,7 @@ info:
 	@echo "OS           : $(OS)"
 	@echo "ARCH         : $(ARCH)"
 	@echo "BUS          : $(BUS)"
-	@if [ ! -z "$(TOOLPATH)" ]; then \
+	@if [ -n "$(TOOLPATH)" ]; then \
 	    @echo "TOOLPATH     : $(TOOLPATH)"; \
 	fi	
 	@echo "KERNELRELEASE: $(KERNELRELEASE)"
@@ -122,7 +122,7 @@ info:
 	@echo "KERNELCONF   : $(KERNELCONF)"
 	@echo "KMODPATH     : $(KMODPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
-	@if [ ! -z "$(DESTDIR)" ]; then \
+	@if [ -n "$(DESTDIR)" ]; then \
 	    echo "DESTDIR      : $(DESTDIR)"; \
 	    echo "SYSTEMMAP    : $(SYSTEMMAP)"; \
 	fi
