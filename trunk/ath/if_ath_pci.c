@@ -359,7 +359,6 @@ init_ath_pci(void)
 
 	if (pci_register_driver(&ath_pci_drv_id) < 0) {
 		printk("ath_pci: No devices found, driver not installed.\n");
-		pci_unregister_driver(&ath_pci_drv_id);
 		return (-ENODEV);
 	}
 #ifdef CONFIG_SYSCTL
