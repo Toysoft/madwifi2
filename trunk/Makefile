@@ -180,7 +180,7 @@ configcheck: sanitycheck
 	fi
 	
 	@# check crypto AES support is enabled for CCMP fallback
-	@if [ -z "$(CONFIG_CRYPTO_AES)" ] || [ -z "$(CONFIG_CRYPTO_AES_586)" ]; then \
+	@if [ -z "$(CONFIG_CRYPTO_AES)" ] && [ -z "$(CONFIG_CRYPTO_AES_586)" ]; then \
 	    echo "FAILED"; \
 	    echo "Please enable an AES crypto module."; \
 	    exit 1; \
