@@ -33,7 +33,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/branches/sam_hal/public/armv4-be-elf.inc#2 $
+# $Id: //depot/sw/branches/sam_hal/public/armv4-be-elf.inc#3 $
 #
 
 #
