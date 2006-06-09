@@ -66,7 +66,7 @@ endif
 
 .PHONY: svnversion.h
 svnversion.h:
-	if [ -d .svn ]; then \
+	@if [ -d .svn ]; then \
 		ver=`svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'`; \
 		echo "#define SVNVERSION \"svn r$$ver\"" > $@; \
 	elif [ -s SNAPSHOT ]; then \
