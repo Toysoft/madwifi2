@@ -6422,7 +6422,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_hal *ah = sc->sc_ah;
-	int iswep, ismcast, keyix, hdrlen, pktlen, try0;
+	int isprot, ismcast, keyix, hdrlen, pktlen, try0;
 	u_int8_t rix, txrate, ctsrate;
 	u_int32_t ivlen = 0, icvlen = 0;
 	int comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
@@ -6440,7 +6440,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	u_int8_t antenna;
 
 	wh = (struct ieee80211_frame *) skb->data;
-	iswep = wh->i_fc[1] & IEEE80211_FC1_WEP;
+	isprot = wh->i_fc[1] & IEEE80211_FC1_PROT;
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 	hdrlen = ieee80211_anyhdrsize(wh);
 	istxfrag = (wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG) || 
@@ -6461,7 +6461,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 */
 	pktlen -= (hdrlen & 3);
 
-	if (iswep) {
+	if (isprot) {
 		const struct ieee80211_cipher *cip;
 		struct ieee80211_key *k;
 

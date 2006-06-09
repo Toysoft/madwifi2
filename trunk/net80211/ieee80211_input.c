@@ -533,7 +533,7 @@ ieee80211_input(struct ieee80211_node *ni,
 		 * crypto cipher modules used to do delayed update
 		 * of replay sequence numbers.
 		 */
-		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
+		if (wh->i_fc[1] & IEEE80211_FC1_PROT) {
 			if ((vap->iv_flags & IEEE80211_F_PRIVACY) == 0) {
 				/*
 				 * Discard encrypted frames when privacy is off.
@@ -551,7 +551,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				goto out;
 			}
 			wh = (struct ieee80211_frame *)skb->data;
-			wh->i_fc[1] &= ~IEEE80211_FC1_WEP;
+			wh->i_fc[1] &= ~IEEE80211_FC1_PROT;
 		} else
 			key = NULL;
 
@@ -725,7 +725,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				ether_sprintf(wh->i_addr2), rssi);
 		}
 #endif
-		if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
+		if (wh->i_fc[1] & IEEE80211_FC1_PROT) {
 			if (subtype != IEEE80211_FC0_SUBTYPE_AUTH) {
 				/*
 				 * Only shared key auth frames with a challenge
@@ -754,7 +754,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				goto out;
 			}
 			wh = (struct ieee80211_frame *)skb->data;
-			wh->i_fc[1] &= ~IEEE80211_FC1_WEP;
+			wh->i_fc[1] &= ~IEEE80211_FC1_PROT;
 		}
 		ic->ic_recv_mgmt(ni, skb, subtype, rssi, rstamp);
 		goto out;
