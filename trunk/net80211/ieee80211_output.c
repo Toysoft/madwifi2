@@ -398,7 +398,7 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 		cb->flags &= ~M_LINK0;
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_AUTH, wh->i_addr1,
 			"encrypting frame (%s)", __func__);
-		wh->i_fc[1] |= IEEE80211_FC1_WEP;
+		wh->i_fc[1] |= IEEE80211_FC1_PROT;
 	}
 
 	if (IEEE80211_VAP_IS_SLEEPING(ni->ni_vap))
@@ -1103,7 +1103,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		    !KEY_UNDEFINED(*key) : !KEY_UNDEFINED(ni->ni_ucastkey)))) {
 			int force_swmic = (fragcnt > 1) ? 1 : 0;
 
-			wh->i_fc[1] |= IEEE80211_FC1_WEP;
+			wh->i_fc[1] |= IEEE80211_FC1_PROT;
 
 			if (!ieee80211_crypto_enmic(vap, key, skb, force_swmic)) {
 				IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_OUTPUT,
