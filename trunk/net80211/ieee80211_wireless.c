@@ -487,19 +487,35 @@ ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 	struct sockaddr *ap_addr, char *extra)
 {
 	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
+	static const u_int8_t broadcast_bssid[IEEE80211_ADDR_LEN] = 
+		"\xff\xff\xff\xff\xff\xff";
 	struct ieee80211vap *vap = dev->priv;
 
 	/* NB: should not be set when in AP mode */
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 		return -EINVAL;
-	IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
-	/* looks like a zero address disables */
-	if (IEEE80211_ADDR_EQ(vap->iv_des_bssid, zero_bssid))
+
+	/* 
+	 * zero address corresponds to 'iwconfig ath0 ap off', which means 
+	 * enable automatic choice of AP without actually forcing a
+	 * reassociation.  
+	 *
+	 * broadcast address corresponds to 'iwconfig ath0 ap any', which
+	 * means scan for the current best AP.
+	 *
+	 * anything else specifies a particular AP.
+	 */
+	if (IEEE80211_ADDR_EQ(vap->iv_des_bssid, zero_bssid)) 
 		vap->iv_flags &= ~IEEE80211_F_DESBSSID;
-	else
-		vap->iv_flags |= IEEE80211_F_DESBSSID;
-	if (IS_UP_AUTO(vap))
-		ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
+	else {
+		IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
+		if (IEEE80211_ADDR_EQ(vap->iv_des_bssid, broadcast_bssid))
+			vap->iv_flags &= ~IEEE80211_F_DESBSSID;
+		else 
+			vap->iv_flags |= IEEE80211_F_DESBSSID;
+		if (IS_UP_AUTO(vap))
+			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
+	}
 	return 0;
 }
 
