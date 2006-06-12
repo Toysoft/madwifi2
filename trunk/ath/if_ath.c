@@ -5535,7 +5535,7 @@ rx_accept:
 		 */
 
 		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV)) {
-			ieee80211_dump_pkt(ic, skb->data, len,
+			ieee80211_dump_pkt(ic, skb->data, skb->len,
 				   sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate,
 				   ds->ds_rxstat.rs_rssi);
 		}
