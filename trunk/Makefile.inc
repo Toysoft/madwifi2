@@ -207,6 +207,11 @@ endif
 include ${HAL}/public/${TARGET}.inc
 include ${obj}/${DEPTH}/BuildCaps.inc
 
+# Filter out compiler options that are not supported by all compilers
+# and that are not needed to ensure compatible architecture and calling
+# conventions.
+COPTS := $(filter-out -mshort-load-bytes,$(COPTS))
+
 
 # The following variables will affect developers only, and are used in the
 # make-release.bash script.
