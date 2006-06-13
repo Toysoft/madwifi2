@@ -2025,8 +2025,11 @@ ieee80211_getrssi(struct ieee80211com *ic)
 	case IEEE80211_M_AHDEMO:	/* average of all neighbors */
 		/* XXX locking */
 		TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
-			rssi_samples++;
-			rssi_total += ic->ic_node_getrssi(ni);
+			if (memcmp(ni->ni_vap->iv_myaddr, ni->ni_macaddr, 
+						IEEE80211_ADDR_LEN)!=0) {
+				rssi_samples++;
+				rssi_total += ic->ic_node_getrssi(ni);
+			}
 		}
 		break;
 	case IEEE80211_M_HOSTAP:	/* average of all associated stations */
