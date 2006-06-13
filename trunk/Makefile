@@ -179,11 +179,4 @@ configcheck: sanitycheck
 	    exit 1; \
 	fi
 	
-	@# check crypto AES support is enabled for CCMP fallback
-	@if ! grep -q -E '^CONFIG_CRYPTO_AES(|_.*)=[my]$$' "$(KERNELCONF)"; then \
-	    echo "FAILED"; \
-	    echo "Please enable an AES crypto module."; \
-	    exit 1; \
-	fi
-	
 	@echo "ok."
