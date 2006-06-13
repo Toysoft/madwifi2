@@ -136,7 +136,7 @@ ccmp_setkey(struct ieee80211_key *k)
 		if (ctx->cc_tfm == NULL)
 			ctx->cc_tfm = crypto_alloc_tfm("aes", 0);
 		
-		if (ctx->cc_tfm == NULL {
+		if (ctx->cc_tfm == NULL) {
 			IEEE80211_DPRINTF(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
 				"%s: Tried to add a software crypto key, but software crypto not available\n",
 				__func__);
