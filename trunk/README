@@ -260,6 +260,12 @@ wpa_supplicant also supports a wide range of 802.1x EAP methods, either
 together with WPA/WPA2 or without; consult the wpa_supplicant documentation
 for an up to date list.
 
+MadWifi supports the use of the Wireless Extensions ioctl's equal to or
+greater than WE18 (linux 2.6.15). When using wpa_supplicant with a recent
+linux kernel, it is preferred to use the 'wext' driver backend, rather than
+the private MadWifi ioctl's. This means that '-D wext' option should be used
+with wpa_supplicant when the linux kernel version is 2.6.15 or above.
+
 NOTE: the in-kernel authenticator is being replaced; to use it you need
       to follow the directions in net80211/Makefile.
 
