@@ -207,6 +207,9 @@ endif
 include ${HAL}/public/${TARGET}.inc
 include ${obj}/${DEPTH}/BuildCaps.inc
 
+# Ensure correct endianess
+LDFLAGS += $(LDOPTS)
+
 # Filter out compiler options that are not supported by all compilers
 # and that are not needed to ensure compatible architecture and calling
 # conventions.
