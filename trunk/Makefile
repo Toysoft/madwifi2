@@ -72,6 +72,8 @@ svnversion.h:
 	elif [ -s SNAPSHOT ]; then \
 		ver=`sed -e '/^Revision: */!d;s///;q' SNAPSHOT`; \
 		echo "#define SVNVERSION \"svn r$$ver\"" > $@; \
+	else \
+		touch svnversion.h; \
 	fi; \
 
 # conflicts with the 'tools' subdirectory

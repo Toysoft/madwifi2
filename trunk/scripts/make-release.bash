@@ -196,7 +196,7 @@ echo "temporarily adjusting release.h..."
 mv release.h release.h.old
 sed -e "/svnversion.h/d" \
     -e "/RELEASE_TYPE/ s/\".*\"/\"RELEASE\"/" \
-    -e "/RELEASE_VERSION/ s/SVNVERSION/\"$newrelease\"/" release.h.old > release.h
+    -e "/RELEASE_VERSION/ s/\".*\"/\"$newrelease\"/" release.h.old > release.h
 rm -f release.h.old 
 
 
