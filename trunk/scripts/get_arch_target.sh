@@ -39,6 +39,7 @@ eval ARCH_${CONFIG_V850}=v850
 eval ARCH_${CONFIG_X86_64}=x86_64
 eval ARCH_${CONFIG_XTENSA}=xtensa
 ARCH=${ARCH_y}
+test -z "${ARCH}" && { echo "" ""; exit 1; }
 
 
 # Determine endianess.  Note that it's not indicated for some CPUs at
