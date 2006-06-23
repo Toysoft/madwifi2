@@ -127,7 +127,7 @@ TARGET ?= $(word 2,$(ARCH_TARGET))
 endif
 
 ifeq (,$(ARCH))
-$(error Cannot determine kernel architecture, please set ARCH)
+$(error Cannot determine kernel architecture, please check $(KERNELCONF))
 endif
 export ARCH
 export TARGET
