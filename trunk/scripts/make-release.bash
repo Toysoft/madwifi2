@@ -92,7 +92,7 @@ fi
 # make sure that the local working copy is in sync with the repository
 repos=$(svn info | grep URL | cut -d" " -f2)
 localrev=$(svn info | grep Last\ Changed\ Rev | cut -d" " -f4)
-remoterev=$(svn info $repos | grep Last\ Changed\ Rev | cut -d" " -f4)
+remoterev=$(svn log -r HEAD --quiet $repos | grep '^r[0-9]* ' | cut -d" " -f1 | cut -b2-)
 
 if [[ "$localrev" != "$remoterev" ]]; then
     echo
