@@ -248,7 +248,6 @@ static int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * but check every second at first.
 								 */
 static int ath_countrycode = CTRY_DEFAULT;	/* country code */
-static int ath_regdomain = 0;			/* regulatory domain */
 static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static char *autocreate = NULL;
@@ -9514,13 +9513,6 @@ static ctl_table ath_static_sysctls[] = {
 	  .mode		= 0444,
 	  .data		= &ath_countrycode,
 	  .maxlen	= sizeof(ath_countrycode),
-	  .proc_handler	= proc_dointvec
-	},
-	{ .ctl_name	= CTL_AUTO,
-	  .procname	= "regdomain",
-	  .mode		= 0444,
-	  .data		= &ath_regdomain,
-	  .maxlen	= sizeof(ath_regdomain),
 	  .proc_handler	= proc_dointvec
 	},
 	{ .ctl_name	= CTL_AUTO,
