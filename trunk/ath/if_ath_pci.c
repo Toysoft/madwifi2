@@ -53,6 +53,7 @@
 
 #include <linux/pci.h>
 
+#include <asm/io.h>
 #include <asm/uaccess.h>
 
 #include "if_media.h"
