@@ -265,7 +265,7 @@ ath_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 	ath_suspend(dev);
 	PCI_SAVE_STATE(pdev, ((struct ath_pci_softc *)dev->priv)->aps_pmstate);
 	pci_disable_device(pdev);
-	if (pci_set_power_state(pdev, PCI_D3hot)); /* XXX: what? */
+	pci_set_power_state(pdev, PCI_D3hot);
 
 	return 0;
 }

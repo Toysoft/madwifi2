@@ -56,7 +56,7 @@
 #define ATH_INIT_TQUEUE(a,b,c)		tasklet_init((a),(b),(unsigned long)(c))
 #define ATH_SCHEDULE_TQUEUE(a,b)	tasklet_schedule((a))
 typedef unsigned long TQUEUE_ARG;
-#define mark_bh(a)
+#define mark_bh(a) do {} while (0)
 #else					/* immediate work queue */
 #define ATH_TQ_STRUCT tq_struct
 #define ATH_INIT_TQUEUE(a,b,c)		INIT_TQUEUE(a,b,c)

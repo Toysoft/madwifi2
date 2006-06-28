@@ -46,7 +46,7 @@
 #define IEEE80211_SCHEDULE_TQUEUE(a)	tasklet_schedule((a))
 #define IEEE80211_CANCEL_TQUEUE(a)	if (!in_interrupt()) tasklet_kill((a))
 typedef unsigned long IEEE80211_TQUEUE_ARG;
-#define mark_bh(a)
+#define mark_bh(a) do {} while (0)
 #else					/* immediate work queue */
 #define IEEE80211_TQ_STRUCT tq_struct
 #define IEEE80211_INIT_TQUEUE(a,b,c)		INIT_TQUEUE(a,b,c)
