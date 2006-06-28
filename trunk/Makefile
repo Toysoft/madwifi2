@@ -167,6 +167,15 @@ configcheck: sanitycheck
 	    exit 1; \
 	fi
 	
+ifneq ($(strip ${BUS}),AHB)
+	@# check PCI support
+	@if [ -z "$(CONFIG_PCI)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable PCI support."; \
+	    exit 1; \
+	fi
+endif
+	
 	@# check wireless extensions support is enabled
 	@if [ -z "$(CONFIG_NET_RADIO)" ]; then \
 	    echo "FAILED"; \
