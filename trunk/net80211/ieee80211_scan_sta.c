@@ -1169,7 +1169,7 @@ adhoc_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 	 * of channels for scanning.  Any channels in the ordered
 	 * list not in the master list will be discarded.
 	 */
-	for (scan = adhocScanTable; scan->list != NULL; scan++) {
+	for (scan = staScanTable; scan->list != NULL; scan++) {
 		mode = scan->mode;
 		if (vap->iv_des_mode != IEEE80211_MODE_AUTO) {
 			/*
