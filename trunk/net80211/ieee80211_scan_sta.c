@@ -427,6 +427,8 @@ static const struct scanlist staScanTable[] = {
 	{ .list = NULL }
 };
 
+#undef X
+
 static int
 checktable(const struct scanlist *scan, const struct ieee80211_channel *c)
 {
@@ -1128,28 +1130,6 @@ static const struct ieee80211_scanner sta_default = {
 	.scan_assoc_success	= sta_assoc_success,
 	.scan_default		= ieee80211_sta_join,
 };
-
-/*
- * Adhoc mode-specific support.
- */
-
-static const u_int16_t adhocWorld[] =		/* 36, 40, 44, 48 */
-{ 5180, 5200, 5220, 5240 };
-static const u_int16_t adhocFcc3[] =		/* 36, 40, 44, 48 145, 149, 153, 157, 161, 165 */
-{ 5180, 5200, 5220, 5240, 5725, 5745, 5765, 5785, 5805, 5825 };
-static const u_int16_t adhocMkk[] =		/* 34, 38, 42, 46 */
-{ 5170, 5190, 5210, 5230 };
-static const u_int16_t adhoc11b[] =		/* 10, 11 */
-{ 2457, 2462 };
-
-static const struct scanlist adhocScanTable[] = {
-	{ IEEE80211_MODE_11B,   X(adhoc11b) },
-	{ IEEE80211_MODE_11A,   X(adhocWorld) },
-	{ IEEE80211_MODE_11A,   X(adhocFcc3) },
-	{ IEEE80211_MODE_11B,   X(adhocMkk) },
-	{ .list = NULL }
-};
-#undef X
 
 /*
  * Start an adhoc-mode scan by populating the channel list.
