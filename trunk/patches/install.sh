@@ -71,7 +71,7 @@ echo "Copying top-level files"
 MADWIFI=${WIRELESS}/madwifi
 rm -rf ${MADWIFI}
 mkdir -p ${MADWIFI}
-make -s -C ${SRC} svnversion.h KERNELCONF=/dev/null ARCH=. TARGET=i386-elf
+make -s -C ${SRC} svnversion.h KERNELPATH=${KERNEL_PATH} KERNELCONF=/dev/null ARCH=. TARGET=i386-elf
 cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
 cat >>${MADWIFI}/BuildCaps.inc <<EOF
 
