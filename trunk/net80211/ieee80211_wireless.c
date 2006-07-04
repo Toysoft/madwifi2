@@ -1780,7 +1780,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ifreq ifr;
 	char s[6];		/* big enough for ``11adt'' */
-	int retv, mode, ifr_mode;
+	int retv, mode, ifr_mode, itr_count;
 
 	if (ic->ic_media.ifm_cur == NULL)
 		return -EINVAL;
@@ -1816,6 +1816,18 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 		vap->iv_des_mode = mode;
 		if (IS_UP_AUTO(vap)) {
 			ieee80211_cancel_scan(vap);
+			itr_count = 0;
+			while((ic->ic_flags & IEEE80211_F_SCAN) != 0) {
+				mdelay(1);
+				if (itr_count < 100) {
+					itr_count++;
+					continue;
+				}
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+				  "%s: Timeout cancelling current scan.\n",
+				  __func__);
+                    		return -ETIMEDOUT;
+			}
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 		}
 		retv = 0;
