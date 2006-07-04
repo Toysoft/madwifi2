@@ -47,6 +47,7 @@
 #include <linux/netdevice.h>
 #include <linux/utsname.h>
 #include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
+#include <linux/delay.h>
 #include <net/iw_handler.h>
 
 #if WIRELESS_EXT < 14
@@ -116,6 +117,39 @@ set_quality(struct iw_quality *iq, u_int rssi)
 	iq->noise = 161;		/* -95dBm */
 	iq->level = iq->noise + iq->qual;
 	iq->updated = IW_QUAL_ALL_UPDATED;
+}
+
+static void
+preempt_scan(struct net_device *dev, int max_grace, int max_wait)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211com *ic = vap->iv_ic;
+	int total_delay = 0;
+	int cancelled = 0, ready = 0;
+	while (!ready && total_delay < max_grace + max_wait) {
+	  if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
+	    ready = 1;
+	  } else {
+	    if (!cancelled && total_delay > max_grace) {
+	      /* 
+		 Cancel any existing active scan, so that any new parameters
+		 in this scan ioctl (or the defaults) can be honored, then
+		 wait around a while to see if the scan cancels properly.
+	      */
+	      IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+				"%s: cancel pending scan request\n", __func__);
+	      (void) ieee80211_cancel_scan(vap);
+	      cancelled = 1;
+	    }
+	    mdelay (1);
+	    total_delay += 1;
+	  }
+	}
+	if (!ready) {
+	  IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, 
+			    "%s: Timeout cancelling current scan.\n", 
+			    __func__); 
+	}
 }
 	
 static struct iw_statistics *
@@ -1412,6 +1446,34 @@ ieee80211_ioctl_siwscan(struct net_device *dev,	struct iw_request_info *info,
 	/* XXX always manual... */
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 		"%s: active scan request\n", __func__);
+	preempt_scan(dev, 100, 100);
+#if WIRELESS_EXT > 17
+	if (data && (data->flags & IW_SCAN_THIS_ESSID)) {
+		struct iw_scan_req req;
+		struct ieee80211_scan_ssid ssid;
+		int copyLength;
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+			"%s: SCAN_THIS_ESSID requested\n", __func__);
+		if (data->length > sizeof req) {
+			copyLength = sizeof req;
+		} else {
+			copyLength = data->length;
+		}
+		memset(&req, 0, sizeof req);
+		if (copy_from_user(&req, data->pointer, copyLength))
+			return -EFAULT;
+		memcpy(&ssid.ssid, req.essid, sizeof ssid.ssid);
+		ssid.len = req.essid_len;
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+				  "%s: requesting scan of essid '%s'\n", __func__, ssid.ssid);
+		(void) ieee80211_start_scan(vap,
+			IEEE80211_SCAN_ACTIVE |
+			IEEE80211_SCAN_NOPICK |
+			IEEE80211_SCAN_ONCE, IEEE80211_SCAN_FOREVER,
+			1, &ssid);
+		return 0;
+	}
+#endif		 
 	(void) ieee80211_start_scan(vap, IEEE80211_SCAN_ACTIVE |
 		IEEE80211_SCAN_NOPICK |	IEEE80211_SCAN_ONCE,
 		IEEE80211_SCAN_FOREVER,
