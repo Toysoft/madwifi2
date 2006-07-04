@@ -46,6 +46,9 @@
 #include <linux/etherdevice.h>
 #include <linux/random.h>
 #include <linux/if_vlan.h>
+#include <net/iw_handler.h> /* wireless_send_event(..) */
+#include <linux/wireless.h> /* SIOCGIWTHRSPY */
+#include <linux/if_arp.h> /* ARPHRD_ETHER */
 
 #include "if_llc.h"
 #include "if_ethersubr.h"
@@ -122,6 +125,77 @@ static void athff_decap(struct sk_buff *);
 #ifdef USE_HEADERLEN_RESV
 static unsigned short ath_eth_type_trans(struct sk_buff *, struct net_device *);
 #endif
+
+/* Enhanced iwspy support */
+#ifdef CONFIG_NET_WIRELESS
+#if WIRELESS_EXT >= 16
+
+/**
+ * This function is a clone of set_quality(..) in ieee80211_wireless.c
+ */
+static void
+set_quality(struct iw_quality *iq, u_int rssi)
+{
+	iq->qual = rssi;
+	/* NB: max is 94 because noise is hardcoded to 161 */
+	if (iq->qual > 94)
+		iq->qual = 94;
+
+	iq->noise = 161;		/* -95dBm */
+	iq->level = iq->noise + iq->qual;
+	iq->updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED |
+		IW_QUAL_NOISE_UPDATED;
+}
+
+/**
+ * Given a node and the rssi value of a just received frame from the node, this
+ * function checks if to raise an iwspy event because we iwspy the node and rssi
+ * exceeds threshold (if active).
+ * 
+ * @param vap: vap
+ * @param ni: sender node
+ * @param rssi: rssi value of received frame
+ */
+static void
+iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
+{
+	if (vap->iv_spy.thr_low && vap->iv_spy.num && ni && (rssi <
+		vap->iv_spy.thr_low || rssi > vap->iv_spy.thr_high)) {
+		int i;
+		for (i = 0; i < vap->iv_spy.num; i++) {
+			if (IEEE80211_ADDR_EQ(ni->ni_macaddr,
+				&(vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]))) {
+					
+				union iwreq_data wrq;
+				struct iw_thrspy thr;
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG,
+					"%s: we spy %s, threshold is active "
+					"and rssi exceeds it -> raise an iwspy"
+					" event\n", __func__, ether_sprintf(
+					 ni->ni_macaddr));
+				memset(&wrq, 0, sizeof(wrq));
+				wrq.data.length = 1;
+				memset(&thr, 0, sizeof(struct iw_thrspy));
+				memcpy(thr.addr.sa_data, ni->ni_macaddr,
+					IEEE80211_ADDR_LEN);
+				thr.addr.sa_family = ARPHRD_ETHER;
+				set_quality(&thr.qual, rssi);
+				set_quality(&thr.low, vap->iv_spy.thr_low);
+				set_quality(&thr.high, vap->iv_spy.thr_high);
+				wireless_send_event(vap->iv_dev,
+					SIOCGIWTHRSPY, &wrq, (char*) &thr);
+				break;
+			}
+		}
+	}
+}
+
+#else
+#define iwspy_event(_vap, _ni, _rssi)
+#endif /* WIRELESS_EXT >= 16 */
+#else
+#define iwspy_event(_vap, _ni, _rssi)
+#endif /* CONFIG_NET_WIRELESS */
 
 /*
  * Process a received frame.  The node associated with the sender
@@ -209,6 +283,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				vap->iv_stats.is_rx_wrongbss++;
 				goto out;
 			}
+			iwspy_event(vap, ni, rssi);
 			break;
 		case IEEE80211_M_IBSS:
 		case IEEE80211_M_AHDEMO:
@@ -247,6 +322,7 @@ ieee80211_input(struct ieee80211_node *ni,
 					}
 				}
 			}
+			iwspy_event(vap, ni, rssi);
 			break;
 		case IEEE80211_M_HOSTAP:
 			if (dir != IEEE80211_FC1_DIR_NODS)
