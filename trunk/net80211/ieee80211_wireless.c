@@ -1135,6 +1135,61 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+/* Enhanced iwspy support */
+static int
+ieee80211_ioctl_setthrspy(struct net_device *dev, struct iw_request_info *info,
+	struct iw_point *data, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct iw_thrspy threshold;
+
+	if (data->length != 1)
+		return -EINVAL;
+	
+	/* get the threshold values into the driver */
+	if (data->pointer) {
+		if (copy_from_user(&threshold, data->pointer,
+		    sizeof(struct iw_thrspy)))
+			return -EFAULT;
+        } else
+		return -EINVAL;
+		
+	if (threshold.low.level == 0) {
+		/* disable threshold */
+		vap->iv_spy.thr_low = 0;
+		vap->iv_spy.thr_high = 0;
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG,
+			"%s: disabled iw_spy threshold\n", __func__);
+	} else {
+		/* calculate corresponding rssi values */
+		vap->iv_spy.thr_low = threshold.low.level - 161;
+		vap->iv_spy.thr_high = threshold.high.level - 161;
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG,
+			"%s: enabled iw_spy threshold\n", __func__);
+	}
+
+	return 0;
+}
+
+static int
+ieee80211_ioctl_getthrspy(struct net_device *dev, struct iw_request_info *info,
+	struct iw_point *data, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct iw_thrspy *threshold;	
+	
+	threshold = (struct iw_thrspy *) extra;
+
+	/* set threshold values */
+	set_quality(&(threshold->low), vap->iv_spy.thr_low);
+	set_quality(&(threshold->high), vap->iv_spy.thr_high);
+
+	/* copy results to userspace */
+	data->length = 1;
+	
+	return 0;
+}
+
 static int
 ieee80211_ioctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 	__u32 *mode, char *extra)
@@ -4781,8 +4836,8 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) NULL /* kernel code */,		/* SIOCGIWSTATS */
 	(iw_handler) ieee80211_ioctl_setspy,		/* SIOCSIWSPY */
 	(iw_handler) ieee80211_ioctl_getspy,		/* SIOCGIWSPY */
-	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) NULL,				/* -- hole -- */
+	(iw_handler) ieee80211_ioctl_setthrspy,		/* SIOCSIWTHRSPY */
+	(iw_handler) ieee80211_ioctl_getthrspy,		/* SIOCGIWTHRSPY */
 	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
 	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
 #ifdef SIOCSIWMLME
