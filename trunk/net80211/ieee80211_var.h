@@ -265,6 +265,28 @@ struct ieee80211_spy {
         u_int8_t num;
 };
 
+#ifdef CONFIG_SYSCTL
+#define MAX_PROC_IEEE80211_SIZE 16383
+#define PROC_IEEE80211_PERM 0644
+
+struct proc_ieee80211_priv {
+     int rlen;
+     int max_rlen;
+     char *rbuf;
+
+     int wlen;
+     int max_wlen;
+     char *wbuf;
+};
+
+struct ieee80211_proc_entry {
+	char *name;
+	struct file_operations *fileops;
+	struct proc_dir_entry *entry;
+	struct ieee80211_proc_entry *next;
+};
+#endif
+
 struct ieee80211vap {
 	struct net_device *iv_dev;		/* associated device */
 	struct net_device_stats	iv_devstats;	/* interface statistics */
@@ -275,8 +297,8 @@ struct ieee80211vap {
 #ifdef CONFIG_SYSCTL
 	struct ctl_table_header	*iv_sysctl_header;
 	struct ctl_table *iv_sysctls;
-	struct proc_dir_entry *iv_proc_stations;
 	struct proc_dir_entry *iv_proc;
+	struct ieee80211_proc_entry *iv_proc_entries;
 #endif
 	struct vlan_group *iv_vlgrp;		/* vlan group state */
 
