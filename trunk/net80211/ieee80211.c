@@ -578,6 +578,7 @@ ieee80211_vap_detach(struct ieee80211vap *vap)
 	ifmedia_removeall(&vap->iv_media);
 
 	ieee80211_sysctl_vdetach(vap);
+	ieee80211_proc_cleanup(vap);
 	ieee80211_ioctl_vdetach(vap);
 	ieee80211_vlan_vdetach(vap);
 	ieee80211_scan_vdetach(vap);
