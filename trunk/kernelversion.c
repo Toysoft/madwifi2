@@ -7,4 +7,10 @@
  * $Id$
  */
 #include <linux/version.h>
+
+/* Linux 2.6.18+ uses <linux/utsrelease.h> */
+#ifndef UTS_RELEASE
+#include <linux/utsrelease.h>
+#endif
+
 char *uts_release = UTS_RELEASE;
