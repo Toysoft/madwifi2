@@ -61,7 +61,7 @@ all:
 
 install:
 	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
-	${TOOLPREFIX}strip -S ath_rate_sample.$(KMODSUF)
+	$(STRIP) -S ath_rate_sample.$(KMODSUF)
 	cp ath_rate_sample.${KMODSUF} ${DESTDIR}/${KMODPATH}
 
 clean:

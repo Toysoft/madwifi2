@@ -46,12 +46,6 @@ export LC_ALL = POSIX
 # OS is the target operating system. Currently only Linux is supported.
 OS=		linux
 
-# TOOLPREFIX is a string that is prepended to all toolchain executables,
-# such as gcc, ld, as, objcopy etc.  This is used for cross-compiling.
-# Default is native compilation.  You can define CROSS_COMPILE instead -
-# it's a more traditional name.
-TOOLPREFIX ?= $(CROSS_COMPILE)
-
 # BUS defines the bus type to which the wireless devices is attached.
 # Currently, the valid BUS types are PCI and AHB.  If BUS is not
 # defined, then, we assume the bus type is PCI
@@ -204,7 +198,22 @@ TARGETS=$(basename $(notdir $(wildcard ${HAL}/public/*.inc)))
 $(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
 endif
 
+# Don't let HAL mess with the toolchain - save toolchain valiables
+save_CC := $(CC)
+save_LD := $(LD)
+save_STRIP := $(STRIP)
+save_OBJCOPY := $(OBJCOPY)
+save_NM := $(NM)
+
 include ${HAL}/public/${TARGET}.inc
+
+# Restore toolchain valiables
+CC := $(save_CC)
+LD := $(save_LD)
+STRIP := $(save_STRIP)
+OBJCOPY := $(save_OBJCOPY)
+NM := $(save_NM)
+
 include ${obj}/${DEPTH}/BuildCaps.inc
 
 # Ensure correct endianess

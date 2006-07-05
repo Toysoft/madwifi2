@@ -91,9 +91,9 @@ $(obj)/${TARGET}.hal.o$(shipped): ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudeco
 
 install:
 	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
-	${TOOLPREFIX}strip -S ath_${BUSNAME}.$(KMODSUF)
+	$(STRIP) -S ath_${BUSNAME}.$(KMODSUF)
 	cp ath_${BUSNAME}.${KMODSUF} ${DESTDIR}/${KMODPATH}
-	${TOOLPREFIX}strip -S ath_hal.$(KMODSUF)
+	$(STRIP) -S ath_hal.$(KMODSUF)
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${KMODPATH}
 
 clean:
