@@ -97,7 +97,7 @@ install:
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${KMODPATH}
 
 clean:
-	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd
+	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd *.hal.o_shipped
 	rm -f .depend .version .*.o.flags .*.o.d
 	rm -rf .tmp_versions
 
