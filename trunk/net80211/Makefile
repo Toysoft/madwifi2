@@ -113,7 +113,6 @@ install:
 	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
 	for i in ${MOD_INSTALL}; do \
 		f=`basename $$i .o`; \
-		$(STRIP) -S $$f.$(KMODSUF); \
 		cp $$f.${KMODSUF} ${DESTDIR}/${KMODPATH}; \
 	done
 

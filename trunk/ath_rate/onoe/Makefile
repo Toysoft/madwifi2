@@ -63,7 +63,6 @@ all:
 
 install:
 	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
-	$(STRIP) -S ath_rate_onoe.$(KMODSUF)
 	cp ath_rate_onoe.${KMODSUF} ${DESTDIR}/${KMODPATH}
 
 clean:
