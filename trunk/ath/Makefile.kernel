@@ -72,6 +72,7 @@ ath_hal-objs	:= ah_osdep.o ${TARGET}.hal.o
 
 hostprogs-y := uudecode
 host-progs := $(hostprogs-y)
+shipped := _shipped
 endif
 
 ifdef LINUX24
@@ -79,6 +80,7 @@ obj-$(CONFIG_ATHEROS) := if_ath.o if_ath_${BUSNAME}.o
 obj-$(CONFIG_ATHEROS) += ah_osdep.o ${TARGET}.hal.o
 
 O_TARGET := ath_${BUSNAME}.o ath_hal.o
+shipped :=
 include $(TOPDIR)/Rules.make
 
 export-objs	:= if_ath_${BUSNAME}.o ah_osdep.o
@@ -88,6 +90,5 @@ uudecode: uudecode.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 endif
 
-$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
-	$(Q)echo "deps_$@ :=" >$(@D)/.$(@F).cmd
+$(obj)/${TARGET}.hal.o$(shipped): ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
 	$(Q)$(obj)/uudecode -o $@ $<
