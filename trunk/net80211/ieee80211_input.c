@@ -130,6 +130,12 @@ static unsigned short ath_eth_type_trans(struct sk_buff *, struct net_device *);
 #ifdef CONFIG_NET_WIRELESS
 #if WIRELESS_EXT >= 16
 
+#ifndef IW_QUAL_QUAL_UPDATED
+#define IW_QUAL_QUAL_UPDATED	0x01
+#define IW_QUAL_LEVEL_UPDATED	0x02
+#define IW_QUAL_NOISE_UPDATED	0x04
+#endif /* IW_QUAL_QUAL_UPDATED */
+
 /**
  * This function is a clone of set_quality(..) in ieee80211_wireless.c
  */
