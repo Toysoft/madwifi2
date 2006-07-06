@@ -2006,18 +2006,15 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		}
 		switch (value) {
 		case IEEE80211_AUTH_WPA:	/* WPA w/ 802.1x */
-			vap->iv_flags |= IEEE80211_F_PRIVACY;
 			value = IEEE80211_AUTH_8021X;
 			break;
 		case IEEE80211_AUTH_OPEN:	/* open */
-			vap->iv_flags &= ~(IEEE80211_F_WPA|IEEE80211_F_PRIVACY);
+			vap->iv_flags &= ~(IEEE80211_F_WPA);
 			break;
 		case IEEE80211_AUTH_SHARED:	/* shared-key */
 		case IEEE80211_AUTH_AUTO:	/* auto */
 		case IEEE80211_AUTH_8021X:	/* 802.1x */
 			vap->iv_flags &= ~IEEE80211_F_WPA;
-			/* both require a key so mark the PRIVACY capability */
-			vap->iv_flags |= IEEE80211_F_PRIVACY;
 			break;
 		}
 		/* NB: authenticator attach/detach happens on state change */
@@ -2131,6 +2128,12 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			vap->iv_flags |= IEEE80211_F_DROPUNENC;
 		else
 			vap->iv_flags &= ~IEEE80211_F_DROPUNENC;
+		break;
+	case IEEE80211_PARAM_DROPUNENC_EAPOL:
+		if (value)
+			IEEE80211_VAP_DROPUNENC_EAPOL_ENABLE(vap);
+		else
+			IEEE80211_VAP_DROPUNENC_EAPOL_DISABLE(vap);
 		break;
 	case IEEE80211_PARAM_COUNTERMEASURES:
 		if (value) {
@@ -2592,6 +2595,9 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_DROPUNENCRYPTED:
 		param[0] = (vap->iv_flags & IEEE80211_F_DROPUNENC) != 0;
+		break;
+	case IEEE80211_PARAM_DROPUNENC_EAPOL:
+		param[0] = IEEE80211_VAP_DROPUNENC_EAPOL(vap);
 		break;
 	case IEEE80211_PARAM_COUNTERMEASURES:
 		param[0] = (vap->iv_flags & IEEE80211_F_COUNTERM) != 0;
@@ -3939,18 +3945,30 @@ siwauth_drop_unencrypted(struct net_device *dev,
 }
 
 
-/*
- * The exact meaning of the IW_AUTH_ALG_* values is a little unclear.
- * For example, wpa_supplicant uses IW_AUTH_ALG_OPEN_SYSTEM for WPA-PSK
- * APs, unless you happen to set the auth_alg=SHARED option in your config
- * file in which case it uses IW_AUTH_ALG_SHARED_KEY.  Fortunately,
- * neither makes a any difference to madwifi, so for now we ignore it.
- */
 static int
 siwauth_80211_auth_alg(struct net_device *dev,
 	struct iw_request_info *info, struct iw_param *erq, char *buf)
 {
-	return -EOPNOTSUPP;
+#define VALID_ALGS_MASK (IW_AUTH_ALG_OPEN_SYSTEM|IW_AUTH_ALG_SHARED_KEY|IW_AUTH_ALG_LEAP)
+	int mode = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_AUTHMODE;
+
+	if (mode & ~VALID_ALGS_MASK) {
+		return -EINVAL;
+	}
+	if (mode & IW_AUTH_ALG_LEAP) {
+		args[1] = IEEE80211_AUTH_8021X;
+	} else if ((mode & IW_AUTH_ALG_SHARED_KEY) &&
+		  (mode & IW_AUTH_ALG_OPEN_SYSTEM)) {
+		args[1] = IEEE80211_AUTH_AUTO;
+	} else if (mode & IW_AUTH_ALG_SHARED_KEY) {
+		args[1] = IEEE80211_AUTH_SHARED;
+	} else {
+		args[1] = IEEE80211_AUTH_OPEN;
+	}
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
 }
 
 static int
@@ -3969,23 +3987,20 @@ siwauth_wpa_enabled(struct net_device *dev,
 	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
 }
 
-/*
- * The wext API says that user space gets to decide whether EAPOL frames are 
- * supposed to be encrypted or in cleartext.  The code in WPA supplicant 
- * indicates that if the AP is using 802.1x authentication but not WPA for
- * key mgmt the eapol frames should be encrypted.  However, even if I set
- * up my AP (linkys WRT54G, fw 1.00.2) for that config, it sends eapol frames 
- * in the clear.  I'm uncertain whether my AP is violating the specification, 
- * or if wpa_supplicant is doing the wrong thing.  But if I let wpa_supplicant
- * tell madwifi to drop unencrypted eapol frames, it breaks the authentication.
- *
- * Thus, madwifi ignores this parameter.
- */
 static int
 siwauth_rx_unencrypted_eapol(struct net_device *dev,
 	struct iw_request_info *info, struct iw_param *erq, char *buf)
 {
-	return -EOPNOTSUPP;
+	int rxunenc = erq->value;
+	int args[2];
+
+	args[0] = IEEE80211_PARAM_DROPUNENC_EAPOL;
+	if (rxunenc) 
+		args[1] = 1;
+	else
+		args[1] = 0;
+
+	return ieee80211_ioctl_setparam(dev, NULL, NULL, (char*)args);
 }
 
 static int
@@ -4765,6 +4780,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "regclass" },
 	{ IEEE80211_PARAM_REGCLASS,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_regclass" },
+	{ IEEE80211_PARAM_DROPUNENC_EAPOL,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dropunenceapol" },
+	{ IEEE80211_PARAM_DROPUNENC_EAPOL,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_dropunencea" },
 	/*
 	 * NB: these should be roamrssi* etc, but iwpriv usurps all
 	 *     strings that start with roam!

@@ -118,6 +118,9 @@ static struct sk_buff *ieee80211_decap(struct ieee80211vap *,
 static void ieee80211_send_error(struct ieee80211_node *, const u_int8_t *,
 	int, int);
 static void ieee80211_recv_pspoll(struct ieee80211_node *, struct sk_buff *);
+static int accept_data_frame(struct ieee80211vap *, struct ieee80211_node *,
+	struct ieee80211_key *, struct sk_buff *, struct ether_header *);
+
 
 #ifdef ATH_SUPERG_FF
 static void athff_decap(struct sk_buff *);
@@ -675,40 +678,10 @@ ieee80211_input(struct ieee80211_node *ni,
 			goto err;
 		}
 		eh = (struct ether_header *) skb->data;
-		if (!ieee80211_node_is_authorized(ni)) {
-			/*
-			 * Deny any non-PAE frames received prior to
-			 * authorization.  For open/shared-key
-			 * authentication the port is mark authorized
-			 * after authentication completes.  For 802.1x
-			 * the port is not marked authorized by the
-			 * authenticator until the handshake has completed.
-			 */
-			if (eh->ether_type != __constant_htons(ETHERTYPE_PAE)) {
-				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
-					eh->ether_shost, "data",
-					"unauthorized port: ether type 0x%x len %u",
-					eh->ether_type, skb->len);
-				vap->iv_stats.is_rx_unauth++;
-				IEEE80211_NODE_STAT(ni, rx_unauth);
-				goto err;
-			}
-		} else {
-			/*
-			 * When denying unencrypted frames, discard
-			 * any non-PAE frames received without encryption.
-			 */
-			if ((vap->iv_flags & IEEE80211_F_DROPUNENC) &&
-			    key == NULL &&
-			    eh->ether_type != __constant_htons(ETHERTYPE_PAE)) {
-				/*
-				 * Drop unencrypted frames.
-				 */
-				vap->iv_stats.is_rx_unencrypted++;
-				IEEE80211_NODE_STAT(ni, rx_unencrypted);
-				goto out;
-			}
-		}
+
+		if (! accept_data_frame(vap, ni, key, skb, eh))
+			goto out;
+
 		vap->iv_devstats.rx_packets++;
 		vap->iv_devstats.rx_bytes += skb->len;
 		IEEE80211_NODE_STAT(ni, rx_data);
@@ -864,6 +837,75 @@ out:
 #undef HAS_SEQ
 }
 EXPORT_SYMBOL(ieee80211_input);
+
+
+/*
+ * Determines whether a frame should be accepted, based on information
+ * about the frame's origin and encryption, and policy for this vap.
+ */
+static int accept_data_frame(struct ieee80211vap *vap,
+       struct ieee80211_node *ni, struct ieee80211_key *key,
+       struct sk_buff *skb, struct ether_header *eh)
+{
+#define IS_EAPOL(eh) ((eh)->ether_type == __constant_htons(ETHERTYPE_PAE))
+#define PAIRWISE_SET(vap) ((vap)->iv_nw_keys[0].wk_cipher != &ieee80211_cipher_none)
+       if (IS_EAPOL(eh)) {
+               /* encrypted eapol is always OK */
+               if (key)
+                       return 1;
+               /* cleartext eapol is OK if we don't have pairwise keys yet */
+               if (! PAIRWISE_SET(vap))
+                       return 1;
+               /* cleartext eapol is OK if configured to allow it */
+               if (! IEEE80211_VAP_DROPUNENC_EAPOL(vap))
+                       return 1;
+               /* cleartext eapol is OK if other unencrypted is OK */
+               if (! (vap->iv_flags & IEEE80211_F_DROPUNENC))
+                       return 1;
+               /* not OK */
+               IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+                       eh->ether_shost, "data",
+                       "unauthorized port: ether type 0x%x len %u",
+                       eh->ether_type, skb->len);
+               vap->iv_stats.is_rx_unauth++;
+               vap->iv_devstats.rx_errors++;
+               IEEE80211_NODE_STAT(ni, rx_unauth);
+               return 0;
+       }
+
+       if (!ieee80211_node_is_authorized(ni)) {
+               /*
+                * Deny any non-PAE frames received prior to
+                * authorization.  For open/shared-key
+                * authentication the port is mark authorized
+                * after authentication completes.  For 802.1x
+                * the port is not marked authorized by the
+                * authenticator until the handshake has completed.
+                */
+               IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+                       eh->ether_shost, "data",
+                       "unauthorized port: ether type 0x%x len %u",
+                       eh->ether_type, skb->len);
+               vap->iv_stats.is_rx_unauth++;
+               vap->iv_devstats.rx_errors++;
+               IEEE80211_NODE_STAT(ni, rx_unauth);
+               return 0;
+       } else {
+               /*
+                * When denying unencrypted frames, discard
+                * any non-PAE frames received without encryption.
+                */
+               if ((vap->iv_flags & IEEE80211_F_DROPUNENC) && key == NULL) {
+                       IEEE80211_NODE_STAT(ni, rx_unencrypted);
+                       return 0;
+               }
+       }
+       return 1;
+
+#undef IS_EAPOL
+#undef PAIRWISE_SET
+}
+
 
 /*
  * Context: softIRQ (tasklet)
