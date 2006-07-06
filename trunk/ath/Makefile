@@ -67,9 +67,6 @@ host-progs	:= $(hostprogs-y)
 
 ifdef LINUX24
 export-objs	:= ah_osdep.o
-shipped		:=
-else
-shipped		:= _shipped
 endif
 
 INCS+=	-I${HAL} -I${obj} -I${HAL}/${OS} -I${obj}/${WLAN} -I${obj}/${DEPTH}
@@ -86,7 +83,8 @@ $(obj)/uudecode: $(obj)/uudecode.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 endif
 
-$(obj)/${TARGET}.hal.o$(shipped): ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
+$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
+	$(Q)echo "deps_$@ :=" >$(@D)/.$(@F).cmd
 	$(Q)$(obj)/uudecode -o $@ $<
 
 install:
@@ -95,7 +93,7 @@ install:
 	cp ath_hal.${KMODSUF} ${DESTDIR}/${KMODPATH}
 
 clean:
-	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd *.hal.o_shipped
+	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd
 	rm -f .depend .version .*.o.flags .*.o.d
 	rm -rf .tmp_versions
 
