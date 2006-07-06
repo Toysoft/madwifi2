@@ -15,11 +15,11 @@ COMPAT=	$(srctree)/$(src)/../include
 
 # Determine endianess.  Note that it's not indicated for some CPUs at
 # all, so this value is only valid for certain processors.
-ifeq ($(filter-out arm%,$(KERNELRELEASE)),)
+ifeq ($(filter-out arm%,$(ARCH)),)
 ENDIAN = le
 endif
 
-ifeq ($(filter-out mips%,$(KERNELRELEASE)),)
+ifeq ($(filter-out mips%,$(ARCH)),)
 ENDIAN = be
 endif
 
