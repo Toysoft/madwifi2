@@ -421,7 +421,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * built with an ah.h that does not correspond to the hal
 	 * module loaded in the kernel.
 	 */
-	ah = _ath_hal_attach(devid, sc, 0, (void *) dev->mem_start, &status);
+	ah = _ath_hal_attach(devid, sc, NULL, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
 			dev->name, ath_get_hal_status_desc(status), status);
@@ -1159,7 +1159,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	if (ic->ic_opmode == IEEE80211_M_AHDEMO)
 		sc->sc_opmode = HAL_M_IBSS;
 	else
-		sc->sc_opmode = ic->ic_opmode;		/* NB: compatible */
+		sc->sc_opmode = (HAL_OPMODE) ic->ic_opmode;	/* NB: compatible */
 
 #ifdef ATH_SUPERG_XR
 	if ( vap->iv_flags & IEEE80211_F_XR ) {
