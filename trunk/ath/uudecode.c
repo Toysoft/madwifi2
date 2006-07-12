@@ -19,7 +19,7 @@
  *  Based on specification from
  *  http://www.opengroup.org/onlinepubs/007904975/utilities/uuencode.html
  *
- *  Bugs: the spec doesnt mention anything about "`\n`\n" prior to the "end" line
+ *  Bugs: the spec doesn't mention anything about "`\n`\n" prior to the "end" line
  */
 
 

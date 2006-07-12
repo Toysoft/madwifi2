@@ -1,4 +1,4 @@
-Acknowledgements
+Acknowledgments
 ================
 This work could not have been done without the support of Atheros
 and in particular the efforts of Greg Chesson.  Comments from David
@@ -107,7 +107,7 @@ We also would like to thank the following individuals and companies
   3 MiniPCI cards
 
 * Linux-Consulting, USA - http://www.linux-consulting.com
-  madwifi.org domain name, DNS server maintainance
+  madwifi.org domain name, DNS server maintenance
 
 * Netgate, USA - http://www.netgate.com
   1U server (P3/850, 1GB RAM, 2x200GB HDD)

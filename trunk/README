@@ -17,7 +17,7 @@ WARNING: USE AT YOUR OWN RISK!
 Introduction
 ============
 This software contains a Linux kernel driver for Atheros-based
-Wireless LAN devices.  The driver supports station, AP, adhoc, and
+Wireless LAN devices.  The driver supports station, AP, ad-hoc, and
 monitor modes of operation.  The Atheros driver depends on a
 device-independent implementation of the 802.11 protocols that
 originated in the BSD community (NetBSD in particular).  
@@ -27,7 +27,7 @@ Extensions API.  As such normal Linux tools can and should be used
 with it.  Where the wireless extensions are lacking private ioctls
 have been added.
 
-There is only one driver included here; it supports PCI, miniPCI
+There is only one driver included here; it supports PCI, MiniPCI
 and Cardbus devices - USB devices are currently not supported by
 this driver!  The driver can be built as a module or linked
 directly into the kernel.  Note however that the net80211 layer is
@@ -84,7 +84,7 @@ but otherwise appear identical to users):
 5212	supports 11a, 11b, and 11g
 
 These parts have been incorporated in a variety of retail products
-including cardbus cards from DLink, Linksys, Netgear, Orinoco,
+including Cardbus cards from D-Link, Linksys, Netgear, Orinoco,
 Proxim, and 3Com; and mini-pci cards from some of these same vendors.
 In addition many laptop vendors use Atheros mini-pci cards for their
 built-in wireless support.
@@ -138,10 +138,10 @@ the driver is successfully loaded it creates two devices, named
 	    Tx excessive retries:0  Invalid misc:0   Missed beacon:0
 
 
-This driver uses wifi%d only as a placeholder for the phyical device, 
+This driver uses wifi%d only as a placeholder for the physical device, 
 and will create one wifi device for each wireless NIC in the system.  
 These wifi devices will reject ifconfig and iwconfig commands. The
-wifi interface provides indicates the existance of a physical Madwifi
+wifi interface provides indicates the existence of a physical Madwifi
 device, but is not of any functional interest other than as a target
 for VAP creation via wlanconfig (see Virtual AP section below).
 
@@ -166,7 +166,7 @@ http://madwifi.org/wiki/UserDocs/autocreate
 
 Virtual AP's (VAP's) and wlanconfig
 ===================================
-An interesting feauture of Madwifi is Virtual AP (VAP) mode, which
+An interesting feature of Madwifi is Virtual AP (VAP) mode, which
 allows the operation of multiple concurrent (virtual) access points,
 and concurrent interfaces running in both AP and station mode. To 
 manipulate VAP's, Madwifi comes with a tool called wlanconfig which
@@ -273,7 +273,7 @@ When operating as an AP you can use fixed/shared key ciphers and/or
 802.1x authentication.  The authentication mode is specified using
 iwpriv:
 
-iwpriv ath0 authmode 1		# open authenticatoin
+iwpriv ath0 authmode 1		# open authentication
 iwpriv ath0 authmode 2		# shared key authentication
 iwpriv ath0 authmode 3		# 802.1x authentication
 
@@ -304,7 +304,7 @@ Known Problems
 ==============
 [All these problems are to be fixed in future revisions.]
 
-1. Adhoc mode is broken; symptoms are intermittent operation.
+1. Ad-hoc mode is broken; symptoms are intermittent operation.
 
 Other issues might be mentioned in our ticket tracker:
 http://madwifi.org/report/1
@@ -350,7 +350,7 @@ is provided as-is; i.e. with no promise of support.
 
 Feedback and Contributions
 ==========================
-Reports about reproducable bugs, feature requests and patches should be
+Reports about reproducible bugs, feature requests and patches should be
 submitted in the form of a trouble ticket:
 
     http://madwifi.org/newticket
