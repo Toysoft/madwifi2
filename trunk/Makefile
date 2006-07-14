@@ -48,7 +48,7 @@ DEPTH=	.
 
 include $(obj)/Makefile.inc
 
-DIRS_MODULES = ${ATH} ${ATH_RATE} ${WLAN}
+DIRS_MODULES = $(ATH) $(ATH_RATE) $(WLAN)
 
 obj-y := ath/ $(ATH_RATE)/ net80211/
 
@@ -56,7 +56,7 @@ all: modules tools
 
 modules: configcheck svnversion.h
 ifdef LINUX24
-	for i in ${DIRS_MODULES}; do \
+	for i in $(DIRS_MODULES); do \
 		$(MAKE) -C $$i || exit 1; \
 	done
 else
@@ -78,7 +78,7 @@ svnversion.h:
 # conflicts with the 'tools' subdirectory
 .PHONY: tools
 tools:
-	$(MAKE) -C ${TOOLS} all || exit 1
+	$(MAKE) -C $(TOOLS) all || exit 1
 
 install: install-modules install-tools
 
@@ -87,25 +87,25 @@ install-modules:
 	@# might cause make to abort the build
 	sh scripts/find-madwifi-modules.sh $(KERNELRELEASE) $(DESTDIR)
 
-	for i in ${DIRS_MODULES}; do \
+	for i in $(DIRS_MODULES); do \
 		$(MAKE) -C $$i install || exit 1; \
 	done
 ifeq ($(DESTDIR),)
-	(export KMODPATH=${KMODPATH}; /sbin/depmod -ae)
+	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae)
 endif
 
 install-tools:
-	$(MAKE) -C ${TOOLS} install || exit 1
+	$(MAKE) -C $(TOOLS) install || exit 1
 
 uninstall:
 	sh scripts/find-madwifi-modules.sh $(KERNELRELEASE) $(DESTDIR)
-	$(MAKE) -C ${TOOLS} uninstall
+	$(MAKE) -C $(TOOLS) uninstall
 
 clean:
-	for i in ${DIRS_MODULES}; do \
+	for i in $(DIRS_MODULES); do \
 		$(MAKE) -C $$i clean; \
 	done
-	-$(MAKE) -C ${TOOLS} clean
+	-$(MAKE) -C $(TOOLS) clean
 	rm -rf .tmp_versions
 	rm -f Modules.symvers svnversion.h
 
@@ -166,7 +166,7 @@ configcheck: sanitycheck
 	    exit 1; \
 	fi
 	
-ifneq ($(strip ${BUS}),AHB)
+ifneq ($(strip $(BUS)),AHB)
 	@# check PCI support
 	@if [ -z "$(CONFIG_PCI)" ]; then \
 	    echo "FAILED"; \

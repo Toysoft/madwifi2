@@ -65,7 +65,7 @@ DESTDIR ?=
 
 # TOOLPATH is the path which contains the crosscompile toolchain (?)
 
-ifeq ($(strip ${BUS}),AHB)
+ifeq ($(strip $(BUS)),AHB)
 # Bus type AHB forces the target platform to be mipsisa32.
 TARGET :=	mipsisa32-be-elf
 
@@ -106,7 +106,7 @@ endif
 
 # KERNELCONF is the name of the file that holds the configuration
 # of the target kernel.
-KERNELCONF ?=	${KERNELPATH}/.config
+KERNELCONF ?=	$(KERNELPATH)/.config
 
 # sanity check: does KERNELCONF exist?
 ifeq ($(wildcard $(KERNELCONF)),)
@@ -115,7 +115,7 @@ endif
 
 # Determine target architecture of the kernel.
 ifeq (,$(ARCH_TARGET))
-ARCH_TARGET=$(shell ${DEPTH}/scripts/get_arch_target.sh $(KERNELCONF))
+ARCH_TARGET=$(shell $(DEPTH)/scripts/get_arch_target.sh $(KERNELCONF))
 ARCH ?= $(word 1,$(ARCH_TARGET))
 TARGET ?= $(word 2,$(ARCH_TARGET))
 endif
@@ -130,14 +130,14 @@ export ARCH_TARGET
 # SYSTEMMAP is the name of the System.map file for the target
 # kernel. This will be needed when DESTDIR is defined in order
 # to run depmod properly.
-SYSTEMMAP ?= 	${KERNELPATH}/System.map
+SYSTEMMAP ?= 	$(KERNELPATH)/System.map
 
 # KMODPATH nominates the directory where the modules will be
 # installed to
-ifeq ($(strip ${BUS}),AHB)
-KMODPATH := 	${KERNELPATH}/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/${KERNELRELEASE}/net
+ifeq ($(strip $(BUS)),AHB)
+KMODPATH := 	$(KERNELPATH)/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/$(KERNELRELEASE)/net
 else
-KMODPATH :=	/lib/modules/${KERNELRELEASE}/net
+KMODPATH :=	/lib/modules/$(KERNELRELEASE)/net
 endif
 
 # Recognize 2.4.x kernels to support the old build system
@@ -160,16 +160,16 @@ AWK=		awk
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=	${obj}/${DEPTH}/hal
+HAL=	$(obj)/$(DEPTH)/hal
 endif
 #
 # Path to the 802.11 include files.
 #
-WLAN=	${DEPTH}/net80211
+WLAN=	$(DEPTH)/net80211
 #
 # Path to the Atheros device driver.
 #
-ATH=	${DEPTH}/ath
+ATH=	$(DEPTH)/ath
 #
 # Path to the rate control algorithm.
 #
@@ -179,13 +179,13 @@ endif
 #
 # Path to the userspace utilities. 
 # 
-TOOLS=  ${DEPTH}/tools 
+TOOLS=  $(DEPTH)/tools 
 
 COPTS+=	-Werror
-INCS=	-include ${obj}/${DEPTH}/include/compat.h -I${obj}/${DEPTH}/include
+INCS=	-include $(obj)/$(DEPTH)/include/compat.h -I$(obj)/$(DEPTH)/include
 
-ifeq ($(strip ${BUS}),AHB)
-INCS+= -isystem ${TOOLPATH}/include
+ifeq ($(strip $(BUS)),AHB)
+INCS+= -isystem $(TOOLPATH)/include
 endif
 
 # TARGET defines the target platform architecture. It must match one of
@@ -193,8 +193,8 @@ endif
 # host machine architecture. You can override TARGET on the make command
 # line or in the environment. See hal/linux/*.inc for the list of
 # supported targets.
-ifeq (,$(wildcard ${HAL}/public/${TARGET}.inc))
-TARGETS=$(basename $(notdir $(wildcard ${HAL}/public/*.inc)))
+ifeq (,$(wildcard $(HAL)/public/$(TARGET).inc))
+TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
 $(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
 endif
 
@@ -205,7 +205,7 @@ save_STRIP := $(STRIP)
 save_OBJCOPY := $(OBJCOPY)
 save_NM := $(NM)
 
-include ${HAL}/public/${TARGET}.inc
+include $(HAL)/public/$(TARGET).inc
 
 # Restore toolchain valiables
 CC := $(save_CC)
@@ -214,7 +214,7 @@ STRIP := $(save_STRIP)
 OBJCOPY := $(save_OBJCOPY)
 NM := $(save_NM)
 
-include ${obj}/${DEPTH}/BuildCaps.inc
+include $(obj)/$(DEPTH)/BuildCaps.inc
 
 # Ensure correct endianess
 LDFLAGS += $(LDOPTS)
