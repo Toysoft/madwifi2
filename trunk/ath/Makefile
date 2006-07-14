@@ -83,9 +83,15 @@ $(obj)/uudecode: $(obj)/uudecode.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 endif
 
+quiet_cmd_uudecode = UUDECODE $@
+      cmd_uudecode = $(obj)/uudecode -o $@ $<
+
 $(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
-	$(Q)echo "deps_$@ :=" >$(@D)/.$(@F).cmd
+ifdef LINUX24
 	$(Q)$(obj)/uudecode -o $@ $<
+else
+	$(call if_changed,uudecode)
+endif
 
 install:
 	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
