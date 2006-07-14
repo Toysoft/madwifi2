@@ -7,7 +7,7 @@ subdir-$(CONFIG_ATHEROS_RATE_AMRR)	+= ath_rate/amrr
 subdir-$(CONFIG_NET80211)		+= net80211
 
 ifeq ($(CONFIG_ATHEROS),y)
-ifeq ($(strip ${BUS}),AHB)
+ifeq ($(strip $(BUS)),AHB)
 	obj-y += ath/ath_ahb.o
 else
 	obj-y += ath/ath_pci.o

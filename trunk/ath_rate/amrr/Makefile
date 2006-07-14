@@ -49,12 +49,12 @@ DEPTH=	../..
 obj-m		+= ath_rate_amrr.o
 ath_rate_amrr-objs	:= amrr.o
 
-include $(obj)/${DEPTH}/Makefile.inc
+include $(obj)/$(DEPTH)/Makefile.inc
 
-INCS+=	-I${HAL} -I${HAL}/${OS} -I${obj}/${ATH} -I${obj}/${WLAN} \
-	-I${obj}/${DEPTH}
+INCS+=	-I$(HAL) -I$(HAL)/$(OS) -I$(obj)/$(ATH) -I$(obj)/$(WLAN) \
+	-I$(obj)/$(DEPTH)
 
-EXTRA_CFLAGS+= ${INCS} ${COPTS}
+EXTRA_CFLAGS+= $(INCS) $(COPTS)
 
 -include $(TOPDIR)/Rules.make
 
@@ -62,13 +62,13 @@ all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
 install:
-	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
-	cp ath_rate_amrr.${KMODSUF} ${DESTDIR}/${KMODPATH}
+	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
+	cp ath_rate_amrr.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 	-rm -rf .tmp_versions
 
-ath_rate_amrr.o: ${ath_rate_amrr-objs}
+ath_rate_amrr.o: $(ath_rate_amrr-objs)
 	$(LD) $(LDOPTS) -o ath_rate_amrr.$(KMODSUF) -r $(ath_rate_amrr-objs)

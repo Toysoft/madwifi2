@@ -14,8 +14,8 @@ ATH=	$(srctree)/$(src)/../../ath
 WLAN=	$(srctree)/$(src)/../../net80211
 COMPAT=	$(srctree)/$(src)/../../include
 
-INCS=	-include ${COMPAT}/compat.h -I${COMPAT}
-EXTRA_CFLAGS+=	${INCS} -I${HAL} -I${HAL}/linux -I${ATH} -I${WLAN} -I${src}/../..
+INCS=	-include $(COMPAT)/compat.h -I$(COMPAT)
+EXTRA_CFLAGS+=	$(INCS) -I$(HAL) -I$(HAL)/linux -I$(ATH) -I$(WLAN) -I$(src)/../..
 
 ifdef LINUX26
 obj-$(CONFIG_ATHEROS) += ath_rate_sample.o

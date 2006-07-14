@@ -31,8 +31,8 @@ DEPTH=	..
 # cross-compiling userspace binaries.  If not defined, CROSS_COMPILE
 # is used.
 USER_CROSS_COMPILE ?= $(CROSS_COMPILE)
-STRIP ?= ${USER_CROSS_COMPILE}strip
-CC = ${USER_CROSS_COMPILE}gcc
+STRIP ?= $(USER_CROSS_COMPILE)strip
+CC = $(USER_CROSS_COMPILE)gcc
 
 BINDIR ?= /usr/local/bin
 MANDIR ?= /usr/local/man
@@ -41,57 +41,57 @@ MANDIR ?= /usr/local/man
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=   ${DEPTH}/hal
+HAL=   $(DEPTH)/hal
 endif
 
-INCS=  -include ${DEPTH}/include/compat.h
+INCS=  -include $(DEPTH)/include/compat.h
 
 
 ALL=	athstats 80211stats athkey athchans athctrl \
 	athdebug 80211debug wlanconfig
 
-all:	${ALL}
+all:	$(ALL)
 
-INCS+=	-I. -I${HAL} -I${DEPTH}
+INCS+=	-I. -I$(HAL) -I$(DEPTH)
 CFLAGS=	-g -O2 -Wall
-ALL_CFLAGS= ${CFLAGS} ${INCS}
+ALL_CFLAGS= $(CFLAGS) $(INCS)
 LDFLAGS=
 
-all:	${ALL}
+all:	$(ALL)
 
 athstats: athstats.c
-	${CC} -o athstats ${ALL_CFLAGS} -I../ath ${LDFLAGS} athstats.c
+	$(CC) -o athstats $(ALL_CFLAGS) -I../ath $(LDFLAGS) athstats.c
 80211stats: 80211stats.c
-	${CC} -o 80211stats ${ALL_CFLAGS} ${LDFLAGS} 80211stats.c
+	$(CC) -o 80211stats $(ALL_CFLAGS) $(LDFLAGS) 80211stats.c
 athkey: athkey.c
-	${CC} -o athkey ${ALL_CFLAGS} ${LDFLAGS} athkey.c
+	$(CC) -o athkey $(ALL_CFLAGS) $(LDFLAGS) athkey.c
 athchans: athchans.c
-	${CC} -o athchans ${ALL_CFLAGS} ${LDFLAGS} athchans.c
+	$(CC) -o athchans $(ALL_CFLAGS) $(LDFLAGS) athchans.c
 athctrl: athctrl.c
-	${CC} -o athctrl ${ALL_CFLAGS} ${LDFLAGS} athctrl.c
+	$(CC) -o athctrl $(ALL_CFLAGS) $(LDFLAGS) athctrl.c
 athdebug: athdebug.c
-	${CC} -o athdebug ${ALL_CFLAGS} ${LDFLAGS} athdebug.c
+	$(CC) -o athdebug $(ALL_CFLAGS) $(LDFLAGS) athdebug.c
 wlanconfig: wlanconfig.c
-	${CC} -o wlanconfig ${ALL_CFLAGS} ${LDFLAGS} wlanconfig.c
+	$(CC) -o wlanconfig $(ALL_CFLAGS) $(LDFLAGS) wlanconfig.c
 80211debug: 80211debug.c
-	${CC} -o 80211debug ${ALL_CFLAGS} ${LDFLAGS} 80211debug.c
+	$(CC) -o 80211debug $(ALL_CFLAGS) $(LDFLAGS) 80211debug.c
 
-install: ${ALL}
-	install -d ${DESTDIR}${BINDIR}
-	for i in ${ALL}; do \
-		install $$i ${DESTDIR}${BINDIR}/$$i; \
-		${STRIP} ${DESTDIR}${BINDIR}/$$i; \
+install: $(ALL)
+	install -d $(DESTDIR)$(BINDIR)
+	for i in $(ALL); do \
+		install $$i $(DESTDIR)$(BINDIR)/$$i; \
+		$(STRIP) $(DESTDIR)$(BINDIR)/$$i; \
 	done
-	install -d ${DESTDIR}${MANDIR}/man8
-	install -m 0644 man/*.8 ${DESTDIR}${MANDIR}/man8
+	install -d $(DESTDIR)$(MANDIR)/man8
+	install -m 0644 man/*.8 $(DESTDIR)$(MANDIR)/man8
 
 uninstall:
-	for i in ${ALL}; do \
-		rm -f ${DESTDIR}${BINDIR}/$$i; \
+	for i in $(ALL); do \
+		rm -f $(DESTDIR)$(BINDIR)/$$i; \
 	done
-	for i in ${ALL:=.8}; do \
-		rm -f ${DESTDIR}${MANDIR}/man8/$$i; \
+	for i in $(ALL:=.8); do \
+		rm -f $(DESTDIR)$(MANDIR)/man8/$$i; \
 	done
 
 clean:
-	rm -f ${ALL} core a.out
+	rm -f $(ALL) core a.out

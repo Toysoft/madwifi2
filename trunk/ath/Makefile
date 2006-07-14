@@ -46,7 +46,7 @@ endif
 
 DEPTH=	..
 
-ifeq ($(strip ${BUS}),AHB)
+ifeq ($(strip $(BUS)),AHB)
 BUSNAME=ahb
 COPTS+= -DATH_AHB
 else
@@ -54,11 +54,11 @@ BUSNAME=pci
 COPTS+= -DATH_PCI
 endif
 
-include $(obj)/${DEPTH}/Makefile.inc
+include $(obj)/$(DEPTH)/Makefile.inc
 
-obj-m		+= ath_${BUSNAME}.o ath_hal.o
-ath_${BUSNAME}-objs	:= if_ath.o if_ath_${BUSNAME}.o
-ath_hal-objs	:= ah_osdep.o ${TARGET}.hal.o
+obj-m		+= ath_$(BUSNAME).o ath_hal.o
+ath_$(BUSNAME)-objs	:= if_ath.o if_ath_$(BUSNAME).o
+ath_hal-objs	:= ah_osdep.o $(TARGET).hal.o
 
 hostprogs-y	:= uudecode
 
@@ -69,9 +69,9 @@ ifdef LINUX24
 export-objs	:= ah_osdep.o
 endif
 
-INCS+=	-I${HAL} -I${obj} -I${HAL}/${OS} -I${obj}/${WLAN} -I${obj}/${DEPTH}
+INCS+=	-I$(HAL) -I$(obj) -I$(HAL)/$(OS) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
 
-EXTRA_CFLAGS+= ${INCS} ${COPTS} -DOPT_AH_H=\"${HAL}/public/${TARGET}.opt_ah.h\"
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 
 -include $(TOPDIR)/Rules.make
 
@@ -86,7 +86,7 @@ endif
 quiet_cmd_uudecode = UUDECODE $@
       cmd_uudecode = $(obj)/uudecode -o $@ $<
 
-$(obj)/${TARGET}.hal.o: ${HAL}/public/${TARGET}.hal.o.uu $(obj)/uudecode
+$(obj)/$(TARGET).hal.o: $(HAL)/public/$(TARGET).hal.o.uu $(obj)/uudecode
 ifdef LINUX24
 	$(Q)$(obj)/uudecode -o $@ $<
 else
@@ -94,17 +94,17 @@ else
 endif
 
 install:
-	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
-	cp ath_${BUSNAME}.${KMODSUF} ${DESTDIR}/${KMODPATH}
-	cp ath_hal.${KMODSUF} ${DESTDIR}/${KMODPATH}
+	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
+	cp ath_$(BUSNAME).$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+	cp ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd
 	rm -f .depend .version .*.o.flags .*.o.d
 	rm -rf .tmp_versions
 
-ath_${BUSNAME}.o: ${ath_${BUSNAME}-objs}
-	$(LD) $(LDOPTS) -o ath_${BUSNAME}.$(KMODSUF) -r $(ath_${BUSNAME}-objs)
+ath_$(BUSNAME).o: $(ath_$(BUSNAME)-objs)
+	$(LD) $(LDOPTS) -o ath_$(BUSNAME).$(KMODSUF) -r $(ath_$(BUSNAME)-objs)
 
-ath_hal.o: ${ath_hal-objs}
+ath_hal.o: $(ath_hal-objs)
 	$(LD) $(LDOPTS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)

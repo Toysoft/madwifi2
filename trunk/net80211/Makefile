@@ -81,11 +81,11 @@ wlan_xauth-objs	:= ieee80211_xauth.o
 wlan_scan_sta-objs :=ieee80211_scan_sta.o
 wlan_scan_ap-objs := ieee80211_scan_ap.o
 
-include $(obj)/${DEPTH}/Makefile.inc
+include $(obj)/$(DEPTH)/Makefile.inc
 
-INCS+=	-I${HAL} -I${HAL}/${OS} -I$(obj)/${WLAN} -I${obj}/${DEPTH}
+INCS+=	-I$(HAL) -I$(HAL)/$(OS) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
 
-EXTRA_CFLAGS+=$(INCS) ${COPTS}
+EXTRA_CFLAGS+=$(INCS) $(COPTS)
 
 -include $(TOPDIR)/Rules.make
 
@@ -110,10 +110,10 @@ wlan_acl.o:	$(wlan_acl-objs)
 	$(LD) $(LDOPTS) -o wlan_acl.$(KMODSUF) -r $(wlan_acl-objs)
 
 install:
-	test -d ${DESTDIR}/${KMODPATH} || mkdir -p ${DESTDIR}/${KMODPATH}
-	for i in ${MOD_INSTALL}; do \
+	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
+	for i in $(MOD_INSTALL); do \
 		f=`basename $$i .o`; \
-		cp $$f.${KMODSUF} ${DESTDIR}/${KMODPATH}; \
+		cp $$f.$(KMODSUF) $(DESTDIR)/$(KMODPATH); \
 	done
 
 clean:
