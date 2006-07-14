@@ -48,8 +48,7 @@ DEPTH=	.
 
 include $(obj)/Makefile.inc
 
-# NB: the order is important here
-DIRS_MODULES=	${WLAN} ${ATH_RATE} ${ATH}
+DIRS_MODULES = ${ATH} ${ATH_RATE} ${WLAN}
 
 obj-y := ath/ $(ATH_RATE)/ net80211/
 
