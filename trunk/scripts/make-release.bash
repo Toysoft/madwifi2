@@ -207,21 +207,33 @@ msg="Tagging r$localrev as release $newrelease."
 tag="release-$newrelease"
 svn copy . $reproot/tags/release-$newrelease -m "$msg"
 
-# revert local changes to release.h
+# revert local changes to release.h ...
 echo "revert changes to release.h..."
 svn revert release.h
 
+# ... and modify the RELEASE_VERSION for trunk, too. We assume that the next
+# release will be a point release.
+echo "adjusting release.h in trunk..."
+trunkrelease="$newmajor.$newminor.$((newpoint+1))"
+mv release.h release.h.old
+sed -e "/RELEASE_VERSION/ s/\"[0-9.]*\"/\"$trunkrelease\"/" release.h.old > release.h
+rm -f release.h.old
+
+msg="Adjust release version in response to release $newrelease."
+svn commit release.h -m "$msg"
+svn update -q
+
+# create the tarball packaging directory
 tmp=$RELEASE_TMP
 store=$RELEASE_STORE
 
-# create the tarball packaging directory
 [[ -d $tmp/madwifi-release ]] || {
     echo "creating packaging directory..."
     mkdir $tmp/madwifi-release || exit 1
 }
 
 # remove old directories
-rm -r $tmp/madwifi-release/*
+rm -r $tmp/madwifi-release/* > /dev/null
 
 # create tarball
 echo "exporting new release from repository..."
