@@ -265,9 +265,7 @@ ath_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 	ath_suspend(dev);
 	PCI_SAVE_STATE(pdev, ((struct ath_pci_softc *)dev->priv)->aps_pmstate);
 	pci_disable_device(pdev);
-	pci_set_power_state(pdev, PCI_D3hot);
-
-	return 0;
+	return pci_set_power_state(pdev, PCI_D3hot);
 }
 
 static int
@@ -275,14 +273,19 @@ ath_pci_resume(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	u32 val;
-	if (pci_set_power_state(pdev, PCI_D0))
-		return 1;
+	int err;
+
+	err = pci_set_power_state(pdev, PCI_D0);
+	if (err)
+		return err;
 
 	/* XXX - Should this return nonzero on fail? */
 	PCI_RESTORE_STATE(pdev,	((struct ath_pci_softc *)dev->priv)->aps_pmstate);
 
-	if (pci_enable_device(pdev))
-		return 1;
+	err = pci_enable_device(pdev);
+	if (err)
+		return err;
+
 	pci_set_master(pdev);
 	/*
 	 * Suspend/Resume resets the PCI configuration space, so we have to
