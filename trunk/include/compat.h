@@ -43,7 +43,11 @@
  */
 #define	NBBY	8			/* number of bits/byte */
 
-#define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
+#define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */ 
+#endif
+
 #define	howmany(x, y)	(((x)+((y)-1))/(y))
 
 /* Bit map related macros. */
