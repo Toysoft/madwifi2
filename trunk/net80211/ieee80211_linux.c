@@ -44,6 +44,9 @@
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
 #include <linux/vmalloc.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
+#include <linux/proc_fs.h>
+#endif
 
 #include <net/iw_handler.h>
 #include <linux/wireless.h>
