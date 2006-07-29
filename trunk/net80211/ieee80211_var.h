@@ -262,6 +262,7 @@ struct ieee80211_nsparams {
 #define IW_MAX_SPY 8
 struct ieee80211_spy {
         u_int8_t mac[IW_MAX_SPY * IEEE80211_ADDR_LEN];
+        u_int32_t ts_rssi[IW_MAX_SPY];   /* ts of rssi value from last read */
         u_int8_t thr_low;	/* 1 byte rssi value, 0 = threshold is off */
         u_int8_t thr_high;	/* 1 byte rssi value */   
         u_int8_t num;

@@ -1088,6 +1088,8 @@ ieee80211_ioctl_setspy(struct net_device *dev, struct iw_request_info *info,
 		for (i = 0; i < number; i++)
 			memcpy(&vap->iv_spy.mac[i * IEEE80211_ADDR_LEN],
 				address[i].sa_data, IEEE80211_ADDR_LEN);
+		/* init rssi timestamps */
+		memset(vap->iv_spy.ts_rssi, 0, IW_MAX_SPY * sizeof(u_int32_t));
 	}
 	vap->iv_spy.num = number;
 
@@ -1119,15 +1121,21 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 		address[i].sa_family = AF_PACKET;
 	}
 
-	/* locate a node, copy its rssi value, convert to dBm */
+	/* locate a node, read its rssi, check if updated, convert to dBm */
 	for (i = 0; i < number; i++) {
 		ni = ieee80211_find_node(nt, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]);
 		/* TODO: free node ? */
 		/* check we are associated w/ this vap */
-		if (ni && (ni->ni_vap == vap))
+		if (ni && (ni->ni_vap == vap)) {
 			set_quality(&spy_stat[i], ni->ni_rssi);
-		else 
+			if (ni->ni_rstamp != vap->iv_spy.ts_rssi[i]) {
+				vap->iv_spy.ts_rssi[i] = ni->ni_rstamp;
+			} else {
+				spy_stat[i].updated = 0;
+			}
+		} else {
 			spy_stat[i].updated = IW_QUAL_ALL_INVALID;
+		}
 	}
 
 	/* copy results to userspace */
