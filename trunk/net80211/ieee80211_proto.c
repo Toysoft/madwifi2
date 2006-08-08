@@ -1009,7 +1009,7 @@ ieee80211_start_running(struct ieee80211com *ic)
 	/* XXX locking */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 		dev = vap->iv_dev;
-		if (dev->flags & IFF_RUNNING)	/* NB: avoid recursion */
+		if ((dev->flags & IFF_UP) && !(dev->flags & IFF_RUNNING))	/* NB: avoid recursion */
 			ieee80211_open(dev);
 	}
 }
