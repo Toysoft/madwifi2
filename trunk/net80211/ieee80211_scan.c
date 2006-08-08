@@ -922,14 +922,17 @@ ieee80211_scan_assoc_fail(struct ieee80211com *ic,
 /*
  * Iterate over the contents of the scan cache.
  */
-void
+int
 ieee80211_scan_iterate(struct ieee80211com *ic,
 	ieee80211_scan_iter_func *f, void *arg)
 {
-	struct ieee80211_scan_state *ss = ic->ic_scan;
-
-	if (ss->ss_ops != NULL)
-		ss->ss_ops->scan_iterate(ss, f, arg);
+  int res = 0;
+  struct ieee80211_scan_state *ss = ic->ic_scan;
+	
+  if (ss->ss_ops != NULL) {
+    res = ss->ss_ops->scan_iterate(ss, f, arg);
+  }
+  return res;
 }
 
 /*

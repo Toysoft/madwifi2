@@ -113,8 +113,8 @@ void ieee80211_scan_assoc_fail(struct ieee80211com *,
 void ieee80211_scan_flush(struct ieee80211com *);
 
 struct ieee80211_scan_entry;
-typedef void ieee80211_scan_iter_func(void *, const struct ieee80211_scan_entry *);
-void ieee80211_scan_iterate(struct ieee80211com *, ieee80211_scan_iter_func, void *);
+typedef int ieee80211_scan_iter_func(void *, const struct ieee80211_scan_entry *);
+int ieee80211_scan_iterate(struct ieee80211com *, ieee80211_scan_iter_func, void *);
 
 /*
  * Parameters supplied when adding/updating an entry in a
@@ -205,7 +205,7 @@ struct ieee80211_scanner {
 	void (*scan_assoc_success)(struct ieee80211_scan_state *,
 		const u_int8_t macaddr[IEEE80211_ADDR_LEN]);
 	/* iterate over entries in the scan cache */
-	void (*scan_iterate)(struct ieee80211_scan_state *,
+	int (*scan_iterate)(struct ieee80211_scan_state *,
 		ieee80211_scan_iter_func *, void *);
 	/* default action to take when found scan match */
 	int (*scan_default)(struct ieee80211vap *,
