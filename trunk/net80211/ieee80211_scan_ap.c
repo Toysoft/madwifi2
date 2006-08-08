@@ -367,11 +367,12 @@ ap_age(struct ieee80211_scan_state *ss)
 	/* XXX is there anything meaningful to do? */
 }
 
-static void
+static int
 ap_iterate(struct ieee80211_scan_state *ss,
 	ieee80211_scan_iter_func *f, void *arg)
 {
 	/* NB: nothing meaningful we can do */
+  return 0;
 }
 
 static void

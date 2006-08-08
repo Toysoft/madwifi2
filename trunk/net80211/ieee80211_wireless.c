@@ -1451,14 +1451,14 @@ struct waplistreq {	/* XXX: not the right place for declaration? */
 	int i;
 };
 
-static void
+static int
 waplist_cb(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct waplistreq *req = arg;
 	int i = req->i;
 
 	if (i >= IW_MAX_AP)
-		return;
+		return 0;
 	req->addr[i].sa_family = ARPHRD_ETHER;
 	if (req->vap->iv_opmode == IEEE80211_M_HOSTAP)
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_macaddr);
@@ -1466,6 +1466,8 @@ waplist_cb(void *arg, const struct ieee80211_scan_entry *se)
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_bssid);
 	set_quality(&req->qual[i], se->se_rssi);
 	req->i = i + 1;
+
+	return 0;
 }
 
 static int
@@ -1576,13 +1578,14 @@ struct iwscanreq {		/* XXX: right place for this declaration? */
 	int mode;
 };
 
-static void
+static int
 giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct iwscanreq *req = arg;
 	struct ieee80211vap *vap = req->vap;
 	char *current_ev = req->current_ev;
 	char *end_buf = req->end_buf;
+	char *last_ev;
 #if WIRELESS_EXT > 14
 	char buf[64 * 2 + 30];
 #endif
@@ -1591,12 +1594,13 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	int j;
 
 	if (current_ev >= end_buf)
-		return;
+		return E2BIG;
 	/* WPA/!WPA sort criteria */
 	if ((req->mode != 0) ^ (se->se_wpa_ie != NULL))
-		return;
+		return 0;
 
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWAP;
 	iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP)
@@ -1605,7 +1609,12 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 		IEEE80211_ADDR_COPY(iwe.u.ap_addr.sa_data, se->se_bssid);
 	current_ev = iwe_stream_add_event(current_ev, end_buf, &iwe, IW_EV_ADDR_LEN);
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWESSID;
 	iwe.u.data.flags = 1;
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
@@ -1619,29 +1628,49 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 			end_buf, &iwe, (char *) se->se_ssid+2);
 	}
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	if (se->se_capinfo & (IEEE80211_CAPINFO_ESS|IEEE80211_CAPINFO_IBSS)) {
 		memset(&iwe, 0, sizeof(iwe));
+		last_ev = current_ev;
 		iwe.cmd = SIOCGIWMODE;
 		iwe.u.mode = se->se_capinfo & IEEE80211_CAPINFO_ESS ?
 			IW_MODE_MASTER : IW_MODE_ADHOC;
 		current_ev = iwe_stream_add_event(current_ev,
 			end_buf, &iwe, IW_EV_UINT_LEN);
+
+		/* We ran out of space in the buffer. */
+		if (last_ev == current_ev)
+		  return E2BIG;
 	}
 
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWFREQ;
 	iwe.u.freq.m = se->se_chan->ic_freq * 100000;
 	iwe.u.freq.e = 1;
 	current_ev = iwe_stream_add_event(current_ev,
 		end_buf, &iwe, IW_EV_FREQ_LEN);
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = IWEVQUAL;
 	set_quality(&iwe.u.qual, se->se_rssi);
 	current_ev = iwe_stream_add_event(current_ev,
 		end_buf, &iwe, IW_EV_QUAL_LEN);
 
+	/* We ran out of space in the buffer */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWENCODE;
 	if (se->se_capinfo & IEEE80211_CAPINFO_PRIVACY)
 		iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
@@ -1650,7 +1679,12 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	iwe.u.data.length = 0;
 	current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, "");
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWRATE;
 	current_val = current_ev + IW_EV_LCP_LEN;
 	/* NB: not sorted, does it matter? */
@@ -1673,17 +1707,28 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 		}
 	}
 	/* remove fixed header if no rates were added */
-	if ((current_val - current_ev) > IW_EV_LCP_LEN)
+	if ((current_val - current_ev) > IW_EV_LCP_LEN) {
 		current_ev = current_val;
+	} else {
+	  /* We ran out of space in the buffer. */
+	  if (last_ev == current_ev)
+	    return E2BIG;
+	}
 
 #if WIRELESS_EXT > 14
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = IWEVCUSTOM;
 	snprintf(buf, sizeof(buf), "bcn_int=%d", se->se_intval);
 	iwe.u.data.length = strlen(buf);
 	current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, buf);
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	if (se->se_rsn_ie != NULL) {
+	  last_ev = current_ev;
 #ifdef IWEVGENIE
 		memset(&iwe, 0, sizeof(iwe));
 		memcpy(buf, se->se_rsn_ie, se->se_rsn_ie[1] + 2);
@@ -1698,12 +1743,18 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 				se->se_rsn_ie, se->se_rsn_ie[1] + 2,
 				rsn_leader, sizeof(rsn_leader) - 1);
 #endif
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+			
+			/* We ran out of space in the buffer */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
 	}
 
 	if (se->se_wpa_ie != NULL) {
+	  last_ev = current_ev;
 #ifdef IWEVGENIE
 		memset(&iwe, 0, sizeof(iwe));
 		memcpy(buf, se->se_wpa_ie, se->se_wpa_ie[1] + 2);
@@ -1717,36 +1768,56 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 			se->se_wpa_ie, se->se_wpa_ie[1] + 2,
 			wpa_leader, sizeof(wpa_leader) - 1);
 #endif
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+			
+			/* We ran out of space in the buffer. */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
+
 	}
 	if (se->se_wme_ie != NULL) {
 		static const char wme_leader[] = "wme_ie=";
 
 		memset(&iwe, 0, sizeof(iwe));
+		last_ev = current_ev;
 		iwe.cmd = IWEVCUSTOM;
 		iwe.u.data.length = encode_ie(buf, sizeof(buf),
 			se->se_wme_ie, se->se_wme_ie[1] + 2,
 			wme_leader, sizeof(wme_leader) - 1);
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+
+			/* We ran out of space in the buffer. */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
 	}
 	if (se->se_ath_ie != NULL) {
 		static const char ath_leader[] = "ath_ie=";
 
 		memset(&iwe, 0, sizeof(iwe));
+		last_ev = current_ev;
 		iwe.cmd = IWEVCUSTOM;
 		iwe.u.data.length = encode_ie(buf, sizeof(buf),
 			se->se_ath_ie, se->se_ath_ie[1] + 2,
 			ath_leader, sizeof(ath_leader) - 1);
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+
+			/* We ran out of space in the buffer. */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
 	}
 #endif /* WIRELESS_EXT > 14 */
 	req->current_ev = current_ev;
+
+	return 0;
 }
 
 static int
@@ -1756,12 +1827,20 @@ ieee80211_ioctl_giwscan(struct net_device *dev,	struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct iwscanreq req;
+	int res = 0;
 
 	req.vap = vap;
 	req.current_ev = extra;
-	req.end_buf = extra + IW_SCAN_MAX_DATA;
+	if (data->length == 0) {
+	  req.end_buf = extra + IW_SCAN_MAX_DATA;
+	} else {
+	  req.end_buf = extra + data->length;
+	}
 
 	/*
+	 * NB: This is no longer needed, as long as the caller supports
+	 * large scan results.
+	 *
 	 * Do two passes to ensure WPA/non-WPA scan candidates
 	 * are sorted to the front.  This is a hack to deal with
 	 * the wireless extensions capping scan results at
@@ -1771,12 +1850,19 @@ ieee80211_ioctl_giwscan(struct net_device *dev,	struct iw_request_info *info,
 	 * guarantee we won't overflow anyway.
 	 */
 	req.mode = vap->iv_flags & IEEE80211_F_WPA;
-	ieee80211_scan_iterate(ic, giwscan_cb, &req);
-	req.mode = req.mode ? 0 : IEEE80211_F_WPA;
-	ieee80211_scan_iterate(ic, giwscan_cb, &req);
+	res = ieee80211_scan_iterate(ic, giwscan_cb, &req);
+	if (res == 0) {
+	  req.mode = req.mode ? 0 : IEEE80211_F_WPA;
+	  res = ieee80211_scan_iterate(ic, giwscan_cb, &req);
+	}
 
 	data->length = req.current_ev - extra;
-	return 0;
+
+	if (res != 0) {
+	  return -res;
+	}
+
+	return res;
 }
 #endif /* SIOCGIWSCAN */
 
@@ -2982,20 +3068,22 @@ struct scanlookup {		/* XXX: right place for declaration? */
 /*
  * Match mac address and any ssid.
  */
-static void
+static int
 mlmelookup(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct scanlookup *look = arg;
 
 	if (!IEEE80211_ADDR_EQ(look->mac, se->se_macaddr))
-		return;
+		return 0;
 	if (look->esslen != 0) {
 		if (se->se_ssid[1] != look->esslen)
-			return;
+			return 0;
 		if (memcmp(look->essid, se->se_ssid + 2, look->esslen))
-			return;
+			return 0;
 	}
 	look->se = se;
+
+	return 0;
 }
 
 static int
@@ -3499,16 +3587,18 @@ scan_space(const struct ieee80211_scan_entry *se, int *ielen)
 		se->se_ssid[1] + *ielen, sizeof(u_int32_t));
 }
 
-static void
+static int
 get_scan_space(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct scanreq *req = arg;
 	int ielen;
 
 	req->space += scan_space(se, &ielen);
+
+	return 0;
 }
 
-static void
+static int
 get_scan_result(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct scanreq *req = arg;
@@ -3517,8 +3607,10 @@ get_scan_result(void *arg, const struct ieee80211_scan_entry *se)
 	u_int8_t *cp;
 
 	len = scan_space(se, &ielen);
-	if (len > req->space)
-		return;
+	if (len > req->space) {
+	  printk("[madwifi] %s() : Not enough space.\n", __FUNCTION__);
+		return 0;
+	}
 
 	sr = req->sr;
 	memset(sr, 0, sizeof(*sr));
@@ -3562,6 +3654,8 @@ get_scan_result(void *arg, const struct ieee80211_scan_entry *se)
 
 	req->space -= len;
 	req->sr = (struct ieee80211req_scan_result *)(((u_int8_t *)sr) + len);
+
+	return 0;
 }
 
 static int
