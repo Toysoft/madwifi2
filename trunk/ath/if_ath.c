@@ -5316,7 +5316,10 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 * ath_newstate as the state machine will go from
 			 * RUN -> RUN when this happens.
 			 */
-			if (le64_to_cpu(ni->ni_tstamp.tsf) >= tsf) {
+			/* jal: added: don't merge if we have a desired
+			   BSSID */
+			if (!(vap->iv_flags & IEEE80211_F_DESBSSID) &&
+				le64_to_cpu(ni->ni_tstamp.tsf) >= tsf) {
 				DPRINTF(sc, ATH_DEBUG_STATE,
 					"ibss merge, rstamp %u tsf %llu "
 					"tstamp %llu\n", rstamp, (long long) tsf,

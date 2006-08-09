@@ -541,7 +541,7 @@ ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 	 *
 	 * anything else specifies a particular AP.
 	 */
-	if (IEEE80211_ADDR_EQ(vap->iv_des_bssid, zero_bssid)) 
+	if (IEEE80211_ADDR_EQ(&ap_addr->sa_data, zero_bssid)) 
 		vap->iv_flags &= ~IEEE80211_F_DESBSSID;
 	else {
 		IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
