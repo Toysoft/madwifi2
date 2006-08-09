@@ -48,6 +48,8 @@
 #include <linux/utsname.h>
 #include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
 #include <linux/delay.h>
+
+#include <linux/wireless.h>
 #include <net/iw_handler.h>
 
 #if WIRELESS_EXT < 14
