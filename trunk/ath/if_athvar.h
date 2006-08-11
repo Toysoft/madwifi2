@@ -108,6 +108,44 @@ typedef void irqreturn_t;
 #define	SET_NETDEV_DEV(ndev, pdev)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,23)
+static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask,
+					       void (*setup)(struct net_device *))
+{
+	struct net_device *dev;
+	int alloc_size;
+
+	/* ensure 32-byte alignment of the private area */
+	alloc_size = sizeof (*dev) + sizeof_priv + 31;
+
+	dev = (struct net_device *) kmalloc (alloc_size, GFP_KERNEL);
+	if (dev == NULL)
+	{
+		printk(KERN_ERR "alloc_dev: Unable to allocate device memory.\n");
+		return NULL;
+	}
+
+	memset(dev, 0, alloc_size);
+
+	if (sizeof_priv)
+		dev->priv = (void *) (((long)(dev + 1) + 31) & ~31);
+
+	setup(dev);
+	strcpy(dev->name, mask);
+
+	return dev;
+}
+
+/* Avoid name collision - some vendor kernels backport alloc_netdev() */
+#undef alloc_netdev
+#define alloc_netdev(s,m,d) _alloc_netdev(s,m,d)
+
+static inline struct proc_dir_entry *PDE(const struct inode *inode)
+{
+	return (struct proc_dir_entry *)inode->u.generic_ip;
+}
+#endif
+
 
 /*
  * Macro to expand scalars to 64-bit objects
