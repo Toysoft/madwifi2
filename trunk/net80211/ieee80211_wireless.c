@@ -1145,6 +1145,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+#if WIRELESS_EXT >= 16
 /* Enhanced iwspy support */
 static int
 ieee80211_ioctl_setthrspy(struct net_device *dev, struct iw_request_info *info,
@@ -1199,6 +1200,7 @@ ieee80211_ioctl_getthrspy(struct net_device *dev, struct iw_request_info *info,
 	
 	return 0;
 }
+#endif
 
 static int
 ieee80211_ioctl_siwmode(struct net_device *dev, struct iw_request_info *info,
@@ -4959,8 +4961,13 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) NULL /* kernel code */,		/* SIOCGIWSTATS */
 	(iw_handler) ieee80211_ioctl_setspy,		/* SIOCSIWSPY */
 	(iw_handler) ieee80211_ioctl_getspy,		/* SIOCGIWSPY */
+#if WIRELESS_EXT >= 16
 	(iw_handler) ieee80211_ioctl_setthrspy,		/* SIOCSIWTHRSPY */
 	(iw_handler) ieee80211_ioctl_getthrspy,		/* SIOCGIWTHRSPY */
+#else
+	(iw_handler) NULL,				/* SIOCSIWTHRSPY */
+	(iw_handler) NULL,				/* SIOCGIWTHRSPY */
+#endif
 	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
 	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
 #ifdef SIOCSIWMLME
