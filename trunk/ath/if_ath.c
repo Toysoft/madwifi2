@@ -3953,6 +3953,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	 *  2) if there are more than one vap and we are using staggered
 	 *     beacons, then drain the cabq by dropping all the frames in
 	 *     the cabq so that the current vaps cab traffic can be scheduled.
+	 * XXX: Need to handle the last MORE_DATA bit here.
 	 */
 	if (ncabq && (avp->av_boff.bo_tim[4] & 1) && sc->sc_cabq->axq_depth) {
 		if (sc->sc_nvaps > 1 && sc->sc_stagbeacons) {
@@ -3980,7 +3981,6 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		/*
 		 * Move everything from the vap's mcast queue 
 		 * to the hardware cab queue.
-		 * XXX MORE_DATA bit?
 		 */
 		ATH_TXQ_LOCK(&avp->av_mcastq);
 		ATH_TXQ_LOCK(cabq);
@@ -3995,6 +3995,13 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 			*cabq->axq_link = bfmcast->bf_daddr;
 #endif
 		}
+
+		/* Set the MORE_DATA bit for each packet except the last one */
+		STAILQ_FOREACH(bfmcast, &avp->av_mcastq.axq_q, bf_list) {
+			if (bfmcast != STAILQ_LAST(&avp->av_mcastq.axq_q, ath_buf, bf_list))
+				((struct ieee80211_frame *)bfmcast->bf_skb->data)->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
+		}
+
 		/* append the private vap mcast list to  the cabq */
 		ATH_TXQ_MOVE_MCASTQ(&avp->av_mcastq, cabq);
 		/* NB: gated by beacon so safe to start here */
