@@ -60,7 +60,7 @@ LDFLAGS=
 all:	$(ALL)
 
 athstats: athstats.c
-	$(CC) -o athstats $(ALL_CFLAGS) -I../ath $(LDFLAGS) athstats.c
+	$(CC) -o athstats $(ALL_CFLAGS) -I$(DEPTH)/ath $(LDFLAGS) athstats.c
 80211stats: 80211stats.c
 	$(CC) -o 80211stats $(ALL_CFLAGS) $(LDFLAGS) 80211stats.c
 athkey: athkey.c
