@@ -179,7 +179,17 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 			skb_pull(skb, ATHDESC_HEADER_SIZE);
 		}
 		break;
-	}		
+	}	
+	case ARPHRD_IEEE80211_RADIOTAP: {
+		if(skb->len >  sizeof(struct ath_tx_radiotap_header)) {
+			struct ath_tx_radiotap_header *wh = (struct ath_tx_radiotap_header *) skb->data;
+			ph->power = wh->wt_txpower;
+			ph->rate0 = wh->wt_rate;
+			ph->try0 = 1;
+			skb_pull(skb, sizeof(struct ath_tx_radiotap_header));
+		}
+		break;
+	}
 	default:
 		break;
 	}
@@ -383,7 +393,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			memcpy(skb_push(skb1, ATHDESC_HEADER_SIZE), ds, ATHDESC_HEADER_SIZE);
 			break;
-		}
+		} 
 		default:
 			break;
 		}
