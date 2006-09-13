@@ -275,7 +275,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
 			ph->frmlen.status = 0;
 			ph->frmlen.len = 4;
-			ph->frmlen.data = skb->len - sizeof(wlan_ng_prism2_header);
+			ph->frmlen.data = skb->len; 
 			
 			ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
 			ph->channel.status = 0;
