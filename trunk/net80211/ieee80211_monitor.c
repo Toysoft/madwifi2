@@ -374,6 +374,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 						break;
 				}
 
+				th->wr_dbm_antnoise = -95;
+				th->wr_dbm_antsignal = th->wr_dbm_antnoise + signal;
 				th->wr_antenna = ds->ds_rxstat.rs_antenna;
 				th->wr_antsignal = signal;
 				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
