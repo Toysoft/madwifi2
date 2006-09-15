@@ -2426,6 +2426,13 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		scan.chan = scan.bchan;
 
 		while (frm < efrm) {
+			/* Agere element in beacon */
+			if ((*frm == IEEE80211_ELEMID_AGERE1) ||
+			    (*frm == IEEE80211_ELEMID_AGERE2)) {
+			    	frm = efrm;
+				continue;
+			}
+
 			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
 			case IEEE80211_ELEMID_SSID:
@@ -3203,6 +3210,19 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 
 		rates = xrates = wme = NULL;
 		while (frm < efrm) {
+			/* 
+			 * Do not discard frames containing proprietary Agere
+			 * elements 128 and 129, as the reported element length
+			 * is often wrong. Skip rest of the frame, since we can
+			 * not rely on the given element length making it impossible
+			 * to know where the next element starts.
+			 */
+			if ((*frm == IEEE80211_ELEMID_AGERE1) ||
+			    (*frm == IEEE80211_ELEMID_AGERE2)) {
+			    	frm = efrm;
+				continue;
+			}
+
 			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
 			case IEEE80211_ELEMID_RATES:
