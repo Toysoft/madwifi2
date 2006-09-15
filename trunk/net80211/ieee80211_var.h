@@ -167,7 +167,7 @@ struct ieee80211com {
 	struct ieee80211_channel *ic_curchan;	/* current channel */
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
 	struct ieee80211_channel *ic_prevchan;	/* previous channel */
-
+	int16_t ic_channoise;			/* current channel noise in dBm */
 	/* regulatory class ids */
 	u_int ic_nregclass;			/* # entries in ic_regclassids */
 	u_int8_t ic_regclassids[IEEE80211_REGCLASSIDS_MAX];

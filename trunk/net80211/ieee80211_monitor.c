@@ -209,9 +209,15 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ath_desc *ds, int tx, u_int32_t mactime, struct ath_softc *sc) 
 {
 	struct ieee80211vap *vap, *next;
-	u_int32_t signal = 0;
-	signal = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
+	int noise = 0;
+	u_int32_t rssi = 0;
 	
+	rssi = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
+	
+	/* We don't have access to the noise value in the descriptor, but it's saved
+	 * in the softc during the last receive interrupt. */
+	noise = sc->sc_channoise;
+
 	/* XXX locking */
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
 		struct sk_buff *skb1;
@@ -287,17 +293,17 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
 			ph->rssi.status = 0;
 			ph->rssi.len = 4;
-			ph->rssi.data = signal;
+			ph->rssi.data = rssi;
 			
 			ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
 			ph->noise.status = 0;
 			ph->noise.len = 4;
-			ph->noise.data = -95;
+			ph->noise.data = noise;
 			
 			ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
 			ph->signal.status = 0;
 			ph->signal.len = 4;
-			ph->signal.data = signal;
+			ph->signal.data = rssi + noise;
 			
 			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 			ph->rate.status = 0;
@@ -374,10 +380,10 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 						break;
 				}
 
-				th->wr_dbm_antnoise = -95;
-				th->wr_dbm_antsignal = th->wr_dbm_antnoise + signal;
+				th->wr_dbm_antnoise = (int8_t) noise;
+				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = ds->ds_rxstat.rs_antenna;
-				th->wr_antsignal = signal;
+				th->wr_antsignal = rssi;
 				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
 				       IEEE80211_CRC_LEN);
 				th->wr_fcs = cpu_to_le32(th->wr_fcs);

@@ -1648,6 +1648,11 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		if (status & HAL_INT_RX) {
 			ath_uapsd_processtriggers(sc);
+			/* Get the noise floor data in interrupt context as we can't get it
+			 * per frame, so we need to get it as soon as possible (i.e. the tasklet
+			 * might take too long to fire */
+			ath_hal_process_noisefloor(ah);
+			sc->sc_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
 			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
 		}
 		if (status & HAL_INT_TX) {
@@ -5368,6 +5373,9 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	int len, type;
 	u_int phyerr;
 
+	/* Let the 802.11 layer know about the new noise floor */
+	ic->ic_channoise = sc->sc_channoise;
+	
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "%s\n", __func__);
 	do {
 		bf = STAILQ_FIRST(&sc->sc_rxbuf);
@@ -5633,7 +5641,7 @@ rx_next:
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 		ATH_RXBUF_UNLOCK_IRQ(sc);
 	} while (ath_rxbuf_init(sc, bf) == 0);
-
+	
 	/* rx signal state monitoring */
 	ath_hal_rxmonitor(ah, &sc->sc_halstats, &sc->sc_curchan);
 	if (ath_hal_radar_event(ah)) {

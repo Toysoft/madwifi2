@@ -143,14 +143,11 @@ static unsigned short ath_eth_type_trans(struct sk_buff *, struct net_device *);
  * This function is a clone of set_quality(..) in ieee80211_wireless.c
  */
 static void
-set_quality(struct iw_quality *iq, u_int rssi)
+set_quality(struct iw_quality *iq, u_int rssi, int noise)
 {
 	iq->qual = rssi;
-	/* NB: max is 94 because noise is hardcoded to 161 */
-	if (iq->qual > 94)
-		iq->qual = 94;
 
-	iq->noise = 161;		/* -95dBm */
+	iq->noise = noise;	
 	iq->level = iq->noise + iq->qual;
 	iq->updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED |
 		IW_QUAL_NOISE_UPDATED;
@@ -188,9 +185,9 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
 				memcpy(thr.addr.sa_data, ni->ni_macaddr,
 					IEEE80211_ADDR_LEN);
 				thr.addr.sa_family = ARPHRD_ETHER;
-				set_quality(&thr.qual, rssi);
-				set_quality(&thr.low, vap->iv_spy.thr_low);
-				set_quality(&thr.high, vap->iv_spy.thr_high);
+				set_quality(&thr.qual, rssi, vap->iv_ic->ic_channoise);
+				set_quality(&thr.low, vap->iv_spy.thr_low, vap->iv_ic->ic_channoise);
+				set_quality(&thr.high, vap->iv_spy.thr_high, vap->iv_ic->ic_channoise);
 				wireless_send_event(vap->iv_dev,
 					SIOCGIWTHRSPY, &wrq, (char*) &thr);
 				break;
