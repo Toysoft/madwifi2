@@ -673,6 +673,7 @@ struct ath_softc {
 	u_int32_t sc_dturbo_bw_turbo;		/* bandwidth threshold */
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
+	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
@@ -1000,5 +1001,7 @@ void ath_sysctl_unregister(void);
 	((*(_ah)->ah_dfsNolCheck)((_ah), (_chan), (_nchans)))
 #define ath_hal_radar_wait(_ah, _chan) \
 	((*(_ah)->ah_radarWait)((_ah), (_chan)))
+#define ath_hal_get_channel_noise(_ah, _chan) \
+	((*(_ah)->ah_getChanNoise)((_ah), (_chan)))
 
 #endif /* _DEV_ATH_ATHVAR_H */

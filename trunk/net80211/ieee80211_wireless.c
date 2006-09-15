@@ -97,26 +97,17 @@
  * rssi values reported in the tx/rx descriptors in the
  * driver are the SNR expressed in db.
  *
- * If you assume that the noise floor is -95, which is an
- * excellent assumption 99.5 % of the time, then you can
- * derive the absolute signal level (i.e. -95 + rssi). 
- * There are some other slight factors to take into account
- * depending on whether the rssi measurement is from 11b,
- * 11g, or 11a.   These differences are at most 2db and
- * can be documented.
+ * noise is measured in dBm. Signal becomes the noise +
+ * the rssi.
  *
  * NB: various calculations are based on the orinoco/wavelan
  *     drivers for compatibility
  */
 static void
-set_quality(struct iw_quality *iq, u_int rssi)
+set_quality(struct iw_quality *iq, u_int rssi, int noise)
 {
 	iq->qual = rssi;
-	/* NB: max is 94 because noise is hardcoded to 161 */
-	if (iq->qual > 94)
-		iq->qual = 94;
-
-	iq->noise = 161;		/* -95dBm */
+	iq->noise = noise; 
 	iq->level = iq->noise + iq->qual;
 	iq->updated = IW_QUAL_ALL_UPDATED;
 }
@@ -159,8 +150,10 @@ ieee80211_iw_getstats(struct net_device *dev)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct iw_statistics *is = &vap->iv_iwstats;
-
-	set_quality(&is->qual, ieee80211_getrssi(vap->iv_ic));
+	struct ieee80211com *ic = vap->iv_ic;
+	
+	set_quality(&is->qual, ieee80211_getrssi(vap->iv_ic), 
+			ic->ic_channoise);
 	is->status = vap->iv_state;
 	is->discard.nwid = vap->iv_stats.is_rx_wrongbss +
 		vap->iv_stats.is_rx_ssidmismatch;
@@ -992,6 +985,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	/* Max quality is max field value minus noise floor */
+	/* XXX Should this be updated to use the current noise floor? */
 	range->max_qual.qual  = 0xff - 161;
 
 	/*
@@ -1109,6 +1103,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211_node_table *nt = &vap->iv_ic->ic_sta;
 	struct ieee80211_node *ni;
+	struct ieee80211com *ic = vap->iv_ic;
 	struct sockaddr *address;
 	struct iw_quality *spy_stat;
 	unsigned int number = vap->iv_spy.num;
@@ -1129,7 +1124,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 		/* TODO: free node ? */
 		/* check we are associated w/ this vap */
 		if (ni && (ni->ni_vap == vap)) {
-			set_quality(&spy_stat[i], ni->ni_rssi);
+			set_quality(&spy_stat[i], ni->ni_rssi, ic->ic_channoise);
 			if (ni->ni_rstamp != vap->iv_spy.ts_rssi[i]) {
 				vap->iv_spy.ts_rssi[i] = ni->ni_rstamp;
 			} else {
@@ -1173,6 +1168,7 @@ ieee80211_ioctl_setthrspy(struct net_device *dev, struct iw_request_info *info,
 			"%s: disabled iw_spy threshold\n", __func__);
 	} else {
 		/* calculate corresponding rssi values */
+		/* XXX Should we use current noise value? */
 		vap->iv_spy.thr_low = threshold.low.level - 161;
 		vap->iv_spy.thr_high = threshold.high.level - 161;
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG,
@@ -1187,13 +1183,14 @@ ieee80211_ioctl_getthrspy(struct net_device *dev, struct iw_request_info *info,
 	struct iw_point *data, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211com *ic = vap->iv_ic;
 	struct iw_thrspy *threshold;	
 	
 	threshold = (struct iw_thrspy *) extra;
 
 	/* set threshold values */
-	set_quality(&(threshold->low), vap->iv_spy.thr_low);
-	set_quality(&(threshold->high), vap->iv_spy.thr_high);
+	set_quality(&(threshold->low), vap->iv_spy.thr_low, ic->ic_channoise);
+	set_quality(&(threshold->high), vap->iv_spy.thr_high, ic->ic_channoise);
 
 	/* copy results to userspace */
 	data->length = 1;
@@ -1468,7 +1465,7 @@ waplist_cb(void *arg, const struct ieee80211_scan_entry *se)
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_macaddr);
 	else
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_bssid);
-	set_quality(&req->qual[i], se->se_rssi);
+	set_quality(&req->qual[i], se->se_rssi, -95);
 	req->i = i + 1;
 
 	return 0;
@@ -1665,7 +1662,7 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	memset(&iwe, 0, sizeof(iwe));
 	last_ev = current_ev;
 	iwe.cmd = IWEVQUAL;
-	set_quality(&iwe.u.qual, se->se_rssi);
+	set_quality(&iwe.u.qual, se->se_rssi, -95);
 	current_ev = iwe_stream_add_event(current_ev,
 		end_buf, &iwe, IW_EV_QUAL_LEN);
 
