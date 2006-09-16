@@ -380,7 +380,7 @@ enum {
 	} while(0)
 
 int
-ath_attach(u_int16_t devid, struct net_device *dev)
+ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -421,7 +421,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * built with an ah.h that does not correspond to the hal
 	 * module loaded in the kernel.
 	 */
-	ah = _ath_hal_attach(devid, sc, NULL, (void *) dev->mem_start, &status);
+	ah = _ath_hal_attach(devid, sc, tag, (void *) dev->mem_start, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
 			dev->name, ath_get_hal_status_desc(status), status);

@@ -218,7 +218,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			break;
 		}
 	}
-	if (ath_attach(vdevice, dev) != 0)
+	if (ath_attach(vdevice, dev, NULL) != 0)
 		goto bad4;
 
 	athname = ath_hal_probe(id->vendor, vdevice);

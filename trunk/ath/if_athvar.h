@@ -720,7 +720,7 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
 #define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
 
-int ath_attach(u_int16_t, struct net_device *);
+int ath_attach(u_int16_t, struct net_device *, HAL_BUS_TAG);
 int ath_detach(struct net_device *);
 void ath_resume(struct net_device *);
 void ath_suspend(struct net_device *);
