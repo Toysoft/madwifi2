@@ -27,6 +27,7 @@
 #include "if_athvar.h"
 #include "ah_devid.h"
 #include "if_ath_ahb.h"
+#include "ah_soc.h"
 
 struct ath_ahb_softc {
 	struct ath_softc	aps_sc;
@@ -176,6 +177,9 @@ bus_free_consistent(void *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle
 int
 ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
+	u_int32_t reset;
+	u_int32_t enable;
+	
 	if ((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) {
 		u_int32_t reg;
 		u_int32_t *en = (u_int32_t *) AR5315_AHB_ARB_CTL;
@@ -203,17 +207,32 @@ ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 		/* wait for the MAC to wakeup */
 		while (REG_READ(AR5315_PCI_MAC_PCICFG) & AR5315_PCI_MAC_PCICFG_SPWR_DN);
 	} else {
-		u_int32_t *en = (u_int32_t *)AR531X_ENABLE;
 		switch (wlanNum) {
 		case AR531X_WLAN0_NUM:
-			*en |= AR531X_ENABLE_WLAN0;
+			reset = (AR531X_RESET_WLAN0 |
+				AR531X_RESET_WARM_WLAN0_MAC |
+				AR531X_RESET_WARM_WLAN0_BB);
+			enable = AR531X_ENABLE_WLAN0;
 			break;
 		case AR531X_WLAN1_NUM:
-			*en |= AR531X_ENABLE_WLAN1;
+			reset = (AR531X_RESET_WLAN1 |
+				AR531X_RESET_WARM_WLAN1_MAC |
+				AR531X_RESET_WARM_WLAN1_BB);
+			enable = AR531X_ENABLE_WLAN1;
 			break;
 		default:
 			return -ENODEV;
 		}
+		/* reset the MAC or suffer lots of AHB PROC errors */
+		REG_WRITE(AR531X_RESETCTL, REG_READ(AR531X_RESETCTL) | reset);
+		mdelay(15);
+
+		/* take it out of reset */
+		REG_WRITE(AR531X_RESETCTL, REG_READ(AR531X_RESETCTL) & ~reset);
+		udelay(25);
+
+		/* enable it */
+		REG_WRITE(AR531X_ENABLE, REG_READ(AR531X_ENABLE) | enable);
 	}
 	return 0;
 }
@@ -221,6 +240,7 @@ ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 int
 ahb_disable_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
+	u_int32_t enable;
 	if ((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) {
 		u_int32_t *en = (u_int32_t *) AR5315_AHB_ARB_CTL;
 
@@ -229,17 +249,17 @@ ahb_disable_wmac(u_int16_t devid, u_int16_t wlanNum)
 		/* Enable Arbitration for WLAN */
 		*en &= ~AR5315_ARB_WLAN;
 	} else { 
-		u_int32_t *en = (u_int32_t *)AR531X_ENABLE;
 		switch (wlanNum) {
 		case AR531X_WLAN0_NUM:
-			*en &= ~AR531X_ENABLE_WLAN0;
+			enable = AR531X_ENABLE_WLAN0;
 			break;
 		case AR531X_WLAN1_NUM:
-			*en &= ~AR531X_ENABLE_WLAN1;
+			enable = AR531X_ENABLE_WLAN1;
 			break;
 		default:
 			return -ENODEV;
 		}
+		REG_WRITE(AR531X_ENABLE, REG_READ(AR531X_ENABLE) & ~enable);
 	}
 	return 0;
 }
@@ -326,13 +346,18 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 	}
 	dev->mem_end = dev->mem_start + AR531X_WLANX_LEN;
 	sc->aps_sc.sc_bdev = NULL;
-        
+
 	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
 		printk(KERN_WARNING "%s: request_irq failed\n", dev->name);
 		goto bad3;
 	}
-        
-	if (ath_attach(devid, dev) != 0)
+	
+	struct ar531x_config config;
+	config.board = ar5312_boardConfig;
+	config.radio = radioConfig;
+	config.unit = wlanNum;
+	config.tag = NULL;
+	if (ath_attach(devid, dev, &config) != 0)
 		goto bad4;
 	athname = ath_hal_probe(ATHEROS_VENDOR_ID, devid);
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
