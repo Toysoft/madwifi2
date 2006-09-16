@@ -172,7 +172,7 @@ __bswap32(u_int32_t _x)
  */
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
 #define _OS_REG_WRITE(_ah, _reg, _val) do {		\
-	writel((0x4000 <= (_reg) && (_reg) < 0x5000) ?	\ 
+	writel((0x4000 <= (_reg) && (_reg) < 0x5000) ?	\
 		__bswap32(_val) : _val, 		\
 		(_ah)->ah_sh + (_reg)); 		\
 } while (0)
