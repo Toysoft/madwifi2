@@ -1589,6 +1589,10 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	char *last_ev;
 #if WIRELESS_EXT > 14
 	char buf[64 * 2 + 30];
+#ifndef IWEVGENIE
+	static const char rsn_leader[] = "rsn_ie=";
+	static const char wpa_leader[] = "wpa_ie=";
+#endif
 #endif
 	struct iw_event iwe;
 	char *current_val;
@@ -1736,7 +1740,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 		iwe.cmd = IWEVGENIE;
 		iwe.u.data.length = se->se_rsn_ie[1] + 2;
 #else	
-		static const char rsn_leader[] = "rsn_ie=";
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVCUSTOM;
 		if (se->se_rsn_ie[0] == IEEE80211_ELEMID_RSN)
@@ -1762,7 +1765,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 		iwe.cmd = IWEVGENIE;
 		iwe.u.data.length = se->se_wpa_ie[1] + 2;
 #else
-		static const char wpa_leader[] = "wpa_ie=";
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVCUSTOM;
 		iwe.u.data.length = encode_ie(buf, sizeof(buf),
