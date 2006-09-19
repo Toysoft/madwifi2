@@ -610,7 +610,6 @@ struct ath_hal {
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
 	HAL_BUS_TAG	ah_st;		/* params for register r+w */
-	/* It's uselss having an opaque type if we have to use it in the OS specific code, right? */
 	HAL_BUS_HANDLE	ah_sh;
 	HAL_CTRY_CODE	ah_countryCode;
 
