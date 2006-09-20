@@ -5195,6 +5195,21 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 }
 
 /*
+ * Extend 15-bit time stamp from rx descriptor to
+ * a full 64-bit TSF using the current h/w TSF.
+ */
+static __inline u_int64_t
+ath_extend_tsf(struct ath_hal *ah, u_int32_t rstamp)
+{
+	u_int64_t tsf;
+
+	tsf = ath_hal_gettsf64(ah);
+	if ((tsf & 0x7fff) < rstamp)
+		tsf -= 0x8000;
+	return ((tsf &~ 0x7fff) | rstamp);
+}
+
+/*
  * Add a prism2 header to a received frame and
  * dispatch it to capture tools like kismet.
  */
@@ -5204,17 +5219,14 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_frame *wh;
-	u_int32_t tsf;
+	u_int64_t tsf;
 
 	/* Pass up tsf clock in mactime
 	 * Rx descriptor has the low 15 bits of the tsf at
 	 * the time the frame was received.  Use the current
-	 * tsf to extend this to 32 bits.
+	 * tsf to extend this to 64 bits.
 	 */
-	tsf = ath_hal_gettsf32(sc->sc_ah);
-	if ((tsf & 0x7fff) < ds->ds_rxstat.rs_tstamp)
-		tsf -= 0x8000;
-	tsf = ds->ds_rxstat.rs_tstamp | (tsf &~ 0x7fff);
+	tsf = ath_extend_tsf(sc->sc_ah, ds->ds_rxstat.rs_tstamp);
 
 	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
 		("data padding not enabled?"));
@@ -5245,6 +5257,15 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	struct ieee80211_frame *wh;
 	int extra = A_MAX(sizeof(struct ath_tx_radiotap_header), 
 			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
+	u_int64_t tsf;
+
+	/* Pass up tsf clock in mactime
+	 * tx descriptor has the low 15 bits of the tsf at
+	 * the time the frame was received.  Use the current
+	 * tsf to extend this to 64 bits.
+	 */
+	tsf = ath_extend_tsf(sc->sc_ah, ds->ds_txstat.ts_tstamp);
+
 	/*                                                                      
 	 * release the owner of this skb since we're basically                  
 	 * recycling it                                                         
@@ -5278,24 +5299,9 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 		printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
 		goto done;
 	}
-	ieee80211_input_monitor(ic, skb, ds, 1, 0, sc);
+	ieee80211_input_monitor(ic, skb, ds, 1, tsf, sc);
  done:
 	dev_kfree_skb(skb);
-}
-
-/*
- * Extend 15-bit time stamp from rx descriptor to
- * a full 64-bit TSF using the current h/w TSF.
- */
-static __inline u_int64_t
-ath_extend_tsf(struct ath_hal *ah, u_int32_t rstamp)
-{
-	u_int64_t tsf;
-
-	tsf = ath_hal_gettsf64(ah);
-	if ((tsf & 0x7fff) < rstamp)
-		tsf -= 0x8000;
-	return ((tsf &~ 0x7fff) | rstamp);
 }
 
 /*
