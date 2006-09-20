@@ -5242,6 +5242,7 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211_frame *wh;
 	int extra = A_MAX(sizeof(struct ath_tx_radiotap_header), 
 			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
 	/*                                                                      
@@ -5260,6 +5261,18 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	} else
 		skb_orphan(skb);
 
+	wh = (struct ieee80211_frame *) skb->data;
+	if (IEEE80211_QOS_HAS_SEQ(wh)) {
+		/* Unlike in rx_capture, we're freeing the skb at the end
+		 * anyway, so we don't need to worry about using a copy */
+		int headersize = ieee80211_hdrsize(wh);
+		int padbytes = roundup(headersize, 4) - headersize;
+		if (padbytes > 0) {
+			memmove(skb->data + padbytes, skb->data, headersize);
+			skb_pull(skb, padbytes);
+		}
+	}
+	
 	if (skb_headroom(skb) < extra &&
 	    pskb_expand_head(skb, extra, 0, GFP_ATOMIC)) {
 		printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
