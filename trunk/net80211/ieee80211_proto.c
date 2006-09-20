@@ -38,7 +38,9 @@
 /*
  * IEEE 802.11 protocol support.
  */
+#ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
+#endif
 #include <linux/version.h>
 #include <linux/kmod.h>
 #include <linux/module.h>

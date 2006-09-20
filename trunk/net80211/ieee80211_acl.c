@@ -45,7 +45,9 @@
  * and if found the frame is either accepted (ACL_POLICY_ALLOW)
  * or rejected (ACL_POLICY_DENT).
  */
+#ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
+#endif
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/skbuff.h>

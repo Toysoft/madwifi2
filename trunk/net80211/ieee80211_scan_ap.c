@@ -37,7 +37,9 @@
 /*
  * IEEE 802.11 ap scanning support.
  */
+#ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
+#endif
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/skbuff.h>
