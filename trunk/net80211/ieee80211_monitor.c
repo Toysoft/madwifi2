@@ -206,7 +206,7 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
  */
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	struct ath_desc *ds, int tx, u_int32_t mactime, struct ath_softc *sc) 
+	struct ath_desc *ds, int tx, u_int64_t mactime, struct ath_softc *sc) 
 {
 	struct ieee80211vap *vap, *next;
 	int noise = 0;
@@ -267,7 +267,9 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->hosttime.status = 0;
 			ph->hosttime.len = 4;
 			ph->hosttime.data = jiffies;
+			
 			/* Pass up tsf clock in mactime */
+			/* NB: the prism mactime field is 32bit, so we lose TSF precision here */
 			ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
 			ph->mactime.status = 0;
 			ph->mactime.len = 4;
@@ -308,7 +310,10 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 			ph->rate.status = 0;
 			ph->rate.len = 4;
-			ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+			if (tx)
+				ph->rate.data = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
+			else
+				ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
 			break;
 		}
 		case ARPHRD_IEEE80211_RADIOTAP: {
@@ -327,10 +332,16 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wt_ihdr.it_version = 0;
 				th->wt_ihdr.it_len = cpu_to_le16(sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_present = cpu_to_le32(ATH_TX_RADIOTAP_PRESENT);
+
+				/* radiotap's TSF field is the full 64 bits, so we don't lose
+				 * any TSF precision when using radiotap */
+				memcpy(&th->wt_tsft, &mactime, IEEE80211_TSF_LEN);
+				th->wt_tsft = cpu_to_le64(th->wt_tsft);
+			
 				th->wt_flags = 0;
-				th->wt_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+				th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
 				th->wt_txpower = 0;
-				th->wt_antenna = 0;
+				th->wt_antenna = ds->ds_txstat.ts_antenna;
 			} else {
 				struct ath_rx_radiotap_header *th;
 				if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {
