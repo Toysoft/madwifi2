@@ -163,29 +163,25 @@ __bswap32(u_int32_t _x)
  * platforms we have to byte-swap thoese registers specifically.
  * Most of this code is collapsed at compile time because the
  * register values are constants.
- *
- * Presumably when talking about hardware byte-swapping, the above
- * text is referring to the Atheros chipset, as the registers 
- * referred to are in the PCI memory address space, and these are
- * never byte-swapped by PCI chipsets or bridges, but always 
- * written directly (as in the format defined by the manufacturer).
  */
 #if AH_BYTE_ORDER == AH_BIG_ENDIAN
-#define _OS_REG_WRITE(_ah, _reg, _val) do {		\
-	writel((0x4000 <= (_reg) && (_reg) < 0x5000) ?	\
-		__bswap32(_val) : _val, 		\
-		(_ah)->ah_sh + (_reg)); 		\
+#define _OS_REG_WRITE(_ah, _reg, _val) do {				    \
+	if ( (_reg) >= 0x4000 && (_reg) < 0x5000)			    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) =	    \
+			__bswap32((_val));				    \
+	else								    \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val);  \
 } while (0)
-#define _OS_REG_READ(_ah, _reg)					\
-	((0x4000 <= (_reg) && (_reg) < 0x5000) ?		\
-		__bswap32(readl((_ah)->ah_sh + (_reg))) :	\
-		readl((_ah)->ah_sh + (_reg)))
+#define _OS_REG_READ(_ah, _reg) \
+	(((_reg) >= 0x4000 && (_reg) < 0x5000) ? \
+		__bswap32(*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))) : \
+		*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))))
 #else /* AH_LITTLE_ENDIAN */
-#define _OS_REG_WRITE(_ah, _reg, _val) do {	\
-	writel(_val, (_ah)->ah_sh + (_reg));	\
+#define _OS_REG_WRITE(_ah, _reg, _val) do { \
+	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg))) = (_val); \
 } while (0)
-#define _OS_REG_READ(_ah, _reg)	\
-	readl((_ah)->ah_sh + (_reg))
+#define _OS_REG_READ(_ah, _reg) \
+	*((volatile u_int32_t *)((_ah)->ah_sh + (_reg)))
 #endif /* AH_BYTE_ORDER */
 
 #if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC) || defined(AH_DEBUG_ALQ)
