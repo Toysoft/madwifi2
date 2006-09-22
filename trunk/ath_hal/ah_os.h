@@ -133,21 +133,21 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
  */
 
 #if (AH_BYTE_ORDER == AH_BIG_ENDIAN)
-#define _OS_REG_WRITE(_ah, _reg, _val) do {		\
-	(0x4000 <= (_reg) && (_reg) < 0x5000) ?		\
-	 writel((_val), (_ah)->ah_sh + (_reg)) :	\
-	 __raw_writel((_val), (_ah)->ah_sh + (_reg));	\
+#define _OS_REG_WRITE(_ah, _reg, _val) do {				\
+	(0x4000 <= (_reg) && (_reg) < 0x5000) ?				\
+	 writel((_val), (void __iomem *)((_ah)->ah_sh + (_reg))) :	\
+	 __raw_writel((_val), (void __iomem *)((_ah)->ah_sh + (_reg)));	\
 } while (0)
-#define _OS_REG_READ(_ah, _reg)				\
-	((0x4000 <= (_reg) && (_reg) < 0x5000) ?	\
-	 readl((_ah)->ah_sh + (_reg)) :			\
-	 __raw_readl((_ah)->ah_sh + (_reg)))
+#define _OS_REG_READ(_ah, _reg)					\
+	((0x4000 <= (_reg) && (_reg) < 0x5000) ?		\
+	 readl((void __iomem *)((_ah)->ah_sh + (_reg))) :	\
+	 __raw_readl((void __iomem *)((_ah)->ah_sh + (_reg))))
 #else /* AH_LITTLE_ENDIAN */
-#define _OS_REG_WRITE(_ah, _reg, _val) do {		\
-	writel(_val, (_ah)->ah_sh + (_reg));		\
+#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+	writel(_val, (void __iomem *)((_ah)->ah_sh + (_reg)));	\
 } while (0)
-#define _OS_REG_READ(_ah, _reg)				\
-	readl((_ah)->ah_sh + (_reg))
+#define _OS_REG_READ(_ah, _reg)					\
+	readl((void __iomem *)((_ah)->ah_sh + (_reg)))
 #endif /* AH_BYTE_ORDER */
 
 #if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC) || defined(AH_DEBUG_ALQ)
