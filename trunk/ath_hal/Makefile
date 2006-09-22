@@ -86,7 +86,6 @@ endif
 
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
-	cp ath_$(BUSNAME).$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 	cp ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
