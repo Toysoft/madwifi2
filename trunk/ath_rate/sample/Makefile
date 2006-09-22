@@ -49,8 +49,8 @@ ath_rate_sample-objs	:= sample.o
 
 include $(obj)/$(DEPTH)/Makefile.inc
 
-INCS+=	-I$(HAL) -I$(HAL)/$(OS) -I$(obj)/$(ATH) -I$(obj)/$(WLAN) \
-	-I$(obj)/$(DEPTH)
+INCS+=	-I$(HAL) -I$(ATH_HAL) -I$(HAL)/$(OS) -I$(obj)/$(ATH) \
+	-I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS)
 

@@ -57,7 +57,8 @@
 
 #include <asm/io.h>
 
-#include "ah.h"
+#include <ah.h>
+#include <ah_os.h>
 
 #ifndef __MOD_INC_USE_COUNT
 #define	AH_MOD_INC_USE_COUNT(_m)					\
@@ -81,12 +82,10 @@ int	ath_hal_additional_swba_backoff = 0;	/* in TU's */
 
 struct ath_hal *
 _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
-		HAL_BUS_TAG t, HAL_BUS_HANDLE h, void* s)
+		HAL_BUS_TAG t, HAL_BUS_HANDLE h, HAL_STATUS *s)
 {
-	HAL_STATUS status;
-	struct ath_hal *ah = ath_hal_attach(devid, sc, t, h, &status);
+	struct ath_hal *ah = ath_hal_attach(devid, sc, t, h, s);
 
-	*(HAL_STATUS *)s = status;
 	if (ah)
 		AH_MOD_INC_USE_COUNT(THIS_MODULE);
 	return ah;

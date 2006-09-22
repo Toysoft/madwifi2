@@ -163,6 +163,10 @@ ifeq ($(HAL),)
 HAL=	$(obj)/$(DEPTH)/hal
 endif
 #
+#
+# Path to HAL/OS interface code
+#
+ATH_HAL= $(obj)/$(DEPTH)/ath_hal
 # Path to the 802.11 include files.
 #
 WLAN=	$(DEPTH)/net80211

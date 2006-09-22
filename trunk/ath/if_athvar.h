@@ -43,6 +43,7 @@
 #define _DEV_ATH_ATHVAR_H
 
 #include "ah.h"
+#include "ah_os.h"
 #include "if_athioctl.h"
 #include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
 

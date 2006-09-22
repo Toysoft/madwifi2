@@ -83,7 +83,7 @@ wlan_scan_ap-objs := ieee80211_scan_ap.o
 
 include $(obj)/$(DEPTH)/Makefile.inc
 
-INCS+=	-I$(HAL) -I$(HAL)/$(OS) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
+INCS+=	-I$(HAL) -I$(ATH_HAL) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
 
 EXTRA_CFLAGS+=$(INCS) $(COPTS)
 
