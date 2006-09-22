@@ -213,6 +213,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	struct ieee80211vap *vap, *next;
 	int noise = 0;
 	u_int32_t rssi = 0;
+	u_int8_t pkttype = 0;
 	
 	rssi = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
 	
@@ -226,6 +227,16 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		struct net_device *dev = vap->iv_dev;
 		struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 		u_int8_t dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
+
+		if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+			if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
+				pkttype = PACKET_BROADCAST;
+			else
+				pkttype = PACKET_MULTICAST;
+		} else if (tx)
+			pkttype = PACKET_OUTGOING;
+		else
+			pkttype = PACKET_HOST;
 
 		next = TAILQ_NEXT(vap, iv_next);
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
@@ -426,7 +437,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			skb1->dev = dev; /* NB: deliver to wlanX */
 			skb1->mac.raw = skb1->data;
 			skb1->ip_summed = CHECKSUM_NONE;
-			skb1->pkt_type = PACKET_OTHERHOST;
+			skb1->pkt_type = pkttype;
 			skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
 			
 			netif_rx(skb1);
