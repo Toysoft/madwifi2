@@ -1982,6 +1982,9 @@ ath_stop_locked(struct net_device *dev)
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);		/* XXX needed? */
 	}
+	else
+		ieee80211_stop_running(ic);	/* stop other vap's */
+
 	if (sc->sc_softled)
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
 	
