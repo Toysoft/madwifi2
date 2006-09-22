@@ -51,8 +51,8 @@ ath_rate_amrr-objs	:= amrr.o
 
 include $(obj)/$(DEPTH)/Makefile.inc
 
-INCS+=	-I$(HAL) -I$(HAL)/$(OS) -I$(obj)/$(ATH) -I$(obj)/$(WLAN) \
-	-I$(obj)/$(DEPTH)
+INCS+=	-I$(HAL) -I$(ATH_HAL) -I$(HAL)/$(OS) -I$(obj)/$(ATH) \
+	-I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS)
 
