@@ -526,6 +526,9 @@ ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 		return -EINVAL;
 
+	if (vap->iv_opmode == IEEE80211_M_WDS)
+		IEEE80211_ADDR_COPY(vap->wds_mac, &ap_addr->sa_data);
+
 	/* 
 	 * zero address corresponds to 'iwconfig ath0 ap off', which means 
 	 * enable automatic choice of AP without actually forcing a
