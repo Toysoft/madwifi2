@@ -88,7 +88,7 @@ EOF
 
 
 echo "Copying source files"
-FILES=`cd ${SRC} && find ath ath_rate hal include net80211 -name '*.[ch]'`
+FILES=`cd ${SRC} && find ath ath_hal ath_rate hal include net80211 -name '*.[ch]'`
 for f in $FILES; do
 	case $f in
 		*.mod.c) continue;;
