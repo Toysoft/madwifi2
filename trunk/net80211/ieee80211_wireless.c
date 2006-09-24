@@ -517,9 +517,6 @@ static int
 ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 	struct sockaddr *ap_addr, char *extra)
 {
-	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
-	static const u_int8_t broadcast_bssid[IEEE80211_ADDR_LEN] = 
-		"\xff\xff\xff\xff\xff\xff";
 	struct ieee80211vap *vap = dev->priv;
 
 	/* NB: should not be set when in AP mode */
@@ -539,14 +536,12 @@ ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 	 *
 	 * anything else specifies a particular AP.
 	 */
-	if (IEEE80211_ADDR_EQ(&ap_addr->sa_data, zero_bssid)) 
-		vap->iv_flags &= ~IEEE80211_F_DESBSSID;
-	else {
-		IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
-		if (IEEE80211_ADDR_EQ(vap->iv_des_bssid, broadcast_bssid))
-			vap->iv_flags &= ~IEEE80211_F_DESBSSID;
-		else 
+	vap->iv_flags &= ~IEEE80211_F_DESBSSID;
+	if (!IEEE80211_ADDR_NULL(&ap_addr->sa_data)) {
+		if (!IEEE80211_ADDR_EQ(vap->iv_des_bssid, (u_int8_t*) "\xff\xff\xff\xff\xff\xff"))
 			vap->iv_flags |= IEEE80211_F_DESBSSID;
+		
+		IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
 		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 	}
@@ -562,14 +557,13 @@ ieee80211_ioctl_giwap(struct net_device *dev, struct iw_request_info *info,
 	if (vap->iv_flags & IEEE80211_F_DESBSSID)
 		IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_des_bssid);
 	else {
-		static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
 		if (vap->iv_state == IEEE80211_S_RUN)
 			if (vap->iv_opmode != IEEE80211_M_WDS) 
 				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bss->ni_bssid);
 			else
 				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->wds_mac);
 		else
-			IEEE80211_ADDR_COPY(&ap_addr->sa_data, zero_bssid);
+			IEEE80211_ADDR_SET_NULL(&ap_addr->sa_data);
 	}
 	ap_addr->sa_family = ARPHRD_ETHER;
 	return 0;

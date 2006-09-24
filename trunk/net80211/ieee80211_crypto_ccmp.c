@@ -240,7 +240,7 @@ ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 	tid = 0;
 	if (IEEE80211_QOS_HAS_SEQ(wh)) 
 		tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
-	/* NB: assume IEEEE80211_WEP_MINLEN covers the extended IV */ 
+	/* NB: assume IEEE80211_WEP_MINLEN covers the extended IV */ 
 	pn = READ_6(ivp[0], ivp[1], ivp[4], ivp[5], ivp[6], ivp[7]);
 	if (pn <= k->wk_keyrsc[tid]) {
 		/*

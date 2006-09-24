@@ -421,7 +421,12 @@ check_bss(struct ieee80211vap *vap, struct ieee80211_node *ni)
 		if ((ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY) == 0)
 			return 0;
 	} else {
-		/* XXX does this mean privacy is supported or required? */
+		/* Reference: IEEE802.11 7.3.1.4
+		 * This means that the data confidentiality service is required
+		 * for all frames exchanged with this STA  in IBSS and for all 
+		 * frames exchanged within the entire BSS otherwise
+		 */
+
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY)
 			return 0;
 	}

@@ -396,10 +396,11 @@ struct ieee80211vap {
 };
 MALLOC_DECLARE(M_80211_VAP);
 
-#define	IEEE80211_ADDR_NULL(a1)	(memcmp(a1, "\x00\x00\x00\x00\x00\x00", \
-	IEEE80211_ADDR_LEN) == 0)
-#define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
-#define	IEEE80211_ADDR_COPY(dst,src)	memcpy(dst,src,IEEE80211_ADDR_LEN)
+#define	IEEE80211_ADDR_NULL(a1)		(memcmp(a1, "\x00\x00\x00\x00\x00\x00", \
+					 IEEE80211_ADDR_LEN) == 0)
+#define	IEEE80211_ADDR_EQ(a1, a2)	(memcmp(a1, a2, IEEE80211_ADDR_LEN) == 0)
+#define	IEEE80211_ADDR_COPY(dst, src)	memcpy(dst, src, IEEE80211_ADDR_LEN)
+#define	IEEE80211_ADDR_SET_NULL(dst)	memset(dst, 0, IEEE80211_ADDR_LEN)
 
 /* ic_flags */
 #define	IEEE80211_F_FF		0x00000001	/* CONF: ATH FF enabled */
