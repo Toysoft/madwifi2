@@ -148,7 +148,9 @@ release:
 
 # new targets should be inserted ABOVE this line in order to avoid
 # problems with the included kernel configuration file below.
+ifneq (svnversion.h,$(MAKECMDGOALS))
 include $(KERNELCONF)
+endif
 
 configcheck: sanitycheck
 	@echo -n "Checking kernel configuration... "
