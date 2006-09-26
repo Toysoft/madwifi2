@@ -46,7 +46,9 @@ endif
 
 DEPTH=	.
 
+ifneq (svnversion.h,$(MAKECMDGOALS))
 include $(obj)/Makefile.inc
+endif
 
 DIRS_MODULES = $(ATH) $(ATH_HAL) $(ATH_RATE) $(WLAN)
 
