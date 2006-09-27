@@ -1,6 +1,6 @@
 O_TARGET := madwifi.o
 
-subdir-$(CONFIG_ATHEROS)		+= ath
+subdir-$(CONFIG_ATHEROS)		+= ath ath_hal
 subdir-$(CONFIG_ATHEROS_RATE_SAMPLE)	+= ath_rate/sample
 subdir-$(CONFIG_ATHEROS_RATE_ONOE)	+= ath_rate/onoe
 subdir-$(CONFIG_ATHEROS_RATE_AMRR)	+= ath_rate/amrr
