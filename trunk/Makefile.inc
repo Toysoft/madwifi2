@@ -114,15 +114,16 @@ $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
 
 # Determine target architecture of the kernel.
-ifeq (,$(ARCH_TARGET))
-ARCH_TARGET=$(shell $(DEPTH)/scripts/get_arch_target.sh $(KERNELCONF))
-ARCH ?= $(word 1,$(ARCH_TARGET))
-TARGET ?= $(word 2,$(ARCH_TARGET))
+ifeq (,$(ARCH))
+ARCH=$(shell $(DEPTH)/scripts/get_arch.sh $(KERNELCONF))
 endif
 
 ifeq (,$(ARCH))
 $(error Cannot determine kernel architecture, please check $(KERNELCONF))
 endif
+
+include $(obj)/$(DEPTH)/ath_hal/ah_target.inc
+
 export ARCH
 export TARGET
 export ARCH_TARGET

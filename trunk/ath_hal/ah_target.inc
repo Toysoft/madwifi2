@@ -1,19 +1,4 @@
-#
-# Makefile for the Atheros WLAN driver.
-#
-
-obj ?= .
-src ?= .
-srctree ?= .
-
-include $(srctree)/$(src)/../BuildCaps.inc
-include $(srctree)/$(src)/../ath_hal/ah_target.inc
-
-ATH_HAL=$(srctree)/$(src)/../ath_hal
-HAL=	$(srctree)/$(src)/../hal
-WLAN=	$(srctree)/$(src)/../net80211
-COMPAT=	$(srctree)/$(src)/../include
-
+# Determine HAL target based on the kernel architecture
 
 # Determine endianess.  Note that it's not indicated for some CPUs at
 # all, so this value is only valid for certain processors.
@@ -49,35 +34,3 @@ TARGET-$(CONFIG_CPU_SA1100) = xscale-$(ENDIAN)-elf
 TARGET-$(CONFIG_CPU_XSCALE) = xscale-$(ENDIAN)-elf
 
 TARGET = $(if $(TARGET-y),$(TARGET-y),$(ARCH)-elf)
-
-
-#
-# Select bus-specific code.  Note that this defaults to PCI.
-#
-ifeq ($(strip $(BUS)),AHB)
-BUSNAME=ahb
-EXTRA_CFLAGS+= -DATH_AHB
-else
-BUSNAME=pci
-EXTRA_CFLAGS+= -DATH_PCI
-endif
-
-INCS = -include $(COMPAT)/compat.h -I$(COMPAT) -I$(ATH_HAL) -I$(HAL) \
-	-I$(WLAN) -I$(src)/.. -I$(src)
-
-EXTRA_CFLAGS += $(INCS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
-
-ifdef LINUX26
-obj-$(CONFIG_ATHEROS)	+= ath_$(BUSNAME).o
-ath_$(BUSNAME)-objs	:= if_ath.o if_ath_$(BUSNAME).o
-endif
-
-ifdef LINUX24
-obj-$(CONFIG_ATHEROS) := if_ath.o if_ath_$(BUSNAME).o
-
-O_TARGET := ath_$(BUSNAME).o
-include $(TOPDIR)/Rules.make
-
-export-objs	:= if_ath_$(BUSNAME).o
-list-multi	:= ath_$(BUSNAME).o
-endif
