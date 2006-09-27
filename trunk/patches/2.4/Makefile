@@ -12,6 +12,7 @@ ifeq ($(strip $(BUS)),AHB)
 else
 	obj-y += ath/ath_pci.o
 endif
+	obj-y += ath_hal/ath_hal.o
 	obj-$(CONFIG_ATHEROS_RATE_SAMPLE) += ath_rate/sample/ath_rate.o
 	obj-$(CONFIG_ATHEROS_RATE_ONOE) += ath_rate/onoe/ath_rate.o
 	obj-$(CONFIG_ATHEROS_RATE_AMRR) += ath_rate/amrr/ath_rate.o
