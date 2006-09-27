@@ -109,7 +109,7 @@ clean:
 	done
 	-$(MAKE) -C $(TOOLS) clean
 	rm -rf .tmp_versions
-	rm -f Modules.symvers svnversion.h
+	rm -f *.symvers svnversion.h
 
 info:
 	@echo "The following settings will be used for compilation:"
