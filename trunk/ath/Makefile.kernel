@@ -8,6 +8,7 @@ srctree ?= .
 
 include $(srctree)/$(src)/../BuildCaps.inc
 
+ATH_HAL=$(srctree)/$(src)/../ath_hal
 HAL=	$(srctree)/$(src)/../hal
 WLAN=	$(srctree)/$(src)/../net80211
 COMPAT=	$(srctree)/$(src)/../include
@@ -60,7 +61,7 @@ BUSNAME=pci
 EXTRA_CFLAGS+= -DATH_PCI
 endif
 
-INCS = -include $(COMPAT)/compat.h -I$(COMPAT) -I$(HAL) \
+INCS = -include $(COMPAT)/compat.h -I$(COMPAT) -I$(ATH_HAL) -I$(HAL) \
 	-I$(WLAN) -I$(src)/.. -I$(src)
 
 EXTRA_CFLAGS += $(INCS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
