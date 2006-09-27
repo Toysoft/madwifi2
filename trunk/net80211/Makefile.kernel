@@ -9,10 +9,11 @@ include $(srctree)/$(src)/../BuildCaps.inc
 
 COMPAT = $(srctree)/$(src)/../include
 
+ATH_HAL = $(srctree)/$(src)/../ath_hal
 HAL = $(srctree)/$(src)/../hal
 
 EXTRA_CFLAGS+=	-include $(COMPAT)/compat.h -I$(COMPAT) -I$(src)/.. \
-	-I$(HAL) -I$(HAL)/linux
+	-I$(HAL) -I$(ATH_HAL)
 
 #
 # There are two authenticator mechanisms: an in-kernel implementation
