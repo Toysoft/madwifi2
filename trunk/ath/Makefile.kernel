@@ -6,13 +6,15 @@ obj ?= .
 src ?= .
 srctree ?= .
 
-include $(srctree)/$(src)/../BuildCaps.inc
-include $(srctree)/$(src)/../ath_hal/ah_target.inc
+TOP = $(srctree)/$(src)/..
 
-ATH_HAL=$(srctree)/$(src)/../ath_hal
-HAL=	$(srctree)/$(src)/../hal
-WLAN=	$(srctree)/$(src)/../net80211
-COMPAT=	$(srctree)/$(src)/../include
+include $(TOP)/BuildCaps.inc
+include $(TOP)/ath_hal/ah_target.inc
+
+ATH_HAL=$(TOP)/ath_hal
+HAL=	$(TOP)/hal
+WLAN=	$(TOP)/net80211
+COMPAT=	$(TOP)/include
 
 #
 # Select bus-specific code.  Note that this defaults to PCI.
@@ -25,8 +27,8 @@ BUSNAME=pci
 EXTRA_CFLAGS+= -DATH_PCI
 endif
 
-INCS = -include $(COMPAT)/compat.h -I$(COMPAT) -I$(ATH_HAL) -I$(HAL) \
-	-I$(WLAN) -I$(src)/.. -I$(src)
+INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
+INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
 EXTRA_CFLAGS += $(INCS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 
