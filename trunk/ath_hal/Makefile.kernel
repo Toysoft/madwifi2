@@ -6,15 +6,17 @@ obj ?= .
 src ?= .
 srctree ?= .
 
-include $(srctree)/$(src)/../BuildCaps.inc
-include $(srctree)/$(src)/../ath_hal/ah_target.inc
+TOP = $(srctree)/$(src)/..
 
-HAL=	$(srctree)/$(src)/../hal
-WLAN=	$(srctree)/$(src)/../net80211
-COMPAT=	$(srctree)/$(src)/../include
+include $(TOP)/BuildCaps.inc
+include $(TOP)/ath_hal/ah_target.inc
 
-INCS = -include $(COMPAT)/compat.h -I$(COMPAT) -I$(HAL) \
-	-I$(WLAN) -I$(src)/.. -I$(src)
+ATH_HAL=$(TOP)/ath_hal
+COMPAT=	$(TOP)/include
+HAL=	$(TOP)/hal
+
+INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
+INCS += -I$(ATH_HAL) -I$(HAL)
 
 EXTRA_CFLAGS += $(INCS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 
