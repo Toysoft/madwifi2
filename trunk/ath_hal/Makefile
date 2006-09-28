@@ -44,9 +44,9 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	..
+TOP = $(obj)/..
 
-include $(obj)/$(DEPTH)/Makefile.inc
+include $(TOP)/Makefile.inc
 
 obj-m		+= ath_hal.o
 ath_hal-objs	:= ah_os.o $(TARGET).hal.o
@@ -60,7 +60,7 @@ ifdef LINUX24
 export-objs	:= ah_os.o
 endif
 
-INCS+=	-I$(HAL) -I$(obj) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH) -I$(obj)/$(ATH)
+INCS += -I$(ATH_HAL) -I$(HAL)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 

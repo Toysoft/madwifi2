@@ -43,7 +43,7 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	..
+TOP = $(obj)/..
 #
 # There are two authenticator mechanisms: an in-kernel implementation
 # (wlan_auth+wlan_radius) and an external implementation (wlan_xauth) that
@@ -81,9 +81,9 @@ wlan_xauth-objs	:= ieee80211_xauth.o
 wlan_scan_sta-objs :=ieee80211_scan_sta.o
 wlan_scan_ap-objs := ieee80211_scan_ap.o
 
-include $(obj)/$(DEPTH)/Makefile.inc
+include $(TOP)/Makefile.inc
 
-INCS+=	-I$(HAL) -I$(ATH_HAL) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
+INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL)
 
 EXTRA_CFLAGS+=$(INCS) $(COPTS)
 
