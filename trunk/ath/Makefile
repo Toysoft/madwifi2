@@ -44,7 +44,7 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	..
+TOP = $(obj)/..
 
 ifeq ($(strip $(BUS)),AHB)
 BUSNAME=ahb
@@ -54,12 +54,12 @@ BUSNAME=pci
 COPTS+= -DATH_PCI
 endif
 
-include $(obj)/$(DEPTH)/Makefile.inc
+include $(TOP)/Makefile.inc
 
 obj-m		+= ath_$(BUSNAME).o
 ath_$(BUSNAME)-objs	:= if_ath.o if_ath_$(BUSNAME).o
 
-INCS+=	-I$(HAL) -I$(ATH_HAL) -I$(obj) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
+INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 

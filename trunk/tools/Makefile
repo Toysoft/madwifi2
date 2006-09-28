@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-DEPTH=	..
+TOP = ..
 
 # USER_CROSS_COMPILE is a string that is prepended to all toolchain
 # executables, such as gcc, ld, as, objcopy etc.  This is used for
@@ -41,10 +41,10 @@ MANDIR ?= /usr/local/man
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=   $(DEPTH)/hal
+HAL=   $(TOP)/hal
 endif
 
-INCS=  -include $(DEPTH)/include/compat.h
+INCS=  -include $(TOP)/include/compat.h
 
 
 ALL=	athstats 80211stats athkey athchans athctrl \
@@ -52,7 +52,7 @@ ALL=	athstats 80211stats athkey athchans athctrl \
 
 all:	$(ALL)
 
-INCS+=	-I. -I$(HAL) -I$(DEPTH)
+INCS+=	-I. -I$(HAL) -I$(TOP)
 CFLAGS=	-g -O2 -Wall
 ALL_CFLAGS= $(CFLAGS) $(INCS)
 LDFLAGS=
@@ -60,7 +60,7 @@ LDFLAGS=
 all:	$(ALL)
 
 athstats: athstats.c
-	$(CC) -o athstats $(ALL_CFLAGS) -I$(DEPTH)/ath $(LDFLAGS) athstats.c
+	$(CC) -o athstats $(ALL_CFLAGS) -I$(TOP)/ath $(LDFLAGS) athstats.c
 80211stats: 80211stats.c
 	$(CC) -o 80211stats $(ALL_CFLAGS) $(LDFLAGS) 80211stats.c
 athkey: athkey.c

@@ -44,10 +44,10 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	.
+TOP = $(obj)
 
 ifneq (svnversion.h,$(MAKECMDGOALS))
-include $(obj)/Makefile.inc
+include $(TOP)/Makefile.inc
 endif
 
 DIRS_MODULES = $(ATH) $(ATH_HAL) $(ATH_RATE) $(WLAN)

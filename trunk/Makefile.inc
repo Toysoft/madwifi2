@@ -36,10 +36,6 @@
 # $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/Makefile.inc#11 $
 #
 
-ifeq ($(obj),)
-obj=	.
-endif
-
 # other locales sometimes cause trouble
 export LC_ALL = POSIX
 
@@ -101,7 +97,7 @@ endif
 # in that file.
 # This trick has been inspired by the lm_sensors project.
 ifndef KERNELRELEASE
-KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(DEPTH)/kernelversion.c | grep uts_release | cut -f2 -d'"')
+KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(TOP)/kernelversion.c | grep uts_release | cut -f2 -d'"')
 endif
 
 # KERNELCONF is the name of the file that holds the configuration
@@ -115,14 +111,14 @@ endif
 
 # Determine target architecture of the kernel.
 ifeq (,$(ARCH))
-ARCH=$(shell $(DEPTH)/scripts/get_arch.sh $(KERNELCONF))
+ARCH=$(shell $(TOP)/scripts/get_arch.sh $(KERNELCONF))
 endif
 
 ifeq (,$(ARCH))
 $(error Cannot determine kernel architecture, please check $(KERNELCONF))
 endif
 
-include $(obj)/$(DEPTH)/ath_hal/ah_target.inc
+include $(TOP)/ath_hal/ah_target.inc
 
 export ARCH
 export TARGET
@@ -161,20 +157,20 @@ AWK=		awk
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=	$(obj)/$(DEPTH)/hal
+HAL=	$(TOP)/hal
 endif
 #
 #
 # Path to HAL/OS interface code
 #
-ATH_HAL= $(obj)/$(DEPTH)/ath_hal
+ATH_HAL= $(TOP)/ath_hal
 # Path to the 802.11 include files.
 #
-WLAN=	$(DEPTH)/net80211
+WLAN=	$(TOP)/net80211
 #
 # Path to the Atheros device driver.
 #
-ATH=	$(DEPTH)/ath
+ATH=	$(TOP)/ath
 #
 # Path to the rate control algorithm.
 #
@@ -184,10 +180,10 @@ endif
 #
 # Path to the userspace utilities. 
 # 
-TOOLS=  $(DEPTH)/tools 
+TOOLS=  $(TOP)/tools 
 
 COPTS+=	-Werror
-INCS=	-include $(obj)/$(DEPTH)/include/compat.h -I$(obj)/$(DEPTH)/include
+INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
 
 ifeq ($(strip $(BUS)),AHB)
 INCS+= -isystem $(TOOLPATH)/include
@@ -219,7 +215,7 @@ STRIP := $(save_STRIP)
 OBJCOPY := $(save_OBJCOPY)
 NM := $(save_NM)
 
-include $(obj)/$(DEPTH)/BuildCaps.inc
+include $(TOP)/BuildCaps.inc
 
 # Ensure correct endianess
 LDFLAGS += $(LDOPTS)
