@@ -175,15 +175,10 @@ ieee80211_scan_vdetach(struct ieee80211vap *vap)
 #define	IEEE80211_SCANNER_MAX	(IEEE80211_M_MONITOR+1)
 
 static const char *scan_modnames[IEEE80211_SCANNER_MAX] = {
-	"wlan_scan_sta",	/* IEEE80211_M_IBSS */
-	"wlan_scan_sta",	/* IEEE80211_M_STA */
-	"wlan_scan_ap",		/* IEEE80211_M_WDS */
-	"wlan_scan_sta",	/* IEEE80211_M_AHDEMO */
-	"wlan_scan_4",		/* n/a */
-	"wlan_scan_5",		/* n/a */
-	"wlan_scan_ap",		/* IEEE80211_M_HOSTAP */
-	"wlan_scan_7",		/* n/a */
-	"wlan_scan_monitor",	/* IEEE80211_M_MONITOR */
+	[IEEE80211_M_IBSS]	= "wlan_scan_sta",
+	[IEEE80211_M_STA]	= "wlan_scan_sta",
+	[IEEE80211_M_AHDEMO]	= "wlan_scan_sta",
+	[IEEE80211_M_HOSTAP]	= "wlan_scan_ap",
 };
 static const struct ieee80211_scanner *scanners[IEEE80211_SCANNER_MAX];
 
@@ -192,6 +187,8 @@ ieee80211_scanner_get(enum ieee80211_opmode mode, int tryload)
 {
 	int err;
 	if (mode >= IEEE80211_SCANNER_MAX)
+		return NULL;
+	if (scan_modnames[mode] == NULL)
 		return NULL;
 	if (scanners[mode] == NULL && tryload) {
 		err = ieee80211_load_module(scan_modnames[mode]);
