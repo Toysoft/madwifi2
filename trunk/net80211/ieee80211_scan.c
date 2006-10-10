@@ -177,7 +177,7 @@ ieee80211_scan_vdetach(struct ieee80211vap *vap)
 static const char *scan_modnames[IEEE80211_SCANNER_MAX] = {
 	"wlan_scan_sta",	/* IEEE80211_M_IBSS */
 	"wlan_scan_sta",	/* IEEE80211_M_STA */
-	"wlan_scan_wds",	/* IEEE80211_M_WDS */
+	"wlan_scan_ap",		/* IEEE80211_M_WDS */
 	"wlan_scan_sta",	/* IEEE80211_M_AHDEMO */
 	"wlan_scan_4",		/* n/a */
 	"wlan_scan_5",		/* n/a */
