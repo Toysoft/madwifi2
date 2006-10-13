@@ -981,11 +981,18 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	int opmode, int flags, struct net_device *mdev)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
 	struct net_device *dev;
 	struct ath_vap *avp;
 	struct ieee80211vap *vap;
 	int ic_opmode;
 
+	if (ic->ic_dev->flags & IFF_RUNNING) {
+		/* needs to disable hardware too */
+		ath_hal_intrset(ah, 0);		/* disable interrupts */
+		ath_draintxq(sc);		/* stop xmit side */
+		ath_stoprecv(sc);		/* stop recv side */
+	}
 	/* XXX ic unlocked and race against add */
 	switch (opmode) {
 	case IEEE80211_M_STA:	/* ap+sta for repeater application */
@@ -1178,6 +1185,15 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		}
 	}
 #endif
+	if (ic->ic_dev->flags & IFF_RUNNING) {
+		/* restart hardware */
+		if (ath_startrecv(sc) != 0)	/* restart recv */
+			printk("%s: %s: unable to start recv logic\n",
+				dev->name, __func__);
+		if (sc->sc_beacons)
+			ath_beacon_config(sc, NULL);	/* restart beacons */
+		ath_hal_intrset(ah, sc->sc_imask);
+	}
 
 	return vap;
 }
@@ -8021,7 +8037,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		/*
 		 * Configure the beacon and sleep timers.
 		 */
-		if (!sc->sc_beacons) {
+		if (!sc->sc_beacons && vap->iv_opmode!=IEEE80211_M_WDS) {
 			ath_beacon_config(sc, vap);
 			sc->sc_beacons = 1;
 		}

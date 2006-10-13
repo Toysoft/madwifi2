@@ -784,8 +784,8 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		/*
 		 * Monitor and wds modes can switch directly.
 		 */
+		ic->ic_curchan = vap->iv_des_chan;
 		if (vap->iv_state == IEEE80211_S_RUN) {
-			ic->ic_curchan = vap->iv_des_chan;
 			ic->ic_set_channel(ic);
 		}
 	} else {
