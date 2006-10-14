@@ -729,7 +729,7 @@ void ath_shutdown(struct net_device *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 irqreturn_t ath_intr(int, void *);
 #else
-irqreturn_t ath_intr(int, void *, struct pt_regs *regs);
+irqreturn_t ath_intr(int, void *, struct pt_regs *);
 #endif
 int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);
