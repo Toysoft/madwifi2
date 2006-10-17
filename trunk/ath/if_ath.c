@@ -289,11 +289,11 @@ MODULE_PARM(rfkill, "i");
 MODULE_PARM(autocreate, "s");
 #else
 #include <linux/moduleparam.h>
-module_param(countrycode, int, 0);
-module_param(outdoor, int, 0);
-module_param(xchanmode, int, 0);
-module_param(rfkill, int, 0);
-module_param(autocreate, charp, 0);
+module_param(countrycode, int, 0600);
+module_param(outdoor, int, 0600);
+module_param(xchanmode, int, 0600);
+module_param(rfkill, int, 0600);
+module_param(autocreate, charp, 0600);
 #endif
 MODULE_PARM_DESC(countrycode, "Override default country code");
 MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
@@ -306,7 +306,7 @@ static int	ath_debug = 0;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
 MODULE_PARM(ath_debug, "i");
 #else
-module_param(ath_debug, int, 0);
+module_param(ath_debug, int, 0600);
 #endif
 MODULE_PARM_DESC(ath_debug, "Load-time debug output enable");
 
