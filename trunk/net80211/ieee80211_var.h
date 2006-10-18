@@ -88,6 +88,8 @@
 #define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
 #define	IEEE80211_TU_TO_JIFFIES(x) ((IEEE80211_TU_TO_MS(x) * HZ) / 1000)
 
+#define	IEEE80211_APPIE_MAX	1024
+
 #define IEEE80211_PWRCONSTRAINT_VAL(ic) \
 	(((ic)->ic_bsschan->ic_maxregpower > (ic)->ic_curchanmaxpwr) ? \
 	    (ic)->ic_bsschan->ic_maxregpower - (ic)->ic_curchanmaxpwr : 0)
@@ -290,6 +292,11 @@ struct ieee80211_proc_entry {
 };
 #endif
 
+struct ieee80211_app_ie_t {
+	u_int32_t		length;		/* buffer length */
+	struct ieee80211_ie    *ie;		/* buffer containing one or more IEs */
+};
+
 struct ieee80211vap {
 	struct net_device *iv_dev;		/* associated device */
 	struct net_device_stats	iv_devstats;	/* interface statistics */
@@ -393,6 +400,9 @@ struct ieee80211vap {
 	unsigned int iv_nsdone;			/* Done with scheduled newstate tasklet */
 	uint8_t	wds_mac[IEEE80211_ADDR_LEN];
 	struct ieee80211_spy iv_spy;         	/* IWSPY support */
+	struct ieee80211_app_ie_t app_ie[IEEE80211_APPIE_NUM_OF_FRAME]; /* app-specified IEs by frame type */
+	u_int32_t app_filter;			/* filters which management frames are forwarded to app */
+
 };
 MALLOC_DECLARE(M_80211_VAP);
 
@@ -453,6 +463,7 @@ MALLOC_DECLARE(M_80211_VAP);
 #define IEEE80211_FEXT_ERPUPDATE 0x00000200	/* STATUS: update ERP element */
 #define IEEE80211_FEXT_SWBMISS 0x00000400	/* CONF: use software beacon timer */
 #define IEEE80211_FEXT_DROPUNENC_EAPOL 0x00000800      /* CONF: drop unencrypted eapol frames */
+#define IEEE80211_FEXT_APPIE_UPDATE 0x00001000	/* STATE: beacon APP IE updated */
 
 #define IEEE80211_COM_UAPSD_ENABLE(_ic)		((_ic)->ic_flags_ext |= IEEE80211_FEXT_UAPSD)
 #define IEEE80211_COM_UAPSD_DISABLE(_ic)	((_ic)->ic_flags_ext &= ~IEEE80211_FEXT_UAPSD)

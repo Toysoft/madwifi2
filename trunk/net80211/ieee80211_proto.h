@@ -265,6 +265,8 @@ struct ieee80211_beacon_offsets {
 	u_int8_t *bo_ath_caps;		/* where ath caps is */
 	u_int8_t *bo_xr;			/* start of xr element */
 	u_int8_t *bo_erp;		/* start of ERP element */
+	u_int8_t *bo_appie_buf;		/* start of APP IE buf */
+	u_int16_t bo_appie_buf_len;	/* APP IE buf length in bytes */
 	u_int16_t bo_chanswitch_trailerlen;
 };
 struct sk_buff *ieee80211_beacon_alloc(struct ieee80211_node *,

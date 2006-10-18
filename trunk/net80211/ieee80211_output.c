@@ -1721,7 +1721,8 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	skb = ieee80211_getmgtframe(&frm, 2 + IEEE80211_NWID_LEN + 
 	       2 + IEEE80211_RATE_SIZE + 
 	       2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) + 
-	       (optie != NULL ? optielen : 0));
+	       (optie != NULL ? optielen : 0) +
+	       vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].length);
 	if (skb == NULL) {
 		vap->iv_stats.is_tx_nobuf++;
 		ieee80211_free_node(ni);
@@ -1737,6 +1738,13 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 		memcpy(frm, optie, optielen);
 		frm += optielen;
 	}
+
+	if (vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].ie) {
+		memcpy(frm, vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].ie,
+			vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].length);
+		frm += vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].length;
+	}
+
 	skb_trim(skb, frm - skb->data);
 
 	cb = (struct ieee80211_cb *)skb->cb;
@@ -1833,6 +1841,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			+ (vap->iv_ath_cap & IEEE80211_ATHC_XR ?	/* XR */
 				sizeof(struct ieee80211_xr_param) : 0)
 #endif
+			+ vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_RESP].length
 		);
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
@@ -1928,6 +1937,12 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)
 			frm = ieee80211_add_xr_param(frm, vap);
 #endif
+		if (vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_RESP].ie) {
+			memcpy(frm, vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_RESP].ie,
+				vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_RESP].length);
+			frm += vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_RESP].length;
+		}
+
 		skb_trim(skb, frm - skb->data);
 		break;
 
@@ -2028,7 +2043,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
 			sizeof(struct ieee80211_ie_wme) +
 			sizeof(struct ieee80211_ie_athAdvCap) +
-			(vap->iv_opt_ie != NULL ? vap->iv_opt_ie_len : 0));
+			(vap->iv_opt_ie != NULL ? vap->iv_opt_ie_len : 0) +
+			vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_REQ].length);
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -2099,6 +2115,13 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			memcpy(frm, vap->iv_opt_ie, vap->iv_opt_ie_len);
 			frm += vap->iv_opt_ie_len;
 		}
+
+		if (vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_REQ].ie) {
+			memcpy(frm, vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_REQ].ie,
+				vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_REQ].length);
+			frm += vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_REQ].length;
+		}
+
 		skb_trim(skb, frm - skb->data);
 
 		timer = IEEE80211_TRANS_WAIT;
@@ -2121,7 +2144,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			2 + IEEE80211_RATE_SIZE +
 			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
 			sizeof(struct ieee80211_wme_param) +
-			(vap->iv_ath_cap ? sizeof(struct ieee80211_ie_athAdvCap):0));
+			(vap->iv_ath_cap ? sizeof(struct ieee80211_ie_athAdvCap):0) +
+			vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_RESP].length);
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -2165,6 +2189,12 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			frm = ieee80211_add_athAdvCap(frm, 
 				vap->iv_ath_cap & ni->ni_ath_flags,
 				ni->ni_ath_defkeyindex); 
+
+		if (vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_RESP].ie) {
+			memcpy(frm, vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_RESP].ie,
+				vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_RESP].length);
+			frm += vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_RESP].length;
+		}
 
 		skb_trim(skb, frm - skb->data);
 		break;
