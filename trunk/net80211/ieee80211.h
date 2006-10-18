@@ -353,6 +353,15 @@ enum CountryCode {
 };
 
 /* 
+ * Generic information element
+ */
+struct ieee80211_ie {
+	u_int8_t id;
+	u_int8_t len;
+	u_int8_t info[];
+} __packed;
+
+/* 
  * Country information element.
  */
 #define IEEE80211_COUNTRY_MAX_TRIPLETS (83)

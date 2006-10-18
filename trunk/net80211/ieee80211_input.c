@@ -2208,6 +2208,60 @@ ieee80211_parse_athParams(struct ieee80211_node *ni, u_int8_t *ie)
 #endif /* ATH_SUPERG_DYNTURBO */
 }
 
+static void
+forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
+	struct ieee80211_frame *wh)
+{
+	struct net_device *dev = vap->iv_dev;
+	int filter_type = 0;
+
+	switch (subtype) {
+	case IEEE80211_FC0_SUBTYPE_BEACON:
+		filter_type = IEEE80211_FILTER_TYPE_BEACON;
+		break;
+	case IEEE80211_FC0_SUBTYPE_PROBE_REQ:
+		filter_type = IEEE80211_FILTER_TYPE_PROBE_REQ;
+		break;
+	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
+		filter_type = IEEE80211_FILTER_TYPE_PROBE_RESP;
+		break;
+	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
+	case IEEE80211_FC0_SUBTYPE_REASSOC_REQ:
+		filter_type = IEEE80211_FILTER_TYPE_ASSOC_REQ;
+		break;
+	case IEEE80211_FC0_SUBTYPE_ASSOC_RESP:
+	case IEEE80211_FC0_SUBTYPE_REASSOC_RESP:
+		filter_type = IEEE80211_FILTER_TYPE_ASSOC_RESP;
+		break;
+	case IEEE80211_FC0_SUBTYPE_AUTH:
+		filter_type = IEEE80211_FILTER_TYPE_AUTH;
+		break;
+	case IEEE80211_FC0_SUBTYPE_DEAUTH:
+		filter_type = IEEE80211_FILTER_TYPE_DEAUTH;
+		break;
+	case IEEE80211_FC0_SUBTYPE_DISASSOC:
+		filter_type = IEEE80211_FILTER_TYPE_DISASSOC;
+		break;
+	default:
+		break;
+	}
+
+	if (filter_type && ((vap->app_filter & filter_type) == filter_type)) {
+		struct sk_buff *skb1;
+
+		skb1 = skb_copy(skb, GFP_ATOMIC);
+		if (skb1 == NULL)
+			return;
+		skb1->dev = dev;
+		skb1->mac.raw = skb1->data;
+		skb1->ip_summed = CHECKSUM_NONE;
+		skb1->pkt_type = PACKET_OTHERHOST;
+		skb1->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
+
+		netif_rx(skb1);
+	}
+}
+
 void
 ieee80211_saveath(struct ieee80211_node *ni, u_int8_t *ie)
 {
@@ -2379,6 +2433,11 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	wh = (struct ieee80211_frame *) skb->data;
 	frm = (u_int8_t *)&wh[1];
 	efrm = skb->data + skb->len;
+
+	/* forward management frame to application */
+	if (vap->iv_opmode != IEEE80211_M_MONITOR)
+		forward_mgmt_to_app(vap, subtype, skb, wh);
+
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 	case IEEE80211_FC0_SUBTYPE_BEACON: {

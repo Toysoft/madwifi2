@@ -2843,6 +2843,62 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+/* returns non-zero if ID is for a system IE (not for app use) */
+static int
+is_sys_ie(u_int8_t ie_id)
+{
+	/* XXX review this list */
+	switch (ie_id) {
+	case IEEE80211_ELEMID_SSID:
+	case IEEE80211_ELEMID_RATES:
+	case IEEE80211_ELEMID_FHPARMS:
+	case IEEE80211_ELEMID_DSPARMS:
+	case IEEE80211_ELEMID_CFPARMS:
+	case IEEE80211_ELEMID_TIM:
+	case IEEE80211_ELEMID_IBSSPARMS:
+	case IEEE80211_ELEMID_COUNTRY:
+	case IEEE80211_ELEMID_REQINFO:
+	case IEEE80211_ELEMID_CHALLENGE:
+	case IEEE80211_ELEMID_PWRCNSTR:
+	case IEEE80211_ELEMID_PWRCAP:
+	case IEEE80211_ELEMID_TPCREQ:
+	case IEEE80211_ELEMID_TPCREP:
+	case IEEE80211_ELEMID_SUPPCHAN:
+	case IEEE80211_ELEMID_CHANSWITCHANN:
+	case IEEE80211_ELEMID_MEASREQ:
+	case IEEE80211_ELEMID_MEASREP:
+	case IEEE80211_ELEMID_QUIET:
+	case IEEE80211_ELEMID_IBSSDFS:
+	case IEEE80211_ELEMID_ERP:
+	case IEEE80211_ELEMID_RSN:
+	case IEEE80211_ELEMID_XRATES:
+	case IEEE80211_ELEMID_TPC:
+	case IEEE80211_ELEMID_CCKM:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+/* returns non-zero if the buffer appears to contain a valid IE list */
+static int
+is_valid_ie_list(u_int32_t buf_len, void *buf, int exclude_sys_ies)
+{
+	struct ieee80211_ie *ie = (struct ieee80211_ie *)buf;
+
+	while (buf_len >= sizeof(*ie)) {
+		int ie_elem_len = sizeof(*ie) + ie->len;
+		if (buf_len < ie_elem_len)
+			break;
+		if (exclude_sys_ies && is_sys_ie(ie->id))
+			break;
+		buf_len -= ie_elem_len;
+		ie = (struct ieee80211_ie *)(ie->info + ie->len);
+	}
+
+	return (buf_len == 0) ? 1 : 0;
+}
+
 static int
 ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
 	struct iw_point *wri, char *extra)
@@ -2858,12 +2914,13 @@ ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
 	 */
 	if (vap->iv_opmode != IEEE80211_M_STA)
 		return -EINVAL;
+	if (! is_valid_ie_list(wri->length, extra, 0))
+		return -EINVAL;
 	/* NB: wri->length is validated by the wireless extensions code */
 	MALLOC(ie, void *, wri->length, M_DEVBUF, M_WAITOK);
 	if (ie == NULL)
 		return -ENOMEM;
 	memcpy(ie, extra, wri->length);
-	/* XXX sanity check data? */
 	if (vap->iv_opt_ie != NULL)
 		FREE(vap->iv_opt_ie, M_DEVBUF);
 	vap->iv_opt_ie = ie;
@@ -2888,6 +2945,136 @@ ieee80211_ioctl_getoptie(struct net_device *dev, struct iw_request_info *info,
 	}
 	wri->length = vap->iv_opt_ie_len;
 	memcpy(extra, vap->iv_opt_ie, vap->iv_opt_ie_len);
+	return 0;
+}
+
+/* the following functions are used by the set/get appiebuf functions */
+static int
+add_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
+	struct ieee80211req_getset_appiebuf *iebuf)
+{
+	struct ieee80211_ie *ie;
+
+	if (! is_valid_ie_list(iebuf->app_buflen, iebuf->app_buf, 1))
+		return -EINVAL;
+	/* NB: data.length is validated by the wireless extensions code */
+	MALLOC(ie, struct ieee80211_ie *, iebuf->app_buflen, M_DEVBUF, M_WAITOK);
+	if (ie == NULL)
+		return -ENOMEM;
+
+	memcpy(ie, iebuf->app_buf, iebuf->app_buflen);
+	if (vap->app_ie[frame_type_index].ie != NULL)
+		FREE(vap->app_ie[frame_type_index].ie, M_DEVBUF);
+	vap->app_ie[frame_type_index].ie = ie;
+	vap->app_ie[frame_type_index].length = iebuf->app_buflen;
+
+	return 0;
+}
+
+static int
+remove_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap)
+{
+	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	if (app_ie->ie != NULL) {
+		FREE(app_ie->ie, M_DEVBUF);
+		app_ie->ie = NULL;
+		app_ie->length = 0;
+	}
+	return 0;
+}
+
+static int
+get_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
+	struct ieee80211req_getset_appiebuf *iebuf)
+{
+	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	if (iebuf->app_buflen < app_ie->length)
+		return -EINVAL;
+
+	iebuf->app_buflen = app_ie->length;
+	memcpy(iebuf->app_buf, app_ie->ie, app_ie->length);
+	return 0;
+}
+
+static int
+ieee80211_ioctl_setappiebuf(struct net_device *dev,
+	struct iw_request_info *info,
+	void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211req_getset_appiebuf *iebuf =
+		(struct ieee80211req_getset_appiebuf *)extra;
+	enum ieee80211_opmode chk_opmode;
+	int rc = 0;
+
+	if (iebuf->app_buflen > IEEE80211_APPIE_MAX)
+		return -EINVAL;
+
+	switch (iebuf->app_frmtype) {
+	case IEEE80211_APPIE_FRAME_BEACON:
+	case IEEE80211_APPIE_FRAME_PROBE_RESP:
+	case IEEE80211_APPIE_FRAME_ASSOC_RESP:
+		chk_opmode = IEEE80211_M_HOSTAP;
+		break;
+	case IEEE80211_APPIE_FRAME_PROBE_REQ:
+	case IEEE80211_APPIE_FRAME_ASSOC_REQ:
+		chk_opmode = IEEE80211_M_STA;
+		break;
+	default:
+		return -EINVAL;
+	}
+	if (vap->iv_opmode != chk_opmode)
+		return -EINVAL;
+
+	if (iebuf->app_buflen)
+		rc = add_app_ie(iebuf->app_frmtype, vap, iebuf);
+	else
+		rc = remove_app_ie(iebuf->app_frmtype, vap);
+	if ((iebuf->app_frmtype == IEEE80211_APPIE_FRAME_BEACON) && (rc == 0))
+		vap->iv_flags_ext |= IEEE80211_FEXT_APPIE_UPDATE;
+
+	return rc;
+}
+
+static int
+ieee80211_ioctl_getappiebuf(struct net_device *dev, struct iw_request_info *info,
+	void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211req_getset_appiebuf *iebuf =
+		(struct ieee80211req_getset_appiebuf *)extra;
+
+	switch (iebuf->app_frmtype) {
+	case IEEE80211_APPIE_FRAME_BEACON:
+	case IEEE80211_APPIE_FRAME_PROBE_RESP:
+	case IEEE80211_APPIE_FRAME_ASSOC_RESP:
+		if (vap->iv_opmode == IEEE80211_M_STA)
+			return -EINVAL;
+		break;
+	case IEEE80211_APPIE_FRAME_PROBE_REQ:
+	case IEEE80211_APPIE_FRAME_ASSOC_REQ:
+		if (vap->iv_opmode != IEEE80211_M_STA)
+			return -EINVAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return get_app_ie(iebuf->app_frmtype, vap, iebuf);
+}
+
+static int
+ieee80211_ioctl_setfilter(struct net_device *dev, struct iw_request_info *info,
+	void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211req_set_filter *app_filter = (struct ieee80211req_set_filter *)extra;
+
+	if ((extra == NULL) || (app_filter->app_filterype & ~IEEE80211_FILTER_TYPE_ALL))
+		return -EINVAL;
+
+	vap->app_filter = app_filter->app_filterype;
+
 	return 0;
 }
 
@@ -4610,6 +4797,10 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chanlist)
 #define	IW_PRIV_TYPE_CHANINFO \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chaninfo)
+#define IW_PRIV_TYPE_APPIEBUF \
+	(IW_PRIV_TYPE_BYTE | IEEE80211_APPIE_MAX)
+#define IW_PRIV_TYPE_FILTER \
+	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_set_filter)
 
 static const struct iw_priv_args ieee80211_priv_args[] = {
 	/* NB: setoptie & getoptie are !IW_PRIV_SIZE_FIXED */
@@ -4936,6 +5127,12 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "markdfs" },
 	{ IEEE80211_PARAM_MARKDFS,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_markdfs" },
+	{ IEEE80211_IOCTL_SET_APPIEBUF,
+	  IW_PRIV_TYPE_APPIEBUF, 0, "setiebuf" },
+	{ IEEE80211_IOCTL_GET_APPIEBUF,
+	  0, IW_PRIV_TYPE_APPIEBUF, "getiebuf" },
+	{ IEEE80211_IOCTL_FILTERFRAME,
+	  IW_PRIV_TYPE_FILTER , 0, "setfilter" },
 
 #endif /* WIRELESS_EXT >= 12 */
 };
@@ -5022,10 +5219,10 @@ static const iw_handler ieee80211_priv_handlers[] = {
 	(iw_handler) ieee80211_ioctl_setchanlist,	/* SIOCIWFIRSTPRIV+6 */
 	(iw_handler) ieee80211_ioctl_getchanlist,	/* SIOCIWFIRSTPRIV+7 */
 	(iw_handler) ieee80211_ioctl_chanswitch,	/* SIOCIWFIRSTPRIV+8 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+9 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+10 */
+	(iw_handler) ieee80211_ioctl_getappiebuf,	/* SIOCIWFIRSTPRIV+9 */
+	(iw_handler) ieee80211_ioctl_setappiebuf,	/* SIOCIWFIRSTPRIV+10 */
 	(iw_handler) ieee80211_ioctl_getscanresults,	/* SIOCIWFIRSTPRIV+11 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+12 */
+	(iw_handler) ieee80211_ioctl_setfilter,		/* SIOCIWFIRSTPRIV+12 */
 	(iw_handler) ieee80211_ioctl_getchaninfo,	/* SIOCIWFIRSTPRIV+13 */
 	(iw_handler) ieee80211_ioctl_setoptie,		/* SIOCIWFIRSTPRIV+14 */
 	(iw_handler) ieee80211_ioctl_getoptie,		/* SIOCIWFIRSTPRIV+15 */

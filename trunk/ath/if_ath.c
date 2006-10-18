@@ -1212,6 +1212,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_vap *avp = ATH_VAP(vap);
 	int decrease = 1;
+	int i;
 	KASSERT(vap->iv_state == IEEE80211_S_INIT, ("vap not stopped"));
 
 	if (dev->flags & IFF_RUNNING) {
@@ -1284,6 +1285,14 @@ ath_vap_delete(struct ieee80211vap *vap)
 		}
 	}
 #endif
+
+	for (i = 0; i < IEEE80211_APPIE_NUM_OF_FRAME; ++ i) {
+		if (vap->app_ie[i].ie != NULL) {
+			FREE(vap->app_ie[i].ie, M_DEVBUF);
+			vap->app_ie[i].ie = NULL;
+			vap->app_ie[i].length = 0;
+		}
+	}
 
 	if (dev->flags & IFF_RUNNING) {
 		/*
