@@ -894,8 +894,12 @@ void ath_sysctl_unregister(void);
 	ath_hal_getcapability(_ah, HAL_CAP_REG_DMN, 0, (_prd))
 #define	ath_hal_getcountrycode(_ah, _pcc) \
 	(*(_pcc) = (_ah)->ah_countryCode)
-#define	ath_hal_tkipsplit(_ah) \
+#define ath_hal_hastkipsplit(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_TKIP_SPLIT, 0, NULL) == HAL_OK)
+#define ath_hal_gettkipsplit(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TKIP_SPLIT, 1, NULL) == HAL_OK)
+#define ath_hal_settkipsplit(_ah, _v) \
+	ath_hal_setcapability(_ah, HAL_CAP_TKIP_SPLIT, 1, _v, NULL)
 #define	ath_hal_wmetkipmic(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_WME_TKIPMIC, 0, NULL) == HAL_OK)
 #define	ath_hal_hwphycounters(_ah) \
