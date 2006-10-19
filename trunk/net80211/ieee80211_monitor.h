@@ -41,7 +41,7 @@
 #define ATHDESC_HEADER_SIZE	32
 
 #include <net80211/ieee80211_radiotap.h>
-#include <hal/ah_desc.h>
+#include <ah_desc.h>
 #include <ath/if_athvar.h>
 struct ieee80211_phy_params {
 	u_int8_t rate0;
