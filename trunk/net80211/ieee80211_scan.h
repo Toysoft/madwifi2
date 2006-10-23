@@ -138,7 +138,7 @@ struct ieee80211_scanparams {
 	u_int8_t *ssid;
 	u_int8_t *rates;
 	u_int8_t *xrates;
-	u_int8_t *doth;
+	u_int8_t *csa;
 	u_int8_t *wpa;
 	u_int8_t *rsn;
 	u_int8_t *wme;
