@@ -87,6 +87,7 @@
 #define	IEEE80211_MS_TO_TU(x)	(((x) * 1000) / 1024)
 #define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
 #define	IEEE80211_TU_TO_JIFFIES(x) ((IEEE80211_TU_TO_MS(x) * HZ) / 1000)
+#define	IEEE80211_JIFFIES_TO_TU(x) IEEE80211_MS_TO_TU((x) * 1000 / HZ)
 
 #define	IEEE80211_APPIE_MAX	1024
 
@@ -348,6 +349,11 @@ struct ieee80211vap {
 	u_int iv_scanvalid;			/* scan cache valid threshold */
 	struct ieee80211_roam iv_roam;		/* sta-mode roaming state */
 
+	u_int32_t iv_csa_jiffies;		/* last csa recv jiffies */
+	u_int8_t iv_csa_count;			/* last csa count */
+	struct ieee80211_channel *iv_csa_chan;	/* last csa channel */
+	u_int8_t iv_csa_mode;			/* last csa mode */
+	struct timer_list iv_csa_timer;		/* csa timer */
 	u_int32_t *iv_aid_bitmap;		/* association id map */
 	u_int16_t iv_max_aid;
 	u_int16_t iv_sta_assoc;			/* stations associated */

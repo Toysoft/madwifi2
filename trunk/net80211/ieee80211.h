@@ -372,6 +372,24 @@ struct ieee80211_ie_country {
 	u_int8_t country_triplet[IEEE80211_COUNTRY_MAX_TRIPLETS * 3];
 } __packed;
 
+/*
+ * Channel Switch Announcement information element.
+ */
+struct ieee80211_ie_csa {
+	u_int8_t csa_id;	/* IEEE80211_ELEMID_CHANSWITCHANN */
+	u_int8_t csa_len;	/* == 3 */
+	u_int8_t csa_mode;	/* Channel Switch Mode: 1 == stop transmission until CS */
+	u_int8_t csa_chan;	/* New Channel Number */
+	u_int8_t csa_count;	/* TBTTs until Channel Switch happens */
+} __packed;
+
+/* minimal Channel Switch Count in the initial announcement */
+#define IEEE80211_CSA_PROTECTION_PERIOD 3
+
+/* maximum allowed deviance of measurement of intervals between CSA in Beacons */
+#define IEEE80211_CSA_SANITY_THRESHOLD 100    
+
+
 /* does frame have QoS sequence control data */
 #define	IEEE80211_QOS_HAS_SEQ(wh) \
 	(((wh)->i_fc[0] & \
