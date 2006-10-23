@@ -822,6 +822,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 				"no default transmit key (%s) deftxkey %u",
 				__func__, vap->iv_def_txkey);
 			vap->iv_stats.is_tx_nodefkey++;
+			goto bad;
 		}
 	} else
 		key = NULL;		
