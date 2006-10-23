@@ -1579,6 +1579,12 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 			nrunning = nscanning = 0;
 			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
 				if (vap != tmpvap) {
+					if (tmpvap->iv_opmode == IEEE80211_M_MONITOR)
+						/* skip monitor vaps as their
+						 * S_RUN shouldn't have any
+						 * influence on modifying state
+						 * transition */
+						continue;
 					if (tmpvap->iv_state == IEEE80211_S_RUN)
 						nrunning++;
 					else if (tmpvap->iv_state == IEEE80211_S_SCAN ||
@@ -1596,7 +1602,14 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 			} else if (!nscanning && nrunning) {
 				/* when no one is scanning but someone is running, bypass
 				 * scan and go to run state immediately */
-				__ieee80211_newstate(vap, IEEE80211_S_RUN, arg);
+				if (vap->iv_opmode == IEEE80211_M_MONITOR ||
+				    vap->iv_opmode == IEEE80211_M_WDS ||
+				    vap->iv_opmode == IEEE80211_M_HOSTAP) {
+					__ieee80211_newstate(vap, IEEE80211_S_RUN, arg);
+				} else {
+					/* MW: avoid invalid S_INIT -> S_RUN transition */
+					__ieee80211_newstate(vap, nstate, arg);
+				}
 			} else if (nscanning && !nrunning) {
 				/* when someone is scanning and no one is running, set
 				 * the scan pending flag. Don't go through state machine */
