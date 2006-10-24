@@ -1,0 +1,97 @@
+                DadWifi (d80211 Atheros Driver for WiFi)
+
+
+
+* Introduction
+
+DadWifi is a port of the MadWifi driver to the d80211 wireless networking stack.
+The d80211 stack is the next generation 802.11 stack for Linux.  DadWifi uses
+the device support layer from MadWifi (the 'ath' layer) and ties it to the
+d80211 stack.  That is, where MadWifi uses the BSD-based net80211 stack, DadWifi
+uses the Linux d80211 stack.  DadWifi reuses a large amount of code from
+MadWifi.
+
+
+* Status
+
+This driver is in the early stages of development so should be considered
+unstable.  Do not use it for applications where you cannot tolerate an
+occasional crash or loss in connectivity. 
+
+What is working:
+
+- station (client) mode
+- monitor (wireless sniffer) mode
+
+See the 'Development' section below for details on what is still being worked
+on.
+
+
+* Obtaining DadWifi
+
+To obtain the latest DadWifi development tree via anonymous subversion:
+
+svn checkout --username anonymous --password anonymous \
+	https://svn.devicescape.org/dav/dadwifi/trunk dadwifi
+
+
+* Using DadWifi
+
+This driver requires a recent wireless-dev git development tree.  We track
+changes in John Linville's tree.  To clone John Linville's tree using Cogito: 
+
+cg-clone git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-dev.git
+
+Build, install and boot that kernel. Be sure to enable the d80211 wireless
+stack, CONFIG_D80211.
+
+The dadwifi source can then be built by simply invoking make:
+
+$ make
+
+to install it (as root) :
+
+# make install
+# modprobe 80211 rate_control ath_pci
+
+
+* Development
+
+DadWifi has a mailing list, see:
+
+http://lists.devicescape.org/mailman/listinfo/dadwifi-devel
+
+for information about the list.
+
+
+Here is a list of tasks which are still to be completed:
+
+  - rate control : This driver currently uses the simple rate control algorithm
+    provided by the d80211 stack.  MadWifi provides three rate control
+    algorithms which may yield better performance.  At least one should be
+    ported to use the d80211 rate control API.
+  - hardware queues : We currently only use a single hardware queue.  In order
+    to support prioritization (WME etc.) of traffic we should use multiple
+    queues.
+  - hardware encryption : Hardware encryption is currently disabled.
+  - AP mode : Various features required by AP mode are currently disabled.
+  - multicast : The multicast filter is currently disabled.
+  - extra tx descriptor : It looks like the hal provides an interface to send
+    retries at a pre-determined set of rates.  We can set, at least for the
+    simple case of probing to higher rates using the alt_retry_rate field of
+    the struct ieee80211_tx_control.
+  - slot time : We are currently ignoring cofiguration of the slot time. The
+    d80211 stack config() handler should be changed to configure the slot time.
+  - skb fragments: The driver currently does not support fragmented skb's.  See
+    the 'fraglist' member in struct ieee80211_hw for details.  We should support
+    more than one skb per frame.
+  - Atheros SOC support (if_ath_ahb) is currently missing.  This requires
+    some small changes to ath/if_ath_ahb.c along the same lines as the changes to
+    ath/if_ath_pci.c.
+
+Here is a list of features which we do not plan on working on:
+
+  - Super G, super G fast frames, super G compression, dynamic turbo and XR :
+    This are all Atheros-specific and for the most part the same functionality
+    will be available once we have 802.11n support.  
+
