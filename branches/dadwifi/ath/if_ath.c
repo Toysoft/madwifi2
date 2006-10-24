@@ -75,7 +75,6 @@
 #include <net80211/if_llc.h>
 #endif
 
-#define	AR_DEBUG
 
 #ifdef CONFIG_NET80211
 #include "if_athrate.h"
@@ -96,6 +95,7 @@
 #include "ath_tx99.h"
 #endif
 #include "if_ath_d80211.h"	
+#include "if_ath.h"	
 
 /* unaligned little endian access */
 #define LE_READ_2(p)							\
@@ -338,7 +338,7 @@ MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
 MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
 
-static int	ath_debug = 0;
+int	ath_debug = 0;
 #ifdef AR_DEBUG
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
 MODULE_PARM(ath_debug, "i");
@@ -351,43 +351,12 @@ MODULE_PARM_DESC(ath_debug, "Load-time debug output enable");
 	((sc->sc_debug & _m))
 static void ath_printrxbuf(struct ath_buf *, int);
 static void ath_printtxbuf(struct ath_buf *, int);
-enum {
-	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
-	ATH_DEBUG_XMIT_DESC	= 0x00000002,	/* xmit descriptors */
-	ATH_DEBUG_RECV		= 0x00000004,	/* basic recv operation */
-	ATH_DEBUG_RECV_DESC	= 0x00000008,	/* recv descriptors */
-	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
-	ATH_DEBUG_RESET		= 0x00000020,	/* reset processing */
-	/* 0x00000040 was ATH_DEBUG_MODE */
-	ATH_DEBUG_BEACON 	= 0x00000080,	/* beacon handling */
-	ATH_DEBUG_WATCHDOG 	= 0x00000100,	/* watchdog timeout */
-	ATH_DEBUG_INTR		= 0x00001000,	/* ISR */
-	ATH_DEBUG_TX_PROC	= 0x00002000,	/* tx ISR proc */
-	ATH_DEBUG_RX_PROC	= 0x00004000,	/* rx ISR proc */
-	ATH_DEBUG_BEACON_PROC	= 0x00008000,	/* beacon ISR proc */
-	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
-	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
-	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
-	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
-	ATH_DEBUG_LED		= 0x00100000,	/* led management */
-	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
-	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamice turbo */
-	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
-	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
-	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
-	ATH_DEBUG_ANY		= 0xffffffff
-};
-#define	DPRINTF(sc, _m, _fmt, ...) do {				\
-	if (sc->sc_debug & (_m))				\
-		printk(_fmt, __VA_ARGS__);			\
-} while (0)
 #define	KEYPRINTF(sc, ix, hk, mac) do {				\
 	if (sc->sc_debug & ATH_DEBUG_KEYCACHE)			\
 		ath_keyprint(__func__, ix, hk, mac);		\
 } while (0)
 #else /* defined(AR_DEBUG) */
 #define	IFF_DUMPPKTS(sc, _m)	netif_msg_dumppkts(&sc->sc_ic)
-#define	DPRINTF(sc, _m, _fmt, ...)
 #define	KEYPRINTF(sc, k, ix, mac)
 #endif /* defined(AR_DEBUG) */
 
