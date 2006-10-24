@@ -48,9 +48,9 @@ DEPTH=	.
 
 include $(obj)/Makefile.inc
 
-DIRS_MODULES = $(ATH) $(ATH_RATE) $(WLAN)
+DIRS_MODULES = $(ATH)
 
-obj-y := ath/ $(ATH_RATE)/ net80211/
+obj-y := ath/
 
 all: modules tools
 
@@ -189,4 +189,10 @@ endif
 	    exit 1; \
 	fi
 	
+	@if [ -z "$(CONFIG_D80211)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable the d80211 wireless stack."; \
+	    exit 1; \
+	fi
+
 	@echo "ok."

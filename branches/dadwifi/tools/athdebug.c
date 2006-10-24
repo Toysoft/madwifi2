@@ -38,7 +38,7 @@
 
 /*
  * athdebug [-i interface] flags
- * (default interface is wifi0).
+ * (default interface is wmaster0).
  */
 #include <sys/types.h>
 #include <sys/file.h>
@@ -183,7 +183,7 @@ int
 main(int argc, char *argv[])
 {
 #ifdef __linux__
-	const char *ifname = "wifi0";
+	const char *ifname = "wmaster0";
 #else
 	const char *ifname = "ath0";
 #endif
