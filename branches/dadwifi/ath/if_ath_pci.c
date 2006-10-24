@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * Copyright (c) 2004-2005 Atheros Communications, Inc.
+ * Copyright (c) 2006 Devicescape Software, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -56,8 +57,13 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
+#ifdef CONFIG_NET80211
 #include "if_media.h"
 #include <net80211/ieee80211_var.h>
+#else
+#include <net/d80211.h> 
+#include "if_ath_d80211.h"
+#endif
 
 #include "if_athvar.h"
 #include "if_ath_pci.h"
@@ -176,12 +182,19 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bad1;
 	}
 
+#ifdef CONFIG_NET80211
 	dev = alloc_netdev(sizeof(struct ath_pci_softc), "wifi%d", ether_setup);
+#else
+	dev = ieee80211_alloc_hw(sizeof(struct ath_pci_softc), NULL);
+#endif
 	if (dev == NULL) {
 		printk(KERN_ERR "ath_pci: no memory for device state\n");
 		goto bad2;
 	}
-	sc = dev->priv;
+	sc = ATH_GET_SOFTC(dev);
+#ifndef CONFIG_NET80211
+	ath_d80211_init_softc(&sc->aps_sc);
+#endif
 	sc->aps_sc.sc_dev = dev;
 
 	/*
@@ -263,7 +276,7 @@ ath_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	ath_suspend(dev);
-	PCI_SAVE_STATE(pdev, ((struct ath_pci_softc *)dev->priv)->aps_pmstate);
+	PCI_SAVE_STATE(pdev, ATH_GET_SOFTC(dev)->aps_pmstate);
 	pci_disable_device(pdev);
 	return pci_set_power_state(pdev, PCI_D3hot);
 }
@@ -280,7 +293,7 @@ ath_pci_resume(struct pci_dev *pdev)
 		return err;
 
 	/* XXX - Should this return nonzero on fail? */
-	PCI_RESTORE_STATE(pdev,	((struct ath_pci_softc *)dev->priv)->aps_pmstate);
+	PCI_RESTORE_STATE(pdev,	ATH_GET_SOFTC(dev)->aps_pmstate);
 
 	err = pci_enable_device(pdev);
 	if (err)

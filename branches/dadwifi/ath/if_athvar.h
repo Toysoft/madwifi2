@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2006 Devicescape Software, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,7 +45,45 @@
 
 #include "ah.h"
 #include "if_athioctl.h"
+#ifdef CONFIG_NET80211
 #include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
+#define ATH_GET_SOFTC(dev) dev->priv
+#define ATH_START_QUEUE(dev) netif_start_queue(dev)
+#define ATH_STOP_QUEUE(dev) netif_stop_queue(dev)
+#else
+
+#include <sys/queue.h>
+#include <net/d80211.h>
+
+
+#define HAL_MAX_MODES	5
+
+#define IEEE80211_ADDR_LEN	ETH_ALEN
+#define WME_NUM_AC		4	/* 4 AC categories */
+#define	WME_AC_VO	3		/* voice */
+#define IEEE80211_MAX_LEN	2500
+#define ATHDESC_HEADER_SIZE	32
+
+/* WME stream classes */
+#define	WME_AC_BE	0		/* best effort */
+#define	WME_AC_BK	1		/* background */
+#define	WME_AC_VI	2		/* video */
+#define	WME_AC_VO	3		/* voice */
+
+enum ieee80211_phytype {
+	IEEE80211_T_DS,			/* direct sequence spread spectrum */
+	IEEE80211_T_FH,			/* frequency hopping */
+	IEEE80211_T_OFDM,		/* frequency division multiplexing */
+	IEEE80211_T_TURBO,		/* high rate OFDM, aka turbo mode */
+};
+#define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
+
+#define	IEEE80211_CHAN_MAX	255
+
+#define ATH_GET_SOFTC(dev) ieee80211_dev_hw_data(dev)
+#define ATH_START_QUEUE(dev) ieee80211_start_queues(dev)
+#define ATH_STOP_QUEUE(dev) ieee80211_stop_queues(dev)
+#endif
 
 /*
  * Deduce if tasklets are available.  If not then
@@ -274,7 +313,9 @@ typedef STAILQ_HEAD(, ath_buf) ath_bufhead;
 
 /* driver-specific node state */
 struct ath_node {
+#ifdef CONFIG_NET80211
 	struct ieee80211_node an_node;		/* base class */
+#endif
 	u_int16_t an_decomp_index; 		/* decompression mask index */
 	u_int32_t an_avgrssi;			/* average rssi over all rx frames */
 	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
@@ -340,6 +381,9 @@ struct ath_buf {
 	u_int16_t bf_flags;			/* tx descriptor flags */
 	dma_addr_t bf_skbaddrff[ATH_TXDESC-1]; 	/* extra addrs for ff */
 #endif
+#ifndef CONFIG_NET80211
+	struct ieee80211_tx_control control;	/* copy of control from stack */
+#endif
 };
 
 /*
@@ -403,11 +447,15 @@ struct ath_txq {
 
 /* driver-specific vap state */
 struct ath_vap {
+#ifdef CONFIG_NET80211
 	struct ieee80211vap av_vap;	/* base class */
 	int (*av_newstate)(struct ieee80211vap *, enum ieee80211_state, int);
+#endif
 	/* XXX beacon state */
 	struct ath_buf *av_bcbuf;	/* beacon buffer */
+#ifdef CONFIG_NET80211
 	struct ieee80211_beacon_offsets av_boff;/* dynamic update state */
+#endif
 	int av_bslot;			/* beacon slot index */
 	struct ath_txq av_mcastq;	/* multicast transmit queue */
 	u_int8_t	av_dfswait_run;
@@ -470,7 +518,9 @@ struct ath_vap {
 #define	BSTUCK_THRESH	3	/* # of stuck beacons before resetting NB: this is a guess*/
 
 struct ath_softc {
+#ifdef CONFIG_NET80211
 	struct ieee80211com sc_ic;		/* NB: must be first */
+#endif
 	struct net_device *sc_dev;
 	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
@@ -518,13 +568,17 @@ struct ath_softc {
 			sc_dfstest:1,		/* Test timer in progress */
 		        sc_ackrate:1;           /* send acks at high bitrate */
 	/* rate tables */
-	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
+	const HAL_RATE_TABLE *sc_rates[HAL_MAX_MODES];
 	const HAL_RATE_TABLE *sc_currates;	/* current rate table */
 	const HAL_RATE_TABLE *sc_xr_rates;	/* XR rate table */
 	const HAL_RATE_TABLE *sc_half_rates;	/* half rate table */
 	const HAL_RATE_TABLE *sc_quarter_rates;	/* quarter rate table */
 	HAL_OPMODE sc_opmode;			/* current hal operating mode */
+#ifdef CONFIG_NET80211
 	enum ieee80211_phymode sc_curmode;	/* current phy mode */
+#else
+	int			sc_mode;	/* current ieee80211 phy mode */
+#endif
 	u_int16_t sc_curtxpow;			/* current tx power limit */
 	u_int16_t sc_curaid;			/* current association id */
 	HAL_CHANNEL sc_curchan;			/* current h/w channel */
@@ -635,6 +689,23 @@ struct ath_softc {
 	u_int32_t sc_dturbo_bw_turbo;		/* bandwidth threshold */
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
+  
+#ifndef CONFIG_NET80211
+#define ATH_MAX_HW_MODES	5
+#define ATH_MAX_CHANNELS	64
+#define ATH_MAX_RATES		16	
+	struct ieee80211_hw		hw_conf;
+	struct ieee80211_hw_modes	hw_modes[ATH_MAX_HW_MODES];
+	struct ieee80211_channel	channels[ATH_MAX_HW_MODES *
+	       					 ATH_MAX_CHANNELS];
+	struct ieee80211_rate		rates[ATH_MAX_HW_MODES * ATH_MAX_RATES];
+	int				sc_ieee80211_channel;
+	int				sc_dev_open;
+	spinlock_t			sc_bss_lock;
+	int				sc_bss_count;
+	int				sc_num_bss_if_ids;
+	int				*sc_bss_if_ids;
+#endif
 };
 
 typedef void (*ath_callback) (struct ath_softc *);

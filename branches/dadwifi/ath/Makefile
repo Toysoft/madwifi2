@@ -57,7 +57,7 @@ endif
 include $(obj)/$(DEPTH)/Makefile.inc
 
 obj-m		+= ath_$(BUSNAME).o ath_hal.o
-ath_$(BUSNAME)-objs	:= if_ath.o if_ath_$(BUSNAME).o
+ath_$(BUSNAME)-objs	:= if_ath_d80211.o if_ath.o if_ath_$(BUSNAME).o
 ath_hal-objs	:= ah_osdep.o $(TARGET).hal.o
 
 hostprogs-y	:= uudecode

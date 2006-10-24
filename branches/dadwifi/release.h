@@ -35,8 +35,9 @@
  *
  * $Id$
  */
+#include "svnversion.h"
 
-#define	RELEASE_TYPE	"RELEASE"
+#define	RELEASE_TYPE	"ALPHA"
 
 #ifdef SVNVERSION
 #define RELEASE_VERSION	SVNVERSION

@@ -47,8 +47,7 @@ endif
 INCS=  -include $(DEPTH)/include/compat.h
 
 
-ALL=	athstats 80211stats athkey athchans athctrl \
-	athdebug 80211debug wlanconfig
+ALL=	athdebug
 
 all:	$(ALL)
 
