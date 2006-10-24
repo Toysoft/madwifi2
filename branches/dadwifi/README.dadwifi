@@ -31,8 +31,7 @@ on.
 
 To obtain the latest DadWifi development tree via anonymous subversion:
 
-svn checkout --username anonymous --password anonymous \
-	https://svn.devicescape.org/dav/dadwifi/trunk dadwifi
+svn co http://svn.madwifi.org/branches/dadwifi
 
 
 * Using DadWifi
@@ -56,13 +55,6 @@ to install it (as root) :
 
 
 * Development
-
-DadWifi has a mailing list, see:
-
-http://lists.devicescape.org/mailman/listinfo/dadwifi-devel
-
-for information about the list.
-
 
 Here is a list of tasks which are still to be completed:
 
