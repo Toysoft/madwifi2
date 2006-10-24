@@ -1507,7 +1507,7 @@ ieee80211_ioctl_siwscan(struct net_device *dev,	struct iw_request_info *info,
 	 * changes to the infrastructure.
 	 */
 	if (!IS_UP(vap->iv_dev))
-		return -EINVAL;		/* XXX */
+		return -ENETDOWN;	/* XXX */
 	/* XXX always manual... */
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 		"%s: active scan request\n", __func__);
