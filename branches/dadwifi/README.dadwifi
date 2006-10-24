@@ -80,6 +80,8 @@ Here is a list of tasks which are still to be completed:
   - Atheros SOC support (if_ath_ahb) is currently missing.  This requires
     some small changes to ath/if_ath_ahb.c along the same lines as the changes to
     ath/if_ath_pci.c.
+  - Turbo modes : hostapd does not currently support turbo modes for the Devicescape
+    stack.  Turbo modes are disabled in dadwifi until that is fixed.
 
 Here is a list of features which we do not plan on working on:
 

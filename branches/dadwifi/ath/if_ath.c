@@ -534,8 +534,11 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ath_rate_setup(dev, HAL_MODE_11A);
 	ath_rate_setup(dev, HAL_MODE_11B);
 	ath_rate_setup(dev, HAL_MODE_11G);
+#if 0
+	/* FIXME: hostapd does not support turbo modes. */
 	ath_rate_setup(dev, HAL_MODE_108A);
 	ath_rate_setup(dev, HAL_MODE_108G);
+#endif
 #if 0
 	/* Setup for half/quarter rates */
 	ath_setup_subrates(dev);
@@ -8905,8 +8908,11 @@ ath_getchannels(struct net_device *dev, u_int cc,
 	ath_d80211_add_channels(dev, MODE_IEEE80211A, chans, nchan, CHANNEL_A);
 	ath_d80211_add_channels(dev, MODE_IEEE80211B, chans, nchan, CHANNEL_B);
 	ath_d80211_add_channels(dev, MODE_IEEE80211G, chans, nchan, CHANNEL_G);
+#if 0
+	/* FIXME: hostapd does not support turbo modes. */
 	ath_d80211_add_channels(dev, MODE_ATHEROS_TURBO, chans, nchan, CHANNEL_108A);
 	ath_d80211_add_channels(dev, MODE_ATHEROS_TURBOG, chans, nchan, CHANNEL_108G);
+#endif
 #endif
 	kfree(chans);
 	return 0;
