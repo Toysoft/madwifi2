@@ -451,7 +451,9 @@ ath_d80211_config_interface(struct net_device *dev, int if_id,
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
-	ath_hal_setassocid(ah, conf->bssid, 0 /* FIXME: aid */);
+	if (conf->bssid)
+		ath_hal_setassocid(ah, conf->bssid, 0 /* FIXME: aid */);
+
 	return ath_reset(dev);
 }
 
