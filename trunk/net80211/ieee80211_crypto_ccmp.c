@@ -299,8 +299,7 @@ xor_block(u8 *b, const u8 *a, size_t len)
 static void
 rijndael_encrypt(struct crypto_tfm *tfm, const void *src, void *dst)
 {
-/* FIXME: check for Linux 2.6.19 or newer once it's released */
-#ifdef CRYPTO_ALG_ASYNC
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 	crypto_cipher_encrypt_one(tfm, dst, src);
 #else
 	struct scatterlist sg_src;
