@@ -111,14 +111,21 @@ ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 	}
 
 	if (i == sc->hw_conf.num_modes) {
-		printk(KERN_ERR "cannot find mode element.\n");
-		return -1;
+		if (sc->hw_conf.num_modes == ATH_MAX_HW_MODES) { 
+			DPRINTF(sc, ATH_DEBUG_ANY,
+				"%s: no free mode elements\n", __func__);
+			return -1;
+		}
+		mode = &sc->hw_modes[sc->hw_conf.num_modes];
+		mode->mode = hw_mode;
+		sc->hw_conf.num_modes++;
+	} else {
+		mode = &sc->hw_modes[i];
 	}
-	
+
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_chan %x hal_flags %x\n", __func__,
 		hal_nchan, hal_flags);
 
-	mode = &sc->hw_modes[i];
 	mode->num_channels = 0;
 
 	for (i = 0; i < hal_nchan; i++) {
@@ -637,16 +644,7 @@ ath_d80211_init_softc(struct ath_softc *sc)
 		hw->modes[i].channels = &sc->channels[i * ATH_MAX_CHANNELS];
 		hw->modes[i].num_rates = 0;
 		hw->modes[i].rates = &sc->rates[i * ATH_MAX_RATES];
-		hw->num_modes++;
 	}
-
-	BUG_ON(ATH_MAX_HW_MODES < 5);
-
-	hw->modes[0].mode = MODE_IEEE80211A;
-	hw->modes[1].mode = MODE_IEEE80211B;
-	hw->modes[2].mode = MODE_ATHEROS_TURBO;
-	hw->modes[3].mode = MODE_IEEE80211G;
-	hw->modes[4].mode = MODE_ATHEROS_TURBOG;
 
 	sc->sc_opmode = HAL_M_STA;
 
