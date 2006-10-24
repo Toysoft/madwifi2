@@ -114,6 +114,9 @@ ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 		printk(KERN_ERR "cannot find mode element.\n");
 		return -1;
 	}
+	
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_chan %x hal_flags %x\n", __func__,
+		hal_nchan, hal_flags);
 
 	mode = &sc->hw_modes[i];
 	mode->num_channels = 0;
@@ -181,6 +184,8 @@ ath_d80211_rate_setup(struct net_device *dev, u_int hal_mode,
 		return -1;
 	}
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_mode %x\n", __func__, hal_mode);
+
 	mode = &sc->hw_modes[i];
 	mode->num_rates = 0;
 	rates = mode->rates;
@@ -236,6 +241,8 @@ ath_d80211_open(struct net_device *dev)
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	int rv;
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
 	rv = ath_init(dev);
 
 	if (rv == 0)
@@ -249,6 +256,8 @@ static int
 ath_d80211_stop(struct net_device *dev)
 {
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
 	sc->sc_dev_open = 0;
 
@@ -301,6 +310,8 @@ ath_d80211_add_interface(struct net_device *dev,
 {
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	int reset;
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
 	switch (conf->type) {
 	case IEEE80211_IF_TYPE_STA:
@@ -364,6 +375,8 @@ ath_d80211_remove_interface(struct net_device *dev,
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	int i;
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
 	switch (conf->type) {
 	case IEEE80211_IF_TYPE_AP:
 
@@ -404,6 +417,8 @@ ath_d80211_config(struct net_device *dev, struct ieee80211_conf *conf)
 	HAL_CHANNEL hchan;
 	int ret;
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
 	sc->sc_ieee80211_channel = conf->channel;
 	sc->sc_mode = conf->phymode;
 
@@ -427,6 +442,8 @@ ath_d80211_config_interface(struct net_device *dev, int if_id,
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	struct ath_hal *ah = sc->sc_ah;
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
 	ath_hal_setassocid(ah, conf->bssid, 0 /* FIXME: aid */);
 	return ath_reset(dev);
 }
@@ -436,6 +453,9 @@ static int
 ath_d80211_set_key(struct net_device *dev, set_key_cmd cmd, u8 * addr,
 		   struct ieee80211_key_conf *key, int aid)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -445,6 +465,9 @@ static int
 ath_d80211_passive_scan(struct net_device *dev, int state,
 			struct ieee80211_scan_conf *conf)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -454,6 +477,9 @@ static int
 ath_d80211_get_stats(struct net_device *dev,
 		     struct ieee80211_low_level_stats *stats)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -462,6 +488,9 @@ ath_d80211_get_stats(struct net_device *dev,
 static int
 ath_d80211_test_mode(struct net_device *dev, int mode)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -470,6 +499,9 @@ ath_d80211_test_mode(struct net_device *dev, int mode)
 static int
 ath_d80211_test_param(struct net_device *dev, int param, int value)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -478,6 +510,9 @@ ath_d80211_test_param(struct net_device *dev, int param, int value)
 static void
 ath_d80211_sta_table_notification(struct net_device *dev, int num_sta)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 }
 
@@ -486,6 +521,9 @@ static int
 ath_d80211_conf_tx(struct net_device *dev, int queue,
 		   const struct ieee80211_tx_queue_params *params)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -495,6 +533,9 @@ static int
 ath_d80211_get_tx_stats(struct net_device *dev,
 			struct ieee80211_tx_queue_stats *stats)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -506,6 +547,8 @@ ath_d80211_get_tsf(struct net_device *dev)
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
 	return ath_hal_gettsf64(ah);
 }
 
@@ -516,6 +559,8 @@ ath_d80211_reset_tsf(struct net_device *dev)
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
 	ath_hal_resettsf(ah);
 }
 
@@ -524,6 +569,9 @@ static int
 ath_d80211_beacon_update(struct net_device *dev, struct sk_buff *skb,
 			 struct ieee80211_tx_control *control)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -532,6 +580,9 @@ ath_d80211_beacon_update(struct net_device *dev, struct sk_buff *skb,
 static int
 ath_d80211_tx_last_beacon(struct net_device *dev)
 {
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 	/* FIXME */
 	return 0;
 }
@@ -575,6 +626,8 @@ ath_d80211_init_softc(struct ath_softc *sc)
 	struct ieee80211_hw *hw = &sc->hw_conf;
 	int i;
 
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
 	memcpy(hw, &ath_d80211_hw, sizeof(ath_d80211_hw));
 
 	hw->modes = &sc->hw_modes[0];
@@ -606,6 +659,8 @@ ath_d80211_attach(struct net_device *dev)
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	struct ieee80211_hw *hw = &sc->hw_conf;
 	int rv = 0;
+
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
 	rv = ieee80211_register_hw(dev, hw);
 	if (rv) {

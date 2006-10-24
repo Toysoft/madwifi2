@@ -46,4 +46,43 @@ int ath_reset(struct net_device *dev);
 int ath_d80211_tx(struct net_device *dev, struct sk_buff *skb,
 		  struct ieee80211_tx_control *control);
 
+#define	AR_DEBUG
+
+extern int	ath_debug;
+#ifdef AR_DEBUG
+enum {
+	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
+	ATH_DEBUG_XMIT_DESC	= 0x00000002,	/* xmit descriptors */
+	ATH_DEBUG_RECV		= 0x00000004,	/* basic recv operation */
+	ATH_DEBUG_RECV_DESC	= 0x00000008,	/* recv descriptors */
+	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
+	ATH_DEBUG_RESET		= 0x00000020,	/* reset processing */
+	/* 0x00000040 was ATH_DEBUG_MODE */
+	ATH_DEBUG_BEACON 	= 0x00000080,	/* beacon handling */
+	ATH_DEBUG_WATCHDOG 	= 0x00000100,	/* watchdog timeout */
+	ATH_DEBUG_INTR		= 0x00001000,	/* ISR */
+	ATH_DEBUG_TX_PROC	= 0x00002000,	/* tx ISR proc */
+	ATH_DEBUG_RX_PROC	= 0x00004000,	/* rx ISR proc */
+	ATH_DEBUG_BEACON_PROC	= 0x00008000,	/* beacon ISR proc */
+	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
+	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
+	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
+	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
+	ATH_DEBUG_LED		= 0x00100000,	/* led management */
+	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
+	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamice turbo */
+	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
+	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
+	ATH_DEBUG_D80211	= 0x02000000,	/* d80211 interface */
+	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
+	ATH_DEBUG_ANY		= 0xffffffff
+};
+#define	DPRINTF(sc, _m, _fmt, ...) do {				\
+	if (sc->sc_debug & (_m))				\
+		printk(_fmt, __VA_ARGS__);			\
+} while (0)
+#else /* defined(AR_DEBUG) */
+#define	DPRINTF(sc, _m, _fmt, ...)
+#endif /* defined(AR_DEBUG) */
+
 #endif /* _IF_ATH_H_ */
