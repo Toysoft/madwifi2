@@ -7303,6 +7303,23 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 				ATH_NODE_UAPSD_UNLOCK_IRQ(an);
 			}
 		}
+
+		{
+			struct ieee80211_frame *wh = (struct ieee80211_frame *)bf->bf_skb->data;
+			if ((ds->ds_txstat.ts_seqnum << IEEE80211_SEQ_SEQ_SHIFT) & ~IEEE80211_SEQ_SEQ_MASK) {
+				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: h/w assigned sequence number is not sane (%d), ignoring it\n", __func__,
+				        ds->ds_txstat.ts_seqnum);
+			} else {
+				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: updating frame's sequence number from %d to %d\n", __func__, 
+				        (le16toh(*(u_int16_t *)&wh->i_seq[0]) & IEEE80211_SEQ_SEQ_MASK) >> IEEE80211_SEQ_SEQ_SHIFT,
+				        ds->ds_txstat.ts_seqnum);
+
+				*(u_int16_t *)&wh->i_seq[0] = htole16(
+					ds->ds_txstat.ts_seqnum << IEEE80211_SEQ_SEQ_SHIFT |
+					(le16toh(*(u_int16_t *)&wh->i_seq[0]) & ~IEEE80211_SEQ_SEQ_MASK));
+			}
+		}
+
 #ifdef ATH_SUPERG_FF
 		{
 			struct sk_buff *skbfree, *skb = bf->bf_skb;
