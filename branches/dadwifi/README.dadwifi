@@ -66,7 +66,12 @@ CFLAGS += -D_LINUX_TYPES_H
 
 * Development
 
-Here is a list of tasks which are still to be completed:
+See the madwifi ticket system for open tickets in the 'dadwifi'
+component.
+
+We would gradually like to get known issues and tasks out of this file
+and into the ticket system.  Here is a list of tasks which are still
+to be completed which are not reflected in the ticket system:
 
   - rate control : This driver currently uses the simple rate control algorithm
     provided by the d80211 stack.  MadWifi provides three rate control
@@ -88,7 +93,6 @@ Here is a list of tasks which are still to be completed:
         having a hard-coded 4 allocated
   - We need to put logic into add_interface which prohibit unsupported
     configurations.
-  - IBSS mode: IBSS mode is untested and IBSS beacon sending is disabled
   - multicast : The multicast filter is currently disabled.
   - extra tx descriptor : It looks like the hal provides an interface to send
     retries at a pre-determined set of rates.  We can set, at least for the
