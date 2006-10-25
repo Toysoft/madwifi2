@@ -105,22 +105,22 @@ ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 	struct ieee80211_hw_modes *mode;
 	int i;
 
-	for (i = 0; i < sc->hw_conf.num_modes ; i++) {
-		if (sc->hw_modes[i].mode == hw_mode)
+	for (i = 0; i < sc->sc_hw_conf.num_modes ; i++) {
+		if (sc->sc_hw_modes[i].mode == hw_mode)
 			break;
 	}
 
-	if (i == sc->hw_conf.num_modes) {
-		if (sc->hw_conf.num_modes == ATH_MAX_HW_MODES) { 
+	if (i == sc->sc_hw_conf.num_modes) {
+		if (sc->sc_hw_conf.num_modes == ATH_MAX_HW_MODES) { 
 			DPRINTF(sc, ATH_DEBUG_ANY,
 				"%s: no free mode elements\n", __func__);
 			return -1;
 		}
-		mode = &sc->hw_modes[sc->hw_conf.num_modes];
+		mode = &sc->sc_hw_modes[sc->sc_hw_conf.num_modes];
 		mode->mode = hw_mode;
-		sc->hw_conf.num_modes++;
+		sc->sc_hw_conf.num_modes++;
 	} else {
-		mode = &sc->hw_modes[i];
+		mode = &sc->sc_hw_modes[i];
 	}
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_chan %x hal_flags %x\n", __func__,
@@ -181,19 +181,19 @@ ath_d80211_rate_setup(struct net_device *dev, u_int hal_mode,
 
 	hw_mode = ath_hal_mode_to_d80211_mode(hal_mode);
 
-	for (i = 0; i < sc->hw_conf.num_modes ; i++) {
-		if (sc->hw_modes[i].mode == hw_mode)
+	for (i = 0; i < sc->sc_hw_conf.num_modes ; i++) {
+		if (sc->sc_hw_modes[i].mode == hw_mode)
 			break;
 	}
 
-	if (i == sc->hw_conf.num_modes) {
+	if (i == sc->sc_hw_conf.num_modes) {
 		printk(KERN_ERR "cannot find mode element.\n");
 		return -1;
 	}
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_mode %x\n", __func__, hal_mode);
 
-	mode = &sc->hw_modes[i];
+	mode = &sc->sc_hw_modes[i];
 	mode->num_rates = 0;
 	rates = mode->rates;
 
@@ -655,20 +655,20 @@ static struct ieee80211_hw ath_d80211_hw = {
 void
 ath_d80211_init_softc(struct ath_softc *sc)
 {
-	struct ieee80211_hw *hw = &sc->hw_conf;
+	struct ieee80211_hw *hw = &sc->sc_hw_conf;
 	int i;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
 	memcpy(hw, &ath_d80211_hw, sizeof(ath_d80211_hw));
 
-	hw->modes = &sc->hw_modes[0];
+	hw->modes = &sc->sc_hw_modes[0];
 
 	for (i = 0; i < ATH_MAX_HW_MODES; i++) {
 		hw->modes[i].num_channels = 0;
-		hw->modes[i].channels = &sc->channels[i * ATH_MAX_CHANNELS];
+		hw->modes[i].channels = &sc->sc_channels[i * ATH_MAX_CHANNELS];
 		hw->modes[i].num_rates = 0;
-		hw->modes[i].rates = &sc->rates[i * ATH_MAX_RATES];
+		hw->modes[i].rates = &sc->sc_ieee80211_rates[i * ATH_MAX_RATES];
 	}
 
 	sc->sc_opmode = HAL_M_STA;
@@ -680,7 +680,7 @@ int
 ath_d80211_attach(struct net_device *dev)
 {
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-	struct ieee80211_hw *hw = &sc->hw_conf;
+	struct ieee80211_hw *hw = &sc->sc_hw_conf;
 	int rv = 0;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
