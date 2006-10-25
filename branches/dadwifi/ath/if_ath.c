@@ -124,7 +124,9 @@ static void ath_fatal_tasklet(TQUEUE_ARG);
 static void ath_rxorn_tasklet(TQUEUE_ARG);
 #if 0
 static void ath_bmiss_tasklet(TQUEUE_ARG);
+#endif
 static void ath_bstuck_tasklet(TQUEUE_ARG);
+#if 0
 static void ath_radar_task(TQUEUE_ARG);
 static void ath_dfs_test_return(unsigned long);
 
@@ -147,8 +149,11 @@ static void ath_mode_init(struct net_device *);
 #if 0
 static void ath_setslottime(struct ath_softc *);
 static void ath_updateslot(struct net_device *);
+#endif
 static int ath_beaconq_setup(struct ath_hal *);
+#if 0
 static int ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
+#endif
 #ifdef ATH_SUPERG_DYNTURBO
 static void ath_beacon_dturbo_update(struct ieee80211vap *, int *, u_int8_t);
 static void ath_beacon_dturbo_config(struct ieee80211vap *, u_int32_t);
@@ -156,11 +161,12 @@ static void ath_turbo_switch_mode(unsigned long);
 static int ath_check_beacon_done(struct ath_softc *);
 #endif
 static void ath_beacon_send(struct ath_softc *, int *);
+#if 0
 static void ath_beacon_start_adhoc(struct ath_softc *, struct ieee80211vap *);
 static void ath_beacon_return(struct ath_softc *, struct ath_buf *);
-static void ath_beacon_free(struct ath_softc *);
-static void ath_beacon_config(struct ath_softc *, struct ieee80211vap *);
 #endif
+static void ath_beacon_free(struct ath_softc *);
+static void ath_beacon_config(struct ath_softc *);
 static int ath_desc_alloc(struct ath_softc *);
 static void ath_desc_free(struct ath_softc *);
 #if 0
@@ -422,8 +428,8 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 #if 0
 	ATH_INIT_TQUEUE(&sc->sc_txtq,	 ath_tx_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq, ath_bmiss_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_bstucktq,ath_bstuck_tasklet,	dev);
 #endif
+	ATH_INIT_TQUEUE(&sc->sc_bstucktq,ath_bstuck_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	dev);
 #if 0
@@ -563,6 +569,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * depends on queue setup.
 	 */
 	ic->ic_caps = 0;
+#endif
 
 	/*
 	 * Allocate hardware transmit queues: one queue for
@@ -586,6 +593,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		error = EIO;
 		goto bad2;
 	}
+#if 0
 	/* NB: ensure BK queue is the lowest priority h/w queue */
 	if (!ath_tx_setup(sc, WME_AC_BK, HAL_WME_AC_BK)) {
 		printk(KERN_ERR "%s: unable to setup xmit queue for %s traffic!\n",
@@ -1041,6 +1049,7 @@ ath_detach(struct net_device *dev)
 #endif /* CONFIG_SYSCTL */
 	ATH_LOCK_DESTROY(sc);
 	dev->stop = NULL; /* prevent calling ath_stop again */
+	ath_d80211_detach(dev);
 #ifdef CONFIG_NET80211
 	unregister_netdev(dev);
 #endif
@@ -1713,9 +1722,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 * this is too slow to meet timing constraints
 			 * under load.
 			 */
-#if 0
 			ath_beacon_send(sc, &needmark);
-#endif
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -2081,9 +2088,7 @@ ath_stop_locked(struct net_device *dev)
 			ath_hal_phydisable(ah);
 		} else
 			sc->sc_rxlink = NULL;
-#if 0
 		ath_beacon_free(sc);		/* XXX needed? */
-#endif
 	}
 	if (sc->sc_softled)
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
@@ -2251,10 +2256,8 @@ ath_reset(struct net_device *dev)
 	 * might change as a result.
 	 */
 	ath_chan_change(sc, &sc->sc_curchan);
-#if 0
 	if (sc->sc_beacons)
-		ath_beacon_config(sc, NULL);	/* restart beacons */
-#endif
+		ath_beacon_config(sc);	/* restart beacons */
 	ath_hal_intrset(ah, sc->sc_imask);
 	ath_set_ack_bitrate(sc, sc->sc_ackrate);
 	netif_wake_queue(dev);		/* restart xmit */
@@ -3869,6 +3872,7 @@ ath_turbo_switch_mode(unsigned long data)
 	/* XXX ieee80211_reset_erp? */
 }
 #endif /* ATH_SUPERG_DYNTURBO */
+#endif
 
 /*
  * Setup a h/w transmit queue for beacons.
@@ -3896,12 +3900,14 @@ static int
 ath_beaconq_config(struct ath_softc *sc)
 {
 #define	ATH_EXPONENT_TO_VALUE(v)	((1<<v)-1)
+#ifdef CONFIG_NET80211
 	struct ieee80211com *ic = &sc->sc_ic;
+#endif
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_TXQ_INFO qi;
 
 	ath_hal_gettxqueueprops(ah, sc->sc_bhalq, &qi);
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+	if (sc->sc_opmode == HAL_M_HOSTAP) {
 		/*
 		 * Always burst out beacon and CAB traffic.
 		 */
@@ -3909,6 +3915,7 @@ ath_beaconq_config(struct ath_softc *sc)
 		qi.tqi_cwmin = 0;
 		qi.tqi_cwmax = 0;
 	} else {
+#if 0
 		struct wmeParams *wmep =
 			&ic->ic_wme.wme_chanParams.cap_wmeParams[WME_AC_BE];
 		/*
@@ -3917,6 +3924,7 @@ ath_beaconq_config(struct ath_softc *sc)
 		qi.tqi_aifs = wmep->wmep_aifsn;
 		qi.tqi_cwmin = 2 * ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmin);
 		qi.tqi_cwmax = ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmax);
+#endif
 	}
 
 	if (!ath_hal_settxqueueprops(ah, sc->sc_bhalq, &qi)) {
@@ -3930,6 +3938,7 @@ ath_beaconq_config(struct ath_softc *sc)
 #undef ATH_EXPONENT_TO_VALUE
 }
 
+#ifdef CONFIG_NET80211
 /*
  * Allocate and setup an initial beacon frame.
  *
@@ -4009,18 +4018,22 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 
 	return 0;
 }
+#endif
 
 /*
  * Setup the beacon frame for transmit.
  */
 static void
-ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
+ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
+		 struct ieee80211_tx_control *control)
 {
+#if 0
 #define	USE_SHPREAMBLE(_ic) \
 	(((_ic)->ic_flags & (IEEE80211_F_SHPREAMBLE | IEEE80211_F_USEBARKER))\
 		== IEEE80211_F_SHPREAMBLE)
 	struct ieee80211_node *ni = bf->bf_node;
 	struct ieee80211com *ic = ni->ni_ic;
+#endif
 	struct sk_buff *skb = bf->bf_skb;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
@@ -4030,6 +4043,8 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	u_int8_t rix, rate;
 	int ctsrate = 0;
 	int ctsduration = 0;
+	int hdrlen;
+	int power;
 
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: m %p len %u\n",
 		__func__, skb, skb->len);
@@ -4043,7 +4058,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		flags |= HAL_TXDESC_INTREQ;
 #endif
 
-	if (ic->ic_opmode == IEEE80211_M_IBSS && sc->sc_hasveol) {
+	if (sc->sc_opmode == HAL_M_IBSS && sc->sc_hasveol) {
 		ds->ds_link = bf->bf_daddr;	/* self-linked */
 		flags |= HAL_TXDESC_VEOL;
 		/*
@@ -4072,9 +4087,15 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	 */
 	rix = sc->sc_minrateix;
 	rt = sc->sc_currates;
+#ifdef CONFIG_NET80211
 	rate = rt->info[rix].rateCode;
+#else
+	rate = control->tx_rate;
+#endif
+#if 0
 	if (USE_SHPREAMBLE(ic))
 		rate |= rt->info[rix].shortPreamble;
+#endif
 #ifdef ATH_SUPERG_XR
 	if (bf->bf_node->ni_vap->iv_flags & IEEE80211_F_XR) {
 		u_int8_t cix;
@@ -4092,11 +4113,21 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		rate = rt->info[IEEE80211_XR_DEFAULT_RATE_INDEX].rateCode;
 	}
 #endif
+
+#ifdef CONFIG_NET80211
+	hdrlen = sizeof(struct ieee80211_frame);
+	power = ni->ni_txpower;
+#else
+	hdrlen = ieee80211_get_hdrlen_from_skb(skb);
+	/* FIXME : what unit does the hal need power is? */
+	power = control->power_level > 60 ? 60 : control->power_level;
+#endif
+
 	ath_hal_setuptxdesc(ah, ds
 		, skb->len + IEEE80211_CRC_LEN	/* frame length */
-		, sizeof(struct ieee80211_frame)	/* header length */
+		, hdrlen			/* header length */
 		, HAL_PKT_TYPE_BEACON		/* Atheros packet type */
-		, ni->ni_txpower		/* txpower XXX */
+		, power				/* txpower XXX */
 		, rate, 1			/* series 0 rate/tries */
 		, HAL_TXKEYIX_INVALID		/* no encryption */
 		, antenna			/* antenna mode */
@@ -4127,13 +4158,24 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
  * Generate beacon frame and queue cab data for a vap.
  */
 static struct ath_buf *
+#ifdef CONFIG_NET80211
 ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmark)
+#else
+ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
+#endif
 {
+#ifdef CONFIG_NET80211
 	struct ath_hal *ah = sc->sc_ah;
-	struct ath_buf *bf;
 	struct ieee80211_node *ni;
 	struct ath_vap *avp;
+#else
+	struct net_device *dev = sc->sc_dev;
+	struct ath_buf *bf;
+#endif
 	struct sk_buff *skb;
+	struct ieee80211_tx_control control;
+
+#ifdef CONFIG_NET80211
 	int ncabq;
 	unsigned int curlen;
 
@@ -4142,6 +4184,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 			__func__, ieee80211_state_name[vap->iv_state]);
 		return NULL;
 	}
+#endif
 #ifdef ATH_SUPERG_XR
 	if (vap->iv_flags & IEEE80211_F_XR) {
 		vap->iv_xrbcnwait++;
@@ -4151,6 +4194,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		vap->iv_xrbcnwait = 0;
 	}
 #endif
+#ifdef CONFIG_NET80211
 	avp = ATH_VAP(vap);
 	if (avp->av_bcbuf == NULL) {
 		DPRINTF(sc, ATH_DEBUG_ANY, "%s: avp=%p av_bcbuf=%p\n",
@@ -4160,6 +4204,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	bf = avp->av_bcbuf;
 	ni = bf->bf_node;
 
+#endif
 #ifdef ATH_SUPERG_DYNTURBO
 	/* 
 	 * If we are using dynamic turbo, update the
@@ -4173,6 +4218,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		ath_beacon_dturbo_update(vap, needmark, dtim);
 	}
 #endif
+#ifdef CONFIG_NET80211
 	/*
 	 * Update dynamic beacon contents.  If this returns
 	 * non-zero then we need to remap the memory because
@@ -4188,7 +4234,36 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 			skb->data, skb->len, BUS_DMA_TODEVICE);
 	}
+#else
+	if (bss->ab_bcbuf == NULL) {
+		bss->ab_bcbuf = STAILQ_FIRST(&sc->sc_bbuf);
+		if (!bss->ab_bcbuf) {
+			DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: no buffers\n",
+				__func__);
+			return NULL;
+		}
+		STAILQ_REMOVE_HEAD(&sc->sc_bbuf, bf_list);
+	}
 
+	bf = bss->ab_bcbuf;
+
+	memset(&control, 0, sizeof(control));
+	skb = ieee80211_beacon_get(dev, bss->ab_if_id, &control);
+	if (!skb) {
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: failed to get beacon for if_id %d\n", __func__,
+		       	bss->ab_if_id);
+		return NULL;
+	}
+
+	dev_kfree_skb(bf->bf_skb);
+
+	bf->bf_skb = skb;
+
+	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
+		skb->data, skb->len, BUS_DMA_TODEVICE);
+#endif
+#if 0
 	/*
 	 * if the CABQ traffic from previous DTIM is pending and the current
 	 * beacon is also a DTIM. 
@@ -4204,15 +4279,17 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 				"%s: flush previous cabq traffic\n", __func__);
 		}
 	}
+#endif
 
 	/*
 	 * Construct tx descriptor.
 	 */
-	ath_beacon_setup(sc, bf);
+	ath_beacon_setup(sc, bf, &control);
 
 	bus_dma_sync_single(sc->sc_bdev,
 		bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 
+#if 0
 	/*
 	 * Enable the CAB queue before the beacon queue to
 	 * ensure cab frames are triggered by this beacon.
@@ -4245,6 +4322,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		ATH_TXQ_UNLOCK(cabq);
 		ATH_TXQ_UNLOCK(&avp->av_mcastq);
 	}
+#endif
 
 	return bf;
 }
@@ -4260,9 +4338,15 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 #define	TSF_TO_TU(_h,_l) \
 	((((u_int32_t)(_h)) << 22) | (((u_int32_t)(_l)) >> 10))
 	struct ath_hal *ah = sc->sc_ah;
+#ifdef CONFIG_NET80211
 	struct ieee80211vap *vap;
+#else
+	int i;
+#endif
 	struct ath_buf *bf;
+#if 0
 	int slot;
+#endif
 	u_int32_t bfaddr;
 
 	/*
@@ -4293,6 +4377,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		sc->sc_bmisscount = 0;
 	}
 
+#ifdef CONFIG_NET80211
 	/*
 	 * Generate beacon frames.  If we are sending frames
 	 * staggered then calculate the slot for this frame based
@@ -4342,7 +4427,36 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		}
 		*bflink = 0;			/* link of last frame */
 	}
+#else
+	{
+		u_int32_t *bflink;
 
+		bflink = &bfaddr;
+
+		spin_lock(&sc->sc_bss_lock);
+
+		for (i = 0; i < sc->sc_num_bss; i++) {
+
+			bf = ath_beacon_generate(sc, &sc->sc_bss[i]);
+
+			if (bf != NULL) {
+#ifdef AH_NEED_DESC_SWAP
+				if (bflink != &bfaddr)
+					*bflink = cpu_to_le32(bf->bf_daddr);
+				else
+					*bflink = bf->bf_daddr;
+#else
+				*bflink = bf->bf_daddr;
+#endif
+				bflink = &bf->bf_desc->ds_link;
+			}
+		}
+		*bflink = 0;			/* link of last frame */
+		spin_unlock(&sc->sc_bss_lock);
+	}
+
+#endif
+#if 0
 	/*
 	 * Handle slot time change when a non-ERP station joins/leaves
 	 * an 11g network.  The 802.11 layer notifies us via callback,
@@ -4365,7 +4479,9 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		sc->sc_slotupdate = slot;
 	} else if (sc->sc_updateslot == COMMIT && sc->sc_slotupdate == slot)
 		ath_setslottime(sc);		/* commit change to hardware */
+#endif
 
+#if 0
 	if ((!sc->sc_stagbeacons || slot == 0) && (!sc->sc_diversity)) {
 		int otherant;
 		/*
@@ -4385,6 +4501,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		}
 		sc->sc_ant_tx[1] = sc->sc_ant_tx[2] = 0;
 	}
+#endif
 
 	if (bfaddr != 0) {
 		/*
@@ -4428,6 +4545,7 @@ ath_bstuck_tasklet(TQUEUE_ARG data)
 	ath_reset(dev);
 }
 
+#if 0
 /*
  * Startup beacon transmission for adhoc mode when
  * they are sent entirely by the hardware using the
@@ -4479,7 +4597,9 @@ ath_beacon_start_adhoc(struct ath_softc *sc, struct ieee80211vap *vap)
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: TXDP%u = %llx (%p)\n", __func__,
 		sc->sc_bhalq, ito64(bf->bf_daddr), bf->bf_desc);
 }
+#endif
 
+#if 0
 /*
  * Reclaim beacon resources and return buffer to the pool.
  */
@@ -4498,6 +4618,7 @@ ath_beacon_return(struct ath_softc *sc, struct ath_buf *bf)
 	}
 	STAILQ_INSERT_TAIL(&sc->sc_bbuf, bf, bf_list);
 }
+#endif
 
 /*
  * Reclaim all beacon resources.
@@ -4514,10 +4635,12 @@ ath_beacon_free(struct ath_softc *sc)
 			dev_kfree_skb(bf->bf_skb);
 			bf->bf_skb = NULL;
 		}
+#ifdef CONFIG_NET80211
 		if (bf->bf_node != NULL) {
 			ieee80211_free_node(bf->bf_node);
 			bf->bf_node = NULL;
 		}
+#endif
 	}
 }
 
@@ -4537,8 +4660,13 @@ ath_beacon_free(struct ath_softc *sc)
  * we've associated with.
  */
 static void
+#if 0
 ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
+#else
+ath_beacon_config(struct ath_softc *sc)
+#endif
 {
+#if 0
 #define	TSF_TO_TU(_h,_l) \
 	((((u_int32_t)(_h)) << 22) | (((u_int32_t)(_l)) >> 10))
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -4720,8 +4848,30 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	}
 	sc->sc_syncbeacon = 0;
 #undef TSF_TO_TU
-}
+#else
+	struct ath_hal *ah = sc->sc_ah;
+	u_int32_t nexttbtt, intval;
+
+	ath_hal_intrset(ah, 0);
+	intval = sc->sc_beacon_interval;
+
+	nexttbtt = intval; /* for ap mode */
+
+	intval |= HAL_BEACON_RESET_TSF;
+
+	/*
+	 * In AP mode we enable the beacon timers and
+	 * SWBA interrupts to prepare beacon frames.
+	 */
+	intval |= HAL_BEACON_ENA;
+	sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
+	ath_beaconq_config(sc);
+	ath_hal_beaconinit(ah, nexttbtt, intval);
+	sc->sc_bmisscount = 0;
+	ath_hal_intrset(ah, sc->sc_imask);
+
 #endif
+}
 
 static int
 ath_descdma_setup(struct ath_softc *sc,
@@ -9995,8 +10145,10 @@ ath_announce(struct net_device *dev)
 		}
 		printk("%s: Use hw queue %u for CAB traffic\n", dev->name,
 			sc->sc_cabq->axq_qnum);
+#endif
 		printk("%s: Use hw queue %u for beacons\n", dev->name,
 			sc->sc_bhalq);
+#if 0
 	}
 #endif
 #undef HAL_MODE_DUALBAND

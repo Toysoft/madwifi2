@@ -58,6 +58,7 @@
 
 #define HAL_MAX_MODES	5
 
+#define IEEE80211_CRC_LEN	FCS_LEN
 #define IEEE80211_ADDR_LEN	ETH_ALEN
 #define WME_NUM_AC		4	/* 4 AC categories */
 #define	WME_AC_VO	3		/* voice */
@@ -462,6 +463,12 @@ struct ath_vap {
 };
 #define	ATH_VAP(_v)	((struct ath_vap *)(_v))
 
+/* ath_bss includes per BSS information used by AP mode */
+struct ath_bss {
+	int ab_if_id;			/* if_id from ieee80211_if_init_conf */
+	struct ath_buf *ab_bcbuf;	/* beacon buffer */
+};
+
 #define	ATH_BEACON_AIFS_DEFAULT		0  /* Default aifs for ap beacon q */
 #define	ATH_BEACON_CWMIN_DEFAULT	0  /* Default cwmin for ap beacon q */
 #define	ATH_BEACON_CWMAX_DEFAULT	0  /* Default cwmax for ap beacon q */
@@ -701,10 +708,11 @@ struct ath_softc {
 	struct ieee80211_rate		rates[ATH_MAX_HW_MODES * ATH_MAX_RATES];
 	int				sc_ieee80211_channel;
 	int				sc_dev_open;
-	spinlock_t			sc_bss_lock;
-	int				sc_bss_count;
-	int				sc_num_bss_if_ids;
-	int				*sc_bss_if_ids;
+	int sc_num_alloced_bss;		/* total # of elements in sc_bss */
+	spinlock_t sc_bss_lock;		/* for access to sc_num_bss, sc_bss */
+	int sc_num_bss;			/* # of used elements in sc_bss */
+	struct ath_bss *sc_bss;		/* array of per bss info */
+	int sc_beacon_interval;		/* beacon interval in units of TU */
 #endif
 };
 

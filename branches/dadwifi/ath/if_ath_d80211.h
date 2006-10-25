@@ -43,6 +43,7 @@
 
 void ath_d80211_init_softc(struct ath_softc *sc);
 int ath_d80211_attach(struct net_device *dev);
+void ath_d80211_detach(struct net_device *dev);
 int ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 			    HAL_CHANNEL *hal_chans, int hal_nchan,
 			    int hal_flags);
