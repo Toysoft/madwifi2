@@ -275,7 +275,9 @@ ath_d80211_stop(struct net_device *dev)
 /**
  * ath_d80211_calc_bssid_mask - Calculate the required BSSID mask.
  * @mdev: master device in question
- * 
+ *
+ * Note: Caller must hold ATH_LOCK
+ *
  * Returns 1 if the bssidmask changed otherwise returns 0.
  */
 static int
@@ -288,10 +290,8 @@ ath_d80211_calc_bssid_mask(struct net_device *mdev)
 
 	memset(mask, 0xff, ETH_ALEN);
 
-	spin_lock_bh(&sc->sc_bss_lock);
-
-	for (i = 0; i < sc->sc_bss_count; i++) {
-		dev = dev_get_by_index(sc->sc_bss_if_ids[i]);
+	for (i = 0; i < sc->sc_num_bss; i++) {
+		dev = dev_get_by_index(sc->sc_bss[i].ab_if_id);
 
 		for (j = 0; j < ETH_ALEN; j++) {
 			mask[j] &= ~(mdev->dev_addr[j] ^ dev->dev_addr[j]);
@@ -299,8 +299,6 @@ ath_d80211_calc_bssid_mask(struct net_device *mdev)
 
 		dev_put(dev);
 	}
-
-	spin_unlock_bh(&sc->sc_bss_lock);
 
 	if (memcmp(sc->sc_bssidmask, mask, ETH_ALEN)) {
 		memcpy(sc->sc_bssidmask, mask, ETH_ALEN);
@@ -316,9 +314,13 @@ ath_d80211_add_interface(struct net_device *dev,
 			 struct ieee80211_if_init_conf *conf)
 {
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	unsigned long flags;
+	int error = 0;
 	int reset;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
+	ATH_LOCK(sc);
 
 	switch (conf->type) {
 	case IEEE80211_IF_TYPE_STA:
@@ -332,46 +334,58 @@ ath_d80211_add_interface(struct net_device *dev,
 		break;
 	case IEEE80211_IF_TYPE_AP:
 
-		spin_lock_bh(&sc->sc_bss_lock);
+		if (sc->sc_num_alloced_bss < sc->sc_num_bss + 1) {
+			struct ath_bss *bss;
 
-		if (sc->sc_num_bss_if_ids < sc->sc_bss_count + 1) {
-			int *ids;
+			bss = kzalloc((sc->sc_num_bss + 1) * sizeof(bss[0]),
+				      GFP_KERNEL);
 
-			ids = kmalloc((sc->sc_num_bss_if_ids + 1) *
-				      sizeof(ids[0]), GFP_KERNEL);
-
-			if (!ids) {
-				spin_unlock_bh(&sc->sc_bss_lock);
-				return -ENOMEM;
+			if (!bss) {
+				error = -ENOMEM;
+				goto done;
 			}
 
-			sc->sc_num_bss_if_ids++;
-			memcpy(ids, sc->sc_bss_if_ids,
-			       sc->sc_bss_count * sizeof(ids[0]));
-		
-			kfree(sc->sc_bss_if_ids);
-			sc->sc_bss_if_ids = ids;
+			spin_lock_irqsave(&sc->sc_bss_lock, flags);
+
+			memcpy(bss, sc->sc_bss,
+			       sc->sc_num_bss * sizeof(bss[0]));
+			kfree(sc->sc_bss);
+			sc->sc_bss = bss;
+			sc->sc_bss[sc->sc_num_bss].ab_if_id = conf->if_id;
+			/* FIXME: Allocate ab_bcbuf here. */
+			sc->sc_num_bss++;
+
+			spin_unlock_irqrestore(&sc->sc_bss_lock, flags);
+
+			sc->sc_num_alloced_bss++;
+
+		} else {
+
+			spin_lock_irqsave(&sc->sc_bss_lock, flags);
+
+			sc->sc_bss[sc->sc_num_bss].ab_if_id = conf->if_id;
+			sc->sc_num_bss++;
+
+			spin_unlock_irqrestore(&sc->sc_bss_lock, flags);
+
 		}
 
-		sc->sc_bss_if_ids[sc->sc_bss_count] = conf->if_id;
-		sc->sc_bss_count++;
-		
-		spin_unlock_bh(&sc->sc_bss_lock);
-
 		sc->sc_opmode = HAL_M_HOSTAP;
-
+		sc->sc_beacons = 1;
 		break;
 	default:
-		return -EINVAL;
-		break;
+		error = -EINVAL;
+		goto done;
 	}
 
 	reset = ath_d80211_calc_bssid_mask(dev);
 
 	if (reset)
-		return ath_reset(dev);
+		error = ath_reset(dev);
 
-	return 0;
+done:
+	ATH_UNLOCK(sc);
+	return error;
 }
 
 
@@ -380,39 +394,47 @@ ath_d80211_remove_interface(struct net_device *dev,
 			    struct ieee80211_if_init_conf *conf)
 {
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	unsigned long flags;
 	int i;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
+	ATH_LOCK(sc);
+
 	switch (conf->type) {
 	case IEEE80211_IF_TYPE_AP:
 
-		spin_lock_bh(&sc->sc_bss_lock);
-
-		for (i = 0; i < sc->sc_bss_count; i++) {
-			if (sc->sc_bss_if_ids[i] == conf->if_id)
+		for (i = 0; i < sc->sc_num_bss; i++) {
+			if (sc->sc_bss[i].ab_if_id == conf->if_id)
 				break;
 		}
 
-		if (i == sc->sc_bss_count) {
+		if (i == sc->sc_num_bss) {
 			printk(KERN_ERR "%s: remove cannot find if_id %d\n",
 			       dev->name, conf->if_id);
-			spin_unlock_bh(&sc->sc_bss_lock);
-			return;
+			goto done;
 		}
 
-		memmove(&sc->sc_bss_if_ids[i], &sc->sc_bss_if_ids[i+1],
-			(sc->sc_bss_count - i - 1) * sizeof(sc->sc_bss_if_ids[0]));
+		spin_lock_irqsave(&sc->sc_bss_lock, flags);
 
-		sc->sc_bss_count--;
+		memmove(&sc->sc_bss[i], &sc->sc_bss[i+1],
+			(sc->sc_num_bss - i - 1) * sizeof(sc->sc_bss[0]));
+		sc->sc_num_bss--;
 
-		spin_unlock_bh(&sc->sc_bss_lock);
+		spin_unlock_irqrestore(&sc->sc_bss_lock, flags);
 
 		break;
 	}
 
+	if (sc->sc_num_bss == 0)
+		sc->sc_beacons = 0;
+
+
 	if (ath_d80211_calc_bssid_mask(dev))
 		ath_reset(dev);
+
+done:
+	ATH_UNLOCK(sc);
 }
 
 
@@ -428,6 +450,7 @@ ath_d80211_config(struct net_device *dev, struct ieee80211_conf *conf)
 
 	sc->sc_ieee80211_channel = conf->channel;
 	sc->sc_mode = conf->phymode;
+	sc->sc_beacon_interval = (conf->beacon_int * 1000) >> 10;
 
 	if (!sc->sc_dev_open || !conf->radio_enabled)
 		return 0;
@@ -669,4 +692,10 @@ ath_d80211_attach(struct net_device *dev)
 	return rv;
 }
 
+void
+ath_d80211_detach(struct net_device *dev)
+{
+	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 
+	kfree(sc->sc_bss);
+}

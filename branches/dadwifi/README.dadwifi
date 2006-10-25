@@ -53,6 +53,16 @@ to install it (as root) :
 # make install
 # modprobe 80211 rate_control ath_pci
 
+For AP mode a recent hostapd development snapshot is required.  hostapd-0.5.5
+is known to work.  You must configure hostapd to include the Devicescape
+driver. In hostapd's build configuration (.config) add the following lines
+(adjust to match the location of your wireless-dev tree) :
+
+CONFIG_DRIVER_DEVICESCAPE=y
+WIRELESS_DEV=/usr/src/wireless-dev
+CFLAGS += -I$(WIRELESS_DEV)/include
+CFLAGS += -I$(WIRELESS_DEV)/net/d80211
+CFLAGS += -D_LINUX_TYPES_H
 
 * Development
 
@@ -66,7 +76,19 @@ Here is a list of tasks which are still to be completed:
     to support prioritization (WME etc.) of traffic we should use multiple
     queues.
   - hardware encryption : Hardware encryption is currently disabled.
-  - AP mode : Various features required by AP mode are currently disabled.
+  - AP mode : Various features required by AP mode are currently disabled
+    including:
+      - cab queue handling
+      - staggared beacons: Support for staggared beacons is currently
+        disabled.  We need to decide if we want to support staggared beacons
+        before doing anything about it.
+      - short preamble
+      - we should reclaim beacon resources when a bss is removed 
+      - should allocated beacon descriptors dynamically with new bss's rather than
+        having a hard-coded 4 allocated
+  - We need to put logic into add_interface which prohibit unsupported
+    configurations.
+  - IBSS mode: IBSS mode is untested and IBSS beacon sending is disabled
   - multicast : The multicast filter is currently disabled.
   - extra tx descriptor : It looks like the hal provides an interface to send
     retries at a pre-determined set of rates.  We can set, at least for the
@@ -82,6 +104,8 @@ Here is a list of tasks which are still to be completed:
     ath/if_ath_pci.c.
   - Turbo modes : hostapd does not currently support turbo modes for the Devicescape
     stack.  Turbo modes are disabled in dadwifi until that is fixed.
+  - tx power control : tx power control handling needs to be looked at.  I don't
+    know what the unit is for the power argument to ath_hal_setuptxdesc().
 
 Here is a list of features which we do not plan on working on:
 
