@@ -1672,7 +1672,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
  * Interrupt handler.  Most of the actual processing is deferred.
  */
 irqreturn_t
-ath_intr(int irq, void *dev_id, struct pt_regs *regs)
+ath_intr(int irq, void *dev_id)
 {
 	struct net_device *dev = dev_id;
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
