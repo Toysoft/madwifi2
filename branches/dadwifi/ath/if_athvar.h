@@ -701,13 +701,14 @@ struct ath_softc {
 #define ATH_MAX_HW_MODES	5
 #define ATH_MAX_CHANNELS	64
 #define ATH_MAX_RATES		16	
-	struct ieee80211_hw		hw_conf;
-	struct ieee80211_hw_modes	hw_modes[ATH_MAX_HW_MODES];
-	struct ieee80211_channel	channels[ATH_MAX_HW_MODES *
-	       					 ATH_MAX_CHANNELS];
-	struct ieee80211_rate		rates[ATH_MAX_HW_MODES * ATH_MAX_RATES];
-	int				sc_ieee80211_channel;
-	int				sc_dev_open;
+	struct ieee80211_hw sc_hw_conf;
+	struct ieee80211_hw_modes sc_hw_modes[ATH_MAX_HW_MODES];
+	struct ieee80211_channel sc_channels[ATH_MAX_HW_MODES *
+					     ATH_MAX_CHANNELS];
+	struct ieee80211_rate sc_ieee80211_rates[ATH_MAX_HW_MODES *
+						 ATH_MAX_RATES];
+	int sc_ieee80211_channel;
+	int sc_dev_open;
 	int sc_num_alloced_bss;		/* total # of elements in sc_bss */
 	spinlock_t sc_bss_lock;		/* for access to sc_num_bss, sc_bss */
 	int sc_num_bss;			/* # of used elements in sc_bss */
