@@ -482,18 +482,6 @@ ath_d80211_config_interface(struct net_device *dev, int if_id,
 
 
 static int
-ath_d80211_set_key(struct net_device *dev, set_key_cmd cmd, u8 * addr,
-		   struct ieee80211_key_conf *key, int aid)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static int
 ath_d80211_passive_scan(struct net_device *dev, int state,
 			struct ieee80211_scan_conf *conf)
 {
@@ -637,7 +625,6 @@ static struct ieee80211_hw ath_d80211_hw = {
 	.remove_interface = ath_d80211_remove_interface,
 	.config = ath_d80211_config,
 	.config_interface = ath_d80211_config_interface,
-	.set_key = ath_d80211_set_key,
 	.passive_scan = ath_d80211_passive_scan,
 	.get_stats = ath_d80211_get_stats,
 	.test_mode = ath_d80211_test_mode,
