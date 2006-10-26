@@ -117,9 +117,7 @@ static struct ieee80211vap *ath_vap_create(struct ieee80211com *,
 	const char *, int, int, int, struct net_device *);
 static void ath_vap_delete(struct ieee80211vap *);
 #endif
-int ath_init(struct net_device *);
 static int ath_set_ack_bitrate(struct ath_softc *, int);
-int ath_reset(struct net_device *);
 static void ath_fatal_tasklet(TQUEUE_ARG);
 static void ath_rxorn_tasklet(TQUEUE_ARG);
 #if 0
@@ -132,7 +130,6 @@ static void ath_dfs_test_return(unsigned long);
 
 #endif
 static int ath_stop_locked(struct net_device *);
-int ath_stop(struct net_device *);
 #if 0
 #if 0
 static void ath_initkeytable(struct ath_softc *);
@@ -216,7 +213,6 @@ static void ath_tx_tasklet(TQUEUE_ARG);
 static void ath_tx_timeout(struct net_device *);
 #endif
 static void ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
-int ath_chan_set(struct ath_softc *, HAL_CHANNEL);
 static void ath_draintxq(struct ath_softc *);
 #ifdef CONFIG_NET80211
 static __inline void ath_tx_txqaddbuf(struct ath_softc *, struct ieee80211_node *,
