@@ -9100,7 +9100,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
  * Diagnostic interface to the HAL.  This is used by various
  * tools to do things like retrieve register contents for
  * debugging.  The mechanism is intentionally opaque so that
- * it can change frequently w/o concern for compatiblity.
+ * it can change frequently w/o concern for compatibility.
  */
 static int
 ath_ioctl_diag(struct ath_softc *sc, struct ath_diag *ad)
