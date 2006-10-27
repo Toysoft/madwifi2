@@ -80,6 +80,7 @@ enum {
 	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
 	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
+	ATH_DEBUG_D80211        = 0x02000000,   /* d80211 interface */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
 
@@ -111,6 +112,7 @@ static struct {
 	{ "uapsd",	ATH_DEBUG_UAPSD, "WME/UAPSD handling" },
 	{ "doth",	ATH_DEBUG_DOTH, "802.11h handling" },
 	{ "fatal",	ATH_DEBUG_FATAL, "fatal errors" },
+	{ "d80211",	ATH_DEBUG_D80211, "d80211 interface" },
 };
 
 static u_int
