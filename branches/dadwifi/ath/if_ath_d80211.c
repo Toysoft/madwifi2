@@ -106,6 +106,7 @@ ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_hw_modes *mode;
+	int error = 0;
 	int i;
 
 	for (i = 0; i < sc->sc_hw_conf.num_modes ; i++) {
@@ -120,16 +121,11 @@ ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 			return -1;
 		}
 		mode = &sc->sc_hw_modes[sc->sc_hw_conf.num_modes];
-		mode->mode = hw_mode;
-		sc->sc_hw_conf.num_modes++;
 	} else {
-		mode = &sc->sc_hw_modes[i];
+		DPRINTF(sc, ATH_DEBUG_ANY,
+			"%s: mode %d already initialized\n", __func__, hw_mode);
+		return -1;
 	}
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_chan %x hal_flags %x\n", __func__,
-		hal_nchan, hal_flags);
-
-	mode->num_channels = 0;
 
 	for (i = 0; i < hal_nchan; i++) {
 		HAL_CHANNEL *c = &hal_chans[i];
@@ -139,7 +135,8 @@ ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 		
 			if (mode->num_channels == ATH_MAX_CHANNELS) {
 				printk(KERN_ERR "channel list truncated\n");
-				return -1;
+				error = -E2BIG;
+				goto done;
 			}
 
 			channel = &mode->channels[mode->num_channels];
@@ -158,7 +155,15 @@ ath_d80211_add_channels(struct net_device *dev, int hw_mode,
 		}
 	}
 
-	return 0;
+done:
+	if (mode->num_channels != 0) {
+		DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_chan %x hal_flags %x\n", __func__,
+			hal_nchan, hal_flags);
+		mode->mode = hw_mode;
+		sc->sc_hw_conf.num_modes++;
+	}
+
+	return error;
 }	
 
 
