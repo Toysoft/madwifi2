@@ -3580,25 +3580,24 @@ ath_mode_init(struct net_device *dev)
 	     __func__, rfilt, mfilt[0], mfilt[1]);
 }
 
-#if 0
 /*
  * Set the slot time based on the current setting.
  */
 static void
 ath_setslottime(struct ath_softc *sc)
 {
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 
 	if (sc->sc_slottimeconf > 0) /* manual override */
 		ath_hal_setslottime(ah, sc->sc_slottimeconf);
-	else if (ic->ic_flags & IEEE80211_F_SHSLOT)
+	else if (sc->sc_shortslottime)
 		ath_hal_setslottime(ah, HAL_SLOT_TIME_9);
 	else
 		ath_hal_setslottime(ah, HAL_SLOT_TIME_20);
 	sc->sc_updateslot = OK;
 }
 
+#if 0
 /*
  * Callback from the 802.11 layer to update the
  * slot time based on the current setting.
@@ -4273,15 +4272,9 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 #define	TSF_TO_TU(_h,_l) \
 	((((u_int32_t)(_h)) << 22) | (((u_int32_t)(_l)) >> 10))
 	struct ath_hal *ah = sc->sc_ah;
-#ifdef CONFIG_NET80211
-	struct ieee80211vap *vap;
-#else
-	int i;
-#endif
 	struct ath_buf *bf;
-#if 0
 	int slot;
-#endif
+
 	u_int32_t bfaddr;
 
 	/*
@@ -4370,9 +4363,9 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 
 		spin_lock(&sc->sc_bss_lock);
 
-		for (i = 0; i < sc->sc_num_bss; i++) {
+		for (slot = 0; slot < sc->sc_num_bss; slot++) {
 
-			bf = ath_beacon_generate(sc, &sc->sc_bss[i]);
+			bf = ath_beacon_generate(sc, &sc->sc_bss[slot]);
 
 			if (bf != NULL) {
 #ifdef AH_NEED_DESC_SWAP
@@ -4391,7 +4384,6 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	}
 
 #endif
-#if 0
 	/*
 	 * Handle slot time change when a non-ERP station joins/leaves
 	 * an 11g network.  The 802.11 layer notifies us via callback,
@@ -4406,7 +4398,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	 *     again.  If we miss a beacon for that slot then we'll be
 	 *     slow to transition but we'll be sure at least one beacon
 	 *     interval has passed.  When bursting slot is always left
-	 *     set to ATH_BCBUF so this check is a noop.
+	 *     set to sc_num_bss so this check is a noop.
 	 */
 	/* XXX locking */
 	if (sc->sc_updateslot == UPDATE) {
@@ -4414,7 +4406,6 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		sc->sc_slotupdate = slot;
 	} else if (sc->sc_updateslot == COMMIT && sc->sc_slotupdate == slot)
 		ath_setslottime(sc);		/* commit change to hardware */
-#endif
 
 #if 0
 	if ((!sc->sc_stagbeacons || slot == 0) && (!sc->sc_diversity)) {
@@ -9651,7 +9642,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
 		if (ret == 0) {
 			switch (ctl->ctl_name) {
-#if 0
 			case ATH_SLOTTIME:
 				if (val > 0) {
 					if (!ath_hal_setslottime(ah, val))
@@ -9664,7 +9654,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 					ath_setslottime(sc);
 				}
 				break;
-#endif
 			case ATH_ACKTIMEOUT:
 				if (!ath_hal_setacktimeout(ah, val))
 					ret = -EINVAL;

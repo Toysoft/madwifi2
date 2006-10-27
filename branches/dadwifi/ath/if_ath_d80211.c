@@ -490,6 +490,11 @@ ath_d80211_config(struct net_device *dev, struct ieee80211_conf *conf)
 	sc->sc_mode = conf->phymode;
 	sc->sc_beacon_interval = (conf->beacon_int * 1000) >> 10;
 
+	if (sc->sc_shortslottime != conf->short_slot_time) {
+		sc->sc_shortslottime = conf->short_slot_time;
+		sc->sc_updateslot = UPDATE;
+	}
+
 	if (!sc->sc_dev_open || !conf->radio_enabled)
 		return 0;
 
