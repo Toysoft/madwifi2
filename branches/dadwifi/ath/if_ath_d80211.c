@@ -393,6 +393,9 @@ ath_d80211_add_interface(struct net_device *dev,
 		} else {
 
 			spin_lock_irqsave(&sc->sc_bss_lock, flags);
+				
+			sc->sc_bss[sc->sc_num_bss].ab_bcbuf = STAILQ_FIRST(&sc->sc_bbuf);
+			STAILQ_REMOVE_HEAD(&sc->sc_bbuf, bf_list);
 
 			sc->sc_bss[sc->sc_num_bss].ab_if_id = conf->if_id;
 			sc->sc_num_bss++;
@@ -448,6 +451,9 @@ ath_d80211_remove_interface(struct net_device *dev,
 		}
 
 		spin_lock_irqsave(&sc->sc_bss_lock, flags);
+			
+		STAILQ_INSERT_TAIL(&sc->sc_bbuf, sc->sc_bss[i].ab_bcbuf,
+				   bf_list);
 
 		memmove(&sc->sc_bss[i], &sc->sc_bss[i+1],
 			(sc->sc_num_bss - i - 1) * sizeof(sc->sc_bss[0]));
