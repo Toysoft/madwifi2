@@ -125,7 +125,7 @@ struct ieee80211com {
 	u_int32_t ic_flags;			/* state flags */
 	u_int32_t ic_flags_ext;			/* extension of state flags */
 	u_int32_t ic_caps;			/* capabilities */
-	u_int8_t ic_ath_cap;			/* Atheros adv. capablities */
+	u_int8_t ic_ath_cap;			/* Atheros adv. capabilities */
 	u_int8_t ic_promisc;			/* vap's needing promisc mode */
 	u_int8_t ic_allmulti;			/* vap's needing all multicast*/
 	u_int8_t ic_nopened;			/* vap's been opened */
@@ -327,7 +327,7 @@ struct ieee80211vap {
 	u_int32_t iv_flags;			/* state flags */
 	u_int32_t iv_flags_ext;			/* extension of state flags */
 	u_int32_t iv_caps;			/* capabilities */
-	u_int8_t iv_ath_cap;			/* Atheros adv. capablities */
+	u_int8_t iv_ath_cap;			/* Atheros adv. capabilities */
 	enum ieee80211_opmode iv_opmode;	/* operation mode */
 	enum ieee80211_state iv_state;		/* state machine state */
 	struct timer_list iv_mgtsend;		/* mgmt frame response timer */
