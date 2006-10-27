@@ -50,6 +50,7 @@
 #include "if_athvar.h"
 #include "if_ath_d80211.h"
 #include "if_ath.h"
+#include "if_ath_pci.h"
 
 #include <net/d80211.h>
 
@@ -320,7 +321,8 @@ ath_d80211_add_interface(struct net_device *dev,
 	int error = 0;
 	int reset;
 
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s: if_id %d, type %d\n", __func__,
+		conf->if_id, conf->type);
 
 	ATH_LOCK(sc);
 
@@ -338,6 +340,10 @@ ath_d80211_add_interface(struct net_device *dev,
 
 		if (sc->sc_num_alloced_bss < sc->sc_num_bss + 1) {
 			struct ath_bss *bss;
+			struct ath_descdma bdma;
+			ath_bufhead bbuf;
+			struct ath_hal *ah = sc->sc_ah;
+			int i;
 
 			bss = kzalloc((sc->sc_num_bss + 1) * sizeof(bss[0]),
 				      GFP_KERNEL);
@@ -347,15 +353,33 @@ ath_d80211_add_interface(struct net_device *dev,
 				goto done;
 			}
 
+			error = ath_descdma_setup(sc, &bdma, &bbuf, "beacon",
+						  sc->sc_num_bss + 1, 1);
+
+			if (error) {
+				kfree(bss);				
+				goto done;
+			}
+
 			spin_lock_irqsave(&sc->sc_bss_lock, flags);
+
+			ath_hal_stoptxdma(ah, sc->sc_bhalq);
+			ath_descdma_cleanup(sc, &sc->sc_bdma, &sc->sc_bbuf,
+					    BUS_DMA_TODEVICE);
+			sc->sc_bdma = bdma;
+			sc->sc_bbuf = bbuf;
 
 			memcpy(bss, sc->sc_bss,
 			       sc->sc_num_bss * sizeof(bss[0]));
 			kfree(sc->sc_bss);
 			sc->sc_bss = bss;
 			sc->sc_bss[sc->sc_num_bss].ab_if_id = conf->if_id;
-			/* FIXME: Allocate ab_bcbuf here. */
 			sc->sc_num_bss++;
+
+			for (i = 0; i < sc->sc_num_bss; i++) {
+				sc->sc_bss[i].ab_bcbuf = STAILQ_FIRST(&sc->sc_bbuf);
+				STAILQ_REMOVE_HEAD(&sc->sc_bbuf, bf_list);
+			}
 
 			spin_unlock_irqrestore(&sc->sc_bss_lock, flags);
 
@@ -399,7 +423,8 @@ ath_d80211_remove_interface(struct net_device *dev,
 	unsigned long flags;
 	int i;
 
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+	DPRINTF(sc, ATH_DEBUG_D80211, "%s: if_id %d, type %d\n", __func__,
+		conf->if_id, conf->type);
 
 	ATH_LOCK(sc);
 

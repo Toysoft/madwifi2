@@ -89,8 +89,6 @@ to be completed which are not reflected in the ticket system:
         before doing anything about it.
       - short preamble
       - we should reclaim beacon resources when a bss is removed 
-      - should allocated beacon descriptors dynamically with new bss's rather than
-        having a hard-coded 4 allocated
   - We need to put logic into add_interface which prohibit unsupported
     configurations.
   - multicast : The multicast filter is currently disabled.

@@ -45,6 +45,10 @@ int ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan);
 int ath_reset(struct net_device *dev);
 int ath_d80211_tx(struct net_device *dev, struct sk_buff *skb,
 		  struct ieee80211_tx_control *control);
+int ath_descdma_setup(struct ath_softc *, struct ath_descdma *, ath_bufhead *,
+		      const char *, int, int);
+void ath_descdma_cleanup(struct ath_softc *, struct ath_descdma *,
+			 ath_bufhead *, int);
 
 #define	AR_DEBUG
 
