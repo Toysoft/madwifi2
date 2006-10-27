@@ -554,7 +554,8 @@ struct ath_softc {
 			sc_rtasksched:1, 	/* radar task is scheduled */
 			sc_dfswait:1,    	/* waiting on channel for radar detect */
 			sc_dfstest:1,		/* Test timer in progress */
-		        sc_ackrate:1;           /* send acks at high bitrate */
+		        sc_ackrate:1,           /* send acks at high bitrate */
+		        sc_shortslottime:1;     /* use short slot time */
 	/* rate tables */
 	const HAL_RATE_TABLE *sc_rates[HAL_MAX_MODES];
 	const HAL_RATE_TABLE *sc_currates;	/* current rate table */
