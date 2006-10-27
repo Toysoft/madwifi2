@@ -276,10 +276,6 @@ static void ath_dynamic_sysctl_register(struct ath_softc *);
 static void ath_dynamic_sysctl_unregister(struct ath_softc *);
 #endif /* CONFIG_SYSCTL */
 static void ath_announce(struct net_device *);
-static int ath_descdma_setup(struct ath_softc *, struct ath_descdma *,
-	ath_bufhead *, const char *, int, int);
-static void ath_descdma_cleanup(struct ath_softc *, struct ath_descdma *,
-	ath_bufhead *, int);
 #if 0
 static void ath_check_dfs_clear(unsigned long);
 #endif
@@ -4156,33 +4152,13 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
  * Generate beacon frame and queue cab data for a vap.
  */
 static struct ath_buf *
-#ifdef CONFIG_NET80211
-ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmark)
-#else
 ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
-#endif
 {
-#ifdef CONFIG_NET80211
-	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211_node *ni;
-	struct ath_vap *avp;
-#else
 	struct net_device *dev = sc->sc_dev;
 	struct ath_buf *bf;
-#endif
 	struct sk_buff *skb;
 	struct ieee80211_tx_control control;
 
-#ifdef CONFIG_NET80211
-	int ncabq;
-	unsigned int curlen;
-
-	if (vap->iv_state != IEEE80211_S_RUN) {
-		DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: skip vap in %s state\n",
-			__func__, ieee80211_state_name[vap->iv_state]);
-		return NULL;
-	}
-#endif
 #ifdef ATH_SUPERG_XR
 	if (vap->iv_flags & IEEE80211_F_XR) {
 		vap->iv_xrbcnwait++;
@@ -4191,17 +4167,6 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 			return NULL;
 		vap->iv_xrbcnwait = 0;
 	}
-#endif
-#ifdef CONFIG_NET80211
-	avp = ATH_VAP(vap);
-	if (avp->av_bcbuf == NULL) {
-		DPRINTF(sc, ATH_DEBUG_ANY, "%s: avp=%p av_bcbuf=%p\n",
-			 __func__, avp, avp->av_bcbuf);
-		return NULL;
-	}
-	bf = avp->av_bcbuf;
-	ni = bf->bf_node;
-
 #endif
 #ifdef ATH_SUPERG_DYNTURBO
 	/* 
@@ -4216,33 +4181,6 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 		ath_beacon_dturbo_update(vap, needmark, dtim);
 	}
 #endif
-#ifdef CONFIG_NET80211
-	/*
-	 * Update dynamic beacon contents.  If this returns
-	 * non-zero then we need to remap the memory because
-	 * the beacon frame changed size (probably because
-	 * of the TIM bitmap).
-	 */
-	skb = bf->bf_skb;
-	curlen = skb->len;
-	ncabq = avp->av_mcastq.axq_depth;
-	if (ieee80211_beacon_update(ni, &avp->av_boff, skb, ncabq)) {
-		bus_unmap_single(sc->sc_bdev,
-			bf->bf_skbaddr, curlen, BUS_DMA_TODEVICE);
-		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
-			skb->data, skb->len, BUS_DMA_TODEVICE);
-	}
-#else
-	if (bss->ab_bcbuf == NULL) {
-		bss->ab_bcbuf = STAILQ_FIRST(&sc->sc_bbuf);
-		if (!bss->ab_bcbuf) {
-			DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: no buffers\n",
-				__func__);
-			return NULL;
-		}
-		STAILQ_REMOVE_HEAD(&sc->sc_bbuf, bf_list);
-	}
-
 	bf = bss->ab_bcbuf;
 
 	memset(&control, 0, sizeof(control));
@@ -4260,7 +4198,6 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 
 	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 		skb->data, skb->len, BUS_DMA_TODEVICE);
-#endif
 #if 0
 	/*
 	 * if the CABQ traffic from previous DTIM is pending and the current
@@ -4633,12 +4570,6 @@ ath_beacon_free(struct ath_softc *sc)
 			dev_kfree_skb(bf->bf_skb);
 			bf->bf_skb = NULL;
 		}
-#ifdef CONFIG_NET80211
-		if (bf->bf_node != NULL) {
-			ieee80211_free_node(bf->bf_node);
-			bf->bf_node = NULL;
-		}
-#endif
 	}
 }
 
@@ -4871,7 +4802,7 @@ ath_beacon_config(struct ath_softc *sc)
 #endif
 }
 
-static int
+int
 ath_descdma_setup(struct ath_softc *sc,
 	struct ath_descdma *dd, ath_bufhead *head,
 	const char *name, int nbuf, int ndesc)
@@ -4926,14 +4857,11 @@ fail:
 #undef DS2PHYS
 }
 
-static void
+void
 ath_descdma_cleanup(struct ath_softc *sc,
 	struct ath_descdma *dd, ath_bufhead *head, int dir)
 {
 	struct ath_buf *bf;
-#if 0
-	struct ieee80211_node *ni;
-#endif
 
 	STAILQ_FOREACH(bf, head, bf_list) {
 		if (bf->bf_skb != NULL) {
@@ -4947,16 +4875,6 @@ ath_descdma_cleanup(struct ath_softc *sc,
 			dev_kfree_skb(bf->bf_skb);
 			bf->bf_skb = NULL;
 		}
-#if 0
-		ni = bf->bf_node;
-		bf->bf_node = NULL;
-		if (ni != NULL) {
-			/*
-			 * Reclaim node reference.
-			 */
-			ieee80211_free_node(ni);
-		}
-#endif
 	}
 
 	/* Free memory associated with descriptors */
@@ -4986,9 +4904,6 @@ ath_desc_alloc(struct ath_softc *sc)
 		return error;
 	}
 
-	/* XXX allocate beacon state together with vap */
-	error = ath_descdma_setup(sc, &sc->sc_bdma, &sc->sc_bbuf,
-			"beacon", ATH_BCBUF, 1);
 	if (error != 0) {
 		ath_descdma_cleanup(sc, &sc->sc_txdma, &sc->sc_txbuf,
 			BUS_DMA_TODEVICE);

@@ -193,8 +193,6 @@ typedef void irqreturn_t;
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	200		/* number of TX buffers */
 
-#define	ATH_BCBUF	4		/* number of beacon buffers */
-
 /* free buffer threshold to restart net dev */
 #define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20) 
 
@@ -446,23 +444,6 @@ struct ath_txq {
         u_int axq_compbufsz;		/* scratch comp buffer size */
 };
 
-/* driver-specific vap state */
-struct ath_vap {
-#ifdef CONFIG_NET80211
-	struct ieee80211vap av_vap;	/* base class */
-	int (*av_newstate)(struct ieee80211vap *, enum ieee80211_state, int);
-#endif
-	/* XXX beacon state */
-	struct ath_buf *av_bcbuf;	/* beacon buffer */
-#ifdef CONFIG_NET80211
-	struct ieee80211_beacon_offsets av_boff;/* dynamic update state */
-#endif
-	int av_bslot;			/* beacon slot index */
-	struct ath_txq av_mcastq;	/* multicast transmit queue */
-	u_int8_t	av_dfswait_run;
-};
-#define	ATH_VAP(_v)	((struct ath_vap *)(_v))
-
 /* ath_bss includes per BSS information used by AP mode */
 struct ath_bss {
 	int ab_if_id;			/* if_id from ieee80211_if_init_conf */
@@ -669,7 +650,6 @@ struct ath_softc {
 		COMMIT				/* beacon sent, commit change */
 	} sc_updateslot;			/* slot time update fsm */
 	int sc_slotupdate;			/* slot to next advance fsm */
-	struct ieee80211vap *sc_bslot[ATH_BCBUF];/* beacon xmit slots */
 	int sc_bnext;				/* next slot for beacon xmit */
 
 	struct timer_list sc_cal_ch;		/* calibration timer */
