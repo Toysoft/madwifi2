@@ -88,7 +88,6 @@ to be completed which are not reflected in the ticket system:
         disabled.  We need to decide if we want to support staggared beacons
         before doing anything about it.
       - short preamble
-      - we should reclaim beacon resources when a bss is removed 
   - We need to put logic into add_interface which prohibit unsupported
     configurations.
   - multicast : The multicast filter is currently disabled.
