@@ -73,14 +73,6 @@ We would gradually like to get known issues and tasks out of this file
 and into the ticket system.  Here is a list of tasks which are still
 to be completed which are not reflected in the ticket system:
 
-  - rate control : This driver currently uses the simple rate control algorithm
-    provided by the d80211 stack.  MadWifi provides three rate control
-    algorithms which may yield better performance.  At least one should be
-    ported to use the d80211 rate control API.
-  - hardware queues : We currently only use a single hardware queue.  In order
-    to support prioritization (WME etc.) of traffic we should use multiple
-    queues.
-  - hardware encryption : Hardware encryption is currently disabled.
   - AP mode : Various features required by AP mode are currently disabled
     including:
       - cab queue handling
@@ -98,9 +90,6 @@ to be completed which are not reflected in the ticket system:
   - skb fragments: The driver currently does not support fragmented skb's.  See
     the 'fraglist' member in struct ieee80211_hw for details.  We should support
     more than one skb per frame.
-  - Atheros SOC support (if_ath_ahb) is currently missing.  This requires
-    some small changes to ath/if_ath_ahb.c along the same lines as the changes to
-    ath/if_ath_pci.c.
   - Turbo modes : hostapd does not currently support turbo modes for the Devicescape
     stack.  Turbo modes are disabled in dadwifi until that is fixed.
   - tx power control : tx power control handling needs to be looked at.  I don't
