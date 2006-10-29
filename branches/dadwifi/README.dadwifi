@@ -22,6 +22,7 @@ What is working:
 
 - station (client) mode
 - monitor (wireless sniffer) mode
+- ap mode
 
 See the 'Development' section below for details on what is still being worked
 on.
