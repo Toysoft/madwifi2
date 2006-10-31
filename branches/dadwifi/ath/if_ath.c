@@ -4020,13 +4020,6 @@ static void
 ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
 		 struct ieee80211_tx_control *control)
 {
-#if 0
-#define	USE_SHPREAMBLE(_ic) \
-	(((_ic)->ic_flags & (IEEE80211_F_SHPREAMBLE | IEEE80211_F_USEBARKER))\
-		== IEEE80211_F_SHPREAMBLE)
-	struct ieee80211_node *ni = bf->bf_node;
-	struct ieee80211com *ic = ni->ni_ic;
-#endif
 	struct sk_buff *skb = bf->bf_skb;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
@@ -4080,15 +4073,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
 	 */
 	rix = sc->sc_minrateix;
 	rt = sc->sc_currates;
-#ifdef CONFIG_NET80211
-	rate = rt->info[rix].rateCode;
-#else
 	rate = control->tx_rate;
-#endif
-#if 0
-	if (USE_SHPREAMBLE(ic))
-		rate |= rt->info[rix].shortPreamble;
-#endif
 #ifdef ATH_SUPERG_XR
 	if (bf->bf_node->ni_vap->iv_flags & IEEE80211_F_XR) {
 		u_int8_t cix;
@@ -4144,7 +4129,6 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
 	 * if descriptor swapping is not enabled
 	 */
 	ath_desc_swap(ds);
-#undef USE_SHPREAMBLE
 }
 
 /*

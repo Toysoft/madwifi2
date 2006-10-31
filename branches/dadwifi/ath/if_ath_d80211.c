@@ -232,8 +232,9 @@ ath_d80211_rate_setup(struct net_device *dev, u_int hal_mode,
 
 		if (rt->info[i].shortPreamble) {
 			rates[i].flags |= IEEE80211_RATE_PREAMBLE2;
+			rates[i].val2 = rt->info[i].rateCode |
+					rt->info[i].shortPreamble;
 		}
-		/* FIXME rates[i].val2 = ?; */
 		/* FIXME rates[i].min_rssi_ack = ?; */
 		/* FIXME rates[i].min_rssi_ack_delta = ?; */
 		mode->num_rates++;
