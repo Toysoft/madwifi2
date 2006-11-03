@@ -122,7 +122,6 @@ include $(TOP)/ath_hal/ah_target.inc
 
 export ARCH
 export TARGET
-export ARCH_TARGET
 
 # SYSTEMMAP is the name of the System.map file for the target
 # kernel. This will be needed when DESTDIR is defined in order
