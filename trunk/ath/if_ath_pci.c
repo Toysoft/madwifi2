@@ -62,6 +62,7 @@
 #include <net80211/ieee80211_var.h>
 
 #include "if_athvar.h"
+#include "ah_devid.h"
 #include "if_ath_pci.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
@@ -220,6 +221,23 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			break;
 		}
 	}
+
+	/*
+	 * Auto-enable soft led processing for IBM cards and for
+	 * 5211 minipci cards.  Users can also manually enable/disable
+	 * support with a sysctl.
+	 */
+	if (vdevice == AR5212_DEVID_IBM || vdevice == AR5211_DEVID) {
+		sc->aps_sc.sc_softled = 1;
+		sc->aps_sc.sc_ledpin = 0;
+	}
+
+	/* Enable softled on PIN1 on HP Compaq nc6xx, nc4000 & nx5000 laptops */
+	if (pdev->subsystem_vendor == PCI_VENDOR_ID_COMPAQ) {
+		sc->aps_sc.sc_softled = 1;
+		sc->aps_sc.sc_ledpin = 1;
+	}
+
 	if (ath_attach(vdevice, dev, NULL) != 0)
 		goto bad4;
 

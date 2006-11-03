@@ -80,7 +80,7 @@
 #include "net80211/if_athproto.h"
 #include "if_athvar.h"
 #include "ah_desc.h"
-#include "ah_devid.h"			/* XXX to identify IBM cards */
+#include "ah_devid.h"			/* XXX to identify chipset */
 
 #ifdef ATH_PCI		/* PCI BUS */
 #include "if_ath_pci.h"
@@ -643,12 +643,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	init_timer(&sc->sc_dfswaittimer);
 	init_timer(&sc->sc_dfstesttimer);
 	sc->sc_ledtimer.data = (unsigned long) sc;
-	/*
-	 * Auto-enable soft led processing for IBM cards and for
-	 * 5211 minipci cards.  Users can also manually enable/disable
-	 * support with a sysctl.
-	 */
-	sc->sc_softled = (devid == AR5212_DEVID_IBM || devid == AR5211_DEVID);
 	if (sc->sc_softled) {
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
