@@ -9320,7 +9320,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_txintrperiod = val;
 				break;
 			case ATH_FFTXQMIN:
-				/* XXX valiate? */
+				/* XXX validate? */
 				sc->sc_fftxqmin = val;
 				break;
 			case ATH_TKIPMIC: {

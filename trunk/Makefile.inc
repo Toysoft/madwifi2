@@ -172,7 +172,7 @@ TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
 $(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
 endif
 
-# Don't let HAL mess with the toolchain - save toolchain valiables
+# Don't let HAL mess with the toolchain - save toolchain variables
 save_CC := $(CC)
 save_LD := $(LD)
 save_STRIP := $(STRIP)
@@ -181,7 +181,7 @@ save_NM := $(NM)
 
 include $(HAL)/public/$(TARGET).inc
 
-# Restore toolchain valiables
+# Restore toolchain variables
 CC := $(save_CC)
 LD := $(save_LD)
 STRIP := $(save_STRIP)
