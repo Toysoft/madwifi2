@@ -170,7 +170,7 @@ configcheck: sanitycheck
 	    exit 1; \
 	fi
 	
-ifneq ($(strip $(BUS)),AHB)
+ifeq ($(strip $(BUS)),PCI)
 	@# check PCI support
 	@if [ -z "$(CONFIG_PCI)" ]; then \
 	    echo "FAILED"; \
