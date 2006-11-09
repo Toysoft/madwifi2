@@ -59,22 +59,6 @@ DESTDIR ?=
 # another kernel, set KERNELPATH manually, for example with:
 # make KERNELPATH=/path/to/kernel/source
 
-# TOOLPATH is the path which contains the crosscompile toolchain (?)
-
-ifeq ($(strip $(BUS)),AHB)
-# Bus type AHB forces the target platform to be mipsisa32.
-TARGET :=	mipsisa32-be-elf
-
-# Bus type AHB requires KERNELPATH and TOOLPATH to be set manually.
-ifndef KERNELPATH
-$(error KERNELPATH must be defined for bus type AHB.)
-endif
-ifndef TOOLPATH
-$(error TOOLPATH must be defined for bus type AHB.)
-endif
-
-else
-
 # The default KERNELPATH points to the directory where the currently
 # running kernel was compiled.  Note that the configuration and the
 # version of the kernel tree might have changed since then.
@@ -85,8 +69,6 @@ ifeq ($(shell cd $(KERNELPATH) && pwd),)
 $(error $(KERNELPATH) is missing, please set KERNELPATH)
 endif
 export KERNELPATH
-endif
-
 endif
 
 # KERNELRELEASE is the target kernel's version.  It's always taken from
@@ -130,11 +112,7 @@ SYSTEMMAP ?= 	$(KERNELPATH)/System.map
 
 # KMODPATH nominates the directory where the modules will be
 # installed to
-ifeq ($(strip $(BUS)),AHB)
-KMODPATH := 	$(KERNELPATH)/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/$(KERNELRELEASE)/net
-else
 KMODPATH :=	/lib/modules/$(KERNELRELEASE)/net
-endif
 
 # Recognize 2.4.x kernels to support the old build system
 ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
@@ -183,10 +161,6 @@ TOOLS=  $(TOP)/tools
 
 COPTS+=	-Werror
 INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
-
-ifeq ($(strip $(BUS)),AHB)
-INCS+= -isystem $(TOOLPATH)/include
-endif
 
 # TARGET defines the target platform architecture. It must match one of
 # the target platforms supported by the HAL. The default target is the
