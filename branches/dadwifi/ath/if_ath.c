@@ -4441,7 +4441,7 @@ static void
 ath_bstuck_tasklet(TQUEUE_ARG data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = dev->priv;
+	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	/*
 	 * XXX:if the bmisscount is cleared while the 
 	 *     tasklet execution is pending, the following
@@ -10142,7 +10142,7 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
 {
 #ifdef CONFIG_SYSCTL
 	struct net_device *dev = (struct net_device *) ptr;
-	struct ath_softc *sc = (struct ath_softc *) dev->priv;
+	struct ath_softc *sc = (struct ath_softc *) ATH_GET_SOFTC(dev);;
 
 	if (!dev || !sc || dev->open != &ath_init)
 		return 0;
