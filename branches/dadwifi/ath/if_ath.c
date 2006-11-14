@@ -10142,7 +10142,7 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
 {
 #ifdef CONFIG_SYSCTL
 	struct net_device *dev = (struct net_device *) ptr;
-	struct ath_softc *sc = (struct ath_softc *) ATH_GET_SOFTC(dev);;
+	struct ath_softc *sc = (struct ath_softc *) dev->priv;
 
 	if (!dev || !sc || dev->open != &ath_init)
 		return 0;
