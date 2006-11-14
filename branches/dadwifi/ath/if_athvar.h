@@ -98,6 +98,7 @@ enum ieee80211_phytype {
 typedef unsigned long TQUEUE_ARG;
 #define mark_bh(a) do {} while (0)
 #else					/* immediate work queue */
+#error "I thought any kernel running this would have tasklets."
 #define ATH_TQ_STRUCT tq_struct
 #define ATH_INIT_TQUEUE(a,b,c)		INIT_TQUEUE(a,b,c)
 #define ATH_SCHEDULE_TQUEUE(a,b) do {		\
@@ -645,6 +646,7 @@ struct ath_softc {
 	struct ath_txq *sc_uapsdq;		/* tx q for uapsd */
 	struct ATH_TQ_STRUCT sc_bmisstq;	/* bmiss intr tasklet */
 	struct ATH_TQ_STRUCT sc_bstucktq;	/* beacon stuck intr tasklet */
+	struct ATH_TQ_STRUCT sc_beacontq;	/* queue beacons for transmit */
 	enum {
 		OK,				/* no change needed */
 		UPDATE,				/* update pending */

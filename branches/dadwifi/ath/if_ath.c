@@ -126,6 +126,7 @@ static void ath_rxorn_tasklet(TQUEUE_ARG);
 static void ath_bmiss_tasklet(TQUEUE_ARG);
 #endif
 static void ath_bstuck_tasklet(TQUEUE_ARG);
+static void ath_beacon_tasklet(TQUEUE_ARG);
 #if 0
 static void ath_radar_task(TQUEUE_ARG);
 static void ath_dfs_test_return(unsigned long);
@@ -424,6 +425,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq, ath_bmiss_tasklet,	dev);
 #endif
 	ATH_INIT_TQUEUE(&sc->sc_bstucktq,ath_bstuck_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_beacontq, ath_beacon_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	dev);
 #if 0
@@ -1712,11 +1714,8 @@ ath_intr(int irq, void *dev_id)
 		if (status & HAL_INT_SWBA) {
 			/*
 			 * Software beacon alert--time to send a beacon.
-			 * Handle beacon transmission directly; deferring
-			 * this is too slow to meet timing constraints
-			 * under load.
 			 */
-			ath_beacon_send(sc, &needmark);
+			ATH_SCHEDULE_TQUEUE(&sc->sc_beacontq, &needmark);
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -4453,6 +4452,16 @@ ath_bstuck_tasklet(TQUEUE_ARG data)
 	printk("%s: stuck beacon; resetting (bmiss count %u)\n",
 		dev->name, sc->sc_bmisscount);
 	ath_reset(dev);
+}
+
+static void
+ath_beacon_tasklet(TQUEUE_ARG data)
+{
+	struct net_device *dev = (struct net_device *)data;
+	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	int needmark;
+
+	ath_beacon_send(sc, &needmark);
 }
 
 #if 0

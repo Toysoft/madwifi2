@@ -323,7 +323,6 @@ ath_d80211_add_interface(struct net_device *dev,
 			 struct ieee80211_if_init_conf *conf)
 {
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-	unsigned long flags;
 	int error = 0;
 	int reset;
 
@@ -367,7 +366,7 @@ ath_d80211_add_interface(struct net_device *dev,
 				goto done;
 			}
 
-			spin_lock_irqsave(&sc->sc_bss_lock, flags);
+			spin_lock_bh(&sc->sc_bss_lock);
 
 			ath_hal_stoptxdma(ah, sc->sc_bhalq);
 			ath_descdma_cleanup(sc, &sc->sc_bdma, &sc->sc_bbuf,
@@ -387,13 +386,13 @@ ath_d80211_add_interface(struct net_device *dev,
 				STAILQ_REMOVE_HEAD(&sc->sc_bbuf, bf_list);
 			}
 
-			spin_unlock_irqrestore(&sc->sc_bss_lock, flags);
+			spin_unlock_bh(&sc->sc_bss_lock);
 
 			sc->sc_num_alloced_bss++;
 
 		} else {
 
-			spin_lock_irqsave(&sc->sc_bss_lock, flags);
+			spin_lock_bh(&sc->sc_bss_lock);
 				
 			sc->sc_bss[sc->sc_num_bss].ab_bcbuf = STAILQ_FIRST(&sc->sc_bbuf);
 			STAILQ_REMOVE_HEAD(&sc->sc_bbuf, bf_list);
@@ -401,7 +400,7 @@ ath_d80211_add_interface(struct net_device *dev,
 			sc->sc_bss[sc->sc_num_bss].ab_if_id = conf->if_id;
 			sc->sc_num_bss++;
 
-			spin_unlock_irqrestore(&sc->sc_bss_lock, flags);
+			spin_unlock_bh(&sc->sc_bss_lock);
 
 		}
 
@@ -429,7 +428,6 @@ ath_d80211_remove_interface(struct net_device *dev,
 			    struct ieee80211_if_init_conf *conf)
 {
 	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-	unsigned long flags;
 	int i;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s: if_id %d, type %d\n", __func__,
@@ -451,7 +449,7 @@ ath_d80211_remove_interface(struct net_device *dev,
 			goto done;
 		}
 
-		spin_lock_irqsave(&sc->sc_bss_lock, flags);
+		spin_lock_bh(&sc->sc_bss_lock);
 			
 		STAILQ_INSERT_TAIL(&sc->sc_bbuf, sc->sc_bss[i].ab_bcbuf,
 				   bf_list);
@@ -460,7 +458,7 @@ ath_d80211_remove_interface(struct net_device *dev,
 			(sc->sc_num_bss - i - 1) * sizeof(sc->sc_bss[0]));
 		sc->sc_num_bss--;
 
-		spin_unlock_irqrestore(&sc->sc_bss_lock, flags);
+		spin_unlock_bh(&sc->sc_bss_lock);
 
 		break;
 	}
