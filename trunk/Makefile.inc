@@ -100,6 +100,7 @@ ifeq (,$(ARCH))
 $(error Cannot determine kernel architecture, please check $(KERNELCONF))
 endif
 
+include $(KERNELCONF)
 include $(TOP)/ath_hal/ah_target.inc
 
 export ARCH
