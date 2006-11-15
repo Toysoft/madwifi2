@@ -100,11 +100,6 @@ export ARCH
 include $(TOP)/ath_hal/ah_target.inc
 export TARGET
 
-# SYSTEMMAP is the name of the System.map file for the target
-# kernel. This will be needed when DESTDIR is defined in order
-# to run depmod properly.
-SYSTEMMAP ?= 	$(KERNELPATH)/System.map
-
 # KMODPATH nominates the directory where the modules will be
 # installed to
 KMODPATH :=	/lib/modules/$(KERNELRELEASE)/net
