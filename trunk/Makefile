@@ -125,9 +125,6 @@ info:
 	@echo "KERNELCONF   : $(KERNELCONF)"
 	@echo "KMODPATH     : $(KMODPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
-	@if [ -n "$(DESTDIR)" ]; then \
-	    echo "DESTDIR      : $(DESTDIR)"; \
-	fi
 
 sanitycheck:
 	@echo -n "Checking requirements... "
