@@ -127,7 +127,6 @@ info:
 	@echo "KMODSUF      : $(KMODSUF)"
 	@if [ -n "$(DESTDIR)" ]; then \
 	    echo "DESTDIR      : $(DESTDIR)"; \
-	    echo "SYSTEMMAP    : $(SYSTEMMAP)"; \
 	fi
 
 sanitycheck:
