@@ -90,26 +90,13 @@ KERNELCONF ?=	$(KERNELPATH)/.config
 ifeq ($(wildcard $(KERNELCONF)),)
 $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
+include $(KERNELCONF)
 
-# Determine target architecture of the kernel.
-KERNELARCH = $(shell $(TOP)/scripts/get_arch.sh $(KERNELCONF))
-
-ifeq (,$(KERNELARCH))
-$(error Cannot determine kernel architecture, please check $(KERNELCONF))
-endif
-
-# Don't allow overriding ARCH
-ifeq (,$(ARCH))
-ARCH = $(KERNELARCH)
-else
-ifneq ($(ARCH),$(KERNELARCH))
-$(error ARCH mismatch: supplied "$(ARCH)", determined "$(KERNELARCH)")
-endif
-endif
+# Determine architecture of the kernel.
+include $(TOP)/scripts/get_arch.mk
 export ARCH
 
 # Determine TARGET
-include $(KERNELCONF)
 include $(TOP)/ath_hal/ah_target.inc
 export TARGET
 
