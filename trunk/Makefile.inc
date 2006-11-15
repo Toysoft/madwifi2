@@ -92,18 +92,25 @@ $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
 
 # Determine target architecture of the kernel.
-ifeq (,$(ARCH))
-ARCH=$(shell $(TOP)/scripts/get_arch.sh $(KERNELCONF))
-endif
+KERNELARCH = $(shell $(TOP)/scripts/get_arch.sh $(KERNELCONF))
 
-ifeq (,$(ARCH))
+ifeq (,$(KERNELARCH))
 $(error Cannot determine kernel architecture, please check $(KERNELCONF))
 endif
 
+# Don't allow overriding ARCH
+ifeq (,$(ARCH))
+ARCH = $(KERNELARCH)
+else
+ifneq ($(ARCH),$(KERNELARCH))
+$(error ARCH mismatch: supplied "$(ARCH)", determined "$(KERNELARCH)")
+endif
+endif
+export ARCH
+
+# Determine TARGET
 include $(KERNELCONF)
 include $(TOP)/ath_hal/ah_target.inc
-
-export ARCH
 export TARGET
 
 # SYSTEMMAP is the name of the System.map file for the target
