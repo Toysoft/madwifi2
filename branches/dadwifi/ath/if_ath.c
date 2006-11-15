@@ -2384,7 +2384,7 @@ dot11_to_ratecode(struct ath_softc *sc, const HAL_RATE_TABLE *rt, int dot11)
 static int 
 ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb) 
 #else
-int 
+void
 ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	       	struct ieee80211_tx_control *control) 
 #endif
@@ -2418,21 +2418,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	header_len = ieee80211_get_hdrlen_from_skb(skb);
 	header_pad = (4 - (header_len & 3)) & 3;
 	if (unlikely(header_pad)) {
-		int headroom = skb_headroom(skb);
 		u8 *pos;
-
-		if (unlikely(headroom < header_pad)) {
-			int err;
-			err = pskb_expand_head(skb, header_pad - headroom, 0,
-					       GFP_ATOMIC);
-			if (err) {
-				printk(KERN_DEBUG "%s: ath_d80211_tx "
-				       "allocate headroom failed - err %d - "
-				       "headroom=%d len=%d - drop frame\n",
-				       dev->name, err, headroom, skb->len);
-				return 1;
-			}
-		}
 
 		pos = skb_push(skb, header_pad);
 		memmove(pos, pos + header_pad, header_len);
@@ -2560,7 +2546,6 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 
 	ath_tx_txqaddbuf(sc, txq, bf, ds, pktlen);
 #endif
-	return 0;
 }
 
 #ifdef ATH_SUPERG_FF
@@ -2676,7 +2661,8 @@ ath_d80211_tx(struct net_device *dev, struct sk_buff *skb,
 	STAILQ_INIT(&bf_head);
 	
 	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-	return ath_tx_startraw(dev, bf, skb, control);
+	ath_tx_startraw(dev, bf, skb, control);
+	return 0;
 		
 hardstart_fail:
 	return 1;

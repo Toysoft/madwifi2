@@ -658,6 +658,7 @@ static struct ieee80211_hw ath_d80211_hw = {
 	.host_broadcast_ps_buffering = 1,
 	.wep_include_iv = 1,
 	.data_nullfunc_ack = 1,
+	.extra_tx_headroom = 2,
 	.channel_change_time = 5000,
 	.tx = ath_d80211_tx,
 	.reset = ath_d80211_reset,
