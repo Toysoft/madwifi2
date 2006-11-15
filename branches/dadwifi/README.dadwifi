@@ -76,7 +76,6 @@ to be completed which are not reflected in the ticket system:
 
   - AP mode : Various features required by AP mode are currently disabled
     including:
-      - cab queue handling
       - staggared beacons: Support for staggared beacons is currently
         disabled.  We need to decide if we want to support staggared beacons
         before doing anything about it.
