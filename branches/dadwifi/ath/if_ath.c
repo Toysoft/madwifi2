@@ -2380,20 +2380,12 @@ dot11_to_ratecode(struct ath_softc *sc, const HAL_RATE_TABLE *rt, int dot11)
 #endif
 
 
-#ifdef CONFIG_NET80211
-static int 
-ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb) 
-#else
 void
 ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	       	struct ieee80211_tx_control *control, struct ath_txq *txq) 
-#endif
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
-#ifdef CONFIG_NET80211
-	struct ieee80211_phy_params *ph = (struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
-#endif
 	const HAL_RATE_TABLE *rt;
 	int pktlen;
 	int hdrlen;
@@ -2404,12 +2396,6 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	int power;
 	u_int8_t antenna, txrate;
 	struct ath_desc *ds=NULL;
-#ifdef CONFIG_NET80211
-	struct ieee80211_frame *wh; 
-	
-	wh = (struct ieee80211_frame *) skb->data;
-	try0 = ph->try0;
-#else
 	int header_len, header_pad;
 
 	/* The Atheros hardware requires that the 802.11 header be
@@ -2423,25 +2409,14 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 		memmove(pos, pos + header_pad, header_len);
         }
 	try0 = control->retry_limit;
-#endif
 	rt = sc->sc_currates;
-#ifdef CONFIG_NET80211
-	txrate = dot11_to_ratecode(sc, rt, ph->rate0);
-	power = ph->power > 60 ? 60 : ph->power;
-#else
 	txrate = control->tx_rate;
 	/* FIXME : what unit does the hal need power is? */
 	power = control->power_level > 60 ? 60 : control->power_level;
 	bf->control = *control;
-#endif
-#ifdef CONFIG_NET80211
-	hdrlen = ieee80211_anyhdrsize(wh);
-	pktlen = skb->len + IEEE80211_CRC_LEN;
-#else
 	hdrlen = ieee80211_get_hdrlen_from_skb(skb);
 	pktlen = skb->len - header_pad + FCS_LEN;
-#endif
-	
+
 	keyix = HAL_TXKEYIX_INVALID;
 	flags = HAL_TXDESC_INTREQ | HAL_TXDESC_CLRDMASK; /* XXX needed for crypto errs */
 	
@@ -2464,23 +2439,10 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_mode));
 	
 	
-#ifdef CONFIG_NET80211
-	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
-		sc->sc_stats.ast_tx_noack++;
-		try0 = 1;
-	}
-#else
 	if (control->no_ack)
 		flags |= HAL_TXDESC_NOACK;
-#endif
 	atype = HAL_PKT_TYPE_NORMAL;		/* default */
-#ifdef CONFIG_NET80211
-	txq = sc->sc_ac2q[skb->priority & 0x3];
-#endif
 
-	
-	
 	flags |= HAL_TXDESC_INTREQ;
 	antenna = sc->sc_txantenna;
 	
@@ -2529,19 +2491,11 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	 */
 	ath_desc_swap(ds);
 	
-#ifdef CONFIG_NET80211
-	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
-		__func__, M_FLAG_GET(skb, M_UAPSD) ? 0 : txq->axq_qnum, ds->ds_link, ds->ds_data,
-		ds->ds_ctl0, ds->ds_ctl1, ds->ds_hw[0], ds->ds_hw[1]);
-		
-	ath_tx_txqaddbuf(sc, NULL, txq, bf, ds, pktlen);
-#else	
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
 		__func__, txq->axq_qnum, ds->ds_link, ds->ds_data,
 		ds->ds_ctl0, ds->ds_ctl1, ds->ds_hw[0], ds->ds_hw[1]);
 
 	ath_tx_txqaddbuf(sc, txq, bf, ds, pktlen);
-#endif
 }
 
 #ifdef ATH_SUPERG_FF
@@ -7396,17 +7350,11 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf = NULL;
 	struct ath_desc *ds = NULL;
-#ifdef CONFIG_NET80211
-	struct ieee80211_node *ni = NULL;
-	struct ath_node *an = NULL;
-	int sr, lr;
-#else
 	struct ieee80211_tx_status txstatus;
 	int header_len, header_pad;
 	struct sk_buff *skb;
 	struct net_device *dev = sc->sc_dev;
 	struct net_device_stats *stats = ieee80211_dev_stats(dev);
-#endif
 	HAL_STATUS status;
 #if 0
 	int uapsdq = 0;
@@ -7474,71 +7422,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 #endif
 			ATH_TXQ_UNLOCK(txq);
 
-#ifdef CONFIG_NET80211
-		ni = bf->bf_node;
-		if (ni != NULL) {
-			an = ATH_NODE(ni);
-			if (ds->ds_txstat.ts_status == 0) {
-				u_int8_t txant = ds->ds_txstat.ts_antenna;
-				sc->sc_stats.ast_ant_tx[txant]++;
-				sc->sc_ant_tx[txant]++;
-#ifdef ATH_SUPERG_FF
-				if (bf->bf_numdesc > 1)
-					ni->ni_vap->iv_stats.is_tx_ffokcnt++;
-#endif
-				if (ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)
-					sc->sc_stats.ast_tx_altrate++;
-				sc->sc_stats.ast_tx_rssi =
-					ds->ds_txstat.ts_rssi;
-				ATH_RSSI_LPF(an->an_halstats.ns_avgtxrssi,
-					ds->ds_txstat.ts_rssi);
-				if (bf->bf_skb->priority == WME_AC_VO ||
-				    bf->bf_skb->priority == WME_AC_VI)
-					ni->ni_ic->ic_wme.wme_hipri_traffic++;
-				ni->ni_inact = ni->ni_inact_reload;
-			} else {
-#ifdef ATH_SUPERG_FF
-				if (bf->bf_numdesc > 1)
-					ni->ni_vap->iv_stats.is_tx_fferrcnt++;
-#endif
-				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY) {
-					sc->sc_stats.ast_tx_xretries++;
-					if (ni->ni_flags & IEEE80211_NODE_UAPSD_TRIG) {
-						ni->ni_stats.ns_tx_eosplost++;
-						DPRINTF(sc, ATH_DEBUG_UAPSD,
-							"%s: frame in SP retried out, possible EOSP stranded!!!\n",
-							__func__);
-					}
-				}
-				if (ds->ds_txstat.ts_status & HAL_TXERR_FIFO)
-					sc->sc_stats.ast_tx_fifoerr++;
-				if (ds->ds_txstat.ts_status & HAL_TXERR_FILT)
-					sc->sc_stats.ast_tx_filtered++;
-			}
-			sr = ds->ds_txstat.ts_shortretry;
-			lr = ds->ds_txstat.ts_longretry;
-			sc->sc_stats.ast_tx_shortretry += sr;
-			sc->sc_stats.ast_tx_longretry += lr;
-			/*
-			 * Hand the descriptor to the rate control algorithm
-			 * if the frame wasn't dropped for filtering or sent
-			 * w/o waiting for an ack.  In those cases the rssi
-			 * and retry counts will be meaningless.
-			 */
-			if ((ds->ds_txstat.ts_status & HAL_TXERR_FILT) == 0 &&
-			    (bf->bf_flags & HAL_TXDESC_NOACK) == 0)
-				ath_rate_tx_complete(sc, an, ds);
-			/*
-			 * Reclaim reference to node.
-			 *
-			 * NB: the node may be reclaimed here if, for example
-			 *     this is a DEAUTH message that was sent and the
-			 *     node was timed out due to inactivity.
-			 */
-			 ieee80211_free_node(ni); 
-		}
-
-#else
 		memset(&txstatus, 0, sizeof(txstatus));
 		skb = bf->bf_skb;
 
@@ -7572,7 +7455,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		}
 
 		ieee80211_tx_status(dev, skb, &txstatus);
-#endif
 		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr, 
                                  bf->bf_skb->len, BUS_DMA_TODEVICE);
 #if 0
@@ -7618,9 +7500,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		bf->bf_numdesc = 0;
 #else
 		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
-#ifdef CONFIG_NET80211
-		ath_tx_capture(sc->sc_dev, ds, skbfree);
-#endif
 #endif
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
