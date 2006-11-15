@@ -74,11 +74,6 @@ We would gradually like to get known issues and tasks out of this file
 and into the ticket system.  Here is a list of tasks which are still
 to be completed which are not reflected in the ticket system:
 
-  - AP mode : Various features required by AP mode are currently disabled
-    including:
-      - staggared beacons: Support for staggared beacons is currently
-        disabled.  We need to decide if we want to support staggared beacons
-        before doing anything about it.
   - We need to put logic into add_interface which prohibit unsupported
     configurations.
   - multicast : The multicast filter is currently disabled.
