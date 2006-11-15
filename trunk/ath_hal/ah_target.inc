@@ -1,5 +1,14 @@
 # Determine HAL target based on the kernel architecture
 
+# Make sure ARCH is defined and .config is included
+ifeq ($(ARCH),)
+$(error ARCH must be defined)
+endif
+
+ifeq ($(CONFIG_NET_RADIO),)
+$(error Wireless extensions must be enabled)
+endif
+
 # Determine endianess.  Note that it's not indicated for some CPUs at
 # all, so this value is only valid for certain processors.
 ifeq ($(filter-out arm%,$(ARCH)),)
