@@ -2386,7 +2386,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 #else
 void
 ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
-	       	struct ieee80211_tx_control *control) 
+	       	struct ieee80211_tx_control *control, struct ath_txq *txq) 
 #endif
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
@@ -2403,7 +2403,6 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	int try0;
 	int power;
 	u_int8_t antenna, txrate;
-	struct ath_txq *txq=NULL;
 	struct ath_desc *ds=NULL;
 #ifdef CONFIG_NET80211
 	struct ieee80211_frame *wh; 
@@ -2478,9 +2477,6 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	atype = HAL_PKT_TYPE_NORMAL;		/* default */
 #ifdef CONFIG_NET80211
 	txq = sc->sc_ac2q[skb->priority & 0x3];
-#else
-	/* FIXME: we are only using a single hardware queue. */
-	txq = sc->sc_ac2q[WME_AC_BK];
 #endif
 
 	
@@ -2624,6 +2620,36 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 }
 #endif
 
+
+static struct ath_buf *ath_get_tx_buf(struct ath_softc *sc) {
+	struct net_device *dev = sc->sc_dev;
+	struct ath_buf *bf;
+
+	ATH_TXBUF_LOCK_IRQ(sc);
+	bf = STAILQ_FIRST(&sc->sc_txbuf);
+	if (bf != NULL) {
+		STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
+	}
+	/* XXX use a counter and leave at least one for mgmt frames */
+	if (STAILQ_EMPTY(&sc->sc_txbuf)) {
+		DPRINTF(sc, ATH_DEBUG_XMIT,
+			"%s: stop queue\n", __func__);
+		sc->sc_stats.ast_tx_qstop++;
+		ATH_STOP_QUEUE(dev);
+		sc->sc_devstopped = 1;
+		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
+	}
+	ATH_TXBUF_UNLOCK_IRQ(sc);
+
+	if (bf == NULL) {		/* NB: should not happen */
+		DPRINTF(sc, ATH_DEBUG_XMIT,
+			"%s: discard, no xmit buf\n", __func__);
+		sc->sc_stats.ast_tx_nobuf++;
+	}
+
+	return bf;
+}
+
 #define ATH_HARDSTART_GET_TX_BUF_WITH_LOCK				\
 	ATH_TXBUF_LOCK_IRQ(sc);						\
 	bf = STAILQ_FIRST(&sc->sc_txbuf);				\
@@ -2661,7 +2687,8 @@ ath_d80211_tx(struct net_device *dev, struct sk_buff *skb,
 	STAILQ_INIT(&bf_head);
 	
 	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-	ath_tx_startraw(dev, bf, skb, control);
+	/* FIXME: we are only using a single hardware queue. */
+	ath_tx_startraw(dev, bf, skb, control, sc->sc_ac2q[WME_AC_BK]);
 	return 0;
 		
 hardstart_fail:
@@ -4117,7 +4144,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
 }
 
 /*
- * Generate beacon frame and queue cab data for a vap.
+ * Generate beacon frame and queue cab data for a bss.
  */
 static struct ath_buf *
 ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
@@ -4126,6 +4153,8 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 	struct ath_buf *bf;
 	struct sk_buff *skb;
 	struct ieee80211_tx_control control;
+	struct ieee80211_tx_control cab_control;
+	struct ath_buf *cab_bf;
 
 #ifdef ATH_SUPERG_XR
 	if (vap->iv_flags & IEEE80211_F_XR) {
@@ -4175,6 +4204,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 	 *     beacons, then drain the cabq by dropping all the frames in
 	 *     the cabq so that the current vaps cab traffic can be scheduled.
 	 */
+	/* FIXME: why drop the packets? */
 	if (ncabq && (avp->av_boff.bo_tim[4] & 1) && sc->sc_cabq->axq_depth) {
 		if (sc->sc_nvaps > 1 && sc->sc_stagbeacons) {
 			ath_tx_draintxq(sc, sc->sc_cabq);
@@ -4192,40 +4222,24 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 	bus_dma_sync_single(sc->sc_bdev,
 		bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 
-#if 0
 	/*
 	 * Enable the CAB queue before the beacon queue to
 	 * ensure cab frames are triggered by this beacon.
 	 */
-	if (avp->av_boff.bo_tim[4] & 1)	{	/* NB: only at DTIM */
-		struct ath_txq *cabq = sc->sc_cabq;
-		struct ath_buf *bfmcast;
-		/*
-		 * Move everything from the vap's mcast queue 
-		 * to the hardware cab queue.
-		 * XXX MORE_DATA bit?
-		 */
-		ATH_TXQ_LOCK(&avp->av_mcastq);
-		ATH_TXQ_LOCK(cabq);
-		bfmcast = STAILQ_FIRST(&avp->av_mcastq.axq_q);
-		/* link the descriptors */
-		if (cabq->axq_link == NULL)
-			ath_hal_puttxbuf(ah, cabq->axq_qnum, bfmcast->bf_daddr);
-		else {
-#ifdef AH_NEED_DESC_SWAP
-			*cabq->axq_link = cpu_to_le32(bfmcast->bf_daddr);
-#else
-			*cabq->axq_link = bfmcast->bf_daddr;
-#endif
+	skb = ieee80211_get_buffered_bc(dev, bss->ab_if_id, &cab_control);
+
+	while (skb) {
+
+		cab_bf = ath_get_tx_buf(sc);
+		if (!cab_bf) {
+			kfree_skb(skb);
+			break;
 		}
-		/* append the private vap mcast list to  the cabq */
-		ATH_TXQ_MOVE_MCASTQ(&avp->av_mcastq, cabq);
 		/* NB: gated by beacon so safe to start here */
-		ath_hal_txstart(ah, cabq->axq_qnum);
-		ATH_TXQ_UNLOCK(cabq);
-		ATH_TXQ_UNLOCK(&avp->av_mcastq);
+		ath_tx_startraw(dev, cab_bf, skb, &cab_control, sc->sc_cabq);
+
+		skb = ieee80211_get_buffered_bc(dev, bss->ab_if_id, &cab_control);
 	}
-#endif
 
 	return bf;
 }
@@ -7655,10 +7669,10 @@ ath_tx_tasklet_q0(TQUEUE_ARG data)
 
 	if (txqactive(sc->sc_ah, 0))
 		ath_tx_processq(sc, &sc->sc_txq[0]);
-#if 0
 	if (txqactive(sc->sc_ah, sc->sc_cabq->axq_qnum))
 		ath_tx_processq(sc, sc->sc_cabq);
 
+#if 0
 	netif_wake_queue(dev);
 #endif
 
@@ -10024,9 +10038,9 @@ ath_announce(struct net_device *dev)
 				dev->name, txq->axq_qnum,
 				ieee80211_wme_acnames[i]);
 		}
+#endif
 		printk("%s: Use hw queue %u for CAB traffic\n", dev->name,
 			sc->sc_cabq->axq_qnum);
-#endif
 		printk("%s: Use hw queue %u for beacons\n", dev->name,
 			sc->sc_bhalq);
 #if 0
