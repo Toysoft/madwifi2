@@ -63,25 +63,12 @@
 #include <linux/rtnetlink.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_NET80211
-#include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
-#include "if_media.h"
-#include "if_llc.h"
-
-#include <net80211/ieee80211_radiotap.h>
-#include <net80211/ieee80211_var.h>
-#include <net80211/ieee80211_monitor.h>
-#endif
 
 #ifdef USE_HEADERLEN_RESV
 #include <net80211/if_llc.h>
 #endif
 
 
-#ifdef CONFIG_NET80211
-#include "if_athrate.h"
-#include "net80211/if_athproto.h"
-#endif
 #include "if_athvar.h"
 #include "ah_desc.h"
 #include "ah_devid.h"			/* XXX to identify IBM cards */
@@ -217,13 +204,8 @@ static void ath_tx_timeout(struct net_device *);
 #endif
 static void ath_tx_draintxq(struct ath_softc *, struct ath_txq *);
 static void ath_draintxq(struct ath_softc *);
-#ifdef CONFIG_NET80211
-static __inline void ath_tx_txqaddbuf(struct ath_softc *, struct ieee80211_node *,
-	struct ath_txq *, struct ath_buf *, struct ath_desc *, int);
-#else
 static __inline void ath_tx_txqaddbuf(struct ath_softc *,
 	struct ath_txq *, struct ath_buf *, struct ath_desc *, int);
-#endif
 static void ath_stoprecv(struct ath_softc *);
 static int ath_startrecv(struct ath_softc *);
 static void ath_flushrecv(struct ath_softc *);
@@ -392,15 +374,9 @@ int
 ath_attach(u_int16_t devid, struct net_device *dev)
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-#endif
 	struct ath_hal *ah;
 	HAL_STATUS status;
 	int error = 0, i;
-#ifdef CONFIG_NET80211
-	int autocreatemode = IEEE80211_M_STA;
-#endif
 	u_int8_t csz;
 
 	sc->devid = devid;
@@ -664,7 +640,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	}
 
 #endif
-#ifndef CONFIG_NET80211
 	ATH_INIT_TQUEUE(&sc->sc_txtq, ath_tx_tasklet_q0, dev);
 	/* FIXME: we are only using a single hardware queue. */
 	if (!ath_tx_setup(sc, WME_AC_BK, HAL_WME_AC_BK)) {
@@ -672,7 +647,6 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		error = -EIO;
 		goto bad2;
 	}
-#endif
 	init_timer(&sc->sc_cal_ch);
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) dev;
@@ -864,21 +838,11 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_hasveol = ath_hal_hasveol(ah);
 
 	/* get mac address from hardware */
-#ifdef CONFIG_NET80211 
-	ath_hal_getmac(ah, ic->ic_myaddr);
-	if (sc->sc_hasbmask) {
-		ath_hal_getbssidmask(ah, sc->sc_bssidmask);
-		ATH_SET_VAP_BSSID_MASK(sc->sc_bssidmask);
-		ath_hal_setbssidmask(ah, sc->sc_bssidmask);
-	}
-	IEEE80211_ADDR_COPY(dev->dev_addr, ic->ic_myaddr);
-#else
 	ath_hal_getmac(ah, dev->dev_addr);
 	if (sc->sc_hasbmask) {
 		memset(sc->sc_bssidmask, 0xff, ETH_ALEN);
 		ath_hal_setbssidmask(ah, sc->sc_bssidmask);
 	}
-#endif
 
 #if 0
 	/* call MI attach routine. */
@@ -915,64 +879,20 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * now that we have a device name with unit number.
 	 */
 #endif
-#ifndef CONFIG_NET80211
 	if (ath_d80211_attach(dev)) {
 		error = -EIO;
 		goto bad;
 	}
-#endif
 #ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_register(sc);
 #endif /* CONFIG_SYSCTL */
-#ifdef CONFIG_NET80211
-	ieee80211_announce(ic);
-#endif
 	ath_announce(dev);
 #ifdef ATH_TX99_DIAG
 	printk("%s: TX99 support enabled\n", dev->name);
 #endif
 	sc->sc_invalid = 0;
 
-#ifdef CONFIG_NET80211
-	if (autocreate) {
-		if (!strcmp(autocreate, "none"))
-			autocreatemode = -1;
-		else if (!strcmp(autocreate, "sta"))
-			autocreatemode = IEEE80211_M_STA;
-		else if (!strcmp(autocreate, "ap"))
-			autocreatemode = IEEE80211_M_HOSTAP;
-		else if (!strcmp(autocreate, "adhoc"))
-			autocreatemode = IEEE80211_M_IBSS;
-		else if (!strcmp(autocreate, "ahdemo"))
-			autocreatemode = IEEE80211_M_AHDEMO;
-		else if (!strcmp(autocreate, "wds"))
-			autocreatemode = IEEE80211_M_WDS;
-		else if (!strcmp(autocreate, "monitor"))
-			autocreatemode = IEEE80211_M_MONITOR;
-		else {
-			printk(KERN_INFO "Unknown autocreate mode: %s\n",
-				autocreate);
-			autocreatemode = -1;
-		}
-	}
-	
-	if (autocreatemode != -1) {
-		rtnl_lock();
-		error = ieee80211_create_vap(ic, "ath%d", dev,
-				autocreatemode, IEEE80211_CLONE_BSSID);
-		rtnl_unlock();
-		if (error)
-			printk(KERN_ERR "%s: autocreation of vap failed: %d\n",
-				dev->name, error);
-	}
-#endif
-
 	return 0;
-#ifdef CONFIG_NET80211
-bad3:
-	ieee80211_ifdetach(ic);
-	ath_rate_detach(sc->sc_rc);
-#endif
 bad2:
 	ath_tx_cleanup(sc);
 	ath_desc_free(sc);
@@ -1017,11 +937,7 @@ ath_detach(struct net_device *dev)
 	 *   it last
 	 * Other than that, it's straightforward...
 	 */
-#ifdef CONFIG_NET80211
-	ieee80211_ifdetach(&sc->sc_ic);
-#else
 	ieee80211_unregister_hw(dev);	
-#endif
 
 	ath_hal_intrset(ah, 0);		/* disable further intr's */
 	ath_hal_getisr(ah, &tmp);	/* clear ISR */
@@ -1033,9 +949,6 @@ ath_detach(struct net_device *dev)
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->detach(sc->sc_tx99);
 #endif
-#ifdef CONFIG_NET80211
-	ath_rate_detach(sc->sc_rc);
-#endif
 	ath_desc_free(sc);
 	ath_tx_cleanup(sc);
 	ath_hal_detach(ah);
@@ -1046,9 +959,6 @@ ath_detach(struct net_device *dev)
 	ATH_LOCK_DESTROY(sc);
 	dev->stop = NULL; /* prevent calling ath_stop again */
 	ath_d80211_detach(dev);
-#ifdef CONFIG_NET80211
-	unregister_netdev(dev);
-#endif
 	return 0;
 }
 
@@ -1898,13 +1808,8 @@ int
 ath_init(struct net_device *dev)
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-	HAL_OPMODE opmode = ic->ic_opmode;
-#else
 	struct ieee80211_conf *conf = ieee80211_get_hw_conf(dev);
 	HAL_OPMODE opmode = sc->sc_opmode;
-#endif
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_STATUS status;
 	int error = 0;
@@ -1951,13 +1856,8 @@ ath_init(struct net_device *dev)
 	 * be followed by initialization of the appropriate bits
 	 * and then setup of the interrupt mask.
 	 */
-#ifdef CONFIG_NET80211
-	sc->sc_curchan.channel = ic->ic_curchan->ic_freq;
-	sc->sc_curchan.channelFlags = ath_chan2flags(ic->ic_curchan);
-#else
 	sc->sc_curchan.channel = conf->freq;
 	sc->sc_curchan.channelFlags = conf->channel_val;
-#endif
 	if (!ath_hal_reset(ah, opmode, &sc->sc_curchan, AH_FALSE, &status)) {
 		printk("%s: unable to reset hardware: '%s' (HAL status %u) "
 			"(freq %u flags 0x%x)\n", dev->name,
@@ -2012,9 +1912,6 @@ ath_init(struct net_device *dev)
 	ath_chan_change(sc, &sc->sc_curchan);
 	ath_set_ack_bitrate(sc, sc->sc_ackrate);
 	dev->flags |= IFF_RUNNING;		/* we are ready to go */
-#ifdef CONFIG_NET80211
-	ieee80211_start_running(ic);		/* start all vap's */
-#endif
 #ifdef ATH_TX99_DIAG
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->start(sc->sc_tx99);
@@ -2033,9 +1930,6 @@ static int
 ath_stop_locked(struct net_device *dev)
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-#endif
 	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: invalid %u flags 0x%x\n",
@@ -2063,9 +1957,6 @@ ath_stop_locked(struct net_device *dev)
 #endif
 		netif_stop_queue(dev);	/* XXX re-enabled by ath_newstate */
 		dev->flags &= ~IFF_RUNNING;	/* NB: avoid recursion */
-#ifdef CONFIG_NET80211
-		ieee80211_stop_running(ic);	/* stop all vap's */
-#endif
 		if (!sc->sc_invalid) {
 			ath_hal_intrset(ah, 0);
 			if (sc->sc_softled) {
@@ -2205,14 +2096,8 @@ int
 ath_reset(struct net_device *dev)
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-#ifdef CONFIG_NET80211 
-	struct ieee80211com *ic = &sc->sc_ic;
-	HAL_OPMODE opmode = ic->ic_opmode;
-	struct ieee80211_channel *c;
-#else
 	struct ieee80211_conf *conf = ieee80211_get_hw_conf(dev);
 	HAL_OPMODE opmode = sc->sc_opmode;
-#endif
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_STATUS status;
 
@@ -2220,14 +2105,8 @@ ath_reset(struct net_device *dev)
 	 * Convert to a HAL channel description with the flags
 	 * constrained to reflect the current operating mode.
 	 */
-#ifdef CONFIG_NET80211 
-	c = ic->ic_curchan;
-	sc->sc_curchan.channel = c->ic_freq;
-	sc->sc_curchan.channelFlags = ath_chan2flags(c);
-#else
 	sc->sc_curchan.channel = conf->freq;
 	sc->sc_curchan.channelFlags = conf->channel_val;
-#endif
 
 	ath_hal_intrset(ah, 0);		/* disable interrupts */
 	ath_draintxq(sc);		/* stop xmit side */
@@ -2292,17 +2171,10 @@ ath_desc_swap(struct ath_desc *ds)
  * Insert a buffer on a txq 
  * 
  */
-#ifdef CONFIG_NET80211
-static __inline void
-ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
-	struct ath_txq *txq, struct ath_buf *bf, 
-	struct ath_desc *lastds, int framelen)
-#else
 static __inline void
 ath_tx_txqaddbuf(struct ath_softc *sc,
 	struct ath_txq *txq, struct ath_buf *bf, 
 	struct ath_desc *lastds, int framelen)
-#endif
 {
 	struct ath_hal *ah = sc->sc_ah;
 
@@ -2361,10 +2233,6 @@ ath_tx_txqaddbuf(struct ath_softc *sc,
 #endif
 	ATH_TXQ_UNLOCK(txq);
 
-#ifdef CONFIG_NET80211
-	sc->sc_devstats.tx_packets++;
-	sc->sc_devstats.tx_bytes += framelen;
-#endif
 }
 
 #if 0
@@ -6894,11 +6762,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	rt = sc->sc_currates;
 #endif
 
-#ifdef CONFIG_NET80211
-	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-#else
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_mode));
-#endif
 
 	/*
 	 * NB: the 802.11 layer marks whether or not we should
@@ -8779,23 +8643,12 @@ ath_getchannels(struct net_device *dev, u_int cc,
 	HAL_BOOL outdoor, HAL_BOOL xchanmode)
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-	u_int8_t *regclassids = ic->ic_regclassids;
-	u_int maxregclassids = IEEE80211_REGCLASSIDS_MAX;
-	u_int *nregclass = &ic->ic_nregclass;
-#else
 	u_int8_t *regclassids = NULL;
 	u_int maxregclassids = 0;
 	u_int *nregclass = NULL;
-#endif
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_CHANNEL *chans;
-#ifdef CONFIG_NET80211
-	int i, nchan;
-#else
 	int nchan;
-#endif
 
 	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
 	if (chans == NULL) {
@@ -8814,23 +8667,6 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		kfree(chans);
 		return -EINVAL;
 	}
-#ifdef CONFIG_NET80211
-	/*
-	 * Convert HAL channels to ieee80211 ones.
-	 */
-	for (i = 0; i < nchan; i++) {
-		HAL_CHANNEL *c = &chans[i];
-		struct ieee80211_channel *ichan = &ic->ic_channels[i];
-
-		ichan->ic_ieee = ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
-		ichan->ic_freq = c->channel;
-		ichan->ic_flags = c->channelFlags;
-		ichan->ic_maxregpower = c->maxRegTxPower;	/* dBm */
-		ichan->ic_maxpower = c->maxTxPower;		    /* 1/4 dBm */
-		ichan->ic_minpower = c->minTxPower;		    /* 1/4 dBm */
-	}
-	ic->ic_nchans = nchan;
-#else
 	ath_d80211_add_channels(dev, MODE_IEEE80211A, chans, nchan, CHANNEL_A);
 	ath_d80211_add_channels(dev, MODE_IEEE80211B, chans, nchan, CHANNEL_B);
 	ath_d80211_add_channels(dev, MODE_IEEE80211G, chans, nchan, CHANNEL_G);
@@ -8838,7 +8674,6 @@ ath_getchannels(struct net_device *dev, u_int cc,
 	/* FIXME: hostapd does not support turbo modes. */
 	ath_d80211_add_channels(dev, MODE_ATHEROS_TURBO, chans, nchan, CHANNEL_108A);
 	ath_d80211_add_channels(dev, MODE_ATHEROS_TURBOG, chans, nchan, CHANNEL_108G);
-#endif
 #endif
 	kfree(chans);
 	return 0;
@@ -9057,32 +8892,13 @@ ath_rate_setup(struct net_device *dev, u_int mode)
 {
 	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_rateset *rs;
-	int i, maxrates;
-#endif
 	const HAL_RATE_TABLE *rt;
 
 	rt = ath_hal_getratetable(ah, mode);
 	sc->sc_rates[ath_mode_to_idx(mode)] = rt;
 	if (rt == NULL)
 		return 0;
-#ifdef CONFIG_NET80211
-	if (rt->rateCount > IEEE80211_RATE_MAXSIZE) {
-		DPRINTF(sc, ATH_DEBUG_ANY,
-			"%s: rate table too small (%u > %u)\n",
-			__func__, rt->rateCount, IEEE80211_RATE_MAXSIZE);
-		maxrates = IEEE80211_RATE_MAXSIZE;
-	} else
-		maxrates = rt->rateCount;
-	rs = &ic->ic_sup_rates[mode];
-	for (i = 0; i < maxrates; i++)
-		rs->rs_rates[i] = rt->info[i].dot11Rate;
-	rs->rs_nrates = maxrates;
-#else
 	ath_d80211_rate_setup(dev, mode, rt);
-#endif
 	return 1;
 }
 
@@ -9147,9 +8963,6 @@ ath_setcurmode(struct ath_softc *sc, u_int mode)
 		sc->sc_hwmap[i].ledoff = msecs_to_jiffies(blinkrates[j].timeOff);
 	}
 	sc->sc_currates = rt;
-#ifdef CONFIG_NET80211
-	sc->sc_curmode = mode;
-#endif
 	/*
 	 * All protection frames are transmited at 2Mb/s for
 	 * 11g, otherwise at 1Mb/s.
