@@ -2307,7 +2307,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_mode));
 	
 	
-	if (control->no_ack)
+	if (control->flags & IEEE80211_TXCTL_NO_ACK)
 		flags |= HAL_TXDESC_NOACK;
 	atype = HAL_PKT_TYPE_NORMAL;		/* default */
 
@@ -7294,7 +7294,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		if (ds->ds_txstat.ts_status == 0) {
 			stats->tx_packets++;
 			stats->tx_bytes += skb->len;
-			txstatus.ack = 1;
+			txstatus.flags |= IEEE80211_TX_STATUS_ACK;
 			txstatus.ack_signal = ds->ds_txstat.ts_rssi;
 		} else {
 			stats->tx_errors++;
@@ -7302,7 +7302,8 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY) {
 				txstatus.excessive_retries = 1;
 			} else if (ds->ds_txstat.ts_status & HAL_TXERR_FILT) {
-				txstatus.tx_filtered = 1;
+				txstatus.flags |=
+					IEEE80211_TX_STATUS_TX_FILTERED;
 			}
 		}
 

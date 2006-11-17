@@ -489,8 +489,10 @@ ath_d80211_config(struct net_device *dev, struct ieee80211_conf *conf)
 	sc->sc_mode = conf->phymode;
 	sc->sc_beacon_interval = (conf->beacon_int * 1000) >> 10;
 
-	if (sc->sc_shortslottime != conf->short_slot_time) {
-		sc->sc_shortslottime = conf->short_slot_time;
+	if (sc->sc_shortslottime !=
+	    !!(conf->flags & IEEE80211_CONF_SHORT_SLOT_TIME)) {
+		sc->sc_shortslottime =
+			!!(conf->flags & IEEE80211_CONF_SHORT_SLOT_TIME);
 		sc->sc_updateslot = UPDATE;
 	}
 
@@ -653,11 +655,11 @@ ath_d80211_tx_last_beacon(struct net_device *dev)
 static struct ieee80211_hw ath_d80211_hw = {
 	.version = IEEE80211_VERSION,
 	.name = "atheros",
-	.host_gen_beacon = 1,
-	.rx_includes_fcs = 1,
-	.host_broadcast_ps_buffering = 1,
-	.wep_include_iv = 1,
-	.data_nullfunc_ack = 1,
+	.flags = IEEE80211_HW_HOST_GEN_BEACON |
+		 IEEE80211_HW_RX_INCLUDES_FCS |
+		 IEEE80211_HW_HOST_BROADCAST_PS_BUFFERING |
+		 IEEE80211_HW_WEP_INCLUDE_IV |
+		 IEEE80211_HW_DATA_NULLFUNC_ACK,
 	.extra_tx_headroom = 2,
 	.channel_change_time = 5000,
 	.tx = ath_d80211_tx,
