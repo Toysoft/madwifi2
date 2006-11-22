@@ -1365,7 +1365,8 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		}
 		break;
 	case IEEE80211_S_AUTH:
-		KASSERT(vap->iv_opmode == IEEE80211_M_STA,
+		/* auth frames are possible between IBSS nodes, see 802.11-1999, chapter 5.7.6 */
+		KASSERT(vap->iv_opmode == IEEE80211_M_STA || vap->iv_opmode == IEEE80211_M_IBSS,
 			("switch to %s state when operating in mode %u",
 			 ieee80211_state_name[nstate], vap->iv_opmode));
 		switch (ostate) {
