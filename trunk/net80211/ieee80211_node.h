@@ -298,6 +298,8 @@ struct ieee80211_node *ieee80211_find_wds_node(struct ieee80211_node_table *,
 typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
 void ieee80211_iterate_nodes(struct ieee80211_node_table *,
 	ieee80211_iter_func *, void *);
+void ieee80211_iterate_dev_nodes(struct net_device *, 
+	struct ieee80211_node_table *, ieee80211_iter_func *, void *);
 
 void	ieee80211_dump_node(struct ieee80211_node_table *,
 	struct ieee80211_node *);
