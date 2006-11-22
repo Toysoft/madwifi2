@@ -1967,6 +1967,7 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 	 */
 	if (vap->iv_auth->ia_node_leave != NULL)
 		vap->iv_auth->ia_node_leave(ni);
+	ieee80211_notify_sta_stats(ni);
 
 	IEEE80211_LOCK_IRQ(ic);
 	if (vap->iv_aid_bitmap != NULL)

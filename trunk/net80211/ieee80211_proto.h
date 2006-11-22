@@ -295,4 +295,6 @@ u_int8_t *ieee80211_add_athAdvCap(u_int8_t *, u_int8_t, u_int16_t);
 void ieee80211_notify_node_join(struct ieee80211_node *, int);
 void ieee80211_notify_node_leave(struct ieee80211_node *);
 void ieee80211_notify_scan_done(struct ieee80211vap *);
+void ieee80211_notify_sta_stats(struct ieee80211_node *ni);
+
 #endif /* _NET80211_IEEE80211_PROTO_H_ */
