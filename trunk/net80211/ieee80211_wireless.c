@@ -3321,12 +3321,15 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 			if (!IEEE80211_ADDR_EQ(mlme->im_macaddr, vap->iv_dev->broadcast)) {
 				ni = ieee80211_find_node(&ic->ic_sta,
 					mlme->im_macaddr);
-				if (ni == NULL)
+				if (ni == NULL) {
+					ieee80211_free_node(ni);
 					return -EINVAL;
-				domlme(mlme, ni);
+				}
+				if (dev == ni->ni_vap->iv_dev)
+					domlme(mlme, ni);
 				ieee80211_free_node(ni);
 			} else
-				ieee80211_iterate_nodes(&ic->ic_sta, domlme, mlme);
+				ieee80211_iterate_dev_nodes(dev, &ic->ic_sta, domlme, mlme);
 			break;
 		default:
 			return -EINVAL;
