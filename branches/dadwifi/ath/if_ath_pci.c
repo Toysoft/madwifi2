@@ -116,7 +116,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned long phymem;
 	unsigned long mem;
 	struct ath_pci_softc *sc;
-	struct net_device *dev;
 	const char *athname;
 	u_int8_t csz;
 	u32 val;
@@ -179,14 +178,14 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bad1;
 	}
 
-	dev = ieee80211_alloc_hw(sizeof(struct ath_pci_softc), NULL);
-	if (dev == NULL) {
-		printk(KERN_ERR "ath_pci: no memory for device state\n");
+	sc = (struct ath_pci_softc *)ath_d80211_alloc(sizeof(*sc));
+
+	if (!sc) {
+		printk(KERN_WARNING "ath_pci: 80211 setup failed\n");
 		goto bad2;
 	}
-	sc = ATH_GET_SOFTC(dev);
-	ath_d80211_init_softc(&sc->aps_sc);
-	sc->aps_sc.sc_dev = dev;
+
+	snprintf(sc->aps_sc.name, sizeof(sc->aps_sc.name), "ath_pci");
 
 	/*
 	 * Mark the device as detached to avoid processing
@@ -194,23 +193,14 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 	sc->aps_sc.sc_invalid = 1;
 
-	dev->irq = pdev->irq;
-	dev->mem_start = mem;
-	dev->mem_end = mem + pci_resource_len(pdev, 0);
-	/*
-	 * Don't leave arp type as ARPHRD_ETHER as this is no eth device
-	 */
-	dev->type = ARPHRD_IEEE80211;
-
-	SET_MODULE_OWNER(dev);
-	SET_NETDEV_DEV(dev, &pdev->dev);
-
+	sc->aps_sc.sc_mem_start = mem;
 	sc->aps_sc.sc_bdev = (void *) pdev;
 
-	pci_set_drvdata(pdev, dev);
+	pci_set_drvdata(pdev, sc);
 
-	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
-		printk(KERN_WARNING "%s: request_irq failed\n", dev->name);
+	if (request_irq(pdev->irq, ath_intr, SA_SHIRQ, sc->aps_sc.name, sc)) {
+		printk(KERN_WARNING "%s: request_irq failed\n",
+		       sc->aps_sc.name);
 		goto bad3;
 	}
 
@@ -222,21 +212,22 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			break;
 		}
 	}
-	if (ath_attach(vdevice, dev) != 0)
+	if (ath_attach(vdevice, &sc->aps_sc) != 0)
 		goto bad4;
 
 	athname = ath_hal_probe(id->vendor, vdevice);
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
-		dev->name, athname ? athname : "Atheros ???", phymem, dev->irq);
+		sc->aps_sc.name, athname ? athname : "Atheros ???", phymem,
+	       	pdev->irq);
 
 	/* ready to process interrupts */
 	sc->aps_sc.sc_invalid = 0;
 
 	return 0;
 bad4:
-	free_irq(dev->irq, dev);
+	free_irq(pdev->irq, sc);
 bad3:
-	free_netdev(dev);
+	ath_d80211_free(&sc->aps_sc);
 bad2:
 	iounmap((void __iomem *) mem);
 bad1:
@@ -249,25 +240,25 @@ bad:
 static void
 ath_pci_remove(struct pci_dev *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ath_softc *sc = pci_get_drvdata(pdev);
 
-	ath_detach(dev);
-	if (dev->irq)
-		free_irq(dev->irq, dev);
-	iounmap((void __iomem *) dev->mem_start);
+	ath_detach(sc);
+	if (pdev->irq)
+		free_irq(pdev->irq, sc);
+	iounmap((void __iomem *) sc->sc_mem_start);
 	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
-	free_netdev(dev);
+	ath_d80211_free(sc);
 }
 
 #ifdef CONFIG_PM
 static int
 ath_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ath_pci_softc *sc = pci_get_drvdata(pdev);
 
-	ath_suspend(dev);
-	PCI_SAVE_STATE(pdev, ATH_GET_SOFTC(dev)->aps_pmstate);
+	ath_suspend(&sc->aps_sc);
+	PCI_SAVE_STATE(pdev, sc->aps_pmstate);
 	pci_disable_device(pdev);
 	return pci_set_power_state(pdev, PCI_D3hot);
 }
@@ -275,7 +266,7 @@ ath_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 static int
 ath_pci_resume(struct pci_dev *pdev)
 {
-	struct net_device *dev = pci_get_drvdata(pdev);
+	struct ath_pci_softc *sc = pci_get_drvdata(pdev);
 	u32 val;
 	int err;
 
@@ -284,7 +275,7 @@ ath_pci_resume(struct pci_dev *pdev)
 		return err;
 
 	/* XXX - Should this return nonzero on fail? */
-	PCI_RESTORE_STATE(pdev,	ATH_GET_SOFTC(dev)->aps_pmstate);
+	PCI_RESTORE_STATE(pdev,	sc->aps_pmstate);
 
 	err = pci_enable_device(pdev);
 	if (err)
@@ -301,7 +292,7 @@ ath_pci_resume(struct pci_dev *pdev)
 	pci_read_config_dword(pdev, 0x40, &val);
 	if ((val & 0x0000ff00) != 0)
 		pci_write_config_dword(pdev, 0x40, val & 0xffff00ff);
-	ath_resume(dev);
+	ath_resume(&sc->aps_sc);
 
 	return 0;
 }

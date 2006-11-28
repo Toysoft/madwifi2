@@ -89,7 +89,7 @@ ath_hal_mode_to_d80211_mode(u_int hal_mode)
 
 /**
  * ath_d80211_add_channels - Setup channel array for a given hardware mode.
- * @dev: device in question
+ * @sc: device in question
  * @hw_mode: ieee80211 hardware mode (MODE_IEEE80211A, MODE_IEEE80211B ...)
  * @hal_chans: pointer to an array of channels from the hal
  * @hal_nchan: number of total channels in @hal_chans
@@ -100,27 +100,26 @@ ath_hal_mode_to_d80211_mode(u_int hal_mode)
  * Returns 0 on success or < 0 on error.
  */
 int
-ath_d80211_add_channels(struct net_device *dev, int hw_mode,
+ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 	       		HAL_CHANNEL *hal_chans, int hal_nchan, int hal_flags)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_hw_modes *mode;
 	int error = 0;
 	int i;
 
-	for (i = 0; i < sc->sc_hw_conf.num_modes ; i++) {
+	for (i = 0; i < sc->sc_hw->num_modes ; i++) {
 		if (sc->sc_hw_modes[i].mode == hw_mode)
 			break;
 	}
 
-	if (i == sc->sc_hw_conf.num_modes) {
-		if (sc->sc_hw_conf.num_modes == ATH_MAX_HW_MODES) { 
+	if (i == sc->sc_hw->num_modes) {
+		if (sc->sc_hw->num_modes == ATH_MAX_HW_MODES) { 
 			DPRINTF(sc, ATH_DEBUG_ANY,
 				"%s: no free mode elements\n", __func__);
 			return -1;
 		}
-		mode = &sc->sc_hw_modes[sc->sc_hw_conf.num_modes];
+		mode = &sc->sc_hw_modes[sc->sc_hw->num_modes];
 	} else {
 		DPRINTF(sc, ATH_DEBUG_ANY,
 			"%s: mode %d already initialized\n", __func__, hw_mode);
@@ -160,7 +159,7 @@ done:
 		DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_chan %x hal_flags %x\n", __func__,
 			hal_nchan, hal_flags);
 		mode->mode = hw_mode;
-		sc->sc_hw_conf.num_modes++;
+		sc->sc_hw->num_modes++;
 	}
 
 	return error;
@@ -169,7 +168,7 @@ done:
 
 /**
  * ath_d80211_rate_setup - Setup a rate array for a given hardware mode.
- * @dev: device in question
+ * @sc: device in question
  * @hal_mode: hal hardware mode (HAL_MODE_11A, HAL_MODE_11B, ...)
  * @rt: hal rate table for the mode in question
  * 
@@ -178,10 +177,9 @@ done:
  * XXX: This happens on every channel change? locking? 
  */
 int
-ath_d80211_rate_setup(struct net_device *dev, u_int hal_mode,
+ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
 		      const HAL_RATE_TABLE *rt)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
 	struct ieee80211_hw_modes *mode;
 	int hw_mode;
 	struct ieee80211_rate *rates;
@@ -189,12 +187,12 @@ ath_d80211_rate_setup(struct net_device *dev, u_int hal_mode,
 
 	hw_mode = ath_hal_mode_to_d80211_mode(hal_mode);
 
-	for (i = 0; i < sc->sc_hw_conf.num_modes ; i++) {
+	for (i = 0; i < sc->sc_hw->num_modes ; i++) {
 		if (sc->sc_hw_modes[i].mode == hw_mode)
 			break;
 	}
 
-	if (i == sc->sc_hw_conf.num_modes) {
+	if (i == sc->sc_hw->num_modes) {
 		printk(KERN_ERR "cannot find mode element.\n");
 		return -1;
 	}
@@ -245,21 +243,22 @@ ath_d80211_rate_setup(struct net_device *dev, u_int hal_mode,
 
 
 static int
-ath_d80211_reset(struct net_device *dev)
+ath_d80211_reset(struct ieee80211_hw *hw)
 {
-	return ath_reset(dev);
+	struct ath_softc *sc = hw->priv;
+	return ath_reset(sc);
 }
 
 
 static int
-ath_d80211_open(struct net_device *dev)
+ath_d80211_open(struct ieee80211_hw *hw)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	struct ath_softc *sc = hw->priv;
 	int rv;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
-	rv = ath_init(dev);
+	rv = ath_init(sc);
 
 	if (rv == 0)
 		sc->sc_dev_open = 1;
@@ -269,30 +268,29 @@ ath_d80211_open(struct net_device *dev)
 
 
 static int
-ath_d80211_stop(struct net_device *dev)
+ath_d80211_stop(struct ieee80211_hw *hw)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	struct ath_softc *sc = hw->priv;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
 	sc->sc_dev_open = 0;
 
-	return ath_stop(dev);
+	return ath_stop(sc);
 }
 
 
 /**
  * ath_d80211_calc_bssid_mask - Calculate the required BSSID mask.
- * @mdev: master device in question
  *
  * Note: Caller must hold ATH_LOCK
  *
  * Returns 1 if the bssidmask changed otherwise returns 0.
  */
 static int
-ath_d80211_calc_bssid_mask(struct net_device *mdev)
+ath_d80211_calc_bssid_mask(struct ieee80211_hw *hw)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(mdev);
+	struct ath_softc *sc = hw->priv;
 	int i, j;
 	struct net_device *dev;
 	unsigned char mask[ETH_ALEN];
@@ -303,7 +301,7 @@ ath_d80211_calc_bssid_mask(struct net_device *mdev)
 		dev = dev_get_by_index(sc->sc_bss[i].ab_if_id);
 
 		for (j = 0; j < ETH_ALEN; j++) {
-			mask[j] &= ~(mdev->dev_addr[j] ^ dev->dev_addr[j]);
+			mask[j] &= ~(hw->perm_addr[j] ^ dev->dev_addr[j]);
 		}
 
 		dev_put(dev);
@@ -319,10 +317,10 @@ ath_d80211_calc_bssid_mask(struct net_device *mdev)
 
 
 static int
-ath_d80211_add_interface(struct net_device *dev,
+ath_d80211_add_interface(struct ieee80211_hw *hw,
 			 struct ieee80211_if_init_conf *conf)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	struct ath_softc *sc = hw->priv;
 	int error = 0;
 	int reset;
 
@@ -412,10 +410,10 @@ ath_d80211_add_interface(struct net_device *dev,
 		goto done;
 	}
 
-	reset = ath_d80211_calc_bssid_mask(dev);
+	reset = ath_d80211_calc_bssid_mask(hw);
 
 	if (reset)
-		error = ath_reset(dev);
+		error = ath_reset(sc);
 
 done:
 	ATH_UNLOCK(sc);
@@ -424,10 +422,10 @@ done:
 
 
 static void
-ath_d80211_remove_interface(struct net_device *dev,
+ath_d80211_remove_interface(struct ieee80211_hw *hw,
 			    struct ieee80211_if_init_conf *conf)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	struct ath_softc *sc = hw->priv;
 	int i;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s: if_id %d, type %d\n", __func__,
@@ -445,7 +443,7 @@ ath_d80211_remove_interface(struct net_device *dev,
 
 		if (i == sc->sc_num_bss) {
 			printk(KERN_ERR "%s: remove cannot find if_id %d\n",
-			       dev->name, conf->if_id);
+			       sc->name, conf->if_id);
 			goto done;
 		}
 
@@ -467,8 +465,8 @@ ath_d80211_remove_interface(struct net_device *dev,
 		sc->sc_beacons = 0;
 
 
-	if (ath_d80211_calc_bssid_mask(dev))
-		ath_reset(dev);
+	if (ath_d80211_calc_bssid_mask(hw))
+		ath_reset(sc);
 
 done:
 	ATH_UNLOCK(sc);
@@ -476,10 +474,10 @@ done:
 
 
 static int
-ath_d80211_config(struct net_device *dev, struct ieee80211_conf *conf)
+ath_d80211_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 {
 	/* FIXME: more to configure */
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	struct ath_softc *sc = hw->priv;
 	HAL_CHANNEL hchan;
 	int ret;
 
@@ -510,10 +508,10 @@ ath_d80211_config(struct net_device *dev, struct ieee80211_conf *conf)
 
 
 static int
-ath_d80211_config_interface(struct net_device *dev, int if_id,
+ath_d80211_config_interface(struct ieee80211_hw *hw, int if_id,
 			    struct ieee80211_if_conf *conf)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	struct ath_softc *sc = hw->priv;
 	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
@@ -521,94 +519,14 @@ ath_d80211_config_interface(struct net_device *dev, int if_id,
 	if (conf->bssid)
 		ath_hal_setassocid(ah, conf->bssid, 0 /* FIXME: aid */);
 
-	return ath_reset(dev);
-}
-
-
-static int
-ath_d80211_passive_scan(struct net_device *dev, int state,
-			struct ieee80211_scan_conf *conf)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static int
-ath_d80211_get_stats(struct net_device *dev,
-		     struct ieee80211_low_level_stats *stats)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static int
-ath_d80211_test_mode(struct net_device *dev, int mode)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static int
-ath_d80211_test_param(struct net_device *dev, int param, int value)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static void
-ath_d80211_sta_table_notification(struct net_device *dev, int num_sta)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-}
-
-
-static int
-ath_d80211_conf_tx(struct net_device *dev, int queue,
-		   const struct ieee80211_tx_queue_params *params)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static int
-ath_d80211_get_tx_stats(struct net_device *dev,
-			struct ieee80211_tx_queue_stats *stats)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
+	return ath_reset(sc);
 }
 
 
 static u64
-ath_d80211_get_tsf(struct net_device *dev)
+ath_d80211_get_tsf(struct ieee80211_hw *hw)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = hw->priv;
 	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
@@ -618,9 +536,9 @@ ath_d80211_get_tsf(struct net_device *dev)
 
 
 static void
-ath_d80211_reset_tsf(struct net_device *dev)
+ath_d80211_reset_tsf(struct ieee80211_hw *hw)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = hw->priv;
 	struct ath_hal *ah = sc->sc_ah;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
@@ -629,39 +547,7 @@ ath_d80211_reset_tsf(struct net_device *dev)
 }
 
 
-static int
-ath_d80211_beacon_update(struct net_device *dev, struct sk_buff *skb,
-			 struct ieee80211_tx_control *control)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static int
-ath_d80211_tx_last_beacon(struct net_device *dev)
-{
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
-	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
-	/* FIXME */
-	return 0;
-}
-
-
-static struct ieee80211_hw ath_d80211_hw = {
-	.version = IEEE80211_VERSION,
-	.name = "atheros",
-	.flags = IEEE80211_HW_HOST_GEN_BEACON |
-		 IEEE80211_HW_RX_INCLUDES_FCS |
-		 IEEE80211_HW_HOST_BROADCAST_PS_BUFFERING |
-		 IEEE80211_HW_WEP_INCLUDE_IV |
-		 IEEE80211_HW_DATA_NULLFUNC_ACK,
-	.extra_tx_headroom = 2,
-	.channel_change_time = 5000,
+static struct ieee80211_ops ath_d80211_ops = {
 	.tx = ath_d80211_tx,
 	.reset = ath_d80211_reset,
 	.open = ath_d80211_open,
@@ -670,29 +556,45 @@ static struct ieee80211_hw ath_d80211_hw = {
 	.remove_interface = ath_d80211_remove_interface,
 	.config = ath_d80211_config,
 	.config_interface = ath_d80211_config_interface,
-	.passive_scan = ath_d80211_passive_scan,
-	.get_stats = ath_d80211_get_stats,
-	.test_mode = ath_d80211_test_mode,
-	.test_param = ath_d80211_test_param,
-	.sta_table_notification = ath_d80211_sta_table_notification,
-	.conf_tx = ath_d80211_conf_tx,
-	.get_tx_stats = ath_d80211_get_tx_stats,
-	.queues = 1,
 	.get_tsf = ath_d80211_get_tsf,
 	.reset_tsf = ath_d80211_reset_tsf,
-	.beacon_update = ath_d80211_beacon_update,
-	.tx_last_beacon = ath_d80211_tx_last_beacon,
 };
 
-void
-ath_d80211_init_softc(struct ath_softc *sc)
+
+/**
+ * ath_d80211_alloc - Allocate and initialize hardware structure
+ * @priv_size: size of private data
+ *
+ * Returns a pointer to the newly allocated struct ath_softc on success.
+ * Returns NULL on error.
+ */
+struct ath_softc *
+ath_d80211_alloc(size_t priv_size)
 {
-	struct ieee80211_hw *hw = &sc->sc_hw_conf;
+	struct ieee80211_hw *hw;
+	struct ath_softc *sc;
 	int i;
+
+	hw = ieee80211_alloc_hw(priv_size, &ath_d80211_ops);
+
+	if (!hw) {
+		printk("ath_d80211: Failed to allocate hw\n");
+		return NULL;
+	}
+
+	sc = hw->priv;
+	sc->sc_hw = hw;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
-	memcpy(hw, &ath_d80211_hw, sizeof(ath_d80211_hw));
+	hw->flags = IEEE80211_HW_HOST_GEN_BEACON |
+		 IEEE80211_HW_RX_INCLUDES_FCS |
+		 IEEE80211_HW_HOST_BROADCAST_PS_BUFFERING |
+		 IEEE80211_HW_WEP_INCLUDE_IV |
+		 IEEE80211_HW_DATA_NULLFUNC_ACK;
+	hw->extra_tx_headroom = 2;
+	hw->channel_change_time = 5000;
+	hw->queues = 1;
 
 	hw->modes = &sc->sc_hw_modes[0];
 
@@ -706,28 +608,38 @@ ath_d80211_init_softc(struct ath_softc *sc)
 	sc->sc_opmode = HAL_M_STA;
 
 	spin_lock_init(&sc->sc_bss_lock);
+
+	return sc;
 }
 
-int
-ath_d80211_attach(struct net_device *dev)
+
+/**
+ * ath_d80211_free - Free memory allocated by ath_d80211_alloc()
+ * @sc: A pointer returned by ath_d80211_alloc().
+ */
+void ath_d80211_free(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-	struct ieee80211_hw *hw = &sc->sc_hw_conf;
+	ieee80211_free_hw(sc->sc_hw);
+}
+
+
+int
+ath_d80211_attach(struct ath_softc *sc)
+{
+	struct ieee80211_hw *hw = sc->sc_hw;
 	int rv = 0;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
-	rv = ieee80211_register_hw(dev, hw);
+	rv = ieee80211_register_hw(hw);
 	if (rv) {
-		printk(KERN_ERR "%s: device registration failed.\n", dev->name);
+		printk(KERN_ERR "%s: device registration failed.\n", sc->name);
 	}
 	return rv;
 }
 
 void
-ath_d80211_detach(struct net_device *dev)
+ath_d80211_detach(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
-
 	kfree(sc->sc_bss);
 }

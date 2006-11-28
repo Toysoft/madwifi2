@@ -119,7 +119,7 @@ static void ath_radar_task(TQUEUE_ARG);
 static void ath_dfs_test_return(unsigned long);
 
 #endif
-static int ath_stop_locked(struct net_device *);
+static int ath_stop_locked(struct ath_softc *);
 #if 0
 #if 0
 static void ath_initkeytable(struct ath_softc *);
@@ -132,7 +132,7 @@ static int ath_key_set(struct ieee80211vap *, const struct ieee80211_key *,
 static void ath_key_update_begin(struct ieee80211vap *);
 static void ath_key_update_end(struct ieee80211vap *);
 #endif
-static void ath_mode_init(struct net_device *);
+static void ath_mode_init(struct ath_softc *);
 #if 0
 static void ath_setslottime(struct ath_softc *);
 static void ath_updateslot(struct net_device *);
@@ -229,7 +229,7 @@ static void ath_setup_stationwepkey(struct ieee80211_node *);
 static void ath_setup_keycacheslot(struct ath_softc *, struct ieee80211_node *);
 static void ath_newassoc(struct ieee80211_node *, int);
 #endif
-static int ath_getchannels(struct net_device *, u_int, HAL_BOOL, HAL_BOOL);
+static int ath_getchannels(struct ath_softc *, u_int, HAL_BOOL, HAL_BOOL);
 static void ath_led_event(struct ath_softc *, int);
 static void ath_update_txpow(struct ath_softc *);
 #if 0
@@ -239,7 +239,7 @@ static int ath_change_mtu(struct net_device *, int);
 static int ath_ioctl(struct net_device *, struct ifreq *, int);
 #endif
 
-static int ath_rate_setup(struct net_device *, u_int);
+static int ath_rate_setup(struct ath_softc *, u_int);
 #if 0
 static void ath_setup_subrates(struct net_device *);
 #ifdef ATH_SUPERG_XR
@@ -258,12 +258,11 @@ static void ath_setcurmode(struct ath_softc *, u_int);
 static void ath_dynamic_sysctl_register(struct ath_softc *);
 static void ath_dynamic_sysctl_unregister(struct ath_softc *);
 #endif /* CONFIG_SYSCTL */
-static void ath_announce(struct net_device *);
+static void ath_announce(struct ath_softc *sc);
 #if 0
 static void ath_check_dfs_clear(unsigned long);
 #endif
 static const char *ath_get_hal_status_desc(HAL_STATUS status);
-static int ath_rcv_dev_event(struct notifier_block *, unsigned long, void *);
 	
 static int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
@@ -295,10 +294,6 @@ static const char *hal_status_desc[] = {
 	"Hardware revision not supported",
 	"Hardware self-test failed",
 	"Operation incomplete"
-};
-
-static struct notifier_block ath_event_block = {
-        .notifier_call = ath_rcv_dev_event
 };
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
@@ -371,9 +366,8 @@ static void ath_printtxbuf(struct ath_buf *, int);
 	} while(0)
 
 int
-ath_attach(u_int16_t devid, struct net_device *dev)
+ath_attach(u_int16_t devid, struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah;
 	HAL_STATUS status;
 	int error = 0, i;
@@ -395,15 +389,15 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	ATH_TXBUF_LOCK_INIT(sc);
 	ATH_RXBUF_LOCK_INIT(sc);
 
-	ATH_INIT_TQUEUE(&sc->sc_rxtq,	 ath_rx_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_rxtq,	 ath_rx_tasklet,	sc);
 #if 0
 	ATH_INIT_TQUEUE(&sc->sc_txtq,	 ath_tx_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq, ath_bmiss_tasklet,	dev);
 #endif
-	ATH_INIT_TQUEUE(&sc->sc_bstucktq,ath_bstuck_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_beacontq, ath_beacon_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_bstucktq,ath_bstuck_tasklet,	sc);
+	ATH_INIT_TQUEUE(&sc->sc_beacontq, ath_beacon_tasklet,	sc);
+	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	sc);
+	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	sc);
 #if 0
 	ATH_INIT_SCHED_TASK(&sc->sc_radartask, ath_radar_task,	dev);
 #endif
@@ -415,17 +409,17 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * built with an ah.h that does not correspond to the hal
 	 * module loaded in the kernel.
 	 */
-	ah = _ath_hal_attach(devid, sc, NULL, (void *) dev->mem_start, &status);
+	ah = _ath_hal_attach(devid, sc, NULL, (void *) sc->sc_mem_start, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
-			dev->name, ath_get_hal_status_desc(status), status);
+			sc->name, ath_get_hal_status_desc(status), status);
 		error = ENXIO;
 		goto bad;
 	}
 	if (ah->ah_abi != HAL_ABI_VERSION) {
 		printk(KERN_ERR "%s: HAL ABI mismatch; "
 			"driver expects 0x%x, HAL reports 0x%x\n",
-			dev->name, HAL_ABI_VERSION, ah->ah_abi);
+			sc->name, HAL_ABI_VERSION, ah->ah_abi);
 		error = ENXIO;		/* XXX */
 		goto bad;
 	}
@@ -454,7 +448,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_keymax = ath_hal_keycachesize(ah);
 	if (sc->sc_keymax > ATH_KEYMAX) {
 		printk("%s: Warning, using only %u entries in %u key cache\n",
-			dev->name, ATH_KEYMAX, sc->sc_keymax);
+			sc->name, ATH_KEYMAX, sc->sc_keymax);
 		sc->sc_keymax = ATH_KEYMAX;
 	}
 	/*
@@ -490,7 +484,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 		ath_outdoor = outdoor;
 	if (xchanmode != -1)
 		ath_xchanmode = xchanmode;
-	error = ath_getchannels(dev, ath_countrycode,
+	error = ath_getchannels(sc, ath_countrycode,
 			ath_outdoor, ath_xchanmode);
 	if (error != 0)
 		goto bad;
@@ -509,9 +503,9 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	/*
 	 * Setup rate tables for all potential media types.
 	 */
-	ath_rate_setup(dev, HAL_MODE_11A);
-	ath_rate_setup(dev, HAL_MODE_11B);
-	ath_rate_setup(dev, HAL_MODE_11G);
+	ath_rate_setup(sc, HAL_MODE_11A);
+	ath_rate_setup(sc, HAL_MODE_11B);
+	ath_rate_setup(sc, HAL_MODE_11G);
 #if 0
 	/* FIXME: hostapd does not support turbo modes. */
 	ath_rate_setup(dev, HAL_MODE_108A);
@@ -531,7 +525,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	error = ath_desc_alloc(sc);
 	if (error != 0) {
 		printk(KERN_ERR "%s: failed to allocate descriptors: %d\n",
-			dev->name, error);
+			sc->name, error);
 		goto bad;
 	}
 
@@ -554,14 +548,14 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_bhalq = ath_beaconq_setup(ah);
 	if (sc->sc_bhalq == (u_int) -1) {
 		printk(KERN_ERR "%s: unable to setup a beacon xmit queue!\n",
-			dev->name);
+			sc->name);
 		error = EIO;
 		goto bad2;
 	}
 	sc->sc_cabq = ath_txq_setup(sc, HAL_TX_QUEUE_CAB, 0);
 	if (sc->sc_cabq == NULL) {
 		printk(KERN_ERR "%s: unable to setup CAB xmit queue!\n",
-			dev->name);
+			sc->name);
 		error = EIO;
 		goto bad2;
 	}
@@ -640,7 +634,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	}
 
 #endif
-	ATH_INIT_TQUEUE(&sc->sc_txtq, ath_tx_tasklet_q0, dev);
+	ATH_INIT_TQUEUE(&sc->sc_txtq, ath_tx_tasklet_q0, sc);
 	/* FIXME: we are only using a single hardware queue. */
 	if (!ath_tx_setup(sc, WME_AC_BK, HAL_WME_AC_BK)) {
 		printk(KERN_ERR "unable to setup xmit queue\n");
@@ -649,7 +643,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	}
 	init_timer(&sc->sc_cal_ch);
 	sc->sc_cal_ch.function = ath_calibrate;
-	sc->sc_cal_ch.data = (unsigned long) dev;
+	sc->sc_cal_ch.data = (unsigned long) sc;
 
 #ifdef ATH_SUPERG_DYNTURBO
 	init_timer(&sc->sc_dturbo_switch_mode);
@@ -838,7 +832,7 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	sc->sc_hasveol = ath_hal_hasveol(ah);
 
 	/* get mac address from hardware */
-	ath_hal_getmac(ah, dev->dev_addr);
+	ath_hal_getmac(ah, sc->sc_hw->perm_addr);
 	if (sc->sc_hasbmask) {
 		memset(sc->sc_bssidmask, 0xff, ETH_ALEN);
 		ath_hal_setbssidmask(ah, sc->sc_bssidmask);
@@ -879,14 +873,15 @@ ath_attach(u_int16_t devid, struct net_device *dev)
 	 * now that we have a device name with unit number.
 	 */
 #endif
-	if (ath_d80211_attach(dev)) {
+	if (ath_d80211_attach(sc)) {
 		error = -EIO;
 		goto bad;
 	}
+	snprintf(sc->name, sizeof(sc->name), "wiphy%d", sc->sc_hw->index);
 #ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_register(sc);
 #endif /* CONFIG_SYSCTL */
-	ath_announce(dev);
+	ath_announce(sc);
 #ifdef ATH_TX99_DIAG
 	printk("%s: TX99 support enabled\n", dev->name);
 #endif
@@ -907,14 +902,13 @@ bad:
 }
 
 int
-ath_detach(struct net_device *dev)
+ath_detach(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 
 	HAL_INT tmp;
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-	ath_stop(dev);
+	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
+	ath_stop(sc);
 
 	ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE);
 	/* Flush the radar task if it's scheduled */
@@ -937,14 +931,10 @@ ath_detach(struct net_device *dev)
 	 *   it last
 	 * Other than that, it's straightforward...
 	 */
-	ieee80211_unregister_hw(dev);	
+	ieee80211_unregister_hw(sc->sc_hw);	
 
 	ath_hal_intrset(ah, 0);		/* disable further intr's */
 	ath_hal_getisr(ah, &tmp);	/* clear ISR */
-	if(dev->irq) {
-		free_irq(dev->irq, dev);
-		dev->irq = 0;
-	}
 #ifdef ATH_TX99_DIAG
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->detach(sc->sc_tx99);
@@ -957,8 +947,7 @@ ath_detach(struct net_device *dev)
 	ath_dynamic_sysctl_unregister(sc);
 #endif /* CONFIG_SYSCTL */
 	ATH_LOCK_DESTROY(sc);
-	dev->stop = NULL; /* prevent calling ath_stop again */
-	ath_d80211_detach(dev);
+	ath_d80211_detach(sc);
 	return 0;
 }
 
@@ -1265,30 +1254,24 @@ ath_vap_delete(struct ieee80211vap *vap)
 
 #endif
 void
-ath_suspend(struct net_device *dev)
+ath_suspend(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-	ath_stop(dev);
+	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
+	ath_stop(sc);
 }
 
 void
-ath_resume(struct net_device *dev)
+ath_resume(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-	ath_init(dev);
+	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
+	ath_init(sc);
 }
 
 void
-ath_shutdown(struct net_device *dev)
+ath_shutdown(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-	ath_stop(dev);
+	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
+	ath_stop(sc);
 }
 
 static void
@@ -1580,8 +1563,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 irqreturn_t
 ath_intr(int irq, void *dev_id)
 {
-	struct net_device *dev = dev_id;
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = dev_id;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_INT status;
 	int needmark;
@@ -1595,13 +1577,7 @@ ath_intr(int irq, void *dev_id)
 	}
 	if (!ath_hal_intrpend(ah))		/* shared irq, not for us */
 		return IRQ_NONE;
-	if ((dev->flags & (IFF_RUNNING | IFF_UP)) != (IFF_RUNNING | IFF_UP)) {
-		DPRINTF(sc, ATH_DEBUG_INTR, "%s: flags 0x%x\n",
-			__func__, dev->flags);
-		ath_hal_getisr(ah, &status);	/* clear ISR */
-		ath_hal_intrset(ah, 0);		/* disable further intr's */
-		return IRQ_HANDLED;
-	}
+
 	needmark = 0;
 	/*
 	 * Figure out the reason(s) for the interrupt.  Note
@@ -1748,19 +1724,19 @@ ath_dfs_test_return(unsigned long data)
 static void
 ath_fatal_tasklet(TQUEUE_ARG data)
 {
-	struct net_device *dev = (struct net_device *)data;
+	struct ath_softc *sc = (struct ath_softc *)data;
 
-	printk("%s: hardware error; reseting\n", dev->name);
-	ath_reset(dev);
+	printk("%s: hardware error; reseting\n", sc->name);
+	ath_reset(sc);
 }
 
 static void
 ath_rxorn_tasklet(TQUEUE_ARG data)
 {
-	struct net_device *dev = (struct net_device *)data;
+	struct ath_softc *sc = (struct ath_softc *)data;
 
-	printk("%s: rx FIFO overrun; reseting\n", dev->name);
-	ath_reset(dev);
+	printk("%s: rx FIFO overrun; reseting\n", sc->name);
+	ath_reset(sc);
 }
 
 #if 0
@@ -1805,10 +1781,9 @@ ath_chan2flags(struct ieee80211_channel *chan)
  */
 
 int
-ath_init(struct net_device *dev)
+ath_init(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-	struct ieee80211_conf *conf = ieee80211_get_hw_conf(dev);
+	struct ieee80211_conf *conf = &sc->sc_hw->conf;
 	HAL_OPMODE opmode = sc->sc_opmode;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_STATUS status;
@@ -1822,7 +1797,7 @@ ath_init(struct net_device *dev)
 	 * Stop anything previously setup.  This is safe
 	 * whether this is the first time through or not.
 	 */
-	ath_stop_locked(dev);
+	ath_stop_locked(sc);
 
 #ifdef ATH_CAP_TPC
 	ath_hal_setcapability(sc->sc_ah, HAL_CAP_TPC, 0, 1, NULL);
@@ -1860,7 +1835,7 @@ ath_init(struct net_device *dev)
 	sc->sc_curchan.channelFlags = conf->channel_val;
 	if (!ath_hal_reset(ah, opmode, &sc->sc_curchan, AH_FALSE, &status)) {
 		printk("%s: unable to reset hardware: '%s' (HAL status %u) "
-			"(freq %u flags 0x%x)\n", dev->name,
+			"(freq %u flags 0x%x)\n", sc->name,
 			ath_get_hal_status_desc(status), status,
 			sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
 		error = -EIO;
@@ -1886,7 +1861,7 @@ ath_init(struct net_device *dev)
 	ath_initkeytable(sc);		/* XXX still needed? */
 #endif
 	if (ath_startrecv(sc) != 0) {
-		printk("%s: unable to start recv logic\n", dev->name);
+		printk("%s: unable to start recv logic\n", sc->name);
 		error = -EIO;
 		goto done;
 	}
@@ -1911,7 +1886,6 @@ ath_init(struct net_device *dev)
 	 */
 	ath_chan_change(sc, &sc->sc_curchan);
 	ath_set_ack_bitrate(sc, sc->sc_ackrate);
-	dev->flags |= IFF_RUNNING;		/* we are ready to go */
 #ifdef ATH_TX99_DIAG
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->start(sc->sc_tx99);
@@ -1927,15 +1901,14 @@ done:
  * Context: softIRQ
  */ 
 static int
-ath_stop_locked(struct net_device *dev)
+ath_stop_locked(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 
-	DPRINTF(sc, ATH_DEBUG_RESET, "%s: invalid %u flags 0x%x\n",
-		__func__, sc->sc_invalid, dev->flags);
+	DPRINTF(sc, ATH_DEBUG_RESET, "%s: invalid %u\n",
+		__func__, sc->sc_invalid);
 
-	if (dev->flags & IFF_RUNNING) {
+	if (1) {
 		/*
 		 * Shutdown the hardware and driver:
 		 *    stop output from above
@@ -1955,8 +1928,7 @@ ath_stop_locked(struct net_device *dev)
 		if (sc->sc_tx99 != NULL)
 			sc->sc_tx99->stop(sc->sc_tx99);
 #endif
-		netif_stop_queue(dev);	/* XXX re-enabled by ath_newstate */
-		dev->flags &= ~IFF_RUNNING;	/* NB: avoid recursion */
+		ieee80211_stop_queues(sc->sc_hw);
 		if (!sc->sc_invalid) {
 			ath_hal_intrset(ah, 0);
 			if (sc->sc_softled) {
@@ -1987,9 +1959,8 @@ ath_stop_locked(struct net_device *dev)
  * stop is preempted).
  */
 int
-ath_stop(struct net_device *dev)
+ath_stop(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	int error;
 
 	ATH_LOCK(sc);
@@ -1997,7 +1968,7 @@ ath_stop(struct net_device *dev)
 	if (!sc->sc_invalid)
 		ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE);
 
-	error = ath_stop_locked(dev);
+	error = ath_stop_locked(sc);
 #if 0
 	if (error == 0 && !sc->sc_invalid) {
 		/*
@@ -2093,13 +2064,13 @@ ath_set_ack_bitrate(struct ath_softc *sc, int high)
  * and to reset the hardware when rf gain settings must be reset.
  */
 int
-ath_reset(struct net_device *dev)
+ath_reset(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
-	struct ieee80211_conf *conf = ieee80211_get_hw_conf(dev);
+	struct ieee80211_conf *conf = &sc->sc_hw->conf;
 	HAL_OPMODE opmode = sc->sc_opmode;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_STATUS status;
+	int i;
 
 	/*
 	 * Convert to a HAL channel description with the flags
@@ -2114,11 +2085,11 @@ ath_reset(struct net_device *dev)
 	/* NB: indicate channel change so we do a full reset */
 	if (!ath_hal_reset(ah, opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
-			dev->name, __func__, ath_get_hal_status_desc(status), status);
+			sc->name, __func__, ath_get_hal_status_desc(status), status);
 	ath_update_txpow(sc);		/* update tx power state */
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
-			dev->name, __func__);
+			sc->name, __func__);
 	if (sc->sc_softled)
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 
@@ -2132,7 +2103,9 @@ ath_reset(struct net_device *dev)
 		ath_beacon_config(sc);	/* restart beacons */
 	ath_hal_intrset(ah, sc->sc_imask);
 	ath_set_ack_bitrate(sc, sc->sc_ackrate);
-	netif_wake_queue(dev);		/* restart xmit */
+
+	for (i = 0; i < sc->sc_hw->queues; i++)
+		ieee80211_wake_queue(sc->sc_hw, i);
 #ifdef ATH_SUPERG_XR
 	/*
 	 * restart the group polls.
@@ -2227,7 +2200,6 @@ ath_tx_txqaddbuf(struct ath_softc *sc,
 		}
 		txq->axq_link = &lastds->ds_link;
 		ath_hal_txstart(ah, txq->axq_qnum);
-		sc->sc_dev->trans_start = jiffies;
 #if 0
 	}
 #endif
@@ -2249,10 +2221,9 @@ dot11_to_ratecode(struct ath_softc *sc, const HAL_RATE_TABLE *rt, int dot11)
 
 
 void
-ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb,
+ath_tx_startraw(struct ath_softc *sc, struct ath_buf *bf, struct sk_buff *skb,
 	       	struct ieee80211_tx_control *control, struct ath_txq *txq) 
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 	const HAL_RATE_TABLE *rt;
 	int pktlen;
@@ -2444,7 +2415,6 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 
 
 static struct ath_buf *ath_get_tx_buf(struct ath_softc *sc) {
-	struct net_device *dev = sc->sc_dev;
 	struct ath_buf *bf;
 
 	ATH_TXBUF_LOCK_IRQ(sc);
@@ -2457,7 +2427,7 @@ static struct ath_buf *ath_get_tx_buf(struct ath_softc *sc) {
 		DPRINTF(sc, ATH_DEBUG_XMIT,
 			"%s: stop queue\n", __func__);
 		sc->sc_stats.ast_tx_qstop++;
-		ATH_STOP_QUEUE(dev);
+		ieee80211_stop_queues(sc->sc_hw);
 		sc->sc_devstopped = 1;
 		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 	}
@@ -2484,7 +2454,7 @@ static struct ath_buf *ath_get_tx_buf(struct ath_softc *sc) {
 		DPRINTF(sc, ATH_DEBUG_XMIT,				\
 			"%s: stop queue\n", __func__);			\
 		sc->sc_stats.ast_tx_qstop++;				\
-		ATH_STOP_QUEUE(dev);					\
+		ieee80211_stop_queues(sc->sc_hw);			\
 		sc->sc_devstopped = 1;					\
 		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL); 		\
 	}								\
@@ -2499,10 +2469,10 @@ static struct ath_buf *ath_get_tx_buf(struct ath_softc *sc) {
 #ifndef CONFIG_NET80211
 
 int
-ath_d80211_tx(struct net_device *dev, struct sk_buff *skb,
+ath_d80211_tx(struct ieee80211_hw *hw, struct sk_buff *skb,
 	      struct ieee80211_tx_control *control)
 {
-	struct ath_softc *sc = ieee80211_dev_hw_data(dev);
+	struct ath_softc *sc = hw->priv;
 	struct ath_buf *bf = NULL;
 	STAILQ_HEAD(tmp_bf_head, ath_buf) bf_head;
 
@@ -2510,7 +2480,7 @@ ath_d80211_tx(struct net_device *dev, struct sk_buff *skb,
 	
 	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 	/* FIXME: we are only using a single hardware queue. */
-	ath_tx_startraw(dev, bf, skb, control, sc->sc_ac2q[WME_AC_BK]);
+	ath_tx_startraw(sc, bf, skb, control, sc->sc_ac2q[WME_AC_BK]);
 	return 0;
 		
 hardstart_fail:
@@ -3325,7 +3295,6 @@ static u_int32_t
 ath_calcrxfilter(struct ath_softc *sc)
 {
 #define	RX_FILTER_PRESERVE	(HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR)
-	struct net_device *dev = sc->sc_dev;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t rfilt;
 
@@ -3334,7 +3303,7 @@ ath_calcrxfilter(struct ath_softc *sc)
 		 HAL_RX_FILTER_MCAST;
 	if (sc->sc_opmode != HAL_M_STA)
 		rfilt |= HAL_RX_FILTER_PROBEREQ;
-	if (sc->sc_opmode != HAL_M_HOSTAP && (dev->flags & IFF_PROMISC))
+	if (sc->sc_opmode != HAL_M_HOSTAP)
 		rfilt |= HAL_RX_FILTER_PROM;
 	if (sc->sc_opmode == HAL_M_STA ||
 	    sc->sc_opmode == HAL_M_IBSS ||	/* NB: AHDEMO too */
@@ -3382,9 +3351,8 @@ ath_merge_mcast(struct ath_softc *sc, u_int32_t mfilt[2])
 
 #endif
 static void
-ath_mode_init(struct net_device *dev)
+ath_mode_init(struct ath_softc *sc)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t rfilt, mfilt[2];
 
@@ -3756,7 +3724,7 @@ ath_beaconq_config(struct ath_softc *sc)
 
 	if (!ath_hal_settxqueueprops(ah, sc->sc_bhalq, &qi)) {
 		printk("%s: unable to update h/w beacon queue parameters\n",
-			sc->sc_dev->name);
+			sc->name);
 		return 0;
 	} else {
 		ath_hal_resettxqueue(ah, sc->sc_bhalq);	/* push to h/w */
@@ -3971,7 +3939,6 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
 static struct ath_buf *
 ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 {
-	struct net_device *dev = sc->sc_dev;
 	struct ath_buf *bf;
 	struct sk_buff *skb;
 	struct ieee80211_tx_control control;
@@ -4003,7 +3970,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 	bf = bss->ab_bcbuf;
 
 	memset(&control, 0, sizeof(control));
-	skb = ieee80211_beacon_get(dev, bss->ab_if_id, &control);
+	skb = ieee80211_beacon_get(sc->sc_hw, bss->ab_if_id, &control);
 	if (!skb) {
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: failed to get beacon for if_id %d\n", __func__,
@@ -4048,7 +4015,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 	 * Enable the CAB queue before the beacon queue to
 	 * ensure cab frames are triggered by this beacon.
 	 */
-	skb = ieee80211_get_buffered_bc(dev, bss->ab_if_id, &cab_control);
+	skb = ieee80211_get_buffered_bc(sc->sc_hw, bss->ab_if_id, &cab_control);
 
 	while (skb) {
 
@@ -4058,9 +4025,9 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 			break;
 		}
 		/* NB: gated by beacon so safe to start here */
-		ath_tx_startraw(dev, cab_bf, skb, &cab_control, sc->sc_cabq);
+		ath_tx_startraw(sc, cab_bf, skb, &cab_control, sc->sc_cabq);
 
-		skb = ieee80211_get_buffered_bc(dev, bss->ab_if_id, &cab_control);
+		skb = ieee80211_get_buffered_bc(sc->sc_hw, bss->ab_if_id, &cab_control);
 	}
 
 	return bf;
@@ -4261,8 +4228,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 static void
 ath_bstuck_tasklet(TQUEUE_ARG data)
 {
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = (struct ath_softc *)data;
 	/*
 	 * XXX:if the bmisscount is cleared while the 
 	 *     tasklet execution is pending, the following
@@ -4272,15 +4238,14 @@ ath_bstuck_tasklet(TQUEUE_ARG data)
 	if (sc->sc_bmisscount <= BSTUCK_THRESH) 
 		return;
 	printk("%s: stuck beacon; resetting (bmiss count %u)\n",
-		dev->name, sc->sc_bmisscount);
-	ath_reset(dev);
+		sc->name, sc->sc_bmisscount);
+	ath_reset(sc);
 }
 
 static void
 ath_beacon_tasklet(TQUEUE_ARG data)
 {
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = (struct ath_softc *)data;
 	int needmark;
 
 	ath_beacon_send(sc, &needmark);
@@ -5272,7 +5237,6 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 				return -ENOMEM;
 			}
 		}
-		skb->dev = sc->sc_dev;
 		bf->bf_skb = skb;
 		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 			skb->data, sc->sc_rxbufsize, BUS_DMA_FROMDEVICE);
@@ -5476,13 +5440,10 @@ ath_rx_tasklet(TQUEUE_ARG data)
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
-	struct net_device *dev = (struct net_device *)data;
 	struct ath_buf *bf;
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = (struct ath_softc *)data;
 #ifdef CONFIG_NET80211
 	struct ieee80211com *ic = &sc->sc_ic;
-#else
-	struct net_device_stats *stats = ieee80211_dev_stats(dev);
 #endif
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
@@ -5504,7 +5465,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 
 		bf = STAILQ_FIRST(&sc->sc_rxbuf);
 		if (bf == NULL) {		/* XXX ??? can this happen */
-			printk("%s: no buffer (%s)\n", dev->name, __func__);
+			printk("%s: no buffer (%s)\n", sc->name, __func__);
 			break;
 		}
 
@@ -5526,7 +5487,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 		}
 		skb = bf->bf_skb;
 		if (skb == NULL) {		/* XXX ??? can this happen */
-			printk("%s: no skbuff (%s)\n", dev->name, __func__);
+			printk("%s: no skbuff (%s)\n", sc->name, __func__);
 			continue;
 		}
 
@@ -5554,9 +5515,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 #endif
 			/* fall thru for monitor mode handling... */
 		} else if (ds->ds_rxstat.rs_status != 0) {
-#ifndef CONFIG_NET80211
-			stats->rx_errors++;
-#endif
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
 				sc->sc_stats.ast_rx_crcerr++;
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_FIFO)
@@ -5639,9 +5597,6 @@ rx_accept:
 #ifdef CONFIG_NET80211
 		sc->sc_devstats.rx_packets++;
 		sc->sc_devstats.rx_bytes += len;
-#else
-		stats->rx_packets++;
-		stats->rx_bytes += len;
 #endif
 
 		skb_put(skb, len);
@@ -5777,7 +5732,7 @@ rx_accept:
 			skb_pull(skb, header_pad);
 		}
 
-		__ieee80211_rx(dev, skb, &status);
+		__ieee80211_rx(sc->sc_hw, skb, &status);
 #endif
 		if (sc->sc_diversity) {
 			/*
@@ -6303,7 +6258,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 	}
 	if (qnum >= N(sc->sc_txq)) {
 		printk("%s: hal qnum %u out of range, max %u!\n",
-			sc->sc_dev->name, qnum, N(sc->sc_txq));
+			sc->name, qnum, N(sc->sc_txq));
 #ifdef ATH_SUPERG_COMP
 		if (compbuf) {
 			bus_free_consistent(sc->sc_bdev, compbufsz,
@@ -6350,7 +6305,7 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 
 	if (ac >= N(sc->sc_ac2q)) {
 		printk("%s: AC %u out of range, max %u!\n",
-		       sc->sc_dev->name, ac, (unsigned)N(sc->sc_ac2q));
+		       sc->name, ac, (unsigned)N(sc->sc_ac2q));
 		return 0;
 	}
 	txq = ath_txq_setup(sc, HAL_TX_QUEUE_DATA, haltype);
@@ -7217,8 +7172,6 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	struct ieee80211_tx_status txstatus;
 	int header_len, header_pad;
 	struct sk_buff *skb;
-	struct net_device *dev = sc->sc_dev;
-	struct net_device_stats *stats = ieee80211_dev_stats(dev);
 	HAL_STATUS status;
 #if 0
 	int uapsdq = 0;
@@ -7292,12 +7245,9 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		txstatus.control = bf->control;
 
 		if (ds->ds_txstat.ts_status == 0) {
-			stats->tx_packets++;
-			stats->tx_bytes += skb->len;
 			txstatus.flags |= IEEE80211_TX_STATUS_ACK;
 			txstatus.ack_signal = ds->ds_txstat.ts_rssi;
 		} else {
-			stats->tx_errors++;
 
 			if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY) {
 				txstatus.excessive_retries = 1;
@@ -7319,7 +7269,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			skb_pull(skb, header_pad);
 		}
 
-		ieee80211_tx_status(dev, skb, &txstatus);
+		ieee80211_tx_status(sc->sc_hw, skb, &txstatus);
 		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr, 
                                  bf->bf_skb->len, BUS_DMA_TODEVICE);
 #if 0
@@ -7375,7 +7325,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			++sc->sc_reapcount;
 			if (sc->sc_reapcount > ATH_TXBUF_FREE_THRESHOLD) {
 				if (!sc->sc_dfswait)
-					ATH_START_QUEUE(sc->sc_dev);
+					ieee80211_start_queues(sc->sc_hw);
 				printk("tx tasklet restart the queue\n");
 				sc->sc_reapcount = 0;
 				sc->sc_devstopped = 0;
@@ -7408,8 +7358,7 @@ txqactive(struct ath_hal *ah, int qnum)
 static void
 ath_tx_tasklet_q0(TQUEUE_ARG data)
 {
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = (struct ath_softc *)data;
 
 	if (txqactive(sc->sc_ah, 0))
 		ath_tx_processq(sc, &sc->sc_txq[0]);
@@ -7591,8 +7540,7 @@ ath_draintxq(struct ath_softc *sc)
 			if (ATH_TXQ_SETUP(sc, i))
 				ath_tx_stopdma(sc, &sc->sc_txq[i]);
 	}
-	sc->sc_dev->trans_start = jiffies;
-	netif_start_queue(sc->sc_dev);		/* XXX move to callers */
+	ieee80211_start_queues(sc->sc_hw);		/* XXX move to callers */
 	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
 		if (ATH_TXQ_SETUP(sc, i))
 			ath_tx_draintxq(sc, &sc->sc_txq[i]);
@@ -7641,7 +7589,6 @@ static int
 ath_startrecv(struct ath_softc *sc)
 {
 	struct ath_hal *ah = sc->sc_ah;
-	struct net_device *dev = sc->sc_dev;
 	struct ath_buf *bf;
 
 	/*
@@ -7655,8 +7602,8 @@ ath_startrecv(struct ath_softc *sc)
 #else
 	sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
 #endif
-	DPRINTF(sc,ATH_DEBUG_RESET, "%s: mtu %u cachelsz %u rxbufsize %u\n",
-		__func__, dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize);
+	DPRINTF(sc,ATH_DEBUG_RESET, "%s: cachelsz %u rxbufsize %u\n",
+		__func__, sc->sc_cachelsz, sc->sc_rxbufsize);
 
 	sc->sc_rxlink = NULL;
 	STAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
@@ -7671,7 +7618,7 @@ ath_startrecv(struct ath_softc *sc)
 	bf = STAILQ_FIRST(&sc->sc_rxbuf);
 	ath_hal_putrxbuf(ah, bf->bf_daddr);
 	ath_hal_rxena(ah);		/* enable recv descriptors */
-	ath_mode_init(dev);		/* set filters, etc. */
+	ath_mode_init(sc);		/* set filters, etc. */
 	ath_hal_startpcurecv(ah);	/* re-enable PCU/DMA engine */
 	return 0;
 }
@@ -7747,7 +7694,6 @@ ath_mode_to_idx(u_int hal_mode)
 static void
 ath_chan_change(struct ath_softc *sc, HAL_CHANNEL *chan)
 {
-	struct net_device *dev = sc->sc_dev;
 #ifdef CONFIG_NET80211
 	struct ieee80211com *ic = &sc->sc_ic;
 #endif
@@ -7755,7 +7701,7 @@ ath_chan_change(struct ath_softc *sc, HAL_CHANNEL *chan)
 
 	mode = hal_chan2mode(chan);
 
-	ath_rate_setup(dev, mode);
+	ath_rate_setup(sc, mode);
 	ath_setcurmode(sc, mode);
 
 #ifdef notyet
@@ -7787,7 +7733,6 @@ ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan)
 	struct ieee80211com *ic = &sc->sc_ic;
 	u_int8_t tswitch = 0;
 #endif
-	struct net_device *dev = sc->sc_dev;
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: %u (%u MHz) -> %u (%u MHz)\n",
 		__func__, ath_hal_mhz2ieee(ah, sc->sc_curchan.channel,
@@ -7825,7 +7770,7 @@ ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan)
 		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
 			printk("%s: %s: unable to reset channel (%uMhz) "
 				"flags 0x%x '%s' (HAL status %u)\n",
-				dev->name, __func__,
+				sc->name, __func__,
 				hchan.channel,
 			        hchan.channelFlags,
 				ath_get_hal_status_desc(status), status);
@@ -7843,7 +7788,7 @@ ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan)
 		 */
 		if (ath_startrecv(sc) != 0) {
 			printk("%s: %s: unable to restart recv logic\n",
-				dev->name, __func__);
+				sc->name, __func__);
 			return -EIO;
 		}
 
@@ -7896,8 +7841,7 @@ ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan)
 static void
 ath_calibrate(unsigned long arg)
 {
-	struct net_device *dev = (struct net_device *) arg;
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
+	struct ath_softc *sc = (struct ath_softc *)arg;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_BOOL isIQdone = AH_FALSE;
 
@@ -7912,7 +7856,7 @@ ath_calibrate(unsigned long arg)
 		 * to load new gain values.
 		 */
 		sc->sc_stats.ast_per_rfgain++;
-		ath_reset(dev);
+		ath_reset(sc);
 	}
 	if (!ath_hal_calibrate(ah, &sc->sc_curchan, &isIQdone)) {
 		DPRINTF(sc, ATH_DEBUG_ANY,
@@ -8640,10 +8584,9 @@ ath_newassoc(struct ieee80211_node *ni, int isnew)
 #endif
 
 static int
-ath_getchannels(struct net_device *dev, u_int cc,
+ath_getchannels(struct ath_softc *sc, u_int cc,
 	HAL_BOOL outdoor, HAL_BOOL xchanmode)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	u_int8_t *regclassids = NULL;
 	u_int maxregclassids = 0;
 	u_int *nregclass = NULL;
@@ -8653,7 +8596,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 
 	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
 	if (chans == NULL) {
-		printk("%s: unable to allocate channel table\n", dev->name);
+		printk("%s: unable to allocate channel table\n", sc->name);
 		return -ENOMEM;
 	}
 	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
@@ -8664,13 +8607,13 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ath_hal_getregdomain(ah, &rd);
 		printk("%s: unable to collect channel list from hal; "
 			"regdomain likely %u country code %u\n",
-			dev->name, rd, cc);
+			sc->name, rd, cc);
 		kfree(chans);
 		return -EINVAL;
 	}
-	ath_d80211_add_channels(dev, MODE_IEEE80211A, chans, nchan, CHANNEL_A);
-	ath_d80211_add_channels(dev, MODE_IEEE80211B, chans, nchan, CHANNEL_B);
-	ath_d80211_add_channels(dev, MODE_IEEE80211G, chans, nchan, CHANNEL_G);
+	ath_d80211_add_channels(sc, MODE_IEEE80211A, chans, nchan, CHANNEL_A);
+	ath_d80211_add_channels(sc, MODE_IEEE80211B, chans, nchan, CHANNEL_B);
+	ath_d80211_add_channels(sc, MODE_IEEE80211G, chans, nchan, CHANNEL_G);
 #if 0
 	/* FIXME: hostapd does not support turbo modes. */
 	ath_d80211_add_channels(dev, MODE_ATHEROS_TURBO, chans, nchan, CHANNEL_108A);
@@ -8889,9 +8832,8 @@ ath_setup_subrates(struct net_device *dev)
 #endif
 
 static int
-ath_rate_setup(struct net_device *dev, u_int mode)
+ath_rate_setup(struct ath_softc *sc, u_int mode)
 {
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 	const HAL_RATE_TABLE *rt;
 
@@ -8899,7 +8841,7 @@ ath_rate_setup(struct net_device *dev, u_int mode)
 	sc->sc_rates[ath_mode_to_idx(mode)] = rt;
 	if (rt == NULL)
 		return 0;
-	ath_d80211_rate_setup(dev, mode, rt);
+	ath_d80211_rate_setup(sc, mode, rt);
 	return 1;
 }
 
@@ -9628,12 +9570,12 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	 * out.  Thus we won't know what the name used to be if we rely
 	 * on it.
 	 */
-	dev_name = kmalloc((strlen(sc->sc_dev->name) + 1) * sizeof(char), GFP_KERNEL);
+	dev_name = kmalloc((strlen(sc->name) + 1) * sizeof(char), GFP_KERNEL);
 	if (dev_name == NULL) {
 		printk("%s: no memory for device name storage!\n", __func__);
 		return;
 	}
-	strncpy(dev_name, sc->sc_dev->name, strlen(sc->sc_dev->name) + 1);
+	strncpy(dev_name, sc->name, strlen(sc->name) + 1);
 
 	/* setup the table */
 	memset(sc->sc_sysctls, 0, space);
@@ -9659,7 +9601,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	/* and register everything */
 	sc->sc_sysctl_header = register_sysctl_table(sc->sc_sysctls, 1);
 	if (!sc->sc_sysctl_header) {
-		printk("%s: failed to register sysctls!\n", sc->sc_dev->name);
+		printk("%s: failed to register sysctls!\n", sc->name);
 		kfree(sc->sc_sysctls);
 		sc->sc_sysctls = NULL;
 	}
@@ -9691,14 +9633,13 @@ ath_dynamic_sysctl_unregister(struct ath_softc *sc)
  * Announce various information on device/driver attach.
  */
 static void
-ath_announce(struct net_device *dev)
+ath_announce(struct ath_softc *sc)
 {
 #define	HAL_MODE_DUALBAND	(HAL_MODE_11A|HAL_MODE_11B)
-	struct ath_softc *sc = ATH_GET_SOFTC(dev);
 	struct ath_hal *ah = sc->sc_ah;
 	u_int modes, cc;
 
-	printk("%s: mac %d.%d phy %d.%d", dev->name,
+	printk("%s: mac %d.%d phy %d.%d", sc->name,
 		ah->ah_macVersion, ah->ah_macRev,
 		ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf);
 	/*
@@ -9732,9 +9673,9 @@ ath_announce(struct net_device *dev)
 				ieee80211_wme_acnames[i]);
 		}
 #endif
-		printk("%s: Use hw queue %u for CAB traffic\n", dev->name,
+		printk("%s: Use hw queue %u for CAB traffic\n", sc->name,
 			sc->sc_cabq->axq_qnum);
-		printk("%s: Use hw queue %u for beacons\n", dev->name,
+		printk("%s: Use hw queue %u for beacons\n", sc->name,
 			sc->sc_bhalq);
 #if 0
 	}
@@ -9814,7 +9755,6 @@ ath_sysctl_register(void)
 	static int initialized = 0;
 
 	if (!initialized) {
-	        register_netdevice_notifier(&ath_event_block);
 		ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
 		initialized = 1;
 	}
@@ -9823,7 +9763,6 @@ ath_sysctl_register(void)
 void
 ath_sysctl_unregister(void)
 {
-	unregister_netdevice_notifier(&ath_event_block);
 	if (ath_sysctl_header)
 		unregister_sysctl_table(ath_sysctl_header);
 }
@@ -9836,27 +9775,4 @@ ath_get_hal_status_desc(HAL_STATUS status)
 		return hal_status_desc[status];
 	else
 		return "";
-}
-
-static int
-ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
-	void *ptr)
-{
-#ifdef CONFIG_SYSCTL
-	struct net_device *dev = (struct net_device *) ptr;
-	struct ath_softc *sc = (struct ath_softc *) dev->priv;
-
-	if (!dev || !sc || dev->open != &ath_init)
-		return 0;
-
-        switch (event) {
-        case NETDEV_CHANGENAME:
-		ath_dynamic_sysctl_unregister(sc);
-		ath_dynamic_sysctl_register(sc);
-		return NOTIFY_DONE;
-        default:
-	        break;
-        }
-#endif /* CONFIG_SYSCTL */
-        return 0;
 }

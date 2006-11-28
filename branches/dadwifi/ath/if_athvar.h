@@ -510,7 +510,8 @@ struct ath_softc {
 #ifdef CONFIG_NET80211
 	struct ieee80211com sc_ic;		/* NB: must be first */
 #endif
-	struct net_device *sc_dev;
+	char name[IFNAMSIZ];
+	unsigned long sc_mem_start;		/* IO base */
 	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats	sc_stats;		/* private statistics */
@@ -684,7 +685,7 @@ struct ath_softc {
 #define ATH_MAX_HW_MODES	5
 #define ATH_MAX_CHANNELS	64
 #define ATH_MAX_RATES		16	
-	struct ieee80211_hw sc_hw_conf;
+	struct ieee80211_hw *sc_hw;
 	struct ieee80211_hw_modes sc_hw_modes[ATH_MAX_HW_MODES];
 	struct ieee80211_channel sc_channels[ATH_MAX_HW_MODES *
 					     ATH_MAX_CHANNELS];
@@ -744,11 +745,11 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
 #define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
 
-int ath_attach(u_int16_t, struct net_device *);
-int ath_detach(struct net_device *);
-void ath_resume(struct net_device *);
-void ath_suspend(struct net_device *);
-void ath_shutdown(struct net_device *);
+int ath_attach(u_int16_t, struct ath_softc *);
+int ath_detach(struct ath_softc *);
+void ath_resume(struct ath_softc *);
+void ath_suspend(struct ath_softc *);
+void ath_shutdown(struct ath_softc *);
 irqreturn_t ath_intr(int, void *);
 int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);

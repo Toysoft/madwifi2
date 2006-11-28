@@ -39,11 +39,11 @@
 
 #include <linux/netdevice.h>
 
-int ath_init(struct net_device *dev);
-int ath_stop(struct net_device *dev);
-int ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan);
-int ath_reset(struct net_device *dev);
-int ath_d80211_tx(struct net_device *dev, struct sk_buff *skb,
+int ath_init(struct ath_softc *);
+int ath_stop(struct ath_softc *);
+int ath_chan_set(struct ath_softc *, HAL_CHANNEL hchan);
+int ath_reset(struct ath_softc *);
+int ath_d80211_tx(struct ieee80211_hw *, struct sk_buff *skb,
 		  struct ieee80211_tx_control *control);
 int ath_descdma_setup(struct ath_softc *, struct ath_descdma *, ath_bufhead *,
 		      const char *, int, int);
