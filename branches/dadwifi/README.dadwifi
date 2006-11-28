@@ -44,7 +44,7 @@ cg-clone git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-dev.git
 
 The dadwifi tree may take some time to adapt to changes in wireless-dev.  If
 you want a more stable dadwifi/wireless-dev combination you can set your
-wireless-dev tree to the last know working tree, i.e.:
+wireless-dev tree to the last known working tree, i.e.:
 
 cg-seek d32512f147017cbaaea66ac432b58b420eb00a82
 
