@@ -41,14 +41,15 @@
 #include <net/d80211.h>
 #include "if_athvar.h"
 
-void ath_d80211_init_softc(struct ath_softc *sc);
-int ath_d80211_attach(struct net_device *dev);
-void ath_d80211_detach(struct net_device *dev);
-int ath_d80211_add_channels(struct net_device *dev, int hw_mode,
+struct ath_softc *ath_d80211_alloc(size_t priv_size);
+void ath_d80211_free(struct ath_softc *sc);
+int ath_d80211_attach(struct ath_softc *sc);
+void ath_d80211_detach(struct ath_softc *sc);
+int ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 			    HAL_CHANNEL *hal_chans, int hal_nchan,
 			    int hal_flags);
 
-int ath_d80211_rate_setup(struct net_device *dev, u_int hal_mode,
+int ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
 			  const HAL_RATE_TABLE *rt);
 
 #endif /* _IF_ATH_D80211_H_ */

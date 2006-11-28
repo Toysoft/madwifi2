@@ -175,13 +175,6 @@ ifneq ($(strip $(BUS)),AHB)
 	fi
 endif
 	
-	@# check wireless extensions support is enabled
-	@if [ -z "$(CONFIG_NET_RADIO)" ]; then \
-	    echo "FAILED"; \
-	    echo "Please enable wireless extensions."; \
-	    exit 1; \
-	fi
-	
 	@# check crypto support is enabled
 	@if [ -z "$(CONFIG_CRYPTO)" ]; then \
 	    echo "FAILED"; \
