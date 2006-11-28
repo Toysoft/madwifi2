@@ -80,6 +80,9 @@ endif
 # This trick has been inspired by the lm_sensors project.
 ifndef KERNELRELEASE
 KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(TOP)/kernelversion.c | grep uts_release | cut -f2 -d'"')
+ifeq (,$(KERNELRELEASE))
+$(error Cannot detect kernel version - please check compiler and KERNELPATH)
+endif
 endif
 
 # KERNELCONF is the name of the file that holds the configuration
