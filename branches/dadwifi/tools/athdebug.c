@@ -185,7 +185,7 @@ int
 main(int argc, char *argv[])
 {
 #ifdef __linux__
-	const char *ifname = "wmaster0";
+	const char *ifname = "wiphy0";
 #else
 	const char *ifname = "ath0";
 #endif
