@@ -7365,9 +7365,7 @@ ath_tx_tasklet_q0(TQUEUE_ARG data)
 	if (txqactive(sc->sc_ah, sc->sc_cabq->axq_qnum))
 		ath_tx_processq(sc, sc->sc_cabq);
 
-#if 0
-	netif_wake_queue(dev);
-#endif
+	ieee80211_wake_queue(sc->sc_hw, 0);
 
 	if (sc->sc_softled)
 		ath_led_event(sc, ATH_LED_TX);
