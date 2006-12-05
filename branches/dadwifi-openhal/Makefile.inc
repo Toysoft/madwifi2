@@ -160,7 +160,7 @@ AWK=		awk
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=	$(obj)/$(DEPTH)/hal
+HAL=	$(obj)/$(DEPTH)/openhal
 endif
 #
 # Path to the 802.11 include files.
