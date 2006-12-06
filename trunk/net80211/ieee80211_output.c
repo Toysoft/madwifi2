@@ -774,11 +774,11 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	int fragcnt = 1;
 	int pdusize = 0;
 	int ismulticast=0;
+	int use4addr=0;
 #ifdef ATH_SUPERG_FF
 	struct sk_buff *skb2 = NULL;
 	struct ether_header eh2;
 	int isff = ATH_FF_MAGIC_PRESENT(skb);
-	int use4addr=0;
 	
 	if (isff) {
 #if 0
