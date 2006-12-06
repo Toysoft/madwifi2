@@ -2173,8 +2173,10 @@ ieee80211_parse_wmeparams(struct ieee80211vap *vap, u_int8_t *frm,
 static void
 ieee80211_parse_athParams(struct ieee80211_node *ni, u_int8_t *ie)
 {
+#ifdef ATH_SUPERG_DYNTURBO
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
+#endif /* ATH_SUPERG_DYNTURBO */
 	struct ieee80211_ie_athAdvCap *athIe =
 		(struct ieee80211_ie_athAdvCap *) ie;
 
