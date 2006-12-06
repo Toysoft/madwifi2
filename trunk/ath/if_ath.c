@@ -4856,7 +4856,7 @@ ath_node_getrssi(const struct ieee80211_node *ni)
 }
 
 
-#if ATH_SUPERG_XR
+#ifdef ATH_SUPERG_XR
 /*
  * stops the txqs and moves data between XR and Normal queues.
  * also adjusts the rate info in the descriptors .

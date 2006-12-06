@@ -90,7 +90,9 @@ EXPORT_SYMBOL(ieee80211_wme_acnames);
 
 static int ieee80211_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 static void ieee80211_tx_timeout(unsigned long);
+#ifdef ATH_SUPERG_XR
 static void ieee80211_start_xrvap(unsigned long);
+#endif
 void ieee80211_auth_setup(void);
 
 void
