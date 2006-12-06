@@ -370,13 +370,13 @@ struct ath_buf {
 	dma_addr_t bf_skbaddr;			/* physical addr of skb data */
 	struct ieee80211_node *bf_node;		/* pointer to the node */
 	u_int32_t bf_status;			/* status flags */
+	u_int16_t bf_flags;			/* tx descriptor flags */
 #ifdef ATH_SUPERG_FF
 	/* XXX: combine this with bf_skbaddr if it ever changes to accomodate
 	 *      multiple segments.
 	 */
-	u_int32_t bf_queueage; 			/* "age" of txq when this buffer placed on stageq */
 	u_int16_t bf_numdesc;			/* number of descs used */
-	u_int16_t bf_flags;			/* tx descriptor flags */
+	u_int32_t bf_queueage; 			/* "age" of txq when this buffer placed on stageq */
 	dma_addr_t bf_skbaddrff[ATH_TXDESC-1]; 	/* extra addrs for ff */
 #endif
 };
