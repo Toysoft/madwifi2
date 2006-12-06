@@ -2503,17 +2503,17 @@ static int
 ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
-	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_node *ni = NULL;
 	struct ath_buf *bf = NULL;
 	struct ieee80211_cb *cb = (struct ieee80211_cb *) skb->cb;
 	struct ether_header *eh;
-	int pktlen;
 	STAILQ_HEAD(tmp_bf_head, ath_buf) bf_head;
 	struct ath_buf *tbf, *tempbf;
 	struct sk_buff *tskb;
 	int framecnt;
 #ifdef ATH_SUPERG_FF
+	int pktlen;
+	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_node *an;
 	struct ath_txq *txq = NULL;
 	int ff_flush;
