@@ -334,7 +334,7 @@ enum {
 	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
 	ATH_DEBUG_LED		= 0x00100000,	/* led management */
 	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
-	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamice turbo */
+	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
 	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
 	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
@@ -417,10 +417,10 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ATH_INIT_SCHED_TASK(&sc->sc_radartask, ath_radar_task,	dev);
 
 	/*
-	 * Attach the hal and verify ABI compatibility by checking
-	 * the hal's ABI signature against the one the driver was
+	 * Attach the HAL and verify ABI compatibility by checking
+	 * the HAL's ABI signature against the one the driver was
 	 * compiled with.  A mismatch indicates the driver was
-	 * built with an ah.h that does not correspond to the hal
+	 * built with an ah.h that does not correspond to the HAL
 	 * module loaded in the kernel.
 	 */
 	ah = _ath_hal_attach(devid, sc, tag, (void *) dev->mem_start, &status);
@@ -475,7 +475,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	/*
 	 * Collect the channel list using the default country
 	 * code and including outdoor channels.  The 802.11 layer
-	 * is resposible for filtering this list based on settings
+	 * is responsible for filtering this list based on settings
 	 * like the phy mode.
 	 */
 	if (countrycode != -1)
@@ -532,7 +532,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	/*
 	 * Allocate hardware transmit queues: one queue for
 	 * beacon frames and one data queue for each QoS
-	 * priority.  Note that the hal handles reseting
+	 * priority.  Note that the HAL handles resetting
 	 * these queues at the needed time.
 	 *
 	 * XXX PS-Poll
@@ -637,7 +637,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_blinking = 0;
 	sc->sc_ledstate = 1;
 	sc->sc_ledon = 0;			/* low true */
-	sc->sc_ledidle = msecs_to_jiffies(2700);	/* 2.7sec */
+	sc->sc_ledidle = msecs_to_jiffies(2700);	/* 2.7 sec */
 	sc->sc_dfstesttime = ATH_DFS_TEST_RETURN_PERIOD;
 	init_timer(&sc->sc_ledtimer);
 	init_timer(&sc->sc_dfswaittimer);
@@ -719,7 +719,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 		| IEEE80211_C_BGSCAN		/* capable of bg scanning */
 		;
 	/*
-	 * Query the hal to figure out h/w crypto support.
+	 * Query the HAL to figure out h/w crypto support.
 	 */
 	if (ath_hal_ciphersupported(ah, HAL_CIPHER_WEP))
 		ic->ic_caps |= IEEE80211_C_WEP;
@@ -800,8 +800,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_flags |= IEEE80211_F_DATAPAD;
 
 	/*
-	 * Query the hal about antenna support
-	 * Enable rx fast diversity if hal has support
+	 * Query the HAL about antenna support
+	 * Enable rx fast diversity if HAL has support
 	 */
 	if (ath_hal_hasdiversity(ah)) {
 		sc->sc_hasdiversity = 1;
@@ -900,7 +900,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 				autocreatemode, IEEE80211_CLONE_BSSID);
 		rtnl_unlock();
 		if (error)
-			printk(KERN_ERR "%s: autocreation of vap failed: %d\n",
+			printk(KERN_ERR "%s: autocreation of VAP failed: %d\n",
 				dev->name, error);
 	}
 
@@ -940,13 +940,13 @@ ath_detach(struct net_device *dev)
 
 	/*
 	 * NB: the order of these is important:
-	 * o call the 802.11 layer before detaching the hal to
+	 * o call the 802.11 layer before detaching the HAL to
 	 *   ensure callbacks into the driver to delete global
 	 *   key cache entries can be handled
 	 * o reclaim the tx queue data structures after calling
 	 *   the 802.11 layer as we'll get called back to reclaim
 	 *   node state and potentially want to use them
-	 * o to cleanup the tx queues the hal is called, so detach
+	 * o to cleanup the tx queues the HAL is called, so detach
 	 *   it last
 	 * Other than that, it's straightforward...
 	 */
@@ -1065,7 +1065,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	vap->iv_comp_set = ath_comp_set;
 #endif
 
-	/* Let rate control register proc entries for the vap */
+	/* Let rate control register proc entries for the VAP */
 	ath_rate_dynamic_proc_register(vap);
 
 	/*
@@ -1085,7 +1085,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		 * virtual ap's with distinct addresses.
 		 */
 		
-		/* do a full search to mark all the allocated vaps */
+		/* do a full search to mark all the allocated VAPs */
 		id_mask = 0;
 		TAILQ_FOREACH(v, &ic->ic_vaps, iv_next)
 			id_mask |= (1 << ATH_GET_VAP_ID(v->iv_myaddr));
@@ -1111,7 +1111,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		if (opmode == IEEE80211_M_HOSTAP || !sc->sc_hasveol) {
 			int slot;
 			/*
-			 * Assign the vap to a beacon xmit slot.  As
+			 * Assign the VAP to a beacon xmit slot.  As
 			 * above, this cannot fail to find one.
 			 */
 			avp->av_bslot = 0;
@@ -1136,7 +1136,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		}
 		if (sc->sc_hastsfadd) {
 			/*
-			 * Multiple vaps are to transmit beacons and we
+			 * Multiple VAPs are to transmit beacons and we
 			 * have h/w support for TSF adjusting; enable use
 			 * of staggered beacons.
 			 */
@@ -1161,9 +1161,9 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	else if (opmode == IEEE80211_M_MONITOR)
 		sc->sc_nmonvaps++;
 	/*
-	 * Adhoc demo mode is a pseudo mode; to the hal it's
+	 * Adhoc demo mode is a pseudo mode; to the HAL it's
 	 * just ibss mode and the driver doesn't use management
-	 * frames.  Other modes carry over directly to the hal.
+	 * frames.  Other modes carry over directly to the HAL.
 	 */
 	if (ic->ic_opmode == IEEE80211_M_AHDEMO)
 		sc->sc_opmode = HAL_M_IBSS;
@@ -1178,7 +1178,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 		if (!sc->sc_xrtxq)
 			sc->sc_xrtxq = ath_txq_setup(sc, HAL_TX_QUEUE_DATA, HAL_XR_DATA);
 		if (sc->sc_hasdiversity) {
-			/* Save current diversity state if user destroys XR vap */
+			/* Save current diversity state if user destroys XR VAP */
 			sc->sc_olddiversity = sc->sc_diversity;
 			ath_hal_setdiversity(sc->sc_ah, 0);
 			sc->sc_diversity = 0;
@@ -1207,15 +1207,15 @@ ath_vap_delete(struct ieee80211vap *vap)
 	struct ath_vap *avp = ATH_VAP(vap);
 	int decrease = 1;
 	int i;
-	KASSERT(vap->iv_state == IEEE80211_S_INIT, ("vap not stopped"));
+	KASSERT(vap->iv_state == IEEE80211_S_INIT, ("VAP not stopped"));
 
 	if (dev->flags & IFF_RUNNING) {
 		/*
-		 * Quiesce the hardware while we remove the vap.  In
+		 * Quiesce the hardware while we remove the VAP.  In
 		 * particular we need to reclaim all references to the
-		 * vap state by any frames pending on the tx queues.
+		 * VAP state by any frames pending on the tx queues.
 		 *
-		 * XXX can we do this w/o affecting other vap's?
+		 * XXX can we do this w/o affecting other VAPs?
 		 */
 		ath_hal_intrset(ah, 0);		/* disable interrupts */
 		ath_draintxq(sc);		/* stop xmit side */
@@ -1223,14 +1223,14 @@ ath_vap_delete(struct ieee80211vap *vap)
 	}
 
 	/*
-	 * Reclaim any pending mcast bufs on the vap.
+	 * Reclaim any pending mcast bufs on the VAP.
 	 */
 	ath_tx_draintxq(sc, &avp->av_mcastq);
 	ATH_TXQ_LOCK_DESTROY(&avp->av_mcastq);
 
 	/*
 	 * Reclaim beacon state.  Note this must be done before
-	 * vap instance is reclaimed as we may have a reference
+	 * VAP instance is reclaimed as we may have a reference
 	 * to it in the buffer for the beacon frame.
 	 */
 	if (avp->av_bcbuf != NULL) {
@@ -1259,8 +1259,8 @@ ath_vap_delete(struct ieee80211vap *vap)
 
 #ifdef ATH_SUPERG_XR 
 	/*
-	 * if its an XR vap ,free the memory allocated explicitly.
-	 * since the XR vap is not registered , OS can not free the memory.
+	 * If it's an XR VAP, free the memory allocated explicitly.
+	 * Since the XR VAP is not registered, OS cannot free the memory.
 	 */
 	if (vap->iv_flags & IEEE80211_F_XR) {
 		ath_grppoll_stop(vap);
@@ -1378,7 +1378,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		}
 
 		/*
-		 * XXXAPSD: consider new hal call that does only the subset
+		 * XXXAPSD: consider new HAL call that does only the subset
 		 *          of ath_hal_rxprocdesc we require for trigger search.
 		 */
 
@@ -1419,7 +1419,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		if (ds->ds_rxstat.rs_keyix == HAL_RXKEYIX_INVALID ||
 		    (ni = sc->sc_keyixmap[ds->ds_rxstat.rs_keyix]) == NULL) {
 			/* 
-			 * XXX: this can occur if WEP mode is used for non-atheros clients
+			 * XXX: this can occur if WEP mode is used for non-Atheros clients
 			 *      (since we do not know which of the 4 WEP keys will be used
 			 *      at association time, so cannot setup a key-cache entry.
 			 *      The Atheros client can convey this in the Atheros IE.)
@@ -1493,7 +1493,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		/* make sure the frame is QoS data/null */
 		/* NB: with current sub-type definitions, the 
 		 * IEEE80211_FC0_SUBTYPE_QOS check, below, covers the 
-		 * qos null case too.
+		 * QoS null case too.
 		 */
 		if (((qwh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA) ||
 		     !(qwh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS))
@@ -1546,8 +1546,8 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				"%s: Queue empty, generating QoS NULL to send\n",
 				__func__);
 			/* 
-			 * Empty queue, so need to send qos null on this ac. Make a
-			 * call that will dump a qos null onto the node's queue, then
+			 * Empty queue, so need to send QoS null on this ac. Make a
+			 * call that will dump a QoS null onto the node's queue, then
 			 * we can proceed as normal.
 			 */
 			ieee80211_send_qosnulldata(ni, ac);
@@ -1639,7 +1639,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	needmark = 0;
 	/*
 	 * Figure out the reason(s) for the interrupt.  Note
-	 * that the hal returns a pseudo-ISR that may include
+	 * that the HAL returns a pseudo-ISR that may include
 	 * bits we haven't explicitly enabled so we mask the
 	 * value to ensure we only process bits we requested.
 	 */
@@ -1692,7 +1692,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 * Check if the beacon queue caused the interrupt 
 			 * when a dynamic turbo switch
 			 * is pending so we can initiate the change. 
-			 * XXX must wait for all vap's beacons
+			 * XXX must wait for all VAPs' beacons
 			 */
 
 			if (sc->sc_dturbo_switch) {
@@ -1724,7 +1724,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 */
 			ath_hal_intrset(ah, 0);
 			/*
-			 * Let the hal handle the event.  We assume it will
+			 * Let the HAL handle the event.  We assume it will
 			 * clear whatever condition caused the interrupt.
 			 */
 			ath_hal_mibevent(ah, &sc->sc_halstats);
@@ -1790,7 +1790,7 @@ ath_fatal_tasklet(TQUEUE_ARG data)
 {
 	struct net_device *dev = (struct net_device *)data;
 
-	printk("%s: hardware error; reseting\n", dev->name);
+	printk("%s: hardware error; resetting\n", dev->name);
 	ath_reset(dev);
 }
 
@@ -1799,7 +1799,7 @@ ath_rxorn_tasklet(TQUEUE_ARG data)
 {
 	struct net_device *dev = (struct net_device *)data;
 
-	printk("%s: rx FIFO overrun; reseting\n", dev->name);
+	printk("%s: rx FIFO overrun; resetting\n", dev->name);
 	ath_reset(dev);
 }
 
@@ -1947,7 +1947,7 @@ ath_init(struct net_device *dev)
 	ath_chan_change(sc, ic->ic_curchan);
 	ath_set_ack_bitrate(sc, sc->sc_ackrate);
 	dev->flags |= IFF_RUNNING;		/* we are ready to go */
-	ieee80211_start_running(ic);		/* start all vap's */
+	ieee80211_start_running(ic);		/* start all VAPs */
 #ifdef ATH_TX99_DIAG
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->start(sc->sc_tx99);
@@ -1993,7 +1993,7 @@ ath_stop_locked(struct net_device *dev)
 #endif
 		netif_stop_queue(dev);	/* XXX re-enabled by ath_newstate */
 		dev->flags &= ~IFF_RUNNING;	/* NB: avoid recursion */
-		ieee80211_stop_running(ic);	/* stop all vap's */
+		ieee80211_stop_running(ic);	/* stop all VAPs */
 		if (!sc->sc_invalid) {
 			ath_hal_intrset(ah, 0);
 			if (sc->sc_softled) {
@@ -2012,7 +2012,7 @@ ath_stop_locked(struct net_device *dev)
 		ath_beacon_free(sc);		/* XXX needed? */
 	}
 	else
-		ieee80211_stop_running(ic);	/* stop other vap's */
+		ieee80211_stop_running(ic);	/* stop other VAPs */
 
 	if (sc->sc_softled)
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
@@ -2108,7 +2108,7 @@ ath_set_ack_bitrate(struct ath_softc *sc, int high)
 	struct ath_hal *ah = sc->sc_ah;
 	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
 		/* set ack to be sent at low bit-rate */
-		/* registers taken from the openbsd 5212 hal */
+		/* registers taken from the OpenBSD 5212 HAL */
 #define AR5K_AR5212_STA_ID1                     0x8004
 #define AR5K_AR5212_STA_ID1_ACKCTS_6MB          0x01000000
 #define AR5K_AR5212_STA_ID1_BASE_RATE_11B       0x02000000
@@ -2793,7 +2793,7 @@ hardstart_fail:
  * Transmit a management frame.  On failure we reclaim the skbuff.
  * Note that management frames come directly from the 802.11 layer
  * and do not honor the send queue flow control.  Need to investigate
- * using priority queueing so management frames can bypass data.
+ * using priority queuing so management frames can bypass data.
  *
  * Context: hwIRQ and softIRQ
  */
@@ -2921,7 +2921,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 		if (sc->sc_splitmic) {
 			/*
 			 * TX key goes at first index, RX key at the rx index.
-			 * The hal handles the MIC keys at index+64.
+			 * The HAL handles the MIC keys at index+64.
 			 */
 			memcpy(hk->kv_mic, k->wk_txmic, sizeof(hk->kv_mic));
 			KEYPRINTF(sc, k->wk_keyix, hk, zerobssid);
@@ -2935,7 +2935,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 		} else {
 			/*
 			 * Room for both TX+RX MIC keys in one key cache
-			 * slot, just set key at the first index; the hal
+			 * slot, just set key at the first index; the HAL
 			 * will handle the reset.
 			 */
 			memcpy(hk->kv_mic, k->wk_rxmic, sizeof(hk->kv_mic));
@@ -2948,7 +2948,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 	} else if (k->wk_flags & IEEE80211_KEY_XR) {
 		/*
 		 * TX/RX key goes at first index.
-		 * The hal handles the MIC keys are index+64.
+		 * The HAL handles the MIC keys are index+64.
 		 */
 		memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
 			k->wk_txmic : k->wk_rxmic, sizeof(hk->kv_mic));
@@ -3151,7 +3151,7 @@ key_alloc_single(struct ath_softc *sc)
 }
 
 /*
- * Allocate one or more key cache slots for a uniacst key.  The
+ * Allocate one or more key cache slots for a unicast key.  The
  * key itself is needed only to identify the cipher.  For hardware
  * TKIP with split cipher+MIC keys we allocate two key cache slot
  * pairs so that we can setup separate TX and RX MIC keys.  Note
@@ -3349,7 +3349,7 @@ ath_key_update_end(struct ieee80211vap *vap)
  * operating mode and state:
  *
  * o always accept unicast, broadcast, and multicast traffic
- * o maintain current state of phy error reception (the hal
+ * o maintain current state of phy error reception (the HAL
  *   may enable phy error frames for noise immunity work)
  * o probe request frames are accepted only when operating in
  *   hostap, adhoc, or monitor modes
@@ -3390,7 +3390,7 @@ ath_calcrxfilter(struct ath_softc *sc)
 }
 
 /*
- * Merge multicast addresses from all vap's to form the
+ * Merge multicast addresses from all VAPs to form the
  * hardware filter.  Ideally we should only inspect our
  * own list and the 802.11 layer would merge for us but
  * that's a bit difficult so for now we put the onus on
@@ -3410,7 +3410,7 @@ ath_merge_mcast(struct ath_softc *sc, u_int32_t mfilt[2])
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 		struct net_device *dev = vap->iv_dev;
 		for (mc = dev->mc_list; mc; mc = mc->next) {
-			/* calculate XOR of eight 6bit values */
+			/* calculate XOR of eight 6-bit values */
 			val = LE_READ_4(mc->dmi_addr + 0);
 			pos = (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
 			val = LE_READ_4(mc->dmi_addr + 3);
@@ -3810,7 +3810,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct sk_buff *skb;
 
 	/*
-	 * release the previous beacon skb , if it already exists.
+	 * release the previous beacon's skb if it already exists.
 	 */
 	bf = avp->av_bcbuf;
 	if (bf->bf_skb != NULL) {
@@ -3851,8 +3851,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * timestamp then convert to TSF units and handle
 		 * byte swapping before writing it in the frame.
 		 * The hardware will then add this each time a beacon
-		 * frame is sent.  Note that we align vap's 1..N
-		 * and leave vap 0 untouched.  This means vap 0
+		 * frame is sent.  Note that we align VAPs 1..N
+		 * and leave VAP 0 untouched.  This means VAP 0
 		 * has a timestamp in one beacon interval while the
 		 * others get a timestamp aligned to the next interval.
 		 */
@@ -3990,7 +3990,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 }
 
 /*
- * Generate beacon frame and queue cab data for a vap.
+ * Generate beacon frame and queue cab data for a VAP.
  */
 static struct ath_buf *
 ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmark)
@@ -4004,7 +4004,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	unsigned int curlen;
 
 	if (vap->iv_state != IEEE80211_S_RUN) {
-		DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: skip vap in %s state\n",
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: skip VAP in %s state\n",
 			__func__, ieee80211_state_name[vap->iv_state]);
 		return NULL;
 	}
@@ -4058,10 +4058,10 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	/*
 	 * if the CABQ traffic from previous DTIM is pending and the current
 	 * beacon is also a DTIM. 
-	 *  1) if there is only one vap let the cab traffic continue. 
-	 *  2) if there are more than one vap and we are using staggered
+	 *  1) if there is only one VAP let the cab traffic continue. 
+	 *  2) if there are more than one VAP and we are using staggered
 	 *     beacons, then drain the cabq by dropping all the frames in
-	 *     the cabq so that the current vaps cab traffic can be scheduled.
+	 *     the cabq so that the current VAP's cab traffic can be scheduled.
 	 * XXX: Need to handle the last MORE_DATA bit here.
 	 */
 	if (ncabq && (avp->av_boff.bo_tim[4] & 1) && sc->sc_cabq->axq_depth) {
@@ -4088,7 +4088,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		struct ath_txq *cabq = sc->sc_cabq;
 		struct ath_buf *bfmcast;
 		/*
-		 * Move everything from the vap's mcast queue 
+		 * Move everything from the VAP's mcast queue 
 		 * to the hardware cab queue.
 		 */
 		ATH_TXQ_LOCK(&avp->av_mcastq);
@@ -4111,7 +4111,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 				((struct ieee80211_frame *)bfmcast->bf_skb->data)->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
 		}
 
-		/* append the private vap mcast list to  the cabq */
+		/* append the private VAP mcast list to the cabq */
 		ATH_TXQ_MOVE_MCASTQ(&avp->av_mcastq, cabq);
 		/* NB: gated by beacon so safe to start here */
 		ath_hal_txstart(ah, cabq->axq_qnum);
@@ -4147,7 +4147,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	 */
 	if (ath_hal_numtxpending(ah, sc->sc_bhalq) != 0) {
 		sc->sc_bmisscount++;
-		/* XXX: doth needs the chanchange IE countdown decremented.
+		/* XXX: 802.11h needs the chanchange IE countdown decremented.
 		 *      We should consider adding a net80211 call to indicate
 		 *      a beacon miss so appropriate action could be taken
 		 *      (in that layer).
@@ -4171,7 +4171,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	 * staggered then calculate the slot for this frame based
 	 * on the tsf to safeguard against missing an swba.
 	 * Otherwise we are bursting all frames together and need
-	 * to generate a frame for each vap that is up and running.
+	 * to generate a frame for each VAP that is up and running.
 	 */
 	if (sc->sc_stagbeacons) {		/* staggered beacons */
 		struct ieee80211com *ic = &sc->sc_ic;
@@ -4230,7 +4230,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	 *     again.  If we miss a beacon for that slot then we'll be
 	 *     slow to transition but we'll be sure at least one beacon
 	 *     interval has passed.  When bursting slot is always left
-	 *     set to ATH_BCBUF so this check is a noop.
+	 *     set to ATH_BCBUF so this check is a no-op.
 	 */
 	/* XXX locking */
 	if (sc->sc_updateslot == UPDATE) {
@@ -4246,7 +4246,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		 * the default rx antenna if noticeably more frames went out
 		 * on the non-default antenna.  Only do this if rx diversity
 		 * is off.
-		 * XXX assumes 2 anntenae
+		 * XXX assumes 2 antennae
 		 */
 		otherant = sc->sc_defant & 1 ? 2 : 1;
 		if (sc->sc_ant_tx[otherant] > sc->sc_ant_tx[sc->sc_defant] + ATH_ANTENNA_DIFF) {
@@ -4261,7 +4261,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 
 	if (bfaddr != 0) {
 		/*
-		 * Stop any current dma and put the new frame(s) on the queue.
+		 * Stop any current DMA and put the new frame(s) on the queue.
 		 * This should never fail since we check above that no frames
 		 * are still pending on the queue.
 		 */
@@ -4275,7 +4275,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		ath_hal_puttxbuf(ah, sc->sc_bhalq, bfaddr);
 		ath_hal_txstart(ah, sc->sc_bhalq);
 
-		sc->sc_stats.ast_be_xmit++;		/* XXX per-vap? */
+		sc->sc_stats.ast_be_xmit++;		/* XXX per-VAP? */
 	}
 #undef TSF_TO_TU
 }
@@ -4291,7 +4291,7 @@ ath_bstuck_tasklet(TQUEUE_ARG data)
 	/*
 	 * XXX:if the bmisscount is cleared while the 
 	 *     tasklet execution is pending, the following
-	 *     check will be true , in which case return 
+	 *     check will be true, in which case return 
 	 *     without resetting the driver.
 	 */
 	if (sc->sc_bmisscount <= BSTUCK_THRESH) 
@@ -4346,7 +4346,7 @@ ath_beacon_start_adhoc(struct ath_softc *sc, struct ieee80211vap *vap)
 	bus_dma_sync_single(sc->sc_bdev,
 		bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 
-	/* NB: caller is known to have already stopped tx dma */
+	/* NB: caller is known to have already stopped tx DMA */
 	ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
 	ath_hal_txstart(ah, sc->sc_bhalq);
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: TXDP%u = %llx (%p)\n", __func__,
@@ -4404,7 +4404,7 @@ ath_beacon_free(struct ath_softc *sc)
  * timers according to the timestamp of the last received
  * beacon and the current TSF, configures PCF and DTIM
  * handling, programs the sleep registers so the hardware
- * will wakeup in time to receive beacons, and configures
+ * will wake up in time to receive beacons, and configures
  * the beacon miss handling so we'll receive a BMISS
  * interrupt when we stop seeing beacons from the AP
  * we've associated with.
@@ -4706,7 +4706,7 @@ ath_desc_alloc(struct ath_softc *sc)
 		return error;
 	}
 
-	/* XXX allocate beacon state together with vap */
+	/* XXX allocate beacon state together with VAP */
 	error = ath_descdma_setup(sc, &sc->sc_bdma, &sc->sc_bbuf,
 			"beacon", ATH_BCBUF, 1);
 	if (error != 0) {
@@ -4750,7 +4750,7 @@ ath_node_alloc(struct ieee80211_node_table *nt,struct ieee80211vap *vap)
 	an->an_halstats.ns_avgrssi = ATH_RSSI_DUMMY_MARKER;
 	an->an_halstats.ns_avgtxrssi = ATH_RSSI_DUMMY_MARKER;
 	/*
-	 * ath_rate_node_init needs a vap pointer in node
+	 * ath_rate_node_init needs a VAP pointer in node
 	 * to decide which mgt rate to use
 	 */
 	an->an_node.ni_vap = vap;
@@ -4858,8 +4858,8 @@ ath_node_getrssi(const struct ieee80211_node *ni)
 
 #ifdef ATH_SUPERG_XR
 /*
- * stops the txqs and moves data between XR and Normal queues.
- * also adjusts the rate info in the descriptors .
+ * Stops the txqs and moves data between XR and Normal queues.
+ * Also adjusts the rate info in the descriptors.
  */
 
 static u_int8_t
@@ -4895,14 +4895,14 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			ath_hal_stoptxdma(ah, txq->axq_qnum);
 			bf = prev = STAILQ_FIRST(&txq->axq_q);
 			/*
-			 * skip all the buffers that are done .
+			 * skip all the buffers that are done
 			 * until the first one that is in progress
 			 */
 			while (bf) {
 #ifdef ATH_SUPERG_FF
 				ds = &bf->bf_desc[bf->bf_numdesc - 1];
 #else
-				ds = bf->bf_desc;		/* NB: last decriptor */
+				ds = bf->bf_desc;		/* NB: last descriptor */
 #endif
 				status = ath_hal_txprocdesc(ah, ds);
 				if (status == HAL_EINPROGRESS)
@@ -4911,8 +4911,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 				bf = STAILQ_NEXT(bf,bf_list);
 			}
 			/* 
-			 * save the pointer to the last buf thats
-			 * done .
+			 * save the pointer to the last buf that's
+			 * done
 			 */
 			if (prev == bf)
 				bf_tmp = NULL;  
@@ -4931,13 +4931,13 @@ ath_node_move_data(const struct ieee80211_node *ni)
 						STAILQ_INSERT_TAIL(&tmp_q.axq_q, bf, bf_list);
 						bf = STAILQ_NEXT(prev, bf_list);
 						/*
-						 * after deleting the node.
-						 * link the descriptors .
+						 * after deleting the node
+						 * link the descriptors
 						 */
 #ifdef ATH_SUPERG_FF
 						ds = &prev->bf_desc[prev->bf_numdesc - 1];
 #else
-						ds = prev->bf_desc;	/* NB: last decriptor */
+						ds = prev->bf_desc;	/* NB: last descriptor */
 #endif
 #ifdef AH_NEED_DESC_SWAP
 						ds->ds_link = cpu_to_le32(bf->bf_daddr);
@@ -4962,7 +4962,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 #ifdef ATH_SUPERG_FF
 						ds = &prev->bf_desc[prev->bf_numdesc - 1];
 #else
-						ds = prev->bf_desc;	/* NB: last decriptor */
+						ds = prev->bf_desc;	/* NB: last descriptor */
 #endif
 						status = ath_hal_txprocdesc(ah, ds);
 						if (status == HAL_EINPROGRESS) 
@@ -4977,7 +4977,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			ATH_TXQ_UNLOCK(txq);
 			/*
 			 * restart the DMA from the first 
-			 * buffer that was not DMAd.
+			 * buffer that was not DMA'd.
 			 */
 			if (bf_tmp)
 				bf = STAILQ_NEXT(bf_tmp, bf_list);
@@ -5028,14 +5028,14 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		ath_hal_stoptxdma(ah, txq->axq_qnum);
 		bf = prev = STAILQ_FIRST(&txq->axq_q);
 		/*
-		 * skip all the buffers that are done .
+		 * skip all the buffers that are done
 		 * until the first one that is in progress
 		 */
 		while (bf) {
 #ifdef ATH_SUPERG_FF
 			ds = &bf->bf_desc[bf->bf_numdesc - 1];
 #else
-			ds = bf->bf_desc;		/* NB: last decriptor */
+			ds = bf->bf_desc;		/* NB: last descriptor */
 #endif
 			status = ath_hal_txprocdesc(ah, ds);
 			if (status == HAL_EINPROGRESS)
@@ -5044,15 +5044,15 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			bf = STAILQ_NEXT(bf,bf_list);
 		}
 		/* 
-		 * save the pointer to the last buf thats
-		 * done .
+		 * save the pointer to the last buf that's
+		 * done
 		 */
 		if (prev == bf)
 			bf_tmp1 = NULL;  
 		else
 			bf_tmp1 = prev;
 		/*
-		 * colect all the data in to four temp SW queues.
+		 * collect all the data in to four temp SW queues.
 		 */
 		while (bf) {
 			if (ni == bf->bf_node) {
@@ -5077,7 +5077,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 				STAILQ_INSERT_TAIL(&wmeq->axq_q, bf_tmp, bf_list);
 				ds = bf_tmp->bf_desc;
 				/* 
-				 * link the descriptors .
+				 * link the descriptors
 				 */
 				if (wmeq->axq_link != NULL) {
 #ifdef AH_NEED_DESC_SWAP
@@ -5110,7 +5110,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 #ifdef ATH_SUPERG_FF
 					ds = &prev->bf_desc[prev->bf_numdesc - 1];
 #else
-					ds = prev->bf_desc;	/* NB: last decriptor */
+					ds = prev->bf_desc;	/* NB: last descriptor */
 #endif
 					status = ath_hal_txprocdesc(ah, ds);
 					if (status == HAL_EINPROGRESS) 
@@ -5128,7 +5128,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		ATH_TXQ_UNLOCK(txq);
 		/*
 		 * restart the DMA from the first 
-		 * buffer that was not DMAd.
+		 * buffer that was not DMA'd.
 		 */
 		if (bf_tmp1)
 			bf = STAILQ_NEXT(bf_tmp1,bf_list);
@@ -5141,7 +5141,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 
 		/* 
 		 * move (concant) the lists from the temp sw queues in to
-		 * wme queues.
+		 * WME queues.
 		 */
 		index = WME_AC_VO;
 		txq = NULL;
@@ -5167,14 +5167,14 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			}
 			if (index == WME_AC_BE || txq != prevq) {
 				/* 
-				 * find the first buffer to be DMAd.
+				 * find the first buffer to be DMA'd.
 				 */
 				bf = STAILQ_FIRST(&txq->axq_q);
 				while (bf) {
 #ifdef ATH_SUPERG_FF
 					ds = &bf->bf_desc[bf->bf_numdesc - 1];
 #else
-					ds = bf->bf_desc;	/* NB: last decriptor */
+					ds = bf->bf_desc;	/* NB: last descriptor */
 #endif
 					status = ath_hal_txprocdesc(ah, ds);
 					if (status == HAL_EINPROGRESS)
@@ -5426,7 +5426,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	sc->sc_recv_mgmt(ni, skb, subtype, rssi, rstamp);
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_BEACON:
-		/* update rssi statistics for use by the hal */
+		/* update rssi statistics for use by the HAL */
 		ATH_RSSI_LPF(ATH_NODE(ni)->an_halstats.ns_avgbrssi, rssi);
 		if (sc->sc_syncbeacon &&
 		    ni == vap->iv_bss && vap->iv_state == IEEE80211_S_RUN) {
@@ -5582,16 +5582,16 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				sc->sc_stats.ast_rx_badmic++;
 				/*
 				 * Do minimal work required to hand off
-				 * the 802.11 header for notifcation.
+				 * the 802.11 header for notification.
 				 */
-				/* XXX frag's and qos frames */
+				/* XXX frag's and QoS frames */
 				len = ds->ds_rxstat.rs_datalen;
 				if (len >= sizeof (struct ieee80211_frame)) {
 					bus_dma_sync_single(sc->sc_bdev,
 					    bf->bf_skbaddr, len,
 					    BUS_DMA_FROMDEVICE);
 #if 0
-/* XXX revalidate MIC, lookup ni to find vap */
+/* XXX revalidate MIC, lookup ni to find VAP */
 					ieee80211_notify_michael_failure(ic,
 					    (struct ieee80211_frame *) skb->data,
 					    sc->sc_splitmic ?
@@ -5635,7 +5635,7 @@ rx_accept:
 
 		if (sc->sc_nmonvaps > 0) {
 			/*
-			 * Some vap is in monitor mode.  Discard
+			 * Some VAP is in monitor mode.  Discard
 			 * anything shorter than an ack or cts, clean
 			 * the skbuff, fabricate the Prism header
 			 * existing tools expect, and dispatch.
@@ -5650,14 +5650,14 @@ rx_accept:
 			}
 			ath_rx_capture(dev, ds, skb);
 			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
-				/* no other vaps need the packet */
+				/* no other VAPs need the packet */
 				dev_kfree_skb(skb);
 				skb = NULL;
 				goto rx_next;
 			}
 		}
 
-		/* remove the crc */
+		/* remove the CRC */
 		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 
 		/*
@@ -5888,7 +5888,7 @@ ath_grppoll_txq_setup(struct ath_softc *sc, int qtype, int period)
 		if (qnum == -1)
 			return ;
 		if (qnum >= N(sc->sc_txq)) {
-			printk("%s: hal qnum %u out of range, max %u!\n",
+			printk("%s: HAL qnum %u out of range, max %u!\n",
 				   sc->sc_dev->name, qnum, N(sc->sc_txq));
 			ath_hal_releasetxqueue(ah, qnum);
 			return;
@@ -6030,7 +6030,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap,int pollcount)
 							AH_FALSE) /*cf-poll time */
 						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))  
 						+ ath_hal_computetxtime(ah,rt,
-							XR_FRAGMENTATION_THRESHOLD ,
+							XR_FRAGMENTATION_THRESHOLD,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
 							AH_FALSE) /*data packet time */
 						+ ath_hal_computetxtime(ah,rt,
@@ -6249,7 +6249,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 		return NULL;
 	}
 	if (qnum >= N(sc->sc_txq)) {
-		printk("%s: hal qnum %u out of range, max %u!\n",
+		printk("%s: HAL qnum %u out of range, max %u!\n",
 			sc->sc_dev->name, qnum, N(sc->sc_txq));
 #ifdef ATH_SUPERG_COMP
 		if (compbuf) {
@@ -6282,7 +6282,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 
 /*
  * Setup a hardware data transmit queue for the specified
- * access control.  The hal may not support all requested
+ * access control.  The HAL may not support all requested
  * queues in which case it will return a reference to a
  * previously setup queue.  We record the mapping from ac's
  * to h/w queues for use by ath_tx_start and also track
@@ -6985,10 +6985,10 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * when the descriptor is specifically marked to generate
 	 * an interrupt.  We periodically mark descriptors in this
 	 * way to ensure timely replenishing of the supply needed
-	 * for sending frames.  Defering interrupts reduces system
+	 * for sending frames.  Deferring interrupts reduces system
 	 * load and potentially allows more concurrent work to be
-	 * done but if done to aggressively can cause senders to
-	 * backup.
+	 * done, but if done too aggressively, it can cause senders
+	 * to backup.
 	 *
 	 * NB: use >= to deal with sc_txintrperiod changing
 	 *     dynamically through sysctl.
@@ -7193,7 +7193,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: frame's last desc: %p\n",
 			__func__, ds);
 #else
-		ds = bf->bf_desc;		/* NB: last decriptor */
+		ds = bf->bf_desc;		/* NB: last descriptor */
 #endif
 		status = ath_hal_txprocdesc(ah, ds);
 #ifdef AR_DEBUG
@@ -7577,7 +7577,7 @@ ath_stoprecv(struct ath_softc *sc)
 	ath_hal_stoppcurecv(ah);	/* disable PCU */
 	ath_hal_setrxfilter(ah, 0);	/* clear recv filter */
 	ath_hal_stopdmarecv(ah);	/* disable DMA engine */
-	mdelay(3);			/* 3ms is long enough for 1 frame */
+	mdelay(3);			/* 3 ms is long enough for 1 frame */
 	tsf = ath_hal_gettsf64(ah);
 #ifdef AR_DEBUG
 	if (sc->sc_debug & (ATH_DEBUG_RESET | ATH_DEBUG_FATAL)) {
@@ -7688,7 +7688,7 @@ ath_chan_change(struct ath_softc *sc, struct ieee80211_channel *chan)
 
 /*
  * Set/change channels.  If the channel is really being changed,
- * it's done by reseting the chip.  To accomplish this we must
+ * it's done by resetting the chip.  To accomplish this we must
  * first cleanup any pending DMA, then restart stuff after a la
  * ath_init.
  */
@@ -7741,7 +7741,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			ath_hal_setcoverageclass(sc->sc_ah, ic->ic_coverageclass, 0);
 
 		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
-			printk("%s: %s: unable to reset channel %u (%uMhz) "
+			printk("%s: %s: unable to reset channel %u (%u MHz) "
 				"flags 0x%x '%s' (HAL status %u)\n",
 				dev->name, __func__,
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq,
@@ -7982,7 +7982,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 	if (nstate == IEEE80211_S_INIT) {
 		/*
-		 * if there is no vap left in RUN state
+		 * if there is no VAP left in RUN state
 		 * disable beacon interrupts.
 		 */
 		TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
@@ -8115,7 +8115,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			if (wds_ni) {
 				/* XXX no rate negotiation; just dup */
 				wds_ni->ni_rates = vap->iv_bss->ni_rates;
-				/* Depending on the sequence of bring-ing up devices
+				/* Depending on the sequence of bringing up devices
 				 * it's possible the rates of the root bss isn't
 				 * filled yet. 
 				 */
@@ -8154,8 +8154,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 *
 		 */
 		if (sc->sc_dfswait && vap->iv_opmode == IEEE80211_M_HOSTAP ) {
-			/* push the vap to RUN state once DFS is cleared */
-			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: vap  -> DFS_WAIT\n",
+			/* push the VAP to RUN state once DFS is cleared */
+			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  -> DFS_WAIT\n",
 				__func__, dev->name);
 			avp->av_dfswait_run = 1; 
 			return 0;
@@ -8166,12 +8166,12 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			sc->sc_dfswaittimer.data == (unsigned long)vap) {
 			del_timer_sync(&sc->sc_dfswaittimer);
 			sc->sc_dfswait = 0;
-			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: vap  out of DFS_WAIT\n",
+			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  out of DFS_WAIT\n",
 				__func__, dev->name);
 		}
 		/*
 		 *  XXXX
-		 * if it is SCAN state , disable Beacons. 
+		 * if it is SCAN state, disable beacons. 
 		 */
 		if (nstate == IEEE80211_S_SCAN) {
 			ath_hal_intrset(ah,sc->sc_imask &~ (HAL_INT_SWBA | HAL_INT_BMISS));
@@ -8210,10 +8210,10 @@ bad:
 }
 
 /*
- * periodically checks for the hal to set
+ * periodically checks for the HAL to set
  * CHANNEL_DFS_CLEAR flag on current channel.
- * if the flag is set and a vap is waiting for it ,push 
- * transition the vap to RUN state.
+ * if the flag is set and a VAP is waiting for it, push 
+ * transition the VAP to RUN state.
  *
  * Context: Timer (softIRQ)
  */
@@ -8248,7 +8248,7 @@ ath_check_dfs_clear(unsigned long data )
 					/* XXX */
 					return;
 				}
-				DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: vap DFS_WAIT -> RUN\n",
+				DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP DFS_WAIT -> RUN\n",
 					__func__, dev->name);
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
 				/* start calibration timer */
@@ -8340,7 +8340,7 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
  * setup a mapping from key index to node. The key cache
  * slot is needed for managing antenna state and for
  * compression when stations do not use crypto.  We do
- * it uniliaterally here; if crypto is employed this slot
+ * it unilaterally here; if crypto is employed this slot
  * will be reassigned.
  */
 static void
@@ -8405,7 +8405,7 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 	txkeyidx = ni->ni_ucastkey.wk_keyix;
 	xmit_key = &vap->iv_nw_keys[vap->iv_def_txkey];
 
-	/* Do we need seperate rx key? */
+	/* Do we need separate rx key? */
 	if (ni->ni_ath_defkeyindex != vap->iv_def_txkey) {
 		ni->ni_ucastkey.wk_keyix = IEEE80211_KEYIX_NONE;
 		if (!ieee80211_crypto_newkey(vap, 
@@ -8555,7 +8555,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		u_int32_t rd;
 
 		ath_hal_getregdomain(ah, &rd);
-		printk("%s: unable to collect channel list from hal; "
+		printk("%s: unable to collect channel list from HAL; "
 			"regdomain likely %u country code %u\n",
 			dev->name, rd, cc);
 		kfree(chans);
@@ -8875,14 +8875,14 @@ ath_setcurmode(struct ath_softc *sc, enum ieee80211_phymode mode)
 			if (blinkrates[j].rate == sc->sc_hwmap[i].ieeerate)
 				break;
 		/* NB: this uses the last entry if the rate isn't found */
-		/* XXX beware of overlow */
+		/* XXX beware of overflow */
 		sc->sc_hwmap[i].ledon = msecs_to_jiffies(blinkrates[j].timeOn);
 		sc->sc_hwmap[i].ledoff = msecs_to_jiffies(blinkrates[j].timeOff);
 	}
 	sc->sc_currates = rt;
 	sc->sc_curmode = mode;
 	/*
-	 * All protection frames are transmited at 2Mb/s for
+	 * All protection frames are transmitted at 2Mb/s for
 	 * 11g, otherwise at 1Mb/s.
 	 * XXX select protection rate index from rate table.
 	 */
@@ -8920,7 +8920,7 @@ athff_approx_txtime(struct ath_softc *sc, struct ath_node *an, struct sk_buff *s
 	return txtime;
 }
 /*
- * Determine if a data frame may be aggregated via ff tunnelling.
+ * Determine if a data frame may be aggregated via ff tunneling.
  *
  *  NB: allowing EAPOL frames to be aggregated with other unicast traffic.
  *      Do 802.1x EAPOL frames proceed in the clear? Then they couldn't
@@ -8963,7 +8963,7 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 	txoplimit = IEEE80211_TXOP_TO_US(
 		ic->ic_wme.wme_chanParams.cap_wmeParams[skb->priority].wmep_txopLimit);
 
-	/* if the 4msec limit is set on the channel, take it in to account */
+	/* if the 4 msec limit is set on the channel, take it into account */
 	if (sc->sc_curchan.privFlags & CHANNEL_4MS_LIMIT)
 		txoplimit = MIN(txoplimit, US_PER_4MS); 
 
@@ -9056,7 +9056,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 		mac->sa_data[3], mac->sa_data[4], mac->sa_data[5]);
 
 	ATH_LOCK(sc);
-	/* XXX not right for multiple vap's */
+	/* XXX not right for multiple VAPs */
 	IEEE80211_ADDR_COPY(ic->ic_myaddr, mac->sa_data);
 	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
 	ath_hal_setmac(ah, dev->dev_addr);
@@ -9535,10 +9535,10 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	}
 	
 	/* 
-	 * We want to reserve space for the name of the device seperate
-	 * to the net_device structure, because when the name is changed
+	 * We want to reserve space for the name of the device separate
+	 * from the net_device structure, because when the name is changed
 	 * it is changed in the net_device structure and the message given
-	 * out.  Thus we won't know what the name used to be if we rely
+	 * out.  Thus we won't know what the name it used to be if we rely
 	 * on it.
 	 */
 	dev_name = kmalloc((strlen(sc->sc_dev->name) + 1) * sizeof(char), GFP_KERNEL);
@@ -9617,13 +9617,13 @@ ath_announce(struct net_device *dev)
 	/*
 	 * Print radio revision(s).  We check the wireless modes
 	 * to avoid falsely printing revs for inoperable parts.
-	 * Dual-band radio revs are returned in the 5Ghz rev number.
+	 * Dual-band radio revs are returned in the 5 GHz rev number.
 	 */
 	ath_hal_getcountrycode(ah, &cc);
 	modes = ath_hal_getwirelessmodes(ah, cc);
 	if ((modes & HAL_MODE_DUALBAND) == HAL_MODE_DUALBAND) {
 		if (ah->ah_analog5GhzRev && ah->ah_analog2GhzRev)
-			printk(" 5ghz radio %d.%d 2ghz radio %d.%d",
+			printk(" 5 GHz radio %d.%d 2 GHz radio %d.%d",
 				ah->ah_analog5GhzRev >> 4,
 				ah->ah_analog5GhzRev & 0xf,
 				ah->ah_analog2GhzRev >> 4,
@@ -9652,11 +9652,11 @@ ath_announce(struct net_device *dev)
 }
 
 /*
- * Static (i.e. global) sysctls.  Note that the hal sysctls
+ * Static (i.e. global) sysctls.  Note that the HAL sysctls
  * are located under ours by sharing the setting for DEV_ATH.
  */
 enum {
-	DEV_ATH		= 9,			/* XXX known by hal */
+	DEV_ATH		= 9,			/* XXX known by HAL */
 };
 
 static ctl_table ath_static_sysctls[] = {
