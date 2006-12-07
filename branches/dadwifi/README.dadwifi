@@ -91,6 +91,11 @@ to be completed which are not reflected in the ticket system:
   - tx power control : tx power control handling needs to be looked at.  I don't
     know what the unit is for the power argument to ath_hal_setuptxdesc().
 
+Here is a list of features which are currently on hold:
+
+  - multicast frame key search: See sc->sc_mcastkey, etc.  I disabled this
+    for now since I am unsure what to do about it.
+
 Here is a list of features which we do not plan on working on:
 
   - Super G, super G fast frames, super G compression, dynamic turbo and XR :

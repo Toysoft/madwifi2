@@ -64,6 +64,8 @@
 #define	WME_AC_VO	3		/* voice */
 #define IEEE80211_MAX_LEN	2500
 #define ATHDESC_HEADER_SIZE	32
+#define	IEEE80211_KEYIX_NONE	((u_int16_t) - 1)
+#define	IEEE80211_WEP_NKID		4	/* number of key ids */
 
 /* WME stream classes */
 #define	WME_AC_BE	0		/* best effort */
@@ -299,13 +301,17 @@ typedef void irqreturn_t;
 /*
  * The key cache is used for h/w cipher state and also for
  * tracking station state such as the current tx antenna.
- * We also setup a mapping table between key cache slot indices
- * and station state to short-circuit node lookups on rx.
  * Different parts have different size key caches.  We handle
  * up to ATH_KEYMAX entries (could dynamically allocate state).
  */
 #define	ATH_KEYMAX	128		/* max key cache size we handle */
 #define	ATH_KEYBYTES	(ATH_KEYMAX / NBBY)	/* storage space in bytes */
+
+/* used to keep track of hardware cipher state */
+struct ath_key {
+	u8 ak_alg;
+};
+
 #define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
 #define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
 struct ath_buf;
@@ -594,6 +600,7 @@ struct ath_softc {
 	u_int sc_fftxqmin;			/* aggregation threshold */
 	HAL_INT sc_imask;			/* interrupt mask copy */
 	u_int sc_keymax;				/* size of key cache */
+	struct ath_key sc_ath_keys[ATH_KEYMAX]; /* cached key table */
 	u_int8_t sc_keymap[ATH_KEYBYTES];	/* key use bit map */
 	struct ieee80211_node *sc_keyixmap[ATH_KEYMAX];/* key ix->node map */
 	u_int8_t sc_bssidmask[IEEE80211_ADDR_LEN];

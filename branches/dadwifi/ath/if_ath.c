@@ -124,11 +124,6 @@ static int ath_stop_locked(struct ath_softc *);
 #if 0
 static void ath_initkeytable(struct ath_softc *);
 #endif
-static int ath_key_alloc(struct ieee80211vap *, const struct ieee80211_key *);
-static int ath_key_delete(struct ieee80211vap *, const struct ieee80211_key *,
-	struct ieee80211_node *);
-static int ath_key_set(struct ieee80211vap *, const struct ieee80211_key *,
-	const u_int8_t mac[IEEE80211_ADDR_LEN]);
 static void ath_key_update_begin(struct ieee80211vap *);
 static void ath_key_update_end(struct ieee80211vap *);
 #endif
@@ -368,6 +363,7 @@ static void ath_printtxbuf(struct ath_buf *, int);
 int
 ath_attach(u_int16_t devid, struct ath_softc *sc)
 {
+	struct ieee80211_hw *hw = sc->sc_hw;
 	struct ath_hal *ah;
 	HAL_STATUS status;
 	int error = 0, i;
@@ -457,20 +453,6 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	 */
 	for (i = 0; i < sc->sc_keymax; i++)
 		ath_hal_keyreset(ah, i);
-#if 0
-	/*
-	 * Mark key cache slots associated with global keys
-	 * as in use.  If we knew TKIP was not to be used we
-	 * could leave the +32, +64, and +32+64 slots free.
-	 * XXX only for splitmic.
-	 */
-	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
-		setbit(sc->sc_keymap, i);
-		setbit(sc->sc_keymap, i+32);
-		setbit(sc->sc_keymap, i+64);
-		setbit(sc->sc_keymap, i+32+64);
-	}
-#endif
 
 	/*
 	 * Collect the channel list using the default country
@@ -744,37 +726,36 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 		| IEEE80211_C_WPA		/* capable of WPA1+WPA2 */
 		| IEEE80211_C_BGSCAN		/* capable of bg scanning */
 		;
+#endif
 	/*
 	 * Query the hal to figure out h/w crypto support.
 	 */
-	if (ath_hal_ciphersupported(ah, HAL_CIPHER_WEP))
-		ic->ic_caps |= IEEE80211_C_WEP;
-	if (ath_hal_ciphersupported(ah, HAL_CIPHER_AES_OCB))
-		ic->ic_caps |= IEEE80211_C_AES;
-	if (ath_hal_ciphersupported(ah, HAL_CIPHER_AES_CCM))
-		ic->ic_caps |= IEEE80211_C_AES_CCM;
-	if (ath_hal_ciphersupported(ah, HAL_CIPHER_CKIP))
-		ic->ic_caps |= IEEE80211_C_CKIP;
 	if (ath_hal_ciphersupported(ah, HAL_CIPHER_TKIP)) {
-		ic->ic_caps |= IEEE80211_C_TKIP;
 		/*
 		 * Check if h/w does the MIC and/or whether the
 		 * separate key cache entries are required to
 		 * handle both tx+rx MIC keys.
 		 */
-		if (ath_hal_ciphersupported(ah, HAL_CIPHER_MIC)) {
-			ic->ic_caps |= IEEE80211_C_TKIPMIC;
+		if (ath_hal_ciphersupported(ah, HAL_CIPHER_MIC) &&
+		    ath_hal_hastkipmic(ah)) {
+
 			/*
 			 * Check if h/w does MIC correctly when
 			 * WMM is turned on.
 			 */
-			if (ath_hal_wmetkipmic(ah))
-				ic->ic_caps |= IEEE80211_C_WME_TKIPMIC;
+			if (!ath_hal_wmetkipmic(ah))
+				/* FIXME: add a flag to d80211 so we can
+				   support hardware TKIP and software MIC
+				   for WME? */
+				hw->flags |= IEEE80211_HW_NO_TKIP_WMM_HWACCEL;
+		} else {
+			hw->flags |= IEEE80211_HW_TKIP_INCLUDE_MMIC;
 		}
  
 		if (ath_hal_tkipsplit(ah))
 			sc->sc_splitmic = 1;
 	}
+#if 0
 	sc->sc_hasclrkey = ath_hal_ciphersupported(ah, HAL_CIPHER_CLR);
 #if 0
 	sc->sc_mcastkey = ath_hal_getmcastkeysearch(ah);
@@ -1025,9 +1006,6 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	vap = &avp->av_vap;
 	avp->av_newstate = vap->iv_newstate;
 	vap->iv_newstate = ath_newstate;
-	vap->iv_key_alloc = ath_key_alloc;
-	vap->iv_key_delete = ath_key_delete;
-	vap->iv_key_set = ath_key_set;
 	vap->iv_key_update_begin = ath_key_update_begin;
 	vap->iv_key_update_end = ath_key_update_end;
 #ifdef ATH_SUPERG_COMP
@@ -2256,7 +2234,31 @@ ath_tx_startraw(struct ath_softc *sc, struct ath_buf *bf, struct sk_buff *skb,
 	hdrlen = ieee80211_get_hdrlen_from_skb(skb);
 	pktlen = skb->len - header_pad + FCS_LEN;
 
-	keyix = HAL_TXKEYIX_INVALID;
+	if (control->key_idx == HW_KEY_IDX_INVALID)
+		keyix = HAL_TXKEYIX_INVALID;
+	else {
+		keyix = control->key_idx;
+
+		if (sc->sc_ath_keys[keyix].ak_alg == ALG_TKIP) {
+			struct ieee80211_hdr *hdr;
+			u16 fc;
+			u16 sc;
+
+			hdr = (struct ieee80211_hdr *) skb->data;
+			fc = le16_to_cpu(hdr->frame_control);
+			sc = le16_to_cpu(hdr->seq_ctrl);
+
+			if (likely(!(fc & IEEE80211_FCTL_MOREFRAGS) &&
+				    (sc & IEEE80211_SCTL_FRAG) == 0)) {
+
+				/* hwaccel adds Michael MIC to the end of the
+				 * payload of unfragmented frames. */
+				pktlen += 8;
+			}
+		}
+
+		pktlen += control->icv_len;
+	}
 	flags = HAL_TXDESC_INTREQ | HAL_TXDESC_CLRDMASK; /* XXX needed for crypto errs */
 	
 	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
@@ -2864,6 +2866,7 @@ bad:
 	skb = NULL;
 	return error;
 }
+#endif
 
 #ifdef AR_DEBUG
 static void
@@ -2883,7 +2886,7 @@ ath_keyprint(const char *tag, u_int ix,
 	printk("%s: [%02u] %-7s ", tag, ix, ciphers[hk->kv_type]);
 	for (i = 0, n = hk->kv_len; i < n; i++)
 		printk("%02x", hk->kv_val[i]);
-	printk(" mac %s", ether_sprintf(mac));
+	printk(" mac " MAC_FMT, MAC_ARG(mac));
 	if (hk->kv_type == HAL_CIPHER_TKIP) {
 		printk(" mic ");
 		for (i = 0; i < sizeof(hk->kv_mic); i++)
@@ -2899,68 +2902,63 @@ ath_keyprint(const char *tag, u_int ix,
  * cache slots for TKIP.
  */
 static int
-ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
-	HAL_KEYVAL *hk, const u_int8_t mac[IEEE80211_ADDR_LEN])
+ath_keyset_tkip(struct ath_softc *sc, struct ieee80211_key_conf *key,
+		HAL_KEYVAL *hk, const u_int8_t mac[IEEE80211_ADDR_LEN])
 {
-#define	IEEE80211_KEY_XR	(IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV)
 	static const u_int8_t zerobssid[IEEE80211_ADDR_LEN];
 	struct ath_hal *ah = sc->sc_ah;
 
-	KASSERT(k->wk_cipher->ic_cipher == IEEE80211_CIPHER_TKIP,
-		("got a non-TKIP key, cipher %u", k->wk_cipher->ic_cipher));
+	KASSERT(hk->kv_type == HAL_CIPHER_TKIP,
+		("got a non-TKIP key, cipher %u", hk->kv_type));
 	KASSERT(sc->sc_splitmic, ("key cache !split"));
-	if ((k->wk_flags & IEEE80211_KEY_XR) == IEEE80211_KEY_XR) {
+	if (!(sc->sc_opmode == HAL_M_STA && key->hw_key_idx < IEEE80211_WEP_NKID)) {
 		/*
 		 * TX key goes at first index, RX key at +32.
 		 * The hal handles the MIC keys at index+64.
 		 */
-		memcpy(hk->kv_mic, k->wk_txmic, sizeof(hk->kv_mic));
-		KEYPRINTF(sc, k->wk_keyix, hk, zerobssid);
-		if (!ath_hal_keyset(ah, k->wk_keyix, hk, zerobssid))
+		memcpy(hk->kv_mic, key->key + 16 /* ALG_TKIP_TEMP_AUTH_TX_MIC_KEY */,
+		       8 /* FIXME: define a constant */);
+		KEYPRINTF(sc, key->hw_key_idx, hk, zerobssid);
+		if (!ath_hal_keyset(ah, key->hw_key_idx, hk, zerobssid))
 			return 0;
 
-		memcpy(hk->kv_mic, k->wk_rxmic, sizeof(hk->kv_mic));
-		KEYPRINTF(sc, k->wk_keyix + 32, hk, mac);
+		memcpy(hk->kv_mic, key->key + 24 /* ALG_TKIP_TEMP_AUTH_RX_MIC_KEY */,
+		       8 /* FIXME: define a constant */);
+		KEYPRINTF(sc, key->hw_key_idx + 32, hk, mac);
 		/* XXX delete tx key on failure? */
-		return ath_hal_keyset(ah, k->wk_keyix + 32, hk, mac);
-	} else if (k->wk_flags & IEEE80211_KEY_XR) {
+		return ath_hal_keyset(ah, key->hw_key_idx + 32, hk, mac);
+	} else {
 		/*
-		 * TX/RX key goes at first index.
+		 * RX key goes at first index.
 		 * The hal handles the MIC keys are index+64.
 		 */
-		memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
-			k->wk_txmic : k->wk_rxmic, sizeof(hk->kv_mic));
-		KEYPRINTF(sc, k->wk_keyix, hk, mac);
-		return ath_hal_keyset(ah, k->wk_keyix, hk, mac);
+		memcpy(hk->kv_mic, key->key + 24 /* ALG_TKIP_TEMP_AUTH_RX_MIC_KEY */,
+		       8 /* FIXME: define a constant */);
+		KEYPRINTF(sc, key->hw_key_idx, hk, mac);
+		return ath_hal_keyset(ah, key->hw_key_idx, hk, mac);
 	}
 	return 0;
-#undef IEEE80211_KEY_XR
 }
 
 /*
- * Set a net80211 key into the hardware.  This handles the
+ * Set a key into the hardware.  This handles the
  * potential distribution of key state to multiple key
  * cache slots for TKIP with hardware MIC support.
  */
-static int
-ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
-	const u_int8_t mac0[IEEE80211_ADDR_LEN],
-	struct ieee80211_node *bss)
+int
+ath_keyset(struct ath_softc *sc, struct ieee80211_key_conf *key,
+	const u_int8_t mac[IEEE80211_ADDR_LEN])
 {
 #define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	static const u_int8_t ciphermap[] = {
-		HAL_CIPHER_WEP,		/* IEEE80211_CIPHER_WEP */
-		HAL_CIPHER_TKIP,	/* IEEE80211_CIPHER_TKIP */
-		HAL_CIPHER_AES_OCB,	/* IEEE80211_CIPHER_AES_OCB */
-		HAL_CIPHER_AES_CCM,	/* IEEE80211_CIPHER_AES_CCM */
-		(u_int8_t) -1,		/* 4 is not allocated */
-		HAL_CIPHER_CKIP,	/* IEEE80211_CIPHER_CKIP */
-		HAL_CIPHER_CLR,		/* IEEE80211_CIPHER_NONE */
+		HAL_CIPHER_CLR,		/* ALG_NONE */
+		HAL_CIPHER_WEP,		/* ALG_WEP */
+		HAL_CIPHER_TKIP,	/* ALG_TKIP */
+		HAL_CIPHER_AES_CCM,	/* ALG_CCMP */
+		HAL_CIPHER_CLR,		/* ALG_NULL */
 	};
 	struct ath_hal *ah = sc->sc_ah;
-	const struct ieee80211_cipher *cip = k->wk_cipher;
-	u_int8_t gmac[IEEE80211_ADDR_LEN];
-	const u_int8_t *mac;
+	struct ieee80211_hw *hw = sc->sc_hw;
 	HAL_KEYVAL hk;
 
 	memset(&hk, 0, sizeof(hk));
@@ -2969,34 +2967,28 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
 	 * state kept in the key cache are maintained and
 	 * so that rx frames have an entry to match.
 	 */
-	if ((k->wk_flags & IEEE80211_KEY_SWCRYPT) == 0) {
-		KASSERT(cip->ic_cipher < N(ciphermap),
-			("invalid cipher type %u", cip->ic_cipher));
-		hk.kv_type = ciphermap[cip->ic_cipher];
-		hk.kv_len = k->wk_keylen;
-		memcpy(hk.kv_val, k->wk_key, k->wk_keylen);
+	if (key->alg != ALG_NULL) {
+		if (key->alg >= N(ciphermap)) {
+			DPRINTF(sc, ATH_DEBUG_KEYCACHE,
+				"%s: invalid cipher type %u\n", __func__, key->alg);
+			return 0;
+		}
+		hk.kv_type = ciphermap[key->alg];
+		if (key->alg == ALG_TKIP)
+			hk.kv_len = 16; /* FIXME: define a constant */
+		else
+			hk.kv_len = key->keylen;
+		memcpy(hk.kv_val, key->key, hk.kv_len);
 	} else
 		hk.kv_type = HAL_CIPHER_CLR;
 
-	if ((k->wk_flags & IEEE80211_KEY_GROUP) && sc->sc_mcastkey) {
-		/*
-		 * Group keys on hardware that supports multicast frame
-		 * key search use a mac that is the sender's address with
-		 * the high bit set instead of the app-specified address.
-		 */
-		IEEE80211_ADDR_COPY(gmac, bss->ni_macaddr);
-		gmac[0] |= 0x80;
-		mac = gmac;
-	} else
-		mac = mac0;
-
 	if (hk.kv_type == HAL_CIPHER_TKIP &&
-	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 &&
+	    (hw->flags & IEEE80211_HW_TKIP_INCLUDE_MMIC) == 0 &&
 	    sc->sc_splitmic) {
-		return ath_keyset_tkip(sc, k, &hk, mac);
+		return ath_keyset_tkip(sc, key, &hk, mac);
 	} else {
-		KEYPRINTF(sc, k->wk_keyix, &hk, mac);
-		return ath_hal_keyset(ah, k->wk_keyix, &hk, mac);
+		KEYPRINTF(sc, key->hw_key_idx, &hk, mac);
+		return ath_hal_keyset(ah, key->hw_key_idx, &hk, mac);
 	}
 #undef N
 }
@@ -3028,8 +3020,9 @@ key_alloc_2pair(struct ath_softc *sc)
 			/* XXX IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV */
 			if (isset(sc->sc_keymap, keyix + 32) ||
 			    isset(sc->sc_keymap, keyix + 64) ||
-			    isset(sc->sc_keymap, keyix + 32 + 64)) {
-				/* full pair unavailable */
+			    isset(sc->sc_keymap, keyix + 32 + 64) ||
+			    keyix < IEEE80211_WEP_NKID) {
+				/* index unavailable */
 				/* XXX statistic */
 				if (keyix == (i + 1) * NBBY) {
 					/* no slots were appropriate, advance */
@@ -3070,8 +3063,23 @@ key_alloc_single(struct ath_softc *sc)
 			 * One or more slots are free.
 			 */
 			keyix = i * NBBY;
-			while (b & 1)
+			while (b & 1) {
+		again:
 				keyix++, b >>= 1;
+			}
+			if (keyix < IEEE80211_WEP_NKID ||
+			    (keyix >= 32 && keyix < (32 + IEEE80211_WEP_NKID)) ||
+			    (keyix >= 64 && keyix < (64 + IEEE80211_WEP_NKID)) ||
+			    (keyix >= (32 + 64) &&
+			     keyix < (32 + 64 + IEEE80211_WEP_NKID))) {
+				/* never alloc a default key or default TKIP
+				   key pair */
+				if (keyix == (i + 1) * NBBY) {
+					/* no slots were appropriate, advance */
+					continue;
+				}
+				goto again;
+			}
 			setbit(sc->sc_keymap, keyix);
 			DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s: key %u\n",
 				__func__, keyix);
@@ -3092,38 +3100,26 @@ key_alloc_single(struct ath_softc *sc)
  * hardware to be at slot i+64.  This limits TKIP keys to the first
  * 64 entries.
  */
-static int
-ath_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
+int
+ath_key_alloc(struct ath_softc *sc, struct ieee80211_key_conf *key,
+	      const u_int8_t addr[IEEE80211_ADDR_LEN])
 {
-	struct net_device *dev = vap->iv_ic->ic_dev;
-	struct ath_softc *sc = dev->priv;
+	struct ieee80211_hw *hw = sc->sc_hw;
+	u_int keyix;
 
-	/*
-	 * Group key allocation must be handled specially for
-	 * parts that do not support multicast key cache search
-	 * functionality.  For those parts the key id must match
-	 * the h/w key index so lookups find the right key.  On
-	 * parts w/ the key search facility we install the sender's
-	 * mac address (with the high bit set) and let the hardware
-	 * find the key w/o using the key id.  This is preferred as
-	 * it permits us to support multiple users for adhoc and/or
-	 * multi-station operation.
-	 */
-	if ((k->wk_flags & IEEE80211_KEY_GROUP) && !sc->sc_mcastkey) {
-		u_int keyix;
+	if ((key->flags & IEEE80211_KEY_DEFAULT_WEP_ONLY) &&
+	    (addr == NULL ||
+	     memcmp(addr, "\xff\xff\xff\xff\xff\xff", ETH_ALEN) == 0)) {
+		keyix = key->keyidx;
 
-		if (!(&vap->iv_nw_keys[0] <= k &&
-		    k < &vap->iv_nw_keys[IEEE80211_WEP_NKID])) {
-			/* should not happen */
-			DPRINTF(sc, ATH_DEBUG_KEYCACHE,
-				"%s: bogus group key\n", __func__);
-			return IEEE80211_KEYIX_NONE;
-		}
-		keyix = k - vap->iv_nw_keys;
-		/*
-		 * XXX we pre-allocate the global keys so
-		 * have no way to check if they've already been allocated.
-		 */
+		if (key->alg == ALG_TKIP) {
+			setbit(sc->sc_keymap, keyix);
+			setbit(sc->sc_keymap, keyix + 64);
+			setbit(sc->sc_keymap, keyix + 32);
+			setbit(sc->sc_keymap, keyix + 32 + 64);
+		} else
+			setbit(sc->sc_keymap, keyix);
+
 		return keyix;
 	}
 	/*
@@ -3137,10 +3133,9 @@ ath_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	 * Allocate 1 pair of keys for WEP case. Make sure the key
 	 * is not a shared-key.
 	 */
-	if (k->wk_flags & IEEE80211_KEY_SWCRYPT)
-		return key_alloc_single(sc);
-	else if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_TKIP &&
-	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 && sc->sc_splitmic) {
+	if (key->alg == ALG_TKIP &&
+	    (hw->flags & IEEE80211_HW_TKIP_INCLUDE_MMIC) == 0 &&
+	    sc->sc_splitmic) {
 		return key_alloc_2pair(sc);
 	} else
 		return key_alloc_single(sc);
@@ -3149,90 +3144,41 @@ ath_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 /*
  * Delete an entry in the key cache allocated by ath_key_alloc.
  */
-static int
-ath_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k,
-				struct ieee80211_node *ninfo)
+int
+ath_key_delete(struct ath_softc *sc, struct ieee80211_key_conf *key)
 {
-	struct net_device *dev = vap->iv_ic->ic_dev;
-	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
-	const struct ieee80211_cipher *cip = k->wk_cipher;
-	struct ieee80211_node *ni;
-	u_int keyix = k->wk_keyix;
-	int rxkeyoff = 0;
+	struct ieee80211_hw *hw = sc->sc_hw;
+	u_int keyix = key->hw_key_idx;
 
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s: delete key %u\n", __func__, keyix);
 
+	keyix = key->hw_key_idx;
+
 	ath_hal_keyreset(ah, keyix);
-	/*
-	 * Check the key->node map and flush any ref.
-	 */
-	ni = sc->sc_keyixmap[keyix];
-	if (ni != NULL) {
-		ieee80211_free_node(ni);
-		sc->sc_keyixmap[keyix] = NULL;
-	}
 	/*
 	 * Handle split tx/rx keying required for TKIP with h/w MIC.
 	 */
-	if (cip->ic_cipher == IEEE80211_CIPHER_TKIP &&
-	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 && sc->sc_splitmic) {
+	if (key->alg == ALG_TKIP &&
+	    (hw->flags & IEEE80211_HW_TKIP_INCLUDE_MMIC) == 0 &&
+	    sc->sc_splitmic) {
 		ath_hal_keyreset(ah, keyix + 32);	/* RX key */
-		ni = sc->sc_keyixmap[keyix+32];
-		if (ni != NULL) {			/* as above... */
-			ieee80211_free_node(ni);
-			sc->sc_keyixmap[keyix+32] = NULL;
-		}
 	}
 
-	/* Remove receive key entry if one exists for static WEP case */
-	if (ninfo != NULL) {
-		rxkeyoff = ninfo->ni_rxkeyoff;
-		if (rxkeyoff != 0) {
-			ninfo->ni_rxkeyoff = 0;
-			ath_hal_keyreset(ah, keyix + rxkeyoff);
-			ni = sc->sc_keyixmap[keyix+rxkeyoff];
-			if (ni != NULL) {	/* as above... */
-				ieee80211_free_node(ni);
-				sc->sc_keyixmap[keyix+rxkeyoff] = NULL;
-			}
-		}
-	}
-
-	if (keyix >= IEEE80211_WEP_NKID) {
-		/*
-		 * Don't touch keymap entries for global keys so
-		 * they are never considered for dynamic allocation.
-		 */
+	if (1) {
 		clrbit(sc->sc_keymap, keyix);
-		if (cip->ic_cipher == IEEE80211_CIPHER_TKIP &&
-		    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 &&
+		if (key->alg == ALG_TKIP &&
+		    (hw->flags & IEEE80211_HW_TKIP_INCLUDE_MMIC) == 0 &&
 		    sc->sc_splitmic) {
 			clrbit(sc->sc_keymap, keyix + 64);	/* TX key MIC */
 			clrbit(sc->sc_keymap, keyix + 32);	/* RX key */
 			clrbit(sc->sc_keymap, keyix + 32 + 64);	/* RX key MIC */
 		}
-
-		if (rxkeyoff != 0)
-			clrbit(sc->sc_keymap, keyix + rxkeyoff);/*RX Key */
 	}
 	return 1;
 }
 
-/*
- * Set the key cache contents for the specified key.  Key cache
- * slot(s) must already have been allocated by ath_key_alloc.
- */
-static int
-ath_key_set(struct ieee80211vap *vap, const struct ieee80211_key *k,
-	const u_int8_t mac[IEEE80211_ADDR_LEN])
-{
-	struct net_device *dev = vap->iv_ic->ic_dev;
-	struct ath_softc *sc = dev->priv;
-
-	return ath_keyset(sc, k, mac, vap->iv_bss);
-}
-
+#if 0
 /*
  * Block/unblock tx+rx processing while a key change is done.
  * We assume the caller serializes key management operations
@@ -5434,6 +5380,42 @@ ath_setdefantenna(struct ath_softc *sc, u_int antenna)
 	sc->sc_rxotherant = 0;
 }
 
+/**
+ * ath_rx_hw_decrypted - determine if this frame was decrypted by hardware
+ *
+ * Returns non-zero if the frame was decrypted by the device.
+ */
+static int
+ath_rx_hw_decrypted(struct ath_softc *sc, struct ath_desc *ds,
+		    struct sk_buff *skb, int header_len)
+{
+	u16 fc;
+	struct ieee80211_hdr *hdr;
+	int keyix;
+
+	if (!(ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT) &&
+	    (ds->ds_rxstat.rs_keyix != HAL_RXKEYIX_INVALID))
+		return 1;
+
+	hdr = (struct ieee80211_hdr *) skb->data;
+	fc = le16_to_cpu(hdr->frame_control);
+
+	/* Apparently when a default key is used to decrypt the packet
+	   the hal does not set the index used to decrypt.  In such cases
+	   get the index from the packet. */
+	if (!(ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT) &&
+	    fc & IEEE80211_FCTL_PROTECTED &&
+	    skb->len >= header_len + 4) {
+		keyix = skb->data[header_len + 3] >> 6;
+
+		if (isset(sc->sc_keymap, keyix)) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 static void
 ath_rx_tasklet(TQUEUE_ARG data)
 {
@@ -5717,10 +5699,6 @@ rx_accept:
 		status.ssi = ds->ds_rxstat.rs_rssi;
 		status.antenna = ds->ds_rxstat.rs_antenna;
 		status.rate = ds->ds_rxstat.rs_rate;
-				
-		if (!(ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT) &&
-			(ds->ds_rxstat.rs_keyix != HAL_RXKEYIX_INVALID))
-			status.flag |= RX_FLAG_DECRYPTED;
 
 		/* The device will pad 802.11 header to a multiple of 4 bytes.
 		   Remove the padding before passing the skb to the stack. */
@@ -5731,6 +5709,9 @@ rx_accept:
 			memmove(skb->data + header_pad, skb->data, header_len);
 			skb_pull(skb, header_pad);
 		}
+
+		if (ath_rx_hw_decrypted(sc, ds, skb, header_len))
+			status.flag |= RX_FLAG_DECRYPTED;
 
 		__ieee80211_rx(sc->sc_hw, skb, &status);
 #endif
@@ -9258,6 +9239,7 @@ static int
 ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 {
 	struct ath_softc *sc = ctl->extra1;
+	struct ieee80211_hw *hw = sc->sc_hw;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
 	int ret;
@@ -9348,20 +9330,18 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				/* XXX valiate? */
 				sc->sc_fftxqmin = val;
 				break;
-#ifdef CONFIG_NET80211
 			case ATH_TKIPMIC: {
-				struct ieee80211com *ic = &sc->sc_ic;
-
 				if (!ath_hal_hastkipmic(ah))
 					return -EINVAL;
 				ath_hal_settkipmic(ah, val);
 				if (val)
-					ic->ic_caps |= IEEE80211_C_TKIPMIC;
+					hw->flags &= ~IEEE80211_HW_TKIP_INCLUDE_MMIC;
 				else
-					ic->ic_caps &= ~IEEE80211_C_TKIPMIC;
+					hw->flags |= IEEE80211_HW_TKIP_INCLUDE_MMIC;
+
+				ieee80211_update_hw(hw);
 				break;
 			}
-#endif
 #ifdef ATH_SUPERG_XR
 			case ATH_XR_POLL_PERIOD: 
 				if (val > XR_MAX_POLL_INTERVAL)
