@@ -1565,6 +1565,8 @@ encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen,
 	memcpy(p, leader, leader_len);
 	bufsize -= leader_len;
 	p += leader_len;
+	if (bufsize < ielen)
+		return 0;
 	for (i = 0; i < ielen && bufsize > 2; i++)
 		p += sprintf(p, "%02x", ie[i]);
 	return (i == ielen ? p - (u_int8_t *)buf : 0);
@@ -1587,7 +1589,8 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	char *end_buf = req->end_buf;
 	char *last_ev;
 #if WIRELESS_EXT > 14
-	char buf[64 * 2 + 30];
+#define MAX_IE_LENGTH 64 * 2 + 30
+	char buf[MAX_IE_LENGTH];
 #ifndef IWEVGENIE
 	static const char rsn_leader[] = "rsn_ie=";
 	static const char wpa_leader[] = "wpa_ie=";
@@ -1735,6 +1738,8 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	  last_ev = current_ev;
 #ifdef IWEVGENIE
 		memset(&iwe, 0, sizeof(iwe));
+		if ((se->se_rsn_ie[1] + 2) > MAX_IE_LENGTH)
+			return E2BIG;
 		memcpy(buf, se->se_rsn_ie, se->se_rsn_ie[1] + 2);
 		iwe.cmd = IWEVGENIE;
 		iwe.u.data.length = se->se_rsn_ie[1] + 2;
@@ -1760,6 +1765,8 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	  last_ev = current_ev;
 #ifdef IWEVGENIE
 		memset(&iwe, 0, sizeof(iwe));
+		if ((se->se_wpa_ie[1] + 2) > MAX_IE_LENGTH)
+			return E2BIG;
 		memcpy(buf, se->se_wpa_ie, se->se_wpa_ie[1] + 2);
 		iwe.cmd = IWEVGENIE;
 		iwe.u.data.length = se->se_wpa_ie[1] + 2;
