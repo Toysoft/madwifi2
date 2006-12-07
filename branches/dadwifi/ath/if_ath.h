@@ -50,6 +50,12 @@ int ath_descdma_setup(struct ath_softc *, struct ath_descdma *, ath_bufhead *,
 void ath_descdma_cleanup(struct ath_softc *, struct ath_descdma *,
 			 ath_bufhead *, int);
 
+int ath_key_alloc(struct ath_softc *sc, struct ieee80211_key_conf *key,
+		  const u_int8_t addr[IEEE80211_ADDR_LEN]);
+int ath_key_delete(struct ath_softc *sc, struct ieee80211_key_conf *key);
+int ath_keyset(struct ath_softc *sc, struct ieee80211_key_conf *key,
+	       const u_int8_t mac0[IEEE80211_ADDR_LEN]);
+
 #define	AR_DEBUG
 
 extern int	ath_debug;
