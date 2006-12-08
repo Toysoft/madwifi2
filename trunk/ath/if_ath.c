@@ -7349,7 +7349,9 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			if (sc->sc_reapcount > ATH_TXBUF_FREE_THRESHOLD) {
 				if (!sc->sc_dfswait)
 					netif_start_queue(sc->sc_dev);
-				printk("tx tasklet restart the queue\n");
+				DPRINTF(sc, ATH_DEBUG_TX_PROC,
+					"%s: tx tasklet restart the queue\n",
+					__func__);
 				sc->sc_reapcount = 0;
 				sc->sc_devstopped = 0;
 			} else
