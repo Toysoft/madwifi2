@@ -52,7 +52,24 @@ $ make
 to install it (as root) :
 
 # make install
-# modprobe 80211 rate_control ath_pci
+# modprobe rc80211_simple
+# modprobe ath_pci
+
+For monitor mode use iwconfig to configure the interface, for example :
+
+# iwconfig wlan0 mode monitor
+# ifconfig wlan0 up
+# iwconfig wlan0 channel 6
+
+Then point your sniffer (tcpdump, wireshare, tshark etc.) at the interface,
+for example:
+
+# tshark -xV -i wlan0
+
+For station mode it is recommended to use wpa_supplicant and the wireless
+extentions driver, i.e.:
+
+# wpa_supplicant -dd -Dwext -i wlan0 -c wpa_supplicant.conf
 
 For AP mode a recent hostapd development snapshot is required.  hostapd-0.5.5
 is known to work.  You must configure hostapd to include the Devicescape
