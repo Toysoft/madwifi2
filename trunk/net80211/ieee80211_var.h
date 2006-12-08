@@ -464,7 +464,7 @@ MALLOC_DECLARE(M_80211_VAP);
 #define IEEE80211_FEXT_UAPSD	0x00000010	/* CONF: enable U-APSD */
 #define IEEE80211_FEXT_SLEEP	0x00000020	/* STATUS: sleeping */
 #define IEEE80211_FEXT_EOSPDROP	0x00000040	/* drop uapsd EOSP frames for test */
-#define	IEEE80211_FEXT_MARKDFS	0x00000080	/* Enable marking of dfs interfernce */
+#define	IEEE80211_FEXT_MARKDFS	0x00000080	/* Enable marking of dfs interference */
 #define IEEE80211_FEXT_REGCLASS	0x00000100	/* CONF: send regclassids in country ie */
 #define IEEE80211_FEXT_ERPUPDATE 0x00000200	/* STATUS: update ERP element */
 #define IEEE80211_FEXT_SWBMISS 0x00000400	/* CONF: use software beacon timer */
@@ -619,7 +619,7 @@ ieee80211_anyhdrspace(struct ieee80211com *ic, const void *data)
 }
 
 #define	IEEE80211_MSG_DEBUG	0x40000000	/* IFF_DEBUG equivalent */
-#define	IEEE80211_MSG_DUMPPKTS	0x20000000	/* IFF_LINK2 equivalant */
+#define	IEEE80211_MSG_DUMPPKTS	0x20000000	/* IFF_LINK2 equivalent */
 #define	IEEE80211_MSG_CRYPTO	0x10000000	/* crypto work */
 #define	IEEE80211_MSG_INPUT	0x08000000	/* input handling */
 #define	IEEE80211_MSG_XRATE	0x04000000	/* rate set handling */

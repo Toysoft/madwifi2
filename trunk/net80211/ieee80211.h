@@ -638,7 +638,7 @@ typedef u_int8_t *ieee80211_mgt_beacon_t;
 #define	IEEE80211_CAPINFO_SHORT_PREAMBLE	0x0020
 #define	IEEE80211_CAPINFO_PBCC			0x0040
 #define	IEEE80211_CAPINFO_CHNL_AGILITY		0x0080
-/* bits 8-9 are reserved (8 now for specturm management) */
+/* bits 8-9 are reserved (8 now for spectrum management) */
 #define IEEE80211_CAPINFO_SPECTRUM_MGMT		0x0100
 #define	IEEE80211_CAPINFO_SHORT_SLOTTIME	0x0400
 #define	IEEE80211_CAPINFO_RSN			0x0800
@@ -927,7 +927,7 @@ enum {
 #define	IEEE80211_RTS_MAX		2346
 
 /* 
- * Regulatory extention identifier for country IE.
+ * Regulatory extension identifier for country IE.
  */
 #define IEEE80211_REG_EXT_ID		201
 

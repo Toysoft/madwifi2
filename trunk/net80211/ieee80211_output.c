@@ -384,7 +384,7 @@ ieee80211_send_setup(struct ieee80211vap *vap,
  * must have a reference as the pointer will be passed to the driver
  * and potentially held for a long time.  If the frame is successfully
  * dispatched to the driver, then it is responsible for freeing the
- * reference (and potentially free'ing up any associated storage).
+ * reference (and potentially freeing up any associated storage).
  */
 static void
 ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
@@ -753,7 +753,7 @@ ieee80211_crypto_getmcastkey(struct ieee80211vap *vap, struct ieee80211_node *ni
  * a reference to the destination node is returned.  If an error is
  * encountered NULL is returned and the node reference will also be NULL.
  *
- * NB: The caller is responsible for free'ing a returned node reference.
+ * NB: The caller is responsible for freeing a returned node reference.
  *     The convention is ic_bss is not reference counted; the caller must
  *     maintain that.
  */
@@ -1773,7 +1773,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 /*
  * Send a management frame.  The node is for the destination (or ic_bss
  * when in station mode).  Nodes other than ic_bss have their reference
- * count bumped to reflect our use for an indeterminant time.
+ * count bumped to reflect our use for an indeterminate time.
  */
 int
 ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)

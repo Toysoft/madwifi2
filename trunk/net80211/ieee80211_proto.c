@@ -786,7 +786,7 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 	/* NB: check ic_bss to avoid NULL deref on initial attach */
 	if (vap->iv_bss != NULL) {
 		/*
-		 * Calculate agressive mode switching threshold based
+		 * Calculate aggressive mode switching threshold based
 		 * on beacon interval.
 		 */
 		wme->wme_hipri_switch_thresh =
@@ -1232,7 +1232,7 @@ ieee80211_new_state(struct ieee80211vap *vap, enum ieee80211_state nstate, int a
 	struct ieee80211com *ic = vap->iv_ic;
 	int rc;
 
-	/* grab the lock so that only one vap can go through transistion at any time */
+	/* grab the lock so that only one vap can go through transition at any time */
 	IEEE80211_VAPS_LOCK_BH(ic);
 	rc = vap->iv_newstate(vap, nstate, arg);
 	IEEE80211_VAPS_UNLOCK_BH(ic);

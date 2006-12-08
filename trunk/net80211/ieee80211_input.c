@@ -752,7 +752,7 @@ ieee80211_input(struct ieee80211_node *ni,
 
 	case IEEE80211_FC0_TYPE_MGT:
 		/*
-		 * WDS opmode do not support managment frames
+		 * WDS opmode do not support management frames
 		 */
 		if (vap->iv_opmode == IEEE80211_M_WDS) {
 			vap->iv_stats.is_rx_mgtdiscard++;
@@ -1691,7 +1691,7 @@ ieee80211_ssid_mismatch(struct ieee80211vap *vap, const char *tag,
 } while (0)
 #endif /* !IEEE80211_DEBUG */
 
-/* unalligned little endian access */     
+/* unaligned little endian access */     
 #define LE_READ_2(p)					\
 	((u_int16_t)					\
 	 ((((const u_int8_t *)(p))[0]      ) |		\
@@ -2298,7 +2298,7 @@ ieee80211_doth_cancel_cs(struct ieee80211vap *vap)
 	del_timer(&vap->iv_csa_timer);
 	if (vap->iv_csa_jiffies) 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				"channel switch cancelled (was: to %u in %u "
+				"channel switch canceled (was: to %u in %u "
 				"tbtt, mode %u)\n", vap->iv_csa_chan->ic_ieee,
 				vap->iv_csa_count, vap->iv_csa_mode);
 	vap->iv_csa_jiffies = 0;

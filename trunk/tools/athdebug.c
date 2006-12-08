@@ -76,7 +76,7 @@ enum {
 	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
 	ATH_DEBUG_LED		= 0x00100000,	/* led management */
 	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
-	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamice turbo */
+	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
 	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
 	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
