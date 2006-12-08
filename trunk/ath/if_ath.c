@@ -7337,7 +7337,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		bf->bf_numdesc = 0;
 #else
 		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
-		ath_tx_capture(sc->sc_dev, ds, skbfree);
+		ath_tx_capture(sc->sc_dev, ds, bf->bf_skb);
 #endif
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
@@ -7483,7 +7483,10 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
-	struct sk_buff *skb, *tskb;
+	struct sk_buff *skb;
+#ifdef ATH_SUPERG_FF
+	struct sk_buff *tskb;
+#endif
 	int i;
 
 	/*
@@ -7509,6 +7512,7 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 			bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 		dev_kfree_skb_any(bf->bf_skb);
 		i = 0;
+#ifdef ATH_SUPERG_FF
 		while (skb) {
 			tskb = skb->next;
 			bus_unmap_single(sc->sc_bdev,
@@ -7516,6 +7520,7 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 			dev_kfree_skb_any(skb);
 			skb = tskb;
 		}
+#endif /* ATH_SUPERG_FF */
 		if (bf->bf_node)
 			ieee80211_free_node(bf->bf_node);
 
