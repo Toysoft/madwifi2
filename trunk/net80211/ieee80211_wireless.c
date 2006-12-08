@@ -1565,10 +1565,10 @@ encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen,
 	memcpy(p, leader, leader_len);
 	bufsize -= leader_len;
 	p += leader_len;
-	if (bufsize < ielen)
-		return 0;
-	for (i = 0; i < ielen && bufsize > 2; i++)
+	for (i = 0; i < ielen && bufsize > 2; i++) {
 		p += sprintf(p, "%02x", ie[i]);
+		bufsize -= 2;
+	}
 	return (i == ielen ? p - (u_int8_t *)buf : 0);
 }
 #endif /* WIRELESS_EXT > 14 */
