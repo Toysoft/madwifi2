@@ -400,7 +400,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	dev->set_mac_address = ieee80211_set_mac_address;
 #endif
  	dev->change_mtu = ieee80211_change_mtu;
-	dev->tx_queue_len = 0;			/* NB: bypass queueing */
+	dev->tx_queue_len = 0;			/* NB: bypass queuing */
 	dev->hard_header_len = parent->hard_header_len;
 	/*
 	 * The caller is assumed to allocate the device with
@@ -1143,7 +1143,7 @@ findrate(struct ieee80211com *ic, enum ieee80211_phymode mode, int rate)
 /*
  * Convert a media specification to a rate index and possibly a mode
  * (if the rate is fixed and the mode is specified as ``auto'' then
- * we need to lock down the mode so the index is meanginful).
+ * we need to lock down the mode so the index is meaningful).
  */
 static int
 checkrate(struct ieee80211com *ic, enum ieee80211_phymode mode, int rate)

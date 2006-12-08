@@ -556,7 +556,7 @@ copy_essid(char buf[], size_t bufsize, const u_int8_t *essid, size_t essid_len)
 	return maxlen;
 }
 
-/* unalligned little endian access */     
+/* unaligned little endian access */     
 #define LE_READ_4(p)					\
 	((u_int32_t)					\
 	 ((((const u_int8_t *)(p))[0]      ) |		\
@@ -699,7 +699,7 @@ list_stations(const char *ifname)
 	} while (len >= sizeof(struct ieee80211req_sta_info));
 }
 
-/* unalligned little endian access */     
+/* unaligned little endian access */     
 #define LE_READ_4(p)					\
 	((u_int32_t)					\
 	 ((((const u_int8_t *)(p))[0]      ) |		\

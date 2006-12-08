@@ -214,7 +214,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	 * beacon frame format
 	 *	[8] time stamp
 	 *	[2] beacon interval
-	 *	[2] cabability information
+	 *	[2] capability information
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
 	 *	[7] FH/DS parameter set
@@ -357,10 +357,10 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		struct ieee80211_wme_state *wme = &ic->ic_wme;
 
 		/*
-		 * Check for agressive mode change.  When there is
+		 * Check for aggressive mode change.  When there is
 		 * significant high priority traffic in the BSS
 		 * throttle back BE traffic by using conservative
-		 * parameters.  Otherwise BE uses agressive params
+		 * parameters.  Otherwise BE uses aggressive params
 		 * to optimize performance of legacy/non-QoS traffic.
 		 */
 		if (wme->wme_flags & WME_F_AGGRMODE) {

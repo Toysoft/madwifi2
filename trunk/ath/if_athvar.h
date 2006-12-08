@@ -279,7 +279,7 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 #define A_MAX(a,b) ((a) > (b) ? (a) : (b))
 
 /*
- * Macros to obtain the Group Poll Periodicty in various situations
+ * Macros to obtain the Group Poll Periodicity in various situations
  *
  * Curerntly there are the two cases
  * (a) When there are no XR STAs associated
@@ -306,8 +306,8 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
  */
 #define	ATH_KEYMAX	128		/* max key cache size we handle */
 #define	ATH_KEYBYTES	(ATH_KEYMAX / NBBY)	/* storage space in bytes */
-#define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
-#define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
+#define	ATH_MIN_FF_RATE	12000		/* min rate for ff aggregation in kbps */
+#define	ATH_MIN_FF_RATE	12000		/* min rate for ff aggregation in kbps */
 struct ath_buf;
 typedef STAILQ_HEAD(, ath_buf) ath_bufhead;
 
@@ -317,14 +317,14 @@ struct ath_node {
 	u_int16_t an_decomp_index; 		/* decompression mask index */
 	u_int32_t an_avgrssi;			/* average rssi over all rx frames */
 	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
-	u_int16_t an_minffrate;			/* mimum rate in kbps for ff to aggragate */
+	u_int16_t an_minffrate;			/* min rate in kbps for ff to aggregate */
 	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
 	struct ath_buf *an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
 	ath_bufhead an_uapsd_q;			/* U-APSD delivery queue */
 	int an_uapsd_qdepth; 			/* U-APSD delivery queue depth */
 	ath_bufhead an_uapsd_overflowq; 	/* U-APSD overflow queue (for > MaxSp frames) */
 	int an_uapsd_overflowqdepth; 		/* U-APSD overflow queue depth */
-	spinlock_t an_uapsd_lock; 		/* U-APSD deleivery queue lock */
+	spinlock_t an_uapsd_lock; 		/* U-APSD delivery queue lock */
 	/* variable-length rate control state follows */
 };
 #define	ATH_NODE(_n)			((struct ath_node *)(_n))
@@ -372,7 +372,7 @@ struct ath_buf {
 	u_int32_t bf_status;			/* status flags */
 	u_int16_t bf_flags;			/* tx descriptor flags */
 #ifdef ATH_SUPERG_FF
-	/* XXX: combine this with bf_skbaddr if it ever changes to accomodate
+	/* XXX: combine this with bf_skbaddr if it ever changes to accommodate
 	 *      multiple segments.
 	 */
 	u_int16_t bf_numdesc;			/* number of descs used */
@@ -538,7 +538,7 @@ struct ath_softc {
 			sc_dturbo_switch:1,	/* turbo switch mode*/
 			sc_dturbo_hold:1,	/* dynamic turbo hold state */
 			sc_rate_recn_state:1,	/* dynamic turbo state recmded by ratectrl */
-			sc_ignore_ar:1,		/* ignore AR during transision*/
+			sc_ignore_ar:1,		/* ignore AR during transition */
 			sc_ledstate:1,		/* LED on/off state */
 			sc_blinking:1,		/* LED blink operation active */
 			sc_beacons:1,		/* beacons running */

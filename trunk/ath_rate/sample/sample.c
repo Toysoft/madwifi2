@@ -1016,7 +1016,7 @@ proc_ratesample_open(struct inode *inode, struct file *file)
 					GFP_KERNEL)))
 		return -ENOMEM;
 
-	/* intially allocate both read and write buffers */
+	/* initially allocate both read and write buffers */
 	pv = (struct proc_ieee80211_priv *) file->private_data;
 	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
 	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);

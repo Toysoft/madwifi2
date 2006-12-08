@@ -120,12 +120,12 @@ preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	int total_delay = 0;
-	int cancelled = 0, ready = 0;
+	int canceled = 0, ready = 0;
 	while (!ready && total_delay < max_grace + max_wait) {
 	  if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
 	    ready = 1;
 	  } else {
-	    if (!cancelled && total_delay > max_grace) {
+	    if (!canceled && total_delay > max_grace) {
 	      /* 
 		 Cancel any existing active scan, so that any new parameters
 		 in this scan ioctl (or the defaults) can be honored, then
@@ -134,7 +134,7 @@ preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 	      IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 				"%s: cancel pending scan request\n", __func__);
 	      (void) ieee80211_cancel_scan(vap);
-	      cancelled = 1;
+	      canceled = 1;
 	    }
 	    mdelay (1);
 	    total_delay += 1;
@@ -142,7 +142,7 @@ preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 	}
 	if (!ready) {
 	  IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, 
-			    "%s: Timeout cancelling current scan.\n", 
+			    "%s: Timeout canceling current scan.\n", 
 			    __func__); 
 	}
 }
@@ -1982,7 +1982,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 					continue;
 				}
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-				  "%s: Timeout cancelling current scan.\n",
+				  "%s: Timeout canceling current scan.\n",
 				  __func__);
                     		return -ETIMEDOUT;
 			}

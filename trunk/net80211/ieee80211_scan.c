@@ -734,7 +734,7 @@ again:
 				"[jiffies %lu, dwell min %lu scanend %lu]\n",
 				__func__,
 				jiffies, ss->ss_mindwell, scanend);
-			ss->ss_next = 0;	/* reset to begining */
+			ss->ss_next = 0;	/* reset to beginning */
 			if (ss->ss_flags & IEEE80211_SCAN_ACTIVE)
 				vap->iv_stats.is_scan_active++;
 			else
