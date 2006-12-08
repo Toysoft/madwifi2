@@ -2144,7 +2144,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_MCASTKEYLEN:
-		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
+		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_mcastkeylen = value;
@@ -2178,7 +2178,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		rsn->rsn_ucastcipher = value;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
-		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
+		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_ucastkeylen = value;
