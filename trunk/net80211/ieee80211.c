@@ -1116,7 +1116,7 @@ ieee80211com_media_change(struct net_device *dev)
 			KASSERT(vap->iv_bss != NULL, ("no bss node"));
 			vap->iv_bss->ni_rates = ic->ic_sup_rates[newphymode];
 		}
-		error = ENETRESET;
+		error = -ENETRESET;
 	}
 	IEEE80211_UNLOCK_IRQ(ic);
 
@@ -1210,11 +1210,11 @@ ieee80211_media_change(struct net_device *dev)
 	error = 0;
 	if (vap->iv_fixed_rate != newrate) {
 		vap->iv_fixed_rate = newrate;		/* fixed tx rate */
-		error = ENETRESET;
+		error = -ENETRESET;
 	}
 	if (vap->iv_des_mode != newmode) {
 		vap->iv_des_mode = newmode;		/* desired phymode */
-		error = ENETRESET;
+		error = -ENETRESET;
 	}
 	return error;
 }
