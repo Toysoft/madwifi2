@@ -1969,7 +1969,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 		ifr_mode = IEEE80211_MODE_11A;
 	ifr.ifr_media |= IFM_MAKEMODE(ifr_mode);
 	retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
-	if ((!retv || retv == ENETRESET) &&  mode != vap->iv_des_mode) {
+	if ((!retv || retv == -ENETRESET) &&  mode != vap->iv_des_mode) {
 		ieee80211_scan_flush(ic);	/* NB: could optimize */
 		vap->iv_des_mode = mode;
 		if (IS_UP_AUTO(vap)) {
