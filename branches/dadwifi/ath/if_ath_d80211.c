@@ -692,6 +692,7 @@ ath_d80211_alloc(size_t priv_size)
 		 IEEE80211_HW_DATA_NULLFUNC_ACK;
 	hw->extra_tx_headroom = 2;
 	hw->channel_change_time = 5000;
+	hw->maxssi = -1; /* FIXME: get a real value for this. */
 	hw->queues = 1;
 
 	hw->modes = &sc->sc_hw_modes[0];
