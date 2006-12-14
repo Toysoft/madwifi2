@@ -1190,6 +1190,15 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	} else {
 		IEEE80211_NODE_STAT(ni, tx_data);
 		IEEE80211_NODE_STAT_ADD(ni, tx_bytes, datalen);
+
+#ifdef ATH_SUPERG_FF
+		/* Account for a second skb in the same packet when FF is on */ 
+		if (skb->next) {
+			datalen = skb->next->len;	
+			IEEE80211_NODE_STAT(ni, tx_data);
+			IEEE80211_NODE_STAT_ADD(ni, tx_bytes, datalen);
+		}
+#endif
 	}
 
 	return skb;
