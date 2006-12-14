@@ -46,6 +46,7 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/if_arp.h>
+#include <linux/etherdevice.h>
 
 #include "if_athvar.h"
 #include "if_ath_d80211.h"
@@ -522,6 +523,102 @@ ath_d80211_config_interface(struct ieee80211_hw *hw, int if_id,
 	return ath_reset(sc);
 }
 
+static int
+ath_d80211_set_key(struct ieee80211_hw *hw, set_key_cmd cmd, u8 *addr,
+		   struct ieee80211_key_conf *key, int aid)
+{
+	struct ath_softc *sc = hw->priv;
+	struct ath_hal *ah = sc->sc_ah;
+	int ret = 0;
+	u_int keyix;
+	int i;
+
+	DPRINTF(sc, ATH_DEBUG_D80211,
+		"%s %s%s%s hw %d %s%s%s%s%s " MAC_FMT " WEP %x, %s%s\n",
+		__func__,
+		cmd == SET_KEY ? "SET_KEY" : "",
+		cmd == DISABLE_KEY ? "DISABLE_KEY" : "",
+		cmd == REMOVE_ALL_KEYS ? "REMOVE_ALL_KEYS" : "",
+		key->hw_key_idx,
+		key->alg == ALG_NONE ? "ALG_NONE" : "",
+		key->alg == ALG_WEP  ? "ALG_WEP"  : "",
+		key->alg == ALG_TKIP ? "ALG_TKIP" : "",
+		key->alg == ALG_CCMP ? "ALG_CCMP" : "",
+		key->alg == ALG_NULL ? "ALG_NULL" : "",
+		MAC_ARG(addr),
+		key->keyidx,
+		key->flags & IEEE80211_KEY_DEFAULT_TX_KEY ?
+			" DEFAULT_TX_KEY" : "",
+		key->flags & IEEE80211_KEY_DEFAULT_WEP_ONLY ?
+			" DEFAULT_WEP_ONLY" : "");
+	ATH_LOCK(sc);
+
+	switch (cmd) {
+	case SET_KEY:
+		switch (key->alg) {
+		case ALG_WEP:
+			if (!ath_hal_ciphersupported(ah, HAL_CIPHER_WEP)) {
+				ret = -1;
+				goto done;
+			}
+			break;
+		case ALG_TKIP:
+			if (!ath_hal_ciphersupported(ah, HAL_CIPHER_TKIP)) {
+				ret = -1;
+				goto done;
+			}
+			break;
+		case ALG_CCMP:
+			if (!ath_hal_ciphersupported(ah, HAL_CIPHER_AES_CCM)) {
+				ret = -1;
+				goto done;
+			}
+			break;
+		case ALG_NONE:
+		case ALG_NULL:
+			break;
+		}
+
+		keyix = ath_key_alloc(sc, key, addr);
+
+		if (keyix == IEEE80211_KEYIX_NONE) {
+			ret = -1;
+			goto done;
+		}
+
+		key->hw_key_idx = keyix;
+
+		if (!ath_keyset(sc, key, addr)) {
+
+			ath_key_delete(sc, key);
+
+			ret = -1;
+			goto done;
+		}
+
+		key->flags &= ~IEEE80211_KEY_FORCE_SW_ENCRYPT;
+		sc->sc_ath_keys[keyix].ak_alg = key->alg;
+		break;
+
+	case DISABLE_KEY:
+		ath_key_delete(sc, key);
+		break;
+	case REMOVE_ALL_KEYS:
+		for (i = 0; i < sc->sc_keymax; i++) {
+			ath_hal_keyreset(ah, i);
+			clrbit(sc->sc_keymap, i);
+		}
+		memset(sc->sc_ath_keys, 0, sizeof(sc->sc_ath_keys));
+	default:
+		ret = -EOPNOTSUPP;
+		break;
+	}
+
+done:
+	ATH_UNLOCK(sc);
+	return ret;
+}
+
 
 static u64
 ath_d80211_get_tsf(struct ieee80211_hw *hw)
@@ -556,6 +653,7 @@ static struct ieee80211_ops ath_d80211_ops = {
 	.remove_interface = ath_d80211_remove_interface,
 	.config = ath_d80211_config,
 	.config_interface = ath_d80211_config_interface,
+	.set_key = ath_d80211_set_key,
 	.get_tsf = ath_d80211_get_tsf,
 	.reset_tsf = ath_d80211_reset_tsf,
 };
@@ -594,6 +692,7 @@ ath_d80211_alloc(size_t priv_size)
 		 IEEE80211_HW_DATA_NULLFUNC_ACK;
 	hw->extra_tx_headroom = 2;
 	hw->channel_change_time = 5000;
+	hw->maxssi = -1; /* FIXME: get a real value for this. */
 	hw->queues = 1;
 
 	hw->modes = &sc->sc_hw_modes[0];
