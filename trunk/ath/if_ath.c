@@ -1134,7 +1134,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 			sc->sc_bslot[avp->av_bslot] = vap;
 			sc->sc_nbcnvaps++;
 		}
-		if (sc->sc_hastsfadd) {
+		if ((opmode == IEEE80211_M_HOSTAP) && (sc->sc_hastsfadd)) {
 			/*
 			 * Multiple VAPs are to transmit beacons and we
 			 * have h/w support for TSF adjusting; enable use
