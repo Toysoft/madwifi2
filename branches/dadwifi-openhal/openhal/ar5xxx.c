@@ -384,28 +384,63 @@ ath_hal_computetxtime(struct ath_hal *hal, const HAL_RATE_TABLE *rates,
 
 /*Following 2 functions come from net80211 M.F.*/
 
-
+/*
+ * Convert MHz frequency to IEEE channel number.
+ */
 u_int
-ath_hal_mhz2ieee(u_int mhz, u_int flags)
+ath_hal_mhz2ieee(u_int freq, u_int flags)
 {
-	return (ieee80211_mhz2ieee(mhz, flags));
+	if (flags & CHANNEL_2GHZ) {	/* 2GHz band */
+		if (freq == 2484)		/* Japan */
+			return 14;
+		if ((freq >= 2412) && (freq < 2484)) /* don't number non-IEEE channels */
+			return (freq - 2407) / 5;
+		return 0;
+	} else if (flags & CHANNEL_5GHZ)	{	/* 5Ghz band */
+		if ((freq >= 5150) && (freq <= 5825))	/* don't number non-IEEE channels */
+			return (freq - 5000) / 5;
+		return 0;
+	} else {
+		/* something is fishy, don't do anything */
+		return 0;
+	}
 }
 
+/*
+ * Convert IEEE channel number to MHz frequency.
+ */
 u_int
-ath_hal_ieee2mhz(u_int ieee, u_int flags)
+ath_hal_ieee2mhz(u_int chan, u_int flags)
 {
-	return (ieee80211_ieee2mhz(ieee, flags));
+	if (flags & CHANNEL_2GHZ) {	/* 2GHz band */
+		if (chan == 14)
+			return 2484;
+		if (chan < 14)
+			return 2407 + chan * 5;
+		else
+			return 2512 + ((chan - 15) * 20);
+	} else if (flags & CHANNEL_5GHZ) /* 5Ghz band */
+		return 5000 + (chan * 5);
+	else {					/* either, guess */
+		if (chan == 14)
+			return 2484;
+		if (chan < 14)			/* 0-13 */
+			return 2407 + chan * 5;
+		if (chan < 27)			/* 15-26 */
+			return 2512 + ((chan - 15) * 20);
+		return 5000 + (chan * 5);
+	}
 }
 
 HAL_BOOL /*O.K.*/
 ar5k_check_channel(struct ath_hal *hal, u_int16_t freq, u_int flags)
 {
 	/* Check if the channel is in our supported range */
-	if (flags & IEEE80211_CHAN_2GHZ) {
+	if (flags & CHANNEL_2GHZ) {
 		if ((freq >= hal->ah_capabilities.cap_range.range_2ghz_min) &&
 		    (freq <= hal->ah_capabilities.cap_range.range_2ghz_max))
 			return (AH_TRUE);
-	} else if (flags & IEEE80211_CHAN_5GHZ) {
+	} else if (flags & CHANNEL_5GHZ) {
 		if ((freq >= hal->ah_capabilities.cap_range.range_5ghz_min) &&
 		    (freq <= hal->ah_capabilities.cap_range.range_5ghz_max))
 			return (AH_TRUE);
@@ -414,10 +449,13 @@ ar5k_check_channel(struct ath_hal *hal, u_int16_t freq, u_int flags)
 	return (AH_FALSE);
 }
 
-HAL_BOOL /*Ported, added SUPERCHANNEL & country code + FIX in debug mode*/
+HAL_BOOL /*Ported, added SUPERCHANNEL, country code and regclassids/maxregids/nregids
+	   and i have no idea what they do :P -just for combatibility-
+	   + FIX in debug mode*/
 ath_hal_init_channels(struct ath_hal *hal, HAL_CHANNEL *channels,
-    u_int max_channels, u_int *channels_size, HAL_CTRY_CODE country, u_int16_t mode,
-    HAL_BOOL outdoor, HAL_BOOL extended)
+	u_int max_channels, u_int *channels_size, u_int8_t *regclassids, 
+	u_int maxregids, u_int *nregids,HAL_CTRY_CODE country, u_int16_t mode,
+	HAL_BOOL outdoor, HAL_BOOL extended)
 {
 	u_int i, c;
 	u_int32_t domain_current;
@@ -442,9 +480,9 @@ ath_hal_init_channels(struct ath_hal *hal, HAL_CHANNEL *channels,
 		u_int flags;
 
 		min = ath_hal_mhz2ieee(IEEE80211_CHANNELS_2GHZ_MIN,
-		    IEEE80211_CHAN_2GHZ);
+		    CHANNEL_2GHZ);
 		max = ath_hal_mhz2ieee(IEEE80211_CHANNELS_2GHZ_MAX,
-		    IEEE80211_CHAN_2GHZ);
+		    CHANNEL_2GHZ);
 		flags = CHANNEL_B /*| CHANNEL_TG |
 		    (hal->ah_version == AR5K_AR5211 ?
 		    CHANNEL_PUREG : CHANNEL_G)*/;
@@ -459,15 +497,15 @@ ath_hal_init_channels(struct ath_hal *hal, HAL_CHANNEL *channels,
 		}
 
 		/* If is there to protect from infinite loop */
-		if (flags & IEEE80211_CHAN_2GHZ) {
+		if (flags & CHANNEL_2GHZ) {
 /* ath_hal_mhz2ieee returns 1 for IEEE80211_CHANNELS_5GHZ_MIN 
 for loop starts from 1 and all channels are marked as 5GHz M.F.*/
 //			min = ath_hal_mhz2ieee(IEEE80211_CHANNELS_5GHZ_MIN,
-//			    IEEE80211_CHAN_5GHZ);
+//			    CHANNEL_5GHZ);
 /* Continue from where we stoped, skip last 2GHz channel */
 			min = max + 1;
 			max = ath_hal_mhz2ieee(IEEE80211_CHANNELS_5GHZ_MAX,
-			    IEEE80211_CHAN_5GHZ);
+			    CHANNEL_5GHZ);
 			flags = CHANNEL_A | CHANNEL_T | CHANNEL_XR;
 			goto debugchan;
 		}
@@ -490,7 +528,7 @@ for loop starts from 1 and all channels are marked as 5GHz M.F.*/
 		/* Check if channel is supported by the chipset */
 		if (ar5k_check_channel(hal,
 		    ar5k_5ghz_channels[i].rc_channel,
-		    IEEE80211_CHAN_5GHZ) == AH_FALSE)
+		    CHANNEL_5GHZ) == AH_FALSE)
 			continue;
 
 		/* Match regulation domain */
@@ -499,10 +537,10 @@ for loop starts from 1 and all channels are marked as 5GHz M.F.*/
 			continue;
 
 		/* Match modes */
-		if (ar5k_5ghz_channels[i].rc_mode & IEEE80211_CHAN_TURBO) {
+		if (ar5k_5ghz_channels[i].rc_mode & CHANNEL_TURBO) {
 			all_channels[c].c_channel_flags = CHANNEL_T;
 		} else if (ar5k_5ghz_channels[i].rc_mode &
-		    IEEE80211_CHAN_OFDM) {
+		    CHANNEL_OFDM) {
 			all_channels[c].c_channel_flags = CHANNEL_A;
 		} else
 			continue;
@@ -520,7 +558,7 @@ for loop starts from 1 and all channels are marked as 5GHz M.F.*/
 		/* Check if channel is supported by the chipset */
 		if (ar5k_check_channel(hal,
 		    ar5k_2ghz_channels[i].rc_channel,
-		    IEEE80211_CHAN_2GHZ) == AH_FALSE)
+		    CHANNEL_2GHZ) == AH_FALSE)
 			continue;
 
 		/* Match regulation domain */
@@ -530,16 +568,16 @@ for loop starts from 1 and all channels are marked as 5GHz M.F.*/
 
 		/* Match modes */
 		if ((hal->ah_capabilities.cap_mode & HAL_MODE_11B) &&
-		   (ar5k_2ghz_channels[i].rc_mode & IEEE80211_CHAN_CCK))
+		   (ar5k_2ghz_channels[i].rc_mode & CHANNEL_CCK))
 			all_channels[c].c_channel_flags = CHANNEL_B;
 
 		if ((hal->ah_capabilities.cap_mode & HAL_MODE_11G) &&
-		   (ar5k_2ghz_channels[i].rc_mode & IEEE80211_CHAN_OFDM)) {
+		   (ar5k_2ghz_channels[i].rc_mode & CHANNEL_OFDM)) {
 			all_channels[c].c_channel_flags |=
 			    hal->ah_version == AR5K_AR5211 ?
 			    CHANNEL_PUREG : CHANNEL_G;
 			if (ar5k_2ghz_channels[i].rc_mode &
-			    IEEE80211_CHAN_TURBO)
+			    CHANNEL_TURBO)
 				all_channels[c].c_channel_flags |= CHANNEL_TG;
 		}
 
@@ -1252,7 +1290,7 @@ ar5k_ar5111_channel(struct ath_hal *hal, HAL_CHANNEL *channel)
 	ath_channel = ieee_channel = ath_hal_mhz2ieee(channel->c_channel,
 	    channel->c_channel_flags);
 
-	if (channel->c_channel_flags & IEEE80211_CHAN_2GHZ) {
+	if (channel->c_channel_flags & CHANNEL_2GHZ) {
 		/* Map 2GHz channel to 5GHz Atheros channel ID */
 		if (ar5k_ar5111_chan2athchan(ieee_channel,
 			&ath_channel_2ghz) == AH_FALSE)
@@ -1572,8 +1610,8 @@ ar5k_ar5111_rfregs(struct ath_hal *hal, HAL_CHANNEL *channel, u_int mode)
 		rf[i] = ar5111_rf[i].rf_value[mode];
 	}
 
-	if (channel->c_channel_flags & IEEE80211_CHAN_2GHZ) {
-		if (channel->c_channel_flags & IEEE80211_CHAN_B)
+	if (channel->c_channel_flags & CHANNEL_2GHZ) {
+		if (channel->c_channel_flags & CHANNEL_B)
 			ee_mode = AR5K_EEPROM_MODE_11B;
 		else
 			ee_mode = AR5K_EEPROM_MODE_11G;
@@ -1676,8 +1714,8 @@ ar5k_ar5112_rfregs(struct ath_hal *hal, HAL_CHANNEL *channel, u_int mode)
 		rf[i] = rf_ini[i].rf_value[mode];
 	}
 
-	if (channel->c_channel_flags & IEEE80211_CHAN_2GHZ) {
-		if (channel->c_channel_flags & IEEE80211_CHAN_B)
+	if (channel->c_channel_flags & CHANNEL_2GHZ) {
+		if (channel->c_channel_flags & CHANNEL_B)
 			ee_mode = AR5K_EEPROM_MODE_11B;
 		else
 			ee_mode = AR5K_EEPROM_MODE_11G;

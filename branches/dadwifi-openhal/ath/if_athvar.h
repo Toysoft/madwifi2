@@ -58,11 +58,11 @@
 
 #define HAL_MAX_MODES	5
 
-#define IEEE80211_CRC_LEN	FCS_LEN
-#define IEEE80211_ADDR_LEN	ETH_ALEN
+//#define IEEE80211_CRC_LEN	FCS_LEN
+//#define IEEE80211_ADDR_LEN	ETH_ALEN
 #define WME_NUM_AC		4	/* 4 AC categories */
 #define	WME_AC_VO	3		/* voice */
-#define IEEE80211_MAX_LEN	2500
+//#define IEEE80211_MAX_LEN	2500
 #define ATHDESC_HEADER_SIZE	32
 #define	IEEE80211_KEYIX_NONE	((u_int16_t) - 1)
 #define	IEEE80211_WEP_NKID		4	/* number of key ids */
@@ -73,13 +73,13 @@
 #define	WME_AC_VI	2		/* video */
 #define	WME_AC_VO	3		/* voice */
 
-enum ieee80211_phytype {
-	IEEE80211_T_DS,			/* direct sequence spread spectrum */
-	IEEE80211_T_FH,			/* frequency hopping */
-	IEEE80211_T_OFDM,		/* frequency division multiplexing */
-	IEEE80211_T_TURBO,		/* high rate OFDM, aka turbo mode */
-};
-#define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
+//enum ieee80211_phytype {
+//	IEEE80211_T_DS,			/* direct sequence spread spectrum */
+//	IEEE80211_T_FH,			/* frequency hopping */
+//	IEEE80211_T_OFDM,		/* frequency division multiplexing */
+//	IEEE80211_T_TURBO,		/* high rate OFDM, aka turbo mode */
+//};
+//#define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
 
 #define	IEEE80211_CHAN_MAX	255
 

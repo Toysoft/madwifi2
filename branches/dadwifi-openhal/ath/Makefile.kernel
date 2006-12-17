@@ -63,12 +63,12 @@ endif
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT) -I$(HAL) -I$(HAL)/linux \
 	-I$(WLAN) -I$(src)/.. -I$(src)
 
-EXTRA_CFLAGS += $(INCS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS += $(INCS) -DOPT_AH_H=\"$(HAL)/opt_ah.h\"
 
 ifdef LINUX26
 obj-$(CONFIG_ATHEROS) += ath_$(BUSNAME).o ath_hal.o
 ath_$(BUSNAME)-objs	:= if_ath.o if_ath_$(BUSNAME).o
-ath_hal-objs	:= ah_osdep.o $(TARGET).hal.o
+ath_hal-objs	:= ah_osdep.o hal.o
 
 hostprogs-y := uudecode
 host-progs := $(hostprogs-y)
@@ -76,7 +76,7 @@ endif
 
 ifdef LINUX24
 obj-$(CONFIG_ATHEROS) := if_ath.o if_ath_$(BUSNAME).o
-obj-$(CONFIG_ATHEROS) += ah_osdep.o $(TARGET).hal.o
+obj-$(CONFIG_ATHEROS) += ah_osdep.o hal.o
 
 O_TARGET := ath_$(BUSNAME).o ath_hal.o
 include $(TOPDIR)/Rules.make
@@ -88,6 +88,6 @@ uudecode: uudecode.c
 	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 endif
 
-$(obj)/$(TARGET).hal.o: $(HAL)/public/$(TARGET).hal.o.uu $(obj)/uudecode
-	$(Q)echo "deps_$@ :=" >$(@D)/.$(@F).cmd
-	$(Q)$(obj)/uudecode -o $@ $<
+#$(obj)/$(TARGET).hal.o: $(HAL)/public/$(TARGET).hal.o.uu $(obj)/uudecode
+#	$(Q)echo "deps_$@ :=" >$(@D)/.$(@F).cmd
+#	$(Q)$(obj)/uudecode -o $@ $<

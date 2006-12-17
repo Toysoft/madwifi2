@@ -1,5 +1,5 @@
-Linux OpenHAL 20061412
-======================
+Linux OpenHAL 20061712 (dadwifi)
+===============================
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *\
  * This is a port of the ar5k hal for atheros device drivers that is         *
  * source-compatible with the Madwifi driver for linux 			     *

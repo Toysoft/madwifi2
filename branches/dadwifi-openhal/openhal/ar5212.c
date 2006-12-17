@@ -184,6 +184,7 @@ ar5k_ar5212_fill(struct ath_hal *hal)
 	AR5K_HAL_FUNCTION(hal, ar5212, set_txpower_limit);
 	AR5K_HAL_FUNCTION(hal, ar5212, set_def_antenna);
 	AR5K_HAL_FUNCTION(hal, ar5212, get_def_antenna);
+	AR5K_HAL_FUNCTION(hal, ar5212, set_bssid_mask);
 	/*Totaly unimplemented*/
 	AR5K_HAL_FUNCTION(hal, ar5212, set_capability);
 	AR5K_HAL_FUNCTION(hal, ar5212, proc_mib_event);
@@ -297,10 +298,10 @@ ar5k_ar5212_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 		clock = AR5K_AR5212_PHY_PLL_AR5111;
 	}
 
-	if (flags & IEEE80211_CHAN_2GHZ) {
+	if (flags & CHANNEL_2GHZ) {
 		mode |= AR5K_AR5212_PHY_MODE_FREQ_2GHZ;
 		clock |= AR5K_AR5212_PHY_PLL_44MHZ;
-	} else if (flags & IEEE80211_CHAN_5GHZ) {
+	} else if (flags & CHANNEL_5GHZ) {
 		mode |= AR5K_AR5212_PHY_MODE_FREQ_5GHZ;
 		clock |= AR5K_AR5212_PHY_PLL_40MHZ;
 	} else {
@@ -308,18 +309,18 @@ ar5k_ar5212_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 		return (AH_FALSE);
 	}
 
-	if (flags & IEEE80211_CHAN_CCK) {
+	if (flags & CHANNEL_CCK) {
 		mode |= AR5K_AR5212_PHY_MODE_MOD_CCK;
-	} else if (flags & IEEE80211_CHAN_OFDM) {
+	} else if (flags & CHANNEL_OFDM) {
 		mode |= AR5K_AR5212_PHY_MODE_MOD_OFDM;
-	} else if (flags & IEEE80211_CHAN_DYN) {
+	} else if (flags & CHANNEL_DYN) {
 		mode |= AR5K_AR5212_PHY_MODE_MOD_DYN;
 	} else {
 		AR5K_PRINT("invalid radio frequency mode\n");
 		return (AH_FALSE);
 	}
 
-	if (flags & IEEE80211_CHAN_TURBO) {
+	if (flags & CHANNEL_TURBO) {
 		turbo = AR5K_AR5212_PHY_TURBO_MODE |
 		    AR5K_AR5212_PHY_TURBO_SHORT;
 	}
@@ -337,7 +338,7 @@ ar5k_ar5212_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 
 	/* ...wakeup */
 	if (ar5k_ar5212_set_power(hal,
-		HAL_PM_AWAKE, AH_TRUE, 0) == AH_FALSE) {
+		HAL_PM_AWAKE, AH_TRUE) == AH_FALSE) {
 		AR5K_PRINT("failed to resume the AR5212 (again)\n");
 		return (AH_FALSE);
 	}
@@ -593,7 +594,7 @@ ar5k_ar5212_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 	 * Set rate duration table
 	 */
 	rt = ar5k_ar5212_get_rate_table(hal,
-	    channel->c_channel_flags & IEEE80211_CHAN_TURBO ?
+	    channel->c_channel_flags & CHANNEL_TURBO ?
 	    HAL_MODE_TURBO : HAL_MODE_XR);
 
 	for (i = 0; i < rt->rt_rate_count; i++) {
@@ -602,7 +603,7 @@ ar5k_ar5212_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 		    rt->rt_info[i].r_control_rate, AH_FALSE));
 	}
 
-	if ((channel->c_channel_flags & IEEE80211_CHAN_TURBO) == 0) {
+	if ((channel->c_channel_flags & CHANNEL_TURBO) == 0) {
 		rt = ar5k_ar5212_get_rate_table(hal, HAL_MODE_11B);
 		for (i = 0; i < rt->rt_rate_count; i++) {
 			data = AR5K_AR5212_RATE_DUR(rt->rt_info[i].r_rate_code);
@@ -623,7 +624,7 @@ ar5k_ar5212_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 		hal->ah_radio_5ghz_revision < AR5K_SREV_RAD_5112A) {
 			AR5K_REG_WRITE(AR5K_AR5212_PHY_CCKTXCTL,
 			AR5K_AR5212_PHY_CCKTXCTL_WORLD);
-		if (channel->c_channel_flags & IEEE80211_CHAN_OFDM)
+		if (channel->c_channel_flags & CHANNEL_OFDM)
 			data = 0xffb81020;
 		else
 			data = 0xffb80d20;
@@ -652,11 +653,11 @@ ar5k_ar5212_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 	 */
 
 	/* OFDM timings */
-	if (channel->c_channel_flags & IEEE80211_CHAN_OFDM) {
+	if (channel->c_channel_flags & CHANNEL_OFDM) {
 		u_int32_t coef_scaled, coef_exp, coef_man, ds_coef_exp,
 		    ds_coef_man, clock;
 
-		clock = channel->c_channel_flags & IEEE80211_CHAN_T ? 80 : 40;
+		clock = channel->c_channel_flags & CHANNEL_TURBO ? 80 : 40;
 		coef_scaled = ((5 * (clock << 24)) / 2) / channel->c_channel;
 
 		for (coef_exp = 31; coef_exp > 0; coef_exp--)
@@ -680,7 +681,7 @@ ar5k_ar5212_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 	}
 
 	if (hal->ah_radio == AR5K_AR5111) {
-		if (channel->c_channel_flags & IEEE80211_CHAN_B)
+		if (channel->c_channel_flags & CHANNEL_B)
 			AR5K_REG_ENABLE_BITS(AR5K_AR5212_TXCFG,
 			    AR5K_AR5212_TXCFG_B_MODE);
 		else
@@ -783,7 +784,7 @@ ar5k_ar5212_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 
 	data = AR5K_REG_READ(AR5K_AR5212_PHY_RX_DELAY) &
 	    AR5K_AR5212_PHY_RX_DELAY_M;
-	data = (channel->c_channel_flags & IEEE80211_CHAN_CCK) ?
+	data = (channel->c_channel_flags & CHANNEL_CCK) ?
 	    ((data << 2) / 22) : (data / 10);
 
 	AR5K_DELAY(100 + data);
@@ -797,7 +798,7 @@ ar5k_ar5212_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 
 
 		hal->ah_calibration = AH_FALSE;
-	if ((channel->c_channel_flags & IEEE80211_CHAN_B) == 0) {
+	if ((channel->c_channel_flags & CHANNEL_B) == 0) {
 		hal->ah_calibration = AH_TRUE;
 		AR5K_REG_WRITE_BITS(AR5K_AR5212_PHY_IQ,
 		    AR5K_AR5212_PHY_IQ_CAL_NUM_LOG_MAX, 15);
@@ -916,8 +917,9 @@ ar5k_ar5212_set_pcu_config(struct ath_hal *hal)
 	return;
 }
 
-HAL_BOOL /*O.K.*/
-ar5k_ar5212_calibrate(struct ath_hal *hal, HAL_CHANNEL *channel)
+HAL_BOOL /*O.K. -added HAL_BOOL * for combatibility (???)*/
+ar5k_ar5212_calibrate(struct ath_hal *hal, HAL_CHANNEL *channel,
+	HAL_BOOL *stat)
 {
 	u_int32_t i_pwr, q_pwr;
 	int32_t iq_corr, i_coff, i_coffd, q_coff, q_coffd;
@@ -953,7 +955,7 @@ ar5k_ar5212_calibrate(struct ath_hal *hal, HAL_CHANNEL *channel)
 	    AR5K_AR5212_PHY_AGCCTL_NF);
 
 	/* Request RF gain */
-	if (channel->c_channel_flags & IEEE80211_CHAN_5GHZ) {
+	if (channel->c_channel_flags & CHANNEL_5GHZ) {
 		AR5K_REG_WRITE(AR5K_AR5212_PHY_PAPD_PROBE,
 		    AR5K_REG_SM(hal->ah_txpower.txp_max,
 		    AR5K_AR5212_PHY_PAPD_PROBE_TXPOWER) |
@@ -1095,7 +1097,7 @@ HAL_BOOL /*O.K.*/
 ar5k_ar5212_reset_tx_queue(struct ath_hal *hal, u_int queue)
 {
 	u_int32_t cw_min, cw_max, retry_lg, retry_sh;
-	struct ieee80211_channel *channel = (struct ieee80211_channel*)
+	struct net80211_channel *channel = (struct net80211_channel*)
 	    &hal->ah_current_channel;
 	HAL_TXQ_INFO *tq;
 
@@ -1113,11 +1115,11 @@ ar5k_ar5212_reset_tx_queue(struct ath_hal *hal, u_int queue)
 	cw_min = hal->ah_cw_min = AR5K_TUNE_CWMIN;
 	cw_max = hal->ah_cw_max = AR5K_TUNE_CWMAX;
 	hal->ah_aifs = AR5K_TUNE_AIFS;
-	if (IEEE80211_IS_CHAN_XR(channel)) {
+	if (IS_CHAN_XR(channel)) {
 		cw_min = hal->ah_cw_min = AR5K_TUNE_CWMIN_XR;
 		cw_max = hal->ah_cw_max = AR5K_TUNE_CWMAX_XR;
 		hal->ah_aifs = AR5K_TUNE_AIFS_XR;
-	} else if (IEEE80211_IS_CHAN_B(channel)) {
+	} else if (IS_CHAN_B(channel)) {
 		cw_min = hal->ah_cw_min = AR5K_TUNE_CWMIN_11B;
 		cw_max = hal->ah_cw_max = AR5K_TUNE_CWMAX_11B;
 		hal->ah_aifs = AR5K_TUNE_AIFS_11B;
@@ -1350,11 +1352,12 @@ ar5k_ar5212_stop_tx_dma(struct ath_hal *hal, u_int queue)
 	return (AH_TRUE);
 }
 
-HAL_BOOL /*O.K. - Initialize tx_desc */
+HAL_BOOL /*O.K. - Initialize tx_desc - added last 3 args for combatibility*/
 ar5k_ar5212_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int packet_length, u_int header_length, HAL_PKT_TYPE type, u_int tx_power,
     u_int tx_rate0, u_int tx_tries0, u_int key_index, u_int antenna_mode,
-    u_int flags, u_int rtscts_rate, u_int rtscts_duration)
+    u_int flags, u_int rtscts_rate, u_int rtscts_duration, u_int compicvLen,
+    u_int compivLen, u_int comp)
 {
 	struct ar5k_ar5212_tx_desc *tx_desc;
 
@@ -1433,7 +1436,7 @@ ar5k_ar5212_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (AH_TRUE);
 }
 
-HAL_BOOL /*Added an argument *last_desc -need revision -don't clear descriptor here*/
+HAL_BOOL /*Added an argument *last_desc -need revision */
 ar5k_ar5212_fill_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int segment_length, HAL_BOOL first_segment, HAL_BOOL last_segment, const struct ath_desc *last_desc)
 {
@@ -1778,9 +1781,9 @@ ar5k_ar5212_setup_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (AH_TRUE);
 }
 
-HAL_STATUS /*O.K.*/
+HAL_STATUS /*O.K. -added tsf arg for combatibility*/
 ar5k_ar5212_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
-    u_int32_t phys_addr, struct ath_desc *next)
+    u_int32_t phys_addr, struct ath_desc *next, u_int64_t tsf)
 {
 	struct ar5k_ar5212_rx_status *rx_status;
 	struct ar5k_ar5212_rx_error *rx_err;
@@ -1856,8 +1859,9 @@ ar5k_ar5212_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (HAL_OK);
 }
 
-void /*Added HAL_NODE_STATS argument*/
-ar5k_ar5212_set_rx_signal(struct ath_hal *hal, const HAL_NODE_STATS *stats)
+void /*Added HAL_NODE_STATS and HAL_CHANNEL arguments*/
+ar5k_ar5212_set_rx_signal(struct ath_hal *hal, const HAL_NODE_STATS *stats,
+	HAL_CHANNEL *channel)
 {
 	AR5K_TRACE;
 	/* Signal state monitoring is not yet supported */
@@ -2007,6 +2011,16 @@ ar5k_ar5212_set_lladdr(struct ath_hal *hal, const u_int8_t *mac)
 
 	return (AH_TRUE);
 }
+
+HAL_BOOL  /*New*/
+ar5k_ar5212_set_bssid_mask(struct ath_hal *hal, const u_int8_t* mask)
+{
+	/*Got that from set associd*/
+	AR5K_REG_WRITE(AR5K_AR5212_BSS_IDM0, mask);
+	AR5K_REG_WRITE(AR5K_AR5212_BSS_IDM1, mask);
+	return AH_TRUE;
+}
+
 
 HAL_BOOL /*O.K.*/
 ar5k_ar5212_set_regdomain(struct ath_hal *hal, u_int16_t regdomain,
@@ -2561,9 +2575,9 @@ ar5k_ar5212_set_key_lladdr(struct ath_hal *hal, u_int16_t entry,
  * Power management functions
  */
 
-HAL_BOOL /*O.K.*/
+HAL_BOOL /*O.K. -removed sleep_duration  (???) for combatibility*/
 ar5k_ar5212_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
-    HAL_BOOL set_chip, u_int16_t sleep_duration)
+    HAL_BOOL set_chip)
 {
 	u_int32_t staid;
 	int i;
@@ -2578,7 +2592,7 @@ ar5k_ar5212_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
 	case HAL_PM_NETWORK_SLEEP:
 		if (set_chip == AH_TRUE) {
 			AR5K_REG_WRITE(AR5K_AR5212_SCR,
-			    AR5K_AR5212_SCR_SLE | sleep_duration);
+			    AR5K_AR5212_SCR_SLE | 0);
 		}
 		staid |= AR5K_AR5212_STA_ID1_PWR_SV;
 		break;
@@ -3177,9 +3191,10 @@ HAL_BOOL /*New*/
 ar5k_ar5212_set_txpower_limit(struct ath_hal *hal, u_int power)
 {
 	/*Just a try M.F.*/
-	HAL_CHANNEL *channel = &hal->ah_current_channel;
+//	HAL_CHANNEL *channel = &hal->ah_current_channel;
 
 	AR5K_TRACE;
 	AR5K_PRINTF("changing txpower to %d\n",power);
-	return (ar5k_ar5212_txpower(hal, channel, power));
+//	return (ar5k_ar5212_txpower(hal, channel, power));
+	return AH_TRUE;
 }
