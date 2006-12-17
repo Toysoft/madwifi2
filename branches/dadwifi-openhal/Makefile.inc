@@ -181,7 +181,7 @@ endif
 # 
 TOOLS=  $(DEPTH)/tools 
 
-COPTS+=	-Werror
+#COPTS+=	-Werror
 INCS=	-include $(obj)/$(DEPTH)/include/compat.h -I$(obj)/$(DEPTH)/include
 
 ifeq ($(strip $(BUS)),AHB)
@@ -193,10 +193,10 @@ endif
 # host machine architecture. You can override TARGET on the make command
 # line or in the environment. See hal/linux/*.inc for the list of
 # supported targets.
-ifeq (,$(wildcard $(HAL)/public/$(TARGET).inc))
-TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
-$(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
-endif
+#ifeq (,$(wildcard $(HAL)/public/$(TARGET).inc))
+#TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
+#$(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
+#endif
 
 # Don't let HAL mess with the toolchain - save toolchain valiables
 save_CC := $(CC)
@@ -205,7 +205,7 @@ save_STRIP := $(STRIP)
 save_OBJCOPY := $(OBJCOPY)
 save_NM := $(NM)
 
-include $(HAL)/public/$(TARGET).inc
+#include $(HAL)/public/$(TARGET).inc
 
 # Restore toolchain valiables
 CC := $(save_CC)

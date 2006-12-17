@@ -1988,9 +1988,9 @@ ar_device(int devid)
 	case AR5212_AR5312_REV2:
 	case AR5212_AR5312_REV7:
 	case AR5212_AR2313_REV8:
-	case AR5212_AR2315_REV6:
-	case AR5212_AR2315_REV7:
-	case AR5212_AR2317_REV1:
+//	case AR5212_AR2315_REV6:
+//	case AR5212_AR2315_REV7:
+//	case AR5212_AR2317_REV1:
 	case AR5212_DEVID_0014:
 	case AR5212_DEVID_0015:
 	case AR5212_DEVID_0016:
@@ -2000,7 +2000,7 @@ ar_device(int devid)
 	case AR5212_AR2413:
 	case AR5212_AR5413:
 	case AR5212_AR5424:
-	case AR5212_DEVID_FF19:
+//	case AR5212_DEVID_FF19:
 		return 5212;
 	case AR5213_SREV_1_0:
 	case AR5213_SREV_REG:
@@ -2016,7 +2016,7 @@ ar_device(int devid)
 static int 
 ath_set_ack_bitrate(struct ath_softc *sc, int high) 
 {
-	struct ath_hal *ah = sc->sc_ah;
+	struct ath_hal *hal = sc->sc_ah;
 	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
 		/* set ack to be sent at low bit-rate */
 		/* registers taken from the openbsd 5212 hal */
@@ -2025,9 +2025,9 @@ ath_set_ack_bitrate(struct ath_softc *sc, int high)
 #define AR5K_AR5212_STA_ID1_BASE_RATE_11B       0x02000000
 		u_int32_t v = AR5K_AR5212_STA_ID1_BASE_RATE_11B | AR5K_AR5212_STA_ID1_ACKCTS_6MB;
 		if (high) {
-			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) & ~v);
+			AR5K_REG_WRITE(AR5K_AR5212_STA_ID1, AR5K_REG_READ(AR5K_AR5212_STA_ID1) & ~v);
 		} else {
-			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) | v);
+			AR5K_REG_WRITE(AR5K_AR5212_STA_ID1, AR5K_REG_READ(AR5K_AR5212_STA_ID1) | v);
 		}
 		return 0;
 	}
@@ -5753,11 +5753,14 @@ rx_next:
 	} while (ath_rxbuf_init(sc, bf) == 0);
 
 	/* rx signal state monitoring */
+#if 0
 	ath_hal_rxmonitor(ah, &sc->sc_halstats, &sc->sc_curchan);
 	if (ath_hal_radar_event(ah)) {
 		sc->sc_rtasksched = 1;
 		ATH_SCHEDULE_TASK(&sc->sc_radartask);
 	}
+#endif
+
 #undef PA2DESC
 }
 
@@ -7714,9 +7717,9 @@ ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan)
 #endif
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: %u (%u MHz) -> %u (%u MHz)\n",
-		__func__, ath_hal_mhz2ieee(ah, sc->sc_curchan.channel,
+		__func__, ath_hal_mhz2ieee(sc->sc_curchan.channel,
 		sc->sc_curchan.channelFlags), sc->sc_curchan.channel,
-		ath_hal_mhz2ieee(ah, hchan.channel, hchan.channelFlags),
+		ath_hal_mhz2ieee(hchan.channel, hchan.channelFlags),
 		hchan.channel);
 #if 0
 	/* check if it is turbo mode switch */

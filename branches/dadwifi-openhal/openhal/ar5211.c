@@ -185,6 +185,7 @@ ar5k_ar5211_fill(struct ath_hal *hal)
 	AR5K_HAL_FUNCTION(hal, ar5211, set_txpower_limit);
 	AR5K_HAL_FUNCTION(hal, ar5211, set_def_antenna);
 	AR5K_HAL_FUNCTION(hal, ar5211, get_def_antenna);
+	AR5K_HAL_FUNCTION(hal, ar5211, set_bssid_mask);
 	/*Totaly unimplemented*/
 	AR5K_HAL_FUNCTION(hal, ar5211, set_capability);
 	AR5K_HAL_FUNCTION(hal, ar5211, proc_mib_event);
@@ -278,10 +279,10 @@ ar5k_ar5211_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 	 * Get channel mode flags
 	 */
 
-	if (flags & IEEE80211_CHAN_2GHZ) {
+	if (flags & CHANNEL_2GHZ) {
 		mode |= AR5K_AR5211_PHY_MODE_FREQ_2GHZ;
 		clock |= AR5K_AR5211_PHY_PLL_44MHZ;
-	} else if (flags & IEEE80211_CHAN_5GHZ) {
+	} else if (flags & CHANNEL_5GHZ) {
 		mode |= AR5K_AR5211_PHY_MODE_FREQ_5GHZ;
 		clock |= AR5K_AR5211_PHY_PLL_40MHZ;
 	} else {
@@ -289,18 +290,18 @@ ar5k_ar5211_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 		return (AH_FALSE);
 	}
 
-	if ((flags & IEEE80211_CHAN_CCK) ||
-	    (flags & IEEE80211_CHAN_DYN)) {
+	if ((flags & CHANNEL_CCK) ||
+	    (flags & CHANNEL_DYN)) {
 		/* Dynamic OFDM/CCK is not supported by the AR5211 */
 		mode |= AR5K_AR5211_PHY_MODE_MOD_CCK;
-	} else if (flags & IEEE80211_CHAN_OFDM) {
+	} else if (flags & CHANNEL_OFDM) {
 		mode |= AR5K_AR5211_PHY_MODE_MOD_OFDM;
 	} else {
 		AR5K_PRINT("invalid radio frequency mode\n");
 		return (AH_FALSE);
 	}
 
-	if (flags & IEEE80211_CHAN_TURBO) {
+	if (flags & CHANNEL_TURBO) {
 		turbo = AR5K_AR5211_PHY_TURBO_MODE |
 		    AR5K_AR5211_PHY_TURBO_SHORT;
 	}
@@ -318,7 +319,7 @@ ar5k_ar5211_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 
 	/* ...wakeup */
 	if (ar5k_ar5211_set_power(hal,
-		HAL_PM_AWAKE, AH_TRUE, 0) == AH_FALSE) {
+		HAL_PM_AWAKE, AH_TRUE) == AH_FALSE) {
 		AR5K_PRINT("failed to resume the AR5211 (again)\n");
 		return (AH_FALSE);
 	}
@@ -519,7 +520,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 	 */
 
 	if (hal->ah_radio == AR5K_AR5111) {
-		if (channel->c_channel_flags & IEEE80211_CHAN_B)
+		if (channel->c_channel_flags & CHANNEL_B)
 			AR5K_REG_ENABLE_BITS(AR5K_AR5211_TXCFG,
 			    AR5K_AR5211_TXCFG_B_MODE);
 		else
@@ -612,7 +613,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 
 	data = AR5K_REG_READ(AR5K_AR5211_PHY_RX_DELAY) &
 	    AR5K_AR5211_PHY_RX_DELAY_M;
-	data = (channel->c_channel_flags & IEEE80211_CHAN_CCK) ?
+	data = (channel->c_channel_flags & CHANNEL_CCK) ?
 	    ((data << 2) / 22) : (data / 10);
 
 	AR5K_DELAY(100 + data);
@@ -624,7 +625,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, HAL_OPMODE op_mode, HAL_CHANNEL *channel,
 	    AR5K_AR5211_PHY_AGCCTL_NF |
 	    AR5K_AR5211_PHY_AGCCTL_CAL);
 
-	if (channel->c_channel_flags & IEEE80211_CHAN_B) {
+	if (channel->c_channel_flags & CHANNEL_B) {
 		hal->ah_calibration = AH_FALSE;
 	} else {
 		hal->ah_calibration = AH_TRUE;
@@ -732,7 +733,8 @@ ar5k_ar5211_set_pcu_config(struct ath_hal *hal)
 }
 
 HAL_BOOL
-ar5k_ar5211_calibrate(struct ath_hal *hal, HAL_CHANNEL *channel)
+ar5k_ar5211_calibrate(struct ath_hal *hal, HAL_CHANNEL *channel,
+	HAL_BOOL *stat)
 {
 	u_int32_t i_pwr, q_pwr;
 	int32_t iq_corr, i_coff, i_coffd, q_coff, q_coffd;
@@ -896,7 +898,7 @@ HAL_BOOL
 ar5k_ar5211_reset_tx_queue(struct ath_hal *hal, u_int queue)
 {
 	u_int32_t cw_min, cw_max, retry_lg, retry_sh;
-	struct ieee80211_channel *channel = (struct ieee80211_channel*)
+	struct net80211_channel *channel = (struct net80211_channel*)
 	    &hal->ah_current_channel;
 	HAL_TXQ_INFO *tq;
 
@@ -910,7 +912,7 @@ ar5k_ar5211_reset_tx_queue(struct ath_hal *hal, u_int queue)
 	/*
 	 * Set registers by channel mode
 	 */
-	if (IEEE80211_IS_CHAN_B(channel)) {
+	if (IS_CHAN_B(channel)) {
 		hal->ah_cw_min = AR5K_TUNE_CWMIN_11B;
 		cw_max = hal->ah_cw_max = AR5K_TUNE_CWMAX_11B;
 		hal->ah_aifs = AR5K_TUNE_AIFS_11B;
@@ -1142,18 +1144,19 @@ ar5k_ar5211_stop_tx_dma(struct ath_hal *hal, u_int queue)
 	return (AH_TRUE);
 }
 
-HAL_BOOL /*O.K. - Initialize tx_desc and clear ds_hw */
+HAL_BOOL /*O.K. - Initialize tx_desc */
 ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int packet_length, u_int header_length, HAL_PKT_TYPE type, u_int tx_power,
     u_int tx_rate0, u_int tx_tries0, u_int key_index, u_int antenna_mode,
-    u_int flags, u_int rtscts_rate, u_int rtscts_duration)
+    u_int flags, u_int rtscts_rate, u_int rtscts_duration, u_int compicvLen,
+    u_int compivLen, u_int comp)
 {
 	struct ar5k_ar5211_tx_desc *tx_desc;
 
 	tx_desc = (struct ar5k_ar5211_tx_desc*)&desc->ds_ctl0;
 
 	/*Clear ds_hw*/
-	bzero(desc->ds_hw, sizeof(desc->ds_hw));
+//	bzero(desc->ds_hw, sizeof(desc->ds_hw));
 
 	/*
 	 * Validate input
@@ -1204,7 +1207,7 @@ ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (AH_TRUE);
 }
 
-HAL_BOOL/*Added an argument *last_desc -need revision -don't clear descriptor here*/
+HAL_BOOL/*Added an argument *last_desc -need revision */
 ar5k_ar5211_fill_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int segment_length, HAL_BOOL first_segment, HAL_BOOL last_segment, const struct ath_desc *last_desc)
 {
@@ -1213,7 +1216,7 @@ ar5k_ar5211_fill_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	tx_desc = (struct ar5k_ar5211_tx_desc*)&desc->ds_ctl0;
 
 	/* Clear status descriptor */
-//	bzero(desc->ds_hw, sizeof(desc->ds_hw));
+	bzero(desc->ds_hw, sizeof(desc->ds_hw));
 
 	/* Validate segment length and initialize the descriptor */
 	if ((tx_desc->tx_control_1 = (segment_length &
@@ -1447,7 +1450,7 @@ ar5k_ar5211_setup_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 
 HAL_STATUS
 ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
-    u_int32_t phys_addr, struct ath_desc *next)
+    u_int32_t phys_addr, struct ath_desc *next, u_int64_t tsf)
 {
 	struct ar5k_ar5211_rx_status *rx_status;
 
@@ -1514,8 +1517,9 @@ ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (HAL_OK);
 }
 
-void /*Added HAL_NODE_STATS argument*/
-ar5k_ar5211_set_rx_signal(struct ath_hal *hal, const HAL_NODE_STATS *stats)
+void /*Added HAL_NODE_STATS and HAL_CHANNEL arguments*/
+ar5k_ar5211_set_rx_signal(struct ath_hal *hal, const HAL_NODE_STATS *stats,
+	HAL_CHANNEL *channel)
 {
 	/* Signal state monitoring is not yet supported */
 }
@@ -1645,6 +1649,14 @@ ar5k_ar5211_set_lladdr(struct ath_hal *hal, const u_int8_t *mac)
 	AR5K_REG_WRITE(AR5K_AR5211_STA_ID1, high_id);
 
 	return (AH_TRUE);
+}
+
+HAL_BOOL  /*New*/
+ar5k_ar5211_set_bssid_mask(struct ath_hal *hal, const u_int8_t* mask)
+{
+	/*???*/
+	AR5K_TRACE;
+	return AH_TRUE;
 }
 
 HAL_BOOL
@@ -2128,7 +2140,7 @@ ar5k_ar5211_set_key_lladdr(struct ath_hal *hal, u_int16_t entry,
 
 HAL_BOOL
 ar5k_ar5211_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
-    HAL_BOOL set_chip, u_int16_t sleep_duration)
+    HAL_BOOL set_chip)
 {
 	u_int32_t staid;
 	int i;
@@ -2142,7 +2154,7 @@ ar5k_ar5211_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
 	case HAL_PM_NETWORK_SLEEP:
 		if (set_chip == AH_TRUE) {
 			AR5K_REG_WRITE(AR5K_AR5211_SCR,
-			    AR5K_AR5211_SCR_SLE | sleep_duration);
+			    AR5K_AR5211_SCR_SLE | 0);
 		}
 		staid |= AR5K_AR5211_STA_ID1_PWR_SV;
 		break;
@@ -2230,8 +2242,6 @@ ar5k_ar5211_disable_pspoll(struct ath_hal *hal)
 HAL_BOOL /*Unimplemented*/
 ar5k_ar5211_set_txpower_limit(struct ath_hal *hal, u_int32_t power)
 {
-	HAL_CHANNEL *channel = &hal->ah_current_channel;
-
 	AR5K_TRACE;
 	AR5K_PRINTF("changing txpower to %d\n unimplemented ;-(",power);
 	return AH_FALSE;

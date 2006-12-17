@@ -48,11 +48,13 @@
 #include "translation.h"
 
 /*net80211 definitions needed for channels etc*/
-#include "../net80211/ieee80211.h"
-#include "../net80211/if_media.h"
-#include "../net80211/ieee80211_var.h"
-#include "../net80211/ieee80211_linux.h"
-#include "../net80211/ieee80211_radiotap.h"
+#include "ieee80211tmp.h"
+//#include "../ath/if_athvar.h"
+//#include "../net80211/_ieee80211.h"
+//#include "../net80211/if_media.h"
+//#include "../net80211/ieee80211_var.h"
+//#include "../net80211/ieee80211_linux.h"
+//#include "../net80211/ieee80211_radiotap.h"
 
 #define IEEE80211_ADDR_LEN      6       /* size of 802.11 address */
 #define ETHER_ADDR_LEN          6       /* length of an Ethernet address */
@@ -64,12 +66,6 @@ typedef struct {
 	u_int32_t	ns_avgrssi;	/* average data rssi */
 	u_int32_t	ns_avgtxrssi;	/* average tx rssi */
 } HAL_NODE_STATS;
-
-/* eXtendent Range (?) stuff */
-#define IEEE80211_T_XR 7
-#define IEEE80211_CHAN_XR		0x1000  /* XXX */
-#define	IEEE80211_IS_CHAN_XR(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_XR) != 0)
 
 /*
  * Possible chipsets (could appear in different combinations)
@@ -159,6 +155,7 @@ typedef enum {
 	HAL_TX_QUEUE_BEACON,		/* beacon xmit q */
 	HAL_TX_QUEUE_CAB,		/* "crap after beacon" xmit q */
 	HAL_TX_QUEUE_PSPOLL,		/* u-apsd power save xmit q (I guess) */
+#define HAL_TX_QUEUE_UAPSD 	HAL_TX_QUEUE_PSPOLL
 } HAL_TX_QUEUE;
 
 #define	HAL_NUM_TX_QUEUES	10		/* max possible # of queues */
@@ -200,15 +197,15 @@ typedef enum {
 #define AR5K_TXQ_FLAG_TXEOLINT_ENABLE			0x0080	/* enable TXEOL interrupt */
 
 typedef enum {
-	TXQ_FLAG_TXOKINT_ENABLE	    = AR5K_TXQ_FLAG_TXINT_ENABLE,    	/* enable TXOK interrupt */
-	TXQ_FLAG_TXERRINT_ENABLE    = AR5K_TXQ_FLAG_TXINT_ENABLE,    	/* enable TXERR interrupt */
-	TXQ_FLAG_TXDESCINT_ENABLE   = AR5K_TXQ_FLAG_TXDESCINT_ENABLE,   /* enable TXDESC interrupt */
-	TXQ_FLAG_TXEOLINT_ENABLE    = AR5K_TXQ_FLAG_TXEOLINT_ENABLE,    /* enable TXEOL interrupt */
-//	TXQ_FLAG_TXURNINT_ENABLE    = 0x0008,    			/* enable TXURN interrupt */
-	TXQ_FLAG_BACKOFF_DISABLE    = AR5K_TXQ_FLAG_BACKOFF_DISABLE,    /* disable Post Backoff  */
-	TXQ_FLAG_COMPRESSION_ENABLE = AR5K_TXQ_FLAG_COMPRESSION_ENABLE, /* compression enabled */
-	TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE = AR5K_TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE, /* enable ready time expiry policy */
-	TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = AR5K_TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE, /* enable backoff while sending fragment burst*/
+	HAL_TXQ_TXOKINT_ENABLE		= AR5K_TXQ_FLAG_TXINT_ENABLE,    	/* enable TXOK interrupt */
+	HAL_TXQ_TXERRINT_ENABLE		= AR5K_TXQ_FLAG_TXINT_ENABLE,    	/* enable TXERR interrupt */
+	HAL_TXQ_TXDESCINT_ENABLE	= AR5K_TXQ_FLAG_TXDESCINT_ENABLE,   /* enable TXDESC interrupt */
+	HAL_TXQ_TXEOLINT_ENABLE		= AR5K_TXQ_FLAG_TXEOLINT_ENABLE,    /* enable TXEOL interrupt */
+//	TXQ_FLAG_TXURNINT_ENABLE	= 0x0008,    			/* enable TXURN interrupt */
+//	TXQ_FLAG_BACKOFF_DISABLE	= AR5K_TXQ_FLAG_BACKOFF_DISABLE,    /* disable Post Backoff  */
+//	TXQ_FLAG_COMPRESSION_ENABLE	= AR5K_TXQ_FLAG_COMPRESSION_ENABLE, /* compression enabled */
+//	TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE = AR5K_TXQ_FLAG_RDYTIME_EXP_POLICY_ENABLE, /* enable ready time expiry policy */
+//	TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE = AR5K_TXQ_FLAG_FRAG_BURST_BACKOFF_ENABLE, /* enable backoff while sending fragment burst*/
 } HAL_TX_QUEUE_FLAGS;
 
 typedef struct {
@@ -227,7 +224,7 @@ typedef struct {
 
 //	u_int16_t			tqi_shretry;	/* rts retry limit */
 //	u_int16_t			tqi_lgretry;	/* long retry limit (not used)*/
-//	u_int32_t			tqi_compBuf; 	/* compression buffer phys addr */
+	u_int32_t			tqi_comp_buffer;/* compression buffer phys addr */
 
 #define tqi_cwmin			tqi_cw_min
 #define tqi_cwmax			tqi_cw_max
@@ -236,6 +233,7 @@ typedef struct {
 #define tqi_burstTime			tqi_burst_time
 #define tqi_readyTime			tqi_ready_time
 #define tqi_qflags			tqi_flags
+#define tqi_compBuf			tqi_comp_buffer
 
 } HAL_TXQ_INFO;
 
@@ -593,10 +591,10 @@ typedef struct {
 	u_int16_t	channel;		/* setting in Mhz */
 	u_int16_t	channelFlags;
 
-//	u_int8_t	privFlags;
-//	int8_t		maxRegTxPower;		/* max regulatory tx power in dBm */
-//	int8_t		maxTxPower;		/* max true tx power in 0.25 dBm */
-//	int8_t		minTxPower;		/* min true tx power in 0.25 dBm */
+	u_int8_t	privFlags;
+	int8_t		maxRegTxPower;		/* max regulatory tx power in dBm */
+	int8_t		maxTxPower;		/* max true tx power in 0.25 dBm */
+	int8_t		minTxPower;		/* min true tx power in 0.25 dBm */
 
 #define c_channel	channel
 #define c_channel_flags	channelFlags
@@ -607,23 +605,61 @@ typedef struct {
 #define HAL_SLOT_TIME_20	880
 #define HAL_SLOT_TIME_MAX	0xffff
 
-/* The following commented sruff are also defined (with different names) in ieee80211.h */
+/* channelFlags */
+#define	CHANNEL_CW_INT	0x0002	/* CW interference detected on channel */
+#define	CHANNEL_TURBO	0x0010	/* Turbo Channel */
+#define	CHANNEL_CCK	0x0020	/* CCK channel */
+#define	CHANNEL_OFDM	0x0040	/* OFDM channel */
+#define	CHANNEL_2GHZ	0x0080	/* 2 GHz spectrum channel. */
+#define	CHANNEL_5GHZ	0x0100	/* 5 GHz spectrum channel */
+#define	CHANNEL_PASSIVE	0x0200	/* Only passive scan allowed in the channel */
+#define	CHANNEL_DYN	0x0400	/* dynamic CCK-OFDM channel */
+#define	CHANNEL_XR	0x0800	/* XR channel */
 
-#define CHANNEL_A		(IEEE80211_CHAN_5GHZ | IEEE80211_CHAN_OFDM)
-#define CHANNEL_B		(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_CCK)
-#define CHANNEL_G		(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_DYN)
-#define CHANNEL_PUREG		(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_OFDM)
-#define CHANNEL_T		(CHANNEL_A | IEEE80211_CHAN_TURBO)
-#define CHANNEL_TG		(CHANNEL_PUREG | IEEE80211_CHAN_TURBO)
-#define CHANNEL_108G		CHANNEL_TG
-#define CHANNEL_XR		(CHANNEL_A | IEEE80211_CHAN_XR)
-#define CHANNEL_MODES   	(CHANNEL_A | CHANNEL_B | CHANNEL_G | CHANNEL_PUREG | \
-				CHANNEL_T | CHANNEL_TG | CHANNEL_XR)
+
+/* privFlags */
+
+#define	CHANNEL_A	(CHANNEL_5GHZ|CHANNEL_OFDM)
+#define	CHANNEL_B	(CHANNEL_2GHZ|CHANNEL_CCK)
+#define	CHANNEL_PUREG	(CHANNEL_2GHZ|CHANNEL_OFDM)
+//#ifdef notdef
+#define	CHANNEL_G	(CHANNEL_2GHZ|CHANNEL_DYN)
+//#else
+//#define	CHANNEL_G	(CHANNEL_2GHZ|CHANNEL_OFDM)
+//#endif
+#define	CHANNEL_T	(CHANNEL_5GHZ|CHANNEL_OFDM|CHANNEL_TURBO)
+#define	CHANNEL_TG	(CHANNEL_2GHZ|CHANNEL_OFDM|CHANNEL_TURBO)
+#define	CHANNEL_108A	CHANNEL_T
+#define	CHANNEL_108G	CHANNEL_TG
+#define	CHANNEL_X	(CHANNEL_5GHZ|CHANNEL_OFDM|CHANNEL_XR)
+#define	CHANNEL_ALL \
+	(CHANNEL_OFDM|CHANNEL_CCK| CHANNEL_2GHZ | CHANNEL_5GHZ | CHANNEL_TURBO)
+#define	CHANNEL_ALL_NOTURBO 	(CHANNEL_ALL &~ CHANNEL_TURBO)
+/*#define CHANNEL_MODES           (CHANNEL_A | CHANNEL_B | CHANNEL_G | CHANNEL_PUREG | \
+                                CHANNEL_T | CHANNEL_TG | CHANNEL_XR)*/
+#define CHANNEL_MODES	CHANNEL_ALL
+
+/*See struct ieee80211_channel*/
+#define IS_CHAN_XR(_c) \
+        (((_c)->ic_flags & CHANNEL_XR) != 0)
+
+#define IS_CHAN_B(_c) \
+        (((_c)->ic_flags & CHANNEL_B) != 0)
 
 typedef enum {
-	HAL_CHIP_5GHZ = IEEE80211_CHAN_5GHZ,
-	HAL_CHIP_2GHZ = IEEE80211_CHAN_2GHZ,
+	HAL_CHIP_5GHZ = CHANNEL_5GHZ,
+	HAL_CHIP_2GHZ = CHANNEL_2GHZ,
 } HAL_CHIP;
+
+
+enum ieee80211_phytype {
+        IEEE80211_T_DS,                 /* direct sequence spread spectrum */
+        IEEE80211_T_FH,                 /* frequency hopping */
+        IEEE80211_T_OFDM,               /* frequency division multiplexing */
+        IEEE80211_T_TURBO,              /* high rate OFDM, aka turbo mode */
+	IEEE80211_T_XR,			/* the XR thingie*/
+};
+#define IEEE80211_T_CCK IEEE80211_T_DS  /* more common nomenclature */
 
 /*
  * The following structure will be used to map 2GHz channels to
@@ -1004,7 +1040,7 @@ typedef enum {
 typedef struct {
 	/*
 	 * Supported PHY modes
-	 * (ie. IEEE80211_CHAN_A, IEEE80211_CHAN_B, ...)
+	 * (ie. CHANNEL_A, CHANNEL_B, ...)
 	 */
 	u_int16_t	cap_mode;
 
@@ -1117,6 +1153,7 @@ struct ath_rx_status {
 struct ath_desc {
 	u_int32_t	ds_link;
 	u_int32_t	ds_data;
+	u_int32_t	ds_vdata; /*???*/
 	u_int32_t	ds_ctl0;
 	u_int32_t	ds_ctl1;
 	u_int32_t	ds_hw[4];
@@ -1154,7 +1191,7 @@ struct ath_desc {
 	    HAL_CHANNEL *, HAL_BOOL change_channel, HAL_STATUS *status); \
 	_t void (_a _n##_set_opmode)(struct ath_hal *); \
 	_t HAL_BOOL (_a _n##_calibrate)(struct ath_hal*, \
-	    HAL_CHANNEL *); \
+	    HAL_CHANNEL *, HAL_BOOL *); \
 	/* Transmit functions */ \
 	_t HAL_BOOL (_a _n##_update_tx_triglevel)(struct ath_hal*, \
 	    HAL_BOOL level); \
@@ -1174,7 +1211,8 @@ struct ath_desc {
 	    u_int packet_length, u_int header_length, HAL_PKT_TYPE type, \
 	    u_int txPower, u_int tx_rate0, u_int tx_tries0, u_int key_index, \
 	    u_int antenna_mode, u_int flags, u_int rtscts_rate, \
-	    u_int rtscts_duration); \
+	    u_int rtscts_duration, u_int compicvLen, u_int compivLen,\
+	    u_int comp); \
 	_t HAL_BOOL (_a _n##_setup_xtx_desc)(struct ath_hal *, \
 	    struct ath_desc *, \
 	    u_int tx_rate1, u_int tx_tries1, u_int tx_rate2, u_int tx_tries2, \
@@ -1203,8 +1241,9 @@ struct ath_desc {
 	_t HAL_BOOL (_a _n##_setup_rx_desc)(struct ath_hal *, \
 	    struct ath_desc *, u_int32_t size, u_int flags); \
 	_t HAL_STATUS (_a _n##_proc_rx_desc)(struct ath_hal *, \
-	    struct ath_desc *, u_int32_t phyAddr, struct ath_desc *next); \
-	_t void (_a _n##_set_rx_signal)(struct ath_hal *, const HAL_NODE_STATS *); \
+	    struct ath_desc *, u_int32_t phyAddr, struct ath_desc *next, u_int64_t tsf); \
+	_t void (_a _n##_set_rx_signal)(struct ath_hal *, const HAL_NODE_STATS *, \
+	    HAL_CHANNEL *); \
 	/* Misc Functions */ \
 	_t void (_a _n##_dump_state)(struct ath_hal *); \
 	_t HAL_BOOL (_a _n##_get_diag_state)(struct ath_hal *, int request,\
@@ -1255,7 +1294,7 @@ struct ath_desc {
 	/* Power Management Functions */ \
 	_t HAL_BOOL (_a _n##_set_power)(struct ath_hal*, \
 	    HAL_POWER_MODE mode, \
-	    HAL_BOOL set_chip, u_int16_t sleep_duration); \
+	    HAL_BOOL set_chip); \
 	_t HAL_POWER_MODE (_a _n##_get_power_mode)(struct ath_hal*); \
 	_t HAL_BOOL (_a _n##_query_pspoll_support)(struct ath_hal*); \
 	_t HAL_BOOL (_a _n##_init_pspoll)(struct ath_hal*); \
@@ -1293,6 +1332,7 @@ struct ath_desc {
 	_t HAL_BOOL (_a _n##_set_txpower_limit)(struct ath_hal *, u_int); \
 	_t void (_a _n##_set_def_antenna)(struct ath_hal *, u_int);\
 	_t u_int  (_a _n ##_get_def_antenna)(struct ath_hal *);\
+	_t HAL_BOOL (_a _n ##_set_bssid_mask)(struct ath_hal *, const u_int8_t*);\
 	/*Totaly unimplemented*/ \
 	_t HAL_BOOL (_a _n##_set_capability)(struct ath_hal *, HAL_CAPABILITY_TYPE, u_int32_t, u_int32_t, HAL_STATUS *) ; \
 	_t void (_a _n##_proc_mib_event)(struct ath_hal *, const HAL_NODE_STATS *) ; \
@@ -1311,7 +1351,7 @@ struct ath_hal {
 	HAL_SOFTC		ah_sc;
 	bus_space_tag_t		ah_st;
 	bus_space_handle_t 	ah_sh;
-	HAL_CTRY_CODE	ah_country_code;
+	HAL_CTRY_CODE		ah_country_code;
 
 	HAL_INT			ah_imr;
 
@@ -1518,7 +1558,7 @@ typedef HAL_BOOL (ar5k_rfgain_t)
  */
 
 #define AR5K_INIT_MODE				(			\
-	IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_CCK			\
+	CHANNEL_2GHZ | CHANNEL_CCK			\
 )
 #define AR5K_INIT_TX_LATENCY			502
 #define AR5K_INIT_USEC				39
@@ -2161,7 +2201,8 @@ u_int			 ath_hal_mhz2ieee(u_int, u_int);
 u_int			 ath_hal_ieee2mhz(u_int, u_int);
 
 HAL_BOOL		 ath_hal_init_channels(struct ath_hal *, HAL_CHANNEL *,
-    u_int, u_int *, HAL_CTRY_CODE, u_int16_t, HAL_BOOL, HAL_BOOL);
+			 u_int, u_int *, u_int8_t *regclassids, u_int maxregids, u_int *nregids, 
+			 HAL_CTRY_CODE, u_int16_t, HAL_BOOL, HAL_BOOL);
 
 const char		*ar5k_printver(enum ar5k_srev_type, u_int32_t);
 void			 ar5k_radar_alert(struct ath_hal *);

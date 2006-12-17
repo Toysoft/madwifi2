@@ -104,7 +104,7 @@ int
 ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 	       		HAL_CHANNEL *hal_chans, int hal_nchan, int hal_flags)
 {
-	struct ath_hal *ah = sc->sc_ah;
+//	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_hw_modes *mode;
 	int error = 0;
 	int i;
@@ -141,7 +141,7 @@ ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 
 			channel = &mode->channels[mode->num_channels];
 
-			channel->chan = ath_hal_mhz2ieee(ah, c->channel, 
+			channel->chan = ath_hal_mhz2ieee(c->channel, 
 							 c->channelFlags);
 			channel->freq = c->channel;
 			channel->val = hal_flags;

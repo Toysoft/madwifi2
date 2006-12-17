@@ -58,40 +58,40 @@ include $(obj)/$(DEPTH)/Makefile.inc
 
 obj-m		+= ath_$(BUSNAME).o ath_hal.o
 ath_$(BUSNAME)-objs	:= if_ath_d80211.o if_ath.o if_ath_$(BUSNAME).o
-ath_hal-objs	:= ah_osdep.o $(TARGET).hal.o
+ath_hal-objs	:= ah_osdep.o ../openhal/ar5xxx.o ../openhal/ar5212.o ../openhal/ar5211.o ../openhal/ar5210.o ../openhal/ieee80211_regdomain.o
 
-hostprogs-y	:= uudecode
+#hostprogs-y	:= uudecode
 
 # For older 2.6 kernels
-host-progs	:= $(hostprogs-y)
+#host-progs	:= $(hostprogs-y)
 
-ifdef LINUX24
-export-objs	:= ah_osdep.o
-endif
+#ifdef LINUX24
+#export-objs	:= ah_osdep.o
+#endif
 
 INCS+=	-I$(HAL) -I$(obj) -I$(HAL)/$(OS) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/.opt_ah.h\"
 
 -include $(TOPDIR)/Rules.make
 
 all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
-ifdef LINUX24
-$(obj)/uudecode: $(obj)/uudecode.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-endif
+#ifdef LINUX24
+#$(obj)/uudecode: $(obj)/uudecode.c
+#	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+#endif
+#
+#quiet_cmd_uudecode = UUDECODE $@
+#      cmd_uudecode = $(obj)/uudecode -o $@ $<
 
-quiet_cmd_uudecode = UUDECODE $@
-      cmd_uudecode = $(obj)/uudecode -o $@ $<
-
-$(obj)/$(TARGET).hal.o: $(HAL)/public/$(TARGET).hal.o.uu $(obj)/uudecode
-ifdef LINUX24
-	$(Q)$(obj)/uudecode -o $@ $<
-else
-	$(call if_changed,uudecode)
-endif
+#$(obj)/$(TARGET).hal.o: $(HAL)/public/$(TARGET).hal.o.uu $(obj)/uudecode
+#ifdef LINUX24
+#	$(Q)$(obj)/uudecode -o $@ $<
+#else
+#	$(call if_changed,uudecode)
+#endif
 
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
