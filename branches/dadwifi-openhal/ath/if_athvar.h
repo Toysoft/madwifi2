@@ -326,7 +326,7 @@ struct ath_node {
 	u_int32_t an_avgrssi;			/* average rssi over all rx frames */
 	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
 	u_int16_t an_minffrate;			/* mimum rate in kbps for ff to aggragate */
-	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
+//	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
 	struct ath_buf *an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
 	ath_bufhead an_uapsd_q;			/* U-APSD delivery queue */
 	int an_uapsd_qdepth; 			/* U-APSD delivery queue depth */
@@ -570,7 +570,7 @@ struct ath_softc {
 	const HAL_RATE_TABLE *sc_xr_rates;	/* XR rate table */
 	const HAL_RATE_TABLE *sc_half_rates;	/* half rate table */
 	const HAL_RATE_TABLE *sc_quarter_rates;	/* quarter rate table */
-	HAL_OPMODE sc_opmode;			/* current hal operating mode */
+	u_int32_t sc_opmode;			/* current hal operating mode */
 #ifdef CONFIG_NET80211
 	enum ieee80211_phymode sc_curmode;	/* current phy mode */
 #else
@@ -664,7 +664,7 @@ struct ath_softc {
 	int sc_bnext;				/* next slot for beacon xmit */
 
 	struct timer_list sc_cal_ch;		/* calibration timer */
-	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
+//	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
 	struct ATH_WORK_THREAD sc_radartask;	/* Schedule task for DFS handling */
 
 #ifdef CONFIG_SYSCTL
@@ -791,13 +791,13 @@ void ath_sysctl_unregister(void);
 #define	ath_hal_updatetxtriglevel(_ah, _inc) \
 	((*(_ah)->ah_updateTxTrigLevel)((_ah), (_inc)))
 #define	ath_hal_setpower(_ah, _mode) \
-	((*(_ah)->ah_setPowerMode)((_ah), (_mode), AH_TRUE))
+	((*(_ah)->ah_setPowerMode)((_ah), (_mode), TRUE))
 #define	ath_hal_keycachesize(_ah) \
 	((*(_ah)->ah_getKeyCacheSize)((_ah)))
 #define	ath_hal_keyreset(_ah, _ix) \
 	((*(_ah)->ah_resetKeyCacheEntry)((_ah), (_ix)))
 #define	ath_hal_keyset(_ah, _ix, _pk, _mac) \
-	((*(_ah)->ah_setKeyCacheEntry)((_ah), (_ix), (_pk), (_mac), AH_FALSE))
+	((*(_ah)->ah_setKeyCacheEntry)((_ah), (_ix), (_pk), (_mac), FALSE))
 #define	ath_hal_keyisvalid(_ah, _ix) \
 	(((*(_ah)->ah_isKeyCacheEntryValid)((_ah), (_ix))))
 #define	ath_hal_keysetmac(_ah, _ix, _mac) \

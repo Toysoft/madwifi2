@@ -63,7 +63,7 @@ static struct {
 	{ HAL_MODE_11A,  MODE_IEEE80211A	},
 	{ HAL_MODE_11B,  MODE_IEEE80211B	},
 	{ HAL_MODE_11G,  MODE_IEEE80211G	},
-	{ HAL_MODE_108A, MODE_ATHEROS_TURBO	},
+	{ HAL_MODE_TURBO, MODE_ATHEROS_TURBO	},
 	{ HAL_MODE_108G, MODE_ATHEROS_TURBOG	},
 };
 
@@ -332,13 +332,13 @@ ath_d80211_add_interface(struct ieee80211_hw *hw,
 
 	switch (conf->type) {
 	case IEEE80211_IF_TYPE_STA:
-		sc->sc_opmode = HAL_M_STA;
+		sc->sc_opmode = IEEE80211_IF_TYPE_STA;
 		break;
 	case IEEE80211_IF_TYPE_IBSS:
-		sc->sc_opmode = HAL_M_IBSS;
+		sc->sc_opmode = IEEE80211_IF_TYPE_IBSS;
 		break;
 	case IEEE80211_IF_TYPE_MNTR:
-		sc->sc_opmode = HAL_M_MONITOR;
+		sc->sc_opmode = IEEE80211_IF_TYPE_MNTR;
 		break;
 	case IEEE80211_IF_TYPE_AP:
 
@@ -403,7 +403,7 @@ ath_d80211_add_interface(struct ieee80211_hw *hw,
 
 		}
 
-		sc->sc_opmode = HAL_M_HOSTAP;
+		sc->sc_opmode = IEEE80211_IF_TYPE_AP;
 		sc->sc_beacons = 1;
 		break;
 	default:
@@ -704,7 +704,7 @@ ath_d80211_alloc(size_t priv_size)
 		hw->modes[i].rates = &sc->sc_ieee80211_rates[i * ATH_MAX_RATES];
 	}
 
-	sc->sc_opmode = HAL_M_STA;
+	sc->sc_opmode = IEEE80211_IF_TYPE_STA;
 
 	spin_lock_init(&sc->sc_bss_lock);
 
