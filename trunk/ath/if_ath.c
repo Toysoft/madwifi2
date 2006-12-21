@@ -5362,13 +5362,18 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	int extra = A_MAX(sizeof(struct ath_tx_radiotap_header), 
 			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
 	u_int64_t tsf;
-
+	u_int32_t tstamp;
+	
 	/* Pass up tsf clock in mactime
-	 * tx descriptor has the low 15 bits of the tsf at
-	 * the time the frame was received.  Use the current
-	 * tsf to extend this to 64 bits.
+	 * TX descriptor contains the transmit time in TU's,
+	 * (bits 25-10 of the TSF).
 	 */
-	tsf = ath_extend_tsf(sc->sc_ah, ds->ds_txstat.ts_tstamp);
+	tsf = ath_hal_gettsf64(sc->sc_ah);
+	tstamp = ds->ds_txstat.ts_tstamp << 10;
+	
+	if ((tsf & 0x3ffffff) < tstamp)
+		tsf -= 0x4000000;
+	tsf = ((tsf &~ 0x3ffffff) | tstamp);
 
 	/*                                                                      
 	 * release the owner of this skb since we're basically                  
