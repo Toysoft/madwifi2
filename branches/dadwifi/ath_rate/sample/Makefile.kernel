@@ -7,15 +7,18 @@
 src ?= .
 srctree ?= .
 
-include $(srctree)/$(src)/../../BuildCaps.inc
+TOP = $(srctree)/$(src)/../..
 
-HAL=	$(srctree)/$(src)/../../hal
-ATH=	$(srctree)/$(src)/../../ath
-WLAN=	$(srctree)/$(src)/../../net80211
-COMPAT=	$(srctree)/$(src)/../../include
+include $(TOP)/BuildCaps.inc
 
-INCS=	-include $(COMPAT)/compat.h -I$(COMPAT)
-EXTRA_CFLAGS+=	$(INCS) -I$(HAL) -I$(HAL)/linux -I$(ATH) -I$(WLAN) -I$(src)/../..
+ATH=	$(TOP)/ath
+ATH_HAL=$(TOP)/ath_hal
+COMPAT=	$(TOP)/include
+HAL=	$(TOP)/hal
+
+INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
+INCS += -I$(TOP) -I$(ATH) -I$(ATH_HAL) -I$(HAL)
+EXTRA_CFLAGS += $(INCS)
 
 ifdef LINUX26
 obj-$(CONFIG_ATHEROS) += ath_rate_sample.o

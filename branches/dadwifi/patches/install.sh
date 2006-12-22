@@ -71,7 +71,7 @@ echo "Copying top-level files"
 MADWIFI=${WIRELESS}/madwifi
 rm -rf ${MADWIFI}
 mkdir -p ${MADWIFI}
-make -s -C ${SRC} svnversion.h KERNELPATH=${KERNEL_PATH} KERNELCONF=/dev/null ARCH=. TARGET=i386-elf
+make -s -C ${SRC} svnversion.h
 cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
 cat >>${MADWIFI}/BuildCaps.inc <<EOF
 
@@ -88,7 +88,7 @@ EOF
 
 
 echo "Copying source files"
-FILES=`cd ${SRC} && find ath ath_rate hal include net80211 -name '*.[ch]'`
+FILES=`cd ${SRC} && find ath ath_hal ath_rate hal include net80211 -name '*.[ch]'`
 for f in $FILES; do
 	case $f in
 		*.mod.c) continue;;
@@ -102,6 +102,7 @@ FILES=`cd ${SRC} && find . -name Makefile.kernel`
 for f in $FILES; do
 	cp -f ${SRC}/$f `dirname ${MADWIFI}/$f`/Makefile
 done
+cp -f ${SRC}/ath_hal/ah_target.inc ${MADWIFI}/ath_hal
 
 echo "Copying Atheros HAL files"
 DST_HAL=${MADWIFI}/hal

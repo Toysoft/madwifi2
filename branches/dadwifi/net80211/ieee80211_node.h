@@ -73,7 +73,7 @@ struct ieee80211_rsnparms {
 	u_int8_t rsn_ucastcipherset;	/* unicast cipher set */
 	u_int8_t rsn_ucastcipher;	/* selected unicast cipher */
 	u_int8_t rsn_ucastkeylen;	/* unicast key length */
-	u_int8_t rsn_keymgmtset;		/* key mangement algorithms */
+	u_int8_t rsn_keymgmtset;	/* key management algorithms */
 	u_int8_t rsn_keymgmt;		/* selected key mgmt algo */
 	u_int16_t rsn_caps;		/* capabilities */
 };

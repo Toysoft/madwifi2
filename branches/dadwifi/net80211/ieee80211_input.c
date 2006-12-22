@@ -145,14 +145,11 @@ static unsigned short ath_eth_type_trans(struct sk_buff *, struct net_device *);
  * This function is a clone of set_quality(..) in ieee80211_wireless.c
  */
 static void
-set_quality(struct iw_quality *iq, u_int rssi)
+set_quality(struct iw_quality *iq, u_int rssi, int noise)
 {
 	iq->qual = rssi;
-	/* NB: max is 94 because noise is hardcoded to 161 */
-	if (iq->qual > 94)
-		iq->qual = 94;
 
-	iq->noise = 161;		/* -95dBm */
+	iq->noise = noise;	
 	iq->level = iq->noise + iq->qual;
 	iq->updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED |
 		IW_QUAL_NOISE_UPDATED;
@@ -190,9 +187,9 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
 				memcpy(thr.addr.sa_data, ni->ni_macaddr,
 					IEEE80211_ADDR_LEN);
 				thr.addr.sa_family = ARPHRD_ETHER;
-				set_quality(&thr.qual, rssi);
-				set_quality(&thr.low, vap->iv_spy.thr_low);
-				set_quality(&thr.high, vap->iv_spy.thr_high);
+				set_quality(&thr.qual, rssi, vap->iv_ic->ic_channoise);
+				set_quality(&thr.low, vap->iv_spy.thr_low, vap->iv_ic->ic_channoise);
+				set_quality(&thr.high, vap->iv_spy.thr_high, vap->iv_ic->ic_channoise);
 				wireless_send_event(vap->iv_dev,
 					SIOCGIWTHRSPY, &wrq, (char*) &thr);
 				break;
@@ -755,7 +752,7 @@ ieee80211_input(struct ieee80211_node *ni,
 
 	case IEEE80211_FC0_TYPE_MGT:
 		/*
-		 * WDS opmode do not support managment frames
+		 * WDS opmode do not support management frames
 		 */
 		if (vap->iv_opmode == IEEE80211_M_WDS) {
 			vap->iv_stats.is_rx_mgtdiscard++;
@@ -1694,7 +1691,7 @@ ieee80211_ssid_mismatch(struct ieee80211vap *vap, const char *tag,
 } while (0)
 #endif /* !IEEE80211_DEBUG */
 
-/* unalligned little endian access */     
+/* unaligned little endian access */     
 #define LE_READ_2(p)					\
 	((u_int16_t)					\
 	 ((((const u_int8_t *)(p))[0]      ) |		\
@@ -2176,8 +2173,10 @@ ieee80211_parse_wmeparams(struct ieee80211vap *vap, u_int8_t *frm,
 static void
 ieee80211_parse_athParams(struct ieee80211_node *ni, u_int8_t *ie)
 {
+#ifdef ATH_SUPERG_DYNTURBO
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
+#endif /* ATH_SUPERG_DYNTURBO */
 	struct ieee80211_ie_athAdvCap *athIe =
 		(struct ieee80211_ie_athAdvCap *) ie;
 
@@ -2211,6 +2210,60 @@ ieee80211_parse_athParams(struct ieee80211_node *ni, u_int8_t *ie)
 #endif /* ATH_SUPERG_DYNTURBO */
 }
 
+static void
+forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
+	struct ieee80211_frame *wh)
+{
+	struct net_device *dev = vap->iv_dev;
+	int filter_type = 0;
+
+	switch (subtype) {
+	case IEEE80211_FC0_SUBTYPE_BEACON:
+		filter_type = IEEE80211_FILTER_TYPE_BEACON;
+		break;
+	case IEEE80211_FC0_SUBTYPE_PROBE_REQ:
+		filter_type = IEEE80211_FILTER_TYPE_PROBE_REQ;
+		break;
+	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
+		filter_type = IEEE80211_FILTER_TYPE_PROBE_RESP;
+		break;
+	case IEEE80211_FC0_SUBTYPE_ASSOC_REQ:
+	case IEEE80211_FC0_SUBTYPE_REASSOC_REQ:
+		filter_type = IEEE80211_FILTER_TYPE_ASSOC_REQ;
+		break;
+	case IEEE80211_FC0_SUBTYPE_ASSOC_RESP:
+	case IEEE80211_FC0_SUBTYPE_REASSOC_RESP:
+		filter_type = IEEE80211_FILTER_TYPE_ASSOC_RESP;
+		break;
+	case IEEE80211_FC0_SUBTYPE_AUTH:
+		filter_type = IEEE80211_FILTER_TYPE_AUTH;
+		break;
+	case IEEE80211_FC0_SUBTYPE_DEAUTH:
+		filter_type = IEEE80211_FILTER_TYPE_DEAUTH;
+		break;
+	case IEEE80211_FC0_SUBTYPE_DISASSOC:
+		filter_type = IEEE80211_FILTER_TYPE_DISASSOC;
+		break;
+	default:
+		break;
+	}
+
+	if (filter_type && ((vap->app_filter & filter_type) == filter_type)) {
+		struct sk_buff *skb1;
+
+		skb1 = skb_copy(skb, GFP_ATOMIC);
+		if (skb1 == NULL)
+			return;
+		skb1->dev = dev;
+		skb1->mac.raw = skb1->data;
+		skb1->ip_summed = CHECKSUM_NONE;
+		skb1->pkt_type = PACKET_OTHERHOST;
+		skb1->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
+
+		netif_rx(skb1);
+	}
+}
+
 void
 ieee80211_saveath(struct ieee80211_node *ni, u_int8_t *ie)
 {
@@ -2239,58 +2292,200 @@ ieee80211_doth_findchan(struct ieee80211vap *vap, u_int8_t chan)
 	return c;
 }
 
-static int
-ieee80211_parse_dothparams(struct ieee80211vap *vap, u_int8_t *frm,
-	const struct ieee80211_frame *wh)
+static void
+ieee80211_doth_cancel_cs(struct ieee80211vap *vap)
+{
+	del_timer(&vap->iv_csa_timer);
+	if (vap->iv_csa_jiffies) 
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				"channel switch canceled (was: to %u in %u "
+				"tbtt, mode %u)\n", vap->iv_csa_chan->ic_ieee,
+				vap->iv_csa_count, vap->iv_csa_mode);
+	vap->iv_csa_jiffies = 0;
+}
+
+static void
+ieee80211_doth_switch_channel(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
-	u_int len = frm[1];
-	u_int8_t chan, tbtt;
 
-	if (len < 4 - 2) {		/* XXX ie struct definition */
-		IEEE80211_DISCARD_IE(vap,
-			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
-			wh, "channel switch", "too short, len %u", len);
-		return -1;
-	}
-	chan = frm[3];
-	if (isclr(ic->ic_chan_avail, chan)) {
-		IEEE80211_DISCARD_IE(vap,
-			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
-			wh, "channel switch", "invalid channel %u", chan);
-		return -1;
-	}
-	tbtt = frm[4];
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-		"%s: channel switch to %d in %d tbtt\n", __func__, chan, tbtt);
-	if (tbtt <= 1) {
-		struct ieee80211_channel *c;
+			"%s: Channel switch to %d NOW!\n",
+			__func__, vap->iv_csa_chan->ic_ieee);
+#if 0
+	/* XXX does not belong here? */
+	/* XXX doesn't stop management frames */
+	/* XXX who restarts the queue? */
+	/* NB: for now, error here is non-catastrophic.
+	 *     in the future we may need to ensure we
+	 *     stop xmit on this channel.
+	 */
+	netif_stop_queue(ic->ic_dev);
+#endif
+
+	vap->iv_csa_jiffies = 0; /* supress "cancel" msg */
+	ieee80211_doth_cancel_cs(vap);
+
+	ic->ic_prevchan = ic->ic_curchan;
+	ic->ic_curchan = ic->ic_bsschan = vap->iv_csa_chan;
+	ic->ic_set_channel(ic);
+}
+
+static void
+ieee80211_doth_switch_channel_tmr(unsigned long arg)
+{
+	struct ieee80211vap *vap = (struct ieee80211vap *)arg;
+	ieee80211_doth_switch_channel(vap);
+}
+
+static int
+ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
+	const struct ieee80211_frame *wh)
+{
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ieee80211_channel *c;
+	struct ieee80211_ie_csa *csa_ie = (struct ieee80211_ie_csa *)frm;
+
+	if (!frm) {
+		/* we had CS underway but now we got Beacon without CSA IE */
+		/* XXX abuse? */
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-			"%s: Channel switch to %d NOW!\n", __func__, chan);
-#if 0
-		/* XXX does not belong here? */
-		/* XXX doesn't stop management frames */
-		/* XXX who restarts the queue? */
-		/* NB: for now, error here is non-catastrophic.
-		 *     in the future we may need to ensure we
-		 *     stop xmit on this channel.
-		 */
-		netif_stop_queue(ic->ic_dev);
-#endif
-		if ((c = ieee80211_doth_findchan(vap, chan)) == NULL) {
-			/* XXX something wrong */
-			IEEE80211_DISCARD_IE(vap,
+				"%s: channel switch is scheduled, but we got "
+				"Beacon without CSA IE!\n", __func__);
+
+		ieee80211_doth_cancel_cs(vap);
+		return 0;
+	}
+
+	if (csa_ie->csa_len != 3) {
+		IEEE80211_DISCARD_IE(vap,
+			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
+			wh, "channel switch", "invalid length %u",
+			csa_ie->csa_len);
+		return -1;
+	}
+
+	if (isclr(ic->ic_chan_avail, csa_ie->csa_chan)) {
+		IEEE80211_DISCARD_IE(vap,
+			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
+			wh, "channel switch", "invalid channel %u", 
+			csa_ie->csa_chan);
+		return -1;
+	}
+
+	if ((c = ieee80211_doth_findchan(vap, csa_ie->csa_chan)) == NULL) {
+		/* XXX something wrong */
+		IEEE80211_DISCARD_IE(vap,
 				IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
 				wh, "channel switch",
-				"channel %u lookup failed", chan);
+				"channel %u lookup failed", csa_ie->csa_chan);
+		return -1;
+	}
+
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+		"%s: channel switch to %u in %u tbtt (mode %u) announced\n",
+		__func__, csa_ie->csa_chan, csa_ie->csa_count,
+		csa_ie->csa_mode);
+
+	if (vap->iv_csa_jiffies) {
+		/* CSA was received recently */
+		if (c != vap->iv_csa_chan) {
+			/* XXX abuse? */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					"%s: channel switch channel "
+					"changed from %u to %u!\n", __func__,
+					vap->iv_csa_chan->ic_ieee,
+					csa_ie->csa_chan);
+
+			if (vap->iv_csa_count > IEEE80211_CSA_PROTECTION_PERIOD)
+				ieee80211_doth_cancel_cs(vap);
 			return 0;
 		}
-		ic->ic_prevchan = ic->ic_curchan;
-		ic->ic_curchan = ic->ic_bsschan = c;
-		ic->ic_set_channel(ic);
-		return 1;
+
+		if (csa_ie->csa_mode != vap->iv_csa_mode) {
+			/* Can be abused, but with no (to little) impact. */
+
+			/* CS mode change has no influence on our actions since
+			 * we don't respect cs modes at all (yet). Complain and
+			 * forget. */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					"%s: channel switch mode changed from "
+					"%u to %u!\n", __func__, 
+					vap->iv_csa_mode, csa_ie->csa_mode);
+		}
+
+		if (csa_ie->csa_count >= vap->iv_csa_count) {
+			/* XXX abuse? what for? */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					"%s: channel switch count didn't "
+					"decrease (%u -> %u)!\n", __func__,
+					vap->iv_csa_count, csa_ie->csa_count);
+			return 0;
+		}
+
+		{
+			u_int32_t elapsed = IEEE80211_JIFFIES_TO_TU(
+			    jiffies - vap->iv_csa_jiffies);
+			u_int32_t cnt_diff = vap->iv_csa_count -
+			  csa_ie->csa_count;
+			u_int32_t expected = ni->ni_intval * cnt_diff;
+			int32_t delta = elapsed - expected;
+			if (delta < 0)
+				delta = -delta;
+			if (delta > IEEE80211_CSA_SANITY_THRESHOLD) {
+				/* XXX abuse? for now, it's safer to cancel CS
+				 * than to follow it blindly */
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+						"%s: %u.%02u bintvals elapsed, "
+						"but count dropped by %u (delta"
+						" = %u TUs)\n", __func__,
+						elapsed / ni->ni_intval,
+						elapsed * 100 / ni->ni_intval 
+						% 100, cnt_diff, delta);
+
+				ieee80211_doth_cancel_cs(vap);
+				return 0;
+			}
+		}
+
+		vap->iv_csa_count = csa_ie->csa_count;
+		mod_timer(&vap->iv_csa_timer, jiffies + 
+				IEEE80211_TU_TO_JIFFIES(vap->iv_csa_count
+				  * ni->ni_intval + 10));
+	} else {
+		/* CSA wasn't received recently, so this is the first one in
+		 * the sequence. */
+
+		if (csa_ie->csa_count < IEEE80211_CSA_PROTECTION_PERIOD) {
+			/* XXX abuse? */
+			IEEE80211_DISCARD_IE(vap,
+					IEEE80211_MSG_ELEMID | 
+					IEEE80211_MSG_DOTH,
+					wh, "channel switch",
+					"initial announcement: channel switch"
+					" would occur too soon (in %u tbtt)",
+					csa_ie->csa_count);
+			return 0;
+		}
+
+		vap->iv_csa_mode = csa_ie->csa_mode;
+		vap->iv_csa_count = csa_ie->csa_count;
+		vap->iv_csa_chan = c;
+
+		vap->iv_csa_timer.function = ieee80211_doth_switch_channel_tmr;
+		vap->iv_csa_timer.data = (unsigned long)vap;
+		vap->iv_csa_timer.expires = jiffies + IEEE80211_TU_TO_JIFFIES(
+		    vap->iv_csa_count * ni->ni_intval + 10);
+		add_timer(&vap->iv_csa_timer);
 	}
+
+	vap->iv_csa_jiffies = jiffies;
+
+	if (vap->iv_csa_count <= 1)
+		ieee80211_doth_switch_channel(vap);
+
 	return 0;
 }
 
@@ -2382,6 +2577,11 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	wh = (struct ieee80211_frame *) skb->data;
 	frm = (u_int8_t *)&wh[1];
 	efrm = skb->data + skb->len;
+
+	/* forward management frame to application */
+	if (vap->iv_opmode != IEEE80211_M_MONITOR)
+		forward_mgmt_to_app(vap, subtype, skb, wh);
+
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 	case IEEE80211_FC0_SUBTYPE_BEACON: {
@@ -2428,6 +2628,13 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		scan.chan = scan.bchan;
 
 		while (frm < efrm) {
+			/* Agere element in beacon */
+			if ((*frm == IEEE80211_ELEMID_AGERE1) ||
+			    (*frm == IEEE80211_ELEMID_AGERE2)) {
+			    	frm = efrm;
+				continue;
+			}
+
 			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
 			case IEEE80211_ELEMID_SSID:
@@ -2487,7 +2694,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				break;
 			case IEEE80211_ELEMID_CHANSWITCHANN:
 				if (ic->ic_flags & IEEE80211_F_DOTH)
-					scan.doth = frm;
+					scan.csa = frm;
 				break;
 			default:
 				IEEE80211_DISCARD_IE(vap, IEEE80211_MSG_ELEMID,
@@ -2589,8 +2796,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				ni->ni_flags &= ~IEEE80211_NODE_UAPSD;
 			if (scan.ath != NULL)
 				ieee80211_parse_athParams(ni, scan.ath);
-			if (scan.doth != NULL)
-				ieee80211_parse_dothparams(vap, scan.doth, wh);
+			if (scan.csa != NULL || vap->iv_csa_jiffies)
+				ieee80211_parse_csaie(ni, scan.csa, wh);
 			if (scan.tim != NULL) {
 				/*
 				 * Check the TIM. For now we drop out of
@@ -3205,6 +3412,19 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 
 		rates = xrates = wme = NULL;
 		while (frm < efrm) {
+			/* 
+			 * Do not discard frames containing proprietary Agere
+			 * elements 128 and 129, as the reported element length
+			 * is often wrong. Skip rest of the frame, since we can
+			 * not rely on the given element length making it impossible
+			 * to know where the next element starts.
+			 */
+			if ((*frm == IEEE80211_ELEMID_AGERE1) ||
+			    (*frm == IEEE80211_ELEMID_AGERE2)) {
+			    	frm = efrm;
+				continue;
+			}
+
 			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
 			case IEEE80211_ELEMID_RATES:
@@ -3251,7 +3471,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 * XXX may need different/additional driver callbacks?
 		 */
 		if (IEEE80211_IS_CHAN_A(ic->ic_curchan) ||
-		    (ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE)) {
+		    ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) &&
+		    (ic->ic_caps & IEEE80211_C_SHPREAMBLE))) {
 			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
 			ic->ic_flags &= ~IEEE80211_F_USEBARKER;
 		} else {
@@ -3276,7 +3497,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC, wh->i_addr2,
 			"%sassoc success: %s preamble, %s slot time%s%s%s%s%s%s%s",
 			ISREASSOC(subtype) ? "re" : "",
-		 	ic->ic_flags&IEEE80211_F_SHPREAMBLE ? "short" : "long",
+		 	(ic->ic_flags&IEEE80211_F_SHPREAMBLE) &&
+			(ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) ? "short" : "long",
 			ic->ic_flags&IEEE80211_F_SHSLOT ? "short" : "long",
 			ic->ic_flags&IEEE80211_F_USEPROT ? ", protection" : "",
 			ni->ni_flags & IEEE80211_NODE_QOS ? ", QoS" : "",

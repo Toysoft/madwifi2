@@ -44,13 +44,15 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	.
+TOP = $(obj)
 
-include $(obj)/Makefile.inc
+ifneq (svnversion.h,$(MAKECMDGOALS))
+include $(TOP)/Makefile.inc
+endif
 
-DIRS_MODULES = $(ATH)
+DIRS_MODULES = $(ATH) $(ATH_HAL)
 
-obj-y := ath/
+obj-y := ath/ ath_hal/
 
 all: modules tools
 
@@ -107,7 +109,7 @@ clean:
 	done
 	-$(MAKE) -C $(TOOLS) clean
 	rm -rf .tmp_versions
-	rm -f Modules.symvers svnversion.h
+	rm -f *.symvers svnversion.h
 
 info:
 	@echo "The following settings will be used for compilation:"
@@ -123,10 +125,6 @@ info:
 	@echo "KERNELCONF   : $(KERNELCONF)"
 	@echo "KMODPATH     : $(KMODPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
-	@if [ -n "$(DESTDIR)" ]; then \
-	    echo "DESTDIR      : $(DESTDIR)"; \
-	    echo "SYSTEMMAP    : $(SYSTEMMAP)"; \
-	fi
 
 sanitycheck:
 	@echo -n "Checking requirements... "
@@ -143,10 +141,6 @@ sanitycheck:
 .PHONY: release
 release:
 	sh scripts/make-release.bash
-
-# new targets should be inserted ABOVE this line in order to avoid
-# problems with the included kernel configuration file below.
-include $(KERNELCONF)
 
 configcheck: sanitycheck
 	@echo -n "Checking kernel configuration... "
@@ -166,7 +160,7 @@ configcheck: sanitycheck
 	    exit 1; \
 	fi
 	
-ifneq ($(strip $(BUS)),AHB)
+ifeq ($(strip $(BUS)),PCI)
 	@# check PCI support
 	@if [ -z "$(CONFIG_PCI)" ]; then \
 	    echo "FAILED"; \

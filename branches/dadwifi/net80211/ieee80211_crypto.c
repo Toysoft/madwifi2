@@ -611,7 +611,7 @@ EXPORT_SYMBOL(ieee80211_crypto_encap);
 
 /*
  * Validate and strip privacy headers (and trailer) for a
- * received frame that has the WEP/Privacy bit set.
+ * received frame that has the Protected Frame bit set.
  */
 struct ieee80211_key *
 ieee80211_crypto_decap(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)

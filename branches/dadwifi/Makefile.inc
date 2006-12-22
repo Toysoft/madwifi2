@@ -36,10 +36,6 @@
 # $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/Makefile.inc#11 $
 #
 
-ifeq ($(obj),)
-obj=	.
-endif
-
 # other locales sometimes cause trouble
 export LC_ALL = POSIX
 
@@ -63,22 +59,6 @@ DESTDIR ?=
 # another kernel, set KERNELPATH manually, for example with:
 # make KERNELPATH=/path/to/kernel/source
 
-# TOOLPATH is the path which contains the crosscompile toolchain (?)
-
-ifeq ($(strip $(BUS)),AHB)
-# Bus type AHB forces the target platform to be mipsisa32.
-TARGET :=	mipsisa32-be-elf
-
-# Bus type AHB requires KERNELPATH and TOOLPATH to be set manually.
-ifndef KERNELPATH
-$(error KERNELPATH must be defined for bus type AHB.)
-endif
-ifndef TOOLPATH
-$(error TOOLPATH must be defined for bus type AHB.)
-endif
-
-else
-
 # The default KERNELPATH points to the directory where the currently
 # running kernel was compiled.  Note that the configuration and the
 # version of the kernel tree might have changed since then.
@@ -91,8 +71,6 @@ endif
 export KERNELPATH
 endif
 
-endif
-
 # KERNELRELEASE is the target kernel's version.  It's always taken from
 # the kernel build tree.  Kernel Makefile doesn't always know the exact
 # kernel version (especially for vendor stock kernels), so we get it
@@ -101,7 +79,10 @@ endif
 # in that file.
 # This trick has been inspired by the lm_sensors project.
 ifndef KERNELRELEASE
-KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(DEPTH)/kernelversion.c | grep uts_release | cut -f2 -d'"')
+KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(TOP)/kernelversion.c | grep uts_release | cut -f2 -d'"')
+ifeq (,$(KERNELRELEASE))
+$(error Cannot detect kernel version - please check compiler and KERNELPATH)
+endif
 endif
 
 # KERNELCONF is the name of the file that holds the configuration
@@ -112,33 +93,19 @@ KERNELCONF ?=	$(KERNELPATH)/.config
 ifeq ($(wildcard $(KERNELCONF)),)
 $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
+include $(KERNELCONF)
 
-# Determine target architecture of the kernel.
-ifeq (,$(ARCH_TARGET))
-ARCH_TARGET=$(shell $(DEPTH)/scripts/get_arch_target.sh $(KERNELCONF))
-ARCH ?= $(word 1,$(ARCH_TARGET))
-TARGET ?= $(word 2,$(ARCH_TARGET))
-endif
-
-ifeq (,$(ARCH))
-$(error Cannot determine kernel architecture, please check $(KERNELCONF))
-endif
+# Determine architecture of the kernel.
+include $(TOP)/scripts/get_arch.mk
 export ARCH
-export TARGET
-export ARCH_TARGET
 
-# SYSTEMMAP is the name of the System.map file for the target
-# kernel. This will be needed when DESTDIR is defined in order
-# to run depmod properly.
-SYSTEMMAP ?= 	$(KERNELPATH)/System.map
+# Determine TARGET
+include $(TOP)/ath_hal/ah_target.inc
+export TARGET
 
 # KMODPATH nominates the directory where the modules will be
 # installed to
-ifeq ($(strip $(BUS)),AHB)
-KMODPATH := 	$(KERNELPATH)/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/$(KERNELRELEASE)/net
-else
 KMODPATH :=	/lib/modules/$(KERNELRELEASE)/net
-endif
 
 # Recognize 2.4.x kernels to support the old build system
 ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
@@ -160,16 +127,20 @@ AWK=		awk
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=	$(obj)/$(DEPTH)/hal
+HAL=	$(TOP)/hal
 endif
 #
+#
+# Path to HAL/OS interface code
+#
+ATH_HAL= $(TOP)/ath_hal
 # Path to the 802.11 include files.
 #
-WLAN=	$(DEPTH)/net80211
+WLAN=	$(TOP)/net80211
 #
 # Path to the Atheros device driver.
 #
-ATH=	$(DEPTH)/ath
+ATH=	$(TOP)/ath
 #
 # Path to the rate control algorithm.
 #
@@ -179,14 +150,10 @@ endif
 #
 # Path to the userspace utilities. 
 # 
-TOOLS=  $(DEPTH)/tools 
+TOOLS=  $(TOP)/tools 
 
 COPTS+=	-Werror
-INCS=	-include $(obj)/$(DEPTH)/include/compat.h -I$(obj)/$(DEPTH)/include
-
-ifeq ($(strip $(BUS)),AHB)
-INCS+= -isystem $(TOOLPATH)/include
-endif
+INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
 
 # TARGET defines the target platform architecture. It must match one of
 # the target platforms supported by the HAL. The default target is the
@@ -198,7 +165,7 @@ TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
 $(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
 endif
 
-# Don't let HAL mess with the toolchain - save toolchain valiables
+# Don't let HAL mess with the toolchain - save toolchain variables
 save_CC := $(CC)
 save_LD := $(LD)
 save_STRIP := $(STRIP)
@@ -207,14 +174,14 @@ save_NM := $(NM)
 
 include $(HAL)/public/$(TARGET).inc
 
-# Restore toolchain valiables
+# Restore toolchain variables
 CC := $(save_CC)
 LD := $(save_LD)
 STRIP := $(save_STRIP)
 OBJCOPY := $(save_OBJCOPY)
 NM := $(save_NM)
 
-include $(obj)/$(DEPTH)/BuildCaps.inc
+include $(TOP)/BuildCaps.inc
 
 # Ensure correct endianess
 LDFLAGS += $(LDOPTS)

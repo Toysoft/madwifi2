@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2006 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,12 +35,23 @@
  *
  * $Id$
  */
-#include "svnversion.h"
+#ifndef _ATH_AH_OSDEP_H_
+#define _ATH_AH_OSDEP_H_
 
-#define	RELEASE_TYPE	"ALPHA"
-
-#ifdef SVNVERSION
-#define RELEASE_VERSION	SVNVERSION
+/*
+ * Starting with 2.6.4 the kernel supports a configuration option
+ * to pass parameters in registers.  If this is enabled we must
+ * mark all function interfaces in+out of the HAL to pass parameters
+ * on the stack as this is the convention used internally (for
+ * maximum portability).
+ */
+#ifdef CONFIG_REGPARM
+#define	__ahdecl	__attribute__((regparm(0)))
 #else
-#define RELEASE_VERSION	"0.9.3"
+#define	__ahdecl
 #endif
+#ifndef __packed
+#define	__packed	__attribute__((__packed__))
+#endif
+
+#endif /* _ATH_AH_OSDEP_H_ */

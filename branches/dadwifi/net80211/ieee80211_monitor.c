@@ -165,6 +165,107 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 			ph->try0 = 1;
                 break;
 	}
+	case ARPHRD_IEEE80211_RADIOTAP: {
+		struct ieee80211_frame *wh = NULL;
+		struct ieee80211_radiotap_header *rh =
+			(struct ieee80211_radiotap_header *)skb->data;
+		u_int32_t present, present_ext;
+		u_int16_t len;
+		u_int8_t *start = skb->data + sizeof(struct ieee80211_radiotap_header);
+		u_int8_t *p = start;
+		u_int8_t *end = skb->data + skb->len;
+		u_int8_t bit, flags = 0;
+
+		if (skb->len < sizeof(*rh) || rh->it_version != 0)
+			break;
+
+		present_ext = present = le32_to_cpu(rh->it_present);
+		len = le16_to_cpu(rh->it_len);
+
+		if (skb->len < len)
+			break;
+
+		/* skip the chain of additional bitmaps following it_present */
+		while (present_ext & (1 << IEEE80211_RADIOTAP_EXT)) {
+			if (p+4 > end) {
+				/* An extended bitmap would now follow, but there is 
+				 * no place for it. Stop parsing. */
+				present = 0;
+				break;
+			}
+			present_ext = le32_to_cpu(*(u_int32_t*)p);
+			p += 4;
+		}
+
+		for (bit = 0; present && p < end; present >>= 1, bit++) {
+			if ((present & 1) == 0)
+				continue;
+			switch (bit) {
+				case IEEE80211_RADIOTAP_RATE:
+					ph->rate0 = *p;
+					p++;
+					break;
+
+				case IEEE80211_RADIOTAP_DBM_TX_POWER:
+					ph->power = *p;
+					p++;
+					break;
+
+				case IEEE80211_RADIOTAP_FLAGS:
+					flags = *p;
+					p++;
+					break;
+
+				case IEEE80211_RADIOTAP_DB_ANTSIGNAL:
+				case IEEE80211_RADIOTAP_DB_ANTNOISE:
+				case IEEE80211_RADIOTAP_ANTENNA:
+				case IEEE80211_RADIOTAP_DBM_ANTSIGNAL:
+				case IEEE80211_RADIOTAP_DBM_ANTNOISE:
+					/* 8-bit */
+					p++;
+					break;
+
+				case IEEE80211_RADIOTAP_FHSS:
+					/* 2 x 8-bit */
+					p += 2;
+					break;
+
+				case IEEE80211_RADIOTAP_LOCK_QUALITY:
+				case IEEE80211_RADIOTAP_TX_ATTENUATION:
+				case IEEE80211_RADIOTAP_DB_TX_ATTENUATION:
+					/* 16-bit */
+					p = start + roundup(p - start, 2) + 2;
+					break;
+
+				case IEEE80211_RADIOTAP_CHANNEL:
+					/* 2 x 16-bit */
+					p = start + roundup(p - start, 2) + 4;
+					break;
+
+				case IEEE80211_RADIOTAP_FCS:
+					/* 32-bit */
+					p = start + roundup(p - start, 4) + 4;
+					break;
+
+				case IEEE80211_RADIOTAP_TSFT:
+					/* 64-bit */
+					p = start + roundup(p - start, 8) + 8;
+					break;
+
+				default:
+					present = 0;
+					break;
+			}
+		}
+		skb_pull(skb, len);
+		if (flags & IEEE80211_RADIOTAP_F_FCS)
+			/* Remove FCS from the end of frames to transmit */
+			skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
+		wh = (struct ieee80211_frame *)skb->data;
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
+			ph->try0 = 1;
+                break;
+	}
 	case ARPHRD_IEEE80211_ATHDESC: {
 		if (skb->len > ATHDESC_HEADER_SIZE) {
 			struct ar5212_openbsd_desc *desc =
@@ -181,7 +282,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 			skb_pull(skb, ATHDESC_HEADER_SIZE);
 		}
 		break;
-	}		
+	}	
 	default:
 		break;
 	}
@@ -198,18 +299,35 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
  */
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	struct ath_desc *ds, int tx, u_int32_t mactime, struct ath_softc *sc) 
+	struct ath_desc *ds, int tx, u_int64_t mactime, struct ath_softc *sc) 
 {
 	struct ieee80211vap *vap, *next;
-	u_int32_t signal = 0;
-	signal = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
+	int noise = 0;
+	u_int32_t rssi = 0;
+	u_int8_t pkttype = 0;
 	
+	rssi = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
+	
+	/* We don't have access to the noise value in the descriptor, but it's saved
+	 * in the softc during the last receive interrupt. */
+	noise = sc->sc_channoise;
+
 	/* XXX locking */
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {
 		struct sk_buff *skb1;
 		struct net_device *dev = vap->iv_dev;
 		struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 		u_int8_t dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
+
+		if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+			if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
+				pkttype = PACKET_BROADCAST;
+			else
+				pkttype = PACKET_MULTICAST;
+		} else if (tx)
+			pkttype = PACKET_OUTGOING;
+		else
+			pkttype = PACKET_HOST;
 
 		next = TAILQ_NEXT(vap, iv_next);
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
@@ -253,7 +371,9 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->hosttime.status = 0;
 			ph->hosttime.len = 4;
 			ph->hosttime.data = jiffies;
+			
 			/* Pass up tsf clock in mactime */
+			/* NB: the prism mactime field is 32bit, so we lose TSF precision here */
 			ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
 			ph->mactime.status = 0;
 			ph->mactime.len = 4;
@@ -267,7 +387,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
 			ph->frmlen.status = 0;
 			ph->frmlen.len = 4;
-			ph->frmlen.data = skb->len - sizeof(wlan_ng_prism2_header);
+			ph->frmlen.data = skb->len; 
 			
 			ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
 			ph->channel.status = 0;
@@ -279,22 +399,25 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
 			ph->rssi.status = 0;
 			ph->rssi.len = 4;
-			ph->rssi.data = signal;
+			ph->rssi.data = rssi;
 			
 			ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
 			ph->noise.status = 0;
 			ph->noise.len = 4;
-			ph->noise.data = -95;
+			ph->noise.data = noise;
 			
 			ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
 			ph->signal.status = 0;
 			ph->signal.len = 4;
-			ph->signal.data = signal;
+			ph->signal.data = rssi + noise;
 			
 			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 			ph->rate.status = 0;
 			ph->rate.len = 4;
-			ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+			if (tx)
+				ph->rate.data = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
+			else
+				ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
 			break;
 		}
 		case ARPHRD_IEEE80211_RADIOTAP: {
@@ -313,10 +436,16 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wt_ihdr.it_version = 0;
 				th->wt_ihdr.it_len = cpu_to_le16(sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_present = cpu_to_le32(ATH_TX_RADIOTAP_PRESENT);
+
+				/* radiotap's TSF field is the full 64 bits, so we don't lose
+				 * any TSF precision when using radiotap */
+				memcpy(&th->wt_tsft, &mactime, IEEE80211_TSF_LEN);
+				th->wt_tsft = cpu_to_le64(th->wt_tsft);
+			
 				th->wt_flags = 0;
-				th->wt_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+				th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
 				th->wt_txpower = 0;
-				th->wt_antenna = 0;
+				th->wt_antenna = ds->ds_txstat.ts_antenna;
 			} else {
 				struct ath_rx_radiotap_header *th;
 				if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {
@@ -366,8 +495,10 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 						break;
 				}
 
+				th->wr_dbm_antnoise = (int8_t) noise;
+				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = ds->ds_rxstat.rs_antenna;
-				th->wr_antsignal = signal;
+				th->wr_antsignal = rssi;
 				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
 				       IEEE80211_CRC_LEN);
 				th->wr_fcs = cpu_to_le32(th->wr_fcs);
@@ -385,7 +516,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			memcpy(skb_push(skb1, ATHDESC_HEADER_SIZE), ds, ATHDESC_HEADER_SIZE);
 			break;
-		}
+		} 
 		default:
 			break;
 		}
@@ -397,7 +528,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			skb1->dev = dev; /* NB: deliver to wlanX */
 			skb1->mac.raw = skb1->data;
 			skb1->ip_summed = CHECKSUM_NONE;
-			skb1->pkt_type = PACKET_OTHERHOST;
+			skb1->pkt_type = pkttype;
 			skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
 			
 			netif_rx(skb1);

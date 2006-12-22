@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2002-2006 Sam Leffler, Errno Consulting
+# Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -33,49 +33,69 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/branches/sam_hal/public/xscale-be-elf.inc#3 $
+# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath/Makefile#12 $
 #
 
 #
-# Compilation configuration for building big-endian XScale/arm-elf.
-#
-# NB: built with AH_REGOPS_FUNC to so that register accesses
-#     can be done using the Linux readl/writel functions on
-#     systems that need it.
-#
-# Reported to work on:
-#	IXP425
+# Makefile for the Atheros WLAN driver.
 #
 
-#
-# Built with GNU cross-devel tools:
-#
-# PREFIX=/pub/gnu
-# BINUTILS=binutils-2.14
-# GCC=gcc-3.3.2
-# target=arm-elf
-#
-# ${BINUTILS}/configure --target=$target --prefix=${PREFIX}
-# ${GCC}/configure --target=$target   --prefix=${PREFIX} \
-#	--enable-languages=c   --with-gnu-as --with-gnu-ld \
-#	--with-newlib   --with-gxx-include-dir=${PREFIX}/$target/include
-#
-ifndef TOOLPREFIX
-TOOLPREFIX=	/pub/gnu/bin/arm-elf-
+ifeq ($(obj),)
+obj=	.
 endif
-#
-CC=	${TOOLPREFIX}gcc
-LD=	${TOOLPREFIX}ld
-STRIP=	${TOOLPREFIX}strip
-OBJCOPY=${TOOLPREFIX}objcopy
-NM=	${TOOLPREFIX}nm
 
-#
-# Force register read/write operations to go through a function.
-#
-AH_REGOPS_FUNC=1
+TOP = $(obj)/..
 
-LDOPTS=	-EB
-COPTS+=	-DAH_BYTE_ORDER=AH_BIG_ENDIAN
-COPTS+= -march=armv4 -mbig-endian -fno-strict-aliasing -fno-common -mapcs-32 \
-	-mtune=xscale  -mshort-load-bytes
+include $(TOP)/Makefile.inc
+
+obj-m		+= ath_hal.o
+ath_hal-objs	:= ah_os.o $(TARGET).hal.o
+
+hostprogs-y	:= uudecode
+
+# For older 2.6 kernels
+host-progs	:= $(hostprogs-y)
+
+ifdef LINUX24
+export-objs	:= ah_os.o
+endif
+
+INCS += -I$(ATH_HAL) -I$(HAL)
+
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
+
+ifeq ($(TARGET),xscale-be-elf)
+LDOPTS += --no-warn-mismatch
+endif
+
+-include $(TOPDIR)/Rules.make
+
+all:
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+
+ifdef LINUX24
+$(obj)/uudecode: $(obj)/uudecode.c
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+endif
+
+quiet_cmd_uudecode = UUDECODE $@
+      cmd_uudecode = $(obj)/uudecode -o $@ $<
+
+$(obj)/$(TARGET).hal.o: $(HAL)/public/$(TARGET).hal.o.uu $(obj)/uudecode
+ifdef LINUX24
+	$(Q)$(obj)/uudecode -o $@ $<
+else
+	$(call if_changed,uudecode)
+endif
+
+install:
+	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
+	cp ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+
+clean:
+	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd
+	rm -f .depend .version .*.o.flags .*.o.d
+	rm -rf .tmp_versions
+
+ath_hal.o: $(ath_hal-objs)
+	$(LD) $(LDOPTS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)

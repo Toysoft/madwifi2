@@ -46,9 +46,7 @@
 #include <linux/etherdevice.h>
 #include <linux/if_vlan.h>
 #include <linux/vmalloc.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
 #include <linux/proc_fs.h>
-#endif
 
 #include <net/iw_handler.h>
 #include <linux/wireless.h>
@@ -239,6 +237,25 @@ ieee80211_notify_node_leave(struct ieee80211_node *ni)
 }
 
 void
+ieee80211_notify_sta_stats(struct ieee80211_node *ni)
+{
+	struct ieee80211vap *vap = ni->ni_vap;
+	static const char *tag = "STA-TRAFFIC-STAT";
+	struct net_device *dev = vap->iv_dev;
+	union iwreq_data wreq;
+	char buf[1024];
+
+	snprintf(buf, sizeof(buf), "%s\nmac=%s\nrx_packets=%u\nrx_bytes=%llu\n"
+			"tx_packets=%u\ntx_bytes=%llu\n", tag, 
+			ether_sprintf(ni->ni_macaddr), ni->ni_stats.ns_rx_data, 
+			ni->ni_stats.ns_rx_bytes, ni->ni_stats.ns_tx_data, 
+			ni->ni_stats.ns_tx_bytes);
+	memset(&wreq, 0, sizeof(wreq));
+	wreq.data.length = strlen(buf);
+	wireless_send_event(dev, IWEVCUSTOM, &wreq, buf);
+}
+
+void
 ieee80211_notify_scan_done(struct ieee80211vap *vap)
 {
 	struct net_device *dev = vap->iv_dev;
@@ -384,7 +401,7 @@ proc_ieee80211_open(struct inode *inode, struct file *file)
 
 	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv), GFP_KERNEL)))
 		return -ENOMEM;
-	/* intially allocate both read and write buffers */
+	/* initially allocate both read and write buffers */
 	pv = (struct proc_ieee80211_priv *) file->private_data;
 	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
 	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);

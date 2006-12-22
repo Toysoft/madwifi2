@@ -55,7 +55,7 @@ const char *progname;
 
 enum {
 	IEEE80211_MSG_DEBUG	= 0x40000000,	/* IFF_DEBUG equivalent */
-	IEEE80211_MSG_DUMPPKTS	= 0x20000000,	/* IFF_LINK2 equivalant, dump packets */
+	IEEE80211_MSG_DUMPPKTS	= 0x20000000,	/* IFF_LINK2 equivalent, dump packets */
 	IEEE80211_MSG_CRYPTO	= 0x10000000,	/* crypto modules */
 	IEEE80211_MSG_INPUT	= 0x08000000,	/* input handling */
 	IEEE80211_MSG_XRATE	= 0x04000000,	/* rate set handling */

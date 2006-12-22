@@ -421,7 +421,12 @@ check_bss(struct ieee80211vap *vap, struct ieee80211_node *ni)
 		if ((ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY) == 0)
 			return 0;
 	} else {
-		/* XXX does this mean privacy is supported or required? */
+		/* Reference: IEEE802.11 7.3.1.4
+		 * This means that the data confidentiality service is required
+		 * for all frames exchanged with this STA  in IBSS and for all 
+		 * frames exchanged within the entire BSS otherwise
+		 */
+
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY)
 			return 0;
 	}
@@ -1840,7 +1845,8 @@ ieee80211_node_join(struct ieee80211_node *ni, int resp)
 		"%s%s%s%s%s%s%s",
 		newassoc ? "" : "re",
 		IEEE80211_NODE_AID(ni),
-		ic->ic_flags & IEEE80211_F_SHPREAMBLE ? "short" : "long",
+		(ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
+		(ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) ? "short" : "long",
 		ic->ic_flags & IEEE80211_F_SHSLOT ? "short" : "long",
 		ic->ic_flags & IEEE80211_F_USEPROT ? ", protection" : "",
 		ni->ni_flags & IEEE80211_NODE_QOS ? ", QoS" : "",
@@ -1962,6 +1968,7 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 	 */
 	if (vap->iv_auth->ia_node_leave != NULL)
 		vap->iv_auth->ia_node_leave(ni);
+	ieee80211_notify_sta_stats(ni);
 
 	IEEE80211_LOCK_IRQ(ic);
 	if (vap->iv_aid_bitmap != NULL)

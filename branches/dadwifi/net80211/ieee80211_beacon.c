@@ -185,6 +185,8 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)	/* XR */
 		frm = ieee80211_add_xr_param(frm, vap);
 #endif
+	bo->bo_appie_buf = frm;
+	bo->bo_appie_buf_len = 0;
 	
 	bo->bo_tim_trailerlen = frm - bo->bo_tim_trailer;
 	bo->bo_chanswitch_trailerlen = frm - bo->bo_chanswitch;
@@ -212,7 +214,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	 * beacon frame format
 	 *	[8] time stamp
 	 *	[2] beacon interval
-	 *	[2] cabability information
+	 *	[2] capability information
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
 	 *	[7] FH/DS parameter set
@@ -355,10 +357,10 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		struct ieee80211_wme_state *wme = &ic->ic_wme;
 
 		/*
-		 * Check for agressive mode change.  When there is
+		 * Check for aggressive mode change.  When there is
 		 * significant high priority traffic in the BSS
 		 * throttle back BE traffic by using conservative
-		 * parameters.  Otherwise BE uses agressive params
+		 * parameters.  Otherwise BE uses aggressive params
 		 * to optimize performance of legacy/non-QoS traffic.
 		 */
 		if (wme->wme_flags & WME_F_AGGRMODE) {
@@ -526,6 +528,31 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	    IEEE80211_IS_CHAN_TURBO(ic->ic_curchan))
 		ieee80211_add_athAdvCap(bo->bo_ath_caps, vap->iv_bss->ni_ath_flags,
 			vap->iv_bss->ni_ath_defkeyindex);
+	/* add APP_IE buffer if app updated it */
+	if (vap->iv_flags_ext & IEEE80211_FEXT_APPIE_UPDATE) {
+		/* adjust the buffer size if the size is changed */
+		if (vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].length != bo->bo_appie_buf_len) {
+			int diff_len;
+			diff_len = vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].length - bo->bo_appie_buf_len;
+
+			if (diff_len > 0)
+				skb_put(skb, diff_len);
+			else
+				skb_trim(skb, skb->len + diff_len);
+
+			bo->bo_appie_buf_len = vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].length;
+			/* update the trailer lens */
+			bo->bo_chanswitch_trailerlen += diff_len;
+			bo->bo_tim_trailerlen += diff_len;
+
+			len_changed = 1;
+		}
+		memcpy(bo->bo_appie_buf,vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].ie,
+			vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].length);
+
+		vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;
+	}
+
 	IEEE80211_UNLOCK(ic);
 
 	return len_changed;

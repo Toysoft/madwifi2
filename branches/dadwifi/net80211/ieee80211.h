@@ -353,6 +353,15 @@ enum CountryCode {
 };
 
 /* 
+ * Generic information element
+ */
+struct ieee80211_ie {
+	u_int8_t id;
+	u_int8_t len;
+	u_int8_t info[];
+} __packed;
+
+/* 
  * Country information element.
  */
 #define IEEE80211_COUNTRY_MAX_TRIPLETS (83)
@@ -362,6 +371,24 @@ struct ieee80211_ie_country {
 	u_int8_t country_str[3];
 	u_int8_t country_triplet[IEEE80211_COUNTRY_MAX_TRIPLETS * 3];
 } __packed;
+
+/*
+ * Channel Switch Announcement information element.
+ */
+struct ieee80211_ie_csa {
+	u_int8_t csa_id;	/* IEEE80211_ELEMID_CHANSWITCHANN */
+	u_int8_t csa_len;	/* == 3 */
+	u_int8_t csa_mode;	/* Channel Switch Mode: 1 == stop transmission until CS */
+	u_int8_t csa_chan;	/* New Channel Number */
+	u_int8_t csa_count;	/* TBTTs until Channel Switch happens */
+} __packed;
+
+/* minimal Channel Switch Count in the initial announcement */
+#define IEEE80211_CSA_PROTECTION_PERIOD 3
+
+/* maximum allowed deviance of measurement of intervals between CSA in Beacons */
+#define IEEE80211_CSA_SANITY_THRESHOLD 100    
+
 
 /* does frame have QoS sequence control data */
 #define	IEEE80211_QOS_HAS_SEQ(wh) \
@@ -611,7 +638,7 @@ typedef u_int8_t *ieee80211_mgt_beacon_t;
 #define	IEEE80211_CAPINFO_SHORT_PREAMBLE	0x0020
 #define	IEEE80211_CAPINFO_PBCC			0x0040
 #define	IEEE80211_CAPINFO_CHNL_AGILITY		0x0080
-/* bits 8-9 are reserved (8 now for specturm management) */
+/* bits 8-9 are reserved (8 now for spectrum management) */
 #define IEEE80211_CAPINFO_SPECTRUM_MGMT		0x0100
 #define	IEEE80211_CAPINFO_SHORT_SLOTTIME	0x0400
 #define	IEEE80211_CAPINFO_RSN			0x0800
@@ -667,6 +694,9 @@ enum {
 	IEEE80211_ELEMID_ERP		= 42,
 	IEEE80211_ELEMID_RSN		= 48,
 	IEEE80211_ELEMID_XRATES		= 50,
+	/* 128-129 proprietary elements used by Agere chipsets */
+	IEEE80211_ELEMID_AGERE1		= 128,
+	IEEE80211_ELEMID_AGERE2		= 129,
 	IEEE80211_ELEMID_TPC		= 150,
 	IEEE80211_ELEMID_CCKM		= 156,
 	IEEE80211_ELEMID_VENDOR		= 221,	/* vendor private */
@@ -897,7 +927,7 @@ enum {
 #define	IEEE80211_RTS_MAX		2346
 
 /* 
- * Regulatory extention identifier for country IE.
+ * Regulatory extension identifier for country IE.
  */
 #define IEEE80211_REG_EXT_ID		201
 
