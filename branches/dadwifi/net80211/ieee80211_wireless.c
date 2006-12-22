@@ -50,6 +50,8 @@
 #include <linux/utsname.h>
 #include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
 #include <linux/delay.h>
+
+#include <linux/wireless.h>
 #include <net/iw_handler.h>
 
 #if WIRELESS_EXT < 14
@@ -97,26 +99,17 @@
  * rssi values reported in the tx/rx descriptors in the
  * driver are the SNR expressed in db.
  *
- * If you assume that the noise floor is -95, which is an
- * excellent assumption 99.5 % of the time, then you can
- * derive the absolute signal level (i.e. -95 + rssi). 
- * There are some other slight factors to take into account
- * depending on whether the rssi measurement is from 11b,
- * 11g, or 11a.   These differences are at most 2db and
- * can be documented.
+ * noise is measured in dBm. Signal becomes the noise +
+ * the rssi.
  *
  * NB: various calculations are based on the orinoco/wavelan
  *     drivers for compatibility
  */
 static void
-set_quality(struct iw_quality *iq, u_int rssi)
+set_quality(struct iw_quality *iq, u_int rssi, int noise)
 {
 	iq->qual = rssi;
-	/* NB: max is 94 because noise is hardcoded to 161 */
-	if (iq->qual > 94)
-		iq->qual = 94;
-
-	iq->noise = 161;		/* -95dBm */
+	iq->noise = noise; 
 	iq->level = iq->noise + iq->qual;
 	iq->updated = IW_QUAL_ALL_UPDATED;
 }
@@ -127,12 +120,12 @@ preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	int total_delay = 0;
-	int cancelled = 0, ready = 0;
+	int canceled = 0, ready = 0;
 	while (!ready && total_delay < max_grace + max_wait) {
 	  if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
 	    ready = 1;
 	  } else {
-	    if (!cancelled && total_delay > max_grace) {
+	    if (!canceled && total_delay > max_grace) {
 	      /* 
 		 Cancel any existing active scan, so that any new parameters
 		 in this scan ioctl (or the defaults) can be honored, then
@@ -141,7 +134,7 @@ preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 	      IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 				"%s: cancel pending scan request\n", __func__);
 	      (void) ieee80211_cancel_scan(vap);
-	      cancelled = 1;
+	      canceled = 1;
 	    }
 	    mdelay (1);
 	    total_delay += 1;
@@ -149,7 +142,7 @@ preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 	}
 	if (!ready) {
 	  IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, 
-			    "%s: Timeout cancelling current scan.\n", 
+			    "%s: Timeout canceling current scan.\n", 
 			    __func__); 
 	}
 }
@@ -159,8 +152,10 @@ ieee80211_iw_getstats(struct net_device *dev)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct iw_statistics *is = &vap->iv_iwstats;
-
-	set_quality(&is->qual, ieee80211_getrssi(vap->iv_ic));
+	struct ieee80211com *ic = vap->iv_ic;
+	
+	set_quality(&is->qual, ieee80211_getrssi(vap->iv_ic), 
+			ic->ic_channoise);
 	is->status = vap->iv_state;
 	is->discard.nwid = vap->iv_stats.is_rx_wrongbss +
 		vap->iv_stats.is_rx_ssidmismatch;
@@ -522,14 +517,14 @@ static int
 ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 	struct sockaddr *ap_addr, char *extra)
 {
-	static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
-	static const u_int8_t broadcast_bssid[IEEE80211_ADDR_LEN] = 
-		"\xff\xff\xff\xff\xff\xff";
 	struct ieee80211vap *vap = dev->priv;
 
 	/* NB: should not be set when in AP mode */
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 		return -EINVAL;
+
+	if (vap->iv_opmode == IEEE80211_M_WDS)
+		IEEE80211_ADDR_COPY(vap->wds_mac, &ap_addr->sa_data);
 
 	/* 
 	 * zero address corresponds to 'iwconfig ath0 ap off', which means 
@@ -541,14 +536,12 @@ ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 	 *
 	 * anything else specifies a particular AP.
 	 */
-	if (IEEE80211_ADDR_EQ(vap->iv_des_bssid, zero_bssid)) 
-		vap->iv_flags &= ~IEEE80211_F_DESBSSID;
-	else {
-		IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
-		if (IEEE80211_ADDR_EQ(vap->iv_des_bssid, broadcast_bssid))
-			vap->iv_flags &= ~IEEE80211_F_DESBSSID;
-		else 
+	vap->iv_flags &= ~IEEE80211_F_DESBSSID;
+	if (!IEEE80211_ADDR_NULL(&ap_addr->sa_data)) {
+		if (!IEEE80211_ADDR_EQ(vap->iv_des_bssid, (u_int8_t*) "\xff\xff\xff\xff\xff\xff"))
 			vap->iv_flags |= IEEE80211_F_DESBSSID;
+		
+		IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
 		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 	}
@@ -564,14 +557,13 @@ ieee80211_ioctl_giwap(struct net_device *dev, struct iw_request_info *info,
 	if (vap->iv_flags & IEEE80211_F_DESBSSID)
 		IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_des_bssid);
 	else {
-		static const u_int8_t zero_bssid[IEEE80211_ADDR_LEN];
 		if (vap->iv_state == IEEE80211_S_RUN)
 			if (vap->iv_opmode != IEEE80211_M_WDS) 
 				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bss->ni_bssid);
 			else
 				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->wds_mac);
 		else
-			IEEE80211_ADDR_COPY(&ap_addr->sa_data, zero_bssid);
+			IEEE80211_ADDR_SET_NULL(&ap_addr->sa_data);
 	}
 	ap_addr->sa_family = ARPHRD_ETHER;
 	return 0;
@@ -792,8 +784,8 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		/*
 		 * Monitor and wds modes can switch directly.
 		 */
+		ic->ic_curchan = vap->iv_des_chan;
 		if (vap->iv_state == IEEE80211_S_RUN) {
-			ic->ic_curchan = vap->iv_des_chan;
 			ic->ic_set_channel(ic);
 		}
 	} else {
@@ -992,6 +984,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	/* Max quality is max field value minus noise floor */
+	/* XXX Should this be updated to use the current noise floor? */
 	range->max_qual.qual  = 0xff - 161;
 
 	/*
@@ -1090,6 +1083,8 @@ ieee80211_ioctl_setspy(struct net_device *dev, struct iw_request_info *info,
 		for (i = 0; i < number; i++)
 			memcpy(&vap->iv_spy.mac[i * IEEE80211_ADDR_LEN],
 				address[i].sa_data, IEEE80211_ADDR_LEN);
+		/* init rssi timestamps */
+		memset(vap->iv_spy.ts_rssi, 0, IW_MAX_SPY * sizeof(u_int32_t));
 	}
 	vap->iv_spy.num = number;
 
@@ -1107,6 +1102,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211_node_table *nt = &vap->iv_ic->ic_sta;
 	struct ieee80211_node *ni;
+	struct ieee80211com *ic = vap->iv_ic;
 	struct sockaddr *address;
 	struct iw_quality *spy_stat;
 	unsigned int number = vap->iv_spy.num;
@@ -1121,15 +1117,21 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 		address[i].sa_family = AF_PACKET;
 	}
 
-	/* locate a node, copy its rssi value, convert to dBm */
+	/* locate a node, read its rssi, check if updated, convert to dBm */
 	for (i = 0; i < number; i++) {
 		ni = ieee80211_find_node(nt, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]);
 		/* TODO: free node ? */
 		/* check we are associated w/ this vap */
-		if (ni && (ni->ni_vap == vap))
-			set_quality(&spy_stat[i], ni->ni_rssi);
-		else 
+		if (ni && (ni->ni_vap == vap)) {
+			set_quality(&spy_stat[i], ni->ni_rssi, ic->ic_channoise);
+			if (ni->ni_rstamp != vap->iv_spy.ts_rssi[i]) {
+				vap->iv_spy.ts_rssi[i] = ni->ni_rstamp;
+			} else {
+				spy_stat[i].updated = 0;
+			}
+		} else {
 			spy_stat[i].updated = IW_QUAL_ALL_INVALID;
+		}
 	}
 
 	/* copy results to userspace */
@@ -1137,6 +1139,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+#if WIRELESS_EXT >= 16
 /* Enhanced iwspy support */
 static int
 ieee80211_ioctl_setthrspy(struct net_device *dev, struct iw_request_info *info,
@@ -1164,6 +1167,7 @@ ieee80211_ioctl_setthrspy(struct net_device *dev, struct iw_request_info *info,
 			"%s: disabled iw_spy threshold\n", __func__);
 	} else {
 		/* calculate corresponding rssi values */
+		/* XXX Should we use current noise value? */
 		vap->iv_spy.thr_low = threshold.low.level - 161;
 		vap->iv_spy.thr_high = threshold.high.level - 161;
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG,
@@ -1178,19 +1182,21 @@ ieee80211_ioctl_getthrspy(struct net_device *dev, struct iw_request_info *info,
 	struct iw_point *data, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211com *ic = vap->iv_ic;
 	struct iw_thrspy *threshold;	
 	
 	threshold = (struct iw_thrspy *) extra;
 
 	/* set threshold values */
-	set_quality(&(threshold->low), vap->iv_spy.thr_low);
-	set_quality(&(threshold->high), vap->iv_spy.thr_high);
+	set_quality(&(threshold->low), vap->iv_spy.thr_low, ic->ic_channoise);
+	set_quality(&(threshold->high), vap->iv_spy.thr_high, ic->ic_channoise);
 
 	/* copy results to userspace */
 	data->length = 1;
 	
 	return 0;
 }
+#endif
 
 static int
 ieee80211_ioctl_siwmode(struct net_device *dev, struct iw_request_info *info,
@@ -1445,21 +1451,23 @@ struct waplistreq {	/* XXX: not the right place for declaration? */
 	int i;
 };
 
-static void
+static int
 waplist_cb(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct waplistreq *req = arg;
 	int i = req->i;
 
 	if (i >= IW_MAX_AP)
-		return;
+		return 0;
 	req->addr[i].sa_family = ARPHRD_ETHER;
 	if (req->vap->iv_opmode == IEEE80211_M_HOSTAP)
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_macaddr);
 	else
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_bssid);
-	set_quality(&req->qual[i], se->se_rssi);
+	set_quality(&req->qual[i], se->se_rssi, -95);
 	req->i = i + 1;
+
+	return 0;
 }
 
 static int
@@ -1499,7 +1507,7 @@ ieee80211_ioctl_siwscan(struct net_device *dev,	struct iw_request_info *info,
 	 * changes to the infrastructure.
 	 */
 	if (!IS_UP(vap->iv_dev))
-		return -EINVAL;		/* XXX */
+		return -ENETDOWN;	/* XXX */
 	/* XXX always manual... */
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 		"%s: active scan request\n", __func__);
@@ -1557,8 +1565,10 @@ encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen,
 	memcpy(p, leader, leader_len);
 	bufsize -= leader_len;
 	p += leader_len;
-	for (i = 0; i < ielen && bufsize > 2; i++)
+	for (i = 0; i < ielen && bufsize > 2; i++) {
 		p += sprintf(p, "%02x", ie[i]);
+		bufsize -= 2;
+	}
 	return (i == ielen ? p - (u_int8_t *)buf : 0);
 }
 #endif /* WIRELESS_EXT > 14 */
@@ -1570,27 +1580,34 @@ struct iwscanreq {		/* XXX: right place for this declaration? */
 	int mode;
 };
 
-static void
+static int
 giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct iwscanreq *req = arg;
 	struct ieee80211vap *vap = req->vap;
 	char *current_ev = req->current_ev;
 	char *end_buf = req->end_buf;
+	char *last_ev;
 #if WIRELESS_EXT > 14
-	char buf[64 * 2 + 30];
+#define MAX_IE_LENGTH 64 * 2 + 30
+	char buf[MAX_IE_LENGTH];
+#ifndef IWEVGENIE
+	static const char rsn_leader[] = "rsn_ie=";
+	static const char wpa_leader[] = "wpa_ie=";
+#endif
 #endif
 	struct iw_event iwe;
 	char *current_val;
 	int j;
 
 	if (current_ev >= end_buf)
-		return;
+		return E2BIG;
 	/* WPA/!WPA sort criteria */
 	if ((req->mode != 0) ^ (se->se_wpa_ie != NULL))
-		return;
+		return 0;
 
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWAP;
 	iwe.u.ap_addr.sa_family = ARPHRD_ETHER;
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP)
@@ -1599,7 +1616,12 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 		IEEE80211_ADDR_COPY(iwe.u.ap_addr.sa_data, se->se_bssid);
 	current_ev = iwe_stream_add_event(current_ev, end_buf, &iwe, IW_EV_ADDR_LEN);
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWESSID;
 	iwe.u.data.flags = 1;
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
@@ -1613,29 +1635,49 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 			end_buf, &iwe, (char *) se->se_ssid+2);
 	}
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	if (se->se_capinfo & (IEEE80211_CAPINFO_ESS|IEEE80211_CAPINFO_IBSS)) {
 		memset(&iwe, 0, sizeof(iwe));
+		last_ev = current_ev;
 		iwe.cmd = SIOCGIWMODE;
 		iwe.u.mode = se->se_capinfo & IEEE80211_CAPINFO_ESS ?
 			IW_MODE_MASTER : IW_MODE_ADHOC;
 		current_ev = iwe_stream_add_event(current_ev,
 			end_buf, &iwe, IW_EV_UINT_LEN);
+
+		/* We ran out of space in the buffer. */
+		if (last_ev == current_ev)
+		  return E2BIG;
 	}
 
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWFREQ;
 	iwe.u.freq.m = se->se_chan->ic_freq * 100000;
 	iwe.u.freq.e = 1;
 	current_ev = iwe_stream_add_event(current_ev,
 		end_buf, &iwe, IW_EV_FREQ_LEN);
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = IWEVQUAL;
-	set_quality(&iwe.u.qual, se->se_rssi);
+	set_quality(&iwe.u.qual, se->se_rssi, -95);
 	current_ev = iwe_stream_add_event(current_ev,
 		end_buf, &iwe, IW_EV_QUAL_LEN);
 
+	/* We ran out of space in the buffer */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWENCODE;
 	if (se->se_capinfo & IEEE80211_CAPINFO_PRIVACY)
 		iwe.u.data.flags = IW_ENCODE_ENABLED | IW_ENCODE_NOKEY;
@@ -1644,7 +1686,12 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	iwe.u.data.length = 0;
 	current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, "");
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = SIOCGIWRATE;
 	current_val = current_ev + IW_EV_LCP_LEN;
 	/* NB: not sorted, does it matter? */
@@ -1667,24 +1714,36 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 		}
 	}
 	/* remove fixed header if no rates were added */
-	if ((current_val - current_ev) > IW_EV_LCP_LEN)
+	if ((current_val - current_ev) > IW_EV_LCP_LEN) {
 		current_ev = current_val;
+	} else {
+	  /* We ran out of space in the buffer. */
+	  if (last_ev == current_ev)
+	    return E2BIG;
+	}
 
 #if WIRELESS_EXT > 14
 	memset(&iwe, 0, sizeof(iwe));
+	last_ev = current_ev;
 	iwe.cmd = IWEVCUSTOM;
 	snprintf(buf, sizeof(buf), "bcn_int=%d", se->se_intval);
 	iwe.u.data.length = strlen(buf);
 	current_ev = iwe_stream_add_point(current_ev, end_buf, &iwe, buf);
 
+	/* We ran out of space in the buffer. */
+	if (last_ev == current_ev)
+	  return E2BIG;
+
 	if (se->se_rsn_ie != NULL) {
+	  last_ev = current_ev;
 #ifdef IWEVGENIE
 		memset(&iwe, 0, sizeof(iwe));
+		if ((se->se_rsn_ie[1] + 2) > MAX_IE_LENGTH)
+			return E2BIG;
 		memcpy(buf, se->se_rsn_ie, se->se_rsn_ie[1] + 2);
 		iwe.cmd = IWEVGENIE;
 		iwe.u.data.length = se->se_rsn_ie[1] + 2;
 #else	
-		static const char rsn_leader[] = "rsn_ie=";
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVCUSTOM;
 		if (se->se_rsn_ie[0] == IEEE80211_ELEMID_RSN)
@@ -1692,55 +1751,82 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 				se->se_rsn_ie, se->se_rsn_ie[1] + 2,
 				rsn_leader, sizeof(rsn_leader) - 1);
 #endif
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+			
+			/* We ran out of space in the buffer */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
 	}
 
 	if (se->se_wpa_ie != NULL) {
+	  last_ev = current_ev;
 #ifdef IWEVGENIE
 		memset(&iwe, 0, sizeof(iwe));
+		if ((se->se_wpa_ie[1] + 2) > MAX_IE_LENGTH)
+			return E2BIG;
 		memcpy(buf, se->se_wpa_ie, se->se_wpa_ie[1] + 2);
 		iwe.cmd = IWEVGENIE;
 		iwe.u.data.length = se->se_wpa_ie[1] + 2;
 #else
-		static const char wpa_leader[] = "wpa_ie=";
 		memset(&iwe, 0, sizeof(iwe));
 		iwe.cmd = IWEVCUSTOM;
 		iwe.u.data.length = encode_ie(buf, sizeof(buf),
 			se->se_wpa_ie, se->se_wpa_ie[1] + 2,
 			wpa_leader, sizeof(wpa_leader) - 1);
 #endif
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+			
+			/* We ran out of space in the buffer. */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
+
 	}
 	if (se->se_wme_ie != NULL) {
 		static const char wme_leader[] = "wme_ie=";
 
 		memset(&iwe, 0, sizeof(iwe));
+		last_ev = current_ev;
 		iwe.cmd = IWEVCUSTOM;
 		iwe.u.data.length = encode_ie(buf, sizeof(buf),
 			se->se_wme_ie, se->se_wme_ie[1] + 2,
 			wme_leader, sizeof(wme_leader) - 1);
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+
+			/* We ran out of space in the buffer. */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
 	}
 	if (se->se_ath_ie != NULL) {
 		static const char ath_leader[] = "ath_ie=";
 
 		memset(&iwe, 0, sizeof(iwe));
+		last_ev = current_ev;
 		iwe.cmd = IWEVCUSTOM;
 		iwe.u.data.length = encode_ie(buf, sizeof(buf),
 			se->se_ath_ie, se->se_ath_ie[1] + 2,
 			ath_leader, sizeof(ath_leader) - 1);
-		if (iwe.u.data.length != 0)
+		if (iwe.u.data.length != 0) {
 			current_ev = iwe_stream_add_point(current_ev, end_buf,
 				&iwe, buf);
+
+			/* We ran out of space in the buffer. */
+			if (last_ev == current_ev)
+			  return E2BIG;
+		}
 	}
 #endif /* WIRELESS_EXT > 14 */
 	req->current_ev = current_ev;
+
+	return 0;
 }
 
 static int
@@ -1750,12 +1836,20 @@ ieee80211_ioctl_giwscan(struct net_device *dev,	struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct iwscanreq req;
+	int res = 0;
 
 	req.vap = vap;
 	req.current_ev = extra;
-	req.end_buf = extra + IW_SCAN_MAX_DATA;
+	if (data->length == 0) {
+	  req.end_buf = extra + IW_SCAN_MAX_DATA;
+	} else {
+	  req.end_buf = extra + data->length;
+	}
 
 	/*
+	 * NB: This is no longer needed, as long as the caller supports
+	 * large scan results.
+	 *
 	 * Do two passes to ensure WPA/non-WPA scan candidates
 	 * are sorted to the front.  This is a hack to deal with
 	 * the wireless extensions capping scan results at
@@ -1765,12 +1859,19 @@ ieee80211_ioctl_giwscan(struct net_device *dev,	struct iw_request_info *info,
 	 * guarantee we won't overflow anyway.
 	 */
 	req.mode = vap->iv_flags & IEEE80211_F_WPA;
-	ieee80211_scan_iterate(ic, giwscan_cb, &req);
-	req.mode = req.mode ? 0 : IEEE80211_F_WPA;
-	ieee80211_scan_iterate(ic, giwscan_cb, &req);
+	res = ieee80211_scan_iterate(ic, giwscan_cb, &req);
+	if (res == 0) {
+	  req.mode = req.mode ? 0 : IEEE80211_F_WPA;
+	  res = ieee80211_scan_iterate(ic, giwscan_cb, &req);
+	}
 
 	data->length = req.current_ev - extra;
-	return 0;
+
+	if (res != 0) {
+	  return -res;
+	}
+
+	return res;
 }
 #endif /* SIOCGIWSCAN */
 
@@ -1868,7 +1969,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 		ifr_mode = IEEE80211_MODE_11A;
 	ifr.ifr_media |= IFM_MAKEMODE(ifr_mode);
 	retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
-	if ((!retv || retv == ENETRESET) &&  mode != vap->iv_des_mode) {
+	if ((!retv || retv == -ENETRESET) &&  mode != vap->iv_des_mode) {
 		ieee80211_scan_flush(ic);	/* NB: could optimize */
 		vap->iv_des_mode = mode;
 		if (IS_UP_AUTO(vap)) {
@@ -1881,7 +1982,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 					continue;
 				}
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-				  "%s: Timeout cancelling current scan.\n",
+				  "%s: Timeout canceling current scan.\n",
 				  __func__);
                     		return -ETIMEDOUT;
 			}
@@ -2043,7 +2144,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_MCASTKEYLEN:
-		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
+		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_mcastkeylen = value;
@@ -2077,7 +2178,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		rsn->rsn_ucastcipher = value;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
-		if (!(0 < value && value < IEEE80211_KEYBUF_SIZE))
+		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_ucastkeylen = value;
@@ -2274,6 +2375,18 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		else
 			ic->ic_flags &= ~IEEE80211_F_DOTH;
 		retv = ENETRESET;	/* XXX: need something this drastic? */
+		break;
+	case IEEE80211_PARAM_SHPREAMBLE:
+		if (value) {
+			ic->ic_caps |= IEEE80211_C_SHPREAMBLE;
+			ic->ic_flags |= IEEE80211_F_SHPREAMBLE;
+			ic->ic_flags &= ~IEEE80211_F_USEBARKER;
+		} else {
+			ic->ic_caps &= ~IEEE80211_C_SHPREAMBLE;
+			ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
+			ic->ic_flags |= IEEE80211_F_USEBARKER;
+		}	
+		retv = ENETRESET;	/* requires restart */
 		break;
 	case IEEE80211_PARAM_PWRTARGET:
 		ic->ic_curchanmaxpwr = value;
@@ -2671,6 +2784,9 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	case IEEE80211_PARAM_DOTH:
 		param[0] = (ic->ic_flags & IEEE80211_F_DOTH) != 0;
 		break;
+	case IEEE80211_PARAM_SHPREAMBLE:
+		param[0] = (ic->ic_caps & IEEE80211_C_SHPREAMBLE) != 0;
+		break;
 	case IEEE80211_PARAM_PWRTARGET:
 		param[0] = ic->ic_curchanmaxpwr;
 		break;
@@ -2749,6 +2865,62 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+/* returns non-zero if ID is for a system IE (not for app use) */
+static int
+is_sys_ie(u_int8_t ie_id)
+{
+	/* XXX review this list */
+	switch (ie_id) {
+	case IEEE80211_ELEMID_SSID:
+	case IEEE80211_ELEMID_RATES:
+	case IEEE80211_ELEMID_FHPARMS:
+	case IEEE80211_ELEMID_DSPARMS:
+	case IEEE80211_ELEMID_CFPARMS:
+	case IEEE80211_ELEMID_TIM:
+	case IEEE80211_ELEMID_IBSSPARMS:
+	case IEEE80211_ELEMID_COUNTRY:
+	case IEEE80211_ELEMID_REQINFO:
+	case IEEE80211_ELEMID_CHALLENGE:
+	case IEEE80211_ELEMID_PWRCNSTR:
+	case IEEE80211_ELEMID_PWRCAP:
+	case IEEE80211_ELEMID_TPCREQ:
+	case IEEE80211_ELEMID_TPCREP:
+	case IEEE80211_ELEMID_SUPPCHAN:
+	case IEEE80211_ELEMID_CHANSWITCHANN:
+	case IEEE80211_ELEMID_MEASREQ:
+	case IEEE80211_ELEMID_MEASREP:
+	case IEEE80211_ELEMID_QUIET:
+	case IEEE80211_ELEMID_IBSSDFS:
+	case IEEE80211_ELEMID_ERP:
+	case IEEE80211_ELEMID_RSN:
+	case IEEE80211_ELEMID_XRATES:
+	case IEEE80211_ELEMID_TPC:
+	case IEEE80211_ELEMID_CCKM:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+/* returns non-zero if the buffer appears to contain a valid IE list */
+static int
+is_valid_ie_list(u_int32_t buf_len, void *buf, int exclude_sys_ies)
+{
+	struct ieee80211_ie *ie = (struct ieee80211_ie *)buf;
+
+	while (buf_len >= sizeof(*ie)) {
+		int ie_elem_len = sizeof(*ie) + ie->len;
+		if (buf_len < ie_elem_len)
+			break;
+		if (exclude_sys_ies && is_sys_ie(ie->id))
+			break;
+		buf_len -= ie_elem_len;
+		ie = (struct ieee80211_ie *)(ie->info + ie->len);
+	}
+
+	return (buf_len == 0) ? 1 : 0;
+}
+
 static int
 ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
 	struct iw_point *wri, char *extra)
@@ -2764,12 +2936,13 @@ ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
 	 */
 	if (vap->iv_opmode != IEEE80211_M_STA)
 		return -EINVAL;
+	if (! is_valid_ie_list(wri->length, extra, 0))
+		return -EINVAL;
 	/* NB: wri->length is validated by the wireless extensions code */
 	MALLOC(ie, void *, wri->length, M_DEVBUF, M_WAITOK);
 	if (ie == NULL)
 		return -ENOMEM;
 	memcpy(ie, extra, wri->length);
-	/* XXX sanity check data? */
 	if (vap->iv_opt_ie != NULL)
 		FREE(vap->iv_opt_ie, M_DEVBUF);
 	vap->iv_opt_ie = ie;
@@ -2794,6 +2967,136 @@ ieee80211_ioctl_getoptie(struct net_device *dev, struct iw_request_info *info,
 	}
 	wri->length = vap->iv_opt_ie_len;
 	memcpy(extra, vap->iv_opt_ie, vap->iv_opt_ie_len);
+	return 0;
+}
+
+/* the following functions are used by the set/get appiebuf functions */
+static int
+add_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
+	struct ieee80211req_getset_appiebuf *iebuf)
+{
+	struct ieee80211_ie *ie;
+
+	if (! is_valid_ie_list(iebuf->app_buflen, iebuf->app_buf, 1))
+		return -EINVAL;
+	/* NB: data.length is validated by the wireless extensions code */
+	MALLOC(ie, struct ieee80211_ie *, iebuf->app_buflen, M_DEVBUF, M_WAITOK);
+	if (ie == NULL)
+		return -ENOMEM;
+
+	memcpy(ie, iebuf->app_buf, iebuf->app_buflen);
+	if (vap->app_ie[frame_type_index].ie != NULL)
+		FREE(vap->app_ie[frame_type_index].ie, M_DEVBUF);
+	vap->app_ie[frame_type_index].ie = ie;
+	vap->app_ie[frame_type_index].length = iebuf->app_buflen;
+
+	return 0;
+}
+
+static int
+remove_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap)
+{
+	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	if (app_ie->ie != NULL) {
+		FREE(app_ie->ie, M_DEVBUF);
+		app_ie->ie = NULL;
+		app_ie->length = 0;
+	}
+	return 0;
+}
+
+static int
+get_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
+	struct ieee80211req_getset_appiebuf *iebuf)
+{
+	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	if (iebuf->app_buflen < app_ie->length)
+		return -EINVAL;
+
+	iebuf->app_buflen = app_ie->length;
+	memcpy(iebuf->app_buf, app_ie->ie, app_ie->length);
+	return 0;
+}
+
+static int
+ieee80211_ioctl_setappiebuf(struct net_device *dev,
+	struct iw_request_info *info,
+	void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211req_getset_appiebuf *iebuf =
+		(struct ieee80211req_getset_appiebuf *)extra;
+	enum ieee80211_opmode chk_opmode;
+	int rc = 0;
+
+	if (iebuf->app_buflen > IEEE80211_APPIE_MAX)
+		return -EINVAL;
+
+	switch (iebuf->app_frmtype) {
+	case IEEE80211_APPIE_FRAME_BEACON:
+	case IEEE80211_APPIE_FRAME_PROBE_RESP:
+	case IEEE80211_APPIE_FRAME_ASSOC_RESP:
+		chk_opmode = IEEE80211_M_HOSTAP;
+		break;
+	case IEEE80211_APPIE_FRAME_PROBE_REQ:
+	case IEEE80211_APPIE_FRAME_ASSOC_REQ:
+		chk_opmode = IEEE80211_M_STA;
+		break;
+	default:
+		return -EINVAL;
+	}
+	if (vap->iv_opmode != chk_opmode)
+		return -EINVAL;
+
+	if (iebuf->app_buflen)
+		rc = add_app_ie(iebuf->app_frmtype, vap, iebuf);
+	else
+		rc = remove_app_ie(iebuf->app_frmtype, vap);
+	if ((iebuf->app_frmtype == IEEE80211_APPIE_FRAME_BEACON) && (rc == 0))
+		vap->iv_flags_ext |= IEEE80211_FEXT_APPIE_UPDATE;
+
+	return rc;
+}
+
+static int
+ieee80211_ioctl_getappiebuf(struct net_device *dev, struct iw_request_info *info,
+	void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211req_getset_appiebuf *iebuf =
+		(struct ieee80211req_getset_appiebuf *)extra;
+
+	switch (iebuf->app_frmtype) {
+	case IEEE80211_APPIE_FRAME_BEACON:
+	case IEEE80211_APPIE_FRAME_PROBE_RESP:
+	case IEEE80211_APPIE_FRAME_ASSOC_RESP:
+		if (vap->iv_opmode == IEEE80211_M_STA)
+			return -EINVAL;
+		break;
+	case IEEE80211_APPIE_FRAME_PROBE_REQ:
+	case IEEE80211_APPIE_FRAME_ASSOC_REQ:
+		if (vap->iv_opmode != IEEE80211_M_STA)
+			return -EINVAL;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return get_app_ie(iebuf->app_frmtype, vap, iebuf);
+}
+
+static int
+ieee80211_ioctl_setfilter(struct net_device *dev, struct iw_request_info *info,
+	void *w, char *extra)
+{
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211req_set_filter *app_filter = (struct ieee80211req_set_filter *)extra;
+
+	if ((extra == NULL) || (app_filter->app_filterype & ~IEEE80211_FILTER_TYPE_ALL))
+		return -EINVAL;
+
+	vap->app_filter = app_filter->app_filterype;
+
 	return 0;
 }
 
@@ -2976,20 +3279,22 @@ struct scanlookup {		/* XXX: right place for declaration? */
 /*
  * Match mac address and any ssid.
  */
-static void
+static int
 mlmelookup(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct scanlookup *look = arg;
 
 	if (!IEEE80211_ADDR_EQ(look->mac, se->se_macaddr))
-		return;
+		return 0;
 	if (look->esslen != 0) {
 		if (se->se_ssid[1] != look->esslen)
-			return;
+			return 0;
 		if (memcmp(look->essid, se->se_ssid + 2, look->esslen))
-			return;
+			return 0;
 	}
 	look->se = se;
+
+	return 0;
 }
 
 static int
@@ -3493,16 +3798,18 @@ scan_space(const struct ieee80211_scan_entry *se, int *ielen)
 		se->se_ssid[1] + *ielen, sizeof(u_int32_t));
 }
 
-static void
+static int
 get_scan_space(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct scanreq *req = arg;
 	int ielen;
 
 	req->space += scan_space(se, &ielen);
+
+	return 0;
 }
 
-static void
+static int
 get_scan_result(void *arg, const struct ieee80211_scan_entry *se)
 {
 	struct scanreq *req = arg;
@@ -3511,8 +3818,10 @@ get_scan_result(void *arg, const struct ieee80211_scan_entry *se)
 	u_int8_t *cp;
 
 	len = scan_space(se, &ielen);
-	if (len > req->space)
-		return;
+	if (len > req->space) {
+	  printk("[madwifi] %s() : Not enough space.\n", __FUNCTION__);
+		return 0;
+	}
 
 	sr = req->sr;
 	memset(sr, 0, sizeof(*sr));
@@ -3556,6 +3865,8 @@ get_scan_result(void *arg, const struct ieee80211_scan_entry *se)
 
 	req->space -= len;
 	req->sr = (struct ieee80211req_scan_result *)(((u_int8_t *)sr) + len);
+
+	return 0;
 }
 
 static int
@@ -4508,6 +4819,10 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chanlist)
 #define	IW_PRIV_TYPE_CHANINFO \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chaninfo)
+#define IW_PRIV_TYPE_APPIEBUF \
+	(IW_PRIV_TYPE_BYTE | IEEE80211_APPIE_MAX)
+#define IW_PRIV_TYPE_FILTER \
+	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_set_filter)
 
 static const struct iw_priv_args ieee80211_priv_args[] = {
 	/* NB: setoptie & getoptie are !IW_PRIV_SIZE_FIXED */
@@ -4786,6 +5101,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dropunenceapol" },
 	{ IEEE80211_PARAM_DROPUNENC_EAPOL,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_dropunencea" },
+	{ IEEE80211_PARAM_SHPREAMBLE,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "shpreamble" },
+	{ IEEE80211_PARAM_SHPREAMBLE,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_shpreamble" },
 	/*
 	 * NB: these should be roamrssi* etc, but iwpriv usurps all
 	 *     strings that start with roam!
@@ -4834,6 +5153,12 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "markdfs" },
 	{ IEEE80211_PARAM_MARKDFS,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_markdfs" },
+	{ IEEE80211_IOCTL_SET_APPIEBUF,
+	  IW_PRIV_TYPE_APPIEBUF, 0, "setiebuf" },
+	{ IEEE80211_IOCTL_GET_APPIEBUF,
+	  0, IW_PRIV_TYPE_APPIEBUF, "getiebuf" },
+	{ IEEE80211_IOCTL_FILTERFRAME,
+	  IW_PRIV_TYPE_FILTER , 0, "setfilter" },
 
 #endif /* WIRELESS_EXT >= 12 */
 };
@@ -4857,8 +5182,13 @@ static const iw_handler ieee80211_handlers[] = {
 	(iw_handler) NULL /* kernel code */,		/* SIOCGIWSTATS */
 	(iw_handler) ieee80211_ioctl_setspy,		/* SIOCSIWSPY */
 	(iw_handler) ieee80211_ioctl_getspy,		/* SIOCGIWSPY */
+#if WIRELESS_EXT >= 16
 	(iw_handler) ieee80211_ioctl_setthrspy,		/* SIOCSIWTHRSPY */
 	(iw_handler) ieee80211_ioctl_getthrspy,		/* SIOCGIWTHRSPY */
+#else
+	(iw_handler) NULL,				/* SIOCSIWTHRSPY */
+	(iw_handler) NULL,				/* SIOCGIWTHRSPY */
+#endif
 	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
 	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
 #ifdef SIOCSIWMLME
@@ -4915,10 +5245,10 @@ static const iw_handler ieee80211_priv_handlers[] = {
 	(iw_handler) ieee80211_ioctl_setchanlist,	/* SIOCIWFIRSTPRIV+6 */
 	(iw_handler) ieee80211_ioctl_getchanlist,	/* SIOCIWFIRSTPRIV+7 */
 	(iw_handler) ieee80211_ioctl_chanswitch,	/* SIOCIWFIRSTPRIV+8 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+9 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+10 */
+	(iw_handler) ieee80211_ioctl_getappiebuf,	/* SIOCIWFIRSTPRIV+9 */
+	(iw_handler) ieee80211_ioctl_setappiebuf,	/* SIOCIWFIRSTPRIV+10 */
 	(iw_handler) ieee80211_ioctl_getscanresults,	/* SIOCIWFIRSTPRIV+11 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+12 */
+	(iw_handler) ieee80211_ioctl_setfilter,		/* SIOCIWFIRSTPRIV+12 */
 	(iw_handler) ieee80211_ioctl_getchaninfo,	/* SIOCIWFIRSTPRIV+13 */
 	(iw_handler) ieee80211_ioctl_setoptie,		/* SIOCIWFIRSTPRIV+14 */
 	(iw_handler) ieee80211_ioctl_getoptie,		/* SIOCIWFIRSTPRIV+15 */

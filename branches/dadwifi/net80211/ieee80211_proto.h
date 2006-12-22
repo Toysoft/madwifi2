@@ -214,11 +214,11 @@ struct chanAccParams{
 
 struct ieee80211_wme_state {
 	u_int32_t wme_flags;
-#define	WME_F_AGGRMODE	0x00000001	/* STATUS: WME agressive mode */
+#define	WME_F_AGGRMODE	0x00000001	/* STATUS: WME aggressive mode */
 
 	u_int wme_hipri_traffic;			/* VI/VO frames in beacon interval */
-	u_int wme_hipri_switch_thresh;		/* agressive mode switch thresh */
-	u_int wme_hipri_switch_hysteresis;	/* agressive mode switch hysteresis */
+	u_int wme_hipri_switch_thresh;		/* aggressive mode switch threshold */
+	u_int wme_hipri_switch_hysteresis;	/* aggressive mode switch hysteresis */
 
 	struct chanAccParams wme_wmeChanParams;	/* configured WME parameters applied to itself*/
 	struct chanAccParams wme_wmeBssChanParams; /* configured WME parameters broadcasted to STAs*/
@@ -265,6 +265,8 @@ struct ieee80211_beacon_offsets {
 	u_int8_t *bo_ath_caps;		/* where ath caps is */
 	u_int8_t *bo_xr;			/* start of xr element */
 	u_int8_t *bo_erp;		/* start of ERP element */
+	u_int8_t *bo_appie_buf;		/* start of APP IE buf */
+	u_int16_t bo_appie_buf_len;	/* APP IE buf length in bytes */
 	u_int16_t bo_chanswitch_trailerlen;
 };
 struct sk_buff *ieee80211_beacon_alloc(struct ieee80211_node *,
@@ -293,4 +295,6 @@ u_int8_t *ieee80211_add_athAdvCap(u_int8_t *, u_int8_t, u_int16_t);
 void ieee80211_notify_node_join(struct ieee80211_node *, int);
 void ieee80211_notify_node_leave(struct ieee80211_node *);
 void ieee80211_notify_scan_done(struct ieee80211vap *);
+void ieee80211_notify_sta_stats(struct ieee80211_node *ni);
+
 #endif /* _NET80211_IEEE80211_PROTO_H_ */

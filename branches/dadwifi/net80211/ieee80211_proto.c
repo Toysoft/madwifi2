@@ -90,7 +90,9 @@ EXPORT_SYMBOL(ieee80211_wme_acnames);
 
 static int ieee80211_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 static void ieee80211_tx_timeout(unsigned long);
+#ifdef ATH_SUPERG_XR
 static void ieee80211_start_xrvap(unsigned long);
+#endif
 void ieee80211_auth_setup(void);
 
 void
@@ -127,6 +129,7 @@ ieee80211_proto_vattach(struct ieee80211vap *vap)
 	init_timer(&vap->iv_mgtsend);
 	init_timer(&vap->iv_xrvapstart);
 	init_timer(&vap->iv_swbmiss);
+	init_timer(&vap->iv_csa_timer);
 	vap->iv_mgtsend.function = ieee80211_tx_timeout;
 	vap->iv_mgtsend.data = (unsigned long) vap;
 
@@ -783,7 +786,7 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 	/* NB: check ic_bss to avoid NULL deref on initial attach */
 	if (vap->iv_bss != NULL) {
 		/*
-		 * Calculate agressive mode switching threshold based
+		 * Calculate aggressive mode switching threshold based
 		 * on beacon interval.
 		 */
 		wme->wme_hipri_switch_thresh =
@@ -1011,7 +1014,7 @@ ieee80211_start_running(struct ieee80211com *ic)
 	/* XXX locking */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 		dev = vap->iv_dev;
-		if (dev->flags & IFF_RUNNING)	/* NB: avoid recursion */
+		if ((dev->flags & IFF_UP) && !(dev->flags & IFF_RUNNING))	/* NB: avoid recursion */
 			ieee80211_open(dev);
 	}
 }
@@ -1229,7 +1232,7 @@ ieee80211_new_state(struct ieee80211vap *vap, enum ieee80211_state nstate, int a
 	struct ieee80211com *ic = vap->iv_ic;
 	int rc;
 
-	/* grab the lock so that only one vap can go through transistion at any time */
+	/* grab the lock so that only one vap can go through transition at any time */
 	IEEE80211_VAPS_LOCK_BH(ic);
 	rc = vap->iv_newstate(vap, nstate, arg);
 	IEEE80211_VAPS_UNLOCK_BH(ic);
@@ -1364,7 +1367,8 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		}
 		break;
 	case IEEE80211_S_AUTH:
-		KASSERT(vap->iv_opmode == IEEE80211_M_STA,
+		/* auth frames are possible between IBSS nodes, see 802.11-1999, chapter 5.7.6 */
+		KASSERT(vap->iv_opmode == IEEE80211_M_STA || vap->iv_opmode == IEEE80211_M_IBSS,
 			("switch to %s state when operating in mode %u",
 			 ieee80211_state_name[nstate], vap->iv_opmode));
 		switch (ostate) {
@@ -1579,6 +1583,12 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 			nrunning = nscanning = 0;
 			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
 				if (vap != tmpvap) {
+					if (tmpvap->iv_opmode == IEEE80211_M_MONITOR)
+						/* skip monitor vaps as their
+						 * S_RUN shouldn't have any
+						 * influence on modifying state
+						 * transition */
+						continue;
 					if (tmpvap->iv_state == IEEE80211_S_RUN)
 						nrunning++;
 					else if (tmpvap->iv_state == IEEE80211_S_SCAN ||
@@ -1596,7 +1606,14 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 			} else if (!nscanning && nrunning) {
 				/* when no one is scanning but someone is running, bypass
 				 * scan and go to run state immediately */
-				__ieee80211_newstate(vap, IEEE80211_S_RUN, arg);
+				if (vap->iv_opmode == IEEE80211_M_MONITOR ||
+				    vap->iv_opmode == IEEE80211_M_WDS ||
+				    vap->iv_opmode == IEEE80211_M_HOSTAP) {
+					__ieee80211_newstate(vap, IEEE80211_S_RUN, arg);
+				} else {
+					/* MW: avoid invalid S_INIT -> S_RUN transition */
+					__ieee80211_newstate(vap, nstate, arg);
+				}
 			} else if (nscanning && !nrunning) {
 				/* when someone is scanning and no one is running, set
 				 * the scan pending flag. Don't go through state machine */

@@ -415,6 +415,10 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,7)
+#include <linux/jiffies.h>
+#endif
+
 #ifndef CLONE_KERNEL
 /*
  * List of flags we want to share for kernel threads,
@@ -423,6 +427,7 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 #define CLONE_KERNEL	(CLONE_FS | CLONE_FILES | CLONE_SIGHAND)
 #endif
 
+#include <linux/mm.h>
 #ifndef offset_in_page
 #define	offset_in_page(p) ((unsigned long) (p) & ~PAGE_MASK)
 #endif

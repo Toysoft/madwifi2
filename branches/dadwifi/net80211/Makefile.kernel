@@ -5,14 +5,18 @@
 src ?= .
 srctree ?= .
 
-include $(srctree)/$(src)/../BuildCaps.inc
+TOP = $(srctree)/$(src)/..
 
-COMPAT = $(srctree)/$(src)/../include
+include $(TOP)/BuildCaps.inc
 
-HAL = $(srctree)/$(src)/../hal
+COMPAT = $(TOP)/include
 
-EXTRA_CFLAGS+=	-include $(COMPAT)/compat.h -I$(COMPAT) -I$(src)/.. \
-	-I$(HAL) -I$(HAL)/linux
+ATH_HAL = $(TOP)/ath_hal
+HAL = $(TOP)/hal
+
+INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
+INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL)
+EXTRA_CFLAGS += $(INCS)
 
 #
 # There are two authenticator mechanisms: an in-kernel implementation

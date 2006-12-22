@@ -471,6 +471,8 @@ struct ieee80211req {
 #define	IEEE80211_IOC_DELMAC		55	/* del sta from MAC ACL table */
 #define	IEEE80211_IOC_FF		56	/* ATH fast frames (on, off) */
 #define	IEEE80211_IOC_TURBOP		57	/* ATH turbo' (on, off) */
+#define	IEEE80211_IOC_APPIEBUF		58	/* IE in the management frame */
+#define	IEEE80211_IOC_FILTERFRAME	59	/* management frame filter */
 
 /*
  * Scan result data returned for IEEE80211_IOC_SCAN_RESULTS.
@@ -514,6 +516,9 @@ struct ieee80211req_scan_result {
 #define	IEEE80211_IOCTL_SETCHANLIST	(SIOCIWFIRSTPRIV+6)
 #define	IEEE80211_IOCTL_GETCHANLIST	(SIOCIWFIRSTPRIV+7)
 #define	IEEE80211_IOCTL_CHANSWITCH	(SIOCIWFIRSTPRIV+8)
+#define	IEEE80211_IOCTL_GET_APPIEBUF	(SIOCIWFIRSTPRIV+9)
+#define	IEEE80211_IOCTL_SET_APPIEBUF	(SIOCIWFIRSTPRIV+10)
+#define	IEEE80211_IOCTL_FILTERFRAME	(SIOCIWFIRSTPRIV+12)
 #define	IEEE80211_IOCTL_GETCHANINFO	(SIOCIWFIRSTPRIV+13)
 #define	IEEE80211_IOCTL_SETOPTIE	(SIOCIWFIRSTPRIV+14)
 #define	IEEE80211_IOCTL_GETOPTIE	(SIOCIWFIRSTPRIV+15)
@@ -525,6 +530,7 @@ struct ieee80211req_scan_result {
 #define	IEEE80211_IOCTL_WDSADDMAC	(SIOCIWFIRSTPRIV+26)
 #define	IEEE80211_IOCTL_WDSDELMAC	(SIOCIWFIRSTPRIV+28)
 #define	IEEE80211_IOCTL_KICKMAC		(SIOCIWFIRSTPRIV+30)
+
 enum {
 	IEEE80211_WMMPARAMS_CWMIN       = 1,
 	IEEE80211_WMMPARAMS_CWMAX       = 2,
@@ -592,6 +598,7 @@ enum {
 	IEEE80211_PARAM_MARKDFS		= 58,	/* mark a dfs interference channel when found */
 	IEEE80211_PARAM_REGCLASS	= 59,	/* enable regclass ids in country IE */
 	IEEE80211_PARAM_DROPUNENC_EAPOL	= 60,	/* drop unencrypted eapol frames */
+ 	IEEE80211_PARAM_SHPREAMBLE	= 61,	/* Short Preamble */
 };
 
 #define	SIOCG80211STATS			(SIOCDEVPRIVATE+2)
@@ -611,6 +618,42 @@ struct ieee80211_clone_params {
 #define	IEEE80211_CLONE_BSSID	0x0001		/* allocate unique mac/bssid */
 #define	IEEE80211_NO_STABEACONS	0x0002		/* Do not setup the station beacon timers */
 };
+
+/* APPIEBUF related definitions */
+
+/* Management frame type to which application IE is added */
+enum {
+	IEEE80211_APPIE_FRAME_BEACON		= 0,
+	IEEE80211_APPIE_FRAME_PROBE_REQ		= 1,
+	IEEE80211_APPIE_FRAME_PROBE_RESP	= 2,
+	IEEE80211_APPIE_FRAME_ASSOC_REQ		= 3,
+	IEEE80211_APPIE_FRAME_ASSOC_RESP	= 4,
+	IEEE80211_APPIE_NUM_OF_FRAME		= 5
+};
+
+struct ieee80211req_getset_appiebuf {
+	u_int32_t	app_frmtype;		/* management frame type for which buffer is added */
+	u_int32_t	app_buflen;		/* application-supplied buffer length */
+	u_int8_t	app_buf[];		/* application-supplied IE(s) */
+};
+
+/* Flags ORed by application to set filter for receiving management frames */
+enum {
+	IEEE80211_FILTER_TYPE_BEACON		= 1<<0,
+	IEEE80211_FILTER_TYPE_PROBE_REQ		= 1<<1,
+	IEEE80211_FILTER_TYPE_PROBE_RESP	= 1<<2,
+	IEEE80211_FILTER_TYPE_ASSOC_REQ		= 1<<3,
+	IEEE80211_FILTER_TYPE_ASSOC_RESP	= 1<<4,
+	IEEE80211_FILTER_TYPE_AUTH		= 1<<5,
+	IEEE80211_FILTER_TYPE_DEAUTH		= 1<<6,
+	IEEE80211_FILTER_TYPE_DISASSOC		= 1<<7,
+	IEEE80211_FILTER_TYPE_ALL		= 0xFF	/* used to check the valid filter bits */
+};
+
+struct ieee80211req_set_filter {
+	u_int32_t app_filterype;		/* management frame filter type */
+};
+
 
 #endif /* __linux__ */
 

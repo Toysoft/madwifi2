@@ -1054,13 +1054,14 @@ sta_age(struct ieee80211_scan_state *ss)
  * Iterate over the entries in the scan cache, invoking
  * the callback function on each one.
  */
-static void
+static int
 sta_iterate(struct ieee80211_scan_state *ss, 
 	ieee80211_scan_iter_func *f, void *arg)
 {
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *se;
 	u_int gen;
+	int res = 0;
 
 	spin_lock(&st->st_scanlock);
 	gen = st->st_scangen++;
@@ -1072,13 +1073,22 @@ restart:
 			/* update public state */
 			se->base.se_age = jiffies - se->se_lastupdate;
 			spin_unlock(&st->st_lock);
-			(*f)(arg, &se->base);
+			res = (*f)(arg, &se->base);
+
+			if(res != 0) {
+			  /* We probably ran out of buffer space. */
+			  goto done;
+			}
 			goto restart;
 		}
 	}
+
 	spin_unlock(&st->st_lock);
 
+ done:
 	spin_unlock(&st->st_scanlock);
+
+	return res;
 }
 
 static void

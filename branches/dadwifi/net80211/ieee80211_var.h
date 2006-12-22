@@ -87,6 +87,9 @@
 #define	IEEE80211_MS_TO_TU(x)	(((x) * 1000) / 1024)
 #define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
 #define	IEEE80211_TU_TO_JIFFIES(x) ((IEEE80211_TU_TO_MS(x) * HZ) / 1000)
+#define	IEEE80211_JIFFIES_TO_TU(x) IEEE80211_MS_TO_TU((x) * 1000 / HZ)
+
+#define	IEEE80211_APPIE_MAX	1024
 
 #define IEEE80211_PWRCONSTRAINT_VAL(ic) \
 	(((ic)->ic_bsschan->ic_maxregpower > (ic)->ic_curchanmaxpwr) ? \
@@ -122,7 +125,7 @@ struct ieee80211com {
 	u_int32_t ic_flags;			/* state flags */
 	u_int32_t ic_flags_ext;			/* extension of state flags */
 	u_int32_t ic_caps;			/* capabilities */
-	u_int8_t ic_ath_cap;			/* Atheros adv. capablities */
+	u_int8_t ic_ath_cap;			/* Atheros adv. capabilities */
 	u_int8_t ic_promisc;			/* vap's needing promisc mode */
 	u_int8_t ic_allmulti;			/* vap's needing all multicast*/
 	u_int8_t ic_nopened;			/* vap's been opened */
@@ -167,7 +170,7 @@ struct ieee80211com {
 	struct ieee80211_channel *ic_curchan;	/* current channel */
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
 	struct ieee80211_channel *ic_prevchan;	/* previous channel */
-
+	int16_t ic_channoise;			/* current channel noise in dBm */
 	/* regulatory class ids */
 	u_int ic_nregclass;			/* # entries in ic_regclassids */
 	u_int8_t ic_regclassids[IEEE80211_REGCLASSIDS_MAX];
@@ -262,6 +265,7 @@ struct ieee80211_nsparams {
 #define IW_MAX_SPY 8
 struct ieee80211_spy {
         u_int8_t mac[IW_MAX_SPY * IEEE80211_ADDR_LEN];
+        u_int32_t ts_rssi[IW_MAX_SPY];   /* ts of rssi value from last read */
         u_int8_t thr_low;	/* 1 byte rssi value, 0 = threshold is off */
         u_int8_t thr_high;	/* 1 byte rssi value */   
         u_int8_t num;
@@ -288,6 +292,11 @@ struct ieee80211_proc_entry {
 	struct ieee80211_proc_entry *next;
 };
 #endif
+
+struct ieee80211_app_ie_t {
+	u_int32_t		length;		/* buffer length */
+	struct ieee80211_ie    *ie;		/* buffer containing one or more IEs */
+};
 
 struct ieee80211vap {
 	struct net_device *iv_dev;		/* associated device */
@@ -318,7 +327,7 @@ struct ieee80211vap {
 	u_int32_t iv_flags;			/* state flags */
 	u_int32_t iv_flags_ext;			/* extension of state flags */
 	u_int32_t iv_caps;			/* capabilities */
-	u_int8_t iv_ath_cap;			/* Atheros adv. capablities */
+	u_int8_t iv_ath_cap;			/* Atheros adv. capabilities */
 	enum ieee80211_opmode iv_opmode;	/* operation mode */
 	enum ieee80211_state iv_state;		/* state machine state */
 	struct timer_list iv_mgtsend;		/* mgmt frame response timer */
@@ -340,6 +349,11 @@ struct ieee80211vap {
 	u_int iv_scanvalid;			/* scan cache valid threshold */
 	struct ieee80211_roam iv_roam;		/* sta-mode roaming state */
 
+	u_int32_t iv_csa_jiffies;		/* last csa recv jiffies */
+	u_int8_t iv_csa_count;			/* last csa count */
+	struct ieee80211_channel *iv_csa_chan;	/* last csa channel */
+	u_int8_t iv_csa_mode;			/* last csa mode */
+	struct timer_list iv_csa_timer;		/* csa timer */
 	u_int32_t *iv_aid_bitmap;		/* association id map */
 	u_int16_t iv_max_aid;
 	u_int16_t iv_sta_assoc;			/* stations associated */
@@ -392,13 +406,17 @@ struct ieee80211vap {
 	unsigned int iv_nsdone;			/* Done with scheduled newstate tasklet */
 	uint8_t	wds_mac[IEEE80211_ADDR_LEN];
 	struct ieee80211_spy iv_spy;         	/* IWSPY support */
+	struct ieee80211_app_ie_t app_ie[IEEE80211_APPIE_NUM_OF_FRAME]; /* app-specified IEs by frame type */
+	u_int32_t app_filter;			/* filters which management frames are forwarded to app */
+
 };
 MALLOC_DECLARE(M_80211_VAP);
 
-#define	IEEE80211_ADDR_NULL(a1)	(memcmp(a1, "\x00\x00\x00\x00\x00\x00", \
-	IEEE80211_ADDR_LEN) == 0)
-#define	IEEE80211_ADDR_EQ(a1,a2)	(memcmp(a1,a2,IEEE80211_ADDR_LEN) == 0)
-#define	IEEE80211_ADDR_COPY(dst,src)	memcpy(dst,src,IEEE80211_ADDR_LEN)
+#define	IEEE80211_ADDR_NULL(a1)		(memcmp(a1, "\x00\x00\x00\x00\x00\x00", \
+					 IEEE80211_ADDR_LEN) == 0)
+#define	IEEE80211_ADDR_EQ(a1, a2)	(memcmp(a1, a2, IEEE80211_ADDR_LEN) == 0)
+#define	IEEE80211_ADDR_COPY(dst, src)	memcpy(dst, src, IEEE80211_ADDR_LEN)
+#define	IEEE80211_ADDR_SET_NULL(dst)	memset(dst, 0, IEEE80211_ADDR_LEN)
 
 /* ic_flags */
 #define	IEEE80211_F_FF		0x00000001	/* CONF: ATH FF enabled */
@@ -446,11 +464,12 @@ MALLOC_DECLARE(M_80211_VAP);
 #define IEEE80211_FEXT_UAPSD	0x00000010	/* CONF: enable U-APSD */
 #define IEEE80211_FEXT_SLEEP	0x00000020	/* STATUS: sleeping */
 #define IEEE80211_FEXT_EOSPDROP	0x00000040	/* drop uapsd EOSP frames for test */
-#define	IEEE80211_FEXT_MARKDFS	0x00000080	/* Enable marking of dfs interfernce */
+#define	IEEE80211_FEXT_MARKDFS	0x00000080	/* Enable marking of dfs interference */
 #define IEEE80211_FEXT_REGCLASS	0x00000100	/* CONF: send regclassids in country ie */
 #define IEEE80211_FEXT_ERPUPDATE 0x00000200	/* STATUS: update ERP element */
 #define IEEE80211_FEXT_SWBMISS 0x00000400	/* CONF: use software beacon timer */
 #define IEEE80211_FEXT_DROPUNENC_EAPOL 0x00000800      /* CONF: drop unencrypted eapol frames */
+#define IEEE80211_FEXT_APPIE_UPDATE 0x00001000	/* STATE: beacon APP IE updated */
 
 #define IEEE80211_COM_UAPSD_ENABLE(_ic)		((_ic)->ic_flags_ext |= IEEE80211_FEXT_UAPSD)
 #define IEEE80211_COM_UAPSD_DISABLE(_ic)	((_ic)->ic_flags_ext &= ~IEEE80211_FEXT_UAPSD)
@@ -600,7 +619,7 @@ ieee80211_anyhdrspace(struct ieee80211com *ic, const void *data)
 }
 
 #define	IEEE80211_MSG_DEBUG	0x40000000	/* IFF_DEBUG equivalent */
-#define	IEEE80211_MSG_DUMPPKTS	0x20000000	/* IFF_LINK2 equivalant */
+#define	IEEE80211_MSG_DUMPPKTS	0x20000000	/* IFF_LINK2 equivalent */
 #define	IEEE80211_MSG_CRYPTO	0x10000000	/* crypto work */
 #define	IEEE80211_MSG_INPUT	0x08000000	/* input handling */
 #define	IEEE80211_MSG_XRATE	0x04000000	/* rate set handling */

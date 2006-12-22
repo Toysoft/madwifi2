@@ -240,7 +240,7 @@ ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 	tid = 0;
 	if (IEEE80211_QOS_HAS_SEQ(wh)) 
 		tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
-	/* NB: assume IEEEE80211_WEP_MINLEN covers the extended IV */ 
+	/* NB: assume IEEE80211_WEP_MINLEN covers the extended IV */ 
 	pn = READ_6(ivp[0], ivp[1], ivp[4], ivp[5], ivp[6], ivp[7]);
 	if (pn <= k->wk_keyrsc[tid]) {
 		/*
@@ -299,6 +299,9 @@ xor_block(u8 *b, const u8 *a, size_t len)
 static void
 rijndael_encrypt(struct crypto_tfm *tfm, const void *src, void *dst)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+	crypto_cipher_encrypt_one(tfm, dst, src);
+#else
 	struct scatterlist sg_src;
 	struct scatterlist sg_dst;
 
@@ -310,6 +313,7 @@ rijndael_encrypt(struct crypto_tfm *tfm, const void *src, void *dst)
 	sg_dst.offset = offset_in_page(dst);
 	sg_dst.length = AES_BLOCK_LEN;
 	crypto_cipher_encrypt(tfm, &sg_dst, &sg_src, AES_BLOCK_LEN);
+#endif
 }
 
 /*

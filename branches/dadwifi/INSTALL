@@ -20,7 +20,7 @@ Requirements
 - gcc of same version that was used to compile the kernel (ignoring this
   will cause "Invalid module format" errors during module load).
 
-2.4.x kernels starting with 2.4.20 and 2.6 kernels should work without
+2.4.x kernels starting with 2.4.22 and 2.6 kernels should work without
 problems.  Other kernel versions may require modifications, e.g. for
 crypto support and/or updated wireless extensions.
 

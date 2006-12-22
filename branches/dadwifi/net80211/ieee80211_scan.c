@@ -175,15 +175,10 @@ ieee80211_scan_vdetach(struct ieee80211vap *vap)
 #define	IEEE80211_SCANNER_MAX	(IEEE80211_M_MONITOR+1)
 
 static const char *scan_modnames[IEEE80211_SCANNER_MAX] = {
-	"wlan_scan_sta",	/* IEEE80211_M_IBSS */
-	"wlan_scan_sta",	/* IEEE80211_M_STA */
-	"wlan_scan_wds",	/* IEEE80211_M_WDS */
-	"wlan_scan_sta",	/* IEEE80211_M_AHDEMO */
-	"wlan_scan_4",		/* n/a */
-	"wlan_scan_5",		/* n/a */
-	"wlan_scan_ap",		/* IEEE80211_M_HOSTAP */
-	"wlan_scan_7",		/* n/a */
-	"wlan_scan_monitor",	/* IEEE80211_M_MONITOR */
+	[IEEE80211_M_IBSS]	= "wlan_scan_sta",
+	[IEEE80211_M_STA]	= "wlan_scan_sta",
+	[IEEE80211_M_AHDEMO]	= "wlan_scan_sta",
+	[IEEE80211_M_HOSTAP]	= "wlan_scan_ap",
 };
 static const struct ieee80211_scanner *scanners[IEEE80211_SCANNER_MAX];
 
@@ -192,6 +187,8 @@ ieee80211_scanner_get(enum ieee80211_opmode mode, int tryload)
 {
 	int err;
 	if (mode >= IEEE80211_SCANNER_MAX)
+		return NULL;
+	if (scan_modnames[mode] == NULL)
 		return NULL;
 	if (scanners[mode] == NULL && tryload) {
 		err = ieee80211_load_module(scan_modnames[mode]);
@@ -737,7 +734,7 @@ again:
 				"[jiffies %lu, dwell min %lu scanend %lu]\n",
 				__func__,
 				jiffies, ss->ss_mindwell, scanend);
-			ss->ss_next = 0;	/* reset to begining */
+			ss->ss_next = 0;	/* reset to beginning */
 			if (ss->ss_flags & IEEE80211_SCAN_ACTIVE)
 				vap->iv_stats.is_scan_active++;
 			else
@@ -924,14 +921,17 @@ ieee80211_scan_assoc_fail(struct ieee80211com *ic,
 /*
  * Iterate over the contents of the scan cache.
  */
-void
+int
 ieee80211_scan_iterate(struct ieee80211com *ic,
 	ieee80211_scan_iter_func *f, void *arg)
 {
-	struct ieee80211_scan_state *ss = ic->ic_scan;
-
-	if (ss->ss_ops != NULL)
-		ss->ss_ops->scan_iterate(ss, f, arg);
+  int res = 0;
+  struct ieee80211_scan_state *ss = ic->ic_scan;
+	
+  if (ss->ss_ops != NULL) {
+    res = ss->ss_ops->scan_iterate(ss, f, arg);
+  }
+  return res;
 }
 
 /*

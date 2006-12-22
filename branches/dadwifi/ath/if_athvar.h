@@ -44,6 +44,7 @@
 #define _DEV_ATH_ATHVAR_H
 
 #include "ah.h"
+#include "ah_os.h"
 #include "if_athioctl.h"
 #ifdef CONFIG_NET80211
 #include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
@@ -149,6 +150,44 @@ typedef void irqreturn_t;
 
 #ifndef SET_NETDEV_DEV
 #define	SET_NETDEV_DEV(ndev, pdev)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,23)
+static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask,
+					       void (*setup)(struct net_device *))
+{
+	struct net_device *dev;
+	int alloc_size;
+
+	/* ensure 32-byte alignment of the private area */
+	alloc_size = sizeof (*dev) + sizeof_priv + 31;
+
+	dev = (struct net_device *) kmalloc (alloc_size, GFP_KERNEL);
+	if (dev == NULL)
+	{
+		printk(KERN_ERR "alloc_dev: Unable to allocate device memory.\n");
+		return NULL;
+	}
+
+	memset(dev, 0, alloc_size);
+
+	if (sizeof_priv)
+		dev->priv = (void *) (((long)(dev + 1) + 31) & ~31);
+
+	setup(dev);
+	strcpy(dev->name, mask);
+
+	return dev;
+}
+
+/* Avoid name collision - some vendor kernels backport alloc_netdev() */
+#undef alloc_netdev
+#define alloc_netdev(s,m,d) _alloc_netdev(s,m,d)
+
+static inline struct proc_dir_entry *PDE(const struct inode *inode)
+{
+	return (struct proc_dir_entry *)inode->u.generic_ip;
+}
 #endif
 
 
@@ -281,7 +320,7 @@ typedef void irqreturn_t;
 #define A_MAX(a,b) ((a) > (b) ? (a) : (b))
 
 /*
- * Macros to obtain the Group Poll Periodicty in various situations
+ * Macros to obtain the Group Poll Periodicity in various situations
  *
  * Curerntly there are the two cases
  * (a) When there are no XR STAs associated
@@ -312,8 +351,8 @@ struct ath_key {
 	u8 ak_alg;
 };
 
-#define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
-#define	ATH_MIN_FF_RATE	12000		/* min rate fof ff aggragattion.in Kbps  */
+#define	ATH_MIN_FF_RATE	12000		/* min rate for ff aggregation in kbps */
+#define	ATH_MIN_FF_RATE	12000		/* min rate for ff aggregation in kbps */
 struct ath_buf;
 typedef STAILQ_HEAD(, ath_buf) ath_bufhead;
 
@@ -325,14 +364,14 @@ struct ath_node {
 	u_int16_t an_decomp_index; 		/* decompression mask index */
 	u_int32_t an_avgrssi;			/* average rssi over all rx frames */
 	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
-	u_int16_t an_minffrate;			/* mimum rate in kbps for ff to aggragate */
+	u_int16_t an_minffrate;			/* min rate in kbps for ff to aggregate */
 	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
 	struct ath_buf *an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
 	ath_bufhead an_uapsd_q;			/* U-APSD delivery queue */
 	int an_uapsd_qdepth; 			/* U-APSD delivery queue depth */
 	ath_bufhead an_uapsd_overflowq; 	/* U-APSD overflow queue (for > MaxSp frames) */
 	int an_uapsd_overflowqdepth; 		/* U-APSD overflow queue depth */
-	spinlock_t an_uapsd_lock; 		/* U-APSD deleivery queue lock */
+	spinlock_t an_uapsd_lock; 		/* U-APSD delivery queue lock */
 	/* variable-length rate control state follows */
 };
 #define	ATH_NODE(_n)			((struct ath_node *)(_n))
@@ -378,13 +417,13 @@ struct ath_buf {
 	dma_addr_t bf_skbaddr;			/* physical addr of skb data */
 	struct ieee80211_node *bf_node;		/* pointer to the node */
 	u_int32_t bf_status;			/* status flags */
+	u_int16_t bf_flags;			/* tx descriptor flags */
 #ifdef ATH_SUPERG_FF
-	/* XXX: combine this with bf_skbaddr if it ever changes to accomodate
+	/* XXX: combine this with bf_skbaddr if it ever changes to accommodate
 	 *      multiple segments.
 	 */
-	u_int32_t bf_queueage; 			/* "age" of txq when this buffer placed on stageq */
 	u_int16_t bf_numdesc;			/* number of descs used */
-	u_int16_t bf_flags;			/* tx descriptor flags */
+	u_int32_t bf_queueage; 			/* "age" of txq when this buffer placed on stageq */
 	dma_addr_t bf_skbaddrff[ATH_TXDESC-1]; 	/* extra addrs for ff */
 #endif
 #ifndef CONFIG_NET80211
@@ -545,7 +584,7 @@ struct ath_softc {
 			sc_dturbo_switch:1,	/* turbo switch mode*/
 			sc_dturbo_hold:1,	/* dynamic turbo hold state */
 			sc_rate_recn_state:1,	/* dynamic turbo state recmded by ratectrl */
-			sc_ignore_ar:1,		/* ignore AR during transision*/
+			sc_ignore_ar:1,		/* ignore AR during transition */
 			sc_ledstate:1,		/* LED on/off state */
 			sc_blinking:1,		/* LED blink operation active */
 			sc_beacons:1,		/* beacons running */
@@ -706,6 +745,7 @@ struct ath_softc {
 	struct ath_bss *sc_bss;		/* array of per bss info */
 	int sc_beacon_interval;		/* beacon interval in units of TU */
 #endif
+	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
@@ -752,12 +792,16 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
 #define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
 
-int ath_attach(u_int16_t, struct ath_softc *);
+int ath_attach(u_int16_t, struct ath_softc *, HAL_BUS_TAG);
 int ath_detach(struct ath_softc *);
 void ath_resume(struct ath_softc *);
 void ath_suspend(struct ath_softc *);
 void ath_shutdown(struct ath_softc *);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 irqreturn_t ath_intr(int, void *);
+#else
+irqreturn_t ath_intr(int, void *, struct pt_regs *);
+#endif
 int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);
 #ifdef CONFIG_SYSCTL
@@ -921,8 +965,12 @@ void ath_sysctl_unregister(void);
 	ath_hal_getcapability(_ah, HAL_CAP_REG_DMN, 0, (_prd))
 #define	ath_hal_getcountrycode(_ah, _pcc) \
 	(*(_pcc) = (_ah)->ah_countryCode)
-#define	ath_hal_tkipsplit(_ah) \
+#define ath_hal_hastkipsplit(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_TKIP_SPLIT, 0, NULL) == HAL_OK)
+#define ath_hal_gettkipsplit(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_TKIP_SPLIT, 1, NULL) == HAL_OK)
+#define ath_hal_settkipsplit(_ah, _v) \
+	ath_hal_setcapability(_ah, HAL_CAP_TKIP_SPLIT, 1, _v, NULL)
 #define	ath_hal_wmetkipmic(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_WME_TKIPMIC, 0, NULL) == HAL_OK)
 #define	ath_hal_hwphycounters(_ah) \
@@ -1033,5 +1081,7 @@ void ath_sysctl_unregister(void);
 	((*(_ah)->ah_dfsNolCheck)((_ah), (_chan), (_nchans)))
 #define ath_hal_radar_wait(_ah, _chan) \
 	((*(_ah)->ah_radarWait)((_ah), (_chan)))
+#define ath_hal_get_channel_noise(_ah, _chan) \
+	((*(_ah)->ah_getChanNoise)((_ah), (_chan)))
 
 #endif /* _DEV_ATH_ATHVAR_H */
