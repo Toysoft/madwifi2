@@ -24,11 +24,11 @@
 #include "ar5211reg.h"
 #include "ar5211var.h"
 
-HAL_BOOL	 ar5k_ar5211_nic_reset(struct ath_hal *, u_int32_t);
-HAL_BOOL	 ar5k_ar5211_nic_wakeup(struct ath_hal *, u_int16_t);
-u_int16_t	 ar5k_ar5211_radio_revision(struct ath_hal *, HAL_CHIP);
+AR5K_BOOL	 ar5k_ar5211_nic_reset(struct ath_hal *, u_int32_t);
+AR5K_BOOL	 ar5k_ar5211_nic_wakeup(struct ath_hal *, u_int16_t);
+u_int16_t	 ar5k_ar5211_radio_revision(struct ath_hal *, AR5K_CHIP);
 void	 ar5k_ar5211_fill(struct ath_hal *);
-void	 ar5k_ar5211_rfregs(struct ath_hal *, HAL_CHANNEL *, u_int,
+void	 ar5k_ar5211_rfregs(struct ath_hal *, AR5K_CHANNEL *, u_int,
     u_int);
 
 /*
@@ -194,8 +194,8 @@ ar5k_ar5211_fill(struct ath_hal *hal)
 }
 
 struct ath_hal * /*Ported & removed an arg from call to set_associd*/
-ar5k_ar5211_attach(u_int16_t device, HAL_SOFTC sc, HAL_BUS_TAG st,
-    HAL_BUS_HANDLE sh, HAL_STATUS *status)
+ar5k_ar5211_attach(u_int16_t device, AR5K_SOFTC sc, AR5K_BUS_TAG st,
+    AR5K_BUS_HANDLE sh, AR5K_STATUS *status)
 {
 	struct ath_hal *hal = (struct ath_hal*) sc;
 	u_int8_t mac[IEEE80211_ADDR_LEN];
@@ -215,7 +215,7 @@ ar5k_ar5211_attach(u_int16_t device, HAL_SOFTC sc, HAL_BUS_TAG st,
 	hal->ah_phy_revision = AR5K_REG_READ(AR5K_AR5211_PHY_CHIP_ID) &
 	    0x00ffffffff;
 	hal->ah_radio_5ghz_revision =
-	    ar5k_ar5211_radio_revision(hal, HAL_CHIP_5GHZ);
+	    ar5k_ar5211_radio_revision(hal, AR5K_CHIP_5GHZ);
 	hal->ah_radio_2ghz_revision = 0;
 
 	/* Identify the chipset (this has to be done in an early step) */
@@ -231,10 +231,10 @@ ar5k_ar5211_attach(u_int16_t device, HAL_SOFTC sc, HAL_BUS_TAG st,
 	return (hal);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_nic_reset(struct ath_hal *hal, u_int32_t val)
 {
-	HAL_BOOL ret = FALSE;
+	AR5K_BOOL ret = FALSE;
 	u_int32_t mask = val ? val : ~0;
 
 	/* Read-and-clear */
@@ -265,7 +265,7 @@ ar5k_ar5211_nic_reset(struct ath_hal *hal, u_int32_t val)
 	return (ret);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 {
 	u_int32_t turbo, mode, clock;
@@ -318,7 +318,7 @@ ar5k_ar5211_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 
 	/* ...wakeup */
 	if (ar5k_ar5211_set_power(hal,
-		HAL_PM_AWAKE, TRUE) == FALSE) {
+		AR5K_PM_AWAKE, TRUE) == FALSE) {
 		AR5K_PRINT("failed to resume the AR5211 (again)\n");
 		return (FALSE);
 	}
@@ -340,7 +340,7 @@ ar5k_ar5211_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 }
 
 u_int16_t
-ar5k_ar5211_radio_revision(struct ath_hal *hal, HAL_CHIP chip)
+ar5k_ar5211_radio_revision(struct ath_hal *hal, AR5K_CHIP chip)
 {
 	int i;
 	u_int32_t srev;
@@ -350,10 +350,10 @@ ar5k_ar5211_radio_revision(struct ath_hal *hal, HAL_CHIP chip)
 	 * Set the radio chip access register
 	 */
 	switch (chip) {
-	case HAL_CHIP_2GHZ:
+	case AR5K_CHIP_2GHZ:
 		AR5K_REG_WRITE(AR5K_AR5211_PHY(0), AR5K_AR5211_PHY_SHIFT_2GHZ);
 		break;
-	case HAL_CHIP_5GHZ:
+	case AR5K_CHIP_5GHZ:
 		AR5K_REG_WRITE(AR5K_AR5211_PHY(0), AR5K_AR5211_PHY_SHIFT_5GHZ);
 		break;
 	default:
@@ -377,18 +377,18 @@ ar5k_ar5211_radio_revision(struct ath_hal *hal, HAL_CHIP chip)
 	return (ret);
 }
 
-const HAL_RATE_TABLE *
+const AR5K_RATE_TABLE *
 ar5k_ar5211_get_rate_table(struct ath_hal *hal, u_int mode)
 {
 	switch (mode) {
-	case HAL_MODE_11A:
+	case AR5K_MODE_11A:
 		return (&hal->ah_rt_11a);
-	case HAL_MODE_TURBO:
+	case AR5K_MODE_TURBO:
 		return (&hal->ah_rt_turbo);
-	case HAL_MODE_11B:
+	case AR5K_MODE_11B:
 		return (&hal->ah_rt_11b);
-	case HAL_MODE_11G:
-//	case HAL_MODE_PUREG:
+	case AR5K_MODE_11G:
+//	case AR5K_MODE_PUREG:
 		return (&hal->ah_rt_11g);
 	default:
 		return (NULL);
@@ -406,7 +406,7 @@ ar5k_ar5211_detach(struct ath_hal *hal)
 	free(hal, M_DEVBUF);
 }
 
-HAL_BOOL /*New*/
+AR5K_BOOL /*New*/
 ar5k_ar5211_phy_disable(struct ath_hal *hal)
 {
 	AR5K_TRACE;
@@ -415,9 +415,9 @@ ar5k_ar5211_phy_disable(struct ath_hal *hal)
 	return TRUE;
 }
 
-HAL_BOOL /*Ported*/
-ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
-    HAL_BOOL change_channel, HAL_STATUS *status)
+AR5K_BOOL /*Ported*/
+ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, AR5K_CHANNEL *channel,
+    AR5K_BOOL change_channel, AR5K_STATUS *status)
 {
 	struct ar5k_eeprom_info *ee = &hal->ah_capabilities.cap_eeprom;
 	u_int8_t mac[IEEE80211_ADDR_LEN];
@@ -440,7 +440,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 	s_led[1] = AR5K_REG_READ(AR5K_AR5211_GPIOCR);
 	s_led[2] = AR5K_REG_READ(AR5K_AR5211_GPIODO);
 
-	if (ar5k_ar5211_nic_wakeup(hal, channel->c_channel_flags) == FALSE)
+	if (ar5k_ar5211_nic_wakeup(hal, channel->channel_flags) == FALSE)
 		return (FALSE);
 
 	/*
@@ -448,7 +448,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 	 */
 	hal->ah_op_mode = op_mode;
 
-	 switch (channel->c_channel_flags & CHANNEL_MODES) {
+	 switch (channel->channel_flags & CHANNEL_MODES) {
  	 case CHANNEL_A:
 		mode = AR5K_INI_VAL_11A;
 		freq = AR5K_INI_RFGAIN_5GHZ;
@@ -471,7 +471,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 		ee_mode = AR5K_EEPROM_MODE_11G;
 		break;
 	default:
-		AR5K_PRINTF("invalid channel: %d\n", channel->c_channel);
+		AR5K_PRINTF("invalid channel: %d\n", channel->channel);
 		return (FALSE);
 	}
 
@@ -519,7 +519,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 	 */
 
 	if (hal->ah_radio == AR5K_AR5111) {
-		if (channel->c_channel_flags & CHANNEL_B)
+		if (channel->channel_flags & CHANNEL_B)
 			AR5K_REG_ENABLE_BITS(AR5K_AR5211_TXCFG,
 			    AR5K_AR5211_TXCFG_B_MODE);
 		else
@@ -532,9 +532,9 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 	    hal->ah_antenna[ee_mode][0], 0xfffffc06);
 
 		if (freq == AR5K_INI_RFGAIN_2GHZ)
-			ant[0] = ant[1] =HAL_ANT_FIXED_B;
+			ant[0] = ant[1] =AR5K_ANT_FIXED_B;
 		else
-			ant[0] = ant[1] = HAL_ANT_FIXED_A;
+			ant[0] = ant[1] = AR5K_ANT_FIXED_A;
 
 	AR5K_REG_WRITE(AR5K_AR5211_PHY_ANT_SWITCH_TABLE_0,
 	    hal->ah_antenna[ee_mode][ant[0]]);
@@ -612,7 +612,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 
 	data = AR5K_REG_READ(AR5K_AR5211_PHY_RX_DELAY) &
 	    AR5K_AR5211_PHY_RX_DELAY_M;
-	data = (channel->c_channel_flags & CHANNEL_CCK) ?
+	data = (channel->channel_flags & CHANNEL_CCK) ?
 	    ((data << 2) / 22) : (data / 10);
 
 	AR5K_DELAY(100 + data);
@@ -624,7 +624,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 	    AR5K_AR5211_PHY_AGCCTL_NF |
 	    AR5K_AR5211_PHY_AGCCTL_CAL);
 
-	if (channel->c_channel_flags & CHANNEL_B) {
+	if (channel->channel_flags & CHANNEL_B) {
 		hal->ah_calibration = FALSE;
 	} else {
 		hal->ah_calibration = TRUE;
@@ -646,7 +646,7 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, HAL_CHANNEL *channel,
 	}
 
 	/* Pre-enable interrupts */
-	ar5k_ar5211_set_intr(hal, HAL_INT_RX | HAL_INT_TX | HAL_INT_FATAL);
+	ar5k_ar5211_set_intr(hal, AR5K_INT_RX | AR5K_INT_TX | AR5K_INT_FATAL);
 
 	/*
 	 * Set RF kill flags if supported by the device (read from the EEPROM)
@@ -693,18 +693,18 @@ ar5k_ar5211_set_opmode(struct ath_hal *hal)
 	pcu_reg = 0;
 
 	switch (hal->ah_op_mode) {
-	case IEEE80211_M_IBSS:
+	case IEEE80211_IF_TYPE_IBSS:
 		pcu_reg |= AR5K_AR5211_STA_ID1_ADHOC |
 		    AR5K_AR5211_STA_ID1_DESC_ANTENNA;
 		break;
 
-	case IEEE80211_M_HOSTAP:
+	case IEEE80211_IF_TYPE_AP:
 		pcu_reg |= AR5K_AR5211_STA_ID1_AP |
 		    AR5K_AR5211_STA_ID1_RTS_DEFAULT_ANTENNA;
 		break;
 
-	case IEEE80211_M_STA:
-	case IEEE80211_M_MONITOR:
+	case IEEE80211_IF_TYPE_STA:
+	case IEEE80211_IF_TYPE_MNTR:
 		pcu_reg |= AR5K_AR5211_STA_ID1_DEFAULT_ANTENNA;
 		break;
 
@@ -731,9 +731,9 @@ ar5k_ar5211_set_pcu_config(struct ath_hal *hal)
 	return;
 }
 
-HAL_BOOL
-ar5k_ar5211_calibrate(struct ath_hal *hal, HAL_CHANNEL *channel,
-	HAL_BOOL *stat)
+AR5K_BOOL
+ar5k_ar5211_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel,
+	AR5K_BOOL *stat)
 {
 	u_int32_t i_pwr, q_pwr;
 	int32_t iq_corr, i_coff, i_coffd, q_coff, q_coffd;
@@ -774,16 +774,16 @@ ar5k_ar5211_calibrate(struct ath_hal *hal, HAL_CHANNEL *channel,
  * Transmit functions
  */
 
-HAL_BOOL
-ar5k_ar5211_update_tx_triglevel(struct ath_hal *hal, HAL_BOOL increase)
+AR5K_BOOL
+ar5k_ar5211_update_tx_triglevel(struct ath_hal *hal, AR5K_BOOL increase)
 {
 	u_int32_t trigger_level, imr;
-	HAL_BOOL status = FALSE;
+	AR5K_BOOL status = FALSE;
 
 	/*
 	 * Disable interrupts by setting the mask
 	 */
-	imr = ar5k_ar5211_set_intr(hal, hal->ah_imr & ~HAL_INT_GLOBAL);
+	imr = ar5k_ar5211_set_intr(hal, hal->ah_imr & ~AR5K_INT_GLOBAL);
 
 	trigger_level = AR5K_REG_MS(AR5K_REG_READ(AR5K_AR5211_TXCFG),
 	    AR5K_AR5211_TXCFG_TXFULL);
@@ -812,33 +812,33 @@ ar5k_ar5211_update_tx_triglevel(struct ath_hal *hal, HAL_BOOL increase)
 }
 
 int
-ar5k_ar5211_setup_tx_queue(struct ath_hal *hal, HAL_TX_QUEUE queue_type,
-     HAL_TXQ_INFO *queue_info)
+ar5k_ar5211_setup_tx_queue(struct ath_hal *hal, AR5K_TX_QUEUE queue_type,
+     AR5K_TXQ_INFO *queue_info)
 {
 	u_int queue;
 
 	/*
 	 * Get queue by type
 	 */
-	if (queue_type == HAL_TX_QUEUE_DATA) {
-		for (queue = HAL_TX_QUEUE_ID_DATA_MIN;
-		     hal->ah_txq[queue].tqi_type != HAL_TX_QUEUE_INACTIVE;
+	if (queue_type == AR5K_TX_QUEUE_DATA) {
+		for (queue = AR5K_TX_QUEUE_ID_DATA_MIN;
+		     hal->ah_txq[queue].tqi_type != AR5K_TX_QUEUE_INACTIVE;
 		     queue++)
-			if (queue > HAL_TX_QUEUE_ID_DATA_MAX)
+			if (queue > AR5K_TX_QUEUE_ID_DATA_MAX)
 				return (-1);
-	} else if (queue_type == HAL_TX_QUEUE_PSPOLL) {
-		queue = HAL_TX_QUEUE_ID_PSPOLL;
-	} else if (queue_type == HAL_TX_QUEUE_BEACON) {
-		queue = HAL_TX_QUEUE_ID_BEACON;
-	} else if (queue_type == HAL_TX_QUEUE_CAB) {
-		queue = HAL_TX_QUEUE_ID_CAB;
+	} else if (queue_type == AR5K_TX_QUEUE_UAPSD) {
+		queue = AR5K_TX_QUEUE_ID_UAPSD;
+	} else if (queue_type == AR5K_TX_QUEUE_BEACON) {
+		queue = AR5K_TX_QUEUE_ID_BEACON;
+	} else if (queue_type == AR5K_TX_QUEUE_CAB) {
+		queue = AR5K_TX_QUEUE_ID_CAB;
 	} else
 		return (-1);
 
 	/*
 	 * Setup internal queue structure
 	 */
-	bzero(&hal->ah_txq[queue], sizeof(HAL_TXQ_INFO));
+	bzero(&hal->ah_txq[queue], sizeof(AR5K_TXQ_INFO));
 	hal->ah_txq[queue].tqi_type = queue_type;
 
 	if (queue_info != NULL) {
@@ -853,65 +853,64 @@ ar5k_ar5211_setup_tx_queue(struct ath_hal *hal, HAL_TX_QUEUE queue_type,
 	return (queue);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_setup_tx_queueprops(struct ath_hal *hal, int queue,
-    const HAL_TXQ_INFO *queue_info)
+    const AR5K_TXQ_INFO *queue_info)
 {
 	AR5K_ASSERT_ENTRY(queue, hal->ah_capabilities.cap_queues.q_tx_num);
 
-	if (hal->ah_txq[queue].tqi_type != HAL_TX_QUEUE_INACTIVE)
+	if (hal->ah_txq[queue].tqi_type != AR5K_TX_QUEUE_INACTIVE)
 		return (FALSE);
 
-	bcopy(queue_info, &hal->ah_txq[queue], sizeof(HAL_TXQ_INFO));
+	bcopy(queue_info, &hal->ah_txq[queue], sizeof(AR5K_TXQ_INFO));
 
-	if (queue_info->tqi_type == HAL_TX_QUEUE_DATA &&
-	    (queue_info->tqi_subtype >= HAL_WME_AC_VI) &&
-	    (queue_info->tqi_subtype <= HAL_WME_UPSD))
+	if ((queue_info->tqi_type == AR5K_TX_QUEUE_DATA && 
+		((queue_info->tqi_subtype == AR5K_WME_AC_VI) ||
+		(queue_info->tqi_subtype == AR5K_WME_AC_VO))) ||
+		queue_info->tqi_type == AR5K_TX_QUEUE_UAPSD)
 		hal->ah_txq[queue].tqi_flags |=
 		    AR5K_TXQ_FLAG_POST_FR_BKOFF_DIS;
 
 	return (TRUE);
 }
 
-HAL_BOOL /*New*/
-ar5k_ar5211_get_tx_queueprops(struct ath_hal *hal, int queue, HAL_TXQ_INFO *queue_info)
+AR5K_BOOL /*New*/
+ar5k_ar5211_get_tx_queueprops(struct ath_hal *hal, int queue, AR5K_TXQ_INFO *queue_info)
 {
 	AR5K_TRACE;
-	memcpy(queue_info, &hal->ah_txq[queue], sizeof(HAL_TXQ_INFO));
+	memcpy(queue_info, &hal->ah_txq[queue], sizeof(AR5K_TXQ_INFO));
 	return (TRUE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_release_tx_queue(struct ath_hal *hal, u_int queue)
 {
 	AR5K_ASSERT_ENTRY(queue, hal->ah_capabilities.cap_queues.q_tx_num);
 
 	/* This queue will be skipped in further operations */
-	hal->ah_txq[queue].tqi_type = HAL_TX_QUEUE_INACTIVE;
+	hal->ah_txq[queue].tqi_type = AR5K_TX_QUEUE_INACTIVE;
 	AR5K_Q_DISABLE_BITS(hal->ah_txq_interrupts, queue);
 
 	return (FALSE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_reset_tx_queue(struct ath_hal *hal, u_int queue)
 {
 	u_int32_t cw_min, cw_max, retry_lg, retry_sh;
-	struct net80211_channel *channel = (struct net80211_channel*)
-	    &hal->ah_current_channel;
-	HAL_TXQ_INFO *tq;
+	AR5K_TXQ_INFO *tq;
 
 	AR5K_ASSERT_ENTRY(queue, hal->ah_capabilities.cap_queues.q_tx_num);
 
 	tq = &hal->ah_txq[queue];
 
-	if (tq->tqi_type == HAL_TX_QUEUE_INACTIVE)
+	if (tq->tqi_type == AR5K_TX_QUEUE_INACTIVE)
 		return (TRUE);
 
 	/*
 	 * Set registers by channel mode
 	 */
-	if (IS_CHAN_B(channel)) {
+	if (IS_CHAN_B(hal->ah_current_channel)) {
 		hal->ah_cw_min = AR5K_TUNE_CWMIN_11B;
 		cw_max = hal->ah_cw_max = AR5K_TUNE_CWMAX_11B;
 		hal->ah_aifs = AR5K_TUNE_AIFS_11B;
@@ -1015,7 +1014,7 @@ ar5k_ar5211_reset_tx_queue(struct ath_hal *hal, u_int queue)
 	 * Set registers by queue type
 	 */
 	switch (tq->tqi_type) {
-	case HAL_TX_QUEUE_BEACON:
+	case AR5K_TX_QUEUE_BEACON:
 		AR5K_REG_ENABLE_BITS(AR5K_AR5211_QCU_MISC(queue),
 		    AR5K_AR5211_QCU_MISC_FRSHED_DBA_GT |
 		    AR5K_AR5211_QCU_MISC_CBREXP_BCN |
@@ -1034,7 +1033,7 @@ ar5k_ar5211_reset_tx_queue(struct ath_hal *hal, u_int queue)
 		    AR5K_AR5211_QCU_RDYTIMECFG_ENABLE);
 		break;
 
-	case HAL_TX_QUEUE_CAB:
+	case AR5K_TX_QUEUE_CAB:
 		AR5K_REG_ENABLE_BITS(AR5K_AR5211_QCU_MISC(queue),
 		    AR5K_AR5211_QCU_MISC_FRSHED_DBA_GT |
 		    AR5K_AR5211_QCU_MISC_CBREXP |
@@ -1045,12 +1044,12 @@ ar5k_ar5211_reset_tx_queue(struct ath_hal *hal, u_int queue)
 		    AR5K_AR5211_DCU_MISC_ARBLOCK_CTL_GLOBAL));
 		break;
 
-	case HAL_TX_QUEUE_PSPOLL:
+	case AR5K_TX_QUEUE_UAPSD:
 		AR5K_REG_ENABLE_BITS(AR5K_AR5211_QCU_MISC(queue),
 		    AR5K_AR5211_QCU_MISC_CBREXP);
 		break;
 
-	case HAL_TX_QUEUE_DATA:
+	case AR5K_TX_QUEUE_DATA:
 	default:
 		break;
 	}
@@ -1080,7 +1079,7 @@ ar5k_ar5211_get_tx_buf(struct ath_hal *hal, u_int queue)
 	return (AR5K_REG_READ(AR5K_AR5211_QCU_TXDP(queue)));
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_put_tx_buf(struct ath_hal *hal, u_int queue, u_int32_t phys_addr)
 {
 	AR5K_ASSERT_ENTRY(queue, hal->ah_capabilities.cap_queues.q_tx_num);
@@ -1104,7 +1103,7 @@ ar5k_ar5211_num_tx_pending(struct ath_hal *hal, u_int queue) {
 	return (AR5K_AR5211_QCU_STS(queue) & AR5K_AR5211_QCU_STS_FRMPENDCNT);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_tx_start(struct ath_hal *hal, u_int queue)
 {
 	AR5K_ASSERT_ENTRY(queue, hal->ah_capabilities.cap_queues.q_tx_num);
@@ -1119,7 +1118,7 @@ ar5k_ar5211_tx_start(struct ath_hal *hal, u_int queue)
 	return (TRUE);
 }
 
-HAL_BOOL /*Fixed delay*/
+AR5K_BOOL /*Fixed delay*/
 ar5k_ar5211_stop_tx_dma(struct ath_hal *hal, u_int queue)
 {
 	int i = 100, pending;
@@ -1143,9 +1142,9 @@ ar5k_ar5211_stop_tx_dma(struct ath_hal *hal, u_int queue)
 	return (TRUE);
 }
 
-HAL_BOOL /*O.K. - Initialize tx_desc */
+AR5K_BOOL /*O.K. - Initialize tx_desc */
 ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
-    u_int packet_length, u_int header_length, HAL_PKT_TYPE type, u_int tx_power,
+    u_int packet_length, u_int header_length, AR5K_PKT_TYPE type, u_int tx_power,
     u_int tx_rate0, u_int tx_tries0, u_int key_index, u_int antenna_mode,
     u_int flags, u_int rtscts_rate, u_int rtscts_duration, u_int compicvLen,
     u_int compivLen, u_int comp)
@@ -1180,7 +1179,7 @@ ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	    AR5K_REG_SM(type, AR5K_AR5211_DESC_TX_CTL1_FRAME_TYPE);
 
 #define _TX_FLAGS(_c, _flag)						\
-	if (flags & HAL_TXDESC_##_flag)					\
+	if (flags & AR5K_TXDESC_##_flag)					\
 		tx_desc->tx_control_##_c |=				\
 			AR5K_AR5211_DESC_TX_CTL##_c##_##_flag
 
@@ -1195,7 +1194,7 @@ ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	/*
 	 * WEP crap
 	 */
-	if (key_index != HAL_TXKEYIX_INVALID) {
+	if (key_index != AR5K_TXKEYIX_INVALID) {
 		tx_desc->tx_control_0 |=
 		    AR5K_AR5211_DESC_TX_CTL0_ENCRYPT_KEY_VALID;
 		tx_desc->tx_control_1 |=
@@ -1206,9 +1205,9 @@ ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (TRUE);
 }
 
-HAL_BOOL/*Added an argument *last_desc -need revision */
+AR5K_BOOL/*Added an argument *last_desc -need revision */
 ar5k_ar5211_fill_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
-    u_int segment_length, HAL_BOOL first_segment, HAL_BOOL last_segment, const struct ath_desc *last_desc)
+    u_int segment_length, AR5K_BOOL first_segment, AR5K_BOOL last_segment, const struct ath_desc *last_desc)
 {
 	struct ar5k_ar5211_tx_desc *tx_desc;
 
@@ -1231,7 +1230,7 @@ ar5k_ar5211_fill_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (TRUE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_setup_xtx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int tx_rate1, u_int tx_tries1, u_int tx_rate2, u_int tx_tries2,
     u_int tx_rate3, u_int tx_tries3)
@@ -1239,7 +1238,7 @@ ar5k_ar5211_setup_xtx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (FALSE);
 }
 
-HAL_STATUS
+AR5K_STATUS
 ar5k_ar5211_proc_tx_desc(struct ath_hal *hal, struct ath_desc *desc)
 {
 	struct ar5k_ar5211_tx_status *tx_status;
@@ -1250,7 +1249,7 @@ ar5k_ar5211_proc_tx_desc(struct ath_hal *hal, struct ath_desc *desc)
 
 	/* No frame has been send or error */
 	if ((tx_status->tx_status_1 & AR5K_AR5211_DESC_TX_STATUS1_DONE) == 0)
-		return (HAL_EINPROGRESS);
+		return (AR5K_EINPROGRESS);
 
 	/*
 	 * Get descriptor status
@@ -1280,21 +1279,21 @@ ar5k_ar5211_proc_tx_desc(struct ath_hal *hal, struct ath_desc *desc)
 	    AR5K_AR5211_DESC_TX_STATUS0_FRAME_XMIT_OK) == 0) {
 		if (tx_status->tx_status_0 &
 		    AR5K_AR5211_DESC_TX_STATUS0_EXCESSIVE_RETRIES)
-			desc->ds_us.tx.ts_status |= HAL_TXERR_XRETRY;
+			desc->ds_us.tx.ts_status |= AR5K_TXERR_XRETRY;
 
 		if (tx_status->tx_status_0 &
 		    AR5K_AR5211_DESC_TX_STATUS0_FIFO_UNDERRUN)
-			desc->ds_us.tx.ts_status |= HAL_TXERR_FIFO;
+			desc->ds_us.tx.ts_status |= AR5K_TXERR_FIFO;
 
 		if (tx_status->tx_status_0 &
 		    AR5K_AR5211_DESC_TX_STATUS0_FILTERED)
-			desc->ds_us.tx.ts_status |= HAL_TXERR_FILT;
+			desc->ds_us.tx.ts_status |= AR5K_TXERR_FILT;
 	}
 
-	return (HAL_OK);
+	return (AR5K_OK);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_has_veol(struct ath_hal *hal)
 {
 	return (TRUE);
@@ -1330,7 +1329,7 @@ ar5k_ar5211_start_rx(struct ath_hal *hal)
 	AR5K_REG_WRITE(AR5K_AR5211_CR, AR5K_AR5211_CR_RXE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_stop_rx_dma(struct ath_hal *hal)
 {
 	int i;
@@ -1369,7 +1368,7 @@ ar5k_ar5211_set_mcast_filter(struct ath_hal *hal, u_int32_t filter0,
 	AR5K_REG_WRITE(AR5K_AR5211_MCAST_FIL1, filter1);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_mcast_filterindex(struct ath_hal *hal, u_int32_t index)
 {
 	if (index >= 64) {
@@ -1385,7 +1384,7 @@ ar5k_ar5211_set_mcast_filterindex(struct ath_hal *hal, u_int32_t index)
 	return (TRUE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_clear_mcast_filter_idx(struct ath_hal *hal, u_int32_t index)
 {
 
@@ -1414,7 +1413,7 @@ ar5k_ar5211_set_rx_filter(struct ath_hal *hal, u_int32_t filter)
 	AR5K_REG_WRITE(AR5K_AR5211_RX_FILTER, filter);
 }
 
-HAL_BOOL /*O.K. - Initialize rx_desc and clear ds_hw */
+AR5K_BOOL /*O.K. - Initialize rx_desc and clear ds_hw */
 ar5k_ar5211_setup_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int32_t size, u_int flags)
 {
@@ -1441,13 +1440,13 @@ ar5k_ar5211_setup_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	    AR5K_AR5211_DESC_RX_CTL1_BUF_LEN)) != size)
 		return (FALSE);
 
-	if (flags & HAL_RXDESC_INTREQ)
+	if (flags & AR5K_RXDESC_INTREQ)
 		rx_desc->rx_control_1 |= AR5K_AR5211_DESC_RX_CTL1_INTREQ;
 
 	return (TRUE);
 }
 
-HAL_STATUS
+AR5K_STATUS
 ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int32_t phys_addr, struct ath_desc *next, u_int64_t tsf)
 {
@@ -1457,7 +1456,7 @@ ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 
 	/* No frame received / not ready */
 	if ((rx_status->rx_status_1 & AR5K_AR5211_DESC_RX_STATUS1_DONE) == 0)
-		return (HAL_EINPROGRESS);
+		return (AR5K_EINPROGRESS);
 
 	/*
 	 * Frame receive status
@@ -1488,7 +1487,7 @@ ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 		    AR5K_REG_MS(rx_status->rx_status_1,
 		    AR5K_AR5211_DESC_RX_STATUS1_KEY_INDEX);
 	} else {
-		desc->ds_us.rx.rs_keyix = HAL_RXKEYIX_INVALID;
+		desc->ds_us.rx.rs_keyix = AR5K_RXKEYIX_INVALID;
 	}
 
 	/*
@@ -1498,11 +1497,11 @@ ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	    AR5K_AR5211_DESC_RX_STATUS1_FRAME_RECEIVE_OK) == 0) {
 		if (rx_status->rx_status_1 &
 		    AR5K_AR5211_DESC_RX_STATUS1_CRC_ERROR)
-			desc->ds_us.rx.rs_status |= HAL_RXERR_CRC;
+			desc->ds_us.rx.rs_status |= AR5K_RXERR_CRC;
 
 		if (rx_status->rx_status_1 &
 		    AR5K_AR5211_DESC_RX_STATUS1_PHY_ERROR) {
-			desc->ds_us.rx.rs_status |= HAL_RXERR_PHY;
+			desc->ds_us.rx.rs_status |= AR5K_RXERR_PHY;
 			desc->ds_us.rx.rs_phyerr =
 			    AR5K_REG_MS(rx_status->rx_status_1,
 			    AR5K_AR5211_DESC_RX_STATUS1_PHY_ERROR);
@@ -1510,14 +1509,14 @@ ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 
 		if (rx_status->rx_status_1 &
 		    AR5K_AR5211_DESC_RX_STATUS1_DECRYPT_CRC_ERROR)
-			desc->ds_us.rx.rs_status |= HAL_RXERR_DECRYPT;
+			desc->ds_us.rx.rs_status |= AR5K_RXERR_DECRYPT;
 	}
 
-	return (HAL_OK);
+	return (AR5K_OK);
 }
 
-void /*Added HAL_CHANNEL argument*/
-ar5k_ar5211_set_rx_signal(struct ath_hal *hal, HAL_CHANNEL *channel)
+void /*Added AR5K_CHANNEL argument*/
+ar5k_ar5211_set_rx_signal(struct ath_hal *hal, AR5K_CHANNEL *channel)
 {
 	/* Signal state monitoring is not yet supported */
 }
@@ -1615,7 +1614,7 @@ ar5k_ar5211_dump_state(struct ath_hal *hal)
 #endif
 }
 
-HAL_BOOL /*Added arguments*/
+AR5K_BOOL /*Added arguments*/
 ar5k_ar5211_get_diag_state(struct ath_hal *hal, int request, const void *args, u_int32_t argsize, void **result, u_int32_t *resultsize)
 {
 	/*
@@ -1631,7 +1630,7 @@ ar5k_ar5211_get_lladdr(struct ath_hal *hal, u_int8_t *mac)
 	bcopy(hal->ah_sta_id, mac, IEEE80211_ADDR_LEN);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_lladdr(struct ath_hal *hal, const u_int8_t *mac)
 {
 	u_int32_t low_id, high_id;
@@ -1649,7 +1648,7 @@ ar5k_ar5211_set_lladdr(struct ath_hal *hal, const u_int8_t *mac)
 	return (TRUE);
 }
 
-HAL_BOOL  /*New*/
+AR5K_BOOL  /*New*/
 ar5k_ar5211_set_bssid_mask(struct ath_hal *hal, const u_int8_t* mask)
 {
 	/*???*/
@@ -1657,9 +1656,9 @@ ar5k_ar5211_set_bssid_mask(struct ath_hal *hal, const u_int8_t* mask)
 	return TRUE;
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_regdomain(struct ath_hal *hal, u_int16_t regdomain,
-    HAL_STATUS *status)
+    AR5K_STATUS *status)
 {
 	ieee80211_regdomain_t ieee_regdomain;
 
@@ -1667,7 +1666,7 @@ ar5k_ar5211_set_regdomain(struct ath_hal *hal, u_int16_t regdomain,
 
 	if (ar5k_eeprom_regulation_domain(hal, TRUE,
 		&ieee_regdomain) == TRUE) {
-		*status = HAL_OK;
+		*status = AR5K_OK;
 		return (TRUE);
 	}
 
@@ -1677,7 +1676,7 @@ ar5k_ar5211_set_regdomain(struct ath_hal *hal, u_int16_t regdomain,
 }
 
 void
-ar5k_ar5211_set_ledstate(struct ath_hal *hal, HAL_LED_STATE state)
+ar5k_ar5211_set_ledstate(struct ath_hal *hal, AR5K_LED_STATE state)
 {
 	u_int32_t led;
 
@@ -1688,19 +1687,19 @@ ar5k_ar5211_set_ledstate(struct ath_hal *hal, HAL_LED_STATE state)
 	 * Some blinking values, define at your wish
 	 */
 	switch (state) {
-	case IEEE80211_S_SCAN:
-	case IEEE80211_S_AUTH:
+	case AR5K_LED_SCAN:
+	case AR5K_LED_AUTH:
 		led = AR5K_AR5211_PCICFG_LEDMODE_PROP |
 		    AR5K_AR5211_PCICFG_LED_PEND;
 		break;
 
-	case IEEE80211_S_INIT:
+	case AR5K_LED_INIT:
 		led = AR5K_AR5211_PCICFG_LEDMODE_PROP |
 		    AR5K_AR5211_PCICFG_LED_NONE;
 		break;
 
-	case IEEE80211_S_ASSOC:
-	case IEEE80211_S_RUN:
+	case AR5K_LED_ASSOC:
+	case AR5K_LED_RUN:
 		led = AR5K_AR5211_PCICFG_LEDMODE_PROP |
 		    AR5K_AR5211_PCICFG_LED_ASSOC;
 		break;
@@ -1746,7 +1745,7 @@ ar5k_ar5211_set_associd(struct ath_hal *hal, const u_int8_t *bssid,
 	ar5k_ar5211_enable_pspoll(hal, NULL, 0);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_gpio_output(struct ath_hal *hal, u_int32_t gpio)
 {
 	if (gpio > AR5K_AR5211_NUM_GPIO)
@@ -1759,7 +1758,7 @@ ar5k_ar5211_set_gpio_output(struct ath_hal *hal, u_int32_t gpio)
 	return (TRUE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_gpio_input(struct ath_hal *hal, u_int32_t gpio)
 {
 	if (gpio > AR5K_AR5211_NUM_GPIO)
@@ -1783,7 +1782,7 @@ ar5k_ar5211_get_gpio(struct ath_hal *hal, u_int32_t gpio)
 	    AR5K_AR5211_GPIODI_M) >> gpio) & 0x1);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_gpio(struct ath_hal *hal, u_int32_t gpio, u_int32_t val)
 {
 	u_int32_t data;
@@ -1855,7 +1854,7 @@ ar5k_ar5211_get_regdomain(struct ath_hal *hal)
 	return (ar5k_get_regdomain(hal));
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_detect_card_present(struct ath_hal *hal)
 {
 	u_int16_t magic;
@@ -1872,7 +1871,7 @@ ar5k_ar5211_detect_card_present(struct ath_hal *hal)
 }
 
 void
-ar5k_ar5211_update_mib_counters(struct ath_hal *hal, HAL_MIB_STATS *statistics)
+ar5k_ar5211_update_mib_counters(struct ath_hal *hal, AR5K_MIB_STATS *statistics)
 {
 	statistics->ackrcv_bad += AR5K_REG_READ(AR5K_AR5211_ACK_FAIL);
 	statistics->rts_bad += AR5K_REG_READ(AR5K_AR5211_RTS_FAIL);
@@ -1888,16 +1887,16 @@ ar5k_ar5211_proc_mib_event(struct ath_hal *hal)
 	return;
 }
 
-HAL_RFGAIN
+AR5K_RFGAIN
 ar5k_ar5211_get_rf_gain(struct ath_hal *hal)
 {
-	return (HAL_RFGAIN_INACTIVE);
+	return (AR5K_RFGAIN_INACTIVE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_slot_time(struct ath_hal *hal, u_int slot_time)
 {
-	if (slot_time < HAL_SLOT_TIME_9 || slot_time > HAL_SLOT_TIME_MAX)
+	if (slot_time < AR5K_SLOT_TIME_9 || slot_time > AR5K_SLOT_TIME_MAX)
 		return (FALSE);
 
 	AR5K_REG_WRITE(AR5K_AR5211_DCU_GBL_IFS_SLOT, slot_time);
@@ -1911,7 +1910,7 @@ ar5k_ar5211_get_slot_time(struct ath_hal *hal)
 	return (AR5K_REG_READ(AR5K_AR5211_DCU_GBL_IFS_SLOT) & 0xffff);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_ack_timeout(struct ath_hal *hal, u_int timeout)
 {
 	if (ar5k_clocktoh(AR5K_REG_MS(0xffffffff, AR5K_AR5211_TIME_OUT_ACK),
@@ -1931,7 +1930,7 @@ ar5k_ar5211_get_ack_timeout(struct ath_hal *hal)
 	    AR5K_AR5211_TIME_OUT_ACK), hal->ah_turbo));
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_cts_timeout(struct ath_hal *hal, u_int timeout)
 {
 	if (ar5k_clocktoh(AR5K_REG_MS(0xffffffff, AR5K_AR5211_TIME_OUT_CTS),
@@ -1951,61 +1950,59 @@ ar5k_ar5211_get_cts_timeout(struct ath_hal *hal)
 	    AR5K_AR5211_TIME_OUT_CTS), hal->ah_turbo));
 }
 
-HAL_STATUS /*New*/
-ar5k_ar5211_get_capability(struct ath_hal *hal, HAL_CAPABILITY_TYPE cap_type,
+AR5K_STATUS /*New*/
+ar5k_ar5211_get_capability(struct ath_hal *hal, AR5K_CAPABILITY_TYPE cap_type,
 			   u_int32_t capability, u_int32_t *result) 
 {
 	AR5K_TRACE;
 
 	switch (cap_type) {
-	case HAL_CAP_REG_DMN:
+	case AR5K_CAP_REG_DMN:
 		if (result){
 			*result = ar5k_get_regdomain(hal);
 			goto yes;
 		}
-	case HAL_CAP_CIPHER: 
+	case AR5K_CAP_CIPHER: 
 		switch (capability) {
-		case HAL_CIPHER_WEP: goto yes;
+		case AR5K_CIPHER_WEP: goto yes;
 		default:             goto no;
 		}
-	case HAL_CAP_NUM_TXQUEUES: 
+	case AR5K_CAP_NUM_TXQUEUES: 
 		if (result) {
 			*result = AR5K_AR5211_TX_NUM_QUEUES;
 			goto yes;
 		}
-	case HAL_CAP_VEOL:
+	case AR5K_CAP_VEOL:
 		goto yes;
-	case HAL_CAP_PSPOLL:
-		goto no;
-	case HAL_CAP_COMPRESSION:
+	case AR5K_CAP_COMPRESSION:
 		goto yes;
-	case HAL_CAP_BURST:
+	case AR5K_CAP_BURST:
 		goto yes;
-	case HAL_CAP_TPC:
+	case AR5K_CAP_TPC:
 		goto yes;
-	case HAL_CAP_BSSIDMASK:
+	case AR5K_CAP_BSSIDMASK:
 		goto yes;
-	case HAL_CAP_XR:
+	case AR5K_CAP_XR:
 		goto yes;
 	default: 
 		goto no;
 	}
 
  no:
-	return (HAL_EINVAL);
+	return (AR5K_EINVAL);
  yes:
-	return HAL_OK;
+	return AR5K_OK;
 	
 }
 
-HAL_BOOL
-ar5k_ar5211_set_capability(struct ath_hal *hal, HAL_CAPABILITY_TYPE cap_type,
-			   u_int32_t capability, u_int32_t setting, HAL_STATUS *status) 
+AR5K_BOOL
+ar5k_ar5211_set_capability(struct ath_hal *hal, AR5K_CAPABILITY_TYPE cap_type,
+			   u_int32_t capability, u_int32_t setting, AR5K_STATUS *status) 
 {
 
 	AR5K_TRACE;
 	if (status) {
-		*status = HAL_OK;
+		*status = AR5K_OK;
 	}
 	return (FALSE);
 }
@@ -2014,13 +2011,13 @@ ar5k_ar5211_set_capability(struct ath_hal *hal, HAL_CAPABILITY_TYPE cap_type,
  * Key table (WEP) functions
  */
 
-HAL_BOOL
-ar5k_ar5211_is_cipher_supported(struct ath_hal *hal, HAL_CIPHER cipher)
+AR5K_BOOL
+ar5k_ar5211_is_cipher_supported(struct ath_hal *hal, AR5K_CIPHER cipher)
 {
 	/*
 	 * The AR5211 only supports WEP
 	 */
-	if (cipher == HAL_CIPHER_WEP)
+	if (cipher == AR5K_CIPHER_WEP)
 		return (TRUE);
 
 	return (FALSE);
@@ -2032,7 +2029,7 @@ ar5k_ar5211_get_keycache_size(struct ath_hal *hal)
 	return (AR5K_AR5211_KEYCACHE_SIZE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_reset_key(struct ath_hal *hal, u_int16_t entry)
 {
 	int i;
@@ -2045,7 +2042,7 @@ ar5k_ar5211_reset_key(struct ath_hal *hal, u_int16_t entry)
 	return (FALSE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_is_key_valid(struct ath_hal *hal, u_int16_t entry)
 {
 	AR5K_ASSERT_ENTRY(entry, AR5K_AR5211_KEYTABLE_SIZE);
@@ -2060,9 +2057,9 @@ ar5k_ar5211_is_key_valid(struct ath_hal *hal, u_int16_t entry)
 	return (FALSE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_key(struct ath_hal *hal, u_int16_t entry,
-    const HAL_KEYVAL *keyval, const u_int8_t *mac, int xor_notused)
+    const AR5K_KEYVAL *keyval, const u_int8_t *mac, int xor_notused)
 {
 	int i;
 	u_int32_t key_v[AR5K_AR5211_KEYCACHE_SIZE - 2];
@@ -2107,7 +2104,7 @@ ar5k_ar5211_set_key(struct ath_hal *hal, u_int16_t entry,
 	return (ar5k_ar5211_set_key_lladdr(hal, entry, mac));
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_set_key_lladdr(struct ath_hal *hal, u_int16_t entry,
     const u_int8_t *mac)
 {
@@ -2136,9 +2133,9 @@ ar5k_ar5211_set_key_lladdr(struct ath_hal *hal, u_int16_t entry,
  * Power management functions
  */
 
-HAL_BOOL
-ar5k_ar5211_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
-    HAL_BOOL set_chip)
+AR5K_BOOL
+ar5k_ar5211_set_power(struct ath_hal *hal, AR5K_POWER_MODE mode,
+    AR5K_BOOL set_chip)
 {
 	u_int32_t staid;
 	int i;
@@ -2146,10 +2143,10 @@ ar5k_ar5211_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
 	staid = AR5K_REG_READ(AR5K_AR5211_STA_ID1);
 
 	switch (mode) {
-	case HAL_PM_AUTO:
+	case AR5K_PM_AUTO:
 		staid &= ~AR5K_AR5211_STA_ID1_DEFAULT_ANTENNA;
 		/* fallthrough */
-	case HAL_PM_NETWORK_SLEEP:
+	case AR5K_PM_NETWORK_SLEEP:
 		if (set_chip == TRUE) {
 			AR5K_REG_WRITE(AR5K_AR5211_SCR,
 			    AR5K_AR5211_SCR_SLE | 0);
@@ -2157,7 +2154,7 @@ ar5k_ar5211_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
 		staid |= AR5K_AR5211_STA_ID1_PWR_SV;
 		break;
 
-	case HAL_PM_FULL_SLEEP:
+	case AR5K_PM_FULL_SLEEP:
 		if (set_chip == TRUE) {
 			AR5K_REG_WRITE(AR5K_AR5211_SCR,
 			    AR5K_AR5211_SCR_SLE_SLP);
@@ -2165,7 +2162,7 @@ ar5k_ar5211_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
 		staid |= AR5K_AR5211_STA_ID1_PWR_SV;
 		break;
 
-	case HAL_PM_AWAKE:
+	case AR5K_PM_AWAKE:
 		if (set_chip == FALSE)
 			goto commit;
 
@@ -2202,20 +2199,20 @@ ar5k_ar5211_set_power(struct ath_hal *hal, HAL_POWER_MODE mode,
 	return (TRUE);
 }
 
-HAL_POWER_MODE
+AR5K_POWER_MODE
 ar5k_ar5211_get_power_mode(struct ath_hal *hal)
 {
 	return (hal->ah_power_mode);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_query_pspoll_support(struct ath_hal *hal)
 {
 	/* nope */
 	return (FALSE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_init_pspoll(struct ath_hal *hal)
 {
 	/*
@@ -2224,20 +2221,20 @@ ar5k_ar5211_init_pspoll(struct ath_hal *hal)
 	return (FALSE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_enable_pspoll(struct ath_hal *hal, u_int8_t *bssid,
     u_int16_t assoc_id)
 {
 	return (FALSE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_disable_pspoll(struct ath_hal *hal)
 {
 	return (FALSE);
 }
 
-HAL_BOOL /*Unimplemented*/
+AR5K_BOOL /*Unimplemented*/
 ar5k_ar5211_set_txpower_limit(struct ath_hal *hal, u_int32_t power)
 {
 	AR5K_TRACE;
@@ -2288,8 +2285,8 @@ ar5k_ar5211_init_beacon(struct ath_hal *hal, u_int32_t next_beacon,
 	    AR5K_AR5211_BEACON_ENABLE));
 }
 
-void /*Removed arguments - should be changed through *state - review HAL_BEACON_STATE struct*/
-ar5k_ar5211_set_beacon_timers(struct ath_hal *hal, const HAL_BEACON_STATE *state)
+void /*Removed arguments - should be changed through *state - review AR5K_BEACON_STATE struct*/
+ar5k_ar5211_set_beacon_timers(struct ath_hal *hal, const AR5K_BEACON_STATE *state)
 {
 	u_int32_t cfp_period, next_cfp;
 
@@ -2350,7 +2347,7 @@ ar5k_ar5211_set_beacon_timers(struct ath_hal *hal, const HAL_BEACON_STATE *state
 	AR5K_REG_WRITE_BITS(AR5K_AR5211_RSSI_THR_M,
 	    AR5K_AR5211_RSSI_THR_BMISS, state->bs_bmiss_threshold);
 	AR5K_REG_WRITE_BITS(AR5K_AR5211_SCR, AR5K_AR5211_SCR_SLDUR,
-	    (state->bs_sleepduration - 3) << 3);
+	    (state->bs_sleep_duration - 3) << 3);
 }
 
 void
@@ -2369,19 +2366,19 @@ ar5k_ar5211_reset_beacon(struct ath_hal *hal)
 	AR5K_REG_WRITE(AR5K_AR5211_BEACON, AR5K_AR5211_BEACON_PERIOD);
 }
 
-HAL_BOOL
-ar5k_ar5211_wait_for_beacon(struct ath_hal *hal, HAL_BUS_ADDR phys_addr)
+AR5K_BOOL
+ar5k_ar5211_wait_for_beacon(struct ath_hal *hal, AR5K_BUS_ADDR phys_addr)
 {
-	HAL_BOOL ret;
+	AR5K_BOOL ret;
 
 	/*
 	 * Wait for beaconn queue to be done
 	 */
 	ret = ar5k_register_timeout(hal,
-	    AR5K_AR5211_QCU_STS(HAL_TX_QUEUE_ID_BEACON),
+	    AR5K_AR5211_QCU_STS(AR5K_TX_QUEUE_ID_BEACON),
 	    AR5K_AR5211_QCU_STS_FRMPENDCNT, 0, FALSE);
 
-	if (AR5K_REG_READ_Q(AR5K_AR5211_QCU_TXE, HAL_TX_QUEUE_ID_BEACON))
+	if (AR5K_REG_READ_Q(AR5K_AR5211_QCU_TXE, AR5K_TX_QUEUE_ID_BEACON))
 		return (FALSE);
 
 	return (ret);
@@ -2391,13 +2388,13 @@ ar5k_ar5211_wait_for_beacon(struct ath_hal *hal, HAL_BUS_ADDR phys_addr)
  * Interrupt handling
  */
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_is_intr_pending(struct ath_hal *hal)
 {
 	return (AR5K_REG_READ(AR5K_AR5211_INTPEND) == 0 ? FALSE : TRUE);
 }
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_get_isr(struct ath_hal *hal, u_int32_t *interrupt_mask)
 {
 	u_int32_t data;
@@ -2410,19 +2407,19 @@ ar5k_ar5211_get_isr(struct ath_hal *hal, u_int32_t *interrupt_mask)
 	/*
 	 * Get abstract interrupt mask (HAL-compatible)
 	 */
-	*interrupt_mask = (data & HAL_INT_COMMON) & hal->ah_imr;
+	*interrupt_mask = (data & AR5K_INT_COMMON) & hal->ah_imr;
 
-	if (data == HAL_INT_NOCARD)
+	if (data == AR5K_INT_NOCARD)
 		return (FALSE);
 
 	if (data & (AR5K_AR5211_PISR_RXOK | AR5K_AR5211_PISR_RXERR))
-		*interrupt_mask |= HAL_INT_RX;
+		*interrupt_mask |= AR5K_INT_RX;
 
 	if (data & (AR5K_AR5211_PISR_TXOK | AR5K_AR5211_PISR_TXERR))
-		*interrupt_mask |= HAL_INT_TX;
+		*interrupt_mask |= AR5K_INT_TX;
 
 	if (data & (AR5K_AR5211_PISR_HIUERR))
-		*interrupt_mask |= HAL_INT_FATAL;
+		*interrupt_mask |= AR5K_INT_FATAL;
 
 	/*
 	 * Special interrupt handling (not caught by the driver)
@@ -2441,10 +2438,10 @@ ar5k_ar5211_get_intr(struct ath_hal *hal)
 	return (hal->ah_imr);
 }
 
-HAL_INT
-ar5k_ar5211_set_intr(struct ath_hal *hal, HAL_INT new_mask)
+AR5K_INT
+ar5k_ar5211_set_intr(struct ath_hal *hal, AR5K_INT new_mask)
 {
-	HAL_INT old_mask, int_mask;
+	AR5K_INT old_mask, int_mask;
 
 	/*
 	 * Disable card interrupts to prevent any race conditions
@@ -2458,23 +2455,23 @@ ar5k_ar5211_set_intr(struct ath_hal *hal, HAL_INT new_mask)
 	 * Add additional, chipset-dependent interrupt mask flags
 	 * and write them to the IMR (interrupt mask register).
 	 */
-	int_mask = new_mask & HAL_INT_COMMON;
+	int_mask = new_mask & AR5K_INT_COMMON;
 
-	if (new_mask & HAL_INT_RX)
+	if (new_mask & AR5K_INT_RX)
 		int_mask |=
 		    AR5K_AR5211_PIMR_RXOK |
 		    AR5K_AR5211_PIMR_RXERR |
 		    AR5K_AR5211_PIMR_RXORN |
 		    AR5K_AR5211_PIMR_RXDESC;
 
-	if (new_mask & HAL_INT_TX)
+	if (new_mask & AR5K_INT_TX)
 		int_mask |=
 		    AR5K_AR5211_PIMR_TXOK |
 		    AR5K_AR5211_PIMR_TXERR |
 		    AR5K_AR5211_PIMR_TXDESC |
 		    AR5K_AR5211_PIMR_TXURN;
 
-	if (new_mask & HAL_INT_FATAL) {
+	if (new_mask & AR5K_INT_FATAL) {
 		int_mask |= AR5K_AR5211_PIMR_HIUERR;
 		AR5K_REG_ENABLE_BITS(AR5K_AR5211_SIMR2,
 		    AR5K_AR5211_SIMR2_MCABT |
@@ -2497,7 +2494,7 @@ ar5k_ar5211_set_intr(struct ath_hal *hal, HAL_INT new_mask)
  * Misc internal functions
  */
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_get_capabilities(struct ath_hal *hal)
 {
 	u_int16_t ee_header;
@@ -2524,7 +2521,7 @@ ar5k_ar5211_get_capabilities(struct ath_hal *hal)
 		hal->ah_capabilities.cap_range.range_5ghz_max = 6100;
 
 		/* Set supported modes */
-		hal->ah_capabilities.cap_mode = HAL_MODE_11A | HAL_MODE_TURBO;
+		hal->ah_capabilities.cap_mode = AR5K_MODE_11A | AR5K_MODE_TURBO;
 	}
 
 	/* This chip will support 802.11b if the 2GHz radio is connected */
@@ -2533,10 +2530,10 @@ ar5k_ar5211_get_capabilities(struct ath_hal *hal)
 		hal->ah_capabilities.cap_range.range_2ghz_max = 2732;
 
 		if (AR5K_EEPROM_HDR_11B(ee_header))
-			hal->ah_capabilities.cap_mode |= HAL_MODE_11B;
+			hal->ah_capabilities.cap_mode |= AR5K_MODE_11B;
 #if 0
 		if (AR5K_EEPROM_HDR_11G(ee_header))
-			hal->ah_capabilities.cap_mode |= HAL_MODE_11G;
+			hal->ah_capabilities.cap_mode |= AR5K_MODE_11G;
 #endif
 	}
 
@@ -2550,7 +2547,7 @@ ar5k_ar5211_get_capabilities(struct ath_hal *hal)
 }
 
 void
-ar5k_ar5211_radar_alert(struct ath_hal *hal, HAL_BOOL enable)
+ar5k_ar5211_radar_alert(struct ath_hal *hal, AR5K_BOOL enable)
 {
 	/*
 	 * Enable radar detection
@@ -2576,7 +2573,7 @@ ar5k_ar5211_radar_alert(struct ath_hal *hal, HAL_BOOL enable)
  * EEPROM access functions
  */
 
-HAL_BOOL
+AR5K_BOOL
 ar5k_ar5211_eeprom_is_busy(struct ath_hal *hal)
 {
 	return (AR5K_REG_READ(AR5K_AR5211_CFG) & AR5K_AR5211_CFG_EEBS ?
@@ -2644,7 +2641,7 @@ ar5k_ar5211_eeprom_write(struct ath_hal *hal, u_int32_t offset, u_int16_t data)
  */
 
 void
-ar5k_ar5211_rfregs(struct ath_hal *hal, HAL_CHANNEL *channel, u_int freq,
+ar5k_ar5211_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int freq,
     u_int ee_mode)
 {
 	struct ar5k_eeprom_info *ee = &hal->ah_capabilities.cap_eeprom;
@@ -2668,10 +2665,10 @@ ar5k_ar5211_rfregs(struct ath_hal *hal, HAL_CHANNEL *channel, u_int freq,
 
 	if (freq == AR5K_INI_RFGAIN_5GHZ) {
 		/* For 11a and Turbo */
-		obdb = channel->c_channel >= 5725 ? 3 :
-		    (channel->c_channel >= 5500 ? 2 :
-			(channel->c_channel >= 5260 ? 1 :
-			    (channel->c_channel > 4000 ? 0 : -1)));
+		obdb = channel->channel >= 5725 ? 3 :
+		    (channel->channel >= 5500 ? 2 :
+			(channel->channel >= 5260 ? 1 :
+			    (channel->channel > 4000 ? 0 : -1)));
 	}
 
 	ob = ee->ee_ob[ee_mode][obdb];
@@ -2699,5 +2696,5 @@ ar5k_ar5211_rfregs(struct ath_hal *hal, HAL_CHANNEL *channel, u_int freq,
 		    rf[i].rf_value[freq]);
 	}
 
-	hal->ah_rf_gain = HAL_RFGAIN_INACTIVE;
+	hal->ah_rf_gain = AR5K_RFGAIN_INACTIVE;
 }

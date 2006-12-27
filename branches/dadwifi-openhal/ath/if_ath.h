@@ -41,7 +41,7 @@
 
 int ath_init(struct ath_softc *);
 int ath_stop(struct ath_softc *);
-int ath_chan_set(struct ath_softc *, HAL_CHANNEL hchan);
+int ath_chan_set(struct ath_softc *, AR5K_CHANNEL hchan);
 int ath_reset(struct ath_softc *);
 int ath_d80211_tx(struct ieee80211_hw *, struct sk_buff *skb,
 		  struct ieee80211_tx_control *control);

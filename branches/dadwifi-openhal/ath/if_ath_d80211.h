@@ -46,10 +46,10 @@ void ath_d80211_free(struct ath_softc *sc);
 int ath_d80211_attach(struct ath_softc *sc);
 void ath_d80211_detach(struct ath_softc *sc);
 int ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
-			    HAL_CHANNEL *hal_chans, int hal_nchan,
+			    AR5K_CHANNEL *hal_chans, int hal_nchan,
 			    int hal_flags);
 
 int ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
-			  const HAL_RATE_TABLE *rt);
+			  const AR5K_RATE_TABLE *rt);
 
 #endif /* _IF_ATH_D80211_H_ */
