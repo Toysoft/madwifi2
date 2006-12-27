@@ -8,28 +8,24 @@
 #include <linux/if_arp.h>
 #include <linux/proc_fs.h>
 #include <linux/sysctl.h>
-/*For radar functions*/
-//#include <linux/cpufreq.h>
 
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
 
-typedef void* HAL_SOFTC;
-typedef int HAL_BUS_TAG;
-typedef void* HAL_BUS_HANDLE;
-typedef u_int32_t HAL_BUS_ADDR;
-#define bus_space_tag_t HAL_BUS_TAG
-#define bus_space_handle_t HAL_BUS_HANDLE
+typedef void* AR5K_SOFTC;
+typedef int AR5K_BUS_TAG;
+typedef void* AR5K_BUS_HANDLE;
+typedef u_int32_t AR5K_BUS_ADDR;
+#define bus_space_tag_t AR5K_BUS_TAG
+#define bus_space_handle_t AR5K_BUS_HANDLE
 //#define hz cpufreq_get(0) / 1000
 //#define tick 1000000 / hz
 
  /*
- * Linux uses __BIG_ENDIAN and __LITTLE_ENDIAN while BSD uses _foo
- * and an explicit _BYTE_ORDER.  Sorry, BSD got there first--define
- * things in the BSD way...
- */
+  * Define things in the BSD way...
+  */
 #define LITTLE_ENDIAN  1234    /* LSB first: i386, vax */
 #define BIG_ENDIAN     4321    /* MSB first: 68000, ibm, net */
 

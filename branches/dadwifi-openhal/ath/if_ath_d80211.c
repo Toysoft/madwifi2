@@ -60,17 +60,17 @@ static struct {
 	u_int	hal_mode;	/* hal phy mode */
 	int	d80211_mode;	/* d80211 phy mode */
 } ath_mode_map[] = {
-	{ HAL_MODE_11A,  MODE_IEEE80211A	},
-	{ HAL_MODE_11B,  MODE_IEEE80211B	},
-	{ HAL_MODE_11G,  MODE_IEEE80211G	},
-	{ HAL_MODE_TURBO, MODE_ATHEROS_TURBO	},
-	{ HAL_MODE_108G, MODE_ATHEROS_TURBOG	},
+	{ AR5K_MODE_11A,  MODE_IEEE80211A	},
+	{ AR5K_MODE_11B,  MODE_IEEE80211B	},
+	{ AR5K_MODE_11G,  MODE_IEEE80211G	},
+	{ AR5K_MODE_TURBO, MODE_ATHEROS_TURBO	},
+	{ AR5K_MODE_108G, MODE_ATHEROS_TURBOG	},
 };
 
 
 /**
  * ath_hal_mode_to_d80211_mode - Convert a hal mode to an IEEE80211 mode.
- * @hal_mode: hal hardware mode (HAL_MODE_11A, HAL_MODE_11B, ...)
+ * @hal_mode: hal hardware mode (AR5K_MODE_11A, AR5K_MODE_11B, ...)
  *
  * Returns ieee80211 hardware mode (MODE_IEEE80211A, MODE_IEEE80211B ...)
  */
@@ -102,7 +102,7 @@ ath_hal_mode_to_d80211_mode(u_int hal_mode)
  */
 int
 ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
-	       		HAL_CHANNEL *hal_chans, int hal_nchan, int hal_flags)
+	       		AR5K_CHANNEL *hal_chans, int hal_nchan, int hal_flags)
 {
 //	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_hw_modes *mode;
@@ -128,9 +128,9 @@ ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 	}
 
 	for (i = 0; i < hal_nchan; i++) {
-		HAL_CHANNEL *c = &hal_chans[i];
+		AR5K_CHANNEL *c = &hal_chans[i];
 
-		if ((c->channelFlags & CHANNEL_ALL) == hal_flags) {
+		if ((c->channel_flags & CHANNEL_ALL) == hal_flags) {
 			struct ieee80211_channel *channel;
 		
 			if (mode->num_channels == ATH_MAX_CHANNELS) {
@@ -142,14 +142,9 @@ ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 			channel = &mode->channels[mode->num_channels];
 
 			channel->chan = ath_hal_mhz2ieee(c->channel, 
-							 c->channelFlags);
+							 c->channel_flags);
 			channel->freq = c->channel;
 			channel->val = hal_flags;
-			/* ? = c->privFlags; FIXME */
-			/* ? = c->minTxPower; FIXME */
-			/* channel->flag = ? FIXME */	
-			channel->power_level = c->maxRegTxPower; /* ??? FIXME */
-			channel->antenna_max = c->maxTxPower; /* ??? FIXME */
 
 			mode->num_channels++;
 		}
@@ -170,7 +165,7 @@ done:
 /**
  * ath_d80211_rate_setup - Setup a rate array for a given hardware mode.
  * @sc: device in question
- * @hal_mode: hal hardware mode (HAL_MODE_11A, HAL_MODE_11B, ...)
+ * @hal_mode: hal hardware mode (AR5K_MODE_11A, AR5K_MODE_11B, ...)
  * @rt: hal rate table for the mode in question
  * 
  * Returns 0 on success or < 0 on error.
@@ -179,7 +174,7 @@ done:
  */
 int
 ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
-		      const HAL_RATE_TABLE *rt)
+		      const AR5K_RATE_TABLE *rt)
 {
 	struct ieee80211_hw_modes *mode;
 	int hw_mode;
@@ -204,24 +199,25 @@ ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
 	mode->num_rates = 0;
 	rates = mode->rates;
 
-	for (i = 0; i < rt->rateCount; i++) {
+	for (i = 0; i < rt->rate_count; i++) {
 
 		if (mode->num_rates == ATH_MAX_RATES) {
 			printk(KERN_ERR "rate list truncated\n");
 			return -1;
 		}
 
-		rates[i].rate = rt->info[i].rateKbps / 100;
-		rates[i].val = rt->info[i].rateCode;
+		rates[i].rate = rt->info[i].rate_kbps / 100;
+		rates[i].val = rt->info[i].rate_code;
 
 		switch (rt->info[i].phy) {
-			case IEEE80211_T_OFDM:
+			case ieee80211_phytype_ofdm_dot11_a:
+			case ieee80211_phytype_ofdm_dot11_g:
 				rates[i].flags |= IEEE80211_RATE_OFDM;
 				break;
-			case IEEE80211_T_CCK:
+			case ieee80211_phytype_dsss_dot11_b:
 				rates[i].flags |= IEEE80211_RATE_CCK;
 				break;
-			case IEEE80211_T_TURBO:
+			case ieee80211_phytype_atheros_turbo:
 				rates[i].flags |= IEEE80211_RATE_TURBO;
 				break;
 			default:
@@ -229,10 +225,10 @@ ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
 				       rt->info[i].phy);
 		}
 
-		if (rt->info[i].shortPreamble) {
+		if (rt->info[i].short_preamble) {
 			rates[i].flags |= IEEE80211_RATE_PREAMBLE2;
-			rates[i].val2 = rt->info[i].rateCode |
-					rt->info[i].shortPreamble;
+			rates[i].val2 = rt->info[i].rate_code |
+					rt->info[i].short_preamble;
 		}
 		/* FIXME rates[i].min_rssi_ack = ?; */
 		/* FIXME rates[i].min_rssi_ack_delta = ?; */
@@ -479,7 +475,7 @@ ath_d80211_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 {
 	/* FIXME: more to configure */
 	struct ath_softc *sc = hw->priv;
-	HAL_CHANNEL hchan;
+	AR5K_CHANNEL hchan;
 	int ret;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
@@ -499,7 +495,7 @@ ath_d80211_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 		return 0;
 
 	hchan.channel = conf->freq;
-	hchan.channelFlags = conf->channel_val;
+	hchan.channel_flags = conf->channel_val;
 
 	if ((ret = ath_chan_set(sc, hchan)))
 		return ret;
@@ -557,19 +553,19 @@ ath_d80211_set_key(struct ieee80211_hw *hw, set_key_cmd cmd, u8 *addr,
 	case SET_KEY:
 		switch (key->alg) {
 		case ALG_WEP:
-			if (!ath_hal_ciphersupported(ah, HAL_CIPHER_WEP)) {
+			if (!ath_hal_ciphersupported(ah, AR5K_CIPHER_WEP)) {
 				ret = -1;
 				goto done;
 			}
 			break;
 		case ALG_TKIP:
-			if (!ath_hal_ciphersupported(ah, HAL_CIPHER_TKIP)) {
+			if (!ath_hal_ciphersupported(ah, AR5K_CIPHER_TKIP)) {
 				ret = -1;
 				goto done;
 			}
 			break;
 		case ALG_CCMP:
-			if (!ath_hal_ciphersupported(ah, HAL_CIPHER_AES_CCM)) {
+			if (!ath_hal_ciphersupported(ah, AR5K_CIPHER_AES_CCM)) {
 				ret = -1;
 				goto done;
 			}

@@ -27,13 +27,13 @@ MODULE_LICENSE("Dual BSD/GPL");
 /*Attach/Dettach to HAL*/
 
 struct ath_hal *
-_ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
-                HAL_BUS_TAG t, HAL_BUS_HANDLE h, void* s)
+_ath_hal_attach(u_int16_t devid, AR5K_SOFTC sc,
+                AR5K_BUS_TAG t, AR5K_BUS_HANDLE h, void* s)
 {
-        HAL_STATUS status;
+        AR5K_STATUS status;
         struct ath_hal *ah = ath_hal_attach(devid, sc, t, h, &status);
 
-        *(HAL_STATUS *)s = status;
+        *(AR5K_STATUS *)s = status;
         if (ah)
                 AH_MOD_INC_USE_COUNT(THIS_MODULE);
         return ah;
@@ -58,7 +58,7 @@ EXPORT_SYMBOL(ath_hal_ieee2mhz);
 static int __init
 init_ath_hal(void)
 {
-	printk(KERN_INFO "%s: driver loaded\n", dev_info);
+	printk(KERN_INFO "%s: OpenHAL loaded (AR5210, AR5211, AR5212)\n", dev_info);
 	return (0);
 }
 module_init(init_ath_hal);
