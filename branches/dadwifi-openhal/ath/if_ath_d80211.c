@@ -209,27 +209,8 @@ ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
 		rates[i].rate = rt->info[i].rate_kbps / 100;
 		rates[i].val = rt->info[i].rate_code;
 
-		switch (rt->info[i].phy) {
-			case ieee80211_phytype_ofdm_dot11_a:
-			case ieee80211_phytype_ofdm_dot11_g:
-				rates[i].flags |= IEEE80211_RATE_OFDM;
-				break;
-			case ieee80211_phytype_dsss_dot11_b:
-				rates[i].flags |= IEEE80211_RATE_CCK;
-				break;
-			case ieee80211_phytype_atheros_turbo:
-				rates[i].flags |= IEEE80211_RATE_TURBO;
-				break;
-			default:
-				printk("unknown phy type %d\n",
-				       rt->info[i].phy);
-		}
+		rates[i].flags = rt->info[i].modulation;
 
-		if (rt->info[i].short_preamble) {
-			rates[i].flags |= IEEE80211_RATE_PREAMBLE2;
-			rates[i].val2 = rt->info[i].rate_code |
-					rt->info[i].short_preamble;
-		}
 		/* FIXME rates[i].min_rssi_ack = ?; */
 		/* FIXME rates[i].min_rssi_ack_delta = ?; */
 		mode->num_rates++;

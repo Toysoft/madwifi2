@@ -48,8 +48,8 @@
 
 /*d80211 definitions*/
 #include <net/d80211.h>
-/*for phytype*/
-#include <net/d80211_common.h>
+/*for rates*/
+#include <net/d80211_shared.h>
 
 
 
@@ -569,7 +569,7 @@ typedef struct {
 #define AR5K_SLOT_TIME_MAX	0xffff
 
 /* channel_flags */
-#define	CHANNEL_CW_INT	0x0002	/* Contention Window interference detected */
+#define	CHANNEL_CW_INT	0x0008	/* Contention Window interference detected */
 #define	CHANNEL_TURBO	0x0010	/* Turbo Channel */
 #define	CHANNEL_CCK	0x0020	/* CCK channel */
 #define	CHANNEL_OFDM	0x0040	/* OFDM channel */
@@ -627,18 +627,19 @@ struct ar5k_athchan_2ghz {
  * Rate definitions
  */
 
-/*TODO:These should go to d80211_common.h*/
-#define ieee80211_phytype_atheros_turbo 9 /*atheros turbo (ofdm -doubled rates)*/
-#define	ieee80211_phytype_atheros_xr 10	/*XR thingie*/
+/*TODO:This should go to d80211_shared.h*/
+#define	IEEE80211_RATE_XR 0x00000200 /*XR thingie*/
+#define AR5K_SET_SHORT_PREAMBLE 0x04 /* adding this flag to rate_code
+					enables short preamble, see ar5212_reg.h */
+#define HAS_SHPREAMBLE(_ix) (rt->info[_ix].modulation & IEEE80211_RATE_PREAMBLE2)
 
 #define AR5K_MAX_RATES	32 /*max number of rates on the rate table*/
 
 typedef struct {
 		u_int8_t	valid;		/* Valid for rate control */
-		u_int8_t	phy;		/* See ieee80211_phytype */
+		u_int32_t	modulation;	/* d80211_shared.h */
 		u_int16_t	rate_kbps;		
 		u_int8_t	rate_code;	/* Rate mapping for h/w descriptors */
-		u_int8_t	short_preamble; /* Enable/disable short preamble in CCK rates */
 		u_int8_t	dot11_rate;
 		u_int8_t	control_rate;
 		u_int16_t	lp_ack_duration;/* long preamble ACK duration */
@@ -658,74 +659,74 @@ typedef struct {
 	255, 255, 255, 255, 255, 255, 255, 255, 6, 4, 2, 0,	\
 	7, 5, 3, 1, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255 }, {		\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 6000, 11, 0, 140, 0 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 9000, 15, 0, 18, 0 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 12000, 10, 0, 152, 2 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 18000, 14, 0, 36, 2 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 24000, 9, 0, 176, 4 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 36000, 13, 0, 72, 4 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 48000, 8, 0, 96, 4 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 54000, 12, 0, 108, 4 } }	\
+	{ 1, IEEE80211_RATE_OFDM, 6000, 11, 140, 0 },	\
+	{ 1, IEEE80211_RATE_OFDM, 9000, 15, 18, 0 },	\
+	{ 1, IEEE80211_RATE_OFDM, 12000, 10, 152, 2 },	\
+	{ 1, IEEE80211_RATE_OFDM, 18000, 14, 36, 2 },	\
+	{ 1, IEEE80211_RATE_OFDM, 24000, 9, 176, 4 },	\
+	{ 1, IEEE80211_RATE_OFDM, 36000, 13, 72, 4 },	\
+	{ 1, IEEE80211_RATE_OFDM, 48000, 8, 96, 4 },	\
+	{ 1, IEEE80211_RATE_OFDM, 54000, 12, 108, 4 } }	\
 }
 
 #define AR5K_RATES_11B { 4, {						\
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	3, 2, 1, 0, 255, 255, 255, 255 }, {				\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 1000, 27, 0x00, 130, 0 },	\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 2000, 26, 0x04, 132, 1 },	\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 5500, 25, 0x04, 139, 1 },	\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 11000, 24, 0x04, 150, 1 } }\
+	{ 1, IEEE80211_RATE_CCK, 1000, 27, 130, 0 },	\
+	{ 1, IEEE80211_RATE_CCK_2, 2000, 26, 132, 1 },	\
+	{ 1, IEEE80211_RATE_CCK_2, 5500, 25, 139, 1 },	\
+	{ 1, IEEE80211_RATE_CCK_2, 11000, 24, 150, 1 } }\
 }
 
 #define AR5K_RATES_11G { 12, {					\
 	255, 255, 255, 255, 255, 255, 255, 255, 10, 8, 6, 4,	\
 	11, 9, 7, 5, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	3, 2, 1, 0, 255, 255, 255, 255 }, {			\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 1000, 27, 0x00, 2, 0 },	\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 2000, 26, 0x04, 4, 1 },	\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 5500, 25, 0x04, 11, 1 },	\
-	{ 1, ieee80211_phytype_dsss_dot11_b, 11000, 24, 0x04, 22, 1 },	\
-	{ 0, ieee80211_phytype_ofdm_dot11_g, 6000, 11, 0, 12, 4 },	\
-	{ 0, ieee80211_phytype_ofdm_dot11_g, 9000, 15, 0, 18, 4 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_g, 12000, 10, 0, 24, 6 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_g, 18000, 14, 0, 36, 6 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_g, 24000, 9, 0, 48, 8 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_g, 36000, 13, 0, 72, 8 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_g, 48000, 8, 0, 96, 8 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_g, 54000, 12, 0, 108, 8 } }	\
+	{ 1, IEEE80211_RATE_CCK, 1000, 27, 2, 0 },	\
+	{ 1, IEEE80211_RATE_CCK, 2000, 26, 4, 1 },	\
+	{ 1, IEEE80211_RATE_CCK_2, 5500, 25, 11, 1 },	\
+	{ 1, IEEE80211_RATE_CCK_2, 11000, 24, 22, 1 },	\
+	{ 0, IEEE80211_RATE_OFDM, 6000, 11, 12, 4 },	\
+	{ 0, IEEE80211_RATE_OFDM, 9000, 15, 18, 4 },	\
+	{ 1, IEEE80211_RATE_OFDM, 12000, 10, 24, 6 },	\
+	{ 1, IEEE80211_RATE_OFDM, 18000, 14, 36, 6 },	\
+	{ 1, IEEE80211_RATE_OFDM, 24000, 9, 48, 8 },	\
+	{ 1, IEEE80211_RATE_OFDM, 36000, 13, 72, 8 },	\
+	{ 1, IEEE80211_RATE_OFDM, 48000, 8, 96, 8 },	\
+	{ 1, IEEE80211_RATE_OFDM, 54000, 12, 108, 8 } }	\
 }
 
 #define AR5K_RATES_TURBO { 8, {					\
 	255, 255, 255, 255, 255, 255, 255, 255, 6, 4, 2, 0,	\
 	7, 5, 3, 1, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255 }, {		\
-	{ 1, ieee80211_phytype_atheros_turbo, 6000, 11, 0, 140, 0 },	\
-	{ 1, ieee80211_phytype_atheros_turbo, 9000, 15, 0, 18, 0 },	\
-	{ 1, ieee80211_phytype_atheros_turbo, 12000, 10, 0, 152, 2 },	\
-	{ 1, ieee80211_phytype_atheros_turbo, 18000, 14, 0, 36, 2 },	\
-	{ 1, ieee80211_phytype_atheros_turbo, 24000, 9, 0, 176, 4 },	\
-	{ 1, ieee80211_phytype_atheros_turbo, 36000, 13, 0, 72, 4 },	\
-	{ 1, ieee80211_phytype_atheros_turbo, 48000, 8, 0, 96, 4 },	\
-	{ 1, ieee80211_phytype_atheros_turbo, 54000, 12, 0, 108, 4 } }	\
+	{ 1, IEEE80211_RATE_TURBO, 6000, 11, 140, 0 },	\
+	{ 1, IEEE80211_RATE_TURBO, 9000, 15, 18, 0 },	\
+	{ 1, IEEE80211_RATE_TURBO, 12000, 10, 152, 2 },	\
+	{ 1, IEEE80211_RATE_TURBO, 18000, 14, 36, 2 },	\
+	{ 1, IEEE80211_RATE_TURBO, 24000, 9, 176, 4 },	\
+	{ 1, IEEE80211_RATE_TURBO, 36000, 13, 72, 4 },	\
+	{ 1, IEEE80211_RATE_TURBO, 48000, 8, 96, 4 },	\
+	{ 1, IEEE80211_RATE_TURBO, 54000, 12, 108, 4 } }\
 }
 
 #define AR5K_RATES_XR { 12, {					\
 	255, 3, 1, 255, 255, 255, 2, 0, 10, 8, 6, 4,		\
 	11, 9, 7, 5, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255 }, {		\
-	{ 1, ieee80211_phytype_atheros_xr, 500, 7, 0, 129, 0 },	\
-	{ 1, ieee80211_phytype_atheros_xr, 1000, 2, 0, 139, 1 },	\
-	{ 1, ieee80211_phytype_atheros_xr, 2000, 6, 0, 150, 2 },	\
-	{ 1, ieee80211_phytype_atheros_xr, 3000, 1, 0, 150, 3 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 6000, 11, 0, 140, 4 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 9000, 15, 0, 18, 4 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 12000, 10, 0, 152, 6 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 18000, 14, 0, 36, 6 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 24000, 9, 0, 176, 8 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 36000, 13, 0, 72, 8 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 48000, 8, 0, 96, 8 },	\
-	{ 1, ieee80211_phytype_ofdm_dot11_a, 54000, 12, 0, 108, 8 } }	\
+	{ 1, IEEE80211_RATE_XR, 500, 7, 129, 0 },	\
+	{ 1, IEEE80211_RATE_XR, 1000, 2, 139, 1 },	\
+	{ 1, IEEE80211_RATE_XR, 2000, 6, 150, 2 },	\
+	{ 1, IEEE80211_RATE_XR, 3000, 1, 150, 3 },	\
+	{ 1, IEEE80211_RATE_OFDM, 6000, 11, 140, 4 },	\
+	{ 1, IEEE80211_RATE_OFDM, 9000, 15, 18, 4 },	\
+	{ 1, IEEE80211_RATE_OFDM, 12000, 10, 152, 6 },	\
+	{ 1, IEEE80211_RATE_OFDM, 18000, 14, 36, 6 },	\
+	{ 1, IEEE80211_RATE_OFDM, 24000, 9, 176, 8 },	\
+	{ 1, IEEE80211_RATE_OFDM, 36000, 13, 72, 8 },	\
+	{ 1, IEEE80211_RATE_OFDM, 48000, 8, 96, 8 },	\
+	{ 1, IEEE80211_RATE_OFDM, 54000, 12, 108, 8 } }	\
 }
 
 /*

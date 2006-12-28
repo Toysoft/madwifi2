@@ -336,26 +336,20 @@ ath_hal_computetxtime(struct ath_hal *hal, const AR5K_RATE_TABLE *rates,
 	/*
 	 * Calculate the transmission time by operation (PHY) mode
 	 */
-	switch (rate->phy) {
-	case ieee80211_phytype_dsss_dot11_b:
+	if(rate->modulation & IEEE80211_RATE_CCK){
 		/*
 		 * CCK / DS mode (802.11b)
 		 */
 		value = AR5K_CCK_TX_TIME(rate->rate_kbps, frame_length,
-		    (short_preamble && rate->short_preamble));
-		break;
-
-	case ieee80211_phytype_ofdm_dot11_a:
-	case ieee80211_phytype_ofdm_dot11_g:
+		    (short_preamble && (rate->modulation & IEEE80211_RATE_PREAMBLE2)));
+	}else if(rate->modulation & IEEE80211_RATE_OFDM){
 		/*
 		 * Orthogonal Frequency Division Multiplexing
 		 */
 		if (AR5K_OFDM_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
 			return (0);
 		value = AR5K_OFDM_TX_TIME(rate->rate_kbps, frame_length);
-		break;
-
-	case ieee80211_phytype_atheros_turbo:
+	}else if(rate->modulation & IEEE80211_RATE_TURBO){
 		/*
 		 * Orthogonal Frequency Division Multiplexing
 		 * Atheros "Turbo Mode" (doubled rates)
@@ -363,9 +357,7 @@ ath_hal_computetxtime(struct ath_hal *hal, const AR5K_RATE_TABLE *rates,
 		if (AR5K_TURBO_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
 			return (0);
 		value = AR5K_TURBO_TX_TIME(rate->rate_kbps, frame_length);
-		break;
-
-	case ieee80211_phytype_atheros_xr:
+	}else if(rate->modulation & IEEE80211_RATE_XR){
 		/*
 		 * Orthogonal Frequency Division Multiplexing
 		 * Atheros "eXtended Range" (XR)
@@ -373,9 +365,7 @@ ath_hal_computetxtime(struct ath_hal *hal, const AR5K_RATE_TABLE *rates,
 		if (AR5K_XR_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
 			return (0);
 		value = AR5K_XR_TX_TIME(rate->rate_kbps, frame_length);
-		break;
-
-	default:
+	} else {
 		return (0);
 	}
 
