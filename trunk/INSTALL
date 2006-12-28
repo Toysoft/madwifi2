@@ -9,16 +9,24 @@ Read the file COPYRIGHT for the complete copyright.
 Requirements
 ------------
 
-- Kernel sources of the target kernel (some Linux distributions provide
-  headers, makefiles and configuration data - it should suffice).
+- Configured kernel sources of the target kernel.  Some Linux
+  distributions provide headers, makefiles and configuration data - it
+  should suffice.
+
 - Wireless Extensions support (14 or later, 17 preferred) - option
   CONFIG_NET_RADIO in kernel .config file.
+
 - Sysctl support - option CONFIG_SYSCTL in kernel .config file.
+
 - Crypto API support - option CONFIG_CRYPTO in kernel .config file (AES
   support is used if present, otherwise the AES-CCMP cipher module falls
   back to a private implementation).
-- gcc of same version that was used to compile the kernel (ignoring this
-  will cause "Invalid module format" errors during module load).
+
+- gcc of same version that was used to compile the kernel.  At least
+  make sure that the first two version numbers or the compiler are the
+  same (e.g. it's OK to use gcc 3.4.6 to compile MadWifi if the kernel
+  was compiled by gcc 3.4.2).  Ignoring this rule will cause "Invalid
+  module format" errors during module load.
 
 2.4.x kernels starting with 2.4.22 and 2.6 kernels should work without
 problems.  Other kernel versions may require modifications, e.g. for
