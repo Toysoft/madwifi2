@@ -255,7 +255,7 @@ ar5k_ar5212_nic_reset(struct ath_hal *hal, u_int32_t val)
 	AR5K_REG_WRITE(AR5K_AR5212_RC, val);
 
 	/* Wait at least 128 PCI clocks */
-	AR5K_DELAY(15);
+	AR5K_DELAY(1000);
 
 	val &=
 	    AR5K_AR5212_RC_PCU | AR5K_AR5212_RC_BB;
