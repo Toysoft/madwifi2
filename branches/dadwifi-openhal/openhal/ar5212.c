@@ -609,9 +609,9 @@ ar5k_ar5212_reset(struct ath_hal *hal, u_int32_t op_mode, AR5K_CHANNEL *channel,
 			AR5K_REG_WRITE(data,
 			    ath_hal_computetxtime(hal, rt, 14,
 			    rt->info[i].control_rate, FALSE));
-			if (rt->info[i].short_preamble) {
+			if (HAS_SHPREAMBLE(i)) {
 				AR5K_REG_WRITE(data +
-				    (rt->info[i].short_preamble << 2),
+				    (AR5K_SET_SHORT_PREAMBLE << 2),
 				    ath_hal_computetxtime(hal, rt, 14,
 				    rt->info[i].control_rate, FALSE));
 			}

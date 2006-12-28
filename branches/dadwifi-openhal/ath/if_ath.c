@@ -3819,8 +3819,8 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
 		cix = rt->info[sc->sc_protrix].control_rate;
 		/* for XR VAP use different RTSCTS rates and calculate duration */
 		ctsrate = rt->info[cix].rate_code;
-		if (USE_SHPREAMBLE(ic))
-			ctsrate |= rt->info[cix].short_preamble;
+		if (USE_SHPREAMBLE(ic) && HAS_SHPREAMBLE(cix))
+			ctsrate |= AR5K_SET_SHORT_PREAMBLE;
 		flags |= AR5K_TXDESC_CTSENA;
 		rt = sc->sc_xr_rates;
 		ctsduration = ath_hal_computetxtime(ah,rt, pktlen,
@@ -5958,8 +5958,8 @@ static void ath_grppoll_start(struct ieee80211vap *vap,int pollcount)
 	rt = sc->sc_currates;
 	cix = rt->info[sc->sc_protrix].control_rate;
 	ctsrate = rt->info[cix].rate_code;
-	if (USE_SHPREAMBLE(ic))
-			ctsrate |= rt->info[cix].short_preamble;
+	if (USE_SHPREAMBLE(ic) && HAS_SHPREAMBLE(cix))
+			ctsrate |= AR5K_SET_SHORT_PREAMBLE;
 	rt = sc->sc_xr_rates;
 	/*
 	 * queue the group polls for each antenna mode. set the right keycache index for the
@@ -6725,8 +6725,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			atype = AR5K_PKT_TYPE_NORMAL;	/* XXX */
 		rix = sc->sc_minrateix;
 		txrate = rt->info[rix].rate_code;
-		if (short_preamble)
-			txrate |= rt->info[rix].short_preamble;
+		if (short_preamble && HAS_SHPREAMBLE(rix))
+			txrate |= AR5K_SET_SHORT_PREAMBLE;
 		try0 = ATH_TXMAXTRY;
 
 		if (ni->ni_flags & IEEE80211_NODE_QOS) {
@@ -6739,8 +6739,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		atype = AR5K_PKT_TYPE_PSPOLL;	/* stop setting of duration */
 		rix = sc->sc_minrateix;
 		txrate = rt->info[rix].rate_code;
-		if (short_preamble)
-			txrate |= rt->info[rix].short_preamble;
+		if (short_preamble && HAS_SHPREAMBLE(rix))
+			txrate |= AR5K_SET_SHORT_PREAMBLE;
 		try0 = ATH_TXMAXTRY;
 
 		if (ni->ni_flags & IEEE80211_NODE_QOS) {
@@ -6755,8 +6755,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		if (ismcast) {
 			rix = ath_tx_findindex(rt, vap->iv_mcast_rate);
 			txrate = rt->info[rix].rate_code;
-			if (short_preamble)
-				txrate |= rt->info[rix].short_preamble;
+			if (short_preamble && HAS_SHPREAMBLE(rix))
+				txrate |= AR5K_SET_SHORT_PREAMBLE;
 			/* 
 			 * ATH_TXMAXTRY disables Multi-rate retries, which
 			 * isn't applicable to mcast packets and overrides
@@ -6851,7 +6851,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * done for OFDM unicast frames.
 	 */
 	if ((ic->ic_flags & IEEE80211_F_USEPROT) &&
-	    rt->info[rix].phy == ieee80211_phytype_ofdm_dot11_g &&
+	    (rt->info[rix].modulation == IEEE80211_RATE_OFDM) &&
 	    (flags & AR5K_TXDESC_NOACK) == 0) {
 		/* XXX fragments must use CCK rates w/ protection */
 		if (ic->ic_protmode == IEEE80211_PROT_RTSCTS)
@@ -6937,8 +6937,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 * NB: CTS is assumed the same size as an ACK so we can
 		 *     use the precalculated ACK durations.
 		 */
-		if (short_preamble) {
-			ctsrate |= rt->info[cix].short_preamble;
+		if (short_preamble && HAS_SHPREAMBLE(cix)) {
+			ctsrate |= AR5K_SET_SHORT_PREAMBLE;
 			if (flags & AR5K_TXDESC_RTSENA)		/* SIFS + CTS */
 				ctsduration += rt->info[cix].sp_ack_duration;
 			ctsduration += ath_hal_computetxtime(ah,
@@ -8864,9 +8864,8 @@ ath_setcurmode(struct ath_softc *sc, u_int mode)
 #if 0
 		sc->sc_hwmap[i].ieeerate =
 			rt->info[ix].dot11_rate & IEEE80211_RATE_VAL;
-		if (rt->info[ix].short_preamble ||
-		    rt->info[ix].phy == ieee80211_phytype_ofdm_dot11_g ||
-		    rt->info[ix].phy == ieee80211_phytype_ofdm_dot11_a)
+		if (HAS_SHPREAMBLE(ix) ||
+		    rt->info[ix].modulation == IEEE80211_RATE_OFDM)
 			sc->sc_hwmap[i].flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
 #endif
 		/* setup blink rate table to avoid per-packet lookup */
