@@ -104,11 +104,30 @@ and linker) and the same compiler flags.  If you get warnings about
 incompatible compiler flags, chances are that you are compiling for a
 wrong target or using an incompatible compiler.
 
-The build system is designed to support cross-building without any
-modification to the distribution files.  If you cannot do what you need
-by setting environment variables please send patches to show where
-things failed to do the right thing.
 
+Cross-compiling
+---------------
+
+The build system is designed to support cross-compiling without any
+modification to the distribution files.  It should be sufficient to
+specify any parameters on the make command line.
+
+In most cases, only KERNELPATH and CROSS_COMPILE need to be defined. 
+CROSS_COMPILE is the prefix for cross-compiling tools.  For instance, if
+the cross compiler is called arm-linux-gcc, set CROSS_COMPILE to
+"arm-linux-":
+
+  trouble% make KERNELPATH=/usr/src/linux-arm CROSS_COMPILE=arm-linux-
+
+The build system determines ARCH and TARGET based on the .config file in
+the Linux build tree.  TARGET still needs to be calculated for some
+embedded systems.
+
+If ARCH is determined incorrectly, please report it.
+
+
+Loading the modules
+-------------------
 
 Building the software will generate numerous loadable modules:
 
@@ -153,6 +172,10 @@ To activate German frequencies you would specify:
 To see available parameters type:
 
   modinfo ath_pci
+
+
+Further information
+-------------------
 
 Further information on how to work with the driver can be found in the
 file README.  In addition, the project's wiki has a lot of valuable
