@@ -8554,7 +8554,8 @@ ath_getchannels(struct net_device *dev, u_int cc,
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_CHANNEL *chans;
-	int i, nchan;
+	int i;
+	u_int nchan;
 
 	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
 	if (chans == NULL) {
