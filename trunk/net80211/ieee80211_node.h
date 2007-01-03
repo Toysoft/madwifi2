@@ -169,7 +169,7 @@ struct ieee80211_node {
 	u_int8_t ni_uapsd;			/* U-APSD per-node flags matching WMM STA Qos Info field */
 	u_int8_t ni_uapsd_maxsp; 		/* maxsp from flags above */
 	u_int16_t ni_uapsd_trigseq[WME_NUM_AC]; 	/* trigger suppression on retry */
-	u_int16_t ni_pschangeseq;
+	__le16 ni_pschangeseq;
 };
 MALLOC_DECLARE(M_80211_NODE);
 
