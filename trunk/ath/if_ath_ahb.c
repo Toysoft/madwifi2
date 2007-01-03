@@ -302,6 +302,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 	const char *athname;
 	struct net_device *dev;
 	struct ath_ahb_softc *sc;
+	struct ar531x_config config;
         
 	if (((wlanNum != 0) && (wlanNum != 1)) ||
 		(sclist[wlanNum] != NULL))
@@ -355,7 +356,6 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 		goto bad3;
 	}
 	
-	struct ar531x_config config;
 	config.board = ar5312_boardConfig;
 	config.radio = radioConfig;
 	config.unit = wlanNum;
