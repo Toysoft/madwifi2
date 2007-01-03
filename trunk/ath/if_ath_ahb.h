@@ -114,9 +114,7 @@ static __inline void bus_dma_sync_single(void *hwdev, dma_addr_t dma_handle,
 static __inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
 	size_t size, int direction)
 {
-    unsigned long addr = (unsigned long) ptr;
-    
-    dma_cache_wback_inv(addr, size);
+    dma_cache_wback_inv((unsigned long) addr, size);
     
     return __pa(ptr);
 }
@@ -136,5 +134,12 @@ void bus_free_consistent(void *, size_t, void *, dma_addr_t);
 
 extern const char * get_system_type(void);
 #define sysRegRead(phys)      (*(volatile u_int32_t *)phys)
+
+/* Allow compiling on non-mips platforms for code verification */
+#ifndef __mips__
+#define CAC_ADDR(addr) (addr)
+#define UNCAC_ADDR(addr) (addr)
+#define KSEG1ADDR(addr) (addr)
+#endif
 
 #endif    /* _DEV_ATH_AHB_H_ */
