@@ -511,6 +511,7 @@ struct ath_vap {
 struct ath_softc {
 	struct ieee80211com sc_ic;		/* NB: must be first */
 	struct net_device *sc_dev;
+	void __iomem *sc_iobase;		/* address of the device */
 	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats	sc_stats;		/* private statistics */
