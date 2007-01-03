@@ -266,7 +266,7 @@ ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 }
 EXPORT_SYMBOL(ath_rate_node_cleanup);
 
-void
+static void
 ath_rate_node_copy(struct ath_softc *sc,
 	struct ath_node *dst, const struct ath_node *src)
 {
@@ -1004,7 +1004,7 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 	return (p - buf);
 }
 
-int
+static int
 proc_ratesample_open(struct inode *inode, struct file *file)
 {
 	struct proc_ieee80211_priv *pv = NULL;
