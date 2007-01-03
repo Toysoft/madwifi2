@@ -153,9 +153,8 @@ void *
 bus_alloc_consistent(void *hwdev, size_t size, dma_addr_t *dma_handle)
 {
 	void *ret;
-	int gfp = GFP_ATOMIC;
      
-	ret = (void *) __get_free_pages(gfp, get_order(size));
+	ret = (void *) __get_free_pages(GFP_ATOMIC, get_order(size));
      
 	if (ret != NULL) {
 		memset(ret, 0, size);
@@ -176,7 +175,7 @@ bus_free_consistent(void *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle
 	free_pages(addr, get_order(size));
 }
 
-int
+static int
 ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
 	u_int32_t reset;
@@ -239,7 +238,7 @@ ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 	return 0;
 }
 
-int
+static int
 ahb_disable_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
 	u_int32_t enable;
@@ -267,7 +266,7 @@ ahb_disable_wmac(u_int16_t devid, u_int16_t wlanNum)
 }
 
 
-int
+static int
 exit_ath_wmac(u_int16_t wlanNum)
 {
 	struct ath_ahb_softc *sc = sclist[wlanNum];
@@ -296,7 +295,7 @@ exit_ath_wmac(u_int16_t wlanNum)
 	return 0;
 }
 
-int
+static int
 init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
 	const char *athname;
@@ -382,7 +381,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 	return -ENODEV;
 }
 
-int
+static int
 init_ahb(void)
 {
 	int ret;
