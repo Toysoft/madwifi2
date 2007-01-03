@@ -74,6 +74,18 @@ typedef	void*			va_list;
 #define	__va_list	va_list 
 #define	OS_INLINE	__inline
 
+extern int ath_hal_dma_beacon_response_time;
+extern int ath_hal_sw_beacon_response_time;
+extern int ath_hal_additional_swba_backoff;
+
+void __ahdecl ath_hal_vprintf(struct ath_hal *ah, const char* fmt,
+			      va_list ap);
+void __ahdecl ath_hal_printf(struct ath_hal *ah, const char* fmt, ...);
+const char* __ahdecl ath_hal_ether_sprintf(const u_int8_t *mac);
+int __ahdecl ath_hal_memcmp(const void *a, const void *b, size_t n);
+void * __ahdecl ath_hal_malloc(size_t size);
+void __ahdecl ath_hal_free(void* p);
+
 /* Delay n microseconds. */
 extern	void __ahdecl ath_hal_delay(int);
 #define	OS_DELAY(_n)		ath_hal_delay(_n)
