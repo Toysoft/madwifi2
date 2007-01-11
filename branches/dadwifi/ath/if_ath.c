@@ -115,7 +115,7 @@ static void ath_bmiss_tasklet(TQUEUE_ARG);
 static void ath_bstuck_tasklet(TQUEUE_ARG);
 static void ath_beacon_tasklet(TQUEUE_ARG);
 #if 0
-static void ath_radar_task(TQUEUE_ARG);
+static void ath_radar_task(struct ATH_WORK_THREAD *);
 static void ath_dfs_test_return(unsigned long);
 
 #endif
@@ -395,7 +395,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc, HAL_BUS_TAG tag)
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	sc);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	sc);
 #if 0
-	ATH_INIT_SCHED_TASK(&sc->sc_radartask, ath_radar_task,	dev);
+	ATH_INIT_SCHED_TASK(&sc->sc_radartask, ath_radar_task);
 #endif
 
 	/*
@@ -1685,10 +1685,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 #if 0
 static void
-ath_radar_task(TQUEUE_ARG data)
+ath_radar_task(struct ATH_WORK_THREAD *thr)
 {
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = dev->priv;
+	struct ath_softc *sc = container_of(thr, struct ath_softc, sc_radartask);
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_channel ichan;
