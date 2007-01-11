@@ -140,6 +140,7 @@ extern const char * get_system_type(void);
 #define CAC_ADDR(addr) (addr)
 #define UNCAC_ADDR(addr) (addr)
 #define KSEG1ADDR(addr) (addr)
+#define get_system_type() "Non-MIPS"
 #endif
 
 #endif    /* _DEV_ATH_AHB_H_ */
