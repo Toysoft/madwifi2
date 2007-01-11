@@ -514,7 +514,7 @@ static ctl_table ath_root_table[] = {
 };
 static struct ctl_table_header *ath_hal_sysctl_header;
 
-void
+static void
 ath_hal_sysctl_register(void)
 {
 	static int initialized = 0;
@@ -526,7 +526,7 @@ ath_hal_sysctl_register(void)
 	}
 }
 
-void
+static void
 ath_hal_sysctl_unregister(void)
 {
 	if (ath_hal_sysctl_header)
