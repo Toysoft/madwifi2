@@ -51,6 +51,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/sched.h>
 
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
