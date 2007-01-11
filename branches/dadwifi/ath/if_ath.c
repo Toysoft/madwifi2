@@ -1409,7 +1409,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			 * (that does nothing) to make this more clear.
 			 */
 			ni->ni_flags |= IEEE80211_NODE_PS_CHANGED;
-			ni->ni_pschangeseq = *(u_int16_t *)(&qwh->i_seq[0]);
+			ni->ni_pschangeseq = *(__le16 *)(&qwh->i_seq[0]);
 			ni->ni_flags &= ~IEEE80211_NODE_UAPSD_SP;
 			ni->ni_flags ^= IEEE80211_NODE_PWR_MGT;
 			if (qwh->i_fc[1] & IEEE80211_FC1_PWR_MGT) {
@@ -1477,7 +1477,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		/*
 		 * Detect duplicate triggers and drop if so.
 		 */
-		frame_seq = le16toh(*(u_int16_t *)qwh->i_seq);
+		frame_seq = le16toh(*(__le16 *)qwh->i_seq);
 		if ((qwh->i_fc[1] & IEEE80211_FC1_RETRY) &&
 		    frame_seq == ni->ni_uapsd_trigseq[ac]) {
 			DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: dropped dup trigger, ac %d, seq %d\n",
@@ -6715,7 +6715,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 	hdrlen = ieee80211_anyhdrsize(wh);
 	istxfrag = (wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG) || 
-		(((le16toh(*(u_int16_t *) &wh->i_seq[0]) >> 
+		(((le16toh(*(__le16 *) &wh->i_seq[0]) >> 
 		IEEE80211_SEQ_FRAG_SHIFT) & IEEE80211_SEQ_FRAG_MASK) > 0);
 
 	pktlen = skb->len;
@@ -7418,12 +7418,12 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 				        ds->ds_txstat.ts_seqnum);
 			} else {
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: updating frame's sequence number from %d to %d\n", __func__, 
-				        (le16toh(*(u_int16_t *)&wh->i_seq[0]) & IEEE80211_SEQ_SEQ_MASK) >> IEEE80211_SEQ_SEQ_SHIFT,
+				        (le16toh(*(__le16 *)&wh->i_seq[0]) & IEEE80211_SEQ_SEQ_MASK) >> IEEE80211_SEQ_SEQ_SHIFT,
 				        ds->ds_txstat.ts_seqnum);
 
-				*(u_int16_t *)&wh->i_seq[0] = htole16(
+				*(__le16 *)&wh->i_seq[0] = htole16(
 					ds->ds_txstat.ts_seqnum << IEEE80211_SEQ_SEQ_SHIFT |
-					(le16toh(*(u_int16_t *)&wh->i_seq[0]) & ~IEEE80211_SEQ_SEQ_MASK));
+					(le16toh(*(__le16 *)&wh->i_seq[0]) & ~IEEE80211_SEQ_SEQ_MASK));
 			}
 		}
 #endif

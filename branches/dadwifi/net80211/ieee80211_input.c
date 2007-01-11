@@ -425,7 +425,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				tid++;
 			} else
 				tid = 0;
-			rxseq = le16toh(*(u_int16_t *)wh->i_seq);
+			rxseq = le16toh(*(__le16 *)wh->i_seq);
 			if ((wh->i_fc[1] & IEEE80211_FC1_RETRY) &&
 			    IEEE80211_SEQ_LEQ(rxseq, ni->ni_rxseqs[tid])) {
 				/* duplicate, discard */
@@ -587,7 +587,7 @@ ieee80211_input(struct ieee80211_node *ni,
 			} else if (ni->ni_flags & IEEE80211_NODE_PS_CHANGED) {
 				int pwr_save_changed = 0;
 				IEEE80211_LOCK_IRQ(ic);
-				if ((*(u_int16_t *)(&wh->i_seq[0])) == ni->ni_pschangeseq) {
+				if ((*(__le16 *)(&wh->i_seq[0])) == ni->ni_pschangeseq) {
 					ni->ni_flags &= ~IEEE80211_NODE_PS_CHANGED;
 					pwr_save_changed = 1;
 				}
@@ -958,8 +958,8 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	u_int8_t fragno, last_fragno;
 	u_int8_t more_frag = wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG;
 
-	rxseq = le16_to_cpu(*(u_int16_t *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
-	fragno = le16_to_cpu(*(u_int16_t *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
+	rxseq = le16_to_cpu(*(__le16 *)wh->i_seq) >> IEEE80211_SEQ_SEQ_SHIFT;
+	fragno = le16_to_cpu(*(__le16 *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
 
 	/* Quick way out, if there's nothing to defragment */
 	if (!more_frag && fragno == 0 && ni->ni_rxfrag[0] == NULL)
@@ -1007,9 +1007,9 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 		struct ieee80211_frame *lwh;
 
 		lwh = (struct ieee80211_frame *) ni->ni_rxfrag[0]->data;
-		last_rxseq = le16_to_cpu(*(u_int16_t *)lwh->i_seq) >>
+		last_rxseq = le16_to_cpu(*(__le16 *)lwh->i_seq) >>
 			IEEE80211_SEQ_SEQ_SHIFT;
-		last_fragno = le16_to_cpu(*(u_int16_t *)lwh->i_seq) &
+		last_fragno = le16_to_cpu(*(__le16 *)lwh->i_seq) &
 			IEEE80211_SEQ_FRAG_MASK;
 		if (rxseq != last_rxseq
 		    || fragno != last_fragno + 1
@@ -1067,7 +1067,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			/* Update tail and length */
 			skb_put(ni->ni_rxfrag[0], skb->len - hdrlen);
 			/* Keep a copy of last sequence and fragno */
-			*(u_int16_t *) lwh->i_seq = *(u_int16_t *) wh->i_seq;
+			*(__le16 *) lwh->i_seq = *(__le16 *) wh->i_seq;
 		}
 		/* we're done with the fragment */
 		dev_kfree_skb(skb);
