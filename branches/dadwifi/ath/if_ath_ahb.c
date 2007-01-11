@@ -347,7 +347,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 		goto bad3;
 	}
 	dev->mem_end = dev->mem_start + AR531X_WLANX_LEN;
-	sc->aps_sc.sc_iobase = dev->mem_start;
+	sc->aps_sc.sc_iobase = (void __iomem *) dev->mem_start;
 	sc->aps_sc.sc_bdev = NULL;
 
 	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
