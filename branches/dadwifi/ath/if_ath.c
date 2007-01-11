@@ -8730,7 +8730,7 @@ ath_getchannels(struct ath_softc *sc, u_int cc,
 	u_int *nregclass = NULL;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_CHANNEL *chans;
-	int nchan;
+	u_int nchan;
 
 	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
 	if (chans == NULL) {
