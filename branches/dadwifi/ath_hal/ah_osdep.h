@@ -39,14 +39,14 @@
 #define _ATH_AH_OSDEP_H_
 
 /*
- * Starting with 2.6.4 the kernel supports a configuration option
- * to pass parameters in registers.  If this is enabled we must
- * mark all function interfaces in+out of the HAL to pass parameters
- * on the stack as this is the convention used internally (for
- * maximum portability).
+ * Linux on i386 may pass parameters in registers.  This is an option
+ * starting with Linux 2.6.4.  Starting with Linux 2.6.20, it's done
+ * unconditionally.  However, the HAL uses standard ABI whereas the
+ * parameters are passed on the stack (for maximum portability).
+ * "asmlinkage" forces the standard ABI for the HAL calls.
  */
-#ifdef CONFIG_REGPARM
-#define	__ahdecl	__attribute__((regparm(0)))
+#ifdef __i386__
+#define	__ahdecl	asmlinkage
 #else
 #define	__ahdecl
 #endif
