@@ -6086,13 +6086,13 @@ static void ath_grppoll_start(struct ieee80211vap *vap,int pollcount)
 	memset(&rates, 0, sizeof(rates));
 	pos = 0;
 	while (sscanf(&(sc->sc_grppoll_str[pos]), "%s %s", ratestr, numpollstr) == 2) {
-		int i = 0;
-		while (ratestrmap[i].ratekbps != 0) {
-			if (strcmp(ratestrmap[i].str, ratestr) == 0)
+		int rtx = 0;
+		while (ratestrmap[rtx].ratekbps != 0) {
+			if (strcmp(ratestrmap[rtx].str, ratestr) == 0)
 				break;
-			i++;
+			rtx++;
 		}
-		sscanf(numpollstr, "%d", &(rates[i]));
+		sscanf(numpollstr, "%d", &(rates[rtx]));
 		pos += strlen(ratestr) + strlen(numpollstr) + 2;
 	}
 	if (!sc->sc_grppolldma.dd_bufptr) {
