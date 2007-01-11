@@ -118,7 +118,7 @@ static void ath_fatal_tasklet(TQUEUE_ARG);
 static void ath_rxorn_tasklet(TQUEUE_ARG);
 static void ath_bmiss_tasklet(TQUEUE_ARG);
 static void ath_bstuck_tasklet(TQUEUE_ARG);
-static void ath_radar_task(TQUEUE_ARG);
+static void ath_radar_task(struct ATH_WORK_THREAD *);
 static void ath_dfs_test_return(unsigned long);
 
 static int ath_stop_locked(struct net_device *);
@@ -414,7 +414,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ATH_INIT_TQUEUE(&sc->sc_bstucktq,ath_bstuck_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	dev);
-	ATH_INIT_SCHED_TASK(&sc->sc_radartask, ath_radar_task,	dev);
+	ATH_INIT_SCHED_TASK(&sc->sc_radartask, ath_radar_task);
 
 	/*
 	 * Attach the HAL and verify ABI compatibility by checking
@@ -1739,10 +1739,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 static void
-ath_radar_task(TQUEUE_ARG data)
+ath_radar_task(struct ATH_WORK_THREAD *thr)
 {
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = dev->priv;
+	struct ath_softc *sc = container_of(thr, struct ath_softc, sc_radartask);
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_channel ichan;

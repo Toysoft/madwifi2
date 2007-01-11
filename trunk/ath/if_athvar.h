@@ -74,17 +74,21 @@ typedef void *TQUEUE_ARG;
 #include <linux/tqueue.h>
 #define ATH_WORK_THREAD			tq_struct
 #define ATH_SCHEDULE_TASK(t)		schedule_task((t))
-#define ATH_INIT_SCHED_TASK(t, f, d) do { 	\
-	memset((t),0,sizeof(struct tq_struct)); 	\
+#define ATH_INIT_SCHED_TASK(t, f) do { 		\
+	memset((t),0,sizeof(struct tq_struct)); \
 	(t)->routine = (void (*)(void*)) (f); 	\
-	(t)->data=(void *) (d); 		\
+	(t)->data=(void *) (t);			\
 } while (0)
 #define ATH_FLUSH_TASKS			flush_scheduled_tasks
 #else
 #include <linux/workqueue.h>
 #define ATH_SCHEDULE_TASK(t)		schedule_work((t))
 
-#define ATH_INIT_SCHED_TASK(_t, _f, _d)	INIT_WORK((_t), (void (*)(void *))(_f), (void *)(_d));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
+#define ATH_INIT_SCHED_TASK(_t, _f)	INIT_WORK((_t), (void (*)(void *))(_f), (void *)(_t));
+#else
+#define ATH_INIT_SCHED_TASK(_t, _f)	INIT_WORK((_t), (_f));
+#endif
 
 #define ATH_WORK_THREAD			work_struct
 #define	ATH_FLUSH_TASKS			flush_scheduled_work
