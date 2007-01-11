@@ -48,8 +48,6 @@
 
 /*d80211 definitions*/
 #include <net/d80211.h>
-/*for rates*/
-#include <net/d80211_shared.h>
 
 
 
