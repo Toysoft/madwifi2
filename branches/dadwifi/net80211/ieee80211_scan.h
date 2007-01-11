@@ -114,7 +114,7 @@ void ieee80211_scan_flush(struct ieee80211com *);
 
 struct ieee80211_scan_entry;
 typedef int ieee80211_scan_iter_func(void *, const struct ieee80211_scan_entry *);
-int ieee80211_scan_iterate(struct ieee80211com *, ieee80211_scan_iter_func, void *);
+int ieee80211_scan_iterate(struct ieee80211com *, ieee80211_scan_iter_func *, void *);
 
 /*
  * Parameters supplied when adding/updating an entry in a
