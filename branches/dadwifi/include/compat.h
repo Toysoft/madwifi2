@@ -37,6 +37,18 @@
  */
 #ifndef _ATH_COMPAT_H_
 #define _ATH_COMPAT_H_
+
+/* Compatibility with older Linux kernels */
+#ifdef __KERNEL__
+#include <linux/types.h>
+#ifndef __bitwise
+#define __le16 u_int16_t
+#define __le32 u_int32_t
+#define __le64 u_int64_t
+#define __force
+#endif
+#endif
+
 /*
  * BSD/Linux compatibility shims.  These are used mainly to
  * minimize differences when importing necesary BSD code.
