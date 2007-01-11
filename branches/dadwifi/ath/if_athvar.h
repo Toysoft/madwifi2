@@ -560,7 +560,6 @@ struct ath_softc {
 	struct ieee80211com sc_ic;		/* NB: must be first */
 #endif
 	char name[IFNAMSIZ];
-	unsigned long sc_mem_start;		/* IO base */
 	void __iomem *sc_iobase;		/* address of the device */
 	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */

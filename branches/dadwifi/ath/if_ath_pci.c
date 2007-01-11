@@ -195,7 +195,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 	sc->aps_sc.sc_invalid = 1;
 
-	sc->aps_sc.sc_mem_start = mem;
 	sc->aps_sc.sc_bdev = (void *) pdev;
 
 	pci_set_drvdata(pdev, sc);
@@ -259,12 +258,12 @@ bad:
 static void
 ath_pci_remove(struct pci_dev *pdev)
 {
-	struct ath_pci_softc *sc = pci_get_drvdata(pdev);
+	struct ath_softc *sc = pci_get_drvdata(pdev);
 
 	ath_detach(sc);
 	if (pdev->irq)
 		free_irq(pdev->irq, sc);
-	iounmap(sc->aps_sc.sc_iobase);
+	iounmap(sc->sc_iobase);
 	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
 	ath_d80211_free(sc);
