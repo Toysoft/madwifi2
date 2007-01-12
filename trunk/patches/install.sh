@@ -71,16 +71,6 @@ rm -rf ${MADWIFI}
 mkdir -p ${MADWIFI}
 make -s -C ${SRC} svnversion.h
 cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
-cat >>${MADWIFI}/BuildCaps.inc <<EOF
-
-EXTRA_CFLAGS += \$(COPTS)
-
-ifdef CONFIG_CPU_BIG_ENDIAN
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
-else
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
-endif
-EOF
 
 
 echo "Copying source files"
