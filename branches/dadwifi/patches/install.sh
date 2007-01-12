@@ -41,8 +41,6 @@ PATCH()
 #
 SRC_HAL=${HAL:-${SRC}/hal}
 test -d ${SRC_HAL} || die "No hal directory ${SRC_HAL}"
-SRC_NET80211=${WLAN:-${SRC}/net80211}
-test -d ${SRC_NET80211} || die "No net80211 directory ${SRC_NET80211}"
 SRC_ATH=${ATH:-${SRC}/ath}
 test -d ${SRC_ATH} || die "No ath directory ${SRC_ATH}"
 SRC_ATH_RATE=${SRC}/ath_rate
@@ -57,12 +55,8 @@ test -d ${WIRELESS} || die "No wireless directory ${WIRELESS}"
 if test -f ${WIRELESS}/Kconfig; then
 	kbuild=2.6
 	kbuildconf=Kconfig
-else if test -f ${WIRELESS}/Config.in; then
-	kbuild=2.4
-	kbuildconf=Config.in
 else
 	die "Kernel build system is not supported"
-fi
 fi
 
 echo "Copying top-level files"
@@ -74,7 +68,7 @@ cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
 
 
 echo "Copying source files"
-FILES=`cd ${SRC} && find ath ath_hal ath_rate hal include net80211 -name '*.[ch]'`
+FILES=`cd ${SRC} && find ath ath_hal ath_rate hal include -name '*.[ch]'`
 for f in $FILES; do
 	case $f in
 		*.mod.c) continue;;

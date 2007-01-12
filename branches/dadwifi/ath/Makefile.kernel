@@ -34,7 +34,7 @@ EXTRA_CFLAGS += $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 
 ifneq ($(VERSION).$(PATCHLEVEL),2.4)
 obj-$(CONFIG_ATHEROS)	+= ath_$(BUSNAME).o
-ath_$(BUSNAME)-objs	:= if_ath.o if_ath_$(BUSNAME).o
+ath_$(BUSNAME)-objs	:= if_ath.o if_ath_d80211.o if_ath_$(BUSNAME).o
 endif
 
 ifeq ($(VERSION).$(PATCHLEVEL),2.4)
