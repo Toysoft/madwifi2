@@ -57,11 +57,9 @@ test -d ${WIRELESS} || die "No wireless directory ${WIRELESS}"
 if test -f ${WIRELESS}/Kconfig; then
 	kbuild=2.6
 	kbuildconf=Kconfig
-	makedef=LINUX26
 else if test -f ${WIRELESS}/Config.in; then
 	kbuild=2.4
 	kbuildconf=Config.in
-	makedef=LINUX24
 else
 	die "Kernel build system is not supported"
 fi
@@ -82,8 +80,6 @@ EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
 else
 EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
 endif
-
-$makedef := 1
 EOF
 
 
