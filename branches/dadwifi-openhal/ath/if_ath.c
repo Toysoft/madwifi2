@@ -9332,7 +9332,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				else
 					hw->flags |= IEEE80211_HW_TKIP_INCLUDE_MMIC;
 
-				ieee80211_update_hw(hw);
 				break;
 			}
 #ifdef ATH_SUPERG_XR
