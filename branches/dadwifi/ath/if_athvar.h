@@ -736,7 +736,8 @@ struct ath_softc {
 #define ATH_MAX_CHANNELS	64
 #define ATH_MAX_RATES		16	
 	struct ieee80211_hw *sc_hw;
-	struct ieee80211_hw_modes sc_hw_modes[ATH_MAX_HW_MODES];
+	struct ieee80211_hw_mode sc_hw_modes[ATH_MAX_HW_MODES];
+	int sc_num_modes;		/* number of modes in sc_hw_modes */
 	struct ieee80211_channel sc_channels[ATH_MAX_HW_MODES *
 					     ATH_MAX_CHANNELS];
 	struct ieee80211_rate sc_ieee80211_rates[ATH_MAX_HW_MODES *

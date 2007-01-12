@@ -105,22 +105,22 @@ ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 	       		HAL_CHANNEL *hal_chans, int hal_nchan, int hal_flags)
 {
 	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211_hw_modes *mode;
+	struct ieee80211_hw_mode *mode;
 	int error = 0;
 	int i;
 
-	for (i = 0; i < sc->sc_hw->num_modes ; i++) {
+	for (i = 0; i < sc->sc_num_modes ; i++) {
 		if (sc->sc_hw_modes[i].mode == hw_mode)
 			break;
 	}
 
-	if (i == sc->sc_hw->num_modes) {
-		if (sc->sc_hw->num_modes == ATH_MAX_HW_MODES) { 
+	if (i == sc->sc_num_modes) {
+		if (sc->sc_num_modes == ATH_MAX_HW_MODES) { 
 			DPRINTF(sc, ATH_DEBUG_ANY,
 				"%s: no free mode elements\n", __func__);
 			return -1;
 		}
-		mode = &sc->sc_hw_modes[sc->sc_hw->num_modes];
+		mode = &sc->sc_hw_modes[sc->sc_num_modes];
 	} else {
 		DPRINTF(sc, ATH_DEBUG_ANY,
 			"%s: mode %d already initialized\n", __func__, hw_mode);
@@ -160,7 +160,7 @@ done:
 		DPRINTF(sc, ATH_DEBUG_D80211, "%s: hal_chan %x hal_flags %x\n", __func__,
 			hal_nchan, hal_flags);
 		mode->mode = hw_mode;
-		sc->sc_hw->num_modes++;
+		sc->sc_num_modes++;
 	}
 
 	return error;
@@ -181,19 +181,19 @@ int
 ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
 		      const HAL_RATE_TABLE *rt)
 {
-	struct ieee80211_hw_modes *mode;
+	struct ieee80211_hw_mode *mode;
 	int hw_mode;
 	struct ieee80211_rate *rates;
 	int i;
 
 	hw_mode = ath_hal_mode_to_d80211_mode(hal_mode);
 
-	for (i = 0; i < sc->sc_hw->num_modes ; i++) {
+	for (i = 0; i < sc->sc_num_modes ; i++) {
 		if (sc->sc_hw_modes[i].mode == hw_mode)
 			break;
 	}
 
-	if (i == sc->sc_hw->num_modes) {
+	if (i == sc->sc_num_modes) {
 		printk(KERN_ERR "cannot find mode element.\n");
 		return -1;
 	}
@@ -670,6 +670,7 @@ struct ath_softc *
 ath_d80211_alloc(size_t priv_size)
 {
 	struct ieee80211_hw *hw;
+	struct ieee80211_hw_mode *modes;
 	struct ath_softc *sc;
 	int i;
 
@@ -694,14 +695,15 @@ ath_d80211_alloc(size_t priv_size)
 	hw->channel_change_time = 5000;
 	hw->maxssi = -1; /* FIXME: get a real value for this. */
 	hw->queues = 1;
+	sc->sc_num_modes = 0;
 
-	hw->modes = &sc->sc_hw_modes[0];
+	modes = &sc->sc_hw_modes[0];
 
 	for (i = 0; i < ATH_MAX_HW_MODES; i++) {
-		hw->modes[i].num_channels = 0;
-		hw->modes[i].channels = &sc->sc_channels[i * ATH_MAX_CHANNELS];
-		hw->modes[i].num_rates = 0;
-		hw->modes[i].rates = &sc->sc_ieee80211_rates[i * ATH_MAX_RATES];
+		modes[i].num_channels = 0;
+		modes[i].channels = &sc->sc_channels[i * ATH_MAX_CHANNELS];
+		modes[i].num_rates = 0;
+		modes[i].rates = &sc->sc_ieee80211_rates[i * ATH_MAX_RATES];
 	}
 
 	sc->sc_opmode = HAL_M_STA;
@@ -727,8 +729,13 @@ ath_d80211_attach(struct ath_softc *sc)
 {
 	struct ieee80211_hw *hw = sc->sc_hw;
 	int rv = 0;
+	int i;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
+
+	for (i = 0; i < sc->sc_num_modes; i++) {
+		ieee80211_register_hwmode(hw, &sc->sc_hw_modes[i]);
+	}
 
 	rv = ieee80211_register_hw(hw);
 	if (rv) {
