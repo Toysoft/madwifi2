@@ -39,9 +39,6 @@
 # other locales sometimes cause trouble
 export LC_ALL = POSIX
 
-# OS is the target operating system. Currently only Linux is supported.
-OS=		linux
-
 # BUS defines the bus type to which the wireless devices is attached.
 # Currently, the valid BUS types are PCI and AHB.  If BUS is not
 # defined, then, we assume the bus type is PCI
@@ -121,7 +118,6 @@ KMODSUF		:= o
 endif
 
 NM=		nm
-AWK=		awk
 
 #
 # Path to the HAL source code.
@@ -130,10 +126,10 @@ ifeq ($(HAL),)
 HAL=	$(TOP)/hal
 endif
 #
-#
 # Path to HAL/OS interface code
 #
 ATH_HAL= $(TOP)/ath_hal
+#
 # Path to the 802.11 include files.
 #
 WLAN=	$(TOP)/net80211
