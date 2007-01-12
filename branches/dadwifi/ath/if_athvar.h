@@ -128,7 +128,7 @@ typedef void *TQUEUE_ARG;
 #define ATH_SCHEDULE_TASK(t)		schedule_work((t))
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-#define ATH_INIT_SCHED_TASK(_t, _f)	INIT_WORK((_t), (void (*)(void *))(_f), (void *)(_t));
+#define ATH_INIT_SCHED_TASK(_t, _f)	INIT_WORK((_t), (void (*)(void *))(_f), (_t));
 #else
 #define ATH_INIT_SCHED_TASK(_t, _f)	INIT_WORK((_t), (_f));
 #endif
