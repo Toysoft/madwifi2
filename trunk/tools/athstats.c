@@ -43,8 +43,6 @@
  * (default interface is wifi0).  If interval is specified a rolling output
  * is displayed every interval seconds.
  */
-#define _BSD_SOURCE
-
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
@@ -57,8 +55,6 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <err.h>
-
-#define __user
 
 #include "wireless_copy.h"
 #include "ah_desc.h"
