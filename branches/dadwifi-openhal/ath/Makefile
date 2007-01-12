@@ -33,7 +33,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath/Makefile#12 $
+# $Id: Makefile 1932 2007-01-12 02:02:00Z proski $
 #
 
 #
@@ -44,7 +44,7 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	..
+TOP = $(obj)/..
 
 ifeq ($(strip $(BUS)),AHB)
 BUSNAME=ahb
@@ -54,17 +54,14 @@ BUSNAME=pci
 COPTS+= -DATH_PCI
 endif
 
-include $(obj)/$(DEPTH)/Makefile.inc
+include $(TOP)/Makefile.inc
 
-obj-m		+= ath_$(BUSNAME).o ath_hal.o
-ath_$(BUSNAME)-objs	:= if_ath_d80211.o if_ath.o if_ath_$(BUSNAME).o
-ath_hal-objs	:= ah_osdep.o ../openhal/ar5xxx.o ../openhal/ar5212.o ../openhal/ar5211.o ../openhal/ar5210.o ../openhal/ieee80211_regdomain.o
+obj-m		+= ath_$(BUSNAME).o
+ath_$(BUSNAME)-objs	:= if_ath.o if_ath_d80211.o if_ath_$(BUSNAME).o
 
-INCS+=	-I$(HAL) -I$(obj) -I$(HAL)/$(OS) -I$(obj)/$(WLAN) -I$(obj)/$(DEPTH)
+INCS += -I$(TOP) -I$(HAL)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/.opt_ah.h\"
-
--include $(TOPDIR)/Rules.make
+EXTRA_CFLAGS+= $(INCS) $(COPTS)
 
 all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
@@ -72,7 +69,6 @@ all:
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
 	cp ath_$(BUSNAME).$(KMODSUF) $(DESTDIR)/$(KMODPATH)
-	cp ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	rm -f *~ *.o *.ko *.mod.c .*.cmd
