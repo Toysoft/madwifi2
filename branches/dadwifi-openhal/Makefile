@@ -33,7 +33,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/Makefile $
+# $Id: Makefile 1932 2007-01-12 02:02:00Z proski $
 #
 
 #
@@ -44,18 +44,27 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	.
+TOP = $(obj)
 
-include $(obj)/Makefile.inc
+ifneq (svnversion.h,$(MAKECMDGOALS))
+include $(TOP)/Makefile.inc
+endif
 
-DIRS_MODULES = $(ATH)
+# FIXME add $(ATH_RATE)
+DIRS_MODULES = $(ATH) $(HAL)
 
-obj-y := ath/
+obj-y := ath/ openhal/
 
 all: modules tools
 
 modules: configcheck svnversion.h
+ifdef LINUX24
+	for i in $(DIRS_MODULES); do \
+		$(MAKE) -C $$i || exit 1; \
+	done
+else
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+endif
 
 .PHONY: svnversion.h
 svnversion.h:
@@ -101,7 +110,7 @@ clean:
 	done
 	-$(MAKE) -C $(TOOLS) clean
 	rm -rf .tmp_versions
-	rm -f Modules.symvers svnversion.h
+	rm -f *.symvers svnversion.h
 
 info:
 	@echo "The following settings will be used for compilation:"
@@ -115,10 +124,6 @@ info:
 	@echo "KERNELCONF   : $(KERNELCONF)"
 	@echo "KMODPATH     : $(KMODPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
-	@if [ -n "$(DESTDIR)" ]; then \
-	    echo "DESTDIR      : $(DESTDIR)"; \
-	    echo "SYSTEMMAP    : $(SYSTEMMAP)"; \
-	fi
 
 sanitycheck:
 	@echo -n "Checking requirements... "
@@ -135,10 +140,6 @@ sanitycheck:
 .PHONY: release
 release:
 	sh scripts/make-release.bash
-
-# new targets should be inserted ABOVE this line in order to avoid
-# problems with the included kernel configuration file below.
-include $(KERNELCONF)
 
 configcheck: sanitycheck
 	@echo -n "Checking kernel configuration... "
@@ -158,7 +159,7 @@ configcheck: sanitycheck
 	    exit 1; \
 	fi
 	
-ifneq ($(strip $(BUS)),AHB)
+ifeq ($(strip $(BUS)),PCI)
 	@# check PCI support
 	@if [ -z "$(CONFIG_PCI)" ]; then \
 	    echo "FAILED"; \

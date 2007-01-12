@@ -33,12 +33,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/Makefile.inc#11 $
+# $Id: Makefile.inc 1939 2007-01-12 03:42:00Z proski $
 #
-
-ifeq ($(obj),)
-obj=	.
-endif
 
 # other locales sometimes cause trouble
 export LC_ALL = POSIX
@@ -60,8 +56,6 @@ DESTDIR ?=
 # another kernel, set KERNELPATH manually, for example with:
 # make KERNELPATH=/path/to/kernel/source
 
-# TOOLPATH is the path which contains the crosscompile toolchain (?)
-
 # The default KERNELPATH points to the directory where the currently
 # running kernel was compiled.  Note that the configuration and the
 # version of the kernel tree might have changed since then.
@@ -82,7 +76,10 @@ endif
 # in that file.
 # This trick has been inspired by the lm_sensors project.
 ifndef KERNELRELEASE
-KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(DEPTH)/kernelversion.c | grep uts_release | cut -f2 -d'"')
+KERNELRELEASE := $(shell $(CC) -I $(KERNELPATH)/include -E $(TOP)/kernelversion.c | grep uts_release | cut -f2 -d'"')
+ifeq (,$(KERNELRELEASE))
+$(error Cannot detect kernel version - please check compiler and KERNELPATH)
+endif
 endif
 
 # KERNELCONF is the name of the file that holds the configuration
@@ -93,19 +90,11 @@ KERNELCONF ?=	$(KERNELPATH)/.config
 ifeq ($(wildcard $(KERNELCONF)),)
 $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
-
-# SYSTEMMAP is the name of the System.map file for the target
-# kernel. This will be needed when DESTDIR is defined in order
-# to run depmod properly.
-SYSTEMMAP ?= 	$(KERNELPATH)/System.map
+include $(KERNELCONF)
 
 # KMODPATH nominates the directory where the modules will be
 # installed to
-ifeq ($(strip $(BUS)),AHB)
-KMODPATH := 	$(KERNELPATH)/arch/mips/ar531x/RAMDISK/rootdir/lib/modules/$(KERNELRELEASE)/net
-else
 KMODPATH :=	/lib/modules/$(KERNELRELEASE)/net
-endif
 
 # Recognize 2.4.x kernels to support the old build system
 ifeq ($(filter-out 2.4%,$(KERNELRELEASE)),)
@@ -121,22 +110,15 @@ KMODSUF		:= o
 endif
 
 NM=		nm
-AWK=		awk
 
 #
 # Path to the HAL source code.
 #
-ifeq ($(HAL),)
-HAL=	$(obj)/$(DEPTH)/openhal
-endif
-#
-# Path to the 802.11 include files.
-#
-WLAN=	$(DEPTH)/net80211
+HAL=	$(TOP)/openhal
 #
 # Path to the Atheros device driver.
 #
-ATH=	$(DEPTH)/ath
+ATH=	$(TOP)/ath
 #
 # Path to the rate control algorithm.
 #
@@ -146,14 +128,10 @@ endif
 #
 # Path to the userspace utilities. 
 # 
-TOOLS=  $(DEPTH)/tools 
+TOOLS=  $(TOP)/tools 
 
-#COPTS+=	-Werror
-INCS=	-include $(obj)/$(DEPTH)/include/compat.h -I$(obj)/$(DEPTH)/include
-
-ifeq ($(strip $(BUS)),AHB)
-INCS+= -isystem $(TOOLPATH)/include
-endif
+COPTS+=	-Wall
+INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
 
 include $(obj)/$(DEPTH)/BuildCaps.inc
 

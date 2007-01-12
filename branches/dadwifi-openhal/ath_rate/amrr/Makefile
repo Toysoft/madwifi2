@@ -44,19 +44,16 @@ ifeq ($(obj),)
 obj=	.
 endif
 
-DEPTH=	../..
+TOP = $(obj)/../..
 
 obj-m		+= ath_rate_amrr.o
 ath_rate_amrr-objs	:= amrr.o
 
-include $(obj)/$(DEPTH)/Makefile.inc
+include $(TOP)/Makefile.inc
 
-INCS+=	-I$(HAL) -I$(HAL)/$(OS) -I$(obj)/$(ATH) -I$(obj)/$(WLAN) \
-	-I$(obj)/$(DEPTH)
+INCS += -I$(TOP) -I$(ATH) -I$(HAL)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS)
-
--include $(TOPDIR)/Rules.make
 
 all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules

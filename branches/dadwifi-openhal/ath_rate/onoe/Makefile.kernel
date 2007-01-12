@@ -7,14 +7,17 @@
 src ?= .
 srctree ?= .
 
-include $(srctree)/$(src)/../../BuildCaps.inc
+TOP = $(srctree)/$(src)/../..
 
-HAL=	$(srctree)/$(src)/../../openhal
-ATH=	$(srctree)/$(src)/../../ath
-COMPAT=	$(srctree)/$(src)/../../include
+include $(TOP)/BuildCaps.inc
 
-INCS=	-include $(COMPAT)/compat.h -I$(COMPAT)
-EXTRA_CFLAGS+=	$(INCS) -I$(HAL) -I$(ATH) -I$(src)/../..
+ATH=	$(TOP)/ath
+COMPAT=	$(TOP)/include
+HAL=	$(TOP)/openhal
+
+INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
+INCS += -I$(TOP) -I$(ATH) -I$(HAL)
+EXTRA_CFLAGS += $(INCS) $(COPTS)
 
 obj-$(CONFIG_ATHEROS) += ath_rate_onoe.o
 ath_rate_onoe-objs	:= onoe.o
