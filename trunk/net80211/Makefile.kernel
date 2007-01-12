@@ -34,7 +34,7 @@ MOD_AUTH	:= wlan_xauth.o
 #
 MOD_SCAN	:= wlan_scan_sta.o wlan_scan_ap.o
 
-obj-$(CONFIG_NET80211) += wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o wlan_acl.o \
+obj-$(CONFIG_ATHEROS) += wlan.o wlan_wep.o wlan_tkip.o wlan_ccmp.o wlan_acl.o \
 		   $(MOD_AUTH) $(MOD_SCAN)
 
 wlan-objs	:= if_media.o \
