@@ -43,9 +43,6 @@ endif
 # other locales sometimes cause trouble
 export LC_ALL = POSIX
 
-# OS is the target operating system. Currently only Linux is supported.
-OS=		linux
-
 # BUS defines the bus type to which the wireless devices is attached.
 # Currently, the valid BUS types are PCI and AHB.  If BUS is not
 # defined, then, we assume the bus type is PCI
@@ -65,20 +62,6 @@ DESTDIR ?=
 
 # TOOLPATH is the path which contains the crosscompile toolchain (?)
 
-ifeq ($(strip $(BUS)),AHB)
-# Bus type AHB forces the target platform to be mipsisa32.
-TARGET :=	mipsisa32-be-elf
-
-# Bus type AHB requires KERNELPATH and TOOLPATH to be set manually.
-ifndef KERNELPATH
-$(error KERNELPATH must be defined for bus type AHB.)
-endif
-ifndef TOOLPATH
-$(error TOOLPATH must be defined for bus type AHB.)
-endif
-
-else
-
 # The default KERNELPATH points to the directory where the currently
 # running kernel was compiled.  Note that the configuration and the
 # version of the kernel tree might have changed since then.
@@ -89,8 +72,6 @@ ifeq ($(shell cd $(KERNELPATH) && pwd),)
 $(error $(KERNELPATH) is missing, please set KERNELPATH)
 endif
 export KERNELPATH
-endif
-
 endif
 
 # KERNELRELEASE is the target kernel's version.  It's always taken from
@@ -112,20 +93,6 @@ KERNELCONF ?=	$(KERNELPATH)/.config
 ifeq ($(wildcard $(KERNELCONF)),)
 $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
-
-# Determine target architecture of the kernel.
-ifeq (,$(ARCH_TARGET))
-ARCH_TARGET=$(shell $(DEPTH)/scripts/get_arch_target.sh $(KERNELCONF))
-ARCH ?= $(word 1,$(ARCH_TARGET))
-TARGET ?= $(word 2,$(ARCH_TARGET))
-endif
-
-ifeq (,$(ARCH))
-$(error Cannot determine kernel architecture, please check $(KERNELCONF))
-endif
-export ARCH
-export TARGET
-export ARCH_TARGET
 
 # SYSTEMMAP is the name of the System.map file for the target
 # kernel. This will be needed when DESTDIR is defined in order
@@ -188,41 +155,7 @@ ifeq ($(strip $(BUS)),AHB)
 INCS+= -isystem $(TOOLPATH)/include
 endif
 
-# TARGET defines the target platform architecture. It must match one of
-# the target platforms supported by the HAL. The default target is the
-# host machine architecture. You can override TARGET on the make command
-# line or in the environment. See hal/linux/*.inc for the list of
-# supported targets.
-#ifeq (,$(wildcard $(HAL)/public/$(TARGET).inc))
-#TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
-#$(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
-#endif
-
-# Don't let HAL mess with the toolchain - save toolchain valiables
-save_CC := $(CC)
-save_LD := $(LD)
-save_STRIP := $(STRIP)
-save_OBJCOPY := $(OBJCOPY)
-save_NM := $(NM)
-
-#include $(HAL)/public/$(TARGET).inc
-
-# Restore toolchain valiables
-CC := $(save_CC)
-LD := $(save_LD)
-STRIP := $(save_STRIP)
-OBJCOPY := $(save_OBJCOPY)
-NM := $(save_NM)
-
 include $(obj)/$(DEPTH)/BuildCaps.inc
-
-# Ensure correct endianess
-LDFLAGS += $(LDOPTS)
-
-# Filter out compiler options that are not supported by all compilers
-# and that are not needed to ensure compatible architecture and calling
-# conventions.
-COPTS := $(filter-out -mshort-load-bytes,$(COPTS))
 
 
 # The following variables will affect developers only, and are used in the

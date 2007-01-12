@@ -39,10 +39,8 @@ PATCH()
 # Location of various pieces.  These mimic what is in Makefile.inc
 # and can be overridden from the environment.
 #
-SRC_HAL=${HAL:-${SRC}/hal}
-test -d ${SRC_HAL} || die "No hal directory ${SRC_HAL}"
-SRC_NET80211=${WLAN:-${SRC}/net80211}
-test -d ${SRC_NET80211} || die "No net80211 directory ${SRC_NET80211}"
+SRC_HAL=${HAL:-${SRC}/openhal}
+test -d ${SRC_HAL} || die "No openhal directory ${SRC_HAL}"
 SRC_ATH=${ATH:-${SRC}/ath}
 test -d ${SRC_ATH} || die "No ath directory ${SRC_ATH}"
 SRC_ATH_RATE=${SRC}/ath_rate
@@ -57,11 +55,6 @@ test -d ${WIRELESS} || die "No wireless directory ${WIRELESS}"
 if test -f ${WIRELESS}/Kconfig; then
 	kbuild=2.6
 	kbuildconf=Kconfig
-	makedef=LINUX26
-else if test -f ${WIRELESS}/Config.in; then
-	kbuild=2.4
-	kbuildconf=Config.in
-	makedef=LINUX24
 else
 	die "Kernel build system is not supported"
 fi
@@ -73,18 +66,6 @@ rm -rf ${MADWIFI}
 mkdir -p ${MADWIFI}
 make -s -C ${SRC} svnversion.h KERNELPATH=${KERNEL_PATH} KERNELCONF=/dev/null ARCH=. TARGET=i386-elf
 cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
-cat >>${MADWIFI}/BuildCaps.inc <<EOF
-
-EXTRA_CFLAGS += \$(COPTS)
-
-ifdef CONFIG_CPU_BIG_ENDIAN
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
-else
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
-endif
-
-$makedef := 1
-EOF
 
 
 echo "Copying source files"

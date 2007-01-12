@@ -55,13 +55,7 @@ obj-y := ath/
 all: modules tools
 
 modules: configcheck svnversion.h
-ifdef LINUX24
-	for i in $(DIRS_MODULES); do \
-		$(MAKE) -C $$i || exit 1; \
-	done
-else
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
-endif
 
 .PHONY: svnversion.h
 svnversion.h:
@@ -111,8 +105,6 @@ clean:
 
 info:
 	@echo "The following settings will be used for compilation:"
-	@echo "TARGET       : $(TARGET)"
-	@echo "OS           : $(OS)"
 	@echo "ARCH         : $(ARCH)"
 	@echo "BUS          : $(BUS)"
 	@if [ -n "$(TOOLPATH)" ]; then \
