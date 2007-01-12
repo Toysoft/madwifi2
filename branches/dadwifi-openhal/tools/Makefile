@@ -41,7 +41,7 @@ MANDIR ?= /usr/local/man
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=   $(DEPTH)/hal
+HAL=   $(DEPTH)/openhal
 endif
 
 INCS=  -include $(DEPTH)/include/compat.h
