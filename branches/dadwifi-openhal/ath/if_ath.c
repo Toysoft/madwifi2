@@ -399,7 +399,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	 * built with an ah.h that does not correspond to the hal
 	 * module loaded in the kernel.
 	 */
-	ah = _ath_hal_attach(devid, sc, NULL, (void *) sc->sc_mem_start, &status);
+	ah = _ath_hal_attach(devid, sc, 0, (void *) sc->sc_mem_start, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
 			sc->name, ath_get_hal_status_desc(status), status);
@@ -5195,7 +5195,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds = bf->bf_desc;
 	ds->ds_link = bf->bf_daddr;		/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
-	ds->ds_vdata = (void *) skb->data;	/* virt addr of buffer */
+//	ds->ds_vdata = (void *) skb->data;	/* virt addr of buffer */
 	ath_hal_setuprxdesc(ah, ds
 		, skb_tailroom(skb)		/* buffer size */
 		, 0
