@@ -133,7 +133,7 @@ TOOLS=  $(TOP)/tools
 COPTS+=	-Wall
 INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
 
-include $(obj)/$(DEPTH)/BuildCaps.inc
+include $(TOP)/BuildCaps.inc
 
 
 # The following variables will affect developers only, and are used in the
