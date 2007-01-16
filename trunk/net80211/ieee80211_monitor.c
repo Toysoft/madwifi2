@@ -489,6 +489,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
+				if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
+					th->wr_flags |= IEEE80211_RADIOTAP_F_BADFCS;
 
 				th->wr_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
 				th->wr_chan_freq = cpu_to_le16(ic->ic_curchan->ic_freq);
