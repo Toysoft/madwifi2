@@ -319,17 +319,42 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 		u_int8_t dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
 
-		if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-			if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
-				pkttype = PACKET_BROADCAST;
-			else
-				pkttype = PACKET_MULTICAST;
-		} else if (tx)
-			pkttype = PACKET_OUTGOING;
-		else
-			pkttype = PACKET_HOST;
-
 		next = TAILQ_NEXT(vap, iv_next);
+		/* If we have rx'd an error frame... */
+		if (!tx && ds->ds_rxstat.rs_status != 0) {
+			
+			/* Discard PHY errors if necessary */
+			if (ds->ds_rxstat.rs_status & HAL_RXERR_PHY) {
+				if (vap->iv_monitor_phy_errors == 0) continue;
+			}
+			
+			/* Discard CRC errors if necessary */
+			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
+				if (vap->iv_monitor_crc_errors == 0) continue;
+			}
+			
+			/* Accept PHY, CRC and decrypt errors. Discard the rest. */
+			if (ds->ds_rxstat.rs_status &~
+					(HAL_RXERR_DECRYPT | HAL_RXERR_MIC |
+					 HAL_RXERR_PHY | HAL_RXERR_CRC )) 
+				continue;
+
+			/* We can't use addr1 to determine direction at this point */
+			pkttype = PACKET_HOST;
+		} else {
+			/* 
+			 * The frame passed it's CRC, so we can rely
+			 * on the contents of the frame to set pkttype.
+			 */
+			if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+				if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
+					pkttype = PACKET_BROADCAST;
+				else
+					pkttype = PACKET_MULTICAST;
+			} else
+				pkttype = (tx) ? PACKET_OUTGOING : PACKET_HOST;
+		}
+
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
 		    vap->iv_state != IEEE80211_S_RUN)
 			continue;

@@ -5567,7 +5567,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				sc->sc_stats.ast_rx_phyerr++;
 				phyerr = ds->ds_rxstat.rs_phyerr & 0x1f;
 				sc->sc_stats.ast_rx_phy[phyerr]++;
-				goto rx_next;
 			}
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_DECRYPT) {
 				/*
@@ -5608,14 +5607,10 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				}
 			}
 			/*
-			 * Reject error frames, we normally don't want
-			 * to see them in monitor mode (in monitor mode
-			 * allow through packets that have crypto problems).
+			 * Reject error frames if we have no vaps that 
+			 * are operating in monitor mode.
 			 */
-			if ((ds->ds_rxstat.rs_status &~
-				(HAL_RXERR_DECRYPT|HAL_RXERR_MIC)) ||
-			    sc->sc_ic.ic_opmode != IEEE80211_M_MONITOR)
-				goto rx_next;
+			if(sc->sc_nmonvaps == 0) goto rx_next;
 		}
 rx_accept:
 		/*
@@ -5640,12 +5635,11 @@ rx_accept:
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
 
 		if (sc->sc_nmonvaps > 0) {
-			/*
-			 * Some VAP is in monitor mode.  Discard
-			 * anything shorter than an ack or cts, clean
-			 * the skbuff, fabricate the Prism header
-			 * existing tools expect, and dispatch.
+			/* 
+			 * Some vap is in monitor mode, so send to
+			 * ath_rx_capture for monitor encapsulation
 			 */
+#if 0
 			if (len < IEEE80211_ACK_LEN) {
 				DPRINTF(sc, ATH_DEBUG_RECV,
 					"%s: runt packet %d\n", __func__, len);
@@ -5654,6 +5648,7 @@ rx_accept:
 				skb = NULL;
 				goto rx_next;
 			}
+#endif
 			ath_rx_capture(dev, ds, skb);
 			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
 				/* no other VAPs need the packet */
@@ -5663,6 +5658,16 @@ rx_accept:
 			}
 		}
 
+		/*
+		 * Finished monitor mode handling, now reject
+		 * error frames before passing to other vaps
+		 */
+		if (ds->ds_rxstat.rs_status != 0) {
+			dev_kfree_skb(skb);
+			skb = NULL;
+			goto rx_next;
+		}
+		
 		/* remove the CRC */
 		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 
