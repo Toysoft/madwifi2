@@ -565,6 +565,51 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_txf_len, ctl, write, filp, buffer
 	}
 	return ret;
 }
+static int
+IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_phy_errors, ctl, write, filp, buffer,
+	lenp, ppos)
+{
+	struct ieee80211vap *vap = ctl->extra1;
+	u_int val;
+	int ret;
+
+	ctl->data = &val;
+	ctl->maxlen = sizeof(val);
+	if (write) {
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+			lenp, ppos);
+		if (ret == 0)
+			vap->iv_monitor_phy_errors = val;
+	} else {
+		val = vap->iv_monitor_phy_errors;
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+			lenp, ppos);
+	}
+	return ret;
+}
+
+static int
+IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_crc_errors, ctl, write, filp, buffer,
+	lenp, ppos)
+{
+	struct ieee80211vap *vap = ctl->extra1;
+	u_int val;
+	int ret;
+
+	ctl->data = &val;
+	ctl->maxlen = sizeof(val);
+	if (write) {
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+			lenp, ppos);
+		if (ret == 0)
+			vap->iv_monitor_crc_errors = val;
+	} else {
+		val = vap->iv_monitor_crc_errors;
+		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
+			lenp, ppos);
+	}
+	return ret;
+}
 
 #define	CTL_AUTO	-2	/* cannot be CTL_ANY or CTL_NONE */
 
@@ -590,6 +635,16 @@ static const ctl_table ieee80211_sysctl_template[] = {
 	  .procname	= "monitor_txf_len",
 	  .mode		= 0644,
 	  .proc_handler	= ieee80211_sysctl_monitor_txf_len
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "monitor_phy_errors",
+	  .mode		= 0644,
+	  .proc_handler = ieee80211_sysctl_monitor_phy_errors
+	},
+	{ .ctl_name	= CTL_AUTO,
+	  .procname	= "monitor_crc_errors",
+	  .mode		= 0644,
+	  .proc_handler = ieee80211_sysctl_monitor_crc_errors
 	},
 	/* NB: must be last entry before NULL */
 	{ .ctl_name	= CTL_AUTO,

@@ -321,6 +321,8 @@ struct ieee80211vap {
 
 	int iv_monitor_nods_only;		/* in monitor mode only nods traffic */
 	int iv_monitor_txf_len;			/* in monitor mode, truncate tx packets */
+	int iv_monitor_phy_errors;		/* in monitor mode, accept phy errors */
+	int iv_monitor_crc_errors;		/* in monitor mode, accept crc errors */
 
 	int (*iv_newstate)(struct ieee80211vap *, enum ieee80211_state, int);
 	u_int8_t iv_myaddr[IEEE80211_ADDR_LEN];
