@@ -346,13 +346,15 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			 * The frame passed it's CRC, so we can rely
 			 * on the contents of the frame to set pkttype.
 			 */
-			if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+			if (tx)
+				pkttype = PACKET_OUTGOING;
+			else if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 				if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
 					pkttype = PACKET_BROADCAST;
 				else
 					pkttype = PACKET_MULTICAST;
 			} else
-				pkttype = (tx) ? PACKET_OUTGOING : PACKET_HOST;
+				pkttype = PACKET_HOST;
 		}
 
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
