@@ -46,12 +46,6 @@
 #include "ah.h"
 #include "ah_os.h"
 #include "if_athioctl.h"
-#ifdef CONFIG_NET80211
-#include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
-#define ATH_GET_SOFTC(dev) dev->priv
-#define ATH_START_QUEUE(dev) netif_start_queue(dev)
-#define ATH_STOP_QUEUE(dev) netif_stop_queue(dev)
-#else
 
 #include <sys/queue.h>
 #include <net/d80211.h>
@@ -87,7 +81,6 @@ enum ieee80211_phytype {
 #define ATH_GET_SOFTC(dev) ieee80211_dev_hw_data(dev)
 #define ATH_START_QUEUE(dev) ieee80211_start_queues(dev)
 #define ATH_STOP_QUEUE(dev) ieee80211_stop_queues(dev)
-#endif
 
 /*
  * Deduce if tasklets are available.  If not then
@@ -362,9 +355,6 @@ typedef STAILQ_HEAD(, ath_buf) ath_bufhead;
 
 /* driver-specific node state */
 struct ath_node {
-#ifdef CONFIG_NET80211
-	struct ieee80211_node an_node;		/* base class */
-#endif
 	u_int16_t an_decomp_index; 		/* decompression mask index */
 	u_int32_t an_avgrssi;			/* average rssi over all rx frames */
 	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
@@ -556,9 +546,6 @@ struct ath_bss {
 #define	BSTUCK_THRESH	3	/* # of stuck beacons before resetting NB: this is a guess*/
 
 struct ath_softc {
-#ifdef CONFIG_NET80211
-	struct ieee80211com sc_ic;		/* NB: must be first */
-#endif
 	char name[IFNAMSIZ];
 	void __iomem *sc_iobase;		/* address of the device */
 	struct semaphore sc_lock;		/* dev-level lock */
@@ -614,11 +601,7 @@ struct ath_softc {
 	const HAL_RATE_TABLE *sc_half_rates;	/* half rate table */
 	const HAL_RATE_TABLE *sc_quarter_rates;	/* quarter rate table */
 	HAL_OPMODE sc_opmode;			/* current hal operating mode */
-#ifdef CONFIG_NET80211
-	enum ieee80211_phymode sc_curmode;	/* current phy mode */
-#else
 	int			sc_mode;	/* current ieee80211 phy mode */
-#endif
 	u_int16_t sc_curtxpow;			/* current tx power limit */
 	u_int16_t sc_curaid;			/* current association id */
 	HAL_CHANNEL sc_curchan;			/* current h/w channel */
@@ -731,7 +714,6 @@ struct ath_softc {
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
   
-#ifndef CONFIG_NET80211
 #define ATH_MAX_HW_MODES	5
 #define ATH_MAX_CHANNELS	64
 #define ATH_MAX_RATES		16	
@@ -749,7 +731,6 @@ struct ath_softc {
 	int sc_num_bss;			/* # of used elements in sc_bss */
 	struct ath_bss *sc_bss;		/* array of per bss info */
 	int sc_beacon_interval;		/* beacon interval in units of TU */
-#endif
 	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
 };
 

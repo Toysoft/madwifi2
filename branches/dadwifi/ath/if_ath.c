@@ -133,9 +133,6 @@ static void ath_setslottime(struct ath_softc *);
 static void ath_updateslot(struct net_device *);
 #endif
 static int ath_beaconq_setup(struct ath_hal *);
-#if 0
-static int ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
-#endif
 #ifdef ATH_SUPERG_DYNTURBO
 static void ath_beacon_dturbo_update(struct ieee80211vap *, int *, u_int8_t);
 static void ath_beacon_dturbo_config(struct ieee80211vap *, u_int32_t);
@@ -2502,7 +2499,6 @@ static struct ath_buf *ath_get_tx_buf(struct ath_softc *sc) {
 		goto hardstart_fail;					\
 	}
 
-#ifndef CONFIG_NET80211
 
 int
 ath_d80211_tx(struct ieee80211_hw *hw, struct sk_buff *skb,
@@ -2522,385 +2518,6 @@ ath_d80211_tx(struct ieee80211_hw *hw, struct sk_buff *skb,
 hardstart_fail:
 	return 1;
 }
-
-#else
-
-/*
- * Transmit a data packet.  On failure caller is
- * assumed to reclaim the resources.
- *
- * Context: process context with BH's disabled
- */
-static int
-ath_hardstart(struct sk_buff *skb, struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211_node *ni = NULL;
-	struct ath_buf *bf = NULL;
-	struct ieee80211_cb *cb = (struct ieee80211_cb *) skb->cb;
-	struct ether_header *eh;
-	STAILQ_HEAD(tmp_bf_head, ath_buf) bf_head;
-	struct ath_buf *tbf, *tempbf;
-	struct sk_buff *tskb;
-	int framecnt;
-#ifdef ATH_SUPERG_FF
-	int pktlen;
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ath_node *an;
-	struct ath_txq *txq = NULL;
-	int ff_flush;
-	struct ieee80211vap *vap;
-#endif
-
-	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
-		DPRINTF(sc, ATH_DEBUG_XMIT,
-			"%s: discard, invalid %d flags %x\n",
-			__func__, sc->sc_invalid, dev->flags);
-		sc->sc_stats.ast_tx_invalid++;
-		return -ENETDOWN;
-	}
-
-
-	STAILQ_INIT(&bf_head);
-
-	if (cb->flags & M_RAW) {
-		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-		return ath_tx_startraw(dev, bf, skb);
-	}
-
-	eh = (struct ether_header *) skb->data;
-	ni = cb->ni;		/* NB: always passed down by 802.11 layer */
-	if (ni == NULL) {
-		/* NB: this happens if someone marks the underlying device up */
-		DPRINTF(sc, ATH_DEBUG_XMIT,
-			"%s: discard, no node in cb\n", __func__);
-		goto hardstart_fail;
-	}
-#ifdef ATH_SUPERG_FF
-	vap = ni->ni_vap;
-
-	if (M_FLAG_GET(skb, M_UAPSD)) {
-		/* bypass FF handling */
-		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-		goto ff_bypass;
-	}
-
-	/*
-	 * Fast frames check.
-	 */
-	ATH_FF_MAGIC_CLR(skb);
-	an = ATH_NODE(ni);
-
-	txq = sc->sc_ac2q[skb->priority];
-
-	if (txq->axq_depth > TAIL_DROP_COUNT) {
-		sc->sc_stats.ast_tx_discard++;
-		goto hardstart_fail;
-	}
-
-	/* NB: use this lock to protect an->an_ff_txbuf in athff_can_aggregate()
-	 *     call too.
-	 */
-	ATH_TXQ_LOCK(txq);
-	if (athff_can_aggregate(sc, eh, an, skb, vap->iv_fragthreshold, &ff_flush)) {
-
-		if (an->an_tx_ffbuf[skb->priority]) { /* i.e., frame on the staging queue */
-			bf = an->an_tx_ffbuf[skb->priority];
-
-			/* get (and remove) the frame from staging queue */
-			TAILQ_REMOVE(&txq->axq_stageq, bf, bf_stagelist);
-			an->an_tx_ffbuf[skb->priority] = NULL;
-
-			ATH_TXQ_UNLOCK(txq);
-
-			/*
-			 * chain skbs and add FF magic
-			 *
-			 * NB: the arriving skb should not be on a list (skb->list),
-			 *     so "re-using" the skb next field should be OK.
-			 */
-			bf->bf_skb->next = skb;
-			skb->next = NULL;
-			skb = bf->bf_skb;
-			ATH_FF_MAGIC_PUT(skb);
-
-			/* decrement extra node reference made when an_tx_ffbuf[] was set */
-			//ieee80211_free_node(ni); /* XXX where was it set ? */
-
-			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
-				"%s: aggregating fast-frame\n", __func__);
-		} else {
-			/* NB: careful grabbing the TX_BUF lock since still holding the txq lock.
-			 *     this could be avoided by always obtaining the txbuf earlier,
-			 *     but the "if" portion of this "if/else" clause would then need
-			 *     to give the buffer back.
-			 */
-			ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
-				"%s: adding to fast-frame stage Q\n", __func__);
-
-			bf->bf_skb = skb;
-			bf->bf_node = ni;
-			bf->bf_queueage = txq->axq_totalqueued;
-			an->an_tx_ffbuf[skb->priority] = bf;
-
-			TAILQ_INSERT_HEAD(&txq->axq_stageq, bf, bf_stagelist);
-
-			ATH_TXQ_UNLOCK(txq);
-
-			return 0;
-		}
-	} else {
-		if (ff_flush) {
-			struct ath_buf *bf_ff = an->an_tx_ffbuf[skb->priority];
-
-			TAILQ_REMOVE(&txq->axq_stageq, bf_ff, bf_stagelist);
-			an->an_tx_ffbuf[skb->priority] = NULL;
-
-			ATH_TXQ_UNLOCK(txq);
-
-			/* encap and xmit */
-			bf_ff->bf_skb = ieee80211_encap(ni, bf_ff->bf_skb, &framecnt);
-
-			if (bf_ff->bf_skb == NULL) {
-				DPRINTF(sc, ATH_DEBUG_XMIT,
-					"%s: discard, ff flush encap failure\n",
-					__func__);
-				sc->sc_stats.ast_tx_encap++;
-				goto ff_flushbad;
-			}
-			pktlen = bf_ff->bf_skb->len;	/* NB: don't reference skb below */
-			/* NB: ath_tx_start() will use ATH_TXBUF_LOCK_BH(). The _BH
-			 *     portion is not needed here since we're running at
-			 *     interrupt time, but should be harmless.
-			 */
-			if (ath_tx_start(dev, ni, bf_ff, bf_ff->bf_skb, 0))
-				goto ff_flushbad;
-			goto ff_flushdone;
-		ff_flushbad:
-			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
-				"%s: ff stageq flush failure\n", __func__);
-			ieee80211_free_node(ni);
-			if (bf_ff->bf_skb) {
-				dev_kfree_skb(bf_ff->bf_skb);
-				bf_ff->bf_skb = NULL;
-			}
-			bf_ff->bf_node = NULL;
-
-			ATH_TXBUF_LOCK(sc);
-			STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
-			ATH_TXBUF_UNLOCK(sc);
-			goto ff_flushdone;
-		}
-		/*
-		 * XXX: out-of-order condition only occurs for AP mode and multicast.
-		 *      But, there may be no valid way to get this condition.
-		 */
-		else if (an->an_tx_ffbuf[skb->priority]) {
-			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
-				"%s: Out-Of-Order fast-frame\n", __func__);
-			ATH_TXQ_UNLOCK(txq);
-		} else
-			ATH_TXQ_UNLOCK(txq);
-
-	ff_flushdone:
-		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-	}
-
-ff_bypass:
-
-#else /* ATH_SUPERG_FF */
-
-	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-
-#endif /* ATH_SUPERG_FF */
-
-	/*
-	 * Encapsulate the packet for transmission.
-	 */
-	skb = ieee80211_encap(ni, skb, &framecnt);
-	if (skb == NULL) {
-		DPRINTF(sc, ATH_DEBUG_XMIT,
-			"%s: discard, encapsulation failure\n", __func__);
-		sc->sc_stats.ast_tx_encap++;
-		goto hardstart_fail;
-	}
-
-	if (framecnt > 1) {
-		int bfcnt;
-
-		/*
-		**  Allocate 1 ath_buf for each frame given 1 was 
-		**  already alloc'd
-		*/
-		ATH_TXBUF_LOCK(sc);
-		for (bfcnt = 1; bfcnt < framecnt; ++bfcnt) {
-			if ((tbf = STAILQ_FIRST(&sc->sc_txbuf)) != NULL) {
-				STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
-				STAILQ_INSERT_TAIL(&bf_head, tbf, bf_list);
-			}
-			else
-				break;
-			
-			ieee80211_ref_node(ni);
-		}
-
-		if (bfcnt != framecnt) {
-			if (!STAILQ_EMPTY(&bf_head)) {
-				/*
-				**  Failed to alloc enough ath_bufs;
-				**  return to sc_txbuf list
-				*/
-				STAILQ_FOREACH_SAFE(tbf, &bf_head, bf_list, tempbf) {
-					STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
-				}
-			}
-			ATH_TXBUF_UNLOCK(sc);
-			STAILQ_INIT(&bf_head);
-			goto hardstart_fail;
-		}
-		ATH_TXBUF_UNLOCK(sc);
-
-		while ((bf = STAILQ_FIRST(&bf_head)) != NULL && skb != NULL) {
-			int nextfraglen = 0;
-
-			STAILQ_REMOVE_HEAD(&bf_head, bf_list);
-			tskb = skb->next;
-			skb->next = NULL;
-			if (tskb)
-				nextfraglen = tskb->len;
-
-			if (ath_tx_start(dev, ni, bf, skb, nextfraglen) != 0) {
-				STAILQ_INSERT_TAIL(&bf_head, bf, bf_list);
-				skb->next = tskb;
-				goto hardstart_fail;
-			}
-			skb = tskb;
-		}
-	} else {
-		if (ath_tx_start(dev, ni, bf, skb, 0) != 0) {
-			STAILQ_INSERT_TAIL(&bf_head, bf, bf_list);
-			goto hardstart_fail;
-		}
-	}
-
-#ifdef ATH_SUPERG_FF
-	/*
-	 * flush out stale FF from staging Q for applicable operational modes.
-	 */
-	/* XXX: ADHOC mode too? */
-	if (txq && ic->ic_opmode == IEEE80211_M_HOSTAP)
-		ath_ffstageq_flush(sc, txq, ath_ff_ageflushtestdone);
-#endif
-
-	return 0;
-
-hardstart_fail:
-	if (!STAILQ_EMPTY(&bf_head)) {
-		ATH_TXBUF_LOCK(sc);
-		STAILQ_FOREACH_SAFE(tbf, &bf_head, bf_list, tempbf) {
-			tbf->bf_skb = NULL;
-			tbf->bf_node = NULL;
-			
-			if (ni != NULL) 
-				ieee80211_free_node(ni);
-
-			STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
-		}
-		ATH_TXBUF_UNLOCK(sc);
-	}
-
-	/* free sk_buffs */
-	while (skb) {
-		tskb = skb->next;
-		skb->next = NULL;
-		dev_kfree_skb(skb);
-		skb = tskb;
-	}
-	return 0;	/* NB: return !0 only in a ``hard error condition'' */
-}
-#undef ATH_HARDSTART_GET_TX_BUF_WITH_LOCK
-#endif
-
-#if 0
-/*
- * Transmit a management frame.  On failure we reclaim the skbuff.
- * Note that management frames come directly from the 802.11 layer
- * and do not honor the send queue flow control.  Need to investigate
- * using priority queuing so management frames can bypass data.
- *
- * Context: hwIRQ and softIRQ
- */
-static int
-ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
-{
-	struct net_device *dev = ic->ic_dev;
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211_node *ni = NULL;
-	struct ath_buf *bf = NULL;
-	struct ieee80211_cb *cb;
-	int error;
-
-	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
-		DPRINTF(sc, ATH_DEBUG_XMIT,
-			"%s: discard, invalid %d flags %x\n",
-			__func__, sc->sc_invalid, dev->flags);
-		sc->sc_stats.ast_tx_invalid++;
-		error = -ENETDOWN;
-		goto bad;
-	}
-	/*
-	 * Grab a TX buffer and associated resources.
-	 */
-	ATH_TXBUF_LOCK_IRQ(sc);
-	bf = STAILQ_FIRST(&sc->sc_txbuf);
-	if (bf != NULL)
-		STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
-	if (STAILQ_EMPTY(&sc->sc_txbuf)) {
-		DPRINTF(sc, ATH_DEBUG_XMIT, "%s: stop queue\n", __func__);
-		sc->sc_stats.ast_tx_qstop++;
-		netif_stop_queue(dev);
-		sc->sc_devstopped=1;
-		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
-	}
-	ATH_TXBUF_UNLOCK_IRQ(sc);
-	if (bf == NULL) {
-		printk("ath_mgtstart: discard, no xmit buf\n");
-		sc->sc_stats.ast_tx_nobufmgt++;
-		error = -ENOBUFS;
-		goto bad;
-	}
-
-	/*
-	 * NB: the referenced node pointer is in the
-	 * control block of the sk_buff.  This is
-	 * placed there by ieee80211_mgmt_output because
-	 * we need to hold the reference with the frame.
-	 */
-	cb = (struct ieee80211_cb *)skb->cb;
-	ni = cb->ni;
-	error = ath_tx_start(dev, ni, bf, skb, 0);
-	if (error == 0) {
-		sc->sc_stats.ast_tx_mgmt++;
-		return 0;
-	}
-	/* fall thru... */
-bad:
-	if (ni != NULL)
-		ieee80211_free_node(ni);
-	if (bf != NULL) {
-		bf->bf_skb = NULL;
-		bf->bf_node = NULL;
-
-		ATH_TXBUF_LOCK_IRQ(sc);
-		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		ATH_TXBUF_UNLOCK_IRQ(sc);
-	}
-	dev_kfree_skb_any(skb);
-	skb = NULL;
-	return error;
-}
-#endif
 
 #ifdef AR_DEBUG
 static void
@@ -3746,9 +3363,6 @@ static int
 ath_beaconq_config(struct ath_softc *sc)
 {
 #define	ATH_EXPONENT_TO_VALUE(v)	((1<<v)-1)
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-#endif
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_TXQ_INFO qi;
 
@@ -3784,87 +3398,6 @@ ath_beaconq_config(struct ath_softc *sc)
 #undef ATH_EXPONENT_TO_VALUE
 }
 
-#ifdef CONFIG_NET80211
-/*
- * Allocate and setup an initial beacon frame.
- *
- * Context: softIRQ
- */
-static int
-ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
-{
-	struct ath_vap *avp = ATH_VAP(ni->ni_vap);
-	struct ieee80211_frame *wh;
-	struct ath_buf *bf;
-	struct sk_buff *skb;
-
-	/*
-	 * release the previous beacon's skb if it already exists.
-	 */
-	bf = avp->av_bcbuf;
-	if (bf->bf_skb != NULL) {
-		bus_unmap_single(sc->sc_bdev,
-		    bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
-		dev_kfree_skb(bf->bf_skb);
-		bf->bf_skb = NULL;
-	}
-	if (bf->bf_node != NULL) {
-		ieee80211_free_node(bf->bf_node);
-		bf->bf_node = NULL;
-	}
-
-	/*
-	 * NB: the beacon data buffer must be 32-bit aligned;
-	 * we assume the mbuf routines will return us something
-	 * with this alignment (perhaps should assert).
-	 */
-	skb = ieee80211_beacon_alloc(ni, &avp->av_boff);
-	if (skb == NULL) {
-		DPRINTF(sc, ATH_DEBUG_BEACON, "%s: cannot get sk_buff\n",
-			__func__);
-		sc->sc_stats.ast_be_nobuf++;
-		return -ENOMEM;
-	}
-
-	/*
-	 * Calculate a TSF adjustment factor required for
-	 * staggered beacons.  Note that we assume the format
-	 * of the beacon frame leaves the tstamp field immediately
-	 * following the header.
-	 */
-	if (sc->sc_stagbeacons && avp->av_bslot > 0) {
-		uint64_t tsfadjust;
-		/*
-		 * The beacon interval is in TU's; the TSF in usecs.
-		 * We figure out how many TU's to add to align the
-		 * timestamp then convert to TSF units and handle
-		 * byte swapping before writing it in the frame.
-		 * The hardware will then add this each time a beacon
-		 * frame is sent.  Note that we align VAPs 1..N
-		 * and leave VAP 0 untouched.  This means VAP 0
-		 * has a timestamp in one beacon interval while the
-		 * others get a timestamp aligned to the next interval.
-		 */
-		tsfadjust = (ni->ni_intval * (ATH_BCBUF - avp->av_bslot)) / ATH_BCBUF;
-		tsfadjust = cpu_to_le64(tsfadjust << 10);	/* TU->TSF */
-
-		DPRINTF(sc, ATH_DEBUG_BEACON,
-			"%s: %s beacons, bslot %d intval %u tsfadjust %llu\n",
-			__func__, sc->sc_stagbeacons ? "stagger" : "burst",
-			avp->av_bslot, ni->ni_intval, (long long) tsfadjust);
-
-		wh = (struct ieee80211_frame *) skb->data;
-		memcpy(&wh[1], &tsfadjust, sizeof(tsfadjust));
-	}
-
-	bf->bf_node = ieee80211_ref_node(ni);
-	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
-		skb->data, skb->len, BUS_DMA_TODEVICE);
-	bf->bf_skb = skb;
-
-	return 0;
-}
-#endif
 
 /*
  * Setup the beacon frame for transmit.
@@ -3945,14 +3478,9 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf,
 	}
 #endif
 
-#ifdef CONFIG_NET80211
-	hdrlen = sizeof(struct ieee80211_frame);
-	power = ni->ni_txpower;
-#else
 	hdrlen = ieee80211_get_hdrlen_from_skb(skb);
 	/* FIXME : what unit does the hal need power is? */
 	power = control->power_level > 60 ? 60 : control->power_level;
-#endif
 
 	ath_hal_setuptxdesc(ah, ds
 		, skb->len + IEEE80211_CRC_LEN	/* frame length */
@@ -4129,57 +3657,6 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		sc->sc_bmisscount = 0;
 	}
 
-#ifdef CONFIG_NET80211
-	/*
-	 * Generate beacon frames.  If we are sending frames
-	 * staggered then calculate the slot for this frame based
-	 * on the tsf to safeguard against missing an swba.
-	 * Otherwise we are bursting all frames together and need
-	 * to generate a frame for each VAP that is up and running.
-	 */
-	if (sc->sc_stagbeacons) {		/* staggered beacons */
-		struct ieee80211com *ic = &sc->sc_ic;
-		u_int64_t tsf;
-		u_int32_t tsftu;
-
-		tsf = ath_hal_gettsf64(ah);
-		tsftu = TSF_TO_TU(tsf >> 32, tsf);
-		slot = ((tsftu % ic->ic_lintval) * ATH_BCBUF) / ic->ic_lintval;
-		vap = sc->sc_bslot[(slot + 1) % ATH_BCBUF];
-		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
-			"%s: slot %d [tsf %llu tsftu %u intval %u] vap %p\n",
-			__func__, slot, (long long) tsf, tsftu, ic->ic_lintval, vap);
-		bfaddr = 0;
-		if (vap != NULL) {
-			bf = ath_beacon_generate(sc, vap, needmark);
-			if (bf != NULL)
-				bfaddr = bf->bf_daddr;
-		}
-	} else {				/* burst'd beacons */
-		u_int32_t *bflink;
-
-		bflink = &bfaddr;
-		/* XXX rotate/randomize order? */
-		for (slot = 0; slot < ATH_BCBUF; slot++) {
-			vap = sc->sc_bslot[slot];
-			if (vap != NULL) {
-				bf = ath_beacon_generate(sc, vap, needmark);
-				if (bf != NULL) {
-#ifdef AH_NEED_DESC_SWAP
-					if (bflink != &bfaddr)
-						*bflink = cpu_to_le32(bf->bf_daddr);
-					else
-						*bflink = bf->bf_daddr;
-#else
-					*bflink = bf->bf_daddr;
-#endif
-					bflink = &bf->bf_desc->ds_link;
-				}
-			}
-		}
-		*bflink = 0;			/* link of last frame */
-	}
-#else
 	{
 		u_int32_t *bflink;
 
@@ -4207,7 +3684,6 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		spin_unlock(&sc->sc_bss_lock);
 	}
 
-#endif
 	/*
 	 * Handle slot time change when a non-ERP station joins/leaves
 	 * an 11g network.  The 802.11 layer notifies us via callback,
@@ -5557,9 +5033,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
 	struct ath_buf *bf;
 	struct ath_softc *sc = (struct ath_softc *)data;
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-#endif
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_desc *ds;
 	struct sk_buff *skb;
@@ -5660,32 +5133,9 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				sc->sc_stats.ast_rx_badcrypt++;
 			}
 			if (ds->ds_rxstat.rs_status & HAL_RXERR_MIC) {
-#ifdef CONFIG_NET80211
-				/*
-				 * Do minimal work required to hand off
-				 * the 802.11 header for notification.
-				 */
-				/* XXX frag's and QoS frames */
-				len = ds->ds_rxstat.rs_datalen;
-				if (len >= sizeof (struct ieee80211_frame)) {
-					bus_dma_sync_single(sc->sc_bdev,
-					    bf->bf_skbaddr, len,
-					    BUS_DMA_FROMDEVICE);
-#if 0
-/* XXX revalidate MIC, lookup ni to find VAP */
-					ieee80211_notify_michael_failure(ic,
-					    (struct ieee80211_frame *) skb->data,
-					    sc->sc_splitmic ?
-					        ds->ds_rxstat.rs_keyix - 32 :
-					        ds->ds_rxstat.rs_keyix
-					);
-#endif
-				}
-#else
 				status.flag |= RX_FLAG_MMIC_ERROR;
 				sc->sc_stats.ast_rx_badmic++;
 				goto rx_accept;
-#endif
 			}
 			/*
 			 * Reject error frames, we normally don't want
@@ -5713,115 +5163,9 @@ rx_accept:
 		bf->bf_skb = NULL;
 
 		sc->sc_stats.ast_ant_rx[ds->ds_rxstat.rs_antenna]++;
-#ifdef CONFIG_NET80211
-		sc->sc_devstats.rx_packets++;
-		sc->sc_devstats.rx_bytes += len;
-#endif
 
 		skb_put(skb, len);
 		skb->protocol = ETH_P_CONTROL;		/* XXX */
-
-#ifdef CONFIG_NET80211
-		if (sc->sc_nmonvaps > 0) {
-			/*
-			 * Some VAP is in monitor mode.  Discard
-			 * anything shorter than an ack or cts, clean
-			 * the skbuff, fabricate the Prism header
-			 * existing tools expect, and dispatch.
-			 */
-			if (len < IEEE80211_ACK_LEN) {
-				DPRINTF(sc, ATH_DEBUG_RECV,
-					"%s: runt packet %d\n", __func__, len);
-				sc->sc_stats.ast_rx_tooshort++;
-				dev_kfree_skb(skb);
-				skb = NULL;
-				goto rx_next;
-			}
-			ath_rx_capture(dev, ds, skb);
-			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
-				/* no other VAPs need the packet */
-				dev_kfree_skb(skb);
-				skb = NULL;
-				goto rx_next;
-			}
-		}
-
-		/* remove the CRC */
-		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
-
-		/*
-		 * From this point on we assume the frame is at least
-		 * as large as ieee80211_frame_min; verify that.
-		 */
-		if (len < IEEE80211_MIN_LEN) {
-			DPRINTF(sc, ATH_DEBUG_RECV, "%s: short packet %d\n",
-				__func__, len);
-			sc->sc_stats.ast_rx_tooshort++;
-			dev_kfree_skb(skb);
-			skb = NULL;
-			goto rx_next;
-		}
-
-		/*
-		 * Normal receive.
-		 */
-
-		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV)) {
-			ieee80211_dump_pkt(ic, skb->data, skb->len,
-				   sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate,
-				   ds->ds_rxstat.rs_rssi);
-		}
-
-		/*
-		 * Locate the node for sender, track state, and then
-		 * pass the (referenced) node up to the 802.11 layer
-		 * for its use.  If the sender is unknown spam the
-		 * frame; it'll be dropped where it's not wanted.
-		 */
-		if (ds->ds_rxstat.rs_keyix != HAL_RXKEYIX_INVALID &&
-		    (ni = sc->sc_keyixmap[ds->ds_rxstat.rs_keyix]) != NULL) {
-			struct ath_node *an;
-			/*
-			 * Fast path: node is present in the key map;
-			 * grab a reference for processing the frame.
-			 */
-			an = ATH_NODE(ieee80211_ref_node(ni));
-			ATH_RSSI_LPF(an->an_avgrssi, ds->ds_rxstat.rs_rssi);
-			type = ieee80211_input(ni, skb,
-				ds->ds_rxstat.rs_rssi, ds->ds_rxstat.rs_tstamp);
-			ieee80211_free_node(ni);
-		} else {
-			/*
-			 * No key index or no entry, do a lookup and
-			 * add the node to the mapping table if possible.
-			 */
-			ni = ieee80211_find_rxnode(ic, 
-				(const struct ieee80211_frame_min *) skb->data);
-			if (ni != NULL) {
-				struct ath_node *an = ATH_NODE(ni);
-				u_int16_t keyix;
-
-				ATH_RSSI_LPF(an->an_avgrssi,
-					ds->ds_rxstat.rs_rssi);
-				type = ieee80211_input(ni, skb,
-					ds->ds_rxstat.rs_rssi,
-					ds->ds_rxstat.rs_tstamp);
-				/*
-				 * If the station has a key cache slot assigned
-				 * update the key->node mapping table.
-				 */
-				keyix = ni->ni_ucastkey.wk_keyix;
-				if (keyix != IEEE80211_KEYIX_NONE &&
-				    sc->sc_keyixmap[keyix] == NULL)
-					sc->sc_keyixmap[keyix] = ieee80211_ref_node(ni);
-				ieee80211_free_node(ni); 
-			} else
-				type = ieee80211_input_all(ic, skb,
-					ds->ds_rxstat.rs_rssi,
-					ds->ds_rxstat.rs_tstamp);
-		}
-
-#else
 
 		status.hosttime = jiffies;
 
@@ -5851,7 +5195,6 @@ rx_accept:
 			status.flag |= RX_FLAG_DECRYPTED;
 
 		__ieee80211_rx(sc->sc_hw, skb, &status);
-#endif
 		if (sc->sc_diversity) {
 			/*
 			 * When using hardware fast diversity, change the default rx
@@ -7833,9 +7176,6 @@ ath_mode_to_idx(u_int hal_mode)
 static void
 ath_chan_change(struct ath_softc *sc, HAL_CHANNEL *chan)
 {
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-#endif
 	u_int mode;
 
 	mode = hal_chan2mode(chan);
@@ -7868,10 +7208,6 @@ int
 ath_chan_set(struct ath_softc *sc, HAL_CHANNEL hchan)
 {
 	struct ath_hal *ah = sc->sc_ah;
-#ifdef CONFIG_NET80211
-	struct ieee80211com *ic = &sc->sc_ic;
-	u_int8_t tswitch = 0;
-#endif
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: %u (%u MHz) -> %u (%u MHz)\n",
 		__func__, ath_hal_mhz2ieee(ah, sc->sc_curchan.channel,
@@ -8003,40 +7339,6 @@ ath_calibrate(unsigned long arg)
 			__func__, sc->sc_curchan.channel);
 		sc->sc_stats.ast_per_calfail++;
 	}
-#ifdef CONFIG_NET80211
-	/* This code runs through the DFS non-occupancy list and marks channels
-	   as radar free.  hostapd handles this for the d80211 stack. */
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-		HAL_CHANNEL *chans;
-		struct ieee80211com *ic = &sc->sc_ic;
-		u_int32_t nchans;
-
-		chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_ATOMIC);
-		if (chans == NULL) {
-			printk("%s: unable to allocate channel table\n", dev->name);
-			return;
-		}
-		nchans = ath_hal_checknol(ah, chans, IEEE80211_CHAN_MAX);
-		if (nchans > 0) {
-			u_int32_t i, j;
-			struct ieee80211_channel *ichan;
-			
-			for (i = 0; i < nchans; i++) {
-				for (j = 0; j < ic->ic_nchans; j++) {
-					ichan = &ic->ic_channels[j];
-					if (chans[i].channel == ichan->ic_freq)
-						ichan->ic_flags &= ~IEEE80211_CHAN_RADAR;
-				}
-
-				ichan = ieee80211_find_channel(ic, chans[i].channel,
-					chans[i].channelFlags);
-				if (ichan != NULL)
-					ichan->ic_flags &= ~IEEE80211_CHAN_RADAR;
-			}
-		}
-		kfree(chans);
-	}
-#endif
 
 	if (isIQdone == AH_TRUE)
 		ath_calinterval = ATH_LONG_CALINTERVAL;
