@@ -69,6 +69,7 @@
 #include <net80211/ieee80211_radiotap.h>
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_monitor.h>
+#include <net80211/ieee80211_rate.h>
 
 #ifdef USE_HEADERLEN_RESV
 #include <net80211/if_llc.h>
@@ -76,7 +77,6 @@
 
 #define	AR_DEBUG
 
-#include "if_athrate.h"
 #include "net80211/if_athproto.h"
 #include "if_athvar.h"
 #include "ah_desc.h"
@@ -253,6 +253,7 @@ static int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static char *autocreate = NULL;
+static char *ratectl = "sample";
 static int rfkill = -1;
 static int countrycode = -1;
 static int outdoor = -1;
@@ -287,6 +288,7 @@ MODULE_PARM(outdoor, "i");
 MODULE_PARM(xchanmode, "i");
 MODULE_PARM(rfkill, "i");
 MODULE_PARM(autocreate, "s");
+MODULE_PARM(ratectl, "s");
 #else
 #include <linux/moduleparam.h>
 module_param(countrycode, int, 0600);
@@ -294,12 +296,14 @@ module_param(outdoor, int, 0600);
 module_param(xchanmode, int, 0600);
 module_param(rfkill, int, 0600);
 module_param(autocreate, charp, 0600);
+module_param(ratectl, charp, 0600);
 #endif
 MODULE_PARM_DESC(countrycode, "Override default country code");
 MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
 MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
+MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|onoe|sample], defaults to 'sample'");
 
 static int	ath_debug = 0;
 #ifdef AR_DEBUG
@@ -620,7 +624,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	}
 
 	sc->sc_setdefantenna = ath_setdefantenna;
-	sc->sc_rc = ath_rate_attach(sc);
+	sc->sc_rc = ieee80211_rate_attach(sc, ratectl);
 	if (sc->sc_rc == NULL) {
 		error = EIO;
 		goto bad2;
@@ -909,7 +913,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	return 0;
 bad3:
 	ieee80211_ifdetach(ic);
-	ath_rate_detach(sc->sc_rc);
+	ieee80211_rate_detach(sc->sc_rc);
 bad2:
 	ath_tx_cleanup(sc);
 	ath_desc_free(sc);
@@ -964,7 +968,7 @@ ath_detach(struct net_device *dev)
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->detach(sc->sc_tx99);
 #endif
-	ath_rate_detach(sc->sc_rc);
+	ieee80211_rate_detach(sc->sc_rc);
 	ath_desc_free(sc);
 	ath_tx_cleanup(sc);
 	ath_hal_detach(ah);
@@ -1068,7 +1072,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 #endif
 
 	/* Let rate control register proc entries for the VAP */
-	ath_rate_dynamic_proc_register(vap);
+	sc->sc_rc->ops->dynamic_proc_register(vap);
 
 	/*
 	 * Change the interface type for monitor mode.
@@ -4755,7 +4759,7 @@ ath_node_alloc(struct ieee80211_node_table *nt,struct ieee80211vap *vap)
 	 * to decide which mgt rate to use
 	 */
 	an->an_node.ni_vap = vap;
-	ath_rate_node_init(sc, an);
+	sc->sc_rc->ops->node_init(sc, an);
 
 	/* U-APSD init */
 	STAILQ_INIT(&an->an_uapsd_q);
@@ -4828,7 +4832,7 @@ ath_node_free(struct ieee80211_node *ni)
 {
 	struct ath_softc *sc = ni->ni_ic->ic_dev->priv;
 
-	ath_rate_node_cleanup(sc, ATH_NODE(ni));
+	sc->sc_rc->ops->node_cleanup(sc, ATH_NODE(ni));
 	sc->sc_node_free(ni);
 #ifdef ATH_SUPERG_XR
 	ath_grppoll_period_update(sc);
@@ -6791,7 +6795,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			/*
 			 * Data frames; consult the rate control module.
 			 */
-			ath_rate_findrate(sc, an, shortPreamble, skb->len,
+			sc->sc_rc->ops->findrate(sc, an, shortPreamble, skb->len,
 				&rix, &try0, &txrate);
 
 			/* Ratecontrol sometimes returns invalid rate index */
@@ -7063,7 +7067,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * we don't use it.
 	 */
 	if (try0 != ATH_TXMAXTRY)
-		ath_rate_setupxtxdesc(sc, an, ds, shortPreamble, skb->len, rix);
+		sc->sc_rc->ops->setupxtxdesc(sc, an, ds, shortPreamble,
+					     skb->len, rix);
 
 #ifndef ATH_SUPERG_FF
 	ds->ds_link = 0;
@@ -7277,7 +7282,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			 */
 			if ((ds->ds_txstat.ts_status & HAL_TXERR_FILT) == 0 &&
 			    (bf->bf_flags & HAL_TXDESC_NOACK) == 0)
-				ath_rate_tx_complete(sc, an, ds);
+				sc->sc_rc->ops->tx_complete(sc, an, ds);
 			/*
 			 * Reclaim reference to node.
 			 *
@@ -8018,7 +8023,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		/*
 		 * Notify the rate control algorithm.
 		 */
-		ath_rate_newstate(vap, nstate);
+		sc->sc_rc->ops->newstate(vap, nstate);
 		goto done;
 	}
 	ni = vap->iv_bss;
@@ -8052,7 +8057,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 	 * Notify the rate control algorithm so rates
 	 * are setup should ath_beacon_alloc be called.
 	 */
-	ath_rate_newstate(vap, nstate);
+	sc->sc_rc->ops->newstate(vap, nstate);
 
 	if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 		/* nothing to do */;
@@ -8527,7 +8532,7 @@ ath_newassoc(struct ieee80211_node *ni, int isnew)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_softc *sc = ic->ic_dev->priv;
 
-	ath_rate_newassoc(sc, ATH_NODE(ni), isnew);
+	sc->sc_rc->ops->newassoc(sc, ATH_NODE(ni), isnew);
 
 	/* are we supporting compression? */
 	if (!(vap->iv_ath_cap & ni->ni_ath_flags & IEEE80211_NODE_COMP))
