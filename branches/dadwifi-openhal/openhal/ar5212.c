@@ -2012,10 +2012,16 @@ ar5k_ar5212_set_lladdr(struct ath_hal *hal, const u_int8_t *mac)
 AR5K_BOOL  /*New*/
 ar5k_ar5212_set_bssid_mask(struct ath_hal *hal, const u_int8_t* mask)
 {
-	/*Got that from set associd*/
-	AR5K_REG_WRITE(AR5K_AR5212_BSS_IDM0, mask);
-	AR5K_REG_WRITE(AR5K_AR5212_BSS_IDM1, mask);
-	return TRUE;
+	u_int32_t low_id, high_id;
+
+	AR5K_TRACE;
+	bcopy(mask, &low_id, 4);
+	bcopy(mask + 4, &high_id, 2);
+	high_id = 0x0000ffff & high_id;
+
+	AR5K_REG_WRITE(AR5K_AR5212_BSS_IDM0, low_id);
+	AR5K_REG_WRITE(AR5K_AR5212_BSS_IDM1, high_id);
+	return (TRUE);
 }
 
 
