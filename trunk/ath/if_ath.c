@@ -102,6 +102,13 @@
 	 ((((u_int8_t *)(p))[0]      ) | (((u_int8_t *)(p))[1] <<  8) |	\
 	  (((u_int8_t *)(p))[2] << 16) | (((u_int8_t *)(p))[3] << 24)))
 
+/* Default rate control algorithm */
+#ifdef CONFIG_ATHEROS_RATE_DEFAULT
+#define DEF_RATE_CTL CONFIG_ATHEROS_RATE_DEFAULT
+#else
+#define DEF_RATE_CTL "sample"
+#endif
+
 enum {
 	ATH_LED_TX,
 	ATH_LED_RX,
@@ -253,7 +260,7 @@ static int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static char *autocreate = NULL;
-static char *ratectl = "sample";
+static char *ratectl = DEF_RATE_CTL;
 static int rfkill = -1;
 static int countrycode = -1;
 static int outdoor = -1;
@@ -303,7 +310,7 @@ MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
 MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
-MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|onoe|sample], defaults to 'sample'");
+MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|onoe|sample], defaults to '" DEF_RATE_CTL "'");
 
 static int	ath_debug = 0;
 #ifdef AR_DEBUG
