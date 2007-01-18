@@ -47,11 +47,6 @@
  * for each data frame.  Management+control frames are always sent at
  * a fixed rate.
  *
- * Only one module may be present at a time; the driver references
- * rate control interfaces by symbol name.  If multiple modules are
- * to be supported we'll need to switch to a registration-based scheme
- * as is currently done, for example, for authentication modules.
- *
  * An instance of the rate control module is attached to each device
  * at attach time and detached when the device is destroyed.  The module
  * may associate data with each device and each node (station).  Both
