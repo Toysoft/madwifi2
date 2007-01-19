@@ -510,7 +510,7 @@ struct ath_vap {
  */
 #define ATH_TXQ_MOVE_Q(_tqs,_tqd)  ATH_TXQ_MOVE_MCASTQ(_tqs,_tqd)
 
-#define	BSTUCK_THRESH	3	/* # of stuck beacons before resetting NB: this is a guess*/
+#define	BSTUCK_THRESH	10	/* # of stuck beacons before resetting NB: this is a guess*/
 
 struct ath_softc {
 	struct ieee80211com sc_ic;		/* NB: must be first */
