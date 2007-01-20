@@ -467,7 +467,9 @@ check_bss_debug(struct ieee80211vap *vap, struct ieee80211_node *ni)
 		if ((ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY) == 0)
 			fail |= 0x04;
 	} else {
-		/* XXX does this mean privacy is supported or required? */
+		/* This means that the data confidentiality service is required
+		 * for all frames exchanged within this BSS. (IEEE802.11 7.3.1.4) 
+		 */
 		if (ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY)
 			fail |= 0x04;
 	}
