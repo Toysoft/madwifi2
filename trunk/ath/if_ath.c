@@ -3260,10 +3260,10 @@ ath_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k,
 	if (cip->ic_cipher == IEEE80211_CIPHER_TKIP &&
 	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 && sc->sc_splitmic) {
 		ath_hal_keyreset(ah, keyix + 32);	/* RX key */
-		ni = sc->sc_keyixmap[keyix+32];
+		ni = sc->sc_keyixmap[keyix + 32];
 		if (ni != NULL) {			/* as above... */
 			ieee80211_free_node(ni);
-			sc->sc_keyixmap[keyix+32] = NULL;
+			sc->sc_keyixmap[keyix + 32] = NULL;
 		}
 	}
 
@@ -3273,10 +3273,10 @@ ath_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k,
 		if (rxkeyoff != 0) {
 			ninfo->ni_rxkeyoff = 0;
 			ath_hal_keyreset(ah, keyix + rxkeyoff);
-			ni = sc->sc_keyixmap[keyix+rxkeyoff];
+			ni = sc->sc_keyixmap[keyix + rxkeyoff];
 			if (ni != NULL) {	/* as above... */
 				ieee80211_free_node(ni);
-				sc->sc_keyixmap[keyix+rxkeyoff] = NULL;
+				sc->sc_keyixmap[keyix + rxkeyoff] = NULL;
 			}
 		}
 	}
