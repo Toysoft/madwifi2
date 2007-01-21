@@ -21,3 +21,8 @@ install:
 	for i in $(obj-y); do \
 		$(MAKE) -C $$i install || exit 1; \
 	done
+
+clean:
+	for i in $(obj-y); do \
+		$(MAKE) -C $$i clean; \
+	done
