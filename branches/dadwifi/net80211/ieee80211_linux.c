@@ -338,7 +338,6 @@ ieee80211_load_module(const char *modname)
 	return rv;
 }
 
-#ifdef CONFIG_SYSCTL
 
 static struct proc_dir_entry *proc_madwifi;
 static int proc_madwifi_count = 0;
@@ -807,7 +806,6 @@ ieee80211_sysctl_vdetach(struct ieee80211vap *vap)
 		vap->iv_sysctls = NULL;
 	}
 }
-#endif /* CONFIG_SYSCTL */
 
 /*
  * Format an Ethernet MAC for printing.
@@ -832,7 +830,6 @@ static int
 ieee80211_rcv_dev_event(struct notifier_block *this, unsigned long event,
 	void *ptr)
 {
-#ifdef CONFIG_SYSCTL
 	struct net_device *dev = (struct net_device *) ptr;
 	if (!dev || dev->open != &ieee80211_open)
 		return 0;
@@ -845,7 +842,6 @@ ieee80211_rcv_dev_event(struct notifier_block *this, unsigned long event,
 	default:
 		break;
         }
-#endif /* CONFIG_SYSCTL */
         return 0;
 }
 

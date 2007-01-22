@@ -246,10 +246,8 @@ static void ath_grppoll_period_update(struct ath_softc *);
 #endif
 static void ath_setcurmode(struct ath_softc *, u_int);
 
-#ifdef CONFIG_SYSCTL
 static void ath_dynamic_sysctl_register(struct ath_softc *);
 static void ath_dynamic_sysctl_unregister(struct ath_softc *);
-#endif /* CONFIG_SYSCTL */
 static void ath_announce(struct ath_softc *sc);
 #if 0
 static void ath_check_dfs_clear(unsigned long);
@@ -857,9 +855,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc, HAL_BUS_TAG tag)
 		goto bad;
 	}
 	snprintf(sc->name, sizeof(sc->name), "wiphy%d", sc->sc_hw->index);
-#ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_register(sc);
-#endif /* CONFIG_SYSCTL */
 	ath_announce(sc);
 #ifdef ATH_TX99_DIAG
 	printk("%s: TX99 support enabled\n", dev->name);
@@ -922,9 +918,7 @@ ath_detach(struct ath_softc *sc)
 	ath_tx_cleanup(sc);
 	ath_hal_detach(ah);
 
-#ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_unregister(sc);
-#endif /* CONFIG_SYSCTL */
 	ATH_LOCK_DESTROY(sc);
 	ath_d80211_detach(sc);
 	return 0;
@@ -8660,7 +8654,6 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 }
 #endif
 
-#ifdef CONFIG_SYSCTL
 /*
  * Sysctls are split into ``static'' and ``dynamic'' tables.
  * The former are defined at module load time and are used
@@ -9205,7 +9198,6 @@ ath_sysctl_unregister(void)
 	if (ath_sysctl_header)
 		unregister_sysctl_table(ath_sysctl_header);
 }
-#endif /* CONFIG_SYSCTL */
 
 static const char* 
 ath_get_hal_status_desc(HAL_STATUS status)

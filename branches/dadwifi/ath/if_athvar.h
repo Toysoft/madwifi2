@@ -420,9 +420,7 @@ struct ath_buf {
 	u_int32_t bf_queueage; 			/* "age" of txq when this buffer placed on stageq */
 	dma_addr_t bf_skbaddrff[ATH_TXDESC-1]; 	/* extra addrs for ff */
 #endif
-#ifndef CONFIG_NET80211
 	struct ieee80211_tx_control control;	/* copy of control from stack */
-#endif
 };
 
 /*
@@ -693,10 +691,8 @@ struct ath_softc {
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
 	struct ATH_WORK_THREAD sc_radartask;	/* Schedule task for DFS handling */
 
-#ifdef CONFIG_SYSCTL
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
-#endif
 
 	u_int16_t sc_reapcount;  		/* # of tx buffers reaped after net dev stopped */
 
@@ -790,10 +786,8 @@ irqreturn_t ath_intr(int, void *, struct pt_regs *);
 #endif
 int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);
-#ifdef CONFIG_SYSCTL
 void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
-#endif /* CONFIG_SYSCTL */
 
 /*
  * HAL definitions to comply with local coding convention.
