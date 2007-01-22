@@ -132,7 +132,6 @@ static unsigned short ath_eth_type_trans(struct sk_buff *, struct net_device *);
 #endif
 
 /* Enhanced iwspy support */
-#ifdef CONFIG_NET_WIRELESS
 #if WIRELESS_EXT >= 16
 
 #ifndef IW_QUAL_QUAL_UPDATED
@@ -203,7 +202,6 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
 #endif /* WIRELESS_EXT >= 16 */
 #else
 #define iwspy_event(_vap, _ni, _rssi)
-#endif /* CONFIG_NET_WIRELESS */
 
 /*
  * Process a received frame.  The node associated with the sender
