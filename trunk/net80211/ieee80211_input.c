@@ -200,8 +200,6 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
 #else
 #define iwspy_event(_vap, _ni, _rssi)
 #endif /* WIRELESS_EXT >= 16 */
-#else
-#define iwspy_event(_vap, _ni, _rssi)
 
 /*
  * Process a received frame.  The node associated with the sender
