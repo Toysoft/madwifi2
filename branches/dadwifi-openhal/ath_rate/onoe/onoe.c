@@ -431,14 +431,12 @@ ath_rate_detach(struct ath_ratectrl *arc)
 }
 EXPORT_SYMBOL(ath_rate_detach);
 
-#ifdef CONFIG_SYSCTL
 void
 ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
 {		
         /* Onoe rate module reports no statistics */
 }
 EXPORT_SYMBOL(ath_rate_dynamic_proc_register);
-#endif /* CONFIG_SYSCTL */
 
 static int minrateinterval = 500;	/* 500ms */
 static int maxpercent = 100;		/* 100% */
@@ -523,9 +521,7 @@ init_ath_rate_onoe(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
-#ifdef CONFIG_SYSCTL
 	ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
-#endif
 	return (0);
 }
 module_init(init_ath_rate_onoe);
@@ -533,10 +529,8 @@ module_init(init_ath_rate_onoe);
 static void __exit
 exit_ath_rate_onoe(void)
 {
-#ifdef CONFIG_SYSCTL
 	if (ath_sysctl_header != NULL)
 		unregister_sysctl_table(ath_sysctl_header);
-#endif
 
 	printk(KERN_INFO "%s: unloaded\n", dev_info);
 }
