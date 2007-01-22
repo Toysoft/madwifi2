@@ -466,9 +466,7 @@ init_ath_ahb(void)
 		printk("ath_ahb: No devices found, driver not installed.\n");
 		return (-ENODEV);
 	}
-#ifdef CONFIG_SYSCTL
 	ath_sysctl_register();
-#endif
 	return 0;
 }
 module_init(init_ath_ahb);
@@ -476,9 +474,7 @@ module_init(init_ath_ahb);
 static void __exit
 exit_ath_ahb(void)
 {
-#ifdef CONFIG_SYSCTL
 	ath_sysctl_unregister();
-#endif
 	exit_ath_wmac(AR531X_WLAN0_NUM);
 	exit_ath_wmac(AR531X_WLAN1_NUM);
 

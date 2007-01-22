@@ -239,10 +239,8 @@ static void ath_grppoll_period_update(struct ath_softc *);
 #endif
 static void ath_setcurmode(struct ath_softc *, enum ieee80211_phymode);
 
-#ifdef CONFIG_SYSCTL
 static void ath_dynamic_sysctl_register(struct ath_softc *);
 static void ath_dynamic_sysctl_unregister(struct ath_softc *);
-#endif /* CONFIG_SYSCTL */
 static void ath_announce(struct net_device *);
 static int ath_descdma_setup(struct ath_softc *, struct ath_descdma *,
 	ath_bufhead *, const char *, int, int);
@@ -875,9 +873,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 * Attach dynamic MIB vars and announce support
 	 * now that we have a device name with unit number.
 	 */
-#ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_register(sc);
-#endif /* CONFIG_SYSCTL */
 	ieee80211_announce(ic);
 	ath_announce(dev);
 #ifdef ATH_TX99_DIAG
@@ -980,9 +976,7 @@ ath_detach(struct net_device *dev)
 	ath_tx_cleanup(sc);
 	ath_hal_detach(ah);
 
-#ifdef CONFIG_SYSCTL
 	ath_dynamic_sysctl_unregister(sc);
-#endif /* CONFIG_SYSCTL */
 	ATH_LOCK_DESTROY(sc);
 	dev->stop = NULL; /* prevent calling ath_stop again */
 	unregister_netdev(dev);
@@ -9224,7 +9218,6 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return error;
 }
 
-#ifdef CONFIG_SYSCTL
 /*
  * Sysctls are split into ``static'' and ``dynamic'' tables.
  * The former are defined at module load time and are used
@@ -9768,7 +9761,6 @@ ath_sysctl_unregister(void)
 	if (ath_sysctl_header)
 		unregister_sysctl_table(ath_sysctl_header);
 }
-#endif /* CONFIG_SYSCTL */
 
 static const char* 
 ath_get_hal_status_desc(HAL_STATUS status)
@@ -9783,7 +9775,6 @@ static int
 ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
 	void *ptr)
 {
-#ifdef CONFIG_SYSCTL
 	struct net_device *dev = (struct net_device *) ptr;
 	struct ath_softc *sc = (struct ath_softc *) dev->priv;
 
@@ -9798,6 +9789,5 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
         default:
 	        break;
         }
-#endif /* CONFIG_SYSCTL */
         return 0;
 }

@@ -271,7 +271,6 @@ struct ieee80211_spy {
         u_int8_t num;
 };
 
-#ifdef CONFIG_SYSCTL
 #define MAX_PROC_IEEE80211_SIZE 16383
 #define PROC_IEEE80211_PERM 0644
 
@@ -291,7 +290,6 @@ struct ieee80211_proc_entry {
 	struct proc_dir_entry *entry;
 	struct ieee80211_proc_entry *next;
 };
-#endif
 
 struct ieee80211_app_ie_t {
 	u_int32_t		length;		/* buffer length */
@@ -302,15 +300,11 @@ struct ieee80211vap {
 	struct net_device *iv_dev;		/* associated device */
 	struct net_device_stats	iv_devstats;	/* interface statistics */
 	struct ifmedia iv_media;			/* interface media config */
-#ifdef CONFIG_NET_WIRELESS
 	struct iw_statistics iv_iwstats;		/* wireless statistics block */
-#endif
-#ifdef CONFIG_SYSCTL
 	struct ctl_table_header	*iv_sysctl_header;
 	struct ctl_table *iv_sysctls;
 	struct proc_dir_entry *iv_proc;
 	struct ieee80211_proc_entry *iv_proc_entries;
-#endif
 	struct vlan_group *iv_vlgrp;		/* vlan group state */
 
 	TAILQ_ENTRY(ieee80211vap) iv_next;	/* list of vap instances */

@@ -934,7 +934,6 @@ ath_rate_detach(struct ath_ratectrl *arc)
 	_MOD_DEC_USE(THIS_MODULE);
 }
 
-#ifdef CONFIG_SYSCTL
 static int
 proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 {
@@ -1054,7 +1053,6 @@ ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
 	ieee80211_proc_vcreate(vap, &proc_ratesample_ops, "ratestats_1600");
 	ieee80211_proc_vcreate(vap, &proc_ratesample_ops, "ratestats_3000");	
 }
-#endif /* CONFIG_SYSCTL */
 
 static struct ieee80211_rate_ops ath_rate_ops = {
 	.ratectl_id = IEEE80211_RATE_SAMPLE,

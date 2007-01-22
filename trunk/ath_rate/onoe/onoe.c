@@ -527,9 +527,7 @@ init_ath_rate_onoe(void)
 	if (ret)
 		return ret;
 
-#ifdef CONFIG_SYSCTL
 	ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
-#endif
 	return (0);
 }
 module_init(init_ath_rate_onoe);
@@ -537,10 +535,8 @@ module_init(init_ath_rate_onoe);
 static void __exit
 exit_ath_rate_onoe(void)
 {
-#ifdef CONFIG_SYSCTL
 	if (ath_sysctl_header != NULL)
 		unregister_sysctl_table(ath_sysctl_header);
-#endif
 	ieee80211_rate_unregister(&ath_rate_ops);
 
 	printk(KERN_INFO "%s: unloaded\n", dev_info);
