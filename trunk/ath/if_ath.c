@@ -1079,7 +1079,8 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 #endif
 
 	/* Let rate control register proc entries for the VAP */
-	sc->sc_rc->ops->dynamic_proc_register(vap);
+	if (sc->sc_rc->ops->dynamic_proc_register)
+		sc->sc_rc->ops->dynamic_proc_register(vap);
 
 	/*
 	 * Change the interface type for monitor mode.

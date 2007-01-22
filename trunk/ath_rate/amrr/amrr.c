@@ -478,14 +478,6 @@ ath_rate_detach(struct ath_ratectrl *arc)
 	_MOD_DEC_USE(THIS_MODULE);
 }
 
-#ifdef CONFIG_SYSCTL
-static void
-ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
-{		
-        /* Amrr rate module reports no statistics */
-}
-#endif /* CONFIG_SYSCTL */
-
 static int minrateinterval = 500;	/* 500ms */
 static int maxint = 0x7fffffff;		/* 32-bit big */
 static int min_threshold = 1;
@@ -563,7 +555,6 @@ static struct ieee80211_rate_ops ath_rate_ops = {
 	.newstate = ath_rate_newstate,
 	.attach = ath_rate_attach,
 	.detach = ath_rate_detach,
-	.dynamic_proc_register = ath_rate_dynamic_proc_register,
 };
 
 #include "release.h"
