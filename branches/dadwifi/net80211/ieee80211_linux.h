@@ -29,9 +29,7 @@
 #ifndef _NET80211_IEEE80211_LINUX_H_
 #define _NET80211_IEEE80211_LINUX_H_
 
-#ifdef CONFIG_NET_WIRELESS
 #include <linux/wireless.h>
-#endif
 
 /*
  * Task deferral
@@ -464,7 +462,6 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 #endif
 
 
-#ifdef CONFIG_SYSCTL
 /*
  * Deal with the sysctl handler api changing.
  */
@@ -487,7 +484,6 @@ void ieee80211_sysctl_vdetach(struct ieee80211vap *);
 int ieee80211_proc_vcreate(struct ieee80211vap *, struct file_operations *,
 	       char *);
 void ieee80211_proc_cleanup(struct ieee80211vap *);
-#endif /* CONFIG_SYSCTL */
 
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define IEEE80211_VLAN_TAG_USED 1

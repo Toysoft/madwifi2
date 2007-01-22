@@ -483,14 +483,12 @@ ath_rate_detach(struct ath_ratectrl *arc)
 }
 EXPORT_SYMBOL(ath_rate_detach);
 
-#ifdef CONFIG_SYSCTL
 void
 ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
 {		
         /* Amrr rate module reports no statistics */
 }
 EXPORT_SYMBOL(ath_rate_dynamic_proc_register);
-#endif /* CONFIG_SYSCTL */
 
 static int minrateinterval = 500;	/* 500ms */
 static int maxint = 0x7fffffff;		/* 32-bit big */
@@ -576,9 +574,7 @@ init_ath_rate_amrr(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
-#ifdef CONFIG_SYSCTL
 	ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
-#endif
 	return (0);
 }
 module_init(init_ath_rate_amrr);
@@ -586,10 +582,8 @@ module_init(init_ath_rate_amrr);
 static void __exit
 exit_ath_rate_amrr(void)
 {
-#ifdef CONFIG_SYSCTL
 	if (ath_sysctl_header != NULL)
 		unregister_sysctl_table(ath_sysctl_header);
-#endif
 
 	printk(KERN_INFO "%s: unloaded\n", dev_info);
 }

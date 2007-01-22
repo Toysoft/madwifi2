@@ -938,7 +938,6 @@ ath_rate_detach(struct ath_ratectrl *arc)
 }
 EXPORT_SYMBOL(ath_rate_detach);
 
-#ifdef CONFIG_SYSCTL
 static int
 proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 {
@@ -1059,7 +1058,6 @@ ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
 	ieee80211_proc_vcreate(vap, &proc_ratesample_ops, "ratestats_3000");	
 }
 EXPORT_SYMBOL(ath_rate_dynamic_proc_register);
-#endif /* CONFIG_SYSCTL */
 
 MODULE_AUTHOR("John Bicket");
 MODULE_DESCRIPTION("SampleRate bit-rate selection algorithm for Atheros devices");

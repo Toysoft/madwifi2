@@ -43,7 +43,6 @@
 #include <linux/config.h>
 #endif
 
-#ifdef CONFIG_NET_WIRELESS
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
@@ -5434,5 +5433,3 @@ ieee80211_ioctl_vdetach(struct ieee80211vap *vap)
 	if ((vap->iv_unit != -1) && isset(wlan_units, vap->iv_unit))
 		ieee80211_delete_wlanunit(vap->iv_unit);
 }
-
-#endif /* CONFIG_NET_WIRELESS */
