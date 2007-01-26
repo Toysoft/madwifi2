@@ -72,26 +72,23 @@ typedef void *TQUEUE_ARG;
 #include <linux/sched.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)
 #include <linux/tqueue.h>
-#define ATH_WORK_THREAD			tq_struct
-#define ATH_SCHEDULE_TASK(t)		schedule_task((t))
-#define ATH_INIT_SCHED_TASK(t, f) do { 		\
+#define work_struct			tq_struct
+#define schedule_work(t)		schedule_task((t))
+#define flush_scheduled_work()		flush_scheduled_tasks()
+#define ATH_INIT_WORK(t, f) do { 			\
 	memset((t),0,sizeof(struct tq_struct)); \
 	(t)->routine = (void (*)(void*)) (f); 	\
 	(t)->data=(void *) (t);			\
 } while (0)
-#define ATH_FLUSH_TASKS			flush_scheduled_tasks
 #else
 #include <linux/workqueue.h>
-#define ATH_SCHEDULE_TASK(t)		schedule_work((t))
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
-#define ATH_INIT_SCHED_TASK(_t, _f)	INIT_WORK((_t), (void (*)(void *))(_f), (_t));
+#define ATH_INIT_WORK(_t, _f)	INIT_WORK((_t), (void (*)(void *))(_f), (_t));
 #else
-#define ATH_INIT_SCHED_TASK(_t, _f)	INIT_WORK((_t), (_f));
+#define ATH_INIT_WORK(_t, _f)	INIT_WORK((_t), (_f));
 #endif
 
-#define ATH_WORK_THREAD			work_struct
-#define	ATH_FLUSH_TASKS			flush_scheduled_work
 #endif /* KERNEL_VERSION < 2.5.41 */
 
 /*
@@ -657,7 +654,7 @@ struct ath_softc {
 
 	struct timer_list sc_cal_ch;		/* calibration timer */
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
-	struct ATH_WORK_THREAD sc_radartask;	/* Schedule task for DFS handling */
+	struct work_struct sc_radartask;	/* Schedule task for DFS handling */
 
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
