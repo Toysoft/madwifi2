@@ -63,6 +63,7 @@
 #include "if_ath_d80211.h"
 
 #include "if_athvar.h"
+#include "ah_devid.h"
 #include "if_ath_pci.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
@@ -114,7 +115,7 @@ static int
 ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	unsigned long phymem;
-	unsigned long mem;
+	void __iomem *mem;
 	struct ath_pci_softc *sc;
 	const char *athname;
 	u_int8_t csz;
@@ -172,7 +173,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto bad;
 	}
 
-	mem = (unsigned long) ioremap(phymem, pci_resource_len(pdev, 0));
+	mem = ioremap(phymem, pci_resource_len(pdev, 0));
 	if (!mem) {
 		printk(KERN_ERR "ath_pci: cannot remap PCI memory region\n") ;
 		goto bad1;
@@ -184,6 +185,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk(KERN_WARNING "ath_pci: 80211 setup failed\n");
 		goto bad2;
 	}
+	sc->aps_sc.sc_iobase = mem;
 
 	snprintf(sc->aps_sc.name, sizeof(sc->aps_sc.name), "ath_pci");
 
@@ -193,7 +195,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 */
 	sc->aps_sc.sc_invalid = 1;
 
-	sc->aps_sc.sc_mem_start = mem;
 	sc->aps_sc.sc_bdev = (void *) pdev;
 
 	pci_set_drvdata(pdev, sc);
@@ -212,6 +213,23 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			break;
 		}
 	}
+
+	/*
+	 * Auto-enable soft led processing for IBM cards and for
+	 * 5211 minipci cards.  Users can also manually enable/disable
+	 * support with a sysctl.
+	 */
+	if (vdevice == PCI_PRODUCT_ATHEROS_AR5212_IBM || vdevice == PCI_PRODUCT_ATHEROS_AR5211) {
+		sc->aps_sc.sc_softled = 1;
+		sc->aps_sc.sc_ledpin = 0;
+	}
+
+	/* Enable softled on PIN1 on HP Compaq nc6xx, nc4000 & nx5000 laptops */
+	if (pdev->subsystem_vendor == PCI_VENDOR_ID_COMPAQ) {
+		sc->aps_sc.sc_softled = 1;
+		sc->aps_sc.sc_ledpin = 1;
+	}
+
 	if (ath_attach(vdevice, &sc->aps_sc) != 0)
 		goto bad4;
 
@@ -229,7 +247,7 @@ bad4:
 bad3:
 	ath_d80211_free(&sc->aps_sc);
 bad2:
-	iounmap((void __iomem *) mem);
+	iounmap(mem);
 bad1:
 	release_mem_region(phymem, pci_resource_len(pdev, 0));
 bad:
@@ -245,7 +263,7 @@ ath_pci_remove(struct pci_dev *pdev)
 	ath_detach(sc);
 	if (pdev->irq)
 		free_irq(pdev->irq, sc);
-	iounmap((void __iomem *) sc->sc_mem_start);
+	iounmap(sc->sc_iobase);
 	release_mem_region(pci_resource_start(pdev, 0), pci_resource_len(pdev, 0));
 	pci_disable_device(pdev);
 	ath_d80211_free(sc);

@@ -10,6 +10,7 @@
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
+
 #define AR531X_WLAN0_NUM       0
 #define AR531X_WLAN1_NUM       1
 
@@ -70,9 +71,18 @@
 #define AR531X_WLAN1		0xb8500000
 #define AR531X_WLANX_LEN	0x000ffffc
 
+#define	AR531X_RESETCTL		0xbc003020
+#define	AR531X_RESET_WLAN0			0x00000004	/* mac & bb */
+#define	AR531X_RESET_WLAN1			0x00000200	/* mac & bb */
+#define	AR531X_RESET_WARM_WLAN0_MAC		0x00002000
+#define	AR531X_RESET_WARM_WLAN0_BB		0x00004000
+#define	AR531X_RESET_WARM_WLAN1_MAC		0x00020000
+#define	AR531X_RESET_WARM_WLAN1_BB		0x00040000
+
 #define AR531X_ENABLE		0xbc003080
-#define AR531X_ENABLE_WLAN1	0x8
-#define AR531X_ENABLE_WLAN0	0x1
+#define	AR531X_ENABLE_WLAN0			0x0001
+#define	AR531X_ENABLE_WLAN1			0x0018	/* both DMA and PIO */
+
 #define AR531X_RADIO_MASK_OFF	0xc8
 #define AR531X_RADIO0_MASK	0x0003
 #define AR531X_RADIO1_MASK	0x000c
@@ -104,9 +114,7 @@ static __inline void bus_dma_sync_single(void *hwdev, dma_addr_t dma_handle,
 static __inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
 	size_t size, int direction)
 {
-    unsigned long addr = (unsigned long) ptr;
-    
-    dma_cache_wback_inv(addr, size);
+    dma_cache_wback_inv((unsigned long) addr, size);
     
     return __pa(ptr);
 }
@@ -126,5 +134,13 @@ void bus_free_consistent(void *, size_t, void *, dma_addr_t);
 
 extern const char * get_system_type(void);
 #define sysRegRead(phys)      (*(volatile u_int32_t *)phys)
+
+/* Allow compiling on non-mips platforms for code verification */
+#ifndef __mips__
+#define CAC_ADDR(addr) (addr)
+#define UNCAC_ADDR(addr) (addr)
+#define KSEG1ADDR(addr) (addr)
+#define get_system_type() "Non-MIPS"
+#endif
 
 #endif    /* _DEV_ATH_AHB_H_ */

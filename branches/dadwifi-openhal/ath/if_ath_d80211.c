@@ -141,10 +141,14 @@ ath_d80211_add_channels(struct ath_softc *sc, int hw_mode,
 
 			channel = &mode->channels[mode->num_channels];
 
-			channel->chan = ath_hal_mhz2ieee(c->channel, 
-							 c->channel_flags);
-			channel->freq = c->channel;
+			channel->chan = ath_hal_mhz2ieee(c->freq, c->channel_flags);
+			channel->freq = c->freq;
 			channel->val = hal_flags;
+			/* ? = c->private_flags; FIXME */
+			/* ? = c->minTxPower; FIXME */
+			/* channel->flag = ? FIXME */	
+//			channel->power_level = c->maxRegTxPower; /* ??? FIXME */
+//			channel->antenna_max = c->maxTxPower; /* ??? FIXME */
 
 			mode->num_channels++;
 		}
@@ -206,10 +210,10 @@ ath_d80211_rate_setup(struct ath_softc *sc, u_int hal_mode,
 			return -1;
 		}
 
-		rates[i].rate = rt->info[i].rate_kbps / 100;
-		rates[i].val = rt->info[i].rate_code;
+		rates[i].rate = rt->rates[i].rate_kbps / 100;
+		rates[i].val = rt->rates[i].rate_code;
 
-		rates[i].flags = rt->info[i].modulation;
+		rates[i].flags = rt->rates[i].modulation;
 
 		/* FIXME rates[i].min_rssi_ack = ?; */
 		/* FIXME rates[i].min_rssi_ack_delta = ?; */
@@ -309,13 +313,13 @@ ath_d80211_add_interface(struct ieee80211_hw *hw,
 
 	switch (conf->type) {
 	case IEEE80211_IF_TYPE_STA:
-		sc->sc_opmode = IEEE80211_IF_TYPE_STA;
+		sc->sc_opmode = AR5K_M_STA;
 		break;
 	case IEEE80211_IF_TYPE_IBSS:
-		sc->sc_opmode = IEEE80211_IF_TYPE_IBSS;
+		sc->sc_opmode = AR5K_M_IBSS;
 		break;
 	case IEEE80211_IF_TYPE_MNTR:
-		sc->sc_opmode = IEEE80211_IF_TYPE_MNTR;
+		sc->sc_opmode = AR5K_M_MONITOR;
 		break;
 	case IEEE80211_IF_TYPE_AP:
 
@@ -380,7 +384,7 @@ ath_d80211_add_interface(struct ieee80211_hw *hw,
 
 		}
 
-		sc->sc_opmode = IEEE80211_IF_TYPE_AP;
+		sc->sc_opmode = AR5K_M_HOSTAP;
 		sc->sc_beacons = 1;
 		break;
 	default:
@@ -475,7 +479,7 @@ ath_d80211_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	if (!sc->sc_dev_open || !conf->radio_enabled)
 		return 0;
 
-	hchan.channel = conf->freq;
+	hchan.freq = conf->freq;
 	hchan.channel_flags = conf->channel_val;
 
 	if ((ret = ath_chan_set(sc, hchan)))
@@ -683,7 +687,7 @@ ath_d80211_alloc(size_t priv_size)
 		modes[i].rates = &sc->sc_ieee80211_rates[i * ATH_MAX_RATES];
 	}
 
-	sc->sc_opmode = IEEE80211_IF_TYPE_STA;
+	sc->sc_opmode = AR5K_M_STA;
 
 	spin_lock_init(&sc->sc_bss_lock);
 

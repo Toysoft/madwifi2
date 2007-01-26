@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2004, 2005 Reyk Floeter <reyk@openbsd.org>
- * Copyright (c) 2006, 2007 Nick Kossifidis <mickflemm@gmail.com>
+ * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,6 +13,8 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * $Id$
  */
 
 /*
@@ -190,7 +192,6 @@ ar5k_ar5211_fill(struct ath_hal *hal)
 	AR5K_HAL_FUNCTION(hal, ar5211, proc_mib_event);
 	AR5K_HAL_FUNCTION(hal, ar5211, get_tx_inter_queue);
 
-
 }
 
 struct ath_hal * /*Ported & removed an arg from call to set_associd*/
@@ -246,7 +247,7 @@ ar5k_ar5211_nic_reset(struct ath_hal *hal, u_int32_t val)
 	AR5K_REG_WRITE(AR5K_AR5211_RC, val);
 
 	/* Wait at least 128 PCI clocks */
-	AR5K_DELAY(1000);
+	AR5K_DELAY(15);
 
 	val &=
 	    AR5K_AR5211_RC_PCU | AR5K_AR5211_RC_BB;
@@ -318,7 +319,7 @@ ar5k_ar5211_nic_wakeup(struct ath_hal *hal, u_int16_t flags)
 
 	/* ...wakeup */
 	if (ar5k_ar5211_set_power(hal,
-		AR5K_PM_AWAKE, TRUE) == FALSE) {
+		AR5K_PM_AWAKE, TRUE, 0) == FALSE) {
 		AR5K_PRINT("failed to resume the AR5211 (again)\n");
 		return (FALSE);
 	}
@@ -388,7 +389,6 @@ ar5k_ar5211_get_rate_table(struct ath_hal *hal, u_int mode)
 	case AR5K_MODE_11B:
 		return (&hal->ah_rt_11b);
 	case AR5K_MODE_11G:
-//	case AR5K_MODE_PUREG:
 		return (&hal->ah_rt_11g);
 	default:
 		return (NULL);
@@ -416,7 +416,7 @@ ar5k_ar5211_phy_disable(struct ath_hal *hal)
 }
 
 AR5K_BOOL /*Ported*/
-ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, AR5K_CHANNEL *channel,
+ar5k_ar5211_reset(struct ath_hal *hal, AR5K_OPMODE op_mode, AR5K_CHANNEL *channel,
     AR5K_BOOL change_channel, AR5K_STATUS *status)
 {
 	struct ar5k_eeprom_info *ee = &hal->ah_capabilities.cap_eeprom;
@@ -465,13 +465,12 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, AR5K_CHANNEL *channel,
 		ee_mode = AR5K_EEPROM_MODE_11B;
 		break;
 	case CHANNEL_G:
-	case CHANNEL_PUREG:
 		mode = AR5K_INI_VAL_11G;
 		freq = AR5K_INI_RFGAIN_2GHZ;
 		ee_mode = AR5K_EEPROM_MODE_11G;
 		break;
 	default:
-		AR5K_PRINTF("invalid channel: %d\n", channel->channel);
+		AR5K_PRINTF("invalid channel: %d\n", channel->freq);
 		return (FALSE);
 	}
 
@@ -651,14 +650,14 @@ ar5k_ar5211_reset(struct ath_hal *hal, u_int32_t op_mode, AR5K_CHANNEL *channel,
 	/*
 	 * Set RF kill flags if supported by the device (read from the EEPROM)
 	 */
-	if (AR5K_EEPROM_HDR_RFKILL(hal->ah_capabilities.cap_eeprom.ee_header)) {
+/*	if (AR5K_EEPROM_HDR_RFKILL(hal->ah_capabilities.cap_eeprom.ee_header)) {
 		ar5k_ar5211_set_gpio_input(hal, 0);
 		if ((hal->ah_gpio[0] = ar5k_ar5211_get_gpio(hal, 0)) == 0)
 			ar5k_ar5211_set_gpio_intr(hal, 0, 1);
 		else
 			ar5k_ar5211_set_gpio_intr(hal, 0, 0);
 	}
-
+*/
 	/* 
 	 * Disable beacons and reset the register
 	 */
@@ -693,18 +692,18 @@ ar5k_ar5211_set_opmode(struct ath_hal *hal)
 	pcu_reg = 0;
 
 	switch (hal->ah_op_mode) {
-	case IEEE80211_IF_TYPE_IBSS:
+	case AR5K_M_IBSS:
 		pcu_reg |= AR5K_AR5211_STA_ID1_ADHOC |
 		    AR5K_AR5211_STA_ID1_DESC_ANTENNA;
 		break;
 
-	case IEEE80211_IF_TYPE_AP:
+	case AR5K_M_HOSTAP:
 		pcu_reg |= AR5K_AR5211_STA_ID1_AP |
 		    AR5K_AR5211_STA_ID1_RTS_DEFAULT_ANTENNA;
 		break;
 
-	case IEEE80211_IF_TYPE_STA:
-	case IEEE80211_IF_TYPE_MNTR:
+	case AR5K_M_STA:
+	case AR5K_M_MONITOR:
 		pcu_reg |= AR5K_AR5211_STA_ID1_DEFAULT_ANTENNA;
 		break;
 
@@ -732,8 +731,7 @@ ar5k_ar5211_set_pcu_config(struct ath_hal *hal)
 }
 
 AR5K_BOOL
-ar5k_ar5211_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel,
-	AR5K_BOOL *stat)
+ar5k_ar5211_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 {
 	u_int32_t i_pwr, q_pwr;
 	int32_t iq_corr, i_coff, i_coffd, q_coff, q_coffd;
@@ -1142,19 +1140,18 @@ ar5k_ar5211_stop_tx_dma(struct ath_hal *hal, u_int queue)
 	return (TRUE);
 }
 
-AR5K_BOOL /*O.K. - Initialize tx_desc */
+AR5K_BOOL /*O.K. - Initialize tx_desc and clear ds_hw */
 ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int packet_length, u_int header_length, AR5K_PKT_TYPE type, u_int tx_power,
     u_int tx_rate0, u_int tx_tries0, u_int key_index, u_int antenna_mode,
-    u_int flags, u_int rtscts_rate, u_int rtscts_duration, u_int compicvLen,
-    u_int compivLen, u_int comp)
+    u_int flags, u_int rtscts_rate, u_int rtscts_duration)
 {
 	struct ar5k_ar5211_tx_desc *tx_desc;
 
 	tx_desc = (struct ar5k_ar5211_tx_desc*)&desc->ds_ctl0;
 
 	/*Clear ds_hw*/
-//	bzero(desc->ds_hw, sizeof(desc->ds_hw));
+	bzero(desc->ds_hw, sizeof(desc->ds_hw));
 
 	/*
 	 * Validate input
@@ -1205,7 +1202,7 @@ ar5k_ar5211_setup_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (TRUE);
 }
 
-AR5K_BOOL/*Added an argument *last_desc -need revision */
+AR5K_BOOL/*Added an argument *last_desc -need revision -don't clear descriptor here*/
 ar5k_ar5211_fill_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
     u_int segment_length, AR5K_BOOL first_segment, AR5K_BOOL last_segment, const struct ath_desc *last_desc)
 {
@@ -1214,7 +1211,7 @@ ar5k_ar5211_fill_tx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	tx_desc = (struct ar5k_ar5211_tx_desc*)&desc->ds_ctl0;
 
 	/* Clear status descriptor */
-	bzero(desc->ds_hw, sizeof(desc->ds_hw));
+//	bzero(desc->ds_hw, sizeof(desc->ds_hw));
 
 	/* Validate segment length and initialize the descriptor */
 	if ((tx_desc->tx_control_1 = (segment_length &
@@ -1448,7 +1445,7 @@ ar5k_ar5211_setup_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 
 AR5K_STATUS
 ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
-    u_int32_t phys_addr, struct ath_desc *next, u_int64_t tsf)
+    u_int32_t phys_addr, struct ath_desc *next)
 {
 	struct ar5k_ar5211_rx_status *rx_status;
 
@@ -1515,8 +1512,8 @@ ar5k_ar5211_proc_rx_desc(struct ath_hal *hal, struct ath_desc *desc,
 	return (AR5K_OK);
 }
 
-void /*Added AR5K_CHANNEL argument*/
-ar5k_ar5211_set_rx_signal(struct ath_hal *hal, AR5K_CHANNEL *channel)
+void /*Added AR5K_NODE_STATS argument*/
+ar5k_ar5211_set_rx_signal(struct ath_hal *hal, const AR5K_NODE_STATS *stats)
 {
 	/* Signal state monitoring is not yet supported */
 }
@@ -1530,9 +1527,9 @@ ar5k_ar5211_dump_state(struct ath_hal *hal)
 {
 #ifdef AR5K_DEBUG
 #define AR5K_PRINT_REGISTER(_x)						\
-	printf("(%s: %08x) ", #_x, AR5K_REG_READ(AR5K_AR5211_##_x));
+	AR5K_PRINTF("(%s: %08x) ", #_x, AR5K_REG_READ(AR5K_AR5211_##_x));
 
-	printf("MAC registers:\n");
+	AR5K_PRINT("MAC registers:\n");
 	AR5K_PRINT_REGISTER(CR);
 	AR5K_PRINT_REGISTER(CFG);
 	AR5K_PRINT_REGISTER(IER);
@@ -1595,9 +1592,9 @@ ar5k_ar5211_dump_state(struct ath_hal *hal)
 	AR5K_PRINT_REGISTER(FCS_FAIL);
 	AR5K_PRINT_REGISTER(BEACON_CNT);
 	AR5K_PRINT_REGISTER(KEYTABLE_0);
-	printf("\n");
+	AR5K_PRINT("\n");
 
-	printf("PHY registers:\n");
+	AR5K_PRINT("PHY registers:\n");
 	AR5K_PRINT_REGISTER(PHY_TURBO);
 	AR5K_PRINT_REGISTER(PHY_AGC);
 	AR5K_PRINT_REGISTER(PHY_CHIP_ID);
@@ -1610,7 +1607,7 @@ ar5k_ar5211_dump_state(struct ath_hal *hal)
 	AR5K_PRINT_REGISTER(PHY_RADAR);
 	AR5K_PRINT_REGISTER(PHY_ANT_SWITCH_TABLE_0);
 	AR5K_PRINT_REGISTER(PHY_ANT_SWITCH_TABLE_1);
-	printf("\n");
+	AR5K_PRINT("\n");
 #endif
 }
 
@@ -1646,14 +1643,6 @@ ar5k_ar5211_set_lladdr(struct ath_hal *hal, const u_int8_t *mac)
 	AR5K_REG_WRITE(AR5K_AR5211_STA_ID1, high_id);
 
 	return (TRUE);
-}
-
-AR5K_BOOL  /*New*/
-ar5k_ar5211_set_bssid_mask(struct ath_hal *hal, const u_int8_t* mask)
-{
-	/*???*/
-	AR5K_TRACE;
-	return TRUE;
 }
 
 AR5K_BOOL
@@ -1745,6 +1734,14 @@ ar5k_ar5211_set_associd(struct ath_hal *hal, const u_int8_t *bssid,
 	ar5k_ar5211_enable_pspoll(hal, NULL, 0);
 }
 
+AR5K_BOOL  /*New*/
+ar5k_ar5211_set_bssid_mask(struct ath_hal *hal, const u_int8_t* mask)
+{
+	/*Not supported in 5211*/
+	AR5K_TRACE; 
+	return (FALSE); 
+}
+
 AR5K_BOOL
 ar5k_ar5211_set_gpio_output(struct ath_hal *hal, u_int32_t gpio)
 {
@@ -1788,7 +1785,7 @@ ar5k_ar5211_set_gpio(struct ath_hal *hal, u_int32_t gpio, u_int32_t val)
 	u_int32_t data;
 
 	if (gpio > AR5K_AR5211_NUM_GPIO)
-		return (0xffffffff);
+		return (FALSE);
 
 	/* GPIO output magic */
 	data =  AR5K_REG_READ(AR5K_AR5211_GPIODO);
@@ -1881,7 +1878,7 @@ ar5k_ar5211_update_mib_counters(struct ath_hal *hal, AR5K_MIB_STATS *statistics)
 }
 
 void /*Unimplemented*/
-ar5k_ar5211_proc_mib_event(struct ath_hal *hal) 
+ar5k_ar5211_proc_mib_event(struct ath_hal *hal, const AR5K_NODE_STATS *stats) 
 {
 	AR5K_TRACE;
 	return;
@@ -2135,7 +2132,7 @@ ar5k_ar5211_set_key_lladdr(struct ath_hal *hal, u_int16_t entry,
 
 AR5K_BOOL
 ar5k_ar5211_set_power(struct ath_hal *hal, AR5K_POWER_MODE mode,
-    AR5K_BOOL set_chip)
+    AR5K_BOOL set_chip, u_int16_t sleep_duration)
 {
 	u_int32_t staid;
 	int i;
@@ -2149,7 +2146,7 @@ ar5k_ar5211_set_power(struct ath_hal *hal, AR5K_POWER_MODE mode,
 	case AR5K_PM_NETWORK_SLEEP:
 		if (set_chip == TRUE) {
 			AR5K_REG_WRITE(AR5K_AR5211_SCR,
-			    AR5K_AR5211_SCR_SLE | 0);
+			    AR5K_AR5211_SCR_SLE | sleep_duration);
 		}
 		staid |= AR5K_AR5211_STA_ID1_PWR_SV;
 		break;
@@ -2237,6 +2234,8 @@ ar5k_ar5211_disable_pspoll(struct ath_hal *hal)
 AR5K_BOOL /*Unimplemented*/
 ar5k_ar5211_set_txpower_limit(struct ath_hal *hal, u_int32_t power)
 {
+//	AR5K_CHANNEL *channel = &hal->ah_current_channel;
+
 	AR5K_TRACE;
 	AR5K_PRINTF("changing txpower to %d\n unimplemented ;-(",power);
 	return FALSE;
@@ -2256,7 +2255,7 @@ ar5k_ar5211_init_beacon(struct ath_hal *hal, u_int32_t next_beacon,
 	 * Set the additional timers by mode
 	 */
 	switch (hal->ah_op_mode) {
-	case IEEE80211_IF_TYPE_STA:
+	case AR5K_M_STA:
 		timer1 = 0x0000ffff;
 		timer2 = 0x0007ffff;
 		break;
@@ -2665,10 +2664,10 @@ ar5k_ar5211_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int freq,
 
 	if (freq == AR5K_INI_RFGAIN_5GHZ) {
 		/* For 11a and Turbo */
-		obdb = channel->channel >= 5725 ? 3 :
-		    (channel->channel >= 5500 ? 2 :
-			(channel->channel >= 5260 ? 1 :
-			    (channel->channel > 4000 ? 0 : -1)));
+		obdb = channel->freq >= 5725 ? 3 :
+		    (channel->freq >= 5500 ? 2 :
+			(channel->freq >= 5260 ? 1 :
+			    (channel->freq > 4000 ? 0 : -1)));
 	}
 
 	ob = ee->ee_ob[ee_mode][obdb];

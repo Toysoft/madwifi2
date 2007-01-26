@@ -1,5 +1,6 @@
 /*
  * Device IDs...
+ *
  */
 
 /* From /dev/pci/pcidevs.h */

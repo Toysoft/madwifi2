@@ -1,3 +1,25 @@
+/*
+ * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * Alternatively, this software may be distributed under the terms of the
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * $Id$
+ */
+
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -8,6 +30,8 @@
 #include <linux/if_arp.h>
 #include <linux/proc_fs.h>
 #include <linux/sysctl.h>
+/*For radar functions*/
+//#include <linux/cpufreq.h>
 
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
@@ -24,8 +48,10 @@ typedef u_int32_t AR5K_BUS_ADDR;
 //#define tick 1000000 / hz
 
  /*
-  * Define things in the BSD way...
-  */
+ * Linux uses __BIG_ENDIAN and __LITTLE_ENDIAN while BSD uses _foo
+ * and an explicit _BYTE_ORDER.  Sorry, BSD got there first--define
+ * things in the BSD way...
+ */
 #define LITTLE_ENDIAN  1234    /* LSB first: i386, vax */
 #define BIG_ENDIAN     4321    /* MSB first: 68000, ibm, net */
 
@@ -49,9 +75,6 @@ typedef u_int32_t AR5K_BUS_ADDR;
 #define free(_a, _b) kfree(_a)
 #define bcopy(_a, _b, _c)       memcpy(_b, _a, _c)
 #define bzero(_a, _b)           memset(_a, 0, _b)
-#ifndef printf
-#define printf                  AR5K_PRINT
-#endif
 
 #define AR5K_REG_WRITE(_reg, _val)      (writel(cpu_to_le32(_val), hal->ah_sh + (_reg)))
 //      bus_space_write_4(hal->ah_st, hal->ah_sh, (_reg), (_val))
