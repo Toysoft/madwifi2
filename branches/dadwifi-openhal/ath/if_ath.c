@@ -387,7 +387,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	sc);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	sc);
 #if 0
-	ATH_INIT_SCHED_TASK(&sc->sc_radartask, ath_radar_task,	dev);
+	INIT_WORK(&sc->sc_radartask, ath_radar_task);
 #endif
 
 	/*
@@ -880,7 +880,7 @@ ath_detach(struct ath_softc *sc)
 	/* Flush the radar task if it's scheduled */
 #if 0
 	if (sc->sc_rtasksched == 1)
-		ATH_FLUSH_TASKS();
+		flush_scheduled_work();
 #endif
 
 	sc->sc_invalid = 1;
@@ -1632,10 +1632,9 @@ ath_intr(int irq, void *dev_id)
 
 #if 0
 static void
-ath_radar_task(TQUEUE_ARG data)
+ath_radar_task(struct work_struct *thr)
 {
-	struct net_device *dev = (struct net_device *)data;
-	struct ath_softc *sc = dev->priv;
+	struct ath_softc *sc = container_of(thr, struct ath_softc, sc_radartask);
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_channel ichan;
@@ -5740,7 +5739,7 @@ rx_next:
 	ath_hal_rxmonitor(ah, &sc->sc_halstats, &sc->sc_curchan);
 	if (ath_hal_radar_event(ah)) {
 		sc->sc_rtasksched = 1;
-		ATH_SCHEDULE_TASK(&sc->sc_radartask);
+		schedule_work(&sc->sc_radartask);
 	}
 #endif
 
