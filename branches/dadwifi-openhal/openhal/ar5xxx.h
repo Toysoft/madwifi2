@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2004, 2005 Reyk Floeter <reyk@openbsd.org>
- * Copyright (c) 2006, 2007 Nick Kossifidis <mickflemm@gmail.com>
+ * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,6 +13,8 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * $Id$
  */
 
 /*
@@ -34,7 +36,7 @@
 /*Os dependent definitions*/
 #include "ah_osdep.h"
 
-/*Regulatory domain definitions*/
+/*Regulatory domain & Channel definitions*/
 #include "ieee80211_regdomain.h"
 
 /*Options*/
@@ -42,16 +44,12 @@
 
 /*
  *Translation for MadWiFi combatibility
- *(this is changed AGAIN in if_athvar.h :P)
+ *(damn this is changed AGAIN in if_ath.pci :P)
  */
 #include "translation.h"
 
-/*d80211 definitions*/
-#include <net/d80211.h>
-
-
-
-
+/*Use with DadWiFi/d80211*/
+#include "stack_d80211.h"
 
 
 /****************************\
@@ -63,25 +61,28 @@
  * TODO: See if there is a bool definition somewere else
  * in the kernel, we shouldn't redefine it if it does...
  */
-typedef enum {
-	FALSE = 0,
-	TRUE,
-} AR5K_BOOL;
+#ifndef TRUE
+#define	TRUE	1
+#endif
+#ifndef FALSE
+#define	FALSE	0
+#endif
+typedef u_int8_t AR5K_BOOL;
 
 /*
  * Error codes reported from HAL to the driver
  */
 typedef enum {
-	AR5K_OK			= 0,	/* Everything went O.K.*/
-	AR5K_ENOMEM		= 1,	/* Unable to allocate memory for ath_hal*/
-	AR5K_EIO		= 2,	/* Hardware I/O Error*/
-	AR5K_EELOCKED		= 3,	/* Unable to access EEPROM*/
-	AR5K_EEBADSUM		= 4,	/* Invalid EEPROM checksum*/
-	AR5K_EEREAD		= 5,	/* Unable to get device caps from EEPROM */
-	AR5K_EEBADMAC		= 6,	/* Unable to read MAC address from EEPROM */
-	AR5K_EINVAL		= 7,	/* Invalid parameter to function */
-	AR5K_ENOTSUPP		= 8,	/* Hardware revision not supported */
-	AR5K_EINPROGRESS	= 9,	/* Unexpected error ocured during process */
+	AR5K_OK		= 0,	/* Everything went O.K.*/
+	AR5K_ENOMEM	= 1,	/* Unable to allocate memory for ath_hal*/
+	AR5K_EIO	= 2,	/* Hardware I/O Error*/
+	AR5K_EELOCKED	= 3,	/* Unable to access EEPROM*/
+	AR5K_EEBADSUM	= 4,	/* Invalid EEPROM checksum*/
+	AR5K_EEREAD	= 5,	/* Unable to get device caps from EEPROM */
+	AR5K_EEBADMAC	= 6,	/* Unable to read MAC address from EEPROM */
+	AR5K_EINVAL	= 7,	/* Invalid parameter to function */
+	AR5K_ENOTSUPP	= 8,	/* Hardware revision not supported */
+	AR5K_EINPROGRESS= 9,	/* Unexpected error ocured during process */
 } AR5K_STATUS;
 
 /*
@@ -92,7 +93,7 @@ typedef enum {
 #define AR5K_TUNE_ADDITIONAL_SWBA_BACKOFF	0
 #define AR5K_TUNE_RADAR_ALERT			FALSE
 #define AR5K_TUNE_MIN_TX_FIFO_THRES		1
-#define AR5K_TUNE_MAX_TX_FIFO_THRES		((IEEE80211_MAX_LEN / 64) + 1)
+#define AR5K_TUNE_MAX_TX_FIFO_THRES		((MAX_PDU_LENGTH / 64) + 1)
 #define AR5K_TUNE_RSSI_THRES			1792
 #define AR5K_TUNE_REGISTER_TIMEOUT		20000
 #define AR5K_TUNE_REGISTER_DWELL_TIME		20000
@@ -117,7 +118,6 @@ typedef enum {
 #define	AR5K_TXQ_USEDEFAULT	((u_int32_t) -1)
 
 #define IEEE80211_ADDR_LEN      6       /* size of 802.11 address */
-#define IEEE80211_MAX_LEN	2500
 #define ETHER_ADDR_LEN          6       /* length of an Ethernet address */
 static const u_char etherbroadcastaddr[ETHER_ADDR_LEN] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 //#define etherbroadcastaddr 0xff
@@ -213,8 +213,6 @@ struct ar5k_srev_name {
 /*
  * Tx Descriptor
  */
-
-/*TODO:Map to ieee80211_tx_status @ d80211.h*/
 struct ath_tx_status {
 	u_int16_t	ts_seqnum;
 	u_int16_t	ts_tstamp;
@@ -237,14 +235,14 @@ struct ath_tx_status {
  */
 typedef enum {
 	AR5K_TX_QUEUE_INACTIVE = 0,/*This queue is not used -see ath_hal_releasetxqueue*/
-	AR5K_TX_QUEUE_DATA,	   /*A normal data queue*/
-	AR5K_TX_QUEUE_XR_DATA,	   /*An XR-data queue*/
-	AR5K_TX_QUEUE_BEACON,	   /*The beacon queue*/
-	AR5K_TX_QUEUE_CAB,	   /*The ater-beacon queue*/
-	AR5K_TX_QUEUE_UAPSD,	   /*Unscheduled Automatic Power Save Delivery queue*/
+	AR5K_TX_QUEUE_DATA,	  /*A normal data queue*/
+	AR5K_TX_QUEUE_XR_DATA,	  /*An XR-data queue*/
+	AR5K_TX_QUEUE_BEACON,	  /*The beacon queue*/
+	AR5K_TX_QUEUE_CAB,	  /*The ater-beacon queue*/
+	AR5K_TX_QUEUE_UAPSD,	  /*Unscheduled Automatic Power Save Delivery queue*/
 } AR5K_TX_QUEUE;
 
-#define	AR5K_MAX_TX_QUEUES	10
+#define	AR5K_NUM_TX_QUEUES	10
 
 /*
  * Queue syb-types to classify normal data queues.
@@ -263,18 +261,19 @@ typedef enum {
 /*
  * Queue ID numbers as returned by the HAL, each number
  * represents a hw queue. If hw does not support hw queues
- * (eg 5210/5211) all data goes in one queue. They are maped
- * here to d80211 definitions.
+ * (eg 5210/5211) all data goes in one queue. These match
+ * d80211 definitions (net80211/MadWiFi don't use them).
  */
 typedef enum {
-	AR5K_TX_QUEUE_ID_DATA_MIN = IEEE80211_TX_QUEUE_DATA0,
-	AR5K_TX_QUEUE_ID_DATA_MAX = IEEE80211_TX_QUEUE_DATA4,
-	AR5K_TX_QUEUE_ID_DATA_SVP = IEEE80211_TX_QUEUE_SVP,	/*Spectralink Voice Protocol*/
-	AR5K_TX_QUEUE_ID_BEACON	  = IEEE80211_TX_QUEUE_BEACON,
-	AR5K_TX_QUEUE_ID_CAB 	  = IEEE80211_TX_QUEUE_AFTER_BEACON,
+	AR5K_TX_QUEUE_ID_DATA_MIN = 0, /*IEEE80211_TX_QUEUE_DATA0*/
+	AR5K_TX_QUEUE_ID_DATA_MAX = 4, /*IEEE80211_TX_QUEUE_DATA4*/
+	AR5K_TX_QUEUE_ID_DATA_SVP = 5, /*IEEE80211_TX_QUEUE_SVP - Spectralink Voice Protocol*/
+	AR5K_TX_QUEUE_ID_CAB	  = 6, /*IEEE80211_TX_QUEUE_AFTER_BEACON*/
+	AR5K_TX_QUEUE_ID_BEACON	  = 7, /*IEEE80211_TX_QUEUE_BEACON*/
 	AR5K_TX_QUEUE_ID_UAPSD	  = 8,
 	AR5K_TX_QUEUE_ID_XR_DATA  = 9,
 } AR5K_TX_QUEUE_ID;
+
 
 /*
  * Flags to set hw queue's parameters...
@@ -290,7 +289,6 @@ typedef enum {
 
 /*
  * A struct to hold tx queue's parameters
- * TODO:Map this to struct ieee80211_tx_queue_params
  */
 typedef struct {
 	AR5K_TX_QUEUE			tqi_type;	/* See AR5K_TX_QUEUE */
@@ -309,8 +307,6 @@ typedef struct {
 /*
  * Transmit packet types.
  * These are not fully used inside OpenHAL yet
- * TODO:Port this to d80211 (STYPES ?? i only saw 2
- * packet types in tx_control)
  */
 typedef enum {
 	AR5K_PKT_TYPE_NORMAL 		= 0,
@@ -397,7 +393,7 @@ typedef enum {
 	AR5K_TURBO_PREAMBLE_TIME + AR5K_TURBO_SIFS_TIME +		\
 	(AR5K_TURBO_NUM_SYMBOLS(_kbps, _frmlen) * AR5K_TURBO_SYMBOL_TIME)
 
-/* XR */
+/* eXtendent Range (?)*/
 #define AR5K_XR_PREAMBLE_TIME(_kbps) (((_kbps) < 1000) ? 173 : 76)
 
 #define AR5K_XR_NUM_BITS_PER_SYM(_kbps) ((_kbps *			\
@@ -422,7 +418,6 @@ typedef enum {
 /*
  * Rx Descriptor
  */
-/*TODO:Map to struct ieee80211_rx_status @ d80211.h*/
 struct ath_rx_status {
 	u_int16_t	rs_datalen;
 	u_int16_t	rs_tstamp;
@@ -458,7 +453,6 @@ struct ath_rx_status {
 #define	AR5K_RX_FILTER_PHYERR 		0x00000100	/* Don't filter phy errors */
 #define	AR5K_RX_FILTER_PHYRADAR 	0x00000200	/* Don't filter phy radar errors*/
 
-
 typedef struct {
 	u_int32_t	ackrcv_bad;
 	u_int32_t	rts_bad;
@@ -474,7 +468,7 @@ typedef struct {
  BEACON TIMERS DEFINITIONS
 \**************************/
 
-#define AR5K_BEACON_PERIOD	0x0000ffff 
+#define AR5K_BEACON_PERIOD	0x0000ffff
 #define AR5K_BEACON_ENA		0x00800000 /*enable beacon xmit*/
 #define AR5K_BEACON_RESET_TSF	0x01000000 /*force a TSF reset*/
 
@@ -510,7 +504,6 @@ typedef struct {
 struct ath_desc {
 	u_int32_t	ds_link;
 	u_int32_t	ds_data;
-	u_int32_t	ds_vdata; /*???*/
 	u_int32_t	ds_ctl0;
 	u_int32_t	ds_ctl1;
 	u_int32_t	ds_hw[4];
@@ -536,8 +529,6 @@ struct ath_desc {
 
 /*
  * 802.11 operating modes...
- * Those definitions are mapped to d80211  
- * inside if_ath_d80211.c
  */
 #define AR5K_MODE_11A  	0x01
 #define AR5K_MODE_11B  	0x02
@@ -545,19 +536,18 @@ struct ath_desc {
 #define AR5K_MODE_TURBO	0x08
 #define AR5K_MODE_108G 	0x16
 #define AR5K_MODE_XR	0x32
-#define AR5K_MODE_ALL 	(AR5K_MODE_11A|\
-			AR5K_MODE_11B|\
-			AR5K_MODE_11G|\
+#define AR5K_MODE_ALL 	(AR5K_MODE_11A|	\
+			AR5K_MODE_11B|	\
+			AR5K_MODE_11G|	\
 			AR5K_MODE_TURBO|\
-			AR5K_MODE_108G|\
+			AR5K_MODE_108G|	\
 			AR5K_MODE_XR)
 
 /*
  * Channel definitions
  */
-/*TODO:Use struct ieee80211_channel everywhere*/
 typedef struct {
-	u_int16_t	channel;	/* setting in Mhz */
+	u_int16_t	freq;		/* setting in Mhz */
 	u_int16_t	channel_flags;
 	u_int8_t	private_flags;	/* not used in OpenHAL yet*/
 } AR5K_CHANNEL;
@@ -625,29 +615,23 @@ struct ar5k_athchan_2ghz {
  * Rate definitions
  */
 
-/*TODO:This should go to d80211_shared.h*/
-#define	IEEE80211_RATE_XR 0x00000200 /*XR thingie*/
-#define AR5K_SET_SHORT_PREAMBLE 0x04 /* adding this flag to rate_code
-					enables short preamble, see ar5212_reg.h */
-#define HAS_SHPREAMBLE(_ix) (rt->info[_ix].modulation & IEEE80211_RATE_PREAMBLE2)
-
 #define AR5K_MAX_RATES	32 /*max number of rates on the rate table*/
 
 typedef struct {
-		u_int8_t	valid;		/* Valid for rate control */
-		u_int32_t	modulation;	/* d80211_shared.h */
-		u_int16_t	rate_kbps;		
-		u_int8_t	rate_code;	/* Rate mapping for h/w descriptors */
-		u_int8_t	dot11_rate;
-		u_int8_t	control_rate;
-		u_int16_t	lp_ack_duration;/* long preamble ACK duration */
-		u_int16_t	sp_ack_duration;/* short preamble ACK duration*/
+	u_int8_t	valid;		/* Valid for rate control */
+	u_int32_t	modulation;
+	u_int16_t	rate_kbps;		
+	u_int8_t	rate_code;	/* Rate mapping for h/w descriptors */
+	u_int8_t	dot11_rate;
+	u_int8_t	control_rate;
+	u_int16_t	lp_ack_duration;/* long preamble ACK duration */
+	u_int16_t	sp_ack_duration;/* short preamble ACK duration*/
 } AR5K_RATE;
 
 typedef struct {
 	u_int16_t	rate_count;				
 	u_int8_t	rate_code_to_index[AR5K_MAX_RATES];	/* Back-mapping */
-	AR5K_RATE	info[AR5K_MAX_RATES];
+	AR5K_RATE	rates[AR5K_MAX_RATES];
 } AR5K_RATE_TABLE;
 
 /*
@@ -657,74 +641,74 @@ typedef struct {
 	255, 255, 255, 255, 255, 255, 255, 255, 6, 4, 2, 0,	\
 	7, 5, 3, 1, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255 }, {		\
-	{ 1, IEEE80211_RATE_OFDM, 6000, 11, 140, 0 },	\
-	{ 1, IEEE80211_RATE_OFDM, 9000, 15, 18, 0 },	\
-	{ 1, IEEE80211_RATE_OFDM, 12000, 10, 152, 2 },	\
-	{ 1, IEEE80211_RATE_OFDM, 18000, 14, 36, 2 },	\
-	{ 1, IEEE80211_RATE_OFDM, 24000, 9, 176, 4 },	\
-	{ 1, IEEE80211_RATE_OFDM, 36000, 13, 72, 4 },	\
-	{ 1, IEEE80211_RATE_OFDM, 48000, 8, 96, 4 },	\
-	{ 1, IEEE80211_RATE_OFDM, 54000, 12, 108, 4 } }	\
+	{ 1, MODULATION_OFDM, 6000, 11, 140, 0 },		\
+	{ 1, MODULATION_OFDM, 9000, 15, 18, 0 },		\
+	{ 1, MODULATION_OFDM, 12000, 10, 152, 2 },		\
+	{ 1, MODULATION_OFDM, 18000, 14, 36, 2 },		\
+	{ 1, MODULATION_OFDM, 24000, 9, 176, 4 },		\
+	{ 1, MODULATION_OFDM, 36000, 13, 72, 4 },		\
+	{ 1, MODULATION_OFDM, 48000, 8, 96, 4 },		\
+	{ 1, MODULATION_OFDM, 54000, 12, 108, 4 } }		\
 }
 
 #define AR5K_RATES_11B { 4, {						\
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	3, 2, 1, 0, 255, 255, 255, 255 }, {				\
-	{ 1, IEEE80211_RATE_CCK, 1000, 27, 130, 0 },	\
-	{ 1, IEEE80211_RATE_CCK_2, 2000, 26, 132, 1 },	\
-	{ 1, IEEE80211_RATE_CCK_2, 5500, 25, 139, 1 },	\
-	{ 1, IEEE80211_RATE_CCK_2, 11000, 24, 150, 1 } }\
+	{ 1, MODULATION_CCK, 1000, 27, 130, 0 },	\
+	{ 1, MODULATION_CCK, 2000, 26, 132, 1 },	\
+	{ 1, MODULATION_CCK, 5500, 25, 139, 1 },	\
+	{ 1, MODULATION_CCK, 11000, 24, 150, 1 } }	\
 }
 
 #define AR5K_RATES_11G { 12, {					\
 	255, 255, 255, 255, 255, 255, 255, 255, 10, 8, 6, 4,	\
 	11, 9, 7, 5, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	3, 2, 1, 0, 255, 255, 255, 255 }, {			\
-	{ 1, IEEE80211_RATE_CCK, 1000, 27, 2, 0 },	\
-	{ 1, IEEE80211_RATE_CCK, 2000, 26, 4, 1 },	\
-	{ 1, IEEE80211_RATE_CCK_2, 5500, 25, 11, 1 },	\
-	{ 1, IEEE80211_RATE_CCK_2, 11000, 24, 22, 1 },	\
-	{ 0, IEEE80211_RATE_OFDM, 6000, 11, 12, 4 },	\
-	{ 0, IEEE80211_RATE_OFDM, 9000, 15, 18, 4 },	\
-	{ 1, IEEE80211_RATE_OFDM, 12000, 10, 24, 6 },	\
-	{ 1, IEEE80211_RATE_OFDM, 18000, 14, 36, 6 },	\
-	{ 1, IEEE80211_RATE_OFDM, 24000, 9, 48, 8 },	\
-	{ 1, IEEE80211_RATE_OFDM, 36000, 13, 72, 8 },	\
-	{ 1, IEEE80211_RATE_OFDM, 48000, 8, 96, 8 },	\
-	{ 1, IEEE80211_RATE_OFDM, 54000, 12, 108, 8 } }	\
+	{ 1, MODULATION_CCK, 1000, 27, 2, 0 },		\
+	{ 1, MODULATION_CCK, 2000, 26, 4, 1 },		\
+	{ 1, MODULATION_CCK, 5500, 25, 11, 1 },		\
+	{ 1, MODULATION_CCK, 11000, 24, 22, 1 },	\
+	{ 0, MODULATION_OFDM, 6000, 11, 12, 4 },	\
+	{ 0, MODULATION_OFDM, 9000, 15, 18, 4 },	\
+	{ 1, MODULATION_OFDM, 12000, 10, 24, 6 },	\
+	{ 1, MODULATION_OFDM, 18000, 14, 36, 6 },	\
+	{ 1, MODULATION_OFDM, 24000, 9, 48, 8 },	\
+	{ 1, MODULATION_OFDM, 36000, 13, 72, 8 },	\
+	{ 1, MODULATION_OFDM, 48000, 8, 96, 8 },	\
+	{ 1, MODULATION_OFDM, 54000, 12, 108, 8 } }	\
 }
 
 #define AR5K_RATES_TURBO { 8, {					\
 	255, 255, 255, 255, 255, 255, 255, 255, 6, 4, 2, 0,	\
 	7, 5, 3, 1, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255 }, {		\
-	{ 1, IEEE80211_RATE_TURBO, 6000, 11, 140, 0 },	\
-	{ 1, IEEE80211_RATE_TURBO, 9000, 15, 18, 0 },	\
-	{ 1, IEEE80211_RATE_TURBO, 12000, 10, 152, 2 },	\
-	{ 1, IEEE80211_RATE_TURBO, 18000, 14, 36, 2 },	\
-	{ 1, IEEE80211_RATE_TURBO, 24000, 9, 176, 4 },	\
-	{ 1, IEEE80211_RATE_TURBO, 36000, 13, 72, 4 },	\
-	{ 1, IEEE80211_RATE_TURBO, 48000, 8, 96, 4 },	\
-	{ 1, IEEE80211_RATE_TURBO, 54000, 12, 108, 4 } }\
+	{ 1, MODULATION_TURBO, 6000, 11, 140, 0 },	\
+	{ 1, MODULATION_TURBO, 9000, 15, 18, 0 },	\
+	{ 1, MODULATION_TURBO, 12000, 10, 152, 2 },	\
+	{ 1, MODULATION_TURBO, 18000, 14, 36, 2 },	\
+	{ 1, MODULATION_TURBO, 24000, 9, 176, 4 },	\
+	{ 1, MODULATION_TURBO, 36000, 13, 72, 4 },	\
+	{ 1, MODULATION_TURBO, 48000, 8, 96, 4 },	\
+	{ 1, MODULATION_TURBO, 54000, 12, 108, 4 } }	\
 }
 
 #define AR5K_RATES_XR { 12, {					\
 	255, 3, 1, 255, 255, 255, 2, 0, 10, 8, 6, 4,		\
 	11, 9, 7, 5, 255, 255, 255, 255, 255, 255, 255, 255,	\
 	255, 255, 255, 255, 255, 255, 255, 255 }, {		\
-	{ 1, IEEE80211_RATE_XR, 500, 7, 129, 0 },	\
-	{ 1, IEEE80211_RATE_XR, 1000, 2, 139, 1 },	\
-	{ 1, IEEE80211_RATE_XR, 2000, 6, 150, 2 },	\
-	{ 1, IEEE80211_RATE_XR, 3000, 1, 150, 3 },	\
-	{ 1, IEEE80211_RATE_OFDM, 6000, 11, 140, 4 },	\
-	{ 1, IEEE80211_RATE_OFDM, 9000, 15, 18, 4 },	\
-	{ 1, IEEE80211_RATE_OFDM, 12000, 10, 152, 6 },	\
-	{ 1, IEEE80211_RATE_OFDM, 18000, 14, 36, 6 },	\
-	{ 1, IEEE80211_RATE_OFDM, 24000, 9, 176, 8 },	\
-	{ 1, IEEE80211_RATE_OFDM, 36000, 13, 72, 8 },	\
-	{ 1, IEEE80211_RATE_OFDM, 48000, 8, 96, 8 },	\
-	{ 1, IEEE80211_RATE_OFDM, 54000, 12, 108, 8 } }	\
+	{ 1, MODULATION_XR, 500, 7, 129, 0 },		\
+	{ 1, MODULATION_XR, 1000, 2, 139, 1 },		\
+	{ 1, MODULATION_XR, 2000, 6, 150, 2 },		\
+	{ 1, MODULATION_XR, 3000, 1, 150, 3 },		\
+	{ 1, MODULATION_OFDM, 6000, 11, 140, 4 },	\
+	{ 1, MODULATION_OFDM, 9000, 15, 18, 4 },	\
+	{ 1, MODULATION_OFDM, 12000, 10, 152, 6 },	\
+	{ 1, MODULATION_OFDM, 18000, 14, 36, 6 },	\
+	{ 1, MODULATION_OFDM, 24000, 9, 176, 8 },	\
+	{ 1, MODULATION_OFDM, 36000, 13, 72, 8 },	\
+	{ 1, MODULATION_OFDM, 48000, 8, 96, 8 },	\
+	{ 1, MODULATION_OFDM, 54000, 12, 108, 8 } }	\
 }
 
 /*
@@ -732,7 +716,6 @@ typedef struct {
  */
 
 /* key types */
-/*TODO:Port to ieee80211_key_alg @ d80211.h*/
 typedef enum {
 	AR5K_CIPHER_WEP		= 0,
 	AR5K_CIPHER_AES_OCB	= 1,
@@ -744,29 +727,17 @@ typedef enum {
 					   Integrity Code */
 } AR5K_CIPHER;
 
-#define AR5K_KEYVAL_KIDLEN	1	/* 1 octet */
-#define AR5K_KEYVAL_IVLEN	3	/* 24bit */
-#define AR5K_KEYVAL_LENGTH_40	5	/* 40bit */
+#define AR5K_KEYVAL_LENGTH_40	5
 #define AR5K_KEYVAL_LENGTH_104	13
 #define AR5K_KEYVAL_LENGTH_128	16
 #define AR5K_KEYVAL_LENGTH_MAX	AR5K_KEYVAL_LENGTH_128
-#define AR5K_KEYVAL_ID_NUM	4	/* number of key ids */
 
-/*TODO: Port to struct ieee80211_key_conf @ d80211.h*/
 typedef struct {
 	int		wk_len;		/* key's length */
 	u_int8_t	wk_key[AR5K_KEYVAL_LENGTH_MAX];
 	u_int8_t	wk_type;	/* see above */
 	u_int8_t	wk_mic[8];	/* TKIP MIC key */
 } AR5K_KEYVAL;
-
-#define	AR5K_RSSI_EP_MULTIPLIER	(1<<7)
-
-#define AR5K_ASSERT_ENTRY(_e, _s) do {	\
-	if (_e >= _s)			\
-		return (FALSE);		\
-} while (0)
-
 
 
 
@@ -775,12 +746,26 @@ typedef struct {
 \***********************/
 
 /*
- *Antennas
+ * Misc definitions
  */
+#define	AR5K_RSSI_EP_MULTIPLIER	(1<<7)
+
+#define AR5K_ASSERT_ENTRY(_e, _s) do {		\
+	if (_e >= _s)				\
+		return (FALSE);			\
+} while (0)
+
+
+typedef struct {
+	u_int32_t	ns_avgbrssi;	/* average beacon rssi */
+	u_int32_t	ns_avgrssi;	/* average data rssi */
+	u_int32_t	ns_avgtxrssi;	/* average tx rssi */
+} AR5K_NODE_STATS;
+
 typedef enum {
-	AR5K_ANT_VARIABLE	= 0,
-	AR5K_ANT_FIXED_A	= 1,	/* switch to 5Ghz antenna */
-	AR5K_ANT_FIXED_B	= 2,	/* switch to 2Ghz antenna */
+	AR5K_ANT_VARIABLE	= 0,	/* variable by programming */
+	AR5K_ANT_FIXED_A	= 1,	/* fixed to 11a frequencies */
+	AR5K_ANT_FIXED_B	= 2,	/* fixed to 11b frequencies */
 	AR5K_ANT_MAX		= 3,
 } AR5K_ANT_SETTING;
 
@@ -830,7 +815,7 @@ typedef enum {
 } AR5K_INT;
 
 /*
- * Power Management
+ * Power management
  */
 typedef enum {
 	AR5K_PM_UNDEFINED = 0,
@@ -840,38 +825,29 @@ typedef enum {
 	AR5K_PM_NETWORK_SLEEP,
 } AR5K_POWER_MODE;
 
+
 /*
  * LED states
  */
 typedef int AR5K_LED_STATE;
 
-/*The folowing are defined ieee80211_proto.h we are just
-   creating aliases here*/
-
-/* 
- * Possible LED states
+/*
+ * These match net80211 definitions (not used in
+ * d80211).
  */
-enum ar5k_led_states {
-	AR5K_LED_INIT =0,
-	AR5K_LED_SCAN,
-	AR5K_LED_AUTH,
-	AR5K_LED_ASSOC,
-	AR5K_LED_RUN,
-};
+#define AR5K_LED_INIT	0 /*IEEE80211_S_INIT*/
+#define AR5K_LED_SCAN	1 /*IEEE80211_S_SCAN*/
+#define AR5K_LED_AUTH	2 /*IEEE80211_S_AUTH*/
+#define AR5K_LED_ASSOC	3 /*IEEE80211_S_ASSOC*/
+#define AR5K_LED_RUN	4 /*IEEE80211_S_RUN*/
 
-/* GPIO-controlled LED */
+/* GPIO-controlled software LED */
 #define AR5K_SOFTLED_PIN	0
 #define AR5K_SOFTLED_ON		0
 #define AR5K_SOFTLED_OFF	1
 
-#define AR5K_MAX_GPIO		10
-
 /*
  * Gain settings
- */
-
-/*
- *Not used in dadwifi
  */
 typedef enum {
 	AR5K_RFGAIN_INACTIVE = 0,
@@ -898,7 +874,7 @@ typedef enum {
 #define AR5K_GAIN_PARAM_PD_132			4
 #define AR5K_GAIN_PARAM_PD_131			5
 #define AR5K_GAIN_PARAM_PD_130			6
-#define AR5K_GAIN_CHECK_ADJUST(_g)					\
+#define AR5K_GAIN_CHECK_ADJUST(_g) 		\
 	((_g)->g_current <= (_g)->g_low || (_g)->g_current >= (_g)->g_high)
 
 struct ar5k_gain_opt_step {
@@ -1018,7 +994,7 @@ struct ar5k_gain {
 #define AR5K_EEPROM_RFKILL_POLARITY_S	1
 
 /* Newer EEPROMs are using a different offset */
-#define AR5K_EEPROM_OFF(_v, _v3_0, _v3_3)					\
+#define AR5K_EEPROM_OFF(_v, _v3_0, _v3_3) \
 	(((_v) >= AR5K_EEPROM_VERSION_3_3) ? _v3_3 : _v3_0)
 
 #define AR5K_EEPROM_ANT_GAIN(_v)	AR5K_EEPROM_OFF(_v, 0x00c4, 0x00c3)
@@ -1134,8 +1110,7 @@ struct ar5k_eeprom_info {
  * AR5k register access
  */
 
-/*O.S. dependent functions are located in ah_osdep.c*/
-
+/*O.S. dependent functions are located in ah_osdep.h*/
 #define AR5K_REG_SM(_val, _flags)					\
 	(((_val) << _flags##_S) & (_flags))
 
@@ -1175,7 +1150,6 @@ struct ar5k_eeprom_info {
 	AR5K_EEPROM_READ(_o, hal->ah_capabilities.cap_eeprom._v);	\
 
 /* Read status of selected queue */
-
 #define AR5K_REG_READ_Q(_reg, _queue)					\
 	(AR5K_REG_READ(_reg) & (1 << _queue))				\
 
@@ -1216,7 +1190,7 @@ struct ar5k_eeprom_info {
 /*
  * Common initial register values
  */
-#define AR5K_INIT_MODE	CHANNEL_B
+#define AR5K_INIT_MODE				CHANNEL_B
 
 #define AR5K_INIT_TX_LATENCY			502
 #define AR5K_INIT_USEC				39
@@ -1293,7 +1267,6 @@ struct ar5k_ini {
 #define AR5K_INI_PHY_5112		1
 #define AR5K_INI_PHY_511X		1
 
-#define AR5K_MAX_RF_BANKS		8
 #define AR5K_AR5111_INI_RF_MAX_BANKS	AR5K_MAX_RF_BANKS
 #define AR5K_AR5112_INI_RF_MAX_BANKS	AR5K_MAX_RF_BANKS
 
@@ -1762,16 +1735,6 @@ struct ar5k_ini_rfgain {
 }
 
 /*
- * Regulation stuff
- */
-
-typedef enum ieee80211_countrycode AR5K_CTRY_CODE;
-
-/* Default regulation domain if stored value EEPROM value is invalid */
-#define AR5K_TUNE_REGDOMAIN	DMN_FCC2_FCCA	/* Canada */
-#define AR5K_TUNE_CTRY		CTRY_DEFAULT
-
-/*
  * Chipset capabilities -see ath_hal_getcapability-
  * get_capability function is not yet fully implemented
  * in OpenHAL so most of these don't work yet...
@@ -1800,11 +1763,6 @@ typedef enum {
 	AR5K_CAP_RFSILENT		= 20,	/* Supports RFsilent */
 } AR5K_CAPABILITY_TYPE;
 
-/*
- * A struct to hold chipset's capabilities
- * this is not used yet by dadwifi (dadwifi uses
- * the above definitions).
- */
 typedef struct {
 	/*
 	 * Supported PHY modes
@@ -1851,8 +1809,18 @@ typedef struct {
 \***************************************/
 
 /*
+ * Regulation stuff
+ */
+typedef enum ieee80211_countrycode AR5K_CTRY_CODE;
+
+/* Default regulation domain if stored value EEPROM value is invalid */
+#define AR5K_TUNE_REGDOMAIN	DMN_FCC2_FCCA	/* Canada */
+#define AR5K_TUNE_CTRY		CTRY_DEFAULT
+
+/*
  * Misc defines
  */
+#define AR5K_ABI_VERSION		0x04090901 /* YYMMDDnn */
 
 #define AR5K_ELEMENTS(_array)	(sizeof(_array) / sizeof(_array[0]))
 
@@ -1867,161 +1835,134 @@ typedef AR5K_BOOL (ar5k_rfgain_t)
  */
 #define AR5K_HAL_FUNCTION(_hal, _n, _f)	(_hal)->ah_##_f = ar5k_##_n##_##_f
 #define AR5K_HAL_FUNCTIONS(_t, _n, _a) \
-	_t const AR5K_RATE_TABLE *(_a _n##_get_rate_table)(struct ath_hal *, \
-	    u_int mode); \
-	_t void (_a _n##_detach)(struct ath_hal *); \
-	/* Reset functions */ \
-	_t AR5K_BOOL (_a _n##_reset)(struct ath_hal *, u_int32_t, \
-	    AR5K_CHANNEL *, AR5K_BOOL change_channel, AR5K_STATUS *status); \
-	_t void (_a _n##_set_opmode)(struct ath_hal *); \
-	_t AR5K_BOOL (_a _n##_calibrate)(struct ath_hal*, \
-	    AR5K_CHANNEL *, AR5K_BOOL *); \
-	/* Transmit functions */ \
-	_t AR5K_BOOL (_a _n##_update_tx_triglevel)(struct ath_hal*, \
-	    AR5K_BOOL level); \
-	_t int (_a _n##_setup_tx_queue)(struct ath_hal *, AR5K_TX_QUEUE, \
-	     AR5K_TXQ_INFO *); \
-	_t AR5K_BOOL (_a _n##_setup_tx_queueprops)(struct ath_hal *, int queue, \
-	    const AR5K_TXQ_INFO *); \
-	_t AR5K_BOOL (_a _n##_release_tx_queue)(struct ath_hal *, u_int queue); \
-	_t AR5K_BOOL (_a _n##_reset_tx_queue)(struct ath_hal *, u_int queue); \
-	_t u_int32_t (_a _n##_get_tx_buf)(struct ath_hal *, u_int queue); \
-	_t AR5K_BOOL (_a _n##_put_tx_buf)(struct ath_hal *, u_int, \
-	    u_int32_t phys_addr); \
-	_t AR5K_BOOL (_a _n##_tx_start)(struct ath_hal *, u_int queue); \
-	_t AR5K_BOOL (_a _n##_stop_tx_dma)(struct ath_hal *, u_int queue); \
-	_t AR5K_BOOL (_a _n##_setup_tx_desc)(struct ath_hal *, \
-	    struct ath_desc *, \
-	    u_int packet_length, u_int header_length, AR5K_PKT_TYPE type, \
-	    u_int txPower, u_int tx_rate0, u_int tx_tries0, u_int key_index, \
-	    u_int antenna_mode, u_int flags, u_int rtscts_rate, \
-	    u_int rtscts_duration, u_int compicvLen, u_int compivLen,\
-	    u_int comp); \
-	_t AR5K_BOOL (_a _n##_setup_xtx_desc)(struct ath_hal *, \
-	    struct ath_desc *, \
-	    u_int tx_rate1, u_int tx_tries1, u_int tx_rate2, u_int tx_tries2, \
-	    u_int tx_rate3, u_int tx_tries3); \
-	_t AR5K_BOOL (_a _n##_fill_tx_desc)(struct ath_hal *, \
-	    struct ath_desc *, \
-	    u_int segLen, AR5K_BOOL firstSeg, AR5K_BOOL lastSeg, const struct ath_desc *); \
-	_t AR5K_STATUS (_a _n##_proc_tx_desc)(struct ath_hal *, \
-	    struct ath_desc *); \
-	_t AR5K_BOOL (_a _n##_has_veol)(struct ath_hal *); \
-	/* Receive Functions */ \
-	_t u_int32_t (_a _n##_get_rx_buf)(struct ath_hal*); \
-	_t void (_a _n##_put_rx_buf)(struct ath_hal*, u_int32_t rxdp); \
-	_t void (_a _n##_start_rx)(struct ath_hal*); \
-	_t AR5K_BOOL (_a _n##_stop_rx_dma)(struct ath_hal*); \
-	_t void (_a _n##_start_rx_pcu)(struct ath_hal*); \
-	_t void (_a _n##_stop_pcu_recv)(struct ath_hal*); \
-	_t void (_a _n##_set_mcast_filter)(struct ath_hal*, \
-	    u_int32_t filter0, u_int32_t filter1); \
-	_t AR5K_BOOL (_a _n##_set_mcast_filterindex)(struct ath_hal*, \
-	    u_int32_t index); \
-	_t AR5K_BOOL (_a _n##_clear_mcast_filter_idx)(struct ath_hal*, \
-	    u_int32_t index); \
-	_t u_int32_t (_a _n##_get_rx_filter)(struct ath_hal*); \
-	_t void (_a _n##_set_rx_filter)(struct ath_hal*, u_int32_t); \
-	_t AR5K_BOOL (_a _n##_setup_rx_desc)(struct ath_hal *, \
-	    struct ath_desc *, u_int32_t size, u_int flags); \
-	_t AR5K_STATUS (_a _n##_proc_rx_desc)(struct ath_hal *, \
-	    struct ath_desc *, u_int32_t phyAddr, struct ath_desc *next, u_int64_t tsf); \
-	_t void (_a _n##_set_rx_signal)(struct ath_hal *, AR5K_CHANNEL *); \
-	/* Misc Functions */ \
-	_t void (_a _n##_dump_state)(struct ath_hal *); \
-	_t AR5K_BOOL (_a _n##_get_diag_state)(struct ath_hal *, int request,\
-				     const void *args, u_int32_t argsize,\
-				     void **result, u_int32_t *resultsize);\
-	_t void (_a _n##_get_lladdr)(struct ath_hal *, u_int8_t *); \
-	_t AR5K_BOOL (_a _n##_set_lladdr)(struct ath_hal *, \
-	    const u_int8_t*); \
-	_t AR5K_BOOL (_a _n##_set_regdomain)(struct ath_hal*, \
-	    u_int16_t, AR5K_STATUS *); \
-	_t void (_a _n##_set_ledstate)(struct ath_hal*, AR5K_LED_STATE); \
-	_t void (_a _n##_set_associd)(struct ath_hal*, \
-	    const u_int8_t *bssid, u_int16_t assocId); \
-	_t AR5K_BOOL (_a _n##_set_gpio_input)(struct ath_hal *, \
-	    u_int32_t gpio); \
-	_t AR5K_BOOL (_a _n##_set_gpio_output)(struct ath_hal *, \
-	    u_int32_t gpio); \
-	_t u_int32_t (_a _n##_get_gpio)(struct ath_hal *, u_int32_t gpio); \
-	_t AR5K_BOOL (_a _n##_set_gpio)(struct ath_hal *, u_int32_t gpio, \
-	    u_int32_t val); \
-	_t void (_a _n##_set_gpio_intr)(struct ath_hal*, u_int, u_int32_t); \
-	_t u_int32_t (_a _n##_get_tsf32)(struct ath_hal*); \
-	_t u_int64_t (_a _n##_get_tsf64)(struct ath_hal*); \
-	_t void (_a _n##_reset_tsf)(struct ath_hal*); \
-	_t u_int16_t (_a _n##_get_regdomain)(struct ath_hal*); \
-	_t AR5K_BOOL (_a _n##_detect_card_present)(struct ath_hal*); \
-	_t void (_a _n##_update_mib_counters)(struct ath_hal*, \
-	    AR5K_MIB_STATS*); \
-	_t AR5K_RFGAIN (_a _n##_get_rf_gain)(struct ath_hal*); \
-	_t AR5K_BOOL (_a _n##_set_slot_time)(struct ath_hal*, u_int);	\
-	_t u_int (_a _n##_get_slot_time)(struct ath_hal*);		\
-	_t AR5K_BOOL (_a _n##_set_ack_timeout)(struct ath_hal *, u_int); \
-	_t u_int (_a _n##_get_ack_timeout)(struct ath_hal*);		\
-	_t AR5K_BOOL (_a _n##_set_cts_timeout)(struct ath_hal*, u_int);	\
-	_t u_int (_a _n##_get_cts_timeout)(struct ath_hal*);		\
-	/* Key Cache Functions */ \
-	_t AR5K_BOOL (_a _n##_is_cipher_supported)(struct ath_hal*, \
-	    AR5K_CIPHER); \
-	_t u_int32_t (_a _n##_get_keycache_size)(struct ath_hal*); \
-	_t AR5K_BOOL (_a _n##_reset_key)(struct ath_hal*, \
-	    u_int16_t); \
-	_t AR5K_BOOL (_a _n##_is_key_valid)(struct ath_hal *, \
-	    u_int16_t); \
-	_t AR5K_BOOL (_a _n##_set_key)(struct ath_hal*, u_int16_t, \
-	    const AR5K_KEYVAL *, const u_int8_t *, int);	\
-	_t AR5K_BOOL (_a _n##_set_key_lladdr)(struct ath_hal*, \
-	    u_int16_t, const u_int8_t *); \
-	/* Power Management Functions */ \
-	_t AR5K_BOOL (_a _n##_set_power)(struct ath_hal*, \
-	    AR5K_POWER_MODE mode, \
-	    AR5K_BOOL set_chip); \
-	_t AR5K_POWER_MODE (_a _n##_get_power_mode)(struct ath_hal*); \
-	_t AR5K_BOOL (_a _n##_query_pspoll_support)(struct ath_hal*); \
-	_t AR5K_BOOL (_a _n##_init_pspoll)(struct ath_hal*); \
-	_t AR5K_BOOL (_a _n##_enable_pspoll)(struct ath_hal *, u_int8_t *, \
-	    u_int16_t); \
-	_t AR5K_BOOL (_a _n##_disable_pspoll)(struct ath_hal *); \
-	/* Beacon Management Functions */ \
-	_t void (_a _n##_init_beacon)(struct ath_hal *, u_int32_t nexttbtt, \
-	    u_int32_t intval); \
-	_t void (_a _n##_set_beacon_timers)(struct ath_hal *, \
-	    const AR5K_BEACON_STATE *); \
-	_t void (_a _n##_reset_beacon)(struct ath_hal *); \
-	_t AR5K_BOOL (_a _n##_wait_for_beacon)(struct ath_hal *, \
-	    AR5K_BUS_ADDR); \
-	/* Interrupt functions */ \
-	_t AR5K_BOOL (_a _n##_is_intr_pending)(struct ath_hal *); \
-	_t AR5K_BOOL (_a _n##_get_isr)(struct ath_hal *, \
-	    u_int32_t *); \
-	_t u_int32_t (_a _n##_get_intr)(struct ath_hal *); \
-	_t AR5K_INT (_a _n##_set_intr)(struct ath_hal *, AR5K_INT); \
-	/* Chipset functions (ar5k-specific, non-HAL) */ \
-	_t AR5K_BOOL (_a _n##_get_capabilities)(struct ath_hal *); \
-	_t void (_a _n##_radar_alert)(struct ath_hal *, AR5K_BOOL enable); \
-	_t AR5K_BOOL (_a _n##_eeprom_is_busy)(struct ath_hal *); \
-	_t int (_a _n##_eeprom_read)(struct ath_hal *, u_int32_t offset, \
-	    u_int16_t *data); \
-	_t int (_a _n##_eeprom_write)(struct ath_hal *, u_int32_t offset, \
-	    u_int16_t data); \
-	/* Functions not found in OpenBSD */ \
-	_t AR5K_BOOL (_a _n##_get_tx_queueprops)(struct ath_hal *, int, AR5K_TXQ_INFO *);\
-	_t AR5K_STATUS (_a _n##_get_capability)(struct ath_hal *, AR5K_CAPABILITY_TYPE,\
-			u_int32_t, u_int32_t *); \
-	_t u_int32_t  (_a _n##_num_tx_pending)(struct ath_hal *, u_int); \
-	_t AR5K_BOOL (_a _n##_phy_disable)(struct ath_hal *);\
-	_t void (_a _n##_set_pcu_config)(struct ath_hal *);\
-	_t AR5K_BOOL (_a _n##_set_txpower_limit)(struct ath_hal *, u_int); \
-	_t void (_a _n##_set_def_antenna)(struct ath_hal *, u_int);\
-	_t u_int  (_a _n ##_get_def_antenna)(struct ath_hal *);\
-	_t AR5K_BOOL (_a _n ##_set_bssid_mask)(struct ath_hal *, const u_int8_t*);\
-	/*Totaly unimplemented*/ \
-	_t AR5K_BOOL (_a _n##_set_capability)(struct ath_hal *, AR5K_CAPABILITY_TYPE,\
- 			u_int32_t, u_int32_t, AR5K_STATUS *) ; \
-	_t void (_a _n##_proc_mib_event)(struct ath_hal *) ; \
+	_t const AR5K_RATE_TABLE *(_a _n##_get_rate_table)(struct ath_hal *, u_int mode);	\
+	_t void (_a _n##_detach)(struct ath_hal *);						\
+	/* Reset functions */									\
+	_t AR5K_BOOL (_a _n##_reset)(struct ath_hal *, AR5K_OPMODE, AR5K_CHANNEL *,		\
+				AR5K_BOOL change_channel, AR5K_STATUS *status);			\
+	_t void (_a _n##_set_opmode)(struct ath_hal *);					\
+	_t AR5K_BOOL (_a _n##_calibrate)(struct ath_hal*, AR5K_CHANNEL *);			\
+	/* Transmit functions */								\
+	_t AR5K_BOOL (_a _n##_update_tx_triglevel)(struct ath_hal*, AR5K_BOOL level);		\
+	_t int (_a _n##_setup_tx_queue)(struct ath_hal *, AR5K_TX_QUEUE, AR5K_TXQ_INFO *);	\
+	_t AR5K_BOOL (_a _n##_setup_tx_queueprops)(struct ath_hal *, int queue,			\
+				const AR5K_TXQ_INFO *);						\
+	_t AR5K_BOOL (_a _n##_release_tx_queue)(struct ath_hal *, u_int queue);			\
+	_t AR5K_BOOL (_a _n##_reset_tx_queue)(struct ath_hal *, u_int queue);			\
+	_t u_int32_t (_a _n##_get_tx_buf)(struct ath_hal *, u_int queue);			\
+	_t AR5K_BOOL (_a _n##_put_tx_buf)(struct ath_hal *, u_int, u_int32_t phys_addr);	\
+	_t AR5K_BOOL (_a _n##_tx_start)(struct ath_hal *, u_int queue);				\
+	_t AR5K_BOOL (_a _n##_stop_tx_dma)(struct ath_hal *, u_int queue);			\
+	_t AR5K_BOOL (_a _n##_setup_tx_desc)(struct ath_hal *, struct ath_desc *,		\
+				u_int packet_length, u_int header_length, AR5K_PKT_TYPE type,	\
+				u_int txPower, u_int tx_rate0, u_int tx_tries0, u_int key_index,\
+				u_int antenna_mode, u_int flags, u_int rtscts_rate,		\
+				u_int rtscts_duration);						\
+	_t AR5K_BOOL (_a _n##_setup_xtx_desc)(struct ath_hal *, struct ath_desc *,		\
+				u_int tx_rate1, u_int tx_tries1, u_int tx_rate2,		\
+				u_int tx_tries2,u_int tx_rate3, u_int tx_tries3);		\
+	_t AR5K_BOOL (_a _n##_fill_tx_desc)(struct ath_hal *, struct ath_desc *, u_int segLen,	\
+				AR5K_BOOL firstSeg, AR5K_BOOL lastSeg, const struct ath_desc *);\
+	_t AR5K_STATUS (_a _n##_proc_tx_desc)(struct ath_hal *, struct ath_desc *);		\
+	_t AR5K_BOOL (_a _n##_has_veol)(struct ath_hal *);					\
+	/* Receive Functions */									\
+	_t u_int32_t (_a _n##_get_rx_buf)(struct ath_hal*);					\
+	_t void (_a _n##_put_rx_buf)(struct ath_hal*, u_int32_t rxdp);				\
+	_t void (_a _n##_start_rx)(struct ath_hal*);						\
+	_t AR5K_BOOL (_a _n##_stop_rx_dma)(struct ath_hal*);					\
+	_t void (_a _n##_start_rx_pcu)(struct ath_hal*);					\
+	_t void (_a _n##_stop_pcu_recv)(struct ath_hal*);					\
+	_t void (_a _n##_set_mcast_filter)(struct ath_hal*, u_int32_t filter0,			\
+				u_int32_t filter1);						\
+	_t AR5K_BOOL (_a _n##_set_mcast_filterindex)(struct ath_hal*, u_int32_t index);	\
+	_t AR5K_BOOL (_a _n##_clear_mcast_filter_idx)(struct ath_hal*,u_int32_t index);	\
+	_t u_int32_t (_a _n##_get_rx_filter)(struct ath_hal*);					\
+	_t void (_a _n##_set_rx_filter)(struct ath_hal*, u_int32_t);				\
+	_t AR5K_BOOL (_a _n##_setup_rx_desc)(struct ath_hal *, struct ath_desc *,		\
+				u_int32_t size,	u_int flags);					\
+	_t AR5K_STATUS (_a _n##_proc_rx_desc)(struct ath_hal *, struct ath_desc *,		\
+				u_int32_t phyAddr, struct ath_desc *next);			\
+	_t void (_a _n##_set_rx_signal)(struct ath_hal *, const AR5K_NODE_STATS *);		\
+	/* Misc Functions */									\
+	_t void (_a _n##_dump_state)(struct ath_hal *);					\
+	_t AR5K_BOOL (_a _n##_get_diag_state)(struct ath_hal *, int request,const void *args,	\
+				u_int32_t argsize, void **result, u_int32_t *resultsize);	\
+	_t void (_a _n##_get_lladdr)(struct ath_hal *, u_int8_t *);				\
+	_t AR5K_BOOL (_a _n##_set_lladdr)(struct ath_hal *, const u_int8_t*);			\
+	_t AR5K_BOOL (_a _n##_set_regdomain)(struct ath_hal*, u_int16_t, AR5K_STATUS *);	\
+	_t void (_a _n##_set_ledstate)(struct ath_hal*, AR5K_LED_STATE);			\
+	_t void (_a _n##_set_associd)(struct ath_hal*, const u_int8_t *bssid,			\
+				u_int16_t assocId);						\
+	_t AR5K_BOOL (_a _n##_set_gpio_input)(struct ath_hal *, u_int32_t gpio);		\
+	_t AR5K_BOOL (_a _n##_set_gpio_output)(struct ath_hal *, u_int32_t gpio);		\
+	_t u_int32_t (_a _n##_get_gpio)(struct ath_hal *, u_int32_t gpio);			\
+	_t AR5K_BOOL (_a _n##_set_gpio)(struct ath_hal *, u_int32_t gpio, u_int32_t val);	\
+	_t void (_a _n##_set_gpio_intr)(struct ath_hal*, u_int, u_int32_t);			\
+	_t u_int32_t (_a _n##_get_tsf32)(struct ath_hal*);					\
+	_t u_int64_t (_a _n##_get_tsf64)(struct ath_hal*);					\
+	_t void (_a _n##_reset_tsf)(struct ath_hal*);						\
+	_t u_int16_t (_a _n##_get_regdomain)(struct ath_hal*);					\
+	_t AR5K_BOOL (_a _n##_detect_card_present)(struct ath_hal*);				\
+	_t void (_a _n##_update_mib_counters)(struct ath_hal*, AR5K_MIB_STATS*);		\
+	_t AR5K_RFGAIN (_a _n##_get_rf_gain)(struct ath_hal*);					\
+	_t AR5K_BOOL (_a _n##_set_slot_time)(struct ath_hal*, u_int);				\
+	_t u_int (_a _n##_get_slot_time)(struct ath_hal*);					\
+	_t AR5K_BOOL (_a _n##_set_ack_timeout)(struct ath_hal *, u_int);			\
+	_t u_int (_a _n##_get_ack_timeout)(struct ath_hal*);					\
+	_t AR5K_BOOL (_a _n##_set_cts_timeout)(struct ath_hal*, u_int);			\
+	_t u_int (_a _n##_get_cts_timeout)(struct ath_hal*);					\
+	/* Key Cache Functions */								\
+	_t AR5K_BOOL (_a _n##_is_cipher_supported)(struct ath_hal*, AR5K_CIPHER);		\
+	_t u_int32_t (_a _n##_get_keycache_size)(struct ath_hal*);				\
+	_t AR5K_BOOL (_a _n##_reset_key)(struct ath_hal*, u_int16_t);				\
+	_t AR5K_BOOL (_a _n##_is_key_valid)(struct ath_hal *, u_int16_t);			\
+	_t AR5K_BOOL (_a _n##_set_key)(struct ath_hal*, u_int16_t, const AR5K_KEYVAL *,		\
+				const u_int8_t *, int);						\
+	_t AR5K_BOOL (_a _n##_set_key_lladdr)(struct ath_hal*, u_int16_t, const u_int8_t *);	\
+	/* Power Management Functions */							\
+	_t AR5K_BOOL (_a _n##_set_power)(struct ath_hal*, AR5K_POWER_MODE mode,		\
+				AR5K_BOOL set_chip, u_int16_t sleep_duration);			\
+	_t AR5K_POWER_MODE (_a _n##_get_power_mode)(struct ath_hal*);				\
+	_t AR5K_BOOL (_a _n##_query_pspoll_support)(struct ath_hal*);				\
+	_t AR5K_BOOL (_a _n##_init_pspoll)(struct ath_hal*);					\
+	_t AR5K_BOOL (_a _n##_enable_pspoll)(struct ath_hal *, u_int8_t *, u_int16_t);		\
+	_t AR5K_BOOL (_a _n##_disable_pspoll)(struct ath_hal *);				\
+	/* Beacon Management Functions */							\
+	_t void (_a _n##_init_beacon)(struct ath_hal *, u_int32_t nexttbtt, u_int32_t intval);	\
+	_t void (_a _n##_set_beacon_timers)(struct ath_hal *, const AR5K_BEACON_STATE *);	\
+	_t void (_a _n##_reset_beacon)(struct ath_hal *);					\
+	_t AR5K_BOOL (_a _n##_wait_for_beacon)(struct ath_hal *, AR5K_BUS_ADDR);		\
+	/* Interrupt functions */								\
+	_t AR5K_BOOL (_a _n##_is_intr_pending)(struct ath_hal *);				\
+	_t AR5K_BOOL (_a _n##_get_isr)(struct ath_hal *, u_int32_t *);				\
+	_t u_int32_t (_a _n##_get_intr)(struct ath_hal *);					\
+	_t AR5K_INT (_a _n##_set_intr)(struct ath_hal *, AR5K_INT);				\
+	/* Chipset functions (ar5k-specific, non-HAL) */					\
+	_t AR5K_BOOL (_a _n##_get_capabilities)(struct ath_hal *);				\
+	_t void (_a _n##_radar_alert)(struct ath_hal *, AR5K_BOOL enable);			\
+	_t AR5K_BOOL (_a _n##_eeprom_is_busy)(struct ath_hal *);				\
+	_t int (_a _n##_eeprom_read)(struct ath_hal *, u_int32_t offset, u_int16_t *data);	\
+	_t int (_a _n##_eeprom_write)(struct ath_hal *, u_int32_t offset, u_int16_t data);	\
+	/* Functions not found in OpenBSD */							\
+	_t AR5K_BOOL (_a _n##_get_tx_queueprops)(struct ath_hal *, int, AR5K_TXQ_INFO *);	\
+	_t AR5K_STATUS (_a _n##_get_capability)(struct ath_hal *, AR5K_CAPABILITY_TYPE,		\
+				u_int32_t, u_int32_t *);					\
+	_t u_int32_t  (_a _n##_num_tx_pending)(struct ath_hal *, u_int);			\
+	_t AR5K_BOOL (_a _n##_phy_disable)(struct ath_hal *);					\
+	_t void (_a _n##_set_pcu_config)(struct ath_hal *);					\
+	_t AR5K_BOOL (_a _n##_set_txpower_limit)(struct ath_hal *, u_int);			\
+	_t void (_a _n##_set_def_antenna)(struct ath_hal *, u_int);				\
+	_t u_int  (_a _n ##_get_def_antenna)(struct ath_hal *);					\
+	_t AR5K_BOOL (_a _n ##_set_bssid_mask)(struct ath_hal *, const u_int8_t*);		\
+	/*Totaly unimplemented*/								\
+	_t AR5K_BOOL (_a _n##_set_capability)(struct ath_hal *, AR5K_CAPABILITY_TYPE, u_int32_t,\
+				u_int32_t,AR5K_STATUS *) ;					\
+	_t void (_a _n##_proc_mib_event)(struct ath_hal *, const AR5K_NODE_STATS *) ;		\
 	_t void (_a _n##_get_tx_inter_queue)(struct ath_hal *, u_int32_t *);
+
+
+#define AR5K_MAX_GPIO		10
+#define AR5K_MAX_RF_BANKS	8
 
 struct ath_hal {
 	u_int32_t		ah_magic;
@@ -2035,7 +1976,7 @@ struct ath_hal {
 
 	AR5K_INT			ah_imr;
 
-	u_int32_t		ah_op_mode;
+	AR5K_OPMODE		ah_op_mode;
 	AR5K_POWER_MODE		ah_power_mode;
 	AR5K_CHANNEL		ah_current_channel;
 	AR5K_BOOL		ah_turbo;
@@ -2068,12 +2009,6 @@ struct ath_hal {
 #define ah_regdomain_hw	ah_capabilities.cap_regdomain.reg_hw
 #define ah_modes		ah_capabilities.cap_mode
 #define ah_ee_version		ah_capabilities.cap_eeprom.ee_version
-#define ah_countryCode		ah_country_code
-#define ah_macVersion		ah_mac_version
-#define ah_macRev		ah_mac_revision
-#define ah_phyRev		ah_phy_revision
-#define ah_analog5GhzRev	ah_radio_5ghz_revision
-#define ah_analog2GhzRev	ah_radio_2ghz_revision
 
 	u_int32_t		ah_atim_window;
 	u_int32_t		ah_aifs;
@@ -2093,7 +2028,7 @@ struct ath_hal {
 
 	ar5k_capabilities_t	ah_capabilities;
 
-	AR5K_TXQ_INFO		ah_txq[AR5K_MAX_TX_QUEUES];
+	AR5K_TXQ_INFO		ah_txq[AR5K_NUM_TX_QUEUES];
 	u_int32_t		ah_txq_interrupts;
 
 	u_int32_t		*ah_rf_banks;
@@ -2122,62 +2057,47 @@ struct ath_hal {
 
 };
 
-
 /*
  * Prototypes -functions common for all chipsets-
  */
 
-//__BEGIN_DECLS
 
 const char		*ath_hal_probe(u_int16_t, u_int16_t);
-
 struct ath_hal		*ath_hal_attach(u_int16_t device, AR5K_SOFTC sc, AR5K_BUS_TAG,
 					AR5K_BUS_HANDLE, AR5K_STATUS *);
-
-u_int16_t		 ath_hal_computetxtime(struct ath_hal *,
-    				const AR5K_RATE_TABLE *, u_int32_t, u_int16_t, AR5K_BOOL);
-
+u_int16_t		 ath_hal_computetxtime(struct ath_hal *, const AR5K_RATE_TABLE *,
+					u_int32_t, u_int16_t, AR5K_BOOL);
 u_int			 ath_hal_mhz2ieee(u_int, u_int);
 u_int			 ath_hal_ieee2mhz(u_int, u_int);
-
 AR5K_BOOL		 ath_hal_init_channels(struct ath_hal *, AR5K_CHANNEL *,
-			 u_int, u_int *, u_int8_t *regclassids, u_int maxregids, u_int *nregids, 
-			 AR5K_CTRY_CODE, u_int16_t, AR5K_BOOL, AR5K_BOOL);
-
+					u_int, u_int *, AR5K_CTRY_CODE, u_int16_t, 
+					AR5K_BOOL, AR5K_BOOL);
 const char		*ar5k_printver(enum ar5k_srev_type, u_int32_t);
 void			 ar5k_radar_alert(struct ath_hal *);
 ieee80211_regdomain_t	 ar5k_regdomain_to_ieee(u_int16_t);
 u_int16_t		 ar5k_regdomain_from_ieee(ieee80211_regdomain_t);
 u_int16_t		 ar5k_get_regdomain(struct ath_hal *);
-
 u_int32_t		 ar5k_bitswap(u_int32_t, u_int);
 u_int			 ar5k_clocktoh(u_int, AR5K_BOOL);
 u_int			 ar5k_htoclock(u_int, AR5K_BOOL);
 void			 ar5k_rt_copy(AR5K_RATE_TABLE *, const AR5K_RATE_TABLE *);
-
-AR5K_BOOL		 ar5k_register_timeout(struct ath_hal *, u_int32_t,
-    				u_int32_t, u_int32_t, AR5K_BOOL);
-
+AR5K_BOOL		 ar5k_register_timeout(struct ath_hal *, u_int32_t, u_int32_t,
+					u_int32_t, AR5K_BOOL);
 int			 ar5k_eeprom_init(struct ath_hal *);
 int			 ar5k_eeprom_read_mac(struct ath_hal *, u_int8_t *);
-AR5K_BOOL		 ar5k_eeprom_regulation_domain(struct ath_hal *,
-    				AR5K_BOOL, ieee80211_regdomain_t *);
-
+AR5K_BOOL		 ar5k_eeprom_regulation_domain(struct ath_hal *, AR5K_BOOL,
+					ieee80211_regdomain_t *);
 AR5K_BOOL		 ar5k_channel(struct ath_hal *, AR5K_CHANNEL *);
 AR5K_BOOL		 ar5k_rfregs(struct ath_hal *, AR5K_CHANNEL *, u_int);
 u_int32_t		 ar5k_rfregs_gainf_corr(struct ath_hal *);
 AR5K_BOOL		 ar5k_rfregs_gain_readback(struct ath_hal *);
 int32_t			 ar5k_rfregs_gain_adjust(struct ath_hal *);
 AR5K_BOOL		 ar5k_rfgain(struct ath_hal *, u_int, u_int);
-
-void			 ar5k_txpower_table(struct ath_hal *, AR5K_CHANNEL *,
-    int16_t);
+void			 ar5k_txpower_table(struct ath_hal *, AR5K_CHANNEL *, int16_t);
 
 /*added*/
 extern	u_int  ath_hal_getwirelessmodes(struct ath_hal*, AR5K_CTRY_CODE);
 void ath_hal_detach(struct ath_hal *ah);
-struct ath_hal * _ath_hal_attach(u_int16_t devid, AR5K_SOFTC sc, AR5K_BUS_TAG t, AR5K_BUS_HANDLE h, void* s);
-
-//__END_DECLS
-
+struct ath_hal * _ath_hal_attach(u_int16_t devid, AR5K_SOFTC sc, AR5K_BUS_TAG t,
+					AR5K_BUS_HANDLE h, void* s);
 #endif /* _AR5K_H */

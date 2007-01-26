@@ -1,7 +1,6 @@
-/*	$OpenBSD: ar5xxx.c,v 1.32 2005/12/18 17:59:58 reyk Exp $	*/
-
 /*
- * Copyright (c) 2004, 2005 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,6 +13,8 @@
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * $Id$
  */
 
 /*
@@ -217,7 +218,7 @@ ath_hal_attach(u_int16_t device, AR5K_SOFTC sc, AR5K_BUS_TAG st, AR5K_BUS_HANDLE
 	hal->ah_country_code = AR5K_TUNE_CTRY;
 	ar5k_get_regdomain(hal);
 
-	hal->ah_op_mode = IEEE80211_IF_TYPE_STA;
+	hal->ah_op_mode = AR5K_M_STA;
 	hal->ah_radar.r_enabled = AR5K_TUNE_RADAR_ALERT;
 	hal->ah_turbo = FALSE;
 	hal->ah_txpower.txp_tpc = AR5K_TUNE_TPC_TXPOWER;
@@ -331,25 +332,30 @@ ath_hal_computetxtime(struct ath_hal *hal, const AR5K_RATE_TABLE *rates,
 	/*
 	 * Get rate by index
 	 */
-	rate = &rates->info[rate_index];
+	rate = &rates->rates[rate_index];
 
 	/*
 	 * Calculate the transmission time by operation (PHY) mode
 	 */
-	if(rate->modulation & IEEE80211_RATE_CCK){
+	switch (rate->modulation) {
+	case MODULATION_CCK:
 		/*
 		 * CCK / DS mode (802.11b)
 		 */
 		value = AR5K_CCK_TX_TIME(rate->rate_kbps, frame_length,
-		    (short_preamble && (rate->modulation & IEEE80211_RATE_PREAMBLE2)));
-	}else if(rate->modulation & IEEE80211_RATE_OFDM){
+		    (short_preamble && (rate->modulation == MODULATION_CCK_SP)));
+		break;
+
+	case MODULATION_OFDM:
 		/*
 		 * Orthogonal Frequency Division Multiplexing
 		 */
 		if (AR5K_OFDM_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
 			return (0);
 		value = AR5K_OFDM_TX_TIME(rate->rate_kbps, frame_length);
-	}else if(rate->modulation & IEEE80211_RATE_TURBO){
+		break;
+
+	case MODULATION_TURBO:
 		/*
 		 * Orthogonal Frequency Division Multiplexing
 		 * Atheros "Turbo Mode" (doubled rates)
@@ -357,7 +363,9 @@ ath_hal_computetxtime(struct ath_hal *hal, const AR5K_RATE_TABLE *rates,
 		if (AR5K_TURBO_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
 			return (0);
 		value = AR5K_TURBO_TX_TIME(rate->rate_kbps, frame_length);
-	}else if(rate->modulation & IEEE80211_RATE_XR){
+		break;
+
+	case MODULATION_XR:
 		/*
 		 * Orthogonal Frequency Division Multiplexing
 		 * Atheros "eXtended Range" (XR)
@@ -365,7 +373,9 @@ ath_hal_computetxtime(struct ath_hal *hal, const AR5K_RATE_TABLE *rates,
 		if (AR5K_XR_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
 			return (0);
 		value = AR5K_XR_TX_TIME(rate->rate_kbps, frame_length);
-	} else {
+		break;
+
+	default:
 		return (0);
 	}
 
@@ -422,6 +432,7 @@ ath_hal_ieee2mhz(u_int chan, u_int flags)
 	}
 }
 
+
 AR5K_BOOL /*O.K.*/
 ar5k_check_channel(struct ath_hal *hal, u_int16_t freq, u_int flags)
 {
@@ -439,13 +450,10 @@ ar5k_check_channel(struct ath_hal *hal, u_int16_t freq, u_int flags)
 	return (FALSE);
 }
 
-AR5K_BOOL /*Ported, added SUPERCHANNEL, country code and regclassids/maxregids/nregids
-	   and i have no idea what they do :P -just for combatibility-
-	   + FIX in debug mode*/
+AR5K_BOOL /*Ported, added SUPERCHANNEL & country code + FIX in debug mode*/
 ath_hal_init_channels(struct ath_hal *hal, AR5K_CHANNEL *channels,
-	u_int max_channels, u_int *channels_size, u_int8_t *regclassids, 
-	u_int maxregids, u_int *nregids,AR5K_CTRY_CODE country, u_int16_t mode,
-	AR5K_BOOL outdoor, AR5K_BOOL extended)
+    u_int max_channels, u_int *channels_size, AR5K_CTRY_CODE country, u_int16_t mode,
+    AR5K_BOOL outdoor, AR5K_BOOL extended)
 {
 	u_int i, c;
 	u_int32_t domain_current;
@@ -482,7 +490,7 @@ ath_hal_init_channels(struct ath_hal *hal, AR5K_CHANNEL *channels,
 			freq = ath_hal_ieee2mhz(i, flags);
 			if (ar5k_check_channel(hal, freq, flags) == FALSE)
 				continue;
-			all_channels[c].channel = freq;
+			all_channels[c].freq = freq;
 			all_channels[c++].channel_flags = flags;
 		}
 
@@ -536,7 +544,7 @@ for loop starts from 1 and all channels are marked as 5GHz M.F.*/
 			continue;
 
 		/* Write channel and increment counter */
-		all_channels[c++].channel = ar5k_5ghz_channels[i].rc_channel;
+		all_channels[c++].freq = ar5k_5ghz_channels[i].rc_channel;
 	}
 
 	/*
@@ -572,7 +580,7 @@ for loop starts from 1 and all channels are marked as 5GHz M.F.*/
 		}
 
 		/* Write channel and increment counter */
-		all_channels[c++].channel = ar5k_2ghz_channels[i].rc_channel;
+		all_channels[c++].freq = ar5k_2ghz_channels[i].rc_channel;
 	}
 
  done:
@@ -621,19 +629,19 @@ ar5k_radar_alert(struct ath_hal *hal)
 	 * Limit ~1/s
 	 */
 	
-//	if (hal->ah_radar.r_last_channel.channel ==
-//	    hal->ah_current_channel.channel &&
+//	if (hal->ah_radar.r_last_channel.freq ==
+//	    hal->ah_current_channel.freq &&
 //	    tick < (hal->ah_radar.r_last_alert + hz))
 		return;
 
-/*	hal->ah_radar.r_last_channel.channel =
-	    hal->ah_current_channel.channel;
+/*	hal->ah_radar.r_last_channel.freq =
+	    hal->ah_current_channel.freq;
 	hal->ah_radar.r_last_channel.channel_flags =
 	    hal->ah_current_channel.channel_flags;
 	hal->ah_radar.r_last_alert = tick;
 
 	AR5K_PRINTF("Possible radar activity detected at %u MHz (tick %u)\n",
-	    hal->ah_radar.r_last_alert, hal->ah_current_channel.channel);*/
+	    hal->ah_radar.r_last_alert, hal->ah_current_channel.freq);*/
 }
 
 u_int16_t /*O.K.*/
@@ -718,7 +726,7 @@ ar5k_rt_copy(AR5K_RATE_TABLE *dst, const AR5K_RATE_TABLE *src)
 {
 	bzero(dst, sizeof(AR5K_RATE_TABLE));
 	dst->rate_count = src->rate_count;
-	bcopy(src->info, dst->info, sizeof(dst->info));
+	bcopy(src->rates, dst->rates, sizeof(dst->rates));
 }
 
 AR5K_BOOL /*O.K.*/
@@ -1176,12 +1184,12 @@ ar5k_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	 * Check bounds supported by the PHY
 	 * (don't care about regulation restrictions at this point)
 	 */
-	if ((channel->channel < hal->ah_capabilities.cap_range.range_2ghz_min ||
-	    channel->channel > hal->ah_capabilities.cap_range.range_2ghz_max) &&
-	    (channel->channel < hal->ah_capabilities.cap_range.range_5ghz_min ||
-	    channel->channel > hal->ah_capabilities.cap_range.range_5ghz_max)) {
+	if ((channel->freq < hal->ah_capabilities.cap_range.range_2ghz_min ||
+	    channel->freq > hal->ah_capabilities.cap_range.range_2ghz_max) &&
+	    (channel->freq < hal->ah_capabilities.cap_range.range_5ghz_min ||
+	    channel->freq > hal->ah_capabilities.cap_range.range_5ghz_max)) {
 		AR5K_PRINTF("channel out of supported range (%u MHz)\n",
-		    channel->channel);
+		    channel->freq);
 		return (FALSE);
 	}
 
@@ -1198,7 +1206,7 @@ ar5k_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	if (ret == FALSE)
 		return (ret);
 
-	hal->ah_current_channel.channel = channel->channel;
+	hal->ah_current_channel.freq = channel->freq;
 	hal->ah_current_channel.channel_flags = channel->channel_flags;
 	hal->ah_turbo = channel->channel_flags == CHANNEL_T ?
 	    TRUE : FALSE;
@@ -1217,7 +1225,7 @@ ar5k_ar5110_chan2athchan(AR5K_CHANNEL *channel)
 	 * newer chipsets like the AR5212A who have a completely
 	 * different RF/PHY part.
 	 */
-	athchan = (ar5k_bitswap((ath_hal_mhz2ieee(channel->channel,
+	athchan = (ar5k_bitswap((ath_hal_mhz2ieee(channel->freq,
 	    channel->channel_flags) - 24) / 2, 5) << 1) |
 	    (1 << 6) | 0x1;
 
@@ -1277,7 +1285,7 @@ ar5k_ar5111_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	 * Set the channel on the AR5111 radio
 	 */
 	data0 = data1 = 0;
-	ath_channel = ieee_channel = ath_hal_mhz2ieee(channel->channel,
+	ath_channel = ieee_channel = ath_hal_mhz2ieee(channel->freq,
 	    channel->channel_flags);
 
 	if (channel->channel_flags & CHANNEL_2GHZ) {
@@ -1314,7 +1322,7 @@ ar5k_ar5112_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	u_int16_t c;
 
 	data = data0 = data1 = data2 = 0;
-	c = channel->channel;
+	c = channel->freq;
 
 	/*
 	 * Set the channel on the AR5112 or newer
@@ -1619,10 +1627,10 @@ ar5k_ar5111_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode)
 	} else {
 		/* For 11a, Turbo and XR */
 		ee_mode = AR5K_EEPROM_MODE_11A;
-		obdb = channel->channel >= 5725 ? 3 :
-		    (channel->channel >= 5500 ? 2 :
-			(channel->channel >= 5260 ? 1 :
-			    (channel->channel > 4000 ? 0 : -1)));
+		obdb = channel->freq >= 5725 ? 3 :
+		    (channel->freq >= 5500 ? 2 :
+			(channel->freq >= 5260 ? 1 :
+			    (channel->freq > 4000 ? 0 : -1)));
 
 		if (!ar5k_rfregs_op(rf, hal->ah_offset[6],
 			ee->ee_pwd_84, 1, 51, 3, TRUE))
@@ -1721,10 +1729,10 @@ ar5k_ar5112_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode)
 	} else {
 		/* For 11a, Turbo and XR */
 		ee_mode = AR5K_EEPROM_MODE_11A;
-		obdb = channel->channel >= 5725 ? 3 :
-		    (channel->channel >= 5500 ? 2 :
-			(channel->channel >= 5260 ? 1 :
-			    (channel->channel > 4000 ? 0 : -1)));
+		obdb = channel->freq >= 5725 ? 3 :
+		    (channel->freq >= 5500 ? 2 :
+			(channel->freq >= 5260 ? 1 :
+			    (channel->freq > 4000 ? 0 : -1)));
 
 		if (!ar5k_rfregs_op(rf, hal->ah_offset[6],
 			ee->ee_ob[ee_mode][obdb], 3, 279, 0, TRUE))
