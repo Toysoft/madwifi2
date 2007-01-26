@@ -99,27 +99,6 @@ typedef void *TQUEUE_ARG;
 #define	tasklet_enable(t)	do { (void) t; local_bh_enable(); } while (0)
 #endif /* !DECLARE_TASKLET */
 
-#include <linux/sched.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)
-#include <linux/tqueue.h>
-#define ATH_WORK_THREAD			tq_struct
-#define ATH_SCHEDULE_TASK(t)		schedule_task((t))
-#define ATH_INIT_SCHED_TASK(t, f, d) do { 	\
-	memset((t),0,sizeof(struct tq_struct)); 	\
-	(t)->routine = (void (*)(void*)) (f); 	\
-	(t)->data=(void *) (d); 		\
-} while (0)
-#define ATH_FLUSH_TASKS			flush_scheduled_tasks
-#else
-#include <linux/workqueue.h>
-#define ATH_SCHEDULE_TASK(t)		schedule_work((t))
-
-#define ATH_INIT_SCHED_TASK(_t, _f, _d)	INIT_WORK((_t), (void (*)(void *))(_f), (void *)(_d));
-
-#define ATH_WORK_THREAD			work_struct
-#define	ATH_FLUSH_TASKS			flush_scheduled_work
-#endif /* KERNEL_VERSION < 2.5.41 */
-
 /*
  * Guess how the interrupt handler should work.
  */
@@ -653,7 +632,7 @@ struct ath_softc {
 
 	struct timer_list sc_cal_ch;		/* calibration timer */
 //	AR5K_NODE_STATS sc_halstats;		/* station-mode rssi stats */
-	struct ATH_WORK_THREAD sc_radartask;	/* Schedule task for DFS handling */
+	struct work_struct sc_radartask;	/* Schedule task for DFS handling */
 
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
