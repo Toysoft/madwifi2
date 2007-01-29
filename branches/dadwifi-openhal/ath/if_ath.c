@@ -5495,11 +5495,13 @@ static void ath_grppoll_start(struct ieee80211vap *vap,int pollcount)
 				STAILQ_REMOVE_HEAD(&sc->sc_grppollbuf, bf_list);
 			else {
 				DPRINTF(sc, ATH_DEBUG_XMIT, "%s: No more TxBufs\n", __func__);
+				ATH_TXBUF_UNLOCK_IRQ_EARLY(sc);
 				return;
 			}
 			/* XXX use a counter and leave at least one for mgmt frames */
 			if (STAILQ_EMPTY(&sc->sc_grppollbuf)) {				
 				DPRINTF(sc, ATH_DEBUG_XMIT, "%s: No more TxBufs left\n", __func__);
+				ATH_TXBUF_UNLOCK_IRQ_EARLY(sc);
 				return;
 			}					
 			ATH_TXBUF_UNLOCK_IRQ(sc);
