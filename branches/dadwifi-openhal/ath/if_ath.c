@@ -2205,7 +2205,7 @@ dot11_to_ratecode(struct ath_softc *sc, const AR5K_RATE_TABLE *rt, int dot11)
 #endif
 
 
-void
+static void
 ath_tx_startraw(struct ath_softc *sc, struct ath_buf *bf, struct sk_buff *skb,
 	       	struct ieee80211_tx_control *control, struct ath_txq *txq) 
 {
