@@ -2266,15 +2266,15 @@ ath_tx_startraw(struct ath_softc *sc, struct ath_buf *bf, struct sk_buff *skb,
 
 		if (sc->sc_ath_keys[keyix].ak_alg == ALG_TKIP) {
 			struct ieee80211_hdr *hdr;
-			u16 fc;
-			u16 sc;
+			u16 fctl;
+			u16 sctl;
 
 			hdr = (struct ieee80211_hdr *) skb->data;
-			fc = le16_to_cpu(hdr->frame_control);
-			sc = le16_to_cpu(hdr->seq_ctrl);
+			fctl = le16_to_cpu(hdr->frame_control);
+			sctl = le16_to_cpu(hdr->seq_ctrl);
 
-			if (likely(!(fc & IEEE80211_FCTL_MOREFRAGS) &&
-				    (sc & IEEE80211_SCTL_FRAG) == 0)) {
+			if (likely(!(fctl & IEEE80211_FCTL_MOREFRAGS) &&
+				    (sctl & IEEE80211_SCTL_FRAG) == 0)) {
 
 				/* hwaccel adds Michael MIC to the end of the
 				 * payload of unfragmented frames. */
