@@ -74,7 +74,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	frm += 8;
 
 	/* beacon interval */
-	*(u_int16_t *)frm = htole16(ni->ni_intval);
+	*(__le16 *)frm = htole16(ni->ni_intval);
 	frm += 2;
 
 	/* capability information */

@@ -193,7 +193,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 				present = 0;
 				break;
 			}
-			present_ext = le32_to_cpu(*(u_int32_t*)p);
+			present_ext = le32_to_cpu(*(__le32 *)p);
 			p += 4;
 		}
 

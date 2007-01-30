@@ -373,7 +373,7 @@ ieee80211_send_setup(struct ieee80211vap *vap,
 	}
 	wh->i_dur = 0;
 	/* NB: use non-QoS tid */
-	*(u_int16_t *)&wh->i_seq[0] =
+	*(__le16 *)&wh->i_seq[0] =
 	    htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
 	ni->ni_txseqs[0]++;
 #undef WH4
@@ -1054,11 +1054,11 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		qos[1] = 0;
 		qwh->i_fc[0] |= IEEE80211_FC0_SUBTYPE_QOS;
 
-		*(u_int16_t *)&wh->i_seq[0] =
+		*(__le16 *)&wh->i_seq[0] =
 			htole16(ni->ni_txseqs[tid] << IEEE80211_SEQ_SEQ_SHIFT);
 		ni->ni_txseqs[tid]++;
 	} else {
-		*(u_int16_t *)wh->i_seq =
+		*(__le16 *)wh->i_seq =
 			htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
 		ni->ni_txseqs[0]++;
 	}
@@ -1139,7 +1139,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		*/
 		wh->i_fc[1] |= IEEE80211_FC1_MORE_FRAG;
 
-		*(u_int16_t *)&wh->i_seq[0] |= 
+		*(__le16 *)&wh->i_seq[0] |= 
 			htole16((fragnum & IEEE80211_SEQ_FRAG_MASK) <<
 				IEEE80211_SEQ_FRAG_SHIFT);
 		fragnum++;
@@ -1157,7 +1157,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			twh = (struct ieee80211_frame *) skb_put(tskb, hdrsize);
 			memcpy((void *) twh, (void *) wh, hdrsize);
 
-			*(u_int16_t *)&twh->i_seq[0] |=
+			*(__le16 *)&twh->i_seq[0] |=
 				htole16((fragnum & IEEE80211_SEQ_FRAG_MASK) <<
 					IEEE80211_SEQ_FRAG_SHIFT);
 			fragnum++;
@@ -1633,9 +1633,9 @@ ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 		frm += IEEE80211_ADDR_LEN;
 		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
-		*(u_int16_t *)frm = htole16(vap->iv_xrvap->iv_bss->ni_intval);
+		*(__le16 *)frm = htole16(vap->iv_xrvap->iv_bss->ni_intval);
 		frm += 2;
-		*(u_int16_t *)frm = htole16(vap->iv_bss->ni_intval);
+		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval);
 		frm += 2;
 		*frm++ = vap->iv_xrvap->iv_ath_cap;
 		*frm++ = vap->iv_ath_cap; 
@@ -1644,9 +1644,9 @@ ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 		frm += IEEE80211_ADDR_LEN;
 		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
-		*(u_int16_t *)frm = htole16(vap->iv_bss->ni_intval);
+		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval);
 		frm += 2;
-		*(u_int16_t *)frm = htole16(vap->iv_xrvap->iv_bss->ni_intval);
+		*(__le16 *)frm = htole16(vap->iv_xrvap->iv_bss->ni_intval);
 		frm += 2;
 		*frm++ = vap->iv_ath_cap; 
 		*frm++ = vap->iv_xrvap->iv_ath_cap;
@@ -1861,7 +1861,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		frm += 8;
 
 		/* beacon interval */
-		*(u_int16_t *)frm = htole16(vap->iv_bss->ni_intval);
+		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval);
 		frm += 2;
 
 		/* cap. info */
@@ -1876,7 +1876,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
 		if (ic->ic_flags & IEEE80211_F_SHSLOT)
 			capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
-		*(u_int16_t *)frm = htole16(capinfo);
+		*(__le16 *)frm = htole16(capinfo);
 		frm += 2;
 
 		/* ssid */
@@ -1982,17 +1982,17 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
-		((u_int16_t *)frm)[0] =
+		((__le16 *)frm)[0] =
 			(is_shared_key) ? htole16(IEEE80211_AUTH_ALG_SHARED)
 				: htole16(IEEE80211_AUTH_ALG_OPEN);
-		((u_int16_t *)frm)[1] = htole16(arg);	/* sequence number */
-		((u_int16_t *)frm)[2] = htole16(status);	/* status */
+		((__le16 *)frm)[1] = htole16(arg);	/* sequence number */
+		((__le16 *)frm)[2] = htole16(status);	/* status */
 
 		if (has_challenge && status == IEEE80211_STATUS_SUCCESS) {
-			((u_int16_t *)frm)[3] =
+			((__le16 *)frm)[3] =
 				htole16((IEEE80211_CHALLENGE_LEN << 8) |
 					IEEE80211_ELEMID_CHALLENGE);
-			memcpy(&((u_int16_t *)frm)[4], ni->ni_challenge,
+			memcpy(&((__le16 *)frm)[4], ni->ni_challenge,
 				IEEE80211_CHALLENGE_LEN);
 			if (arg == IEEE80211_AUTH_SHARED_RESPONSE) {
 				struct ieee80211_cb *cb =
@@ -2019,7 +2019,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		skb = ieee80211_getmgtframe(&frm, sizeof(u_int16_t));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
-		*(u_int16_t *)frm = htole16(arg);	/* reason */
+		*(__le16 *)frm = htole16(arg);	/* reason */
 
 		IEEE80211_NODE_STAT(ni, tx_deauth);
 		IEEE80211_NODE_STAT_SET(ni, tx_deauth_code, arg);
@@ -2076,11 +2076,11 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if ((ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) &&
 		    (ic->ic_caps & IEEE80211_C_SHSLOT))
 			capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
-		*(u_int16_t *)frm = htole16(capinfo);
+		*(__le16 *)frm = htole16(capinfo);
 		frm += 2;
 
 		/* listen interval */
-		*(u_int16_t *)frm = htole16(ic->ic_lintval);
+		*(__le16 *)frm = htole16(ic->ic_lintval);
 		frm += 2;
 
 		/* Current AP address */
@@ -2168,16 +2168,16 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
 		if (ic->ic_flags & IEEE80211_F_SHSLOT)
 			capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
-		*(u_int16_t *)frm = htole16(capinfo);
+		*(__le16 *)frm = htole16(capinfo);
 		frm += 2;
 
 		/* status */
-		*(u_int16_t *)frm = htole16(arg);
+		*(__le16 *)frm = htole16(arg);
 		frm += 2;
 
 		/* Assoc ID */
 		if (arg == IEEE80211_STATUS_SUCCESS) {
-			*(u_int16_t *)frm = htole16(ni->ni_associd);
+			*(__le16 *)frm = htole16(ni->ni_associd);
 			IEEE80211_NODE_STAT(ni, tx_assoc);
 		} else
 			IEEE80211_NODE_STAT(ni, tx_assoc_fail);
@@ -2215,7 +2215,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		skb = ieee80211_getmgtframe(&frm, sizeof(u_int16_t));
 		if (skb == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
-		*(u_int16_t *)frm = htole16(arg);	/* reason */
+		*(__le16 *)frm = htole16(arg);	/* reason */
 
 		IEEE80211_NODE_STAT(ni, tx_disassoc);
 		IEEE80211_NODE_STAT_SET(ni, tx_disassoc_code, arg);
@@ -2259,7 +2259,7 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 
 	wh = (struct ieee80211_ctlframe_addr2 *) skb_put(skb, sizeof(struct ieee80211_ctlframe_addr2));
 
-	*(u_int16_t *)(&wh->i_aidordur) = htole16(0xc000 | IEEE80211_NODE_AID(ni));
+	wh->i_aidordur = htole16(0xc000 | IEEE80211_NODE_AID(ni));
 	IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_bssid);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
 	wh->i_fc[0] = 0;
