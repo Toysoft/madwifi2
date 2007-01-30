@@ -220,7 +220,6 @@ ieee80211_input(struct ieee80211_node *ni,
 #define	HAS_SEQ(type)	((type & 0x4) == 0)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = vap->iv_ic;
-	struct ieee80211_node *ni_wds = NULL;
 	struct net_device *dev = vap->iv_dev;
 	struct ieee80211_frame *wh;
 	struct ieee80211_key *key;
@@ -487,7 +486,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				 */
 				if (vap->iv_flags_ext & IEEE80211_FEXT_WDS) {
 					struct ieee80211_node_table *nt;
-					struct ieee80211_node *ni_wds = NULL;
+					struct ieee80211_node *ni_wds;
 					nt = &ic->ic_sta;
 					ni_wds = ieee80211_find_wds_node(nt, wh->i_addr3);
 					if (ni_wds) {
@@ -548,6 +547,7 @@ ieee80211_input(struct ieee80211_node *ni,
 			if (dir == IEEE80211_FC1_DIR_DSTODS) {
 				struct ieee80211_node_table *nt;
 				struct ieee80211_frame_addr4 *wh4;
+				struct ieee80211_node *ni_wds;
 				if (!(vap->iv_flags_ext & IEEE80211_FEXT_WDS)) {
 					IEEE80211_DISCARD(vap, IEEE80211_MSG_INPUT,
 						wh, "data", "%s", "4 addr not allowed");
