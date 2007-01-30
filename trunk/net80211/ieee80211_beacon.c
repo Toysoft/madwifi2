@@ -91,8 +91,8 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
 	if (ic->ic_flags & IEEE80211_F_DOTH)
 		capinfo |= IEEE80211_CAPINFO_SPECTRUM_MGMT;
-	bo->bo_caps = (u_int16_t *)frm;
-	*(u_int16_t *)frm = htole16(capinfo);
+	bo->bo_caps = (__le16 *)frm;
+	*(__le16 *)frm = htole16(capinfo);
 	frm += 2;
 
 	/* ssid */
