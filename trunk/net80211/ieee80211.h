@@ -108,7 +108,7 @@ struct ieee80211_qosframe_addr4 {
 
 struct ieee80211_ctlframe_addr2 {
 	u_int8_t i_fc[2];
-	u_int8_t i_aidordur[2]; /* AID or duration */
+	__le16 i_aidordur; /* AID or duration */
 	u_int8_t i_addr1[IEEE80211_ADDR_LEN];
 	u_int8_t i_addr2[IEEE80211_ADDR_LEN];
 } __packed;

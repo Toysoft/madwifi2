@@ -128,7 +128,7 @@ static int accept_data_frame(struct ieee80211vap *, struct ieee80211_node *,
 static void athff_decap(struct sk_buff *);
 #endif
 #ifdef USE_HEADERLEN_RESV
-static unsigned short ath_eth_type_trans(struct sk_buff *, struct net_device *);
+static __be16 ath_eth_type_trans(struct sk_buff *, struct net_device *);
 #endif
 
 /* Enhanced iwspy support */
@@ -861,7 +861,7 @@ static int accept_data_frame(struct ieee80211vap *vap,
                IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
                        eh->ether_shost, "data",
                        "unauthorized port: ether type 0x%x len %u",
-                       eh->ether_type, skb->len);
+                       ntohs(eh->ether_type), skb->len);
                vap->iv_stats.is_rx_unauth++;
                vap->iv_devstats.rx_errors++;
                IEEE80211_NODE_STAT(ni, rx_unauth);
@@ -880,7 +880,7 @@ static int accept_data_frame(struct ieee80211vap *vap,
                IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
                        eh->ether_shost, "data",
                        "unauthorized port: ether type 0x%x len %u",
-                       eh->ether_type, skb->len);
+                       ntohs(eh->ether_type), skb->len);
                vap->iv_stats.is_rx_unauth++;
                vap->iv_devstats.rx_errors++;
                IEEE80211_NODE_STAT(ni, rx_unauth);
@@ -1159,7 +1159,7 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 	struct ieee80211_qosframe_addr4 wh;	/* Max size address frames */
 	struct ether_header *eh;
 	struct llc *llc;
-	u_short ether_type = 0;
+	__be16 ether_type = 0;
 
 	memcpy(&wh, skb->data, hdrlen);	/* Only copy hdrlen over */
 	llc = (struct llc *) skb_pull(skb, hdrlen);
@@ -2616,9 +2616,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		memset(&scan, 0, sizeof(scan));
 		scan.tstamp  = frm;
 		frm += 8;
-		scan.bintval = le16toh(*(u_int16_t *)frm);
+		scan.bintval = le16toh(*(__le16 *)frm);
 		frm += 2;
-		scan.capinfo = le16toh(*(u_int16_t *)frm);
+		scan.capinfo = le16toh(*(__le16 *)frm);
 		frm += 2;
 		scan.bchan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 		scan.chan = scan.bchan;
@@ -3008,9 +3008,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 *	[tlv*] challenge
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 6);
-		algo   = le16toh(*(u_int16_t *)frm);
-		seq    = le16toh(*(u_int16_t *)(frm + 2));
-		status = le16toh(*(u_int16_t *)(frm + 4));
+		algo   = le16toh(*(__le16 *)frm);
+		seq    = le16toh(*(__le16 *)(frm + 2));
+		status = le16toh(*(__le16 *)(frm + 4));
 #ifdef ATH_SUPERG_XR
 		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bss->ni_bssid)) {
 			/*
@@ -3118,9 +3118,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			vap->iv_stats.is_rx_assoc_bss++;
 			return;
 		}
-		capinfo = le16toh(*(u_int16_t *)frm);
+		capinfo = le16toh(*(__le16 *)frm);
 		frm += 2;
-		bintval = le16toh(*(u_int16_t *)frm);
+		bintval = le16toh(*(__le16 *)frm);
 		frm += 2;
 		if (reassoc)
 			frm += 6;	/* ignore current AP info */
@@ -3389,9 +3389,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 6);
 		ni = vap->iv_bss;
-		capinfo = le16toh(*(u_int16_t *)frm);
+		capinfo = le16toh(*(__le16 *)frm);
 		frm += 2;
-		status = le16toh(*(u_int16_t *)frm);
+		status = le16toh(*(__le16 *)frm);
 		frm += 2;
 		if (status != 0) {
 			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC,
@@ -3403,7 +3403,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				IEEE80211_SCAN_FAIL_STATUS);
 			return;
 		}
-		associd = le16toh(*(u_int16_t *)frm);
+		associd = le16toh(*(__le16 *)frm);
 		frm += 2;
 
 		rates = xrates = wme = NULL;
@@ -3525,7 +3525,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 *	[2] reason
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 2);
-		reason = le16toh(*(u_int16_t *)frm);
+		reason = le16toh(*(__le16 *)frm);
 		vap->iv_stats.is_rx_deauth++;
 		IEEE80211_NODE_STAT(ni, rx_deauth);
 
@@ -3561,7 +3561,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 *	[2] reason
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 2);
-		reason = le16toh(*(u_int16_t *)frm);
+		reason = le16toh(*(__le16 *)frm);
 		vap->iv_stats.is_rx_disassoc++;
 		IEEE80211_NODE_STAT(ni, rx_disassoc);
 
@@ -3688,7 +3688,7 @@ athff_decap(struct sk_buff *skb)
  * inconsistent with dev->hard_header_len header reservation. This 
  * is a rewrite of the portion of eth_type_trans() that we need.
  */
-static unsigned short 
+static __be16
 ath_eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ethhdr *eth;
