@@ -371,7 +371,7 @@ ieee80211_send_setup(struct ieee80211vap *vap,
 		IEEE80211_ADDR_COPY(wh->i_addr2, sa);
 		IEEE80211_ADDR_COPY(wh->i_addr3, bssid);
 	}
-	*(u_int16_t *)&wh->i_dur[0] = 0;
+	wh->i_dur = 0;
 	/* NB: use non-QoS tid */
 	*(u_int16_t *)&wh->i_seq[0] =
 	    htole16(ni->ni_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
@@ -986,7 +986,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	
 	wh = (struct ieee80211_frame *) skb_push(skb, hdrsize);
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
-	*(u_int16_t *)&wh->i_dur[0] = 0;
+	wh->i_dur = 0;
 	if (use4addr) {
 		wh->i_fc[1] = IEEE80211_FC1_DIR_DSTODS;
 		IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_macaddr);
@@ -2302,11 +2302,11 @@ ieee80211_getcfframe(struct ieee80211vap *vap, int type)
 	if (type == IEEE80211_FC0_SUBTYPE_CFPOLL) { 
 		wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
 		wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA | type;
-		*(u_int16_t *)wh->i_dur = htole16(0x8000);
+		wh->i_dur = htole16(0x8000);
 	} else if (type == IEEE80211_FC0_SUBTYPE_CF_END) { 
 		wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
 		wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL | type;
-		*(u_int16_t *)wh->i_dur = 0;
+		wh->i_dur = 0;
 	}
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);

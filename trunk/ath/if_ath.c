@@ -6944,7 +6944,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			try0 = ATH_TXMAXTRY;
 		}
 
-		*(u_int16_t *)wh->i_dur = cpu_to_le16(dur);
+		wh->i_dur = cpu_to_le16(dur);
 	}
 
 	/*
