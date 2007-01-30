@@ -3617,7 +3617,7 @@ ieee80211_recv_pspoll(struct ieee80211_node *ni, struct sk_buff *skb0)
 		return;
 	}
 
-	aid = le16toh(*(u_int16_t *)wh->i_dur);
+	aid = le16toh(wh->i_dur);
 	if (aid != ni->ni_associd) {
 		IEEE80211_DISCARD(vap,
 			IEEE80211_MSG_POWER | IEEE80211_MSG_DEBUG,

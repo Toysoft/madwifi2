@@ -271,7 +271,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
 		IEEE80211_FC0_SUBTYPE_BEACON;
 	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
-	*(u_int16_t *)wh->i_dur = 0;
+	wh->i_dur = 0;
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
 	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
