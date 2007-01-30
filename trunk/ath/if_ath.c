@@ -3851,7 +3851,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 	 * following the header.
 	 */
 	if (sc->sc_stagbeacons && avp->av_bslot > 0) {
-		uint64_t tsfadjust;
+		uint64_t tuadjust;
+		__le64 tsfadjust;
 		/*
 		 * The beacon interval is in TU's; the TSF in usecs.
 		 * We figure out how many TU's to add to align the
@@ -3863,13 +3864,13 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * has a timestamp in one beacon interval while the
 		 * others get a timestamp aligned to the next interval.
 		 */
-		tsfadjust = (ni->ni_intval * (ATH_BCBUF - avp->av_bslot)) / ATH_BCBUF;
-		tsfadjust = cpu_to_le64(tsfadjust << 10);	/* TU->TSF */
+		tuadjust = (ni->ni_intval * (ATH_BCBUF - avp->av_bslot)) / ATH_BCBUF;
+		tsfadjust = cpu_to_le64(tuadjust << 10);	/* TU->TSF */
 
 		DPRINTF(sc, ATH_DEBUG_BEACON,
-			"%s: %s beacons, bslot %d intval %u tsfadjust %llu\n",
+			"%s: %s beacons, bslot %d intval %u tsfadjust(Kus) %llu\n",
 			__func__, sc->sc_stagbeacons ? "stagger" : "burst",
-			avp->av_bslot, ni->ni_intval, (long long) tsfadjust);
+			avp->av_bslot, ni->ni_intval, (long long) tuadjust);
 
 		wh = (struct ieee80211_frame *) skb->data;
 		memcpy(&wh[1], &tsfadjust, sizeof(tsfadjust));
@@ -5470,7 +5471,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				DPRINTF(sc, ATH_DEBUG_STATE,
 					"ibss merge, rstamp %u tsf %llu "
 					"tstamp %llu\n", rstamp, (long long) tsf,
-					(long long) ni->ni_tstamp.tsf);
+					(long long) le64_to_cpu(ni->ni_tstamp.tsf));
 				(void) ieee80211_ibss_merge(ni);
 			}
 		}

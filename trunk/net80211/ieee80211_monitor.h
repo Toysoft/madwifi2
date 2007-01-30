@@ -144,7 +144,7 @@ struct ath_rx_radiotap_header {
 
 struct ath_tx_radiotap_header {
         struct ieee80211_radiotap_header wt_ihdr;
-	u_int64_t wt_tsft;
+	__le64 wt_tsft;
         u_int8_t wt_flags;	
         u_int8_t wt_rate;
         u_int8_t wt_txpower;
