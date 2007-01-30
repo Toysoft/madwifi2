@@ -50,13 +50,6 @@
 #include "if_media.h"
 #include <net80211/ieee80211_var.h>
 
-/* 
- *  XXX: Include an intra-module function from ieee80211_input.c.
- *       When we move regdomain code out to separate .h/.c files
- *       this should go to that .h file.
- */
-struct ieee80211_channel *ieee80211_doth_findchan(struct ieee80211vap *, u_int8_t);
-
 
 static u_int8_t *
 ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets *bo,
