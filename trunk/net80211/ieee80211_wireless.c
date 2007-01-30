@@ -4752,7 +4752,7 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 
 		memset(&olderq, 0, sizeof(olderq));
 		olderq.flags = erq->flags;
-		olderq.pointer = ext->key;
+		olderq.pointer = erq->pointer;
 		olderq.length = ext->key_len;
 
 		key = ext->key;
