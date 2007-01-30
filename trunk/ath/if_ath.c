@@ -5638,7 +5638,7 @@ rx_accept:
 		sc->sc_devstats.rx_bytes += len;
 
 		skb_put(skb, len);
-		skb->protocol = ETH_P_CONTROL;		/* XXX */
+		skb->protocol = __constant_htons(ETH_P_CONTROL);
 
 		if (sc->sc_nmonvaps > 0) {
 			/* 
