@@ -5141,7 +5141,7 @@ rx_accept:
 		sc->sc_stats.ast_ant_rx[ds->ds_rxstat.rs_antenna]++;
 
 		skb_put(skb, len);
-		skb->protocol = ETH_P_CONTROL;		/* XXX */
+		skb->protocol = __constant_htons(ETH_P_CONTROL);
 
 		status.hosttime = jiffies;
 
