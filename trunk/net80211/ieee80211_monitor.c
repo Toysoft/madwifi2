@@ -466,8 +466,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				/* radiotap's TSF field is the full 64 bits, so we don't lose
 				 * any TSF precision when using radiotap */
-				memcpy(&th->wt_tsft, &mactime, IEEE80211_TSF_LEN);
-				th->wt_tsft = cpu_to_le64(th->wt_tsft);
+				th->wt_tsft = cpu_to_le64(mactime);
 			
 				th->wt_flags = 0;
 				th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
@@ -528,11 +527,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = ds->ds_rxstat.rs_antenna;
 				th->wr_antsignal = rssi;
-				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
-				       IEEE80211_CRC_LEN);
-				th->wr_fcs = cpu_to_le32(th->wr_fcs);
-				memcpy(&th->wr_tsft, &mactime, IEEE80211_TSF_LEN);
-				th->wr_tsft = cpu_to_le64(th->wr_tsft);
+				th->wr_fcs = cpu_to_le32p((u32 *)&skb1->data[skb1->len - IEEE80211_CRC_LEN]);
+				th->wr_tsft = cpu_to_le64(mactime);
 			}
 			break;
 		}
