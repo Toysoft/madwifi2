@@ -1234,7 +1234,7 @@ EXPORT_SYMBOL(ieee80211_encap);
 /*
  * Add a supported rates element id to a frame.
  */
-int8_t *
+u_int8_t *
 ieee80211_add_rates(u_int8_t *frm, const struct ieee80211_rateset *rs)
 {
 	int nrates;
