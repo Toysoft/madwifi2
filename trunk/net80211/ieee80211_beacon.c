@@ -314,6 +314,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		if (c == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				"%s: find channel failure\n", __func__);
+			IEEE80211_UNLOCK(ic);
 			return 0;
 		}
 		ic->ic_bsschan = c;
