@@ -2497,7 +2497,6 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		DPRINTF(sc,ATH_DEBUG_XMIT,				\
 			"%s: discard, no xmit buf\n", __func__);	\
 		sc->sc_stats.ast_tx_nobuf++;				\
-		goto hardstart_fail;					\
 	}
 
 /*
@@ -2540,6 +2539,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	if (cb->flags & M_RAW) {
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+		if (bf == NULL)
+			goto hardstart_fail;
 		return ath_tx_startraw(dev, bf, skb);
 	}
 
@@ -2557,6 +2558,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (M_FLAG_GET(skb, M_UAPSD)) {
 		/* bypass FF handling */
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+		if (bf == NULL)
+			goto hardstart_fail;
 		goto ff_bypass;
 	}
 
@@ -2611,6 +2614,10 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			 *     to give the buffer back.
 			 */
 			ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+			if (bf == NULL) {
+				ATH_TXQ_UNLOCK(txq);
+				goto hardstart_fail;
+			}
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
 				"%s: adding to fast-frame stage Q\n", __func__);
 
@@ -2680,6 +2687,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	ff_flushdone:
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+		if (bf == NULL)
+			goto hardstart_fail;
 	}
 
 ff_bypass:
