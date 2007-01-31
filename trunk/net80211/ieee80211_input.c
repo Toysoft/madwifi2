@@ -1261,6 +1261,7 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			 * create a node for the station that we're going to reject.
 			 * The node will be freed automatically */
 			if (ni == vap->iv_bss) {
+				ieee80211_free_node(ni);
 				ni = ieee80211_dup_bss(vap, wh->i_addr2);
 				if (ni == NULL)
 					return;
@@ -1298,6 +1299,7 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		}
 		/* always accept open authentication requests */
 		if (ni == vap->iv_bss) {
+			ieee80211_free_node(ni);
 			ni = ieee80211_dup_bss(vap, wh->i_addr2); 
 			if (ni == NULL)
 				return;
@@ -1362,6 +1364,7 @@ ieee80211_send_error(struct ieee80211_node *ni,
 	int istmp;
 
 	if (ni == vap->iv_bss) {
+		ieee80211_free_node(ni);
 		ni = ieee80211_tmp_node(vap, mac);
 		if (ni == NULL) {
 			/* XXX msg */
@@ -1488,6 +1491,7 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		switch (seq) {
 		case IEEE80211_AUTH_SHARED_REQUEST:
 			if (ni == vap->iv_bss) {
+				ieee80211_free_node(ni);
 				ni = ieee80211_dup_bss(vap, wh->i_addr2);
 				if (ni == NULL) {
 					/* NB: no way to return an error */
@@ -2849,9 +2853,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 		if (scan.capinfo & IEEE80211_CAPINFO_IBSS) {
 			if (!IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_macaddr)) {
-				/*
-				 * Create a new entry in the neighbor table.
-				 */
+				/* Create a new entry in the neighbor table. */
+				ieee80211_free_node(ni);
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
 			} else {
 				/*
@@ -2963,10 +2966,13 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				 * send the response so blindly add them to the
 				 * neighbor table.
 				 */
+				ieee80211_free_node(ni);
 				ni = ieee80211_fakeup_adhoc_node(vap,
 					wh->i_addr2);
-			} else
+			} else {
+				ieee80211_free_node(ni);
 				ni = ieee80211_tmp_node(vap, wh->i_addr2);
+			}
 			if (ni == NULL)
 				return;
 			allocbs = 1;
