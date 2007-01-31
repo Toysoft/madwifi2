@@ -299,15 +299,26 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
  */
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	struct ath_desc *ds, int tx, u_int64_t mactime, struct ath_softc *sc) 
+	const struct ath_buf *bf, int tx, u_int64_t mactime, struct ath_softc *sc) 
 {
 	struct ieee80211vap *vap, *next;
+	struct ath_desc *ds = bf->bf_desc;
 	int noise = 0;
+	int antenna = 0;
+	int ieeerate = 0;
 	u_int32_t rssi = 0;
 	u_int8_t pkttype = 0;
 	
-	rssi = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
-	
+	if(tx) {
+		rssi = bf->bf_dsstatus.ds_txstat.ts_rssi;
+		antenna = bf->bf_dsstatus.ds_txstat.ts_antenna;
+		ieeerate = sc->sc_hwmap[bf->bf_dsstatus.ds_txstat.ts_rate].ieeerate;
+	} else {
+		rssi = bf->bf_dsstatus.ds_rxstat.rs_rssi;
+		antenna = bf->bf_dsstatus.ds_rxstat.rs_antenna;
+		ieeerate = sc->sc_hwmap[bf->bf_dsstatus.ds_rxstat.rs_rate].ieeerate;
+	}
+
 	/* We don't have access to the noise value in the descriptor, but it's saved
 	 * in the softc during the last receive interrupt. */
 	noise = sc->sc_channoise;
@@ -414,10 +425,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 			ph->rate.status = 0;
 			ph->rate.len = 4;
-			if (tx)
-				ph->rate.data = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
-			else
-				ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+			ph->rate.data = ieeerate;
 			break;
 		}
 		case ARPHRD_IEEE80211_RADIOTAP: {
@@ -443,9 +451,9 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wt_tsft = cpu_to_le64(th->wt_tsft);
 			
 				th->wt_flags = 0;
-				th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
+				th->wt_rate = ieeerate;
 				th->wt_txpower = 0;
-				th->wt_antenna = ds->ds_txstat.ts_antenna;
+				th->wt_antenna = antenna;
 			} else {
 				struct ath_rx_radiotap_header *th;
 				if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {
@@ -465,7 +473,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
 
-				th->wr_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+				th->wr_rate = ieeerate;
 				th->wr_chan_freq = cpu_to_le16(ic->ic_curchan->ic_freq);
 
 				/* Define the channel flags for radiotap */
@@ -497,7 +505,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				th->wr_dbm_antnoise = (int8_t) noise;
 				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
-				th->wr_antenna = ds->ds_rxstat.rs_antenna;
+				th->wr_antenna = antenna;
 				th->wr_antsignal = rssi;
 				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
 				       IEEE80211_CRC_LEN);
