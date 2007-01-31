@@ -274,9 +274,15 @@ struct ieee80211_cb {
  * mbuf packet header to store this data.
  * XXX use private cb area
  */
-#define	M_AGE_SET(skb,v)	(skb->csum = v)
-#define	M_AGE_GET(skb)		(skb->csum)
-#define	M_AGE_SUB(skb,adj)	(skb->csum -= adj)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+#define skb_age csum_offset
+#else
+#define skb_age csum
+#endif
+
+#define	M_AGE_SET(skb,v)	(skb->skb_age = v)
+#define	M_AGE_GET(skb)		(skb->skb_age)
+#define	M_AGE_SUB(skb,adj)	(skb->skb_age -= adj)
 
 struct ieee80211com;
 struct ieee80211vap;
