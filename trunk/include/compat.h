@@ -45,6 +45,9 @@
 #define __le16 u_int16_t
 #define __le32 u_int32_t
 #define __le64 u_int64_t
+#define __be16 u_int16_t
+#define __be32 u_int32_t
+#define __be64 u_int64_t
 #define __force
 #endif
 #endif
