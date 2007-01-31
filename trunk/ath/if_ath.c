@@ -6699,8 +6699,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 #ifndef ATH_SUPERG_FF
 	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 		skb->data, pktlen, BUS_DMA_TODEVICE);
-	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %x\n",
-		__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %llx\n",
+		__func__, skb, skb->data, skb->len, ito64(bf->bf_skbaddr));
 #else /* ATH_SUPERG_FF case */
 	/* NB: ensure skb->len had been updated for each skb so we don't need pktlen */
 	{
