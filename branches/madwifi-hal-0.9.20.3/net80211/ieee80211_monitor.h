@@ -156,7 +156,7 @@ struct ath_tx_radiotap_header {
  * to have space at the front to push a wlan_ng_prims2_header.
  */
 void ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
-	struct ath_desc *, int, u_int64_t, struct ath_softc *);
+	const struct ath_buf *, int, u_int64_t, struct ath_softc *);
 
 
 void ieee80211_monitor_encap(struct ieee80211vap *, struct sk_buff *);

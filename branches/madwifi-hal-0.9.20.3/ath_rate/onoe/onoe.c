@@ -151,16 +151,17 @@ EXPORT_SYMBOL(ath_rate_setupxtxdesc);
 
 void
 ath_rate_tx_complete(struct ath_softc *sc,
-	struct ath_node *an, const struct ath_desc *ds)
+	struct ath_node *an, const struct ath_buf *bf)
 {
 	struct onoe_node *on = ATH_NODE_ONOE(an);
-
-	if (ds->ds_txstat.ts_status == 0)
+	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
+	
+	if (ts->ts_status == 0)
 		on->on_tx_ok++;
 	else
 		on->on_tx_err++;
-	on->on_tx_retr += ds->ds_txstat.ts_shortretry
-			+ ds->ds_txstat.ts_longretry;
+	on->on_tx_retr += ts->ts_shortretry
+			+ ts->ts_longretry;
 	if (jiffies >= on->on_nextcheck) {
 		ath_rate_ctl(sc, &an->an_node);
 		/* XXX halve rate for station mode */

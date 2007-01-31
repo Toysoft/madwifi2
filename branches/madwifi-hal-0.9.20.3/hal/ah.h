@@ -59,7 +59,7 @@ typedef void* HAL_SOFTC;		/* pointer to driver/OS state */
 typedef void* HAL_BUS_TAG;		/* opaque bus i/o id tag */
 typedef void* HAL_BUS_HANDLE;		/* opaque bus i/o handle */
 
-#include <ah_osdep.h>
+#include "ah_osdep.h"
 
 /*
  * __ahdecl is analogous to _cdecl; it defines the calling
@@ -132,6 +132,7 @@ typedef enum {
 	HAL_CAP_11D		= 28,   /* 11d beacon support for changing cc */
 	HAL_CAP_INTMIT		= 29,	/* interference mitigation */
 	HAL_CAP_RXORN_FATAL	= 30,	/* HAL_INT_RXORN treated as fatal */
+	HAL_CAP_RXTSTAMP_PREC	= 34,	/* rx desc tstamp precision (bits) */
 } HAL_CAPABILITY_TYPE;
 
 /* 
@@ -591,6 +592,8 @@ typedef struct {
 #define	HAL_RSSI_EP_MULTIPLIER	(1<<7)	/* pow2 to optimize out * and / */
 
 struct ath_desc;
+struct ath_tx_status;
+struct ath_rx_status;
 
 /*
  * Hardware Access Layer (HAL) API.
@@ -605,7 +608,7 @@ struct ath_desc;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x06090700	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x06102600	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -634,12 +637,7 @@ struct ath_hal {
 	HAL_BOOL  __ahdecl(*ah_perCalibration)(struct ath_hal*, HAL_CHANNEL *, HAL_BOOL *);
 	HAL_BOOL  __ahdecl(*ah_setTxPowerLimit)(struct ath_hal *, u_int32_t);
 
-	void	  __ahdecl(*ah_arEnable)(struct ath_hal *);
-	void	  __ahdecl(*ah_arDisable)(struct ath_hal *);
-	void	  __ahdecl(*ah_arReset)(struct ath_hal *);
-	HAL_BOOL  __ahdecl(*ah_radarHaveEvent)(struct ath_hal *);
-	HAL_BOOL  __ahdecl(*ah_processDfs)(struct ath_hal *, HAL_CHANNEL *);
-	u_int32_t __ahdecl(*ah_dfsNolCheck)(struct ath_hal *, HAL_CHANNEL *, u_int32_t);
+	/* DFS support */
 	HAL_BOOL  __ahdecl(*ah_radarWait)(struct ath_hal *, HAL_CHANNEL *);
 
 	/* Transmit functions */
@@ -673,7 +671,8 @@ struct ath_hal {
 	HAL_BOOL  __ahdecl(*ah_fillTxDesc)(struct ath_hal *, struct ath_desc *,
 				u_int segLen, HAL_BOOL firstSeg,
 				HAL_BOOL lastSeg, const struct ath_desc *);
-	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *, struct ath_desc*);
+	HAL_STATUS __ahdecl(*ah_procTxDesc)(struct ath_hal *,
+				struct ath_desc *, struct ath_tx_status *);
 	void	   __ahdecl(*ah_getTxIntrQueue)(struct ath_hal *, u_int32_t *);
 	void	   __ahdecl(*ah_reqTxIntrDesc)(struct ath_hal *, struct ath_desc*);
 
@@ -694,9 +693,10 @@ struct ath_hal {
 	void	  __ahdecl(*ah_setRxFilter)(struct ath_hal*, u_int32_t);
 	HAL_BOOL  __ahdecl(*ah_setupRxDesc)(struct ath_hal *, struct ath_desc *,
 				u_int32_t size, u_int flags);
-	HAL_STATUS __ahdecl(*ah_procRxDesc)(struct ath_hal *, struct ath_desc *,
-				u_int32_t phyAddr, struct ath_desc *next,
-				u_int64_t tsf);
+	HAL_STATUS __ahdecl(*ah_procRxDesc)(struct ath_hal *,
+				struct ath_desc *, u_int32_t phyAddr,
+				struct ath_desc *next, u_int64_t tsf,
+				struct ath_rx_status *);
 	void	  __ahdecl(*ah_rxMonitor)(struct ath_hal *,
 				const HAL_NODE_STATS *, HAL_CHANNEL *);
 	void	  __ahdecl(*ah_procMibEvent)(struct ath_hal *,
