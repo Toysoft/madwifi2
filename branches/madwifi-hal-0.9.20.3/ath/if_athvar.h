@@ -73,22 +73,23 @@ typedef void *TQUEUE_ARG;
 #include <linux/sched.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,41)
 #include <linux/tqueue.h>
-#define ATH_WORK_THREAD			tq_struct
-#define ATH_SCHEDULE_TASK(t)		schedule_task((t))
-#define ATH_INIT_SCHED_TASK(t, f, d) do { 	\
-	memset((t),0,sizeof(struct tq_struct)); 	\
+#define work_struct			tq_struct
+#define schedule_work(t)		schedule_task((t))
+#define flush_scheduled_work()		flush_scheduled_tasks()
+#define ATH_INIT_WORK(t, f) do { 			\
+	memset((t),0,sizeof(struct tq_struct)); \
 	(t)->routine = (void (*)(void*)) (f); 	\
-	(t)->data=(void *) (d); 		\
+	(t)->data=(void *) (t);			\
 } while (0)
-#define ATH_FLUSH_TASKS			flush_scheduled_tasks
 #else
 #include <linux/workqueue.h>
-#define ATH_SCHEDULE_TASK(t)		schedule_work((t))
 
-#define ATH_INIT_SCHED_TASK(_t, _f, _d)	INIT_WORK((_t), (void (*)(void *))(_f), (void *)(_d));
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20)
+#define ATH_INIT_WORK(_t, _f)	INIT_WORK((_t), (void (*)(void *))(_f), (_t));
+#else
+#define ATH_INIT_WORK(_t, _f)	INIT_WORK((_t), (_f));
+#endif
 
-#define ATH_WORK_THREAD			work_struct
-#define	ATH_FLUSH_TASKS			flush_scheduled_work
 #endif /* KERNEL_VERSION < 2.5.41 */
 
 /*
@@ -508,7 +509,7 @@ struct ath_vap {
  */
 #define ATH_TXQ_MOVE_Q(_tqs,_tqd)  ATH_TXQ_MOVE_MCASTQ(_tqs,_tqd)
 
-#define	BSTUCK_THRESH	3	/* # of stuck beacons before resetting NB: this is a guess*/
+#define	BSTUCK_THRESH	10	/* # of stuck beacons before resetting NB: this is a guess*/
 
 struct ath_softc {
 	struct ieee80211com sc_ic;		/* NB: must be first */
@@ -655,12 +656,10 @@ struct ath_softc {
 
 	struct timer_list sc_cal_ch;		/* calibration timer */
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
-	struct ATH_WORK_THREAD sc_radartask;	/* Schedule task for DFS handling */
+	struct work_struct sc_radartask;	/* Schedule task for DFS handling */
 
-#ifdef CONFIG_SYSCTL
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
-#endif
 
 	u_int16_t sc_reapcount;  		/* # of tx buffers reaped after net dev stopped */
 
@@ -736,10 +735,8 @@ irqreturn_t ath_intr(int, void *, struct pt_regs *);
 #endif
 int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);
-#ifdef CONFIG_SYSCTL
 void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
-#endif /* CONFIG_SYSCTL */
 
 /*
  * HAL definitions to comply with local coding convention.

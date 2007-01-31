@@ -60,8 +60,8 @@
 
 #include <net80211/if_media.h>
 #include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_rate.h>
 
-#include "if_athrate.h"
 #include "if_athvar.h"
 #include "ah_desc.h"
 
@@ -251,22 +251,21 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 	return tt;
 }
 
-void
+static void
 ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
 {
 	DPRINTF(sc, ATH_DEBUG_NODE, "%s:\n", __func__);
 	/* NB: assumed to be zero'd by caller */
 	ath_rate_ctl_reset(sc, &an->an_node);
 }
-EXPORT_SYMBOL(ath_rate_node_init);
 
-void
+static void
 ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 {
 	DPRINTF(sc, ATH_DEBUG_NODE, "%s:\n", __func__);
 }
-EXPORT_SYMBOL(ath_rate_node_cleanup);
 
+#if 0
 static void
 ath_rate_node_copy(struct ath_softc *sc,
 	struct ath_node *dst, const struct ath_node *src)
@@ -275,7 +274,7 @@ ath_rate_node_copy(struct ath_softc *sc,
 	const struct sample_node *osrc = (const struct sample_node *)&src[1];
 	memcpy(odst, osrc, sizeof(struct sample_node));
 }
-EXPORT_SYMBOL(ath_rate_node_copy);
+#endif
 
 /*
  * returns the ndx with the lowest average_tx_time,
@@ -364,7 +363,7 @@ pick_sample_ndx(struct sample_node *sn, int size_bin)
 	return current_ndx;
 }
 
-void
+static void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	int shortPreamble, size_t frameLen,
 	u_int8_t *rix, int *try0, u_int8_t *txrate)
@@ -496,9 +495,8 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 		*txrate = sn->rates[ndx].rateCode;
 	sn->packets_sent[size_bin]++;
 }
-EXPORT_SYMBOL(ath_rate_findrate);
 
-void
+static void
 ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 	struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
 {
@@ -523,7 +521,6 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 			     , 0, 0	                /* series 3 */
 			     );
 }
-EXPORT_SYMBOL(ath_rate_setupxtxdesc);
 
 static void 
 update_stats(struct ath_softc *sc, struct ath_node *an, 
@@ -647,7 +644,7 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 	}
 }
 
-void
+static void
 ath_rate_tx_complete(struct ath_softc *sc,
 	struct ath_node *an, const struct ath_buf *bf)
 {
@@ -800,9 +797,8 @@ ath_rate_tx_complete(struct ath_softc *sc,
 				ts->ts_status);
 	}
 }
-EXPORT_SYMBOL(ath_rate_tx_complete);
 
-void
+static void
 ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 {
 	DPRINTF(sc, ATH_DEBUG_RATE, "%s: %s %s isnew %d\n", dev_info,
@@ -810,7 +806,6 @@ ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 	if (isnew)
 		ath_rate_ctl_reset(sc, &an->an_node);
 }
-EXPORT_SYMBOL(ath_rate_newassoc);
 
 /*
  * Initialize the tables for a node.
@@ -935,7 +930,7 @@ ath_rate_cb(void *arg, struct ieee80211_node *ni)
 /*
  * Reset the rate control state for each 802.11 state transition.
  */
-void
+static void
 ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state newstate)
 {
 	struct ieee80211com *ic = vap->iv_ic;
@@ -950,17 +945,19 @@ ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state newstate)
 		ath_rate_newassoc(ic->ic_dev->priv, ATH_NODE(vap->iv_bss), 1);
 	}
 }
-EXPORT_SYMBOL(ath_rate_newstate);
 
-struct ath_ratectrl *
+static struct ath_ratectrl *
 ath_rate_attach(struct ath_softc *sc)
 {
 	struct sample_softc *osc;
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: %s\n", dev_info, __func__);
 	
+	_MOD_INC_USE(THIS_MODULE, return NULL);
 	osc = kmalloc(sizeof(struct sample_softc), GFP_ATOMIC);
-	if (osc == NULL)
+	if (osc == NULL) {
+		_MOD_DEC_USE(THIS_MODULE);
 		return NULL;
+	}
 	osc->arc.arc_space = sizeof(struct sample_node);
 	osc->arc.arc_vap_space = 0;
 
@@ -969,17 +966,15 @@ ath_rate_attach(struct ath_softc *sc)
 
 	return &osc->arc;
 }
-EXPORT_SYMBOL(ath_rate_attach);
 
-void
+static void
 ath_rate_detach(struct ath_ratectrl *arc)
 {
 	struct sample_softc *osc = (struct sample_softc *) arc;
 	kfree(osc);
+	_MOD_DEC_USE(THIS_MODULE);
 }
-EXPORT_SYMBOL(ath_rate_detach);
 
-#ifdef CONFIG_SYSCTL
 static int
 proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 {
@@ -1091,7 +1086,7 @@ static struct file_operations proc_ratesample_ops = {
 	.release = NULL,
 };
 
-void
+static void
 ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
 {		
 	/* Create proc entries for the rate control algorithm */
@@ -1099,8 +1094,20 @@ ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
 	ieee80211_proc_vcreate(vap, &proc_ratesample_ops, "ratestats_1600");
 	ieee80211_proc_vcreate(vap, &proc_ratesample_ops, "ratestats_3000");	
 }
-EXPORT_SYMBOL(ath_rate_dynamic_proc_register);
-#endif /* CONFIG_SYSCTL */
+
+static struct ieee80211_rate_ops ath_rate_ops = {
+	.ratectl_id = IEEE80211_RATE_SAMPLE,
+	.node_init = ath_rate_node_init,
+	.node_cleanup = ath_rate_node_cleanup,
+	.findrate = ath_rate_findrate,
+	.setupxtxdesc = ath_rate_setupxtxdesc,
+	.tx_complete = ath_rate_tx_complete,
+	.newassoc = ath_rate_newassoc,
+	.newstate = ath_rate_newstate,
+	.attach = ath_rate_attach,
+	.detach = ath_rate_detach,
+	.dynamic_proc_register = ath_rate_dynamic_proc_register,
+};
 
 MODULE_AUTHOR("John Bicket");
 MODULE_DESCRIPTION("SampleRate bit-rate selection algorithm for Atheros devices");
@@ -1115,13 +1122,14 @@ static int __init
 init_ath_rate_sample(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
-	return (0);
+	return ieee80211_rate_register(&ath_rate_ops);
 }
 module_init(init_ath_rate_sample);
 
 static void __exit
 exit_ath_rate_sample(void)
 {
+	ieee80211_rate_unregister(&ath_rate_ops);
 	printk(KERN_INFO "%s: unloaded\n", dev_info);
 }
 module_exit(exit_ath_rate_sample);

@@ -193,7 +193,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 				present = 0;
 				break;
 			}
-			present_ext = le32_to_cpu(*(u_int32_t*)p);
+			present_ext = le32_to_cpu(*(__le32 *)p);
 			p += 4;
 		}
 
@@ -330,17 +330,44 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 		u_int8_t dir = wh->i_fc[1] & IEEE80211_FC1_DIR_MASK;
 
-		if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-			if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
-				pkttype = PACKET_BROADCAST;
-			else
-				pkttype = PACKET_MULTICAST;
-		} else if (tx)
-			pkttype = PACKET_OUTGOING;
-		else
-			pkttype = PACKET_HOST;
-
 		next = TAILQ_NEXT(vap, iv_next);
+		/* If we have rx'd an error frame... */
+		if (!tx && bf->bf_dsstatus.ds_rxstat.rs_status != 0) {
+			
+			/* Discard PHY errors if necessary */
+			if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_PHY) {
+				if (vap->iv_monitor_phy_errors == 0) continue;
+			}
+			
+			/* Discard CRC errors if necessary */
+			if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC) {
+				if (vap->iv_monitor_crc_errors == 0) continue;
+			}
+			
+			/* Accept PHY, CRC and decrypt errors. Discard the rest. */
+			if (bf->bf_dsstatus.ds_rxstat.rs_status &~
+					(HAL_RXERR_DECRYPT | HAL_RXERR_MIC |
+					 HAL_RXERR_PHY | HAL_RXERR_CRC )) 
+				continue;
+
+			/* We can't use addr1 to determine direction at this point */
+			pkttype = PACKET_HOST;
+		} else {
+			/* 
+			 * The frame passed it's CRC, so we can rely
+			 * on the contents of the frame to set pkttype.
+			 */
+			if (tx)
+				pkttype = PACKET_OUTGOING;
+			else if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+				if (IEEE80211_ADDR_EQ(wh->i_addr1, dev->broadcast))
+					pkttype = PACKET_BROADCAST;
+				else
+					pkttype = PACKET_MULTICAST;
+			} else
+				pkttype = PACKET_HOST;
+		}
+
 		if (vap->iv_opmode != IEEE80211_M_MONITOR ||
 		    vap->iv_state != IEEE80211_S_RUN)
 			continue;
@@ -447,8 +474,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				/* radiotap's TSF field is the full 64 bits, so we don't lose
 				 * any TSF precision when using radiotap */
-				memcpy(&th->wt_tsft, &mactime, IEEE80211_TSF_LEN);
-				th->wt_tsft = cpu_to_le64(th->wt_tsft);
+				th->wt_tsft = cpu_to_le64(mactime);
 			
 				th->wt_flags = 0;
 				th->wt_rate = ieeerate;
@@ -472,6 +498,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
+				if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC)
+					th->wr_flags |= IEEE80211_RADIOTAP_F_BADFCS;
 
 				th->wr_rate = ieeerate;
 				th->wr_chan_freq = cpu_to_le16(ic->ic_curchan->ic_freq);
@@ -507,11 +535,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = antenna;
 				th->wr_antsignal = rssi;
-				memcpy(&th->wr_fcs, &skb1->data[skb1->len - IEEE80211_CRC_LEN],
-				       IEEE80211_CRC_LEN);
-				th->wr_fcs = cpu_to_le32(th->wr_fcs);
-				memcpy(&th->wr_tsft, &mactime, IEEE80211_TSF_LEN);
-				th->wr_tsft = cpu_to_le64(th->wr_tsft);
+				th->wr_fcs = cpu_to_le32p((u32 *)&skb1->data[skb1->len - IEEE80211_CRC_LEN]);
+				th->wr_tsft = cpu_to_le64(mactime);
 			}
 			break;
 		}

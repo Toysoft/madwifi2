@@ -50,13 +50,6 @@
 #include "if_media.h"
 #include <net80211/ieee80211_var.h>
 
-/* 
- *  XXX: Include an intra-module function from ieee80211_input.c.
- *       When we move regdomain code out to separate .h/.c files
- *       this should go to that .h file.
- */
-struct ieee80211_channel *ieee80211_doth_findchan(struct ieee80211vap *, u_int8_t);
-
 
 static u_int8_t *
 ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets *bo,
@@ -74,7 +67,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	frm += 8;
 
 	/* beacon interval */
-	*(u_int16_t *)frm = htole16(ni->ni_intval);
+	*(__le16 *)frm = htole16(ni->ni_intval);
 	frm += 2;
 
 	/* capability information */
@@ -91,8 +84,8 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
 	if (ic->ic_flags & IEEE80211_F_DOTH)
 		capinfo |= IEEE80211_CAPINFO_SPECTRUM_MGMT;
-	bo->bo_caps = (u_int16_t *)frm;
-	*(u_int16_t *)frm = htole16(capinfo);
+	bo->bo_caps = (__le16 *)frm;
+	*(__le16 *)frm = htole16(capinfo);
 	frm += 2;
 
 	/* ssid */
@@ -271,7 +264,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
 		IEEE80211_FC0_SUBTYPE_BEACON;
 	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
-	*(u_int16_t *)wh->i_dur = 0;
+	wh->i_dur = 0;
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
 	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
@@ -314,6 +307,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		if (c == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				"%s: find channel failure\n", __func__);
+			IEEE80211_UNLOCK(ic);
 			return 0;
 		}
 		ic->ic_bsschan = c;

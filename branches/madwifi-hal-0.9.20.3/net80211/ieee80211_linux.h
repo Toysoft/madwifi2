@@ -29,9 +29,7 @@
 #ifndef _NET80211_IEEE80211_LINUX_H_
 #define _NET80211_IEEE80211_LINUX_H_
 
-#ifdef CONFIG_NET_WIRELESS
 #include <linux/wireless.h>
-#endif
 
 /*
  * Task deferral
@@ -276,9 +274,15 @@ struct ieee80211_cb {
  * mbuf packet header to store this data.
  * XXX use private cb area
  */
-#define	M_AGE_SET(skb,v)	(skb->csum = v)
-#define	M_AGE_GET(skb)		(skb->csum)
-#define	M_AGE_SUB(skb,adj)	(skb->csum -= adj)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
+#define skb_age csum_offset
+#else
+#define skb_age csum
+#endif
+
+#define	M_AGE_SET(skb,v)	(skb->skb_age = v)
+#define	M_AGE_GET(skb)		(skb->skb_age)
+#define	M_AGE_SUB(skb,adj)	(skb->skb_age -= adj)
 
 struct ieee80211com;
 struct ieee80211vap;
@@ -464,7 +468,6 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 #endif
 
 
-#ifdef CONFIG_SYSCTL
 /*
  * Deal with the sysctl handler api changing.
  */
@@ -487,7 +490,6 @@ void ieee80211_sysctl_vdetach(struct ieee80211vap *);
 int ieee80211_proc_vcreate(struct ieee80211vap *, struct file_operations *,
 	       char *);
 void ieee80211_proc_cleanup(struct ieee80211vap *);
-#endif /* CONFIG_SYSCTL */
 
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define IEEE80211_VLAN_TAG_USED 1

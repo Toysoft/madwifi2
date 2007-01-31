@@ -34,7 +34,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id$
+ * $Id: if_athrate.h 1667 2006-07-04 10:23:35Z kelmo $
  */
 #ifndef _ATH_RATECTRL_H_
 #define _ATH_RATECTRL_H_
@@ -46,11 +46,6 @@
  * A rate control module is responsible for choosing the transmit rate
  * for each data frame.  Management+control frames are always sent at
  * a fixed rate.
- *
- * Only one module may be present at a time; the driver references
- * rate control interfaces by symbol name.  If multiple modules are
- * to be supported we'll need to switch to a registration-based scheme
- * as is currently done, for example, for authentication modules.
  *
  * An instance of the rate control module is attached to each device
  * at attach time and detached when the device is destroyed.  The module
@@ -71,78 +66,84 @@
  * additional transmit state.  The rate control code is assumed to write
  * this additional data directly to the transmit descriptor.
  */
+
+enum {
+	IEEE80211_RATE_AMRR,
+	IEEE80211_RATE_ONOE,
+	IEEE80211_RATE_SAMPLE,
+	IEEE80211_RATE_MAX
+};
+
 struct ath_softc;
 struct ath_node;
 struct ath_desc;
-struct ieee80211vap;
 struct ath_buf;
+struct ieee80211vap;
+
+struct ieee80211_rate_ops {
+	int ratectl_id;
+
+	/* Attach/detach a rate control module */
+	struct ath_ratectrl *(*attach)(struct ath_softc *sc);
+	void (*detach)(struct ath_ratectrl *arc);
+
+	/* Register proc entries with a VAP */
+	void (*dynamic_proc_register)(struct ieee80211vap *vap);
+
+	/* *** State storage handling *** */
+
+	/* Initialize per-node state already allocated for the specified
+	 * node; this space can be assumed initialized to zero */
+	void (*node_init)(struct ath_softc *sc, struct ath_node *an);
+
+	/* Cleanup any per-node state prior to the node being reclaimed */
+	void (*node_cleanup)(struct ath_softc *sc, struct ath_node *an);
+
+	/* Update rate control state on station associate/reassociate 
+	 * (when operating as an ap or for nodes discovered when operating
+	 * in ibss mode) */
+	void (*newassoc)(struct ath_softc *sc, struct ath_node *an,
+			 int isnew);
+
+	/* Update/reset rate control state for 802.11 state transitions.
+	 * Important mostly as the analog to newassoc when operating
+	 * in station mode */
+	void (*newstate)(struct ieee80211vap *vap,
+			 enum ieee80211_state state);
+
+	/* *** Transmit handling *** */
+
+	/* Return the transmit info for a data packet.  If multi-rate state
+	 * is to be setup then try0 should contain a value other than ATH_TXMATRY
+	 * and setupxtxdesc will be called after deciding if the frame
+	 * can be transmitted with multi-rate retry. */
+	void (*findrate)(struct ath_softc *sc, struct ath_node *an,
+			 int shortPreamble, size_t frameLen,
+			 u_int8_t *rix, int *try0, u_int8_t *txrate);
+
+	/* Setup any extended (multi-rate) descriptor state for a data packet.
+	 * The rate index returned by findrate is passed back in. */
+	void (*setupxtxdesc)(struct ath_softc *sc, struct ath_node *an,
+			     struct ath_desc *ds, int shortPreamble,
+			     size_t frame_size, u_int8_t rix);
+
+	/* Update rate control state for a packet associated with the
+	 * supplied transmit descriptor.  The routine is invoked both
+	 * for packets that were successfully sent and for those that
+	 * failed (consult the descriptor for details). */
+	void (*tx_complete)(struct ath_softc *sc, struct ath_node *an,
+			    const struct ath_buf *bf);
+};
 
 struct ath_ratectrl {
+	struct ieee80211_rate_ops *ops;
 	size_t arc_space;	/* space required for per-node state */
 	size_t arc_vap_space;	/* space required for per-vap state */
 };
-/*
- * Attach/detach a rate control module.
- */
-struct ath_ratectrl *ath_rate_attach(struct ath_softc *);
-void ath_rate_detach(struct ath_ratectrl *);
 
-#ifdef CONFIG_SYSCTL
-/*
- * Allow rate control module to register proc entries with a vap 
- * Deallocation of the entries will be dealt with when the vap is destroyed
- */
-void ath_rate_dynamic_proc_register(struct ieee80211vap *vap);
-#endif /* CONFIG_SYSCTL */
+int ieee80211_rate_register(struct ieee80211_rate_ops *ops);
+void ieee80211_rate_unregister(struct ieee80211_rate_ops *ops);
 
-/*
- * State storage handling.
- */
-/*
- * Initialize per-node state already allocated for the specified
- * node; this space can be assumed initialized to zero.
- */
-void ath_rate_node_init(struct ath_softc *, struct ath_node *);
-/*
- * Cleanup any per-node state prior to the node being reclaimed.
- */
-void ath_rate_node_cleanup(struct ath_softc *, struct ath_node *);
-/*
- * Update rate control state on station associate/reassociate 
- * (when operating as an ap or for nodes discovered when operating
- * in ibss mode).
- */
-void ath_rate_newassoc(struct ath_softc *, struct ath_node *, int);
-/*
- * Update/reset rate control state for 802.11 state transitions.
- * Important mostly as the analog to ath_rate_newassoc when operating
- * in station mode.
- */
-void ath_rate_newstate(struct ieee80211vap *, enum ieee80211_state);
-
-/*
- * Transmit handling.
- */
-/*
- * Return the transmit info for a data packet.  If multi-rate state
- * is to be setup then try0 should contain a value other than ATH_TXMATRY
- * and ath_rate_setupxtxdesc will be called after deciding if the frame
- * can be transmitted with multi-rate retry.
- */
-void ath_rate_findrate(struct ath_softc *, struct ath_node *, int, size_t,
-	u_int8_t *, int *, u_int8_t *);
-/*
- * Setup any extended (multi-rate) descriptor state for a data packet.
- * The rate index returned by ath_rate_findrate is passed back in.
- */
-void ath_rate_setupxtxdesc(struct ath_softc *, struct ath_node *,
-	struct ath_desc *, int, size_t, u_int8_t);
-/*
- * Update rate control state for a packet associated with the
- * supplied transmit descriptor.  The routine is invoked both
- * for packets that were successfully sent and for those that
- * failed (consult the descriptor for details).
- */
-void ath_rate_tx_complete(struct ath_softc *, struct ath_node *,
-	const struct ath_buf *);
+struct ath_ratectrl *ieee80211_rate_attach(struct ath_softc *sc, const char *name);
+void ieee80211_rate_detach(struct ath_ratectrl *);
 #endif /* _ATH_RATECTRL_H_ */

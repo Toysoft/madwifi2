@@ -114,7 +114,7 @@ static __inline void bus_dma_sync_single(void *hwdev, dma_addr_t dma_handle,
 static __inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
 	size_t size, int direction)
 {
-    dma_cache_wback_inv((unsigned long) addr, size);
+    dma_cache_wback_inv((unsigned long) ptr, size);
     
     return __pa(ptr);
 }

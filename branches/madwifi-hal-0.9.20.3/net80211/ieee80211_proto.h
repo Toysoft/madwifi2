@@ -62,6 +62,7 @@ void ieee80211_proto_vattach(struct ieee80211vap *);
 void ieee80211_proto_vdetach(struct ieee80211vap *);
 
 struct ieee80211_node;
+struct ieee80211_channel *ieee80211_doth_findchan(struct ieee80211vap *, u_int8_t);
 int ieee80211_input(struct ieee80211_node *, struct sk_buff *, int, u_int32_t);
 int ieee80211_input_all(struct ieee80211com *, struct sk_buff *, int, u_int32_t);
 int ieee80211_setup_rates(struct ieee80211_node *, const u_int8_t *,
@@ -255,7 +256,7 @@ struct sk_buff *ieee80211_getcfframe(struct ieee80211vap *, int);
  * can update the frame later w/ minimal overhead.
  */
 struct ieee80211_beacon_offsets {
-	u_int16_t *bo_caps;		/* capabilities */
+	__le16 *bo_caps;		/* capabilities */
 	u_int8_t *bo_tim;		/* start of atim/dtim */
 	u_int8_t *bo_wme;		/* start of WME parameters */
 	u_int8_t *bo_tim_trailer;	/* start of fixed-size tim trailer */
@@ -275,7 +276,7 @@ int ieee80211_beacon_update(struct ieee80211_node *,
 	struct ieee80211_beacon_offsets *, struct sk_buff *, int);
 
 /* XXX exposed due to of beacon code botch */
-int8_t *ieee80211_add_rates(u_int8_t *, const struct ieee80211_rateset *);
+u_int8_t *ieee80211_add_rates(u_int8_t *, const struct ieee80211_rateset *);
 u_int8_t *ieee80211_add_xrates(u_int8_t *, const struct ieee80211_rateset *);
 u_int8_t *ieee80211_add_wpa(u_int8_t *, struct ieee80211vap *);
 u_int8_t *ieee80211_add_erp(u_int8_t *, struct ieee80211com *);
