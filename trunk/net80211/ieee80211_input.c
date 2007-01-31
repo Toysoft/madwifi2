@@ -310,6 +310,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				/*
 				 * Try to find sender in local node table.
 				 */
+				ieee80211_free_node(ni);
 				ni = ieee80211_find_node(ni->ni_table, wh->i_addr2);
 				if (ni == NULL) {
 					/*
