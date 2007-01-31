@@ -43,7 +43,6 @@
 #include <linux/config.h>
 #endif
 
-#ifdef CONFIG_NET_WIRELESS
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
@@ -4753,7 +4752,7 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 
 		memset(&olderq, 0, sizeof(olderq));
 		olderq.flags = erq->flags;
-		olderq.pointer = ext->key;
+		olderq.pointer = erq->pointer;
 		olderq.length = ext->key_len;
 
 		key = ext->key;
@@ -5435,4 +5434,3 @@ ieee80211_ioctl_vdetach(struct ieee80211vap *vap)
 		ieee80211_delete_wlanunit(vap->iv_unit);
 }
 
-#endif /* CONFIG_NET_WIRELESS */

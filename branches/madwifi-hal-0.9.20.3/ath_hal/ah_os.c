@@ -51,6 +51,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/sched.h>
 
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
@@ -430,7 +431,6 @@ ath_hal_memcmp(const void *a, const void *b, size_t n)
 }
 EXPORT_SYMBOL(ath_hal_memcmp);
 
-#ifdef CONFIG_SYSCTL
 enum {
 	DEV_ATH		= 9,			/* XXX must match driver */
 };
@@ -532,7 +532,6 @@ ath_hal_sysctl_unregister(void)
 	if (ath_hal_sysctl_header)
 		unregister_sysctl_table(ath_hal_sysctl_header);
 }
-#endif /* CONFIG_SYSCTL */
 
 /*
  * Module glue.
@@ -572,9 +571,7 @@ init_ath_hal(void)
 		sep = ", ";
 	}
 	printk(")\n");
-#ifdef CONFIG_SYSCTL
 	ath_hal_sysctl_register();
-#endif
 	return (0);
 }
 module_init(init_ath_hal);
@@ -582,9 +579,7 @@ module_init(init_ath_hal);
 static void __exit
 exit_ath_hal(void)
 {
-#ifdef CONFIG_SYSCTL
 	ath_hal_sysctl_unregister();
-#endif
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_ath_hal);

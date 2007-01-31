@@ -57,11 +57,9 @@ test -d ${WIRELESS} || die "No wireless directory ${WIRELESS}"
 if test -f ${WIRELESS}/Kconfig; then
 	kbuild=2.6
 	kbuildconf=Kconfig
-	makedef=LINUX26
 else if test -f ${WIRELESS}/Config.in; then
 	kbuild=2.4
 	kbuildconf=Config.in
-	makedef=LINUX24
 else
 	die "Kernel build system is not supported"
 fi
@@ -73,18 +71,6 @@ rm -rf ${MADWIFI}
 mkdir -p ${MADWIFI}
 make -s -C ${SRC} svnversion.h
 cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
-cat >>${MADWIFI}/BuildCaps.inc <<EOF
-
-EXTRA_CFLAGS += \$(COPTS)
-
-ifdef CONFIG_CPU_BIG_ENDIAN
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_BIG_ENDIAN
-else
-EXTRA_CFLAGS += -DAH_BYTE_ORDER=AH_LITTLE_ENDIAN
-endif
-
-$makedef := 1
-EOF
 
 
 echo "Copying source files"

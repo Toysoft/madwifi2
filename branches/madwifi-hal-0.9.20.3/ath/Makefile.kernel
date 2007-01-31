@@ -30,14 +30,14 @@ endif
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
 INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
-EXTRA_CFLAGS += $(INCS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS += $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 
-ifdef LINUX26
+ifneq ($(VERSION).$(PATCHLEVEL),2.4)
 obj-$(CONFIG_ATHEROS)	+= ath_$(BUSNAME).o
 ath_$(BUSNAME)-objs	:= if_ath.o if_ath_$(BUSNAME).o
 endif
 
-ifdef LINUX24
+ifeq ($(VERSION).$(PATCHLEVEL),2.4)
 obj-$(CONFIG_ATHEROS) := if_ath.o if_ath_$(BUSNAME).o
 
 O_TARGET := ath_$(BUSNAME).o

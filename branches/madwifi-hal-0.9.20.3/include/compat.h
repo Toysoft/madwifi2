@@ -45,8 +45,17 @@
 #define __le16 u_int16_t
 #define __le32 u_int32_t
 #define __le64 u_int64_t
+#define __be16 u_int16_t
+#define __be32 u_int32_t
+#define __be64 u_int64_t
 #define __force
 #endif
+#endif
+
+#ifndef container_of
+#define container_of(ptr, type, member) ({			\
+        const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+        (type *)( (char *)__mptr - offsetof(type,member) );})
 #endif
 
 /*

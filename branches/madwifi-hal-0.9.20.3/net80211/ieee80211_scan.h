@@ -158,7 +158,7 @@ struct ieee80211_scan_entry {
 	u_int32_t se_rstamp;		/* recv timestamp */
 	union {
 		u_int8_t data[8];
-		u_int64_t tsf;
+		__le64 tsf;
 	} se_tstamp;			/* from last rcv'd beacon */
 	u_int16_t se_intval;		/* beacon interval (host byte order) */
 	u_int16_t se_capinfo;		/* capabilities (host byte order) */

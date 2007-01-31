@@ -18,14 +18,14 @@ HAL=	$(TOP)/hal
 
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
 INCS += -I$(TOP) -I$(ATH) -I$(ATH_HAL) -I$(HAL)
-EXTRA_CFLAGS += $(INCS)
+EXTRA_CFLAGS += $(INCS) $(COPTS)
 
-ifdef LINUX26
+ifneq ($(VERSION).$(PATCHLEVEL),2.4)
 obj-$(CONFIG_ATHEROS) += ath_rate_onoe.o
 ath_rate_onoe-objs	:= onoe.o
 endif
 
-ifdef LINUX24
+ifeq ($(VERSION).$(PATCHLEVEL),2.4)
 obj-$(CONFIG_ATHEROS) := onoe.o
 
 export-objs	:= onoe.o

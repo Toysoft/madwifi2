@@ -62,8 +62,8 @@
 
 #include <net80211/if_media.h>
 #include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_rate.h>
 
-#include "if_athrate.h"
 #include "if_athvar.h"
 #include "ah_desc.h"
 
@@ -88,21 +88,19 @@ static void ath_rate_update(struct ath_softc *, struct ieee80211_node *, int);
 static void ath_rate_ctl_start(struct ath_softc *, struct ieee80211_node *);
 static void ath_rate_ctl(void *, struct ieee80211_node *);
 
-void
+static void
 ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
 {
 	/* NB: assumed to be zero'd by caller */
 	ath_rate_update(sc, &an->an_node, 0);
 }
-EXPORT_SYMBOL(ath_rate_node_init);
 
-void
+static void
 ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 {
 }
-EXPORT_SYMBOL(ath_rate_node_cleanup);
 
-void
+static void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	int shortPreamble, size_t frameLen,
 	u_int8_t *rix, int *try0, u_int8_t *txrate)
@@ -116,9 +114,8 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	else
 		*txrate = amn->amn_tx_rate0;
 }
-EXPORT_SYMBOL(ath_rate_findrate);
 
-void
+static void
 ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 	struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
 {
@@ -130,14 +127,13 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 		, amn->amn_tx_rate3sp, amn->amn_tx_try3	/* series 3 */
 	);
 }
-EXPORT_SYMBOL(ath_rate_setupxtxdesc);
 
-void
+static void
 ath_rate_tx_complete(struct ath_softc *sc,
 	struct ath_node *an, const struct ath_buf *bf)
 {
 	struct amrr_node *amn = ATH_NODE_AMRR(an);
-	const struct ath_tx_status *ts = &bf->bf_status.ds_txstat;
+	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
 	int sr = ts->ts_shortretry;
 	int lr = ts->ts_longretry;
 	int retry_count = sr + lr;
@@ -159,15 +155,13 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		amn->amn_tx_failure_cnt++;
 	}
 }
-EXPORT_SYMBOL(ath_rate_tx_complete);
 
-void
+static void
 ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 {
 	if (isnew)
 		ath_rate_ctl_start(sc, &an->an_node);
 }
-EXPORT_SYMBOL(ath_rate_newassoc);
 
 static void 
 node_reset (struct amrr_node *amn)
@@ -316,7 +310,7 @@ ath_rate_cb(void *arg, struct ieee80211_node *ni)
 /*
  * Reset the rate control state for each 802.11 state transition.
  */
-void
+static void
 ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state state)
 {
 	struct ieee80211com *ic = vap->iv_ic;
@@ -360,7 +354,6 @@ ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state state)
 		mod_timer(&asc->timer, jiffies + ((HZ * interval) / 1000));
 	}
 }
-EXPORT_SYMBOL(ath_rate_newstate);
 
 /* 
  * Examine and potentially adjust the transmit rate.
@@ -456,14 +449,17 @@ ath_ratectl(unsigned long data)
 	add_timer(&asc->timer);
 }
 
-struct ath_ratectrl *
+static struct ath_ratectrl *
 ath_rate_attach(struct ath_softc *sc)
 {
 	struct amrr_softc *asc;
 
+	_MOD_INC_USE(THIS_MODULE, return NULL);
 	asc = kmalloc(sizeof(struct amrr_softc), GFP_ATOMIC);
-	if (asc == NULL)
+	if (asc == NULL) {
+		_MOD_DEC_USE(THIS_MODULE);
 		return NULL;
+	}
 	asc->arc.arc_space = sizeof(struct amrr_node);
 	asc->arc.arc_vap_space = 0;
 	init_timer(&asc->timer);
@@ -472,26 +468,16 @@ ath_rate_attach(struct ath_softc *sc)
 
 	return &asc->arc;
 }
-EXPORT_SYMBOL(ath_rate_attach);
 
-void
+static void
 ath_rate_detach(struct ath_ratectrl *arc)
 {
 	struct amrr_softc *asc = (struct amrr_softc *) arc;
 
 	del_timer(&asc->timer);
 	kfree(asc);
+	_MOD_DEC_USE(THIS_MODULE);
 }
-EXPORT_SYMBOL(ath_rate_detach);
-
-#ifdef CONFIG_SYSCTL
-void
-ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
-{		
-        /* Amrr rate module reports no statistics */
-}
-EXPORT_SYMBOL(ath_rate_dynamic_proc_register);
-#endif /* CONFIG_SYSCTL */
 
 static int minrateinterval = 500;	/* 500ms */
 static int maxint = 0x7fffffff;		/* 32-bit big */
@@ -559,6 +545,19 @@ static ctl_table ath_root_table[] = {
 };
 static struct ctl_table_header *ath_sysctl_header;
 
+static struct ieee80211_rate_ops ath_rate_ops = {
+	.ratectl_id = IEEE80211_RATE_AMRR,
+	.node_init = ath_rate_node_init,
+	.node_cleanup = ath_rate_node_cleanup,
+	.findrate = ath_rate_findrate,
+	.setupxtxdesc = ath_rate_setupxtxdesc,
+	.tx_complete = ath_rate_tx_complete,
+	.newassoc = ath_rate_newassoc,
+	.newstate = ath_rate_newstate,
+	.attach = ath_rate_attach,
+	.detach = ath_rate_detach,
+};
+
 #include "release.h"
 static char *version = "0.1 (" RELEASE_VERSION ")";
 static char *dev_info = "ath_rate_amrr";
@@ -575,11 +574,14 @@ MODULE_LICENSE("Dual BSD/GPL");
 static int __init
 init_ath_rate_amrr(void)
 {
+	int ret;
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
-#ifdef CONFIG_SYSCTL
+	ret = ieee80211_rate_register(&ath_rate_ops);
+	if (ret)
+		return ret;
+
 	ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
-#endif
 	return (0);
 }
 module_init(init_ath_rate_amrr);
@@ -587,10 +589,9 @@ module_init(init_ath_rate_amrr);
 static void __exit
 exit_ath_rate_amrr(void)
 {
-#ifdef CONFIG_SYSCTL
 	if (ath_sysctl_header != NULL)
 		unregister_sysctl_table(ath_sysctl_header);
-#endif
+	ieee80211_rate_unregister(&ath_rate_ops);
 
 	printk(KERN_INFO "%s: unloaded\n", dev_info);
 }
