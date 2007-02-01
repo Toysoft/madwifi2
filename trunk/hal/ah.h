@@ -59,7 +59,7 @@ typedef void* HAL_SOFTC;		/* pointer to driver/OS state */
 typedef void* HAL_BUS_TAG;		/* opaque bus i/o id tag */
 typedef void* HAL_BUS_HANDLE;		/* opaque bus i/o handle */
 
-#include <ah_osdep.h>
+#include "ah_osdep.h"
 
 /*
  * __ahdecl is analogous to _cdecl; it defines the calling
