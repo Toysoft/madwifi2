@@ -54,4 +54,8 @@
 #define	__packed	__attribute__((__packed__))
 #endif
 
+/* Replace non-annotated HAL_BUS_HANDLE from ah.h */
+typedef void __iomem* ath_iomem_t;
+#define HAL_BUS_HANDLE ath_iomem_t
+
 #endif /* _ATH_AH_OSDEP_H_ */
