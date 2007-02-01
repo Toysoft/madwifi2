@@ -52,14 +52,14 @@
  * authorized.  The latter timeout is shorter to more aggressively
  * reclaim nodes that leave part way through the 802.1x exchange.
  */
-#define	IEEE80211_INACT_WAIT	15		/* inactivity interval (secs) */
+#define	IEEE80211_INACT_WAIT	15				/* inactivity interval (secs) */
 #define	IEEE80211_INACT_INIT	(30/IEEE80211_INACT_WAIT)	/* initial */
 #define	IEEE80211_INACT_AUTH	(180/IEEE80211_INACT_WAIT)	/* associated but not authorized */
 #define	IEEE80211_INACT_RUN	(300/IEEE80211_INACT_WAIT)	/* authorized */
 #define	IEEE80211_INACT_PROBE	(30/IEEE80211_INACT_WAIT)	/* probe */
 #define	IEEE80211_INACT_SCAN	(300/IEEE80211_INACT_WAIT)	/* scanned */
 
-#define	IEEE80211_TRANS_WAIT 	5		/* mgt frame tx timer (secs) */
+#define	IEEE80211_TRANS_WAIT 	5				/* mgt frame tx timer (secs) */
 
 #define	IEEE80211_NODE_HASHSIZE	32
 /* simple hash is enough for variation of macaddr */
@@ -94,7 +94,8 @@ struct ieee80211_node {
 	struct ieee80211_node_table *ni_table;
 	TAILQ_ENTRY(ieee80211_node) ni_list;
 	LIST_ENTRY(ieee80211_node) ni_hash;
-	atomic_t ni_refcnt;
+	// ieee80211_node_lock_t ni_nodelock;	/* on node - notably for ref counting */
+	ieee80211_node_ref_count_t ni_refcnt;
 	u_int ni_scangen;			/* gen# for timeout scan */
 	u_int8_t ni_authmode;			/* authentication algorithm */
 	u_int16_t ni_flags;			/* special-purpose state */
@@ -121,13 +122,13 @@ struct ieee80211_node {
 	u_int16_t ni_associd;			/* assoc response */
 	u_int16_t ni_txpower;			/* current transmit power (in 0.5 dBm) */
 	u_int16_t ni_vlan;			/* vlan tag */
-	u_int32_t *ni_challenge;			/* shared-key challenge */
+	u_int32_t *ni_challenge;		/* shared-key challenge */
 	u_int8_t *ni_wpa_ie;			/* captured WPA ie */
 	u_int8_t *ni_rsn_ie;			/* captured RSN ie */
 	u_int8_t *ni_wme_ie;			/* captured WME ie */
 	u_int8_t *ni_ath_ie;			/* captured Atheros ie */
-	u_int16_t ni_txseqs[17];			/* tx seq per-tid */
-	u_int16_t ni_rxseqs[17];			/* rx seq previous per-tid*/
+	u_int16_t ni_txseqs[17];		/* tx seq per-tid */
+	u_int16_t ni_rxseqs[17];		/* rx seq previous per-tid*/
 	u_int32_t ni_rxfragstamp;		/* time stamp of last rx frag */
 	struct sk_buff *ni_rxfrag[3];		/* rx frag reassembly */
 	struct ieee80211_rsnparms ni_rsn;	/* RSN/WPA parameters */
@@ -156,7 +157,7 @@ struct ieee80211_node {
 	struct ieee80211_channel *ni_chan;
 	u_int16_t ni_fhdwell;			/* FH only */
 	u_int8_t ni_fhindex;			/* FH only */
-	u_int8_t ni_erp;				/* ERP from beacon/probe resp */
+	u_int8_t ni_erp;			/* ERP from beacon/probe resp */
 	u_int16_t ni_timoff;			/* byte offset to TIM ie */
 
 	/* others */
@@ -168,7 +169,7 @@ struct ieee80211_node {
 	struct ieee80211vap *ni_prev_vap;  	/* previously associated vap */
 	u_int8_t ni_uapsd;			/* U-APSD per-node flags matching WMM STA Qos Info field */
 	u_int8_t ni_uapsd_maxsp; 		/* maxsp from flags above */
-	u_int16_t ni_uapsd_trigseq[WME_NUM_AC]; 	/* trigger suppression on retry */
+	u_int16_t ni_uapsd_trigseq[WME_NUM_AC];	/* trigger suppression on retry */
 	__le16 ni_pschangeseq;
 };
 MALLOC_DECLARE(M_80211_NODE);
@@ -185,20 +186,6 @@ MALLOC_DECLARE(M_80211_NODE);
 #define IEEE80211_NODE_UAPSD_USETIM(_ni) (((_ni)->ni_uapsd & 0xF) == 0xF )
 #define WME_UAPSD_NODE_INVALIDSEQ	0xffff
 #define WME_UAPSD_NODE_TRIGSEQINIT(_ni)	(memset(&(_ni)->ni_uapsd_trigseq[0], 0xff, sizeof((_ni)->ni_uapsd_trigseq)))
-
-static __inline struct ieee80211_node *
-ieee80211_ref_node(struct ieee80211_node *ni)
-{
-	ieee80211_node_incref(ni);
-	return ni;
-}
-
-static __inline void
-ieee80211_unref_node(struct ieee80211_node **ni)
-{
-	ieee80211_node_decref(*ni);
-	*ni = NULL;			/* guard against use */
-}
 
 void ieee80211_node_attach(struct ieee80211com *);
 void ieee80211_node_detach(struct ieee80211com *);
@@ -242,43 +229,39 @@ struct ieee80211_wds_addr {
  * is a second table for associated stations or neighbors.
  */
 struct ieee80211_node_table {
+	const char *nt_name;			/* for debugging */
 	struct ieee80211com *nt_ic;		/* back reference */
-	ieee80211_node_lock_t nt_nodelock;	/* on node table */
+	ieee80211_node_table_lock_t nt_nodelock;	/* on node table */
 	TAILQ_HEAD(, ieee80211_node) nt_node;	/* information of all nodes */
 	ATH_LIST_HEAD(, ieee80211_node) nt_hash[IEEE80211_NODE_HASHSIZE];
 	ATH_LIST_HEAD(, ieee80211_wds_addr) nt_wds_hash[IEEE80211_NODE_HASHSIZE];
-	const char *nt_name;			/* for debugging */
 	ieee80211_scan_lock_t nt_scanlock;	/* on nt_scangen */
 	u_int nt_scangen;			/* gen# for timeout scan */
 	int nt_inact_init;			/* initial node inact setting */
 	struct timer_list nt_wds_aging_timer;	/* timer to age out wds entries */
 };
 
-struct ieee80211_node *ieee80211_alloc_node(struct ieee80211_node_table *,
-	struct ieee80211vap *, const u_int8_t *);
-struct ieee80211_node *ieee80211_tmp_node(struct ieee80211vap *,
+struct ieee80211_node *ieee80211_alloc_node_table(struct ieee80211vap *,
 	const u_int8_t *);
-struct ieee80211_node *ieee80211_dup_bss(struct ieee80211vap *,
-	const u_int8_t *);
+struct ieee80211_node *ieee80211_dup_bss(struct ieee80211vap *, 
+	const u_int8_t *, unsigned char);
 void ieee80211_node_reset(struct ieee80211_node *, struct ieee80211vap *);
 #ifdef IEEE80211_DEBUG_REFCNT
-void ieee80211_free_node_debug(struct ieee80211_node *, const char *, int);
 struct ieee80211_node *ieee80211_find_node_debug(struct ieee80211_node_table *,
 	const u_int8_t *, const char *, int);
 struct ieee80211_node *ieee80211_find_rxnode_debug(struct ieee80211com *,
 	const struct ieee80211_frame_min *, const char *, int);
 struct ieee80211_node *ieee80211_find_txnode_debug(struct ieee80211vap *,
 	const u_int8_t *, const char *, int);
-#define	ieee80211_free_node(ni) \
-	ieee80211_free_node_debug(ni, __func__, __LINE__)
-#define	ieee80211_find_node(nt, mac) \
-	ieee80211_find_node_debug(nt, mac, __func__, __LINE__)
-#define	ieee80211_find_rxnode(nt, wh) \
-	ieee80211_find_rxnode_debug(nt, wh, __func__, __LINE__)
-#define	ieee80211_find_txnode(nt, mac) \
-	ieee80211_find_txnode_debug(nt, mac, __func__, __LINE__)
+#define	ieee80211_unref_node(_ni) \
+	ieee80211_unref_node_debug(_ni, __func__, __LINE__)
+#define	ieee80211_find_node(_nt, _mac) \
+	ieee80211_find_node_debug(_nt, _mac, __func__, __LINE__)
+#define	ieee80211_find_rxnode(_nt, _wh) \
+	ieee80211_find_rxnode_debug(_nt, _wh, __func__, __LINE__)
+#define	ieee80211_find_txnode(_nt, _mac) \
+	ieee80211_find_txnode_debug(_nt, _mac, __func__, __LINE__)
 #else
-void ieee80211_free_node(struct ieee80211_node *);
 
 struct ieee80211_node *ieee80211_find_node(struct ieee80211_node_table *,
 	const u_int8_t *);
@@ -287,6 +270,53 @@ struct ieee80211_node * ieee80211_find_rxnode(struct ieee80211com *,
 struct ieee80211_node *ieee80211_find_txnode(struct ieee80211vap *,
 	const u_int8_t *);
 #endif
+
+void _ieee80211_free_node(struct ieee80211_node *);
+
+static __inline struct ieee80211_node *
+ieee80211_ref_node(struct ieee80211_node *ni)
+{
+	ieee80211_node_incref(ni);
+	return ni;
+}
+
+static __inline struct ieee80211_node *
+_ieee80211_pass_node(struct ieee80211_node **pni) {
+	struct ieee80211_node *tmp = *pni;
+	*pni = NULL;
+	return (tmp);
+}
+
+#define PASS_NODE(_ni) \
+	_ieee80211_pass_node(&_ni)
+
+static __inline int
+_ieee80211_unref_node(struct ieee80211_node *ni) {
+	if (ieee80211_node_dectestref(ni)) {
+		_ieee80211_free_node(ni);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+static __inline void
+#ifdef IEEE80211_DEBUG_REFCNT
+ieee80211_unref_node_debug(struct ieee80211_node **pni, const char *func, int line)
+#else
+ieee80211_unref_node(struct ieee80211_node **pni)
+#endif
+{	
+	struct ieee80211_node *ni = *pni;
+#ifdef IEEE80211_DEBUG_REFCNT
+	IEEE80211_DPRINTF(NULL, IEEE80211_MSG_NODE,
+		"%s (%s:%u) %p<%s> refcnt %d\n", __func__, func, line, ni,
+		 ether_sprintf(ni->ni_macaddr), ieee80211_node_refcnt(ni) - 1);
+#endif
+	_ieee80211_unref_node(ni); 
+	*pni = NULL;			/* guard against use */
+}
+
 int ieee80211_add_wds_addr(struct ieee80211_node_table *, struct ieee80211_node *,
 	const u_int8_t *, u_int8_t);
 void ieee80211_remove_wds_addr(struct ieee80211_node_table *, const u_int8_t *);
