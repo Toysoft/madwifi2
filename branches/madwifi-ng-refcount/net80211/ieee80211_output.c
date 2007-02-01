@@ -254,7 +254,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 	
-	cb->ni = ni;
+	cb->ni = ieee80211_ref_node(ni);
 	
 	/* power-save checks */
 	if (WME_UAPSD_AC_CAN_TRIGGER(skb->priority, ni)) {
@@ -293,13 +293,14 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	}
 #endif
 	ieee80211_parent_queue_xmit(skb);
+	ieee80211_unref_node(&ni);
 	return 0;
 
 bad:
 	if (skb != NULL)
 		dev_kfree_skb(skb);
 	if (ni != NULL)
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 	return 0;
 }
 
@@ -453,7 +454,7 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 	if (skb == NULL) {
 		/* XXX debug msg */
 		vap->iv_stats.is_tx_nobuf++;
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 		return -ENOMEM;
 	}
 	cb = (struct ieee80211_cb *)skb->cb;
@@ -507,16 +508,14 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 	u_int8_t *frm;
 	int tid;
 
-	ieee80211_ref_node(ni);
 	skb = ieee80211_getmgtframe(&frm, 2);
 	if (skb == NULL) {
 		/* XXX debug msg */
 		vap->iv_stats.is_tx_nobuf++;
-		ieee80211_free_node(ni);
 		return -ENOMEM;
 	}
 	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ni;
+	cb->ni = ieee80211_ref_node(ni);
 
 	skb->priority = ac;
 	qwh = (struct ieee80211_qosframe *)skb_push(skb, sizeof(struct ieee80211_qosframe));
@@ -865,7 +864,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 				nt = &ic->ic_sta;
 				ni_wds = ieee80211_find_wds_node(nt, eh.ether_shost);
 				if (ni_wds)
-					ieee80211_free_node(ni_wds); /* Decr ref count */
+					ieee80211_unref_node(&ni_wds); /* Decr ref count */
 				else
 					ieee80211_add_wds_addr(nt, ni, eh.ether_shost, 0);
 			}
@@ -1719,7 +1718,6 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 		__func__, __LINE__,
 		ni, ether_sprintf(ni->ni_macaddr),
 		ieee80211_node_refcnt(ni) + 1);
-	ieee80211_ref_node(ni);
 
 	/*
 	 * prreq frame format
@@ -1735,7 +1733,6 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	       vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].length);
 	if (skb == NULL) {
 		vap->iv_stats.is_tx_nobuf++;
-		ieee80211_free_node(ni);
 		return -ENOMEM;
 	}
 
@@ -1758,7 +1755,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	skb_trim(skb, frm - skb->data);
 
 	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ni;
+	cb->ni = ieee80211_ref_node(ni);
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
@@ -2233,7 +2230,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		mod_timer(&vap->iv_mgtsend, jiffies + timer * HZ);
 	return 0;
 bad:
-	ieee80211_free_node(ni);
+	ieee80211_unref_node(&ni);
 	return ret;
 #undef senderr
 }

@@ -37,8 +37,7 @@
 /*
  * Definitions for IEEE 802.11 drivers.
  */
-#define	IEEE80211_DEBUG
-#undef	IEEE80211_DEBUG_REFCNT			/* node refcnt stuff */
+#include <net80211/ieee80211_debug.h>
 
 #include <net80211/ieee80211_linux.h>
 
@@ -230,8 +229,7 @@ struct ieee80211com {
 	/* new station association callback/notification */
 	void (*ic_newassoc)(struct ieee80211_node *, int);
 	/* node state management */
-	struct ieee80211_node *(*ic_node_alloc)(struct ieee80211_node_table *,
-		struct ieee80211vap *);
+	struct ieee80211_node *(*ic_node_alloc)(struct ieee80211vap *);
 	void (*ic_node_free)(struct ieee80211_node *);
 	void (*ic_node_cleanup)(struct ieee80211_node *);
 	u_int8_t (*ic_node_getrssi)(const struct ieee80211_node *);
@@ -406,6 +404,12 @@ struct ieee80211vap {
 	u_int32_t app_filter;			/* filters which management frames are forwarded to app */
 
 };
+
+static __inline int ieee80211_is_printed(struct ieee80211vap *vap, unsigned m)
+{
+	return !!(vap->iv_debug & m);
+}
+
 MALLOC_DECLARE(M_80211_VAP);
 
 #define	IEEE80211_ADDR_NULL(a1)		(memcmp(a1, "\x00\x00\x00\x00\x00\x00", \
@@ -613,79 +617,4 @@ ieee80211_anyhdrspace(struct ieee80211com *ic, const void *data)
 		size = roundup(size, sizeof(u_int32_t));
 	return size;
 }
-
-#define	IEEE80211_MSG_DEBUG	0x40000000	/* IFF_DEBUG equivalent */
-#define	IEEE80211_MSG_DUMPPKTS	0x20000000	/* IFF_LINK2 equivalent */
-#define	IEEE80211_MSG_CRYPTO	0x10000000	/* crypto work */
-#define	IEEE80211_MSG_INPUT	0x08000000	/* input handling */
-#define	IEEE80211_MSG_XRATE	0x04000000	/* rate set handling */
-#define	IEEE80211_MSG_ELEMID	0x02000000	/* element id parsing */
-#define	IEEE80211_MSG_NODE	0x01000000	/* node handling */
-#define	IEEE80211_MSG_ASSOC	0x00800000	/* association handling */
-#define	IEEE80211_MSG_AUTH	0x00400000	/* authentication handling */
-#define	IEEE80211_MSG_SCAN	0x00200000	/* scanning */
-#define	IEEE80211_MSG_OUTPUT	0x00100000	/* output handling */
-#define	IEEE80211_MSG_STATE	0x00080000	/* state machine */
-#define	IEEE80211_MSG_POWER	0x00040000	/* power save handling */
-#define	IEEE80211_MSG_DOT1X	0x00020000	/* 802.1x authenticator */
-#define	IEEE80211_MSG_DOT1XSM	0x00010000	/* 802.1x state machine */
-#define	IEEE80211_MSG_RADIUS	0x00008000	/* 802.1x radius client */
-#define	IEEE80211_MSG_RADDUMP	0x00004000	/* dump 802.1x radius packets */
-#define	IEEE80211_MSG_RADKEYS	0x00002000	/* dump 802.1x keys */
-#define	IEEE80211_MSG_WPA	0x00001000	/* WPA/RSN protocol */
-#define	IEEE80211_MSG_ACL	0x00000800	/* ACL handling */
-#define	IEEE80211_MSG_WME	0x00000400	/* WME protocol */
-#define	IEEE80211_MSG_SUPG	0x00000200	/* SUPERG */
-#define	IEEE80211_MSG_DOTH	0x00000100	/* 11.h */
-#define	IEEE80211_MSG_INACT	0x00000080	/* inactivity handling */
-#define	IEEE80211_MSG_ROAM	0x00000040	/* sta-mode roaming */
-
-#define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
-
-#ifdef IEEE80211_DEBUG
-#define	ieee80211_msg(_vap, _m)	((_vap)->iv_debug & (_m))
-#define	IEEE80211_DPRINTF(_vap, _m, _fmt, ...) do {			\
-	if (ieee80211_msg(_vap, _m))					\
-		ieee80211_note(_vap, _fmt, __VA_ARGS__);		\
-} while (0)
-#define	IEEE80211_NOTE(_vap, _m, _ni, _fmt, ...) do {			\
-	if (ieee80211_msg(_vap, _m))					\
-		ieee80211_note_mac(_vap, (_ni)->ni_macaddr, _fmt, __VA_ARGS__);\
-} while (0)
-#define	IEEE80211_NOTE_MAC(_vap, _m, _mac, _fmt, ...) do {		\
-	if (ieee80211_msg(_vap, _m))					\
-		ieee80211_note_mac(_vap, _mac, _fmt, __VA_ARGS__);	\
-} while (0)
-#define	IEEE80211_NOTE_FRAME(_vap, _m, _wh, _fmt, ...) do {		\
-	if (ieee80211_msg(_vap, _m))					\
-		ieee80211_note_frame(_vap, _wh, _fmt, __VA_ARGS__);	\
-} while (0)
-void ieee80211_note(struct ieee80211vap *, const char *, ...);
-void ieee80211_note_mac(struct ieee80211vap *,
-	const u_int8_t mac[IEEE80211_ADDR_LEN], const char *, ...);
-void ieee80211_note_frame(struct ieee80211vap *,
-	const struct ieee80211_frame *, const char *, ...);
-#define	ieee80211_msg_debug(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_DEBUG)
-#define	ieee80211_msg_dumppkts(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_DUMPPKTS)
-#define	ieee80211_msg_input(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_INPUT)
-#define	ieee80211_msg_radius(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_RADIUS)
-#define	ieee80211_msg_dumpradius(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_RADDUMP)
-#define	ieee80211_msg_dumpradkeys(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_RADKEYS)
-#define	ieee80211_msg_scan(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_SCAN)
-#define	ieee80211_msg_assoc(_vap) \
-	ieee80211_msg(_vap, IEEE80211_MSG_ASSOC)
-#else /* IEEE80211_DEBUG */
-#define	IEEE80211_DPRINTF(_vap, _m, _fmt, ...)
-#define	IEEE80211_NOTE(_vap, _m, _wh, _fmt, ...)
-#define	IEEE80211_NOTE_FRAME(_vap, _m, _wh, _fmt, ...)
-#define	IEEE80211_NOTE_MAC(_vap, _m, _mac, _fmt, ...)
-#endif /* IEEE80211_DEBUG */
-
 #endif /* _NET80211_IEEE80211_VAR_H_ */
