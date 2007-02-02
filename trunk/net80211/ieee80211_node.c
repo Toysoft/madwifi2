@@ -759,9 +759,7 @@ node_alloc(struct ieee80211_node_table *nt, struct ieee80211vap *vap)
 static void
 node_cleanup(struct ieee80211_node *ni)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
 	struct ieee80211vap *vap = ni->ni_vap;
-	int i;
 
 	/* NB: preserve ni_table */
 	if (ni->ni_flags & IEEE80211_NODE_PWR_MGT) {
@@ -810,14 +808,13 @@ node_cleanup(struct ieee80211_node *ni)
 	 *
 	 * XXX does this leave us open to inheriting old state?
 	 */
-	for (i = 0; i < N(ni->ni_rxfrag); i++)
-		if (ni->ni_rxfrag[i] != NULL) {
-			dev_kfree_skb_any(ni->ni_rxfrag[i]);
-			ni->ni_rxfrag[i] = NULL;
-		}
+    
+	if (ni->ni_rxfrag != NULL) {
+		dev_kfree_skb_any(ni->ni_rxfrag);
+		ni->ni_rxfrag = NULL;
+	}
 	ieee80211_crypto_delkey(vap, &ni->ni_ucastkey, ni);
 	ni->ni_rxkeyoff = 0;
-#undef N
 }
 
 static void
@@ -859,7 +856,6 @@ ieee80211_alloc_node(struct ieee80211_node_table *nt,
 	struct ieee80211com *ic = nt->nt_ic;
 	struct ieee80211_node *ni;
 	int hash;
-	int i;
 
 	ni = ic->ic_node_alloc(nt, vap);
 	if (ni == NULL) {
@@ -892,10 +888,7 @@ ieee80211_alloc_node(struct ieee80211_node_table *nt,
 	ni->ni_table = nt;
 	TAILQ_INSERT_TAIL(&nt->nt_node, ni, ni_list);
 	LIST_INSERT_HEAD(&nt->nt_hash[hash], ni, ni_hash);
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
-	for (i = 0; i < N(ni->ni_rxfrag); i++)
-		ni->ni_rxfrag[i] = NULL;
-#undef N
+	ni->ni_rxfrag = NULL;
 	ni->ni_challenge = NULL;
 	IEEE80211_NODE_UNLOCK_IRQ(nt);
 
@@ -1019,7 +1012,6 @@ ieee80211_tmp_node(struct ieee80211vap *vap, const u_int8_t *macaddr)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_node *ni;
-	int i;
 
 	ni = ic->ic_node_alloc(&ic->ic_sta,vap);
 	if (ni != NULL) {
@@ -1041,10 +1033,7 @@ ieee80211_tmp_node(struct ieee80211vap *vap, const u_int8_t *macaddr)
 
 		ni->ni_table = NULL;		/* NB: pedantic */
 		ni->ni_ic = ic;
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
-		for (i = 0; i < N(ni->ni_rxfrag); i++)
-			ni->ni_rxfrag[i] = NULL;
-#undef N
+		ni->ni_rxfrag = NULL;
 		ni->ni_challenge = NULL;
 	} else {
 		/* XXX msg */
@@ -1061,7 +1050,6 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_node *ni;
-	int i;
 
 	ni = ieee80211_alloc_node(&ic->ic_sta, vap, macaddr);
 	if (ni != NULL) {
@@ -1074,10 +1062,7 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr)
 		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
 		ieee80211_node_set_chan(ic, ni);
 		ni->ni_rsn = vap->iv_bss->ni_rsn;
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
-		for (i = 0; i < N(ni->ni_rxfrag); i++)
-			ni->ni_rxfrag[i] = NULL;
-#undef N
+		ni->ni_rxfrag = NULL;
 	}
 	return ni;
 }
@@ -1562,10 +1547,10 @@ restart:
 		 * (last fragment older than 1s).
 		 * XXX doesn't belong here
 		 */
-		if (ni->ni_rxfrag[0] != NULL &&
+		if (ni->ni_rxfrag != NULL &&
 		    jiffies > ni->ni_rxfragstamp + HZ) {
-			dev_kfree_skb(ni->ni_rxfrag[0]);
-			ni->ni_rxfrag[0] = NULL;
+			dev_kfree_skb(ni->ni_rxfrag);
+			ni->ni_rxfrag = NULL;
 		}
 		/*
 		 * Special case ourself; we may be idle for extended periods
