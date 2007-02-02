@@ -305,12 +305,10 @@ ieee80211_input(struct ieee80211_node *ni,
 				}
 				bssid = wh->i_addr3;
 			}
-			if (type == IEEE80211_FC0_TYPE_DATA &&
-			    ni == vap->iv_bss) {
-				/*
-				 * Try to find sender in local node table.
-				 */
-				ieee80211_unref_node(&ni);
+			/* Do not try to find a node reference if the packet really did come from the BSS */
+			if (type == IEEE80211_FC0_TYPE_DATA && ni == vap->iv_bss &&
+					!IEEE80211_ADDR_EQ(vap->iv_bss->ni_macaddr, wh->i_addr2)) {
+				/* Try to find sender in local node table. */
 				ni = ieee80211_find_node(vap->iv_bss->ni_table, wh->i_addr2);
 				if (ni == NULL) {
 					/*
@@ -1249,7 +1247,6 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		vap->iv_stats.is_rx_bad_auth++;	/* XXX maybe a unique error? */
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
 			if (ni == vap->iv_bss) {
-				ieee80211_unref_node(&ni);
 				ni = ieee80211_dup_bss(vap, wh->i_addr2, 0);
 				if (ni == NULL)
 					return;
@@ -1260,7 +1257,7 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 				tmpnode = 1;
 			}
 			IEEE80211_SEND_MGMT(ni,	IEEE80211_FC0_SUBTYPE_AUTH,
-				(seq + 1) | (IEEE80211_STATUS_ALG<<16));
+				(seq + 1) | (IEEE80211_STATUS_ALG << 16));
 			
 			if (tmpnode)
 				ieee80211_unref_node(&ni);
@@ -1291,7 +1288,6 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		}
 		/* always accept open authentication requests */
 		if (ni == vap->iv_bss) {
-			ieee80211_unref_node(&ni);
 			ni = ieee80211_dup_bss(vap, wh->i_addr2, 0); 
 			if (ni == NULL)
 				return;
@@ -1351,7 +1347,6 @@ ieee80211_send_error(struct ieee80211_node *ni,
 	int istmp;
 
 	if (ni == vap->iv_bss) {
-		ieee80211_unref_node(&ni);
 		ni = ieee80211_dup_bss(vap, mac, 1);
 		if (ni == NULL) {
 			/* XXX msg */
@@ -1477,7 +1472,6 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		switch (seq) {
 		case IEEE80211_AUTH_SHARED_REQUEST:
 			if (ni == vap->iv_bss) {
-				ieee80211_unref_node(&ni);
 				ni = ieee80211_dup_bss(vap, wh->i_addr2, 0);
 				if (ni == NULL) {
 					/* NB: no way to return an error */
@@ -2829,7 +2823,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 		if (scan.capinfo & IEEE80211_CAPINFO_IBSS) {
 			if (!IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_macaddr)) {
-				ieee80211_unref_node(&ni);
+				/* Create a new entry in the neighbor table. */
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
 			} else {
 				/*
@@ -2941,11 +2935,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				 * send the response so blindly add them to the
 				 * neighbor table.
 				 */
-				ieee80211_unref_node(&ni);
 				ni = ieee80211_fakeup_adhoc_node(vap,
 					wh->i_addr2);
 			} else {
-				ieee80211_unref_node(&ni);
 				ni = ieee80211_dup_bss(vap, wh->i_addr2, 1);
 			}
 			if (ni == NULL)
