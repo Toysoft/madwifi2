@@ -19,12 +19,13 @@
 #include <linux/if.h>
 #include <linux/netdevice.h>
 #include <linux/cache.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include "if_media.h"
-#include <net80211/ieee80211_var.h>
+#include <net/d80211.h> 
+#include "if_ath_d80211.h"
 
 #include "if_athvar.h"
 #include "ah_devid.h"
@@ -33,6 +34,7 @@
 
 struct ath_ahb_softc {
 	struct ath_softc	aps_sc;
+	int			irq;
 #ifdef CONFIG_PM
 	u32 aps_pmstate[16];
 #endif
@@ -270,17 +272,15 @@ static int
 exit_ath_wmac(u_int16_t wlanNum)
 {
 	struct ath_ahb_softc *sc = sclist[wlanNum];
-	struct net_device *dev;
 	const char *sysType;
 	u_int16_t devid;        
 
 	if (sc == NULL)
 		return -ENODEV; /* XXX: correct return value? */
         
-	dev = sc->aps_sc.sc_dev;
-	ath_detach(dev);
-	if (dev->irq)
-		free_irq(dev->irq, dev);
+	ath_detach(&sc->aps_sc);
+	if (sc->irq)
+		free_irq(sc->irq, sc);
 	sysType = get_system_type();
 	if (!strcmp(sysType, "Atheros AR5315"))
 		devid = (u_int16_t) (sysRegRead(AR5315_SREV) &
@@ -290,7 +290,6 @@ exit_ath_wmac(u_int16_t wlanNum)
 			(AR531X_REV_MAJ | AR531X_REV_MIN));
   
 	ahb_disable_wmac(devid, wlanNum);
-	free_netdev(dev);
 	sclist[wlanNum] = NULL;
 	return 0;
 }
@@ -299,7 +298,7 @@ static int
 init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
 	const char *athname;
-	struct net_device *dev;
+	unsigned long mem_start;
 	struct ath_ahb_softc *sc;
 	struct ar531x_config config;
         
@@ -309,49 +308,42 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
         
 	ahb_enable_wmac(devid, wlanNum);
 
-	dev = alloc_netdev(sizeof(struct ath_ahb_softc), "wifi%d", ether_setup);
-	if (dev == NULL) {
-		printk(KERN_ERR "ath_dev_probe: no memory for device state\n");
+	sc = (struct ath_ahb_softc *)ath_d80211_alloc(sizeof(*sc));
+
+	if (!sc) {
+		printk(KERN_WARNING "ath_ahb: 80211 setup failed\n");
 		goto bad2;
 	}
-	sc = dev->priv;
-	sc->aps_sc.sc_dev = dev;
 
 	/*
 	 * Mark the device as detached to avoid processing
 	 * interrupts until setup is complete.
 	 */
 	sc->aps_sc.sc_invalid = 1;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,41)
-	dev->owner = THIS_MODULE;
-#else
-	SET_MODULE_OWNER(dev);
-#endif
 	sclist[wlanNum] = sc;
 
 	switch (wlanNum) {
 	case AR531X_WLAN0_NUM:
 		if ((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) {
-			dev->irq = AR5315_IRQ_WLAN0_INTRS;
-			dev->mem_start = AR5315_WLAN0;
+			sc->irq = AR5315_IRQ_WLAN0_INTRS;
+			mem_start = AR5315_WLAN0;
 		} else {
-			dev->irq = AR531X_IRQ_WLAN0_INTRS;
-			dev->mem_start = AR531X_WLAN0;
+			sc->irq = AR531X_IRQ_WLAN0_INTRS;
+			mem_start = AR531X_WLAN0;
 		}
 		break;
 	case AR531X_WLAN1_NUM:
-		dev->irq = AR531X_IRQ_WLAN1_INTRS;
-		dev->mem_start = KSEG1ADDR(AR531X_WLAN1);
+		sc->irq = AR531X_IRQ_WLAN1_INTRS;
+		mem_start = KSEG1ADDR(AR531X_WLAN1);
 		break;
 	default:
 		goto bad3;
 	}
-	dev->mem_end = dev->mem_start + AR531X_WLANX_LEN;
-	sc->aps_sc.sc_iobase = (void __iomem *) dev->mem_start;
+	sc->aps_sc.sc_iobase = (void __iomem *) mem_start;
 	sc->aps_sc.sc_bdev = NULL;
 
-	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
-		printk(KERN_WARNING "%s: request_irq failed\n", dev->name);
+	if (request_irq(sc->irq, ath_intr, SA_SHIRQ, sc->aps_sc.name, sc)) {
+		printk(KERN_WARNING "%s: request_irq failed\n", sc->aps_sc.name);
 		goto bad3;
 	}
 	
@@ -359,11 +351,11 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 	config.radio = radioConfig;
 	config.unit = wlanNum;
 	config.tag = NULL;
-	if (ath_attach(devid, dev, &config) != 0)
+	if (ath_attach(devid, &sc->aps_sc, &config) != 0)
 		goto bad4;
 	athname = ath_hal_probe(ATHEROS_VENDOR_ID, devid);
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
-		dev->name, athname ? athname : "Atheros ???", dev->mem_start, dev->irq);
+		sc->aps_sc.name, athname ? athname : "Atheros ???", mem_start, sc->irq);
 	num_activesc++;
 	/* Ready to process interrupts */
 
@@ -371,9 +363,8 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 	return 0;
         
  bad4:
-	free_irq(dev->irq, dev);
+	free_irq(sc->irq, sc);
  bad3:
-	free_netdev(dev);
 	sclist[wlanNum] = NULL;
  bad2:
 	ahb_disable_wmac(devid, wlanNum);
