@@ -2152,11 +2152,11 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_UCASTCIPHERS:
 		/*
-		 * Convert cipher set to equivalent capabilities.
 		 * NB: this logic intentionally ignores unknown and
 		 * unsupported ciphers so folks can specify 0xff or
 		 * similar and get all available ciphers.
 		 */
+		/* caps are really ciphers */
 		caps = 0;
 		for (j = 1; j < 32; j++)	/* NB: skip WEP */
 			if ((value & (1 << j)) &&
@@ -2172,9 +2172,12 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHER:
-		if ((rsn->rsn_ucastcipherset & cipher2cap(value)) == 0)
+		if ((vap->iv_caps & cipher2cap(value)) == 0 &&
+		    !ieee80211_crypto_available(value))
 			return -EINVAL;
 		rsn->rsn_ucastcipher = value;
+		if (vap->iv_flags & IEEE80211_F_WPA)
+			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
 		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
@@ -2668,10 +2671,7 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 		param[0] = rsn->rsn_mcastkeylen;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHERS:
-		param[0] = 0;
-		for (m = 0x1; m != 0; m <<= 1)
-			if (rsn->rsn_ucastcipherset & m)
-				param[0] |= 1<<cap2cipher(m);
+		param[0] = rsn->rsn_ucastcipherset;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHER:
 		param[0] = rsn->rsn_ucastcipher;
