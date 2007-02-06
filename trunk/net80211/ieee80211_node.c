@@ -1649,6 +1649,13 @@ ieee80211_node_timeout(unsigned long arg)
 void
 ieee80211_iterate_nodes(struct ieee80211_node_table *nt, ieee80211_iter_func *f, void *arg)
 {
+	ieee80211_iterate_dev_nodes(NULL, nt, f, arg);
+}
+EXPORT_SYMBOL(ieee80211_iterate_nodes);
+
+void
+ieee80211_iterate_dev_nodes(struct net_device *dev, struct ieee80211_node_table *nt, ieee80211_iter_func *f, void *arg)
+{
 	struct ieee80211_node *ni;
 	u_int gen;
 
@@ -1657,6 +1664,8 @@ ieee80211_iterate_nodes(struct ieee80211_node_table *nt, ieee80211_iter_func *f,
 restart:
 	IEEE80211_NODE_LOCK(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
+		if (dev != NULL && ni->ni_vap->iv_dev != dev) 
+			continue;  /* skip node not for this vap */
 		if (ni->ni_scangen != gen) {
 			ni->ni_scangen = gen;
 			(void) ieee80211_ref_node(ni);
@@ -1670,7 +1679,7 @@ restart:
 
 	IEEE80211_SCAN_UNLOCK_IRQ(nt);
 }
-EXPORT_SYMBOL(ieee80211_iterate_nodes);
+EXPORT_SYMBOL(ieee80211_iterate_dev_nodes);
 
 void
 ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
