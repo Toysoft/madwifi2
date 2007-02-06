@@ -3020,15 +3020,18 @@ get_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
 static int
 ieee80211_ioctl_setappiebuf(struct net_device *dev,
 	struct iw_request_info *info,
-	void *w, char *extra)
+	struct iw_point *data, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211req_getset_appiebuf *iebuf =
 		(struct ieee80211req_getset_appiebuf *)extra;
 	enum ieee80211_opmode chk_opmode;
+	int iebuf_len;
 	int rc = 0;
 
-	if (iebuf->app_buflen > IEEE80211_APPIE_MAX)
+	iebuf_len = data->length - sizeof(struct ieee80211req_getset_appiebuf);
+	if ( iebuf_len < 0 || iebuf_len != iebuf->app_buflen ||
+		 iebuf->app_buflen > IEEE80211_APPIE_MAX )
 		return -EINVAL;
 
 	switch (iebuf->app_frmtype) {
@@ -3059,11 +3062,21 @@ ieee80211_ioctl_setappiebuf(struct net_device *dev,
 
 static int
 ieee80211_ioctl_getappiebuf(struct net_device *dev, struct iw_request_info *info,
-	void *w, char *extra)
+	struct iw_point *data, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211req_getset_appiebuf *iebuf =
 		(struct ieee80211req_getset_appiebuf *)extra;
+	int max_iebuf_len;
+	int rc = 0;
+
+	max_iebuf_len = data->length - sizeof(struct ieee80211req_getset_appiebuf);
+	if (max_iebuf_len < 0)
+		return -EINVAL;
+	if (copy_from_user(iebuf, data->pointer, sizeof(struct ieee80211req_getset_appiebuf)))
+		return -EFAULT;		
+	if (iebuf->app_buflen > max_iebuf_len)
+		iebuf->app_buflen = max_iebuf_len;
 
 	switch (iebuf->app_frmtype) {
 	case IEEE80211_APPIE_FRAME_BEACON:
@@ -3081,7 +3094,11 @@ ieee80211_ioctl_getappiebuf(struct net_device *dev, struct iw_request_info *info
 		return -EINVAL;
 	}
 
-	return get_app_ie(iebuf->app_frmtype, vap, iebuf);
+	rc = get_app_ie(iebuf->app_frmtype, vap, iebuf);
+	
+	data->length = sizeof(struct ieee80211req_getset_appiebuf) + iebuf->app_buflen;
+	
+	return rc;
 }
 
 static int
@@ -4819,7 +4836,7 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 #define	IW_PRIV_TYPE_CHANINFO \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chaninfo)
 #define IW_PRIV_TYPE_APPIEBUF \
-	(IW_PRIV_TYPE_BYTE | IEEE80211_APPIE_MAX)
+	(IW_PRIV_TYPE_BYTE | (sizeof(struct ieee80211req_getset_appiebuf) + IEEE80211_APPIE_MAX))
 #define IW_PRIV_TYPE_FILTER \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_set_filter)
 
