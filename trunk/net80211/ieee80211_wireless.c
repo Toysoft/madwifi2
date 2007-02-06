@@ -2594,6 +2594,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	return -retv;
 }
 
+#if 0
 static int
 cap2cipher(int flag)
 {
@@ -2606,6 +2607,7 @@ cap2cipher(int flag)
 	}
 	return -1;
 }
+#endif
 
 static int
 ieee80211_ioctl_getmode(struct net_device *dev, struct iw_request_info *info,
@@ -2653,7 +2655,7 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_rsnparms *rsn = &vap->iv_bss->ni_rsn;
 	int *param = (int *) extra;
-	u_int m;
+	
 	switch (param[0]) {
 	case IEEE80211_PARAM_AUTHMODE:
 		if (vap->iv_flags & IEEE80211_F_WPA)
