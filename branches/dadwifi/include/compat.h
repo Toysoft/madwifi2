@@ -38,34 +38,7 @@
 #ifndef _ATH_COMPAT_H_
 #define _ATH_COMPAT_H_
 
-/* Compatibility with older Linux kernels */
-#ifdef __KERNEL__
-#include <linux/types.h>
-#ifndef __bitwise
-#define __le16 u_int16_t
-#define __le32 u_int32_t
-#define __le64 u_int64_t
-#define __force
-#endif
-#endif
-
-#ifndef container_of
-#define container_of(ptr, type, member) ({			\
-        const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-        (type *)( (char *)__mptr - offsetof(type,member) );})
-#endif
-
-/*
- * BSD/Linux compatibility shims.  These are used mainly to
- * minimize differences when importing necesary BSD code.
- */
 #define	NBBY	8			/* number of bits/byte */
-
-/* roundup() appears in Linux 2.6.18 */
-#include <linux/kernel.h>
-#ifndef roundup
-#define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */ 
-#endif
 
 #define	howmany(x, y)	(((x)+((y)-1))/(y))
 
@@ -73,36 +46,14 @@
 #define	setbit(a,i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
 #define	clrbit(a,i)	((a)[(i)/NBBY] &= ~(1<<((i)%NBBY)))
 #define	isset(a,i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
-#define	isclr(a,i)	(((a)[(i)/NBBY] & (1<<((i)%NBBY))) == 0)
 
 #define	__packed	__attribute__((__packed__))
-#define	__printflike(_a,_b) \
-	__attribute__ ((__format__ (__printf__, _a, _b)))
-#define	__offsetof(t,m)	offsetof(t,m)
 
-#ifndef ALIGNED_POINTER
-/*
- * ALIGNED_POINTER is a boolean macro that checks whether an address
- * is valid to fetch data elements of type t from on this architecture.
- * This does not reflect the optimal alignment, just the possibility
- * (within reasonable limits). 
- *
- */
-#define ALIGNED_POINTER(p,t)	1
-#endif
-
-#ifdef __KERNEL__
 #define	KASSERT(exp, msg) do {			\
 	if (unlikely(!(exp))) {			\
 		printk msg;			\
 		BUG();				\
 	}					\
 } while (0)
-#endif /* __KERNEL__ */
 
-/*
- * NetBSD/FreeBSD defines for file version.
- */
-#define	__FBSDID(_s)
-#define	__KERNEL_RCSID(_n,_s)
 #endif /* _ATH_COMPAT_H_ */
