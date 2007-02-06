@@ -5391,7 +5391,9 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 		return -EPERM;
 	if (copy_from_user(&cp, ifr->ifr_data, sizeof(cp)))
 		return -EFAULT;
-
+	if (access_ok(VERIFY_WRITE, ifr->ifr_name, IFNAMSIZ))
+		return -EFAULT;
+	  
 	unit = ieee80211_new_wlanunit();
 	if (unit == -1)
 		return -EIO;		/* XXX */
@@ -5402,8 +5404,11 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 		ieee80211_delete_wlanunit(unit);
 		return -EIO;
 	}
-	/* return final device name */
-	strncpy(ifr->ifr_name, vap->iv_dev->name, IFNAMSIZ);
+
+	/* return final device name - should not fail, we have already
+	   checked above if we can access this. */
+	if (__copy_to_user(ifr->ifr_name, vap->iv_dev->name, IFNAMSIZ))
+	        return -EFAULT;
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_create_vap);
