@@ -5296,7 +5296,7 @@ static struct iw_handler_def ieee80211_iw_handler_def = {
 	.num_private		= N(ieee80211_priv_handlers),
 	.private_args		= (struct iw_priv_args *) ieee80211_priv_args,
 	.num_private_args	= N(ieee80211_priv_args),
-#if WIRELESS_EXT >= 17
+#if IW_HANDLER_VERSION >= 7
 	.get_wireless_stats	= ieee80211_iw_getstats,
 #endif
 #undef N
