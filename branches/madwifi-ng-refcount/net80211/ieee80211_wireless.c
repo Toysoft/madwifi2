@@ -2152,11 +2152,11 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_UCASTCIPHERS:
 		/*
-		 * Convert cipher set to equivalent capabilities.
 		 * NB: this logic intentionally ignores unknown and
 		 * unsupported ciphers so folks can specify 0xff or
 		 * similar and get all available ciphers.
 		 */
+		/* caps are really ciphers */
 		caps = 0;
 		for (j = 1; j < 32; j++)	/* NB: skip WEP */
 			if ((value & (1 << j)) &&
@@ -2172,9 +2172,12 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHER:
-		if ((rsn->rsn_ucastcipherset & cipher2cap(value)) == 0)
+		if ((vap->iv_caps & cipher2cap(value)) == 0 &&
+		    !ieee80211_crypto_available(value))
 			return -EINVAL;
 		rsn->rsn_ucastcipher = value;
+		if (vap->iv_flags & IEEE80211_F_WPA)
+			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
 		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
@@ -2591,6 +2594,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	return -retv;
 }
 
+#if 0
 static int
 cap2cipher(int flag)
 {
@@ -2603,6 +2607,7 @@ cap2cipher(int flag)
 	}
 	return -1;
 }
+#endif
 
 static int
 ieee80211_ioctl_getmode(struct net_device *dev, struct iw_request_info *info,
@@ -2650,7 +2655,7 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_rsnparms *rsn = &vap->iv_bss->ni_rsn;
 	int *param = (int *) extra;
-	u_int m;
+	
 	switch (param[0]) {
 	case IEEE80211_PARAM_AUTHMODE:
 		if (vap->iv_flags & IEEE80211_F_WPA)
@@ -2668,10 +2673,7 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 		param[0] = rsn->rsn_mcastkeylen;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHERS:
-		param[0] = 0;
-		for (m = 0x1; m != 0; m <<= 1)
-			if (rsn->rsn_ucastcipherset & m)
-				param[0] |= 1<<cap2cipher(m);
+		param[0] = rsn->rsn_ucastcipherset;
 		break;
 	case IEEE80211_PARAM_UCASTCIPHER:
 		param[0] = rsn->rsn_ucastcipher;
@@ -3020,15 +3022,18 @@ get_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
 static int
 ieee80211_ioctl_setappiebuf(struct net_device *dev,
 	struct iw_request_info *info,
-	void *w, char *extra)
+	struct iw_point *data, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211req_getset_appiebuf *iebuf =
 		(struct ieee80211req_getset_appiebuf *)extra;
 	enum ieee80211_opmode chk_opmode;
+	int iebuf_len;
 	int rc = 0;
 
-	if (iebuf->app_buflen > IEEE80211_APPIE_MAX)
+	iebuf_len = data->length - sizeof(struct ieee80211req_getset_appiebuf);
+	if ( iebuf_len < 0 || iebuf_len != iebuf->app_buflen ||
+		 iebuf->app_buflen > IEEE80211_APPIE_MAX )
 		return -EINVAL;
 
 	switch (iebuf->app_frmtype) {
@@ -3059,11 +3064,21 @@ ieee80211_ioctl_setappiebuf(struct net_device *dev,
 
 static int
 ieee80211_ioctl_getappiebuf(struct net_device *dev, struct iw_request_info *info,
-	void *w, char *extra)
+	struct iw_point *data, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211req_getset_appiebuf *iebuf =
 		(struct ieee80211req_getset_appiebuf *)extra;
+	int max_iebuf_len;
+	int rc = 0;
+
+	max_iebuf_len = data->length - sizeof(struct ieee80211req_getset_appiebuf);
+	if (max_iebuf_len < 0)
+		return -EINVAL;
+	if (copy_from_user(iebuf, data->pointer, sizeof(struct ieee80211req_getset_appiebuf)))
+		return -EFAULT;		
+	if (iebuf->app_buflen > max_iebuf_len)
+		iebuf->app_buflen = max_iebuf_len;
 
 	switch (iebuf->app_frmtype) {
 	case IEEE80211_APPIE_FRAME_BEACON:
@@ -3081,7 +3096,11 @@ ieee80211_ioctl_getappiebuf(struct net_device *dev, struct iw_request_info *info
 		return -EINVAL;
 	}
 
-	return get_app_ie(iebuf->app_frmtype, vap, iebuf);
+	rc = get_app_ie(iebuf->app_frmtype, vap, iebuf);
+	
+	data->length = sizeof(struct ieee80211req_getset_appiebuf) + iebuf->app_buflen;
+	
+	return rc;
 }
 
 static int
@@ -3344,10 +3363,11 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 					mlme->im_macaddr);
 				if (ni == NULL)
 					return -EINVAL;
-				domlme(mlme, ni);
+				if (dev == ni->ni_vap->iv_dev)
+					domlme(mlme, ni);
 				ieee80211_unref_node(&ni);
 			} else
-				ieee80211_iterate_nodes(&ic->ic_sta, domlme, mlme);
+				ieee80211_iterate_dev_nodes(dev, &ic->ic_sta, domlme, mlme);
 			break;
 		default:
 			return -EINVAL;
@@ -4819,7 +4839,7 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 #define	IW_PRIV_TYPE_CHANINFO \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chaninfo)
 #define IW_PRIV_TYPE_APPIEBUF \
-	(IW_PRIV_TYPE_BYTE | IEEE80211_APPIE_MAX)
+	(IW_PRIV_TYPE_BYTE | (sizeof(struct ieee80211req_getset_appiebuf) + IEEE80211_APPIE_MAX))
 #define IW_PRIV_TYPE_FILTER \
 	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_set_filter)
 
@@ -5276,7 +5296,7 @@ static struct iw_handler_def ieee80211_iw_handler_def = {
 	.num_private		= N(ieee80211_priv_handlers),
 	.private_args		= (struct iw_priv_args *) ieee80211_priv_args,
 	.num_private_args	= N(ieee80211_priv_args),
-#if WIRELESS_EXT >= 17
+#if IW_HANDLER_VERSION >= 7
 	.get_wireless_stats	= ieee80211_iw_getstats,
 #endif
 #undef N
@@ -5374,7 +5394,9 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 		return -EPERM;
 	if (copy_from_user(&cp, ifr->ifr_data, sizeof(cp)))
 		return -EFAULT;
-
+	if (access_ok(VERIFY_WRITE, ifr->ifr_name, IFNAMSIZ))
+		return -EFAULT;
+	  
 	unit = ieee80211_new_wlanunit();
 	if (unit == -1)
 		return -EIO;		/* XXX */
@@ -5385,8 +5407,11 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 		ieee80211_delete_wlanunit(unit);
 		return -EIO;
 	}
-	/* return final device name */
-	strncpy(ifr->ifr_name, vap->iv_dev->name, IFNAMSIZ);
+
+	/* return final device name - should not fail, we have already
+	   checked above if we can access this. */
+	if (__copy_to_user(ifr->ifr_name, vap->iv_dev->name, IFNAMSIZ))
+	        return -EFAULT;
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ioctl_create_vap);

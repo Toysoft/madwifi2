@@ -55,6 +55,8 @@
 #include <getopt.h>
 #include <err.h>
 
+#include <include/compat.h>
+
 #include "wireless_copy.h"
 #include "net80211/ieee80211.h"
 #include "net80211/ieee80211_crypto.h"
@@ -178,7 +180,7 @@ main(int argc, char *argv[])
 
 		ifr.ifr_data = (void *) &cp;
 		vap_create(&ifr);
-		printf("%s\n", cp.icp_name);
+		printf("%s\n", ifr.ifr_name);
 	} else if (streq(cmd, "destroy")) {
 		vap_destroy(ifname);
 	} else if (streq(cmd, "list")) {

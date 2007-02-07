@@ -41,6 +41,7 @@
 /* Compatibility with older Linux kernels */
 #ifdef __KERNEL__
 #include <linux/types.h>
+#endif
 #ifndef __bitwise
 #define __le16 u_int16_t
 #define __le32 u_int32_t
@@ -49,10 +50,6 @@
 #define __be32 u_int32_t
 #define __be64 u_int64_t
 #define __force
-#endif
-#else
-#include <sys/types.h>
-#include <linux/types.h>
 #endif
 
 #ifndef container_of
