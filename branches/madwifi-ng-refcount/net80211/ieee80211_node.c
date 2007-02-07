@@ -1573,14 +1573,14 @@ ieee80211_iterate_dev_nodes(struct net_device *dev, struct ieee80211_node_table 
 	gen = ++nt->nt_scangen;
 	
 restart:
-	IEEE80211_NODE_LOCK(nt);
+	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		if (dev != NULL && ni->ni_vap->iv_dev != dev) 
 			continue;  /* skip node not for this vap */
 		if (ni->ni_scangen != gen) {
 			ni->ni_scangen = gen;
 			(void) ieee80211_ref_node(ni);
-			IEEE80211_NODE_UNLOCK(nt);
+			IEEE80211_NODE_TABLE_UNLOCK_IRQ_EARLY(nt);
 			(*f)(arg, ni);
 			
 			ieee80211_unref_node(&ni);
