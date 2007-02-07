@@ -44,14 +44,12 @@ ifeq ($(HAL),)
 HAL=   $(TOP)/hal
 endif
 
-INCS=  -include $(TOP)/include/compat.h
-
 
 ALL=	athdebug
 
 all:	$(ALL)
 
-INCS+=	-I. -I$(HAL) -I$(TOP)
+INCS=	-I. -I$(HAL) -I$(TOP)
 CFLAGS=	-g -O2 -Wall
 ALL_CFLAGS= $(CFLAGS) $(INCS)
 LDFLAGS=
