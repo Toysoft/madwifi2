@@ -44,8 +44,6 @@ ifeq ($(HAL),)
 HAL=   $(TOP)/openhal
 endif
 
-INCS=  -include $(TOP)/include/compat.h
-
 
 # FIXME fix other tools
 #ALL=	athstats 80211stats athkey athchans athctrl \
@@ -54,7 +52,7 @@ ALL=	80211debug athctrl athdebug
 
 all:	$(ALL)
 
-INCS+=	-I. -I$(HAL) -I$(TOP)
+INCS=	-I. -I$(HAL) -I$(TOP)
 CFLAGS=	-g -O2 -Wall
 ALL_CFLAGS= $(CFLAGS) $(INCS)
 LDFLAGS=
