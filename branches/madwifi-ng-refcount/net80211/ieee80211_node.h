@@ -130,7 +130,7 @@ struct ieee80211_node {
 	u_int16_t ni_txseqs[17];		/* tx seq per-tid */
 	u_int16_t ni_rxseqs[17];		/* rx seq previous per-tid*/
 	u_int32_t ni_rxfragstamp;		/* time stamp of last rx frag */
-	struct sk_buff *ni_rxfrag[3];		/* rx frag reassembly */
+	struct sk_buff *ni_rxfrag;		/* rx frag reassembly */
 	struct ieee80211_rsnparms ni_rsn;	/* RSN/WPA parameters */
 	struct ieee80211_key ni_ucastkey;	/* unicast key */
 	int ni_rxkeyoff;    			/* Receive key offset */
@@ -328,6 +328,8 @@ struct ieee80211_node *ieee80211_find_wds_node(struct ieee80211_node_table *,
 typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
 void ieee80211_iterate_nodes(struct ieee80211_node_table *,
 	ieee80211_iter_func *, void *);
+void ieee80211_iterate_dev_nodes(struct net_device *, 
+	struct ieee80211_node_table *, ieee80211_iter_func *, void *);
 
 void	ieee80211_dump_node(struct ieee80211_node_table *,
 	struct ieee80211_node *);

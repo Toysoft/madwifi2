@@ -842,8 +842,8 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
 		break;
 	case IEEE80211_M_HOSTAP:
-		if (!IEEE80211_ADDR_EQ(eh.ether_dhost, ni->ni_macaddr) &&
-		    !IEEE80211_IS_MULTICAST(eh.ether_dhost)) {
+		if (!IEEE80211_IS_MULTICAST(eh.ether_dhost) &&
+		    !IEEE80211_ADDR_EQ(eh.ether_dhost, ni->ni_macaddr)) {
 			hdrsize += IEEE80211_ADDR_LEN;
 			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
@@ -852,8 +852,8 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			ismulticast = IEEE80211_IS_MULTICAST(eh.ether_dhost);
 		break;
 	case IEEE80211_M_STA:
-		if ((!IEEE80211_ADDR_EQ(eh.ether_shost, vap->iv_myaddr)) &&
-		    (vap->iv_flags_ext & IEEE80211_FEXT_WDS)) {
+		if ((vap->iv_flags_ext & IEEE80211_FEXT_WDS) &&
+		    (!IEEE80211_ADDR_EQ(eh.ether_shost, vap->iv_myaddr))) {
 			hdrsize += IEEE80211_ADDR_LEN;
 			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);

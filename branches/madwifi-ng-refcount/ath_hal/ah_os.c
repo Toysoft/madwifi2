@@ -41,6 +41,9 @@
 #define	EXPORT_SYMTAB
 #endif
 
+/* Don't use virtualized timer in Linux 2.6.20+ */
+#define USE_REAL_TIME_DELAY
+
 #ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
 #endif

@@ -957,7 +957,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	fragno = le16_to_cpu(*(__le16 *)wh->i_seq) & IEEE80211_SEQ_FRAG_MASK;
 
 	/* Quick way out, if there's nothing to defragment */
-	if (!more_frag && fragno == 0 && ni->ni_rxfrag[0] == NULL)
+	if (!more_frag && fragno == 0 && ni->ni_rxfrag == NULL)
 		return skb;
 
 	/*
@@ -980,7 +980,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	/*
 	 * Update the time stamp.  As a side effect, it
 	 * also makes sure that the timer will not change
-	 * ni->ni_rxfrag[0] for at least 1 second, or in
+	 * ni->ni_rxfrag for at least 1 second, or in
 	 * other words, for the remaining of this function.
 	 * XXX HUGE HORRIFIC HACK
 	 */
@@ -990,10 +990,10 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	 * Validate that fragment is in order and
 	 * related to the previous ones.
 	 */
-	if (ni->ni_rxfrag[0]) {
+	if (ni->ni_rxfrag) {
 		struct ieee80211_frame *lwh;
 
-		lwh = (struct ieee80211_frame *) ni->ni_rxfrag[0]->data;
+		lwh = (struct ieee80211_frame *) ni->ni_rxfrag->data;
 		last_rxseq = le16_to_cpu(*(__le16 *)lwh->i_seq) >>
 			IEEE80211_SEQ_SEQ_SHIFT;
 		last_fragno = le16_to_cpu(*(__le16 *)lwh->i_seq) &
@@ -1002,20 +1002,20 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 		    || fragno != last_fragno + 1
 		    || (!IEEE80211_ADDR_EQ(wh->i_addr1, lwh->i_addr1))
 		    || (!IEEE80211_ADDR_EQ(wh->i_addr2, lwh->i_addr2))
-		    || (ni->ni_rxfrag[0]->end - ni->ni_rxfrag[0]->tail <
+		    || (ni->ni_rxfrag->end - ni->ni_rxfrag->tail <
 			skb->len)) {
 			/*
 			 * Unrelated fragment or no space for it,
 			 * clear current fragments
 			 */
-			dev_kfree_skb(ni->ni_rxfrag[0]);
-			ni->ni_rxfrag[0] = NULL;
+			dev_kfree_skb(ni->ni_rxfrag);
+			ni->ni_rxfrag = NULL;
 		}
 	}
 
 	/* If this is the first fragment */
- 	if (ni->ni_rxfrag[0] == NULL && fragno == 0) {
-		ni->ni_rxfrag[0] = skb;
+ 	if (ni->ni_rxfrag == NULL && fragno == 0) {
+		ni->ni_rxfrag = skb;
 		/* If more frags are coming */
 		if (more_frag) {
 			if (skb_is_nonlinear(skb)) {
@@ -1023,7 +1023,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 				 * We need a continous buffer to
 				 * assemble fragments
 				 */
-				ni->ni_rxfrag[0] = skb_copy(skb, GFP_ATOMIC);
+				ni->ni_rxfrag = skb_copy(skb, GFP_ATOMIC);
 				dev_kfree_skb(skb);
 			}
 			/*
@@ -1033,26 +1033,26 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			 */
 			else if (skb->end - skb->head < ni->ni_vap->iv_dev->mtu +
 				 hdrlen) {
-				ni->ni_rxfrag[0] = skb_copy_expand(skb, 0,
+				ni->ni_rxfrag = skb_copy_expand(skb, 0,
 					(ni->ni_vap->iv_dev->mtu + hdrlen) -
 					(skb->end - skb->head), GFP_ATOMIC);
 				dev_kfree_skb(skb);
 			}
 		}
 	} else {
-		if (ni->ni_rxfrag[0]) {
+		if (ni->ni_rxfrag) {
 			struct ieee80211_frame *lwh = (struct ieee80211_frame *)
-				ni->ni_rxfrag[0]->data;
+				ni->ni_rxfrag->data;
 
 			/*
 			 * We know we have enough space to copy,
 			 * we've verified that before
 			 */
 			/* Copy current fragment at end of previous one */
-			memcpy(ni->ni_rxfrag[0]->tail,
+			memcpy(ni->ni_rxfrag->tail,
 			       skb->data + hdrlen, skb->len - hdrlen);
 			/* Update tail and length */
-			skb_put(ni->ni_rxfrag[0], skb->len - hdrlen);
+			skb_put(ni->ni_rxfrag, skb->len - hdrlen);
 			/* Keep a copy of last sequence and fragno */
 			*(__le16 *) lwh->i_seq = *(__le16 *) wh->i_seq;
 		}
@@ -1065,8 +1065,8 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 		skb = NULL;
 	} else {
 		/* Last fragment received, we're done! */
-		skb = ni->ni_rxfrag[0];
-		ni->ni_rxfrag[0] = NULL;
+		skb = ni->ni_rxfrag;
+		ni->ni_rxfrag = NULL;
 	}
 	return skb;
 }

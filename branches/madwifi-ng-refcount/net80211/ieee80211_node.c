@@ -786,9 +786,7 @@ node_alloc(struct ieee80211vap *vap)
 static void
 node_cleanup(struct ieee80211_node *ni)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
 	struct ieee80211vap *vap = ni->ni_vap;
-	int i;
 
 	/* NB: preserve ni_table */
 	if (ni->ni_flags & IEEE80211_NODE_PWR_MGT) {
@@ -827,14 +825,13 @@ node_cleanup(struct ieee80211_node *ni)
 	 *
 	 * XXX does this leave us open to inheriting old state?
 	 */
-	for (i = 0; i < N(ni->ni_rxfrag); i++)
-		if (ni->ni_rxfrag[i] != NULL) {
-			dev_kfree_skb_any(ni->ni_rxfrag[i]);
-			ni->ni_rxfrag[i] = NULL;
-		}
+    
+	if (ni->ni_rxfrag != NULL) {
+		dev_kfree_skb_any(ni->ni_rxfrag);
+		ni->ni_rxfrag = NULL;
+	}
 	ieee80211_crypto_delkey(vap, &ni->ni_ucastkey, ni);
 	ni->ni_rxkeyoff = 0;
-#undef N
 }
 
 static void
@@ -1460,10 +1457,10 @@ restart:
 		 * (last fragment older than 1s).
 		 * XXX doesn't belong here
 		 */
-		if (ni->ni_rxfrag[0] != NULL &&
+		if (ni->ni_rxfrag != NULL &&
 		    jiffies > ni->ni_rxfragstamp + HZ) {
-			dev_kfree_skb(ni->ni_rxfrag[0]);
-			ni->ni_rxfrag[0] = NULL;
+			dev_kfree_skb(ni->ni_rxfrag);
+			ni->ni_rxfrag = NULL;
 		}
 		/*
 		 * Special case ourself; we may be idle for extended periods
@@ -1562,21 +1559,28 @@ ieee80211_node_timeout(unsigned long arg)
 void
 ieee80211_iterate_nodes(struct ieee80211_node_table *nt, ieee80211_iter_func *f, void *arg)
 {
-	struct ieee80211_node *tni, *ni;
+	ieee80211_iterate_dev_nodes(NULL, nt, f, arg);
+}
+EXPORT_SYMBOL(ieee80211_iterate_nodes);
+
+void
+ieee80211_iterate_dev_nodes(struct net_device *dev, struct ieee80211_node_table *nt, ieee80211_iter_func *f, void *arg)
+{
+	struct ieee80211_node *ni;
 	u_int gen;
 
 	IEEE80211_SCAN_LOCK_IRQ(nt);
 	gen = ++nt->nt_scangen;
 	
 restart:
-	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
-	TAILQ_FOREACH(tni, &nt->nt_node, ni_list) {
-		if (tni->ni_scangen != gen) {
-			tni->ni_scangen = gen;
-			
-			ni = ieee80211_ref_node(tni);
-			IEEE80211_NODE_TABLE_UNLOCK_IRQ_EARLY(nt);
-
+	IEEE80211_NODE_LOCK(nt);
+	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
+		if (dev != NULL && ni->ni_vap->iv_dev != dev) 
+			continue;  /* skip node not for this vap */
+		if (ni->ni_scangen != gen) {
+			ni->ni_scangen = gen;
+			(void) ieee80211_ref_node(ni);
+			IEEE80211_NODE_UNLOCK(nt);
 			(*f)(arg, ni);
 			
 			ieee80211_unref_node(&ni);
@@ -1587,7 +1591,7 @@ restart:
 
 	IEEE80211_SCAN_UNLOCK_IRQ(nt);
 }
-EXPORT_SYMBOL(ieee80211_iterate_nodes);
+EXPORT_SYMBOL(ieee80211_iterate_dev_nodes);
 
 void
 ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
