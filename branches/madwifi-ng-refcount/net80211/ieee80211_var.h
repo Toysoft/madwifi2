@@ -405,11 +405,6 @@ struct ieee80211vap {
 
 };
 
-static __inline int ieee80211_is_printed(struct ieee80211vap *vap, unsigned m)
-{
-	return !!(vap->iv_debug & m);
-}
-
 MALLOC_DECLARE(M_80211_VAP);
 
 #define	IEEE80211_ADDR_NULL(a1)		(memcmp(a1, "\x00\x00\x00\x00\x00\x00", \

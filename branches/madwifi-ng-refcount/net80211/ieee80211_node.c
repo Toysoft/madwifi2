@@ -203,6 +203,11 @@ ieee80211_node_vdetach(struct ieee80211vap *vap)
 	}
 }
 
+int ieee80211_msg_is_reported(struct ieee80211vap *vap, unsigned m)
+{
+	return !!(vap->iv_debug & m);
+}
+
 /* 
  * Port authorize/unauthorize interfaces for use by an authenticator.
  */
