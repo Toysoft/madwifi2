@@ -81,7 +81,6 @@ struct ath_ratectrl *ieee80211_rate_attach(struct ath_softc *sc,
 					    const char *name)
 {
 	int id;
-	int err;
 	char buf[64];
 	struct ath_ratectrl *ctl;
 
@@ -96,10 +95,11 @@ struct ath_ratectrl *ieee80211_rate_attach(struct ath_softc *sc,
 		return NULL;
 	}
 
-	err = ieee80211_load_module(buf);
-	if (err || !ratectls[id].attach) {
-		printk(KERN_ERR "Error %d loading module \"%s\"\n",
-		       err, buf);
+	if (!ratectls[id].attach)
+		ieee80211_load_module(buf);
+
+	if (!ratectls[id].attach) {
+		printk(KERN_ERR "Error loading module \"%s\"\n", buf);
 		return NULL;
 	}
 
