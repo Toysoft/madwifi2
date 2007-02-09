@@ -207,6 +207,7 @@ int ieee80211_msg_is_reported(struct ieee80211vap *vap, unsigned m)
 {
 	return !!(vap->iv_debug & m);
 }
+EXPORT_SYMBOL(ieee80211_msg_is_reported);
 
 /* 
  * Port authorize/unauthorize interfaces for use by an authenticator.
