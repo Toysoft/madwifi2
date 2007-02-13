@@ -1248,13 +1248,6 @@ ath_resume(struct ath_softc *sc)
 	ath_init(sc);
 }
 
-void
-ath_shutdown(struct ath_softc *sc)
-{
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
-	ath_stop(sc);
-}
-
 static void
 ath_uapsd_processtriggers(struct ath_softc *sc)
 {
