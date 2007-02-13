@@ -752,7 +752,6 @@ int ath_attach(u_int16_t, struct ath_softc *);
 int ath_detach(struct ath_softc *);
 void ath_resume(struct ath_softc *);
 void ath_suspend(struct ath_softc *);
-void ath_shutdown(struct ath_softc *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 irqreturn_t ath_intr(int, void *);
 #else
