@@ -731,7 +731,6 @@ int ath_attach(u_int16_t, struct net_device *, HAL_BUS_TAG);
 int ath_detach(struct net_device *);
 void ath_resume(struct net_device *);
 void ath_suspend(struct net_device *);
-void ath_shutdown(struct net_device *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 irqreturn_t ath_intr(int, void *);
 #else

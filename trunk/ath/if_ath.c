@@ -1325,15 +1325,6 @@ ath_resume(struct net_device *dev)
 	ath_init(dev);
 }
 
-void
-ath_shutdown(struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-	ath_stop(dev);
-}
-
 static void
 ath_uapsd_processtriggers(struct ath_softc *sc)
 {
