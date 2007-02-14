@@ -47,7 +47,9 @@
 #define	clrbit(a,i)	((a)[(i)/NBBY] &= ~(1<<((i)%NBBY)))
 #define	isset(a,i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
 
+#ifndef __packed
 #define	__packed	__attribute__((__packed__))
+#endif
 
 #define	KASSERT(exp, msg) do {			\
 	if (unlikely(!(exp))) {			\
