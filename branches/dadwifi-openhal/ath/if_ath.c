@@ -86,6 +86,8 @@
 #include "if_ath_d80211.h"	
 #include "if_ath.h"	
 
+#include "ath_hw.h"
+
 /* unaligned little endian access */
 #define LE_READ_2(p)							\
 	((u_int16_t)							\
@@ -1548,7 +1550,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 */
 		return IRQ_NONE;
 	}
-	if (!ath_hal_intrpend(ah))		/* shared irq, not for us */
+	if (!ath_hw_irq_pending(ah))		/* shared irq, not for us */
 		return IRQ_NONE;
 
 	needmark = 0;
