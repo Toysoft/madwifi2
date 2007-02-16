@@ -527,7 +527,11 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = ds->ds_rxstat.rs_antenna;
 				th->wr_antsignal = rssi;
-				th->wr_fcs = cpu_to_le32p((u32 *)&skb1->data[skb1->len - IEEE80211_CRC_LEN]);
+				if (skb->len >= IEEE80211_CRC_LEN) 
+					th->wr_fcs = cpu_to_le32p((u32 *)&skb1->data[skb1->len - IEEE80211_CRC_LEN]);
+				else 
+					th->wr_fcs = 0;
+				
 				th->wr_tsft = cpu_to_le64(mactime);
 			}
 			break;
@@ -546,7 +550,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			break;
 		}
 		if (skb1) {
-			if (!tx) {
+			if (!tx && skb->len >= IEEE80211_CRC_LEN) {
 				/* Remove FCS from end of rx frames*/
 				skb_trim(skb1, skb1->len - IEEE80211_CRC_LEN);
 			}
