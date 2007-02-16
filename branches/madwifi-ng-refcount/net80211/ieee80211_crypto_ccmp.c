@@ -57,6 +57,10 @@
 
 #define AES_BLOCK_LEN 16
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+#define crypto_cipher_cast(c) (c)
+#endif
+
 struct ccmp_ctx {
 	struct ieee80211vap *cc_vap;	/* for diagnostics + statistics */
 	struct ieee80211com *cc_ic;
@@ -145,7 +149,8 @@ ccmp_setkey(struct ieee80211_key *k)
 			return 0;
 		}
 		
-		crypto_cipher_setkey(ctx->cc_tfm, k->wk_key, k->wk_keylen);
+		crypto_cipher_setkey(crypto_cipher_cast(ctx->cc_tfm),
+				     k->wk_key, k->wk_keylen);
 	}
 	return 1;
 }
@@ -300,7 +305,7 @@ static void
 rijndael_encrypt(struct crypto_tfm *tfm, const void *src, void *dst)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
-	crypto_cipher_encrypt_one(tfm, dst, src);
+	crypto_cipher_encrypt_one(crypto_cipher_cast(tfm), dst, src);
 #else
 	struct scatterlist sg_src;
 	struct scatterlist sg_dst;

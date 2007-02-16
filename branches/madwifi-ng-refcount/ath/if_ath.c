@@ -1153,7 +1153,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	}
 	if (sc->sc_hastsfadd)
 		ath_hal_settsfadjust(sc->sc_ah, sc->sc_stagbeacons);
-	SET_NETDEV_DEV(dev, mdev->class_dev.dev);
+	SET_NETDEV_DEV(dev, ATH_GET_NETDEV_DEV(mdev));
 	/* complete setup */
 	(void) ieee80211_vap_attach(vap,
 		ieee80211_media_change, ieee80211_media_status);
@@ -1324,15 +1324,6 @@ ath_resume(struct net_device *dev)
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
 	ath_init(dev);
-}
-
-void
-ath_shutdown(struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-	ath_stop(dev);
 }
 
 static void

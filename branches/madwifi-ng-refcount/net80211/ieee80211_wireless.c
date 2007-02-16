@@ -2019,6 +2019,8 @@ ieee80211_setupxr(struct ieee80211vap *vap)
 			vap->iv_xrvap = ic->ic_vap_create(ic, name, vap->iv_unit,
 				IEEE80211_M_HOSTAP,IEEE80211_VAP_XR |
 				IEEE80211_CLONE_BSSID, dev);
+			if (!vap->iv_xrvap)
+				return;
 			vap->iv_xrvap->iv_fragthreshold = IEEE80211_XR_FRAG_THRESHOLD;
 			copy_des_ssid(vap->iv_xrvap, vap);
 			vap->iv_xrvap->iv_des_mode = vap->iv_des_mode;

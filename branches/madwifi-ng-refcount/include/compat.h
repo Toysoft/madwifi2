@@ -42,7 +42,7 @@
 #ifdef __KERNEL__
 #include <linux/types.h>
 #endif
-#ifndef __bitwise
+#if !defined(__KERNEL__) || !defined (__bitwise)
 #define __le16 u_int16_t
 #define __le32 u_int32_t
 #define __le64 u_int64_t
@@ -78,7 +78,10 @@
 #define	isset(a,i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
 #define	isclr(a,i)	(((a)[(i)/NBBY] & (1<<((i)%NBBY))) == 0)
 
+#ifndef __packed
 #define	__packed	__attribute__((__packed__))
+#endif
+
 #define	__printflike(_a,_b) \
 	__attribute__ ((__format__ (__printf__, _a, _b)))
 #define	__offsetof(t,m)	offsetof(t,m)
