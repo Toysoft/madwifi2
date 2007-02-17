@@ -283,7 +283,7 @@ ath_d80211_calc_bssid_mask(struct ieee80211_hw *hw)
 		dev = dev_get_by_index(sc->sc_bss[i].ab_if_id);
 
 		for (j = 0; j < ETH_ALEN; j++) {
-			mask[j] &= ~(hw->perm_addr[j] ^ dev->dev_addr[j]);
+			mask[j] &= ~(hw->wiphy->perm_addr[j] ^ dev->dev_addr[j]);
 		}
 
 		dev_put(dev);
