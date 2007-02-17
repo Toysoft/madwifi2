@@ -807,7 +807,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc, HAL_BUS_TAG tag)
 	sc->sc_hasveol = ath_hal_hasveol(ah);
 
 	/* get mac address from hardware */
-	ath_hal_getmac(ah, sc->sc_hw->perm_addr);
+	ath_hal_getmac(ah, sc->sc_hw->wiphy->perm_addr);
 	if (sc->sc_hasbmask) {
 		memset(sc->sc_bssidmask, 0xff, ETH_ALEN);
 		ath_hal_setbssidmask(ah, sc->sc_bssidmask);
@@ -852,7 +852,7 @@ ath_attach(u_int16_t devid, struct ath_softc *sc, HAL_BUS_TAG tag)
 		error = -EIO;
 		goto bad;
 	}
-	snprintf(sc->name, sizeof(sc->name), "wiphy%d", sc->sc_hw->index);
+	strlcpy(sc->name, wiphy_name(sc->sc_hw->wiphy), sizeof(sc->name));
 	ath_dynamic_sysctl_register(sc);
 	ath_announce(sc);
 #ifdef ATH_TX99_DIAG
