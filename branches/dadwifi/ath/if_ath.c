@@ -4268,7 +4268,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 	while (an->an_uapsd_qdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_q);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_q, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 
 		dev_kfree_skb_any(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -4284,7 +4284,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 	while (an->an_uapsd_overflowqdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_overflowq);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_overflowq, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 
 		dev_kfree_skb_any(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -5834,7 +5834,7 @@ ath_uapsd_flush(struct ieee80211_node *ni)
 	while (an->an_uapsd_qdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_q);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_q, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 		txq = sc->sc_ac2q[bf->bf_skb->priority & 0x3];
 		ath_tx_txqaddbuf(sc, ni, txq, bf, bf->bf_desc, bf->bf_skb->len);
 		an->an_uapsd_qdepth--;
@@ -5843,7 +5843,7 @@ ath_uapsd_flush(struct ieee80211_node *ni)
 	while (an->an_uapsd_overflowqdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_overflowq);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_overflowq, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 		txq = sc->sc_ac2q[bf->bf_skb->priority & 0x3];
 		ath_tx_txqaddbuf(sc, ni, txq, bf, bf->bf_desc, bf->bf_skb->len);
 		an->an_uapsd_overflowqdepth--;
