@@ -19,6 +19,9 @@
 #include <linux/if.h>
 #include <linux/netdevice.h>
 #include <linux/cache.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+#include <linux/platform_device.h>
+#endif
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -41,6 +44,7 @@ struct ath_ahb_softc {
 static struct ath_ahb_softc *sclist[2] = {NULL, NULL};
 static u_int8_t num_activesc = 0;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 static struct ar531x_boarddata *ar5312_boardConfig = NULL;
 static char *radioConfig = NULL;
 
@@ -138,6 +142,8 @@ ar5312BspEepromRead(u_int32_t off, u_int32_t nbytes, u_int8_t *data)
 		data[i] = eepromAddr[off];
 }
 
+#endif
+
 /* set bus cachesize in 4B word units */
 void
 bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz)
@@ -181,7 +187,8 @@ ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 	u_int32_t reset;
 	u_int32_t enable;
 	
-	if ((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) {
+	if (((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) ||
+		((devid & AR5315_REV_MAJ_M) == AR5317_REV_MAJ)) {
 		u_int32_t reg;
 		u_int32_t *en = (u_int32_t *) AR5315_AHB_ARB_CTL;
 		
@@ -242,7 +249,8 @@ static int
 ahb_disable_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
 	u_int32_t enable;
-	if ((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) {
+	if (((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) ||
+		((devid & AR5315_REV_MAJ_M) == AR5317_REV_MAJ)) {
 		u_int32_t *en = (u_int32_t *) AR5315_AHB_ARB_CTL;
 
 		KASSERT(wlanNum == 0, ("invalid wlan # %d", wlanNum) ); 
@@ -296,12 +304,11 @@ exit_ath_wmac(u_int16_t wlanNum)
 }
 
 static int
-init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
+init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 {
 	const char *athname;
 	struct net_device *dev;
 	struct ath_ahb_softc *sc;
-	struct ar531x_config config;
         
 	if (((wlanNum != 0) && (wlanNum != 1)) ||
 		(sclist[wlanNum] != NULL))
@@ -331,7 +338,8 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 
 	switch (wlanNum) {
 	case AR531X_WLAN0_NUM:
-		if ((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) {
+		if (((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) ||
+			((devid & AR5315_REV_MAJ_M) == AR5317_REV_MAJ)) {
 			dev->irq = AR5315_IRQ_WLAN0_INTRS;
 			dev->mem_start = AR5315_WLAN0;
 		} else {
@@ -355,11 +363,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 		goto bad3;
 	}
 	
-	config.board = ar5312_boardConfig;
-	config.radio = radioConfig;
-	config.unit = wlanNum;
-	config.tag = NULL;
-	if (ath_attach(devid, dev, &config) != 0)
+	if (ath_attach(devid, dev, config) != 0)
 		goto bad4;
 	athname = ath_hal_probe(ATHEROS_VENDOR_ID, devid);
 	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
@@ -381,24 +385,63 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum)
 	return -ENODEV;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+static int ahb_wmac_probe(struct platform_device *pdev)
+{
+	u32 devid;
+	struct ar531x_config *config;
+
+	config = (struct ar531x_config *) pdev->dev.platform_data;
+	devid = (u32) config->tag;
+	config->tag = NULL;
+	
+	return init_ath_wmac((u_int16_t) devid, pdev->id, config);
+}
+
+
+static int ahb_wmac_remove(struct platform_device *pdev)
+{
+	exit_ath_wmac(pdev->id);
+
+	return 0;
+}
+
+struct platform_driver ahb_wmac_driver = {
+	.driver.name = "ar531x-wmac",
+	.probe = ahb_wmac_probe,
+	.remove = ahb_wmac_remove
+};
+
+#else
+
 static int
 init_ahb(void)
 {
 	int ret;
 	u_int16_t devid, radioMask;
 	const char *sysType;
-	sysType = get_system_type();
-	if (!strcmp(sysType,"Atheros AR5315")) {
-		devid = (u_int16_t) (sysRegRead(AR5315_SREV) &
-			(AR5315_REV_MAJ_M | AR5315_REV_MIN_M));
-		if ((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ)
-			return init_ath_wmac(devid, 0);
-	}
+	struct ar531x_config config;
 
+	sysType = get_system_type();
+	
 	/* Probe to find out the silicon revision and enable the
 	   correct number of macs */
 	if (!ar5312SetupFlash())
 		return -ENODEV;
+
+	config.board = ar5312_boardConfig;
+	config.radio = radioConfig;
+	config.unit = wlanNum;
+	config.tag = NULL;
+
+	if (!strcmp(sysType,"Atheros AR5315")) {
+		devid = (u_int16_t) (sysRegRead(AR5315_SREV) &
+			(AR5315_REV_MAJ_M | AR5315_REV_MIN_M));
+		if (((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) ||
+			((devid & AR5315_REV_MAJ_M) == AR5317_REV_MAJ))
+			return init_ath_wmac(devid, 0, &config);
+	}
+
 	devid = (u_int16_t) ((sysRegRead(AR531X_REV) >>8) &
 		(AR531X_REV_MAJ | AR531X_REV_MIN));
 	switch (devid) {
@@ -409,11 +452,11 @@ init_ahb(void)
 		ar5312BspEepromRead(2 * AR531X_RADIO_MASK_OFF, 2,
 			(char *) &radioMask);
 		if ((radioMask & AR531X_RADIO0_MASK) != 0)
-			if ((ret = init_ath_wmac(devid, 0)) !=0 )
+			if ((ret = init_ath_wmac(devid, 0, &config)) !=0 )
 				return ret;
 		/* XXX: Fall through?! */
 	case AR5212_AR2313_REV8:
-		if ((ret = init_ath_wmac(devid, 1)) != 0)
+		if ((ret = init_ath_wmac(devid, 1, &config)) != 0)
 			return ret;
 		break;
 	default:
@@ -422,6 +465,7 @@ init_ahb(void)
 	return 0;
 }
 
+#endif
 
 /*
  * Module glue.
@@ -462,10 +506,15 @@ init_ath_ahb(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+	platform_driver_register(&ahb_wmac_driver);
+#else
 	if (init_ahb() != 0) {
 		printk("ath_ahb: No devices found, driver not installed.\n");
 		return (-ENODEV);
 	}
+#endif
+
 	ath_sysctl_register();
 	return 0;
 }
@@ -475,8 +524,13 @@ static void __exit
 exit_ath_ahb(void)
 {
 	ath_sysctl_unregister();
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
+	platform_driver_unregister(&ahb_wmac_driver);
+#else
 	exit_ath_wmac(AR531X_WLAN0_NUM);
 	exit_ath_wmac(AR531X_WLAN1_NUM);
+#endif
 
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
