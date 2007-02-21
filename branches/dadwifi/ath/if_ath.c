@@ -5152,8 +5152,6 @@ rx_accept:
 		skb_put(skb, len);
 		skb->protocol = __constant_htons(ETH_P_CONTROL);
 
-		status.hosttime = jiffies;
-
 		if (sc->sc_opmode == HAL_M_MONITOR)
 			status.mactime = ath_extend_tsf(ah, ds->ds_rxstat.rs_tstamp);
 		else 
