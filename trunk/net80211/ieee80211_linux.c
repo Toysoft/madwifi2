@@ -705,7 +705,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 	vap->iv_sysctls[i-1].data = vap->iv_ic->ic_dev->name;	/* XXX? */
 
 	/* and register everything */
-	vap->iv_sysctl_header = register_sysctl_table(vap->iv_sysctls, 1);
+	vap->iv_sysctl_header = ATH_REGISTER_SYSCTL_TABLE(vap->iv_sysctls);
 	if (!vap->iv_sysctl_header) {
 		printk("%s: failed to register sysctls!\n", vap->iv_dev->name);
 		kfree(vap->iv_sysctls);
