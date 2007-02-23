@@ -33,7 +33,6 @@
 #include "if_athvar.h"
 #include "ah_devid.h"
 #include "if_ath_ahb.h"
-#include "ah_soc.h"
 
 struct ath_ahb_softc {
 	struct ath_softc	aps_sc;
@@ -41,6 +40,11 @@ struct ath_ahb_softc {
 #ifdef CONFIG_PM
 	u32 aps_pmstate[16];
 #endif
+};
+
+/* Dumb replacement for non-free ah_soc.h */
+struct ar531x_config {
+	void *tag;
 };
 
 static struct ath_ahb_softc *sclist[2] = {NULL, NULL};
