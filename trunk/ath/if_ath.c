@@ -9072,7 +9072,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct sockaddr *mac = addr;
-	int error;
+	int error = 0;
 
 	if (netif_running(dev)) {
 		DPRINTF(sc, ATH_DEBUG_ANY,
@@ -9089,7 +9089,9 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 	IEEE80211_ADDR_COPY(ic->ic_myaddr, mac->sa_data);
 	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
 	ath_hal_setmac(ah, dev->dev_addr);
-	error = ath_reset(dev);
+	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
+		error = ath_reset(dev);
+	}
 	ATH_UNLOCK(sc);
 
 	return error;
@@ -9099,7 +9101,7 @@ static int
 ath_change_mtu(struct net_device *dev, int mtu)
 {
 	struct ath_softc *sc = dev->priv;
-	int error;
+	int error = 0;
 
 	if (!(ATH_MIN_MTU < mtu && mtu <= ATH_MAX_MTU)) {
 		DPRINTF(sc, ATH_DEBUG_ANY, "%s: invalid %d, min %u, max %u\n",
@@ -9110,10 +9112,12 @@ ath_change_mtu(struct net_device *dev, int mtu)
 
 	ATH_LOCK(sc);
 	dev->mtu = mtu;
-	/* NB: the rx buffers may need to be reallocated */
-	tasklet_disable(&sc->sc_rxtq);
-	error = ath_reset(dev);
-	tasklet_enable(&sc->sc_rxtq);
+	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
+		/* NB: the rx buffers may need to be reallocated */
+		tasklet_disable(&sc->sc_rxtq);
+		error = ath_reset(dev);
+		tasklet_enable(&sc->sc_rxtq);
+	}
 	ATH_UNLOCK(sc);
 
 	return error;
