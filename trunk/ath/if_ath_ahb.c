@@ -406,7 +406,7 @@ static int ahb_wmac_remove(struct platform_device *pdev)
 	return 0;
 }
 
-struct platform_driver ahb_wmac_driver = {
+static struct platform_driver ahb_wmac_driver = {
 	.driver.name = "ar531x-wmac",
 	.probe = ahb_wmac_probe,
 	.remove = ahb_wmac_remove
