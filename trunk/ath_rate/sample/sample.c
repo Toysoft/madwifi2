@@ -963,8 +963,8 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 		p += sprintf(p, 
 				"rate\ttt\tperfect\tfailed\tpkts\tavg_tries\tlast_tx\n");
 		for (x = 0; x < sn->num_rates; x++) {
-			int a = 1;
-			int t = 1;
+			unsigned int a = 1;
+			unsigned int t = 1;
 
 			p += sprintf(p, "%s", 
 					(x == sn->current_rate[size_bin]) ? "*" : " ");
@@ -984,6 +984,7 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 				t = sn->stats[size_bin][x].tries;
 			}
 			p += sprintf(p, "\t%d.%02d\t", t/a, (t*100/a) % 100);
+			
 			if (sn->stats[size_bin][x].last_tx) {
 				unsigned d = jiffies - 
 					sn->stats[size_bin][x].last_tx;
