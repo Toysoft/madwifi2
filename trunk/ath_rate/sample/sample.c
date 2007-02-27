@@ -635,7 +635,6 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	unsigned int long_tries = 0;
 	unsigned int frame_size = 0;
 	unsigned int mrr;
-	int ndx = -1;
 
 	final_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate &~ HAL_TXSTAT_ALTRATE].ieeerate;
 	short_tries = ds->ds_txstat.ts_shortretry + 1;
@@ -672,7 +671,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 
 	if (!mrr || !(ds->ds_txstat.ts_rate & HAL_TXSTAT_ALTRATE)) {
 		/* only one rate was used */
-		ndx = rate_to_ndx(sn, final_rate);
+		int ndx = rate_to_ndx(sn, final_rate);
 		if (ndx >= 0 && ndx < sn->num_rates) {
 			update_stats(sc, an, frame_size, 
 				ndx, long_tries,
@@ -869,7 +868,6 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 
 	DPRINTF(sc, "%s: %s %s %u rates %u%sMbps (%uus)- %u%sMbps (%uus)\n",
-        int best_rate_ndx = 0;
 		dev_info, __func__, ether_sprintf(ni->ni_macaddr), 
 		sn->num_rates,
 		sn->rates[0].rate / 2, sn->rates[0].rate % 0x1 ? ".5" : "",
