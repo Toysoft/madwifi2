@@ -154,6 +154,13 @@ configcheck: sanitycheck
 	}
 	
 	@# check kernel configuration
+	@if [ -z "$(CONFIG_KMOD)" ]; then \
+	    echo "FAILED"; \
+	    echo "Please enable automatic module loading support."; \
+	    exit 1; \
+	fi
+	
+	@# check kernel configuration
 	@if [ -z "$(CONFIG_SYSCTL)" ]; then \
 	    echo "FAILED"; \
 	    echo "Please enable sysctl support."; \
