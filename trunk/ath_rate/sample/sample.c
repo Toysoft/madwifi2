@@ -158,12 +158,12 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
 	int rts, cts;
 	
-	unsigned t_slot = 20;
-	unsigned t_difs = 50; 
-	unsigned t_sifs = 10; 
+	unsigned t_slot;
+	unsigned t_difs;
+	unsigned t_sifs;
 	struct ieee80211com *ic = &sc->sc_ic;
 	unsigned int tt = 0;
-	unsigned int x = 0;
+	unsigned int x;
 	unsigned int cw = WIFI_CW_MIN;
 	unsigned int cix = rt->info[rix].controlRate;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
@@ -284,7 +284,7 @@ static __inline int best_rate_ndx(struct sample_node *sn, int size_bin,
 {
 	unsigned int x;
         unsigned int best_rate_tt = 0;
-        unsigned int best_rate_ndx = 0;
+        unsigned int best_rate_ndx = -1;
         
 	for (x = 0; x < sn->num_rates; x++) {
 		unsigned int tt = sn->stats[size_bin][x].average_tx_time;
@@ -305,7 +305,7 @@ static __inline int best_rate_ndx(struct sample_node *sn, int size_bin,
 			best_rate_ndx = x;
 		}
         }
-        return (best_rate_tt) ? best_rate_ndx : -1;
+        return best_rate_ndx;
 }
 
 /*
@@ -314,9 +314,9 @@ static __inline int best_rate_ndx(struct sample_node *sn, int size_bin,
 static __inline int 
 pick_sample_ndx(struct sample_node *sn, int size_bin) 
 {
-	unsigned int x = 0;
-	unsigned current_tt = 0;
-	int current_ndx = 0;
+	unsigned int x;
+	unsigned current_tt;
+	int current_ndx;
 	
 	current_ndx = sn->current_rate[size_bin];
 	if (current_ndx < 0) {
@@ -501,9 +501,9 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 	struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
-	unsigned int size_bin = 0;
-	int ndx = 0;
-	int rateCode = -1;
+	unsigned int size_bin;
+	int ndx;
+	int rateCode;
 
 	size_bin = size_to_bin(frame_size);
 	ndx = sn->current_rate[size_bin]; /* retry at the current bit-rate */
@@ -536,9 +536,9 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 	struct sample_softc *ssc = ATH_SOFTC_SAMPLE(sc);
 	unsigned int tt = 0;
 	unsigned int tries_so_far = 0;
-	unsigned int size_bin = 0;
-	unsigned int size = 0;
-	unsigned int rate = 0;
+	unsigned int size_bin;
+	unsigned int size;
+	unsigned int rate;
 
 	size_bin = size_to_bin(frame_size);
 	size = bin_to_size(size_bin);
@@ -630,10 +630,10 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	struct ieee80211com *ic = &sc->sc_ic;
 	const struct ar5212_desc *ads = (const struct ar5212_desc *)&ds->ds_ctl0;
-	unsigned int final_rate = 0;
-	unsigned int short_tries = 0;
-	unsigned int long_tries = 0;
-	unsigned int frame_size = 0;
+	unsigned int final_rate;
+	unsigned int short_tries;
+	unsigned int long_tries;
+	unsigned int frame_size;
 	unsigned int mrr;
 
 	final_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate &~ HAL_TXSTAT_ALTRATE].ieeerate;
@@ -942,8 +942,8 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 	struct sample_node *sn;
 	struct ieee80211_node_table *nt = 
 		(struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
-	unsigned int x = 0;
-	unsigned int size_bin = 0;
+	unsigned int x;
+	unsigned int size_bin;
 
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		/* Assume each node needs 500 bytes */
@@ -1002,10 +1002,10 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 static int
 proc_ratesample_open(struct inode *inode, struct file *file)
 {
-	struct proc_ieee80211_priv *pv = NULL;
+	struct proc_ieee80211_priv *pv;
 	struct proc_dir_entry *dp = PDE(inode);
 	struct ieee80211vap *vap = dp->data;
-	unsigned long size = 0;
+	unsigned long size;
 
 	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv),
 					GFP_KERNEL)))
