@@ -1921,9 +1921,7 @@ ath_init(struct net_device *dev)
 		error = -EIO;
 		goto done;
 	}
-	/*
-	 * Enable interrupts.
-	 */
+	/* Enable interrupts. */
 	sc->sc_imask = HAL_INT_RX | HAL_INT_TX
 		  | HAL_INT_RXEOL | HAL_INT_RXORN
 		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
@@ -1987,7 +1985,7 @@ ath_stop_locked(struct net_device *dev)
 		if (sc->sc_tx99 != NULL)
 			sc->sc_tx99->stop(sc->sc_tx99);
 #endif
-		netif_stop_queue(dev);	/* XXX re-enabled by ath_newstate */
+		netif_stop_queue(dev);		/* XXX re-enabled by ath_newstate */
 		dev->flags &= ~IFF_RUNNING;	/* NB: avoid recursion */
 		ieee80211_stop_running(ic);	/* stop all VAPs */
 		if (!sc->sc_invalid) {
@@ -2006,8 +2004,7 @@ ath_stop_locked(struct net_device *dev)
 		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);		/* XXX needed? */
-	}
-	else
+	} else
 		ieee80211_stop_running(ic);	/* stop other VAPs */
 
 	if (sc->sc_softled)
