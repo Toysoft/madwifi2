@@ -31,9 +31,11 @@ Requirements
   was compiled by gcc 3.4.2).  Ignoring this rule will cause "Invalid
   module format" errors during module load.
 
-2.4.x kernels starting with 2.4.22 and 2.6 kernels should work without
-problems.  Other kernel versions may require modifications, e.g. for
-crypto support and/or updated wireless extensions.
+Linux 2.4.x kernels starting with 2.4.22 and 2.6 kernels should work
+without problems.  Due to quick pace of Linux development, there is no
+way compatibility with the future 2.6 kernels can be ensured.  However,
+the latest 2.6 kernel at the time of the release should be expected to
+work.
 
 
 Building the driver
@@ -183,6 +185,15 @@ To activate German frequencies you would specify:
 To see available parameters type:
 
   modinfo ath_pci
+
+
+Integrating into the kernel sources
+-----------------------------------
+
+It is also possible to patch Linux kernel sources to integrate MadWifi
+directly into the kernel tree.  This allows building MadWifi as part of
+the kernel.  This could be useful for embedded systems that don't
+support loadable modules.  Please refer to patches/README for details.
 
 
 Further information
