@@ -176,9 +176,9 @@ endif
 	    exit 1; \
 	fi
 	
-	@if [ -z "$(CONFIG_D80211)" ]; then \
+	@if [ -z "$(CONFIG_MAC80211)" ]; then \
 	    echo "FAILED"; \
-	    echo "Please enable the d80211 wireless stack."; \
+	    echo "Please enable the mac80211 wireless stack."; \
 	    exit 1; \
 	fi
 

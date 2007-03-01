@@ -38,7 +38,7 @@
 #define _IF_ATH_D80211_H_
 
 #include <linux/netdevice.h>
-#include <net/d80211.h>
+#include <net/mac80211.h>
 #include "if_athvar.h"
 
 struct ath_softc *ath_d80211_alloc(size_t priv_size);

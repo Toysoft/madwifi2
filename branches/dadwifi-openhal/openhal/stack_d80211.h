@@ -21,7 +21,7 @@
  */
 
 /*d80211 definitions needed for use with dadwifi*/
-#include <net/d80211.h>
+#include <net/mac80211.h>
 
 #define IEEE80211_MAX_LEN       2500
 
