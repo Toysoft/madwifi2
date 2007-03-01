@@ -59,7 +59,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
-#include <net/d80211.h> 
+#include <net/mac80211.h> 
 #include "if_ath_d80211.h"
 
 #include "if_athvar.h"
