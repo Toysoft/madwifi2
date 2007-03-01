@@ -48,7 +48,7 @@
 #include "if_athioctl.h"
 
 #include <sys/queue.h>
-#include <net/d80211.h>
+#include <net/mac80211.h>
 
 
 #define HAL_MAX_MODES	5

@@ -1,15 +1,15 @@
-                DadWifi (d80211 Atheros Driver for WiFi)
+                DadWifi (mac80211 Atheros Driver for WiFi)
 
 
 
 * Introduction
 
-DadWifi is a port of the MadWifi driver to the d80211 wireless
-networking stack.  The d80211 stack is the next generation 802.11 stack
-for Linux.  DadWifi uses the device support layer from MadWifi (the
-'ath' layer) and ties it to the d80211 stack.  That is, where MadWifi
-uses the BSD-based net80211 stack, DadWifi uses the Linux d80211 stack. 
-DadWifi reuses a large amount of code from MadWifi.
+DadWifi is a port of the MadWifi driver to the mac80211 wireless
+networking stack.  The mac80211 stack is the next generation 802.11
+stack for Linux.  DadWifi uses the device support layer from MadWifi
+(the 'ath' layer) and ties it to the mac80211 stack.  That is, where
+MadWifi uses the BSD-based net80211 stack, DadWifi uses the Linux
+mac80211 stack.  DadWifi reuses a large amount of code from MadWifi.
 
 
 * Status
@@ -43,8 +43,8 @@ using Cogito:
 
 cg-clone git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-dev.git
 
-Build, install and boot that kernel. Be sure to enable the d80211
-wireless stack, CONFIG_D80211.
+Build, install and boot that kernel. Be sure to enable the mac80211
+wireless stack, CONFIG_MAC80211.
 
 The dadwifi source can then be built by simply invoking make:
 
@@ -81,7 +81,7 @@ tree):
 CONFIG_DRIVER_DEVICESCAPE=y
 WIRELESS_DEV=/usr/src/wireless-dev
 CFLAGS += -I$(WIRELESS_DEV)/include
-CFLAGS += -I$(WIRELESS_DEV)/net/d80211
+CFLAGS += -I$(WIRELESS_DEV)/net/mac80211
 CFLAGS += -D_LINUX_TYPES_H
 
 * Development

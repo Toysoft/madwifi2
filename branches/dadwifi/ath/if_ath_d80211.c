@@ -53,7 +53,7 @@
 #include "if_ath.h"
 #include "if_ath_pci.h"
 
-#include <net/d80211.h>
+#include <net/mac80211.h>
 
 
 static struct {
