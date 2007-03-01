@@ -13,9 +13,6 @@ Requirements
   distributions provide headers, makefiles and configuration data - it
   should suffice.
 
-- Automatic module loading support - option CONFIG_KMOD in the kernel
-  .config file
-
 - Wireless Extensions support (14 or later, 17 preferred) - option
   CONFIG_NET_RADIO in kernel .config file.
 
@@ -37,6 +34,8 @@ way compatibility with the future 2.6 kernels can be ensured.  However,
 the latest 2.6 kernel at the time of the release should be expected to
 work.
 
+Automatic module loading support (CONFIG_KMOD) is recommended; otherwise, 
+care will have to be taken to manually load needed modules.
 
 Building the driver
 -------------------

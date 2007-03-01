@@ -317,25 +317,30 @@ ieee80211_notify_michael_failure(struct ieee80211vap *vap,
 }
 EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 
+/*
+ * Note that a successful call to this function does not guarantee that
+ * the services provided by the requested module are available:
+ *
+ * "Note that a successful module load does not mean the module did not
+ * then unload and exit on an error of its own. Callers must check that
+ * the service they requested is now available not blindly invoke it."
+ * http://kernelnewbies.org/documents/kdoc/kernel-api/r7338.html
+ */
 int
 ieee80211_load_module(const char *modname)
 {
+#ifdef CONFIG_KMOD
 	int rv;
-	
 	rv = request_module(modname);
-	
 	if (rv < 0)
-		printk(KERN_ERR "couldn't load module '%s' (%d)\n",
-			modname, rv);
-	/*
-	 * XXX Further checking needed if module has been loaded successfully:
-	 *
-	 * "Note that a successful module load does not mean the module did not
-	 * then unload and exit on an error of its own. Callers must check that
-	 * the service they requested is now available not blindly invoke it."
-	 * http://kernelnewbies.org/documents/kdoc/kernel-api/r7338.html
-	 */
+		printk(KERN_ERR "failed to automatically load module: %s; " \
+			"errno: %d\n", modname, rv);
 	return rv;
+#else /* CONFIG_KMOD */
+	printk(KERN_ERR "Unable to load needed module: %s; no support for " \
+			"automatic module loading", modname );
+	return -ENOSYS;
+#endif /* CONFIG_KMOD */
 }
 
 
