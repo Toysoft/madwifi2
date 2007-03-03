@@ -8687,10 +8687,8 @@ ath_update_txpow(struct ath_softc *sc)
 	 * Find the maxtxpow of the card and regulatory constraints
 	 */
 	(void)ath_hal_getmaxtxpow(ah, &txpowlimit);
-
 	ath_hal_settxpowlimit(ah, maxtxpowlimit);
-	(void)ath_hal_gettxpowlimit(ah, &maxtxpowlimit);
-
+	(void)ath_hal_getmaxtxpow(ah, &maxtxpowlimit);
 	ic->ic_txpowlimit = maxtxpowlimit;
 	ath_hal_settxpowlimit(ah, txpowlimit);
  	
