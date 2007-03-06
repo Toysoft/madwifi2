@@ -28,10 +28,14 @@ Requirements
   was compiled by gcc 3.4.2).  Ignoring this rule will cause "Invalid
   module format" errors during module load.
 
-2.4.x kernels starting with 2.4.22 and 2.6 kernels should work without
-problems.  Other kernel versions may require modifications, e.g. for
-crypto support and/or updated wireless extensions.
+Linux 2.4.x kernels starting with 2.4.22 and 2.6 kernels should work
+without problems.  Due to quick pace of Linux development, there is no
+way compatibility with the future 2.6 kernels can be ensured.  However,
+the latest 2.6 kernel at the time of the release should be expected to
+work.
 
+Automatic module loading support (CONFIG_KMOD) is recommended; otherwise, 
+care will have to be taken to manually load needed modules.
 
 Building the driver
 -------------------
@@ -49,12 +53,14 @@ development package for the default kernel is called linux-headers on
 Debian and kernel-devel on Fedora Core.  Installing a package with full
 kernel sources should not be generally necessary.
 
-Note: in the following examples "trouble%" stands for your system
-prompt; you're not expected to type that as part of the actual command.
+Note: in the following examples "$" stands for your system prompt;
+you're not expected to type that as part of the actual command.  "#"
+stands for the command prompt when the commands must be executed by
+root.
 
 Most people can just type:
 
-  trouble% make
+  $ make
 
 in the top-level MadWifi source directory to build all the modules for
 the currently running system.
@@ -65,13 +71,13 @@ Linux, e.g. building for 2.6 after building for 2.4.
 If you want to compile MadWifi for a different kernel, you need to
 specify the location of the kernel build tree, e.g.:
 
-  trouble% make KERNELPATH=/usr/src/linux-2.6.3
+  $ make KERNELPATH=/usr/src/linux-2.6.3
 
 Note that you can also specify this path by setting an environment
 variable; e.g.
 
-  trouble% export KERNELPATH=/usr/src/linux-2.6.3
-  trouble% make
+  $ export KERNELPATH=/usr/src/linux-2.6.3
+  $ make
 
 If the kernel was built outside the source directory, KERNELPATH should
 point to the output directory where .config is located, not to the
@@ -79,11 +85,10 @@ sources.
 
 MadWifi currently provides three different rate control algorithms,
 ONOE, AMRR and SAMPLE.  SAMPLE is the most advanced one and is used by
-default.  In order to make MadWifi use AMRR instead, you have to specify
-that via the ATH_RATE environment variable; e.g.
+default.  In order to make MadWifi use e.g. AMRR instead, you have to
+specify that as the module parameter e.g.
 
-  trouble% export ATH_RATE=ath_rate/amrr
-  trouble% make
+  # modprobe ath_pci ratectl=amrr
 
 NOTE: Changing the rate control is only required (and recommended) for
       users who want to setup an access point using MadWifi in difficult
@@ -94,15 +99,15 @@ Because of the binary nature of the HAL not all platforms are supported
 (the list grows as time permits).  The supported target platforms can be
 found with:
 
-  trouble% ls hal/pub/*.inc
+  $ ls hal/public/*.inc
 
-A target specifies the CPU architecture, byte order, and the ABI/file
-format.  For most popular platforms, the build system will find the
-appropriate files.  When cross-compiling or compiling for less common
-platforms, the target platform may need to be specified using the TARGET
-variable, e.g:
+A target specifies the CPU architecture, byte order (unless implied by
+the CPU), and the ABI/file format.  For most popular platforms, the
+build system will find the appropriate files.  When cross-compiling or
+compiling for less common platforms, the target platform may need to be
+specified using the TARGET variable, e.g:
 
-  trouble% make TARGET=armv4-le-elf
+  $ make TARGET=armv4-le-elf
 
 Consult the contents of the .inc file to find out what the target
 platform is and what toolchain was used to build the HAL object module. 
@@ -125,13 +130,12 @@ CROSS_COMPILE is the prefix for cross-compiling tools.  For instance, if
 the cross compiler is called arm-linux-gcc, set CROSS_COMPILE to
 "arm-linux-":
 
-  trouble% make KERNELPATH=/usr/src/linux-arm CROSS_COMPILE=arm-linux-
+  $ make KERNELPATH=/usr/src/linux-arm CROSS_COMPILE=arm-linux-
 
 The build system determines ARCH and TARGET based on the .config file in
-the Linux build tree.  TARGET still needs to be calculated for some
-embedded systems.
-
-If ARCH is determined incorrectly, please report it.
+the Linux build tree.  TARGET still may need to be provided on the
+command line some uncommon systems.  If ARCH is determined incorrectly,
+please report it.
 
 
 Loading the modules
@@ -149,10 +153,6 @@ Building the software will generate numerous loadable modules:
   wlan_acl		MAC ACL support for AP operation
   wlan_scan_ap		AP scanning support
   wlan_scan_sta		station scanning support
-
-and, depending on the rate control algorithm you choose (see above), one
-of these:
-
   ath_rate_onoe		ONOE rate control
   ath_rate_amrr		AMRR rate control
   ath_rate_sample	SAMPLE rate control
@@ -162,7 +162,7 @@ through the hotplug or card manager support.  The remaining modules are
 loaded automatically as needed, so after doing a "make install" you only
 need to run following:
 
-  modprobe ath_pci
+  # modprobe ath_pci
 
 For automatic module loading you may need to modify your system's
 configuration files so the necessary modules are loaded when an Atheros
@@ -175,11 +175,20 @@ http://www.unicode.org/onlinedat/countries.html to find your code.
 
 To activate German frequencies you would specify:
 
-  modprobe ath_pci countrycode=276
+  # modprobe ath_pci countrycode=276
 
-To see available parameters type:
+To see all available module parameters type:
 
-  modinfo ath_pci
+  $ modinfo ath_pci
+
+
+Integrating into the kernel sources
+-----------------------------------
+
+It is also possible to patch Linux kernel sources to integrate MadWifi
+directly into the kernel tree.  This allows building MadWifi as part of
+the kernel.  This could be useful for embedded systems that don't
+support loadable modules.  Please refer to patches/README for details.
 
 
 Further information

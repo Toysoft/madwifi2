@@ -528,7 +528,7 @@ init_ath_rate_onoe(void)
 	if (ret)
 		return ret;
 
-	ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
+	ath_sysctl_header = ATH_REGISTER_SYSCTL_TABLE(ath_root_table);
 	return (0);
 }
 module_init(init_ath_rate_onoe);
