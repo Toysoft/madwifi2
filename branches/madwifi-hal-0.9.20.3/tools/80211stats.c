@@ -53,6 +53,8 @@
 #include <unistd.h>
 #include <err.h>
 
+#include <include/compat.h>
+
 #include "wireless_copy.h"
 #include "net80211/ieee80211.h"
 #include "net80211/ieee80211_crypto.h"

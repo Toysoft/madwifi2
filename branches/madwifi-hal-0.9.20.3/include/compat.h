@@ -41,7 +41,8 @@
 /* Compatibility with older Linux kernels */
 #ifdef __KERNEL__
 #include <linux/types.h>
-#ifndef __bitwise
+#endif
+#if !defined(__KERNEL__) || !defined (__bitwise)
 #define __le16 u_int16_t
 #define __le32 u_int32_t
 #define __le64 u_int64_t
@@ -49,7 +50,6 @@
 #define __be32 u_int32_t
 #define __be64 u_int64_t
 #define __force
-#endif
 #endif
 
 #ifndef container_of
@@ -78,7 +78,10 @@
 #define	isset(a,i)	((a)[(i)/NBBY] & (1<<((i)%NBBY)))
 #define	isclr(a,i)	(((a)[(i)/NBBY] & (1<<((i)%NBBY))) == 0)
 
+#ifndef __packed
 #define	__packed	__attribute__((__packed__))
+#endif
+
 #define	__printflike(_a,_b) \
 	__attribute__ ((__format__ (__printf__, _a, _b)))
 #define	__offsetof(t,m)	offsetof(t,m)
@@ -108,4 +111,25 @@
  */
 #define	__FBSDID(_s)
 #define	__KERNEL_RCSID(_n,_s)
+
+/*
+ * Fixes for Linux API changes
+ */
+#ifdef __KERNEL__
+
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
+#define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t, 1)
+#else
+#define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
+#define __user
+#define __kernel
+#define __iomem
+#endif
+
+#endif /* __KERNEL__ */
+
 #endif /* _ATH_COMPAT_H_ */

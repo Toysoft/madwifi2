@@ -41,6 +41,9 @@
 #define	EXPORT_SYMTAB
 #endif
 
+/* Don't use virtualized timer in Linux 2.6.20+ */
+#define USE_REAL_TIME_DELAY
+
 #ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
 #endif
@@ -521,7 +524,7 @@ ath_hal_sysctl_register(void)
 
 	if (!initialized) {
 		ath_hal_sysctl_header =
-			register_sysctl_table(ath_root_table, 1);
+			ATH_REGISTER_SYSCTL_TABLE(ath_root_table);
 		initialized = 1;
 	}
 }

@@ -435,9 +435,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 * built with an ah.h that does not correspond to the HAL
 	 * module loaded in the kernel.
 	 */
-	ah = _ath_hal_attach(devid, sc, tag,
-			     (__force HAL_BUS_HANDLE) sc->sc_iobase,
-			     &status);
+	ah = _ath_hal_attach(devid, sc, tag, sc->sc_iobase, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
 			dev->name, ath_get_hal_status_desc(status), status);
@@ -1157,7 +1155,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	}
 	if (sc->sc_hastsfadd)
 		ath_hal_settsfadjust(sc->sc_ah, sc->sc_stagbeacons);
-	SET_NETDEV_DEV(dev, mdev->class_dev.dev);
+	SET_NETDEV_DEV(dev, ATH_GET_NETDEV_DEV(mdev));
 	/* complete setup */
 	(void) ieee80211_vap_attach(vap,
 		ieee80211_media_change, ieee80211_media_status);
@@ -1328,15 +1326,6 @@ ath_resume(struct net_device *dev)
 
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
 	ath_init(dev);
-}
-
-void
-ath_shutdown(struct net_device *dev)
-{
-	struct ath_softc *sc = dev->priv;
-
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
-	ath_stop(dev);
 }
 
 static void
@@ -1939,9 +1928,7 @@ ath_init(struct net_device *dev)
 		error = -EIO;
 		goto done;
 	}
-	/*
-	 * Enable interrupts.
-	 */
+	/* Enable interrupts. */
 	sc->sc_imask = HAL_INT_RX | HAL_INT_TX
 		  | HAL_INT_RXEOL | HAL_INT_RXORN
 		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
@@ -2005,7 +1992,7 @@ ath_stop_locked(struct net_device *dev)
 		if (sc->sc_tx99 != NULL)
 			sc->sc_tx99->stop(sc->sc_tx99);
 #endif
-		netif_stop_queue(dev);	/* XXX re-enabled by ath_newstate */
+		netif_stop_queue(dev);		/* XXX re-enabled by ath_newstate */
 		dev->flags &= ~IFF_RUNNING;	/* NB: avoid recursion */
 		ieee80211_stop_running(ic);	/* stop all VAPs */
 		if (!sc->sc_invalid) {
@@ -2024,8 +2011,7 @@ ath_stop_locked(struct net_device *dev)
 		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);		/* XXX needed? */
-	}
-	else
+	} else
 		ieee80211_stop_running(ic);	/* stop other VAPs */
 
 	if (sc->sc_softled)
@@ -4818,7 +4804,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 	while (an->an_uapsd_qdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_q);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_q, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 
 		dev_kfree_skb_any(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -4834,7 +4820,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 	while (an->an_uapsd_overflowqdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_overflowq);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_overflowq, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 
 		dev_kfree_skb_any(bf->bf_skb);
 		bf->bf_skb = NULL;
@@ -6427,7 +6413,7 @@ ath_uapsd_flush(struct ieee80211_node *ni)
 	while (an->an_uapsd_qdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_q);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_q, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 		txq = sc->sc_ac2q[bf->bf_skb->priority & 0x3];
 		ath_tx_txqaddbuf(sc, ni, txq, bf, bf->bf_desc, bf->bf_skb->len);
 		an->an_uapsd_qdepth--;
@@ -6436,7 +6422,7 @@ ath_uapsd_flush(struct ieee80211_node *ni)
 	while (an->an_uapsd_overflowqdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_overflowq);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_overflowq, bf_list);
-		bf->bf_desc->ds_link = (u_int32_t)NULL;
+		bf->bf_desc->ds_link = 0;
 		txq = sc->sc_ac2q[bf->bf_skb->priority & 0x3];
 		ath_tx_txqaddbuf(sc, ni, txq, bf, bf->bf_desc, bf->bf_skb->len);
 		an->an_uapsd_overflowqdepth--;
@@ -8726,10 +8712,8 @@ ath_update_txpow(struct ath_softc *sc)
 	 * Find the maxtxpow of the card and regulatory constraints
 	 */
 	(void)ath_hal_getmaxtxpow(ah, &txpowlimit);
-
 	ath_hal_settxpowlimit(ah, maxtxpowlimit);
-	(void)ath_hal_gettxpowlimit(ah, &maxtxpowlimit);
-
+	(void)ath_hal_getmaxtxpow(ah, &maxtxpowlimit);
 	ic->ic_txpowlimit = maxtxpowlimit;
 	ath_hal_settxpowlimit(ah, txpowlimit);
  	
@@ -9110,7 +9094,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct sockaddr *mac = addr;
-	int error;
+	int error = 0;
 
 	if (netif_running(dev)) {
 		DPRINTF(sc, ATH_DEBUG_ANY,
@@ -9127,7 +9111,9 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 	IEEE80211_ADDR_COPY(ic->ic_myaddr, mac->sa_data);
 	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
 	ath_hal_setmac(ah, dev->dev_addr);
-	error = ath_reset(dev);
+	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
+		error = ath_reset(dev);
+	}
 	ATH_UNLOCK(sc);
 
 	return error;
@@ -9137,7 +9123,7 @@ static int
 ath_change_mtu(struct net_device *dev, int mtu)
 {
 	struct ath_softc *sc = dev->priv;
-	int error;
+	int error = 0;
 
 	if (!(ATH_MIN_MTU < mtu && mtu <= ATH_MAX_MTU)) {
 		DPRINTF(sc, ATH_DEBUG_ANY, "%s: invalid %d, min %u, max %u\n",
@@ -9148,10 +9134,12 @@ ath_change_mtu(struct net_device *dev, int mtu)
 
 	ATH_LOCK(sc);
 	dev->mtu = mtu;
-	/* NB: the rx buffers may need to be reallocated */
-	tasklet_disable(&sc->sc_rxtq);
-	error = ath_reset(dev);
-	tasklet_enable(&sc->sc_rxtq);
+	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
+		/* NB: the rx buffers may need to be reallocated */
+		tasklet_disable(&sc->sc_rxtq);
+		error = ath_reset(dev);
+		tasklet_enable(&sc->sc_rxtq);
+	}
 	ATH_UNLOCK(sc);
 
 	return error;
@@ -9636,7 +9624,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 			sc->sc_sysctls[i].extra1 = sc;
 
 	/* and register everything */
-	sc->sc_sysctl_header = register_sysctl_table(sc->sc_sysctls, 1);
+	sc->sc_sysctl_header = ATH_REGISTER_SYSCTL_TABLE(sc->sc_sysctls);
 	if (!sc->sc_sysctl_header) {
 		printk("%s: failed to register sysctls!\n", sc->sc_dev->name);
 		kfree(sc->sc_sysctls);
@@ -9790,7 +9778,7 @@ ath_sysctl_register(void)
 
 	if (!initialized) {
 	        register_netdevice_notifier(&ath_event_block);
-		ath_sysctl_header = register_sysctl_table(ath_root_table, 1);
+		ath_sysctl_header = ATH_REGISTER_SYSCTL_TABLE(ath_root_table);
 		initialized = 1;
 	}
 }

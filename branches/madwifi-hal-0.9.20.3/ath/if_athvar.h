@@ -111,6 +111,12 @@ typedef void irqreturn_t;
 #define	SET_NETDEV_DEV(ndev, pdev)
 #endif
 
+#ifdef to_net_dev
+#define ATH_GET_NETDEV_DEV(ndev)	((ndev)->dev.parent)
+#else
+#define ATH_GET_NETDEV_DEV(ndev)	((ndev)->class_dev.dev)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,23)
 static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask,
 					       void (*setup)(struct net_device *))
@@ -727,7 +733,6 @@ int ath_attach(u_int16_t, struct net_device *, HAL_BUS_TAG);
 int ath_detach(struct net_device *);
 void ath_resume(struct net_device *);
 void ath_suspend(struct net_device *);
-void ath_shutdown(struct net_device *);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 irqreturn_t ath_intr(int, void *);
 #else
