@@ -162,7 +162,7 @@ ieee80211_vlan_kill_vid(struct net_device *dev, unsigned short vid)
 	struct ieee80211vap *vap = dev->priv;
 
 	if (vap->iv_vlgrp != NULL)
-		vap->iv_vlgrp->vlan_devices[vid] = NULL;
+		vlan_group_set_device(vap->iv_vlgrp, vid, NULL);
 }
 #endif /* IEEE80211_VLAN_TAG_USED */
 
