@@ -68,7 +68,7 @@
 #define	IEEE80211_MSG_ANY	0xffffffff	/* anything */
 
 #ifdef IEEE80211_DEBUG
-int ieee80211_msg_is_reported(struct ieee80211vap *, unsigned int msg);
+#define ieee80211_msg_is_reported(_vap, m)	(!!((_vap)->iv_debug & (m)))
 #define	IEEE80211_DPRINTF(_vap, _m, _fmt, ...) do {			\
 	if (ieee80211_msg_is_reported(_vap, _m))					\
 		ieee80211_note(_vap, _fmt, __VA_ARGS__);		\
