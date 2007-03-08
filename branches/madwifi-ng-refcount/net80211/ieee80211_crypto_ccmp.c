@@ -58,13 +58,15 @@
 #define AES_BLOCK_LEN 16
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-#define crypto_cipher_cast(c) (c)
+#define crypto_cipher crypto_tfm
+#define crypto_alloc_cipher(name,type,mask) crypto_alloc_tfm(name,type)
+#define crypto_free_cipher(cipher) crypto_free_tfm(cipher)
 #endif
 
 struct ccmp_ctx {
 	struct ieee80211vap *cc_vap;	/* for diagnostics + statistics */
 	struct ieee80211com *cc_ic;
-	struct crypto_tfm *cc_tfm;
+	struct crypto_cipher *cc_tfm;
 };
 
 static void *ccmp_attach(struct ieee80211vap *, struct ieee80211_key *);
@@ -120,7 +122,7 @@ ccmp_detach(struct ieee80211_key *k)
 	struct ccmp_ctx *ctx = k->wk_private;
 
 	if (ctx->cc_tfm != NULL)
-		crypto_free_tfm(ctx->cc_tfm);
+		crypto_free_cipher(ctx->cc_tfm);
 	FREE(ctx, M_DEVBUF);
 
 	_MOD_DEC_USE(THIS_MODULE);
@@ -140,7 +142,8 @@ ccmp_setkey(struct ieee80211_key *k)
 	
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT) {
 		if (ctx->cc_tfm == NULL)
-			ctx->cc_tfm = crypto_alloc_tfm("aes", 0);
+			ctx->cc_tfm = crypto_alloc_cipher("aes", 0,
+							  CRYPTO_ALG_ASYNC);
 		
 		if (ctx->cc_tfm == NULL) {
 			IEEE80211_DPRINTF(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
@@ -149,8 +152,7 @@ ccmp_setkey(struct ieee80211_key *k)
 			return 0;
 		}
 		
-		crypto_cipher_setkey(crypto_cipher_cast(ctx->cc_tfm),
-				     k->wk_key, k->wk_keylen);
+		crypto_cipher_setkey(ctx->cc_tfm, k->wk_key, k->wk_keylen);
 	}
 	return 1;
 }
@@ -302,10 +304,10 @@ xor_block(u8 *b, const u8 *a, size_t len)
 }
 
 static void
-rijndael_encrypt(struct crypto_tfm *tfm, const void *src, void *dst)
+rijndael_encrypt(struct crypto_cipher *tfm, const void *src, void *dst)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
-	crypto_cipher_encrypt_one(crypto_cipher_cast(tfm), dst, src);
+	crypto_cipher_encrypt_one(tfm, dst, src);
 #else
 	struct scatterlist sg_src;
 	struct scatterlist sg_dst;
@@ -336,7 +338,7 @@ rijndael_encrypt(struct crypto_tfm *tfm, const void *src, void *dst)
  */
 
 static void
-ccmp_init_blocks(struct crypto_tfm *tfm, struct ieee80211_frame *wh,
+ccmp_init_blocks(struct crypto_cipher *tfm, struct ieee80211_frame *wh,
 	u_int64_t pn, size_t dlen,
 	uint8_t b0[AES_BLOCK_LEN], uint8_t aad[2 * AES_BLOCK_LEN],
 	uint8_t auth[AES_BLOCK_LEN], uint8_t s0[AES_BLOCK_LEN])
