@@ -492,10 +492,10 @@ void ieee80211_proc_cleanup(struct ieee80211vap *);
 #define	vlan_hwaccel_receive_skb(skb, grp, tag)	vlan_hwaccel_rx(skb, grp, tag)
 #endif
 
-#ifndef VLAN_GROUP_ARRAY_LEN
+#ifndef VLAN_GROUP_ARRAY_PART_LEN
 #define vlan_group_set_device(group, vid, dev) do { \
 	group->vlan_devices[vid] = dev; \
-while (0);
+} while (0);
 #endif
 
 #else
