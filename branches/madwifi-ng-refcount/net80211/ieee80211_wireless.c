@@ -2999,7 +2999,7 @@ add_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
 static int
 remove_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap)
 {
-	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	struct ieee80211_app_ie *app_ie = &vap->app_ie[frame_type_index];
 	if (app_ie->ie != NULL) {
 		FREE(app_ie->ie, M_DEVBUF);
 		app_ie->ie = NULL;
@@ -3012,7 +3012,7 @@ static int
 get_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
 	struct ieee80211req_getset_appiebuf *iebuf)
 {
-	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	struct ieee80211_app_ie *app_ie = &vap->app_ie[frame_type_index];
 	if (iebuf->app_buflen < app_ie->length)
 		return -EINVAL;
 
