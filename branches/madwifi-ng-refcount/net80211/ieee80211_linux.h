@@ -499,12 +499,6 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 #error "Please fix asm/byteorder.h"
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,9)
-#define __user
-#define __kernel
-#define __iomem
-#endif
-
 
 /*
  * Deal with the sysctl handler api changing.
@@ -535,6 +529,13 @@ void ieee80211_proc_cleanup(struct ieee80211vap *);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,20)
 #define	vlan_hwaccel_receive_skb(skb, grp, tag)	vlan_hwaccel_rx(skb, grp, tag)
 #endif
+
+#ifndef VLAN_GROUP_ARRAY_PART_LEN
+#define vlan_group_set_device(group, vid, dev) do { \
+	group->vlan_devices[vid] = dev; \
+} while (0);
+#endif
+
 #else
 #define IEEE80211_VLAN_TAG_USED 0
 #endif

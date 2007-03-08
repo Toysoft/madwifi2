@@ -69,13 +69,14 @@ endif
 svnversion.h:
 	@if [ -d .svn ]; then \
 		ver=`svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'`; \
-		echo "#define SVNVERSION \"svn r$$ver\"" > $@; \
+		echo "#define SVNVERSION \"svn r$$ver\"" > $@.tmp; \
 	elif [ -s SNAPSHOT ]; then \
 		ver=`sed -e '/^Revision: */!d;s///;q' SNAPSHOT`; \
-		echo "#define SVNVERSION \"svn r$$ver\"" > $@; \
+		echo "#define SVNVERSION \"svn r$$ver\"" > $@.tmp; \
 	else \
-		touch svnversion.h; \
+		touch $@.tmp; \
 	fi; \
+	diff $@ $@.tmp >/dev/null 2>&1 || cp -f $@.tmp $@; rm -f $@.tmp
 
 # conflicts with the 'tools' subdirectory
 .PHONY: tools
@@ -93,7 +94,7 @@ install-modules:
 		$(MAKE) -C $$i install || exit 1; \
 	done
 ifeq ($(DESTDIR),)
-	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae)
+	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae $(KERNELRELEASE))
 endif
 
 install-tools:
@@ -169,7 +170,7 @@ ifeq ($(strip $(BUS)),PCI)
 endif
 	
 	@# check wireless extensions support is enabled
-	@if [ -z "$(CONFIG_NET_RADIO)" ]; then \
+	@if [ -z "$(CONFIG_NET_RADIO)$(CONFIG_WIRELESS_EXT)" ]; then \
 	    echo "FAILED"; \
 	    echo "Please enable wireless extensions."; \
 	    exit 1; \
