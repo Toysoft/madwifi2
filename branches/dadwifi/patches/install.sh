@@ -43,9 +43,6 @@ SRC_HAL=${HAL:-${SRC}/hal}
 test -d ${SRC_HAL} || die "No hal directory ${SRC_HAL}"
 SRC_ATH=${ATH:-${SRC}/ath}
 test -d ${SRC_ATH} || die "No ath directory ${SRC_ATH}"
-SRC_ATH_RATE=${SRC}/ath_rate
-test -d ${SRC_ATH_RATE} ||
-	die "No rate control algorithm directory ${SRC_ATH_RATE}"
 SRC_COMPAT=${SRC}/include
 test -d ${SRC_COMPAT} || die "No compat directory ${SRC_COMPAT}"
 
@@ -68,7 +65,7 @@ cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
 
 
 echo "Copying source files"
-FILES=`cd ${SRC} && find ath ath_hal ath_rate hal include -name '*.[ch]'`
+FILES=`cd ${SRC} && find ath ath_hal hal include -name '*.[ch]'`
 for f in $FILES; do
 	case $f in
 		*.mod.c) continue;;
