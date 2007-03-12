@@ -138,12 +138,6 @@ WLAN=	$(TOP)/net80211
 #
 ATH=	$(TOP)/ath
 #
-# Path to the rate control algorithm.
-#
-ifeq ($(ATH_RATE),)
-ATH_RATE=	ath_rate/sample
-endif
-#
 # Path to the userspace utilities. 
 # 
 TOOLS=  $(TOP)/tools 
