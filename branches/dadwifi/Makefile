@@ -126,23 +126,11 @@ info:
 	@echo "KMODPATH     : $(KMODPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
 
-sanitycheck:
-	@echo -n "Checking requirements... "
-	
-	@# check if specified rate control is available
-	@if [ ! -d $(ATH_RATE) ]; then \
-	    echo "FAILED"; \
-	    echo "Selected rate control $(ATH_RATE) not available."; \
-	    exit 1; \
-	fi
-	
-	@echo "ok."
-
 .PHONY: release
 release:
 	sh scripts/make-release.bash
 
-configcheck: sanitycheck
+configcheck:
 	@echo -n "Checking kernel configuration... "
 	
 	@# check version of kernel
