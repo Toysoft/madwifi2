@@ -776,7 +776,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct ieee80211vap *vap = ni->ni_vap;
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
 	unsigned int x, y;
-	unsigned int srate;
+	int srate;
 	sn->num_rates = 0;
 
 	if (rt == NULL) {
