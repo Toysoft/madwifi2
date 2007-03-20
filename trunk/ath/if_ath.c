@@ -9312,7 +9312,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 1 = antenna port 1
 				 * 2 = antenna port 2
 				 */
-				if (val < 0 || val > 2)
+				if (val > 2)
 					return -EINVAL;
 				else
 					sc->sc_txantenna = val;
@@ -9324,7 +9324,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 1 = antenna port 1
 				 * 2 = antenna port 2
 				 */
-				if (val < 0 || val > 2)
+				if (val > 2)
 					return -EINVAL;
 				else
 					ath_setdefantenna(sc, val);
@@ -9334,7 +9334,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 0 = disallow use of diversity
 				 * 1 = allow use of diversity
 				 */
-				if (val < 0 || val > 1)
+				if (val > 1)
 					return -EINVAL;
 				/* Don't enable diversity if XR is enabled */
 				if (((!sc->sc_hasdiversity) || (sc->sc_xrtxq != NULL)) && val)
