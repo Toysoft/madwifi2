@@ -137,6 +137,13 @@ the Linux build tree.  TARGET still may need to be provided on the
 command line some uncommon systems.  If ARCH is determined incorrectly,
 please report it.
 
+If the compiler needs additional flags to compile userspace binaries,
+you can redefine CC to include those flags.
+
+When installing MadWifi, set DESTDIR to the root of the target
+filesystem, so that the cross-compiled binaries don't overwrite the
+native ones.
+
 
 Loading the modules
 -------------------
