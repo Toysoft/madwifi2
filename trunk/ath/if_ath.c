@@ -7335,14 +7335,10 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			struct sk_buff *skbfree, *skb = bf->bf_skb;
 			int i;
 
-			skbfree = skb;
-			skb = skb->next;
-			DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
-				__func__, skbfree);
-			ath_tx_capture(sc->sc_dev, ds, skbfree);
-			for (i = 1; i < bf->bf_numdesc; i++) {
-				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i-1],
-					bf->bf_skb->len, BUS_DMA_TODEVICE);
+			for (i = 0; i < bf->bf_numdesc; i++) {
+				if (i > 0)
+					bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i],
+							 skb->len, BUS_DMA_TODEVICE);
 				skbfree = skb;
 				skb = skb->next;
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
