@@ -858,6 +858,7 @@ ieee80211_ioctl_siwessid(struct net_device *dev, struct iw_request_info *info,
 		memcpy(vap->iv_des_ssid[0].ssid, ssid, data->length);
 		vap->iv_des_ssid[0].len = data->length;
 		vap->iv_des_nssid = 1;
+#if WIRELESS_EXT < 21
 		/*
 		 * Deduct a trailing \0 since iwconfig passes a string
 		 * length that includes this.  Unfortunately this means
@@ -867,9 +868,11 @@ ieee80211_ioctl_siwessid(struct net_device *dev, struct iw_request_info *info,
 		 * exactly those bytes that are meaningful and not include
 		 * extraneous stuff).
 		 */
+		/* The API was fixed in WE21 */
 		if (data->length > 0 &&
 		    vap->iv_des_ssid[0].ssid[data->length - 1] == '\0')
 			vap->iv_des_ssid[0].len--;
+#endif /* WIRELESS_EXT < 21 */
 	}
 #ifdef ATH_SUPERG_XR 
 	if (vap->iv_xrvap != NULL && !(vap->iv_flags & IEEE80211_F_XR)) {
