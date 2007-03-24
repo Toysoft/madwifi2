@@ -9032,8 +9032,8 @@ static void
 ath_printrxbuf(const struct ath_buf *bf, int done)
 {
 	const struct ath_rx_status *rs = &bf->bf_dsstatus.ds_rxstat;
-	const struct ath_desc *ds = bf->bf_desc;;
-	
+	const struct ath_desc *ds = bf->bf_desc;
+
 	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
