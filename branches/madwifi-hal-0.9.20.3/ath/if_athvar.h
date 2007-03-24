@@ -184,7 +184,6 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 #define	ATH_TIMEOUT	1000
 
 #define ATH_DFS_WAIT_POLL_PERIOD	2	/* 2 seconds */
-#define	ATH_DFS_TEST_RETURN_PERIOD	15	/* 15 seconds */
 
 #define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between calibrations */
 #define	ATH_SHORT_CALINTERVAL		1	/* 1 second between calibrations */
@@ -562,9 +561,7 @@ struct ath_softc {
 			sc_hasclrkey:1,		/* CLR key supported */
 			sc_devstopped:1,	/* stopped due to of no tx bufs */
 			sc_stagbeacons:1,	/* use staggered beacons */
-			sc_rtasksched:1, 	/* radar task is scheduled */
 			sc_dfswait:1,    	/* waiting on channel for radar detect */
-			sc_dfstest:1,		/* Test timer in progress */
 		        sc_ackrate:1;           /* send acks at high bitrate */
 	/* rate tables */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
@@ -589,8 +586,6 @@ struct ath_softc {
 	u_int8_t sc_protrix;			/* protection rate index */
 	u_int8_t sc_mcastantenna;		/* Multicast antenna number */
 	u_int8_t sc_txantenna;			/* data tx antenna (fixed or auto) */
-	u_int8_t sc_dfstest_ieeechan;		/* IEEE channel number to return to after a dfs mute test */
-	u_int32_t sc_dfstesttime;		/* Time to stay off chan during dfs test */
 	u_int16_t sc_nvaps;			/* # of active virtual ap's */
 	u_int8_t sc_nstavaps;			/* # of active station vaps */
 	u_int8_t sc_nmonvaps;			/* # of monitor vaps */
@@ -611,7 +606,6 @@ struct ath_softc {
 	u_int16_t sc_ledoff;			/* off time for current blink */
 	struct timer_list sc_ledtimer;		/* led off timer */
 	struct timer_list sc_dfswaittimer;	/* dfs wait timer */
-	struct timer_list sc_dfstesttimer;	/* dfs mute test timer */
 
 	struct ATH_TQ_STRUCT sc_fataltq;	/* fatal error intr tasklet */
 
@@ -662,7 +656,6 @@ struct ath_softc {
 
 	struct timer_list sc_cal_ch;		/* calibration timer */
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
-	struct work_struct sc_radartask;	/* Schedule task for DFS handling */
 
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
