@@ -125,10 +125,6 @@ static void ath_fatal_tasklet(TQUEUE_ARG);
 static void ath_rxorn_tasklet(TQUEUE_ARG);
 static void ath_bmiss_tasklet(TQUEUE_ARG);
 static void ath_bstuck_tasklet(TQUEUE_ARG);
-#if 0 /* Diabling radar_task for HAL 0.9.20.3 */
-static void ath_radar_task(struct work_struct *);
-static void ath_dfs_test_return(unsigned long);
-#endif
 static int ath_stop_locked(struct net_device *);
 static int ath_stop(struct net_device *);
 #if 0
@@ -424,9 +420,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ATH_INIT_TQUEUE(&sc->sc_bstucktq,ath_bstuck_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq, ath_rxorn_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_fataltq, ath_fatal_tasklet,	dev);
-#if 0 /* disabling radar_task for HAL 0.9.20.3 */
-	ATH_INIT_WORK(&sc->sc_radartask, ath_radar_task);
-#endif
 
 	/*
 	 * Attach the HAL and verify ABI compatibility by checking
@@ -635,7 +628,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 		error = EIO;
 		goto bad2;
 	}
-
 	init_timer(&sc->sc_cal_ch);
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) dev;
@@ -650,10 +642,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_ledstate = 1;
 	sc->sc_ledon = 0;			/* low true */
 	sc->sc_ledidle = msecs_to_jiffies(2700);	/* 2.7 sec */
-	sc->sc_dfstesttime = ATH_DFS_TEST_RETURN_PERIOD;
 	init_timer(&sc->sc_ledtimer);
 	init_timer(&sc->sc_dfswaittimer);
-	init_timer(&sc->sc_dfstesttimer);
 	sc->sc_ledtimer.data = (unsigned long) sc;
 	if (sc->sc_softled) {
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
@@ -942,9 +932,6 @@ ath_detach(struct net_device *dev)
 	ath_stop(dev);
 
 	ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE);
-	/* Flush the radar task if it's scheduled */
-	if (sc->sc_rtasksched == 1)
-		flush_scheduled_work();
 
 	sc->sc_invalid = 1;
 
@@ -1737,56 +1724,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		mark_bh(IMMEDIATE_BH);
 	return IRQ_HANDLED;
 }
-
-#if 0 /* HAL 0.9.20.3 has no procdfs method, disabling radar task */
-static void
-ath_radar_task(struct work_struct *thr)
-{
-	struct ath_softc *sc = container_of(thr, struct ath_softc, sc_radartask);
-	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_channel ichan;
-	HAL_CHANNEL hchan;
-
-	sc->sc_rtasksched = 0;
-	if (ath_hal_procdfs(ah, &hchan)) {
-		/*
-		 * DFS was found, initiate channel change
-		 */
-		ichan.ic_ieee = ath_hal_mhz2ieee(ah, hchan.channel, hchan.channelFlags);
-		ichan.ic_freq = hchan.channel;
-		ichan.ic_flags = hchan.channelFlags;
-
-		if ((sc->sc_curchan.channel == hchan.channel) &&
-		    (sc->sc_curchan.channelFlags == hchan.channel)) {
-			if (hchan.privFlags & CHANNEL_INTERFERENCE)
-				sc->sc_curchan.privFlags |= CHANNEL_INTERFERENCE;
-		}
-		ieee80211_mark_dfs(ic, &ichan);
-		if (((ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) == 0) &&
-		    (ic->ic_opmode == IEEE80211_M_HOSTAP)) {
-			sc->sc_dfstest_ieeechan = ic->ic_curchan->ic_ieee;
-			sc->sc_dfstesttimer.function = ath_dfs_test_return;
-			sc->sc_dfstesttimer.expires = jiffies + (sc->sc_dfstesttime * HZ);
-			sc->sc_dfstesttimer.data = (unsigned long)sc;
-			if (sc->sc_dfstest == 0) {
-				sc->sc_dfstest = 1;
-				add_timer(&sc->sc_dfstesttimer);
-			}
-		}
-	}
-}
-
-static void
-ath_dfs_test_return(unsigned long data)
-{
-	struct ath_softc *sc = (struct ath_softc *)data; 
-	struct ieee80211com *ic = &sc->sc_ic;
-
-	sc->sc_dfstest = 0;
-	ieee80211_dfs_test_return(ic, sc->sc_dfstest_ieeechan);
-}
-#endif /* HAL 0.9.20.3 */
 
 static void
 ath_fatal_tasklet(TQUEUE_ARG data)
@@ -5309,9 +5246,6 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds = bf->bf_desc;
 	ds->ds_link = bf->bf_daddr;		/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
-#if 0 /* HAL 0.9.20.3 */
-	ds->ds_vdata = (void *) skb->data;	/* virt addr of buffer */
-#endif
 	ath_hal_setuprxdesc(ah, ds
 		, skb_tailroom(skb)		/* buffer size */
 		, 0
@@ -5799,12 +5733,6 @@ rx_next:
 	
 	/* rx signal state monitoring */
 	ath_hal_rxmonitor(ah, &sc->sc_halstats, &sc->sc_curchan);
-#if 0 /* HAL 0.9.20.3 has removed this method */
-	if (ath_hal_radar_event(ah)) {
-		sc->sc_rtasksched = 1;
-		schedule_work(&sc->sc_radartask);
-	}
-#endif
 #undef PA2DESC
 }
 
@@ -7857,8 +7785,6 @@ ath_calibrate(unsigned long arg)
 	struct net_device *dev = (struct net_device *) arg;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
-	struct ieee80211com *ic = &sc->sc_ic;
-	HAL_CHANNEL *chans;
 	/* u_int32_t nchans; */
 	HAL_BOOL isIQdone = AH_FALSE;
 
@@ -7880,34 +7806,6 @@ ath_calibrate(unsigned long arg)
 			"%s: calibration of channel %u failed\n",
 			__func__, sc->sc_curchan.channel);
 		sc->sc_stats.ast_per_calfail++;
-	}
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-		chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_ATOMIC);
-		if (chans == NULL) {
-			printk("%s: unable to allocate channel table\n", dev->name);
-			return;
-		}
-#if 0 /* HAL 0.9.20.3 has no checknol method */
-		nchans = ath_hal_checknol(ah, chans, IEEE80211_CHAN_MAX);
-		if (nchans > 0) {
-			u_int32_t i, j;
-			struct ieee80211_channel *ichan;
-			
-			for (i = 0; i < nchans; i++) {
-				for (j = 0; j < ic->ic_nchans; j++) {
-					ichan = &ic->ic_channels[j];
-					if (chans[i].channel == ichan->ic_freq)
-						ichan->ic_flags &= ~IEEE80211_CHAN_RADAR;
-				}
-
-				ichan = ieee80211_find_channel(ic, chans[i].channel,
-					chans[i].channelFlags);
-				if (ichan != NULL)
-					ichan->ic_flags &= ~IEEE80211_CHAN_RADAR;
-			}
-		}
-#endif
-		kfree(chans);
 	}
 
 	if (isIQdone == AH_TRUE)
