@@ -321,8 +321,8 @@ MODULE_PARM_DESC(ath_debug, "Load-time debug output enable");
 
 #define	IFF_DUMPPKTS(sc, _m) \
 	((sc->sc_debug & _m))
-static void ath_printrxbuf(struct ath_buf *, int);
-static void ath_printtxbuf(struct ath_buf *, int);
+static void ath_printrxbuf(const struct ath_buf *, int);
+static void ath_printtxbuf(const struct ath_buf *, int);
 enum {
 	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
 	ATH_DEBUG_XMIT_DESC	= 0x00000002,	/* xmit descriptors */
@@ -9004,9 +9004,9 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 
 #ifdef AR_DEBUG
 static void
-ath_printrxbuf(struct ath_buf *bf, int done)
+ath_printrxbuf(const struct ath_buf *bf, int done)
 {
-	struct ath_desc *ds = bf->bf_desc;
+	const struct ath_desc *ds = bf->bf_desc;
 
 	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, ito64(bf->bf_daddr),
@@ -9017,9 +9017,9 @@ ath_printrxbuf(struct ath_buf *bf, int done)
 }
 
 static void
-ath_printtxbuf(struct ath_buf *bf, int done)
+ath_printtxbuf(const struct ath_buf *bf, int done)
 {
-	struct ath_desc *ds = bf->bf_desc;
+	const struct ath_desc *ds = bf->bf_desc;
 
 	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, ito64(bf->bf_daddr),
