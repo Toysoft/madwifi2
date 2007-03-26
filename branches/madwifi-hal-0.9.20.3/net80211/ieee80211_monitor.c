@@ -242,11 +242,6 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 					p = start + roundup(p - start, 2) + 4;
 					break;
 
-				case IEEE80211_RADIOTAP_FCS:
-					/* 32-bit */
-					p = start + roundup(p - start, 4) + 4;
-					break;
-
 				case IEEE80211_RADIOTAP_TSFT:
 					/* 64-bit */
 					p = start + roundup(p - start, 8) + 8;
@@ -500,6 +495,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
 				if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_BADFCS;
+				if (skb->len >= IEEE80211_CRC_LEN) 
+					th->wr_flags |= IEEE80211_RADIOTAP_F_FCS;
 
 				th->wr_rate = ieeerate;
 				th->wr_chan_freq = cpu_to_le16(ic->ic_curchan->ic_freq);
@@ -535,10 +532,6 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = antenna;
 				th->wr_antsignal = rssi;
-				if (skb->len >= IEEE80211_CRC_LEN) 
-					th->wr_fcs = cpu_to_le32p((u32 *)&skb1->data[skb1->len - IEEE80211_CRC_LEN]);
-				else 
-					th->wr_fcs = 0;
 				
 				th->wr_tsft = cpu_to_le64(mactime);
 			}
@@ -558,8 +551,9 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			break;
 		}
 		if (skb1) {
-			if (!tx && skb->len >= IEEE80211_CRC_LEN) {
-				/* Remove FCS from end of rx frames*/
+			if (!tx && (vap->iv_dev->type != ARPHRD_IEEE80211_RADIOTAP) && (skb1->len >= IEEE80211_CRC_LEN)) {
+				/* Remove FCS from end of rx frames when
+				 * delivering to non-Radiotap VAPs */
 				skb_trim(skb1, skb1->len - IEEE80211_CRC_LEN);
 			}
 			skb1->dev = dev; /* NB: deliver to wlanX */
