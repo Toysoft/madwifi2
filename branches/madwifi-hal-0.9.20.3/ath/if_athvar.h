@@ -369,23 +369,23 @@ struct ath_buf {
 	/* FFXXX: convert both list types to TAILQ to save a field? */
 	STAILQ_ENTRY(ath_buf) bf_list;
 #ifdef ATH_SUPERG_FF
-	TAILQ_ENTRY(ath_buf) bf_stagelist;	/* fast-frame staging list */
+	TAILQ_ENTRY(ath_buf) bf_stagelist;		/* fast-frame staging list */
 #endif
-	struct ath_desc	*bf_desc;		/* virtual addr of desc */
-	struct ath_desc_status	bf_dsstatus;	/* tx/rx descriptor status */
-	dma_addr_t bf_daddr;			/* physical addr of desc */
-	struct sk_buff *bf_skb;			/* skbuff for buf */
-	dma_addr_t bf_skbaddr;			/* physical addr of skb data */
-	struct ieee80211_node *bf_node;		/* pointer to the node */
-	u_int32_t bf_status;			/* status flags */
-	u_int16_t bf_flags;			/* tx descriptor flags */
+	struct ath_desc	*bf_desc;			/* virtual addr of desc */
+	struct ath_desc_status bf_dsstatus;		/* tx/rx descriptor status */
+	dma_addr_t bf_daddr;				/* physical addr of desc */
+	struct sk_buff *bf_skb;				/* skbuff for buf */
+	dma_addr_t bf_skbaddr;				/* physical addr of skb data - always used by one desc*/
+	struct ieee80211_node *bf_node;			/* pointer to the node */
+	u_int32_t bf_status;				/* status flags */
+	u_int16_t bf_flags;				/* tx descriptor flags */
 #ifdef ATH_SUPERG_FF
 	/* XXX: combine this with bf_skbaddr if it ever changes to accommodate
 	 *      multiple segments.
 	 */
-	u_int16_t bf_numdesc;			/* number of descs used */
-	u_int32_t bf_queueage; 			/* "age" of txq when this buffer placed on stageq */
-	dma_addr_t bf_skbaddrff[ATH_TXDESC-1]; 	/* extra addrs for ff */
+	u_int16_t bf_numdescff;				/* number of descs used for FF (these are extra) */
+	u_int32_t bf_queueage;				/* "age" of txq when this buffer placed on stageq */
+	dma_addr_t bf_skbaddrff[ATH_TXDESC - 1]; 	/* extra addrs for FF */
 #endif
 };
 
