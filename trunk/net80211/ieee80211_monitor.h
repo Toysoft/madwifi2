@@ -112,6 +112,7 @@ typedef struct {
 	(1 << IEEE80211_RADIOTAP_DBM_ANTNOISE)	| \
 	(1 << IEEE80211_RADIOTAP_ANTENNA)       | \
 	(1 << IEEE80211_RADIOTAP_DB_ANTSIGNAL)  | \
+	(1 << IEEE80211_RADIOTAP_RX_FLAGS)	| \
 	0)
 
 struct ath_rx_radiotap_header {
@@ -125,6 +126,7 @@ struct ath_rx_radiotap_header {
 	int8_t		wr_dbm_antnoise;
 	u_int8_t	wr_antenna;
 	u_int8_t	wr_antsignal;
+	__le16		wr_rxflags;
 }__attribute__((__packed__));
 
 #define ATH_TX_RADIOTAP_PRESENT (               \
@@ -133,6 +135,8 @@ struct ath_rx_radiotap_header {
 	(1 << IEEE80211_RADIOTAP_RATE)          | \
 	(1 << IEEE80211_RADIOTAP_DBM_TX_POWER)  | \
 	(1 << IEEE80211_RADIOTAP_ANTENNA)       | \
+	(1 << IEEE80211_RADIOTAP_TX_FLAGS)	| \
+	(1 << IEEE80211_RADIOTAP_DATA_RETRIES)	| \
 	0)
 
 struct ath_tx_radiotap_header {
@@ -142,6 +146,8 @@ struct ath_tx_radiotap_header {
 	u_int8_t	wt_rate;
 	u_int8_t	wt_txpower;
 	u_int8_t	wt_antenna;
+	__le16		wt_txflags;
+	u_int8_t	wt_dataretries;
 };
 
 /*
