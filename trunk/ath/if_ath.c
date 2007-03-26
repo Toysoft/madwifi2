@@ -2710,9 +2710,9 @@ ff_bypass:
 		if (bfcnt != framecnt) {
 			if (!STAILQ_EMPTY(&bf_head)) {
 				/*
-				**  Failed to alloc enough ath_bufs;
-				**  return to sc_txbuf list
-				*/
+				 *  Failed to alloc enough ath_bufs;
+				 *  return to sc_txbuf list
+				 */
 				STAILQ_FOREACH_SAFE(tbf, &bf_head, bf_list, tempbf) {
 					STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
 				}
@@ -2747,9 +2747,7 @@ ff_bypass:
 	}
 
 #ifdef ATH_SUPERG_FF
-	/*
-	 * flush out stale FF from staging Q for applicable operational modes.
-	 */
+	/* flush out stale FF from staging Q for applicable operational modes. */
 	/* XXX: ADHOC mode too? */
 	if (txq && ic->ic_opmode == IEEE80211_M_HOSTAP)
 		ath_ffstageq_flush(sc, txq, ath_ff_ageflushtestdone);
