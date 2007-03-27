@@ -37,6 +37,8 @@ CC = $(USER_CROSS_COMPILE)gcc
 BINDIR ?= /usr/local/bin
 MANDIR ?= /usr/local/man
 
+ATH_HAL = $(TOP)/ath_hal
+
 #
 # Path to the HAL source code.
 #
@@ -50,7 +52,7 @@ ALL=	athstats 80211stats athkey athchans athctrl \
 
 all:	$(ALL)
 
-INCS=	-I. -I$(HAL) -I$(TOP)
+INCS=	-I. -I$(HAL) -I$(TOP) -I$(ATH_HAL)
 CFLAGS=	-g -O2 -Wall
 ALL_CFLAGS= $(CFLAGS) $(INCS)
 LDFLAGS=
