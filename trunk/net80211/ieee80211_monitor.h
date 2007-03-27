@@ -148,7 +148,7 @@ struct ath_tx_radiotap_header {
 	u_int8_t	wt_antenna;
 	__le16		wt_txflags;
 	u_int8_t	wt_dataretries;
-};
+}__attribute__((__packed__));
 
 /*
  * Dispatch an skb to monitor-mode vap's.  The skb is assumed
