@@ -1069,7 +1069,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	 * Change the interface type for monitor mode.
 	 */
 	if (opmode == IEEE80211_M_MONITOR)
-		dev->type = ARPHRD_IEEE80211_PRISM;
+		dev->type = ARPHRD_IEEE80211_RADIOTAP;
 	if ((flags & IEEE80211_CLONE_BSSID) &&
 	    sc->sc_nvaps != 0 && opmode != IEEE80211_M_WDS && sc->sc_hasbmask) {
 		struct ieee80211vap *v;
@@ -7264,26 +7264,27 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			}
 		}
 
+		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
+		ath_tx_capture(sc->sc_dev, bf, bf->bf_skb);
+
 #ifdef ATH_SUPERG_FF
 		{
-			struct sk_buff *skbfree, *skb = bf->bf_skb;
+			struct sk_buff *skbnext = bf->bf_skb, *skb = NULL;
 			unsigned int i;
 
 			for (i = 0; i < bf->bf_numdescff; i++) {
-				skbfree = skb;
-				skb = skb->next;
-				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
-					__func__, skbfree);
-				ath_tx_capture(sc->sc_dev, bf, skbfree);
+				skb = skbnext;
+				skbnext = skb->next;
 				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i],
 						skb->len, BUS_DMA_TODEVICE);
+				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
+					__func__, skb);
+				ath_tx_capture(sc->sc_dev, bf, skb);
 			}
 		}
 		bf->bf_numdescff = 0;
-#else
-		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
-		ath_tx_capture(sc->sc_dev, bf, bf->bf_skb);
 #endif
+
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
