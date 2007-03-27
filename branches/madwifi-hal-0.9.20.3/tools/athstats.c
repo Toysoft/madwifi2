@@ -56,8 +56,11 @@
 #include <unistd.h>
 #include <err.h>
 
-#include "wireless_copy.h"
+/* We don't need the real TARGET.opt_ah.h */
+#define OPT_AH_H <stdio.h>
 #include "ah_desc.h"
+
+#include "wireless_copy.h"
 #include "if_athioctl.h"
 
 static const struct {
