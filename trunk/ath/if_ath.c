@@ -7314,26 +7314,27 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			}
 		}
 
+		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
+		ath_tx_capture(sc->sc_dev, ds, bf->bf_skb);
+
 #ifdef ATH_SUPERG_FF
 		{
-			struct sk_buff *skbfree, *skb = bf->bf_skb;
+			struct sk_buff *skbnext = bf->bf_skb, *skb = NULL;
 			unsigned int i;
 
 			for (i = 0; i < bf->bf_numdescff; i++) {
-				skbfree = skb;
-				skb = skb->next;
-				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
-					__func__, skbfree);
-				ath_tx_capture(sc->sc_dev, ds, skbfree);
+				skb = skbnext;
+				skbnext = skb->next;
 				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i],
 						skb->len, BUS_DMA_TODEVICE);
+				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
+					__func__, skb);
+				ath_tx_capture(sc->sc_dev, ds, skb);
 			}
 		}
 		bf->bf_numdescff = 0;
-#else
-		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
-		ath_tx_capture(sc->sc_dev, ds, bf->bf_skb);
 #endif
+
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
