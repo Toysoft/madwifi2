@@ -491,9 +491,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
-				if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
+				if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_BADFCS;
-				}
 				if (skb->len >= IEEE80211_CRC_LEN) 
 					th->wr_flags |= IEEE80211_RADIOTAP_F_FCS;
 
