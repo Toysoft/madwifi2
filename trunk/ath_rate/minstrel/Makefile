@@ -51,7 +51,7 @@ include $(TOP)/Makefile.inc
 
 INCS += -I$(TOP) -I$(ATH) -I$(ATH_HAL) -I$(HAL)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS)
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
 
 -include $(TOPDIR)/Rules.make
 
