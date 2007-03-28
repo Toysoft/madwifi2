@@ -305,7 +305,7 @@ MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
 MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
-MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|onoe|sample], defaults to '" DEF_RATE_CTL "'");
+MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|minstrel|onoe|sample], defaults to '" DEF_RATE_CTL "'");
 
 static int	ath_debug = 0;
 #ifdef AR_DEBUG
@@ -6514,7 +6514,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_hal *ah = sc->sc_ah;
 	int isprot, ismcast, istxfrag;
-	unsigned int keyix, hdrlen, pktlen, try0, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
+	unsigned int keyix, hdrlen, pktlen, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
+	int try0;
 	u_int8_t rix, txrate, ctsrate;
 	u_int32_t ivlen = 0, icvlen = 0;
 	u_int8_t cix = 0xff;		/* NB: silence compiler */
