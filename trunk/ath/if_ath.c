@@ -6565,7 +6565,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_hal *ah = sc->sc_ah;
 	int isprot, ismcast, istxfrag;
-	unsigned int keyix, hdrlen, pktlen, try0, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
+	unsigned int keyix, hdrlen, pktlen, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
+	int try0;
 	u_int8_t rix, txrate, ctsrate;
 	u_int32_t ivlen = 0, icvlen = 0;
 	u_int8_t cix = 0xff;		/* NB: silence compiler */
