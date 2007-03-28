@@ -112,7 +112,6 @@ typedef struct {
 	(1 << IEEE80211_RADIOTAP_DBM_ANTNOISE)	| \
 	(1 << IEEE80211_RADIOTAP_ANTENNA)       | \
 	(1 << IEEE80211_RADIOTAP_DB_ANTSIGNAL)  | \
-	(1 << IEEE80211_RADIOTAP_RX_FLAGS)	| \
 	0)
 
 struct ath_rx_radiotap_header {
@@ -126,7 +125,6 @@ struct ath_rx_radiotap_header {
 	int8_t		wr_dbm_antnoise;
 	u_int8_t	wr_antenna;
 	u_int8_t	wr_antsignal;
-	__le16		wr_rxflags;
 }__attribute__((__packed__));
 
 #define ATH_TX_RADIOTAP_PRESENT (               \
