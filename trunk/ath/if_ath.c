@@ -308,7 +308,7 @@ MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
 MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
-MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|onoe|sample], defaults to '" DEF_RATE_CTL "'");
+MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|minstrel|onoe|sample], defaults to '" DEF_RATE_CTL "'");
 
 static int	ath_debug = 0;
 #ifdef AR_DEBUG
