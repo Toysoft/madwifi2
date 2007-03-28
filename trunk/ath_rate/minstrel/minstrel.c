@@ -968,7 +968,7 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
         return (p - buf);
 }
 
-int
+static int
 ath_proc_ratesample_open(struct inode *inode, struct file *file)
 {
         struct proc_ieee80211_priv *pv = NULL;
