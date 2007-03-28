@@ -477,7 +477,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wt_antenna = antenna;
 
 				if (bf->bf_dsstatus.ds_txstat.ts_status & HAL_TXERR_XRETRY)
-					th->wt_txflags |= IEEE80211_RADIOTAP_F_TX_FAIL;
+					th->wt_txflags |= cpu_to_le16(IEEE80211_RADIOTAP_F_TX_FAIL);
 				
 				th->wt_dataretries = bf->bf_dsstatus.ds_txstat.ts_shortretry + bf->bf_dsstatus.ds_txstat.ts_longretry;
 				
@@ -499,10 +499,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
-				if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC) {
+				if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_BADFCS;
-					th->wr_rxflags |= IEEE80211_RADIOTAP_F_RX_BADFCS;
-				}
 				if (skb->len >= IEEE80211_CRC_LEN) 
 					th->wr_flags |= IEEE80211_RADIOTAP_F_FCS;
 
