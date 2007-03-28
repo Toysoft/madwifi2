@@ -46,9 +46,10 @@
 #include <net80211/ieee80211_rate.h>
 
 static const char *module_names[] = {
-	[IEEE80211_RATE_AMRR] = "ath_rate_amrr",
-	[IEEE80211_RATE_ONOE] = "ath_rate_onoe",
-	[IEEE80211_RATE_SAMPLE] = "ath_rate_sample"
+	[IEEE80211_RATE_AMRR]     = "ath_rate_amrr",
+	[IEEE80211_RATE_MINSTREL] = "ath_rate_minstrel",
+	[IEEE80211_RATE_ONOE]     = "ath_rate_onoe",
+	[IEEE80211_RATE_SAMPLE]   = "ath_rate_sample"
 };
 
 /*
