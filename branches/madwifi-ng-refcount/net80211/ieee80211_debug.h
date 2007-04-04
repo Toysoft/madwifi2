@@ -34,9 +34,7 @@
 #ifndef _NET80211_IEEE80211_DEBUG_H_
 #define _NET80211_IEEE80211_DEBUG_H_
 
-#define	IEEE80211_DEBUG
-#define	IEEE80211_DEBUG_REFCNT			/* node refcnt stuff */
-
+#include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211.h>
 
 #define	IEEE80211_MSG_DEBUG	0x40000000	/* IFF_DEBUG equivalent */

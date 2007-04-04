@@ -34,6 +34,7 @@
 #ifndef _NET80211_IEEE80211_NODE_H_
 #define _NET80211_IEEE80211_NODE_H_
 
+#include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_ioctl.h>		/* for ieee80211_nodestats */
 #include <net80211/ieee80211_proto.h>		/* for proto macros on node */
 
