@@ -31,8 +31,12 @@
  *
  * $Id$
  */
+
 #ifndef _NET80211_IEEE80211_VAR_H_
 #define _NET80211_IEEE80211_VAR_H_
+
+#define	IEEE80211_DEBUG
+#define	IEEE80211_DEBUG_REFCNT			/* Node reference count debugging */
 
 /* Definitions for IEEE 802.11 drivers. */
 #include <net80211/ieee80211_linux.h>
@@ -43,7 +47,6 @@
 #include <net80211/ieee80211.h>
 #include <net80211/ieee80211_crypto.h>
 #include <net80211/ieee80211_ioctl.h>		/* for ieee80211_stats */
-#include <net80211/ieee80211_node.h>
 #include <net80211/ieee80211_power.h>
 #include <net80211/ieee80211_proto.h>
 #include <net80211/ieee80211_scan.h>
@@ -243,6 +246,7 @@ struct ieee80211vap {
  * is used at runtime to determine if we should log an event
  */
 #include <net80211/ieee80211_debug.h>
+#include <net80211/ieee80211_node.h>
 
 struct ieee80211com {
 	struct net_device *ic_dev;		/* associated device */
