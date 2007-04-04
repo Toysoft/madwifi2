@@ -53,8 +53,8 @@
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
 
-#if WIRELESS_EXT < 14
-#error "Wireless extensions v14 or better is needed."
+#if WIRELESS_EXT < 15
+#error "Wireless extensions v15 or better is needed."
 #endif
 
 #include <asm/uaccess.h>
@@ -933,7 +933,6 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	memset(range, 0, sizeof(struct iw_range));
 
 	/* txpower (128 values, but will print out only IW_MAX_TXPOWER) */
-#if WIRELESS_EXT >= 10
 	range->num_txpower = (ic->ic_txpowlimit >= 8) ? IW_MAX_TXPOWER : ic->ic_txpowlimit;
 	step = ic->ic_txpowlimit / (2 * (IW_MAX_TXPOWER - 1));
  
@@ -941,8 +940,6 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	for (i = 1; i < IW_MAX_TXPOWER; i++)
 		range->txpower[i] = (ic->ic_txpowlimit/2)
 			- (IW_MAX_TXPOWER - i - 1) * step;
-#endif
-
 
 	range->txpower_capa = IW_TXPOW_DBM;
 
@@ -959,7 +956,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	range->we_version_compiled = WIRELESS_EXT;
-	range->we_version_source = 13;
+	range->we_version_source = 18;
 
 	range->retry_capa = IW_RETRY_LIMIT;
 	range->retry_flags = IW_RETRY_LIMIT;
@@ -1213,10 +1210,8 @@ ieee80211_ioctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 	
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		valid = (*mode == IW_MODE_MASTER);
-#if WIRELESS_EXT >= 15
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		valid = (*mode == IW_MODE_MONITOR);
-#endif
 	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		valid = (*mode == IW_MODE_ADHOC);
 	else if (imr.ifm_active & IFM_IEEE80211_WDS)
@@ -1239,10 +1234,8 @@ ieee80211_ioctl_giwmode(struct net_device *dev,	struct iw_request_info *info,
 
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		*mode = IW_MODE_MASTER;
-#if WIRELESS_EXT >= 15
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		*mode = IW_MODE_MONITOR;
-#endif
 	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		*mode = IW_MODE_ADHOC;
 	else if (imr.ifm_active & IFM_IEEE80211_WDS)
@@ -1549,7 +1542,6 @@ ieee80211_ioctl_siwscan(struct net_device *dev,	struct iw_request_info *info,
 	return 0;
 }
 
-#if WIRELESS_EXT > 14
 /*
  * Encode a WPA or RSN information element as a custom
  * element using the hostap format.
@@ -1573,7 +1565,6 @@ encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen,
 	}
 	return (i == ielen ? p - (u_int8_t *)buf : 0);
 }
-#endif /* WIRELESS_EXT > 14 */
 
 struct iwscanreq {		/* XXX: right place for this declaration? */
 	struct ieee80211vap *vap;
@@ -1590,13 +1581,11 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	char *current_ev = req->current_ev;
 	char *end_buf = req->end_buf;
 	char *last_ev;
-#if WIRELESS_EXT > 14
 #define MAX_IE_LENGTH 64 * 2 + 30
 	char buf[MAX_IE_LENGTH];
 #ifndef IWEVGENIE
 	static const char rsn_leader[] = "rsn_ie=";
 	static const char wpa_leader[] = "wpa_ie=";
-#endif
 #endif
 	struct iw_event iwe;
 	char *current_val;
@@ -1724,7 +1713,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	    return E2BIG;
 	}
 
-#if WIRELESS_EXT > 14
 	memset(&iwe, 0, sizeof(iwe));
 	last_ev = current_ev;
 	iwe.cmd = IWEVCUSTOM;
@@ -1825,7 +1813,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 			  return E2BIG;
 		}
 	}
-#endif /* WIRELESS_EXT > 14 */
 	req->current_ev = current_ev;
 
 	return 0;
@@ -4888,7 +4875,6 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_CHAR |  6, 0, "mode" },
 	{ IEEE80211_IOCTL_GETMODE,
 	  0, IW_PRIV_TYPE_CHAR | 6, "get_mode" },
-#if WIRELESS_EXT >= 12	  
 	{ IEEE80211_IOCTL_SETWMMPARAMS,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4, 0,"setwmmparams" },
 	{ IEEE80211_IOCTL_GETWMMPARAMS,
@@ -5191,8 +5177,6 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  0, IW_PRIV_TYPE_APPIEBUF, "getiebuf" },
 	{ IEEE80211_IOCTL_FILTERFRAME,
 	  IW_PRIV_TYPE_FILTER , 0, "setfilter" },
-
-#endif /* WIRELESS_EXT >= 12 */
 };
 
 #define set_handler(x,f) [x - SIOCIWFIRST] = (iw_handler) f
