@@ -42,5 +42,5 @@
 #ifdef SVNVERSION
 #define RELEASE_VERSION	SVNVERSION
 #else
-#define RELEASE_VERSION	"0.9.3"
+#define RELEASE_VERSION	"0.9.4"
 #endif
