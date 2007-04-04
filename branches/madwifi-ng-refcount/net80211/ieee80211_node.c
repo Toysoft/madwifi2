@@ -110,7 +110,6 @@ ieee80211_node_detach(struct ieee80211com *ic)
 {
 	del_timer(&ic->ic_inact);
 	ieee80211_node_table_cleanup(&ic->ic_sta);
-
 }
 
 void
@@ -981,7 +980,6 @@ ieee80211_remove_wds_addr(struct ieee80211_node_table *nt, const u_int8_t *macad
 }
 EXPORT_SYMBOL(ieee80211_remove_wds_addr);
 
-
 /* Remove node references from wds table */
 void
 ieee80211_del_wds_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
@@ -1358,27 +1356,25 @@ _ieee80211_free_node(struct ieee80211_node *ni)
 }
 EXPORT_SYMBOL(_ieee80211_free_node);
 
+static void _reset_node(void *arg, struct ieee80211_node *ni)
+{
+	if (ni->ni_associd != 0) {
+		struct ieee80211vap *vap = ni->ni_vap;
+
+		if (vap->iv_auth->ia_node_leave != NULL)
+			vap->iv_auth->ia_node_leave(ni);
+		if (vap->iv_aid_bitmap != NULL)
+			IEEE80211_AID_CLR(vap, ni->ni_associd);
+	}
+
+	ieee80211_node_leave(ni);
+}
+
 static void
 ieee80211_node_table_reset(struct ieee80211_node_table *nt,
-	struct ieee80211vap *match)
+	struct ieee80211vap *vap)
 {
-	struct ieee80211_node *ni, *next;
-
-	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
-	TAILQ_FOREACH_SAFE(ni, &nt->nt_node, ni_list, next) {
-		if (match != NULL && ni->ni_vap != match)
-			continue;
-		if (ni->ni_associd != 0) {
-			struct ieee80211vap *vap = ni->ni_vap;
-
-			if (vap->iv_auth->ia_node_leave != NULL)
-				vap->iv_auth->ia_node_leave(ni);
-			if (vap->iv_aid_bitmap != NULL)
-				IEEE80211_AID_CLR(vap, ni->ni_associd);
-		}
-		ieee80211_node_leave(ni);
-	}
-	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
+	ieee80211_iterate_dev_nodes(vap->iv_dev, nt, _reset_node, NULL);
 }
 
 static void

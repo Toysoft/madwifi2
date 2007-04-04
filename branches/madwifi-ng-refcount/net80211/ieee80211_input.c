@@ -543,10 +543,12 @@ ieee80211_input(struct ieee80211_node *ni,
 			 * the node table for the packet source address (addr4).
 			 * If not, add one.
 			 */
+			/* XXX: Useless node mgmt API; make better */
 			if (dir == IEEE80211_FC1_DIR_DSTODS) {
 				struct ieee80211_node_table *nt;
 				struct ieee80211_frame_addr4 *wh4;
 				struct ieee80211_node *ni_wds;
+
 				if (!(vap->iv_flags_ext & IEEE80211_FEXT_WDS)) {
 					IEEE80211_DISCARD(vap, IEEE80211_MSG_INPUT,
 						wh, "data", "%s", "4 addr not allowed");
@@ -569,7 +571,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				if (ni_wds == NULL)
 					ieee80211_add_wds_addr(nt, ni, wh4->i_addr4, 0);
 				else
-					ieee80211_unref_node(&ni_wds); /* Decr ref count */
+					ieee80211_unref_node(&ni_wds); /* Decr. ref count */
 			}
 			
 			/*
