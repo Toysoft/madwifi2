@@ -53,8 +53,8 @@
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
 
-#if WIRELESS_EXT < 14
-#error "Wireless extensions v14 or better is needed."
+#if WIRELESS_EXT < 15
+#error "Wireless extensions v15 or better is needed."
 #endif
 
 #include <asm/uaccess.h>
@@ -858,6 +858,7 @@ ieee80211_ioctl_siwessid(struct net_device *dev, struct iw_request_info *info,
 		memcpy(vap->iv_des_ssid[0].ssid, ssid, data->length);
 		vap->iv_des_ssid[0].len = data->length;
 		vap->iv_des_nssid = 1;
+#if WIRELESS_EXT < 21
 		/*
 		 * Deduct a trailing \0 since iwconfig passes a string
 		 * length that includes this.  Unfortunately this means
@@ -867,9 +868,11 @@ ieee80211_ioctl_siwessid(struct net_device *dev, struct iw_request_info *info,
 		 * exactly those bytes that are meaningful and not include
 		 * extraneous stuff).
 		 */
+		/* The API was fixed in WE21 */
 		if (data->length > 0 &&
 		    vap->iv_des_ssid[0].ssid[data->length - 1] == '\0')
 			vap->iv_des_ssid[0].len--;
+#endif /* WIRELESS_EXT < 21 */
 	}
 #ifdef ATH_SUPERG_XR 
 	if (vap->iv_xrvap != NULL && !(vap->iv_flags & IEEE80211_F_XR)) {
@@ -930,7 +933,6 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	memset(range, 0, sizeof(struct iw_range));
 
 	/* txpower (128 values, but will print out only IW_MAX_TXPOWER) */
-#if WIRELESS_EXT >= 10
 	range->num_txpower = (ic->ic_txpowlimit >= 8) ? IW_MAX_TXPOWER : ic->ic_txpowlimit;
 	step = ic->ic_txpowlimit / (2 * (IW_MAX_TXPOWER - 1));
  
@@ -938,8 +940,6 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	for (i = 1; i < IW_MAX_TXPOWER; i++)
 		range->txpower[i] = (ic->ic_txpowlimit/2)
 			- (IW_MAX_TXPOWER - i - 1) * step;
-#endif
-
 
 	range->txpower_capa = IW_TXPOW_DBM;
 
@@ -956,7 +956,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	range->we_version_compiled = WIRELESS_EXT;
-	range->we_version_source = 13;
+	range->we_version_source = 18;
 
 	range->retry_capa = IW_RETRY_LIMIT;
 	range->retry_flags = IW_RETRY_LIMIT;
@@ -1210,10 +1210,8 @@ ieee80211_ioctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 	
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		valid = (*mode == IW_MODE_MASTER);
-#if WIRELESS_EXT >= 15
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		valid = (*mode == IW_MODE_MONITOR);
-#endif
 	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		valid = (*mode == IW_MODE_ADHOC);
 	else if (imr.ifm_active & IFM_IEEE80211_WDS)
@@ -1236,10 +1234,8 @@ ieee80211_ioctl_giwmode(struct net_device *dev,	struct iw_request_info *info,
 
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		*mode = IW_MODE_MASTER;
-#if WIRELESS_EXT >= 15
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		*mode = IW_MODE_MONITOR;
-#endif
 	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		*mode = IW_MODE_ADHOC;
 	else if (imr.ifm_active & IFM_IEEE80211_WDS)
@@ -1546,7 +1542,6 @@ ieee80211_ioctl_siwscan(struct net_device *dev,	struct iw_request_info *info,
 	return 0;
 }
 
-#if WIRELESS_EXT > 14
 /*
  * Encode a WPA or RSN information element as a custom
  * element using the hostap format.
@@ -1570,7 +1565,6 @@ encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen,
 	}
 	return (i == ielen ? p - (u_int8_t *)buf : 0);
 }
-#endif /* WIRELESS_EXT > 14 */
 
 struct iwscanreq {		/* XXX: right place for this declaration? */
 	struct ieee80211vap *vap;
@@ -1587,13 +1581,11 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	char *current_ev = req->current_ev;
 	char *end_buf = req->end_buf;
 	char *last_ev;
-#if WIRELESS_EXT > 14
 #define MAX_IE_LENGTH 64 * 2 + 30
 	char buf[MAX_IE_LENGTH];
 #ifndef IWEVGENIE
 	static const char rsn_leader[] = "rsn_ie=";
 	static const char wpa_leader[] = "wpa_ie=";
-#endif
 #endif
 	struct iw_event iwe;
 	char *current_val;
@@ -1721,7 +1713,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	    return E2BIG;
 	}
 
-#if WIRELESS_EXT > 14
 	memset(&iwe, 0, sizeof(iwe));
 	last_ev = current_ev;
 	iwe.cmd = IWEVCUSTOM;
@@ -1822,7 +1813,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 			  return E2BIG;
 		}
 	}
-#endif /* WIRELESS_EXT > 14 */
 	req->current_ev = current_ev;
 
 	return 0;
@@ -3326,8 +3316,16 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211req_mlme *mlme = (struct ieee80211req_mlme *)extra;
 	struct ieee80211_node *ni;
 
-	if (!IS_UP(dev))
-		return -EINVAL;
+	if (!IS_UP(dev)) {
+		switch (mlme->im_op) {
+		case IEEE80211_MLME_DISASSOC:
+		case IEEE80211_MLME_DEAUTH:
+		case IEEE80211_MLME_UNAUTHORIZE:
+			return 0;
+		default:
+			return -ENETDOWN;
+		}
+	}
 	switch (mlme->im_op) {
 	case IEEE80211_MLME_ASSOC:
 		if (vap->iv_opmode == IEEE80211_M_STA) {
@@ -4877,7 +4875,6 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_CHAR |  6, 0, "mode" },
 	{ IEEE80211_IOCTL_GETMODE,
 	  0, IW_PRIV_TYPE_CHAR | 6, "get_mode" },
-#if WIRELESS_EXT >= 12	  
 	{ IEEE80211_IOCTL_SETWMMPARAMS,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4, 0,"setwmmparams" },
 	{ IEEE80211_IOCTL_GETWMMPARAMS,
@@ -5180,116 +5177,89 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  0, IW_PRIV_TYPE_APPIEBUF, "getiebuf" },
 	{ IEEE80211_IOCTL_FILTERFRAME,
 	  IW_PRIV_TYPE_FILTER , 0, "setfilter" },
-
-#endif /* WIRELESS_EXT >= 12 */
 };
 
+#define set_handler(x,f) [x - SIOCIWFIRST] = (iw_handler) f
 static const iw_handler ieee80211_handlers[] = {
-	(iw_handler) NULL,				/* SIOCSIWCOMMIT */
-	(iw_handler) ieee80211_ioctl_giwname,		/* SIOCGIWNAME */
-	(iw_handler) NULL,				/* SIOCSIWNWID */
-	(iw_handler) NULL,				/* SIOCGIWNWID */
-	(iw_handler) ieee80211_ioctl_siwfreq,		/* SIOCSIWFREQ */
-	(iw_handler) ieee80211_ioctl_giwfreq,		/* SIOCGIWFREQ */
-	(iw_handler) ieee80211_ioctl_siwmode,		/* SIOCSIWMODE */
-	(iw_handler) ieee80211_ioctl_giwmode,		/* SIOCGIWMODE */
-	(iw_handler) ieee80211_ioctl_siwsens,		/* SIOCSIWSENS */
-	(iw_handler) ieee80211_ioctl_giwsens,		/* SIOCGIWSENS */
-	(iw_handler) NULL /* not used */,		/* SIOCSIWRANGE */
-	(iw_handler) ieee80211_ioctl_giwrange,		/* SIOCGIWRANGE */
-	(iw_handler) NULL /* not used */,		/* SIOCSIWPRIV */
-	(iw_handler) NULL /* kernel code */,		/* SIOCGIWPRIV */
-	(iw_handler) NULL /* not used */,		/* SIOCSIWSTATS */
-	(iw_handler) NULL /* kernel code */,		/* SIOCGIWSTATS */
-	(iw_handler) ieee80211_ioctl_setspy,		/* SIOCSIWSPY */
-	(iw_handler) ieee80211_ioctl_getspy,		/* SIOCGIWSPY */
+	set_handler(SIOCGIWNAME, ieee80211_ioctl_giwname),
+	set_handler(SIOCSIWFREQ, ieee80211_ioctl_siwfreq),
+	set_handler(SIOCGIWFREQ, ieee80211_ioctl_giwfreq),
+	set_handler(SIOCSIWMODE, ieee80211_ioctl_siwmode),
+	set_handler(SIOCGIWMODE, ieee80211_ioctl_giwmode),
+	set_handler(SIOCSIWSENS, ieee80211_ioctl_siwsens),
+	set_handler(SIOCGIWSENS, ieee80211_ioctl_giwsens),
+	set_handler(SIOCGIWRANGE, ieee80211_ioctl_giwrange),
+	set_handler(SIOCSIWSPY, ieee80211_ioctl_setspy),
+	set_handler(SIOCGIWSPY, ieee80211_ioctl_getspy),
 #if WIRELESS_EXT >= 16
-	(iw_handler) ieee80211_ioctl_setthrspy,		/* SIOCSIWTHRSPY */
-	(iw_handler) ieee80211_ioctl_getthrspy,		/* SIOCGIWTHRSPY */
-#else
-	(iw_handler) NULL,				/* SIOCSIWTHRSPY */
-	(iw_handler) NULL,				/* SIOCGIWTHRSPY */
+	set_handler(SIOCSIWTHRSPY, ieee80211_ioctl_setthrspy),
+	set_handler(SIOCGIWTHRSPY, ieee80211_ioctl_getthrspy),
 #endif
-	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
-	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
+	set_handler(SIOCSIWAP, ieee80211_ioctl_siwap),
+	set_handler(SIOCGIWAP, ieee80211_ioctl_giwap),
 #ifdef SIOCSIWMLME
-	(iw_handler) ieee80211_ioctl_siwmlme,		/* SIOCSIWMLME */
-#else
-	(iw_handler) NULL,				/* -- hole -- */
+	set_handler(SIOCSIWMLME, ieee80211_ioctl_siwmlme),
 #endif
-	(iw_handler) ieee80211_ioctl_iwaplist,		/* SIOCGIWAPLIST */
+	set_handler(SIOCGIWAPLIST, ieee80211_ioctl_iwaplist),
 #ifdef SIOCGIWSCAN
-	(iw_handler) ieee80211_ioctl_siwscan,		/* SIOCSIWSCAN */
-	(iw_handler) ieee80211_ioctl_giwscan,		/* SIOCGIWSCAN */
-#else
-	(iw_handler) NULL,				/* SIOCSIWSCAN */
-	(iw_handler) NULL,				/* SIOCGIWSCAN */
+	set_handler(SIOCSIWSCAN, ieee80211_ioctl_siwscan),
+	set_handler(SIOCGIWSCAN, ieee80211_ioctl_giwscan),
 #endif /* SIOCGIWSCAN */
-	(iw_handler) ieee80211_ioctl_siwessid,		/* SIOCSIWESSID */
-	(iw_handler) ieee80211_ioctl_giwessid,		/* SIOCGIWESSID */
-	(iw_handler) ieee80211_ioctl_siwnickn,		/* SIOCSIWNICKN */
-	(iw_handler) ieee80211_ioctl_giwnickn,		/* SIOCGIWNICKN */
-	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) ieee80211_ioctl_siwrate,		/* SIOCSIWRATE */
-	(iw_handler) ieee80211_ioctl_giwrate,		/* SIOCGIWRATE */
-	(iw_handler) ieee80211_ioctl_siwrts,		/* SIOCSIWRTS */
-	(iw_handler) ieee80211_ioctl_giwrts,		/* SIOCGIWRTS */
-	(iw_handler) ieee80211_ioctl_siwfrag,		/* SIOCSIWFRAG */
-	(iw_handler) ieee80211_ioctl_giwfrag,		/* SIOCGIWFRAG */
-	(iw_handler) ieee80211_ioctl_siwtxpow,		/* SIOCSIWTXPOW */
-	(iw_handler) ieee80211_ioctl_giwtxpow,		/* SIOCGIWTXPOW */
-	(iw_handler) ieee80211_ioctl_siwretry,		/* SIOCSIWRETRY */
-	(iw_handler) ieee80211_ioctl_giwretry,		/* SIOCGIWRETRY */
-	(iw_handler) ieee80211_ioctl_siwencode,		/* SIOCSIWENCODE */
-	(iw_handler) ieee80211_ioctl_giwencode,		/* SIOCGIWENCODE */
-	(iw_handler) ieee80211_ioctl_siwpower,		/* SIOCSIWPOWER */
-	(iw_handler) ieee80211_ioctl_giwpower,		/* SIOCGIWPOWER */
-	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) NULL,				/* -- hole -- */
+	set_handler(SIOCSIWESSID, ieee80211_ioctl_siwessid),
+	set_handler(SIOCGIWESSID, ieee80211_ioctl_giwessid),
+	set_handler(SIOCSIWNICKN, ieee80211_ioctl_siwnickn),
+	set_handler(SIOCGIWNICKN, ieee80211_ioctl_giwnickn),
+	set_handler(SIOCSIWRATE, ieee80211_ioctl_siwrate),
+	set_handler(SIOCGIWRATE, ieee80211_ioctl_giwrate),
+	set_handler(SIOCSIWRTS, ieee80211_ioctl_siwrts),
+	set_handler(SIOCGIWRTS, ieee80211_ioctl_giwrts),
+	set_handler(SIOCSIWFRAG, ieee80211_ioctl_siwfrag),
+	set_handler(SIOCGIWFRAG, ieee80211_ioctl_giwfrag),
+	set_handler(SIOCSIWTXPOW, ieee80211_ioctl_siwtxpow),
+	set_handler(SIOCGIWTXPOW, ieee80211_ioctl_giwtxpow),
+	set_handler(SIOCSIWRETRY, ieee80211_ioctl_siwretry),
+	set_handler(SIOCGIWRETRY, ieee80211_ioctl_giwretry),
+	set_handler(SIOCSIWENCODE, ieee80211_ioctl_siwencode),
+	set_handler(SIOCGIWENCODE, ieee80211_ioctl_giwencode),
+	set_handler(SIOCSIWPOWER, ieee80211_ioctl_siwpower),
+	set_handler(SIOCGIWPOWER, ieee80211_ioctl_giwpower),
 #if WIRELESS_EXT >= 18
-	(iw_handler) ieee80211_ioctl_siwgenie,		/* SIOCSIWGENIE */
-	(iw_handler) ieee80211_ioctl_giwgenie,		/* SIOCGIWGENIE */
-	(iw_handler) ieee80211_ioctl_siwauth,		/* SIOCSIWAUTH */
-	(iw_handler) ieee80211_ioctl_giwauth,		/* SIOCGIWAUTH */
-	(iw_handler) ieee80211_ioctl_siwencodeext,	/* SIOCSIWENCODEEXT */
-	(iw_handler) ieee80211_ioctl_giwencodeext,	/* SIOCGIWENCODEEXT */
+	set_handler(SIOCSIWGENIE, ieee80211_ioctl_siwgenie),
+	set_handler(SIOCGIWGENIE, ieee80211_ioctl_giwgenie),
+	set_handler(SIOCSIWAUTH, ieee80211_ioctl_siwauth),
+	set_handler(SIOCGIWAUTH, ieee80211_ioctl_giwauth),
+	set_handler(SIOCSIWENCODEEXT, ieee80211_ioctl_siwencodeext),
+	set_handler(SIOCGIWENCODEEXT, ieee80211_ioctl_giwencodeext),
 #endif /* WIRELESS_EXT >= 18 */
 };
+
+#define set_priv(x,f) [x - SIOCIWFIRSTPRIV] = (iw_handler) f
 static const iw_handler ieee80211_priv_handlers[] = {
-	(iw_handler) ieee80211_ioctl_setparam,		/* SIOCIWFIRSTPRIV+0 */
-	(iw_handler) ieee80211_ioctl_getparam,		/* SIOCIWFIRSTPRIV+1 */
-	(iw_handler) ieee80211_ioctl_setmode,		/* SIOCIWFIRSTPRIV+2 */
-	(iw_handler) ieee80211_ioctl_getmode,		/* SIOCIWFIRSTPRIV+3 */
-	(iw_handler) ieee80211_ioctl_setwmmparams,	/* SIOCIWFIRSTPRIV+4 */
-	(iw_handler) ieee80211_ioctl_getwmmparams,	/* SIOCIWFIRSTPRIV+5 */
-	(iw_handler) ieee80211_ioctl_setchanlist,	/* SIOCIWFIRSTPRIV+6 */
-	(iw_handler) ieee80211_ioctl_getchanlist,	/* SIOCIWFIRSTPRIV+7 */
-	(iw_handler) ieee80211_ioctl_chanswitch,	/* SIOCIWFIRSTPRIV+8 */
-	(iw_handler) ieee80211_ioctl_getappiebuf,	/* SIOCIWFIRSTPRIV+9 */
-	(iw_handler) ieee80211_ioctl_setappiebuf,	/* SIOCIWFIRSTPRIV+10 */
-	(iw_handler) ieee80211_ioctl_getscanresults,	/* SIOCIWFIRSTPRIV+11 */
-	(iw_handler) ieee80211_ioctl_setfilter,		/* SIOCIWFIRSTPRIV+12 */
-	(iw_handler) ieee80211_ioctl_getchaninfo,	/* SIOCIWFIRSTPRIV+13 */
-	(iw_handler) ieee80211_ioctl_setoptie,		/* SIOCIWFIRSTPRIV+14 */
-	(iw_handler) ieee80211_ioctl_getoptie,		/* SIOCIWFIRSTPRIV+15 */
-	(iw_handler) ieee80211_ioctl_setmlme,		/* SIOCIWFIRSTPRIV+16 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+17 */
-	(iw_handler) ieee80211_ioctl_setkey,		/* SIOCIWFIRSTPRIV+18 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+19 */
-	(iw_handler) ieee80211_ioctl_delkey,		/* SIOCIWFIRSTPRIV+20 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+21 */
-	(iw_handler) ieee80211_ioctl_addmac,		/* SIOCIWFIRSTPRIV+22 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+23 */
-	(iw_handler) ieee80211_ioctl_delmac,		/* SIOCIWFIRSTPRIV+24 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+25 */
-	(iw_handler) ieee80211_ioctl_wdsmac,		/* SIOCIWFIRSTPRIV+26 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+27 */
-	(iw_handler) ieee80211_ioctl_wdsdelmac,		/* SIOCIWFIRSTPRIV+28 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+29 */
-	(iw_handler) ieee80211_ioctl_kickmac,		/* SIOCIWFIRSTPRIV+30 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+31 */
+	set_priv(IEEE80211_IOCTL_SETPARAM, ieee80211_ioctl_setparam),
+	set_priv(IEEE80211_IOCTL_GETPARAM, ieee80211_ioctl_getparam),
+	set_priv(IEEE80211_IOCTL_SETMODE, ieee80211_ioctl_setmode),
+	set_priv(IEEE80211_IOCTL_GETMODE, ieee80211_ioctl_getmode),
+	set_priv(IEEE80211_IOCTL_SETWMMPARAMS, ieee80211_ioctl_setwmmparams),
+	set_priv(IEEE80211_IOCTL_GETWMMPARAMS, ieee80211_ioctl_getwmmparams),
+	set_priv(IEEE80211_IOCTL_SETCHANLIST, ieee80211_ioctl_setchanlist),
+	set_priv(IEEE80211_IOCTL_GETCHANLIST, ieee80211_ioctl_getchanlist),
+	set_priv(IEEE80211_IOCTL_CHANSWITCH, ieee80211_ioctl_chanswitch),
+	set_priv(IEEE80211_IOCTL_GET_APPIEBUF, ieee80211_ioctl_getappiebuf),
+	set_priv(IEEE80211_IOCTL_SET_APPIEBUF, ieee80211_ioctl_setappiebuf),
+	set_priv(IEEE80211_IOCTL_FILTERFRAME, ieee80211_ioctl_setfilter),
+	set_priv(IEEE80211_IOCTL_GETCHANINFO, ieee80211_ioctl_getchaninfo),
+	set_priv(IEEE80211_IOCTL_SETOPTIE, ieee80211_ioctl_setoptie),
+	set_priv(IEEE80211_IOCTL_GETOPTIE, ieee80211_ioctl_getoptie),
+	set_priv(IEEE80211_IOCTL_SETMLME, ieee80211_ioctl_setmlme),
+	set_priv(IEEE80211_IOCTL_SETKEY, ieee80211_ioctl_setkey),
+	set_priv(IEEE80211_IOCTL_DELKEY, ieee80211_ioctl_delkey),
+	set_priv(IEEE80211_IOCTL_ADDMAC, ieee80211_ioctl_addmac),
+	set_priv(IEEE80211_IOCTL_DELMAC, ieee80211_ioctl_delmac),
+	set_priv(IEEE80211_IOCTL_WDSADDMAC, ieee80211_ioctl_wdsmac),
+	set_priv(IEEE80211_IOCTL_WDSDELMAC, ieee80211_ioctl_wdsdelmac),
+	set_priv(IEEE80211_IOCTL_KICKMAC, ieee80211_ioctl_kickmac),
 };
+
 static struct iw_handler_def ieee80211_iw_handler_def = {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
 	.standard		= (iw_handler *) ieee80211_handlers,

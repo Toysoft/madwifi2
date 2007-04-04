@@ -29,7 +29,6 @@
 #ifndef _NET80211_IEEE80211_MONITOR_H_
 #define _NET80211_IEEE80211_MONITOR_H_
 
-
 #ifndef ARPHRD_IEEE80211_RADIOTAP
 #define ARPHRD_IEEE80211_RADIOTAP	803 /* IEEE 802.11 + radiotap header */
 #endif /* ARPHRD_IEEE80211_RADIOTAP */
@@ -43,11 +42,12 @@
 #include <net80211/ieee80211_radiotap.h>
 #include <ah_desc.h>
 #include <ath/if_athvar.h>
+
 struct ieee80211_phy_params {
 	u_int8_t rate0;
 	u_int8_t rate1;
 	u_int8_t rate2;
-	u_int8_t rate3;
+	u_int8_t rate3;	
 
 	u_int8_t try0;
 	u_int8_t try1;
@@ -57,8 +57,6 @@ struct ieee80211_phy_params {
 	u_int8_t power;
 	u_int32_t flags;
 };
-
-
 
 enum {
 	DIDmsg_lnxind_wlansniffrm		= 0x00000044,
@@ -82,74 +80,73 @@ enum {
 };
 
 typedef struct {
-        u_int32_t did;
-        u_int16_t status;
-        u_int16_t len;
-        u_int32_t data;
+	u_int32_t did;
+	u_int16_t status;
+	u_int16_t len;
+	u_int32_t data;
 } p80211item_uint32_t;
 
 typedef struct {
-        u_int32_t msgcode;
-        u_int32_t msglen;
+	u_int32_t msgcode;
+	u_int32_t msglen;
 #define WLAN_DEVNAMELEN_MAX 16
-        u_int8_t devname[WLAN_DEVNAMELEN_MAX];
-        p80211item_uint32_t hosttime;
-        p80211item_uint32_t mactime;
-        p80211item_uint32_t channel;
-        p80211item_uint32_t rssi;
-        p80211item_uint32_t sq;
-        p80211item_uint32_t signal;
-        p80211item_uint32_t noise;
-        p80211item_uint32_t rate;
-        p80211item_uint32_t istx;
-        p80211item_uint32_t frmlen;
+	u_int8_t devname[WLAN_DEVNAMELEN_MAX];
+	p80211item_uint32_t hosttime;
+	p80211item_uint32_t mactime;
+	p80211item_uint32_t channel;
+	p80211item_uint32_t rssi;
+	p80211item_uint32_t sq;
+	p80211item_uint32_t signal;
+	p80211item_uint32_t noise;
+	p80211item_uint32_t rate;
+	p80211item_uint32_t istx;
+	p80211item_uint32_t frmlen;
 } wlan_ng_prism2_header;
-
-
 
 #define ATH_RX_RADIOTAP_PRESENT (               \
 	(1 << IEEE80211_RADIOTAP_TSFT)		| \
-        (1 << IEEE80211_RADIOTAP_FLAGS)         | \
-        (1 << IEEE80211_RADIOTAP_RATE)          | \
-        (1 << IEEE80211_RADIOTAP_CHANNEL)       | \
+	(1 << IEEE80211_RADIOTAP_FLAGS)         | \
+	(1 << IEEE80211_RADIOTAP_RATE)          | \
+	(1 << IEEE80211_RADIOTAP_CHANNEL)       | \
 	(1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL)	| \
 	(1 << IEEE80211_RADIOTAP_DBM_ANTNOISE)	| \
-        (1 << IEEE80211_RADIOTAP_ANTENNA)       | \
-        (1 << IEEE80211_RADIOTAP_DB_ANTSIGNAL)  | \
-        (1 << IEEE80211_RADIOTAP_FCS)           | \
-        0)
+	(1 << IEEE80211_RADIOTAP_ANTENNA)       | \
+	(1 << IEEE80211_RADIOTAP_DB_ANTSIGNAL)  | \
+	0)
 
 struct ath_rx_radiotap_header {
-        struct ieee80211_radiotap_header wr_ihdr;
-	__le64 wr_tsft;
-        u_int8_t wr_flags;
-        u_int8_t wr_rate;
-        __le16 wr_chan_freq;
-        __le16 wr_chan_flags;
-	int8_t  wr_dbm_antsignal;
-	int8_t  wr_dbm_antnoise;
-        u_int8_t wr_antenna;
-        u_int8_t wr_antsignal;
-	u_int8_t wr_pad[2]; /* Ensure fcs is on 32 bit boundary */
-	__le32 wr_fcs;
+	struct ieee80211_radiotap_header wr_ihdr;
+	__le64		wr_tsft;
+	u_int8_t	wr_flags;
+	u_int8_t	wr_rate;
+	__le16		wr_chan_freq;
+	__le16		wr_chan_flags;
+	int8_t		wr_dbm_antsignal;
+	int8_t		wr_dbm_antnoise;
+	u_int8_t	wr_antenna;
+	u_int8_t	wr_antsignal;
 }__attribute__((__packed__));
 
 #define ATH_TX_RADIOTAP_PRESENT (               \
 	(1 << IEEE80211_RADIOTAP_TSFT)		| \
-        (1 << IEEE80211_RADIOTAP_FLAGS)         | \
-        (1 << IEEE80211_RADIOTAP_RATE)          | \
-        (1 << IEEE80211_RADIOTAP_DBM_TX_POWER)  | \
-        (1 << IEEE80211_RADIOTAP_ANTENNA)       | \
-        0)
+	(1 << IEEE80211_RADIOTAP_FLAGS)         | \
+	(1 << IEEE80211_RADIOTAP_RATE)          | \
+	(1 << IEEE80211_RADIOTAP_DBM_TX_POWER)  | \
+	(1 << IEEE80211_RADIOTAP_ANTENNA)       | \
+	(1 << IEEE80211_RADIOTAP_TX_FLAGS)	| \
+	(1 << IEEE80211_RADIOTAP_DATA_RETRIES)	| \
+	0)
 
 struct ath_tx_radiotap_header {
-        struct ieee80211_radiotap_header wt_ihdr;
-	__le64 wt_tsft;
-        u_int8_t wt_flags;	
-        u_int8_t wt_rate;
-        u_int8_t wt_txpower;
-        u_int8_t wt_antenna;
-};
+	struct ieee80211_radiotap_header wt_ihdr;
+	__le64		wt_tsft;
+	u_int8_t	wt_flags;	
+	u_int8_t	wt_rate;
+	u_int8_t	wt_txpower;
+	u_int8_t	wt_antenna;
+	__le16		wt_txflags;
+	u_int8_t	wt_dataretries;
+}__attribute__((__packed__));
 
 /*
  * Dispatch an skb to monitor-mode vap's.  The skb is assumed

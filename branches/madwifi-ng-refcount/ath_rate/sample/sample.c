@@ -777,6 +777,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	const HAL_RATE_TABLE *rt = sc->sc_currates;
 	unsigned int x, y;
 	unsigned int srate;
+	
 	sn->num_rates = 0;
 
 	if (rt == NULL) {
@@ -812,8 +813,6 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 
 	if (vap->iv_fixed_rate != -1) {
-		srate = sn->num_rates - 1;
-
 		/*
 		 * A fixed rate is to be used; ic_fixed_rate is an
 		 * index into the supported rate set.  Convert this
@@ -822,9 +821,11 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * rate set is checked when the station associates.
 		 */
 		/* NB: the rate set is assumed sorted */
-		for (; srate >= 0 && (ni->ni_rates.rs_rates[srate] & IEEE80211_RATE_VAL) != vap->iv_fixed_rate; srate--);
+		for (x = 0, srate = 0; x < sn->num_rates; x++)
+			if ((ni->ni_rates.rs_rates[x] & IEEE80211_RATE_VAL) == vap->iv_fixed_rate)
+				srate = x;
 
-		KASSERT(srate >= 0,
+		KASSERT(((ni->ni_rates.rs_rates[srate] & IEEE80211_RATE_VAL) == vap->iv_fixed_rate),
 			("fixed rate %u not in rate set", vap->iv_fixed_rate));
 
 		sn->static_rate_ndx = srate;

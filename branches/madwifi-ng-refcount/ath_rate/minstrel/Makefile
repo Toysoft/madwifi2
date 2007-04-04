@@ -34,8 +34,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGES.
 #
-# $Id: //depot/sw/linuxsrc/src/802_11/madwifi/madwifi/ath_rate/onoe/Makefile $
-#
 
 #
 # Makefile for the Atheros Rate Control Support.
@@ -46,8 +44,8 @@ endif
 
 TOP = $(obj)/../..
 
-obj-m		+= ath_rate_onoe.o
-ath_rate_onoe-objs	:= onoe.o
+obj-m		+= ath_rate_minstrel.o
+ath_rate_minstrel-objs	:= minstrel.o
 
 include $(TOP)/Makefile.inc
 
@@ -62,12 +60,12 @@ all:
 
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
-	cp ath_rate_onoe.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+	cp ath_rate_minstrel.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	-rm -f *~ *.o *.ko *.mod.c
 	-rm -f .depend .version .*.o.flags .*.o.d .*.o.cmd .*.ko.cmd
 	-rm -rf .tmp_versions
 
-ath_rate_onoe.o: $(ath_rate_onoe-objs)
-	$(LD) $(LDOPTS) -o ath_rate_onoe.$(KMODSUF) -r $(ath_rate_onoe-objs)
+ath_rate_minstrel.o: $(ath_rate_minstrel-objs)
+	$(LD) $(LDOPTS) -o ath_rate_minstrel.$(KMODSUF) -r $(ath_rate_minstrel-objs)
