@@ -311,7 +311,7 @@ void ieee80211_parent_queue_xmit(struct sk_buff *skb) {
 	vap->iv_devstats.tx_bytes += skb->len;
 	vap->iv_ic->ic_lastdata = jiffies;
 
-	// Dispatch the packet to the parent device
+	/* Dispatch the packet to the parent device */
 	skb->dev = vap->iv_ic->ic_dev;
 	(void) dev_queue_xmit(skb);
 }

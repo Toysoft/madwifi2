@@ -2582,8 +2582,10 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			skb = bf->bf_skb;
 			ATH_FF_MAGIC_PUT(skb);
 
+#if 0
 			/* decrement extra node reference made when an_tx_ffbuf[] was set */
-			//ieee80211_unref_node(&ni); /* XXX where was it set ? */
+			ieee80211_unref_node(&ni); /* XXX where was it set ? */
+#endif
 
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
 				"%s: aggregating fast-frame\n", __func__);
@@ -4813,7 +4815,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 		an->an_uapsd_overflowqdepth--;
 	}
 
-	// Clean up node-specific rate things - this currently appears to always be a no-op
+	/* Clean up node-specific rate things - this currently appears to always be a no-op */
 	sc->sc_rc->ops->node_cleanup(sc, ATH_NODE(ni));
 
 	ATH_NODE_UAPSD_LOCK_IRQ(an);

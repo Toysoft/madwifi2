@@ -369,7 +369,7 @@ ieee80211_reset_bss(struct ieee80211vap *vap)
 	ni = ieee80211_alloc_node_table(vap, vap->iv_myaddr);
 	KASSERT(ni != NULL, ("unable to setup inital BSS node"));
 	obss = vap->iv_bss;
-	// Caller's reference
+	/* New reference for caller */
 	vap->iv_bss = ieee80211_ref_node(ni);
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, "%s: new bss %p<%s> refcnt %d\n",
@@ -379,7 +379,7 @@ ieee80211_reset_bss(struct ieee80211vap *vap)
 	if (obss != NULL) {
 		copy_bss(ni, obss);
 		ni->ni_intval = ic->ic_lintval;
-		// Caller's reference
+		/* Caller's reference */
 		ieee80211_unref_node(&obss);
 	}
 }
@@ -830,7 +830,7 @@ static void
 node_free(struct ieee80211_node *ni)
 {
 #if 0
-	// We should 'cleanup' and then free'ing should be done automatically on decref
+	/* We should 'cleanup' and then free'ing should be done automatically on decref */
 	struct ieee80211com *ic = ni->ni_ic;
 
 	ic->ic_node_cleanup(ni);
@@ -1035,7 +1035,7 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr,
 {
 	struct ieee80211_node *ni;
 	
-	// HACK
+	/* FIXME: Hack */
 	if (tmp)
 		ni = ieee80211_alloc_node(vap, macaddr);
 	else
