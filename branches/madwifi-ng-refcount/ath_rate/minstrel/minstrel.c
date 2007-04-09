@@ -311,7 +311,7 @@ ath_rate_node_copy(struct ath_softc *sc,
 static void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
         int shortPreamble, size_t frameLen,
-        u_int8_t *rix, int *try0, u_int8_t *txrate)
+        u_int8_t *rix, unsigned int *try0, u_int8_t *txrate)
 {
         struct minstrel_node *sn = ATH_NODE_MINSTREL(an);
         struct ieee80211com *ic = &sc->sc_ic;
@@ -818,7 +818,7 @@ ath_rate_statistics(void *arg, struct ieee80211_node *ni)
 		 * Sample less often above the 95% chance of success.
 		 * rn->rs_probability is in units of 0..18000(100%), which avoids rounding issues.*/
 		if ((rn->rs_probability[i] > 17100) || ( rn->rs_probability[i] < 1800)) {
-			rn->retry_adjusted_count[i] = rn->retry_count[i]>> 1;
+			rn->retry_adjusted_count[i] = rn->retry_count[i] >> 1;
 			if (rn->retry_adjusted_count[i] > 2)
 				rn->retry_adjusted_count[i] = 2;
 		} else 
