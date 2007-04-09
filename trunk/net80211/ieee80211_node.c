@@ -737,6 +737,9 @@ ieee80211_node_table_init(struct ieee80211com *ic,
 	mod_timer(&nt->nt_wds_aging_timer, jiffies + HZ * WDS_AGING_TIMER_VAL);
 }
 
+/* This is overridden by ath_node_alloc in ath/if_ath.c, and so
+ * should never get called
+ */
 static struct ieee80211_node *
 node_alloc(struct ieee80211_node_table *nt, struct ieee80211vap *vap)
 {
