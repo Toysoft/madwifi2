@@ -57,6 +57,11 @@
 
 #define AES_BLOCK_LEN 16
 
+/* This function might sleep; this means it can only be called in contexts 
+ * where we may sleep. This means that it cannot be used from soft-IRQs or 
+ * hard-IRQs.
+ * Context: process
+ */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
 #define crypto_cipher crypto_tfm
 #define crypto_alloc_cipher(name,type,mask) crypto_alloc_tfm(name,type)
@@ -113,6 +118,13 @@ ccmp_attach(struct ieee80211vap *vap, struct ieee80211_key *k)
 
 	ctx->cc_vap = vap;
 	ctx->cc_ic = vap->iv_ic;
+	ctx->cc_tfm = crypto_alloc_tfm("aes", 0);
+	if (ctx->cc_tfm == NULL) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO, 
+				"%s: unable to load kernel AES crypto support\n", 
+				__func__);
+	}
+
 	return ctx;
 }
 
@@ -141,10 +153,6 @@ ccmp_setkey(struct ieee80211_key *k)
 	}
 	
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT) {
-		if (ctx->cc_tfm == NULL)
-			ctx->cc_tfm = crypto_alloc_cipher("aes", 0,
-							  CRYPTO_ALG_ASYNC);
-		
 		if (ctx->cc_tfm == NULL) {
 			IEEE80211_DPRINTF(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
 				"%s: Tried to add a software crypto key, but software crypto not available\n",
@@ -154,6 +162,7 @@ ccmp_setkey(struct ieee80211_key *k)
 		
 		crypto_cipher_setkey(ctx->cc_tfm, k->wk_key, k->wk_keylen);
 	}
+
 	return 1;
 }
 

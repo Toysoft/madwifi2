@@ -6570,11 +6570,10 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_hal *ah = sc->sc_ah;
 	int isprot, ismcast, istxfrag;
-	unsigned int keyix, hdrlen, pktlen, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
-	int try0;
+	unsigned int try0, keyix, hdrlen, pktlen, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
 	u_int8_t rix, txrate, ctsrate;
 	u_int32_t ivlen = 0, icvlen = 0;
-	u_int8_t cix = 0xff;		/* NB: silence compiler */
+	u_int8_t cix = 0xff;
 	struct ath_desc *ds = NULL;
 	struct ath_txq *txq = NULL;
 	struct ieee80211_frame *wh;
@@ -6879,13 +6878,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 		if (istxfrag)
 			/*
-			**  if Tx fragment, it would be desirable to 
-			**  use highest CCK rate for RTS/CTS.
-			**  However, stations farther away may detect it
-			**  at a lower CCK rate. Therefore, use the 
-			**  configured protect rate, which is 2 Mbps
-			**  for 11G.
-			*/
+			 *  if Tx fragment, it would be desirable to 
+			 *  use highest CCK rate for RTS/CTS.
+			 *  However, stations farther away may detect it
+			 *  at a lower CCK rate. Therefore, use the 
+			 *  configured protect rate, which is 2 Mbps
+			 *  for 11G.
+			 */
 			cix = rt->info[sc->sc_protrix].controlRate;
 		else
 			cix = rt->info[sc->sc_protrix].controlRate;
@@ -6899,9 +6898,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if ((flags & HAL_TXDESC_NOACK) == 0 &&
 	    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_CTL) {
 		u_int16_t dur;
-		/*
-		 * XXX not right with fragmentation.
-		 */
+		
+		/* XXX: not right with fragmentation. */
 		if (shortPreamble)
 			dur = rt->info[rix].spAckDuration;
 		else
@@ -7325,17 +7323,19 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 
 #ifdef ATH_SUPERG_FF
 		{
-			struct sk_buff *skbnext = bf->bf_skb, *skb = NULL;
+			/* Handle every skb after the first one - these are FF extra
+			 * buffers */
+			struct sk_buff *tskb = NULL, *skb = bf->bf_skb->next;
 			unsigned int i;
 
 			for (i = 0; i < bf->bf_numdescff; i++) {
-				skb = skbnext;
-				skbnext = skb->next;
+				tskb = skb->next;
 				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i],
 						skb->len, BUS_DMA_TODEVICE);
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
 					__func__, skb);
 				ath_tx_capture(sc->sc_dev, ds, skb);
+				skb = tskb;
 			}
 		}
 		bf->bf_numdescff = 0;
