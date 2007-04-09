@@ -358,7 +358,7 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
         struct ieee80211_node *ni;
         struct ieee80211_node_table *nt = (struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
 
-        //IEEE80211_NODE_LOCK(nt);                                                                               
+        /* IEEE80211_NODE_LOCK(nt); */
         TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
                 /* Assume each node needs 500 bytes */
                 if (buf + space < p + 500)
@@ -376,7 +376,7 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 
 		}
         }
-        //IEEE80211_NODE_UNLOCK(nt);                                                                             
+        /* IEEE80211_NODE_UNLOCK(nt); */
         return (p - buf);
 }
 

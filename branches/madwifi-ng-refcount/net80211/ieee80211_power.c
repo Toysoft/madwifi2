@@ -312,7 +312,9 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		 * unicast packets when the STA is in PS mode (7.1.3.1.8);
 		 * which it isn't.
 		 */
-		// M_PWR_SAV_SET(skb);
+#if 0
+		 M_PWR_SAV_SET(skb);
+#endif
 
 #ifdef ATH_SUPERG_XR
 		/*
