@@ -205,7 +205,7 @@ struct ieee80211_stats {
 struct ieee80211req_key {
 	u_int8_t ik_type;		/* key/cipher type */
 	u_int8_t ik_pad;
-	u_int16_t ik_keyix;		/* key index */
+	ieee80211_keyix_t ik_keyix;	/* key index */
 	u_int8_t ik_keylen;		/* key length in bytes */
 	u_int8_t ik_flags;
 /* NB: IEEE80211_KEY_XMIT and IEEE80211_KEY_RECV defined elsewhere */
@@ -221,7 +221,7 @@ struct ieee80211req_key {
  * to IEEE80211_KEYIX_NONE when deleting a unicast key.
  */
 struct ieee80211req_del_key {
-	u_int8_t idk_keyix;		/* key index */
+	ieee80211_keyix_t idk_keyix;	/* key index */
 	u_int8_t idk_macaddr[IEEE80211_ADDR_LEN];
 };
 

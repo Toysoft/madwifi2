@@ -299,19 +299,19 @@ struct ieee80211_app_ie_t {
 struct ieee80211vap {
 	struct net_device *iv_dev;		/* associated device */
 	struct net_device_stats	iv_devstats;	/* interface statistics */
-	struct ifmedia iv_media;			/* interface media config */
-	struct iw_statistics iv_iwstats;		/* wireless statistics block */
+	struct ifmedia iv_media;		/* interface media config */
+	struct iw_statistics iv_iwstats;	/* wireless statistics block */
 	struct ctl_table_header	*iv_sysctl_header;
 	struct ctl_table *iv_sysctls;
 	struct proc_dir_entry *iv_proc;
 	struct ieee80211_proc_entry *iv_proc_entries;
-	struct vlan_group *iv_vlgrp;		/* vlan group state */
+	struct vlan_group *iv_vlgrp;		/* VLAN group state */
 
 	TAILQ_ENTRY(ieee80211vap) iv_next;	/* list of vap instances */
 	u_int iv_unit;				/* virtual AP unit */
 	struct ieee80211com *iv_ic;		/* back ptr to common state */
 	u_int32_t iv_debug;			/* debug msg flags */
-	struct ieee80211_stats iv_stats;		/* statistics */
+	struct ieee80211_stats iv_stats;	/* statistics */
 
 	int iv_monitor_nods_only;		/* in monitor mode only nods traffic */
 	int iv_monitor_txf_len;			/* in monitor mode, truncate tx packets */
@@ -345,36 +345,36 @@ struct ieee80211vap {
 	u_int iv_scanvalid;			/* scan cache valid threshold */
 	struct ieee80211_roam iv_roam;		/* sta-mode roaming state */
 
-	u_int32_t iv_csa_jiffies;		/* last csa recv jiffies */
-	u_int8_t iv_csa_count;			/* last csa count */
-	struct ieee80211_channel *iv_csa_chan;	/* last csa channel */
-	u_int8_t iv_csa_mode;			/* last csa mode */
-	struct timer_list iv_csa_timer;		/* csa timer */
-	u_int32_t *iv_aid_bitmap;		/* association id map */
+	u_int32_t iv_csa_jiffies;		/* last CSA recv jiffies */
+	u_int8_t iv_csa_count;			/* last CSA count */
+	struct ieee80211_channel *iv_csa_chan;	/* last CSA channel */
+	u_int8_t iv_csa_mode;			/* last CSA mode */
+	struct timer_list iv_csa_timer;		/* CSA timer */
+	u_int32_t *iv_aid_bitmap;		/* association ID map */
 	u_int16_t iv_max_aid;
 	u_int16_t iv_sta_assoc;			/* stations associated */
 	u_int16_t iv_ps_sta;			/* stations in power save */
-	u_int16_t iv_ps_pending;			/* ps sta's w/ pending frames */
-	u_int8_t *iv_tim_bitmap;			/* power-save stations w/ data*/
+	u_int16_t iv_ps_pending;		/* PS STAs w/ pending frames */
+	u_int8_t *iv_tim_bitmap;		/* PS STAs w/ data*/
 	u_int16_t iv_tim_len;			/* ic_tim_bitmap size (bytes) */
-	u_int8_t iv_dtim_period;			/* DTIM period */
+	u_int8_t iv_dtim_period;		/* DTIM period */
 	u_int8_t iv_dtim_count;			/* DTIM count from last bcn */
-						/* set/unset aid pwrsav state */
+						/* set/unset AID PS state */
 	void (*iv_set_tim)(struct ieee80211_node *, int);
-	u_int8_t iv_uapsdinfo;			/* sta mode QoS Info flags */
+	u_int8_t iv_uapsdinfo;			/* STA mode QoS Info flags */
 	struct ieee80211_node *iv_bss;		/* information for this node */
 	int iv_fixed_rate;			/* 802.11 rate or -1 */
 	u_int16_t iv_rtsthreshold;
 	u_int16_t iv_fragthreshold;
-	u_int16_t iv_txmin;			/* min tx retry count */
-	u_int16_t iv_txmax;			/* max tx retry count */
-	u_int16_t iv_txlifetime;			/* tx lifetime */
+	u_int16_t iv_txmin;			/* min TX retry count */
+	u_int16_t iv_txmax;			/* max TX retry count */
+	u_int16_t iv_txlifetime;		/* TX lifetime */
 	int iv_inact_timer;			/* inactivity timer wait */
 	void *iv_opt_ie;			/* user-specified IE's */
-	u_int16_t iv_opt_ie_len;			/* length of ni_opt_ie */
-	u_int16_t iv_def_txkey;			/* default/group tx key index */
+	u_int16_t iv_opt_ie_len;		/* length of ni_opt_ie */
+	ieee80211_keyix_t iv_def_txkey;		/* default/group TX key index */
 	struct ieee80211_key iv_nw_keys[IEEE80211_WEP_NKID];
-	int (*iv_key_alloc)(struct ieee80211vap *, const struct ieee80211_key *);
+	ieee80211_keyix_t (*iv_key_alloc)(struct ieee80211vap *, const struct ieee80211_key *);
 	int (*iv_key_delete)(struct ieee80211vap *, const struct ieee80211_key *,
 		struct ieee80211_node *);
 	int (*iv_key_set)(struct ieee80211vap *, const struct ieee80211_key *,
@@ -388,9 +388,9 @@ struct ieee80211vap {
 	void *iv_ec;				/* private auth state */
 	struct ieee80211vap *iv_xrvap;		/* pointer to XR VAP , if XR is enabled */
 	u_int16_t iv_xrbcnwait;			/* SWBA count incremented until it reaches XR_BECON_FACTOR */
-	struct timer_list iv_xrvapstart;	/* timer to start xr */
+	struct timer_list iv_xrvapstart;	/* timer to start XR */
 	u_int8_t iv_chanchange_count; 		/* 11h counter for channel change */
-	int iv_mcast_rate; 			/* Multicast rate (Kbps) */
+	int iv_mcast_rate; 			/* Multicast rate (kbps) */
 
 	const struct ieee80211_aclator *iv_acl;	/* aclator glue */
 	void *iv_as;				/* private aclator state */
