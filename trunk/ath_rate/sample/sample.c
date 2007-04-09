@@ -366,7 +366,7 @@ pick_sample_ndx(struct sample_node *sn, int size_bin)
 static void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	int shortPreamble, size_t frameLen,
-	u_int8_t *rix, int *try0, u_int8_t *txrate)
+	u_int8_t *rix, unsigned int *try0, u_int8_t *txrate)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	struct sample_softc *ssc = ATH_SOFTC_SAMPLE(sc);
