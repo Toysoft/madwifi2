@@ -7622,7 +7622,7 @@ ath_startrecv(struct ath_softc *sc)
 #else
 	sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
 #endif
-	DPRINTF(sc,ATH_DEBUG_RESET, "%s: mtu %u cachelsz %u rxbufsize %u\n",
+	DPRINTF(sc, ATH_DEBUG_RESET, "%s: mtu %u cachelsz %u rxbufsize %u\n",
 		__func__, dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize);
 
 	sc->sc_rxlink = NULL;
