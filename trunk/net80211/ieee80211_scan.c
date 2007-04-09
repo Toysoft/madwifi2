@@ -182,6 +182,12 @@ static const char *scan_modnames[IEEE80211_SCANNER_MAX] = {
 };
 static const struct ieee80211_scanner *scanners[IEEE80211_SCANNER_MAX];
 
+/* If try load is set, this function will attempt to automatically load the
+ * requested module if it is not present. This is on operation that may sleep, 
+ * as such, may only be called from contexts where we may sleep. Those are not
+ * hard-IRQs or soft-IRQs.
+ * if !!tryload, then Context: process
+ */
 const struct ieee80211_scanner *
 ieee80211_scanner_get(enum ieee80211_opmode mode, int tryload)
 {

@@ -2128,7 +2128,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_MCASTCIPHER:
 		if ((vap->iv_caps & cipher2cap(value)) == 0 &&
-		    !ieee80211_crypto_available(value))
+		    !ieee80211_crypto_available(vap, value))
 			return -EINVAL;
 		rsn->rsn_mcastcipher = value;
 		if (vap->iv_flags & IEEE80211_F_WPA)
@@ -2153,7 +2153,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		for (j = 1; j < 32; j++)	/* NB: skip WEP */
 			if ((value & (1 << j)) &&
 			    ((vap->iv_caps & cipher2cap(j)) ||
-			     ieee80211_crypto_available(j)))
+			     ieee80211_crypto_available(vap, j)))
 				caps |= 1 << j;
 		if (caps == 0)			/* nothing available */
 			return -EINVAL;
@@ -2165,7 +2165,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_UCASTCIPHER:
 		if ((vap->iv_caps & cipher2cap(value)) == 0 &&
-		    !ieee80211_crypto_available(value))
+		    !ieee80211_crypto_available(vap, value))
 			return -EINVAL;
 		rsn->rsn_ucastcipher = value;
 		if (vap->iv_flags & IEEE80211_F_WPA)

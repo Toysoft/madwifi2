@@ -239,21 +239,58 @@ ieee80211_crypto_unregister(const struct ieee80211_cipher *cip)
 }
 EXPORT_SYMBOL(ieee80211_crypto_unregister);
 
-int
-ieee80211_crypto_available(u_int cipher)
-{
-	return cipher < IEEE80211_CIPHER_MAX && ciphers[cipher] != NULL;
-}
-EXPORT_SYMBOL(ieee80211_crypto_available);
-
 /* XXX well-known names! */
 static const char *cipher_modnames[] = {
-	"wlan_wep",	/* IEEE80211_CIPHER_WEP */
-	"wlan_tkip",	/* IEEE80211_CIPHER_TKIP */
+	"wlan_wep",	/* IEEE80211_CIPHER_WEP     */
+	"wlan_tkip",	/* IEEE80211_CIPHER_TKIP    */
 	"wlan_aes_ocb",	/* IEEE80211_CIPHER_AES_OCB */
 	"wlan_ccmp",	/* IEEE80211_CIPHER_AES_CCM */
-	"wlan_ckip",	/* IEEE80211_CIPHER_CKIP */
+	"wlan_ckip",	/* IEEE80211_CIPHER_CKIP    */
 };
+
+
+int
+ieee80211_crypto_available(struct ieee80211vap *vap, u_int cipher)
+{
+#define	N(a)	(sizeof(a) / sizeof(a[0]))
+	unsigned int status = 0;
+
+	if (cipher < IEEE80211_CIPHER_MAX) {
+		if (ciphers[cipher] == NULL) {
+			/*
+			 * Auto-load cipher module if we have a well-known name
+			 * for it.  It might be better to use string names rather
+			 * than numbers and craft a module name based on the cipher
+			 * name; e.g. wlan_cipher_<cipher-name>.
+			 */
+			if (cipher < N(cipher_modnames)) {
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
+						"%s: unregistered cipher %u, load module %s\n",
+						__func__, cipher, cipher_modnames[cipher]);
+				ieee80211_load_module(cipher_modnames[cipher]);
+
+				/*
+				 * If cipher module loaded it should immediately
+				 * call ieee80211_crypto_register which will fill
+				 * in the entry in the ciphers array.
+				 */
+				if (ciphers[cipher] == NULL) {
+					IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
+							"%s: unable to load cipher %u, module %s\n",
+							__func__, cipher,
+							cipher < N(cipher_modnames) ?
+							cipher_modnames[cipher] : "<unknown>");
+					vap->iv_stats.is_crypto_nocipher++;
+				} else
+					status = 1;
+			}
+		} else
+			status = 1;
+	}
+	return status;
+#undef N
+}
+EXPORT_SYMBOL(ieee80211_crypto_available);
 
 /*
  * Establish a relationship between the specified key and cipher
@@ -272,7 +309,6 @@ int
 ieee80211_crypto_newkey(struct ieee80211vap *vap,
 	int cipher, int flags, struct ieee80211_key *key)
 {
-#define	N(a)	(sizeof(a) / sizeof(a[0]))
 	const struct ieee80211_cipher *cip;
 	void *keyctx;
 	int oflags;
@@ -287,35 +323,8 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 		return 0;
 	}
 	cip = ciphers[cipher];
-	if (cip == NULL) {
-		/*
-		 * Auto-load cipher module if we have a well-known name
-		 * for it.  It might be better to use string names rather
-		 * than numbers and craft a module name based on the cipher
-		 * name; e.g. wlan_cipher_<cipher-name>.
-		 */
-		if (cipher < N(cipher_modnames)) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-				"%s: unregistered cipher %u, load module %s\n",
-				__func__, cipher, cipher_modnames[cipher]);
-			ieee80211_load_module(cipher_modnames[cipher]);
-			/*
-			 * If cipher module loaded it should immediately
-			 * call ieee80211_crypto_register which will fill
-			 * in the entry in the ciphers array.
-			 */
-			cip = ciphers[cipher];
-		}
-		if (cip == NULL) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-				"%s: unable to load cipher %u, module %s\n",
-				__func__, cipher,
-				cipher < N(cipher_modnames) ?
-					cipher_modnames[cipher] : "<unknown>");
-			vap->iv_stats.is_crypto_nocipher++;
-			return 0;
-		}
-	}
+	if (cip == NULL)
+		return 0;
 
 	oflags = key->wk_flags;
 	flags &= IEEE80211_KEY_COMMON;
@@ -425,7 +434,6 @@ again:
 		}
 	}
 	return 1;
-#undef N
 }
 EXPORT_SYMBOL(ieee80211_crypto_newkey);
 
