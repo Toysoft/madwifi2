@@ -7320,17 +7320,19 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 
 #ifdef ATH_SUPERG_FF
 		{
-			struct sk_buff *skbnext = bf->bf_skb, *skb = NULL;
+			/* Handle every skb after the first one - these are FF extra
+			 * buffers */
+			struct sk_buff *tskb = NULL, *skb = bf->bf_skb->next;
 			unsigned int i;
 
 			for (i = 0; i < bf->bf_numdescff; i++) {
-				skb = skbnext;
-				skbnext = skb->next;
+				tskb = skb->next;
 				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i],
 						skb->len, BUS_DMA_TODEVICE);
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
 					__func__, skb);
 				ath_tx_capture(sc->sc_dev, ds, skb);
+				skb = tskb;
 			}
 		}
 		bf->bf_numdescff = 0;
