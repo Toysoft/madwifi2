@@ -116,7 +116,8 @@ ccmp_attach(struct ieee80211vap *vap, struct ieee80211_key *k)
 
 	ctx->cc_vap = vap;
 	ctx->cc_ic = vap->iv_ic;
-	ctx->cc_tfm = crypto_alloc_cipher("aes", 0);
+	ctx->cc_tfm = crypto_alloc_cipher("aes", 0,
+					CRYPTO_ALG_ASYNC);
 	if (ctx->cc_tfm == NULL) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO, 
 				"%s: unable to load kernel AES crypto support\n", 
