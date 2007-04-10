@@ -64,7 +64,7 @@ static int _ieee80211_crypto_delkey(struct ieee80211vap *,
 /*
  * Default "null" key management routines.
  */
-static ieee80211_keyix_t
+static int
 null_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
 	return IEEE80211_KEYIX_NONE;
@@ -111,7 +111,7 @@ cipher_attach(struct ieee80211vap *vap, struct ieee80211_key *key)
 /* 
  * Wrappers for driver key management methods.
  */
-static __inline ieee80211_keyix_t
+static __inline int
 dev_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *key)
 {
 	return vap->iv_key_alloc(vap, key);
@@ -444,7 +444,7 @@ static int
 _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	struct ieee80211_node *ni)
 {
-	ieee80211_keyix_t keyix;
+	u_int16_t keyix;
 
 	KASSERT(key->wk_cipher != NULL, ("No cipher!"));
 
