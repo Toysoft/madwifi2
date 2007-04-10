@@ -317,9 +317,7 @@ ieee80211_notify_michael_failure(struct ieee80211vap *vap,
 }
 EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 
-/* This function might sleep; this means it can only be called in contexts 
- * where we may sleep. This means that it cannot be used from soft-IRQs or 
- * hard-IRQs.
+/* This function might sleep. Therefore: 
  * Context: process
  *
  * Note that a successful call to this function does not guarantee that
