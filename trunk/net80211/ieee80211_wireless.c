@@ -1251,35 +1251,33 @@ ieee80211_ioctl_siwpower(struct net_device *dev, struct iw_request_info *info,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-
-	if (wrq->disabled) {
-		if (ic->ic_flags & IEEE80211_F_PMGTON) {
-			ic->ic_flags &= ~IEEE80211_F_PMGTON;
-			goto done;
-		}
-		return 0;
-	}
+	
+	/* XXX: These values, flags, and caps do not seem to be used elsewhere 
+	 * at all? */
 
 	if ((ic->ic_caps & IEEE80211_C_PMGT) == 0)
 		return -EOPNOTSUPP;
-	switch (wrq->flags & IW_POWER_MODE) {
-	case IW_POWER_UNICAST_R:
-	case IW_POWER_ALL_R:
-	case IW_POWER_ON:
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-		break;
-	default:
-		return -EINVAL;
+	
+	if (wrq->disabled) {
+		if (ic->ic_flags & IEEE80211_F_PMGTON)
+			ic->ic_flags &= ~IEEE80211_F_PMGTON;
+	} else {
+		switch (wrq->flags & IW_POWER_MODE) {
+		case IW_POWER_UNICAST_R:
+		case IW_POWER_ALL_R:
+		case IW_POWER_ON:
+			ic->ic_flags |= IEEE80211_F_PMGTON;
+			
+			if (wrq->flags & IW_POWER_TIMEOUT)
+				ic->ic_holdover = IEEE80211_MS_TO_TU(wrq->value);
+			if (wrq->flags & IW_POWER_PERIOD)
+				ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
+			break;
+		default:
+			return -EINVAL;
+		}
 	}
-	if (wrq->flags & IW_POWER_TIMEOUT) {
-		ic->ic_holdover = IEEE80211_MS_TO_TU(wrq->value);
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-	}
-	if (wrq->flags & IW_POWER_PERIOD) {
-		ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-	}
-done:
+	
 	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
