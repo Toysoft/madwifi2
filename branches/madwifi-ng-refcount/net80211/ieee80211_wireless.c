@@ -228,6 +228,10 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 	int wepchange = 0;
 
 	if ((erq->flags & IW_ENCODE_DISABLED) == 0) {
+		/* Check WEP support, load WEP module if needed */
+		if (!ieee80211_crypto_available(vap, IEEE80211_CIPHER_WEP))
+			return -EOPNOTSUPP;
+
 		/*
 		 * Enable crypto, set key contents, and
 		 * set the default transmit key.
@@ -1251,35 +1255,33 @@ ieee80211_ioctl_siwpower(struct net_device *dev, struct iw_request_info *info,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-
-	if (wrq->disabled) {
-		if (ic->ic_flags & IEEE80211_F_PMGTON) {
-			ic->ic_flags &= ~IEEE80211_F_PMGTON;
-			goto done;
-		}
-		return 0;
-	}
+	
+	/* XXX: These values, flags, and caps do not seem to be used elsewhere 
+	 * at all? */
 
 	if ((ic->ic_caps & IEEE80211_C_PMGT) == 0)
 		return -EOPNOTSUPP;
-	switch (wrq->flags & IW_POWER_MODE) {
-	case IW_POWER_UNICAST_R:
-	case IW_POWER_ALL_R:
-	case IW_POWER_ON:
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-		break;
-	default:
-		return -EINVAL;
+	
+	if (wrq->disabled) {
+		if (ic->ic_flags & IEEE80211_F_PMGTON)
+			ic->ic_flags &= ~IEEE80211_F_PMGTON;
+	} else {
+		switch (wrq->flags & IW_POWER_MODE) {
+		case IW_POWER_UNICAST_R:
+		case IW_POWER_ALL_R:
+		case IW_POWER_ON:
+			ic->ic_flags |= IEEE80211_F_PMGTON;
+			
+			if (wrq->flags & IW_POWER_TIMEOUT)
+				ic->ic_holdover = IEEE80211_MS_TO_TU(wrq->value);
+			if (wrq->flags & IW_POWER_PERIOD)
+				ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
+			break;
+		default:
+			return -EINVAL;
+		}
 	}
-	if (wrq->flags & IW_POWER_TIMEOUT) {
-		ic->ic_holdover = IEEE80211_MS_TO_TU(wrq->value);
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-	}
-	if (wrq->flags & IW_POWER_PERIOD) {
-		ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-	}
-done:
+	
 	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
@@ -3122,7 +3124,10 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 	u_int16_t kid;
 	int error, flags,i;
 
-	/* NB: cipher support is verified by ieee80211_crypt_newkey */
+	/* Check cipher support, load crypto modules if needed */
+	if (!ieee80211_crypto_available(vap, ik->ik_type))
+		return -EOPNOTSUPP;
+
 	/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
 	if (ik->ik_keylen > sizeof(ik->ik_keydata))
 		return -E2BIG;
