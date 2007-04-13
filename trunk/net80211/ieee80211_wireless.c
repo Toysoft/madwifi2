@@ -228,6 +228,10 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 	int wepchange = 0;
 
 	if ((erq->flags & IW_ENCODE_DISABLED) == 0) {
+		/* Check WEP support, load WEP module if needed */
+		if (!ieee80211_crypto_available(vap, IEEE80211_CIPHER_WEP))
+			return -EOPNOTSUPP;
+
 		/*
 		 * Enable crypto, set key contents, and
 		 * set the default transmit key.
@@ -3120,7 +3124,10 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 	u_int16_t kid;
 	int error, flags,i;
 
-	/* NB: cipher support is verified by ieee80211_crypt_newkey */
+	/* Check cipher support, load crypto modules if needed */
+	if (!ieee80211_crypto_available(vap, ik->ik_type))
+		return -EOPNOTSUPP;
+
 	/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
 	if (ik->ik_keylen > sizeof(ik->ik_keydata))
 		return -E2BIG;
