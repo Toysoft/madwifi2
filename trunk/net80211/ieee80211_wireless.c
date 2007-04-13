@@ -1263,8 +1263,7 @@ ieee80211_ioctl_siwpower(struct net_device *dev, struct iw_request_info *info,
 		return -EOPNOTSUPP;
 	
 	if (wrq->disabled) {
-		if (ic->ic_flags & IEEE80211_F_PMGTON)
-			ic->ic_flags &= ~IEEE80211_F_PMGTON;
+		ic->ic_flags &= ~IEEE80211_F_PMGTON;
 	} else {
 		switch (wrq->flags & IW_POWER_MODE) {
 		case IW_POWER_UNICAST_R:
