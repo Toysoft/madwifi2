@@ -34,8 +34,6 @@
 #ifndef _NET80211_IEEE80211_CRYPTO_H_
 #define _NET80211_IEEE80211_CRYPTO_H_
 
-#include <ah_desc.h>
-
 /*
  * 802.11 protocol crypto-related definitions.
  */
@@ -108,7 +106,7 @@ struct ieee80211_key {
 
 #define	IEEE80211_CIPHER_MAX		(IEEE80211_CIPHER_NONE + 1)
 
-#define	IEEE80211_KEYIX_NONE	((ieee80211_keyix_t) HAL_TXKEYIX_INVALID)
+#define	IEEE80211_KEYIX_NONE	((ieee80211_keyix_t) -1)
 
 #if defined(__KERNEL__) || defined(_KERNEL)
 
