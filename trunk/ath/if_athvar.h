@@ -313,6 +313,13 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
  */
 #define	ATH_KEYMAX	128		/* max key cache size we handle */
 #define	ATH_KEYBYTES	(ATH_KEYMAX / NBBY)	/* storage space in bytes */
+
+/*
+ * Convert from net80211 layer values to Ath layer values. Hopefully this will
+ * be optimised away when the two constants are the same.
+ */
+#define ATH_KEY(_keyix)	((_keyix == IEEE80211_KEYIX_NONE) ? HAL_TXKEYIX_INVALID : _keyix)
+
 #define	ATH_MIN_FF_RATE	12000		/* min rate for ff aggregation in kbps */
 #define	ATH_MIN_FF_RATE	12000		/* min rate for ff aggregation in kbps */
 struct ath_buf;
@@ -595,15 +602,15 @@ struct ath_softc {
 	u_int8_t sc_nbcnvaps;			/* # of vaps sending beacons */
 	u_int sc_fftxqmin;			/* aggregation threshold */
 	HAL_INT sc_imask;			/* interrupt mask copy */
-	u_int sc_keymax;				/* size of key cache */
+	u_int sc_keymax;			/* size of key cache */
 	u_int8_t sc_keymap[ATH_KEYBYTES];	/* key use bit map */
 	struct ieee80211_node *sc_keyixmap[ATH_KEYMAX];/* key ix->node map */
 	u_int8_t sc_bssidmask[IEEE80211_ADDR_LEN];
 
-	u_int sc_ledpin;				/* GPIO pin for driving LED */
+	u_int sc_ledpin;			/* GPIO pin for driving LED */
 	u_int sc_ledon;				/* pin setting for LED on */
 	u_int sc_ledidle;			/* idle polling interval */
-	int sc_ledevent;				/* time of last LED event */
+	int sc_ledevent;			/* time of last LED event */
 	u_int8_t sc_rxrate;			/* current rx rate for LED */
 	u_int8_t sc_txrate;			/* current tx rate for LED */
 	u_int16_t sc_ledoff;			/* off time for current blink */
@@ -639,7 +646,7 @@ struct ath_softc {
 	u_int sc_bhalq;				/* HAL q for outgoing beacons */
 	u_int sc_bmisscount;			/* missed beacon transmits */
 	u_int32_t sc_ant_tx[8];			/* recent tx frames/antenna */
-	struct ath_txq *sc_cabq;			/* tx q for cab frames */
+	struct ath_txq *sc_cabq;		/* tx q for cab frames */
 	struct ath_txq sc_grpplq;		/* tx q for XR group polls */
 	struct ath_txq *sc_xrtxq;		/* tx q for XR data */
 	struct ath_descdma sc_grppolldma;	/* TX descriptors for grppoll */
