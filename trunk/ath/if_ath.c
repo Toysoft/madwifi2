@@ -2922,13 +2922,13 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 			 */
 			memcpy(hk->kv_mic, k->wk_txmic, sizeof(hk->kv_mic));
 			KEYPRINTF(sc, k->wk_keyix, hk, zerobssid);
-			if (!ath_hal_keyset(ah, k->wk_keyix, hk, zerobssid))
+			if (!ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, zerobssid))
 				return 0;
 
 			memcpy(hk->kv_mic, k->wk_rxmic, sizeof(hk->kv_mic));
-			KEYPRINTF(sc, k->wk_keyix+32, hk, mac);
+			KEYPRINTF(sc, k->wk_keyix + 32, hk, mac);
 			/* XXX delete tx key on failure? */
-			return ath_hal_keyset(ah, k->wk_keyix+32, hk, mac);
+			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix + 32), hk, mac);
 		} else {
 			/*
 			 * Room for both TX+RX MIC keys in one key cache
@@ -2940,7 +2940,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 			memcpy(hk->kv_txmic, k->wk_txmic, sizeof(hk->kv_txmic));
 #endif
 			KEYPRINTF(sc, k->wk_keyix, hk, mac);
-			return ath_hal_keyset(ah, k->wk_keyix, hk, mac);
+			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac);
 		}
 	} else if (k->wk_flags & IEEE80211_KEY_XR) {
 		/*
@@ -2950,7 +2950,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 		memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
 			k->wk_txmic : k->wk_rxmic, sizeof(hk->kv_mic));
 		KEYPRINTF(sc, k->wk_keyix, hk, mac);
-		return ath_hal_keyset(ah, k->wk_keyix, hk, mac);
+		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac);
 	}
 	return 0;
 #undef IEEE80211_KEY_XR
@@ -3014,7 +3014,7 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
 		return ath_keyset_tkip(sc, k, &hk, mac);
 	} else {
 		KEYPRINTF(sc, k->wk_keyix, &hk, mac);
-		return ath_hal_keyset(ah, k->wk_keyix, &hk, mac);
+		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), &hk, mac);
 	}
 #undef N
 }
@@ -6049,7 +6049,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 					struct ieee80211_key *k;
 					k = ieee80211_crypto_encap(vap->iv_bss, skb);
 					if (k)
-						keyix = k->wk_keyix;
+						keyix = ATH_KEY(k->wk_keyix);
 				}
 			}
 			ATH_TXBUF_LOCK_IRQ(sc);					
@@ -6651,7 +6651,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 				if (cip->ic_cipher != IEEE80211_CIPHER_TKIP)
 					pktlen += cip->ic_miclen;
 		}
-		keyix = k->wk_keyix;
+		keyix = ATH_KEY(k->wk_keyix);
 
 #ifdef ATH_SUPERG_COMP
 		icvlen = ath_get_icvlen(k) / 4;
@@ -6663,9 +6663,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		/*
 		 * Use station key cache slot, if assigned.
 		 */
-		keyix = ni->ni_ucastkey.wk_keyix;
-		if (keyix == IEEE80211_KEYIX_NONE)
-			keyix = HAL_TXKEYIX_INVALID;
+		keyix = ATH_KEY(ni->ni_ucastkey.wk_keyix);
 	} else
 		keyix = HAL_TXKEYIX_INVALID;
 
