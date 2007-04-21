@@ -54,4 +54,18 @@
 	}					\
 } while (0)
 
+/*
+ * Fixes for Linux API changes
+ */
+#ifdef __KERNEL__
+
+#include <linux/version.h>
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
+#define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t, 1)
+#else
+#define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t)
+#endif
+
+#endif /* __KERNEL__ */
+
 #endif /* _ATH_COMPAT_H_ */
