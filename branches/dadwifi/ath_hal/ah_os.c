@@ -521,7 +521,7 @@ ath_hal_sysctl_register(void)
 
 	if (!initialized) {
 		ath_hal_sysctl_header =
-			register_sysctl_table(ath_root_table);
+			ATH_REGISTER_SYSCTL_TABLE(ath_root_table);
 		initialized = 1;
 	}
 }
