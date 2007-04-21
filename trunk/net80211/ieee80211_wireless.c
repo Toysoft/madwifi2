@@ -1463,7 +1463,7 @@ waplist_cb(void *arg, const struct ieee80211_scan_entry *se)
 	else
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_bssid);
 	set_quality(&req->qual[i], se->se_rssi, -95);
-	req->i = i + 1;
+	req->i++;
 
 	return 0;
 }
@@ -2078,9 +2078,9 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_rsnparms *rsn = &vap->iv_bss->ni_rsn;
-	int *i = (int *) extra;
-	int param = i[0];		/* parameter id is 1st */
-	int value = i[1];		/* NB: most values are TYPE_INT */
+	unsigned int *i = (unsigned int *) extra;
+	unsigned int param = i[0];		/* parameter id is 1st */
+	unsigned int value = i[1];		/* NB: most values are TYPE_INT */
 	int retv = 0;
 	int j, caps;
 	const struct ieee80211_authenticator *auth;
@@ -2138,7 +2138,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_MCASTKEYLEN:
-		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
+		if (value > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_mcastkeylen = value;
@@ -2175,7 +2175,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
-		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
+		if (value > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_ucastkeylen = value;
@@ -2470,7 +2470,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = EINVAL;
 		break;
 	case IEEE80211_PARAM_COVERAGE_CLASS:
-		if (value >= 0 && value <= IEEE80211_COVERAGE_CLASS_MAX) {
+		if (value <= IEEE80211_COVERAGE_CLASS_MAX) {
 			ic->ic_coverageclass = value;
 			if (IS_UP_AUTO(vap))
 				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
@@ -2570,7 +2570,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 #ifdef ATH_SUPERG_XR
 	/* set the same params on the xr vap device if exists */
 	if (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR)) {
-		ieee80211_ioctl_setparam(vap->iv_xrvap->iv_dev,info,w,extra);
+		ieee80211_ioctl_setparam(vap->iv_xrvap->iv_dev, info, w, extra);
 		vap->iv_xrvap->iv_ath_cap &= IEEE80211_ATHC_XR; /* XR vap does not support  any superG features */
 	} 
 	/*
@@ -2649,7 +2649,7 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_rsnparms *rsn = &vap->iv_bss->ni_rsn;
-	int *param = (int *) extra;
+	unsigned int *param = (unsigned int *) extra;
 	
 	switch (param[0]) {
 	case IEEE80211_PARAM_AUTHMODE:
@@ -2932,7 +2932,7 @@ ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
 	 */
 	if (vap->iv_opmode != IEEE80211_M_STA)
 		return -EINVAL;
-	if (! is_valid_ie_list(wri->length, extra, 0))
+	if (!is_valid_ie_list(wri->length, extra, 0))
 		return -EINVAL;
 	/* NB: wri->length is validated by the wireless extensions code */
 	MALLOC(ie, void *, wri->length, M_DEVBUF, M_WAITOK);
@@ -3626,14 +3626,14 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 	struct iw_request_info *info, void *w, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
-	int *param = (int *) extra;
-	int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
-	int bss = param[2]; 
+	unsigned int *param = (unsigned int *) extra;
+	unsigned int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
+	unsigned int bss = param[2]; 
 	struct ieee80211_wme_state *wme = &vap->iv_ic->ic_wme;
 
 	switch (param[0]) {
         case IEEE80211_WMMPARAMS_CWMIN:
-		if (param[3] < 0 || param[3] > 15) 
+		if (param[3] > 15) 
 			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
@@ -3646,7 +3646,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
 	case IEEE80211_WMMPARAMS_CWMAX:
-		if (param[3] < 0 || param[3] > 15) 
+		if (param[3] > 15) 
 			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
@@ -3659,7 +3659,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
         case IEEE80211_WMMPARAMS_AIFS:
-		if (param[3] < 0 || param[3] > 15) 
+		if (param[3] > 15) 
 			return -EINVAL;	
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
@@ -3672,7 +3672,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
         case IEEE80211_WMMPARAMS_TXOPLIMIT:
-		if (param[3] < 0 || param[3] > 8192) 
+		if (param[3] > 8192) 
 			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_txopLimit 
@@ -3689,7 +3689,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
         case IEEE80211_WMMPARAMS_ACM:
-		if (!bss || param[3] < 0 || param[3] > 1) 
+		if (!bss || param[3] > 1) 
 			return -EINVAL;
         	/* ACM bit applies to BSS case only */
 		wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
@@ -3697,7 +3697,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 			wme->wme_bssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
 		break;
         case IEEE80211_WMMPARAMS_NOACKPOLICY:
-		if (bss || param[3] < 0 || param[3] > 1) 
+		if (bss || param[3] > 1) 
 			return -EINVAL;	
         	/* ack policy applies to non-BSS case only */
 		wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
@@ -3714,8 +3714,8 @@ ieee80211_ioctl_getwmmparams(struct net_device *dev,
 	struct iw_request_info *info, void *w, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
-	int *param = (int *) extra;
-	int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
+	unsigned int *param = (unsigned int *) extra;
+	unsigned int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
 	struct ieee80211_wme_state *wme = &vap->iv_ic->ic_wme;
 	struct chanAccParams *chanParams = (param[2] == 0) ? 
 		&(wme->wme_chanParams) : &(wme->wme_bssChanParams);
@@ -4095,7 +4095,7 @@ ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-	int *param = (int *) extra;
+	unsigned int *param = (unsigned int *) extra;
 
 	if (!(ic->ic_flags & IEEE80211_F_DOTH))
 		return 0;
