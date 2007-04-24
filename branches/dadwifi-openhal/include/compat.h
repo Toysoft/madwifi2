@@ -61,12 +61,14 @@
 
 #include <linux/version.h>
 #include <linux/kernel.h>
+#include <linux/sysctl.h>
 
 #ifndef __packed
 #define	__packed	__attribute__((__packed__))
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21) && defined(CTL_ANY)
+/* Ubuntu 7.04 */
 #define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t, 1)
 #else
 #define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t)
