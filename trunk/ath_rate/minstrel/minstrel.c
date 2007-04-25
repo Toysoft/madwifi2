@@ -327,7 +327,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
   
         mrr = sc->sc_mrretry && !(ic->ic_flags & IEEE80211_F_USEPROT) && ENABLE_MRR;
 
-        if (sn->static_rate_ndx != -1) {
+        if (sn->static_rate_ndx >= 0) {
                 ndx = sn->static_rate_ndx;
         } else {
 		sn->packet_count++;
@@ -367,7 +367,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	else
                 *try0 = sn->retry_adjusted_count[ndx];
 
-        KASSERT((ndx >= 0) && (ndx < sn->num_rates),
+        KASSERT((ndx < sn->num_rates),
                 ("%s: bad ndx (%d/%d) for %s?\n",
                  dev_info, ndx, sn->num_rates,
                  ether_sprintf(an->an_node.ni_macaddr)));
