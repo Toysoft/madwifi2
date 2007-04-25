@@ -208,9 +208,9 @@ struct ieee80211vap {
 	int iv_inact_timer;				/* inactivity timer wait */
 	void *iv_opt_ie;				/* user-specified IE's */
 	u_int16_t iv_opt_ie_len;			/* length of ni_opt_ie */
-	u_int16_t iv_def_txkey;				/* default/group tx key index */
+	ieee80211_keyix_t iv_def_txkey;			/* default/group TX key index */
 	struct ieee80211_key iv_nw_keys[IEEE80211_WEP_NKID];
-	int (*iv_key_alloc)(struct ieee80211vap *, const struct ieee80211_key *);
+	ieee80211_keyix_t (*iv_key_alloc)(struct ieee80211vap *, const struct ieee80211_key *);
 	int (*iv_key_delete)(struct ieee80211vap *, const struct ieee80211_key *,
 		struct ieee80211_node *);
 	int (*iv_key_set)(struct ieee80211vap *, const struct ieee80211_key *,

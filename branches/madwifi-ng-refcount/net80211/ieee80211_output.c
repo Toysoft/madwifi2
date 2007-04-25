@@ -1789,7 +1789,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb;
 	u_int8_t *frm;
-	u_int16_t capinfo, def_keyindex;
+	u_int16_t capinfo;
+	ieee80211_keyix_t def_keyindex;
 	int has_challenge, is_shared_key, ret, timer, status;
 
 	KASSERT(ni != NULL, ("null node"));
