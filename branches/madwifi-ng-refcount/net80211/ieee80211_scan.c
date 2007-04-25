@@ -57,11 +57,11 @@
 struct scan_state {
 	struct ieee80211_scan_state base;	/* public state */
 
-	u_int ss_iflags;				/* flags used internally */
-#define	ISCAN_MINDWELL 	0x0001		/* min dwell time reached */
-#define	ISCAN_DISCARD	0x0002		/* discard rx'd frames */
-#define	ISCAN_CANCEL	0x0004		/* cancel current scan */
-#define	ISCAN_START	0x0008		/* 1st time through next_scan */
+	u_int ss_iflags;			/* flags used internally */
+#define	ISCAN_MINDWELL 	0x0001			/* min dwell time reached */
+#define	ISCAN_DISCARD	0x0002			/* discard rx'd frames */
+#define	ISCAN_CANCEL	0x0004			/* cancel current scan */
+#define	ISCAN_START	0x0008			/* 1st time through next_scan */
 	unsigned long ss_chanmindwell;		/* min dwell on curchan */
 	unsigned long ss_scanend;		/* time scan must stop */
 	u_int ss_duration;			/* duration for next scan */
@@ -295,8 +295,8 @@ scan_restart_pwrsav(unsigned long arg)
 	/*
 	 * Use an initial 1ms delay to ensure the null
 	 * data frame has a chance to go out.
-	 * XXX 1ms is a lot, better to trigger scan
-	 * on tx complete.
+	 * XXX: 1ms is a lot, better to trigger scan
+	 * on TX complete.
 	 */
 	delay = msecs_to_jiffies(1);
 	if (delay < 1)
@@ -535,7 +535,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 		u_int duration;
 		/*
 		 * Go off-channel for a fixed interval that is large
-		 * enough to catch most ap's but short enough that
+		 * enough to catch most APs but short enough that
 		 * we can return on-channel before our listen interval
 		 * expires.
 		 */
@@ -549,22 +549,23 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 		if (ss->ss_ops != NULL) {
 			ss->ss_vap = vap;
 			/*
-			 * A background scan does not select a new sta; it
+			 * A background scan does not select a new STA; it
 			 * just refreshes the scan cache.  Also, indicate
 			 * the scan logic should follow the beacon schedule:
 			 * we go off-channel and scan for a while, then
 			 * return to the bss channel to receive a beacon,
 			 * then go off-channel again.  All during this time
 			 * we notify the ap we're in power save mode.  When
-			 * the scan is complete we leave power save mode.
+			 * the scan is complete, we leave power save mode.
 			 * If any beacon indicates there are frames pending
-			 *for us then we drop out of power save mode
+			 * for us then we drop out of power save mode
 			 * (and background scan) automatically by way of the
-			 * usual sta power save logic.
+			 * usual STA power save logic.
 			 */
 			ss->ss_flags |= IEEE80211_SCAN_NOPICK |
 				IEEE80211_SCAN_BGSCAN;
-			/* if previous scan completed, restart */
+			
+			/* If previous scan completed, restart */
 			if (ss->ss_next >= ss->ss_last) {
 				ss->ss_next = 0;
 				if (ss->ss_flags & IEEE80211_SCAN_ACTIVE)
@@ -573,7 +574,8 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 					vap->iv_stats.is_scan_passive++;
 				ss->ss_ops->scan_restart(ss, vap);
 			}
-			/* NB: flush frames rx'd before 1st channel change */
+			
+			/* NB: Flush frames RX'd before 1st channel change */
 			SCAN_PRIVATE(ss)->ss_iflags |= ISCAN_DISCARD;
 			ss->ss_mindwell = duration;
 			if (scan_restart(SCAN_PRIVATE(ss), duration)) {
@@ -730,9 +732,9 @@ again:
 		 * notify the driver to end the scan above to avoid having
 		 * rx frames alter the scan candidate list.
 		 */
-		if ((SCAN_PRIVATE(ss)->ss_iflags & ISCAN_CANCEL) == 0 &&
+		if (((SCAN_PRIVATE(ss)->ss_iflags & ISCAN_CANCEL) == 0) &&
 		    !ss->ss_ops->scan_end(ss, vap, NULL, 0) &&
-		    (ss->ss_flags & IEEE80211_SCAN_ONCE) == 0 &&
+		    ((ss->ss_flags & IEEE80211_SCAN_ONCE) == 0) &&
 		    time_before(jiffies + ss->ss_mindwell, scanend)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 				"%s: done, restart "
@@ -748,7 +750,6 @@ again:
 			ic->ic_scan_start(ic);	/* notify driver */
 			goto again;
 		} else {
-			/* past here, scandone is ``true'' if not in bg mode */
 			if ((ss->ss_flags & IEEE80211_SCAN_BGSCAN) == 0)
 				scandone = 1;
 
@@ -765,6 +766,7 @@ again:
 			 * may generate a request to cancel scanning.
 			 */
 			ic->ic_flags &= ~IEEE80211_F_SCAN;
+			
 			/*
 			 * Drop out of power save mode when a scan has
 			 * completed.  If this scan was prematurely terminated
