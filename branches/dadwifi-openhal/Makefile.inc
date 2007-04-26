@@ -124,7 +124,8 @@ ATH=	$(TOP)/ath
 # 
 TOOLS=  $(TOP)/tools 
 
-COPTS+=	-Werror
+WARNINGS = -Werror
+COPTS+= $(WARNINGS)
 INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
 
 include $(TOP)/BuildCaps.inc
