@@ -146,7 +146,8 @@ ATH_RATE=	$(TOP)/ath_rate
 # 
 TOOLS=  $(TOP)/tools 
 
-COPTS+=	-Werror
+WARNINGS = -Werror
+COPTS+= $(WARNINGS)
 INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
 
 # TARGET defines the target platform architecture. It must match one of
