@@ -2211,10 +2211,15 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		retv = ENETRESET;		/* XXX? */
 		break;
 	case IEEE80211_PARAM_ROAMING:
-		if (!(IEEE80211_ROAMING_DEVICE <= value &&
-		    value <= IEEE80211_ROAMING_MANUAL))
+		switch (value) {
+		case IEEE80211_ROAMING_DEVICE:
+		case IEEE80211_ROAMING_AUTO:
+		case IEEE80211_ROAMING_MANUAL:
+			ic->ic_roaming = value;
+			break;
+		default:
 			return -EINVAL;
-		ic->ic_roaming = value;
+		}
 		break;
 	case IEEE80211_PARAM_PRIVACY:
 		if (value) {
