@@ -2536,7 +2536,10 @@ ieee80211_deliver_l2uf(struct ieee80211_node *ni)
 	l2uf->xid[2] = 0x00;
 	
 	skb->dev = dev;
-	skb->protocol = eth_type_trans(skb, dev);
+	/* eth_trans_type modifies skb state (skb_pull(ETH_HLEN)), so use
+	 * constants instead. We know the packet type anyway. */
+	skb->pkt_type = PACKET_BROADCAST;
+	skb->protocol = htons(ETH_P_802_2);
 	skb->mac.raw = skb->data;
 	ieee80211_deliver_data(ni, skb);
 	return;
