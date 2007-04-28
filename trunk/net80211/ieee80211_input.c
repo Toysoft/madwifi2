@@ -722,7 +722,7 @@ ieee80211_input(struct ieee80211_node *ni,
 			skb1 = skb_clone(skb, GFP_ATOMIC); /* XXX: GFP_ATOMIC is overkill? */
 
 			/* we now have 802.3 MAC hdr followed by 802.2 LLC/SNAP; convert to EthernetII.
-			 * Not that the frame is at least IEEE80211_MIN_LEN, due to the driver code. */
+			 * Note that the frame is at least IEEE80211_MIN_LEN, due to the driver code. */
 			athff_decap(skb);
 
 			/* remove second frame from end of first */
