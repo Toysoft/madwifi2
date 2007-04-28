@@ -732,12 +732,12 @@ ieee80211_input(struct ieee80211_node *ni,
 			skb_pull(skb1, roundup(sizeof(struct ether_header) + frame_len, 4));
 			
 			/* Fail if there is no space left for at least the necessary headers */
-			if (athff_decap(skb1))
-			{
+			if (athff_decap(skb1)) {
 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
 						ni->ni_macaddr, "data", "%s", "Decapsulation error");
 				vap->iv_stats.is_rx_decap++;
 				IEEE80211_NODE_STAT(ni, rx_decap);
+				dev_kfree_skb(skb1);
 				goto err;
 			}
 
@@ -1204,9 +1204,9 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 	}
 
 	if (llc != NULL)
-		eh->ether_type = ether_type;
-	else
 		eh->ether_type = htons(skb->len - sizeof(*eh));
+	else
+		eh->ether_type = ether_type;
 	
 	if (!ALIGNED_POINTER(skb->data + sizeof(*eh), u_int32_t)) {
 		struct sk_buff *tskb;
