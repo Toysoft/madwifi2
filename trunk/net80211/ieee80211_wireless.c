@@ -5374,23 +5374,18 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 	struct ieee80211_clone_params cp;
 	struct ieee80211vap *vap;
 	char name[IFNAMSIZ];
-	int unit;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 	if (copy_from_user(&cp, ifr->ifr_data, sizeof(cp)))
 		return -EFAULT;
 
-	unit = ieee80211_new_wlanunit();
-	if (unit == -1)
-		return -EIO;		/* XXX */
 	strncpy(name, cp.icp_name, sizeof(name));
 	
-	vap = ic->ic_vap_create(ic, name, unit, cp.icp_opmode, cp.icp_flags, mdev);
-	if (vap == NULL) {
-		ieee80211_delete_wlanunit(unit);
+	vap = ieee80211_create_vap(ic, name, mdev, cp.icp_opmode, cp.icp_flags);
+	if (vap == NULL)
 		return -EIO;
-	}
+
 	/* return final device name */
 	strncpy(ifr->ifr_name, vap->iv_dev->name, IFNAMSIZ);
 	return 0;
@@ -5402,7 +5397,7 @@ EXPORT_SYMBOL(ieee80211_ioctl_create_vap);
  * outside our control (e.g. in the driver).
  * Must be called with rtnl_lock held
  */
-int
+struct ieee80211vap*
 ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	struct net_device *mdev, int opmode, int opflags)
 {
@@ -5410,13 +5405,13 @@ ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	int unit;
 	
 	if ((unit = ieee80211_new_wlanunit()) == -1)
-		return -EIO;		/* XXX */
+		return NULL;		/* XXX */
 
 	if ((vap = ic->ic_vap_create(ic, name, unit, opmode, opflags, mdev)) == NULL) {
 		ieee80211_delete_wlanunit(unit);
-		return -EIO;
 	}
-	return 0;
+
+	return vap;
 }
 EXPORT_SYMBOL(ieee80211_create_vap);
 

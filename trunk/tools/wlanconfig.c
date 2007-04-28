@@ -76,7 +76,6 @@
 
 static int if_split_name(const char *, char **, unsigned int *);
 static int proc_if_get_name(char *, char *, size_t);
-static int if_find_unit(const char *);
 static void vap_create(struct ifreq *);
 static void vap_destroy(const char *);
 static void list_stations(const char *);
@@ -165,14 +164,8 @@ main(int argc, char *argv[])
 			err(1, "if_split_name() - malloc");
 		} else if ((res == 0) && (bnounit == 0)) {
 			/* user gave a string only and using a unit */
-			unit_res = if_find_unit(if_base);
-
-			if (unit_res < 0) {
-				err(1, "if_find_unit - failed");
-			} else {
-				snprintf(cp.icp_name + strlen(if_base),
-					IFNAMSIZ - strlen(if_base), "%d", unit_res);
-			}
+			snprintf(cp.icp_name + strlen(if_base),
+				IFNAMSIZ - strlen(if_base), "%%d");
 		}
 
 		free(if_base);
@@ -279,41 +272,6 @@ static int proc_if_get_name(char *if_name, char *line, size_t line_sz) {
 	}
 
 	return (status);
-}
-
-static int if_find_unit(const char *if_name) {
-	int	unit	= -1;
-	
-	FILE	*fh_proc_if	= NULL;
-	char	lin_buf[512];
-	char	if_cmp[IFNAMSIZ];
-
-	if ((fh_proc_if = fopen("/proc/net/dev", "r")) < 0) {
-		err(1, "fopen(/proc/net/dev)");
-	} else {
-		int i;
-		// Eat two header lines
-		for (i = 0; i < 2; ++i) {
-			fgets(lin_buf, sizeof(lin_buf), fh_proc_if);
-		}
-		while (fgets(lin_buf, sizeof(lin_buf), fh_proc_if) != NULL) {
-			char	*p	= NULL;
-			int	tmp	= -1;
-			
-			if (proc_if_get_name(if_cmp, lin_buf, sizeof(lin_buf)) < 0) {
-				err(1, "proc_if_get_name - malformed data from /proc/net/dev");
-			} else {
-				p = strstr(if_cmp, if_name);
-				if (p != NULL)
-					tmp = atoi(p + strlen(if_name));
-				if (unit < tmp)
-					unit = tmp;
-			}
-		}
-		fclose(fh_proc_if);
-	}
-
-	return (unit + 1);
 }
 
 static void
