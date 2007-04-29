@@ -3565,9 +3565,11 @@ ieee80211_ioctl_setchanlist(struct net_device *dev,
 	if (ic->ic_bsschan != IEEE80211_CHAN_ANYC &&	/* XXX */
 	    isclr(chanlist, ic->ic_bsschan->ic_ieee))
 		ic->ic_bsschan = IEEE80211_CHAN_ANYC;	/* invalidate */
+
 	memcpy(ic->ic_chan_active, chanlist, sizeof(ic->ic_chan_active));
 	if (IS_UP_AUTO(vap))
 		ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
+
 	return 0;
 }
 
@@ -3764,7 +3766,8 @@ ieee80211_ioctl_getwpaie(struct net_device *dev, struct iwreq *iwr)
 		return -EFAULT;
 	ni = ieee80211_find_node(&ic->ic_sta, wpaie.wpa_macaddr);
 	if (ni == NULL)
-		return -EINVAL;		/* XXX */
+		return -ENOENT;	
+
 	memset(wpaie.wpa_ie, 0, sizeof(wpaie.wpa_ie));
 	if (ni->ni_wpa_ie != NULL) {
 		int ielen = ni->ni_wpa_ie[1] + 2;
@@ -3799,7 +3802,8 @@ ieee80211_ioctl_getstastats(struct net_device *dev, struct iwreq *iwr)
 		return -EFAULT;
 	ni = ieee80211_find_node(&ic->ic_sta, macaddr);
 	if (ni == NULL)
-		return -EINVAL;		/* XXX */
+		return -ENOENT;
+
 	if (iwr->u.data.length > sizeof(struct ieee80211req_sta_stats))
 		iwr->u.data.length = sizeof(struct ieee80211req_sta_stats);
 	/* NB: copy out only the statistics */
@@ -5405,7 +5409,7 @@ ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	int unit;
 	
 	if ((unit = ieee80211_new_wlanunit()) == -1)
-		return NULL;		/* XXX */
+		return NULL;
 
 	if ((vap = ic->ic_vap_create(ic, name, unit, opmode, opflags, mdev)) == NULL) {
 		ieee80211_delete_wlanunit(unit);
