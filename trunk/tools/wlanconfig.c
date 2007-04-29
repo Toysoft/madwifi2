@@ -75,7 +75,6 @@
 #define	streq(a,b)	(strncasecmp(a,b,sizeof(b)-1) == 0)
 
 static int if_split_name(const char *, char **, unsigned int *);
-static int proc_if_get_name(char *, char *, size_t);
 static void vap_create(struct ifreq *);
 static void vap_destroy(const char *);
 static void list_stations(const char *);
@@ -246,32 +245,6 @@ static int if_split_name(const char *if_name, char **if_base_name, unsigned int 
 	}
 
 	return status;
-}
-
-// *if_name must point to a memory location of at least IFNAMSIZ bytes
-static int proc_if_get_name(char *if_name, char *line, size_t line_sz) {
-	char	*p	= NULL;
-	char	*s	= NULL;
-	int	status	= -1;
-	
-	memset(if_name, 0, IFNAMSIZ);
-	
-	for (p = line; p - line < line_sz; ++p) {
-		if ((!isspace(*p)) && (s == NULL)) {
-			// First character
-			s = p;
-		} else if (isspace(*p) && (s != NULL)) {
-			// Sanity Check: no spaces in interface name
-			break;
-		} else if (*p == ':') {
-			// Copy everything up to the ':' - string is already zeroed
-			strncpy(if_name, s, p - s);
-			status = 0;
-			break;
-		}
-	}
-
-	return (status);
 }
 
 static void
