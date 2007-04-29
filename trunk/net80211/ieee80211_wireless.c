@@ -3264,7 +3264,7 @@ ieee80211_ioctl_delkey(struct net_device *dev, struct iw_request_info *info,
 
 		ni = ieee80211_find_node(&ic->ic_sta, dk->idk_macaddr);
 		if (ni == NULL)
-			return -EINVAL;		/* XXX */
+			return -ENOENT; /* No such entity is a more appropriate error */
 		/* XXX error return */
 		ieee80211_crypto_delkey(vap, &ni->ni_ucastkey, ni);
 		ieee80211_free_node(ni);
