@@ -305,15 +305,9 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 			ni->ni_bssid[0] |= 0x02;	/* local bit for IBSS */
 	} else if (vap->iv_opmode == IEEE80211_M_AHDEMO) {
 		if (vap->iv_flags & IEEE80211_F_DESBSSID)
-		    IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_des_bssid);
-		else {
-		    ni->ni_bssid[0] = 0x00;
-		    ni->ni_bssid[1] = 0x00;
-		    ni->ni_bssid[2] = 0x00;
-		    ni->ni_bssid[3] = 0x00;
-		    ni->ni_bssid[4] = 0x00;
-		    ni->ni_bssid[5] = 0x00;
-		}
+			IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_des_bssid);
+		else
+			IEEE80211_ADDR_SET_NULL(ni->ni_bssid);
 	}
 #ifdef ATH_SUPERG_DYNTURBO
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
