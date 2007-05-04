@@ -79,7 +79,13 @@
 
 #include "net80211/if_athproto.h"
 #include "if_athvar.h"
+
 #include "ah_desc.h"
+/* This is defined rubbishly in ah_desc.h; it is only used in this file, so
+ * redefine it here. */
+#undef HAL_TXKEYIX_INVALID
+#define HAL_TXKEYIX_INVALID	((ieee80211_keyix_t) -1)
+
 #include "ah_devid.h"			/* XXX to identify chipset */
 
 #ifdef ATH_PCI		/* PCI BUS */
@@ -130,7 +136,7 @@ static int ath_stop(struct net_device *);
 #if 0
 static void ath_initkeytable(struct ath_softc *);
 #endif
-static int ath_key_alloc(struct ieee80211vap *, const struct ieee80211_key *);
+static ieee80211_keyix_t ath_key_alloc(struct ieee80211vap *, const struct ieee80211_key *);
 static int ath_key_delete(struct ieee80211vap *, const struct ieee80211_key *,
 	struct ieee80211_node *);
 static int ath_key_set(struct ieee80211vap *, const struct ieee80211_key *,
@@ -392,6 +398,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211vap *vap;
 	struct ath_hal *ah;
 	HAL_STATUS status;
 	int error = 0;
@@ -897,12 +904,12 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	
 	if (autocreatemode != -1) {
 		rtnl_lock();
-		error = ieee80211_create_vap(ic, "ath%d", dev,
+		vap = ieee80211_create_vap(ic, "ath%d", dev,
 				autocreatemode, IEEE80211_CLONE_BSSID);
 		rtnl_unlock();
-		if (error)
-			printk(KERN_ERR "%s: autocreation of VAP failed: %d\n",
-				dev->name, error);
+		if (vap == NULL)
+			printk(KERN_ERR "%s: autocreation of VAP failed.",
+				dev->name);
 	}
 
 	return 0;
@@ -1392,20 +1399,20 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		if (HAL_EINPROGRESS == retval)
 			break;
 
-		/* XXX: we do not support frames spanning multiple descriptors */
+		/* XXX: We do not support frames spanning multiple descriptors */
 		bf->bf_status |= ATH_BUFSTATUS_DONE;
 
-		/* errors? */
+		/* Errors? */
 		if (rs->rs_status)
 			continue;
 
-		/* prepare wireless header for examination */
+		/* Prepare wireless header for examination */
 		bus_dma_sync_single(sc->sc_bdev, bf->bf_skbaddr, 
 				sizeof(struct ieee80211_qosframe), 
 				BUS_DMA_FROMDEVICE);
 		qwh = (struct ieee80211_qosframe *) skb->data;
 
-		/* find the node. it MUST be in the keycache. */
+		/* Find the node. it MUST be in the keycache. */
 		if (rs->rs_keyix == HAL_RXKEYIX_INVALID ||
 		    (ni = sc->sc_keyixmap[rs->rs_keyix]) == NULL) {
 			/* 
@@ -1417,9 +1424,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			 * TODO: The fix is to use the hash lookup on the node here.
 			 */
 #if 0
-			/*
-			 * This print is very chatty, so removing for now.
-			 */
+			/* This print is very chatty, so removing for now. */
 			DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: U-APSD node (%s) has invalid keycache entry\n",
 				__func__, ether_sprintf(qwh->i_addr2));
 #endif
@@ -1440,7 +1445,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		     (ni->ni_flags & IEEE80211_NODE_PWR_MGT))) {
 			/*
 			 * NB: do not require lock here since this runs at intr
-			 * "proper" time and cannot be interrupted by rx tasklet
+			 * "proper" time and cannot be interrupted by RX tasklet
 			 * (code there has lock). May want to place a macro here
 			 * (that does nothing) to make this more clear.
 			 */
@@ -1464,7 +1469,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 					__func__, ether_sprintf(qwh->i_addr2),
 					ic->ic_uapsdmaxtriggers);
 				/* 
-				 * XXX: rapidly thrashing sta could get 
+				 * XXX: Rapidly thrashing sta could get 
 				 * out-of-order frames due this flush placing
 				 * frames on backlogged regular AC queue and
 				 * re-entry to PS having fresh arrivals onto
@@ -2228,7 +2233,8 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_phy_params *ph = (struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
 	const HAL_RATE_TABLE *rt;
-	unsigned int pktlen, hdrlen, keyix, try0, power;
+	unsigned int pktlen, hdrlen, try0, power;
+	ieee80211_keyix_t keyix;
 	HAL_PKT_TYPE atype;
 	u_int flags;
 	u_int8_t antenna, txrate;
@@ -2861,13 +2867,13 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 			 */
 			memcpy(hk->kv_mic, k->wk_txmic, sizeof(hk->kv_mic));
 			KEYPRINTF(sc, k->wk_keyix, hk, zerobssid);
-			if (!ath_hal_keyset(ah, k->wk_keyix, hk, zerobssid))
+			if (!ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, zerobssid))
 				return 0;
 
 			memcpy(hk->kv_mic, k->wk_rxmic, sizeof(hk->kv_mic));
-			KEYPRINTF(sc, k->wk_keyix+32, hk, mac);
+			KEYPRINTF(sc, k->wk_keyix + 32, hk, mac);
 			/* XXX delete tx key on failure? */
-			return ath_hal_keyset(ah, k->wk_keyix+32, hk, mac);
+			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix + 32), hk, mac);
 		} else {
 			/*
 			 * Room for both TX+RX MIC keys in one key cache
@@ -2879,7 +2885,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 			memcpy(hk->kv_txmic, k->wk_txmic, sizeof(hk->kv_txmic));
 #endif
 			KEYPRINTF(sc, k->wk_keyix, hk, mac);
-			return ath_hal_keyset(ah, k->wk_keyix, hk, mac);
+			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac);
 		}
 	} else if (k->wk_flags & IEEE80211_KEY_XR) {
 		/*
@@ -2889,7 +2895,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 		memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
 			k->wk_txmic : k->wk_rxmic, sizeof(hk->kv_mic));
 		KEYPRINTF(sc, k->wk_keyix, hk, mac);
-		return ath_hal_keyset(ah, k->wk_keyix, hk, mac);
+		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac);
 	}
 	return 0;
 #undef IEEE80211_KEY_XR
@@ -2953,7 +2959,7 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
 		return ath_keyset_tkip(sc, k, &hk, mac);
 	} else {
 		KEYPRINTF(sc, k->wk_keyix, &hk, mac);
-		return ath_hal_keyset(ah, k->wk_keyix, &hk, mac);
+		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), &hk, mac);
 	}
 #undef N
 }
@@ -2962,11 +2968,12 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
  * Allocate tx/rx key slots for TKIP.  We allocate two slots for
  * each key, one for decrypt/encrypt and the other for the MIC.
  */
-static u_int16_t
+static ieee80211_keyix_t
 key_alloc_2pair(struct ath_softc *sc)
 {
 #define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
-	u_int i, keyix;
+	u_int i;
+	ieee80211_keyix_t keyix;
 
 	KASSERT(sc->sc_splitmic, ("key cache !split"));
 	/* XXX could optimize */
@@ -3014,11 +3021,12 @@ key_alloc_2pair(struct ath_softc *sc)
  * Allocate tx/rx key slots for TKIP.  We allocate two slots for
  * each key, one for decrypt/encrypt and the other for the MIC.
  */
-static u_int16_t
+static ieee80211_keyix_t
 key_alloc_pair(struct ath_softc *sc)
 {
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
-	u_int i, keyix;
+	u_int i;
+	ieee80211_keyix_t keyix;
 
 	KASSERT(!sc->sc_splitmic, ("key cache split"));
 	/* XXX could optimize */
@@ -3059,11 +3067,12 @@ key_alloc_pair(struct ath_softc *sc)
 /*
  * Allocate a single key cache slot.
  */
-static u_int16_t
+static ieee80211_keyix_t
 key_alloc_single(struct ath_softc *sc)
 {
 #define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
-	u_int i, keyix;
+	u_int i;
+	ieee80211_keyix_t keyix;
 
 	/* XXX try i,i+32,i+64,i+32+64 to minimize key pair conflicts */
 	for (i = 0; i < N(sc->sc_keymap); i++) {
@@ -3095,7 +3104,7 @@ key_alloc_single(struct ath_softc *sc)
  * hardware to be at slot i+64.  This limits TKIP keys to the first
  * 64 entries.
  */
-static int
+static ieee80211_keyix_t
 ath_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 {
 	struct net_device *dev = vap->iv_ic->ic_dev;
@@ -3164,7 +3173,7 @@ ath_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k,
 	struct ath_hal *ah = sc->sc_ah;
 	const struct ieee80211_cipher *cip = k->wk_cipher;
 	struct ieee80211_node *ni;
-	u_int keyix = k->wk_keyix;
+	ieee80211_keyix_t keyix = k->wk_keyix;
 	unsigned int rxkeyoff = 0;
 
 	DPRINTF(sc, ATH_DEBUG_KEYCACHE, "%s: delete key %u\n", __func__, keyix);
@@ -5667,7 +5676,7 @@ rx_accept:
 				(const struct ieee80211_frame_min *) skb->data);
 			if (ni != NULL) {
 				struct ath_node *an = ATH_NODE(ni);
-				u_int16_t keyix;
+				ieee80211_keyix_t keyix;
 
 				ATH_RSSI_LPF(an->an_avgrssi, rs->rs_rssi);
 				type = ieee80211_input(ni, skb,	rs->rs_rssi,rs->rs_tstamp);
@@ -5867,7 +5876,8 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 {
 	unsigned int i, amode;
 	unsigned int flags = 0;
-	unsigned int pktlen = 0, keyix = 0;
+	unsigned int pktlen = 0;
+	ieee80211_keyix_t keyix = 0;
 	unsigned int pollsperrate, pos;
 	struct sk_buff *skb = NULL;
 	struct ath_buf *bf, *head = NULL;
@@ -5989,7 +5999,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 					struct ieee80211_key *k;
 					k = ieee80211_crypto_encap(vap->iv_bss, skb);
 					if (k)
-						keyix = k->wk_keyix;
+						keyix = ATH_KEY(k->wk_keyix);
 				}
 			}
 			ATH_TXBUF_LOCK_IRQ(sc);					
@@ -6514,11 +6524,11 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_hal *ah = sc->sc_ah;
 	int isprot, ismcast, istxfrag;
-	unsigned int keyix, hdrlen, pktlen, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
-	int try0;
+	unsigned int try0, hdrlen, pktlen, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
+	ieee80211_keyix_t keyix;
 	u_int8_t rix, txrate, ctsrate;
 	u_int32_t ivlen = 0, icvlen = 0;
-	u_int8_t cix = 0xff;		/* NB: silence compiler */
+	u_int8_t cix = 0xff;
 	struct ath_desc *ds = NULL;
 	struct ath_txq *txq = NULL;
 	struct ieee80211_frame *wh;
@@ -6591,7 +6601,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 				if (cip->ic_cipher != IEEE80211_CIPHER_TKIP)
 					pktlen += cip->ic_miclen;
 		}
-		keyix = k->wk_keyix;
+		keyix = ATH_KEY(k->wk_keyix);
 
 #ifdef ATH_SUPERG_COMP
 		icvlen = ath_get_icvlen(k) / 4;
@@ -6603,9 +6613,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		/*
 		 * Use station key cache slot, if assigned.
 		 */
-		keyix = ni->ni_ucastkey.wk_keyix;
-		if (keyix == IEEE80211_KEYIX_NONE)
-			keyix = HAL_TXKEYIX_INVALID;
+		keyix = ATH_KEY(ni->ni_ucastkey.wk_keyix);
 	} else
 		keyix = HAL_TXKEYIX_INVALID;
 
@@ -6823,13 +6831,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 		if (istxfrag)
 			/*
-			**  if Tx fragment, it would be desirable to 
-			**  use highest CCK rate for RTS/CTS.
-			**  However, stations farther away may detect it
-			**  at a lower CCK rate. Therefore, use the 
-			**  configured protect rate, which is 2 Mbps
-			**  for 11G.
-			*/
+			 *  if Tx fragment, it would be desirable to 
+			 *  use highest CCK rate for RTS/CTS.
+			 *  However, stations farther away may detect it
+			 *  at a lower CCK rate. Therefore, use the 
+			 *  configured protect rate, which is 2 Mbps
+			 *  for 11G.
+			 */
 			cix = rt->info[sc->sc_protrix].controlRate;
 		else
 			cix = rt->info[sc->sc_protrix].controlRate;
@@ -6843,9 +6851,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if ((flags & HAL_TXDESC_NOACK) == 0 &&
 	    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_CTL) {
 		u_int16_t dur;
-		/*
-		 * XXX not right with fragmentation.
-		 */
+		
+		/* XXX: not right with fragmentation. */
 		if (shortPreamble)
 			dur = rt->info[rix].spAckDuration;
 		else
@@ -7270,17 +7277,19 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 
 #ifdef ATH_SUPERG_FF
 		{
-			struct sk_buff *skbnext = bf->bf_skb, *skb = NULL;
+			/* Handle every skb after the first one - these are FF extra
+			 * buffers */
+			struct sk_buff *tskb = NULL, *skb = bf->bf_skb->next;
 			unsigned int i;
 
 			for (i = 0; i < bf->bf_numdescff; i++) {
-				skb = skbnext;
-				skbnext = skb->next;
+				tskb = skb->next;
 				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i],
 						skb->len, BUS_DMA_TODEVICE);
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
 					__func__, skb);
 				ath_tx_capture(sc->sc_dev, bf, skb);
+				skb = tskb;
 			}
 		}
 		bf->bf_numdescff = 0;
@@ -7573,7 +7582,7 @@ ath_startrecv(struct ath_softc *sc)
 #else
 	sc->sc_rxbufsize = roundup(IEEE80211_MAX_LEN, sc->sc_cachelsz);
 #endif
-	DPRINTF(sc,ATH_DEBUG_RESET, "%s: mtu %u cachelsz %u rxbufsize %u\n",
+	DPRINTF(sc, ATH_DEBUG_RESET, "%s: mtu %u cachelsz %u rxbufsize %u\n",
 		__func__, dev->mtu, sc->sc_cachelsz, sc->sc_rxbufsize);
 
 	sc->sc_rxlink = NULL;
@@ -8220,7 +8229,7 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
 	struct ath_node *an = ATH_NODE(ni);
-	u_int16_t keyindex;
+	ieee80211_keyix_t keyix;
 
 	if (enable) {
 		/* Have we negotiated compression? */
@@ -8232,7 +8241,7 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
 			return;
 
 		/* Setup decompression mask.
-		 * For TKIP and split MIC case, recv. keyindex is at 32 offset
+		 * For TKIP and split MIC case, recv. keyix is at 32 offset
 		 * from tx key.
 		 */
 		if ((ni->ni_wpa_ie != NULL) &&
@@ -8240,14 +8249,14 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
 		    sc->sc_splitmic) {
 			if ((ni->ni_ucastkey.wk_flags & IEEE80211_KEY_XR) 
 							== IEEE80211_KEY_XR)
-				keyindex = ni->ni_ucastkey.wk_keyix + 32;
+				keyix = ni->ni_ucastkey.wk_keyix + 32;
 			else
-				keyindex = ni->ni_ucastkey.wk_keyix;
+				keyix = ni->ni_ucastkey.wk_keyix;
 		} else
-			keyindex = ni->ni_ucastkey.wk_keyix + ni->ni_rxkeyoff;
+			keyix = ni->ni_ucastkey.wk_keyix + ni->ni_rxkeyoff;
 
-		ath_hal_setdecompmask(sc->sc_ah, keyindex, 1);
-		an->an_decomp_index = keyindex;
+		ath_hal_setdecompmask(sc->sc_ah, keyix, 1);
+		an->an_decomp_index = keyix;
 	} else {
 		if (an->an_decomp_index != INVALID_DECOMP_INDEX) {
 			ath_hal_setdecompmask(sc->sc_ah, an->an_decomp_index, 0);
@@ -8273,7 +8282,7 @@ ath_setup_stationkey(struct ieee80211_node *ni)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
-	u_int16_t keyix;
+	ieee80211_keyix_t keyix;
 
 	keyix = ath_key_alloc(vap, &ni->ni_ucastkey);
 	if (keyix == IEEE80211_KEYIX_NONE) {
@@ -8312,7 +8321,8 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 	struct ieee80211_key *ni_key;
 	struct ieee80211_key tmpkey;
 	struct ieee80211_key *rcv_key, *xmit_key;
-	unsigned int txkeyidx, rxkeyidx = IEEE80211_KEYIX_NONE, i;
+	unsigned int i;
+	ieee80211_keyix_t txkeyidx, rxkeyidx = IEEE80211_KEYIX_NONE;
 	u_int8_t null_macaddr[IEEE80211_ADDR_LEN] = {0, 0, 0, 0, 0, 0};
 
 	KASSERT(ni->ni_ath_defkeyindex < IEEE80211_WEP_NKID,

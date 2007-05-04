@@ -342,7 +342,7 @@ ieee80211_sta_pwrsave(struct ieee80211vap *vap, int enable)
 		return;
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-		"sta power save mode %s", enable ? "on" : "off");
+		"STA power save mode %s", enable ? "on" : "off");
 	if (!enable) {
 		ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
 		ieee80211_send_nulldata(ieee80211_ref_node(ni));
@@ -350,12 +350,12 @@ ieee80211_sta_pwrsave(struct ieee80211vap *vap, int enable)
 		 * Flush any queued frames; we can do this immediately
 		 * because we know they'll be queued behind the null
 		 * data frame we send the ap.
-		 * XXX can we use a data frame to take us out of ps?
+		 * XXX: Can we use a data frame to take us out of PS mode?
 		 */
 		qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
 		if (qlen != 0) {
 			IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-				"flush ps queue, %u packets queued", qlen);
+				"flush PS queue, %u packets queued", qlen);
 			for (;;) {
 				struct sk_buff *skb;
 

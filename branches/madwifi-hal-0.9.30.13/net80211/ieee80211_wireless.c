@@ -53,8 +53,8 @@
 #include <linux/wireless.h>
 #include <net/iw_handler.h>
 
-#if WIRELESS_EXT < 14
-#error "Wireless extensions v14 or better is needed."
+#if WIRELESS_EXT < 15
+#error "Wireless extensions v15 or better is needed."
 #endif
 
 #include <asm/uaccess.h>
@@ -201,19 +201,19 @@ ieee80211_ioctl_giwname(struct net_device *dev, struct iw_request_info *info,
  * to be base zero.
  */
 static int
-getiwkeyix(struct ieee80211vap *vap, const struct iw_point* erq, int *kix)
+getiwkeyix(struct ieee80211vap *vap, const struct iw_point* erq, ieee80211_keyix_t *rkix)
 {
-	int kid;
+	ieee80211_keyix_t kix;
 
-	kid = erq->flags & IW_ENCODE_INDEX;
-	if (kid < 1 || kid > IEEE80211_WEP_NKID) {
-		kid = vap->iv_def_txkey;
-		if (kid == IEEE80211_KEYIX_NONE)
-			kid = 0;
+	kix = erq->flags & IW_ENCODE_INDEX;
+	if (kix < 1 || kix > IEEE80211_WEP_NKID) {
+		kix = vap->iv_def_txkey;
+		if (kix == IEEE80211_KEYIX_NONE)
+			kix = 0;
 	} else
-		--kid;
-	if (0 <= kid && kid < IEEE80211_WEP_NKID) {
-		*kix = kid;
+		--kix;
+	if (kix < IEEE80211_WEP_NKID) {
+		*rkix = kix;
 		return 0;
 	} else
 		return -EINVAL;
@@ -224,15 +224,20 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 	struct iw_request_info *info, struct iw_point *erq, char *keybuf)
 {
 	struct ieee80211vap *vap = dev->priv;
-	int kid, error;
+	int error;
 	int wepchange = 0;
+	ieee80211_keyix_t kix;
 
 	if ((erq->flags & IW_ENCODE_DISABLED) == 0) {
+		/* Check WEP support, load WEP module if needed */
+		if (!ieee80211_crypto_available(vap, IEEE80211_CIPHER_WEP))
+			return -EOPNOTSUPP;
+
 		/*
 		 * Enable crypto, set key contents, and
 		 * set the default transmit key.
 		 */
-		error = getiwkeyix(vap, erq, &kid);
+		error = getiwkeyix(vap, erq, &kix);
 		if (error < 0)
 			return error;
 		if (erq->length > IEEE80211_KEYBUF_SIZE)
@@ -240,13 +245,13 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 		/* XXX no way to install 0-length key */
 		ieee80211_key_update_begin(vap);
 		if (erq->length > 0) {
-			struct ieee80211_key *k = &vap->iv_nw_keys[kid];
+			struct ieee80211_key *k = &vap->iv_nw_keys[kix];
 
 			/*
 			 * Set key contents.  This interface only supports WEP.
 			 * Indicate intended key index.			 
 			 */
-			k->wk_keyix = kid;
+			k->wk_keyix = kix;
 			if (ieee80211_crypto_newkey(vap, IEEE80211_CIPHER_WEP,
 			    IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV, k)) {
 				k->wk_keylen = erq->length;
@@ -263,7 +268,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 			 * the default transmit key.  Verify the new key has
 			 * a non-zero length.
 			 */
-			if (vap->iv_nw_keys[kid].wk_keylen == 0)
+			if (vap->iv_nw_keys[kix].wk_keylen == 0)
 				error = -EINVAL;
 		}
 		if (error == 0) {
@@ -276,7 +281,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 			 */
 			if (erq->length == 0 ||
 			    (vap->iv_flags & IEEE80211_F_PRIVACY) == 0)
-				vap->iv_def_txkey = kid;
+				vap->iv_def_txkey = kix;
 			wepchange = (vap->iv_flags & IEEE80211_F_PRIVACY) == 0;
 			vap->iv_flags |= IEEE80211_F_PRIVACY;
 		}
@@ -329,16 +334,17 @@ ieee80211_ioctl_giwencode(struct net_device *dev, struct iw_request_info *info,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211_key *k;
-	int error, kid;
+	int error;
+	ieee80211_keyix_t kix;
 
 	if (vap->iv_flags & IEEE80211_F_PRIVACY) {
-		error = getiwkeyix(vap, erq, &kid);
+		error = getiwkeyix(vap, erq, &kix);
 		if (error < 0)
 			return error;
-		k = &vap->iv_nw_keys[kid];
+		k = &vap->iv_nw_keys[kix];
 		/* XXX no way to return cipher/key type */
 
-		erq->flags = kid + 1;			/* NB: base 1 */
+		erq->flags = kix + 1;			/* NB: base 1 */
 		if (erq->length > k->wk_keylen)
 			erq->length = k->wk_keylen;
 		memcpy(key, k->wk_key, erq->length);
@@ -624,7 +630,7 @@ findchannel(struct ieee80211com *ic, int ieee, int mode)
 		IEEE80211_CHAN_ST,	/* IEEE80211_MODE_TURBO_STATIC_A */
 	};
 	u_int modeflags;
-	int i;
+	unsigned int i;
 
 	modeflags = chanflags[mode];
 	for (i = 0; i < ic->ic_nchans; i++) {
@@ -933,7 +939,6 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	memset(range, 0, sizeof(struct iw_range));
 
 	/* txpower (128 values, but will print out only IW_MAX_TXPOWER) */
-#if WIRELESS_EXT >= 10
 	range->num_txpower = (ic->ic_txpowlimit >= 8) ? IW_MAX_TXPOWER : ic->ic_txpowlimit;
 	step = ic->ic_txpowlimit / (2 * (IW_MAX_TXPOWER - 1));
  
@@ -941,8 +946,6 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	for (i = 1; i < IW_MAX_TXPOWER; i++)
 		range->txpower[i] = (ic->ic_txpowlimit/2)
 			- (IW_MAX_TXPOWER - i - 1) * step;
-#endif
-
 
 	range->txpower_capa = IW_TXPOW_DBM;
 
@@ -959,7 +962,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	range->we_version_compiled = WIRELESS_EXT;
-	range->we_version_source = 13;
+	range->we_version_source = 18;
 
 	range->retry_capa = IW_RETRY_LIMIT;
 	range->retry_flags = IW_RETRY_LIMIT;
@@ -1213,10 +1216,8 @@ ieee80211_ioctl_siwmode(struct net_device *dev, struct iw_request_info *info,
 	
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		valid = (*mode == IW_MODE_MASTER);
-#if WIRELESS_EXT >= 15
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		valid = (*mode == IW_MODE_MONITOR);
-#endif
 	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		valid = (*mode == IW_MODE_ADHOC);
 	else if (imr.ifm_active & IFM_IEEE80211_WDS)
@@ -1239,10 +1240,8 @@ ieee80211_ioctl_giwmode(struct net_device *dev,	struct iw_request_info *info,
 
 	if (imr.ifm_active & IFM_IEEE80211_HOSTAP)
 		*mode = IW_MODE_MASTER;
-#if WIRELESS_EXT >= 15
 	else if (imr.ifm_active & IFM_IEEE80211_MONITOR)
 		*mode = IW_MODE_MONITOR;
-#endif
 	else if (imr.ifm_active & IFM_IEEE80211_ADHOC)
 		*mode = IW_MODE_ADHOC;
 	else if (imr.ifm_active & IFM_IEEE80211_WDS)
@@ -1258,35 +1257,32 @@ ieee80211_ioctl_siwpower(struct net_device *dev, struct iw_request_info *info,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-
-	if (wrq->disabled) {
-		if (ic->ic_flags & IEEE80211_F_PMGTON) {
-			ic->ic_flags &= ~IEEE80211_F_PMGTON;
-			goto done;
-		}
-		return 0;
-	}
+	
+	/* XXX: These values, flags, and caps do not seem to be used elsewhere 
+	 * at all? */
 
 	if ((ic->ic_caps & IEEE80211_C_PMGT) == 0)
 		return -EOPNOTSUPP;
-	switch (wrq->flags & IW_POWER_MODE) {
-	case IW_POWER_UNICAST_R:
-	case IW_POWER_ALL_R:
-	case IW_POWER_ON:
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-		break;
-	default:
-		return -EINVAL;
+	
+	if (wrq->disabled) {
+		ic->ic_flags &= ~IEEE80211_F_PMGTON;
+	} else {
+		switch (wrq->flags & IW_POWER_MODE) {
+		case IW_POWER_UNICAST_R:
+		case IW_POWER_ALL_R:
+		case IW_POWER_ON:
+			ic->ic_flags |= IEEE80211_F_PMGTON;
+			
+			if (wrq->flags & IW_POWER_TIMEOUT)
+				ic->ic_holdover = IEEE80211_MS_TO_TU(wrq->value);
+			if (wrq->flags & IW_POWER_PERIOD)
+				ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
+			break;
+		default:
+			return -EINVAL;
+		}
 	}
-	if (wrq->flags & IW_POWER_TIMEOUT) {
-		ic->ic_holdover = IEEE80211_MS_TO_TU(wrq->value);
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-	}
-	if (wrq->flags & IW_POWER_PERIOD) {
-		ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
-		ic->ic_flags |= IEEE80211_F_PMGTON;
-	}
-done:
+	
 	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
@@ -1467,7 +1463,7 @@ waplist_cb(void *arg, const struct ieee80211_scan_entry *se)
 	else
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_bssid);
 	set_quality(&req->qual[i], se->se_rssi, -95);
-	req->i = i + 1;
+	req->i++;
 
 	return 0;
 }
@@ -1549,7 +1545,6 @@ ieee80211_ioctl_siwscan(struct net_device *dev,	struct iw_request_info *info,
 	return 0;
 }
 
-#if WIRELESS_EXT > 14
 /*
  * Encode a WPA or RSN information element as a custom
  * element using the hostap format.
@@ -1573,7 +1568,6 @@ encode_ie(void *buf, size_t bufsize, const u_int8_t *ie, size_t ielen,
 	}
 	return (i == ielen ? p - (u_int8_t *)buf : 0);
 }
-#endif /* WIRELESS_EXT > 14 */
 
 struct iwscanreq {		/* XXX: right place for this declaration? */
 	struct ieee80211vap *vap;
@@ -1590,13 +1584,11 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	char *current_ev = req->current_ev;
 	char *end_buf = req->end_buf;
 	char *last_ev;
-#if WIRELESS_EXT > 14
 #define MAX_IE_LENGTH 64 * 2 + 30
 	char buf[MAX_IE_LENGTH];
 #ifndef IWEVGENIE
 	static const char rsn_leader[] = "rsn_ie=";
 	static const char wpa_leader[] = "wpa_ie=";
-#endif
 #endif
 	struct iw_event iwe;
 	char *current_val;
@@ -1724,7 +1716,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	    return E2BIG;
 	}
 
-#if WIRELESS_EXT > 14
 	memset(&iwe, 0, sizeof(iwe));
 	last_ev = current_ev;
 	iwe.cmd = IWEVCUSTOM;
@@ -1825,7 +1816,6 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 			  return E2BIG;
 		}
 	}
-#endif /* WIRELESS_EXT > 14 */
 	req->current_ev = current_ev;
 
 	return 0;
@@ -2088,9 +2078,9 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_rsnparms *rsn = &vap->iv_bss->ni_rsn;
-	int *i = (int *) extra;
-	int param = i[0];		/* parameter id is 1st */
-	int value = i[1];		/* NB: most values are TYPE_INT */
+	unsigned int *i = (unsigned int *) extra;
+	unsigned int param = i[0];		/* parameter id is 1st */
+	unsigned int value = i[1];		/* NB: most values are TYPE_INT */
 	int retv = 0;
 	int j, caps;
 	const struct ieee80211_authenticator *auth;
@@ -2141,14 +2131,14 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_MCASTCIPHER:
 		if ((vap->iv_caps & cipher2cap(value)) == 0 &&
-		    !ieee80211_crypto_available(value))
+		    !ieee80211_crypto_available(vap, value))
 			return -EINVAL;
 		rsn->rsn_mcastcipher = value;
 		if (vap->iv_flags & IEEE80211_F_WPA)
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_MCASTKEYLEN:
-		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
+		if (value > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_mcastkeylen = value;
@@ -2166,7 +2156,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		for (j = 1; j < 32; j++)	/* NB: skip WEP */
 			if ((value & (1 << j)) &&
 			    ((vap->iv_caps & cipher2cap(j)) ||
-			     ieee80211_crypto_available(j)))
+			     ieee80211_crypto_available(vap, j)))
 				caps |= 1 << j;
 		if (caps == 0)			/* nothing available */
 			return -EINVAL;
@@ -2178,14 +2168,14 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_UCASTCIPHER:
 		if ((vap->iv_caps & cipher2cap(value)) == 0 &&
-		    !ieee80211_crypto_available(value))
+		    !ieee80211_crypto_available(vap, value))
 			return -EINVAL;
 		rsn->rsn_ucastcipher = value;
 		if (vap->iv_flags & IEEE80211_F_WPA)
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_UCASTKEYLEN:
-		if (!(0 < value && value <= IEEE80211_KEYBUF_SIZE))
+		if (value > IEEE80211_KEYBUF_SIZE)
 			return -EINVAL;
 		/* XXX no way to verify driver capability */
 		rsn->rsn_ucastkeylen = value;
@@ -2221,10 +2211,15 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		retv = ENETRESET;		/* XXX? */
 		break;
 	case IEEE80211_PARAM_ROAMING:
-		if (!(IEEE80211_ROAMING_DEVICE <= value &&
-		    value <= IEEE80211_ROAMING_MANUAL))
+		switch (value) {
+		case IEEE80211_ROAMING_DEVICE:
+		case IEEE80211_ROAMING_AUTO:
+		case IEEE80211_ROAMING_MANUAL:
+			ic->ic_roaming = value;
+			break;
+		default:
 			return -EINVAL;
-		ic->ic_roaming = value;
+		}
 		break;
 	case IEEE80211_PARAM_PRIVACY:
 		if (value) {
@@ -2480,7 +2475,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = EINVAL;
 		break;
 	case IEEE80211_PARAM_COVERAGE_CLASS:
-		if (value >= 0 && value <= IEEE80211_COVERAGE_CLASS_MAX) {
+		if (value <= IEEE80211_COVERAGE_CLASS_MAX) {
 			ic->ic_coverageclass = value;
 			if (IS_UP_AUTO(vap))
 				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
@@ -2580,7 +2575,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 #ifdef ATH_SUPERG_XR
 	/* set the same params on the xr vap device if exists */
 	if (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR)) {
-		ieee80211_ioctl_setparam(vap->iv_xrvap->iv_dev,info,w,extra);
+		ieee80211_ioctl_setparam(vap->iv_xrvap->iv_dev, info, w, extra);
 		vap->iv_xrvap->iv_ath_cap &= IEEE80211_ATHC_XR; /* XR vap does not support  any superG features */
 	} 
 	/*
@@ -2659,7 +2654,7 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_rsnparms *rsn = &vap->iv_bss->ni_rsn;
-	int *param = (int *) extra;
+	unsigned int *param = (unsigned int *) extra;
 	
 	switch (param[0]) {
 	case IEEE80211_PARAM_AUTHMODE:
@@ -2942,7 +2937,7 @@ ieee80211_ioctl_setoptie(struct net_device *dev, struct iw_request_info *info,
 	 */
 	if (vap->iv_opmode != IEEE80211_M_STA)
 		return -EINVAL;
-	if (! is_valid_ie_list(wri->length, extra, 0))
+	if (!is_valid_ie_list(wri->length, extra, 0))
 		return -EINVAL;
 	/* NB: wri->length is validated by the wireless extensions code */
 	MALLOC(ie, void *, wri->length, M_DEVBUF, M_WAITOK);
@@ -3132,15 +3127,18 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211req_key *ik = (struct ieee80211req_key *)extra;
 	struct ieee80211_node *ni;
 	struct ieee80211_key *wk;
-	u_int16_t kid;
+	ieee80211_keyix_t kix;
 	int error, flags,i;
 
-	/* NB: cipher support is verified by ieee80211_crypt_newkey */
+	/* Check cipher support, load crypto modules if needed */
+	if (!ieee80211_crypto_available(vap, ik->ik_type))
+		return -EOPNOTSUPP;
+
 	/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
 	if (ik->ik_keylen > sizeof(ik->ik_keydata))
 		return -E2BIG;
-	kid = ik->ik_keyix;
-	if (kid == IEEE80211_KEYIX_NONE) {
+	kix = ik->ik_keyix;
+	if (kix == IEEE80211_KEYIX_NONE) {
 		/* XXX unicast keys currently must be tx/rx */
 		if (ik->ik_flags != (IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV))
 			return -EINVAL;
@@ -3154,9 +3152,9 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 			return -ENOENT;
 		wk = &ni->ni_ucastkey;
 	} else {
-		if (kid >= IEEE80211_WEP_NKID)
+		if (kix >= IEEE80211_WEP_NKID)
 			return -EINVAL;
-		wk = &vap->iv_nw_keys[kid];
+		wk = &vap->iv_nw_keys[kix];
 		ni = NULL;
 		/* XXX auto-add group key flag until applications are updated */
 		if ((ik->ik_flags & IEEE80211_KEY_XMIT) == 0)	/* XXX */
@@ -3179,7 +3177,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 		    ni != NULL ? ni->ni_macaddr : ik->ik_macaddr, ni))
 			error = -EIO;
 		else if ((ik->ik_flags & IEEE80211_KEY_DEFAULT))
-			vap->iv_def_txkey = kid;
+			vap->iv_def_txkey = kix;
 	} else
 		error = -ENXIO;
 	ieee80211_key_update_end(vap);
@@ -3202,22 +3200,22 @@ ieee80211_ioctl_getkey(struct net_device *dev, struct iwreq *iwr)
 	struct ieee80211req_key ik;
 	struct ieee80211_key *wk;
 	const struct ieee80211_cipher *cip;
-	u_int kid;
+	ieee80211_keyix_t kix;
 
 	if (iwr->u.data.length != sizeof(ik))
 		return -EINVAL;
 	if (copy_from_user(&ik, iwr->u.data.pointer, sizeof(ik)))
 		return -EFAULT;
-	kid = ik.ik_keyix;
-	if (kid == IEEE80211_KEYIX_NONE) {
+	kix = ik.ik_keyix;
+	if (kix == IEEE80211_KEYIX_NONE) {
 		ni = ieee80211_find_node(&ic->ic_sta, ik.ik_macaddr);
 		if (ni == NULL)
 			return -EINVAL;		/* XXX */
 		wk = &ni->ni_ucastkey;
 	} else {
-		if (kid >= IEEE80211_WEP_NKID)
+		if (kix >= IEEE80211_WEP_NKID)
 			return -EINVAL;
-		wk = &vap->iv_nw_keys[kid];
+		wk = &vap->iv_nw_keys[kix];
 		IEEE80211_ADDR_COPY(&ik.ik_macaddr, vap->iv_bss->ni_macaddr);
 		ni = NULL;
 	}
@@ -3255,24 +3253,26 @@ ieee80211_ioctl_delkey(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211req_del_key *dk = (struct ieee80211req_del_key *)extra;
-	int kid;
+	ieee80211_keyix_t kix;
 
-	kid = dk->idk_keyix;
-	/* XXX u_int8_t -> u_int16_t */
+	kix = dk->idk_keyix;
+
+	/* XXX: This cast can be removed when struct ieee80211req_del_key is 
+	 * fixed. */
 	if (dk->idk_keyix == (u_int8_t) IEEE80211_KEYIX_NONE) {
 		struct ieee80211_node *ni;
 
 		ni = ieee80211_find_node(&ic->ic_sta, dk->idk_macaddr);
 		if (ni == NULL)
-			return -EINVAL;		/* XXX */
+			return -ENOENT; /* No such entity is a more appropriate error */
 		/* XXX error return */
 		ieee80211_crypto_delkey(vap, &ni->ni_ucastkey, ni);
 		ieee80211_free_node(ni);
 	} else {
-		if (kid >= IEEE80211_WEP_NKID)
+		if (kix >= IEEE80211_WEP_NKID)
 			return -EINVAL;
 		/* XXX error return */
-		ieee80211_crypto_delkey(vap, &vap->iv_nw_keys[kid], NULL);
+		ieee80211_crypto_delkey(vap, &vap->iv_nw_keys[kix], NULL);
 	}
 	return 0;
 }
@@ -3565,9 +3565,11 @@ ieee80211_ioctl_setchanlist(struct net_device *dev,
 	if (ic->ic_bsschan != IEEE80211_CHAN_ANYC &&	/* XXX */
 	    isclr(chanlist, ic->ic_bsschan->ic_ieee))
 		ic->ic_bsschan = IEEE80211_CHAN_ANYC;	/* invalidate */
+
 	memcpy(ic->ic_chan_active, chanlist, sizeof(ic->ic_chan_active));
 	if (IS_UP_AUTO(vap))
 		ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
+
 	return 0;
 }
 
@@ -3631,14 +3633,14 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 	struct iw_request_info *info, void *w, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
-	int *param = (int *) extra;
-	int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
-	int bss = param[2]; 
+	unsigned int *param = (unsigned int *) extra;
+	unsigned int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
+	unsigned int bss = param[2]; 
 	struct ieee80211_wme_state *wme = &vap->iv_ic->ic_wme;
 
 	switch (param[0]) {
         case IEEE80211_WMMPARAMS_CWMIN:
-		if (param[3] < 0 || param[3] > 15) 
+		if (param[3] > 15) 
 			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
@@ -3651,7 +3653,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
 	case IEEE80211_WMMPARAMS_CWMAX:
-		if (param[3] < 0 || param[3] > 15) 
+		if (param[3] > 15) 
 			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
@@ -3664,7 +3666,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
         case IEEE80211_WMMPARAMS_AIFS:
-		if (param[3] < 0 || param[3] > 15) 
+		if (param[3] > 15) 
 			return -EINVAL;	
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
@@ -3677,7 +3679,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
         case IEEE80211_WMMPARAMS_TXOPLIMIT:
-		if (param[3] < 0 || param[3] > 8192) 
+		if (param[3] > 8192) 
 			return -EINVAL;
         	if (bss) {
 			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_txopLimit 
@@ -3694,7 +3696,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 		ieee80211_wme_updateparams(vap);	
 		break;
         case IEEE80211_WMMPARAMS_ACM:
-		if (!bss || param[3] < 0 || param[3] > 1) 
+		if (!bss || param[3] > 1) 
 			return -EINVAL;
         	/* ACM bit applies to BSS case only */
 		wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
@@ -3702,7 +3704,7 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 			wme->wme_bssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
 		break;
         case IEEE80211_WMMPARAMS_NOACKPOLICY:
-		if (bss || param[3] < 0 || param[3] > 1) 
+		if (bss || param[3] > 1) 
 			return -EINVAL;	
         	/* ack policy applies to non-BSS case only */
 		wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
@@ -3719,8 +3721,8 @@ ieee80211_ioctl_getwmmparams(struct net_device *dev,
 	struct iw_request_info *info, void *w, char *extra)
 {
 	struct ieee80211vap *vap = dev->priv;
-	int *param = (int *) extra;
-	int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
+	unsigned int *param = (unsigned int *) extra;
+	unsigned int ac = (param[1] < WME_NUM_AC) ? param[1] : WME_AC_BE;
 	struct ieee80211_wme_state *wme = &vap->iv_ic->ic_wme;
 	struct chanAccParams *chanParams = (param[2] == 0) ? 
 		&(wme->wme_chanParams) : &(wme->wme_bssChanParams);
@@ -3764,7 +3766,8 @@ ieee80211_ioctl_getwpaie(struct net_device *dev, struct iwreq *iwr)
 		return -EFAULT;
 	ni = ieee80211_find_node(&ic->ic_sta, wpaie.wpa_macaddr);
 	if (ni == NULL)
-		return -EINVAL;		/* XXX */
+		return -ENOENT;	
+
 	memset(wpaie.wpa_ie, 0, sizeof(wpaie.wpa_ie));
 	if (ni->ni_wpa_ie != NULL) {
 		int ielen = ni->ni_wpa_ie[1] + 2;
@@ -3799,7 +3802,8 @@ ieee80211_ioctl_getstastats(struct net_device *dev, struct iwreq *iwr)
 		return -EFAULT;
 	ni = ieee80211_find_node(&ic->ic_sta, macaddr);
 	if (ni == NULL)
-		return -EINVAL;		/* XXX */
+		return -ENOENT;
+
 	if (iwr->u.data.length > sizeof(struct ieee80211req_sta_stats))
 		iwr->u.data.length = sizeof(struct ieee80211req_sta_stats);
 	/* NB: copy out only the statistics */
@@ -4100,7 +4104,7 @@ ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-	int *param = (int *) extra;
+	unsigned int *param = (unsigned int *) extra;
 
 	if (!(ic->ic_flags & IEEE80211_F_DOTH))
 		return 0;
@@ -4682,9 +4686,9 @@ ieee80211_ioctl_giwencodeext(struct net_device *dev,
 	struct ieee80211vap *vap = dev->priv;
 	struct iw_encode_ext *ext;
 	struct ieee80211_key *wk;
-	int error;
-	int kid;
+	ieee80211_keyix_t kix;
 	int max_key_len;
+	int error;
 	
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -4694,15 +4698,15 @@ ieee80211_ioctl_giwencodeext(struct net_device *dev,
 		return -EINVAL;
 	ext = (struct iw_encode_ext *)extra;
 
-	error = getiwkeyix(vap, erq, &kid);
+	error = getiwkeyix(vap, erq, &kix);
 	if (error < 0)
 		return error;
 
-	wk = &vap->iv_nw_keys[kid];
+	wk = &vap->iv_nw_keys[kix];
 	if (wk->wk_keylen > max_key_len)
 		return -E2BIG;
 
-	erq->flags = kid+1;
+	erq->flags = kix + 1;
 	memset(ext, 0, sizeof(*ext));
 
 	ext->key_len = wk->wk_keylen;
@@ -4742,9 +4746,10 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 	struct ieee80211vap *vap = dev->priv;
 	struct iw_encode_ext *ext = (struct iw_encode_ext *)extra;
 	struct ieee80211req_key kr;
+	ieee80211_keyix_t kix;
 	int error;
-	int kid;
-	error = getiwkeyix(vap, erq, &kid);
+	
+	error = getiwkeyix(vap, erq, &kix);
 	if (error < 0)
 		return error;
 
@@ -4756,7 +4761,7 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 		struct ieee80211req_del_key dk;
 		
 		memset(&dk, 0, sizeof(dk));
-		dk.idk_keyix = kid;
+		dk.idk_keyix = kix;
 		memcpy(&dk.idk_macaddr, ext->addr.sa_data, IEEE80211_ADDR_LEN);
 
 		return ieee80211_ioctl_delkey(dev, NULL, NULL, (char*)&dk);
@@ -4812,7 +4817,7 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 		return -EINVAL;
 	}
 
-	kr.ik_keyix = kid;
+	kr.ik_keyix = kix;
 
 	if (ext->key_len > sizeof(kr.ik_keydata)) {
 		printk(KERN_WARNING "%s: key size %d is too large\n",
@@ -4888,7 +4893,6 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_CHAR |  6, 0, "mode" },
 	{ IEEE80211_IOCTL_GETMODE,
 	  0, IW_PRIV_TYPE_CHAR | 6, "get_mode" },
-#if WIRELESS_EXT >= 12	  
 	{ IEEE80211_IOCTL_SETWMMPARAMS,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 4, 0,"setwmmparams" },
 	{ IEEE80211_IOCTL_GETWMMPARAMS,
@@ -5191,116 +5195,89 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  0, IW_PRIV_TYPE_APPIEBUF, "getiebuf" },
 	{ IEEE80211_IOCTL_FILTERFRAME,
 	  IW_PRIV_TYPE_FILTER , 0, "setfilter" },
-
-#endif /* WIRELESS_EXT >= 12 */
 };
 
+#define set_handler(x,f) [x - SIOCIWFIRST] = (iw_handler) f
 static const iw_handler ieee80211_handlers[] = {
-	(iw_handler) NULL,				/* SIOCSIWCOMMIT */
-	(iw_handler) ieee80211_ioctl_giwname,		/* SIOCGIWNAME */
-	(iw_handler) NULL,				/* SIOCSIWNWID */
-	(iw_handler) NULL,				/* SIOCGIWNWID */
-	(iw_handler) ieee80211_ioctl_siwfreq,		/* SIOCSIWFREQ */
-	(iw_handler) ieee80211_ioctl_giwfreq,		/* SIOCGIWFREQ */
-	(iw_handler) ieee80211_ioctl_siwmode,		/* SIOCSIWMODE */
-	(iw_handler) ieee80211_ioctl_giwmode,		/* SIOCGIWMODE */
-	(iw_handler) ieee80211_ioctl_siwsens,		/* SIOCSIWSENS */
-	(iw_handler) ieee80211_ioctl_giwsens,		/* SIOCGIWSENS */
-	(iw_handler) NULL /* not used */,		/* SIOCSIWRANGE */
-	(iw_handler) ieee80211_ioctl_giwrange,		/* SIOCGIWRANGE */
-	(iw_handler) NULL /* not used */,		/* SIOCSIWPRIV */
-	(iw_handler) NULL /* kernel code */,		/* SIOCGIWPRIV */
-	(iw_handler) NULL /* not used */,		/* SIOCSIWSTATS */
-	(iw_handler) NULL /* kernel code */,		/* SIOCGIWSTATS */
-	(iw_handler) ieee80211_ioctl_setspy,		/* SIOCSIWSPY */
-	(iw_handler) ieee80211_ioctl_getspy,		/* SIOCGIWSPY */
+	set_handler(SIOCGIWNAME, ieee80211_ioctl_giwname),
+	set_handler(SIOCSIWFREQ, ieee80211_ioctl_siwfreq),
+	set_handler(SIOCGIWFREQ, ieee80211_ioctl_giwfreq),
+	set_handler(SIOCSIWMODE, ieee80211_ioctl_siwmode),
+	set_handler(SIOCGIWMODE, ieee80211_ioctl_giwmode),
+	set_handler(SIOCSIWSENS, ieee80211_ioctl_siwsens),
+	set_handler(SIOCGIWSENS, ieee80211_ioctl_giwsens),
+	set_handler(SIOCGIWRANGE, ieee80211_ioctl_giwrange),
+	set_handler(SIOCSIWSPY, ieee80211_ioctl_setspy),
+	set_handler(SIOCGIWSPY, ieee80211_ioctl_getspy),
 #if WIRELESS_EXT >= 16
-	(iw_handler) ieee80211_ioctl_setthrspy,		/* SIOCSIWTHRSPY */
-	(iw_handler) ieee80211_ioctl_getthrspy,		/* SIOCGIWTHRSPY */
-#else
-	(iw_handler) NULL,				/* SIOCSIWTHRSPY */
-	(iw_handler) NULL,				/* SIOCGIWTHRSPY */
+	set_handler(SIOCSIWTHRSPY, ieee80211_ioctl_setthrspy),
+	set_handler(SIOCGIWTHRSPY, ieee80211_ioctl_getthrspy),
 #endif
-	(iw_handler) ieee80211_ioctl_siwap,		/* SIOCSIWAP */
-	(iw_handler) ieee80211_ioctl_giwap,		/* SIOCGIWAP */
+	set_handler(SIOCSIWAP, ieee80211_ioctl_siwap),
+	set_handler(SIOCGIWAP, ieee80211_ioctl_giwap),
 #ifdef SIOCSIWMLME
-	(iw_handler) ieee80211_ioctl_siwmlme,		/* SIOCSIWMLME */
-#else
-	(iw_handler) NULL,				/* -- hole -- */
+	set_handler(SIOCSIWMLME, ieee80211_ioctl_siwmlme),
 #endif
-	(iw_handler) ieee80211_ioctl_iwaplist,		/* SIOCGIWAPLIST */
+	set_handler(SIOCGIWAPLIST, ieee80211_ioctl_iwaplist),
 #ifdef SIOCGIWSCAN
-	(iw_handler) ieee80211_ioctl_siwscan,		/* SIOCSIWSCAN */
-	(iw_handler) ieee80211_ioctl_giwscan,		/* SIOCGIWSCAN */
-#else
-	(iw_handler) NULL,				/* SIOCSIWSCAN */
-	(iw_handler) NULL,				/* SIOCGIWSCAN */
+	set_handler(SIOCSIWSCAN, ieee80211_ioctl_siwscan),
+	set_handler(SIOCGIWSCAN, ieee80211_ioctl_giwscan),
 #endif /* SIOCGIWSCAN */
-	(iw_handler) ieee80211_ioctl_siwessid,		/* SIOCSIWESSID */
-	(iw_handler) ieee80211_ioctl_giwessid,		/* SIOCGIWESSID */
-	(iw_handler) ieee80211_ioctl_siwnickn,		/* SIOCSIWNICKN */
-	(iw_handler) ieee80211_ioctl_giwnickn,		/* SIOCGIWNICKN */
-	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) ieee80211_ioctl_siwrate,		/* SIOCSIWRATE */
-	(iw_handler) ieee80211_ioctl_giwrate,		/* SIOCGIWRATE */
-	(iw_handler) ieee80211_ioctl_siwrts,		/* SIOCSIWRTS */
-	(iw_handler) ieee80211_ioctl_giwrts,		/* SIOCGIWRTS */
-	(iw_handler) ieee80211_ioctl_siwfrag,		/* SIOCSIWFRAG */
-	(iw_handler) ieee80211_ioctl_giwfrag,		/* SIOCGIWFRAG */
-	(iw_handler) ieee80211_ioctl_siwtxpow,		/* SIOCSIWTXPOW */
-	(iw_handler) ieee80211_ioctl_giwtxpow,		/* SIOCGIWTXPOW */
-	(iw_handler) ieee80211_ioctl_siwretry,		/* SIOCSIWRETRY */
-	(iw_handler) ieee80211_ioctl_giwretry,		/* SIOCGIWRETRY */
-	(iw_handler) ieee80211_ioctl_siwencode,		/* SIOCSIWENCODE */
-	(iw_handler) ieee80211_ioctl_giwencode,		/* SIOCGIWENCODE */
-	(iw_handler) ieee80211_ioctl_siwpower,		/* SIOCSIWPOWER */
-	(iw_handler) ieee80211_ioctl_giwpower,		/* SIOCGIWPOWER */
-	(iw_handler) NULL,				/* -- hole -- */
-	(iw_handler) NULL,				/* -- hole -- */
+	set_handler(SIOCSIWESSID, ieee80211_ioctl_siwessid),
+	set_handler(SIOCGIWESSID, ieee80211_ioctl_giwessid),
+	set_handler(SIOCSIWNICKN, ieee80211_ioctl_siwnickn),
+	set_handler(SIOCGIWNICKN, ieee80211_ioctl_giwnickn),
+	set_handler(SIOCSIWRATE, ieee80211_ioctl_siwrate),
+	set_handler(SIOCGIWRATE, ieee80211_ioctl_giwrate),
+	set_handler(SIOCSIWRTS, ieee80211_ioctl_siwrts),
+	set_handler(SIOCGIWRTS, ieee80211_ioctl_giwrts),
+	set_handler(SIOCSIWFRAG, ieee80211_ioctl_siwfrag),
+	set_handler(SIOCGIWFRAG, ieee80211_ioctl_giwfrag),
+	set_handler(SIOCSIWTXPOW, ieee80211_ioctl_siwtxpow),
+	set_handler(SIOCGIWTXPOW, ieee80211_ioctl_giwtxpow),
+	set_handler(SIOCSIWRETRY, ieee80211_ioctl_siwretry),
+	set_handler(SIOCGIWRETRY, ieee80211_ioctl_giwretry),
+	set_handler(SIOCSIWENCODE, ieee80211_ioctl_siwencode),
+	set_handler(SIOCGIWENCODE, ieee80211_ioctl_giwencode),
+	set_handler(SIOCSIWPOWER, ieee80211_ioctl_siwpower),
+	set_handler(SIOCGIWPOWER, ieee80211_ioctl_giwpower),
 #if WIRELESS_EXT >= 18
-	(iw_handler) ieee80211_ioctl_siwgenie,		/* SIOCSIWGENIE */
-	(iw_handler) ieee80211_ioctl_giwgenie,		/* SIOCGIWGENIE */
-	(iw_handler) ieee80211_ioctl_siwauth,		/* SIOCSIWAUTH */
-	(iw_handler) ieee80211_ioctl_giwauth,		/* SIOCGIWAUTH */
-	(iw_handler) ieee80211_ioctl_siwencodeext,	/* SIOCSIWENCODEEXT */
-	(iw_handler) ieee80211_ioctl_giwencodeext,	/* SIOCGIWENCODEEXT */
+	set_handler(SIOCSIWGENIE, ieee80211_ioctl_siwgenie),
+	set_handler(SIOCGIWGENIE, ieee80211_ioctl_giwgenie),
+	set_handler(SIOCSIWAUTH, ieee80211_ioctl_siwauth),
+	set_handler(SIOCGIWAUTH, ieee80211_ioctl_giwauth),
+	set_handler(SIOCSIWENCODEEXT, ieee80211_ioctl_siwencodeext),
+	set_handler(SIOCGIWENCODEEXT, ieee80211_ioctl_giwencodeext),
 #endif /* WIRELESS_EXT >= 18 */
 };
+
+#define set_priv(x,f) [x - SIOCIWFIRSTPRIV] = (iw_handler) f
 static const iw_handler ieee80211_priv_handlers[] = {
-	(iw_handler) ieee80211_ioctl_setparam,		/* SIOCIWFIRSTPRIV+0 */
-	(iw_handler) ieee80211_ioctl_getparam,		/* SIOCIWFIRSTPRIV+1 */
-	(iw_handler) ieee80211_ioctl_setmode,		/* SIOCIWFIRSTPRIV+2 */
-	(iw_handler) ieee80211_ioctl_getmode,		/* SIOCIWFIRSTPRIV+3 */
-	(iw_handler) ieee80211_ioctl_setwmmparams,	/* SIOCIWFIRSTPRIV+4 */
-	(iw_handler) ieee80211_ioctl_getwmmparams,	/* SIOCIWFIRSTPRIV+5 */
-	(iw_handler) ieee80211_ioctl_setchanlist,	/* SIOCIWFIRSTPRIV+6 */
-	(iw_handler) ieee80211_ioctl_getchanlist,	/* SIOCIWFIRSTPRIV+7 */
-	(iw_handler) ieee80211_ioctl_chanswitch,	/* SIOCIWFIRSTPRIV+8 */
-	(iw_handler) ieee80211_ioctl_getappiebuf,	/* SIOCIWFIRSTPRIV+9 */
-	(iw_handler) ieee80211_ioctl_setappiebuf,	/* SIOCIWFIRSTPRIV+10 */
-	(iw_handler) ieee80211_ioctl_getscanresults,	/* SIOCIWFIRSTPRIV+11 */
-	(iw_handler) ieee80211_ioctl_setfilter,		/* SIOCIWFIRSTPRIV+12 */
-	(iw_handler) ieee80211_ioctl_getchaninfo,	/* SIOCIWFIRSTPRIV+13 */
-	(iw_handler) ieee80211_ioctl_setoptie,		/* SIOCIWFIRSTPRIV+14 */
-	(iw_handler) ieee80211_ioctl_getoptie,		/* SIOCIWFIRSTPRIV+15 */
-	(iw_handler) ieee80211_ioctl_setmlme,		/* SIOCIWFIRSTPRIV+16 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+17 */
-	(iw_handler) ieee80211_ioctl_setkey,		/* SIOCIWFIRSTPRIV+18 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+19 */
-	(iw_handler) ieee80211_ioctl_delkey,		/* SIOCIWFIRSTPRIV+20 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+21 */
-	(iw_handler) ieee80211_ioctl_addmac,		/* SIOCIWFIRSTPRIV+22 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+23 */
-	(iw_handler) ieee80211_ioctl_delmac,		/* SIOCIWFIRSTPRIV+24 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+25 */
-	(iw_handler) ieee80211_ioctl_wdsmac,		/* SIOCIWFIRSTPRIV+26 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+27 */
-	(iw_handler) ieee80211_ioctl_wdsdelmac,		/* SIOCIWFIRSTPRIV+28 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+29 */
-	(iw_handler) ieee80211_ioctl_kickmac,		/* SIOCIWFIRSTPRIV+30 */
-	(iw_handler) NULL,				/* SIOCIWFIRSTPRIV+31 */
+	set_priv(IEEE80211_IOCTL_SETPARAM, ieee80211_ioctl_setparam),
+	set_priv(IEEE80211_IOCTL_GETPARAM, ieee80211_ioctl_getparam),
+	set_priv(IEEE80211_IOCTL_SETMODE, ieee80211_ioctl_setmode),
+	set_priv(IEEE80211_IOCTL_GETMODE, ieee80211_ioctl_getmode),
+	set_priv(IEEE80211_IOCTL_SETWMMPARAMS, ieee80211_ioctl_setwmmparams),
+	set_priv(IEEE80211_IOCTL_GETWMMPARAMS, ieee80211_ioctl_getwmmparams),
+	set_priv(IEEE80211_IOCTL_SETCHANLIST, ieee80211_ioctl_setchanlist),
+	set_priv(IEEE80211_IOCTL_GETCHANLIST, ieee80211_ioctl_getchanlist),
+	set_priv(IEEE80211_IOCTL_CHANSWITCH, ieee80211_ioctl_chanswitch),
+	set_priv(IEEE80211_IOCTL_GET_APPIEBUF, ieee80211_ioctl_getappiebuf),
+	set_priv(IEEE80211_IOCTL_SET_APPIEBUF, ieee80211_ioctl_setappiebuf),
+	set_priv(IEEE80211_IOCTL_FILTERFRAME, ieee80211_ioctl_setfilter),
+	set_priv(IEEE80211_IOCTL_GETCHANINFO, ieee80211_ioctl_getchaninfo),
+	set_priv(IEEE80211_IOCTL_SETOPTIE, ieee80211_ioctl_setoptie),
+	set_priv(IEEE80211_IOCTL_GETOPTIE, ieee80211_ioctl_getoptie),
+	set_priv(IEEE80211_IOCTL_SETMLME, ieee80211_ioctl_setmlme),
+	set_priv(IEEE80211_IOCTL_SETKEY, ieee80211_ioctl_setkey),
+	set_priv(IEEE80211_IOCTL_DELKEY, ieee80211_ioctl_delkey),
+	set_priv(IEEE80211_IOCTL_ADDMAC, ieee80211_ioctl_addmac),
+	set_priv(IEEE80211_IOCTL_DELMAC, ieee80211_ioctl_delmac),
+	set_priv(IEEE80211_IOCTL_WDSADDMAC, ieee80211_ioctl_wdsmac),
+	set_priv(IEEE80211_IOCTL_WDSDELMAC, ieee80211_ioctl_wdsdelmac),
+	set_priv(IEEE80211_IOCTL_KICKMAC, ieee80211_ioctl_kickmac),
 };
+
 static struct iw_handler_def ieee80211_iw_handler_def = {
 #define	N(a)	(sizeof (a) / sizeof (a[0]))
 	.standard		= (iw_handler *) ieee80211_handlers,
@@ -5401,23 +5378,18 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 	struct ieee80211_clone_params cp;
 	struct ieee80211vap *vap;
 	char name[IFNAMSIZ];
-	int unit;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 	if (copy_from_user(&cp, ifr->ifr_data, sizeof(cp)))
 		return -EFAULT;
 
-	unit = ieee80211_new_wlanunit();
-	if (unit == -1)
-		return -EIO;		/* XXX */
 	strncpy(name, cp.icp_name, sizeof(name));
 	
-	vap = ic->ic_vap_create(ic, name, unit, cp.icp_opmode, cp.icp_flags, mdev);
-	if (vap == NULL) {
-		ieee80211_delete_wlanunit(unit);
+	vap = ieee80211_create_vap(ic, name, mdev, cp.icp_opmode, cp.icp_flags);
+	if (vap == NULL)
 		return -EIO;
-	}
+
 	/* return final device name */
 	strncpy(ifr->ifr_name, vap->iv_dev->name, IFNAMSIZ);
 	return 0;
@@ -5429,7 +5401,7 @@ EXPORT_SYMBOL(ieee80211_ioctl_create_vap);
  * outside our control (e.g. in the driver).
  * Must be called with rtnl_lock held
  */
-int
+struct ieee80211vap*
 ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	struct net_device *mdev, int opmode, int opflags)
 {
@@ -5437,13 +5409,13 @@ ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	int unit;
 	
 	if ((unit = ieee80211_new_wlanunit()) == -1)
-		return -EIO;		/* XXX */
+		return NULL;
 
 	if ((vap = ic->ic_vap_create(ic, name, unit, opmode, opflags, mdev)) == NULL) {
 		ieee80211_delete_wlanunit(unit);
-		return -EIO;
 	}
-	return 0;
+
+	return vap;
 }
 EXPORT_SYMBOL(ieee80211_create_vap);
 

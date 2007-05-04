@@ -296,7 +296,7 @@ EXPORT_SYMBOL(ieee80211_notify_replay_failure);
 
 void
 ieee80211_notify_michael_failure(struct ieee80211vap *vap,
-	const struct ieee80211_frame *wh, u_int keyix)
+	const struct ieee80211_frame *wh, ieee80211_keyix_t keyix)
 {
 	static const char *tag = "MLME-MICHAELMICFAILURE.indication";
 	struct net_device *dev = vap->iv_dev;
@@ -317,7 +317,9 @@ ieee80211_notify_michael_failure(struct ieee80211vap *vap,
 }
 EXPORT_SYMBOL(ieee80211_notify_michael_failure);
 
-/*
+/* This function might sleep. Therefore: 
+ * Context: process
+ *
  * Note that a successful call to this function does not guarantee that
  * the services provided by the requested module are available:
  *
