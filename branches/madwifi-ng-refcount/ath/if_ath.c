@@ -400,6 +400,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211vap *vap;
 	struct ath_hal *ah;
 	HAL_STATUS status;
 	int error = 0;
@@ -911,12 +912,12 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	
 	if (autocreatemode != -1) {
 		rtnl_lock();
-		error = ieee80211_create_vap(ic, "ath%d", dev,
+		vap = ieee80211_create_vap(ic, "ath%d", dev,
 				autocreatemode, IEEE80211_CLONE_BSSID);
 		rtnl_unlock();
-		if (error)
-			printk(KERN_ERR "%s: autocreation of VAP failed: %d\n",
-				dev->name, error);
+		if (vap == NULL)
+			printk(KERN_ERR "%s: autocreation of VAP failed.",
+				dev->name);
 	}
 
 	return 0;

@@ -2211,10 +2211,15 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		retv = ENETRESET;		/* XXX? */
 		break;
 	case IEEE80211_PARAM_ROAMING:
-		if (!(IEEE80211_ROAMING_DEVICE <= value &&
-		    value <= IEEE80211_ROAMING_MANUAL))
+		switch (value) {
+		case IEEE80211_ROAMING_DEVICE:
+		case IEEE80211_ROAMING_AUTO:
+		case IEEE80211_ROAMING_MANUAL:
+			ic->ic_roaming = value;
+			break;
+		default:
 			return -EINVAL;
-		ic->ic_roaming = value;
+		}
 		break;
 	case IEEE80211_PARAM_PRIVACY:
 		if (value) {
@@ -3259,7 +3264,7 @@ ieee80211_ioctl_delkey(struct net_device *dev, struct iw_request_info *info,
 
 		ni = ieee80211_find_node(&ic->ic_sta, dk->idk_macaddr);
 		if (ni == NULL)
-			return -EINVAL;		/* XXX */
+			return -ENOENT; /* No such entity is a more appropriate error */
 		/* XXX error return */
 		ieee80211_crypto_delkey(vap, &ni->ni_ucastkey, ni);
 		ieee80211_unref_node(&ni);
@@ -3560,9 +3565,11 @@ ieee80211_ioctl_setchanlist(struct net_device *dev,
 	if (ic->ic_bsschan != IEEE80211_CHAN_ANYC &&	/* XXX */
 	    isclr(chanlist, ic->ic_bsschan->ic_ieee))
 		ic->ic_bsschan = IEEE80211_CHAN_ANYC;	/* invalidate */
+
 	memcpy(ic->ic_chan_active, chanlist, sizeof(ic->ic_chan_active));
 	if (IS_UP_AUTO(vap))
 		ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
+
 	return 0;
 }
 
@@ -3759,7 +3766,8 @@ ieee80211_ioctl_getwpaie(struct net_device *dev, struct iwreq *iwr)
 		return -EFAULT;
 	ni = ieee80211_find_node(&ic->ic_sta, wpaie.wpa_macaddr);
 	if (ni == NULL)
-		return -EINVAL;		/* XXX */
+		return -ENOENT;	
+
 	memset(wpaie.wpa_ie, 0, sizeof(wpaie.wpa_ie));
 	if (ni->ni_wpa_ie != NULL) {
 		int ielen = ni->ni_wpa_ie[1] + 2;
@@ -3794,7 +3802,8 @@ ieee80211_ioctl_getstastats(struct net_device *dev, struct iwreq *iwr)
 		return -EFAULT;
 	ni = ieee80211_find_node(&ic->ic_sta, macaddr);
 	if (ni == NULL)
-		return -EINVAL;		/* XXX */
+		return -ENOENT;
+
 	if (iwr->u.data.length > sizeof(struct ieee80211req_sta_stats))
 		iwr->u.data.length = sizeof(struct ieee80211req_sta_stats);
 	/* NB: copy out only the statistics */
@@ -5369,23 +5378,18 @@ ieee80211_ioctl_create_vap(struct ieee80211com *ic, struct ifreq *ifr, struct ne
 	struct ieee80211_clone_params cp;
 	struct ieee80211vap *vap;
 	char name[IFNAMSIZ];
-	int unit;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 	if (copy_from_user(&cp, ifr->ifr_data, sizeof(cp)))
 		return -EFAULT;
 
-	unit = ieee80211_new_wlanunit();
-	if (unit == -1)
-		return -EIO;		/* XXX */
 	strncpy(name, cp.icp_name, sizeof(name));
 	
-	vap = ic->ic_vap_create(ic, name, unit, cp.icp_opmode, cp.icp_flags, mdev);
-	if (vap == NULL) {
-		ieee80211_delete_wlanunit(unit);
+	vap = ieee80211_create_vap(ic, name, mdev, cp.icp_opmode, cp.icp_flags);
+	if (vap == NULL)
 		return -EIO;
-	}
+
 	/* return final device name */
 	strncpy(ifr->ifr_name, vap->iv_dev->name, IFNAMSIZ);
 	return 0;
@@ -5397,7 +5401,7 @@ EXPORT_SYMBOL(ieee80211_ioctl_create_vap);
  * outside our control (e.g. in the driver).
  * Must be called with rtnl_lock held
  */
-int
+struct ieee80211vap*
 ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	struct net_device *mdev, int opmode, int opflags)
 {
@@ -5405,13 +5409,13 @@ ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	int unit;
 	
 	if ((unit = ieee80211_new_wlanunit()) == -1)
-		return -EIO;		/* XXX */
+		return NULL;
 
 	if ((vap = ic->ic_vap_create(ic, name, unit, opmode, opflags, mdev)) == NULL) {
 		ieee80211_delete_wlanunit(unit);
-		return -EIO;
 	}
-	return 0;
+
+	return vap;
 }
 EXPORT_SYMBOL(ieee80211_create_vap);
 
