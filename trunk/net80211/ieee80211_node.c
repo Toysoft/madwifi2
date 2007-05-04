@@ -640,7 +640,9 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	if (ni == NULL) {
 		ni = ieee80211_alloc_node(&ic->ic_sta, vap, se->se_macaddr);
 		if (ni == NULL) {
-			/* XXX msg */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+			"%s: Unable to allocate node for BSS: %s\n", __func__, 
+			ether_sprintf(ni->ni_macaddr));
 			return 0;
 		}
 	} else
