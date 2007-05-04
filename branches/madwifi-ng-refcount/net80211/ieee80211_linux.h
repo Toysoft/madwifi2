@@ -551,6 +551,6 @@ void ieee80211_ioctl_vdetach(struct ieee80211vap *);
 struct ifreq;
 int ieee80211_ioctl_create_vap(struct ieee80211com *, struct ifreq *,
 	struct net_device *);
-int ieee80211_create_vap(struct ieee80211com *, char *, struct net_device *,
-	int, int);
+struct ieee80211vap *ieee80211_create_vap(struct ieee80211com *, char *, 
+	struct net_device *, int, int);
 #endif /* _NET80211_IEEE80211_LINUX_H_ */
