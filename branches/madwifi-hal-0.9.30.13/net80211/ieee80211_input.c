@@ -125,7 +125,7 @@ static int accept_data_frame(struct ieee80211vap *, struct ieee80211_node *,
 
 
 #ifdef ATH_SUPERG_FF
-static void athff_decap(struct sk_buff *);
+static int athff_decap(struct sk_buff *);
 #endif
 #ifdef USE_HEADERLEN_RESV
 static __be16 ath_eth_type_trans(struct sk_buff *, struct net_device *);
@@ -689,7 +689,7 @@ ieee80211_input(struct ieee80211_node *ni,
 			struct sk_buff *skb1 = NULL;
 			struct ether_header *eh_tmp;
 			struct athl2p_tunnel_hdr *ath_hdr;
-			int frame_len;
+			unsigned int frame_len;
 
 			/* NB: assumes linear (i.e., non-fragmented) skb */
 
@@ -714,14 +714,15 @@ ieee80211_input(struct ieee80211_node *ni,
 			
 			/* move past the tunneled header, with alignment */
 			skb_pull(skb, roundup(sizeof(struct athl2p_tunnel_hdr) - 2, 4) + 2);
-
-			skb1 = skb_clone(skb, GFP_ATOMIC); /* XXX: GFP_ATOMIC is overkill? */
 			eh_tmp = (struct ether_header *)skb->data;
-
-			/* ether_type must be length*/
+			
+			/* ether_type must be length as FF frames are always LLC/SNAP encap'd */
 			frame_len = ntohs(eh_tmp->ether_type);
 
-			/* we now have 802.3 MAC hdr followed by 802.2 LLC/SNAP. convert to DIX */
+			skb1 = skb_clone(skb, GFP_ATOMIC); /* XXX: GFP_ATOMIC is overkill? */
+
+			/* we now have 802.3 MAC hdr followed by 802.2 LLC/SNAP; convert to EthernetII.
+			 * Note that the frame is at least IEEE80211_MIN_LEN, due to the driver code. */
 			athff_decap(skb);
 
 			/* remove second frame from end of first */
@@ -729,9 +730,16 @@ ieee80211_input(struct ieee80211_node *ni,
 
 			/* prepare second tunneled frame */
 			skb_pull(skb1, roundup(sizeof(struct ether_header) + frame_len, 4));
-			eh_tmp = (struct ether_header *)skb1->data;
-			frame_len = ntohs(eh_tmp->ether_type);
-			athff_decap(skb1);
+			
+			/* Fail if there is no space left for at least the necessary headers */
+			if (athff_decap(skb1)) {
+				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+						ni->ni_macaddr, "data", "%s", "Decapsulation error");
+				vap->iv_stats.is_rx_decap++;
+				IEEE80211_NODE_STAT(ni, rx_decap);
+				dev_kfree_skb(skb1);
+				goto err;
+			}
 
 			/* deliver the frames */
 			ieee80211_deliver_data(ni, skb);
@@ -1152,6 +1160,8 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 	}
 }
 
+/* This function removes the 802.11 header, including LLC/SNAP headers and 
+ * replaces it with an Ethernet II header. */
 static struct sk_buff *
 ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 {
@@ -1160,16 +1170,19 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 	struct llc *llc;
 	__be16 ether_type = 0;
 
-	memcpy(&wh, skb->data, hdrlen);	/* Only copy hdrlen over */
+	memcpy(&wh, skb->data, hdrlen);	/* Make a copy of the variably sized .11 header */
+	
 	llc = (struct llc *) skb_pull(skb, hdrlen);
 	if (skb->len >= LLC_SNAPFRAMELEN &&
 	    llc->llc_dsap == LLC_SNAP_LSAP && llc->llc_ssap == LLC_SNAP_LSAP &&
 	    llc->llc_control == LLC_UI && llc->llc_snap.org_code[0] == 0 &&
 	    llc->llc_snap.org_code[1] == 0 && llc->llc_snap.org_code[2] == 0) {
+		
 		ether_type = llc->llc_un.type_snap.ether_type;
 		skb_pull(skb, LLC_SNAPFRAMELEN);
 		llc = NULL;
 	}
+
 	eh = (struct ether_header *) skb_push(skb, sizeof(struct ether_header));
 	switch (wh.i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
@@ -1189,21 +1202,20 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 		IEEE80211_ADDR_COPY(eh->ether_shost, wh.i_addr4);
 		break;
 	}
-	if (!ALIGNED_POINTER(skb->data + sizeof(*eh), u_int32_t)) {
-		struct sk_buff *n;
 
-		/* XXX does this always work? */
-		n = skb_copy(skb, GFP_ATOMIC);
-		dev_kfree_skb(skb);
-		if (n == NULL)
-			return NULL;
-		skb = n;
-		eh = (struct ether_header *) skb->data;
-	}
 	if (llc != NULL)
 		eh->ether_type = htons(skb->len - sizeof(*eh));
 	else
 		eh->ether_type = ether_type;
+	
+	if (!ALIGNED_POINTER(skb->data + sizeof(*eh), u_int32_t)) {
+		struct sk_buff *tskb;
+
+		/* XXX: does this always work? */
+		tskb = skb_copy(skb, GFP_ATOMIC);
+		dev_kfree_skb(skb);
+		skb = tskb;
+	}
 	return skb;
 }
 
@@ -2524,7 +2536,10 @@ ieee80211_deliver_l2uf(struct ieee80211_node *ni)
 	l2uf->xid[2] = 0x00;
 	
 	skb->dev = dev;
-	skb->protocol = eth_type_trans(skb, dev);
+	/* eth_trans_type modifies skb state (skb_pull(ETH_HLEN)), so use
+	 * constants instead. We know the packet type anyway. */
+	skb->pkt_type = PACKET_BROADCAST;
+	skb->protocol = htons(ETH_P_802_2);
 	skb->mac.raw = skb->data;
 	ieee80211_deliver_data(ni, skb);
 	return;
@@ -3664,11 +3679,14 @@ ieee80211_recv_pspoll(struct ieee80211_node *ni, struct sk_buff *skb0)
 }
 
 #ifdef ATH_SUPERG_FF
-static void
+static int
 athff_decap(struct sk_buff *skb)
 {
 	struct ether_header eh_src, *eh_dst;
 	struct llc *llc;
+
+	if (skb->len < (sizeof(struct ether_header) + LLC_SNAPFRAMELEN))
+		return -1;
 
 	memcpy(&eh_src, skb->data, sizeof(struct ether_header));
 	llc = (struct llc *) skb_pull(skb, sizeof(struct ether_header));
@@ -3677,6 +3695,8 @@ athff_decap(struct sk_buff *skb)
 
 	eh_dst = (struct ether_header *) skb_push(skb, sizeof(struct ether_header));
 	memcpy(eh_dst, &eh_src, sizeof(struct ether_header));
+
+	return 0;
 }
 #endif
 

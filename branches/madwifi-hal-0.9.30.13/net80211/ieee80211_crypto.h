@@ -38,7 +38,7 @@
  * 802.11 protocol crypto-related definitions.
  */
 #define	IEEE80211_KEYBUF_SIZE	16
-#define	IEEE80211_MICBUF_SIZE	(8 + 8)		/* space for both tx+rx keys */
+#define	IEEE80211_MICBUF_SIZE	(8 + 8)		/* space for both TX & RX keys */
 #define IEEE80211_TID_SIZE	17		/* total number of TIDs */
 
 /*
@@ -67,7 +67,9 @@ struct ieee80211_cipher;
  * Ciphers such as TKIP may also support mixed hardware/software
  * encrypt/decrypt and MIC processing.
  */
-/* XXX need key index typedef */
+
+typedef u_int16_t ieee80211_keyix_t;
+
 /* XXX pack better? */
 /* XXX 48-bit rsc/tsc */
 struct ieee80211_key {
@@ -78,7 +80,7 @@ struct ieee80211_key {
 #define	IEEE80211_KEY_GROUP	0x04	/* key used for WPA group operation */
 #define	IEEE80211_KEY_SWCRYPT	0x10	/* host-based encrypt/decrypt */
 #define	IEEE80211_KEY_SWMIC	0x20	/* host-based enmic/demic */
-	u_int16_t wk_keyix;		/* key index */
+	ieee80211_keyix_t wk_keyix;	/* key index */
 	u_int8_t wk_key[IEEE80211_KEYBUF_SIZE+IEEE80211_MICBUF_SIZE];
 #define	wk_txmic	wk_key+IEEE80211_KEYBUF_SIZE+0	/* XXX can't () right */
 #define	wk_rxmic	wk_key+IEEE80211_KEYBUF_SIZE+8	/* XXX can't () right */
@@ -102,9 +104,9 @@ struct ieee80211_key {
 #define	IEEE80211_CIPHER_CKIP		5
 #define	IEEE80211_CIPHER_NONE		6	/* pseudo value */
 
-#define	IEEE80211_CIPHER_MAX		(IEEE80211_CIPHER_NONE+1)
+#define	IEEE80211_CIPHER_MAX		(IEEE80211_CIPHER_NONE + 1)
 
-#define	IEEE80211_KEYIX_NONE	((u_int16_t) - 1)
+#define	IEEE80211_KEYIX_NONE	((ieee80211_keyix_t) -1)
 
 #if defined(__KERNEL__) || defined(_KERNEL)
 
@@ -133,10 +135,10 @@ void ieee80211_crypto_delglobalkeys(struct ieee80211vap *);
  */
 struct ieee80211_cipher {
 	const char *ic_name;		/* printable name */
-	u_int ic_cipher;			/* IEEE80211_CIPHER_* */
-	u_int ic_header;			/* size of privacy header (bytes) */
+	u_int ic_cipher;		/* IEEE80211_CIPHER_* */
+	u_int ic_header;		/* size of privacy header (bytes) */
 	u_int ic_trailer;		/* size of privacy trailer (bytes) */
-	u_int ic_miclen;			/* size of mic trailer (bytes) */
+	u_int ic_miclen;		/* size of mic trailer (bytes) */
 	void *(*ic_attach)(struct ieee80211vap *, struct ieee80211_key *);
 	void (*ic_detach)(struct ieee80211_key *);
 	int (*ic_setkey)(struct ieee80211_key *);
@@ -149,7 +151,7 @@ extern const struct ieee80211_cipher ieee80211_cipher_none;
 
 void ieee80211_crypto_register(const struct ieee80211_cipher *);
 void ieee80211_crypto_unregister(const struct ieee80211_cipher *);
-int ieee80211_crypto_available(u_int);
+int ieee80211_crypto_available(struct ieee80211vap*, u_int);
 
 struct ieee80211_key *ieee80211_crypto_encap(struct ieee80211_node *,
 	struct sk_buff *);
@@ -185,7 +187,7 @@ ieee80211_crypto_enmic(struct ieee80211vap *vap, struct ieee80211_key *k,
  */
 static __inline void
 ieee80211_crypto_resetkey(struct ieee80211vap *vap, struct ieee80211_key *k,
-	u_int16_t ix)
+	ieee80211_keyix_t ix)
 {
 	k->wk_cipher = &ieee80211_cipher_none;;
 	k->wk_private = k->wk_cipher->ic_attach(vap, k);
@@ -200,6 +202,6 @@ void ieee80211_notify_replay_failure(struct ieee80211vap *,
 	const struct ieee80211_frame *, const struct ieee80211_key *,
 	u_int64_t rsc);
 void ieee80211_notify_michael_failure(struct ieee80211vap *,
-	const struct ieee80211_frame *, u_int keyix);
+	const struct ieee80211_frame *, ieee80211_keyix_t keyix);
 #endif /* defined(__KERNEL__) || defined(_KERNEL) */
 #endif /* _NET80211_IEEE80211_CRYPTO_H_ */

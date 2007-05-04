@@ -115,12 +115,12 @@ struct ieee80211_rate_ops {
 	/* *** Transmit handling *** */
 
 	/* Return the transmit info for a data packet.  If multi-rate state
-	 * is to be setup then try0 should contain a value other than ATH_TXMATRY
+	 * is to be setup then try0 should contain a value other than ATH_TXMAXTRY
 	 * and setupxtxdesc will be called after deciding if the frame
 	 * can be transmitted with multi-rate retry. */
 	void (*findrate)(struct ath_softc *sc, struct ath_node *an,
 			 int shortPreamble, size_t frameLen,
-			 u_int8_t *rix, int *try0, u_int8_t *txrate);
+			 u_int8_t *rix, unsigned int *try0, u_int8_t *txrate);
 
 	/* Setup any extended (multi-rate) descriptor state for a data packet.
 	 * The rate index returned by findrate is passed back in. */

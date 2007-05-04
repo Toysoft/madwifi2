@@ -103,7 +103,7 @@ ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 static void
 ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	int shortPreamble, size_t frameLen,
-	u_int8_t *rix, int *try0, u_int8_t *txrate)
+	u_int8_t *rix, unsigned int *try0, u_int8_t *txrate)
 {
 	struct amrr_node *amn = ATH_NODE_AMRR(an);
 
