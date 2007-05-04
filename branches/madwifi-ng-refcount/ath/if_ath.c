@@ -81,10 +81,6 @@
 #include "if_athvar.h"
 
 #include "ah_desc.h"
-/* This is defined rubbishly in ah_desc.h; it is only used in this file, so
- * redefine it here. */
-#undef HAL_TXKEYIX_INVALID
-#define HAL_TXKEYIX_INVALID	((ieee80211_keyix_t) -1)
 
 #include "ah_devid.h"			/* XXX to identify chipset */
 
@@ -2291,7 +2287,6 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	struct ieee80211_phy_params *ph = (struct ieee80211_phy_params *) (skb->cb + sizeof(struct ieee80211_cb));
 	const HAL_RATE_TABLE *rt;
 	unsigned int pktlen, hdrlen, try0, power;
-	ieee80211_keyix_t keyix;
 	HAL_PKT_TYPE atype;
 	u_int flags;
 	u_int8_t antenna, txrate;
@@ -2307,7 +2302,6 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	hdrlen = ieee80211_anyhdrsize(wh);
 	pktlen = skb->len + IEEE80211_CRC_LEN;
 	
-	keyix = HAL_TXKEYIX_INVALID;
 	flags = HAL_TXDESC_INTREQ | HAL_TXDESC_CLRDMASK; /* XXX needed for crypto errs */
 	
 	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
@@ -2347,7 +2341,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 			    atype, 			/* Atheros packet type */
 			    power, 			/* txpower */
 			    txrate, try0, 		/* series 0 rate/tries */
-			    keyix, 			/* key cache index */
+			    HAL_TXKEYIX_INVALID,	/* key cache index */
 			    antenna, 			/* antenna mode */
 			    flags, 			/* flags */
 			    0, 				/* rts/cts rate */
@@ -3095,26 +3089,26 @@ key_alloc_pair(struct ath_softc *sc)
 			/*
 			 * One or more slots in this byte are free.
 			 */
-			keyix = i*NBBY;
+			keyix = i * NBBY;
 			while (b & 1) {
 		again:
 				keyix++;
 				b >>= 1;
 			}
-			if (isset(sc->sc_keymap, keyix+64)) {
+			if (isset(sc->sc_keymap, keyix + 64)) {
 				/* full pair unavailable */
 				/* XXX statistic */
-				if (keyix == (i+1)*NBBY) {
+				if (keyix == (i + 1) * NBBY) {
 					/* no slots were appropriate, advance */
 					continue;
 				}
 				goto again;
 			}
 			setbit(sc->sc_keymap, keyix);
-			setbit(sc->sc_keymap, keyix+64);
+			setbit(sc->sc_keymap, keyix + 64);
 			DPRINTF(sc, ATH_DEBUG_KEYCACHE,
 				"%s: key pair %u,%u\n",
-				__func__, keyix, keyix+64);
+				__func__, keyix, keyix + 64);
 			return keyix;
 		}
 	}
@@ -3133,7 +3127,7 @@ key_alloc_single(struct ath_softc *sc)
 	u_int i;
 	ieee80211_keyix_t keyix;
 
-	/* XXX try i,i+32,i+64,i+32+64 to minimize key pair conflicts */
+	/* XXX: try i, i + 32, i + 64, i + 32 + 64 to minimize key pair conflicts */
 	for (i = 0; i < N(sc->sc_keymap); i++) {
 		u_int8_t b = sc->sc_keymap[i];
 		if (b != 0xff) {
@@ -3181,7 +3175,7 @@ ath_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	 * multi-station operation.
 	 */
 	if ((k->wk_flags & IEEE80211_KEY_GROUP) && !sc->sc_mcastkey) {
-		u_int keyix;
+		ieee80211_keyix_t keyix;
 
 		if (!(&vap->iv_nw_keys[0] <= k &&
 		    k < &vap->iv_nw_keys[IEEE80211_WEP_NKID])) {
@@ -3284,13 +3278,13 @@ ath_key_delete(struct ieee80211vap *vap, const struct ieee80211_key *k,
 			clrbit(sc->sc_keymap, keyix + 64);	/* TX key MIC */
 			if (sc->sc_splitmic) {
 				/* +32 for RX key, +32+64 for RX key MIC */
-				clrbit(sc->sc_keymap, keyix+32);
-				clrbit(sc->sc_keymap, keyix+32+64);
+				clrbit(sc->sc_keymap, keyix + 32);
+				clrbit(sc->sc_keymap, keyix + 32 + 64);
 			}
 		}
 
 		if (rxkeyoff != 0)
-			clrbit(sc->sc_keymap, keyix + rxkeyoff);/*RX Key */
+			clrbit(sc->sc_keymap, keyix + rxkeyoff);	/* RX Key */
 	}
 	return 1;
 }
@@ -5936,7 +5930,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 	unsigned int i, amode;
 	unsigned int flags = 0;
 	unsigned int pktlen = 0;
-	ieee80211_keyix_t keyix = 0;
+	ath_keyix_t keyix = HAL_TXKEYIX_INVALID;
 	unsigned int pollsperrate, pos;
 	struct sk_buff *skb = NULL;
 	struct ath_buf *bf, *head = NULL;
@@ -6015,7 +6009,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 			 */
 
 			if (i == pollcount) {
-				skb = ieee80211_getcfframe(vap,IEEE80211_FC0_SUBTYPE_CF_END);
+				skb = ieee80211_getcfframe(vap, IEEE80211_FC0_SUBTYPE_CF_END);
 				rate = ctsrate;
 				ctsduration = ath_hal_computetxtime(ah,
 					sc->sc_currates, pktlen, sc->sc_protrix, AH_FALSE);
@@ -6030,37 +6024,39 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				if (i == 0 && amode == HAL_ANTENNA_FIXED_A) {
 					ctsduration = ath_hal_computetxtime(ah,	rt,
 							pktlen,	rtindex,
-							AH_FALSE) /*cf-poll time */
+							AH_FALSE) /* CF-Poll time */
 						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))  
 						+ ath_hal_computetxtime(ah, rt,
 							2 * (sizeof(struct ieee80211_frame_min) + 6),
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
-							AH_FALSE) /*auth packet time */
+							AH_FALSE) /* Auth packet time */
 						+ ath_hal_computetxtime(ah, rt,
 							IEEE80211_ACK_LEN,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
-							AH_FALSE); /*ack frame time */ 
+							AH_FALSE); /* ACK. frame time */ 
 				} else {
 					ctsduration = ath_hal_computetxtime(ah, rt,
 							pktlen, rtindex,
-							AH_FALSE) /*cf-poll time */
+							AH_FALSE) /* CF-Poll time */
 						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))  
 						+ ath_hal_computetxtime(ah,rt,
 							XR_FRAGMENTATION_THRESHOLD,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
-							AH_FALSE) /*data packet time */
+							AH_FALSE) /* Data packet time */
 						+ ath_hal_computetxtime(ah,rt,
 							IEEE80211_ACK_LEN,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
-							AH_FALSE); /*ack frame time */ 
+							AH_FALSE); /* ACK frame time */ 
 				}
-				if ((vap->iv_flags & IEEE80211_F_PRIVACY) && keyix == 0) {
+				if ((vap->iv_flags & IEEE80211_F_PRIVACY) &&
+						(keyix == HAL_TXKEYIX_INVALID)) {
 					struct ieee80211_key *k;
 					k = ieee80211_crypto_encap(vap->iv_bss, skb);
 					if (k)
 						keyix = ATH_KEY(k->wk_keyix);
 				}
 			}
+
 			ATH_TXBUF_LOCK_IRQ(sc);					
 			bf = STAILQ_FIRST(&sc->sc_grppollbuf);
 			if (bf != NULL)
@@ -6077,6 +6073,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				return;
 			}					
 			ATH_TXBUF_UNLOCK_IRQ(sc);
+
 			bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 				skb->data, skb->len, BUS_DMA_TODEVICE);
 			bf->bf_skb = skb;
@@ -6583,7 +6580,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ath_hal *ah = sc->sc_ah;
 	int isprot, ismcast, istxfrag;
 	unsigned int try0, hdrlen, pktlen, comp = ATH_COMP_PROC_NO_COMP_NO_CCS;
-	ieee80211_keyix_t keyix;
+	ath_keyix_t keyix;
 	u_int8_t rix, txrate, ctsrate;
 	u_int32_t ivlen = 0, icvlen = 0;
 	u_int8_t cix = 0xff;
@@ -8339,7 +8336,7 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
 		} else
 			keyix = ni->ni_ucastkey.wk_keyix + ni->ni_rxkeyoff;
 
-		ath_hal_setdecompmask(sc->sc_ah, keyix, 1);
+		ath_hal_setdecompmask(sc->sc_ah, ATH_KEY(keyix), 1);
 		an->an_decomp_index = keyix;
 	} else {
 		if (an->an_decomp_index != INVALID_DECOMP_INDEX) {
