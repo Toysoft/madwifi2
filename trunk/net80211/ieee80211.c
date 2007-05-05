@@ -371,7 +371,7 @@ EXPORT_SYMBOL(ieee80211_ifdetach);
 
 int
 ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
-	const char *name, int unit, int opmode, int flags)
+	const char *name, int opmode, int flags)
 {
 #define	IEEE80211_C_OPMODE \
 	(IEEE80211_C_IBSS | IEEE80211_C_HOSTAP | IEEE80211_C_AHDEMO | \
@@ -421,35 +421,28 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	 * link the XR VAP to its normal val.
 	 */
 	if (flags & IEEE80211_VAP_XR) {
-		struct ieee80211vap *vapparent = NULL;
-		vap->iv_unit = -1;
 		vap->iv_flags = ic->ic_flags | IEEE80211_F_XR;	/* propagate common flags and add XR flag */
 		vap->iv_flags_ext = ic->ic_flags_ext;
-		TAILQ_FOREACH(vapparent, &ic->ic_vaps, iv_next)
-			if (vapparent->iv_unit == unit)
-				break;
-		vap->iv_xrvap = vapparent;
-		vap->iv_ath_cap = vapparent->iv_ath_cap;
+		vap->iv_ath_cap = ic->ic_ath_cap;
 		/* Default multicast rate to lowest possible 256 kbps */
 		vap->iv_mcast_rate = 256;
 	} else {
-		vap->iv_unit = unit;
 		vap->iv_flags = ic->ic_flags;		/* propagate common flags */
 		vap->iv_flags_ext = ic->ic_flags_ext;
 		vap->iv_xrvap = NULL;
 		vap->iv_ath_cap = ic->ic_ath_cap;
-		/* Default multicast traffic to lowest rate of 1 Mbps*/
+		/* Default multicast traffic to lowest rate of 1 Mbps */
 		vap->iv_mcast_rate = 1000;
 	}
 #else
-	vap->iv_unit = unit;
 	vap->iv_flags = ic->ic_flags;		/* propagate common flags */
 	vap->iv_flags_ext = ic->ic_flags_ext;
 	vap->iv_xrvap = NULL;
 	vap->iv_ath_cap = ic->ic_ath_cap;
-	/* Default multicast traffic to lowest rate of 1000 kbps*/
+	/* Default multicast traffic to lowest rate of 1Mbps */
 	vap->iv_mcast_rate = 1000;
 #endif
+
 	vap->iv_caps = ic->ic_caps &~ IEEE80211_C_OPMODE;
 	switch (opmode) {
 	case IEEE80211_M_STA:
