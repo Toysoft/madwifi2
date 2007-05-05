@@ -118,7 +118,7 @@ enum {
 };
 
 static struct ieee80211vap *ath_vap_create(struct ieee80211com *,
-	const char *, int, int, int, struct net_device *);
+	const char *, int, int, struct net_device *);
 static void ath_vap_delete(struct ieee80211vap *);
 static int ath_init(struct net_device *);
 static int ath_set_ack_bitrate(struct ath_softc *, int);
@@ -986,7 +986,7 @@ ath_detach(struct net_device *dev)
 }
 
 static struct ieee80211vap *
-ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
+ath_vap_create(struct ieee80211com *ic, const char *name, 
 	int opmode, int flags, struct net_device *mdev)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
@@ -1060,7 +1060,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name, int unit,
 	}
 	
 	avp = dev->priv;
-	ieee80211_vap_setup(ic, dev, name, unit, opmode, flags);
+	ieee80211_vap_setup(ic, dev, name, opmode, flags);
 	/* override with driver methods */
 	vap = &avp->av_vap;
 	avp->av_newstate = vap->iv_newstate;
