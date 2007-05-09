@@ -8707,7 +8707,7 @@ ath_update_txpow(struct ath_softc *sc)
 	if (ic->ic_newtxpowlimit >= ic->ic_txpowlimit)
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 #else
-	if (ic->ic_newtxpowlimit != ic->ic_txpowlimit)
+	if (ic->ic_newtxpowlimit != txpowlimit)
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 #endif
 }
