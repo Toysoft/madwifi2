@@ -113,37 +113,39 @@ set_quality(struct iw_quality *iq, u_int rssi, int noise)
 	iq->updated = IW_QUAL_ALL_UPDATED;
 }
 
-static void
+static int
 preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	int total_delay = 0;
 	int canceled = 0, ready = 0;
+	
 	while (!ready && total_delay < max_grace + max_wait) {
-	  if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
-	    ready = 1;
-	  } else {
-	    if (!canceled && total_delay > max_grace) {
-	      /* 
-		 Cancel any existing active scan, so that any new parameters
-		 in this scan ioctl (or the defaults) can be honored, then
-		 wait around a while to see if the scan cancels properly.
-	      */
-	      IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-				"%s: cancel pending scan request\n", __func__);
-	      (void) ieee80211_cancel_scan(vap);
-	      canceled = 1;
-	    }
-	    mdelay (1);
-	    total_delay += 1;
-	  }
+		if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
+			ready = 1;
+		} else {
+			if (!canceled && (total_delay > max_grace)) {
+				/* Cancel any existing active scan, so that any new parameters
+				 * in this scan ioctl (or the defaults) can be honored, then
+				 * wait around a while to see if the scan cancels properly. */
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+						"%s: cancel pending scan request\n", __func__);
+				(void) ieee80211_cancel_scan(vap);
+				canceled = 1;
+			}
+			mdelay (1);
+			total_delay += 1;
+		}
 	}
+
 	if (!ready) {
-	  IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, 
-			    "%s: Timeout canceling current scan.\n", 
-			    __func__); 
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, 
+				"%s: Timeout canceling current scan.\n", 
+				__func__); 
 	}
+
+	return ready;
 }
 	
 static struct iw_statistics *
@@ -1930,20 +1932,20 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ifreq ifr;
 	char s[6];		/* big enough for ``11adt'' */
-	int retv, mode, ifr_mode, itr_count;
+	int retv, mode, ifr_mode;
 
 	if (ic->ic_media.ifm_cur == NULL)
-		return -EINVAL;
+		return -EINVAL;			/* XXX: Wrong error */
 	if (wri->length > sizeof(s))		/* silently truncate */
 		wri->length = sizeof(s);
 	if (copy_from_user(s, wri->pointer, wri->length))
 		return -EINVAL;
-	s[sizeof(s)-1] = '\0';			/* ensure null termination */
+	s[sizeof(s) - 1] = '\0';		/* ensure null termination */
 	mode = ieee80211_convert_mode(s);
 	if (mode < 0)
 		return -EINVAL;
 
-	if(ieee80211_check_mode_consistency(ic,mode,vap->iv_des_chan)) { 
+	if(ieee80211_check_mode_consistency(ic, mode, vap->iv_des_chan)) { 
 		/*
 		 * error in AP mode.
 		 * overwrite channel selection in other modes.
@@ -1951,42 +1953,36 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 			return -EINVAL;
 		else
-			vap->iv_des_chan=IEEE80211_CHAN_ANYC;
+			vap->iv_des_chan = IEEE80211_CHAN_ANYC;
 	}
 
 	ifr_mode = mode;
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media &~ IFM_MMASK;
+	ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media & ~IFM_MMASK;
 	if (mode == IEEE80211_MODE_TURBO_STATIC_A)
 		ifr_mode = IEEE80211_MODE_11A;
 	ifr.ifr_media |= IFM_MAKEMODE(ifr_mode);
+	
 	retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
-	if ((!retv || retv == -ENETRESET) &&  mode != vap->iv_des_mode) {
-		ieee80211_scan_flush(ic);	/* NB: could optimize */
+	if ((!retv || retv == -ENETRESET) && (mode != vap->iv_des_mode)) {
+		if (preempt_scan(dev, 100, 100))
+			ieee80211_scan_flush(ic);	/* NB: could optimize */
+		else
+			return -ETIMEDOUT;
+		
 		vap->iv_des_mode = mode;
-		if (IS_UP_AUTO(vap)) {
-			ieee80211_cancel_scan(vap);
-			itr_count = 0;
-			while((ic->ic_flags & IEEE80211_F_SCAN) != 0) {
-				mdelay(1);
-				if (itr_count < 100) {
-					itr_count++;
-					continue;
-				}
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-				  "%s: Timeout canceling current scan.\n",
-				  __func__);
-                    		return -ETIMEDOUT;
-			}
+		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
-		}
+		
 		retv = 0;
 	}
+
 #ifdef ATH_SUPERG_XR
 	/* set the same params on the xr vap device if exists */
 	if (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR))
 		vap->iv_xrvap->iv_des_mode = mode;
 #endif
+
 	return -retv;
 }
 #undef IEEE80211_MODE_TURBO_STATIC_A
