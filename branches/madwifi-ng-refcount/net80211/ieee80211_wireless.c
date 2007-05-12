@@ -113,37 +113,39 @@ set_quality(struct iw_quality *iq, u_int rssi, int noise)
 	iq->updated = IW_QUAL_ALL_UPDATED;
 }
 
-static void
+static int
 preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	int total_delay = 0;
 	int canceled = 0, ready = 0;
+	
 	while (!ready && total_delay < max_grace + max_wait) {
-	  if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
-	    ready = 1;
-	  } else {
-	    if (!canceled && total_delay > max_grace) {
-	      /* 
-		 Cancel any existing active scan, so that any new parameters
-		 in this scan ioctl (or the defaults) can be honored, then
-		 wait around a while to see if the scan cancels properly.
-	      */
-	      IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-				"%s: cancel pending scan request\n", __func__);
-	      (void) ieee80211_cancel_scan(vap);
-	      canceled = 1;
-	    }
-	    mdelay (1);
-	    total_delay += 1;
-	  }
+		if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
+			ready = 1;
+		} else {
+			if (!canceled && (total_delay > max_grace)) {
+				/* Cancel any existing active scan, so that any new parameters
+				 * in this scan ioctl (or the defaults) can be honored, then
+				 * wait around a while to see if the scan cancels properly. */
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+						"%s: cancel pending scan request\n", __func__);
+				(void) ieee80211_cancel_scan(vap);
+				canceled = 1;
+			}
+			mdelay (1);
+			total_delay += 1;
+		}
 	}
+
 	if (!ready) {
-	  IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, 
-			    "%s: Timeout canceling current scan.\n", 
-			    __func__); 
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN, 
+				"%s: Timeout canceling current scan.\n", 
+				__func__); 
 	}
+
+	return ready;
 }
 	
 static struct iw_statistics *
@@ -1930,20 +1932,20 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ifreq ifr;
 	char s[6];		/* big enough for ``11adt'' */
-	int retv, mode, ifr_mode, itr_count;
+	int retv, mode, ifr_mode;
 
 	if (ic->ic_media.ifm_cur == NULL)
-		return -EINVAL;
+		return -EINVAL;			/* XXX: Wrong error */
 	if (wri->length > sizeof(s))		/* silently truncate */
 		wri->length = sizeof(s);
 	if (copy_from_user(s, wri->pointer, wri->length))
 		return -EINVAL;
-	s[sizeof(s)-1] = '\0';			/* ensure null termination */
+	s[sizeof(s) - 1] = '\0';		/* ensure null termination */
 	mode = ieee80211_convert_mode(s);
 	if (mode < 0)
 		return -EINVAL;
 
-	if(ieee80211_check_mode_consistency(ic,mode,vap->iv_des_chan)) { 
+	if(ieee80211_check_mode_consistency(ic, mode, vap->iv_des_chan)) { 
 		/*
 		 * error in AP mode.
 		 * overwrite channel selection in other modes.
@@ -1951,42 +1953,36 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 			return -EINVAL;
 		else
-			vap->iv_des_chan=IEEE80211_CHAN_ANYC;
+			vap->iv_des_chan = IEEE80211_CHAN_ANYC;
 	}
 
 	ifr_mode = mode;
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media &~ IFM_MMASK;
+	ifr.ifr_media = ic->ic_media.ifm_cur->ifm_media & ~IFM_MMASK;
 	if (mode == IEEE80211_MODE_TURBO_STATIC_A)
 		ifr_mode = IEEE80211_MODE_11A;
 	ifr.ifr_media |= IFM_MAKEMODE(ifr_mode);
+	
 	retv = ifmedia_ioctl(ic->ic_dev, &ifr, &ic->ic_media, SIOCSIFMEDIA);
-	if ((!retv || retv == -ENETRESET) &&  mode != vap->iv_des_mode) {
-		ieee80211_scan_flush(ic);	/* NB: could optimize */
+	if ((!retv || retv == -ENETRESET) && (mode != vap->iv_des_mode)) {
+		if (preempt_scan(dev, 100, 100))
+			ieee80211_scan_flush(ic);	/* NB: could optimize */
+		else
+			return -ETIMEDOUT;
+		
 		vap->iv_des_mode = mode;
-		if (IS_UP_AUTO(vap)) {
-			ieee80211_cancel_scan(vap);
-			itr_count = 0;
-			while((ic->ic_flags & IEEE80211_F_SCAN) != 0) {
-				mdelay(1);
-				if (itr_count < 100) {
-					itr_count++;
-					continue;
-				}
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-				  "%s: Timeout canceling current scan.\n",
-				  __func__);
-                    		return -ETIMEDOUT;
-			}
+		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
-		}
+		
 		retv = 0;
 	}
+
 #ifdef ATH_SUPERG_XR
 	/* set the same params on the xr vap device if exists */
 	if (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR))
 		vap->iv_xrvap->iv_des_mode = mode;
 #endif
+
 	return -retv;
 }
 #undef IEEE80211_MODE_TURBO_STATIC_A
@@ -1999,27 +1995,32 @@ ieee80211_setupxr(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 	if (!(vap->iv_flags & IEEE80211_F_XR)) {
 		if ((vap->iv_ath_cap & IEEE80211_ATHC_XR) && !vap->iv_xrvap) { 
+			struct ieee80211vap *xrvap = NULL;
 			char name[IFNAMSIZ];
 			strcpy(name, dev->name);
 			strcat(name, "-xr");
 			/*
-			 * create a new XR vap. if the normal VAP is already up,
+			 * Create a new XR vap. If the normal VAP is already up,
 			 * bring up the XR vap aswell.
 			 */
 			vap->iv_ath_cap &= ~IEEE80211_ATHC_TURBOP; /* turn off turbo */ 
 			ieee80211_scan_flush(ic);	/* NB: could optimize */
 			 
-			vap->iv_xrvap = ic->ic_vap_create(ic, name, vap->iv_unit,
-				IEEE80211_M_HOSTAP,IEEE80211_VAP_XR |
-				IEEE80211_CLONE_BSSID, dev);
-			if (!vap->iv_xrvap)
+			if (!(xrvap = ic->ic_vap_create(ic, name, IEEE80211_M_HOSTAP, 
+				IEEE80211_VAP_XR | IEEE80211_CLONE_BSSID, dev)))
 				return;
-			vap->iv_xrvap->iv_fragthreshold = IEEE80211_XR_FRAG_THRESHOLD;
-			copy_des_ssid(vap->iv_xrvap, vap);
-			vap->iv_xrvap->iv_des_mode = vap->iv_des_mode;
+
+			/* We use iv_xrvap to link to the parent VAP as well */
+			xrvap->iv_xrvap = vap;
+			xrvap->iv_ath_cap = vap->iv_ath_cap;
+			xrvap->iv_fragthreshold = IEEE80211_XR_FRAG_THRESHOLD;
+			xrvap->iv_des_mode = vap->iv_des_mode;
+			copy_des_ssid(xrvap, vap);
+
+			vap->iv_xrvap = xrvap;
 		} else if (!(vap->iv_ath_cap & IEEE80211_ATHC_XR) && vap->iv_xrvap) { 
 			/*
-			 * destroy the XR vap. if the XR VAP is up , bring
+			 * Destroy the XR vap. If the XR VAP is up, bring
 			 * it down before destroying.
 			 */
 			if (vap->iv_xrvap) {
@@ -5292,8 +5293,6 @@ static struct iw_handler_def ieee80211_iw_handler_def = {
 #undef N
 };
 
-static	void ieee80211_delete_wlanunit(u_int);
-
 /*
  * Handle private ioctl requests.
  */
@@ -5301,7 +5300,6 @@ static int
 ieee80211_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ieee80211vap *vap = dev->priv;
-	u_int unit;
 
 	switch (cmd) {
 	case SIOCG80211STATS:
@@ -5311,7 +5309,6 @@ ieee80211_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		ieee80211_stop(vap->iv_dev);	/* force state before cleanup */
-		unit = vap->iv_unit;
 		vap->iv_ic->ic_vap_delete(vap);
 		return 0;
 	case IEEE80211_IOCTL_GETKEY:
@@ -5326,46 +5323,6 @@ ieee80211_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return ieee80211_ioctl_getscanresults(dev, (struct iwreq *)ifr);
 	}
 	return -EOPNOTSUPP;
-}
-
-static u_int8_t wlan_units[32];		/* enough for 256 */
-
-/*
- * Allocate a new unit number.  If the map is full return -1;
- * otherwise the allocate unit number is returned.
- */
-static int
-ieee80211_new_wlanunit(void)
-{
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
-	u_int unit;
-	u_int8_t b;
-	int i;
-
-	/* NB: covered by rtnl_lock */
-	unit = 0;
-	for (i = 0; i < N(wlan_units) && wlan_units[i] == 0xff; i++)
-		unit += NBBY;
-	if (i == N(wlan_units))
-		return -1;
-	for (b = wlan_units[i]; b & 1; b >>= 1)
-		unit++;
-	setbit(wlan_units, unit);
-
-	return unit;
-#undef N
-}
-
-/*
- * Reclaim the specified unit number.
- */
-static void
-ieee80211_delete_wlanunit(u_int unit)
-{
-	/* NB: covered by rtnl_lock */
-	KASSERT(unit < sizeof(wlan_units) * NBBY, ("invalid wlan unit %u", unit));
-	KASSERT(isset(wlan_units, unit), ("wlan unit %u not allocated", unit));
-	clrbit(wlan_units, unit);
 }
 
 /*
@@ -5405,17 +5362,7 @@ struct ieee80211vap*
 ieee80211_create_vap(struct ieee80211com *ic, char *name,
 	struct net_device *mdev, int opmode, int opflags)
 {
-	struct ieee80211vap *vap;
-	int unit;
-	
-	if ((unit = ieee80211_new_wlanunit()) == -1)
-		return NULL;
-
-	if ((vap = ic->ic_vap_create(ic, name, unit, opmode, opflags, mdev)) == NULL) {
-		ieee80211_delete_wlanunit(unit);
-	}
-
-	return vap;
+	return ic->ic_vap_create(ic, name, opmode, opflags, mdev);
 }
 EXPORT_SYMBOL(ieee80211_create_vap);
 
@@ -5435,7 +5382,5 @@ ieee80211_ioctl_vattach(struct ieee80211vap *vap)
 void
 ieee80211_ioctl_vdetach(struct ieee80211vap *vap)
 {
-	if ((vap->iv_unit != -1) && isset(wlan_units, vap->iv_unit))
-		ieee80211_delete_wlanunit(vap->iv_unit);
 }
 
