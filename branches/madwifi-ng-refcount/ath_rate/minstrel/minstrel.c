@@ -539,7 +539,7 @@ ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 static void
 ath_fill_sample_table(struct minstrel_node *sn)
 {
-        int num_sample_rates = sn->num_rates - 1;
+        unsigned int num_sample_rates = sn->num_rates;
         unsigned int i, column_index;
         int newIndex;
         u_int8_t random_bytes[12];
@@ -548,7 +548,7 @@ ath_fill_sample_table(struct minstrel_node *sn)
                 for (i = 0; i <= IEEE80211_RATE_MAXSIZE; i++)
                         sn->rs_sampleTable[i][column_index] = 0;
 
-                for (i = 0; i < num_sample_rates; i++) {
+                for (i = 0; i <= num_sample_rates; i++) {
                         get_random_bytes(random_bytes, 8);
                         newIndex = (i + (int)(random_bytes[i & 7])) % num_sample_rates;
                         if (newIndex < 0)
@@ -659,7 +659,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * the node.  We know the rate is there because the
 		 * rate set is checked when the station associates. */
 		/* NB: the rate set is assumed sorted */
-		for (; srate >= 0 && (ni->ni_rates.rs_rates[srate] & IEEE80211_RATE_VAL) != vap->iv_fixed_rate; srate--);
+		for (; (srate >= 0) && (ni->ni_rates.rs_rates[srate] & IEEE80211_RATE_VAL) != vap->iv_fixed_rate; srate--);
 
 		KASSERT(srate >= 0,
 			("fixed rate %d not in rate set", vap->iv_fixed_rate));
@@ -669,7 +669,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		DPRINTF(sc, "%s: %s %s fixed rate %d%sMbps\n",
 			dev_info, __func__, ether_sprintf(ni->ni_macaddr), 
 			sn->rates[srate].rate / 2,
-			(sn->rates[srate].rate % 0x1) ? ".5" : " ");
+			(sn->rates[srate].rate % 2) ? ".5 " : " ");
 		return;
 	}
 	
@@ -691,7 +691,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 
 		for (retry_index = 2; retry_index < ATH_TXMAXTRY; retry_index++) {
 			tx_time = calc_usecs_unicast_packet(sc, 1200, sn->rates[x].rix, 0, retry_index);
-			if (tx_time >  ath_segment_size) 
+			if (tx_time > ath_segment_size) 
 				break;
 			sn->retry_count[x] = retry_index;
 			sn->retry_adjusted_count[x] = retry_index;
