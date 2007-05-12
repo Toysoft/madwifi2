@@ -548,7 +548,7 @@ ath_fill_sample_table(struct minstrel_node *sn)
                 for (i = 0; i <= IEEE80211_RATE_MAXSIZE; i++)
                         sn->rs_sampleTable[i][column_index] = 0;
 
-                for (i = 0; i <= num_sample_rates; i++) {
+                for (i = 0; i < num_sample_rates; i++) {
                         get_random_bytes(random_bytes, 8);
                         newIndex = (i + (int)(random_bytes[i & 7])) % num_sample_rates;
                         if (newIndex < 0)
