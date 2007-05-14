@@ -772,8 +772,8 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	struct sk_buff *tskb;
 	int fragcnt = 1;
 	int pdusize = 0;
-	int ismulticast=0;
-	int use4addr=0;
+	int ismulticast = 0;
+	int use4addr = 0;
 #ifdef ATH_SUPERG_FF
 	struct sk_buff *skb2 = NULL;
 	struct ether_header eh2;
@@ -942,7 +942,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		llc->llc_snap.org_code[0] = 0;
 		llc->llc_snap.org_code[1] = 0;
 		llc->llc_snap.org_code[2] = 0;
-		llc->llc_snap.ether_type = eh.ether_type;
+		llc->llc_snap.ether_type = eh2.ether_type;
 
 		eh_inter = (struct ether_header *) skb_push(skb2, sizeof(struct ether_header));
 		if (eh_inter == NULL) {
@@ -952,7 +952,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			return NULL;
 		}
 
-		memcpy(eh_inter, &eh2, sizeof(struct ether_header) - sizeof eh.ether_type);
+		memcpy(eh_inter, &eh2, sizeof(struct ether_header) - sizeof eh2.ether_type);
 		eh_inter->ether_type = htons(payload);
 
 		/* variable length pad */
