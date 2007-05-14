@@ -247,6 +247,7 @@ copy_bss(struct ieee80211_node *nbss, const struct ieee80211_node *obss)
 	nbss->ni_txpower = obss->ni_txpower;
 	nbss->ni_vlan = obss->ni_vlan;
 	nbss->ni_rsn = obss->ni_rsn;
+	nbss->ni_rates = obss->ni_rates;
 	/* XXX statistics? */
 }
 
