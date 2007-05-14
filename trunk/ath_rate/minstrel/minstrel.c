@@ -539,7 +539,7 @@ ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 static void
 ath_fill_sample_table(struct minstrel_node *sn)
 {
-        int num_sample_rates = sn->num_rates - 1;
+        unsigned int num_sample_rates = sn->num_rates;
         unsigned int i, column_index;
         int newIndex;
         u_int8_t random_bytes[12];
