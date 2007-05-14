@@ -342,20 +342,20 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 			}				
 
 			/* Don't look for slowest rate (i.e. slowest
-			 * base rate) We must presume that the slowest
+			 * base rate). We must presume that the slowest
 			 * rate works fine, or else other management
 			 * frames will also be failing - therefore the
 			 * link will soon be broken anyway. Indeed,
 			 * the slowest rate was used to establish the
 			 * link in the first place. */
 			ndx = sn->rs_sampleTable[sn->rs_sampleIndex][sn->rs_sampleColumn];
-			if (ndx >= sn->num_rates)
-			    ndx = 1;
+			
 			sn->rs_sampleIndex++;
 			if (sn->rs_sampleIndex > (sn->num_rates - 2)) {
 				sn->rs_sampleIndex = 0;
+				
 				sn->rs_sampleColumn++;
-				if (sn->rs_sampleColumn == MINSTREL_COLUMNS)
+				if (sn->rs_sampleColumn >= MINSTREL_COLUMNS)
 					sn->rs_sampleColumn = 0;
 			}
 		} else
@@ -478,7 +478,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	mrr = sc->sc_mrretry && !(ic->ic_flags & IEEE80211_F_USEPROT) && ENABLE_MRR;
 
 	if (!mrr) {
-		if (ndx >= 0 && ndx < sn->num_rates) {
+		if ((0 <= ndx) && (ndx < sn->num_rates)) {
 			sn->rs_rateattempts[ndx]++; /* only one rate was used */
 		}
 		return;
@@ -539,47 +539,47 @@ ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 static void
 ath_fill_sample_table(struct minstrel_node *sn)
 {
-        unsigned int num_sample_rates = sn->num_rates;
-        unsigned int i, column_index;
-        int newIndex;
-        u_int8_t random_bytes[12];
+        unsigned int num_sample_rates = (sn->num_rates - 1);
+	/* newIndex varies as 0 .. (num_rates - 2) 
+	 * The highest index rate is the slowest and is ignored */
+        unsigned int i, column_index, newIndex;
+        u_int8_t random_bytes[8];
 
-        for(column_index = 0; column_index < MINSTREL_COLUMNS; column_index++) {
-                for (i = 0; i <= IEEE80211_RATE_MAXSIZE; i++)
-                        sn->rs_sampleTable[i][column_index] = 0;
-
-                for (i = 0; i < num_sample_rates; i++) {
-                        get_random_bytes(random_bytes, 8);
-                        newIndex = (i + (int)(random_bytes[i & 7])) % num_sample_rates;
-                        if (newIndex < 0)
-                                newIndex = 2;
-
-                        while (sn->rs_sampleTable[newIndex][column_index] != 0) {
-                                newIndex = ((int)(newIndex + 1)) % num_sample_rates;
-                                if (newIndex < 0)
-                                        newIndex = 2;
-                        }
-
-                        sn->rs_sampleTable[newIndex][column_index] = i + 1;
-                }
-        }
+	/* This should be unnecessary if we are assuming storage is provided
+	 * as zeroed */
+	memset(sn->rs_sampleTable, 0, sizeof(sn->rs_sampleTable));
 
         sn->rs_sampleColumn = 0;
         sn->rs_sampleIndex = 0;
 
-	/* Seed value to random number geenrator, which determines when we
-	 * send a sample packet at some non-optimal rate */
+	/* Seed value to random number generator, which determines when we
+	 * send a sample packet at some non-optimal rate
+	 * FIXME: randomise? */
         sn->random_n = 1;
         sn->a = 1664525;
         sn->b = 1013904223;
+
+	if (sn->num_rates > 1) {
+		for(column_index = 0; column_index < MINSTREL_COLUMNS; column_index++) {
+			for (i = 0; i < num_sample_rates; i++) {
+				get_random_bytes(random_bytes, 8);
+				newIndex = (i + random_bytes[i & 7]) % num_sample_rates;
+
+				while (sn->rs_sampleTable[newIndex][column_index] != 0)
+					newIndex = (newIndex + 1) % num_sample_rates;
+
+				sn->rs_sampleTable[newIndex][column_index] = i + 1;
+			}
+		}
+	}
+
 #if 0
         char rates[200];
         char *p;
         for(column_index = 0; column_index < MINSTREL_COLUMNS; column_index++) {
                 p = rates + sprintf(rates, "rates :: %d ", column_index);
                 for (i = 0; i < num_sample_rates; i++)
-                        p += sprintf(p, "%2d ", (int)sn->rs_sampleTable[i][column_index])
-;
+                        p += sprintf(p, "%2u ", sn->rs_sampleTable[i][column_index]);
                 printk("%s\n", rates);
         };
 #endif
@@ -640,7 +640,6 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	ath_fill_sample_table(sn);
 	
 	ni->ni_txrate = 0;
-	sn->num_rates = ni->ni_rates.rs_nrates;
 
 	if (sn->num_rates <= 0) {
 		DPRINTF(sc, "%s: %s %s no rates (fixed %d) \n",
