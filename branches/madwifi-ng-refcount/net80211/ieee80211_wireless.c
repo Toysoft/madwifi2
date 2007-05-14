@@ -752,7 +752,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		default:		/* NB: no static turboG */
 			break;
 		}
-		if (ieee80211_check_mode_consistency(ic,vap->iv_des_mode,c)) {
+		if (ieee80211_check_mode_consistency(ic, vap->iv_des_mode, c)) {
 			if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 				return -EINVAL;
 		}
@@ -2409,7 +2409,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			/* no turbo and XR at the same time */
 			if ((vap->iv_ath_cap & IEEE80211_ATHC_XR) && value)
 				return -EINVAL;
-			if (ieee80211_set_turbo(dev,value))
+			if (ieee80211_set_turbo(dev, value))
 				return -EINVAL;
 			ieee80211_scan_flush(ic);
 		}
@@ -3129,7 +3129,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211_node *ni;
 	struct ieee80211_key *wk;
 	ieee80211_keyix_t kix;
-	int error, flags,i;
+	int error, flags, i;
 
 	/* Check cipher support, load crypto modules if needed */
 	if (!ieee80211_crypto_available(vap, ik->ik_type))
@@ -3357,7 +3357,7 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 				if (ieee80211_sta_join(vap, lookup.se))
 					while (!vap->iv_nsdone)
 						IEEE80211_RESCHEDULE();
-				if (vap->iv_nsparams.result)
+				if (!vap->iv_nsparams.result)
 					return 0;
 			}
 		}
@@ -5070,41 +5070,41 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "doth_reassoc" },
 	{ IEEE80211_PARAM_COMPRESSION,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "compression" },
-	{ IEEE80211_PARAM_COMPRESSION,0,
+	{ IEEE80211_PARAM_COMPRESSION, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_compression" },
 	{ IEEE80211_PARAM_FF,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ff" },
-	{ IEEE80211_PARAM_FF,0,
+	{ IEEE80211_PARAM_FF, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ff" },
 	{ IEEE80211_PARAM_TURBO,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "turbo" },
-	{ IEEE80211_PARAM_TURBO,0,
+	{ IEEE80211_PARAM_TURBO, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_turbo" },
 	{ IEEE80211_PARAM_XR,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "xr" },
-	{ IEEE80211_PARAM_XR,0,
+	{ IEEE80211_PARAM_XR, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_xr" },
 	{ IEEE80211_PARAM_BURST,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "burst" },
-	{ IEEE80211_PARAM_BURST,0,
+	{ IEEE80211_PARAM_BURST, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_burst" },
 	{ IEEE80211_IOCTL_CHANSWITCH,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0,	"doth_chanswitch" },
 	{ IEEE80211_PARAM_PUREG,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "pureg" },
-	{ IEEE80211_PARAM_PUREG,0,
+	{ IEEE80211_PARAM_PUREG, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_pureg" },
 	{ IEEE80211_PARAM_AR,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "ar" },
-	{ IEEE80211_PARAM_AR,0,
+	{ IEEE80211_PARAM_AR, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_ar" },
 	{ IEEE80211_PARAM_WDS,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "wds" },
-	{ IEEE80211_PARAM_WDS,0,
+	{ IEEE80211_PARAM_WDS, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_wds" },
 	{ IEEE80211_PARAM_BGSCAN,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "bgscan" },
-	{ IEEE80211_PARAM_BGSCAN,0,
+	{ IEEE80211_PARAM_BGSCAN, 0,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_bgscan" },
 	{ IEEE80211_PARAM_BGSCAN_IDLE,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "bgscanidle" },
