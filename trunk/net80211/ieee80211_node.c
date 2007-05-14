@@ -931,11 +931,11 @@ void
 ieee80211_remove_wds_addr(struct ieee80211_node_table *nt, const u_int8_t *macaddr)
 {
 	int hash;
-	struct ieee80211_wds_addr *wds;
+	struct ieee80211_wds_addr *wds, *twds;
 
 	hash = IEEE80211_NODE_HASH(macaddr);
 	IEEE80211_NODE_LOCK_IRQ(nt);
-	LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
+	LIST_FOREACH_SAFE(wds, &nt->nt_wds_hash[hash], wds_hash, twds) {
 		if (IEEE80211_ADDR_EQ(wds->wds_macaddr, macaddr)) {
 			if (ieee80211_node_dectestref(wds->wds_ni)) {
 				_ieee80211_free_node(wds->wds_ni);
@@ -955,11 +955,11 @@ void
 ieee80211_del_wds_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 {
 	int hash;
-	struct ieee80211_wds_addr *wds;
+	struct ieee80211_wds_addr *wds, *twds;
 
 	IEEE80211_NODE_LOCK_IRQ(nt);
 	for (hash = 0; hash < IEEE80211_NODE_HASHSIZE; hash++) {
-		LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
+		LIST_FOREACH_SAFE(wds, &nt->nt_wds_hash[hash], wds_hash, twds) {
 			if (wds->wds_ni == ni) {
 				if (ieee80211_node_dectestref(ni)) {
 					_ieee80211_free_node(ni);
@@ -978,11 +978,11 @@ ieee80211_node_wds_ageout(unsigned long data)
 {
 	struct ieee80211_node_table *nt = (struct ieee80211_node_table *)data;
 	int hash;
-	struct ieee80211_wds_addr *wds;
+	struct ieee80211_wds_addr *wds, *twds;
 
 	IEEE80211_NODE_LOCK_IRQ(nt);
 	for (hash = 0; hash < IEEE80211_NODE_HASHSIZE; hash++) {
-		LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
+		LIST_FOREACH_SAFE(wds, &nt->nt_wds_hash[hash], wds_hash, twds) {
 			if (wds->wds_agingcount != WDS_AGING_STATIC) {
 				if (!wds->wds_agingcount) {
 					if (ieee80211_node_dectestref(wds->wds_ni)) {
