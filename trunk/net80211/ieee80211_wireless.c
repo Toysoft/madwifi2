@@ -3357,7 +3357,7 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 				if (ieee80211_sta_join(vap, lookup.se))
 					while (!vap->iv_nsdone)
 						IEEE80211_RESCHEDULE();
-				if (vap->iv_nsparams.result)
+				if (!vap->iv_nsparams.result)
 					return 0;
 			}
 		}
