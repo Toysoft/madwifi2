@@ -709,19 +709,23 @@ int
 ath_d80211_attach(struct ath_softc *sc)
 {
 	struct ieee80211_hw *hw = sc->sc_hw;
+	struct pci_dev *pdev = (struct pci_dev *)sc->sc_bdev;
+	unsigned int i;
 	int rv = 0;
-	int i;
 
 	DPRINTF(sc, ATH_DEBUG_D80211, "%s\n", __func__);
 
 	for (i = 0; i < sc->sc_num_modes; i++) {
 		ieee80211_register_hwmode(hw, &sc->sc_hw_modes[i]);
+		printk(KERN_DEBUG "register hw_mode %d\n",sc->sc_hw_modes[i].mode);
 	}
 
+	SET_IEEE80211_DEV(hw, &pdev->dev);
+
 	rv = ieee80211_register_hw(hw);
-	if (rv) {
+	if (rv)
 		printk(KERN_ERR "%s: device registration failed.\n", sc->name);
-	}
+
 	return rv;
 }
 
