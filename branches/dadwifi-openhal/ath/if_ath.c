@@ -849,7 +849,12 @@ ath_attach(u_int16_t devid, struct ath_softc *sc)
 	printk("%s: TX99 support enabled\n", dev->name);
 #endif
 	sc->sc_invalid = 0;
-
+	
+	if ((sc->sc_num_modes > 0) && (sc->sc_hw_modes[0].num_channels > 0)) {
+	    sc->sc_hw->conf.freq = sc->sc_hw_modes[0].channels[0].freq;
+	    sc->sc_hw->conf.channel_val = sc->sc_hw_modes[0].channels[0].val;
+	}
+	
 	return 0;
 bad2:
 	ath_tx_cleanup(sc);
@@ -2846,6 +2851,9 @@ ath_key_delete(struct ath_softc *sc, struct ieee80211_key_conf *key)
 
 	keyix = key->hw_key_idx;
 
+	if (keyix >= sc->sc_keymax)
+	    return 0;
+	    
 	ath_hal_keyreset(ah, keyix);
 	/*
 	 * Handle split tx/rx keying required for TKIP with h/w MIC.
@@ -2856,18 +2864,20 @@ ath_key_delete(struct ath_softc *sc, struct ieee80211_key_conf *key)
 		ath_hal_keyreset(ah, keyix + 32);	/* RX key */
 	}
 
-	if (1) {
-		clrbit(sc->sc_keymap, keyix);
-		if (key->alg == ALG_TKIP &&
-		    (hw->flags & IEEE80211_HW_TKIP_INCLUDE_MMIC) == 0) {
+	clrbit(sc->sc_keymap, keyix);
+	if (key->alg == ALG_TKIP &&
+	    (hw->flags & IEEE80211_HW_TKIP_INCLUDE_MMIC) == 0) {
+		if ((keyix + 64) < sc->sc_keymax)
 			clrbit(sc->sc_keymap, keyix + 64);	/* TX key MIC */
-			if (sc->sc_splitmic) {
-				/* +32 for RX key, +32+64 for RX key MIC */
-				clrbit(sc->sc_keymap, keyix+32);
-				clrbit(sc->sc_keymap, keyix+32+64);
-			}
+		if (sc->sc_splitmic) {
+			/* +32 for RX key, +32+64 for RX key MIC */
+			if ((keyix + 32) < sc->sc_keymax)
+			    clrbit(sc->sc_keymap, keyix + 32);
+			if ((keyix + 32 + 64) < sc->sc_keymax)
+			    clrbit(sc->sc_keymap, keyix + 32 + 64);
 		}
 	}
+
 	return 1;
 }
 
