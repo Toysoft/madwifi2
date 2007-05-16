@@ -3858,7 +3858,7 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		DPRINTF(sc, ATH_DEBUG_BEACON,
 			"%s: %s beacons, bslot %d intval %u tsfadjust(Kus) %llu\n",
 			__func__, sc->sc_stagbeacons ? "stagger" : "burst",
-			avp->av_bslot, ni->ni_intval, (long long) tuadjust);
+			avp->av_bslot, ni->ni_intval, (unsigned long long) tuadjust);
 
 		wh = (struct ieee80211_frame *) skb->data;
 		memcpy(&wh[1], &tsfadjust, sizeof(tsfadjust));
@@ -4178,7 +4178,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		vap = sc->sc_bslot[(slot + 1) % ATH_BCBUF];
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"%s: slot %d [tsf %llu tsftu %u intval %u] vap %p\n",
-			__func__, slot, (long long) tsf, tsftu, ic->ic_lintval, vap);
+			__func__, slot, (unsigned long long) tsf, tsftu, ic->ic_lintval, vap);
 		bfaddr = 0;
 		if (vap != NULL) {
 			bf = ath_beacon_generate(sc, vap, needmark);
@@ -4529,7 +4529,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		DPRINTF(sc, ATH_DEBUG_BEACON, 
 			"%s: tsf %llu tsf:tu %u intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u maxdur %u next %u timoffset %u\n",
 			__func__,
-			(long long) tsf, tsftu,
+			(unsigned long long) tsf, tsftu,
 			bs.bs_intval,
 			bs.bs_nexttbtt,
 			bs.bs_dtimperiod,
@@ -5454,8 +5454,8 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				le64_to_cpu(ni->ni_tstamp.tsf) >= tsf) {
 				DPRINTF(sc, ATH_DEBUG_STATE,
 					"ibss merge, rstamp %u tsf %llu "
-					"tstamp %llu\n", rstamp, (long long) tsf,
-					(long long) le64_to_cpu(ni->ni_tstamp.tsf));
+					"tstamp %llu\n", rstamp, (unsigned long long) tsf,
+					(unsigned long long) le64_to_cpu(ni->ni_tstamp.tsf));
 				(void) ieee80211_ibss_merge(ni);
 			}
 		}
