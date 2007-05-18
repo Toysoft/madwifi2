@@ -2773,8 +2773,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 * beacon interval outside of an arbitrary range in
 		 * order to protect against attack.
 		 */
-		if (!(IEEE80211_BINTVAL_MIN <= scan.bintval && 
-		     scan.bintval <= IEEE80211_BINTVAL_MAX)) {
+		if (!IEEE80211_BINTVAL_VALID(scan.bintval)) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_SCAN,
 				wh, "beacon", "invalid beacon interval (%u)", 
 				scan.bintval);
