@@ -318,6 +318,7 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
  * Convert from net80211 layer values to Ath layer values. Hopefully this will
  * be optimised away when the two constants are the same.
  */
+typedef unsigned int ath_keyix_t;
 #define ATH_KEY(_keyix)	((_keyix == IEEE80211_KEYIX_NONE) ? HAL_TXKEYIX_INVALID : _keyix)
 
 #define	ATH_MIN_FF_RATE	12000		/* min rate for ff aggregation in kbps */

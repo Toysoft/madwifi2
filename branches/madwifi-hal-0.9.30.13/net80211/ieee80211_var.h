@@ -60,9 +60,15 @@
 #define	IEEE80211_DTIM_MIN	1	/* min DTIM period */
 #define	IEEE80211_DTIM_DEFAULT	1	/* default DTIM period */
 
-#define	IEEE80211_BINTVAL_MAX	500	/* max beacon interval (TU's) */
+#define	IEEE80211_BINTVAL_MAX	1000	/* max beacon interval (TU's) */
 #define	IEEE80211_BINTVAL_MIN	25	/* min beacon interval (TU's) */
 #define	IEEE80211_BINTVAL_DEFAULT 100	/* default beacon interval (TU's) */
+#define IEEE80211_BINTVAL_VALID(_bi) \
+	((IEEE80211_BINTVAL_MIN <= (_bi)) && \
+	 ((_bi) <= IEEE80211_BINTVAL_MAX))
+#define IEEE80211_BINTVAL_SANITISE(_bi) \
+	(IEEE80211_BINTVAL_VALID(_bi) ? \
+	 (_bi) : IEEE80211_BINTVAL_DEFAULT)
 
 #define	IEEE80211_BGSCAN_INTVAL_MIN	15	/* min bg scan intvl (secs) */
 #define	IEEE80211_BGSCAN_INTVAL_DEFAULT	(5*60)	/* default bg scan intvl */
@@ -214,7 +220,7 @@ struct ieee80211com {
 
 	/* virtual ap create/delete */
 	struct ieee80211vap *(*ic_vap_create)(struct ieee80211com *,
-		const char *, int, int, int, struct net_device *);
+		const char *, int, int, struct net_device *);
 	void (*ic_vap_delete)(struct ieee80211vap *);
 	/* send/recv 802.11 management frame */
 	int (*ic_send_mgmt)(struct ieee80211_node *, int, int);
@@ -308,7 +314,6 @@ struct ieee80211vap {
 	struct vlan_group *iv_vlgrp;		/* VLAN group state */
 
 	TAILQ_ENTRY(ieee80211vap) iv_next;	/* list of vap instances */
-	u_int iv_unit;				/* virtual AP unit */
 	struct ieee80211com *iv_ic;		/* back ptr to common state */
 	u_int32_t iv_debug;			/* debug msg flags */
 	struct ieee80211_stats iv_stats;	/* statistics */
@@ -548,7 +553,7 @@ MALLOC_DECLARE(M_80211_VAP);
 int ieee80211_ifattach(struct ieee80211com *);
 void ieee80211_ifdetach(struct ieee80211com *);
 int ieee80211_vap_setup(struct ieee80211com *, struct net_device *,
-	const char *, int, int, int);
+	const char *, int, int);
 int ieee80211_vap_attach(struct ieee80211vap *, ifm_change_cb_t, ifm_stat_cb_t);
 void ieee80211_vap_detach(struct ieee80211vap *);
 void ieee80211_mark_dfs(struct ieee80211com *, struct ieee80211_channel *);

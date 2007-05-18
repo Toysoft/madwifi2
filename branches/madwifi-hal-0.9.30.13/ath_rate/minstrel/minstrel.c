@@ -116,14 +116,14 @@
 
 #include "minstrel.h"
 
-/* XXX: Use standard debug functions */
-#define	MINSTREL_DEBUG 10
+#define	MINSTREL_DEBUG 
 #ifdef MINSTREL_DEBUG
 enum {
 	ATH_DEBUG_RATE		= 0x00000010	/* rate control */
 };
-#define	DPRINTF(sc, _fmt, ...) do {				\
-	/*	printk(_fmt, __VA_ARGS__);	*/		\
+#define	DPRINTF(sc, _fmt, ...) do {		\
+	if (sc->sc_debug & ATH_DEBUG_RATE)	\
+		printk(_fmt, __VA_ARGS__);		\
 } while (0)
 #else
 #define	DPRINTF(sc, _fmt, ...)
@@ -454,11 +454,11 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	final_rate = sc->sc_hwmap[ts->ts_rate & ~HAL_TXSTAT_ALTRATE].ieeerate;
 	final_ndx = rate_to_ndx(sn, final_rate);
 	if (final_ndx >= sn->num_rates) {
-		printk(KERN_ERR "final ndx too high\n");
+		DPRINTF(sc,"%s: final ndx too high\n", __func__);
 		final_ndx = 0;
 	}
 	if (final_ndx < 0) {
-		printk(KERN_ERR "final ndx too low\n");
+		DPRINTF(sc, "%s: final ndx too low\n", __func__);
 		final_ndx = 0;
 	}		
 
@@ -540,7 +540,7 @@ ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 static void
 ath_fill_sample_table(struct minstrel_node *sn)
 {
-        int num_sample_rates = sn->num_rates - 1;
+        unsigned int num_sample_rates = sn->num_rates;
         unsigned int i, column_index;
         int newIndex;
         u_int8_t random_bytes[12];
@@ -581,7 +581,7 @@ ath_fill_sample_table(struct minstrel_node *sn)
                 for (i = 0; i < num_sample_rates; i++)
                         p += sprintf(p, "%2d ", (int)sn->rs_sampleTable[i][column_index])
 ;
-                printk("%s\n", rates);
+                DPRINTF(sc, "%s\n", rates);
         };
 #endif
 }
@@ -608,7 +608,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	sn->is_sampling = 0;
 
 	if (rt == NULL) {
-		printk(KERN_WARNING "no rates yet! mode %u\n", sc->sc_curmode);
+		DPRINTF(sc, "no rates yet! mode %u\n", sc->sc_curmode);
 		return;
 	}
         sn->static_rate_ndx = -1;
@@ -700,9 +700,9 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 	}
 
 #if 0
-	printk(KERN_ERR "Retry table for this node\n");
+	DPRINTF(sc, "%s: Retry table for this node\n", __func__);
 	      for (x = 0; x < ni->ni_rates.rs_nrates; x++) 
-		     printk(KERN_ERR "%2d  %2d %6d  \n",x, sn->retry_count[x], sn->perfect_tx_time[x]);
+		     DPRINTF(sc, "%2d  %2d %6d  \n",x, sn->retry_count[x], sn->perfect_tx_time[x]);
 #endif
 
 	/* Set the initial rate */
@@ -746,10 +746,10 @@ ath_timer_function(unsigned long data)
 	unsigned int interval = ath_timer_interval;
 
 	if (dev == NULL) 
-		printk(KERN_INFO "'dev' is null in this timer \n");
+		DPRINTF(sc, "%s: 'dev' is null in this timer \n", __func__);
 
 	if (sc == NULL) 
-		printk(KERN_INFO "'sc' is null in this timer\n");
+		DPRINTF(sc, "%s: 'sc' is null in this timer\n", __func__);
 
 	ic = &sc->sc_ic;
 
@@ -773,7 +773,7 @@ ath_timer_function(unsigned long data)
 
 	timer  = &(ssc->timer);
 	if (timer == NULL) 
-		printk(KERN_INFO "timer is null - leave it\n");
+		DPRINTF(sc, "%s: timer is null - leave it\n", __func__);
 
         timer->expires = jiffies + ((HZ * interval) / 1000);
         add_timer(timer);
@@ -916,6 +916,7 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
                 (struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
         unsigned int x = 0;
 	unsigned int this_tp, this_prob, this_eprob;
+		struct ath_softc *sc = vap->iv_ic->ic_dev->priv;;
 
         TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
                 /* Assume each node needs 1500 bytes */
@@ -924,7 +925,7 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 				p += sprintf(p, "out of room for node %s\n\n", ether_sprintf(ni->ni_macaddr));
 				break;
 			}
-			printk("out of memeory to write tall of the nodes\n");
+			DPRINTF(sc, "%s: out of memeory to write tall of the nodes\n", __func__);
                         break;
 		}
                 an = ATH_NODE(ni);
@@ -958,8 +959,8 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 				     this_prob / 10, this_prob % 10,
 				     odst->rs_lastratesuccess[x],
 				     odst->rs_lastrateattempts[x],
-				     odst->rs_succ_hist[x],
-				     odst->rs_att_hist[x]);
+				     (unsigned long long)odst->rs_succ_hist[x],
+				     (unsigned long long)odst->rs_att_hist[x]);
 		}
 		p += sprintf(p, "\n");
 

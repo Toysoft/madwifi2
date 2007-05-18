@@ -1135,8 +1135,15 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 		}
 		if (skb1 != NULL) {
 			skb1->dev = dev;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
+			skb1->mac_header = skb1->data;
+			skb1->network_header = skb1->data + sizeof(struct ether_header);
+#else
 			skb1->mac.raw = skb1->data;
 			skb1->nh.raw = skb1->data + sizeof(struct ether_header);
+#endif
+
 			skb1->protocol = __constant_htons(ETH_P_802_2);
 			/* XXX insert vlan tag before queue it? */
 			dev_queue_xmit(skb1);
@@ -2262,7 +2269,13 @@ forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
 		if (skb1 == NULL)
 			return;
 		skb1->dev = dev;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
+		skb1->mac_header = skb1->data;
+#else
 		skb1->mac.raw = skb1->data;
+#endif
+
 		skb1->ip_summed = CHECKSUM_NONE;
 		skb1->pkt_type = PACKET_OTHERHOST;
 		skb1->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
@@ -2540,7 +2553,13 @@ ieee80211_deliver_l2uf(struct ieee80211_node *ni)
 	 * constants instead. We know the packet type anyway. */
 	skb->pkt_type = PACKET_BROADCAST;
 	skb->protocol = htons(ETH_P_802_2);
+ 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
+	skb->mac_header = skb->data;
+#else
 	skb->mac.raw = skb->data;
+#endif
+
 	ieee80211_deliver_data(ni, skb);
 	return;
 }
@@ -2748,7 +2767,19 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			vap->iv_stats.is_rx_chanmismatch++;
 			return;
 		}
-
+		
+		/* IEEE802.11 does not specify the allowed range for 
+		 * beacon interval. We discard any beacons with a 
+		 * beacon interval outside of an arbitrary range in
+		 * order to protect against attack.
+		 */
+		if (!IEEE80211_BINTVAL_VALID(scan.bintval)) {
+			IEEE80211_DISCARD(vap, IEEE80211_MSG_SCAN,
+				wh, "beacon", "invalid beacon interval (%u)", 
+				scan.bintval);
+			return;
+		}
+		
 		/*
 		 * Count frame now that we know it's to be processed.
 		 */
@@ -2876,7 +2907,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 				memcpy(ni->ni_tstamp.data, scan.tstamp,
 					sizeof(ni->ni_tstamp));
-				ni->ni_intval = scan.bintval;
+				ni->ni_intval = IEEE80211_BINTVAL_SANITISE(scan.bintval);
 				ni->ni_capinfo = scan.capinfo;
 				ni->ni_chan = ic->ic_curchan;
 				ni->ni_fhdwell = scan.fhdwell;
@@ -3300,7 +3331,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
 		ni->ni_last_rx = jiffies;
-		ni->ni_intval = bintval;
+		ni->ni_intval = IEEE80211_BINTVAL_SANITISE(bintval);
 		ni->ni_capinfo = capinfo;
 		ni->ni_chan = ic->ic_curchan;
 		ni->ni_fhdwell = vap->iv_bss->ni_fhdwell;
@@ -3710,15 +3741,25 @@ static __be16
 ath_eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ethhdr *eth;
-	
-	skb->mac.raw=skb->data;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)	
+	skb->mac_header = skb->data;
+#else
+	skb->mac.raw = skb->data;
+#endif
+
 	skb_pull(skb, ETH_HLEN);
 	/*
 	 * NB: mac.ethernet is replaced in 2.6.9 by eth_hdr but
 	 *     since that's an inline and not a define there's
 	 *     no easy way to do this cleanly.
 	 */
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
+	eth = (struct ethhdr *)skb->mac_header;
+#else
 	eth = (struct ethhdr *)skb->mac.raw;
+#endif
 	
 	if (*eth->h_dest & 1)
 		if (memcmp(eth->h_dest, dev->broadcast, ETH_ALEN) == 0)
