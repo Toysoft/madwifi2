@@ -2767,7 +2767,20 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			vap->iv_stats.is_rx_chanmismatch++;
 			return;
 		}
-
+		
+		/* IEEE802.11 does not specify the allowed range for 
+		 * beacon interval. We discard any beacons with a 
+		 * beacon interval outside of an arbitrary range in
+		 * order to protect against attack.
+		 */
+		if (!(IEEE80211_BINTVAL_MIN <= scan.bintval && 
+		     scan.bintval <= IEEE80211_BINTVAL_MAX)) {
+			IEEE80211_DISCARD(vap, IEEE80211_MSG_SCAN,
+				wh, "beacon", "invalid beacon interval (%u)", 
+				scan.bintval);
+			return;
+		}
+		
 		/*
 		 * Count frame now that we know it's to be processed.
 		 */
@@ -2895,7 +2908,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 				memcpy(ni->ni_tstamp.data, scan.tstamp,
 					sizeof(ni->ni_tstamp));
-				ni->ni_intval = scan.bintval;
+				ni->ni_intval = IEEE80211_BINTVAL_SANITISE(scan.bintval);
 				ni->ni_capinfo = scan.capinfo;
 				ni->ni_chan = ic->ic_curchan;
 				ni->ni_fhdwell = scan.fhdwell;
@@ -3319,7 +3332,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		ni->ni_rssi = rssi;
 		ni->ni_rstamp = rstamp;
 		ni->ni_last_rx = jiffies;
-		ni->ni_intval = bintval;
+		ni->ni_intval = IEEE80211_BINTVAL_SANITISE(bintval);
 		ni->ni_capinfo = capinfo;
 		ni->ni_chan = ic->ic_curchan;
 		ni->ni_fhdwell = vap->iv_bss->ni_fhdwell;
