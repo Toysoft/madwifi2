@@ -640,7 +640,9 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	if (ni == NULL) {
 		ni = ieee80211_alloc_node(&ic->ic_sta, vap, se->se_macaddr);
 		if (ni == NULL) {
-			/* XXX msg */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
+			"%s: Unable to allocate node for BSS: %s\n", __func__, 
+			ether_sprintf(ni->ni_macaddr));
 			return 0;
 		}
 	} else
@@ -658,7 +660,7 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	memcpy(ni->ni_essid, se->se_ssid + 2, ni->ni_esslen);
 	ni->ni_rstamp = se->se_rstamp;
 	ni->ni_tstamp.tsf = se->se_tstamp.tsf;
-	ni->ni_intval = se->se_intval;
+	ni->ni_intval = IEEE80211_BINTVAL_SANITISE(se->se_intval);
 	ni->ni_capinfo = se->se_capinfo;
 	ni->ni_chan = se->se_chan;
 	ni->ni_timoff = se->se_timoff;
@@ -929,11 +931,11 @@ void
 ieee80211_remove_wds_addr(struct ieee80211_node_table *nt, const u_int8_t *macaddr)
 {
 	int hash;
-	struct ieee80211_wds_addr *wds;
+	struct ieee80211_wds_addr *wds, *twds;
 
 	hash = IEEE80211_NODE_HASH(macaddr);
 	IEEE80211_NODE_LOCK_IRQ(nt);
-	LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
+	LIST_FOREACH_SAFE(wds, &nt->nt_wds_hash[hash], wds_hash, twds) {
 		if (IEEE80211_ADDR_EQ(wds->wds_macaddr, macaddr)) {
 			if (ieee80211_node_dectestref(wds->wds_ni)) {
 				_ieee80211_free_node(wds->wds_ni);
@@ -953,11 +955,11 @@ void
 ieee80211_del_wds_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 {
 	int hash;
-	struct ieee80211_wds_addr *wds;
+	struct ieee80211_wds_addr *wds, *twds;
 
 	IEEE80211_NODE_LOCK_IRQ(nt);
 	for (hash = 0; hash < IEEE80211_NODE_HASHSIZE; hash++) {
-		LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
+		LIST_FOREACH_SAFE(wds, &nt->nt_wds_hash[hash], wds_hash, twds) {
 			if (wds->wds_ni == ni) {
 				if (ieee80211_node_dectestref(ni)) {
 					_ieee80211_free_node(ni);
@@ -976,11 +978,11 @@ ieee80211_node_wds_ageout(unsigned long data)
 {
 	struct ieee80211_node_table *nt = (struct ieee80211_node_table *)data;
 	int hash;
-	struct ieee80211_wds_addr *wds;
+	struct ieee80211_wds_addr *wds, *twds;
 
 	IEEE80211_NODE_LOCK_IRQ(nt);
 	for (hash = 0; hash < IEEE80211_NODE_HASHSIZE; hash++) {
-		LIST_FOREACH(wds, &nt->nt_wds_hash[hash], wds_hash) {
+		LIST_FOREACH_SAFE(wds, &nt->nt_wds_hash[hash], wds_hash, twds) {
 			if (wds->wds_agingcount != WDS_AGING_STATIC) {
 				if (!wds->wds_agingcount) {
 					if (ieee80211_node_dectestref(wds->wds_ni)) {
@@ -1213,7 +1215,7 @@ ieee80211_add_neighbor(struct ieee80211vap *vap,	const struct ieee80211_frame *w
 		memcpy(ni->ni_essid, sp->ssid + 2, sp->ssid[1]);
 		IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 		memcpy(ni->ni_tstamp.data, sp->tstamp, sizeof(ni->ni_tstamp));
-		ni->ni_intval = sp->bintval;
+		ni->ni_intval = IEEE80211_BINTVAL_SANITISE(sp->bintval);
 		ni->ni_capinfo = sp->capinfo;
 		ni->ni_chan = ic->ic_curchan;
 		ni->ni_fhdwell = sp->fhdwell;

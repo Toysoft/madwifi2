@@ -327,11 +327,13 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 			bestchan = chan;
 	}
 	if (bestchan == -1) {
-		/* no suitable channel, should not happen */
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-			"%s: no suitable channel! (should not happen)\n", __func__);
-		/* XXX print something? */
-		return 0;			/* restart scan */
+		if (ss->ss_last > 0) {
+			/* no suitable channel, should not happen */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+				"%s: no suitable channel! (should not happen)\n", __func__);
+			/* XXX print something? */
+		}
+		return 0; /* restart scan */
 	} else {
 		struct ieee80211_channel *c;
 		struct ieee80211_scan_entry se;

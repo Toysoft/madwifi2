@@ -248,8 +248,9 @@ ieee80211_notify_sta_stats(struct ieee80211_node *ni)
 	snprintf(buf, sizeof(buf), "%s\nmac=%s\nrx_packets=%u\nrx_bytes=%llu\n"
 			"tx_packets=%u\ntx_bytes=%llu\n", tag, 
 			ether_sprintf(ni->ni_macaddr), ni->ni_stats.ns_rx_data, 
-			ni->ni_stats.ns_rx_bytes, ni->ni_stats.ns_tx_data, 
-			ni->ni_stats.ns_tx_bytes);
+			(unsigned long long)ni->ni_stats.ns_rx_bytes, 
+			ni->ni_stats.ns_tx_data, 
+			(unsigned long long)ni->ni_stats.ns_tx_bytes);
 	memset(&wreq, 0, sizeof(wreq));
 	wreq.data.length = strlen(buf);
 	wireless_send_event(dev, IWEVCUSTOM, &wreq, buf);
@@ -281,7 +282,8 @@ ieee80211_notify_replay_failure(struct ieee80211vap *vap,
 
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
 		"%s replay detected <keyix %d, rsc %llu >",
-		k->wk_cipher->ic_name, k->wk_keyix, rsc );
+		k->wk_cipher->ic_name, k->wk_keyix, 
+		(unsigned long long)rsc );
 
 	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
 	snprintf(buf, sizeof(buf), "%s(keyid=%d %scast addr=%s)", tag,

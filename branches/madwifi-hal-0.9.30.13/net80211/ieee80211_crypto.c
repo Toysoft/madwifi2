@@ -449,10 +449,9 @@ _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	KASSERT(key->wk_cipher != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-		"%s: %s keyix %u flags 0x%x tsc %llu len %u\n",
-		__func__, key->wk_cipher->ic_name,
-		key->wk_keyix, key->wk_flags,
-		key->wk_keytsc, key->wk_keylen);
+		"%s: %s keyix %u flags 0x%x tsc %llu len %u\n", __func__, 
+		key->wk_cipher->ic_name, key->wk_keyix, key->wk_flags,
+		(unsigned long long)key->wk_keytsc, key->wk_keylen);
 
 	keyix = key->wk_keyix;
 	if (keyix != IEEE80211_KEYIX_NONE) {
@@ -529,10 +528,10 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	KASSERT(cip != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-		"%s: %s keyix %u flags 0x%x mac %s  tsc %llu len %u\n",
-		__func__, cip->ic_name, key->wk_keyix,
-		key->wk_flags, ether_sprintf(macaddr),
-		key->wk_keytsc, key->wk_keylen);
+		"%s: %s keyix %u flags 0x%x mac %s  tsc %llu len %u\n", __func__, 
+		cip->ic_name, key->wk_keyix, key->wk_flags, 
+		ether_sprintf(macaddr), (unsigned long long)key->wk_keytsc, 
+		key->wk_keylen);
 
 	/*
 	 * Give cipher a chance to validate key contents.
