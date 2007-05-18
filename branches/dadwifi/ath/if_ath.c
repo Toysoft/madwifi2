@@ -3606,8 +3606,6 @@ ath_beacon_generate(struct ath_softc *sc, struct ath_bss *bss)
 static void
 ath_beacon_send(struct ath_softc *sc, int *needmark)
 {
-#define	TSF_TO_TU(_h,_l) \
-	((((u_int32_t)(_h)) << 22) | (((u_int32_t)(_l)) >> 10))
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf;
 	int slot;
@@ -3732,7 +3730,6 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 
 		sc->sc_stats.ast_be_xmit++;		/* XXX per-VAP? */
 	}
-#undef TSF_TO_TU
 }
 
 /*
@@ -3880,8 +3877,7 @@ ath_beacon_config(struct ath_softc *sc)
 #endif
 {
 #if 0
-#define	TSF_TO_TU(_h,_l) \
-	((((u_int32_t)(_h)) << 22) | (((u_int32_t)(_l)) >> 10))
+#define	TSF_TO_TU(_h) (((u_int64_t)(_l)) >> 10)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_node *ni;
@@ -3893,8 +3889,7 @@ ath_beacon_config(struct ath_softc *sc)
 	ni = vap->iv_bss;
 
 	/* extract tstamp from last beacon and convert to TU */
-	nexttbtt = TSF_TO_TU(LE_READ_4(ni->ni_tstamp.data + 4),
-			     LE_READ_4(ni->ni_tstamp.data));
+	nexttbtt = TSF_TO_TU(LE_READ_8(ni->ni_tstamp.tsf));
 	/* XXX conditionalize multi-bss support? */
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/*
@@ -3943,7 +3938,7 @@ ath_beacon_config(struct ath_softc *sc)
 		 * TSF and calculate dtim+cfp state for the result.
 		 */
 		tsf = ath_hal_gettsf64(ah);
-		tsftu = TSF_TO_TU(tsf>>32, tsf) + FUDGE;
+		tsftu = TSF_TO_TU(tsf) + FUDGE;
 		do {
 			nexttbtt += intval;
 			if (--dtimcount < 0) {
@@ -4792,11 +4787,12 @@ static __inline u_int64_t
 ath_extend_tsf(struct ath_hal *ah, u_int32_t rstamp)
 {
 	u_int64_t tsf;
-
+#define RXTSFMASK	0x7fff
 	tsf = ath_hal_gettsf64(ah);
-	if ((tsf & 0x7fff) < rstamp)
-		tsf -= 0x8000;
-	return ((tsf &~ 0x7fff) | rstamp);
+	if ((tsf & RXTSFMASK) < rstamp)
+		tsf -= (RXTSFMASK + 1);
+	return ((tsf & ~RXTSFMASK) | rstamp);
+#undef RXTSFMASK
 }
 
 #if 0
@@ -4825,9 +4821,11 @@ ath_rx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	wh = (struct ieee80211_frame *) skb->data;
 	if (IEEE80211_QOS_HAS_SEQ(wh)) {
 		struct sk_buff *skb1 = skb_copy(skb, GFP_ATOMIC);
-		/* Remove hw pad bytes */
-		int headersize = ieee80211_hdrsize(wh);
-		int padbytes = roundup(headersize, 4) - headersize;
+		
+		/* Remove HW padding bytes */
+		/* Calculate inverse modulo 4; optimise modulo arithmetic for
+		 * case where modulus is of the form 2^n */
+		int padbytes = (-ieee80211_hdrsize(wh)) & 0x3;
 		if (padbytes > 0) {
 			memmove(skb1->data + padbytes, skb1->data, headersize);
 			skb_pull(skb1, padbytes);
@@ -4851,16 +4849,18 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	u_int64_t tsf;
 	u_int32_t tstamp;
 	
-	/* Pass up tsf clock in mactime
-	 * TX descriptor contains the transmit time in TU's,
-	 * (bits 25-10 of the TSF).
+	/* Pass up TSF clock in MAC time
+	 * TX descriptor contains the transmit time in TUs,
+	 * (bits 25-10 of the TSF). 1 TU = 1024 microsecs.
 	 */
 	tsf = ath_hal_gettsf64(sc->sc_ah);
-	tstamp = ds->ds_txstat.ts_tstamp << 10;
-	
-	if ((tsf & 0x3ffffff) < tstamp)
-		tsf -= 0x4000000;
-	tsf = ((tsf &~ 0x3ffffff) | tstamp);
+	tstamp = (ds->ds_txstat.ts_tstamp << 10);
+
+#define TUMASK	0x3ffffff
+	if ((tsf & TUMASK) < tstamp)
+		tsf -= (TUMASK + 1);
+	tsf = ((tsf & ~TUMASK) | tstamp);
+#undef TUMASK
 
 	/*                                                                      
 	 * release the owner of this skb since we're basically                  
@@ -4882,8 +4882,10 @@ ath_tx_capture(struct net_device *dev, struct ath_desc *ds, struct sk_buff *skb)
 	if (IEEE80211_QOS_HAS_SEQ(wh)) {
 		/* Unlike in rx_capture, we're freeing the skb at the end
 		 * anyway, so we don't need to worry about using a copy */
-		int headersize = ieee80211_hdrsize(wh);
-		int padbytes = roundup(headersize, 4) - headersize;
+		
+		/* Calculate inverse modulo 4; optimise modulo arithmetic for
+		 * case where modulus is of the form 2^n */
+		int padbytes = (-ieee80211_hdrsize(wh)) & 0x3;
 		if (padbytes > 0) {
 			memmove(skb->data + padbytes, skb->data, headersize);
 			skb_pull(skb, padbytes);
@@ -5167,7 +5169,7 @@ rx_accept:
 		/* The device will pad 802.11 header to a multiple of 4 bytes.
 		   Remove the padding before passing the skb to the stack. */
 		header_len = ieee80211_get_hdrlen_from_skb(skb);
-		header_pad = (4 - (header_len & 0x3)) & 0x3;
+		header_pad = (-header_len) & 0x3;
 
 		if (unlikely(header_pad)) {
 			memmove(skb->data + header_pad, skb->data, header_len);
@@ -6130,21 +6132,22 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %x\n",
 		__func__, skb, skb->data, skb->len, bf->bf_skbaddr);
 #else /* ATH_SUPERG_FF case */
+	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
+			skb->data, skb->len, BUS_DMA_TODEVICE);
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb%d %p [data %p len %u] skbaddr %llx\n",
+			__func__, i, skb, skb->data, skb->len, ito64(bf->bf_skbaddr));
 	/* NB: ensure skb->len had been updated for each skb so we don't need pktlen */
 	{
 		struct sk_buff *skbtmp = skb;
-		int i = 0;
+		unsigned int i = 0;
 
-		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
-			skb->data, skb->len, BUS_DMA_TODEVICE);
- 		DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb%d %p [data %p len %u] skbaddr %llx\n",
-			__func__, i, skb, skb->data, skb->len, ito64(bf->bf_skbaddr));
 		while ((skbtmp = skbtmp->next)) {
-			bf->bf_skbaddrff[i++] = bus_map_single(sc->sc_bdev,
+			bf->bf_skbaddrff[i] = bus_map_single(sc->sc_bdev,
 				skbtmp->data, skbtmp->len, BUS_DMA_TODEVICE);
 			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb%d %p [data %p len %u] skbaddr %llx\n",
 				__func__, i, skbtmp, skbtmp->data, skbtmp->len,
-				ito64(bf->bf_skbaddrff[i-1]));
+				ito64(bf->bf_skbaddrff[i]));
+			i++;
 		}
 		bf->bf_numdesc = i + 1;
 	}
@@ -6709,7 +6712,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		/* Remove possible alignment padding after 802.11 hdr to make
 		 * frames look correct for upper level code. */
 		header_len = ieee80211_get_hdrlen_from_skb(skb);
-		header_pad = (4 - (header_len & 3)) & 3;
+		header_pad = (-header_len) & 3;
 		if (unlikely(header_pad)) { 
 			memmove(skb->data + header_pad, skb->data, header_len);
 			skb_pull(skb, header_pad);
@@ -6756,29 +6759,23 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			}
 		}
 #endif
+		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
 #ifdef ATH_SUPERG_FF
 		{
-			struct sk_buff *skbfree, *skb = bf->bf_skb;
-			int i;
+			struct sk_buff *tskb, *skb = bf->bf_skb->next;
+			unsigned int i;
 
-			skbfree = skb;
-			skb = skb->next;
-			DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
-				__func__, skbfree);
-			ath_tx_capture(sc->sc_dev, ds, skbfree);
 			for (i = 1; i < bf->bf_numdesc; i++) {
-				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i-1],
-					bf->bf_skb->len, BUS_DMA_TODEVICE);
-				skbfree = skb;
-				skb = skb->next;
+				tskb = skb->next;
+				bus_unmap_single(sc->sc_bdev, bf->bf_skbaddrff[i],
+					skb->len, BUS_DMA_TODEVICE);
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
-					__func__, skbfree);
-				ath_tx_capture(sc->sc_dev, ds, skbfree);
+					__func__, skb);
+				ath_tx_capture(sc->sc_dev, ds, skb);
+				skb = tskb;
 			}
 		}
 		bf->bf_numdesc = 0;
-#else
-		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
 #endif
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
