@@ -3877,7 +3877,7 @@ ath_beacon_config(struct ath_softc *sc)
 #endif
 {
 #if 0
-#define	TSF_TO_TU(_h) (((u_int64_t)(_l)) >> 10)
+#define	TSF_TO_TU(_h) (((u_int64_t)(_h)) >> 10)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_node *ni;
