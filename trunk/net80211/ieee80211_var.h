@@ -67,12 +67,6 @@
 #define IEEE80211_BINTVAL_SANITISE(_bi) \
 	(IEEE80211_BINTVAL_VALID(_bi) ? \
 	 (_bi) : IEEE80211_BINTVAL_DEFAULT)
-#define IEEE80211_BINTVAL_VALID(_bi) \
-	((IEEE80211_BINTVAL_MIN <= (_bi)) && \
-	 ((_bi) <= IEEE80211_BINTVAL_MAX))
-#define IEEE80211_BINTVAL_SANITISE(_bi) \
-	(IEEE80211_BINTVAL_VALID(_bi) ? \
-	 (_bi) : IEEE80211_BINTVAL_DEFAULT)
 
 #define	IEEE80211_BGSCAN_INTVAL_MIN	15	/* min bg scan intvl (secs) */
 #define	IEEE80211_BGSCAN_INTVAL_DEFAULT	(5*60)	/* default bg scan intvl */
