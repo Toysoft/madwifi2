@@ -95,7 +95,6 @@ struct ieee80211_node {
 	struct ieee80211_node_table *ni_table;
 	TAILQ_ENTRY(ieee80211_node) ni_list;
 	LIST_ENTRY(ieee80211_node) ni_hash;
-	// ieee80211_node_lock_t ni_nodelock;	/* on node - notably for ref counting */
 	ieee80211_node_ref_count_t ni_refcnt;
 	u_int ni_scangen;			/* gen# for timeout scan */
 	u_int8_t ni_authmode;			/* authentication algorithm */
@@ -273,6 +272,12 @@ struct ieee80211_node *ieee80211_find_txnode(struct ieee80211vap *,
 #endif
 
 void _ieee80211_free_node(struct ieee80211_node *);
+
+/* Reference counting only needs to be locked out against the transitions,
+ * 0->1 and 1->0 (i.e., when we do not own the reference we are getting).
+ * This only happens when finding the a node reference from the node table,
+ * which is locked seperately. Thus, we do not need to lock the follwoing 
+ * functions. */
 
 static __inline struct ieee80211_node *
 ieee80211_ref_node(struct ieee80211_node *ni)

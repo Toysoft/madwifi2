@@ -916,6 +916,7 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 	unsigned int this_tp, this_prob, this_eprob;
 		struct ath_softc *sc = vap->iv_ic->ic_dev->priv;;
 
+        IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
         TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
                 /* Assume each node needs 1500 bytes */
                 if ((buf + space) < (p + 1500)) {
@@ -964,6 +965,7 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 
 		p += sprintf(p, "Total packet count::    ideal %d      lookaround %d\n\n", odst->packet_count, odst->sample_count);
         }
+        IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
 
         return (p - buf);
 }
