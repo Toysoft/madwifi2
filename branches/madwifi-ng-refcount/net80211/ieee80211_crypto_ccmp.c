@@ -654,7 +654,7 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct sk_buff *skb0, int 
 		IEEE80211_NOTE_MAC(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
 			wh->i_addr2,
 			"AES-CCM decrypt failed; MIC mismatch (keyix %u, rsc %llu)",
-			key->wk_keyix, pn);
+			key->wk_keyix, (unsigned long long)pn);
 		ctx->cc_vap->iv_stats.is_rx_ccmpmic++;
 		return 0;
 	}

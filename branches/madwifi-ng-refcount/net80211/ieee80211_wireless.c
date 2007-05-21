@@ -1273,12 +1273,16 @@ ieee80211_ioctl_siwpower(struct net_device *dev, struct iw_request_info *info,
 		case IW_POWER_UNICAST_R:
 		case IW_POWER_ALL_R:
 		case IW_POWER_ON:
-			ic->ic_flags |= IEEE80211_F_PMGTON;
-			
+			if (wrq->flags & IW_POWER_PERIOD) {
+				if (IEEE80211_BINTVAL_VALID(wrq->value))
+					ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
+				else
+					return -EINVAL;
+			}
 			if (wrq->flags & IW_POWER_TIMEOUT)
 				ic->ic_holdover = IEEE80211_MS_TO_TU(wrq->value);
-			if (wrq->flags & IW_POWER_PERIOD)
-				ic->ic_lintval = IEEE80211_MS_TO_TU(wrq->value);
+			
+			ic->ic_flags |= IEEE80211_F_PMGTON;
 			break;
 		default:
 			return -EINVAL;
@@ -2365,8 +2369,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		if (vap->iv_opmode != IEEE80211_M_HOSTAP &&
 		    vap->iv_opmode != IEEE80211_M_IBSS)
 			return -EINVAL;
-		if (IEEE80211_BINTVAL_MIN <= value &&
-		    value <= IEEE80211_BINTVAL_MAX) {
+		if (IEEE80211_BINTVAL_VALID(value)) {
 			ic->ic_lintval = value;		/* XXX multi-bss */
 			retv = ENETRESET;		/* requires restart */
 		} else

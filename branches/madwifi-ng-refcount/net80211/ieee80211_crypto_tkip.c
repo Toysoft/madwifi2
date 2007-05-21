@@ -1038,7 +1038,8 @@ tkip_decrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 		}
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 			"[%s] TKIP ICV mismatch on decrypt (keyix %d, rsc %llu)\n",
-			ether_sprintf(wh->i_addr2), key->wk_keyix, ctx->rx_rsc);
+			ether_sprintf(wh->i_addr2), key->wk_keyix, 
+			(unsigned long long)ctx->rx_rsc);
 		vap->iv_stats.is_rx_tkipicv++;
 		return 0;
 	}

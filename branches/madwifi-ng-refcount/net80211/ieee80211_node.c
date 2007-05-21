@@ -659,7 +659,7 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	memcpy(ni->ni_essid, se->se_ssid + 2, ni->ni_esslen);
 	ni->ni_rstamp = se->se_rstamp;
 	ni->ni_tstamp.tsf = se->se_tstamp.tsf;
-	ni->ni_intval = se->se_intval;
+	ni->ni_intval = IEEE80211_BINTVAL_SANITISE(se->se_intval);
 	ni->ni_capinfo = se->se_capinfo;
 	ni->ni_chan = se->se_chan;
 	ni->ni_timoff = se->se_timoff;
@@ -1192,7 +1192,7 @@ ieee80211_add_neighbor(struct ieee80211vap *vap, const struct ieee80211_frame *w
 		memcpy(ni->ni_essid, sp->ssid + 2, sp->ssid[1]);
 		IEEE80211_ADDR_COPY(ni->ni_bssid, wh->i_addr3);
 		memcpy(ni->ni_tstamp.data, sp->tstamp, sizeof(ni->ni_tstamp));
-		ni->ni_intval = sp->bintval;
+		ni->ni_intval = IEEE80211_BINTVAL_SANITISE(sp->bintval);
 		ni->ni_capinfo = sp->capinfo;
 		ni->ni_chan = ic->ic_curchan;
 		ni->ni_fhdwell = sp->fhdwell;
