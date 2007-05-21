@@ -158,10 +158,10 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 	  (_reg)); mb(); __v; }))
 #else /* AH_LITTLE_ENDIAN */
 #define _OS_REG_WRITE(_ah, _reg, _val) do {			\
-	writel(_val, (void __force __iomem *)((_ah)->ah_sh + (_reg)));	\
+	writel(_val, (_ah)->ah_sh + (_reg));			\
 } while (0)
 #define _OS_REG_READ(_ah, _reg)					\
-	readl((void __force __iomem *)((_ah)->ah_sh + (_reg)))
+	readl((_ah)->ah_sh + (_reg))
 #endif /* AH_BYTE_ORDER */
 
 #if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC) || defined(AH_DEBUG_ALQ)
