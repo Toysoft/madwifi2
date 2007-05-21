@@ -63,6 +63,12 @@ typedef void *IEEE80211_TQUEUE_ARG;
 
 #define	IEEE80211_RESCHEDULE	schedule
 
+/* Locking */
+/* NB: beware, spin_is_locked() is not usefully defined for !(DEBUG || SMP)
+ * because spinlocks do not exist in this configuration. Instead IRQs 
+ * or pre-emption are simply disabled, as this is all that is needed.
+ */
+
 /*
  * Beacon handler locking definitions.
  * Beacon locking 
@@ -85,13 +91,13 @@ typedef spinlock_t ieee80211com_lock_t;
 #define IEEE80211_LOCK(_ic)	spin_lock(&(_ic)->ic_comlock)
 #define IEEE80211_UNLOCK(_ic)	spin_unlock(&(_ic)->ic_comlock)
 
-/* NB: beware, spin_is_locked() is unusable for !SMP */
-#if defined(CONFIG_SMP)
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	IEEE80211_LOCK_ASSERT(_ic) \
 	KASSERT(spin_is_locked(&(_ic)->ic_comlock),("ieee80211com not locked!"))
 #else
 #define	IEEE80211_LOCK_ASSERT(_ic)
 #endif
+
 
 #define IEEE80211_VAPS_LOCK_INIT(_ic, _name)		\
 	spin_lock_init(&(_ic)->ic_vapslock)
@@ -108,11 +114,10 @@ typedef spinlock_t ieee80211com_lock_t;
 } while (0)
 #define IEEE80211_VAPS_UNLOCK_IRQ_EARLY(_ic)	spin_unlock_irqrestore(&(_ic)->ic_vapslock, _vaps_lockflags)
 
-
-/* NB: beware, spin_is_locked() is unusable for !SMP */
-#if defined(CONFIG_SMP)
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define IEEE80211_VAPS_LOCK_ASSERT(_ic) \
-	KASSERT(spin_is_locked(&(_ic)->ic_vapslock),("ieee80211com_vaps not locked!"))
+	KASSERT(spin_is_locked(&(_ic)->ic_vapslock), \
+		("ieee80211com_vaps not locked!"))
 #else
 #define IEEE80211_VAPS_LOCK_ASSERT(_ic)
 #endif
@@ -121,29 +126,63 @@ typedef spinlock_t ieee80211com_lock_t;
 /*
  * Node locking definitions.
  */
+#if 0
+
 typedef spinlock_t ieee80211_node_lock_t;
-#define	IEEE80211_NODE_LOCK_INIT(_nt, _name)	spin_lock_init(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_LOCK_DESTROY(_nt)
-#define	IEEE80211_NODE_LOCK(_nt)	spin_lock(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_UNLOCK(_nt)	spin_unlock(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_LOCK_BH(_nt)	spin_lock_bh(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_UNLOCK_BH(_nt)	spin_unlock_bh(&(_nt)->nt_nodelock)
-#define	IEEE80211_NODE_LOCK_IRQ(_nt)	do {	\
+#define	IEEE80211_NODE_LOCK_INIT(_ni, _name)	spin_lock_init(&(_ni)->ni_nodelock)
+#define	IEEE80211_NODE_LOCK_DESTROY(_ni)
+#if 0	/* We should always be contesting in the same contexts */
+#define	IEEE80211_NODE_LOCK(_ni)	spin_lock(&(_ni)->ni_nodelock)
+#define	IEEE80211_NODE_UNLOCK(_ni)	spin_unlock(&(_ni)->ni_nodelock)
+#define	IEEE80211_NODE_LOCK_BH(_ni)	spin_lock_bh(&(_ni)->ni_nodelock)
+#define	IEEE80211_NODE_UNLOCK_BH(_ni)	spin_unlock_bh(&(_ni)->ni_nodelock)
+#endif
+#define	IEEE80211_NODE_LOCK_IRQ(_ni)	do {	\
+	unsigned long __node_lockflags;		\
+	spin_lock_irqsave(&(_ni)->ni_nodelock, __node_lockflags);
+#define	IEEE80211_NODE_UNLOCK_IRQ(_ni)		\
+	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags); \
+} while(0)
+#define	IEEE80211_NODE_UNLOCK_IRQ_EARLY(_ni)		\
+	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags);
+
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
+#define	IEEE80211_NODE_LOCK_ASSERT(_nt) \
+	KASSERT(spin_is_locked(&(_ni)->ni_nodelock), \
+		("802.11 node not locked!"))
+#else
+#define	IEEE80211_NODE_LOCK_ASSERT(_ni)
+#endif
+
+#endif /* node lock */
+
+/*
+ * Node table locking definitions.
+ */
+typedef spinlock_t ieee80211_node_table_lock_t;
+#define	IEEE80211_NODE_TABLE_LOCK_INIT(_nt, _name)	spin_lock_init(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_TABLE_LOCK_DESTROY(_nt)
+#if 0	/* We should always be contesting in the same contexts */
+#define	IEEE80211_NODE_TABLE_LOCK(_nt)	spin_lock(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_TABLE_UNLOCK(_nt)	spin_unlock(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_TABLE_LOCK_BH(_nt)	spin_lock_bh(&(_nt)->nt_nodelock)
+#define	IEEE80211_NODE_TABLE_UNLOCK_BH(_nt)	spin_unlock_bh(&(_nt)->nt_nodelock)
+#endif
+#define	IEEE80211_NODE_TABLE_LOCK_IRQ(_nt)	do {	\
 	unsigned long __node_lockflags;		\
 	spin_lock_irqsave(&(_nt)->nt_nodelock, __node_lockflags);
-#define	IEEE80211_NODE_UNLOCK_IRQ(_nt)		\
+#define	IEEE80211_NODE_TABLE_UNLOCK_IRQ(_nt)		\
 	spin_unlock_irqrestore(&(_nt)->nt_nodelock, __node_lockflags); \
 } while(0)
-#define	IEEE80211_NODE_UNLOCK_IRQ_EARLY(_nt)		\
+#define	IEEE80211_NODE_TABLE_UNLOCK_IRQ_EARLY(_nt)		\
 	spin_unlock_irqrestore(&(_nt)->nt_nodelock, __node_lockflags);
 
-/* NB: beware, *_is_locked() are bogusly defined for UP+!PREEMPT */
-#if (defined(CONFIG_SMP) || defined(CONFIG_PREEMPT)) && defined(spinlock_is_locked)
-#define	IEEE80211_NODE_LOCK_ASSERT(_nt) \
-	KASSERT(spinlock_is_locked(&(_nt)->nt_nodelock), \
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
+#define	IEEE80211_NODE_TABLE_LOCK_ASSERT(_nt) \
+	KASSERT(spin_is_locked(&(_nt)->nt_nodelock), \
 		("802.11 node table not locked!"))
 #else
-#define	IEEE80211_NODE_LOCK_ASSERT(_nt)
+#define	IEEE80211_NODE_TABLE_LOCK_ASSERT(_nt)
 #endif
 
 /*
@@ -163,8 +202,7 @@ typedef spinlock_t ieee80211_scan_lock_t;
 #define	IEEE80211_SCAN_UNLOCK_IRQ_EARLY(_nt)		\
 	spin_unlock_irqrestore(&(_nt)->nt_scanlock, __scan_lockflags);
 
-/* NB: beware, spin_is_locked() is unusable for !SMP */
-#if defined(CONFIG_SMP)
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	IEEE80211_SCAN_LOCK_ASSERT(_nt) \
 	KASSERT(spin_is_locked(&(_nt)->nt_scanlock), ("scangen not locked!"))
 #else
@@ -182,8 +220,7 @@ typedef spinlock_t acl_lock_t;
 #define	ACL_LOCK_BH(_as)		spin_lock_bh(&(_as)->as_lock)
 #define	ACL_UNLOCK_BH(_as)		spin_unlock_bh(&(_as)->as_lock)
 
-/* NB: beware, spin_is_locked() is unusable for !SMP */
-#if defined(CONFIG_SMP)
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	ACL_LOCK_ASSERT(_as) \
 	KASSERT(spin_is_locked(&(_as)->as_lock), ("ACL not locked!"))
 #else
@@ -299,6 +336,7 @@ int ieee80211_load_module(const char *);
  *				is the last reference, otherwise 0
  * ieee80211_node_refcnt	reference count for printing (only)
  */
+typedef atomic_t ieee80211_node_ref_count_t; 
 #define ieee80211_node_initref(_ni)	atomic_set(&(_ni)->ni_refcnt, 1)
 #define ieee80211_node_incref(_ni)	atomic_inc(&(_ni)->ni_refcnt)
 #define	ieee80211_node_decref(_ni)	atomic_dec(&(_ni)->ni_refcnt)
@@ -379,8 +417,8 @@ get_jiffies_64(void)
 /* msecs_to_jiffies appeared in 2.6.7 and 2.4.29 */
 #include <linux/delay.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) && \
-      LINUX_VERSION_CODE < KERNEL_VERSION(2,6,7)) || \
-     LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29)
+     LINUX_VERSION_CODE < KERNEL_VERSION(2,6,7)) || \
+    LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29)
 
 /* The following definitions and inline functions are
  * copied from the kernel src, include/linux/jiffies.h */
