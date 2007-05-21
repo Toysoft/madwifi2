@@ -489,7 +489,7 @@ ieee80211_input(struct ieee80211_node *ni,
 					nt = &ic->ic_sta;
 					ni_wds = ieee80211_find_wds_node(nt, wh->i_addr3);
 					if (ni_wds) {
-						ieee80211_free_node(ni_wds); /* Decr ref count */
+						ieee80211_unref_node(&ni_wds); /* Decr ref count */
 						IEEE80211_DISCARD(vap, IEEE80211_MSG_INPUT,
 							wh, NULL, "%s",
 							"multicast echo originated from node behind me");
@@ -543,10 +543,12 @@ ieee80211_input(struct ieee80211_node *ni,
 			 * the node table for the packet source address (addr4).
 			 * If not, add one.
 			 */
+			/* XXX: Useless node mgmt API; make better */
 			if (dir == IEEE80211_FC1_DIR_DSTODS) {
 				struct ieee80211_node_table *nt;
 				struct ieee80211_frame_addr4 *wh4;
 				struct ieee80211_node *ni_wds;
+
 				if (!(vap->iv_flags_ext & IEEE80211_FEXT_WDS)) {
 					IEEE80211_DISCARD(vap, IEEE80211_MSG_INPUT,
 						wh, "data", "%s", "4 addr not allowed");
@@ -569,7 +571,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				if (ni_wds == NULL)
 					ieee80211_add_wds_addr(nt, ni, wh4->i_addr4, 0);
 				else
-					ieee80211_free_node(ni_wds); /* Decr ref count */
+					ieee80211_unref_node(&ni_wds); /* Decr. ref count */
 			}
 			
 			/*
@@ -936,7 +938,7 @@ ieee80211_input_all(struct ieee80211com *ic,
 		}
 		ni = ieee80211_ref_node(vap->iv_bss);
 		type = ieee80211_input(ni, skb1, rssi, rstamp);
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 	}
 	if (skb != NULL)		/* no vaps, reclaim skb */
 		dev_kfree_skb(skb);
@@ -986,21 +988,13 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	}
 
 	/*
-	 * Use this lock to make sure ni->ni_rxfrag is
-	 * not freed by the timer process while we use it.
-	 * XXX bogus
-	 */
-	IEEE80211_NODE_LOCK_IRQ(ni->ni_table);
-
-	/*
 	 * Update the time stamp.  As a side effect, it
 	 * also makes sure that the timer will not change
 	 * ni->ni_rxfrag for at least 1 second, or in
 	 * other words, for the remaining of this function.
+	 * XXX HUGE HORRIFIC HACK
 	 */
 	ni->ni_rxfragstamp = jiffies;
-
-	IEEE80211_NODE_UNLOCK_IRQ(ni->ni_table);
 
 	/*
 	 * Validate that fragment is in order and
@@ -1130,7 +1124,7 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 					skb = NULL;
 				}
 				/* XXX statistic? */
-				ieee80211_free_node(ni1);
+				ieee80211_unref_node(&ni1);
 			}
 		}
 		if (skb1 != NULL) {
@@ -1265,6 +1259,7 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 	int rssi, u_int32_t rstamp, u_int16_t seq, u_int16_t status)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
+	unsigned int tmpnode = 0;
 
 	if (ni->ni_authmode == IEEE80211_AUTH_SHARED) {
 		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_AUTH,
@@ -1272,22 +1267,21 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			"bad sta auth mode %u", ni->ni_authmode);
 		vap->iv_stats.is_rx_bad_auth++;	/* XXX maybe a unique error? */
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
-			/* XXX hack to workaround calling convention */
-
-			/* XXX To send the frame to the requesting STA, we have to
-			 * create a node for the station that we're going to reject.
-			 * The node will be freed automatically */
 			if (ni == vap->iv_bss) {
-				ni = ieee80211_dup_bss(vap, wh->i_addr2);
+				ni = ieee80211_dup_bss(vap, wh->i_addr2, 0);
 				if (ni == NULL)
 					return;
 
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
 				"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
 				ieee80211_node_refcnt(ni));
+				tmpnode = 1;
 			}
 			IEEE80211_SEND_MGMT(ni,	IEEE80211_FC0_SUBTYPE_AUTH,
 				(seq + 1) | (IEEE80211_STATUS_ALG << 16));
+			
+			if (tmpnode)
+				ieee80211_unref_node(&ni);
 			return;
 		}
 	}
@@ -1315,23 +1309,16 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		}
 		/* always accept open authentication requests */
 		if (ni == vap->iv_bss) {
-			ni = ieee80211_dup_bss(vap, wh->i_addr2); 
+			ni = ieee80211_dup_bss(vap, wh->i_addr2, 0); 
 			if (ni == NULL)
 				return;
 
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, 
 			"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr), 
 			ieee80211_node_refcnt(ni));
-
-		} else if ((ni->ni_flags & IEEE80211_NODE_AREF) == 0)
-			(void) ieee80211_ref_node(ni);
-		/*
-		 * Mark the node as referenced to reflect that it's
-		 * reference count has been bumped to ensure it remains
-		 * after the transaction completes.
-		 */
-		ni->ni_flags |= IEEE80211_NODE_AREF;
-
+			tmpnode = 1;
+		}
+		
 		IEEE80211_SEND_MGMT(ni, IEEE80211_FC0_SUBTYPE_AUTH, seq + 1);
 		IEEE80211_NOTE(vap, IEEE80211_MSG_DEBUG | IEEE80211_MSG_AUTH,
 			ni, "station authenticated (%s)", "open");
@@ -1341,6 +1328,8 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		 */
 		if (ni->ni_authmode != IEEE80211_AUTH_8021X)
 			ieee80211_node_authorize(ni);
+		if (tmpnode)
+			ieee80211_unref_node(&ni);
 		break;
 
 	case IEEE80211_M_STA:
@@ -1379,7 +1368,7 @@ ieee80211_send_error(struct ieee80211_node *ni,
 	int istmp;
 
 	if (ni == vap->iv_bss) {
-		ni = ieee80211_tmp_node(vap, mac);
+		ni = ieee80211_dup_bss(vap, mac, 1);
 		if (ni == NULL) {
 			/* XXX msg */
 			return;
@@ -1389,7 +1378,7 @@ ieee80211_send_error(struct ieee80211_node *ni,
 		istmp = 0;
 	IEEE80211_SEND_MGMT(ni, subtype, arg);
 	if (istmp)
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 }
 
 static int
@@ -1415,7 +1404,7 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	u_int8_t *challenge;
-	int allocbs, estatus;
+	int allocbs = 0, estatus = 0;
 
 	/*
 	 * NB: this can happen as we allow pre-shared key
@@ -1425,7 +1414,6 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 	 * ordering in which case this check would just be
 	 * for sanity/consistency.
 	 */
-	estatus = 0;			/* NB: silence compiler */
 	if ((vap->iv_flags & IEEE80211_F_PRIVACY) == 0) {
 		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_AUTH,
 			ni->ni_macaddr, "shared key auth",
@@ -1505,7 +1493,7 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		switch (seq) {
 		case IEEE80211_AUTH_SHARED_REQUEST:
 			if (ni == vap->iv_bss) {
-				ni = ieee80211_dup_bss(vap, wh->i_addr2);
+				ni = ieee80211_dup_bss(vap, wh->i_addr2, 0);
 				if (ni == NULL) {
 					/* NB: no way to return an error */
 					return;
@@ -1516,17 +1504,8 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 				ieee80211_node_refcnt(ni));
 
 				allocbs = 1;
-			} else {
-				if ((ni->ni_flags & IEEE80211_NODE_AREF) == 0)
-					(void) ieee80211_ref_node(ni);
-				allocbs = 0;
 			}
-			/*
-			 * Mark the node as referenced to reflect that it's
-			 * reference count has been bumped to ensure it remains
-			 * after the transaction completes.
-			 */
-			ni->ni_flags |= IEEE80211_NODE_AREF;
+
 			ni->ni_rssi = rssi;
 			ni->ni_rstamp = rstamp;
 			ni->ni_last_rx = jiffies;
@@ -1620,14 +1599,13 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 	}
 	return;
 bad:
-	/*
-	 * Send an error response; but only when operating as an AP.
-	 */
+	/* Send an error response; but only when operating as an AP. */
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
 		/* XXX hack to workaround calling convention */
 		ieee80211_send_error(ni, wh->i_addr2, 
 			IEEE80211_FC0_SUBTYPE_AUTH,
 			(seq + 1) | (estatus<<16));
+		ieee80211_node_leave(ni);
 	} else if (vap->iv_opmode == IEEE80211_M_STA) {
 		/*
 		 * Kick the state machine.  This short-circuits
@@ -2091,7 +2069,7 @@ ieee80211_parse_rsn(struct ieee80211vap *vap, u_int8_t *frm,
 	/* optional RSN capabilities */
 	if (len > 2)
 		rsn_parm->rsn_caps = LE_READ_2(frm);
-	/* XXXPMKID */
+	/* XXX PMKID */
 
 	return 0;
 }
@@ -2600,7 +2578,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	u_int8_t *frm, *efrm;
 	u_int8_t *ssid, *rates, *xrates, *wpa, *rsn, *wme, *ath;
 	u_int8_t rate;
-	int reassoc, resp, allocbs;
+	int reassoc, resp, allocbs = 0;
 	u_int8_t qosinfo;
 
 	wh = (struct ieee80211_frame *) skb->data;
@@ -3008,13 +2986,13 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				ni = ieee80211_fakeup_adhoc_node(vap,
 					wh->i_addr2);
 			} else {
-				ni = ieee80211_tmp_node(vap, wh->i_addr2);
+				ni = ieee80211_dup_bss(vap, wh->i_addr2, 1);
 			}
 			if (ni == NULL)
 				return;
 			allocbs = 1;
-		} else
-			allocbs = 0;
+		}
+
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_INPUT, wh->i_addr2,
 			"%s", "recv probe req");
 		ni->ni_rssi = rssi;
@@ -3037,7 +3015,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 * Temporary node created just to send a
 			 * response, reclaim immediately
 			 */
-			ieee80211_free_node(ni);
+			ieee80211_unref_node(&ni);
 		} else if (ath != NULL)
 			ieee80211_saveath(ni, ath);
 		break;
@@ -3067,6 +3045,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 					ni = vap->iv_xrvap->iv_bss;
 				else {
 					ieee80211_node_leave(ni);
+					/* This would be a stupid place to add a node to the table
+					 * XR stuff needs work anyway
+					 */
 					ieee80211_node_reset(ni, vap->iv_xrvap);
 				}
 				vap = vap->iv_xrvap;
@@ -3079,9 +3060,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 #endif
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_AUTH, wh->i_addr2,
 			"recv auth frame with algorithm %d seq %d", algo, seq);
-		/*
-		 * Consult the ACL policy module if setup.
-		 */
+		/* Consult the ACL policy module if setup. */
 		if (vap->iv_acl != NULL &&
 		    !vap->iv_acl->iac_check(vap, wh->i_addr2)) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_ACL,
@@ -3114,7 +3093,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				/* XXX not right */
 				ieee80211_send_error(ni, wh->i_addr2,
 					IEEE80211_FC0_SUBTYPE_AUTH,
-					(seq+1) | (IEEE80211_STATUS_ALG << 16));
+					(seq + 1) | (IEEE80211_STATUS_ALG << 16));
 			}
 			return;
 		} 

@@ -3001,7 +3001,7 @@ add_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
 static int
 remove_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap)
 {
-	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	struct ieee80211_app_ie *app_ie = &vap->app_ie[frame_type_index];
 	if (app_ie->ie != NULL) {
 		FREE(app_ie->ie, M_DEVBUF);
 		app_ie->ie = NULL;
@@ -3014,7 +3014,7 @@ static int
 get_app_ie(unsigned int frame_type_index, struct ieee80211vap *vap,
 	struct ieee80211req_getset_appiebuf *iebuf)
 {
-	struct ieee80211_app_ie_t *app_ie = &vap->app_ie[frame_type_index];
+	struct ieee80211_app_ie *app_ie = &vap->app_ie[frame_type_index];
 	if (iebuf->app_buflen < app_ie->length)
 		return -EINVAL;
 
@@ -3186,7 +3186,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 		error = -ENXIO;
 	ieee80211_key_update_end(vap);
 	if (ni != NULL)
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 #ifdef ATH_SUPERG_XR
 	/* set the same params on the xr vap device if exists */
 	if (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR))
@@ -3246,7 +3246,7 @@ ieee80211_ioctl_getkey(struct net_device *dev, struct iwreq *iwr)
 		memset(ik.ik_keydata, 0, sizeof(ik.ik_keydata));
 	}
 	if (ni != NULL)
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 	return (copy_to_user(iwr->u.data.pointer, &ik, sizeof(ik)) ? -EFAULT : 0);
 }
 
@@ -3271,7 +3271,7 @@ ieee80211_ioctl_delkey(struct net_device *dev, struct iw_request_info *info,
 			return -ENOENT; /* No such entity is a more appropriate error */
 		/* XXX error return */
 		ieee80211_crypto_delkey(vap, &ni->ni_ucastkey, ni);
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 	} else {
 		if (kix >= IEEE80211_WEP_NKID)
 			return -EINVAL;
@@ -3382,7 +3382,7 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 					return -EINVAL;
 				if (dev == ni->ni_vap->iv_dev)
 					domlme(mlme, ni);
-				ieee80211_free_node(ni);
+				ieee80211_unref_node(&ni);
 			} else
 				ieee80211_iterate_dev_nodes(dev, &ic->ic_sta, domlme, mlme);
 			break;
@@ -3401,7 +3401,7 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 			ieee80211_node_authorize(ni);
 		else
 			ieee80211_node_unauthorize(ni);
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 		break;
 	case IEEE80211_MLME_CLEAR_STATS:
 		if (vap->iv_opmode != IEEE80211_M_HOSTAP)
@@ -3412,7 +3412,7 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 		
 		/* clear statistics */
 		memset(&ni->ni_stats, 0, sizeof(struct ieee80211_nodestats));
-		ieee80211_free_node(ni);
+		ieee80211_unref_node(&ni);
 		break;
 	default:
 		return -EINVAL;
@@ -3785,7 +3785,7 @@ ieee80211_ioctl_getwpaie(struct net_device *dev, struct iwreq *iwr)
 			ielen = sizeof(wpaie.rsn_ie);
 		memcpy(wpaie.rsn_ie, ni->ni_rsn_ie, ielen);
 	}
-	ieee80211_free_node(ni);
+	ieee80211_unref_node(&ni);
 	return (copy_to_user(iwr->u.data.pointer, &wpaie, sizeof(wpaie)) ?
 		-EFAULT : 0);
 }
@@ -3813,7 +3813,7 @@ ieee80211_ioctl_getstastats(struct net_device *dev, struct iwreq *iwr)
 	/* NB: copy out only the statistics */
 	error = copy_to_user(iwr->u.data.pointer + off, &ni->ni_stats,
 		iwr->u.data.length - off);
-	ieee80211_free_node(ni);
+	ieee80211_unref_node(&ni);
 	return (error ? -EFAULT : 0);
 }
 

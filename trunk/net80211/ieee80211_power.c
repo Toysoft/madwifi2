@@ -109,13 +109,15 @@ ieee80211_power_vdetach(struct ieee80211vap *vap)
 int
 ieee80211_node_saveq_drain(struct ieee80211_node *ni)
 {
+	struct ieee80211_cb *cb = NULL;
 	struct sk_buff *skb;
 	int qlen;
 
 	IEEE80211_NODE_SAVEQ_LOCK(ni);
 	qlen = skb_queue_len(&ni->ni_savedq);
 	while ((skb = __skb_dequeue(&ni->ni_savedq)) != NULL) {
-		ieee80211_free_node(ni);
+		cb = (struct ieee80211_cb *) skb->cb;
+		ieee80211_unref_node(&cb->ni);
 		dev_kfree_skb_any(skb);
 	}
 	IEEE80211_NODE_SAVEQ_UNLOCK(ni);
@@ -310,7 +312,9 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		 * unicast packets when the STA is in PS mode (7.1.3.1.8);
 		 * which it isn't.
 		 */
-		// M_PWR_SAV_SET(skb);
+#if 0
+		 M_PWR_SAV_SET(skb);
+#endif
 
 #ifdef ATH_SUPERG_XR
 		/*
