@@ -43,6 +43,7 @@
 #define _DEV_ATH_ATHVAR_H
 
 #include "ah.h"
+#include "ah_desc.h"
 #include "ah_os.h"
 #include "if_athioctl.h"
 #include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
@@ -183,7 +184,6 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 #define	ATH_TIMEOUT	1000
 
 #define ATH_DFS_WAIT_POLL_PERIOD	2	/* 2 seconds */
-#define	ATH_DFS_TEST_RETURN_PERIOD	15	/* 15 seconds */
 
 #define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between calibrations */
 #define	ATH_SHORT_CALINTERVAL		1	/* 1 second between calibrations */
@@ -380,6 +380,7 @@ struct ath_buf {
 	TAILQ_ENTRY(ath_buf) bf_stagelist;		/* fast-frame staging list */
 #endif
 	struct ath_desc	*bf_desc;			/* virtual addr of desc */
+	struct ath_desc_status bf_dsstatus;		/* tx/rx descriptor status */
 	dma_addr_t bf_daddr;				/* physical addr of desc */
 	struct sk_buff *bf_skb;				/* skbuff for buf */
 	dma_addr_t bf_skbaddr;				/* physical addr of skb data - always used by one desc*/
@@ -568,9 +569,7 @@ struct ath_softc {
 			sc_hasclrkey:1,		/* CLR key supported */
 			sc_devstopped:1,	/* stopped due to of no tx bufs */
 			sc_stagbeacons:1,	/* use staggered beacons */
-			sc_rtasksched:1, 	/* radar task is scheduled */
 			sc_dfswait:1,    	/* waiting on channel for radar detect */
-			sc_dfstest:1,		/* Test timer in progress */
 		        sc_ackrate:1;           /* send acks at high bitrate */
 	/* rate tables */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
@@ -595,8 +594,6 @@ struct ath_softc {
 	u_int8_t sc_protrix;			/* protection rate index */
 	u_int8_t sc_mcastantenna;		/* Multicast antenna number */
 	u_int8_t sc_txantenna;			/* data tx antenna (fixed or auto) */
-	u_int8_t sc_dfstest_ieeechan;		/* IEEE channel number to return to after a dfs mute test */
-	u_int32_t sc_dfstesttime;		/* Time to stay off chan during dfs test */
 	u_int16_t sc_nvaps;			/* # of active virtual ap's */
 	u_int8_t sc_nstavaps;			/* # of active station vaps */
 	u_int8_t sc_nmonvaps;			/* # of monitor vaps */
@@ -617,7 +614,6 @@ struct ath_softc {
 	u_int16_t sc_ledoff;			/* off time for current blink */
 	struct timer_list sc_ledtimer;		/* led off timer */
 	struct timer_list sc_dfswaittimer;	/* dfs wait timer */
-	struct timer_list sc_dfstesttimer;	/* dfs mute test timer */
 
 	struct ATH_TQ_STRUCT sc_fataltq;	/* fatal error intr tasklet */
 
@@ -668,7 +664,6 @@ struct ath_softc {
 
 	struct timer_list sc_cal_ch;		/* calibration timer */
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
-	struct work_struct sc_radartask;	/* Schedule task for DFS handling */
 
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
@@ -974,8 +969,8 @@ void ath_sysctl_unregister(void);
 
 #define	ath_hal_setuprxdesc(_ah, _ds, _size, _intreq) \
 	((*(_ah)->ah_setupRxDesc)((_ah), (_ds), (_size), (_intreq)))
-#define	ath_hal_rxprocdesc(_ah, _ds, _dspa, _dsnext, _tsf) \
-	((*(_ah)->ah_procRxDesc)((_ah), (_ds), (_dspa), (_dsnext), (_tsf)))
+#define	ath_hal_rxprocdesc(_ah, _ds, _dspa, _dsnext, _tsf, _rs) \
+	((*(_ah)->ah_procRxDesc)((_ah), (_ds), (_dspa), (_dsnext), (_tsf), (_rs)))
 #define	ath_hal_updateCTSForBursting(_ah, _ds, _prevds, _prevdsWithCTS, _gatingds,    \
                                      _txOpLimit, _ctsDuration)			      \
 	((*(_ah)->ah_updateCTSForBursting)((_ah), (_ds), (_prevds), (_prevdsWithCTS), \
@@ -994,8 +989,8 @@ void ath_sysctl_unregister(void);
 		(_txr1), (_txtr1), (_txr2), (_txtr2), (_txr3), (_txtr3)))
 #define	ath_hal_filltxdesc(_ah, _ds, _l, _first, _last, _ds0) \
 	((*(_ah)->ah_fillTxDesc)((_ah), (_ds), (_l), (_first), (_last), (_ds0)))
-#define	ath_hal_txprocdesc(_ah, _ds) \
-	((*(_ah)->ah_procTxDesc)((_ah), (_ds)))
+#define	ath_hal_txprocdesc(_ah, _ds, _ts) \
+	((*(_ah)->ah_procTxDesc)((_ah), (_ds), (_ts)))
 #define ath_hal_gettxintrtxqs(_ah, _txqs) \
 	((*(_ah)->ah_getTxIntrQueue)((_ah), (_txqs)))
 #define	ath_hal_txreqintrdesc(_ah, _ds) \
@@ -1005,20 +1000,8 @@ void ath_sysctl_unregister(void);
         ((*(_ah)->ah_gpioCfgOutput)((_ah), (_gpio)))
 #define ath_hal_gpioset(_ah, _gpio, _b) \
         ((*(_ah)->ah_gpioSet)((_ah), (_gpio), (_b)))
-#define	ath_hal_ar_enable(_ah) \
-	((*(_ah)->ah_arEnable)((_ah)))
-#define	ath_hal_ar_disable(_ah) \
-	((*(_ah)->ah_arDisable)((_ah)))
-#define	ath_hal_ar_reset(_ah) \
-	((*(_ah)->ah_arReset)((_ah)))
 #define	ath_hal_setcoverageclass(_ah, _coverageclass, _now) \
 	((*(_ah)->ah_setCoverageClass)((_ah), (_coverageclass), (_now)))
-#define ath_hal_radar_event(_ah) \
-	((*(_ah)->ah_radarHaveEvent)((_ah)))
-#define ath_hal_procdfs(_ah, _chan) \
-	((*(_ah)->ah_processDfs)((_ah), (_chan)))
-#define ath_hal_checknol(_ah, _chan, _nchans) \
-	((*(_ah)->ah_dfsNolCheck)((_ah), (_chan), (_nchans)))
 #define ath_hal_radar_wait(_ah, _chan) \
 	((*(_ah)->ah_radarWait)((_ah), (_chan)))
 #define ath_hal_get_channel_noise(_ah, _chan) \

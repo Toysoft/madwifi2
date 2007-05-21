@@ -432,11 +432,12 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 
 static void
 ath_rate_tx_complete(struct ath_softc *sc,
-	struct ath_node *an, const struct ath_desc *ds)
+	struct ath_node *an, const struct ath_buf *bf)
 {
 	struct minstrel_node *sn = ATH_NODE_MINSTREL(an);
 	struct ieee80211com *ic = &sc->sc_ic;
-	const struct ar5212_desc *ads = (const struct ar5212_desc *)&ds->ds_ctl0;
+	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
+	const struct ath_desc *ds = &bf->bf_desc[0];
 	int final_rate = 0;
 	int tries = 0;
 	int ndx = -1;
@@ -450,7 +451,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	/* This is the index in the retry chain we finish at.
 	 * With no retransmits, it is always 0.
 	 * int finalTSIdx = ads->final_ts_index; */
-	final_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate & ~HAL_TXSTAT_ALTRATE].ieeerate;
+	final_rate = sc->sc_hwmap[ts->ts_rate & ~HAL_TXSTAT_ALTRATE].ieeerate;
 	final_ndx = rate_to_ndx(sn, final_rate);
 	if (final_ndx >= sn->num_rates) {
 		DPRINTF(sc,"%s: final ndx too high\n", __func__);
@@ -464,7 +465,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	/* 'tries' is the total number of times we have endeavoured to
 	 * send this packet, and is a sum of the #attempts at each
 	 * level in the multi-rate retry chain */
-	tries = ds->ds_txstat.ts_shortretry + ds->ds_txstat.ts_longretry + 1;
+	tries = ts->ts_shortretry + ts->ts_longretry + 1;
 
 	if (sn->num_rates <= 0) {
 		DPRINTF(sc, "%s: %s %s no rates yet\n", dev_info, 
@@ -472,7 +473,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		return;
 	}
 
-	if (!ds->ds_txstat.ts_status)  /* Success when sending a packet*/
+	if (!ts->ts_status)  /* Success when sending a packet*/
 		sn->rs_ratesuccess[final_ndx]++;
 
 	mrr = sc->sc_mrretry && !(ic->ic_flags & IEEE80211_F_USEPROT) && ENABLE_MRR;
@@ -487,20 +488,20 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	/* Now, query the hal/hardware to find out the contents of the multirate retry chain.
 	 * If we have it set to 6,3,2,2, this call will always return 6,3,2,2. For some packets, we can
 	 * get a mrr of 0, -1, -1, -1, which indicates there is no chain installed for that packet */
-	rate0 = sc->sc_hwmap[ads->xmit_rate0].ieeerate;
-	tries0 = ads->xmit_tries0;
+	rate0 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate0)].ieeerate;
+	tries0 = MS(ds->ds_ctl2, AR_XmitDataTries0);
 	ndx0 = rate_to_ndx(sn, rate0);
 	
-	rate1 = sc->sc_hwmap[ads->xmit_rate1].ieeerate;
-	tries1 = ads->xmit_tries1;
+	rate1 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate1)].ieeerate;
+	tries1 = MS(ds->ds_ctl2, AR_XmitDataTries1);
 	ndx1 = rate_to_ndx(sn, rate1);
 	
-	rate2 = sc->sc_hwmap[ads->xmit_rate2].ieeerate;
-	tries2 = ads->xmit_tries2;
+	rate2 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate2)].ieeerate;
+	tries2 = MS(ds->ds_ctl2, AR_XmitDataTries2);
 	ndx2 = rate_to_ndx(sn, rate2);
 	
-	rate3 = sc->sc_hwmap[ads->xmit_rate3].ieeerate;
-	tries3 = ads->xmit_tries3;
+	rate3 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate3)].ieeerate;
+	tries3 = MS(ds->ds_ctl2, AR_XmitDataTries3);
 	ndx3 = rate_to_ndx(sn, rate3);
 
 	sn->rs_rateattempts[ndx0] += MIN(tries, tries0);

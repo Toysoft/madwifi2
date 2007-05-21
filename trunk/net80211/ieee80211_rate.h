@@ -78,6 +78,7 @@ enum {
 struct ath_softc;
 struct ath_node;
 struct ath_desc;
+struct ath_buf;
 struct ieee80211vap;
 
 struct ieee80211_rate_ops {
@@ -132,7 +133,7 @@ struct ieee80211_rate_ops {
 	 * for packets that were successfully sent and for those that
 	 * failed (consult the descriptor for details). */
 	void (*tx_complete)(struct ath_softc *sc, struct ath_node *an,
-			    const struct ath_desc *ds);
+			    const struct ath_buf *bf);
 };
 
 struct ath_ratectrl {

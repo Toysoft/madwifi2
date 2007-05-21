@@ -294,15 +294,26 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
  */
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	struct ath_desc *ds, int tx, u_int64_t mactime, struct ath_softc *sc) 
+	const struct ath_buf *bf, int tx, u_int64_t mactime, struct ath_softc *sc) 
 {
 	struct ieee80211vap *vap, *next;
+	struct ath_desc *ds = bf->bf_desc;
 	int noise = 0;
+	int antenna = 0;
+	int ieeerate = 0;
 	u_int32_t rssi = 0;
 	u_int8_t pkttype = 0;
 	
-	rssi = tx ? ds->ds_txstat.ts_rssi : ds->ds_rxstat.rs_rssi;
-	
+	if(tx) {
+		rssi = bf->bf_dsstatus.ds_txstat.ts_rssi;
+		antenna = bf->bf_dsstatus.ds_txstat.ts_antenna;
+		ieeerate = sc->sc_hwmap[bf->bf_dsstatus.ds_txstat.ts_rate].ieeerate;
+	} else {
+		rssi = bf->bf_dsstatus.ds_rxstat.rs_rssi;
+		antenna = bf->bf_dsstatus.ds_rxstat.rs_antenna;
+		ieeerate = sc->sc_hwmap[bf->bf_dsstatus.ds_rxstat.rs_rate].ieeerate;
+	}
+
 	/* We don't have access to the noise value in the descriptor, but it's saved
 	 * in the softc during the last receive interrupt. */
 	noise = sc->sc_channoise;
@@ -316,20 +327,20 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 		next = TAILQ_NEXT(vap, iv_next);
 		/* If we have rx'd an error frame... */
-		if (!tx && ds->ds_rxstat.rs_status != 0) {
+		if (!tx && bf->bf_dsstatus.ds_rxstat.rs_status != 0) {
 			
 			/* Discard PHY errors if necessary */
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_PHY) {
+			if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_PHY) {
 				if (vap->iv_monitor_phy_errors == 0) continue;
 			}
 			
 			/* Discard CRC errors if necessary */
-			if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC) {
+			if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC) {
 				if (vap->iv_monitor_crc_errors == 0) continue;
 			}
 			
 			/* Accept PHY, CRC and decrypt errors. Discard the rest. */
-			if (ds->ds_rxstat.rs_status &~
+			if (bf->bf_dsstatus.ds_rxstat.rs_status &~
 					(HAL_RXERR_DECRYPT | HAL_RXERR_MIC |
 					 HAL_RXERR_PHY | HAL_RXERR_CRC )) 
 				continue;
@@ -442,10 +453,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 			ph->rate.status = 0;
 			ph->rate.len = 4;
-			if (tx)
-				ph->rate.data = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
-			else
-				ph->rate.data = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+			ph->rate.data = ieeerate;
 			break;
 		}
 		case ARPHRD_IEEE80211_RADIOTAP: {
@@ -470,14 +478,14 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wt_tsft = cpu_to_le64(mactime);
 			
 				th->wt_flags = 0;
-				th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
+				th->wt_rate = ieeerate;
 				th->wt_txpower = 0;
-				th->wt_antenna = ds->ds_txstat.ts_antenna;
+				th->wt_antenna = antenna;
 
-				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
+				if (bf->bf_dsstatus.ds_txstat.ts_status & HAL_TXERR_XRETRY)
 					th->wt_txflags |= cpu_to_le16(IEEE80211_RADIOTAP_F_TX_FAIL);
 				
-				th->wt_dataretries = ds->ds_txstat.ts_shortretry + ds->ds_txstat.ts_longretry;
+				th->wt_dataretries = bf->bf_dsstatus.ds_txstat.ts_shortretry + bf->bf_dsstatus.ds_txstat.ts_longretry;
 				
 			} else {
 				struct ath_rx_radiotap_header *th;
@@ -497,12 +505,12 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
-				if (ds->ds_rxstat.rs_status & HAL_RXERR_CRC)
+				if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_BADFCS;
 				if (skb->len >= IEEE80211_CRC_LEN) 
 					th->wr_flags |= IEEE80211_RADIOTAP_F_FCS;
 
-				th->wr_rate = sc->sc_hwmap[ds->ds_rxstat.rs_rate].ieeerate;
+				th->wr_rate = ieeerate;
 				th->wr_chan_freq = cpu_to_le16(ic->ic_curchan->ic_freq);
 
 				/* Define the channel flags for radiotap */
@@ -534,7 +542,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				th->wr_dbm_antnoise = (int8_t) noise;
 				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
-				th->wr_antenna = ds->ds_rxstat.rs_antenna;
+				th->wr_antenna = antenna;
 				th->wr_antsignal = rssi;
 				
 				th->wr_tsft = cpu_to_le64(mactime);
