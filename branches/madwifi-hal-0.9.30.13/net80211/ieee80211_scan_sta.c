@@ -762,7 +762,7 @@ match_bss(struct ieee80211vap *vap,
 	if (se->se_rssi < STA_RSSI_MIN)
 		fail |= 0x100;
 #ifdef IEEE80211_DEBUG
-	if (ieee80211_msg(vap, IEEE80211_MSG_SCAN | IEEE80211_MSG_ROAM)) {
+	if (ieee80211_msg_is_reported(vap, IEEE80211_MSG_SCAN | IEEE80211_MSG_ROAM)) {
 		printf(" %03x", fail);
 		printf(" %c %s",
 			fail & 0x40 ? '=' : fail & 0x80 ? '^' : fail ? '-' : '+',
