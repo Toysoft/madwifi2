@@ -58,9 +58,15 @@
 #define	IEEE80211_DTIM_MIN	1		/* min DTIM period */
 #define	IEEE80211_DTIM_DEFAULT	1		/* default DTIM period */
 
-#define	IEEE80211_BINTVAL_MAX	500		/* max beacon interval (TU's) */
-#define	IEEE80211_BINTVAL_MIN	25		/* min beacon interval (TU's) */
-#define	IEEE80211_BINTVAL_DEFAULT 100		/* default beacon interval (TU's) */
+#define	IEEE80211_BINTVAL_MAX	1000		/* max beacon interval (TUs) */
+#define	IEEE80211_BINTVAL_MIN	25		/* min beacon interval (TUs) */
+#define	IEEE80211_BINTVAL_DEFAULT 100		/* default beacon interval (TUs) */
+#define IEEE80211_BINTVAL_VALID(_bi) \
+	((IEEE80211_BINTVAL_MIN <= (_bi)) && \
+	 ((_bi) <= IEEE80211_BINTVAL_MAX))
+#define IEEE80211_BINTVAL_SANITISE(_bi) \
+	(IEEE80211_BINTVAL_VALID(_bi) ? \
+	 (_bi) : IEEE80211_BINTVAL_DEFAULT)
 
 #define	IEEE80211_BGSCAN_INTVAL_MIN	15	/* min bg scan intvl (secs) */
 #define	IEEE80211_BGSCAN_INTVAL_DEFAULT	(5*60)	/* default bg scan intvl */

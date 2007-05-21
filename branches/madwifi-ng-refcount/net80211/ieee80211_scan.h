@@ -131,7 +131,7 @@ struct ieee80211_scanparams {
 	u_int8_t bchan;
 	u_int8_t fhindex;
 	u_int8_t erp;
-	u_int8_t bintval;
+	u_int16_t bintval;
 	u_int8_t timoff;
 	u_int8_t *tim;
 	u_int8_t *tstamp;
