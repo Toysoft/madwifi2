@@ -36,6 +36,7 @@
 #define	IEEE80211_SCAN_MAX	IEEE80211_CHAN_MAX
 
 struct ieee80211_scanner;
+struct ieee80211_scan_entry;
 
 struct ieee80211_scan_ssid {
 	int len;					/* length in bytes */
