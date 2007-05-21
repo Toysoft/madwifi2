@@ -8655,7 +8655,7 @@ ath_xr_rate_setup(struct net_device *dev)
 	rt = sc->sc_xr_rates;
 	if (rt == NULL)
 		return 0;
-	if (rt->rateCount > XR_NUM_SUP_RATES) {
+	if (rt->rateCount > IEEE80211_RATE_MAXSIZE) {
 		DPRINTF(sc, ATH_DEBUG_ANY,
 			"%s: rate table too small (%u > %u)\n",
 			__func__, rt->rateCount, IEEE80211_RATE_MAXSIZE);
