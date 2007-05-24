@@ -1669,11 +1669,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		if (status & HAL_INT_RX) {
 			ath_uapsd_processtriggers(sc);
-			/* Get the noise floor data in interrupt context as we can't get it
-			 * per frame, so we need to get it as soon as possible (i.e. the tasklet
-			 * might take too long to fire */
-			ath_hal_process_noisefloor(ah);
-			sc->sc_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
 			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
 		}
 		if (status & HAL_INT_TX) {
@@ -5460,6 +5455,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	u_int phyerr;
 
 	/* Let the 802.11 layer know about the new noise floor */
+	sc->sc_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
 	ic->ic_channoise = sc->sc_channoise;
 	
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "%s\n", __func__);
@@ -7803,6 +7799,7 @@ ath_calibrate(unsigned long arg)
 		sc->sc_stats.ast_per_calfail++;
 	}
 
+	ath_hal_process_noisefloor(ah);
 	if (isIQdone == AH_TRUE)
 		ath_calinterval = ATH_LONG_CALINTERVAL;
 	else
@@ -8071,7 +8068,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			break;
 		}
 
-
+		ath_hal_process_noisefloor(ah);
 		/*
 		 * Configure the beacon and sleep timers.
 		 */
