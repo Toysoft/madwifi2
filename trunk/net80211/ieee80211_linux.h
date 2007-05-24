@@ -248,9 +248,11 @@ typedef spinlock_t acl_lock_t;
 #define	IEEE80211_NODE_SAVEQ_LOCK_IRQ(_ni) do {			\
 	unsigned long __sqlockflags;				\
 	spin_lock_irqsave(&(_ni)->ni_savedq.lock, __sqlockflags);
-#define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(_ni)			\
-	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __sqlockflags);\
+#define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(_ni)				\
+	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __sqlockflags);	\
 } while (0)
+#define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ_EARLY(_ni)		\
+	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __sqlockflags);
 
 /* caller MUST lock IEEE80211_NODE_SAVEQ */
 #define	IEEE80211_NODE_SAVEQ_DEQUEUE(_ni, _skb, _qlen) do {	\
