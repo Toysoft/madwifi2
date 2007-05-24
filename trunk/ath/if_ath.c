@@ -706,7 +706,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 #endif
 
 #ifdef ATH_SUPERG_DYNTURBO
-	ic->ic_ath_cap |= (ath_hal_turboagsupported(ah) ? (IEEE80211_ATHC_TURBOP |
+	ic->ic_ath_cap |= (ath_hal_turboagsupported(ah, ath_countrycode) ? (IEEE80211_ATHC_TURBOP |
 							IEEE80211_ATHC_AR) : 0);
 #endif
 #ifdef ATH_SUPERG_XR
