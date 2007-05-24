@@ -51,7 +51,11 @@
 #include <net80211/ieee80211_proto.h>
 #include <net80211/ieee80211_scan.h>
 
-#define	IEEE80211_TXPOWER_MAX	100		/* .5 dBm units */
+/*
+Note: Atheros chips use 6 bits when power is specified in whole dBm units, with a value range from 0 to 63.
+Note: Atheros chips use 7 bits when power is specified in half dBm units, with a value range from 0 to 127.
+*/
+#define	IEEE80211_TXPOWER_MAX	127		/* .5 dBm units */
 #define	IEEE80211_TXPOWER_MIN	0		/* kill radio */
 
 #define	IEEE80211_DTIM_MAX	15		/* max DTIM period */
