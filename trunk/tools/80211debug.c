@@ -208,8 +208,12 @@ main(int argc, char *argv[])
 	snprintf(oid, sizeof(oid), "dev.wlan.%s.debug", ifname+4);
 #endif
 	debuglen = sizeof(debug);
-	if (sysctlbyname(oid, &debug, &debuglen, NULL, 0) < 0)
-		err(1, "sysctl-get(%s)", oid);
+	if (sysctlbyname(oid, &debug, &debuglen, NULL, 0) < 0) {
+		if (argc <= 1) 
+			usage(); /* no user input, device not found - show usage instead of error message */
+		else 
+			err(1, "sysctl-get(%s)", oid); /* user specified arguments indicating a command, show error message */
+	}
 	ndebug = debug;
 	for (; argc > 1; argc--, argv++) {
 		cp = argv[1];
@@ -258,6 +262,9 @@ main(int argc, char *argv[])
 			sep = ",";
 		}
 	printf("%s\n", *sep != '<' ? ">" : "");
+	printf("Details:\n");
+	for (i = 0; i < N(flags); i++)
+		printf("%12s %s 0x%08x - %s\n", flags[i].name, debug & flags[i].bit ? "+" : " ", flags[i].bit, flags[i].desc);
 	return 0;
 }
 
