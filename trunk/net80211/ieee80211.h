@@ -514,7 +514,7 @@ struct ieee80211_ie_athAdvCap {
 	u_int8_t athAdvCap_id;		/* IEEE80211_ELEMID_VENDOR */
 	u_int8_t athAdvCap_len;		/* length in bytes */
 	u_int8_t athAdvCap_oui[3];	/* 0x00, 0x03, 0x7f */
-	u_int8_t athAdvCap_type;		/* OUI type */
+	u_int8_t athAdvCap_type;	/* OUI type */
 	u_int8_t athAdvCap_subtype;	/* OUI subtype */
 	u_int8_t athAdvCap_version;	/* spec revision */
 	u_int8_t athAdvCap_capability;	/* Capability info */
@@ -662,7 +662,7 @@ struct ieee80211_ie_wpa {
 	u_int32_t wpa_authsels[8];	/* selectors */
 	u_int16_t wpa_caps;		/* 802.11i capabilities */
 	u_int16_t wpa_pmkidcnt;		/* 802.11i pmkid count */
-	u_int16_t wpa_pmkids[8];		/* 802.11i pmkids */
+	u_int16_t wpa_pmkids[8];	/* 802.11i pmkids */
 } __packed;
 
 /*
@@ -746,9 +746,10 @@ struct ieee80211_country_ie {
 #define	ATH_OUI			0x7f0300		/* Atheros OUI */
 #define	ATH_OUI_TYPE		0x01
 #define	ATH_OUI_SUBTYPE		0x01
-#define ATH_OUI_VERSION		0x00
+#define	ATH_OUI_VERSION		0x00
 #define	ATH_OUI_TYPE_XR		0x03
-#define	ATH_OUI_VER_XR		0x01
+#define	ATH_OUI_SUBTYPE_XR	0x01
+#define	ATH_OUI_VER_XR		0x00
 
 #define	WPA_OUI			0xf25000
 #define	WPA_OUI_TYPE		0x01

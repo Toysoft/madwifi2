@@ -1587,8 +1587,8 @@ u_int8_t *
 ieee80211_add_athAdvCap(u_int8_t *frm, u_int8_t capability, u_int16_t defaultKey)
 {
 	static const u_int8_t oui[6] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
-		((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE,
-		ATH_OUI_SUBTYPE, ATH_OUI_VERSION};
+					((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE,
+					ATH_OUI_SUBTYPE, ATH_OUI_VERSION};
 	struct ieee80211_ie_athAdvCap *ie = (struct ieee80211_ie_athAdvCap *) frm;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
@@ -1612,40 +1612,33 @@ ieee80211_add_athAdvCap(u_int8_t *frm, u_int8_t capability, u_int16_t defaultKey
 u_int8_t *
 ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 {
-	static const u_int8_t oui[3] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
-		((ATH_OUI >> 16) & 0xff)};
+	static const u_int8_t oui[6] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
+					((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE_XR,
+					ATH_OUI_SUBTYPE_XR, ATH_OUI_VER_XR};
 	struct ieee80211_xr_param *ie = (struct ieee80211_xr_param *) frm;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
 	*frm++ = 0;				/* Length filled in below */
 	memcpy(frm, oui, sizeof(oui));		/* Atheros OUI, type, subtype, and version for adv capabilities */
 	frm += sizeof(oui);
-	*frm++ = ATH_OUI_TYPE_XR;
-	*frm++ = ATH_OUI_VER_XR;
-	*frm++ = 0;
-	*frm++ = 0;
-	*frm++ = 0;
+	*frm++ = 0;				/* XR info */
 
 	/* copy the BSSIDs */
 	if (vap->iv_flags & IEEE80211_F_XR) {
-		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid); 	/* Base BSSID */
 		frm += IEEE80211_ADDR_LEN;
-		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);		/* XR BSSID */
 		frm += IEEE80211_ADDR_LEN;
-		*(__le16 *)frm = htole16(vap->iv_xrvap->iv_bss->ni_intval);
+		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval); 		/* XR beacon interval */
 		frm += 2;
-		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval);
-		frm += 2;
-		*frm++ = vap->iv_xrvap->iv_ath_cap;
-		*frm++ = vap->iv_ath_cap; 
+		*frm++ = vap->iv_xrvap->iv_ath_cap;				/* Base mode capability */
+		*frm++ = vap->iv_ath_cap; 					/* XR mode capability */
 	} else {
 		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
 		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid);
 		frm += IEEE80211_ADDR_LEN;
 		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval);
-		frm += 2;
-		*(__le16 *)frm = htole16(vap->iv_xrvap->iv_bss->ni_intval);
 		frm += 2;
 		*frm++ = vap->iv_ath_cap; 
 		*frm++ = vap->iv_xrvap->iv_ath_cap;
