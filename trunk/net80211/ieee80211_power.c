@@ -114,7 +114,7 @@ ieee80211_node_saveq_drain(struct ieee80211_node *ni)
 	int qlen;
 
 	IEEE80211_NODE_SAVEQ_LOCK(ni);
-	qlen = skb_queue_len(&ni->ni_savedq);
+	qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
 	while ((skb = __skb_dequeue(&ni->ni_savedq)) != NULL) {
 		cb = (struct ieee80211_cb *) skb->cb;
 		ieee80211_unref_node(&cb->ni);
@@ -209,14 +209,13 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
-	unsigned long flags;
 	struct sk_buff *tail;
 	int qlen, age;
 
-	spin_lock_irqsave(&ni->ni_savedq.lock, flags);
-	if (skb_queue_len(&ni->ni_savedq) >= IEEE80211_PS_MAX_QUEUE) {
+	IEEE80211_NODE_SAVEQ_LOCK_IRQ(ni);	
+	if (IEEE80211_NODE_SAVEQ_QLEN(ni) >= IEEE80211_PS_MAX_QUEUE) {
 		IEEE80211_NODE_STAT(ni, psq_drops);
-		spin_unlock_irqrestore(&ni->ni_savedq.lock, flags);
+		IEEE80211_NODE_SAVEQ_UNLOCK_IRQ_EARLY(ni);
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,
 			"pwr save q overflow, drops %d (size %d)",
 			ni->ni_stats.ns_psq_drops, IEEE80211_PS_MAX_QUEUE);
@@ -227,6 +226,7 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 		dev_kfree_skb(skb);
 		return;
 	}
+
 	/*
 	 * Tag the frame with it's expiry time and insert
 	 * it in the queue.  The aging interval is 4 times
@@ -243,8 +243,8 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 	} else
 		__skb_queue_head(&ni->ni_savedq, skb);
 	M_AGE_SET(skb, age);
-	qlen = skb_queue_len(&ni->ni_savedq);
-	spin_unlock_irqrestore(&ni->ni_savedq.lock, flags);
+	qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
+	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(ni);	
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
 		"save frame, %u now queued", qlen);
@@ -272,65 +272,64 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
 			"power save mode on, %u sta's in ps mode",
 			vap->iv_ps_sta);
-		return;
-	}
+	} else {
+		if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT))
+			vap->iv_ps_sta--;
+		ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
+		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
+				"power save mode off, %u sta's in ps mode", vap->iv_ps_sta);
+		/* XXX if no stations in ps mode, flush mc frames */
 
-	if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT))
-		vap->iv_ps_sta--;
-	ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
-	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-		"power save mode off, %u sta's in ps mode", vap->iv_ps_sta);
-	/* XXX if no stations in ps mode, flush mc frames */
-
-	/*
-	 * Flush queued unicast frames.
-	 */
-	if (IEEE80211_NODE_SAVEQ_QLEN(ni) == 0) {
-		if (vap->iv_set_tim != NULL)
-			vap->iv_set_tim(ni, 0);		/* just in case */
-		return;
-	}
-	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-		"flush ps queue, %u packets queued",
-		IEEE80211_NODE_SAVEQ_QLEN(ni));
-	for (;;) {
-		struct sk_buff *skb;
-		int qlen;
-
-		IEEE80211_NODE_SAVEQ_LOCK(ni);
-		IEEE80211_NODE_SAVEQ_DEQUEUE(ni, skb, qlen);
-		IEEE80211_NODE_SAVEQ_UNLOCK(ni);
-		if (skb == NULL)
-			break;
-		/* 
-		 * If this is the last packet, turn off the TIM bit.
-		 *
-		 * Set the M_PWR_SAV bit on skb to allow encap to test for
-		 * adding MORE_DATA bit to wh.
-		 *
-		 * The 802.11 MAC Spec says we should only set MORE_DATA for 
-		 * unicast packets when the STA is in PS mode (7.1.3.1.8);
-		 * which it isn't.
+		/*
+		 * Flush queued unicast frames.
 		 */
+		if (IEEE80211_NODE_SAVEQ_QLEN(ni) == 0) {
+			if (vap->iv_set_tim != NULL)
+				vap->iv_set_tim(ni, 0);		/* just in case */
+			return;
+		}
+		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
+				"flush ps queue, %u packets queued",
+				IEEE80211_NODE_SAVEQ_QLEN(ni));
+		for (;;) {
+			struct sk_buff *skb;
+			int qlen;
+
+			IEEE80211_NODE_SAVEQ_LOCK(ni);
+			IEEE80211_NODE_SAVEQ_DEQUEUE(ni, skb, qlen);
+			IEEE80211_NODE_SAVEQ_UNLOCK(ni);
+			if (skb == NULL)
+				break;
+			/* 
+			 * If this is the last packet, turn off the TIM bit.
+			 *
+			 * Set the M_PWR_SAV bit on skb to allow encap to test for
+			 * adding MORE_DATA bit to wh.
+			 *
+			 * The 802.11 MAC Spec says we should only set MORE_DATA for 
+			 * unicast packets when the STA is in PS mode (7.1.3.1.8);
+			 * which it isn't.
+			 */
 #if 0
-		 M_PWR_SAV_SET(skb);
+			M_PWR_SAV_SET(skb);
 #endif
 
 #ifdef ATH_SUPERG_XR
-		/*
-		 * if it is a XR vap, send the data to associated normal net
-		 * device. XR vap has a net device which is not registered with
-		 * OS. 
-		 */
-		if (vap->iv_xrvap && vap->iv_flags & IEEE80211_F_XR)
-			skb->dev = vap->iv_xrvap->iv_dev;
-		else
-			skb->dev = vap->iv_dev;		/* XXX? unnecessary */
+			/*
+			 * if it is a XR vap, send the data to associated normal net
+			 * device. XR vap has a net device which is not registered with
+			 * OS. 
+			 */
+			if (vap->iv_xrvap && vap->iv_flags & IEEE80211_F_XR)
+				skb->dev = vap->iv_xrvap->iv_dev;
+			else
+				skb->dev = vap->iv_dev;		/* XXX? unnecessary */
 #endif
-		
-		ieee80211_parent_queue_xmit(skb);
+
+			ieee80211_parent_queue_xmit(skb);
+		}
+		vap->iv_set_tim(ni, 0);
 	}
-	vap->iv_set_tim(ni, 0);
 }
 
 /*
