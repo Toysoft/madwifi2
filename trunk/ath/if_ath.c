@@ -1334,7 +1334,6 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	int ac, retval;
 	u_int8_t tid;
 	u_int16_t frame_seq;
-	u_int64_t tsf;
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
@@ -1343,7 +1342,6 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	 *          based on ic->ic_uapsdmaxtriggers.
 	 */
 
-	tsf = ath_hal_gettsf64(ah);
 	ATH_RXBUF_LOCK(sc);
 	if (sc->sc_rxbufcur == NULL)
 		sc->sc_rxbufcur = STAILQ_FIRST(&sc->sc_rxbuf);
@@ -1390,7 +1388,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		 * a self-linked list to avoid rx overruns.
 		 */
 		rs = &bf->bf_dsstatus.ds_rxstat;
-		retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), tsf, rs);
+		retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), sc->sc_tsf, rs);
 		if (HAL_EINPROGRESS == retval)
 			break;
 
@@ -1668,6 +1666,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			ath_hal_updatetxtriglevel(ah, AH_TRUE);
 		}
 		if (status & HAL_INT_RX) {
+			sc->sc_tsf = ath_hal_gettsf64(ah);
 			ath_uapsd_processtriggers(sc);
 			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
 		}
@@ -5251,11 +5250,8 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
  * a full 64-bit TSF using the current h/w TSF.
  */
 static __inline u_int64_t
-ath_extend_tsf(struct ath_hal *ah, u_int32_t rstamp)
+ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
 {
-	u_int64_t tsf;
-
-	tsf = ath_hal_gettsf64(ah);
 	if ((tsf & 0x7fff) < rstamp)
 		tsf -= 0x8000;
 	return ((tsf &~ 0x7fff) | rstamp);
@@ -5272,7 +5268,6 @@ ath_rx_capture(struct net_device *dev, const struct ath_buf *bf, struct sk_buff 
 	const struct ath_rx_status *rs = &bf->bf_dsstatus.ds_rxstat;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_frame *wh;
-	u_int64_t tsf;
 
 	/* Pass up tsf clock in mactime
 	 * Rx descriptor has the low 15 bits of the tsf at
@@ -5280,7 +5275,7 @@ ath_rx_capture(struct net_device *dev, const struct ath_buf *bf, struct sk_buff 
 	 * tsf to extend this to 64 bits.
 	 */
 	/* NB: Not all chipsets return the same precision rstamp */
-	tsf = ath_extend_tsf(sc->sc_ah, rs->rs_tstamp);
+	u_int64_t tsf = ath_extend_tsf(sc->sc_tsf, rs->rs_tstamp);
 
 	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
 		("data padding not enabled?"));
@@ -5304,7 +5299,8 @@ ath_rx_capture(struct net_device *dev, const struct ath_buf *bf, struct sk_buff 
 
 
 static void
-ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff *skb)
+ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff *skb, 
+		u_int64_t tsf)
 {
 	struct ath_softc *sc = dev->priv;
 	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
@@ -5312,20 +5308,7 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 	struct ieee80211_frame *wh;
 	unsigned int extra = A_MAX(sizeof(struct ath_tx_radiotap_header), 
 			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
-	u_int64_t tsf;
 	u_int32_t tstamp;
-	
-	/* Pass up tsf clock in mactime
-	 * TX descriptor contains the transmit time in TU's,
-	 * (bits 25-10 of the TSF).
-	 */
-	tsf = ath_hal_gettsf64(sc->sc_ah);
-	tstamp = ts->ts_tstamp << 10;
-	
-	if ((tsf & 0x3ffffff) < tstamp)
-		tsf -= 0x4000000;
-	tsf = ((tsf &~ 0x3ffffff) | tstamp);
-
 	/*                                                                      
 	 * release the owner of this skb since we're basically                  
 	 * recycling it                                                         
@@ -5359,7 +5342,20 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 		printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
 		goto done;
 	}
-	ieee80211_input_monitor(ic, skb, bf, 1, tsf, sc);
+	
+	if (sc->sc_nmonvaps > 0) {
+		/* Pass up tsf clock in mactime
+		 * TX descriptor contains the transmit time in TU's,
+		 * (bits 25-10 of the TSF).
+		 */
+		tstamp = ts->ts_tstamp << 10;
+
+		if ((tsf & 0x3ffffff) < tstamp)
+			tsf -= 0x4000000;
+		tsf = ((tsf &~ 0x3ffffff) | tstamp);
+
+		ieee80211_input_monitor(ic, skb, bf, 1, tsf, sc);
+	}
  done:
 	dev_kfree_skb(skb);
 }
@@ -5396,7 +5392,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 		if (vap->iv_opmode == IEEE80211_M_IBSS &&
 		    vap->iv_state == IEEE80211_S_RUN) {
-			u_int64_t tsf = ath_extend_tsf(sc->sc_ah, rstamp);
+			u_int64_t tsf = ath_extend_tsf(sc->sc_tsf, rstamp);
 			/*
 			 * Handle ibss merge as needed; check the tsf on the
 			 * frame before attempting the merge.  The 802.11 spec
@@ -7118,11 +7114,15 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	HAL_STATUS status;
 	int uapsdq = 0;
 	unsigned long uapsdq_lockflags = 0;
-
+	u_int64_t tsf = 0; /* Only needed for monitor mode */
+	
 	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %d (0x%x), link %p\n", __func__,
 		txq->axq_qnum, ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
 		txq->axq_link);
 
+	if (sc->sc_nmonvaps > 0) 
+		tsf = ath_hal_gettsf64(ah);
+		
 	if (txq == sc->sc_uapsdq) {
 		DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: reaping U-APSD txq\n", __func__);
 		uapsdq = 1;
@@ -7271,8 +7271,8 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		}
 
 		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n", __func__, bf->bf_skb);
-		ath_tx_capture(sc->sc_dev, bf, bf->bf_skb);
 
+		ath_tx_capture(sc->sc_dev, bf, bf->bf_skb, tsf);
 #ifdef ATH_SUPERG_FF
 		{
 			/* Handle every skb after the first one - these are FF extra
@@ -7286,13 +7286,13 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 						skb->len, BUS_DMA_TODEVICE);
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: free skb %p\n",
 					__func__, skb);
-				ath_tx_capture(sc->sc_dev, bf, skb);
+				ath_tx_capture(sc->sc_dev, bf, skb, tsf);
 				skb = tskb;
 			}
 		}
 		bf->bf_numdescff = 0;
 #endif
-
+		
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
