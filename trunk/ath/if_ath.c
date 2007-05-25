@@ -258,6 +258,9 @@ static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static char *autocreate = NULL;
 static char *ratectl = DEF_RATE_CTL;
 static int rfkill = -1;
+#ifdef ATH_CAP_TPC
+static int tpc = -1;
+#endif
 static int countrycode = -1;
 static int outdoor = -1;
 static int xchanmode = -1;
@@ -290,6 +293,9 @@ MODULE_PARM(countrycode, "i");
 MODULE_PARM(outdoor, "i");
 MODULE_PARM(xchanmode, "i");
 MODULE_PARM(rfkill, "i");
+#ifdef ATH_CAP_TPC
+MODULE_PARM(tpc, "i");
+#endif
 MODULE_PARM(autocreate, "s");
 MODULE_PARM(ratectl, "s");
 #else
@@ -298,6 +304,9 @@ module_param(countrycode, int, 0600);
 module_param(outdoor, int, 0600);
 module_param(xchanmode, int, 0600);
 module_param(rfkill, int, 0600);
+#ifdef ATH_CAP_TPC
+module_param(tpc, int, 0600);
+#endif
 module_param(autocreate, charp, 0600);
 module_param(ratectl, charp, 0600);
 #endif
@@ -305,6 +314,9 @@ MODULE_PARM_DESC(countrycode, "Override default country code");
 MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
 MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
 MODULE_PARM_DESC(rfkill, "Enable/disable RFKILL capability");
+#ifdef ATH_CAP_TPC
+MODULE_PARM_DESC(tpc, "Enable/disable per-packet transmit power control (TPC) capability");
+#endif
 MODULE_PARM_DESC(autocreate, "Create ath device in [sta|ap|wds|adhoc|ahdemo|monitor] mode. defaults to sta, use 'none' to disable");
 MODULE_PARM_DESC(ratectl, "Rate control algorithm [amrr|minstrel|onoe|sample], defaults to '" DEF_RATE_CTL "'");
 
@@ -505,6 +517,14 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 			rfkill ? "on" : "off");	
 		ath_hal_setrfsilent(ah, rfkill);
 	}
+
+#ifdef ATH_CAP_TPC
+	if (tpc != -1) {
+		printk(KERN_INFO "ath_pci: ath_pci: switching per-packet transmit power control %s\n",
+			tpc ? "on" : "off");
+		ath_hal_settpc(ah, tpc);
+	}
+#endif
 
 	/*
 	 * Setup rate tables for all potential media types.

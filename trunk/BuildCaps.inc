@@ -18,7 +18,7 @@ export ATH_CAP_XR=1
 endif
 
 ifndef ATH_CAP_TPC
-export ATH_CAP_TPC=0
+export ATH_CAP_TPC=1
 endif
 
 ifndef ATH_CAP_TX99
