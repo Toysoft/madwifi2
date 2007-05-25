@@ -684,6 +684,7 @@ struct ath_softc {
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
 	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
+	u_int64_t sc_tsf;			/* TSF at last rx interrupt */
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
