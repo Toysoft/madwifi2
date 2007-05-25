@@ -160,6 +160,14 @@ TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
 $(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
 endif
 
+# HAL_DEBUG enables HAL debugging code
+# At the moment this consists of wrappers around HAL functions so that 
+# stack traces are more decipherable.
+
+ifdef HAL_DEBUG
+COPTS+= -DAH_HALOPS_FUNC
+endif
+
 # Don't let HAL mess with the toolchain - save toolchain variables
 save_CC := $(CC)
 save_LD := $(LD)
