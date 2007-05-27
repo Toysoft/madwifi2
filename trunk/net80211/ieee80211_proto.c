@@ -633,9 +633,9 @@ ieee80211_wme_initparams(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 	ieee80211_wme_initparams_locked(vap);
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 }
 
 void
@@ -918,9 +918,9 @@ ieee80211_wme_updateparams(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 
 	if (ic->ic_caps & IEEE80211_C_WME) {
-		IEEE80211_LOCK(ic);
+		IEEE80211_LOCK_IRQ(ic);
 		ieee80211_wme_updateparams_locked(vap);
-		IEEE80211_UNLOCK(ic);
+		IEEE80211_UNLOCK_IRQ(ic);
 	}
 }
 

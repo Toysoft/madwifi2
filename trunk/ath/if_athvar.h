@@ -345,8 +345,6 @@ struct ath_node {
 #define	ATH_NODE(_n)			((struct ath_node *)(_n))
 #define	ATH_NODE_CONST(ni)		((const struct ath_node *)(ni))
 #define ATH_NODE_UAPSD_LOCK_INIT(_an)	spin_lock_init(&(_an)->an_uapsd_lock)
-#define ATH_NODE_UAPSD_LOCK(_an) 	spin_lock(&(_an)->an_uapsd_lock)
-#define ATH_NODE_UAPSD_UNLOCK(_an)	spin_unlock(&(_an)->an_uapsd_lock)
 #define ATH_NODE_UAPSD_LOCK_IRQ(_an)	do {	\
 	unsigned long __an_uapsd_lockflags;	\
 	spin_lock_irqsave(&(_an)->an_uapsd_lock, __an_uapsd_lockflags);
@@ -476,10 +474,6 @@ struct ath_vap {
 #define ATH_TXQ_INTR_PERIOD		5  /* axq_intrcnt period for intr gen */
 #define	ATH_TXQ_LOCK_INIT(_tq)		spin_lock_init(&(_tq)->axq_lock)
 #define	ATH_TXQ_LOCK_DESTROY(_tq)	
-#define	ATH_TXQ_LOCK(_tq)		spin_lock(&(_tq)->axq_lock)
-#define	ATH_TXQ_UNLOCK(_tq)		spin_unlock(&(_tq)->axq_lock)
-#define	ATH_TXQ_LOCK_BH(_tq)		spin_lock_bh(&(_tq)->axq_lock)
-#define	ATH_TXQ_UNLOCK_BH(_tq)		spin_unlock_bh(&(_tq)->axq_lock)
 #define ATH_TXQ_LOCK_IRQ(_tq)		do {	\
 	unsigned long __axq_lockflags;		\
 	spin_lock_irqsave(&(_tq)->axq_lock, __axq_lockflags);
@@ -489,14 +483,9 @@ struct ath_vap {
 #define ATH_TXQ_UNLOCK_IRQ_EARLY(_tq)			\
 	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags);
 
-#define ATH_TXQ_UAPSDQ_LOCK_IRQ(_tq)	spin_lock_irqsave(&(_tq)->axq_lock, uapsdq_lockflags)
-#define ATH_TXQ_UAPSDQ_UNLOCK_IRQ(_tq)	spin_unlock_irqrestore(&(_tq)->axq_lock, uapsdq_lockflags)
-
-
-
-
 #define	ATH_TXQ_LOCK_ASSERT(_tq) \
 	KASSERT(spin_is_locked(&(_tq)->axq_lock), ("txq not locked!"))
+
 #define ATH_TXQ_INSERT_TAIL(_tq, _elm, _field) do { \
 	STAILQ_INSERT_TAIL( &(_tq)->axq_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
@@ -688,14 +677,10 @@ struct ath_softc {
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
-#define	ATH_TXQ_SETUP(sc, i)	((sc)->sc_txqsetup & (1<<i))
+#define	ATH_TXQ_SETUP(sc, i)	((sc)->sc_txqsetup & (1 << i))
 
 #define	ATH_TXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_DESTROY(_sc)
-#define	ATH_TXBUF_LOCK(_sc)		spin_lock(&(_sc)->sc_txbuflock)
-#define	ATH_TXBUF_UNLOCK(_sc)		spin_unlock(&(_sc)->sc_txbuflock)
-#define	ATH_TXBUF_LOCK_BH(_sc)		spin_lock_bh(&(_sc)->sc_txbuflock)
-#define	ATH_TXBUF_UNLOCK_BH(_sc)	spin_unlock_bh(&(_sc)->sc_txbuflock)
 #define	ATH_TXBUF_LOCK_IRQ(_sc)		do {	\
 	unsigned long __txbuflockflags;		\
 	spin_lock_irqsave(&(_sc)->sc_txbuflock, __txbuflockflags);
@@ -711,10 +696,6 @@ typedef void (*ath_callback) (struct ath_softc *);
 
 #define	ATH_RXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_rxbuflock)
 #define	ATH_RXBUF_LOCK_DESTROY(_sc)
-#define	ATH_RXBUF_LOCK(_sc)		spin_lock(&(_sc)->sc_rxbuflock)
-#define	ATH_RXBUF_UNLOCK(_sc)		spin_unlock(&(_sc)->sc_rxbuflock)
-#define	ATH_RXBUF_LOCK_BH(_sc)		spin_lock_bh(&(_sc)->sc_rxbuflock)
-#define	ATH_RXBUF_UNLOCK_BH(_sc)	spin_unlock_bh(&(_sc)->sc_rxbuflock)
 #define	ATH_RXBUF_LOCK_IRQ(_sc)		do {	\
 	unsigned long __rxbuflockflags;		\
 	spin_lock_irqsave(&(_sc)->sc_rxbuflock, __rxbuflockflags);
@@ -723,7 +704,6 @@ typedef void (*ath_callback) (struct ath_softc *);
 } while (0)
 #define	ATH_RXBUF_UNLOCK_IRQ_EARLY(_sc)		\
 	spin_unlock_irqrestore(&(_sc)->sc_rxbuflock, __rxbuflockflags);
-
 
 /* Protects the device from concurrent accesses */
 #define	ATH_LOCK_INIT(_sc)		init_MUTEX(&(_sc)->sc_lock)

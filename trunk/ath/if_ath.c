@@ -1289,7 +1289,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 		if (vap->iv_xrvap)
 			vap->iv_xrvap->iv_xrvap = NULL;
 		kfree(vap->iv_dev);
-		ath_tx_cleanupq(sc,sc->sc_xrtxq);
+		ath_tx_cleanupq(sc, sc->sc_xrtxq);
 		sc->sc_xrtxq = NULL;
 		if (sc->sc_hasdiversity) {
 			/* Restore diversity setting to old diversity setting */
@@ -1362,7 +1362,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	 *          based on ic->ic_uapsdmaxtriggers.
 	 */
 
-	ATH_RXBUF_LOCK(sc);
+	ATH_RXBUF_LOCK_IRQ(sc);
 	if (sc->sc_rxbufcur == NULL)
 		sc->sc_rxbufcur = STAILQ_FIRST(&sc->sc_rxbuf);
 	for (bf = sc->sc_rxbufcur; bf; bf = STAILQ_NEXT(bf, bf_list)) {
@@ -1542,13 +1542,13 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		an = ATH_NODE(ni);
 
 		/* start the SP */
-		ATH_NODE_UAPSD_LOCK(an);
+		ATH_NODE_UAPSD_LOCK_IRQ(an);
 		ni->ni_stats.ns_uapsd_triggers++;
 		ni->ni_flags |= IEEE80211_NODE_UAPSD_SP;
 		ni->ni_uapsd_trigseq[ac] = frame_seq;
-		ATH_NODE_UAPSD_UNLOCK(an);
+		ATH_NODE_UAPSD_UNLOCK_IRQ(an);
 
-		ATH_TXQ_LOCK(uapsd_xmit_q);
+		ATH_TXQ_LOCK_IRQ(uapsd_xmit_q);
 		if (STAILQ_EMPTY(&an->an_uapsd_q)) {
 			DPRINTF(sc, ATH_DEBUG_UAPSD,
 				"%s: Queue empty, generating QoS NULL to send\n",
@@ -1605,10 +1605,10 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		}
 		an->an_uapsd_qdepth = 0;
 
-		ATH_TXQ_UNLOCK(uapsd_xmit_q);
+		ATH_TXQ_UNLOCK_IRQ(uapsd_xmit_q);
 	}
 	sc->sc_rxbufcur = bf;
-	ATH_RXBUF_UNLOCK(sc);
+	ATH_RXBUF_UNLOCK_IRQ(sc);
 #undef PA2DESC
 }
 
@@ -2173,7 +2173,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	 * Insert the frame on the outbound list and
 	 * pass it on to the hardware.
 	 */
-	ATH_TXQ_LOCK(txq);
+	ATH_TXQ_LOCK_IRQ(txq);
 	if (ni && ni->ni_vap && txq == &ATH_VAP(ni->ni_vap)->av_mcastq) {
 		/*
 		 * The CAB queue is started from the SWBA handler since
@@ -2218,7 +2218,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 		ath_hal_txstart(ah, txq->axq_qnum);
 		sc->sc_dev->trans_start = jiffies;
 	}
-	ATH_TXQ_UNLOCK(txq);
+	ATH_TXQ_UNLOCK_IRQ(txq);
 
 	sc->sc_devstats.tx_packets++;
 	sc->sc_devstats.tx_bytes += framelen;
@@ -2356,7 +2356,7 @@ ath_ff_ageflushtestdone(struct ath_txq *txq, struct ath_buf *bf)
 	return 0;
 }
 
-/* Caller must not hold ATH_TXQ_LOCK and ATH_TXBUF_LOCK
+/* Caller must not hold ATH_TXQ_LOCK_IRQ and ATH_TXBUF_LOCK_IRQ
  *
  * Context: softIRQ
  */
@@ -2370,11 +2370,11 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 	int framecnt;
 
 	for (;;) {
-		ATH_TXQ_LOCK(txq);
+		ATH_TXQ_LOCK_IRQ(txq);
 
 		bf_ff = TAILQ_LAST(&txq->axq_stageq, axq_headtype);
 		if ((!bf_ff) || ath_ff_flushdonetest(txq, bf_ff)) {
-			ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 			break;
 		}
 
@@ -2384,7 +2384,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		ATH_NODE(ni)->an_tx_ffbuf[bf_ff->bf_skb->priority] = NULL;
 		TAILQ_REMOVE(&txq->axq_stageq, bf_ff, bf_stagelist);
 
-		ATH_TXQ_UNLOCK(txq);
+		ATH_TXQ_UNLOCK_IRQ(txq);
 
 		/* encap and xmit */
 		bf_ff->bf_skb = ieee80211_encap(ni, bf_ff->bf_skb, &framecnt);
@@ -2412,7 +2412,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 }
 #endif
 
-#define ATH_HARDSTART_GET_TX_BUF_WITH_LOCK				\
+#define ATH_HARDSTART_GET_TX_BUF_WITH_LOCK	do {			\
 	ATH_TXBUF_LOCK_IRQ(sc);						\
 	bf = STAILQ_FIRST(&sc->sc_txbuf);				\
 	if (bf != NULL) {						\
@@ -2433,7 +2433,8 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		DPRINTF(sc,ATH_DEBUG_XMIT,				\
 			"%s: discard, no xmit buf\n", __func__);	\
 		sc->sc_stats.ast_tx_nobuf++;				\
-	}
+	}								\
+	} while (0)
 
 /*
  * Transmit a data packet.  On failure caller is
@@ -2515,17 +2516,14 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/* NB: use this lock to protect an->an_ff_txbuf in athff_can_aggregate()
 	 *     call too.
 	 */
-	ATH_TXQ_LOCK(txq);
+	ATH_TXQ_LOCK_IRQ(txq);
 	if (athff_can_aggregate(sc, eh, an, skb, vap->iv_fragthreshold, &ff_flush)) {
-
 		if (an->an_tx_ffbuf[skb->priority]) { /* i.e., frame on the staging queue */
 			bf = an->an_tx_ffbuf[skb->priority];
 
 			/* get (and remove) the frame from staging queue */
 			TAILQ_REMOVE(&txq->axq_stageq, bf, bf_stagelist);
 			an->an_tx_ffbuf[skb->priority] = NULL;
-
-			ATH_TXQ_UNLOCK(txq);
 
 			/*
 			 * chain skbs and add FF magic
@@ -2538,22 +2536,17 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			skb = bf->bf_skb;
 			ATH_FF_MAGIC_PUT(skb);
 
-#if 0
-			/* decrement extra node reference made when an_tx_ffbuf[] was set */
-			ieee80211_unref_node(&ni); /* XXX where was it set ? */
-#endif
-
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
 				"%s: aggregating fast-frame\n", __func__);
 		} else {
-			/* NB: careful grabbing the TX_BUF lock since still holding the txq lock.
-			 *     this could be avoided by always obtaining the txbuf earlier,
+			/* NB: Careful grabbing the TX_BUF lock since still holding the TXQ lock.
+			 *     This could be avoided by always obtaining the TXBuf earlier,
 			 *     but the "if" portion of this "if/else" clause would then need
 			 *     to give the buffer back.
 			 */
 			ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 			if (bf == NULL) {
-				ATH_TXQ_UNLOCK(txq);
+				ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 				goto hardstart_fail;
 			}
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
@@ -2566,18 +2559,17 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 			TAILQ_INSERT_HEAD(&txq->axq_stageq, bf, bf_stagelist);
 
-			ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 
 			return 0;
 		}
 	} else {
 		if (ff_flush) {
 			struct ath_buf *bf_ff = an->an_tx_ffbuf[skb->priority];
+			int success = 0;
 
 			TAILQ_REMOVE(&txq->axq_stageq, bf_ff, bf_stagelist);
 			an->an_tx_ffbuf[skb->priority] = NULL;
-
-			ATH_TXQ_UNLOCK(txq);
 
 			/* encap and xmit */
 			bf_ff->bf_skb = ieee80211_encap(ni, bf_ff->bf_skb, &framecnt);
@@ -2587,30 +2579,26 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 					"%s: discard, ff flush encap failure\n",
 					__func__);
 				sc->sc_stats.ast_tx_encap++;
-				goto ff_flushbad;
+			} else {
+				pktlen = bf_ff->bf_skb->len;	/* NB: don't reference skb below */
+				if (!ath_tx_start(dev, ni, bf_ff, bf_ff->bf_skb, 0))
+					success = 1;
 			}
-			pktlen = bf_ff->bf_skb->len;	/* NB: don't reference skb below */
-			/* NB: ath_tx_start() will use ATH_TXBUF_LOCK_BH(). The _BH
-			 *     portion is not needed here since we're running at
-			 *     interrupt time, but should be harmless.
-			 */
-			if (ath_tx_start(dev, ni, bf_ff, bf_ff->bf_skb, 0))
-				goto ff_flushbad;
-			goto ff_flushdone;
-		ff_flushbad:
-			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
-				"%s: ff stageq flush failure\n", __func__);
-			ieee80211_unref_node(&ni);
-			if (bf_ff->bf_skb) {
-				dev_kfree_skb(bf_ff->bf_skb);
-				bf_ff->bf_skb = NULL;
-			}
-			bf_ff->bf_node = NULL;
 
-			ATH_TXBUF_LOCK(sc);
-			STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
-			ATH_TXBUF_UNLOCK(sc);
-			goto ff_flushdone;
+			if (!success) {
+				DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
+					"%s: ff stageq flush failure\n", __func__);
+				ieee80211_unref_node(&ni);
+				if (bf_ff->bf_skb) {
+					dev_kfree_skb(bf_ff->bf_skb);
+					bf_ff->bf_skb = NULL;
+				}
+				bf_ff->bf_node = NULL;
+
+				ATH_TXBUF_LOCK_IRQ(sc);
+				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
+				ATH_TXBUF_UNLOCK_IRQ(sc);
+			}
 		}
 		/*
 		 * XXX: out-of-order condition only occurs for AP mode and multicast.
@@ -2619,15 +2607,16 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		else if (an->an_tx_ffbuf[skb->priority]) {
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
 				"%s: Out-Of-Order fast-frame\n", __func__);
-			ATH_TXQ_UNLOCK(txq);
-		} else
-			ATH_TXQ_UNLOCK(txq);
-
-	ff_flushdone:
+		}
+		
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
-		if (bf == NULL)
+		if (bf == NULL) {
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 			goto hardstart_fail;
+		}
 	}
+	
+	ATH_TXQ_UNLOCK_IRQ(txq);
 
 ff_bypass:
 
@@ -2655,7 +2644,7 @@ ff_bypass:
 		 *  Allocate 1 ath_buf for each frame given 1 was 
 		 *  already alloc'd
 		 */
-		ATH_TXBUF_LOCK(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		for (bfcnt = 1; bfcnt < framecnt; ++bfcnt) {
 			if ((tbf = STAILQ_FIRST(&sc->sc_txbuf)) != NULL) {
 				STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
@@ -2676,11 +2665,11 @@ ff_bypass:
 					STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
 				}
 			}
-			ATH_TXBUF_UNLOCK(sc);
+			ATH_TXBUF_UNLOCK_IRQ_EARLY(sc);
 			STAILQ_INIT(&bf_head);
 			goto hardstart_fail;
 		}
-		ATH_TXBUF_UNLOCK(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 
 		while ((bf = STAILQ_FIRST(&bf_head)) != NULL && skb != NULL) {
 			unsigned int nextfraglen = 0;
@@ -2716,7 +2705,7 @@ ff_bypass:
 
 hardstart_fail:
 	if (!STAILQ_EMPTY(&bf_head)) {
-		ATH_TXBUF_LOCK(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_FOREACH_SAFE(tbf, &bf_head, bf_list, tempbf) {
 			tbf->bf_skb = NULL;
 			tbf->bf_node = NULL;
@@ -2726,7 +2715,7 @@ hardstart_fail:
 
 			STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
 		}
-		ATH_TXBUF_UNLOCK(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
 
 	/* free sk_buffs */
@@ -2781,6 +2770,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 	}
 	ATH_TXBUF_UNLOCK_IRQ(sc);
+
 	if (bf == NULL) {
 		printk("ath_mgtstart: discard, no xmit buf\n");
 		sc->sc_stats.ast_tx_nobufmgt++;
@@ -4048,8 +4038,8 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		 * Move everything from the VAP's mcast queue 
 		 * to the hardware cab queue.
 		 */
-		ATH_TXQ_LOCK(&avp->av_mcastq);
-		ATH_TXQ_LOCK(cabq);
+		ATH_TXQ_LOCK_IRQ(&avp->av_mcastq);
+		ATH_TXQ_LOCK_IRQ(cabq);
 		bfmcast = STAILQ_FIRST(&avp->av_mcastq.axq_q);
 		/* link the descriptors */
 		if (cabq->axq_link == NULL)
@@ -4072,8 +4062,8 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		ATH_TXQ_MOVE_MCASTQ(&avp->av_mcastq, cabq);
 		/* NB: gated by beacon so safe to start here */
 		ath_hal_txstart(ah, cabq->axq_qnum);
-		ATH_TXQ_UNLOCK(cabq);
-		ATH_TXQ_UNLOCK(&avp->av_mcastq);
+		ATH_TXQ_UNLOCK_IRQ(cabq);
+		ATH_TXQ_UNLOCK_IRQ(&avp->av_mcastq);
 	}
 
 	return bf;
@@ -4742,6 +4732,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 		ni->ni_flags &= ~IEEE80211_NODE_UAPSD_SP;
 	}
 	ATH_NODE_UAPSD_UNLOCK_IRQ(an);
+
 	while (an->an_uapsd_qdepth) {
 		bf = STAILQ_FIRST(&an->an_uapsd_q);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_q, bf_list);
@@ -4857,7 +4848,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		index = WME_AC_VO;
 		while (index >= WME_AC_BE && txq != sc->sc_ac2q[index]) { 
 			txq = sc->sc_ac2q[index]; 
-			ATH_TXQ_LOCK(txq);
+
+			ATH_TXQ_LOCK_IRQ(txq);
 			ath_hal_stoptxdma(ah, txq->axq_qnum);
 			bf = prev = STAILQ_FIRST(&txq->axq_q);
 			/*
@@ -4940,7 +4932,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			} else
 				txq->axq_link = NULL;
 
-			ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_IRQ(txq);
+
 			/*
 			 * restart the DMA from the first 
 			 * buffer that was not DMA'd.
@@ -4966,9 +4959,11 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			skb = bf->bf_skb;
 			bf->bf_skb = NULL;
 			bf->bf_node = NULL;
-			ATH_TXBUF_LOCK(sc);
+			
+			ATH_TXBUF_LOCK_IRQ(sc);
 			STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-			ATH_TXBUF_UNLOCK(sc);
+			ATH_TXBUF_UNLOCK_IRQ(sc);
+			
 			ath_hardstart(skb,sc->sc_dev);
 			ATH_TXQ_REMOVE_HEAD(&tmp_q, bf_list);
 			bf = STAILQ_FIRST(&tmp_q.axq_q);
@@ -4990,7 +4985,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		for (index = 0; index <= WME_AC_VO; index++)
 			STAILQ_INIT(&wme_tmp_qs[index].axq_q);
 		txq = sc->sc_xrtxq; 
-		ATH_TXQ_LOCK(txq);
+		
+		ATH_TXQ_LOCK_IRQ(txq);
 		ath_hal_stoptxdma(ah, txq->axq_qnum);
 		bf = prev = STAILQ_FIRST(&txq->axq_q);
 		/*
@@ -5093,7 +5089,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			 */
 			txq->axq_link = NULL;
 		}
-		ATH_TXQ_UNLOCK(txq);
+		ATH_TXQ_UNLOCK_IRQ(txq);
+		
 		/*
 		 * restart the DMA from the first 
 		 * buffer that was not DMA'd.
@@ -5102,62 +5099,60 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			bf = STAILQ_NEXT(bf_tmp1,bf_list);
 		else
 			bf = STAILQ_FIRST(&txq->axq_q);
+
 		if (bf) {	
 			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
 			ath_hal_txstart(ah, txq->axq_qnum);
 		}
 
-		/* 
-		 * move (concant) the lists from the temp sw queues in to
-		 * WME queues.
-		 */
+		/* Move (concat.) the lists from the temp. SW queues in to
+		 * WME queues. */
 		index = WME_AC_VO;
-		txq = NULL;
-		while (index >= WME_AC_BE) { 
-			prevq = txq;
+		while (index >= WME_AC_BE) {
 			txq = sc->sc_ac2q[index];
-			if (txq != prevq) {
-				ATH_TXQ_LOCK(txq);
-				ath_hal_stoptxdma(ah, txq->axq_qnum);
+			
+			ATH_TXQ_LOCK_IRQ(txq);
+			ath_hal_stoptxdma(ah, txq->axq_qnum);
+
+			while ((txq == sc->sc_ac2q[index]) && (index >= WME_AC_BE)) {
+				wmeq = &wme_tmp_qs[index];
+				bf = STAILQ_FIRST(&wmeq->axq_q);
+				if (bf) {
+					ATH_TXQ_MOVE_Q(wmeq, txq);
+					if (txq->axq_link != NULL) {
+#ifdef AH_NEED_DESC_SWAP
+						*(txq->axq_link) = cpu_to_le32(bf->bf_daddr);
+#else
+						*(txq->axq_link) = bf->bf_daddr;
+#endif
+					} 
+				}
+				index--;
+			}
+
+			/* Find the first buffer to be DMA'd. */
+			bf = STAILQ_FIRST(&txq->axq_q);
+			while (bf) {
+#ifdef ATH_SUPERG_FF
+				ds = &bf->bf_desc[bf->bf_numdescff];
+#else
+				ds = bf->bf_desc;	/* NB: last descriptor */
+#endif
+				ts = &bf->bf_dsstatus.ds_txstat;
+				status = ath_hal_txprocdesc(ah, ds, ts);
+				if (status == HAL_EINPROGRESS)
+					break; 
+				bf = STAILQ_NEXT(bf, bf_list);
+			}
+
+			if (bf) {
+				ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
+				ath_hal_txstart(ah, txq->axq_qnum);
 			}
 			
-			wmeq = &wme_tmp_qs[index];
-			bf = STAILQ_FIRST(&wmeq->axq_q);
-			if (bf) {
-				ATH_TXQ_MOVE_Q(wmeq,txq);
-				if (txq->axq_link != NULL) {
-#ifdef AH_NEED_DESC_SWAP
-					*(txq->axq_link) = cpu_to_le32(bf->bf_daddr);
-#else
-					*(txq->axq_link) = bf->bf_daddr;
-#endif
-				} 
-			}
-			if (index == WME_AC_BE || txq != prevq) {
-				/* 
-				 * find the first buffer to be DMA'd.
-				 */
-				bf = STAILQ_FIRST(&txq->axq_q);
-				while (bf) {
-#ifdef ATH_SUPERG_FF
-					ds = &bf->bf_desc[bf->bf_numdescff];
-#else
-					ds = bf->bf_desc;	/* NB: last descriptor */
-#endif
-					ts = &bf->bf_dsstatus.ds_txstat;
-					status = ath_hal_txprocdesc(ah, ds, ts);
-					if (status == HAL_EINPROGRESS)
-						break; 
-					bf = STAILQ_NEXT(bf,bf_list);
-				}
-				if (bf) {
-					ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
-					ath_hal_txstart(ah, txq->axq_qnum);
-				}
-				ATH_TXQ_UNLOCK(txq);
-			}
-			index--;
+			ATH_TXQ_UNLOCK_IRQ(txq);
 		}
+
 		printk("moved %d buffers from XR to NORMAL\n", count);
 	}
 #endif
@@ -5578,7 +5573,8 @@ ath_rx_tasklet(TQUEUE_ARG data)
 			 * Reject error frames if we have no vaps that 
 			 * are operating in monitor mode.
 			 */
-			if(sc->sc_nmonvaps == 0) goto rx_next;
+			if (sc->sc_nmonvaps == 0)
+				goto rx_next;
 		}
 rx_accept:
 		/*
@@ -5656,11 +5652,10 @@ rx_accept:
 		 * Normal receive.
 		 */
 
-		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV)) {
+		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV))
 			ieee80211_dump_pkt(ic, skb->data, skb->len,
 				   sc->sc_hwmap[rs->rs_rate].ieeerate,
 				   rs->rs_rssi);
-		}
 
 		/*
 		 * Locate the node for sender, track state, and then
@@ -6118,24 +6113,25 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 
 	/* move the grppool bufs back to the grppollbuf */
 	for (;;) {
-		ATH_TXQ_LOCK(txq);
+		ATH_TXQ_LOCK_IRQ(txq);
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
-			ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 			break;
 		}
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
-		ATH_TXQ_UNLOCK(txq);
+		ATH_TXQ_UNLOCK_IRQ(txq);
+
 		bus_unmap_single(sc->sc_bdev,
 			bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
-		ATH_TXBUF_LOCK(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_grppollbuf, bf, bf_list);
-		ATH_TXBUF_UNLOCK(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
 	STAILQ_INIT(&txq->axq_q);
 	ATH_TXQ_LOCK_INIT(txq);
@@ -6497,6 +6493,7 @@ ath_tx_uapsdqueue(struct ath_softc *sc, struct ath_node *an, struct ath_buf *bf)
 		dev_kfree_skb(lastbuf->bf_skb);
 		lastbuf->bf_skb = NULL;
 		ieee80211_unref_node(&lastbuf->bf_node);
+
 		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, lastbuf, bf_list);
 		ATH_TXBUF_UNLOCK_IRQ(sc);
@@ -7127,13 +7124,12 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_buf *bf = NULL;
 	struct ath_desc *ds = NULL;
-	struct ath_tx_status *ts;
+	struct ath_tx_status *ts = NULL;
 	struct ieee80211_node *ni = NULL;
 	struct ath_node *an = NULL;
 	unsigned int sr, lr;
 	HAL_STATUS status;
 	int uapsdq = 0;
-	unsigned long uapsdq_lockflags = 0;
 	u_int64_t tsf = 0; /* Only needed for monitor mode */
 	
 	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %d (0x%x), link %p\n", __func__,
@@ -7149,18 +7145,13 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	}
 
 	for (;;) {
-		if (uapsdq)
-			ATH_TXQ_UAPSDQ_LOCK_IRQ(txq);
-		else
-			ATH_TXQ_LOCK(txq);
+		ATH_TXQ_LOCK_IRQ(txq);
+
 		txq->axq_intrcnt = 0; /* reset periodic desc intr count */
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
-			if (uapsdq)
-				ATH_TXQ_UAPSDQ_UNLOCK_IRQ(txq);
-			else
-				ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 			break;
 		}
 
@@ -7178,18 +7169,12 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			ath_printtxbuf(bf, status == HAL_OK);
 #endif
 		if (status == HAL_EINPROGRESS) {
-			if (uapsdq)
-				ATH_TXQ_UAPSDQ_UNLOCK_IRQ(txq);
-			else
-				ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 			break;
 		}
 
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
-		if (uapsdq)
-			ATH_TXQ_UAPSDQ_UNLOCK_IRQ(txq);
-		else
-			ATH_TXQ_UNLOCK(txq);
+		ATH_TXQ_UNLOCK_IRQ(txq);
 
 		ni = bf->bf_node;
 		if (ni != NULL) {
@@ -7465,15 +7450,15 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 	 *     we do not need to block ath_tx_tasklet
 	 */
 	for (;;) {
-		ATH_TXQ_LOCK(txq);
+		ATH_TXQ_LOCK_IRQ(txq);
 		bf = STAILQ_FIRST(&txq->axq_q);
 		if (bf == NULL) {
 			txq->axq_link = NULL;
-			ATH_TXQ_UNLOCK(txq);
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 			break;
 		}
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
-		ATH_TXQ_UNLOCK(txq);
+		ATH_TXQ_UNLOCK_IRQ(txq);
 #ifdef AR_DEBUG
 		if (sc->sc_debug & ATH_DEBUG_RESET)
 			ath_printtxbuf(bf, ath_hal_txprocdesc(ah, bf->bf_desc, &bf->bf_dsstatus.ds_txstat) == HAL_OK);
@@ -7500,9 +7485,9 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
-		ATH_TXBUF_LOCK(sc);
+		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
-		ATH_TXBUF_UNLOCK(sc);
+		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
 }
 
@@ -7697,10 +7682,12 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		sc->sc_curchan.channelFlags), sc->sc_curchan.channel,
 		ath_hal_mhz2ieee(ah, hchan.channel, hchan.channelFlags),
 		hchan.channel);
+	
 	/* check if it is turbo mode switch */
 	if (hchan.channel == sc->sc_curchan.channel &&
 	   (hchan.channelFlags & IEEE80211_CHAN_TURBO) != (sc->sc_curchan.channelFlags & IEEE80211_CHAN_TURBO)) 
 		tswitch = 1;
+	
 	if (hchan.channel != sc->sc_curchan.channel ||
 	    hchan.channelFlags != sc->sc_curchan.channelFlags) {
 		HAL_STATUS status;
@@ -7767,9 +7754,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 					sc->sc_dfswaittimer.data = (unsigned long)sc;
 					add_timer(&sc->sc_dfswaittimer);
 				}
-			} else
-				if (sc->sc_dfswait == 1)
-					mod_timer(&sc->sc_dfswaittimer, jiffies + 2);
+			} else if (sc->sc_dfswait == 1)
+				mod_timer(&sc->sc_dfswaittimer, jiffies + 2);
 		}
 		/*
 		 * re configure beacons when it is a turbo mode switch.

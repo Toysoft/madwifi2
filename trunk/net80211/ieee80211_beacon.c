@@ -286,7 +286,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	int len_changed = 0;
 	u_int16_t capinfo;
 
-	IEEE80211_LOCK(ic);
+	IEEE80211_LOCK_IRQ(ic);
 
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
 	    (vap->iv_flags & IEEE80211_F_CHANSWITCH) &&
@@ -307,7 +307,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		if (c == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				"%s: find channel failure\n", __func__);
-			IEEE80211_UNLOCK(ic);
+			IEEE80211_UNLOCK_IRQ_EARLY(ic);
 			return 0;
 		}
 		ic->ic_bsschan = c;
@@ -547,7 +547,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;
 	}
 
-	IEEE80211_UNLOCK(ic);
+	IEEE80211_UNLOCK_IRQ(ic);
 
 	return len_changed;
 }

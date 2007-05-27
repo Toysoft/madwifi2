@@ -3654,9 +3654,9 @@ ieee80211_recv_pspoll(struct ieee80211_node *ni, struct sk_buff *skb0)
 	}
 
 	/* Okay, take the first queued packet and put it out... */
-	IEEE80211_NODE_SAVEQ_LOCK(ni);
+	IEEE80211_NODE_SAVEQ_LOCK_BH(ni);
 	IEEE80211_NODE_SAVEQ_DEQUEUE(ni, skb, qlen);
-	IEEE80211_NODE_SAVEQ_UNLOCK(ni);
+	IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
 	if (skb == NULL) {
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_POWER, wh->i_addr2,
 			"%s", "recv ps-poll, but queue empty");
