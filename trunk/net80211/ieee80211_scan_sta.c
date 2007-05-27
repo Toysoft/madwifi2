@@ -110,6 +110,24 @@ struct sta_table {
 	int (*st_action)(struct ieee80211vap *, const struct ieee80211_scan_entry *);
 };
 
+#define	SCAN_STA_LOCK_INIT(_st, _name)					\
+	spin_lock_init(&(_st)->st_lock)
+#define	SCAN_STA_LOCK_DESTROY(_st)
+#define	SCAN_STA_LOCK_IRQ(_st) do {					\
+	unsigned long __stlockflags;					\
+	spin_lock_irqsave(&(_st)->st_lock, __stlockflags);
+#define	SCAN_STA_UNLOCK_IRQ(_st)					\
+	spin_unlock_irqrestore(&(_st)->st_lock, __stlockflags);		\
+} while (0)
+#define	SCAN_STA_UNLOCK_IRQ_EARLY(_st)					\
+	spin_unlock_irqrestore(&(_st)->st_lock, __stlockflags);
+
+#define	SCAN_STA_GEN_LOCK_INIT(_st, _name)				\
+	spin_lock_init(&(_st)->st_lock)
+#define	SCAN_STA_GEN_LOCK_DESTROY(_st)
+#define	SCAN_STA_GEN_LOCK(_st)		spin_lock(&(_st)->st_scanlock);
+#define	SCAN_STA_GEN_UNLOCK(_st)	spin_unlock(&(_st)->st_scanlock);
+
 static void sta_flush_table(struct sta_table *);
 static int match_bss(struct ieee80211vap *, const struct ieee80211_scan_state *,
 	const struct sta_entry *);
@@ -129,8 +147,8 @@ sta_attach(struct ieee80211_scan_state *ss)
 		M_80211_SCAN, M_NOWAIT | M_ZERO);
 	if (st == NULL)
 		return 0;
-	spin_lock_init(&st->st_lock);
-	spin_lock_init(&st->st_scanlock);
+	SCAN_STA_LOCK_INIT(st, "scan_sta");
+	SCAN_STA_GEN_LOCK_INIT(st, "scan_sta_gen");
 	TAILQ_INIT(&st->st_entry);
 	IEEE80211_INIT_TQUEUE(&st->st_actiontq, action_tasklet, ss);
 	ss->ss_priv = st;
@@ -163,9 +181,9 @@ sta_flush(struct ieee80211_scan_state *ss)
 {
 	struct sta_table *st = ss->ss_priv;
 
-	spin_lock(&st->st_lock);
+	SCAN_STA_LOCK_IRQ(st);
 	sta_flush_table(st);
-	spin_unlock(&st->st_lock);
+	SCAN_STA_UNLOCK_IRQ(st);
 	ss->ss_last = 0;
 	return 0;
 }
@@ -215,7 +233,7 @@ sta_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 	int hash;
 
 	hash = STA_HASH(macaddr);
-	spin_lock(&st->st_lock);  
+	SCAN_STA_LOCK_IRQ(st);
 	LIST_FOREACH(se, &st->st_hash[hash], se_hash)
 		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr) &&
 		    sp->ssid[1] == se->base.se_ssid[1] && 
@@ -225,7 +243,7 @@ sta_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 	MALLOC(se, struct sta_entry *, sizeof(struct sta_entry),
 		M_80211_SCAN, M_NOWAIT | M_ZERO);
 	if (se == NULL) {
-		spin_unlock(&st->st_lock);
+		SCAN_STA_UNLOCK_IRQ_EARLY(st);
 		return 0;
 	}
 	se->se_scangen = st->st_scangen-1;
@@ -287,7 +305,7 @@ found:
 	se->se_seen = 1;
 	se->se_notseen = 0;
 
-	spin_unlock(&st->st_lock);
+	SCAN_STA_UNLOCK_IRQ(st);
 
 	/*
 	 * If looking for a quick choice and nothing's
@@ -792,9 +810,8 @@ static void
 sta_update_notseen(struct sta_table *st)
 {
 	struct sta_entry *se;
-	unsigned long stlockflags;
 
-	spin_lock_irqsave(&st->st_lock, stlockflags);
+	SCAN_STA_LOCK_IRQ(st);
 	TAILQ_FOREACH(se, &st->st_entry, se_list) {
 		/*
 		 * If seen then reset and don't bump the count;
@@ -808,20 +825,19 @@ sta_update_notseen(struct sta_table *st)
 		else
 			se->se_notseen++;
 	}
-	spin_unlock_irqrestore(&st->st_lock, stlockflags);
+	SCAN_STA_UNLOCK_IRQ(st);
 }
 
 static void
 sta_dec_fails(struct sta_table *st)
 {
 	struct sta_entry *se;
-	unsigned long stlockflags;
 
-	spin_lock_irqsave(&st->st_lock, stlockflags);
+	SCAN_STA_LOCK_IRQ(st);
 	TAILQ_FOREACH(se, &st->st_entry, se_list)
 		if (se->se_fails)
 			se->se_fails--;
-	spin_unlock_irqrestore(&st->st_lock, stlockflags);
+	SCAN_STA_UNLOCK_IRQ(st);
 }
 
 static struct sta_entry *
@@ -829,11 +845,10 @@ select_bss(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 {
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *se, *selbs = NULL;
-	unsigned long stlockflags;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN | IEEE80211_MSG_ROAM, " %s\n",
 		"macaddr          bssid         chan  rssi  rate flag  wep  essid");
-	spin_lock_irqsave(&st->st_lock, stlockflags);
+	SCAN_STA_LOCK_IRQ(st);
 	TAILQ_FOREACH(se, &st->st_entry, se_list) {
 		if (match_bss(vap, ss, se) == 0) {
 			if (selbs == NULL)
@@ -842,7 +857,7 @@ select_bss(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 				selbs = se;
 		}
 	}
-	spin_unlock_irqrestore(&st->st_lock, stlockflags);
+	SCAN_STA_UNLOCK_IRQ(st);
 
 	return selbs;
 }
@@ -930,11 +945,11 @@ sta_lookup(struct sta_table *st, const u_int8_t macaddr[IEEE80211_ADDR_LEN])
 	struct sta_entry *se;
 	int hash = STA_HASH(macaddr);
 
-	spin_lock(&st->st_lock);
+	SCAN_STA_LOCK_IRQ(st);
 	LIST_FOREACH(se, &st->st_hash[hash], se_hash)
 		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr))
 			break;
-	spin_unlock(&st->st_lock);
+	SCAN_STA_UNLOCK_IRQ(st);
 
 	return se;		/* NB: unlocked */
 }
@@ -1024,7 +1039,7 @@ sta_age(struct ieee80211_scan_state *ss)
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *se, *next;
 
-	spin_lock(&st->st_lock);
+	SCAN_STA_LOCK_IRQ(st);
 	TAILQ_FOREACH_SAFE(se, &st->st_entry, se_list, next) {
 		if (se->se_notseen > STA_PURGE_SCANS) {
 			TAILQ_REMOVE(&st->st_entry, se, se_list);
@@ -1032,7 +1047,7 @@ sta_age(struct ieee80211_scan_state *ss)
 			FREE(se, M_80211_SCAN);
 		}
 	}
-	spin_unlock(&st->st_lock);
+	SCAN_STA_UNLOCK_IRQ(st);
 	/*
 	 * If rate control is enabled check periodically to see if
 	 * we should roam from our current connection to one that
@@ -1063,30 +1078,31 @@ sta_iterate(struct ieee80211_scan_state *ss,
 	u_int gen;
 	int res = 0;
 
-	spin_lock(&st->st_scanlock);
+	SCAN_STA_GEN_LOCK(st);
 	gen = st->st_scangen++;
 restart:
-	spin_lock(&st->st_lock);
+	SCAN_STA_LOCK_IRQ(st);
 	TAILQ_FOREACH(se, &st->st_entry, se_list) {
 		if (se->se_scangen != gen) {
 			se->se_scangen = gen;
 			/* update public state */
 			se->base.se_age = jiffies - se->se_lastupdate;
-			spin_unlock(&st->st_lock);
+			SCAN_STA_UNLOCK_IRQ_EARLY(st);
+			
 			res = (*f)(arg, &se->base);
 
-			if(res != 0) {
+			if(res != 0)
 			  /* We probably ran out of buffer space. */
 			  goto done;
-			}
+
 			goto restart;
 		}
 	}
 
-	spin_unlock(&st->st_lock);
+	SCAN_STA_UNLOCK_IRQ(st);
 
  done:
-	spin_unlock(&st->st_scanlock);
+	SCAN_STA_GEN_UNLOCK(st);
 
 	return res;
 }
@@ -1235,7 +1251,7 @@ adhoc_pick_channel(struct ieee80211_scan_state *ss)
 	bestchan = NULL;
 	bestrssi = -1;
 
-	spin_lock(&st->st_lock);
+	SCAN_STA_LOCK_IRQ(st);
 	for (i = 0; i < ss->ss_last; i++) {
 		c = ss->ss_chans[i];
 		maxrssi = 0;
@@ -1248,7 +1264,7 @@ adhoc_pick_channel(struct ieee80211_scan_state *ss)
 		if (bestchan == NULL || maxrssi < bestrssi)
 			bestchan = c;
 	}
-	spin_unlock(&st->st_lock);
+	SCAN_STA_UNLOCK_IRQ(st);
 
 	return bestchan;
 }
@@ -1349,7 +1365,7 @@ adhoc_age(struct ieee80211_scan_state *ss)
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *se, *next;
 
-	spin_lock(&st->st_lock);
+	SCAN_STA_LOCK_IRQ(st);
 	TAILQ_FOREACH_SAFE(se, &st->st_entry, se_list, next) {
 		if (se->se_notseen > STA_PURGE_SCANS) {
 			TAILQ_REMOVE(&st->st_entry, se, se_list);
@@ -1357,7 +1373,7 @@ adhoc_age(struct ieee80211_scan_state *ss)
 			FREE(se, M_80211_SCAN);
 		}
 	}
-	spin_unlock(&st->st_lock);
+	SCAN_STA_UNLOCK_IRQ(st);
 }
 
 /*
