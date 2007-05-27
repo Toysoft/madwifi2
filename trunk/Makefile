@@ -85,7 +85,7 @@ tools:
 
 install: install-modules install-tools
 
-install-modules:
+install-modules: modules
 	@# check if there are modules left from an old installation
 	@# might cause make to abort the build
 	sh scripts/find-madwifi-modules.sh $(KERNELRELEASE) $(DESTDIR)
@@ -97,7 +97,7 @@ ifeq ($(DESTDIR),)
 	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae $(KERNELRELEASE))
 endif
 
-install-tools:
+install-tools: tools
 	$(MAKE) -C $(TOOLS) install || exit 1
 
 uninstall:
