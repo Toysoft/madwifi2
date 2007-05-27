@@ -2734,8 +2734,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 * silently discard it.
 			 *
 			 * NB: this can happen due to signal leakage.
-			 *     But we should take it for FH phy because
-			 *     the rssi value should be correct even for
+			 *     But we should take it for FH PHY because
+			 *     the RSSI value should be correct even for
 			 *     different hop pattern in FH.
 			 */
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_ELEMID,
