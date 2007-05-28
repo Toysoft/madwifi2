@@ -12,6 +12,12 @@
  */
 
 /*
+ * Atheros RSSI, Signal, Noise, etc.
+ */
+
+#define ATH_DEFAULT_NOISE	-95	/* dBm */
+
+/*
  * Atheros proprietary SuperG defines.
  */
 

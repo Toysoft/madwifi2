@@ -1299,7 +1299,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 	}
 #endif
 
-	for (i = 0; i < IEEE80211_APPIE_NUM_OF_FRAME; ++ i) {
+	for (i = 0; i < IEEE80211_APPIE_NUM_OF_FRAME; i++) {
 		if (vap->app_ie[i].ie != NULL) {
 			FREE(vap->app_ie[i].ie, M_DEVBUF);
 			vap->app_ie[i].ie = NULL;
