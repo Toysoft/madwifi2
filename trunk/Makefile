@@ -83,7 +83,7 @@ svnversion.h:
 tools:
 	$(MAKE) -C $(TOOLS) all || exit 1
 
-install: install-modules install-tools
+install: install-modules install-tools install-scripts
 
 install-modules: modules
 	@# check if there are modules left from an old installation
@@ -96,6 +96,9 @@ install-modules: modules
 ifeq ($(DESTDIR),)
 	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae $(KERNELRELEASE))
 endif
+
+install-scripts:
+	install scripts/madwifi-unload.bash $(DESTDIR)/sbin/madwifi-unload
 
 install-tools: tools
 	$(MAKE) -C $(TOOLS) install || exit 1
@@ -141,6 +144,10 @@ sanitycheck:
 .PHONY: release
 release:
 	sh scripts/make-release.bash
+
+.PHONY: unload 
+unload:
+	bash scripts/madwifi-unload.bash
 
 configcheck: sanitycheck
 	@echo -n "Checking kernel configuration... "
