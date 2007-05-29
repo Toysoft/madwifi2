@@ -460,14 +460,14 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ah = _ath_hal_attach(devid, sc, tag, sc->sc_iobase, &status);
 	if (ah == NULL) {
 		printk(KERN_ERR "%s: unable to attach hardware: '%s' (HAL status %u)\n",
-			dev->name, ath_get_hal_status_desc(status), status);
+			DEV_NAME(dev), ath_get_hal_status_desc(status), status);
 		error = ENXIO;
 		goto bad;
 	}
 	if (ah->ah_abi != HAL_ABI_VERSION) {
 		printk(KERN_ERR "%s: HAL ABI mismatch; "
 			"driver expects 0x%x, HAL reports 0x%x\n",
-			dev->name, HAL_ABI_VERSION, ah->ah_abi);
+			DEV_NAME(dev), HAL_ABI_VERSION, ah->ah_abi);
 		error = ENXIO;		/* XXX */
 		goto bad;
 	}
@@ -496,7 +496,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_keymax = ath_hal_keycachesize(ah);
 	if (sc->sc_keymax > ATH_KEYMAX) {
 		printk("%s: Warning, using only %u entries in %u key cache\n",
-			dev->name, ATH_KEYMAX, sc->sc_keymax);
+			DEV_NAME(dev), ATH_KEYMAX, sc->sc_keymax);
 		sc->sc_keymax = ATH_KEYMAX;
 	}
 	/*
@@ -561,7 +561,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	error = ath_desc_alloc(sc);
 	if (error != 0) {
 		printk(KERN_ERR "%s: failed to allocate descriptors: %d\n",
-			dev->name, error);
+			DEV_NAME(dev), error);
 		goto bad;
 	}
 
@@ -582,21 +582,21 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_bhalq = ath_beaconq_setup(ah);
 	if (sc->sc_bhalq == (u_int) -1) {
 		printk(KERN_ERR "%s: unable to setup a beacon xmit queue!\n",
-			dev->name);
+			DEV_NAME(dev));
 		error = EIO;
 		goto bad2;
 	}
 	sc->sc_cabq = ath_txq_setup(sc, HAL_TX_QUEUE_CAB, 0);
 	if (sc->sc_cabq == NULL) {
 		printk(KERN_ERR "%s: unable to setup CAB xmit queue!\n",
-			dev->name);
+			DEV_NAME(dev));
 		error = EIO;
 		goto bad2;
 	}
 	/* NB: ensure BK queue is the lowest priority h/w queue */
 	if (!ath_tx_setup(sc, WME_AC_BK, HAL_WME_AC_BK)) {
 		printk(KERN_ERR "%s: unable to setup xmit queue for %s traffic!\n",
-			dev->name, ieee80211_wme_acnames[WME_AC_BK]);
+			DEV_NAME(dev), ieee80211_wme_acnames[WME_AC_BK]);
 		error = EIO;
 		goto bad2;
 	}
@@ -902,7 +902,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_mhz2ieee = ath_mhz2ieee;
 
 	if (register_netdev(dev)) {
-		printk(KERN_ERR "%s: unable to register device\n", dev->name);
+		printk(KERN_ERR "%s: unable to register device\n", DEV_NAME(dev));
 		goto bad3;
 	}
 	/*
@@ -913,7 +913,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ieee80211_announce(ic);
 	ath_announce(dev);
 #ifdef ATH_TX99_DIAG
-	printk("%s: TX99 support enabled\n", dev->name);
+	printk("%s: TX99 support enabled\n", DEV_NAME(dev));
 #endif
 	sc->sc_invalid = 0;
 
@@ -946,7 +946,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 		rtnl_unlock();
 		if (vap == NULL)
 			printk(KERN_ERR "%s: autocreation of VAP failed.",
-				dev->name);
+				DEV_NAME(dev));
 	}
 
 	return 0;
@@ -1230,7 +1230,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		/* restart hardware */
 		if (ath_startrecv(sc) != 0)	/* restart recv */
 			printk("%s: %s: unable to start recv logic\n",
-				dev->name, __func__);
+				DEV_NAME(dev), __func__);
 		if (sc->sc_beacons)
 			ath_beacon_config(sc, NULL);	/* restart beacons */
 		ath_hal_intrset(ah, sc->sc_imask);
@@ -1335,7 +1335,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 		 */
 		if (ath_startrecv(sc) != 0)	/* restart recv */
 			printk("%s: %s: unable to start recv logic\n",
-				dev->name, __func__);
+				DEV_NAME(dev), __func__);
 		if (sc->sc_beacons)
 			ath_beacon_config(sc, NULL);	/* restart beacons */
 		ath_hal_intrset(ah, sc->sc_imask);
@@ -1767,7 +1767,7 @@ ath_fatal_tasklet(TQUEUE_ARG data)
 {
 	struct net_device *dev = (struct net_device *)data;
 
-	printk("%s: hardware error; resetting\n", dev->name);
+	printk("%s: hardware error; resetting\n", DEV_NAME(dev));
 	ath_reset(dev);
 }
 
@@ -1776,7 +1776,7 @@ ath_rxorn_tasklet(TQUEUE_ARG data)
 {
 	struct net_device *dev = (struct net_device *)data;
 
-	printk("%s: rx FIFO overrun; resetting\n", dev->name);
+	printk("%s: rx FIFO overrun; resetting\n", DEV_NAME(dev));
 	ath_reset(dev);
 }
 
@@ -1871,7 +1871,7 @@ ath_init(struct net_device *dev)
 	sc->sc_curchan.channelFlags = ath_chan2flags(ic->ic_curchan);
 	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_FALSE, &status)) {
 		printk("%s: unable to reset hardware: '%s' (HAL status %u) "
-			"(freq %u flags 0x%x)\n", dev->name,
+			"(freq %u flags 0x%x)\n", DEV_NAME(dev),
 			ath_get_hal_status_desc(status), status,
 			sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
 		error = -EIO;
@@ -1897,7 +1897,7 @@ ath_init(struct net_device *dev)
 	ath_initkeytable(sc);		/* XXX still needed? */
 #endif
 	if (ath_startrecv(sc) != 0) {
-		printk("%s: unable to start recv logic\n", dev->name);
+		printk("%s: unable to start recv logic\n", DEV_NAME(dev));
 		error = -EIO;
 		goto done;
 	}
@@ -2128,11 +2128,11 @@ ath_reset(struct net_device *dev)
 	/* NB: indicate channel change so we do a full reset */
 	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
-			dev->name, __func__, ath_get_hal_status_desc(status), status);
+			DEV_NAME(dev), __func__, ath_get_hal_status_desc(status), status);
 	ath_update_txpow(sc);		/* update tx power state */
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
-			dev->name, __func__);
+			DEV_NAME(dev), __func__);
 	if (sc->sc_softled)
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 
@@ -3584,7 +3584,7 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark,u_int8_t dtim)
 			  IEEE80211_IS_CHAN_2GHZ(ic->ic_curchan)) || 
 			 !sc->sc_dturbo_hold_count)) {
 			DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Leaving turbo\n",
-					sc->sc_dev->name);
+					DEV_NAME(sc->sc_dev));
 			ic->ic_ath_cap &= ~IEEE80211_ATHC_BOOST;
 			vap->iv_bss->ni_ath_flags &= ~IEEE80211_ATHC_BOOST;
 			sc->sc_dturbo_tcount = 0;
@@ -3614,7 +3614,7 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark,u_int8_t dtim)
 			 bss_traffic >= sc->sc_dturbo_bw_turbo && 
 			 sc->sc_rate_recn_state)) {
 			DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Entering turbo\n",
-					sc->sc_dev->name);
+					DEV_NAME(sc->sc_dev));
 			ic->ic_ath_cap |= IEEE80211_ATHC_BOOST;
 			vap->iv_bss->ni_ath_flags |= IEEE80211_ATHC_BOOST;
 			sc->sc_dturbo_tcount = 0;
@@ -3675,7 +3675,7 @@ ath_turbo_switch_mode(unsigned long data)
 		("unexpected operating mode %d", ic->ic_opmode));
 
 	DPRINTF(sc, ATH_DEBUG_STATE, "%s: dynamic turbo switch to %s mode\n",
-		dev->name,
+		DEV_NAME(dev),
 		ic->ic_ath_cap & IEEE80211_ATHC_BOOST ? "turbo" : "base");
 
 	if (!ath_check_beacon_done(sc)) {
@@ -3760,7 +3760,7 @@ ath_beaconq_config(struct ath_softc *sc)
 
 	if (!ath_hal_settxqueueprops(ah, sc->sc_bhalq, &qi)) {
 		printk("%s: unable to update h/w beacon queue parameters\n",
-			sc->sc_dev->name);
+			DEV_NAME(sc->sc_dev));
 		return 0;
 	} else {
 		ath_hal_resettxqueue(ah, sc->sc_bhalq);	/* push to h/w */
@@ -4267,7 +4267,7 @@ ath_bstuck_tasklet(TQUEUE_ARG data)
 	if (sc->sc_bmisscount <= BSTUCK_THRESH) 
 		return;
 	printk("%s: stuck beacon; resetting (bmiss count %u)\n",
-		dev->name, sc->sc_bmisscount);
+		DEV_NAME(dev), sc->sc_bmisscount);
 	ath_reset(dev);
 }
 
@@ -5496,7 +5496,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	do {
 		bf = STAILQ_FIRST(&sc->sc_rxbuf);
 		if (bf == NULL) {		/* XXX ??? can this happen */
-			printk("%s: no buffer (%s)\n", dev->name, __func__);
+			printk("%s: no buffer (%s)\n", DEV_NAME(dev), __func__);
 			break;
 		}
 
@@ -5518,7 +5518,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 		}
 		skb = bf->bf_skb;
 		if (skb == NULL) {		/* XXX ??? can this happen */
-			printk("%s: no skbuff (%s)\n", dev->name, __func__);
+			printk("%s: no skbuff (%s)\n", DEV_NAME(dev), __func__);
 			continue;
 		}
 
@@ -5877,7 +5877,7 @@ ath_grppoll_txq_setup(struct ath_softc *sc, int qtype, int period)
 			return ;
 		if (qnum >= N(sc->sc_txq)) {
 			printk("%s: HAL qnum %u out of range, max %u!\n",
-				   sc->sc_dev->name, qnum, N(sc->sc_txq));
+				   DEV_NAME(sc->sc_dev), qnum, N(sc->sc_txq));
 			ath_hal_releasetxqueue(ah, qnum);
 			return;
 		}
@@ -6243,7 +6243,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 	}
 	if (qnum >= N(sc->sc_txq)) {
 		printk("%s: HAL qnum %u out of range, max %u!\n",
-			sc->sc_dev->name, qnum, N(sc->sc_txq));
+			DEV_NAME(sc->sc_dev), qnum, N(sc->sc_txq));
 #ifdef ATH_SUPERG_COMP
 		if (compbuf) {
 			bus_free_consistent(sc->sc_bdev, compbufsz,
@@ -6290,7 +6290,7 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 
 	if (ac >= N(sc->sc_ac2q)) {
 		printk("%s: AC %u out of range, max %u!\n",
-		       sc->sc_dev->name, ac, (unsigned)N(sc->sc_ac2q));
+		       DEV_NAME(sc->sc_dev), ac, (unsigned)N(sc->sc_ac2q));
 		return 0;
 	}
 	txq = ath_txq_setup(sc, HAL_TX_QUEUE_DATA, haltype);
@@ -6324,7 +6324,7 @@ ath_txq_update(struct ath_softc *sc, struct ath_txq *txq, int ac)
 	if (!ath_hal_settxqueueprops(ah, txq->axq_qnum, &qi)) {
 		printk("%s: unable to update hardware queue "
 			"parameters for %s traffic!\n",
-			sc->sc_dev->name, ieee80211_wme_acnames[ac]);
+			DEV_NAME(sc->sc_dev), ieee80211_wme_acnames[ac]);
 		return 0;
 	} else {
 		ath_hal_resettxqueue(ah, txq->axq_qnum); /* push to h/w */
@@ -6800,7 +6800,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			txq = sc->sc_ac2q[WME_AC_BE];
 		break;
 	default:
-		printk("%s: bogus frame type 0x%x (%s)\n", dev->name,
+		printk("%s: bogus frame type 0x%x (%s)\n", DEV_NAME(dev),
 			wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK, __func__);
 		/* XXX statistic */
 		return -EIO;
@@ -7738,7 +7738,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
 			printk("%s: %s: unable to reset channel %u (%u MHz) "
 				"flags 0x%x '%s' (HAL status %u)\n",
-				dev->name, __func__,
+				DEV_NAME(dev), __func__,
 				ieee80211_chan2ieee(ic, chan), chan->ic_freq,
 			        hchan.channelFlags,
 				ath_get_hal_status_desc(status), status);
@@ -7756,7 +7756,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		 */
 		if (ath_startrecv(sc) != 0) {
 			printk("%s: %s: unable to restart recv logic\n",
-				dev->name, __func__);
+				DEV_NAME(dev), __func__);
 			return -EIO;
 		}
 
@@ -7773,7 +7773,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 					if (sc->sc_dfswait)
 						del_timer_sync(&sc->sc_dfswaittimer);
 					DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: start dfs wait period\n",
-						__func__, dev->name);
+						__func__, DEV_NAME(dev));
 					sc->sc_dfswait = 1;
 					sc->sc_dfswaittimer.function = ath_check_dfs_clear;
 					sc->sc_dfswaittimer.expires = 
@@ -7940,7 +7940,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		HAL_LED_RUN, 	/* IEEE80211_S_RUN */
 	};
 
-	DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: %s -> %s\n", __func__, dev->name,
+	DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: %s -> %s\n", __func__, DEV_NAME(dev),
 		ieee80211_state_name[vap->iv_state],
 		ieee80211_state_name[nstate]);
 
@@ -8124,7 +8124,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		if (sc->sc_dfswait && vap->iv_opmode == IEEE80211_M_HOSTAP ) {
 			/* push the VAP to RUN state once DFS is cleared */
 			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  -> DFS_WAIT\n",
-				__func__, dev->name);
+				__func__, DEV_NAME(dev));
 			avp->av_dfswait_run = 1; 
 			return 0;
 		}
@@ -8135,7 +8135,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			del_timer_sync(&sc->sc_dfswaittimer);
 			sc->sc_dfswait = 0;
 			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  out of DFS_WAIT\n",
-				__func__, dev->name);
+				__func__, DEV_NAME(dev));
 		}
 		
 		/* XXX: if it is SCAN state, disable beacons. */
@@ -8215,7 +8215,7 @@ ath_check_dfs_clear(unsigned long data )
 					return;
 				}
 				DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP DFS_WAIT -> RUN\n",
-					__func__, dev->name);
+					__func__, DEV_NAME(dev));
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
 				/* start calibration timer */
 				mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
@@ -8514,7 +8514,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 
 	chans = kmalloc(IEEE80211_CHAN_MAX * sizeof(HAL_CHANNEL), GFP_KERNEL);
 	if (chans == NULL) {
-		printk("%s: unable to allocate channel table\n", dev->name);
+		printk("%s: unable to allocate channel table\n", DEV_NAME(dev));
 		return -ENOMEM;
 	}
 	if (!ath_hal_init_channels(ah, chans, IEEE80211_CHAN_MAX, &nchan,
@@ -8525,7 +8525,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ath_hal_getregdomain(ah, &rd);
 		printk("%s: unable to collect channel list from HAL; "
 			"regdomain likely %u country code %u\n",
-			dev->name, rd, cc);
+			DEV_NAME(dev), rd, cc);
 		kfree(chans);
 		return -EINVAL;
 	}
@@ -9514,12 +9514,12 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	 * out.  Thus we won't know what the name it used to be if we rely
 	 * on it.
 	 */
-	dev_name = kmalloc((strlen(sc->sc_dev->name) + 1) * sizeof(char), GFP_KERNEL);
+	dev_name = kmalloc((strlen(DEV_NAME(sc->sc_dev)) + 1) * sizeof(char), GFP_KERNEL);
 	if (dev_name == NULL) {
 		printk("%s: no memory for device name storage!\n", __func__);
 		return;
 	}
-	strncpy(dev_name, sc->sc_dev->name, strlen(sc->sc_dev->name) + 1);
+	strncpy(dev_name, DEV_NAME(sc->sc_dev), strlen(DEV_NAME(sc->sc_dev)) + 1);
 
 	/* setup the table */
 	memset(sc->sc_sysctls, 0, space);
@@ -9545,7 +9545,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	/* and register everything */
 	sc->sc_sysctl_header = ATH_REGISTER_SYSCTL_TABLE(sc->sc_sysctls);
 	if (!sc->sc_sysctl_header) {
-		printk("%s: failed to register sysctls!\n", sc->sc_dev->name);
+		printk("%s: failed to register sysctls!\n", DEV_NAME(sc->sc_dev));
 		kfree(sc->sc_sysctls);
 		sc->sc_sysctls = NULL;
 	}
@@ -9584,7 +9584,7 @@ ath_announce(struct net_device *dev)
 	struct ath_hal *ah = sc->sc_ah;
 	u_int modes, cc;
 
-	printk("%s: mac %d.%d phy %d.%d", dev->name,
+	printk("%s: mac %d.%d phy %d.%d", DEV_NAME(dev),
 		ah->ah_macVersion, ah->ah_macRev,
 		ah->ah_phyRev >> 4, ah->ah_phyRev & 0xf);
 	/*
@@ -9613,12 +9613,12 @@ ath_announce(struct net_device *dev)
 		for (i = 0; i <= WME_AC_VO; i++) {
 			struct ath_txq *txq = sc->sc_ac2q[i];
 			printk("%s: Use hw queue %u for %s traffic\n",
-				dev->name, txq->axq_qnum,
+				DEV_NAME(dev), txq->axq_qnum,
 				ieee80211_wme_acnames[i]);
 		}
-		printk("%s: Use hw queue %u for CAB traffic\n", dev->name,
+		printk("%s: Use hw queue %u for CAB traffic\n", DEV_NAME(dev),
 			sc->sc_cabq->axq_qnum);
-		printk("%s: Use hw queue %u for beacons\n", dev->name,
+		printk("%s: Use hw queue %u for beacons\n", DEV_NAME(dev),
 			sc->sc_bhalq);
 	}
 #undef HAL_MODE_DUALBAND
