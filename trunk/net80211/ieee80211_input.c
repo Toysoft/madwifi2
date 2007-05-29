@@ -1019,11 +1019,12 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			 * incoming fragments
 			 * XXX 4-address/QoS frames?
 			 */
-			else if (skb->end - skb->head < ni->ni_vap->iv_dev->mtu +
-				 hdrlen) {
+			else if ((skb_end_pointer(skb) - skb->head) <
+				 (ni->ni_vap->iv_dev->mtu + hdrlen)) {
 				ni->ni_rxfrag = skb_copy_expand(skb, 0,
 					(ni->ni_vap->iv_dev->mtu + hdrlen) -
-					(skb->end - skb->head), GFP_ATOMIC);
+					(skb_end_pointer(skb) - skb->head),
+					GFP_ATOMIC);
 				dev_kfree_skb(skb);
 			}
 		}
@@ -1037,7 +1038,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			 * we've verified that before
 			 */
 			/* Copy current fragment at end of previous one */
-			memcpy(ni->ni_rxfrag->tail,
+			memcpy(skb_tail_pointer(ni->ni_rxfrag),
 			       skb->data + hdrlen, skb->len - hdrlen);
 			/* Update tail and length */
 			skb_put(ni->ni_rxfrag, skb->len - hdrlen);
@@ -1107,14 +1108,8 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 		}
 		if (skb1 != NULL) {
 			skb1->dev = dev;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
-			skb1->mac_header = skb1->data;
-			skb1->network_header = skb1->data + sizeof(struct ether_header);
-#else
-			skb1->mac.raw = skb1->data;
-			skb1->nh.raw = skb1->data + sizeof(struct ether_header);
-#endif
+			skb_reset_mac_header(skb1);
+			skb_set_network_header(skb1, sizeof(struct ether_header));
 
 			skb1->protocol = __constant_htons(ETH_P_802_2);
 			/* XXX insert vlan tag before queue it? */
@@ -2225,12 +2220,7 @@ forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
 		if (skb1 == NULL)
 			return;
 		skb1->dev = dev;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
-		skb1->mac_header = skb1->data;
-#else
-		skb1->mac.raw = skb1->data;
-#endif
+		skb_reset_mac_header(skb1);
 
 		skb1->ip_summed = CHECKSUM_NONE;
 		skb1->pkt_type = PACKET_OTHERHOST;
@@ -2509,12 +2499,7 @@ ieee80211_deliver_l2uf(struct ieee80211_node *ni)
 	 * constants instead. We know the packet type anyway. */
 	skb->pkt_type = PACKET_BROADCAST;
 	skb->protocol = htons(ETH_P_802_2);
- 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
-	skb->mac_header = skb->data;
-#else
-	skb->mac.raw = skb->data;
-#endif
+	skb_reset_mac_header(skb); 
 
 	ieee80211_deliver_data(ni, skb);
 	return;
@@ -3699,24 +3684,9 @@ ath_eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ethhdr *eth;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)	
-	skb->mac_header = skb->data;
-#else
-	skb->mac.raw = skb->data;
-#endif
-
+	skb_reset_mac_header(skb);
 	skb_pull(skb, ETH_HLEN);
-	/*
-	 * NB: mac.ethernet is replaced in 2.6.9 by eth_hdr but
-	 *     since that's an inline and not a define there's
-	 *     no easy way to do this cleanly.
-	 */
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,22)
-	eth = (struct ethhdr *)skb->mac_header;
-#else
-	eth = (struct ethhdr *)skb->mac.raw;
-#endif
+	eth = (struct ethhdr *)skb_mac_header(skb);
 	
 	if (*eth->h_dest & 1)
 		if (memcmp(eth->h_dest, dev->broadcast, ETH_ALEN) == 0)
