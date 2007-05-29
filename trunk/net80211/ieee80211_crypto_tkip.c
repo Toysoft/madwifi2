@@ -620,7 +620,7 @@ tkip_mixing_phase2(u8 *WEPSeed, const u8 *TK, const u16 *TTAK, u16 IV16)
 static void
 wep_encrypt(u8 *key, struct sk_buff *skb0, u_int off, size_t data_len)
 {
-#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while(0)
+#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while (0)
 	struct sk_buff *skb = skb0;
 	uint32_t i, j, k, crc;
 	size_t buflen;
@@ -681,7 +681,7 @@ wep_encrypt(u8 *key, struct sk_buff *skb0, u_int off, size_t data_len)
 static int
 wep_decrypt(u8 *key, struct sk_buff *skb, u_int off, size_t data_len)
 {
-#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while(0)
+#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while (0)
 	u32 i, j, k, crc;
 	u8 S[256];
 	u8 *pos, icv[4];

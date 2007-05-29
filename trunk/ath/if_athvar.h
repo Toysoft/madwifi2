@@ -64,7 +64,7 @@ typedef unsigned long TQUEUE_ARG;
 #define ATH_INIT_TQUEUE(a,b,c)		INIT_TQUEUE(a,b,c)
 #define ATH_SCHEDULE_TQUEUE(a,b) do {		\
 	*(b) |= queue_task((a), &tq_immediate);	\
-} while(0)
+} while (0)
 typedef void *TQUEUE_ARG;
 #define	tasklet_disable(t)	do { (void) t; local_bh_disable(); } while (0)
 #define	tasklet_enable(t)	do { (void) t; local_bh_enable(); } while (0)

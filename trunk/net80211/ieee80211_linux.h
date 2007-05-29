@@ -100,7 +100,7 @@ typedef unsigned long IEEE80211_TQUEUE_ARG;
 	__macro_needmark |= queue_task((a), &tq_immediate);	\
 	if (__macro_needmark)		\
 		mark_bh(IMMEDIATE_BH);	\
-} while(0)
+} while (0)
 typedef void *IEEE80211_TQUEUE_ARG;
 #define	tasklet_disable(t)	do { (void) t; local_bh_disable(); } while (0)
 #define	tasklet_enable(t)	do { (void) t; local_bh_enable(); } while (0)
@@ -170,7 +170,7 @@ typedef spinlock_t ieee80211_node_lock_t;
 	spin_lock_irqsave(&(_ni)->ni_nodelock, __node_lockflags);
 #define	IEEE80211_NODE_UNLOCK_IRQ(_ni)		\
 	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags); \
-} while(0)
+} while (0)
 #define	IEEE80211_NODE_UNLOCK_IRQ_EARLY(_ni)		\
 	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags);
 
@@ -201,7 +201,7 @@ typedef spinlock_t ieee80211_node_table_lock_t;
 	spin_lock_irqsave(&(_nt)->nt_nodelock, __node_lockflags);
 #define	IEEE80211_NODE_TABLE_UNLOCK_IRQ(_nt)		\
 	spin_unlock_irqrestore(&(_nt)->nt_nodelock, __node_lockflags); \
-} while(0)
+} while (0)
 #define	IEEE80211_NODE_TABLE_UNLOCK_IRQ_EARLY(_nt)		\
 	spin_unlock_irqrestore(&(_nt)->nt_nodelock, __node_lockflags);
 

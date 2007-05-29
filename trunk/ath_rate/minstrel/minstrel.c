@@ -561,7 +561,7 @@ ath_fill_sample_table(struct minstrel_node *sn)
         sn->b = 1013904223;
 
 	if (sn->num_rates > 1) {
-		for(column_index = 0; column_index < MINSTREL_COLUMNS; column_index++) {
+		for (column_index = 0; column_index < MINSTREL_COLUMNS; column_index++) {
 			for (i = 0; i < num_sample_rates; i++) {
 				get_random_bytes(random_bytes, 8);
 				newIndex = (i + random_bytes[i & 7]) % num_sample_rates;
@@ -577,7 +577,7 @@ ath_fill_sample_table(struct minstrel_node *sn)
 #if 0
         char rates[200];
         char *p;
-        for(column_index = 0; column_index < MINSTREL_COLUMNS; column_index++) {
+        for (column_index = 0; column_index < MINSTREL_COLUMNS; column_index++) {
                 p = rates + sprintf(rates, "rates :: %d ", column_index);
                 for (i = 0; i < num_sample_rates; i++)
                         p += sprintf(p, "%2u ", sn->rs_sampleTable[i][column_index]);
