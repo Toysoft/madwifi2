@@ -220,6 +220,18 @@ static int ath_getchannels(struct net_device *, u_int, HAL_BOOL, HAL_BOOL);
 static void ath_led_event(struct ath_softc *, int);
 static void ath_update_txpow(struct ath_softc *);
 
+#ifdef ATH_REVERSE_ENGINEERING
+/* Reverse engineering utility commands */
+static void ath_registers_dump(struct ieee80211com *ic);
+static void ath_registers_dump_delta(struct ieee80211com *ic);
+static void ath_registers_mark(struct ieee80211com *ic);
+static unsigned int ath_read_register(struct ieee80211com *ic, unsigned int address, unsigned int* value);
+static unsigned int ath_write_register(struct ieee80211com *ic, unsigned int address, unsigned int value);
+static void ath_ar5212_registers_dump(struct ath_softc *sc);
+static void ath_print_register(const char* name, u_int32_t address, u_int32_t v);
+static void ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old,u_int32_t v_new);
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
 static int ath_set_mac_address(struct net_device *, void *);
 static int ath_change_mtu(struct net_device *, int);
 static int ath_ioctl(struct net_device *, struct ifreq *, int);
@@ -264,6 +276,8 @@ static int tpc = -1;
 static int countrycode = -1;
 static int outdoor = -1;
 static int xchanmode = -1;
+
+#define DEV_NAME(_d) ((0 == _d || 0 == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? "MadWifi" : _d->name)
 
 static const char *hal_status_desc[] = {
 	"No error",
@@ -875,6 +889,14 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_scan_start = ath_scan_start;
 	ic->ic_scan_end = ath_scan_end;
 	ic->ic_set_channel = ath_set_channel;
+
+#ifdef ATH_REVERSE_ENGINEERING
+	ic->ic_read_register        = ath_read_register;
+	ic->ic_write_register       = ath_write_register;
+	ic->ic_registers_dump       = ath_registers_dump;
+	ic->ic_registers_dump_delta = ath_registers_dump_delta;
+	ic->ic_registers_mark       = ath_registers_mark;
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
 	ic->ic_set_coverageclass = ath_set_coverageclass;
 	ic->ic_mhz2ieee = ath_mhz2ieee;
@@ -1796,7 +1818,6 @@ ath_chan2flags(struct ieee80211_channel *chan)
 /*
  * Context: process context
  */
-
 static int
 ath_init(struct net_device *dev)
 {
@@ -1905,6 +1926,7 @@ ath_init(struct net_device *dev)
 	if (sc->sc_tx99 != NULL)
 		sc->sc_tx99->start(sc->sc_tx99);
 #endif
+
 done:
 	ATH_UNLOCK(sc);
 	return error;
@@ -1990,6 +2012,7 @@ ath_stop(struct net_device *dev)
 		ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE);
 
 	error = ath_stop_locked(dev);
+
 #if 0
 	if (error == 0 && !sc->sc_invalid) {
 		/*
@@ -9716,3 +9739,842 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
         }
         return 0;
 }
+
+/*
+For any addresses we wish to get a symbolic representation of (i.e. flag names) we can add it to 
+this helper function and a subsequent line is printed with the status in symbolic form.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
+{
+/* constants from openhal ar5212reg.h */
+#define AR5K_AR5212_PHY_ERR_FIL		    0x810c
+#define AR5K_AR5212_PHY_ERR_FIL_RADAR	0x00000020
+#define AR5K_AR5212_PHY_ERR_FIL_OFDM	0x00020000
+#define AR5K_AR5212_PHY_ERR_FIL_CCK     0x02000000
+#define AR5K_AR5212_PIMR		        0x00a0
+#define AR5K_AR5212_PISR		        0x0080
+#define AR5K_AR5212_PIMR_RXOK		    0x00000001
+#define AR5K_AR5212_PIMR_RXDESC		    0x00000002
+#define AR5K_AR5212_PIMR_RXERR		    0x00000004
+#define AR5K_AR5212_PIMR_RXNOFRM	    0x00000008
+#define AR5K_AR5212_PIMR_RXEOL		    0x00000010
+#define AR5K_AR5212_PIMR_RXORN		    0x00000020
+#define AR5K_AR5212_PIMR_TXOK		    0x00000040
+#define AR5K_AR5212_PIMR_TXDESC		    0x00000080
+#define AR5K_AR5212_PIMR_TXERR		    0x00000100
+#define AR5K_AR5212_PIMR_TXNOFRM	    0x00000200
+#define AR5K_AR5212_PIMR_TXEOL		    0x00000400
+#define AR5K_AR5212_PIMR_TXURN		    0x00000800
+#define AR5K_AR5212_PIMR_MIB		    0x00001000
+#define AR5K_AR5212_PIMR_SWI		    0x00002000
+#define AR5K_AR5212_PIMR_RXPHY		    0x00004000
+#define AR5K_AR5212_PIMR_RXKCM		    0x00008000
+#define AR5K_AR5212_PIMR_SWBA		    0x00010000
+#define AR5K_AR5212_PIMR_BRSSI		    0x00020000
+#define AR5K_AR5212_PIMR_BMISS		    0x00040000
+#define AR5K_AR5212_PIMR_HIUERR		    0x00080000
+#define AR5K_AR5212_PIMR_BNR		    0x00100000
+#define AR5K_AR5212_PIMR_RXCHIRP	    0x00200000
+#define AR5K_AR5212_PIMR_TIM		    0x00800000
+#define AR5K_AR5212_PIMR_BCNMISC	    0x00800000
+#define AR5K_AR5212_PIMR_GPIO		    0x01000000
+#define AR5K_AR5212_PIMR_QCBRORN	    0x02000000
+#define AR5K_AR5212_PIMR_QCBRURN	    0x04000000
+#define AR5K_AR5212_PIMR_QTRIG		    0x08000000
+
+    if (address == AR5K_AR5212_PHY_ERR_FIL) {
+        printk(KERN_DEBUG "%18s info:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+               , (name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_")) : name)
+               , (v & (1 << 31)                ? " (1 << 31)"     : "")
+               , (v & (1 << 30)                ? " (1 << 30)"     : "")
+               , (v & (1 << 29)                ? " (1 << 29)"     : "")
+               , (v & (1 << 28)                ? " (1 << 28)"     : "")
+               , (v & (1 << 27)                ? " (1 << 27)"     : "")
+               , (v & (1 << 26)                ? " (1 << 26)"     : "")
+               , (v & AR5K_AR5212_PHY_ERR_FIL_CCK  ? " CCK"       : "")
+               , (v & (1 << 24)                ? " (1 << 24)"     : "")
+               , (v & (1 << 23)                ? " (1 << 23)"     : "")
+               , (v & (1 << 22)                ? " (1 << 22)"     : "")
+               , (v & (1 << 21)                ? " (1 << 21)"     : "")
+               , (v & (1 << 20)                ? " (1 << 20)"     : "")
+               , (v & (1 << 19)                ? " (1 << 19)"     : "")
+               , (v & (1 << 18)                ? " (1 << 18)"     : "")
+               , (v & AR5K_AR5212_PHY_ERR_FIL_OFDM ? " OFDM"      : "")
+               , (v & (1 << 16)                ? " (1 << 16)"     : "")
+               , (v & (1 << 15)                ? " (1 << 15)"     : "")
+               , (v & (1 << 14)                ? " (1 << 14)"     : "")
+               , (v & (1 << 13)                ? " (1 << 13)"     : "")
+               , (v & (1 << 12)                ? " (1 << 12)"     : "")
+               , (v & (1 << 11)                ? " (1 << 11)"     : "")
+               , (v & (1 << 10)                ? " (1 << 10)"     : "")
+               , (v & (1 <<  9)                ? " (1 <<  9)"     : "")
+               , (v & (1 <<  8)                ? " (1 <<  8)"     : "")
+               , (v & (1 <<  7)                ? " (1 <<  7)"     : "")
+               , (v & (1 <<  6)                ? " (1 <<  6)"     : "")
+               , (v & AR5K_AR5212_PHY_ERR_FIL_RADAR ? " RADAR"    : "")
+               , (v & (1 <<  4)                ? " (1 <<  4)"     : "")
+               , (v & (1 <<  3)                ? " (1 <<  3)"     : "")
+               , (v & (1 <<  2)                ? " (1 <<  2)"     : "")
+               , (v & (1 <<  1)                ? " (1 <<  1)"     : "")
+               , (v & (1 <<  0)                ? " (1 <<  0)"     : "")
+               );
+    }
+    if (address == AR5K_AR5212_PISR || address == AR5K_AR5212_PIMR) {
+        printk(KERN_DEBUG "%18s info:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+               , (name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_")) : name)
+               , (v & HAL_INT_GLOBAL           ? " HAL_INT_GLOBAL"    : "")
+               , (v & HAL_INT_FATAL            ? " HAL_INT_FATAL"     : "")
+               , (v & (1 << 29)                ? " (1 << 29)"         : "")
+               , (v & (1 << 28)                ? " (1 << 28)"         : "")
+               , (v & AR5K_AR5212_PIMR_RXOK    ? " RXOK" : "")
+               , (v & AR5K_AR5212_PIMR_RXDESC  ? " RXDESC" : "")
+               , (v & AR5K_AR5212_PIMR_RXERR   ? " RXERR" : "")
+               , (v & AR5K_AR5212_PIMR_RXNOFRM ? " RXNOFRM" : "")
+               , (v & AR5K_AR5212_PIMR_RXEOL   ? " RXEOL" : "")
+               , (v & AR5K_AR5212_PIMR_RXORN   ? " RXORN" : "")
+               , (v & AR5K_AR5212_PIMR_TXOK    ? " TXOK" : "")
+               , (v & AR5K_AR5212_PIMR_TXDESC  ? " TXDESC" : "")
+               , (v & AR5K_AR5212_PIMR_TXERR   ? " TXERR" : "")
+               , (v & AR5K_AR5212_PIMR_TXNOFRM ? " TXNOFRM" : "")
+               , (v & AR5K_AR5212_PIMR_TXEOL   ? " TXEOL" : "")
+               , (v & AR5K_AR5212_PIMR_TXURN   ? " TXURN" : "")
+               , (v & AR5K_AR5212_PIMR_MIB     ? " MIB" : "")
+               , (v & AR5K_AR5212_PIMR_SWI     ? " SWI" : "")
+               , (v & AR5K_AR5212_PIMR_RXPHY   ? " RXPHY" : "")
+               , (v & AR5K_AR5212_PIMR_RXKCM   ? " RXKCM" : "")
+               , (v & AR5K_AR5212_PIMR_SWBA    ? " SWBA" : "")
+               , (v & AR5K_AR5212_PIMR_BRSSI   ? " BRSSI" : "")
+               , (v & AR5K_AR5212_PIMR_BMISS   ? " BMISS" : "")
+               , (v & AR5K_AR5212_PIMR_HIUERR  ? " HIUERR" : "")
+               , (v & AR5K_AR5212_PIMR_BNR     ? " BNR" : "")
+               , (v & AR5K_AR5212_PIMR_RXCHIRP ? " RXCHIRP" : "")
+               , (v & AR5K_AR5212_PIMR_TIM     ? " TIM" : "")
+               , (v & AR5K_AR5212_PIMR_BCNMISC ? " BCNMISC" : "")
+               , (v & AR5K_AR5212_PIMR_GPIO    ? " GPIO" : "")
+               , (v & AR5K_AR5212_PIMR_QCBRORN ? " QCBRORN" : "")
+               , (v & AR5K_AR5212_PIMR_QCBRURN ? " QCBRURN" : "")
+               , (v & AR5K_AR5212_PIMR_QTRIG   ? " QTRIG" : "")
+               );
+    }
+#undef AR5K_AR5212_PHY_ERR_FIL		
+#undef AR5K_AR5212_PHY_ERR_FIL_RADAR
+#undef AR5K_AR5212_PHY_ERR_FIL_OFDM
+#undef AR5K_AR5212_PHY_ERR_FIL_CCK
+#undef AR5K_AR5212_PIMR		    
+#undef AR5K_AR5212_PISR		    
+#undef AR5K_AR5212_PIMR_RXOK		
+#undef AR5K_AR5212_PIMR_RXDESC		
+#undef AR5K_AR5212_PIMR_RXERR		
+#undef AR5K_AR5212_PIMR_RXNOFRM	
+#undef AR5K_AR5212_PIMR_RXEOL		
+#undef AR5K_AR5212_PIMR_RXORN		
+#undef AR5K_AR5212_PIMR_TXOK		
+#undef AR5K_AR5212_PIMR_TXDESC		
+#undef AR5K_AR5212_PIMR_TXERR		
+#undef AR5K_AR5212_PIMR_TXNOFRM	
+#undef AR5K_AR5212_PIMR_TXEOL		
+#undef AR5K_AR5212_PIMR_TXURN		
+#undef AR5K_AR5212_PIMR_MIB		
+#undef AR5K_AR5212_PIMR_SWI		
+#undef AR5K_AR5212_PIMR_RXPHY		
+#undef AR5K_AR5212_PIMR_RXKCM		
+#undef AR5K_AR5212_PIMR_SWBA		
+#undef AR5K_AR5212_PIMR_BRSSI		
+#undef AR5K_AR5212_PIMR_BMISS		
+#undef AR5K_AR5212_PIMR_HIUERR		
+#undef AR5K_AR5212_PIMR_BNR		
+#undef AR5K_AR5212_PIMR_RXCHIRP	
+#undef AR5K_AR5212_PIMR_TIM		
+#undef AR5K_AR5212_PIMR_BCNMISC	
+#undef AR5K_AR5212_PIMR_GPIO		
+#undef AR5K_AR5212_PIMR_QCBRORN	
+#undef AR5K_AR5212_PIMR_QCBRURN	
+#undef AR5K_AR5212_PIMR_QTRIG		
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Print out a register with name, address and value in hex and binary.  
+If v_old and v_new are the same we just dump the binary out (zeros are listed using dots for easier reading).
+If v_old and v_new are NOT the same, we indicate which bits were activated or de-activated using differnet characters than 1.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u_int32_t v_new)
+{
+#define BIT_UNCHANGED_ON  "1"
+#define BIT_UNCHANGED_OFF "."
+#define BIT_CHANGED_ON    "+"
+#define BIT_CHANGED_OFF   "-"
+#define NYBLE_SEPARATOR   ""
+#define BYTE_SEPARATOR    " "
+#define BIT_STATUS(_shift) \
+    ( \
+        ((v_old & (1<<_shift)) == (v_new & (1<<_shift))) \
+            ? (v_new & (1<<_shift) ? BIT_UNCHANGED_ON : BIT_UNCHANGED_OFF) \
+            : (v_new & (1<<_shift) ? BIT_CHANGED_ON   : BIT_CHANGED_OFF) \
+    )
+    /* Used for formatting hex data with spacing */
+    static char nybles[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+    char address_string[10] = "";
+    
+    if (address != 0xffffffff) {
+        address_string[0] = '*';
+        address_string[1] = '0';
+        address_string[2] = 'x';
+        address_string[3] = nybles[(address >> 12) & 0x0f];
+        address_string[4] = nybles[(address >>  8) & 0x0f];
+        address_string[5] = nybles[(address >>  4) & 0x0f];
+        address_string[6] = nybles[(address >>  0) & 0x0f];
+        address_string[7] = '=';
+        address_string[9] = '\0';
+    }
+    printk(KERN_DEBUG 
+        "%23s: %s0x%08x%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+      , (name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_")) : name)
+      , address_string
+      , v_new
+      , "  "
+      , BIT_STATUS(31)
+      , BIT_STATUS(30)
+      , BIT_STATUS(29)
+      , BIT_STATUS(28)
+      , NYBLE_SEPARATOR
+      , BIT_STATUS(27)
+      , BIT_STATUS(26)
+      , BIT_STATUS(25)
+      , BIT_STATUS(24)
+      , BYTE_SEPARATOR
+      , BIT_STATUS(23)
+      , BIT_STATUS(22)
+      , BIT_STATUS(21)
+      , BIT_STATUS(20)
+      , NYBLE_SEPARATOR
+      , BIT_STATUS(19)
+      , BIT_STATUS(18)
+      , BIT_STATUS(17)
+      , BIT_STATUS(16)
+      , BYTE_SEPARATOR
+      , BIT_STATUS(15)
+      , BIT_STATUS(14)
+      , BIT_STATUS(13)
+      , BIT_STATUS(12)
+      , NYBLE_SEPARATOR
+      , BIT_STATUS(11)
+      , BIT_STATUS(10)
+      , BIT_STATUS( 9)
+      , BIT_STATUS( 8)
+      , BYTE_SEPARATOR
+      , BIT_STATUS( 7)
+      , BIT_STATUS( 6)
+      , BIT_STATUS( 5)
+      , BIT_STATUS( 4)
+      , NYBLE_SEPARATOR
+      , BIT_STATUS( 3)
+      , BIT_STATUS( 2)
+      , BIT_STATUS( 1)
+      , BIT_STATUS( 0)
+      , ""
+      );
+#undef BIT_UNCHANGED_ON
+#undef BIT_UNCHANGED_OFF
+#undef BIT_CHANGED_ON
+#undef BIT_CHANGED_OFF
+#undef NYBLE_SEPARATOR
+#undef BYTE_SEPARATOR
+#undef BIT_STATUS
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Lookup a friendly name for a register address (for any we have nicknames for)
+Names were taken from openhal ar5212regs.h
+Return AH_TRUE if the name is a known ar5212 register, and AH_FALSE otherwise.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static const HAL_BOOL
+ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t address) {
+    const char* static_label = NULL;
+    memset(buf,0,buflen);
+
+    if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
+        /* Handle Static Register Labels (unique stuff we know about) */
+        switch(address) {
+            case 0x0008: static_label = "CR";                     break;
+            case 0x000c: static_label = "RXDP";                   break;
+            case 0x0014: static_label = "CFG";                    break;
+            case 0x0024: static_label = "IER";                    break;
+            case 0x0030: static_label = "TXCFG";                  break;
+            case 0x0034: static_label = "RXCFG";                  break;
+            case 0x0040: static_label = "MIBC";                   break;
+            case 0x0044: static_label = "TOPS";                   break;
+            case 0x0048: static_label = "RXNOFRM";                break;
+            case 0x004c: static_label = "TXNOFRM";                break;
+            case 0x0050: static_label = "RPGTO";                  break;
+            case 0x0054: static_label = "RFCNT";                  break;
+            case 0x0058: static_label = "MISC";                   break;
+            case 0x0080: static_label = "PISR";                   break;
+            case 0x0084: static_label = "SISR0";                  break;
+            case 0x0088: static_label = "SISR1";                  break;
+            case 0x008c: static_label = "SISR2";                  break;
+            case 0x0090: static_label = "SISR3";                  break;
+            case 0x0094: static_label = "SISR4";                  break;
+            case 0x00a0: static_label = "PIMR";                   break;
+            case 0x00a4: static_label = "SIMR0";                  break;
+            case 0x00a8: static_label = "SIMR1";                  break;
+            case 0x00ac: static_label = "SIMR2";                  break;
+            case 0x00b0: static_label = "SIMR3";                  break;
+            case 0x00b4: static_label = "SIMR4";                  break;
+            case 0x0400: static_label = "DCM_ADDR";               break;
+            case 0x0404: static_label = "DCM_DATA";               break;
+            case 0x0420: static_label = "DCCFG";                  break;
+            case 0x0600: static_label = "CCFG";                   break;
+            case 0x0604: static_label = "CCFG_CUP";               break;
+            case 0x0610: static_label = "CPC0";                   break;
+            case 0x0614: static_label = "CPC1";                   break;
+            case 0x0618: static_label = "CPC2";                   break;
+            case 0x061c: static_label = "CPC3";                   break;
+            case 0x0620: static_label = "CPCORN";                 break;
+            case 0x0800: static_label = "QCU_TXDP(0)";            break;
+            case 0x0804: static_label = "QCU_TXDP(1)";            break;
+            case 0x0808: static_label = "QCU_TXDP(2)";            break;
+            case 0x080c: static_label = "QCU_TXDP(3)";            break;
+            case 0x0810: static_label = "QCU_TXDP(4)";            break;
+            case 0x0814: static_label = "QCU_TXDP(5)";            break;
+            case 0x0818: static_label = "QCU_TXDP(6)";            break;
+            case 0x081c: static_label = "QCU_TXDP(7)";            break;
+            case 0x0820: static_label = "QCU_TXDP(8)";            break;
+            case 0x0824: static_label = "QCU_TXDP(9)";            break;
+            case 0x0840: static_label = "QCU_TXE";                break;
+            case 0x0880: static_label = "QCU_TXD";                break;
+            case 0x08c0: static_label = "QCU_CBRCFG(0)";          break;
+            case 0x08c4: static_label = "QCU_CBRCFG(1)";          break;
+            case 0x08c8: static_label = "QCU_CBRCFG(2)";          break;
+            case 0x08cc: static_label = "QCU_CBRCFG(3)";          break;
+            case 0x08d0: static_label = "QCU_CBRCFG(4)";          break;
+            case 0x08d4: static_label = "QCU_CBRCFG(5)";          break;
+            case 0x08d8: static_label = "QCU_CBRCFG(6)";          break;
+            case 0x08dc: static_label = "QCU_CBRCFG(7)";          break;
+            case 0x08e0: static_label = "QCU_CBRCFG(8)";          break;
+            case 0x08e4: static_label = "QCU_CBRCFG(9)";          break;
+            case 0x0900: static_label = "QCU_RDYTIMECFG(0)";      break;
+            case 0x0904: static_label = "QCU_RDYTIMECFG(1)";      break;
+            case 0x0908: static_label = "QCU_RDYTIMECFG(2)";      break;
+            case 0x090c: static_label = "QCU_RDYTIMECFG(3)";      break;
+            case 0x0910: static_label = "QCU_RDYTIMECFG(4)";      break;
+            case 0x0914: static_label = "QCU_RDYTIMECFG(5)";      break;
+            case 0x0918: static_label = "QCU_RDYTIMECFG(6)";      break;
+            case 0x091c: static_label = "QCU_RDYTIMECFG(7)";      break;
+            case 0x0920: static_label = "QCU_RDYTIMECFG(8)";      break;
+            case 0x0924: static_label = "QCU_RDYTIMECFG(9)";      break;
+            case 0x0940: static_label = "QCU_ONESHOTARM_SET(0)";  break;
+            case 0x0944: static_label = "QCU_ONESHOTARM_SET(1)";  break;
+            case 0x0948: static_label = "QCU_ONESHOTARM_SET(2)";  break;
+            case 0x094c: static_label = "QCU_ONESHOTARM_SET(3)";  break;
+            case 0x0950: static_label = "QCU_ONESHOTARM_SET(4)";  break;
+            case 0x0954: static_label = "QCU_ONESHOTARM_SET(5)";  break;
+            case 0x0958: static_label = "QCU_ONESHOTARM_SET(6)";  break;
+            case 0x095c: static_label = "QCU_ONESHOTARM_SET(7)";  break;
+            case 0x0960: static_label = "QCU_ONESHOTARM_SET(8)";  break;
+            case 0x0964: static_label = "QCU_ONESHOTARM_SET(9)";  break;
+            case 0x0980: static_label = "QCU_ONESHOTARM_CLR(0)";  break;
+            case 0x0984: static_label = "QCU_ONESHOTARM_CLR(1)";  break;
+            case 0x0988: static_label = "QCU_ONESHOTARM_CLR(2)";  break;
+            case 0x098c: static_label = "QCU_ONESHOTARM_CLR(3)";  break;
+            case 0x0990: static_label = "QCU_ONESHOTARM_CLR(4)";  break;
+            case 0x0994: static_label = "QCU_ONESHOTARM_CLR(5)";  break;
+            case 0x0998: static_label = "QCU_ONESHOTARM_CLR(6)";  break;
+            case 0x099c: static_label = "QCU_ONESHOTARM_CLR(7)";  break;
+            case 0x09a0: static_label = "QCU_ONESHOTARM_CLR(8)";  break;
+            case 0x09a4: static_label = "QCU_ONESHOTARM_CLR(9)";  break;
+            case 0x09c0: static_label = "QCU_MISC(0)";            break;
+            case 0x09c4: static_label = "QCU_MISC(1)";            break;
+            case 0x09c8: static_label = "QCU_MISC(2)";            break;
+            case 0x09cc: static_label = "QCU_MISC(3)";            break;
+            case 0x09d0: static_label = "QCU_MISC(4)";            break;
+            case 0x09d4: static_label = "QCU_MISC(5)";            break;
+            case 0x09d8: static_label = "QCU_MISC(6)";            break;
+            case 0x09dc: static_label = "QCU_MISC(7)";            break;
+            case 0x09e0: static_label = "QCU_MISC(8)";            break;
+            case 0x09e4: static_label = "QCU_MISC(9)";            break;
+            case 0x0a00: static_label = "QCU_STS(0)";             break;
+            case 0x0a04: static_label = "QCU_STS(1)";             break;
+            case 0x0a08: static_label = "QCU_STS(2)";             break;
+            case 0x0a0c: static_label = "QCU_STS(3)";             break;
+            case 0x0a10: static_label = "QCU_STS(4)";             break;
+            case 0x0a14: static_label = "QCU_STS(5)";             break;
+            case 0x0a18: static_label = "QCU_STS(6)";             break;
+            case 0x0a1c: static_label = "QCU_STS(7)";             break;
+            case 0x0a20: static_label = "QCU_STS(8)";             break;
+            case 0x0a24: static_label = "QCU_STS(9)";             break;
+            case 0x0a40: static_label = "QCU_RDYTIMESHDN";        break;
+            case 0x0b00: static_label = "QCU_CBB_SELECT";         break;
+            case 0x0b04: static_label = "QCU_CBB_ADDR";           break;
+            case 0x0b08: static_label = "QCU_CBCFG";              break;
+            case 0x1000: static_label = "DCU_QCUMASK(9)";         break;
+            case 0x1004: static_label = "DCU_QCUMASK(0)";         break;
+            case 0x1008: static_label = "DCU_QCUMASK(1)";         break;
+            case 0x100c: static_label = "DCU_QCUMASK(2)";         break;
+            case 0x1010: static_label = "DCU_QCUMASK(3)";         break;
+            case 0x1014: static_label = "DCU_QCUMASK(4)";         break;
+            case 0x1018: static_label = "DCU_QCUMASK(5)";         break;
+            case 0x101c: static_label = "DCU_QCUMASK(6)";         break;
+            case 0x1020: static_label = "DCU_QCUMASK(7)";         break;
+            case 0x1024: static_label = "DCU_QCUMASK(8)";         break;
+            case 0x1030: static_label = "DCU_GBL_IFS_SIFS";       break;
+            case 0x1038: static_label = "DCU_TX_FILTER";          break;
+            case 0x1040: static_label = "DCU_LCL_IFS(0)";         break;
+            case 0x1044: static_label = "DCU_LCL_IFS(1)";         break;
+            case 0x1048: static_label = "DCU_LCL_IFS(2)";         break;
+            case 0x104c: static_label = "DCU_LCL_IFS(3)";         break;
+            case 0x1050: static_label = "DCU_LCL_IFS(4)";         break;
+            case 0x1054: static_label = "DCU_LCL_IFS(5)";         break;
+            case 0x1058: static_label = "DCU_LCL_IFS(6)";         break;
+            case 0x105c: static_label = "DCU_LCL_IFS(7)";         break;
+            case 0x1060: static_label = "DCU_LCL_IFS(8)";         break;
+            case 0x1064: static_label = "DCU_LCL_IFS(9)";         break;
+            case 0x1070: static_label = "DCU_GBL_IFS_SLOT";       break;
+            case 0x1080: static_label = "DCU_RETRY_LIMIT(0)";     break;
+            case 0x1084: static_label = "DCU_RETRY_LIMIT(1)";     break;
+            case 0x1088: static_label = "DCU_RETRY_LIMIT(2)";     break;
+            case 0x108c: static_label = "DCU_RETRY_LIMIT(3)";     break;
+            case 0x1090: static_label = "DCU_RETRY_LIMIT(4)";     break;
+            case 0x1094: static_label = "DCU_RETRY_LIMIT(5)";     break;
+            case 0x1098: static_label = "DCU_RETRY_LIMIT(6)";     break;
+            case 0x109c: static_label = "DCU_RETRY_LIMIT(7)";     break;
+            case 0x10a0: static_label = "DCU_RETRY_LIMIT(8)";     break;
+            case 0x10a4: static_label = "DCU_RETRY_LIMIT(9)";     break;
+            case 0x10b0: static_label = "DCU_GBL_IFS_EIFS";       break;
+            case 0x10c0: static_label = "DCU_CHAN_TIME(0)";       break;
+            case 0x10c4: static_label = "DCU_CHAN_TIME(1)";       break;
+            case 0x10c8: static_label = "DCU_CHAN_TIME(2)";       break;
+            case 0x10cc: static_label = "DCU_CHAN_TIME(3)";       break;
+            case 0x10d0: static_label = "DCU_CHAN_TIME(4)";       break;
+            case 0x10d4: static_label = "DCU_CHAN_TIME(5)";       break;
+            case 0x10d8: static_label = "DCU_CHAN_TIME(6)";       break;
+            case 0x10dc: static_label = "DCU_CHAN_TIME(7)";       break;
+            case 0x10e0: static_label = "DCU_CHAN_TIME(8)";       break;
+            case 0x10e4: static_label = "DCU_CHAN_TIME(9)";       break;
+            case 0x10f0: static_label = "DCU_GBL_IFS_MISC";       break;
+            case 0x1100: static_label = "DCU_MISC(0)";            break;
+            case 0x1104: static_label = "DCU_MISC(1)";            break;
+            case 0x1108: static_label = "DCU_MISC(2)";            break;
+            case 0x110c: static_label = "DCU_MISC(3)";            break;
+            case 0x1110: static_label = "DCU_MISC(4)";            break;
+            case 0x1114: static_label = "DCU_MISC(5)";            break;
+            case 0x1118: static_label = "DCU_MISC(6)";            break;
+            case 0x111c: static_label = "DCU_MISC(7)";            break;
+            case 0x1120: static_label = "DCU_MISC(8)";            break;
+            case 0x1124: static_label = "DCU_MISC(9)";            break;
+            case 0x1140: static_label = "DCU_SEQ_NUM(0)";         break;
+            case 0x1144: static_label = "DCU_SEQ_NUM(1)";         break;
+            case 0x1148: static_label = "DCU_SEQ_NUM(2)";         break;
+            case 0x114c: static_label = "DCU_SEQ_NUM(3)";         break;
+            case 0x1150: static_label = "DCU_SEQ_NUM(4)";         break;
+            case 0x1154: static_label = "DCU_SEQ_NUM(5)";         break;
+            case 0x1158: static_label = "DCU_SEQ_NUM(6)";         break;
+            case 0x115c: static_label = "DCU_SEQ_NUM(7)";         break;
+            case 0x1160: static_label = "DCU_SEQ_NUM(8)";         break;
+            case 0x1164: static_label = "DCU_SEQ_NUM(9)";         break;
+            case 0x1230: static_label = "DCU_FP";                 break;
+            case 0x1270: static_label = "DCU_TXP";                break;
+            case 0x143c: static_label = "DCU_TX_FILTER_CLR";      break;
+            case 0x147c: static_label = "DCU_TX_FILTER_SET";      break;
+            case 0x4000: static_label = "RESET_CONTROL";          break;
+            case 0x4004: static_label = "SLEEP_CONTROL";          break;
+            case 0x4008: static_label = "INTERRUPT_PENDING";      break;
+            case 0x400c: static_label = "SLEEP_FORCE";            break;
+            case 0x4010: static_label = "PCICFG";                 break;
+            case 0x4014: static_label = "GPIOCR";                 break;
+            case 0x4018: static_label = "GPIODO";                 break;
+            case 0x401c: static_label = "GPIODI";                 break;
+            case 0x4020: static_label = "SREV";                   break;
+            case 0x6000: static_label = "EEPROM_BASE";            break;
+            case 0x6004: static_label = "EEPROM_DATA";            break;
+            case 0x6008: static_label = "EEPROM_CMD";             break;
+            case 0x6010: static_label = "EEPROM_CFG";             break;
+            case 0x8000: static_label = "STA_ID0";                break;
+            case 0x8004: static_label = "STA_ID1";                break;
+            case 0x8008: static_label = "BSS_ID0";                break;
+            case 0x800c: static_label = "BSS_ID1";                break;
+            case 0x8010: static_label = "SLOT_TIME";              break;
+            case 0x8014: static_label = "TIME_OUT";               break;
+            case 0x8018: static_label = "RSSI_THR";               break;
+            case 0x801c: static_label = "USEC";                   break;
+            case 0x8020: static_label = "BEACON";                 break;
+            case 0x8024: static_label = "CFP_PERIOD";             break;
+            case 0x8028: static_label = "TIMER0";                 break;
+            case 0x802c: static_label = "TIMER1";                 break;
+            case 0x8030: static_label = "TIMER2";                 break;
+            case 0x8034: static_label = "TIMER3";                 break;
+            case 0x8038: static_label = "CFP_DUR";                break;
+            case 0x803c: static_label = "RX_FILTER";              break;
+            case 0x8040: static_label = "MCAST_FIL0";             break;
+            case 0x8044: static_label = "MCAST_FIL1";             break;
+            case 0x8048: static_label = "DIAG_SW";                break;
+            case 0x804c: static_label = "TSF_L32";                break;
+            case 0x8050: static_label = "TSF_U32";                break;
+            case 0x8054: static_label = "ADDAC_TEST";             break;
+            case 0x8058: static_label = "DEFAULT_ANTENNA";        break;
+            case 0x8080: static_label = "LAST_TSTP";              break;
+            case 0x8084: static_label = "NAV";                    break;
+            case 0x8088: static_label = "RTS_OK";                 break;
+            case 0x808c: static_label = "RTS_FAIL";               break;
+            case 0x8090: static_label = "ACK_FAIL";               break;
+            case 0x8094: static_label = "FCS_FAIL";               break;
+            case 0x8098: static_label = "BEACON_CNT";             break;
+            case 0x80c0: static_label = "XRMODE";                 break;
+            case 0x80c4: static_label = "XRDELAY";                break;
+            case 0x80c8: static_label = "XRTIMETOUT";             break;
+            case 0x80cc: static_label = "XRCHIRP";                break;
+            case 0x80d0: static_label = "XRSTOMP";                break;
+            case 0x80d4: static_label = "SLEEP0";                 break;
+            case 0x80d8: static_label = "SLEEP1";                 break;
+            case 0x80dc: static_label = "SLEEP2";                 break;
+            case 0x80e0: static_label = "BSS_IDM0";               break;
+            case 0x80e4: static_label = "BSS_IDM1";               break;
+            case 0x80e8: static_label = "TXPC";                   break;
+            case 0x80ec: static_label = "PROFCNT_TX";             break;
+            case 0x80f0: static_label = "PROFCNT_RX";             break;
+            case 0x80f4: static_label = "PROFCNT_RXCLR";          break;
+            case 0x80f8: static_label = "PROFCNT_CYCLE";          break;
+            case 0x8104: static_label = "TSF_PARM";               break;
+            case 0x810c: static_label = "PHY_ERR_FIL";            break;
+            case 0x9800: static_label = "PHY(0)";                 break;
+            case 0x9804: static_label = "PHY_TURBO";              break;
+            case 0x9808: static_label = "PHY_AGC";                break;
+            case 0x9814: static_label = "PHY_TIMING_3";           break;
+            case 0x9818: static_label = "PHY_CHIP_ID";            break;
+            case 0x981c: static_label = "PHY_ACTIVE";             break;
+            case 0x9860: static_label = "PHY_AGCCTL";             break;
+            case 0x9864: static_label = "PHY_NF";                 break;
+            case 0x9870: static_label = "PHY_SCR";                break;
+            case 0x9874: static_label = "PHY_SLMT";               break;
+            case 0x9878: static_label = "PHY_SCAL";               break;
+            case 0x987c: static_label = "PHY_PLL";                break;
+            case 0x9914: static_label = "PHY_RX_DELAY";           break;
+            case 0x9920: static_label = "PHY_IQ";                 break;
+            case 0x9930: static_label = "PHY_PAPD_PROBE";         break;
+            case 0x9934: static_label = "PHY_TXPOWER_RATE1";      break;
+            case 0x9938: static_label = "PHY_TXPOWER_RATE2";      break;
+            case 0x993c: static_label = "PHY_TXPOWER_RATE_MAX";   break;
+            case 0x9944: static_label = "PHY_FC";                 break;
+            case 0x9954: static_label = "PHY_RADAR";              break;
+            case 0x9960: static_label = "PHY_ANT_SWITCH_TABLE_0"; break;
+            case 0x9964: static_label = "PHY_ANT_SWITCH_TABLE_1"; break;
+            case 0x99f0: static_label = "PHY_SCLOCK";             break;
+            case 0x99f4: static_label = "PHY_SDELAY";             break;
+            case 0x99f8: static_label = "PHY_SPENDING";           break;
+            case 0x9c10: static_label = "PHY_IQRES_CAL_PWR_I";    break;
+            case 0x9c14: static_label = "PHY_IQRES_CAL_PWR_Q";    break;
+            case 0x9c18: static_label = "PHY_IQRES_CAL_CORR";     break;
+            case 0x9c1c: static_label = "PHY_CURRENT_RSSI";       break;
+            case 0xa200: static_label = "PHY_MODE";               break;
+            case 0xa204: static_label = "PHY_CCKTXCTL";           break;
+            case 0xa20c: static_label = "PHY_GAIN_2GHZ";          break;
+            case 0xa234: static_label = "PHY_TXPOWER_RATE3";      break;
+            case 0xa238: static_label = "PHY_TXPOWER_RATE4";      break;
+            default:
+                break;            
+        }
+        if(static_label) {
+            snprintf(buf,buflen,static_label);
+            return AH_TRUE;
+        }
+        /* Handle Key Table */
+        if(address >= 0x8800 && address < 0x9800) {
+            #define keytable_entry_reg_count (8)
+            #define keytable_entry_size      (keytable_entry_reg_count * sizeof(u_int32_t))
+            int key = ((address - 0x8800) / keytable_entry_size);
+            int reg = ((address - 0x8800) % keytable_entry_size) / sizeof(u_int32_t);
+            char* format = NULL;
+            switch(reg) {               
+                case 0: format = "KEY(%3d).KEYBITS[031:000]"; break;
+                case 1: format = "KEY(%3d).KEYBITS[047:032]"; break;
+                case 2: format = "KEY(%3d).KEYBITS[079:048]"; break;
+                case 3: format = "KEY(%3d).KEYBITS[095:080]"; break;
+                case 4: format = "KEY(%3d).KEYBITS[127:096]"; break; 
+                case 5: format = "KEY(%3d).TYPE............"; break; 
+                case 6: format = "KEY(%3d).MAC[32:01]......"; break; 
+                case 7: format = "KEY(%3d).MAC[47:33]......"; break;
+                default:
+                    BUG();
+            }
+            snprintf(buf, buflen, format, key);
+            #undef keytable_entry_reg_count
+            #undef keytable_entry_size
+            return AH_TRUE;
+        }
+        /* Handle Rate Duration Table */
+        if(address >= 0x8700 && address < 0x8800) {
+            snprintf(buf, buflen, "RATE(%2d).DURATION", ((address - 0x8700) / sizeof(u_int32_t)));
+            return AH_TRUE;
+        }
+    
+        /* Handle txpower Table */
+        if(address >= 0xa180 && address < 0xa200) {
+            snprintf(buf, buflen, "PCDAC_TXPOWER(%2d)", ((address - 0xa180) / sizeof(u_int32_t)));
+            return AH_TRUE;
+        }
+    }
+
+    /* Everything else... */
+    snprintf(buf, buflen, UNKNOWN_NAME);
+    return AH_FALSE;
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Print out a single register name/address/value in hex and binary
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_print_register(const char* name, u_int32_t address, u_int32_t v)
+{
+    ath_print_register_delta(name,address,v,v);
+    ath_print_register_details(name, address, v);
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+A filter for hiding the addresses we don't think are very interesting or which have adverse side effects.
+Return AH_TRUE if the address should be exlucded, and AH_FALSE otherwise.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static HAL_BOOL
+ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
+#ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
+    char buf[MAX_REGISTER_NAME_LEN];
+#endif
+    #define UNFILTERED AH_FALSE
+    #define FILTERED   AH_TRUE
+
+    if (ar_device(sc->devid) != 5212 && ar_device(sc->devid) != 5213) return FILTERED;
+    /*
+    Addresses with side effects are never dumped out by bulk debug dump routines
+    */
+    if(address >= 0x00c0 && address <= 0x00df) return FILTERED;
+    if(address >= 0x143c && address <= 0x143f) return FILTERED;
+
+#ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
+    /* 
+    We are being conservative, and do not want to access addresses that may
+    crash the system, so we will only consider addresses we know the names of from previous
+    reverse engineering efforts (aka. openhal).
+    */
+    return (AH_TRUE == ath_lookup_register_name(sc, buf, MAX_REGISTER_NAME_LEN, address)) ? UNFILTERED : FILTERED;
+#else /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
+
+    /* 
+    In this mode, we only filter out large blocks of unused registers that are either known to be 
+    uninteresting or known to cause a PCI bus hang because it is not mapped by the hardware decoder
+    on some PCI boards. 
+
+    There ARE still undocumented registers that will be output by this routine, but it will crash on some boards
+    with ATH_REVERSE_ENGINEERING_WITH_NO_FEAR defined!
+
+    XXX: Figure out whether I handle the errors instead and still make these requests without screwing up the ATH PCI device.
+    */
+    /* ALLOW - General registers */
+    if (address < 0x00c0) return UNFILTERED;
+    /* SKIP  - read and clear registers */
+    if (address < 0x00e0) return FILTERED;
+    /* ALLOW - Unknown, rest of 8-bit addresses */
+    if (address < 0x01e0) return UNFILTERED;
+    /* SKIP  - Unknown */
+    if (address < 0x0800) return FILTERED;
+    /* ALLOW - QCU Registers (0x0800-0x0B00 block) */
+    if (address < 0x0B00) return UNFILTERED;
+    /* SKIP  - Unknown */
+    if (address < 0x1000) return FILTERED;
+    /* ALLOW - DCU Registers (0x1000-0x1500 block) */
+    if (address < 0x1500) return UNFILTERED;
+    /* SKIP  - Unknown */
+    if (address < 0x4000) return FILTERED;
+    /* SKIP - PCI Domain Registers (0x4000-0x5000 block) */
+    if (address < 0x5000) return FILTERED;
+    /* SKIP  - Unknown */
+    if (address < 0x8000) return FILTERED;
+    /* ALLOW - PCU Registers */
+    if (address < 0x8140) return UNFILTERED;
+    /* SKIP  - Unknown */
+    if (address < 0x8600) return FILTERED;
+    /* ALLOW - RATE_DUR  */
+    if (address < 0x8800) return UNFILTERED;
+    /* ALLOW - WEP Key Table  */
+    if (address < 0x9800) return UNFILTERED;
+    /* ALLOW - PHY Registers */
+    if (address < 0x9a00) return UNFILTERED;
+    /* SKIP  - PHY Register space, unused portion */
+    if (address < 0x9c00) return FILTERED;
+    /* ALLOW - PHY Registers */
+    if (address < 0x9c20) return UNFILTERED;
+    /* SKIP  - PHY Register space, unused portion */
+    if (address < 0xA200) return FILTERED;
+    /* ALLOW - PHY Registers */
+    if (address < 0xA210) return FILTERED;
+    /* SKIP  - Unknown*/
+    return FILTERED;
+#endif /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
+    #undef UNFILTERED
+    #undef FILTERED
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Dump any Atheros registers we think might be interesting,
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_ar5212_registers_dump(struct ath_softc *sc) {
+    struct ath_hal *ah   = sc->sc_ah;
+    char name[MAX_REGISTER_NAME_LEN];
+    unsigned int address = MIN_REGISTER_ADDRESS;
+    unsigned int value   = 0;
+
+    do {
+        if (ath_regdump_filter(sc, address)) 
+            continue;
+        ath_lookup_register_name(sc, name, MAX_REGISTER_NAME_LEN, address);
+        value = OS_REG_READ(ah,address);
+        ath_print_register(name, address, value);
+    } while ( (address+=4) < MAX_REGISTER_ADDRESS);
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Dump any changes that were made to Atheros registers we think might be interesting,
+since the last call to ath_ar5212_registers_mark.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_ar5212_registers_dump_delta(struct ath_softc *sc)
+{
+    struct ath_hal *ah   = sc->sc_ah;
+    unsigned int address = MIN_REGISTER_ADDRESS;
+    unsigned int value   = 0;
+    char name[MAX_REGISTER_NAME_LEN];
+    unsigned int *p_old  = 0;
+
+    do {
+        if (ath_regdump_filter(sc, address)) 
+            continue;
+        value = OS_REG_READ(ah,address);
+        p_old = (unsigned int*)&sc->register_snapshot[address];
+        if (*p_old != value) {
+            ath_lookup_register_name(sc, name, MAX_REGISTER_NAME_LEN, address);
+            ath_print_register_delta(name, address, *p_old, value);
+            ath_print_register_details(name, address, value);
+        }
+    } while ( (address+=4) < MAX_REGISTER_ADDRESS);
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Mark the current values of all Atheros registers we think might be interesting,
+so any changes can be dumped out by a subsequent call to ath_ar5212_registers_dump_delta.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_ar5212_registers_mark(struct ath_softc *sc)
+{
+    struct ath_hal *ah   = sc->sc_ah;
+    unsigned int address = MIN_REGISTER_ADDRESS;
+
+    do {
+        *((unsigned int*)&sc->register_snapshot[address]) = 
+            ath_regdump_filter(sc, address)
+                ? 0x0
+                : OS_REG_READ(ah,address)
+                ;
+    } while ( (address+=4) < MAX_REGISTER_ADDRESS);
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Read an Atheros register...for reverse engineering.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static unsigned int
+ath_read_register(struct ieee80211com *ic, unsigned int address, unsigned int* value)
+{
+    struct ath_softc *sc = ic->ic_dev->priv;
+    if(address >= MAX_REGISTER_ADDRESS) {
+        printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x >= 0x%04x\n", DEV_NAME(sc->sc_dev), __func__, address, MAX_REGISTER_ADDRESS);
+        return 1;
+    }
+    if(address % 4) {
+        printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x \%% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
+        return 1;
+    }
+    *value = OS_REG_READ(sc->sc_ah, address);
+    printk(KERN_DEBUG "*0x%04x -> 0x%08x\n", address, *value);
+    return 0;
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Write to a Atheros register...for reverse engineering.
+XXX: known issue with iwpriv argument handling.  It only knows how to handle signed 32-bit integers and
+seems to get confused if you are writing 0xffffffff or something.  Using the signed integer equivalent always
+works, but for some reason 0xffffffff is just as likely to give you something else at the moment.
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static unsigned int 
+ath_write_register(struct ieee80211com *ic, unsigned int address, unsigned int value)
+{
+    struct ath_softc *sc = ic->ic_dev->priv;
+    if(address >= MAX_REGISTER_ADDRESS) {
+        printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x >= 0x%04x\n", DEV_NAME(sc->sc_dev), __func__, address, MAX_REGISTER_ADDRESS);
+        return 1;
+    }
+    if(address % 4) {
+        printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x \%% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
+        return 1;
+    }
+    OS_REG_WRITE(sc->sc_ah, address, value);
+    printk(KERN_DEBUG "*0x%04x <- 0x%08x = 0x%08x\n", address, value, OS_REG_READ(sc->sc_ah, address));
+    return 0;
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+/*
+Dump out Atheros registers (excluding known duplicate mappings, unmapped zones, etc.)
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_registers_dump(struct ieee80211com *ic)
+{
+    struct net_device *dev = ic->ic_dev;
+    struct ath_softc *sc = dev->priv;
+    ath_ar5212_registers_dump(sc);
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Make a copy of significant registers in the Atheros chip for later comparison and dump with ath_registers_dump_delta
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_registers_mark(struct ieee80211com *ic)
+{
+    struct net_device *dev = ic->ic_dev;
+    struct ath_softc *sc = dev->priv;
+    ath_ar5212_registers_mark(sc);
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+/*
+Dump out any registers changed since the last call to ath_registers_mark
+*/
+#ifdef ATH_REVERSE_ENGINEERING
+static void
+ath_registers_dump_delta(struct ieee80211com *ic)
+{
+    struct net_device *dev = ic->ic_dev;
+    struct ath_softc *sc = dev->priv;
+    ath_ar5212_registers_dump_delta(sc);
+}
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
+

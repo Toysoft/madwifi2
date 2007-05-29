@@ -673,13 +673,36 @@ ieee80211_input(struct ieee80211_node *ni,
 
 			/* NB: assumes linear (i.e., non-fragmented) skb */
 
+ 			/* check length > header */
+ 			if (skb->len < sizeof(struct ether_header) + LLC_SNAPFRAMELEN
+ 			    + roundup(sizeof(struct athl2p_tunnel_hdr) - 2, 4) + 2)
+ 			{
+ 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+ 					ni->ni_macaddr, "data", "%s", "decap error");
+ 					vap->iv_stats.is_rx_decap++;
+ 				IEEE80211_NODE_STAT(ni, rx_decap);
+ 				goto err;
+ 			}
+ 
 			/* get to the tunneled headers */
 			ath_hdr = (struct athl2p_tunnel_hdr *)
-				skb_pull(skb, sizeof(struct ether_header) + LLC_SNAPFRAMELEN);
- 			/* ignore invalid frames */
-			if(ath_hdr == NULL)
+ 				skb->data + sizeof(struct ether_header) + LLC_SNAPFRAMELEN;
+ 			eh_tmp = (struct ether_header *)((char *)ath_hdr)
+ 				+ roundup(sizeof(struct athl2p_tunnel_hdr) - 2, 4) + 2;
+ 			/* cut headers */
+ 			skb_pull(skb, sizeof(struct ether_header) + LLC_SNAPFRAMELEN
+ 			         + roundup(sizeof(struct athl2p_tunnel_hdr) - 2, 4) + 2);
+ 			/* sanity check for malformed 802.3 length */
+ 			frame_len = ntohs(eh_tmp->ether_type);
+ 			if (skb->len < roundup(sizeof(struct ether_header) + frame_len, 4))
+ 			{
+ 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+ 					ni->ni_macaddr, "data", "%s", "decap error");
+ 					vap->iv_stats.is_rx_decap++;
+ 				IEEE80211_NODE_STAT(ni, rx_decap);
 				goto err;
-			
+			}
+
 			/* only implementing FF now. drop all others. */
 			if (ath_hdr->proto != ATH_L2TUNNEL_PROTO_FF) {
 				IEEE80211_DISCARD_MAC(vap,
@@ -692,15 +715,6 @@ ieee80211_input(struct ieee80211_node *ni,
 			}
 			vap->iv_stats.is_rx_ffcnt++;
 			
-			/* move past the tunneled header, with alignment */
-			skb_pull(skb, roundup(sizeof(struct athl2p_tunnel_hdr) - 2, 4) + 2);
-			eh_tmp = (struct ether_header *)skb->data;
-			
-			/* ether_type must be length as FF frames are always LLC/SNAP encap'd */
-			frame_len = ntohs(eh_tmp->ether_type);
-
-			skb1 = skb_clone(skb, GFP_ATOMIC); /* XXX: GFP_ATOMIC is overkill? */
-
 			/* we now have 802.3 MAC hdr followed by 802.2 LLC/SNAP; convert to EthernetII.
 			 * Note that the frame is at least IEEE80211_MIN_LEN, due to the driver code. */
 			athff_decap(skb);
