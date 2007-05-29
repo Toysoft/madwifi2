@@ -949,18 +949,20 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 		}
 	}
 
-	/* If IW_QUAL_DBM, then these values are assumed to be negative,
-	 * and values are taken to be in the range -max_qual .. 0. Not 
-	 * sure about WIRELESS_EXT < 19 */
 	/* Atheros' RSSI value is SNR: 0 -> 60 for old chipsets. Range 
 	 * for newer chipsets is unknown. */
 	range->max_qual.qual  = 127;
-	/* Min. quality is noise + 1 */
-	range->max_qual.level = ATH_DEFAULT_NOISE + 1;
-	/* XXX: This should be updated to use the current noise floor. */
-	range->max_qual.noise = ATH_DEFAULT_NOISE;
 #if WIRELESS_EXT >= 19
+	/* XXX: This should be updated to use the current noise floor. */
+	/* These are negative full bytes.
+	 * Min. quality is noise + 1 */
 	range->max_qual.updated |= IW_QUAL_DBM;
+	range->max_qual.level = ATH_DEFAULT_NOISE + 1;
+	range->max_qual.noise = ATH_DEFAULT_NOISE;
+#else
+	/* Values larger than the maximum are assumed to be absolute */
+	range->max_qual.level = 0;
+	range->max_qual.noise = 0;
 #endif
 
 	range->sensitivity = 3;
