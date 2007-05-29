@@ -1091,7 +1091,7 @@ restart:
 			
 			res = (*f)(arg, &se->base);
 
-			if(res != 0)
+			if (res != 0)
 			  /* We probably ran out of buffer space. */
 			  goto done;
 

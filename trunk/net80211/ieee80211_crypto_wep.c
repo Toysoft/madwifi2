@@ -307,7 +307,7 @@ static const uint32_t crc32_table[256] = {
 static int
 wep_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 {
-#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while(0)
+#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while (0)
 	struct wep_ctx *ctx = key->wk_private;
 	struct ieee80211vap *vap = ctx->wc_vap;
 	struct sk_buff *skb = skb0;
@@ -405,7 +405,7 @@ wep_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 static int
 wep_decrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 {
-#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while(0)
+#define S_SWAP(a,b) do { uint8_t t = S[a]; S[a] = S[b]; S[b] = t; } while (0)
 	struct wep_ctx *ctx = key->wk_private;
 	struct ieee80211vap *vap = ctx->wc_vap;
 	struct sk_buff *skb = skb0;

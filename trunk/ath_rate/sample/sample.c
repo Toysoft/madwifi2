@@ -551,7 +551,7 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 	size_bin = size_to_bin(frame_size);
 	size = bin_to_size(size_bin);
 
-	if(!(0 <= ndx0 && ndx0 < sn->num_rates)) {
+	if (!(0 <= ndx0 && ndx0 < sn->num_rates)) {
 		printk("%s: bogus ndx0 %d, max %u, mode %u\n",
 				__func__, ndx0, sn->num_rates, sc->sc_curmode);
 		return;

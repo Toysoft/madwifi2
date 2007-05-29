@@ -1956,7 +1956,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 	if (mode < 0)
 		return -EINVAL;
 
-	if(ieee80211_check_mode_consistency(ic, mode, vap->iv_des_chan)) { 
+	if (ieee80211_check_mode_consistency(ic, mode, vap->iv_des_chan)) { 
 		/*
 		 * error in AP mode.
 		 * overwrite channel selection in other modes.
@@ -3184,7 +3184,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 		/* NB: MIC presence is implied by cipher type */
 		if (wk->wk_keylen > IEEE80211_KEYBUF_SIZE)
 			wk->wk_keylen = IEEE80211_KEYBUF_SIZE;
-		for(i = 0; i < IEEE80211_TID_SIZE; i++)
+		for (i = 0; i < IEEE80211_TID_SIZE; i++)
 			wk->wk_keyrsc[i] = ik->ik_keyrsc;
 		wk->wk_keytsc = 0;			/* new key, reset */
 		memset(wk->wk_key, 0, sizeof(wk->wk_key));

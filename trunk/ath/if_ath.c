@@ -398,7 +398,7 @@ enum {
 			ath_grppoll_start(vap, sc->sc_xrpollcount); \
 			ath_hal_setrxfilter(sc->sc_ah, rfilt|HAL_RX_FILTER_XRPOLL); \
 		} \
-   	} while(0)
+   	} while (0)
 
 /*
  * Define the scheme that we select MAC address for multiple BSS on the same radio.
@@ -412,7 +412,7 @@ enum {
     	do {                                    \
 		if (id)                            \
             		(bssid)[0] |= (((id) << 2) | 0x02); \
-	} while(0)
+	} while (0)
 
 int
 ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
@@ -996,7 +996,7 @@ ath_detach(struct net_device *dev)
 
 	ath_hal_intrset(ah, 0);		/* disable further intr's */
 	ath_hal_getisr(ah, &tmp);	/* clear ISR */
-	if(dev->irq) {
+	if (dev->irq) {
 		free_irq(dev->irq, dev);
 		dev->irq = 0;
 	}
@@ -1724,7 +1724,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			if (sc->sc_dturbo_switch) {
 				u_int32_t txqs = (1 << sc->sc_bhalq);
 				ath_hal_gettxintrtxqs(ah, &txqs);
-				if(txqs & (1 << sc->sc_bhalq)) {
+				if (txqs & (1 << sc->sc_bhalq)) {
 					sc->sc_dturbo_switch = 0;
 					/*
 					 * Hack: defer switch for 10ms to permit slow
@@ -3642,7 +3642,7 @@ ath_check_beacon_done(struct ath_softc *sc)
 	 * check if the last beacon went out with the mode change flag set.
 	 */
 	for (slot = 0; slot < ATH_BCBUF; slot++) {
-		if(sc->sc_bslot[slot]) { 
+		if (sc->sc_bslot[slot]) { 
 			vap = sc->sc_bslot[slot];
 			break;
 		}
@@ -6689,7 +6689,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	/* setup descriptors */
 	ds = bf->bf_desc;
 #ifdef ATH_SUPERG_XR
-	if(vap->iv_flags & IEEE80211_F_XR ) 
+	if (vap->iv_flags & IEEE80211_F_XR ) 
 		rt = sc->sc_xr_rates;
 	else
 		rt = sc->sc_currates;
@@ -8192,7 +8192,7 @@ ath_check_dfs_clear(unsigned long data )
 	struct ieee80211vap *vap ;
 	HAL_CHANNEL hchan;
 
-	if(!sc->sc_dfswait) return;
+	if (!sc->sc_dfswait) return;
 
 	/* if still need to wait */
 	ath_hal_radar_wait(sc->sc_ah, &hchan);
@@ -8210,7 +8210,7 @@ ath_check_dfs_clear(unsigned long data )
 				/* re alloc beacons to update new channel info */
 				int error;
 				error = ath_beacon_alloc(sc, vap->iv_bss);
-				if(error < 0) {
+				if (error < 0) {
 					/* XXX */
 					return;
 				}
@@ -8417,7 +8417,7 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 		ni_key->wk_keyix = rxkeyidx;
 		ni_key->wk_flags = IEEE80211_KEY_RECV;
 		ni_key->wk_keylen = rcv_key->wk_keylen;
-		for(i = 0; i < IEEE80211_TID_SIZE; i++)
+		for (i = 0; i < IEEE80211_TID_SIZE; i++)
 			ni_key->wk_keyrsc[i] = rcv_key->wk_keyrsc[i];
 		ni_key->wk_keytsc = 0; 
 		ni_key->wk_cipher = rcv_key->wk_cipher; 
@@ -10279,12 +10279,12 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
             default:
                 break;            
         }
-        if(static_label) {
+        if (static_label) {
             snprintf(buf,buflen,static_label);
             return AH_TRUE;
         }
         /* Handle Key Table */
-        if(address >= 0x8800 && address < 0x9800) {
+        if (address >= 0x8800 && address < 0x9800) {
             #define keytable_entry_reg_count (8)
             #define keytable_entry_size      (keytable_entry_reg_count * sizeof(u_int32_t))
             int key = ((address - 0x8800) / keytable_entry_size);
@@ -10308,13 +10308,13 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
             return AH_TRUE;
         }
         /* Handle Rate Duration Table */
-        if(address >= 0x8700 && address < 0x8800) {
+        if (address >= 0x8700 && address < 0x8800) {
             snprintf(buf, buflen, "RATE(%2d).DURATION", ((address - 0x8700) / sizeof(u_int32_t)));
             return AH_TRUE;
         }
     
         /* Handle txpower Table */
-        if(address >= 0xa180 && address < 0xa200) {
+        if (address >= 0xa180 && address < 0xa200) {
             snprintf(buf, buflen, "PCDAC_TXPOWER(%2d)", ((address - 0xa180) / sizeof(u_int32_t)));
             return AH_TRUE;
         }
@@ -10355,8 +10355,8 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
     /*
     Addresses with side effects are never dumped out by bulk debug dump routines
     */
-    if(address >= 0x00c0 && address <= 0x00df) return FILTERED;
-    if(address >= 0x143c && address <= 0x143f) return FILTERED;
+    if (address >= 0x00c0 && address <= 0x00df) return FILTERED;
+    if (address >= 0x143c && address <= 0x143f) return FILTERED;
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
     /* 
@@ -10501,11 +10501,11 @@ static unsigned int
 ath_read_register(struct ieee80211com *ic, unsigned int address, unsigned int* value)
 {
     struct ath_softc *sc = ic->ic_dev->priv;
-    if(address >= MAX_REGISTER_ADDRESS) {
+    if (address >= MAX_REGISTER_ADDRESS) {
         printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x >= 0x%04x\n", DEV_NAME(sc->sc_dev), __func__, address, MAX_REGISTER_ADDRESS);
         return 1;
     }
-    if(address % 4) {
+    if (address % 4) {
         printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x \%% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
         return 1;
     }
@@ -10526,11 +10526,11 @@ static unsigned int
 ath_write_register(struct ieee80211com *ic, unsigned int address, unsigned int value)
 {
     struct ath_softc *sc = ic->ic_dev->priv;
-    if(address >= MAX_REGISTER_ADDRESS) {
+    if (address >= MAX_REGISTER_ADDRESS) {
         printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x >= 0x%04x\n", DEV_NAME(sc->sc_dev), __func__, address, MAX_REGISTER_ADDRESS);
         return 1;
     }
-    if(address % 4) {
+    if (address % 4) {
         printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x \%% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
         return 1;
     }

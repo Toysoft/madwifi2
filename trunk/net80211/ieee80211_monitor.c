@@ -304,7 +304,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	u_int32_t rssi = 0;
 	u_int8_t pkttype = 0;
 	
-	if(tx) {
+	if (tx) {
 		rssi = bf->bf_dsstatus.ds_txstat.ts_rssi;
 		antenna = bf->bf_dsstatus.ds_txstat.ts_antenna;
 		ieeerate = sc->sc_hwmap[bf->bf_dsstatus.ds_txstat.ts_rate].ieeerate;

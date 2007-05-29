@@ -2908,7 +2908,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
  * XR vap does not process  probe requests.
  */
 #ifdef ATH_SUPERG_XR
-	if(vap->iv_flags & IEEE80211_F_XR ) 
+	if (vap->iv_flags & IEEE80211_F_XR ) 
 		return;
 #endif
 		/*
