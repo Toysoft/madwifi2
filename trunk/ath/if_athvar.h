@@ -314,6 +314,12 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 #define	ATH_KEYMAX	128		/* max key cache size we handle */
 #define	ATH_KEYBYTES	(ATH_KEYMAX / NBBY)	/* storage space in bytes */
 
+#ifdef ATH_REVERSE_ENGINEERING
+#define MIN_REGISTER_ADDRESS 0x0000
+#define MAX_REGISTER_ADDRESS 0xc000 /* 48k address range */
+#define MAX_REGISTER_NAME_LEN 32
+#define UNKNOWN_NAME "(unknown)"
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
 /*
  * Convert from net80211 layer values to Ath layer values. Hopefully this will
  * be optimised away when the two constants are the same.
@@ -658,6 +664,10 @@ struct ath_softc {
 	struct ctl_table *sc_sysctls;
 
 	u_int16_t sc_reapcount;  		/* # of tx buffers reaped after net dev stopped */
+
+#ifdef ATH_REVERSE_ENGINEERING
+    u_int8_t register_snapshot[MAX_REGISTER_ADDRESS];
+#endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
 #ifdef ATH_SUPERG_DYNTURBO
 	struct timer_list sc_dturbo_switch_mode;/* AP scan timer */
