@@ -142,7 +142,7 @@ static void ath_key_update_end(struct ieee80211vap *);
 static void ath_mode_init(struct net_device *);
 static void ath_setslottime(struct ath_softc *);
 static void ath_updateslot(struct net_device *);
-static int ath_beaconq_setup(struct ath_hal *);
+static int ath_beaconq_setup(struct ath_softc *);
 static int ath_beacon_alloc(struct ath_softc *, struct ieee80211_node *);
 #ifdef ATH_SUPERG_DYNTURBO
 static void ath_beacon_dturbo_update(struct ieee80211vap *, int *, u_int8_t);
@@ -579,7 +579,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 *
 	 * XXX PS-Poll
 	 */
-	sc->sc_bhalq = ath_beaconq_setup(ah);
+	sc->sc_bhalq = ath_beaconq_setup(sc);
 	if (sc->sc_bhalq == (u_int) -1) {
 		printk(KERN_ERR "%s: unable to setup a beacon xmit queue!\n",
 			DEV_NAME(dev));
@@ -3713,9 +3713,11 @@ ath_turbo_switch_mode(unsigned long data)
  * Setup a h/w transmit queue for beacons.
  */
 static int
-ath_beaconq_setup(struct ath_hal *ah)
+ath_beaconq_setup(struct ath_softc *sc)
 {
 	HAL_TXQ_INFO qi;
+	struct ath_txq *txq;
+	int qnum;
 
 	memset(&qi, 0, sizeof(qi));
 	qi.tqi_aifs = 1;
@@ -3725,7 +3727,14 @@ ath_beaconq_setup(struct ath_hal *ah)
 	qi.tqi_qflags = HAL_TXQ_TXDESCINT_ENABLE;
 #endif
 	/* NB: don't enable any interrupts */
-	return ath_hal_setuptxqueue(ah, HAL_TX_QUEUE_BEACON, &qi);
+	qnum = ath_hal_setuptxqueue(sc->sc_ah, HAL_TX_QUEUE_BEACON, &qi);
+	txq = &sc->sc_txq[qnum];
+	memset(txq, 0, sizeof(struct ath_txq));
+	txq->axq_qnum 		= qnum;
+	STAILQ_INIT(&txq->axq_q);
+	ATH_TXQ_LOCK_INIT(txq);
+	TAILQ_INIT(&txq->axq_stageq);
+	return qnum;
 }
 
 /*
