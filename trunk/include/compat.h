@@ -67,7 +67,7 @@
 /* roundup() appears in Linux 2.6.18 */
 #include <linux/kernel.h>
 #ifndef roundup
-#define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */ 
+#define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
 #endif
 
 #define	howmany(x, y)	(((x)+((y)-1))/(y))

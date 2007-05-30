@@ -53,7 +53,7 @@ ar5312_get_board_config(void)
 {
 	int dataFound;
 	char *bd_config;
-	
+
 	/*
 	 * Find start of Board Configuration data, using heuristics:
 	 * Search back from the (aliased) end of flash by 0x1000 bytes
@@ -70,7 +70,7 @@ ar5312_get_board_config(void)
 			break;
 		}
 	}
-	
+
 	if (!dataFound) {
 		printk("Could not find Board Configuration Data\n");
 		bd_config = NULL;
@@ -84,7 +84,7 @@ ar5312_get_radio_config(void)
 {
 	int dataFound;
 	char *radio_config;
-	
+
 	/* 
 	 * Now find the start of Radio Configuration data, using heuristics:
 	 * Search forward from Board Configuration data by 0x1000 bytes
@@ -127,7 +127,7 @@ ar5312SetupFlash(void)
 		if (ar5312_get_radio_config())
 			return 1;
 	return 0;
-}	
+}
 
 /*
  * Read 16 bits of data from offset into *data
@@ -137,7 +137,7 @@ ar5312BspEepromRead(u_int32_t off, u_int32_t nbytes, u_int8_t *data)
 {
 	int i;
 	char *eepromAddr = radioConfig;
-	
+
 	for (i = 0; i < nbytes; i++, off++)
 		data[i] = eepromAddr[off];
 }
@@ -159,16 +159,16 @@ void *
 bus_alloc_consistent(void *hwdev, size_t size, dma_addr_t *dma_handle)
 {
 	void *ret;
-	 
+
 	ret = (void *) __get_free_pages(GFP_ATOMIC, get_order(size));
-	 
+
 	if (ret != NULL) {
 		memset(ret, 0, size);
 		*dma_handle = __pa(ret);
 		dma_cache_wback_inv((unsigned long) ret, size);
 		ret = UNCAC_ADDR(ret);
 	}
-	 
+
 	return ret;
 }
 
@@ -176,7 +176,7 @@ void
 bus_free_consistent(void *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
 	unsigned long addr = (unsigned long) vaddr;
-	
+
 	addr = CAC_ADDR(addr);
 	free_pages(addr, get_order(size));
 }
@@ -186,13 +186,13 @@ ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 {
 	u_int32_t reset;
 	u_int32_t enable;
-	
+
 	if (((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) ||
 		((devid & AR5315_REV_MAJ_M) == AR5317_REV_MAJ)) {
 		u_int32_t reg;
 		u_int32_t *en = (u_int32_t *) AR5315_AHB_ARB_CTL;
-		
-		KASSERT(wlanNum == 0, ("invalid wlan # %d", wlanNum)); 
+
+		KASSERT(wlanNum == 0, ("invalid wlan # %d", wlanNum));
 
 		/* Enable Arbitration for WLAN */
 		*en  |= AR5315_ARB_WLAN;
@@ -206,9 +206,9 @@ ahb_enable_wmac(u_int16_t devid, u_int16_t wlanNum)
 		/* NOTE: for the following write to succeed the
 		 * RST_AHB_ARB_CTL should be set to 0. This driver
 		 * assumes that the register has been set to 0 by boot loader
-		 */ 
+		 */
 		reg = REG_READ(AR5315_PCI_MAC_SCR);
-		reg = (reg & ~AR5315_PCI_MAC_SCR_SLMODE_M) | 
+		reg = (reg & ~AR5315_PCI_MAC_SCR_SLMODE_M) |
 		    (AR5315_PCI_MAC_SCR_SLM_FWAKE << AR5315_PCI_MAC_SCR_SLMODE_S);
 		REG_WRITE(AR5315_PCI_MAC_SCR, reg);
 
@@ -253,11 +253,11 @@ ahb_disable_wmac(u_int16_t devid, u_int16_t wlanNum)
 		((devid & AR5315_REV_MAJ_M) == AR5317_REV_MAJ)) {
 		u_int32_t *en = (u_int32_t *) AR5315_AHB_ARB_CTL;
 
-		KASSERT(wlanNum == 0, ("invalid wlan # %d", wlanNum) ); 
+		KASSERT(wlanNum == 0, ("invalid wlan # %d", wlanNum) );
 
 		/* Enable Arbitration for WLAN */
 		*en &= ~AR5315_ARB_WLAN;
-	} else { 
+	} else {
 		switch (wlanNum) {
 		case AR531X_WLAN0_NUM:
 			enable = AR531X_ENABLE_WLAN0;
@@ -280,7 +280,7 @@ exit_ath_wmac(u_int16_t wlanNum)
 	struct ath_ahb_softc *sc = sclist[wlanNum];
 	struct net_device *dev;
 	const char *sysType;
-	u_int16_t devid;        
+	u_int16_t devid;
 
 	if (sc == NULL)
 		return -ENODEV; /* XXX: correct return value? */
@@ -294,9 +294,9 @@ exit_ath_wmac(u_int16_t wlanNum)
 		devid = (u_int16_t) (sysRegRead(AR5315_SREV) &
 			(AR5315_REV_MAJ_M | AR5315_REV_MIN_M));
 	else
-		devid = (u_int16_t) ((sysRegRead(AR531X_REV) >> 8) & 
+		devid = (u_int16_t) ((sysRegRead(AR531X_REV) >> 8) &
 			(AR531X_REV_MAJ | AR531X_REV_MIN));
-  
+
 	ahb_disable_wmac(devid, wlanNum);
 	free_netdev(dev);
 	sclist[wlanNum] = NULL;
@@ -362,7 +362,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 		printk(KERN_WARNING "%s: request_irq failed\n", dev->name);
 		goto bad3;
 	}
-	
+
 	if (ath_attach(devid, dev, config) != 0)
 		goto bad4;
 	athname = ath_hal_probe(ATHEROS_VENDOR_ID, devid);
@@ -394,7 +394,7 @@ static int ahb_wmac_probe(struct platform_device *pdev)
 	config = (struct ar531x_config *) pdev->dev.platform_data;
 	devid = (u32) config->tag;
 	config->tag = NULL;
-	
+
 	return init_ath_wmac((u_int16_t) devid, pdev->id, config);
 }
 
@@ -423,7 +423,7 @@ init_ahb(void)
 	struct ar531x_config config;
 
 	sysType = get_system_type();
-	
+
 	/* Probe to find out the silicon revision and enable the
 	   correct number of macs */
 	if (!ar5312SetupFlash())

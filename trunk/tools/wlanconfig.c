@@ -70,7 +70,7 @@
 #define IEEE80211_NODE_FF	0x0004          /* Fast Frame capable */
 #define IEEE80211_NODE_XR	0x0008		/* Atheros WME enable */
 #define IEEE80211_NODE_AR	0x0010		/* AR capable */
-#define IEEE80211_NODE_BOOST	0x0080 
+#define IEEE80211_NODE_BOOST	0x0080
 
 #define	streq(a,b)	(strncasecmp(a,b,sizeof(b)-1) == 0)
 
@@ -224,7 +224,7 @@ static int if_split_name(const char *if_name, char **if_base_name, unsigned int 
 		if (!isdigit(*p))
 			break;
 	}
-	
+
 	if (p < l) {
 		if (unit != NULL)
 			*unit = atoi(p + 1);
@@ -302,7 +302,7 @@ getopmode(const char *s)
 		return IEEE80211_M_WDS;
 	if (streq(s, "ahdemo"))
 		return IEEE80211_M_AHDEMO;
-	
+
 	errx(1, "unknown operating mode %s", s);
 	/*NOTREACHED*/
 	return -1;
@@ -453,7 +453,7 @@ printie(const char* tag, const uint8_t *ie, size_t ielen, int maxlen)
 static int
 copy_essid(char buf[], size_t bufsize, const u_int8_t *essid, size_t essid_len)
 {
-	const u_int8_t *p; 
+	const u_int8_t *p;
 	int maxlen;
 	int i;
 
@@ -489,7 +489,7 @@ copy_essid(char buf[], size_t bufsize, const u_int8_t *essid, size_t essid_len)
 	return maxlen;
 }
 
-/* unaligned little endian access */     
+/* unaligned little endian access */
 #define LE_READ_4(p)					\
 	((u_int32_t)					\
 	 ((((const u_int8_t *)(p))[0]      ) |		\
@@ -632,7 +632,7 @@ list_stations(const char *ifname)
 	} while (len >= sizeof(struct ieee80211req_sta_info));
 }
 
-/* unaligned little endian access */     
+/* unaligned little endian access */
 #define LE_READ_4(p)					\
 	((u_int32_t)					\
 	 ((((const u_int8_t *)(p))[0]      ) |		\

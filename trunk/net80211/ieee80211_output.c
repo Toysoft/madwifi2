@@ -79,7 +79,7 @@ doprint(struct ieee80211vap *vap, int subtype)
  * written into the skb->priority field. On success, returns 0. Failure
  * due to bad or mis-matched vlan tag is indicated by non-zero return.
  */
-static int 
+static int
 ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
@@ -89,7 +89,7 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 	/* default priority */
 	skb->priority = WME_AC_BE;
 
-	if (!(ni->ni_flags & IEEE80211_NODE_QOS)) 
+	if (!(ni->ni_flags & IEEE80211_NODE_QOS))
 		return 0;
 
 	/* 
@@ -105,7 +105,7 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 			ni->ni_stats.ns_tx_novlantag++;
 			return 1;
 		}
-		if (((tag = vlan_tx_tag_get(skb)) & VLAN_VID_MASK) != 
+		if (((tag = vlan_tx_tag_get(skb)) & VLAN_VID_MASK) !=
 		    (ni->ni_vlan & VLAN_VID_MASK)) {
 			IEEE80211_NODE_STAT(ni, tx_vlanmismatch);
 			ni->ni_stats.ns_tx_vlanmismatch++;
@@ -190,7 +190,7 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 			}
 		}
 	}
-	
+
 	return 0;
 }
 
@@ -225,7 +225,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	cb = (struct ieee80211_cb *) skb->cb;
 	memset(cb, 0, sizeof(struct ieee80211_cb));
-	
+
 	if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 		ieee80211_monitor_encap(vap, skb);
 		ieee80211_parent_queue_xmit(skb);
@@ -253,9 +253,9 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 			"%s: discard, classification failure", __func__);
 		goto bad;
 	}
-	
+
 	cb->ni = ieee80211_ref_node(ni);
-	
+
 	/* power-save checks */
 	if (WME_UAPSD_AC_CAN_TRIGGER(skb->priority, ni)) {
 		/* U-APSD power save queue */
@@ -401,7 +401,7 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
-	ieee80211_send_setup(vap, ni, wh, 
+	ieee80211_send_setup(vap, ni, wh,
 		IEEE80211_FC0_TYPE_MGT | type,
 		vap->iv_myaddr, ni->ni_macaddr, ni->ni_bssid);
 	/* XXX power management */
@@ -524,10 +524,10 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 
 	ieee80211_send_setup(vap, ni, (struct ieee80211_frame *)qwh,
 		IEEE80211_FC0_TYPE_DATA,
-		vap->iv_myaddr, /* SA */ 
+		vap->iv_myaddr, /* SA */
 		ni->ni_macaddr, /* DA */
 		ni->ni_bssid);
-	
+
 	qwh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
 		IEEE80211_FC0_SUBTYPE_QOS_NULL;
 
@@ -540,7 +540,7 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 	if (ic->ic_wme.wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy)
 		qwh->i_qos[0] |= (1 << IEEE80211_QOS_ACKPOLICY_S) & IEEE80211_QOS_ACKPOLICY;
 	qwh->i_qos[1] = 0;
-	
+
 	IEEE80211_NODE_STAT(ni, tx_data);
 
 	if (WME_UAPSD_AC_CAN_TRIGGER(skb->priority, ni)) {
@@ -548,7 +548,7 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 		/* XXXAPSD: assuming triggerable means deliverable */
 		M_FLAG_SET(skb, M_UAPSD);
 	}
-	
+
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
 		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
 		__func__, __LINE__,
@@ -556,7 +556,7 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 		ieee80211_node_refcnt(ni));
 
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
-	
+
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_send_qosnulldata);
@@ -651,7 +651,7 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 		/* second skb with header and tail adjustments possible */
 		if (skb_tailroom(skb2) < need_tailroom) {
 			int n = 0;
-			if (inter_headroom > skb_headroom(skb2)) 
+			if (inter_headroom > skb_headroom(skb2))
 				n = inter_headroom - skb_headroom(skb2);
 			if (pskb_expand_head(skb2, n,
 			    need_tailroom - skb_tailroom(skb2), GFP_ATOMIC)) {
@@ -778,7 +778,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	struct sk_buff *skb2 = NULL;
 	struct ether_header eh2;
 	int isff = ATH_FF_MAGIC_PRESENT(skb);
-	
+
 	if (isff) {
 #if 0
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
@@ -824,7 +824,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			goto bad;
 		}
 	} else
-		key = NULL;		
+		key = NULL;
 	addqos = (ni->ni_flags & IEEE80211_NODE_QOS) &&
 		eh.ether_type != htons(ETHERTYPE_PAE);
 	if (addqos)
@@ -857,7 +857,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			hdrsize += IEEE80211_ADDR_LEN;
 			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
-			/* add a wds entry to the station vap */ 
+			/* add a wds entry to the station vap */
 			if (IEEE80211_IS_MULTICAST(eh.ether_dhost)) {
 				struct ieee80211_node_table *nt;
 				struct ieee80211_node *ni_wds = NULL;
@@ -878,13 +878,13 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	hdrsize_nopad = hdrsize;
 	if (ic->ic_flags & IEEE80211_F_DATAPAD)
 		hdrsize = roundup(hdrsize, sizeof(u_int32_t));
-	
+
 	skb = ieee80211_skbhdr_adjust(vap, hdrsize, key, skb, ismulticast);
 	if (skb == NULL) {
 		/* NB: ieee80211_skbhdr_adjust handles msgs+statistics */
 		goto bad;
 	}
-	
+
 #ifdef ATH_SUPERG_FF
 	if (isff) {
 		struct ether_header *eh_inter;
@@ -982,7 +982,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	}
 #endif /* ATH_SUPERG_FF */
 	datalen = skb->len;			/* NB: w/o 802.11 header */
-	
+
 	wh = (struct ieee80211_frame *) skb_push(skb, hdrsize);
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
 	wh->i_dur = 0;
@@ -1041,7 +1041,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			(struct ieee80211_qosframe *) wh;
 		u_int8_t *qos;
 		int tid;
-		
+
 		qos = &qwh->i_qos[0];
 		if (use4addr)
 			qos += IEEE80211_ADDR_LEN;
@@ -1077,11 +1077,11 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			ciphdrsize = cip->ic_header;
 			tailsize += (cip->ic_trailer + cip->ic_miclen);
 		}
-		
+
 		pdusize = vap->iv_fragthreshold - (hdrsize_nopad + ciphdrsize);
-		fragcnt = *framecnt = 
+		fragcnt = *framecnt =
 			((pktlen - (hdrsize_nopad + ciphdrsize)) / pdusize) +
-			(((pktlen - (hdrsize_nopad + ciphdrsize)) % 
+			(((pktlen - (hdrsize_nopad + ciphdrsize)) %
 				pdusize == 0) ? 0 : 1);
 
 		/*
@@ -1092,7 +1092,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			tskb = dev_alloc_skb(hdrsize + ciphdrsize + pdusize + tailsize);
 			if (tskb == NULL)
 				break;
-			
+
 			tskb->next = framelist;
 			framelist = tskb;
 		}
@@ -1138,7 +1138,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		*/
 		wh->i_fc[1] |= IEEE80211_FC1_MORE_FRAG;
 
-		*(__le16 *)&wh->i_seq[0] |= 
+		*(__le16 *)&wh->i_seq[0] |=
 			htole16((fragnum & IEEE80211_SEQ_FRAG_MASK) <<
 				IEEE80211_SEQ_FRAG_SHIFT);
 		fragnum++;
@@ -1191,9 +1191,9 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		IEEE80211_NODE_STAT_ADD(ni, tx_bytes, datalen);
 
 #ifdef ATH_SUPERG_FF
-		/* Account for a second skb in the same packet when FF is on */ 
+		/* Account for a second skb in the same packet when FF is on */
 		if (skb->next) {
-			datalen = skb->next->len;	
+			datalen = skb->next->len;
 			IEEE80211_NODE_STAT(ni, tx_data);
 			IEEE80211_NODE_STAT_ADD(ni, tx_bytes, datalen);
 		}
@@ -1640,7 +1640,7 @@ ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 		frm += IEEE80211_ADDR_LEN;
 		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval);
 		frm += 2;
-		*frm++ = vap->iv_ath_cap; 
+		*frm++ = vap->iv_ath_cap;
 		*frm++ = vap->iv_xrvap->iv_ath_cap;
 	}
 	ie->param_len = frm - &ie->param_oui[0];
@@ -1667,7 +1667,7 @@ ieee80211_add_doth(u_int8_t *frm, struct ieee80211com *ic)
 	 * Supported Channels IE
 	 */
 	*frm++ = IEEE80211_ELEMID_SUPPCHAN;
-	
+
 	/* XXX
 	 * THIS IS WRONG! check 802.11h chapter 7.3.2.19
 	 * we should send channel_number/number_of_channels pairs
@@ -1719,9 +1719,9 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	 *	[tlv] extended supported rates
 	 *	[tlv] user-specified ie's
 	 */
-	skb = ieee80211_getmgtframe(&frm, 2 + IEEE80211_NWID_LEN + 
-		2 + IEEE80211_RATE_SIZE + 
-		2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) + 
+	skb = ieee80211_getmgtframe(&frm, 2 + IEEE80211_NWID_LEN +
+		2 + IEEE80211_RATE_SIZE +
+		2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
 		(optie != NULL ? optielen : 0) +
 		vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].length);
 	if (skb == NULL) {
@@ -1821,7 +1821,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *	[tlv] Atheros Advanced Capabilities
 		 *	[tlv] AtherosXR parameters
 		 */
-		skb = ieee80211_getmgtframe(&frm, 
+		skb = ieee80211_getmgtframe(&frm,
 			  8
 			+ sizeof(u_int16_t)
 			+ sizeof(u_int16_t)
@@ -1848,7 +1848,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			senderr(ENOMEM, is_tx_nobuf);
 
 		/* timestamp should be filled later */
-		memset(frm, 0, 8);	
+		memset(frm, 0, 8);
 		frm += 8;
 
 		/* beacon interval */
@@ -1905,14 +1905,14 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if ((ic->ic_flags & IEEE80211_F_DOTH) ||
 		    (ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE))
 			frm = ieee80211_add_country(frm, ic);
-		
+
 		/* power constraint */
 		if (ic->ic_flags & IEEE80211_F_DOTH) {
 			*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 			*frm++ = 1;
 			*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
 		}
-		
+
 		/* ERP */
 		if (IEEE80211_IS_CHAN_ANYG(ic->ic_curchan))
 			frm = ieee80211_add_erp(frm, ic);
@@ -1924,7 +1924,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (vap->iv_flags & IEEE80211_F_WME)
 			frm = ieee80211_add_wme_param(frm, &ic->ic_wme,
 				IEEE80211_VAP_UAPSD_ENABLED(vap));
-		
+
 		/* WPA */
 		if (vap->iv_flags & IEEE80211_F_WPA)
 			frm = ieee80211_add_wpa(frm, vap);
@@ -1932,7 +1932,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		/* AthAdvCaps */
 		if (vap->iv_bss && vap->iv_bss->ni_ath_flags)
 			frm = ieee80211_add_athAdvCap(frm, vap->iv_bss->ni_ath_flags,
-				vap->iv_bss->ni_ath_defkeyindex); 
+				vap->iv_bss->ni_ath_defkeyindex);
 #ifdef ATH_SUPERG_XR
 		/* XR params */
 		if (vap->iv_xrvap && vap->iv_ath_cap & IEEE80211_ATHC_XR)
@@ -1966,7 +1966,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			(arg == IEEE80211_AUTH_SHARED_REQUEST &&
 			vap->iv_bss->ni_authmode == IEEE80211_AUTH_SHARED);
 
-		skb = ieee80211_getmgtframe(&frm, 
+		skb = ieee80211_getmgtframe(&frm,
 			3 * sizeof(u_int16_t)
 			+ (has_challenge && status == IEEE80211_STATUS_SUCCESS ?
 				sizeof(u_int16_t)+IEEE80211_CHALLENGE_LEN : 0));
@@ -2034,8 +2034,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *      [tlv] Atheros advanced capabilities
 		 *	[tlv] user-specified ie's
 		 */
-		skb = ieee80211_getmgtframe(&frm, 
-			sizeof(u_int16_t) + 
+		skb = ieee80211_getmgtframe(&frm,
+			sizeof(u_int16_t) +
 			sizeof(u_int16_t) +
 			IEEE80211_ADDR_LEN +
 			2 + IEEE80211_NWID_LEN +
@@ -2108,7 +2108,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 			frm = ieee80211_add_athAdvCap(frm,
 				ni->ni_ath_flags & vap->iv_ath_cap,
-				def_keyindex); 
+				def_keyindex);
 		}
 
 		/* User-spec */
@@ -2140,7 +2140,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *      [tlv] WME (if enabled and STA enabled)
 		 *      [tlv] Atheros Advanced Capabilities 
 		 */
-		skb = ieee80211_getmgtframe(&frm, 
+		skb = ieee80211_getmgtframe(&frm,
 			3 * sizeof(u_int16_t) +
 			2 + IEEE80211_RATE_SIZE +
 			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
@@ -2187,9 +2187,9 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 		/* athAdvCap */
 		if (vap->iv_ath_cap)
-			frm = ieee80211_add_athAdvCap(frm, 
+			frm = ieee80211_add_athAdvCap(frm,
 				vap->iv_ath_cap & ni->ni_ath_flags,
-				ni->ni_ath_defkeyindex); 
+				ni->ni_ath_defkeyindex);
 
 		if (vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_RESP].ie) {
 			memcpy(frm, vap->app_ie[IEEE80211_APPIE_FRAME_ASSOC_RESP].ie,
@@ -2259,7 +2259,7 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 		IEEE80211_FC0_SUBTYPE_PS_POLL;
 	if (IEEE80211_VAP_IS_SLEEPING(ni->ni_vap))
 		wh->i_fc[1] |= IEEE80211_FC1_PWR_MGT;
-	
+
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
 		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
 		__func__, __LINE__,
@@ -2290,11 +2290,11 @@ ieee80211_getcfframe(struct ieee80211vap *vap, int type)
 		return NULL;
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
-	if (type == IEEE80211_FC0_SUBTYPE_CFPOLL) { 
+	if (type == IEEE80211_FC0_SUBTYPE_CFPOLL) {
 		wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
 		wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA | type;
 		wh->i_dur = htole16(0x8000);
-	} else if (type == IEEE80211_FC0_SUBTYPE_CF_END) { 
+	} else if (type == IEEE80211_FC0_SUBTYPE_CF_END) {
 		wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
 		wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_CTL | type;
 		wh->i_dur = 0;

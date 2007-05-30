@@ -119,8 +119,8 @@ ccmp_attach(struct ieee80211vap *vap, struct ieee80211_key *k)
 	ctx->cc_tfm = crypto_alloc_cipher("aes", 0,
 					CRYPTO_ALG_ASYNC);
 	if (ctx->cc_tfm == NULL) {
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO, 
-				"%s: unable to load kernel AES crypto support\n", 
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
+				"%s: unable to load kernel AES crypto support\n",
 				__func__);
 	}
 
@@ -150,7 +150,7 @@ ccmp_setkey(struct ieee80211_key *k)
 			__func__, k->wk_keylen, 128 / NBBY);
 		return 0;
 	}
-	
+
 	if (k->wk_flags & IEEE80211_KEY_SWCRYPT) {
 		if (ctx->cc_tfm == NULL) {
 			IEEE80211_DPRINTF(ctx->cc_vap, IEEE80211_MSG_CRYPTO,
@@ -158,7 +158,7 @@ ccmp_setkey(struct ieee80211_key *k)
 				__func__);
 			return 0;
 		}
-		
+
 		crypto_cipher_setkey(ctx->cc_tfm, k->wk_key, k->wk_keylen);
 	}
 
@@ -253,9 +253,9 @@ ccmp_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 		return 0;
 	}
 	tid = 0;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) 
+	if (IEEE80211_QOS_HAS_SEQ(wh))
 		tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
-	/* NB: assume IEEE80211_WEP_MINLEN covers the extended IV */ 
+	/* NB: assume IEEE80211_WEP_MINLEN covers the extended IV */
 	pn = READ_6(ivp[0], ivp[1], ivp[4], ivp[5], ivp[6], ivp[7]);
 	if (pn <= k->wk_keyrsc[tid]) {
 		/*

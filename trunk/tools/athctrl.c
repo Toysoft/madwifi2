@@ -66,7 +66,7 @@ setsysctrl(const char *dev, const char *control , u_long value)
 		fclose(fd);
 	} else
 		fprintf(stderr, "Could not open %s for writing!\n", buffer);
-	
+
 	return 0;
 }
 
@@ -120,7 +120,7 @@ main(int argc, char *argv[])
 	    	int slottime = 9 + (distance / 300) + ((distance % 300) ? 1 : 0);
 		int acktimeout = slottime * 2 + 3;
 		int ctstimeout = slottime * 2 + 3;
-		
+
 		printf("Setting distance on interface %s to %i meters\n",
 			device, distance);
 		setsysctrl(device, "slottime", slottime);

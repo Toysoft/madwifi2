@@ -212,7 +212,7 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 	struct sk_buff *tail;
 	int qlen, age;
 
-	IEEE80211_NODE_SAVEQ_LOCK_BH(ni);	
+	IEEE80211_NODE_SAVEQ_LOCK_BH(ni);
 	if (IEEE80211_NODE_SAVEQ_QLEN(ni) >= IEEE80211_PS_MAX_QUEUE) {
 		IEEE80211_NODE_STAT(ni, psq_drops);
 		IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
@@ -244,7 +244,7 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 		__skb_queue_head(&ni->ni_savedq, skb);
 	M_AGE_SET(skb, age);
 	qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
-	IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);	
+	IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
 		"save frame, %u now queued", qlen);
@@ -373,7 +373,7 @@ ieee80211_sta_pwrsave(struct ieee80211vap *vap, int enable)
 			}
 		}
 	} else {
-		IEEE80211_VAP_GOTOSLEEP(vap);	
+		IEEE80211_VAP_GOTOSLEEP(vap);
 		ieee80211_send_nulldata(ieee80211_ref_node(ni));
 	}
 }

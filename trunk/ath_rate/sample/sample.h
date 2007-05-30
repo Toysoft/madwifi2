@@ -58,7 +58,7 @@ struct rate_info {
 };
 
 
-struct rate_stats {	
+struct rate_stats {
 	unsigned average_tx_time;
 	int successive_failures;
 	int tries;
@@ -82,11 +82,11 @@ struct sample_node {
 	int num_rates;
 
 	struct rate_info rates[IEEE80211_RATE_MAXSIZE];
-	
+
 	struct rate_stats stats[NUM_PACKET_SIZE_BINS][IEEE80211_RATE_MAXSIZE];
 	int last_sample_ndx[NUM_PACKET_SIZE_BINS];
 
-	int current_sample_ndx[NUM_PACKET_SIZE_BINS];       
+	int current_sample_ndx[NUM_PACKET_SIZE_BINS];
 	int packets_sent[NUM_PACKET_SIZE_BINS];
 
 	int current_rate[NUM_PACKET_SIZE_BINS];

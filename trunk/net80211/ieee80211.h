@@ -51,7 +51,7 @@ struct ieee80211_plcp_hdr {
 	u_int16_t i_crc;
 } __packed;
 
-#define IEEE80211_PLCP_SFD      0xF3A0 
+#define IEEE80211_PLCP_SFD      0xF3A0
 #define IEEE80211_PLCP_SERVICE  0x00
 
 /*
@@ -387,7 +387,7 @@ struct ieee80211_ie_csa {
 #define IEEE80211_CSA_PROTECTION_PERIOD 3
 
 /* maximum allowed deviance of measurement of intervals between CSA in Beacons */
-#define IEEE80211_CSA_SANITY_THRESHOLD 100    
+#define IEEE80211_CSA_SANITY_THRESHOLD 100
 
 
 /* does frame have QoS sequence control data */

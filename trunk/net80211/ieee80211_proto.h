@@ -210,7 +210,7 @@ struct wmeParams {
 struct chanAccParams{
 	/* XXX: is there any reason to have multiple instances of cap_info_count??? */
 	u_int8_t cap_info_count;		 		/* ver. of the current param set */
-	struct wmeParams cap_wmeParams[WME_NUM_AC];	/*WME params for each access class */ 
+	struct wmeParams cap_wmeParams[WME_NUM_AC];	/*WME params for each access class */
 };
 
 struct ieee80211_wme_state {

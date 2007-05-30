@@ -70,7 +70,7 @@ static __inline void
 set_quality(struct iw_quality *iq, u_int rssi, int noise)
 {
 	iq->qual = rssi;
-	iq->noise = noise; 
+	iq->noise = noise;
 	iq->level = ((((int)rssi + noise) <= 0) ? ((int)rssi + noise) : 0);
 	iq->updated = IW_QUAL_ALL_UPDATED;
 #if WIRELESS_EXT >= 19
@@ -352,7 +352,7 @@ int ieee80211_load_module(const char *);
  *				is the last reference, otherwise 0
  * ieee80211_node_refcnt	reference count for printing (only)
  */
-typedef atomic_t ieee80211_node_ref_count_t; 
+typedef atomic_t ieee80211_node_ref_count_t;
 #define ieee80211_node_initref(_ni)	atomic_set(&(_ni)->ni_refcnt, 1)
 #define ieee80211_node_incref(_ni)	atomic_inc(&(_ni)->ni_refcnt)
 #define	ieee80211_node_decref(_ni)	atomic_dec(&(_ni)->ni_refcnt)
@@ -567,6 +567,6 @@ void ieee80211_ioctl_vdetach(struct ieee80211vap *);
 struct ifreq;
 int ieee80211_ioctl_create_vap(struct ieee80211com *, struct ifreq *,
 	struct net_device *);
-struct ieee80211vap *ieee80211_create_vap(struct ieee80211com *, char *, 
+struct ieee80211vap *ieee80211_create_vap(struct ieee80211com *, char *,
 	struct net_device *, int, int);
 #endif /* _NET80211_IEEE80211_LINUX_H_ */

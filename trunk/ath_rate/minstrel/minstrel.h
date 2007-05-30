@@ -78,7 +78,7 @@ struct minstrel_softc {
 	struct ctl_table *sysctls;
 #endif
 	struct ath_softc  *sc;
-	struct net_device *sc_dev; 
+	struct net_device *sc_dev;
 
 
 	struct timer_list timer;	/* periodic timer */
@@ -102,7 +102,7 @@ struct minstrel_node {
 	int static_rate_ndx; /*User has bypassed dynamic selection. Fix on one rate */
 	int num_rates;
 	struct rate_info rates[IEEE80211_RATE_MAXSIZE];
-	
+
 	unsigned perfect_tx_time[IEEE80211_RATE_MAXSIZE];  /* transmit time for 0 retries */
 	unsigned retry_count[IEEE80211_RATE_MAXSIZE];      /*The number of retrys permitted for this particular rate */
 	unsigned retry_adjusted_count[IEEE80211_RATE_MAXSIZE]; /*retry_count, but altered, depending on if this is a very poor (or very good) link */
@@ -114,12 +114,12 @@ struct minstrel_node {
 	u_int32_t		rs_lastrateattempts[IEEE80211_RATE_MAXSIZE];
 	u_int32_t		rs_lastratesuccess [IEEE80211_RATE_MAXSIZE];
 	u_int32_t               rs_probability [IEEE80211_RATE_MAXSIZE]; /* units of parts per thousand */
-	u_int64_t               rs_succ_hist   [IEEE80211_RATE_MAXSIZE]; 
-	u_int64_t               rs_att_hist    [IEEE80211_RATE_MAXSIZE]; 
-	   
+	u_int64_t               rs_succ_hist   [IEEE80211_RATE_MAXSIZE];
+	u_int64_t               rs_att_hist    [IEEE80211_RATE_MAXSIZE];
+
 	u_int32_t               rs_this_tp     [IEEE80211_RATE_MAXSIZE]; /*Throughput, each rate */
 
-	int                     is_sampling; 
+	int                     is_sampling;
 
 	/** These four parameters are indexes into the current rate
 	    table, and are calculated in ath_rate_statistics(), which

@@ -85,8 +85,8 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 #define	IEEE80211_PS_MAX_QUEUE	50		/* maximum saved packets */
 
 #define	IEEE80211_XR_BEACON_FACTOR	3	/* factor between xr Beacon interval and normal beacon interval */
-#define	IEEE80211_XR_DEFAULT_RATE_INDEX	0	
-#define	IEEE80211_XR_FRAG_THRESHOLD	540	
+#define	IEEE80211_XR_DEFAULT_RATE_INDEX	0
+#define	IEEE80211_XR_FRAG_THRESHOLD	540
 
 #define	IEEE80211_FIXED_RATE_NONE	-1
 
@@ -133,7 +133,7 @@ struct ieee80211_spy {
 	u_int8_t mac[IW_MAX_SPY * IEEE80211_ADDR_LEN];
 	u_int32_t ts_rssi[IW_MAX_SPY];		/* ts of rssi value from last read */
 	u_int8_t thr_low;			/* 1 byte rssi value, 0 = threshold is off */
-	u_int8_t thr_high;			/* 1 byte rssi value */   
+	u_int8_t thr_high;			/* 1 byte rssi value */
 	u_int8_t num;
 };
 
@@ -316,7 +316,7 @@ struct ieee80211com {
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
 	struct ieee80211_channel *ic_prevchan;	/* previous channel */
 	int16_t ic_channoise;			/* current channel noise in dBm */
-	
+
 	/* Regulatory class ids */
 	u_int ic_nregclass;			/* # entries in ic_regclassids */
 	u_int8_t ic_regclassids[IEEE80211_REGCLASSIDS_MAX];
@@ -340,12 +340,12 @@ struct ieee80211com {
 	u_int16_t ic_sta_assoc;			/* stations associated */
 	u_int16_t ic_dt_sta_assoc;		/* dturbo capable stations */
 	u_int16_t ic_xr_sta_assoc;		/* XR stations associated */
-	
+
 	/* Spectrum management. */
 	u_int16_t ic_country_code;
 	int ic_country_outdoor;
 	struct ieee80211_ie_country ic_country_ie; /* country info element */
-	
+
 	/* current channel max power, used to compute Power Constraint IE.
 	 *
 	 * NB: local power constraint depends on the channel, but assuming it must
@@ -360,25 +360,25 @@ struct ieee80211com {
 	struct ieee80211vap *(*ic_vap_create)(struct ieee80211com *,
 		const char *, int, int, struct net_device *);
 	void (*ic_vap_delete)(struct ieee80211vap *);
-	
+
 	/* Send/recv 802.11 management frame */
 	int (*ic_send_mgmt)(struct ieee80211_node *, int, int);
 	void (*ic_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int,
 		int, u_int32_t);
-	
+
 	/* Send management frame to driver (like hardstart) */
 	int (*ic_mgtstart)(struct ieee80211com *, struct sk_buff *);
-	
+
 	/* Reset device state after 802.11 parameter/state change */
 	int (*ic_init)(struct net_device *);
 	int (*ic_reset)(struct net_device *);
-	
+
 	/* Update device state for 802.11 slot time change */
 	void (*ic_updateslot)(struct net_device *);
-	
+
 	/* New station association callback/notification */
 	void (*ic_newassoc)(struct ieee80211_node *, int);
-	
+
 	/* Node state management */
 	struct ieee80211_node *(*ic_node_alloc)(struct ieee80211vap *);
 	void (*ic_node_free)(struct ieee80211_node *);
@@ -417,7 +417,7 @@ struct proc_ieee80211_priv {
 	int rlen;
 	int max_rlen;
 	char *rbuf;
-	
+
 	int wlen;
 	int max_wlen;
 	char *wbuf;
@@ -475,7 +475,7 @@ MALLOC_DECLARE(M_80211_VAP);
 #define	IEEE80211_F_WMEUPDATE	0x20000000		/* STATUS: update beacon wme */
 #define IEEE80211_F_DOTH	0x40000000		/* enable 11.h */
 #define IEEE80211_F_CHANSWITCH	0x80000000		/* force chanswitch */
-	
+
 /* ic_flags_ext */
 #define	IEEE80211_FEXT_WDS	0x00000001		/* CONF: 4 addr allowed */
 #define IEEE80211_FEXT_COUNTRYIE 0x00000002		/* CONF: enable country IE */

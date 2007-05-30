@@ -564,7 +564,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 			 */
 			ss->ss_flags |= IEEE80211_SCAN_NOPICK |
 				IEEE80211_SCAN_BGSCAN;
-			
+
 			/* If previous scan completed, restart */
 			if (ss->ss_next >= ss->ss_last) {
 				ss->ss_next = 0;
@@ -574,7 +574,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 					vap->iv_stats.is_scan_passive++;
 				ss->ss_ops->scan_restart(ss, vap);
 			}
-			
+
 			/* NB: Flush frames RX'd before 1st channel change */
 			SCAN_PRIVATE(ss)->ss_iflags |= ISCAN_DISCARD;
 			ss->ss_mindwell = duration;
@@ -766,7 +766,7 @@ again:
 			 * may generate a request to cancel scanning.
 			 */
 			ic->ic_flags &= ~IEEE80211_F_SCAN;
-			
+
 			/*
 			 * Drop out of power save mode when a scan has
 			 * completed.  If this scan was prematurely terminated
@@ -806,7 +806,7 @@ dump_probe_beacon(u_int8_t subtype, int isnew,
 	printf("\n");
 
 	if (isnew) {
-		printf("[%s] caps 0x%x bintval %u erp 0x%x", 
+		printf("[%s] caps 0x%x bintval %u erp 0x%x",
 			ether_sprintf(mac), sp->capinfo, sp->bintval, sp->erp);
 		if (sp->country != NULL) {
 #ifdef __FreeBSD__
@@ -934,7 +934,7 @@ ieee80211_scan_iterate(struct ieee80211com *ic,
 {
   int res = 0;
   struct ieee80211_scan_state *ss = ic->ic_scan;
-	
+
   if (ss->ss_ops != NULL) {
 	res = ss->ss_ops->scan_iterate(ss, f, arg);
   }

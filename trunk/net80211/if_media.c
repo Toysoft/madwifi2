@@ -210,7 +210,7 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 		if (match == NULL) {
 #ifdef IFMEDIA_DEBUG
 			if (ifmedia_debug) {
-				printk("ifmedia_ioctl: no media found for 0x%x\n", 
+				printk("ifmedia_ioctl: no media found for 0x%x\n",
 					newmedia);
 			}
 #endif
@@ -254,7 +254,7 @@ ifmedia_ioctl(struct net_device *dev, struct ifreq *ifr,
 	/*
 	 * Get list of available media and current media on interface.
 	 */
-	case  SIOCGIFMEDIA: 
+	case  SIOCGIFMEDIA:
 	{
 		struct ifmedia_entry *ep;
 		int *kptr, count;
@@ -492,7 +492,7 @@ ifmedia_printword(int ifmw)
 			if (seen_option == 0)
 				printk(" <");
 			printk("%s%s", seen_option++ ? "," : "",
-			    desc->ifmt_string); 
+			    desc->ifmt_string);
 		}
 	}
 	printk("%s\n", seen_option ? ">" : "");

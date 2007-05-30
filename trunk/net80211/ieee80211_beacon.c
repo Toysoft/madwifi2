@@ -96,7 +96,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		frm += ni->ni_esslen;
 	} else
 		*frm++ = 0;
-	
+
 	/* supported rates */
 	frm = ieee80211_add_rates(frm, rs);
 
@@ -131,7 +131,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	bo->bo_tim_trailer = frm;
 
 	/* country */
-	if ((ic->ic_flags & IEEE80211_F_DOTH) || 
+	if ((ic->ic_flags & IEEE80211_F_DOTH) ||
 	    (ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE)) {
 		frm = ieee80211_add_country(frm, ic);
 	}
@@ -143,7 +143,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
 	}
 
-	/* XXX: channel switch announcement ? */ 
+	/* XXX: channel switch announcement ? */
 	bo->bo_chanswitch = frm;
 
 	/* ERP */
@@ -171,7 +171,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	if (vap->iv_bss && vap->iv_bss->ni_ath_flags)
 		frm = ieee80211_add_athAdvCap(frm, vap->iv_bss->ni_ath_flags,
 			vap->iv_bss->ni_ath_defkeyindex);
-	
+
 	/* XR */
 	bo->bo_xr = frm;
 #ifdef ATH_SUPERG_XR
@@ -180,7 +180,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 #endif
 	bo->bo_appie_buf = frm;
 	bo->bo_appie_buf_len = 0;
-	
+
 	bo->bo_tim_trailerlen = frm - bo->bo_tim_trailer;
 	bo->bo_chanswitch_trailerlen = frm - bo->bo_chanswitch;
 
@@ -315,7 +315,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		skb_pull(skb, sizeof(struct ieee80211_frame));
 		skb_trim(skb, 0);
 		frm = skb->data;
-		skb_put(skb, ieee80211_beacon_init(ni, bo, frm) - frm); 
+		skb_put(skb, ieee80211_beacon_init(ni, bo, frm) - frm);
 		skb_push(skb, sizeof(struct ieee80211_frame));
 
 		vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
@@ -476,7 +476,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				vap->iv_flags |= IEEE80211_F_CHANSWITCH;
 
 				/* copy out trailer to open up a slot */
-				memmove(bo->bo_chanswitch + IEEE80211_CHANSWITCHANN_BYTES, 
+				memmove(bo->bo_chanswitch + IEEE80211_CHANSWITCHANN_BYTES,
 					bo->bo_chanswitch, bo->bo_chanswitch_trailerlen);
 
 				/* add ie in opened slot */

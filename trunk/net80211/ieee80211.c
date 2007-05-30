@@ -76,7 +76,7 @@ MALLOC_DEFINE(M_80211_VAP, "80211vap", "802.11 vap state");
  * Country Code Table for code-to-string conversion.
  */
 struct country_code_to_string {
-	u_int16_t iso_code;	   
+	u_int16_t iso_code;
 	const char *iso_name;
 };
 
@@ -116,7 +116,7 @@ static const  struct country_code_to_string country_strings[] = {
 	{CTRY_DOMINICAN_REPUBLIC,   "DO"},
 	{CTRY_ECUADOR,              "EC"},
 	{CTRY_EGYPT,                "EG"},
-	{CTRY_EL_SALVADOR,          "SV"},    
+	{CTRY_EL_SALVADOR,          "SV"},
 	{CTRY_ESTONIA,              "EE"},
 	{CTRY_FINLAND,              "FI"},
 	{CTRY_FRANCE,               "FR"},
@@ -137,30 +137,30 @@ static const  struct country_code_to_string country_strings[] = {
 	{CTRY_ITALY,                "IT"},
 	{CTRY_JAPAN,                "JP"},
 	{CTRY_JAPAN1,               "J1"},
-	{CTRY_JAPAN2,               "J2"},    
+	{CTRY_JAPAN2,               "J2"},
 	{CTRY_JAPAN3,               "J3"},
 	{CTRY_JAPAN4,               "J4"},
-	{CTRY_JAPAN5,               "J5"},    
+	{CTRY_JAPAN5,               "J5"},
 	{CTRY_JAPAN7,               "JP"},
 	{CTRY_JAPAN6,               "JP"},
 	{CTRY_JAPAN8,               "JP"},
 	{CTRY_JAPAN9,               "JP"},
-	{CTRY_JAPAN10,              "JP"}, 
+	{CTRY_JAPAN10,              "JP"},
 	{CTRY_JAPAN11,              "JP"},
 	{CTRY_JAPAN12,              "JP"},
 	{CTRY_JAPAN13,              "JP"},
 	{CTRY_JAPAN14,              "JP"},
 	{CTRY_JAPAN15,              "JP"},
-	{CTRY_JAPAN16,              "JP"}, 
+	{CTRY_JAPAN16,              "JP"},
 	{CTRY_JAPAN17,              "JP"},
 	{CTRY_JAPAN18,              "JP"},
 	{CTRY_JAPAN19,              "JP"},
 	{CTRY_JAPAN20,              "JP"},
-	{CTRY_JAPAN21,              "JP"}, 
+	{CTRY_JAPAN21,              "JP"},
 	{CTRY_JAPAN22,              "JP"},
 	{CTRY_JAPAN23,              "JP"},
 	{CTRY_JAPAN24,              "JP"},
-	{CTRY_JAPAN25,              "JP"}, 
+	{CTRY_JAPAN25,              "JP"},
 	{CTRY_JAPAN26,              "JP"},
 	{CTRY_JAPAN27,              "JP"},
 	{CTRY_JAPAN28,              "JP"},
@@ -235,11 +235,11 @@ static const  struct country_code_to_string country_strings[] = {
 	{CTRY_UNITED_STATES,        "US"},
 	{CTRY_UNITED_STATES_FCC49,  "US"},
 	{CTRY_URUGUAY,              "UY"},
-	{CTRY_UZBEKISTAN,           "UZ"},    
+	{CTRY_UZBEKISTAN,           "UZ"},
 	{CTRY_VENEZUELA,            "VE"},
 	{CTRY_VIET_NAM,             "VN"},
 	{CTRY_YEMEN,                "YE"},
-	{CTRY_ZIMBABWE,             "ZW"}    
+	{CTRY_ZIMBABWE,             "ZW"}
 };
 
 int
@@ -269,14 +269,14 @@ ieee80211_ifattach(struct ieee80211com *ic)
 		("invalid number of channels specified: %u", ic->ic_nchans));
 	memset(ic->ic_chan_avail, 0, sizeof(ic->ic_chan_avail));
 	ic->ic_modecaps |= 1 << IEEE80211_MODE_AUTO;
-	
+
 	for (i = 0; i < ic->ic_nchans; i++) {
 		c = &ic->ic_channels[i];
 		KASSERT(c->ic_flags != 0, ("channel with no flags"));
 		KASSERT(c->ic_ieee < IEEE80211_CHAN_MAX,
 			("channel with bogus ieee number %u", c->ic_ieee));
 		setbit(ic->ic_chan_avail, c->ic_ieee);
-		
+
 		/* Identify mode capabilities. */
 		if (IEEE80211_IS_CHAN_A(c))
 			ic->ic_modecaps |= 1 << IEEE80211_MODE_11A;
@@ -379,7 +379,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	struct ieee80211vap *vap = dev->priv;
 	struct net_device *parent = ic->ic_dev;
 	int err;
-	
+
 	if (name != NULL) {	/* XXX */
 		if (strchr(name, '%')) {
 			if ((err = dev_alloc_name(dev, name)) < 0) {
@@ -516,7 +516,7 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 
 	memset(vap->wds_mac, 0x00, IEEE80211_ADDR_LEN);
 
-	(void) ieee80211_media_setup(ic, &vap->iv_media, vap->iv_caps, 
+	(void) ieee80211_media_setup(ic, &vap->iv_media, vap->iv_caps,
 				     media_change, media_status);
 	ieee80211_media_status(dev, &imr);
 	ifmedia_set(&vap->iv_media, imr.ifm_active);
@@ -530,7 +530,7 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 #ifdef ATH_SUPERG_XR
 	/* Do not register XR VAP device with OS. */
 	if (vap->iv_flags & IEEE80211_F_XR)
-		return 0; 
+		return 0;
 #endif
 
 	ieee80211_scanner_get(vap->iv_opmode, 1);
@@ -658,7 +658,7 @@ ieee80211_find_channel(struct ieee80211com *ic, int freq, int flags)
 	if (c != NULL && c->ic_freq == freq &&
 	    (c->ic_flags & IEEE80211_CHAN_ALLTURBO) == flags)
 		return c;
-	
+
 	/* Brute force search */
 	for (i = 0; i < ic->ic_nchans; i++) {
 		c = &ic->ic_channels[i];
@@ -690,9 +690,9 @@ ieee80211_media_setup(struct ieee80211com *ic,
 	ifmedia_init(media, 0, media_change, media_stat);
 	maxrate = 0;
 	memset(&allrates, 0, sizeof(allrates));
-	
+
 	for (mode = IEEE80211_MODE_AUTO; mode < IEEE80211_MODE_MAX; mode++) {
-		static const u_int mopts[] = { 
+		static const u_int mopts[] = {
 			IFM_AUTO,
 			IFM_IEEE80211_11A,
 			IFM_IEEE80211_11B,
@@ -718,7 +718,7 @@ ieee80211_media_setup(struct ieee80211com *ic,
 		if (mode == IEEE80211_MODE_AUTO)
 			continue;
 		rs = &ic->ic_sup_rates[mode];
-		
+
 		for (i = 0; i < rs->rs_nrates; i++) {
 			rate = rs->rs_rates[i];
 			mword = ieee80211_rate2media(ic, rate, mode);
@@ -750,7 +750,7 @@ ieee80211_media_setup(struct ieee80211com *ic,
 				maxrate = rate;
 		}
 	}
-	
+
 	for (i = 0; i < allrates.rs_nrates; i++) {
 		mword = ieee80211_rate2media(ic, allrates.rs_rates[i],
 				IEEE80211_MODE_AUTO);
@@ -769,7 +769,7 @@ ieee80211_media_setup(struct ieee80211com *ic,
 		if (caps & IEEE80211_C_WDS)
 			ADD(media, mword, IFM_IEEE80211_WDS);
 	}
-	
+
 	return maxrate;
 #undef ADD
 }
@@ -793,7 +793,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 					continue;
 				c->ic_flags |= IEEE80211_CHAN_RADAR;
 			}
-			
+
 			c = ieee80211_find_channel(ic, ichan->ic_freq, ichan->ic_flags);
 			if (c == NULL) {
 				if_printf(dev,"%s: Couldn't find matching channel for dfs mark (%d, 0x%x)\n",
@@ -814,7 +814,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 					 * if any one is scanning.
 					 */
 					vap = TAILQ_FIRST(&ic->ic_vaps);
-					while ((vap != NULL) && (vap->iv_state != IEEE80211_S_SCAN) && 
+					while ((vap != NULL) && (vap->iv_state != IEEE80211_S_SCAN) &&
 					       (vap->iv_ic != ic)) {
 						vap = TAILQ_NEXT(vap, iv_next);
 					}
@@ -930,9 +930,9 @@ ieee80211_announce_channels(struct ieee80211com *ic)
 			type = 'b';
 		else
 			type = 'f';
-		printf("%4d  %4d%c %6d  %6d  %6d\n", 
-			c->ic_ieee, c->ic_freq, type, 
-			c->ic_maxregpower, 
+		printf("%4d  %4d%c %6d  %6d  %6d\n",
+			c->ic_ieee, c->ic_freq, type,
+			c->ic_maxregpower,
 			c->ic_minpower, c->ic_maxpower
 		);
 	}
@@ -1054,7 +1054,7 @@ ieee80211com_media_change(struct net_device *dev)
 	/* First, identify the phy mode. */
 	if (!media2mode(ime, &newphymode))
 		return -EINVAL;
-	
+
 	/* NB: Mode must be supported, no need to check */
 	/*
 	 * Autoselect doesn't make sense when operating as an AP.
@@ -1250,7 +1250,7 @@ ieee80211_chan2mode(const struct ieee80211_channel *chan)
 	 * XXX: Probably needs to be revised.
 	 */
 	KASSERT(chan != IEEE80211_CHAN_ANYC, ("channel not setup"));
-	
+
 	if (IEEE80211_IS_CHAN_108G(chan))
 		return IEEE80211_MODE_TURBO_G;
 	else if (IEEE80211_IS_CHAN_TURBO(chan))
@@ -1318,7 +1318,7 @@ ieee80211_rate2media(struct ieee80211com *ic, int rate, enum ieee80211_phymode m
 		{ 108 | IFM_IEEE80211_11G, IFM_IEEE80211_OFDM54 },
 		/* NB: OFDM72 doesn't really exist so we don't handle it */
 	};
-	
+
 	u_int mask, i;
 	mask = rate & IEEE80211_RATE_VAL;
 	switch (mode) {
@@ -1484,7 +1484,7 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 	u_int8_t *cur_runlen, *cur_chan, *cur_pow, prevchan;
 
 	/* Fill in country IE. */
-	memset(&ic->ic_country_ie, 0, sizeof(ic->ic_country_ie));  
+	memset(&ic->ic_country_ie, 0, sizeof(ic->ic_country_ie));
 	ic->ic_country_ie.country_id = IEEE80211_ELEMID_COUNTRY;
 	ic->ic_country_ie.country_len = 0; /* init needed by following code */
 
@@ -1502,7 +1502,7 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 		if_printf(dev, "bad country string ignored: %d\n",
 			ic->ic_country_code);
 		ic->ic_country_ie.country_str[0] = ' ';
-		ic->ic_country_ie.country_str[1] = ' ';			
+		ic->ic_country_ie.country_str[1] = ' ';
 	}
 
 	/* 
@@ -1535,24 +1535,24 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 			*cur_chan = IEEE80211_REG_EXT_ID;
 			*cur_runlen = ic->ic_regclassids[i];
 			*cur_pow = ic->ic_coverageclass;
-	
+
 			cur_runlen += 3;
 			cur_chan += 3;
 			cur_pow += 3;
 			ic->ic_country_ie.country_len += 3;
 		}
 	} else {
-		if ((ic->ic_curmode == IEEE80211_MODE_11A) || 
+		if ((ic->ic_curmode == IEEE80211_MODE_11A) ||
 		    (ic->ic_curmode == IEEE80211_MODE_TURBO_A))
 			chanflags = IEEE80211_CHAN_5GHZ;
-		else 
+		else
 			chanflags = IEEE80211_CHAN_2GHZ;
-	
-		memset(&chanlist[0], 0, sizeof(chanlist));  
+
+		memset(&chanlist[0], 0, sizeof(chanlist));
 		/* XXX: Not right, due to duplicate entries */
 		for (i = 0; i < ic->ic_nchans; i++) {
 			c = &ic->ic_channels[i];
-	
+
 			/* Does channel belong to current operation mode */
 			if (!(c->ic_flags & chanflags))
 				continue;
@@ -1561,22 +1561,22 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 			for (j = 0; j < chancnt; j++)
 				if (c->ic_ieee == chanlist[j])
 					break;
-			
+
 			if (j != chancnt) /* found a match */
 				continue;
 
 			chanlist[chancnt] = c->ic_ieee;
 			chancnt++;
-	
+
 			/* Skip turbo channels */
 			if (IEEE80211_IS_CHAN_TURBO(c))
 				continue;
-	
+
 			/* Skip half/quarter rate channels */
-			if (IEEE80211_IS_CHAN_HALF(c) || 
+			if (IEEE80211_IS_CHAN_HALF(c) ||
 			    IEEE80211_IS_CHAN_QUARTER(c))
 				continue;
-	
+
 			if (*cur_runlen == 0) {
 				(*cur_runlen)++;
 				*cur_pow = c->ic_maxregpower;

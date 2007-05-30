@@ -192,8 +192,8 @@ ieee80211_notify_node_join(struct ieee80211_node *ni, int newassoc)
 	struct net_device *dev = vap->iv_dev;
 	union iwreq_data wreq;
 
-	if (ni == vap->iv_bss) { 
-		if (newassoc) 
+	if (ni == vap->iv_bss) {
+		if (newassoc)
 			netif_carrier_on(dev);
 		memset(&wreq, 0, sizeof(wreq));
 		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
@@ -246,10 +246,10 @@ ieee80211_notify_sta_stats(struct ieee80211_node *ni)
 	char buf[1024];
 
 	snprintf(buf, sizeof(buf), "%s\nmac=%s\nrx_packets=%u\nrx_bytes=%llu\n"
-			"tx_packets=%u\ntx_bytes=%llu\n", tag, 
-			ether_sprintf(ni->ni_macaddr), ni->ni_stats.ns_rx_data, 
-			(unsigned long long)ni->ni_stats.ns_rx_bytes, 
-			ni->ni_stats.ns_tx_data, 
+			"tx_packets=%u\ntx_bytes=%llu\n", tag,
+			ether_sprintf(ni->ni_macaddr), ni->ni_stats.ns_rx_data,
+			(unsigned long long)ni->ni_stats.ns_rx_bytes,
+			ni->ni_stats.ns_tx_data,
 			(unsigned long long)ni->ni_stats.ns_tx_bytes);
 	memset(&wreq, 0, sizeof(wreq));
 	wreq.data.length = strlen(buf);
@@ -282,7 +282,7 @@ ieee80211_notify_replay_failure(struct ieee80211vap *vap,
 
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
 		"%s replay detected <keyix %d, rsc %llu >",
-		k->wk_cipher->ic_name, k->wk_keyix, 
+		k->wk_cipher->ic_name, k->wk_keyix,
 		(unsigned long long)rsc );
 
 	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
@@ -357,7 +357,7 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 	char *p = buf;
 	struct ieee80211_node *ni;
 	struct ieee80211_node_table *nt = (struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
-	
+
 	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		/* Assume each node needs 500 bytes */
@@ -370,8 +370,8 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 			jiffies_to_timespec(jiffies - ni->ni_last_rx, &t);
 			p += sprintf(p, "macaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
 			p += sprintf(p, " rssi %d\n", ni->ni_rssi);
-			
-			p += sprintf(p, " last_rx %ld.%06ld\n", 
+
+			p += sprintf(p, " last_rx %ld.%06ld\n",
 				     t.tv_sec, t.tv_nsec / 1000);
 
 		}
@@ -670,7 +670,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 	int i, space;
 	char *devname = NULL;
 	struct ieee80211_proc_entry *tmp=NULL;
-	
+
 	space = 5 * sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	vap->iv_sysctls = kmalloc(space, GFP_KERNEL);
 	if (vap->iv_sysctls == NULL) {
@@ -733,7 +733,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 		proc_madwifi_count++;
 		vap->iv_proc = proc_mkdir(vap->iv_dev->name, proc_madwifi);
 	}
-	
+
 	/* Create a proc entry listing the associated stations */
 	ieee80211_proc_vcreate(vap, &proc_ieee80211_ops, "associated_sta");
 
@@ -742,7 +742,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 		tmp = vap->iv_proc_entries;
 		while (tmp) {
 			if (!tmp->entry) {
-				tmp->entry = create_proc_entry(tmp->name, 
+				tmp->entry = create_proc_entry(tmp->name,
 				PROC_IEEE80211_PERM, vap->iv_proc);
 				tmp->entry->data = vap;
 				tmp->entry->proc_fops = tmp->fileops;
@@ -753,7 +753,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 }
 
 /* Frees all memory used for the list of proc entries */
-void 
+void
 ieee80211_proc_cleanup(struct ieee80211vap *vap)
 {
 	struct ieee80211_proc_entry *tmp=vap->iv_proc_entries;
@@ -766,8 +766,8 @@ ieee80211_proc_cleanup(struct ieee80211vap *vap)
 }
 
 /* Called by other modules to register a proc entry under the vap directory */
-int 
-ieee80211_proc_vcreate(struct ieee80211vap *vap, 
+int
+ieee80211_proc_vcreate(struct ieee80211vap *vap,
 		struct file_operations *fileops, char *name)
 {
 	struct ieee80211_proc_entry *entry;
@@ -786,11 +786,11 @@ ieee80211_proc_vcreate(struct ieee80211vap *vap,
 			tmp = tmp->next;
 		} while (1);
 	}
-	
+
 	/* Create an item in our list for the new entry */
 	entry = kmalloc(sizeof(struct ieee80211_proc_entry), GFP_KERNEL);
 	if (entry == NULL) {
-		printk("%s: no memory for new proc entry (%s)!\n", __func__, 
+		printk("%s: no memory for new proc entry (%s)!\n", __func__,
 				name);
 		return -1;
 	}
@@ -804,7 +804,7 @@ ieee80211_proc_vcreate(struct ieee80211vap *vap,
 		fileops->read = proc_ieee80211_read;
 	if (!fileops->write)
 		fileops->write = proc_ieee80211_write;
-	
+
 	/* Create the entry record */
 	entry->name = name;
 	entry->fileops = fileops;
@@ -813,7 +813,7 @@ ieee80211_proc_vcreate(struct ieee80211vap *vap,
 
 	/* Create the actual proc entry */
 	if (vap->iv_proc) {
-		entry->entry = create_proc_entry(entry->name, 
+		entry->entry = create_proc_entry(entry->name,
 				PROC_IEEE80211_PERM, vap->iv_proc);
 		entry->entry->data = vap;
 		entry->entry->proc_fops = entry->fileops;
@@ -864,7 +864,7 @@ ieee80211_sysctl_vdetach(struct ieee80211vap *vap)
 		kfree(vap->iv_sysctls[2].procname);
 		vap->iv_sysctls[2].procname = NULL;
 	}
-	
+
 	if (vap->iv_sysctls) {
 		kfree(vap->iv_sysctls);
 		vap->iv_sysctls = NULL;

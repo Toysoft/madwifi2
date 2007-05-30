@@ -36,7 +36,7 @@
  *
  * $Id$
  */
- 
+
 #ifndef _DEV_ATH_PCI_H_
 #define _DEV_ATH_PCI_H_
 

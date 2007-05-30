@@ -115,8 +115,8 @@ struct ieee80211_node {
 #define IEEE80211_NODE_FF	0x0004          /* Fast Frame capable */
 #define IEEE80211_NODE_XR	0x0008		/* Atheros WME enable */
 #define IEEE80211_NODE_AR	0x0010		/* AR capable */
-#define IEEE80211_NODE_BOOST	0x0080 
-#define IEEE80211_NODE_PS_CHANGED	0x0200	/* PS state change */ 
+#define IEEE80211_NODE_BOOST	0x0080
+#define IEEE80211_NODE_PS_CHANGED	0x0200	/* PS state change */
 	u_int16_t ni_ath_defkeyindex;		/* Atheros def key index */
 #define IEEE80211_INVAL_DEFKEY	0x7FFF
 	u_int16_t ni_associd;			/* assoc response */
@@ -210,8 +210,8 @@ int ieee80211_sta_join(struct ieee80211vap *, const struct ieee80211_scan_entry 
 void ieee80211_sta_join1_tasklet(IEEE80211_TQUEUE_ARG);
 void ieee80211_sta_leave(struct ieee80211_node *);
 
-#define WDS_AGING_TIME		600   /* 10 minutes */ 
-#define WDS_AGING_COUNT 	2 
+#define WDS_AGING_TIME		600   /* 10 minutes */
+#define WDS_AGING_COUNT 	2
 #define WDS_AGING_STATIC 	0xffff
 #define WDS_AGING_TIMER_VAL 	(WDS_AGING_TIME / 2)
 
@@ -221,7 +221,7 @@ struct ieee80211_wds_addr {
 	struct ieee80211_node *wds_ni;
 	u_int16_t wds_agingcount;
 };
-	
+
 /*
  * Table of ieee80211_node instances.  Each ieee80211com
  * has at least one for holding the scan candidates.
@@ -243,7 +243,7 @@ struct ieee80211_node_table {
 
 struct ieee80211_node *ieee80211_alloc_node_table(struct ieee80211vap *,
 	const u_int8_t *);
-struct ieee80211_node *ieee80211_dup_bss(struct ieee80211vap *, 
+struct ieee80211_node *ieee80211_dup_bss(struct ieee80211vap *,
 	const u_int8_t *, unsigned char);
 void ieee80211_node_reset(struct ieee80211_node *, struct ieee80211vap *);
 #ifdef IEEE80211_DEBUG_REFCNT
@@ -312,14 +312,14 @@ ieee80211_unref_node_debug(struct ieee80211_node **pni, const char *func, int li
 #else
 ieee80211_unref_node(struct ieee80211_node **pni)
 #endif
-{	
+{
 	struct ieee80211_node *ni = *pni;
 #ifdef IEEE80211_DEBUG_REFCNT
 	IEEE80211_DPRINTF(ni->ni_vap, IEEE80211_MSG_NODE,
 		"%s (%s:%u) %p<%s> refcnt %d\n", __func__, func, line, ni,
 		 ether_sprintf(ni->ni_macaddr), ieee80211_node_refcnt(ni) - 1);
 #endif
-	_ieee80211_unref_node(ni); 
+	_ieee80211_unref_node(ni);
 	*pni = NULL;			/* guard against use */
 }
 
@@ -334,7 +334,7 @@ struct ieee80211_node *ieee80211_find_wds_node(struct ieee80211_node_table *,
 typedef void ieee80211_iter_func(void *, struct ieee80211_node *);
 void ieee80211_iterate_nodes(struct ieee80211_node_table *,
 	ieee80211_iter_func *, void *);
-void ieee80211_iterate_dev_nodes(struct net_device *, 
+void ieee80211_iterate_dev_nodes(struct net_device *,
 	struct ieee80211_node_table *, ieee80211_iter_func *, void *);
 
 void	ieee80211_dump_node(struct ieee80211_node_table *,

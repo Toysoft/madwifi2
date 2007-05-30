@@ -163,7 +163,7 @@ ath_rate_newassoc(struct ath_softc *sc, struct ath_node *an, int isnew)
 		ath_rate_ctl_start(sc, &an->an_node);
 }
 
-static void 
+static void
 node_reset (struct amrr_node *amn)
 {
 	amn->amn_tx_try0_cnt = 0;
@@ -372,7 +372,7 @@ ath_rate_ctl(void *arg, struct ieee80211_node *ni)
 #define is_min_rate(ni) (ni->ni_txrate == 0)
 
 	old_rate = ni->ni_txrate;
-  
+
   	DPRINTF (sc, "cnt0: %d cnt1: %d cnt2: %d cnt3: %d -- threshold: %d\n",
 		 amn->amn_tx_try0_cnt,
 		 amn->amn_tx_try1_cnt,
