@@ -171,6 +171,7 @@ struct ieee80211_node {
 	u_int8_t ni_uapsd_maxsp; 		/* maxsp from flags above */
 	u_int16_t ni_uapsd_trigseq[WME_NUM_AC];	/* trigger suppression on retry */
 	__le16 ni_pschangeseq;
+	spinlock_t ni_savedqlock;
 };
 MALLOC_DECLARE(M_80211_NODE);
 
