@@ -433,8 +433,8 @@ get_jiffies_64(void)
 /* msecs_to_jiffies appeared in 2.6.7 and 2.4.29 */
 #include <linux/delay.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) && \
-     LINUX_VERSION_CODE < KERNEL_VERSION(2,6,7)) || \
-    LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29)
+	 LINUX_VERSION_CODE < KERNEL_VERSION(2,6,7)) || \
+	LINUX_VERSION_CODE < KERNEL_VERSION(2,4,29)
 
 /* The following definitions and inline functions are
  * copied from the kernel src, include/linux/jiffies.h */

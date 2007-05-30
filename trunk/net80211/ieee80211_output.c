@@ -226,12 +226,12 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	cb = (struct ieee80211_cb *) skb->cb;
 	memset(cb, 0, sizeof(struct ieee80211_cb));
 	
-        if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+	if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 		ieee80211_monitor_encap(vap, skb);
-                ieee80211_parent_queue_xmit(skb);
-                return 0;
-        }
-	if (ic->ic_flags & IEEE80211_F_SCAN)		/* cancel bg scan */
+		ieee80211_parent_queue_xmit(skb);
+		return 0;
+	}
+	if (ic->ic_flags & IEEE80211_F_SCAN) /* cancel bg scan */
 		ieee80211_cancel_scan(vap);
 	/* 
 	 * Find the node for the destination so we can do
@@ -1720,10 +1720,10 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	 *	[tlv] user-specified ie's
 	 */
 	skb = ieee80211_getmgtframe(&frm, 2 + IEEE80211_NWID_LEN + 
-	       2 + IEEE80211_RATE_SIZE + 
-	       2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) + 
-	       (optie != NULL ? optielen : 0) +
-	       vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].length);
+		2 + IEEE80211_RATE_SIZE + 
+		2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) + 
+		(optie != NULL ? optielen : 0) +
+		vap->app_ie[IEEE80211_APPIE_FRAME_PROBE_REQ].length);
 	if (skb == NULL) {
 		vap->iv_stats.is_tx_nobuf++;
 		return -ENOMEM;
@@ -1879,15 +1879,15 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 		/* XXX: FH/DS parameter set, correct ? */
 		if (ic->ic_phytype == IEEE80211_T_FH) {
-                        *frm++ = IEEE80211_ELEMID_FHPARMS;
-                        *frm++ = 5;
-                        *frm++ = ni->ni_fhdwell & 0x00ff;
-                        *frm++ = (ni->ni_fhdwell >> 8) & 0x00ff;
-                        *frm++ = IEEE80211_FH_CHANSET(
-				ieee80211_chan2ieee(ic, ic->ic_curchan));
-                        *frm++ = IEEE80211_FH_CHANPAT(
-				ieee80211_chan2ieee(ic, ic->ic_curchan));
-                        *frm++ = ni->ni_fhindex;
+			*frm++ = IEEE80211_ELEMID_FHPARMS;
+			*frm++ = 5;
+			*frm++ = ni->ni_fhdwell & 0x00ff;
+			*frm++ = (ni->ni_fhdwell >> 8) & 0x00ff;
+			*frm++ = IEEE80211_FH_CHANSET(
+					ieee80211_chan2ieee(ic, ic->ic_curchan));
+			*frm++ = IEEE80211_FH_CHANPAT(
+					ieee80211_chan2ieee(ic, ic->ic_curchan));
+			*frm++ = ni->ni_fhindex;
 		} else {
 			*frm++ = IEEE80211_ELEMID_DSPARMS;
 			*frm++ = 1;
@@ -2103,7 +2103,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			def_keyindex = IEEE80211_INVAL_DEFKEY;
 			if (((vap->iv_flags & IEEE80211_F_WPA) == 0) &&
 			    (ni->ni_authmode != IEEE80211_AUTH_8021X) &&
-                            (vap->iv_def_txkey != IEEE80211_KEYIX_NONE))
+			    (vap->iv_def_txkey != IEEE80211_KEYIX_NONE))
 				def_keyindex = vap->iv_def_txkey;
 
 			frm = ieee80211_add_athAdvCap(frm,

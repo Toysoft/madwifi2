@@ -291,9 +291,9 @@ static __inline int best_rate_ndx(struct sample_node *sn, int size_bin,
 	int require_acked_before)
 {
 	unsigned int x;
-        unsigned int best_rate_tt = 0;
-        unsigned int best_rate_ndx = -1;
-        
+	unsigned int best_rate_tt = 0;
+	unsigned int best_rate_ndx = -1;
+
 	for (x = 0; x < sn->num_rates; x++) {
 		unsigned int tt = sn->stats[size_bin][x].average_tx_time;
 		if (tt <= 0 || (require_acked_before && 
@@ -312,8 +312,8 @@ static __inline int best_rate_ndx(struct sample_node *sn, int size_bin,
 			best_rate_tt = tt;
 			best_rate_ndx = x;
 		}
-        }
-        return best_rate_ndx;
+	}
+	return best_rate_ndx;
 }
 
 /*
@@ -337,7 +337,7 @@ pick_sample_ndx(struct sample_node *sn, int size_bin)
 	for (x = 0; x < sn->num_rates; x++) {
 		unsigned int ndx = (sn->last_sample_ndx[size_bin] + 1 + x) % sn->num_rates;
 
-	        /* don't sample the current bit-rate */
+		/* don't sample the current bit-rate */
 		if (ndx == current_ndx) 
 			continue;
 
@@ -481,8 +481,8 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 			ndx = sn->current_rate[size_bin];
 			sn->packets_since_switch[size_bin]++;
 			if (size_bin == 0) {
-	    			/* 
-	    			 * set the visible txrate for this node
+				/* 
+				 * set the visible txrate for this node
 			         * to the rate of small packets
 			         */
 				an->an_node.ni_txrate = ndx;
@@ -834,10 +834,10 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		printk(KERN_WARNING "no rates yet! mode %u\n", sc->sc_curmode);
 		return;
 	}
-        sn->static_rate_ndx = -1;
+	sn->static_rate_ndx = -1;
 
 	sn->num_rates = ni->ni_rates.rs_nrates;
-        for (x = 0; x < ni->ni_rates.rs_nrates; x++) {
+	for (x = 0; x < ni->ni_rates.rs_nrates; x++) {
 		sn->rates[x].rate = ni->ni_rates.rs_rates[x] & IEEE80211_RATE_VAL;
 		sn->rates[x].rix = sc->sc_rixmap[sn->rates[x].rate];
 		if (sn->rates[x].rix == 0xff) {
@@ -933,7 +933,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 static void
 ath_rate_cb(void *arg, struct ieee80211_node *ni)
 {
-        ath_rate_ctl_reset(ni->ni_ic->ic_dev->priv, ni);
+	ath_rate_ctl_reset(ni->ni_ic->ic_dev->priv, ni);
 }
 
 /*
@@ -996,7 +996,7 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 	unsigned int x;
 	unsigned int size_bin;
 
-        IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
+	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		/* Assume each node needs 500 bytes */
 		if (buf + space < p + 500)
@@ -1047,7 +1047,7 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 		}
 		printk("\n");
 	}
-        IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
+	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
 
 	return (p - buf);
 }

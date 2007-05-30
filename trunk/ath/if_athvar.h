@@ -7,7 +7,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer,
-    without modification.
+	without modification.
  * 2. Redistributions in binary form must reproduce at minimum a disclaimer
  *    similar to the "NO WARRANTY" disclaimer below ("Disclaimer") and any
  *    redistribution must be conditioned upon including a substantially
@@ -294,7 +294,7 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
  */
 #define GRP_POLL_PERIOD_NO_XR_STA(sc) (sc->sc_xrpollint)
 #define GRP_POLL_PERIOD_XR_STA(sc)                                                   \
-        A_MAX(GRP_POLL_PERIOD_FACTOR_XR_STA * (sc->sc_xrpollint / 100), GRP_POLL_PERIOD_XR_STA_MAX)
+	A_MAX(GRP_POLL_PERIOD_FACTOR_XR_STA * (sc->sc_xrpollint / 100), GRP_POLL_PERIOD_XR_STA_MAX)
 
 /*
  * When there are no XR STAs and a valid double chirp is received then the Group Polls are
@@ -366,10 +366,10 @@ struct ath_node {
 #define ATH_EP_MUL(x, mul)	((x) * (mul))
 #define ATH_RSSI_IN(x)		(ATH_EP_MUL((x), HAL_RSSI_EP_MULTIPLIER))
 #define ATH_LPF_RSSI(x, y, len) \
-    ((x != ATH_RSSI_DUMMY_MARKER) ? (((x) * ((len) - 1) + (y)) / (len)) : (y))
+	((x != ATH_RSSI_DUMMY_MARKER) ? (((x) * ((len) - 1) + (y)) / (len)) : (y))
 #define ATH_RSSI_LPF(x, y) do {						\
-    if ((y) >= -20)							\
-    	x = ATH_LPF_RSSI((x), ATH_RSSI_IN((y)), ATH_RSSI_LPF_LEN);	\
+	if ((y) >= -20)							\
+		x = ATH_LPF_RSSI((x), ATH_RSSI_IN((y)), ATH_RSSI_LPF_LEN);	\
 } while (0)
 
 #define	ATH_ANTENNA_DIFF	2	/* Num frames difference in
@@ -454,10 +454,10 @@ struct ath_txq {
 	 */
 	TAILQ_HEAD(axq_headtype, ath_buf) axq_stageq;
 
-        /* scratch compression buffer */
-        char *axq_compbuf;		/* scratch comp buffer */
-        dma_addr_t axq_compbufp;	/* scratch comp buffer (phys)*/
-        u_int axq_compbufsz;		/* scratch comp buffer size */
+	/* scratch compression buffer */
+	char *axq_compbuf;		/* scratch comp buffer */
+	dma_addr_t axq_compbufp;	/* scratch comp buffer (phys)*/
+	u_int axq_compbufsz;		/* scratch comp buffer size */
 };
 
 /* driver-specific vap state */
@@ -666,7 +666,7 @@ struct ath_softc {
 	u_int16_t sc_reapcount;  		/* # of tx buffers reaped after net dev stopped */
 
 #ifdef ATH_REVERSE_ENGINEERING
-    u_int8_t register_snapshot[MAX_REGISTER_ADDRESS];
+	u_int8_t register_snapshot[MAX_REGISTER_ADDRESS];
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
 #ifdef ATH_SUPERG_DYNTURBO

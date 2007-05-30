@@ -72,8 +72,8 @@
 #define RSSI_IN(x)		((x) * RSSI_EP_MULTIPLIER)
 #define LPF_RSSI(x, y, len)	(((x) * ((len) - 1) + (y)) / (len))
 #define RSSI_LPF(x, y) do {						\
-    if ((y) >= -20)							\
-    	x = LPF_RSSI((x), RSSI_IN((y)), RSSI_LPF_LEN);			\
+	if ((y) >= -20)							\
+		x = LPF_RSSI((x), RSSI_IN((y)), RSSI_LPF_LEN);			\
 } while (0)
 #define	EP_RND(x, mul) \
 	((((x)%(mul)) >= ((mul)/2)) ? howmany(x, mul) : (x)/(mul))
@@ -732,8 +732,8 @@ match_bss(struct ieee80211vap *vap,
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	const struct ieee80211_scan_entry *se = &se0->base;
-        u_int8_t rate;
-        int fail;
+	u_int8_t rate;
+	int fail;
 
 	fail = 0;
 	if (isclr(ic->ic_chan_active, ieee80211_chan2ieee(ic, se->se_chan)))
@@ -1429,7 +1429,7 @@ action_tasklet(IEEE80211_TQUEUE_ARG data)
 		break;
 	default:
 		/* ADHOC */
-        	if (vap->iv_des_nssid) {
+		if (vap->iv_des_nssid) {
 			/*
 			 * No existing adhoc network to join and we have
 			 * an ssid; start one up.  If no channel was
@@ -1450,14 +1450,14 @@ action_tasklet(IEEE80211_TQUEUE_ARG data)
 		}
 		/*
 		 * If nothing suitable was found decrement
-	         * the failure counts so entries will be
+		 * the failure counts so entries will be
 		 * reconsidered the next time around.  We
 		 * really want to do this only for sta's
 		 * where we've previously had some success.
 		 */
 		sta_dec_fails(st);
 		st->st_newscan = 1;
-			break;
+		break;
 	}
 
 	/* 

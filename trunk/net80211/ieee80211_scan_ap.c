@@ -271,8 +271,8 @@ ap_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
  */
 static int
 ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
-       int (*action)(struct ieee80211vap *, const struct ieee80211_scan_entry *),
-       u_int32_t flags)
+	   int (*action)(struct ieee80211vap *, const struct ieee80211_scan_entry *),
+	   u_int32_t flags)
 {
 	struct ap_state *as = ss->ss_priv;
 	struct ieee80211com *ic = vap->iv_ic;

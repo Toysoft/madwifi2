@@ -77,12 +77,12 @@ struct minstrel_softc {
 	struct ctl_table_header *sysctl_header;
 	struct ctl_table *sysctls;
 #endif
-        struct ath_softc  *sc;
-        struct net_device *sc_dev; 
+	struct ath_softc  *sc;
+	struct net_device *sc_dev; 
 
 
 	struct timer_list timer;	/* periodic timer */
-        int close_timer_now;
+	int close_timer_now;
 };
 
 
@@ -99,7 +99,7 @@ struct rate_info {
 
 /* per-node state */
 struct minstrel_node {
-        int static_rate_ndx; /*User has bypassed dynamic selection. Fix on one rate */
+	int static_rate_ndx; /*User has bypassed dynamic selection. Fix on one rate */
 	int num_rates;
 	struct rate_info rates[IEEE80211_RATE_MAXSIZE];
 	
@@ -116,7 +116,7 @@ struct minstrel_node {
 	u_int32_t               rs_probability [IEEE80211_RATE_MAXSIZE]; /* units of parts per thousand */
 	u_int64_t               rs_succ_hist   [IEEE80211_RATE_MAXSIZE]; 
 	u_int64_t               rs_att_hist    [IEEE80211_RATE_MAXSIZE]; 
-       
+	   
 	u_int32_t               rs_this_tp     [IEEE80211_RATE_MAXSIZE]; /*Throughput, each rate */
 
 	int                     is_sampling; 
@@ -132,7 +132,7 @@ struct minstrel_node {
 	   percentage of packets have been used to do sample on. 
 	   Thus,if ath_lookaround_rate is set to 10%, we can expect that
 	   sample_count
-           ------------                    = 0.1
+	       ------------                    = 0.1
 	   sample_count + packet_count                           */
 	int packet_count;     /*  The number of times we have  
 				  sent a packet to this node. */
@@ -148,13 +148,13 @@ struct minstrel_node {
 	int                   rs_sampleColumn;
 	int                   rs_sampleIndex;
 
-       /**Random number generator is
-           Rn+1 = (A*Rn) + B. 
+	   /**Random number generator is
+	       Rn+1 = (A*Rn) + B. 
 
-           This Random number generator determines when we send a minstrel
-           packet, or a packet at an optimal rate.*/
-        int random_n;
-        int a, b;          /**Coefficients of the random thing */
+	       This Random number generator determines when we send a minstrel
+	       packet, or a packet at an optimal rate.*/
+	int random_n;
+	int a, b;          /**Coefficients of the random thing */
 };
 
 

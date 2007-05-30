@@ -216,9 +216,9 @@ sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 	ctl->data = &enable;
 	ctl->maxlen = sizeof(enable);
 	enable = (ath_hal_alq != NULL);
-        error = proc_dointvec(AH_SYSCTL_ARGS);
-        if (error || !write)
-                return error;
+	error = proc_dointvec(AH_SYSCTL_ARGS);
+	if (error || !write)
+		return error;
 	else
 		return ath_hal_setlogging(enable);
 }

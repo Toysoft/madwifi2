@@ -8,7 +8,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer,
-    without modification.
+	without modification.
  * 2. Redistributions in binary form must reproduce at minimum a disclaimer
  *    similar to the "NO WARRANTY" disclaimer below ("Disclaimer") and any
  *    redistribution must be conditioned upon including a substantially
@@ -54,7 +54,7 @@ struct amrr_node {
   	u_int amn_tx_try2_cnt;
   	u_int amn_tx_try3_cnt;
   	u_int amn_tx_failure_cnt; 
-        /* AMRR algorithm state for this node */
+	/* AMRR algorithm state for this node */
   	u_int amn_success_threshold;
   	u_int amn_success;
   	u_int amn_recovery;

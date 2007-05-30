@@ -61,7 +61,7 @@ struct athl2p_tunnel_hdr {
 #define ATH_FF_MAX_HDR		30
 #define ATH_FF_MAX_PAYLOAD 	3066
 #define ATH_FF_MAX_LEN (ATH_FF_MAX_PAYLOAD + IEEE80211_CRC_LEN + \
-    (IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + IEEE80211_WEP_CRCLEN))
+	(IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + IEEE80211_WEP_CRCLEN))
 
 /*
  * Store a magic number in skb->cb[] area to indicate FF within driver.
