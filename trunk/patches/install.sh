@@ -97,26 +97,23 @@ cp -f ${SRC_HAL}/public/*.hal.o.uu ${DST_HAL}/public
 
 echo "Patching the build system"
 if test "$kbuild" = 2.6; then
-cp -f $kbuild/Kconfig ${MADWIFI}
+cp -f Kconfig ${MADWIFI}
 sed -i '/madwifi/d;/^endmenu/i\
 source "drivers/net/wireless/madwifi/Kconfig"' ${WIRELESS}/Kconfig
 sed -i '$a\
 obj-$(CONFIG_ATHEROS) += madwifi/
 /madwifi/d;' ${WIRELESS}/Makefile
 else
-cp -f $kbuild/Config.in ${MADWIFI}
+cp -f Config.in ${MADWIFI}
 sed -i '$a\
 source drivers/net/wireless/madwifi/Config.in
 /madwifi/d' ${WIRELESS}/Config.in
 sed -i '/madwifi/d;/include/i\
 subdir-$(CONFIG_ATHEROS) += madwifi\
 obj-$(CONFIG_ATHEROS) += madwifi/madwifi.o' ${WIRELESS}/Makefile
-fi
-
 DST_DOC=${KERNEL_PATH}/Documentation
-if test -f $kbuild/Configure.help.patch; then
-	grep -q 'CONFIG_ATHEROS' ${DST_DOC}/Configure.help || \
-		PATCH ${DST_DOC}/Configure.help $kbuild/Configure.help.patch
+grep -q 'CONFIG_ATHEROS' ${DST_DOC}/Configure.help || \
+	PATCH ${DST_DOC}/Configure.help Configure.help.patch
 fi
 
 
