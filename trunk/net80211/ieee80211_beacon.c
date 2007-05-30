@@ -225,18 +225,18 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	 * NB: we allocate the max space required for the TIM bitmap.
 	 */
 	rs = &ni->ni_rates;
-	pktlen =   8					/* time stamp */
+	pktlen = 8					/* time stamp */
 		 + sizeof(u_int16_t)			/* beacon interval */
 		 + sizeof(u_int16_t)			/* capability information */
 		 + 2 + ni->ni_esslen			/* ssid */
-	         + 2 + IEEE80211_RATE_SIZE		/* supported rates */
-	         + 7 					/* FH/DS parameters max(7,3) */
+		 + 2 + IEEE80211_RATE_SIZE		/* supported rates */
+		 + 7 					/* FH/DS parameters max(7,3) */
 		 + 2 + 4 + vap->iv_tim_len		/* IBSS/TIM parameter set*/
 		 + ic->ic_country_ie.country_len + 2	/* country code */
-	         + 3					/* power constraint */
-	         + 5					/* channel switch announcement */
+		 + 3					/* power constraint */
+		 + 5					/* channel switch announcement */
 		 + 3					/* ERP */
-	         + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) /* Ext. Supp. Rates */
+		 + 2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) /* Ext. Supp. Rates */
 		 + (vap->iv_caps & IEEE80211_C_WME ?	/* WME */
 			sizeof(struct ieee80211_wme_param) : 0)
 		 + (vap->iv_caps & IEEE80211_C_WPA ?	/* WPA 1+2 */

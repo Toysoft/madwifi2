@@ -936,7 +936,7 @@ ieee80211_scan_iterate(struct ieee80211com *ic,
   struct ieee80211_scan_state *ss = ic->ic_scan;
 	
   if (ss->ss_ops != NULL) {
-    res = ss->ss_ops->scan_iterate(ss, f, arg);
+	res = ss->ss_ops->scan_iterate(ss, f, arg);
   }
   return res;
 }

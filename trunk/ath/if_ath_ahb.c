@@ -101,15 +101,15 @@ ar5312_get_radio_config(void)
 	}
 
 	if (!dataFound) { /* AR2316 relocates radio config to new location */
-	    dataFound = 0;
-	    for (radio_config = ((char *) ar5312_boardConfig) + 0xf8;
-			 radio_config < (char *)0xbffff0f8;
-			 radio_config += 0x1000) {
+		dataFound = 0;
+		for (radio_config = ((char *) ar5312_boardConfig) + 0xf8;
+		    radio_config < (char *)0xbffff0f8;
+		    radio_config += 0x1000) {
 			if (*(int *)radio_config != 0xffffffff) {
 				dataFound = 1;
 				break;
 			}
-	    }
+		}
 	}
 
 	if (!dataFound) {
@@ -159,16 +159,16 @@ void *
 bus_alloc_consistent(void *hwdev, size_t size, dma_addr_t *dma_handle)
 {
 	void *ret;
-     
+	 
 	ret = (void *) __get_free_pages(GFP_ATOMIC, get_order(size));
-     
+	 
 	if (ret != NULL) {
 		memset(ret, 0, size);
 		*dma_handle = __pa(ret);
 		dma_cache_wback_inv((unsigned long) ret, size);
 		ret = UNCAC_ADDR(ret);
 	}
-     
+	 
 	return ret;
 }
 
@@ -176,7 +176,7 @@ void
 bus_free_consistent(void *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
 	unsigned long addr = (unsigned long) vaddr;
-    
+	
 	addr = CAC_ADDR(addr);
 	free_pages(addr, get_order(size));
 }
@@ -284,7 +284,7 @@ exit_ath_wmac(u_int16_t wlanNum)
 
 	if (sc == NULL)
 		return -ENODEV; /* XXX: correct return value? */
-        
+
 	dev = sc->aps_sc.sc_dev;
 	ath_detach(dev);
 	if (dev->irq)
@@ -309,11 +309,11 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 	const char *athname;
 	struct net_device *dev;
 	struct ath_ahb_softc *sc;
-        
+
 	if (((wlanNum != 0) && (wlanNum != 1)) ||
 		(sclist[wlanNum] != NULL))
 		goto bad;
-        
+
 	ahb_enable_wmac(devid, wlanNum);
 
 	dev = alloc_netdev(sizeof(struct ath_ahb_softc), "wifi%d", ether_setup);
@@ -373,7 +373,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 
 	sc->aps_sc.sc_invalid = 0;
 	return 0;
-        
+
  bad4:
 	free_irq(dev->irq, dev);
  bad3:

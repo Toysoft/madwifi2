@@ -106,29 +106,29 @@
 static __inline void bus_dma_sync_single(void *hwdev, dma_addr_t dma_handle,
 	size_t size, int direction)
 {
-    unsigned long addr;
-    
-    addr = (unsigned long) __va(dma_handle);
-    dma_cache_wback_inv(addr, size);
+	unsigned long addr;
+	
+	addr = (unsigned long) __va(dma_handle);
+	dma_cache_wback_inv(addr, size);
 }
 
 static __inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
 	size_t size, int direction)
 {
-    dma_cache_wback_inv((unsigned long) ptr, size);
-    
-    return __pa(ptr);
+	dma_cache_wback_inv((unsigned long) ptr, size);
+	
+	return __pa(ptr);
 }
 
 static __inline void bus_unmap_single(void *hwdev, dma_addr_t dma_addr,
 	size_t size, int direction)
 {
-    if (direction != BUS_DMA_TODEVICE) {
-        unsigned long addr;
-        
-        addr = (unsigned long)__va(dma_addr);
-        dma_cache_wback_inv(addr, size);
-    }
+	if (direction != BUS_DMA_TODEVICE) {
+		unsigned long addr;
+
+		addr = (unsigned long)__va(dma_addr);
+		dma_cache_wback_inv(addr, size);
+	}
 }
 void *bus_alloc_consistent(void *, size_t, dma_addr_t *);
 void bus_free_consistent(void *, size_t, void *, dma_addr_t);

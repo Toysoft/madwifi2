@@ -65,26 +65,26 @@
 static int
 ratecode_to_dot11(int ratecode)
 {
-        switch (ratecode) {
-                /* a */
-        case 0x0b: return 12;
-        case 0x0f: return 18;
-        case 0x0a: return 24;
-        case 0x0e: return 36;
-        case 0x09: return 48;
-        case 0x0d: return 72;
-        case 0x08: return 96;
-        case 0x0c: return 108;
-
-        case 0x1b: return 2;
-        case 0x1a: return 4;
-        case 0x1e: return 4;
-        case 0x19: return 11;
-        case 0x1d: return 11;
-        case 0x18: return 22;
-        case 0x1c: return 22;
-        }
-        return 0;
+	switch (ratecode) {
+	    /* a */
+	case 0x0b: return 12;
+	case 0x0f: return 18;
+	case 0x0a: return 24;
+	case 0x0e: return 36;
+	case 0x09: return 48;
+	case 0x0d: return 72;
+	case 0x08: return 96;
+	case 0x0c: return 108;
+	
+	case 0x1b: return 2;
+	case 0x1a: return 4;
+	case 0x1e: return 4;
+	case 0x19: return 11;
+	case 0x1d: return 11;
+	case 0x18: return 22;
+	case 0x1c: return 22;
+	}
+	return 0;
 }
 
 struct ar5212_openbsd_desc {
@@ -155,15 +155,15 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 			(wlan_ng_prism2_header *) skb->data;
 		/* does it look like there is a prism header here? */
 		if (skb->len > sizeof (wlan_ng_prism2_header) &&
-                    p2h->msgcode == DIDmsg_lnxind_wlansniffrm &&
+	                p2h->msgcode == DIDmsg_lnxind_wlansniffrm &&
 		    p2h->rate.did == DIDmsg_lnxind_wlansniffrm_rate) {
-                        ph->rate0 = p2h->rate.data;
-                        skb_pull(skb, sizeof(wlan_ng_prism2_header));
+	                    ph->rate0 = p2h->rate.data;
+	                    skb_pull(skb, sizeof(wlan_ng_prism2_header));
 		}
 		wh = (struct ieee80211_frame *) skb->data;
 		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
 			ph->try0 = 1;
-                break;
+		break;
 	}
 	case ARPHRD_IEEE80211_RADIOTAP: {
 		struct ieee80211_frame *wh = NULL;
@@ -259,7 +259,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 		wh = (struct ieee80211_frame *)skb->data;
 		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
 			ph->try0 = 1;
-                break;
+		break;
 	}
 	case ARPHRD_IEEE80211_ATHDESC: {
 		if (skb->len > ATHDESC_HEADER_SIZE) {

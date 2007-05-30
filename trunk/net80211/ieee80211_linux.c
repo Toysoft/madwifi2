@@ -354,15 +354,15 @@ static int proc_madwifi_count = 0;
 static int
 proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 {
-        char *p = buf;
-        struct ieee80211_node *ni;
-        struct ieee80211_node_table *nt = (struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
-
-        IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
-        TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
-                /* Assume each node needs 500 bytes */
-                if (buf + space < p + 500)
-                        break;
+	char *p = buf;
+	struct ieee80211_node *ni;
+	struct ieee80211_node_table *nt = (struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
+	
+	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
+	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
+		/* Assume each node needs 500 bytes */
+		if (buf + space < p + 500)
+			break;
 
 		if (ni->ni_vap == vap &&
 		    0 != memcmp(vap->iv_myaddr, ni->ni_macaddr, IEEE80211_ADDR_LEN)) {
@@ -376,8 +376,8 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 
 		}
         }
-        IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
-        return (p - buf);
+	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
+	return (p - buf);
 }
 
 static ssize_t
@@ -470,10 +470,10 @@ proc_ieee80211_close(struct inode *inode, struct file *file)
 }
 
 static struct file_operations proc_ieee80211_ops = {
-        .read = proc_ieee80211_read,
-        .write = proc_ieee80211_write,
-        .open = proc_ieee80211_open,
-        .release = proc_ieee80211_close,
+	.read = proc_ieee80211_read,
+	.write = proc_ieee80211_write,
+	.open = proc_ieee80211_open,
+	.release = proc_ieee80211_close,
 };
 
 #ifdef IEEE80211_DEBUG
@@ -898,19 +898,19 @@ ieee80211_rcv_dev_event(struct notifier_block *this, unsigned long event,
 	if (!dev || dev->open != &ieee80211_open)
 		return 0;
 
-        switch (event) {
-        case NETDEV_CHANGENAME:
+	switch (event) {
+	case NETDEV_CHANGENAME:
 		ieee80211_sysctl_vdetach(dev->priv);
 		ieee80211_sysctl_vattach(dev->priv);
 		return NOTIFY_DONE;
 	default:
-		break;
-        }
-        return 0;
+	break;
+	}
+	return 0;
 }
 
 static struct notifier_block ieee80211_event_block = {
-        .notifier_call = ieee80211_rcv_dev_event
+	.notifier_call = ieee80211_rcv_dev_event
 };
 
 /*

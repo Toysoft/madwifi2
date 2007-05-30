@@ -72,19 +72,19 @@ setsysctrl(const char *dev, const char *control , u_long value)
 
 static void usage(void)
 {
-    fprintf(stderr,
-        "Atheros driver control\n"
-        "Copyright (c) 2002-2004 Gunter Burchardt, Local-Web AG\n"
-        "\n"
-        "usage: athctrl [-i interface] [-d distance]\n"
-        "\n"
-        "options:\n"
-        "   -h   show this usage\n"
+	fprintf(stderr,
+	    "Atheros driver control\n"
+	    "Copyright (c) 2002-2004 Gunter Burchardt, Local-Web AG\n"
+	    "\n"
+	    "usage: athctrl [-i interface] [-d distance]\n"
+	    "\n"
+	    "options:\n"
+	    "   -h   show this usage\n"
 	"   -i   interface (default interface is wifi0)\n"
-        "   -d   specify the maximum distance of a sta or the distance\n"
+	    "   -d   specify the maximum distance of a sta or the distance\n"
 	"        of the master\n");
 
-    exit(1);
+	exit(1);
 }
 
 int
@@ -97,27 +97,27 @@ main(int argc, char *argv[])
 	strncpy(device, "wifi0", sizeof (device));
 
 	for (;;) {
-        	c = getopt(argc, argv, "d:i:h");
-        	if (c < 0)
+	    	c = getopt(argc, argv, "d:i:h");
+	    	if (c < 0)
 			break;
-        	switch (c) {
-        	case 'h':
+	    	switch (c) {
+	    	case 'h':
 			usage();
 			break;
-        	case 'd':
+	    	case 'd':
 			distance = atoi(optarg);
 			break;
-        	case 'i':
+	    	case 'i':
 			strncpy(device, optarg, sizeof (device));
 			break;
-        	default:
+	    	default:
 			usage();
 			break;
-        	}
+	    	}
 	}
 
 	if (distance >= 0) {
-        	int slottime = 9 + (distance / 300) + ((distance % 300) ? 1 : 0);
+	    	int slottime = 9 + (distance / 300) + ((distance % 300) ? 1 : 0);
 		int acktimeout = slottime * 2 + 3;
 		int ctstimeout = slottime * 2 + 3;
 		

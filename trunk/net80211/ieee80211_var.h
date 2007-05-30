@@ -130,11 +130,11 @@ struct ieee80211_nsparams {
 
 #define IW_MAX_SPY 8
 struct ieee80211_spy {
-        u_int8_t mac[IW_MAX_SPY * IEEE80211_ADDR_LEN];
-        u_int32_t ts_rssi[IW_MAX_SPY];		/* ts of rssi value from last read */
-        u_int8_t thr_low;			/* 1 byte rssi value, 0 = threshold is off */
-        u_int8_t thr_high;			/* 1 byte rssi value */   
-        u_int8_t num;
+	u_int8_t mac[IW_MAX_SPY * IEEE80211_ADDR_LEN];
+	u_int32_t ts_rssi[IW_MAX_SPY];		/* ts of rssi value from last read */
+	u_int8_t thr_low;			/* 1 byte rssi value, 0 = threshold is off */
+	u_int8_t thr_high;			/* 1 byte rssi value */   
+	u_int8_t num;
 };
 
 struct ieee80211_app_ie {
@@ -401,12 +401,12 @@ struct ieee80211com {
 	u_int (*ic_mhz2ieee)(struct ieee80211com *, u_int, u_int);
 
 #ifdef ATH_REVERSE_ENGINEERING
-    /* debug and reverse engineering hooks */
-    void (*ic_registers_dump)(struct ieee80211com *);
-    void (*ic_registers_mark)(struct ieee80211com *);
-    void (*ic_registers_dump_delta)(struct ieee80211com *);
-    unsigned int (*ic_write_register)(struct ieee80211com *, unsigned int, unsigned int);
-    unsigned int (*ic_read_register)(struct ieee80211com *, unsigned int, unsigned int*);
+	/* debug and reverse engineering hooks */
+	void (*ic_registers_dump)(struct ieee80211com *);
+	void (*ic_registers_mark)(struct ieee80211com *);
+	void (*ic_registers_dump_delta)(struct ieee80211com *);
+	unsigned int (*ic_write_register)(struct ieee80211com *, unsigned int, unsigned int);
+	unsigned int (*ic_read_register)(struct ieee80211com *, unsigned int, unsigned int*);
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 };
 
@@ -414,13 +414,13 @@ struct ieee80211com {
 #define PROC_IEEE80211_PERM 0644
 
 struct proc_ieee80211_priv {
-     int rlen;
-     int max_rlen;
-     char *rbuf;
-
-     int wlen;
-     int max_wlen;
-     char *wbuf;
+	int rlen;
+	int max_rlen;
+	char *rbuf;
+	
+	int wlen;
+	int max_wlen;
+	char *wbuf;
 };
 
 struct ieee80211_proc_entry {

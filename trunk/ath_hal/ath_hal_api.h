@@ -143,7 +143,7 @@
 #define	ath_hal_getctstimeout(_ah) \
 	((*(_ah)->ah_getCTSTimeout)((_ah)))
 #define ath_hal_setdecompmask(_ah, _keyid, _b) \
-        ((*(_ah)->ah_setDecompMask)((_ah), (_keyid), (_b)))
+	((*(_ah)->ah_setDecompMask)((_ah), (_keyid), (_b)))
 #define	ath_hal_enablePhyDiag(_ah) \
 	((*(_ah)->ah_enablePhyErrDiag)((_ah)))
 #define	ath_hal_disablePhyDiag(_ah) \
@@ -161,13 +161,13 @@
 #define ath_hal_xrsupported(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_XR, 0, NULL) == HAL_OK)
 #define ath_hal_compressionsupported(_ah) \
-        (ath_hal_getcapability(_ah, HAL_CAP_COMPRESSION, 0, NULL) == HAL_OK)
+	(ath_hal_getcapability(_ah, HAL_CAP_COMPRESSION, 0, NULL) == HAL_OK)
 #define ath_hal_turboagsupported(_ah, _countrycode) \
 	(ath_hal_getwirelessmodes(_ah, _countrycode) & (HAL_MODE_108G|HAL_MODE_TURBO))
 #define ath_hal_halfrate_chansupported(_ah) \
-        (ath_hal_getcapability(_ah, HAL_CAP_CHAN_HALFRATE, 0, NULL) == HAL_OK)
+	(ath_hal_getcapability(_ah, HAL_CAP_CHAN_HALFRATE, 0, NULL) == HAL_OK)
 #define ath_hal_quarterrate_chansupported(_ah) \
-        (ath_hal_getcapability(_ah, HAL_CAP_CHAN_QUARTERRATE, 0, NULL) == HAL_OK)
+	(ath_hal_getcapability(_ah, HAL_CAP_CHAN_QUARTERRATE, 0, NULL) == HAL_OK)
 #define	ath_hal_getregdomain(_ah, _prd) \
 	ath_hal_getcapability(_ah, HAL_CAP_REG_DMN, 0, (_prd))
 #define	ath_hal_getcountrycode(_ah, _pcc) \
@@ -213,7 +213,7 @@
 #define	ath_hal_hasbursting(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_BURST, 0, NULL) == HAL_OK)
 #define ath_hal_hascompression(_ah) \
-        (ath_hal_getcapability(_ah, HAL_CAP_COMPRESSION, 0, NULL) == HAL_OK)
+	(ath_hal_getcapability(_ah, HAL_CAP_COMPRESSION, 0, NULL) == HAL_OK)
 #define	ath_hal_hasfastframes(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_FASTFRAME, 0, NULL) == HAL_OK)
 #define	ath_hal_hasbssidmask(_ah) \
@@ -235,7 +235,7 @@
 #define	ath_hal_settsfadjust(_ah, _v) \
 	ath_hal_setcapability(_ah, HAL_CAP_TSF_ADJUST, 1, _v, NULL)
 #define ath_hal_setrfsilent(_ah, _v) \
-        ath_hal_setcapability(_ah, HAL_CAP_RFSILENT, 1, _v, NULL)
+	ath_hal_setcapability(_ah, HAL_CAP_RFSILENT, 1, _v, NULL)
 #define ath_hal_hasrfsilent(_ah) \
 	(ath_hal_getcapability(_ah, HAL_CAP_RFSILENT, 0, NULL) == HAL_OK)
 
@@ -269,9 +269,9 @@
 	((*(_ah)->ah_reqTxIntrDesc)((_ah), (_ds)))
 
 #define ath_hal_gpioCfgOutput(_ah, _gpio) \
-        ((*(_ah)->ah_gpioCfgOutput)((_ah), (_gpio)))
+	((*(_ah)->ah_gpioCfgOutput)((_ah), (_gpio)))
 #define ath_hal_gpioset(_ah, _gpio, _b) \
-        ((*(_ah)->ah_gpioSet)((_ah), (_gpio), (_b)))
+	((*(_ah)->ah_gpioSet)((_ah), (_gpio), (_b)))
 #define	ath_hal_setcoverageclass(_ah, _coverageclass, _now) \
 	((*(_ah)->ah_setCoverageClass)((_ah), (_coverageclass), (_now)))
 #define ath_hal_radar_wait(_ah, _chan) \

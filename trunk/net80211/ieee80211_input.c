@@ -500,7 +500,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				IEEE80211_DISCARD(vap, IEEE80211_MSG_INPUT,
 					wh, "data", "%s", "unknown src");
 				/* NB: caller deals with reference */
-    				if (vap->iv_state == IEEE80211_S_RUN)
+					if (vap->iv_state == IEEE80211_S_RUN)
 					ieee80211_send_error(ni, wh->i_addr2,
 						IEEE80211_FC0_SUBTYPE_DEAUTH,
 						IEEE80211_REASON_NOT_AUTHED);
@@ -663,7 +663,7 @@ ieee80211_input(struct ieee80211_node *ni,
 		ic->ic_lastdata = jiffies;
 
 #ifdef ATH_SUPERG_FF
-        	/* check for FF */
+		/* check for FF */
 		llc = (struct llc *) (skb->data + sizeof(struct ether_header));
 		if (ntohs(llc->llc_snap.ether_type) == (u_int16_t)ATH_ETH_TYPE) {
 			struct sk_buff *skb1 = NULL;
@@ -840,63 +840,63 @@ EXPORT_SYMBOL(ieee80211_input);
  * about the frame's origin and encryption, and policy for this vap.
  */
 static int accept_data_frame(struct ieee80211vap *vap,
-       struct ieee80211_node *ni, struct ieee80211_key *key,
-       struct sk_buff *skb, struct ether_header *eh)
+	struct ieee80211_node *ni, struct ieee80211_key *key,
+	struct sk_buff *skb, struct ether_header *eh)
 {
 #define IS_EAPOL(eh) ((eh)->ether_type == __constant_htons(ETHERTYPE_PAE))
 #define PAIRWISE_SET(vap) ((vap)->iv_nw_keys[0].wk_cipher != &ieee80211_cipher_none)
-       if (IS_EAPOL(eh)) {
-               /* encrypted eapol is always OK */
-               if (key)
-                       return 1;
-               /* cleartext eapol is OK if we don't have pairwise keys yet */
-               if (! PAIRWISE_SET(vap))
-                       return 1;
-               /* cleartext eapol is OK if configured to allow it */
-               if (! IEEE80211_VAP_DROPUNENC_EAPOL(vap))
-                       return 1;
-               /* cleartext eapol is OK if other unencrypted is OK */
-               if (! (vap->iv_flags & IEEE80211_F_DROPUNENC))
-                       return 1;
-               /* not OK */
-               IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
-                       eh->ether_shost, "data",
-                       "unauthorized port: ether type 0x%x len %u",
-                       ntohs(eh->ether_type), skb->len);
-               vap->iv_stats.is_rx_unauth++;
-               vap->iv_devstats.rx_errors++;
-               IEEE80211_NODE_STAT(ni, rx_unauth);
-               return 0;
-       }
+	if (IS_EAPOL(eh)) {
+		/* encrypted eapol is always OK */
+		if (key)
+			return 1;
+		/* cleartext eapol is OK if we don't have pairwise keys yet */
+		if (! PAIRWISE_SET(vap))
+			return 1;
+		/* cleartext eapol is OK if configured to allow it */
+		if (! IEEE80211_VAP_DROPUNENC_EAPOL(vap))
+			return 1;
+		/* cleartext eapol is OK if other unencrypted is OK */
+		if (! (vap->iv_flags & IEEE80211_F_DROPUNENC))
+			return 1;
+		/* not OK */
+		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+				      eh->ether_shost, "data",
+				      "unauthorized port: ether type 0x%x len %u",
+				      ntohs(eh->ether_type), skb->len);
+		vap->iv_stats.is_rx_unauth++;
+		vap->iv_devstats.rx_errors++;
+		IEEE80211_NODE_STAT(ni, rx_unauth);
+		return 0;
+	}
 
-       if (!ieee80211_node_is_authorized(ni)) {
-               /*
-                * Deny any non-PAE frames received prior to
-                * authorization.  For open/shared-key
-                * authentication the port is mark authorized
-                * after authentication completes.  For 802.1x
-                * the port is not marked authorized by the
-                * authenticator until the handshake has completed.
-                */
-               IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
-                       eh->ether_shost, "data",
-                       "unauthorized port: ether type 0x%x len %u",
-                       ntohs(eh->ether_type), skb->len);
-               vap->iv_stats.is_rx_unauth++;
-               vap->iv_devstats.rx_errors++;
-               IEEE80211_NODE_STAT(ni, rx_unauth);
-               return 0;
-       } else {
-               /*
-                * When denying unencrypted frames, discard
-                * any non-PAE frames received without encryption.
-                */
-               if ((vap->iv_flags & IEEE80211_F_DROPUNENC) && key == NULL) {
-                       IEEE80211_NODE_STAT(ni, rx_unencrypted);
-                       return 0;
-               }
-       }
-       return 1;
+	if (!ieee80211_node_is_authorized(ni)) {
+		/*
+		* Deny any non-PAE frames received prior to
+		* authorization.  For open/shared-key
+		* authentication the port is mark authorized
+		* after authentication completes.  For 802.1x
+		* the port is not marked authorized by the
+		* authenticator until the handshake has completed.
+		*/
+		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+				      eh->ether_shost, "data",
+				      "unauthorized port: ether type 0x%x len %u",
+				      ntohs(eh->ether_type), skb->len);
+		vap->iv_stats.is_rx_unauth++;
+		vap->iv_devstats.rx_errors++;
+		IEEE80211_NODE_STAT(ni, rx_unauth);
+		return 0;
+	} else {
+		/*
+		* When denying unencrypted frames, discard
+		* any non-PAE frames received without encryption.
+		*/
+		if ((vap->iv_flags & IEEE80211_F_DROPUNENC) && key == NULL) {
+			IEEE80211_NODE_STAT(ni, rx_unencrypted);
+			return 0;
+		}
+	}
+	return 1;
 
 #undef IS_EAPOL
 #undef PAIRWISE_SET
@@ -2598,7 +2598,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 *	[tlv] extended supported rates
 		 *	[tlv] WME
 		 *	[tlv] WPA or RSN
-                 *      [tlv] Atheros Advanced Capabilities
+		 *	[tlv] Atheros Advanced Capabilities
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 12);
 		memset(&scan, 0, sizeof(scan));
@@ -2916,7 +2916,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
-                 *      [tlv] Atheros Advanced Capabilities
+		 *	[tlv] Atheros Advanced Capabilities
 		 */
 		ssid = rates = xrates = ath = NULL;
 		while (frm < efrm) {
@@ -3151,7 +3151,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				/* don't override RSN element
 				 * XXX: actually the driver should report both WPA versions,
 				 * so wpa_supplicant can choose and also detect downgrade attacks
-                                 */
+				*/
 				if (iswpaoui(frm) && !wpa) {
 					if (vap->iv_flags & IEEE80211_F_WPA1)
 						wpa = frm;
@@ -3417,7 +3417,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 */
 			if ((*frm == IEEE80211_ELEMID_AGERE1) ||
 			    (*frm == IEEE80211_ELEMID_AGERE2)) {
-			    	frm = efrm;
+				frm = efrm;
 				continue;
 			}
 
@@ -3445,7 +3445,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		if (rate & IEEE80211_RATE_BASIC) {
 			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC,
 				wh->i_addr2,
-			 	"%sassoc failed (rate set mismatch)",
+				"%sassoc failed (rate set mismatch)",
 				ISREASSOC(subtype) ?  "re" : "");
 			vap->iv_stats.is_rx_assoc_norate++;
 			ieee80211_new_state(vap, IEEE80211_S_SCAN,
@@ -3493,7 +3493,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC, wh->i_addr2,
 			"%sassoc success: %s preamble, %s slot time%s%s%s%s%s%s%s",
 			ISREASSOC(subtype) ? "re" : "",
-		 	(ic->ic_flags&IEEE80211_F_SHPREAMBLE) &&
+			(ic->ic_flags&IEEE80211_F_SHPREAMBLE) &&
 			(ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) ? "short" : "long",
 			ic->ic_flags&IEEE80211_F_SHSLOT ? "short" : "long",
 			ic->ic_flags&IEEE80211_F_USEPROT ? ", protection" : "",
@@ -3522,7 +3522,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 		/*
 		 * deauth frame format
-		 *	[2] reason
+		 *        [2] reason
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 2);
 		reason = le16toh(*(__le16 *)frm);
@@ -3558,7 +3558,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 		/*
 		 * disassoc frame format
-		 *	[2] reason
+		 *        [2] reason
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, 2);
 		reason = le16toh(*(__le16 *)frm);

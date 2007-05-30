@@ -400,7 +400,7 @@ static int
 check_bss(struct ieee80211vap *vap, struct ieee80211_node *ni)
 {
 	struct ieee80211com *ic = ni->ni_ic;
-        u_int8_t rate;
+	u_int8_t rate;
 
 	if (isclr(ic->ic_chan_active, ieee80211_chan2ieee(ic, ni->ni_chan)))
 		return 0;
@@ -444,8 +444,8 @@ static void
 check_bss_debug(struct ieee80211vap *vap, struct ieee80211_node *ni)
 {
 	struct ieee80211com *ic = ni->ni_ic;
-        u_int8_t rate;
-        int fail;
+	u_int8_t rate;
+	int fail;
 
 	fail = 0;
 	if (isclr(ic->ic_chan_active, ieee80211_chan2ieee(ic, ni->ni_chan)))
@@ -488,10 +488,10 @@ check_bss_debug(struct ieee80211vap *vap, struct ieee80211_node *ni)
 		(ni->ni_capinfo & IEEE80211_CAPINFO_ESS) ? "ess" :
 			(ni->ni_capinfo & IEEE80211_CAPINFO_IBSS) ? "ibss" :
 				"????",
-	    	fail & 0x02 ? '!' : ' ');
+		fail & 0x02 ? '!' : ' ');
 	printf(" %3s%c ",
-	    	(ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY) ?  "wep" : "no",
-	    	fail & 0x04 ? '!' : ' ');
+		(ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY) ?  "wep" : "no",
+		fail & 0x04 ? '!' : ' ');
 	ieee80211_print_essid(ni->ni_essid, ni->ni_esslen);
 	printf("%s\n", fail & 0x10 ? "!" : "");
 }
@@ -814,7 +814,7 @@ node_cleanup(struct ieee80211_node *ni)
 	 *
 	 * XXX does this leave us open to inheriting old state?
 	 */
-    
+	
 	if (ni->ni_rxfrag != NULL) {
 		dev_kfree_skb_any(ni->ni_rxfrag);
 		ni->ni_rxfrag = NULL;
@@ -936,7 +936,7 @@ ieee80211_add_wds_addr(struct ieee80211_node_table *nt,
 	struct ieee80211_wds_addr *wds;
 
 	MALLOC(wds, struct ieee80211_wds_addr *, sizeof(struct ieee80211_wds_addr),
-	       M_80211_WDS, M_NOWAIT | M_ZERO);
+		M_80211_WDS, M_NOWAIT | M_ZERO);
 	if (wds == NULL) {
 		/* XXX msg */
 		return 1;
@@ -1628,8 +1628,8 @@ ieee80211_node_join_11g(struct ieee80211_node *ni)
 	IEEE80211_LOCK_ASSERT(ic);
 
 	KASSERT(IEEE80211_IS_CHAN_ANYG(ic->ic_bsschan),
-	     ("not in 11g, bss %u:0x%x, curmode %u", ic->ic_bsschan->ic_freq,
-	      ic->ic_bsschan->ic_flags, ic->ic_curmode));
+	    ("not in 11g, bss %u:0x%x, curmode %u", ic->ic_bsschan->ic_freq,
+	    ic->ic_bsschan->ic_flags, ic->ic_curmode));
 
 	/*
 	 * Station isn't capable of short slot time.  Bump

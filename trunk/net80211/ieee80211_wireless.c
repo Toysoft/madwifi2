@@ -1018,7 +1018,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 #if WIRELESS_EXT >= 18
 	/* report supported WPA/WPA2 capabilities to userspace */
 	range->enc_capa = IW_ENC_CAPA_WPA | IW_ENC_CAPA_WPA2 |
-               IW_ENC_CAPA_CIPHER_TKIP | IW_ENC_CAPA_CIPHER_CCMP;
+		IW_ENC_CAPA_CIPHER_TKIP | IW_ENC_CAPA_CIPHER_CCMP;
 #endif
 	
 	return 0;
@@ -1042,7 +1042,7 @@ ieee80211_ioctl_setspy(struct net_device *dev, struct iw_request_info *info,
 		if (copy_from_user(address, data->pointer,
 		    sizeof(struct sockaddr) * number))
 			return -EFAULT;
-        } else
+	} else
 		return -EFAULT;
 
 	/* copy the MAC addresses into a list */
@@ -1124,7 +1124,7 @@ ieee80211_ioctl_setthrspy(struct net_device *dev, struct iw_request_info *info,
 		if (copy_from_user(&threshold, data->pointer,
 		    sizeof(struct iw_thrspy)))
 			return -EFAULT;
-        } else
+	} else
 		return -EINVAL;
 		
 	if (threshold.low.level == 0) {
@@ -1370,10 +1370,10 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 		if (ic->ic_bsschan != IEEE80211_CHAN_ANYC) {
 			if (ic->ic_bsschan->ic_maxregpower >= rrq->value &&
 			    ic->ic_txpowlimit/2 >= rrq->value) {
- 			        vap->iv_bss->ni_txpower = 2 * rrq->value;
+				vap->iv_bss->ni_txpower = 2 * rrq->value;
 				ic->ic_newtxpowlimit = 2 * rrq->value;
- 				ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
- 			} else
+				ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
+			} else
 				return -EINVAL;
 		} else {
 			/*
@@ -1414,22 +1414,22 @@ ieee80211_ioctl_giwtxpow(struct net_device *dev, struct iw_request_info *info,
 static int
 ieee80211_dump_registers(struct net_device *dev, struct iw_request_info *info, void *w, char *extra)
 {
-    unsigned int *params = (unsigned int*) extra;
-    struct ieee80211vap *vap = dev->priv;
-    struct ieee80211com *ic = vap->iv_ic;
-    switch(params[1]) {
-        case 2:
-            ic->ic_registers_mark(ic);
-            break;
-        case 1:
-            ic->ic_registers_dump_delta(ic);
-            break;
-        case 0:
-        default:
-            ic->ic_registers_dump(ic);
-            break;
-    }
-    return 0;
+	unsigned int *params = (unsigned int*) extra;
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211com *ic = vap->iv_ic;
+	switch (params[1]) {
+	case 2:
+		ic->ic_registers_mark(ic);
+		break;
+	case 1:
+		ic->ic_registers_dump_delta(ic);
+		break;
+	case 0:
+	default:
+		ic->ic_registers_dump(ic);
+		break;
+	}
+	return 0;
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
@@ -1451,7 +1451,7 @@ ieee80211_ioctl_readreg(struct net_device *dev, struct iw_request_info *info, vo
 	unsigned int *params = (unsigned int*) extra;
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-    return ic->ic_read_register(ic, params[0], &params[0]);
+	return ic->ic_read_register(ic, params[0], &params[0]);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
@@ -1724,9 +1724,9 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	if ((current_val - current_ev) > IW_EV_LCP_LEN) {
 		current_ev = current_val;
 	} else {
-	  /* We ran out of space in the buffer. */
-	  if (last_ev == current_ev)
-	    return E2BIG;
+		/* We ran out of space in the buffer. */
+		if (last_ev == current_ev)
+			return E2BIG;
 	}
 
 	memset(&iwe, 0, sizeof(iwe));
@@ -2580,9 +2580,9 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			ic->ic_flags_ext &= ~IEEE80211_FEXT_MARKDFS;
 		break;
 #ifdef ATH_REVERSE_ENGINEERING
-    case IEEE80211_PARAM_DUMPREGS:
-        ieee80211_dump_registers(dev, info, w, extra);
-        break;
+	case IEEE80211_PARAM_DUMPREGS:
+		ieee80211_dump_registers(dev, info, w, extra);
+		break;
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 	default:
 		retv = EOPNOTSUPP;
@@ -3482,7 +3482,7 @@ ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	printk("%s: WDS MAC address %s is not known by this interface\n",
-	       dev->name, ether_sprintf(sa->sa_data));
+		dev->name, ether_sprintf(sa->sa_data));
 
 	return -1;
 }
@@ -3655,79 +3655,79 @@ ieee80211_ioctl_setwmmparams(struct net_device *dev,
 	struct ieee80211_wme_state *wme = &vap->iv_ic->ic_wme;
 
 	switch (param[0]) {
-        case IEEE80211_WMMPARAMS_CWMIN:
-		if (param[3] > 15) 
-			return -EINVAL;
-        	if (bss) {
-			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
-			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
-				wme->wme_bssChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
-		} else {
-			wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
-			wme->wme_chanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
-		}
-		ieee80211_wme_updateparams(vap);	
-		break;
-	case IEEE80211_WMMPARAMS_CWMAX:
-		if (param[3] > 15) 
-			return -EINVAL;
-        	if (bss) {
-			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
-			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
-				wme->wme_bssChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
-		} else {
-			wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
-			wme->wme_chanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
-		}
-		ieee80211_wme_updateparams(vap);	
-		break;
-        case IEEE80211_WMMPARAMS_AIFS:
-		if (param[3] > 15) 
-			return -EINVAL;	
-        	if (bss) {
-			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
-			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
-				wme->wme_bssChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
-		} else {
-			wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
-			wme->wme_chanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
-		}
-		ieee80211_wme_updateparams(vap);	
-		break;
-        case IEEE80211_WMMPARAMS_TXOPLIMIT:
-		if (param[3] > 8192) 
-			return -EINVAL;
-        	if (bss) {
-			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_txopLimit 
+		case IEEE80211_WMMPARAMS_CWMIN:
+			if (param[3] > 15)
+				return -EINVAL;
+			if (bss) {
+				wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
+				if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
+					wme->wme_bssChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
+			} else {
+				wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
+				wme->wme_chanParams.cap_wmeParams[ac].wmep_logcwmin = param[3];
+			}
+			ieee80211_wme_updateparams(vap);        
+			break;
+		case IEEE80211_WMMPARAMS_CWMAX:
+			if (param[3] > 15)
+				return -EINVAL;
+			if (bss) {
+				wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
+				if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
+					wme->wme_bssChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
+			} else {
+				wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
+				wme->wme_chanParams.cap_wmeParams[ac].wmep_logcwmax = param[3];
+			}
+			ieee80211_wme_updateparams(vap);        
+			break;
+		case IEEE80211_WMMPARAMS_AIFS:
+			if (param[3] > 15)
+				return -EINVAL;
+			if (bss) {
+				wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
+				if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
+					wme->wme_bssChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
+			} else {
+				wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
+				wme->wme_chanParams.cap_wmeParams[ac].wmep_aifsn = param[3];
+			}
+			ieee80211_wme_updateparams(vap);        
+			break;
+		case IEEE80211_WMMPARAMS_TXOPLIMIT:
+			if (param[3] > 8192)
+				return -EINVAL;
+			if (bss) {
+				wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_txopLimit 
 				= IEEE80211_US_TO_TXOP(param[3]);
-			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
-				wme->wme_bssChanParams.cap_wmeParams[ac].wmep_txopLimit =
+				if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
+					wme->wme_bssChanParams.cap_wmeParams[ac].wmep_txopLimit =
 					IEEE80211_US_TO_TXOP(param[3]);
-		} else {
-			wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_txopLimit 
+			} else {
+				wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_txopLimit 
 				= IEEE80211_US_TO_TXOP(param[3]);
-			wme->wme_chanParams.cap_wmeParams[ac].wmep_txopLimit 
+				wme->wme_chanParams.cap_wmeParams[ac].wmep_txopLimit 
 				= IEEE80211_US_TO_TXOP(param[3]);
-		}
-		ieee80211_wme_updateparams(vap);	
-		break;
-        case IEEE80211_WMMPARAMS_ACM:
-		if (!bss || param[3] > 1) 
-			return -EINVAL;
-        	/* ACM bit applies to BSS case only */
-		wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
-		if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
-			wme->wme_bssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
-		break;
-        case IEEE80211_WMMPARAMS_NOACKPOLICY:
-		if (bss || param[3] > 1) 
-			return -EINVAL;	
-        	/* ack policy applies to non-BSS case only */
-		wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
-		wme->wme_chanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
-		break;
-	default:
-		break;
+			}
+			ieee80211_wme_updateparams(vap);        
+			break;
+		case IEEE80211_WMMPARAMS_ACM:
+			if (!bss || param[3] > 1)
+				return -EINVAL;
+			/* ACM bit applies to BSS case only */
+			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
+			if ((wme->wme_flags & WME_F_AGGRMODE) == 0)
+				wme->wme_bssChanParams.cap_wmeParams[ac].wmep_acm = param[3];
+			break;
+		case IEEE80211_WMMPARAMS_NOACKPOLICY:
+			if (bss || param[3] > 1)
+				return -EINVAL;
+			/* ack policy applies to non-BSS case only */
+			wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
+			wme->wme_chanParams.cap_wmeParams[ac].wmep_noackPolicy = param[3];
+			break;
+		default:
+			break;
 	}
 	return 0;
 }
@@ -3744,26 +3744,26 @@ ieee80211_ioctl_getwmmparams(struct net_device *dev,
 		&(wme->wme_chanParams) : &(wme->wme_bssChanParams);
 
 	switch (param[0]) {
-        case IEEE80211_WMMPARAMS_CWMIN: 
-		param[0] = chanParams->cap_wmeParams[ac].wmep_logcwmin;
-		break;
-        case IEEE80211_WMMPARAMS_CWMAX: 
-		param[0] = chanParams->cap_wmeParams[ac].wmep_logcwmax;
-		break;
-        case IEEE80211_WMMPARAMS_AIFS: 
-		param[0] = chanParams->cap_wmeParams[ac].wmep_aifsn;
-		break;
-        case IEEE80211_WMMPARAMS_TXOPLIMIT: 
-		param[0] = IEEE80211_TXOP_TO_US(chanParams->cap_wmeParams[ac].wmep_txopLimit);
-		break;
-        case IEEE80211_WMMPARAMS_ACM: 
-		param[0] = wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm;
-		break;
-        case IEEE80211_WMMPARAMS_NOACKPOLICY: 
-		param[0] = wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy;
-		break;
-	default:
-		break;
+		case IEEE80211_WMMPARAMS_CWMIN: 
+			param[0] = chanParams->cap_wmeParams[ac].wmep_logcwmin;
+			break;
+		case IEEE80211_WMMPARAMS_CWMAX: 
+			param[0] = chanParams->cap_wmeParams[ac].wmep_logcwmax;
+			break;
+		case IEEE80211_WMMPARAMS_AIFS: 
+			param[0] = chanParams->cap_wmeParams[ac].wmep_aifsn;
+			break;
+		case IEEE80211_WMMPARAMS_TXOPLIMIT: 
+			param[0] = IEEE80211_TXOP_TO_US(chanParams->cap_wmeParams[ac].wmep_txopLimit);
+			break;
+		case IEEE80211_WMMPARAMS_ACM: 
+			param[0] = wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm;
+			break;
+		case IEEE80211_WMMPARAMS_NOACKPOLICY: 
+			param[0] = wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy;
+			break;
+		default:
+			break;
 	}
 	return 0;
 }
@@ -3988,7 +3988,7 @@ get_sta_space(void *arg, struct ieee80211_node *ni)
 	if (vap != req->vap && vap != req->vap->iv_xrvap)	/* only entries for this vap */
 		return;
 	if ((vap->iv_opmode == IEEE80211_M_HOSTAP ||
-	     vap->iv_opmode == IEEE80211_M_WDS) &&
+	    vap->iv_opmode == IEEE80211_M_WDS) &&
 	    ni->ni_associd == 0)				/* only associated stations or a WDS peer */
 		return;
 	req->space += sta_space(ni, &ielen);
@@ -4007,7 +4007,7 @@ get_sta_info(void *arg, struct ieee80211_node *ni)
 	if (vap != req->vap && vap != req->vap->iv_xrvap)	/* only entries for this vap (or) xrvap */
 		return;
 	if ((vap->iv_opmode == IEEE80211_M_HOSTAP ||
-	     vap->iv_opmode == IEEE80211_M_WDS) &&
+	    vap->iv_opmode == IEEE80211_M_WDS) &&
 	    ni->ni_associd == 0)				/* only associated stations or a WDS peer */
 		return;
 	if (ni->ni_chan == IEEE80211_CHAN_ANYC)			/* XXX bogus entry */
@@ -4061,7 +4061,7 @@ get_sta_info(void *arg, struct ieee80211_node *ni)
 	if (ni->ni_rsn_ie != NULL) {
 		memcpy(cp, ni->ni_rsn_ie, 2 + ni->ni_rsn_ie[1]);
 		cp += 2 + ni->ni_rsn_ie[1];
-        }
+	}
 	if (ni->ni_wpa_ie != NULL) {
 		memcpy(cp, ni->ni_wpa_ie, 2 + ni->ni_wpa_ie[1]);
 		cp += 2 + ni->ni_wpa_ie[1];
@@ -4472,13 +4472,13 @@ giwauth_wpa_version(struct net_device *dev,
 
 	switch(arg) {
 	case 1:
-	    	ver = IW_AUTH_WPA_VERSION_WPA;
+		ver = IW_AUTH_WPA_VERSION_WPA;
 		break;
 	case 2:
-	    	ver = IW_AUTH_WPA_VERSION_WPA2;
+		ver = IW_AUTH_WPA_VERSION_WPA2;
 		break;
 	case 3:
-	    	ver = IW_AUTH_WPA_VERSION|IW_AUTH_WPA_VERSION_WPA2;
+		ver = IW_AUTH_WPA_VERSION|IW_AUTH_WPA_VERSION_WPA2;
 		break;
 	default:
 		ver = IW_AUTH_WPA_VERSION_DISABLED;
@@ -5213,15 +5213,15 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_FILTER , 0, "setfilter" },
 
 #ifdef ATH_REVERSE_ENGINEERING
-    /*
-    Diagnostic dump of device registers
-    */
-    { IEEE80211_PARAM_DUMPREGS, 
-      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dumpregs" },
-    { IEEE80211_IOCTL_READREG,
-      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "readreg" },
-    { IEEE80211_IOCTL_WRITEREG,
-      IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "writereg" },
+	/*
+	Diagnostic dump of device registers
+	*/
+	{ IEEE80211_PARAM_DUMPREGS, 
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "dumpregs" },
+	{ IEEE80211_IOCTL_READREG,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "readreg" },
+	{ IEEE80211_IOCTL_WRITEREG,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 2, 0, "writereg" },
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 };
 
@@ -5305,8 +5305,8 @@ static const iw_handler ieee80211_priv_handlers[] = {
 	set_priv(IEEE80211_IOCTL_WDSDELMAC, ieee80211_ioctl_wdsdelmac),
 	set_priv(IEEE80211_IOCTL_KICKMAC, ieee80211_ioctl_kickmac),
 #ifdef ATH_REVERSE_ENGINEERING
-    set_priv(IEEE80211_IOCTL_READREG, ieee80211_ioctl_readreg),
-    set_priv(IEEE80211_IOCTL_WRITEREG, ieee80211_ioctl_writereg),
+	set_priv(IEEE80211_IOCTL_READREG, ieee80211_ioctl_readreg),
+	set_priv(IEEE80211_IOCTL_WRITEREG, ieee80211_ioctl_writereg),
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 };
 

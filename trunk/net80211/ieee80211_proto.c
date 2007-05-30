@@ -575,13 +575,13 @@ ieee80211_iserp_rateset(struct ieee80211com *ic, struct ieee80211_rateset *rs)
 }
 
 static const struct ieee80211_rateset basic11g[IEEE80211_MODE_MAX] = {
-    { 0 },			/* IEEE80211_MODE_AUTO */
-    { 3, { 12, 24, 48 } },	/* IEEE80211_MODE_11A */
-    { 2, { 2, 4 } },		/* IEEE80211_MODE_11B */
-    { 4, { 2, 4, 11, 22 } },	/* IEEE80211_MODE_11G (mixed b/g) */
-    { 0 },			/* IEEE80211_MODE_FH */
-    { 3, { 12, 24, 48 } },	/* IEEE80211_MODE_TURBO_A */
-    { 4, { 2, 4, 11, 22 } },	/* IEEE80211_MODE_TURBO_G (mixed b/g) */
+	{ 0 },			/* IEEE80211_MODE_AUTO */
+	{ 3, { 12, 24, 48 } },	/* IEEE80211_MODE_11A */
+	{ 2, { 2, 4 } },		/* IEEE80211_MODE_11B */
+	{ 4, { 2, 4, 11, 22 } },	/* IEEE80211_MODE_11G (mixed b/g) */
+	{ 0 },			/* IEEE80211_MODE_FH */
+	{ 3, { 12, 24, 48 } },	/* IEEE80211_MODE_TURBO_A */
+	{ 4, { 2, 4, 11, 22 } },	/* IEEE80211_MODE_TURBO_G (mixed b/g) */
 };
 
 /*
@@ -655,62 +655,62 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 	paramType *pPhyParam, *pBssPhyParam;
 
 	static struct phyParamType phyParamForAC_BE[IEEE80211_MODE_MAX] = {
-	/* IEEE80211_MODE_AUTO  */ { 3, 4,  6,   0, 0 },    
-	/* IEEE80211_MODE_11A   */ { 3, 4,  6,   0, 0 },
-	/* IEEE80211_MODE_11B   */ { 3, 5,  7,   0, 0 },
-	/* IEEE80211_MODE_11G   */ { 3, 4,  6,   0, 0 },
-	/* IEEE80211_MODE_FH    */ { 3, 5,  7,   0, 0 },
-	/* IEEE80211_MODE_TURBO */ { 2, 3,  5,   0, 0 },
-	/* IEEE80211_MODE_TURBO */ { 2, 3,  5,   0, 0 }};
+		/* IEEE80211_MODE_AUTO  */ { 3, 4,  6,   0, 0 },    
+		/* IEEE80211_MODE_11A   */ { 3, 4,  6,   0, 0 },
+		/* IEEE80211_MODE_11B   */ { 3, 5,  7,   0, 0 },
+		/* IEEE80211_MODE_11G   */ { 3, 4,  6,   0, 0 },
+		/* IEEE80211_MODE_FH    */ { 3, 5,  7,   0, 0 },
+		/* IEEE80211_MODE_TURBO */ { 2, 3,  5,   0, 0 },
+		/* IEEE80211_MODE_TURBO */ { 2, 3,  5,   0, 0 }};
 	static struct phyParamType phyParamForAC_BK[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ { 7, 4, 10,   0, 0 },
-        /* IEEE80211_MODE_11A   */ { 7, 4, 10,   0, 0 },
-        /* IEEE80211_MODE_11B   */ { 7, 5, 10,   0, 0 },
-        /* IEEE80211_MODE_11G   */ { 7, 4, 10,   0, 0 },
-	/* IEEE80211_MODE_FH    */ { 7, 5, 10,   0, 0 },
-	/* IEEE80211_MODE_TURBO */ { 7, 3, 10,   0, 0 },
-	/* IEEE80211_MODE_TURBO */ { 7, 3, 10,   0, 0 }};
+		/* IEEE80211_MODE_AUTO  */ { 7, 4, 10,   0, 0 },
+		/* IEEE80211_MODE_11A   */ { 7, 4, 10,   0, 0 },
+		/* IEEE80211_MODE_11B   */ { 7, 5, 10,   0, 0 },
+		/* IEEE80211_MODE_11G   */ { 7, 4, 10,   0, 0 },
+		/* IEEE80211_MODE_FH    */ { 7, 5, 10,   0, 0 },
+		/* IEEE80211_MODE_TURBO */ { 7, 3, 10,   0, 0 },
+		/* IEEE80211_MODE_TURBO */ { 7, 3, 10,   0, 0 }};
 	static struct phyParamType phyParamForAC_VI[IEEE80211_MODE_MAX] = {
-	/* IEEE80211_MODE_AUTO  */ { 1, 3,  4,  94, 0 },
-	/* IEEE80211_MODE_11A   */ { 1, 3,  4,  94, 0 },
-	/* IEEE80211_MODE_11B   */ { 1, 4,  5, 188, 0 },
-	/* IEEE80211_MODE_11G   */ { 1, 3,  4,  94, 0 },
-	/* IEEE80211_MODE_FH    */ { 1, 4,  5, 188, 0 },
-	/* IEEE80211_MODE_TURBO */ { 1, 2,  3,  94, 0 },
-	/* IEEE80211_MODE_TURBO */ { 1, 2,  3,  94, 0 }};
+		/* IEEE80211_MODE_AUTO  */ { 1, 3,  4,  94, 0 },
+		/* IEEE80211_MODE_11A   */ { 1, 3,  4,  94, 0 },
+		/* IEEE80211_MODE_11B   */ { 1, 4,  5, 188, 0 },
+		/* IEEE80211_MODE_11G   */ { 1, 3,  4,  94, 0 },
+		/* IEEE80211_MODE_FH    */ { 1, 4,  5, 188, 0 },
+		/* IEEE80211_MODE_TURBO */ { 1, 2,  3,  94, 0 },
+		/* IEEE80211_MODE_TURBO */ { 1, 2,  3,  94, 0 }};
 	static struct phyParamType phyParamForAC_VO[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ { 1, 2,  3,  47, 0 },
-	/* IEEE80211_MODE_11A   */ { 1, 2,  3,  47, 0 },
-        /* IEEE80211_MODE_11B   */ { 1, 3,  4, 102, 0 },
-        /* IEEE80211_MODE_11G   */ { 1, 2,  3,  47, 0 },
-	/* IEEE80211_MODE_FH    */ { 1, 3,  4, 102, 0 },
-        /* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 },
-        /* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 }};
+		/* IEEE80211_MODE_AUTO  */ { 1, 2,  3,  47, 0 },
+		/* IEEE80211_MODE_11A   */ { 1, 2,  3,  47, 0 },
+		/* IEEE80211_MODE_11B   */ { 1, 3,  4, 102, 0 },
+		/* IEEE80211_MODE_11G   */ { 1, 2,  3,  47, 0 },
+		/* IEEE80211_MODE_FH    */ { 1, 3,  4, 102, 0 },
+		/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 },
+		/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 }};
 
 	static struct phyParamType bssPhyParamForAC_BE[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ { 3, 4, 10,   0, 0 },
-        /* IEEE80211_MODE_11A   */ { 3, 4, 10,   0, 0 },
-        /* IEEE80211_MODE_11B   */ { 3, 5, 10,   0, 0 },
-        /* IEEE80211_MODE_11G   */ { 3, 4, 10,   0, 0 },
-        /* IEEE80211_MODE_FH    */ { 3, 5, 10,   0, 0 },
-        /* IEEE80211_MODE_TURBO */ { 2, 3, 10,   0, 0 },
-        /* IEEE80211_MODE_TURBO */ { 2, 3, 10,   0, 0 }};
+		/* IEEE80211_MODE_AUTO  */ { 3, 4, 10,   0, 0 },
+		/* IEEE80211_MODE_11A   */ { 3, 4, 10,   0, 0 },
+		/* IEEE80211_MODE_11B   */ { 3, 5, 10,   0, 0 },
+		/* IEEE80211_MODE_11G   */ { 3, 4, 10,   0, 0 },
+		/* IEEE80211_MODE_FH    */ { 3, 5, 10,   0, 0 },
+		/* IEEE80211_MODE_TURBO */ { 2, 3, 10,   0, 0 },
+		/* IEEE80211_MODE_TURBO */ { 2, 3, 10,   0, 0 }};
 	static struct phyParamType bssPhyParamForAC_VI[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ { 2, 3,  4,  94, 0 },
-        /* IEEE80211_MODE_11A   */ { 2, 3,  4,  94, 0 },
-        /* IEEE80211_MODE_11B   */ { 2, 4,  5, 188, 0 },
-        /* IEEE80211_MODE_11G   */ { 2, 3,  4,  94, 0 },
-        /* IEEE80211_MODE_FH    */ { 2, 4,  5, 188, 0 },
-        /* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 },
-        /* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 }};
+		/* IEEE80211_MODE_AUTO  */ { 2, 3,  4,  94, 0 },
+		/* IEEE80211_MODE_11A   */ { 2, 3,  4,  94, 0 },
+		/* IEEE80211_MODE_11B   */ { 2, 4,  5, 188, 0 },
+		/* IEEE80211_MODE_11G   */ { 2, 3,  4,  94, 0 },
+		/* IEEE80211_MODE_FH    */ { 2, 4,  5, 188, 0 },
+		/* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 },
+		/* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 }};
 	static struct phyParamType bssPhyParamForAC_VO[IEEE80211_MODE_MAX] = {
-        /* IEEE80211_MODE_AUTO  */ { 2, 2,  3,  47, 0 },    
-        /* IEEE80211_MODE_11A   */ { 2, 2,  3,  47, 0 },
-        /* IEEE80211_MODE_11B   */ { 2, 3,  4, 102, 0 },
-        /* IEEE80211_MODE_11G   */ { 2, 2,  3,  47, 0 },
-        /* IEEE80211_MODE_FH    */ { 2, 3,  4, 102, 0 },
-	/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 },
-	/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 }};
+		/* IEEE80211_MODE_AUTO  */ { 2, 2,  3,  47, 0 },    
+		/* IEEE80211_MODE_11A   */ { 2, 2,  3,  47, 0 },
+		/* IEEE80211_MODE_11B   */ { 2, 3,  4, 102, 0 },
+		/* IEEE80211_MODE_11G   */ { 2, 2,  3,  47, 0 },
+		/* IEEE80211_MODE_FH    */ { 2, 3,  4, 102, 0 },
+		/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 },
+		/* IEEE80211_MODE_TURBO */ { 1, 2,  2,  47, 0 }};
 
 	int i;
 
@@ -803,18 +803,18 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 {
 	static const struct { u_int8_t aifsn; u_int8_t logcwmin; u_int8_t logcwmax; u_int16_t txopLimit;}
 	phyParam[IEEE80211_MODE_MAX] = {
-          /* IEEE80211_MODE_AUTO  */ { 2, 4, 10, 64 },	
-          /* IEEE80211_MODE_11A   */ { 2, 4, 10, 64 },
-          /* IEEE80211_MODE_11B   */ { 2, 5, 10, 64 },
-          /* IEEE80211_MODE_11G   */ { 2, 4, 10, 64 },
-          /* IEEE80211_MODE_FH    */ { 2, 5, 10, 64 },
-          /* IEEE80211_MODE_TURBO */ { 1, 3, 10, 64 }};
+	      /* IEEE80211_MODE_AUTO  */ { 2, 4, 10, 64 },
+	      /* IEEE80211_MODE_11A   */ { 2, 4, 10, 64 },
+	      /* IEEE80211_MODE_11B   */ { 2, 5, 10, 64 },
+	      /* IEEE80211_MODE_11G   */ { 2, 4, 10, 64 },
+	      /* IEEE80211_MODE_FH    */ { 2, 5, 10, 64 },
+	      /* IEEE80211_MODE_TURBO */ { 1, 3, 10, 64 }};
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_wme_state *wme = &ic->ic_wme;
 	enum ieee80211_phymode mode;
 	int i;
 
-       	/* set up the channel access parameters for the physical device */
+	/* set up the channel access parameters for the physical device */
 
 	for (i = 0; i < WME_NUM_AC; i++) {
 		wme->wme_chanParams.cap_wmeParams[i].wmep_aifsn =
@@ -845,7 +845,7 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 		mode = ieee80211_chan2mode(ic->ic_bsschan);
 	else
 		mode = IEEE80211_MODE_AUTO;
-        if ((vap->iv_opmode == IEEE80211_M_HOSTAP &&
+	    if ((vap->iv_opmode == IEEE80211_M_HOSTAP &&
 	     (wme->wme_flags & WME_F_AGGRMODE) != 0) ||
 	    (vap->iv_opmode != IEEE80211_M_HOSTAP &&
 	     (vap->iv_bss->ni_flags & IEEE80211_NODE_QOS) == 0) ||

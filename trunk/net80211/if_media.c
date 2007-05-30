@@ -365,40 +365,40 @@ ifmedia_match(struct ifmedia *ifm, int target, int mask)
 
 #ifdef IFMEDIA_DEBUG
 struct ifmedia_description ifm_type_descriptions[] =
-    IFM_TYPE_DESCRIPTIONS;
+	IFM_TYPE_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_ethernet_descriptions[] =
-    IFM_SUBTYPE_ETHERNET_DESCRIPTIONS;
+	IFM_SUBTYPE_ETHERNET_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_ethernet_option_descriptions[] =
-    IFM_SUBTYPE_ETHERNET_OPTION_DESCRIPTIONS;
+	IFM_SUBTYPE_ETHERNET_OPTION_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_tokenring_descriptions[] =
-    IFM_SUBTYPE_TOKENRING_DESCRIPTIONS;
+	IFM_SUBTYPE_TOKENRING_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_tokenring_option_descriptions[] =
-    IFM_SUBTYPE_TOKENRING_OPTION_DESCRIPTIONS;
+	IFM_SUBTYPE_TOKENRING_OPTION_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_fddi_descriptions[] =
-    IFM_SUBTYPE_FDDI_DESCRIPTIONS;
+	IFM_SUBTYPE_FDDI_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_fddi_option_descriptions[] =
-    IFM_SUBTYPE_FDDI_OPTION_DESCRIPTIONS;
+	IFM_SUBTYPE_FDDI_OPTION_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_ieee80211_descriptions[] =
-    IFM_SUBTYPE_IEEE80211_DESCRIPTIONS;
+	IFM_SUBTYPE_IEEE80211_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_ieee80211_option_descriptions[] =
-    IFM_SUBTYPE_IEEE80211_OPTION_DESCRIPTIONS;
+	IFM_SUBTYPE_IEEE80211_OPTION_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_ieee80211_mode_descriptions[] =
-    IFM_SUBTYPE_IEEE80211_MODE_DESCRIPTIONS;
+	IFM_SUBTYPE_IEEE80211_MODE_DESCRIPTIONS;
 
 struct ifmedia_description ifm_subtype_shared_descriptions[] =
-    IFM_SUBTYPE_SHARED_DESCRIPTIONS;
+	IFM_SUBTYPE_SHARED_DESCRIPTIONS;
 
 struct ifmedia_description ifm_shared_option_descriptions[] =
-    IFM_SHARED_OPTION_DESCRIPTIONS;
+	IFM_SHARED_OPTION_DESCRIPTIONS;
 
 struct ifmedia_type_to_subtype {		/* XXX: right place for declaration? */
 	struct ifmedia_description *subtypes;
