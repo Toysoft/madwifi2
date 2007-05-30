@@ -196,7 +196,8 @@ Integrating into the kernel sources
 It is also possible to patch Linux kernel sources to integrate MadWifi
 directly into the kernel tree.  This allows building MadWifi as part of
 the kernel.  This could be useful for embedded systems that don't
-support loadable modules.  Please refer to patches/README for details.
+support loadable modules.  Please refer to patch-kernel/README for
+details.
 
 
 Further information
