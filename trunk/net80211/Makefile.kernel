@@ -8,6 +8,7 @@ srctree ?= .
 TOP = $(srctree)/$(src)/..
 
 include $(TOP)/BuildCaps.inc
+include $(TOP)/ath_hal/ah_target.inc
 
 COMPAT = $(TOP)/include
 
