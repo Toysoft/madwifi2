@@ -480,13 +480,13 @@ struct ath_vap {
 #define ATH_TXQ_INTR_PERIOD		5  /* axq_intrcnt period for intr gen */
 #define	ATH_TXQ_LOCK_INIT(_tq)		spin_lock_init(&(_tq)->axq_lock)
 #define	ATH_TXQ_LOCK_DESTROY(_tq)
-#define ATH_TXQ_LOCK_IRQ(_tq)		do {	\
-	unsigned long __axq_lockflags;		\
+#define ATH_TXQ_LOCK_IRQ(_tq)		do {				\
+	unsigned long __axq_lockflags;					\
 	spin_lock_irqsave(&(_tq)->axq_lock, __axq_lockflags);
-#define ATH_TXQ_UNLOCK_IRQ(_tq)			\
-	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags); \
+#define ATH_TXQ_UNLOCK_IRQ(_tq)						\
+	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags);	\
 } while (0)
-#define ATH_TXQ_UNLOCK_IRQ_EARLY(_tq)			\
+#define ATH_TXQ_UNLOCK_IRQ_EARLY(_tq)					\
 	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags);
 
 #define	ATH_TXQ_LOCK_ASSERT(_tq) \
@@ -525,7 +525,7 @@ struct ath_softc {
 	void __iomem *sc_iobase;		/* address of the device */
 	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
-	struct ath_stats	sc_stats;		/* private statistics */
+	struct ath_stats sc_stats;		/* private statistics */
 	int devid;
 	int sc_debug;
 	void (*sc_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int, int, u_int32_t);
