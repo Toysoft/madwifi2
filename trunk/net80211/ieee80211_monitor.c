@@ -75,7 +75,7 @@ ratecode_to_dot11(int ratecode)
 	case 0x0d: return 72;
 	case 0x08: return 96;
 	case 0x0c: return 108;
-	
+
 	case 0x1b: return 2;
 	case 0x1a: return 4;
 	case 0x1e: return 4;
@@ -126,7 +126,7 @@ struct ar5212_openbsd_desc {
 };
 
 void
-ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb) 
+ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 {
 	struct ieee80211_cb *cb = (struct ieee80211_cb *) skb->cb;
 	struct ieee80211_phy_params *ph =
@@ -145,13 +145,13 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 	switch (skb->dev->type) {
 	case ARPHRD_IEEE80211: {
 		struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
-		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
 			ph->try0 = 1;
 		break;
 	}
 	case ARPHRD_IEEE80211_PRISM: {
 		struct ieee80211_frame *wh = NULL;
-		wlan_ng_prism2_header *p2h = 
+		wlan_ng_prism2_header *p2h =
 			(wlan_ng_prism2_header *) skb->data;
 		/* does it look like there is a prism header here? */
 		if (skb->len > sizeof (wlan_ng_prism2_header) &&
@@ -161,7 +161,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 	                    skb_pull(skb, sizeof(wlan_ng_prism2_header));
 		}
 		wh = (struct ieee80211_frame *) skb->data;
-		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
 			ph->try0 = 1;
 		break;
 	}
@@ -257,7 +257,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 			/* Remove FCS from the end of frames to transmit */
 			skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 		wh = (struct ieee80211_frame *)skb->data;
-		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL) 
+		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
 			ph->try0 = 1;
 		break;
 	}
@@ -277,7 +277,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 			skb_pull(skb, ATHDESC_HEADER_SIZE);
 		}
 		break;
-	}	
+	}
 	default:
 		break;
 	}
@@ -294,7 +294,7 @@ EXPORT_SYMBOL(ieee80211_monitor_encap);
  */
 void
 ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
-	const struct ath_buf *bf, int tx, u_int64_t mactime, struct ath_softc *sc) 
+	const struct ath_buf *bf, int tx, u_int64_t mactime, struct ath_softc *sc)
 {
 	struct ieee80211vap *vap, *next;
 	struct ath_desc *ds = bf->bf_desc;
@@ -303,7 +303,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	int ieeerate = 0;
 	u_int32_t rssi = 0;
 	u_int8_t pkttype = 0;
-	
+
 	if (tx) {
 		rssi = bf->bf_dsstatus.ds_txstat.ts_rssi;
 		antenna = bf->bf_dsstatus.ds_txstat.ts_antenna;
@@ -328,21 +328,21 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		next = TAILQ_NEXT(vap, iv_next);
 		/* If we have rx'd an error frame... */
 		if (!tx && bf->bf_dsstatus.ds_rxstat.rs_status != 0) {
-			
+
 			/* Discard PHY errors if necessary */
 			if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_PHY) {
 				if (vap->iv_monitor_phy_errors == 0) continue;
 			}
-			
+
 			/* Discard CRC errors if necessary */
 			if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC) {
 				if (vap->iv_monitor_crc_errors == 0) continue;
 			}
-			
+
 			/* Accept PHY, CRC and decrypt errors. Discard the rest. */
 			if (bf->bf_dsstatus.ds_rxstat.rs_status &~
 					(HAL_RXERR_DECRYPT | HAL_RXERR_MIC |
-					 HAL_RXERR_PHY | HAL_RXERR_CRC )) 
+					 HAL_RXERR_PHY | HAL_RXERR_CRC ))
 				continue;
 
 			/* We can't use addr1 to determine direction at this point */
@@ -370,12 +370,12 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		    dir != IEEE80211_FC1_DIR_NODS) {
 			/* don't rx fromds, tods, or dstods packets */
 			continue;
-		}		    
+		}
 		skb1 = skb_copy(skb, GFP_ATOMIC);
 		if (skb1 == NULL) {
 			/* XXX stat+msg */
 			continue;
-		}		
+		}
 		if (vap->iv_monitor_txf_len && tx) {
 			/* truncate transmit feedback packets */
 			skb_trim(skb1, vap->iv_monitor_txf_len);
@@ -391,59 +391,59 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				skb1 = NULL;
 				break;
 			}
-			
+
 			ph = (wlan_ng_prism2_header *)
 				skb_push(skb1, sizeof(wlan_ng_prism2_header));
 			memset(ph, 0, sizeof(wlan_ng_prism2_header));
-			
+
 			ph->msgcode = DIDmsg_lnxind_wlansniffrm;
 			ph->msglen = sizeof(wlan_ng_prism2_header);
 			strncpy(ph->devname, dev->name, sizeof(ph->devname));
-			
+
 			ph->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
 			ph->hosttime.status = 0;
 			ph->hosttime.len = 4;
 			ph->hosttime.data = jiffies;
-			
+
 			/* Pass up tsf clock in mactime */
 			/* NB: the prism mactime field is 32bit, so we lose TSF precision here */
 			ph->mactime.did = DIDmsg_lnxind_wlansniffrm_mactime;
 			ph->mactime.status = 0;
 			ph->mactime.len = 4;
 			ph->mactime.data = mactime;
-			
+
 			ph->istx.did = DIDmsg_lnxind_wlansniffrm_istx;
 			ph->istx.status = 0;
 			ph->istx.len = 4;
 			ph->istx.data = tx ? P80211ENUM_truth_true : P80211ENUM_truth_false;
-			
+
 			ph->frmlen.did = DIDmsg_lnxind_wlansniffrm_frmlen;
 			ph->frmlen.status = 0;
 			ph->frmlen.len = 4;
-			ph->frmlen.data = skb->len; 
-			
+			ph->frmlen.data = skb->len;
+
 			ph->channel.did = DIDmsg_lnxind_wlansniffrm_channel;
 			ph->channel.status = 0;
 			ph->channel.len = 4;
 			ph->channel.data =
-				ieee80211_mhz2ieee(ic->ic_curchan->ic_freq, 
+				ieee80211_mhz2ieee(ic->ic_curchan->ic_freq,
 					ic->ic_curchan->ic_flags);
-			
+
 			ph->rssi.did = DIDmsg_lnxind_wlansniffrm_rssi;
 			ph->rssi.status = 0;
 			ph->rssi.len = 4;
 			ph->rssi.data = rssi;
-			
+
 			ph->noise.did = DIDmsg_lnxind_wlansniffrm_noise;
 			ph->noise.status = 0;
 			ph->noise.len = 4;
 			ph->noise.data = noise;
-			
+
 			ph->signal.did = DIDmsg_lnxind_wlansniffrm_signal;
 			ph->signal.status = 0;
 			ph->signal.len = 4;
 			ph->signal.data = rssi + noise;
-			
+
 			ph->rate.did = DIDmsg_lnxind_wlansniffrm_rate;
 			ph->rate.status = 0;
 			ph->rate.len = 4;
@@ -459,8 +459,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					skb1 = NULL;
 					break;
 				}
-				
-				th = (struct ath_tx_radiotap_header *) skb_push(skb1, 
+
+				th = (struct ath_tx_radiotap_header *) skb_push(skb1,
 					sizeof(struct ath_tx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_version = 0;
@@ -470,7 +470,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				/* radiotap's TSF field is the full 64 bits, so we don't lose
 				 * any TSF precision when using radiotap */
 				th->wt_tsft = cpu_to_le64(mactime);
-			
+
 				th->wt_flags = 0;
 				th->wt_rate = ieeerate;
 				th->wt_txpower = 0;
@@ -478,9 +478,9 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				if (bf->bf_dsstatus.ds_txstat.ts_status & HAL_TXERR_XRETRY)
 					th->wt_txflags |= cpu_to_le16(IEEE80211_RADIOTAP_F_TX_FAIL);
-				
+
 				th->wt_dataretries = bf->bf_dsstatus.ds_txstat.ts_shortretry + bf->bf_dsstatus.ds_txstat.ts_longretry;
-				
+
 			} else {
 				struct ath_rx_radiotap_header *th;
 				if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {
@@ -489,8 +489,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					skb1 = NULL;
 					break;
 				}
-				
-				th = (struct ath_rx_radiotap_header *) skb_push(skb1, 
+
+				th = (struct ath_rx_radiotap_header *) skb_push(skb1,
 					sizeof(struct ath_rx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_rx_radiotap_header));
 				th->wr_ihdr.it_version = 0;
@@ -501,7 +501,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					th->wr_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
 				if (bf->bf_dsstatus.ds_rxstat.rs_status & HAL_RXERR_CRC)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_BADFCS;
-				if (skb->len >= IEEE80211_CRC_LEN) 
+				if (skb->len >= IEEE80211_CRC_LEN)
 					th->wr_flags |= IEEE80211_RADIOTAP_F_FCS;
 
 				th->wr_rate = ieeerate;
@@ -514,19 +514,19 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 							cpu_to_le16(IEEE80211_CHAN_A);
 						break;
 					case IEEE80211_MODE_TURBO_A:
-						th->wr_chan_flags = 
+						th->wr_chan_flags =
 							cpu_to_le16(IEEE80211_CHAN_TA);
 						break;
 					case IEEE80211_MODE_11B:
-						th->wr_chan_flags = 
+						th->wr_chan_flags =
 							cpu_to_le16(IEEE80211_CHAN_B);
 						break;
 					case IEEE80211_MODE_11G:
-						th->wr_chan_flags = 
+						th->wr_chan_flags =
 							cpu_to_le16(IEEE80211_CHAN_G);
 						break;
 					case IEEE80211_MODE_TURBO_G:
-						th->wr_chan_flags = 
+						th->wr_chan_flags =
 							cpu_to_le16(IEEE80211_CHAN_TG);
 						break;
 					default:
@@ -538,7 +538,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = antenna;
 				th->wr_antsignal = rssi;
-				
+
 				th->wr_tsft = cpu_to_le64(mactime);
 			}
 			break;
@@ -552,7 +552,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			}
 			memcpy(skb_push(skb1, ATHDESC_HEADER_SIZE), ds, ATHDESC_HEADER_SIZE);
 			break;
-		} 
+		}
 		default:
 			break;
 		}
@@ -568,9 +568,9 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			skb1->ip_summed = CHECKSUM_NONE;
 			skb1->pkt_type = pkttype;
 			skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
-			
+
 			netif_rx(skb1);
-			
+
 			vap->iv_devstats.rx_packets++;
 			vap->iv_devstats.rx_bytes += skb1->len;
 		}

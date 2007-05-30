@@ -116,7 +116,7 @@
 
 #include "minstrel.h"
 
-#define	MINSTREL_DEBUG 
+#define	MINSTREL_DEBUG
 #ifdef MINSTREL_DEBUG
 enum {
 		ATH_DEBUG_RATE		= 0x00000010	/* rate control */
@@ -171,7 +171,7 @@ MODULE_PARM_DESC(ath_ewma_level, " scaling % used in ewma rolloff calculations  
 MODULE_PARM_DESC(ath_segment_size, " max duration of time to spend in either of the first two mrr segments (6000)");
 
 
-static __inline int 
+static __inline int
 rate_to_ndx(struct minstrel_node *sn, int rate)
 {
 		unsigned int x = 0;
@@ -183,14 +183,14 @@ rate_to_ndx(struct minstrel_node *sn, int rate)
 
 /* Calculate the transmit duration of a frame. */
 static unsigned
-calc_usecs_unicast_packet(struct ath_softc *sc, int length, 
+calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 		int rix, int short_retries, int long_retries)
 {
 		const HAL_RATE_TABLE *rt = sc->sc_currates;
 		struct ieee80211com *ic = &sc->sc_ic;
 		unsigned t_slot = 20;
-		unsigned t_difs = 50; 
-		unsigned t_sifs = 10; 
+		unsigned t_difs = 50;
+		unsigned t_sifs = 10;
 		unsigned int x = 0, tt = 0;
 		unsigned int cix = rt->info[rix].controlRate;
 		int rts = 0, cts = 0;
@@ -205,7 +205,7 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 			       sc->sc_curmode);
 			return 0;
 		}
-		
+
 		/* XXX: Getting MAC/PHY level timings should be fixed for turbo
 		 * rates, and there is probably a way to get this from the
 		 * HAL... */
@@ -259,7 +259,7 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 #endif
 				return 0;
 			}
-			
+
 
 			ctsrate |= rt->info[cix].shortPreamble;
 			if (rts)	/* SIFS + CTS */
@@ -275,7 +275,7 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 		}
 		tt += t_difs;
 		tt += (long_retries + 1) * (t_sifs + rt->info[rix].spAckDuration);
-		tt += (long_retries + 1) * ath_hal_computetxtime(sc->sc_ah, rt, length, 
+		tt += (long_retries + 1) * ath_hal_computetxtime(sc->sc_ah, rt, length,
 							rix, AH_TRUE);
 		for (x = 0; x <= short_retries + long_retries; x++) {
 			cw = MIN(WIFI_CW_MAX, (cw + 1) * 2);
@@ -324,7 +324,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 			           ether_sprintf(an->an_node.ni_macaddr));
 			    return;
 		}
-  
+
 		mrr = sc->sc_mrretry && !(ic->ic_flags & IEEE80211_F_USEPROT) && ENABLE_MRR;
 
 		if (sn->static_rate_ndx >= 0) {
@@ -339,7 +339,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 				if (sn->packet_count >= 10000) {
 					sn->sample_count = 0;
 					sn->packet_count = 0;
-				}				
+				}
 
 				/* Don't look for slowest rate (i.e. slowest
 				 * base rate). We must presume that the slowest
@@ -349,11 +349,11 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 				 * the slowest rate was used to establish the
 				 * link in the first place. */
 				ndx = sn->rs_sampleTable[sn->rs_sampleIndex][sn->rs_sampleColumn];
-				
+
 				sn->rs_sampleIndex++;
 				if (sn->rs_sampleIndex > (sn->num_rates - 2)) {
 					sn->rs_sampleIndex = 0;
-					
+
 					sn->rs_sampleColumn++;
 					if (sn->rs_sampleColumn >= MINSTREL_COLUMNS)
 						sn->rs_sampleColumn = 0;
@@ -362,7 +362,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 				ndx = sn->max_tp_rate;
 		 }
 
-		if ((sn->static_rate_ndx != -1) || !mrr) 
+		if ((sn->static_rate_ndx != -1) || !mrr)
 			    *try0 = ATH_TXMAXTRY;
 		else
 			    *try0 = sn->retry_adjusted_count[ndx];
@@ -394,7 +394,7 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 		} else {
 			rc1 = sn->max_tp_rate2;
 		}
-		
+
 		rc2 = sn->max_prob_rate;
 		rc3 = 0;
 
@@ -447,7 +447,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		int rate1, tries1, ndx1;
 		int rate2, tries2, ndx2;
 		int rate3, tries3, ndx3;
-		
+
 		/* This is the index in the retry chain we finish at.
 		 * With no retransmits, it is always 0.
 		 * int finalTSIdx = ads->final_ts_index; */
@@ -460,7 +460,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		if (final_ndx < 0) {
 			DPRINTF(sc, "%s: final ndx too low\n", __func__);
 			final_ndx = 0;
-		}		
+		}
 
 		/* 'tries' is the total number of times we have endeavoured to
 		 * send this packet, and is a sum of the #attempts at each
@@ -468,7 +468,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		tries = ts->ts_shortretry + ts->ts_longretry + 1;
 
 		if (sn->num_rates <= 0) {
-			DPRINTF(sc, "%s: %s %s no rates yet\n", dev_info, 
+			DPRINTF(sc, "%s: %s %s no rates yet\n", dev_info,
 				ether_sprintf(an->an_node.ni_macaddr), __func__);
 			return;
 		}
@@ -491,15 +491,15 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		rate0 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate0)].ieeerate;
 		tries0 = MS(ds->ds_ctl2, AR_XmitDataTries0);
 		ndx0 = rate_to_ndx(sn, rate0);
-		
+
 		rate1 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate1)].ieeerate;
 		tries1 = MS(ds->ds_ctl2, AR_XmitDataTries1);
 		ndx1 = rate_to_ndx(sn, rate1);
-		
+
 		rate2 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate2)].ieeerate;
 		tries2 = MS(ds->ds_ctl2, AR_XmitDataTries2);
 		ndx2 = rate_to_ndx(sn, rate2);
-		
+
 		rate3 = sc->sc_hwmap[MS(ds->ds_ctl3, AR_XmitRate3)].ieeerate;
 		tries3 = MS(ds->ds_ctl2, AR_XmitDataTries3);
 		ndx3 = rate_to_ndx(sn, rate3);
@@ -513,7 +513,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		tries = tries - tries0;
 		sn->rs_rateattempts[ndx1] += MIN(tries, tries1);
 		if (tries <= tries1)
-			return; 
+			return;
 
 		if  (tries2 < 0)
 			return;
@@ -525,7 +525,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		if  (tries3 < 0)
 			return;
 		tries = tries - tries2;
-		sn->rs_rateattempts[ndx3] += MIN(tries, tries3);	
+		sn->rs_rateattempts[ndx3] += MIN(tries, tries3);
 }
 
 static void
@@ -633,13 +633,13 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 				continue;
 			}
 			sn->rates[x].rateCode = rt->info[sn->rates[x].rix].rateCode;
-			sn->rates[x].shortPreambleRateCode = 
-				rt->info[sn->rates[x].rix].rateCode | 
+			sn->rates[x].shortPreambleRateCode =
+				rt->info[sn->rates[x].rix].rateCode |
 				rt->info[sn->rates[x].rix].shortPreamble;
 		}
 
 		ath_fill_sample_table(sn);
-		
+
 		ni->ni_txrate = 0;
 
 		if (sn->num_rates <= 0) {
@@ -667,12 +667,12 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 			sn->static_rate_ndx = srate;
 			ni->ni_txrate = srate;
 			DPRINTF(sc, "%s: %s %s fixed rate %d%sMbps\n",
-				dev_info, __func__, ether_sprintf(ni->ni_macaddr), 
+				dev_info, __func__, ether_sprintf(ni->ni_macaddr),
 				sn->rates[srate].rate / 2,
 				(sn->rates[srate].rate % 2) ? ".5 " : " ");
 			return;
 		}
-		
+
 		for (x = 0; x < ni->ni_rates.rs_nrates; x++) {
 			sn->rs_rateattempts	[x] = 0;
 			sn->rs_thisprob		[x] = 0;
@@ -682,8 +682,8 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 			sn->rs_lastratesuccess 	[x] = 0;
 			sn->rs_succ_hist 	[x] = 0;
 			sn->rs_att_hist 	[x] = 0;
-			sn->perfect_tx_time 	[x] = 
-				calc_usecs_unicast_packet(sc, 1200, 
+			sn->perfect_tx_time 	[x] =
+				calc_usecs_unicast_packet(sc, 1200,
 							  sn->rates[x].rix,
 							  0, 0);
 			sn->retry_count 	[x] = 1;
@@ -691,7 +691,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 
 			for (retry_index = 2; retry_index < ATH_TXMAXTRY; retry_index++) {
 				tx_time = calc_usecs_unicast_packet(sc, 1200, sn->rates[x].rix, 0, retry_index);
-				if (tx_time > ath_segment_size) 
+				if (tx_time > ath_segment_size)
 					break;
 				sn->retry_count[x] = retry_index;
 				sn->retry_adjusted_count[x] = retry_index;
@@ -700,7 +700,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 
 #if 0
 		DPRINTF(sc, "%s: Retry table for this node\n", __func__);
-		  for (x = 0; x < ni->ni_rates.rs_nrates; x++) 
+		  for (x = 0; x < ni->ni_rates.rs_nrates; x++)
 			     DPRINTF(sc, "%2d  %2d %6d  \n",x, sn->retry_count[x], sn->perfect_tx_time[x]);
 #endif
 
@@ -724,7 +724,7 @@ static void
 ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state newstate)
 {
 		struct ieee80211com *ic = vap->iv_ic;
-		
+
 		if (newstate == IEEE80211_S_RUN) {
 			if (ic->ic_opmode != IEEE80211_M_STA) {
 				/* Sync rates for associated stations and neighbors. */
@@ -744,17 +744,17 @@ ath_timer_function(unsigned long data)
 		struct timer_list *timer;
 		unsigned int interval = ath_timer_interval;
 
-		if (dev == NULL) 
+		if (dev == NULL)
 			DPRINTF(sc, "%s: 'dev' is null in this timer \n", __func__);
 
-		if (sc == NULL) 
+		if (sc == NULL)
 			DPRINTF(sc, "%s: 'sc' is null in this timer\n", __func__);
 
 		ic = &sc->sc_ic;
 
 		if (ssc->close_timer_now)
 			return;
-		
+
 		if (dev->flags & IFF_RUNNING) {
 			sc->sc_stats.ast_rate_calls++;
 
@@ -771,7 +771,7 @@ ath_timer_function(unsigned long data)
 			interval = ath_timer_interval >> 1;
 
 		timer  = &(ssc->timer);
-		if (timer == NULL) 
+		if (timer == NULL)
 			DPRINTF(sc, "%s: timer is null - leave it\n", __func__);
 
 		timer->expires = jiffies + ((HZ * interval) / 1000);
@@ -789,14 +789,14 @@ ath_rate_statistics(void *arg, struct ieee80211_node *ni)
 		u_int32_t micro_secs;
 		u_int32_t max_prob,    index_max_prob;
 		u_int32_t max_tp,      index_max_tp,      index_max_tp2;
-		
+
 		/* Calculate statistics for each date rate in the table */
 		/* 'micro_secs' is the time to transmit 1200 bytes, or 9600 bits. */
 		for (i = 0; i < rs->rs_nrates; i++) {
 			micro_secs = rn->perfect_tx_time[i];
-			if (micro_secs == 0) 
+			if (micro_secs == 0)
 				micro_secs = ONE_SECOND;
-			
+
 			    if (rn->rs_rateattempts[i] != 0) {
 			            p = (rn->rs_ratesuccess[i] * 18000) / rn->rs_rateattempts[i];
 			            rn->rs_succ_hist[i] += rn->rs_ratesuccess[i];
@@ -821,21 +821,21 @@ ath_rate_statistics(void *arg, struct ieee80211_node *ni)
 				rn->retry_adjusted_count[i] = rn->retry_count[i] >> 1;
 				if (rn->retry_adjusted_count[i] > 2)
 					rn->retry_adjusted_count[i] = 2;
-			} else 
+			} else
 				rn->retry_adjusted_count[i] = rn->retry_count[i];
 			if (rn->retry_adjusted_count[i] == 0)
 				rn->retry_adjusted_count[i] = 1;
 		}
-		 
+
 		/* The High speed rates (e.g 54Mbps) is checked last. If
 		 * throughput is the same for two rates, we prefer the
 		 * lower rate, as this has a better chance of success. */
-		max_prob = 0; 
+		max_prob = 0;
 		index_max_prob = 0;
-		max_tp = 0; 
+		max_tp = 0;
 		index_max_tp  = 0;
 		index_max_tp2 = 0;
-		
+
 		/* This code could have been moved up into the previous
 		 * loop. More readable to have it here */
 		for (i = 0; i < rs->rs_nrates; i++) {
@@ -849,7 +849,7 @@ ath_rate_statistics(void *arg, struct ieee80211_node *ni)
 				max_prob = rn->rs_probability[i];
 			}
 		}
-		 
+
 		max_tp = 0;
 		for (i = 0; i < rs->rs_nrates; i++) {
 			if ((i != index_max_tp) && (max_tp <= rn->rs_this_tp[i])) {
@@ -869,7 +869,7 @@ ath_rate_attach(struct ath_softc *sc)
 {
 		struct minstrel_softc *osc;
 		DPRINTF(sc, "%s: %s\n", dev_info, __func__);
-		
+
 		_MOD_INC_USE(THIS_MODULE, return NULL);
 		osc = kmalloc(sizeof(struct minstrel_softc), GFP_ATOMIC);
 		if (osc == NULL) {
@@ -886,14 +886,14 @@ ath_rate_attach(struct ath_softc *sc)
 		osc->sc_dev      = sc->sc_dev;
 		osc->timer.function = ath_timer_function;
 		osc->timer.data = (unsigned long)osc;
-		
+
 		osc->timer.expires = jiffies + HZ;
 		add_timer(&osc->timer);
-		
+
 		return &osc->arc;
 }
 
-static void 
+static void
 ath_rate_detach(struct ath_ratectrl *arc)
 {
  	struct minstrel_softc *osc = (struct minstrel_softc *) arc;
@@ -939,7 +939,7 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 			for (x = 0; x < odst->num_rates; x++) {
 				p += sprintf(p, "%s",
 					     (x == odst->current_rate) ? "T" : " ");
-				
+
 				p += sprintf(p, "%s",
 					     (x == odst->max_tp_rate2) ? "t" : " ");
 
@@ -1014,7 +1014,7 @@ static struct file_operations ath_proc_ratesample_ops = {
 		.release = NULL,
 };
 
-static void 
+static void
 ath_rate_dynamic_proc_register(struct ieee80211vap *vap)
 {
 		/* Create proc entries for the rate control algorithm */
@@ -1052,7 +1052,7 @@ static int __init ath_rate_minstrel_init(void)
 		printk(KERN_ERR "\n");
 		printk(KERN_ERR "Minstrel automatic rate control algorithm.\n");
 		printk(KERN_ERR "\n");
- 
+
 		printk(KERN_ERR "Look around rate set to %d%%\n", ath_lookaround_rate);
 		printk(KERN_ERR "EWMA rolloff level set to %d%%\n", ath_ewma_level);
 		printk(KERN_ERR "Max Segment size in the mrr set to %d us\n", ath_segment_size);
@@ -1071,7 +1071,7 @@ module_exit(ath_rate_minstrel_exit);
 
 /* The comment below is magic for those who use emacs to edit this file. */
 /* With the comment below, the tab key does auto indent to 8 spaces.     */
- 
+
 /*
  * Local Variables:
  * mode:c

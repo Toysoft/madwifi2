@@ -199,7 +199,7 @@ ap_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 			 * do not select static turbo channels if the mode is not
 			 * static turbo .
 			 */
-			if (IEEE80211_IS_CHAN_STURBO(c) && vap->iv_des_mode != IEEE80211_MODE_MAX ) 
+			if (IEEE80211_IS_CHAN_STURBO(c) && vap->iv_des_mode != IEEE80211_MODE_MAX )
 				continue;
 			/* No dfs interference detected channels */
 			if (c->ic_flags & IEEE80211_CHAN_RADAR)
@@ -341,8 +341,8 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 		/* if this is a dynamic turbo frequency , start with normal mode first */
 
 		c = ss->ss_chans[bestchanix];
-		if (IEEE80211_IS_CHAN_TURBO(c) && !IEEE80211_IS_CHAN_STURBO(c)) { 
-			if ((c = ieee80211_find_channel(ic, c->ic_freq, 
+		if (IEEE80211_IS_CHAN_TURBO(c) && !IEEE80211_IS_CHAN_STURBO(c)) {
+			if ((c = ieee80211_find_channel(ic, c->ic_freq,
 				c->ic_flags & ~IEEE80211_CHAN_TURBO)) == NULL) {
 				/* should never happen ?? */
 				return 0;
@@ -355,7 +355,7 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 		if (action)
 			as->as_action = action;
 		as->as_selbss = se;
-		
+
 		/* 
 		 * Must defer action to avoid possible recursive call through 80211
 		 * state machine, which would result in recursive locking.

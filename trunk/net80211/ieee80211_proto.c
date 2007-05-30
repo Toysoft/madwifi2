@@ -290,7 +290,7 @@ void
 ieee80211_print_essid(const u_int8_t *essid, int len)
 {
 	int i;
-	const u_int8_t *p; 
+	const u_int8_t *p;
 
 	if (len > IEEE80211_NWID_LEN)
 		len = IEEE80211_NWID_LEN;
@@ -357,7 +357,7 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 		break;
 	}
 	if (IEEE80211_QOS_HAS_SEQ(wh)) {
-		const struct ieee80211_qosframe *qwh = 
+		const struct ieee80211_qosframe *qwh =
 			(const struct ieee80211_qosframe *)buf;
 		printf(" QoS [TID %u%s]", qwh->i_qos[0] & IEEE80211_QOS_TID,
 			qwh->i_qos[0] & IEEE80211_QOS_ACKPOLICY ? " ACM" : "");
@@ -643,10 +643,10 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_wme_state *wme = &ic->ic_wme;
-	typedef struct phyParamType { 
-		u_int8_t aifsn; 
+	typedef struct phyParamType {
+		u_int8_t aifsn;
 		u_int8_t logcwmin;
-		u_int8_t logcwmax; 
+		u_int8_t logcwmax;
 		u_int16_t txopLimit;
 		u_int8_t acm;
 	} paramType;
@@ -655,7 +655,7 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 	paramType *pPhyParam, *pBssPhyParam;
 
 	static struct phyParamType phyParamForAC_BE[IEEE80211_MODE_MAX] = {
-		/* IEEE80211_MODE_AUTO  */ { 3, 4,  6,   0, 0 },    
+		/* IEEE80211_MODE_AUTO  */ { 3, 4,  6,   0, 0 },
 		/* IEEE80211_MODE_11A   */ { 3, 4,  6,   0, 0 },
 		/* IEEE80211_MODE_11B   */ { 3, 5,  7,   0, 0 },
 		/* IEEE80211_MODE_11G   */ { 3, 4,  6,   0, 0 },
@@ -704,7 +704,7 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 		/* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 },
 		/* IEEE80211_MODE_TURBO */ { 2, 2,  3,  94, 0 }};
 	static struct phyParamType bssPhyParamForAC_VO[IEEE80211_MODE_MAX] = {
-		/* IEEE80211_MODE_AUTO  */ { 2, 2,  3,  47, 0 },    
+		/* IEEE80211_MODE_AUTO  */ { 2, 2,  3,  47, 0 },
 		/* IEEE80211_MODE_11A   */ { 2, 2,  3,  47, 0 },
 		/* IEEE80211_MODE_11B   */ { 2, 3,  4, 102, 0 },
 		/* IEEE80211_MODE_11G   */ { 2, 2,  3,  47, 0 },
@@ -744,11 +744,11 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 			break;
 		case WME_AC_BE:
 		default:
-			pPhyParam = &phyParamForAC_BE[mode];		
+			pPhyParam = &phyParamForAC_BE[mode];
 			pBssPhyParam = &bssPhyParamForAC_BE[mode];
 			break;
 		}
-	
+
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_acm =
 				pPhyParam->acm;
@@ -771,7 +771,7 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 				pBssPhyParam->logcwmax;
 			wme->wme_wmeChanParams.cap_wmeParams[i].wmep_txopLimit =
 				pBssPhyParam->txopLimit;
-		}	
+		}
 		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_acm =
 			pBssPhyParam->acm;
 		wme->wme_wmeBssChanParams.cap_wmeParams[i].wmep_aifsn =
@@ -864,7 +864,7 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmin =
 			phyParam[mode].logcwmin;
 		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmax =
-			phyParam[mode].logcwmax;		
+			phyParam[mode].logcwmax;
 		wme->wme_chanParams.cap_wmeParams[WME_AC_BE].wmep_txopLimit =
 			burstEnabled ? phyParam[mode].txopLimit : 0;
 		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_aifsn =
@@ -874,17 +874,17 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_logcwmax =
 			phyParam[mode].logcwmax;
 		wme->wme_bssChanParams.cap_wmeParams[WME_AC_BE].wmep_txopLimit =
-			burstEnabled ? phyParam[mode].txopLimit : 0;		
+			burstEnabled ? phyParam[mode].txopLimit : 0;
 	}
-	
+
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
 	    ic->ic_sta_assoc < 2 && (wme->wme_flags & WME_F_AGGRMODE) != 0) {
 		static const u_int8_t logCwMin[IEEE80211_MODE_MAX] = {
-			/* IEEE80211_MODE_AUTO  */   3,		
+			/* IEEE80211_MODE_AUTO  */   3,
 			/* IEEE80211_MODE_11A   */   3,
 			/* IEEE80211_MODE_11B   */   4,
 			/* IEEE80211_MODE_11G   */   3,
-			/* IEEE80211_MODE_FH    */   4,	
+			/* IEEE80211_MODE_FH    */   4,
 			/* IEEE80211_MODE_TURBO_A */ 3,
 			/* IEEE80211_MODE_TURBO_G */ 3
 		};
@@ -966,7 +966,7 @@ ieee80211_init(struct net_device *dev, int forcescan)
 			 * we should be able to apply any new state/parameters
 			 * simply by re-associating.  Otherwise we need to
 			 * re-scan to select an appropriate ap.
-			 */ 
+			 */
 			if (vap->iv_state != IEEE80211_S_RUN || forcescan)
 				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 			else
@@ -977,7 +977,7 @@ ieee80211_init(struct net_device *dev, int forcescan)
 			 * be brought to init.
 			 */
 			if (vap->iv_state == IEEE80211_S_RUN)
-				ieee80211_new_state(vap, IEEE80211_S_INIT, -1); 		
+				ieee80211_new_state(vap, IEEE80211_S_INIT, -1);
 			/*
 			 * For monitor+wds modes there's nothing to do but
 			 * start running.  Otherwise, if this is the first
@@ -1316,7 +1316,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				ieee80211_create_ibss(vap, vap->iv_des_chan);
 			} else {
 				ieee80211_check_scan(vap,
-					IEEE80211_SCAN_ACTIVE | 
+					IEEE80211_SCAN_ACTIVE |
 					IEEE80211_SCAN_FLUSH,
 					IEEE80211_SCAN_FOREVER,
 					vap->iv_des_nssid, vap->iv_des_ssid,
@@ -1453,7 +1453,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 
 				/*
 				 * In wds mode allocate and initialize peer node
-				 */				
+				 */
 				if (vap->iv_opmode == IEEE80211_M_WDS) {
 					struct ieee80211_node *wds_ni;
 					wds_ni = ieee80211_alloc_node_table(vap, vap->wds_mac);
@@ -1497,7 +1497,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			if (vap->iv_opmode == IEEE80211_M_STA) {
 				ieee80211_scan_assoc_success(ic,
 					ni->ni_macaddr);
-				ieee80211_notify_node_join(ni, 
+				ieee80211_notify_node_join(ni,
 					(arg == IEEE80211_FC0_SUBTYPE_ASSOC_RESP) | \
 					(arg == IEEE80211_FC0_SUBTYPE_REASSOC_RESP));
 			}
@@ -1512,10 +1512,10 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			vap->iv_swbmiss.data = (unsigned long) vap;
 			vap->iv_swbmiss_period = IEEE80211_TU_TO_JIFFIES(
 				IEEE80211_SWBMISS_THRESHOLD * ni->ni_intval);
-			
+
 			mod_timer(&vap->iv_swbmiss, jiffies + vap->iv_swbmiss_period);
 		}
-		
+
 		/*
 		 * Start/stop the authenticator when operating as an
 		 * AP.  We delay until here to allow configuration to
@@ -1551,7 +1551,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			 * have the bssid initialized and the XR vap will use the
 			 * invalid bssid in XRIE of its beacon.
 			 */
-			if (vap->iv_xrvap->iv_flags_ext & IEEE80211_FEXT_SCAN_PENDING) 
+			if (vap->iv_xrvap->iv_flags_ext & IEEE80211_FEXT_SCAN_PENDING)
 				vap->iv_xrvap->iv_flags_ext &= ~IEEE80211_FEXT_SCAN_PENDING;
 		}
 		/*
@@ -1560,10 +1560,10 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		 * with the xr vaps MAC address.
 		 */
 		if (vap->iv_flags & IEEE80211_F_XR)
-			vap->iv_xrvap->iv_flags |= IEEE80211_F_XRUPDATE; 
+			vap->iv_xrvap->iv_flags |= IEEE80211_F_XRUPDATE;
 #endif
 		break;
-	}	
+	}
 	return 0;
 }
 
@@ -1638,7 +1638,7 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 			__ieee80211_newstate(vap, nstate, arg);
 		}
 		break;
-		
+
 	case IEEE80211_S_RUN:
 		if (ostate == IEEE80211_S_SCAN ||		/* AP coming out of scan */
 		    vap->iv_opmode == IEEE80211_M_STA) {	/* STA in WDS/Repeater needs to bring up other VAPs  */

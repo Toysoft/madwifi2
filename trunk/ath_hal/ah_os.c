@@ -404,7 +404,7 @@ ath_hal_malloc(size_t size)
 	if (p)
 		OS_MEMZERO(p, size);
 	return p;
-		
+
 }
 
 void __ahdecl
@@ -457,7 +457,7 @@ static ctl_table ath_hal_sysctls[] = {
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
-	{ .ctl_name	= CTL_AUTO,	
+	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "sw_beacon_response_time",
 	  .mode		= 0644,
 	  .data		= &ath_hal_sw_beacon_response_time,

@@ -416,7 +416,7 @@ typedef struct {
 #define	CHANNEL_STURBO	0x02000	/* Static turbo, no 11a-only usage */
 #define	CHANNEL_HALF    0x04000 /* Half rate channel */
 #define	CHANNEL_QUARTER 0x08000 /* Quarter rate channel */
-#define	CHANNEL_HT20	0x10000 /* 11n 20MHZ channel */ 
+#define	CHANNEL_HT20	0x10000 /* 11n 20MHZ channel */
 #define	CHANNEL_HT40PLUS 0x20000 /* 11n 40MHZ channel w/ ext chan above */
 #define	CHANNEL_HT40MINUS 0x40000 /* 11n 40MHZ channel w/ ext chan below */
 
@@ -711,9 +711,9 @@ struct ath_hal {
 				HAL_BOOL incTrigLevel);
 	int	  __ahdecl(*ah_setupTxQueue)(struct ath_hal *, HAL_TX_QUEUE,
 				const HAL_TXQ_INFO *qInfo);
-	HAL_BOOL  __ahdecl(*ah_setTxQueueProps)(struct ath_hal *, int q, 
+	HAL_BOOL  __ahdecl(*ah_setTxQueueProps)(struct ath_hal *, int q,
 				const HAL_TXQ_INFO *qInfo);
-	HAL_BOOL  __ahdecl(*ah_getTxQueueProps)(struct ath_hal *, int q, 
+	HAL_BOOL  __ahdecl(*ah_getTxQueueProps)(struct ath_hal *, int q,
 				HAL_TXQ_INFO *qInfo);
 	HAL_BOOL  __ahdecl(*ah_releaseTxQueue)(struct ath_hal *ah, u_int q);
 	HAL_BOOL  __ahdecl(*ah_resetTxQueue)(struct ath_hal *ah, u_int q);

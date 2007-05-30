@@ -8,7 +8,7 @@
  *
  * The macros are faster, but the functions have the advantage that they show up unobfuscated in backtraces thus giving you a clue as to where in 
  * your code you went wrong in your use of the HAL.
- *s
+ *
  */
 #ifndef _IF_ATH_HAL_H
 #define _IF_ATH_HAL_H

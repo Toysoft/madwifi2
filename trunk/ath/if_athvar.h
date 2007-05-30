@@ -194,7 +194,7 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
  * 2312 - 8 - 2 - 12 = 2290
  */
 #define ATH_MAX_MTU     2290
-#define ATH_MIN_MTU     32  
+#define ATH_MIN_MTU     32
 
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	200		/* number of TX buffers */
@@ -202,16 +202,16 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 #define	ATH_BCBUF	4		/* number of beacon buffers */
 
 /* free buffer threshold to restart net dev */
-#define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20) 
+#define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20)
 
 #define TAIL_DROP_COUNT 50             /* maximum number of queued frames allowed */
 
 /*
  * dynamic turbo specific macros.
  */
-#define ATH_TURBO_UP_THRESH	750000	/* bytes/sec */ 
-#define ATH_TURBO_DN_THRESH 	1000000	/* bytes/sec */ 
-#define ATH_TURBO_PERIOD_HOLD	1 	/* in seconds */ 
+#define ATH_TURBO_UP_THRESH	750000	/* bytes/sec */
+#define ATH_TURBO_DN_THRESH 	1000000	/* bytes/sec */
+#define ATH_TURBO_PERIOD_HOLD	1 	/* in seconds */
 
 /*
  * The only case where we see skbuff chains is due to FF aggregation in
@@ -244,7 +244,7 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 /* XR specific macros */
 
 #define XR_DEFAULT_GRPPOLL_RATE_STR 	"0.25 1 1 3 3 6 6 20"
-#define GRPPOLL_RATE_STR_LEN 	64 
+#define GRPPOLL_RATE_STR_LEN 	64
 #define XR_SLOT_DELAY		30      /* in usec */
 #define XR_AIFS			0
 #define XR_NUM_RATES		5
@@ -253,8 +253,8 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 #define XR_CWMIN_CWMAX	7
 
 #define XR_DATA_AIFS	3
-#define XR_DATA_CWMIN	31 
-#define XR_DATA_CWMAX	1023 
+#define XR_DATA_CWMIN	31
+#define XR_DATA_CWMAX	1023
 
 /* pick the threshold so that we meet most of the regulatory constraints */
 #define XR_FRAGMENTATION_THRESHOLD		540
@@ -262,13 +262,13 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 
 #define XR_MAX_GRP_POLL_PERIOD		1000	/* Maximum Group Poll Periodicity */
 
-#define XR_DEFAULT_POLL_INTERVAL	100 
-#define XR_MIN_POLL_INTERVAL		30 
-#define XR_MAX_POLL_INTERVAL		1000 
-#define XR_DEFAULT_POLL_COUNT		32 
-#define XR_MIN_POLL_COUNT		16 
-#define XR_MAX_POLL_COUNT		64 
-#define XR_POLL_UPDATE_PERIOD		10	/* number of XR beacons */  
+#define XR_DEFAULT_POLL_INTERVAL	100
+#define XR_MIN_POLL_INTERVAL		30
+#define XR_MAX_POLL_INTERVAL		1000
+#define XR_DEFAULT_POLL_COUNT		32
+#define XR_MIN_POLL_COUNT		16
+#define XR_MAX_POLL_COUNT		64
+#define XR_POLL_UPDATE_PERIOD		10	/* number of XR beacons */
 #define XR_GRPPOLL_PERIOD_FACTOR	5	/* factor used in calculating grp poll interval */
 #define XR_4MS_FRAG_THRESHOLD		128	/* fragmentation threshold for 4msec frame limit  */
 
@@ -479,7 +479,7 @@ struct ath_vap {
 
 #define ATH_TXQ_INTR_PERIOD		5  /* axq_intrcnt period for intr gen */
 #define	ATH_TXQ_LOCK_INIT(_tq)		spin_lock_init(&(_tq)->axq_lock)
-#define	ATH_TXQ_LOCK_DESTROY(_tq)	
+#define	ATH_TXQ_LOCK_DESTROY(_tq)
 #define ATH_TXQ_LOCK_IRQ(_tq)		do {	\
 	unsigned long __axq_lockflags;		\
 	spin_lock_irqsave(&(_tq)->axq_lock, __axq_lockflags);
@@ -543,7 +543,7 @@ struct ath_softc {
 			sc_needmib:1,		/* enable MIB stats intr */
 			sc_hasdiversity:1,	/* rx diversity available */
 			sc_diversity:1, 	/* enable rx diversity */
-			sc_olddiversity:1, 	/* diversity setting before XR enable */	       
+			sc_olddiversity:1, 	/* diversity setting before XR enable */
 			sc_hasveol:1,		/* tx VEOL support */
 			sc_hastpc:1,		/* per-packet TPC support */
 			sc_dturbo:1,		/* dynamic turbo capable */
@@ -617,7 +617,7 @@ struct ath_softc {
 	ath_bufhead sc_rxbuf;			/* receive buffer */
 	struct ath_buf *sc_rxbufcur;		/* current rx buffer */
 	u_int32_t *sc_rxlink;			/* link ptr in last RX desc */
-	spinlock_t sc_rxbuflock; 
+	spinlock_t sc_rxbuflock;
 	struct ATH_TQ_STRUCT sc_rxtq;		/* rx intr tasklet */
 	struct ATH_TQ_STRUCT sc_rxorntq;	/* rxorn intr tasklet */
 	u_int8_t sc_defant;			/* current default antenna */
@@ -630,9 +630,9 @@ struct ath_softc {
 	u_int sc_txqsetup;			/* h/w queues setup */
 	u_int sc_txintrperiod;			/* tx interrupt batching */
 	struct ath_txq sc_txq[HAL_NUM_TX_QUEUES];
-	struct ath_txq *sc_ac2q[WME_NUM_AC];	/* WME AC -> h/w qnum */ 
+	struct ath_txq *sc_ac2q[WME_NUM_AC];	/* WME AC -> h/w qnum */
 	struct ATH_TQ_STRUCT sc_txtq;		/* tx intr tasklet */
-	u_int8_t sc_grppoll_str[GRPPOLL_RATE_STR_LEN];  
+	u_int8_t sc_grppoll_str[GRPPOLL_RATE_STR_LEN];
 	struct ath_descdma sc_bdma;		/* beacon descriptors */
 	ath_bufhead sc_bbuf;			/* beacon buffers */
 	u_int sc_bhalq;				/* HAL q for outgoing beacons */
@@ -675,7 +675,7 @@ struct ath_softc {
 	u_int32_t sc_dturbo_hold_max;		/* hold count before switching to base*/
 	u_int16_t sc_dturbo_hold_count;		/* hold count before switching to base*/
 	u_int16_t sc_dturbo_turbo_tmin;		/* min turbo count */
-	u_int32_t sc_dturbo_bytes;		/* bandwidth stats */ 
+	u_int32_t sc_dturbo_bytes;		/* bandwidth stats */
 	u_int32_t sc_dturbo_base_tmin;		/* min time in base */
 	u_int32_t sc_dturbo_turbo_tmax;		/* max time in turbo */
 	u_int32_t sc_dturbo_bw_base;		/* bandwidth threshold */

@@ -209,9 +209,9 @@ main(int argc, char *argv[])
 #endif
 	debuglen = sizeof(debug);
 	if (sysctlbyname(oid, &debug, &debuglen, NULL, 0) < 0) {
-		if (argc <= 1) 
+		if (argc <= 1)
 			usage(); /* no user input, device not found - show usage instead of error message */
-		else 
+		else
 			err(1, "sysctl-get(%s)", oid); /* user specified arguments indicating a command, show error message */
 	}
 	ndebug = debug;

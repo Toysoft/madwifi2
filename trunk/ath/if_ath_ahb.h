@@ -25,7 +25,7 @@
  * PCI-MAC Configuration registers 
  */
 #define AR5315_PCI		0xB0100000      /* PCI MMR */
-#define AR5315_PCI_MAC_RC	(AR5315_PCI + 0x4000) 
+#define AR5315_PCI_MAC_RC	(AR5315_PCI + 0x4000)
 #define AR5315_PCI_MAC_SCR	(AR5315_PCI + 0x4004)
 #define AR5315_PCI_MAC_INTPEND	(AR5315_PCI + 0x4008)
 #define AR5315_PCI_MAC_SFR	(AR5315_PCI + 0x400C)
@@ -36,10 +36,10 @@
 #define AR5315_PCI_MAC_RC_BB	0x00000002
 
 #define AR5315_PCI_MAC_SCR_SLMODE_M	0x00030000
-#define AR5315_PCI_MAC_SCR_SLMODE_S	16        
-#define AR5315_PCI_MAC_SCR_SLM_FWAKE	0         
-#define AR5315_PCI_MAC_SCR_SLM_FSLEEP	1         
-#define AR5315_PCI_MAC_SCR_SLM_NORMAL	2         
+#define AR5315_PCI_MAC_SCR_SLMODE_S	16
+#define AR5315_PCI_MAC_SCR_SLM_FWAKE	0
+#define AR5315_PCI_MAC_SCR_SLM_FSLEEP	1
+#define AR5315_PCI_MAC_SCR_SLM_NORMAL	2
 
 #define AR5315_PCI_MAC_SFR_SLEEP	0x00000001
 
@@ -107,7 +107,7 @@ static __inline void bus_dma_sync_single(void *hwdev, dma_addr_t dma_handle,
 	size_t size, int direction)
 {
 	unsigned long addr;
-	
+
 	addr = (unsigned long) __va(dma_handle);
 	dma_cache_wback_inv(addr, size);
 }
@@ -116,7 +116,7 @@ static __inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
 	size_t size, int direction)
 {
 	dma_cache_wback_inv((unsigned long) ptr, size);
-	
+
 	return __pa(ptr);
 }
 

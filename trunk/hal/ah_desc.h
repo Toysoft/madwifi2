@@ -87,7 +87,7 @@ struct ath_tx_status {
 
 /* bits found in ts_flags */
 #define	HAL_TX_BA		0x01	/* Block Ack seen */
-#define	HAL_TX_AGGR		0x02	/* Aggregate */ 
+#define	HAL_TX_AGGR		0x02	/* Aggregate */
 
 /*
  * Receive descriptor status.  This structure is filled
@@ -131,7 +131,7 @@ struct ath_rx_status {
 	u_int8_t	rs_flags;	/* misc flags */
 	u_int32_t	rs_evm0;	/* evm bytes */
 	u_int32_t	rs_evm1;
-	u_int32_t	rs_evm2;	
+	u_int32_t	rs_evm2;
 #endif /* AH_SUPPORT_AR5416 */
 };
 

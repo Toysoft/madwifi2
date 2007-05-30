@@ -47,7 +47,7 @@ struct ieee80211_phy_params {
 	u_int8_t rate0;
 	u_int8_t rate1;
 	u_int8_t rate2;
-	u_int8_t rate3;	
+	u_int8_t rate3;
 
 	u_int8_t try0;
 	u_int8_t try1;
@@ -140,7 +140,7 @@ struct ath_rx_radiotap_header {
 struct ath_tx_radiotap_header {
 	struct ieee80211_radiotap_header wt_ihdr;
 	__le64		wt_tsft;
-	u_int8_t	wt_flags;	
+	u_int8_t	wt_flags;
 	u_int8_t	wt_rate;
 	u_int8_t	wt_txpower;
 	u_int8_t	wt_antenna;

@@ -37,9 +37,8 @@
 /*
  * HAL definitions to comply with local coding convention.
  */
-HAL_BOOL ath_hal_reset(struct ath_hal* ah, HAL_OPMODE opmode, HAL_CHANNEL* chan,  HAL_BOOL outdoor, HAL_STATUS* pstatus)
-{ 
-	return ((*ah->ah_reset)(ah, (opmode), (chan), (outdoor), (pstatus))); 
+HAL_BOOL ath_hal_reset(struct ath_hal* ah, HAL_OPMODE opmode, HAL_CHANNEL* chan,  HAL_BOOL outdoor, HAL_STATUS* pstatus) {
+	return ((*ah->ah_reset)(ah, (opmode), (chan), (outdoor), (pstatus)));
 }
 const HAL_RATE_TABLE* ath_hal_getratetable(struct ath_hal* ah, u_int mode) {
 	return ((*ah->ah_getRateTable)(ah, (mode)));
@@ -286,7 +285,7 @@ HAL_BOOL ath_hal_quarterrate_chansupported(struct ath_hal * ah) {
 HAL_BOOL ath_hal_getregdomain(struct ath_hal * ah, u_int32_t* destination) {
 	return ath_hal_getcapability(ah, HAL_CAP_REG_DMN, 0, destination);
 }
-	    
+
 HAL_BOOL ath_hal_getcountrycode(struct ath_hal * ah, u_int32_t* destination) {
 	(*(destination) = ah->ah_countryCode);
 	return AH_TRUE;
@@ -327,15 +326,15 @@ HAL_BOOL ath_hal_setdiversity(struct ath_hal * ah, int v) {
 HAL_BOOL ath_hal_getnumtxqueues(struct ath_hal * ah, u_int32_t* destination) {
 	return (ath_hal_getcapability(ah, HAL_CAP_NUM_TXQUEUES, 0, destination) == HAL_OK);
 }
-	    
+
 HAL_BOOL ath_hal_hasveol(struct ath_hal * ah) {
 	return (ath_hal_getcapability(ah, HAL_CAP_VEOL, 0, NULL) == HAL_OK);
 }
-	    
+
 HAL_BOOL ath_hal_hastxpowlimit(struct ath_hal * ah) {
 	return (ath_hal_getcapability(ah, HAL_CAP_TXPOW, 0, NULL) == HAL_OK);
 }
-	    
+
 HAL_BOOL ath_hal_settxpowlimit(struct ath_hal * ah, u_int32_t power) {
 	return ((*ah->ah_setTxPowerLimit)(ah, power));
 }
@@ -468,7 +467,7 @@ int16_t ath_hal_get_channel_noise(struct ath_hal * ah, HAL_CHANNEL *chan) {
 
 HAL_BOOL ath_hal_set_regulatory_domain(struct ath_hal* ah, u_int16_t domain, HAL_STATUS* pstatus) {
 	return ((*ah->ah_setRegulatoryDomain)(ah, domain, pstatus));
-   
+
 }
 
 HAL_POWER_MODE ath_hal_getpower(struct ath_hal* ah) {

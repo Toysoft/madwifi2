@@ -293,7 +293,7 @@ tkip_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
 	}
 
 	tid = 0;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) 
+	if (IEEE80211_QOS_HAS_SEQ(wh))
 		tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
 
 	ctx->rx_rsc = READ_6(ivp[2], ivp[0], ivp[4], ivp[5], ivp[6], ivp[7]);
@@ -362,7 +362,7 @@ tkip_demic(struct ieee80211_key *k, struct sk_buff *skb0, int hdrlen)
 
 		vap->iv_stats.is_crypto_tkipdemic++;
 
-		michael_mic(ctx, k->wk_rxmic, 
+		michael_mic(ctx, k->wk_rxmic,
 			skb0, hdrlen, pktlen - (hdrlen + tkip.ic_miclen),
 			mic);
 		/* XXX assert skb->len >= tkip.ic_miclen */
@@ -383,7 +383,7 @@ tkip_demic(struct ieee80211_key *k, struct sk_buff *skb0, int hdrlen)
 	 * Ok to update rsc now that MIC has been verified.
 	 */
 	tid = 0;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) 
+	if (IEEE80211_QOS_HAS_SEQ(wh))
 		tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
 	k->wk_keyrsc[tid] = ctx->rx_rsc;
 
@@ -1018,7 +1018,7 @@ tkip_decrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 
 	wh = (struct ieee80211_frame *) skb0->data;
 	tid = 0;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) 
+	if (IEEE80211_QOS_HAS_SEQ(wh))
 		tid = ((struct ieee80211_qosframe *)wh)->i_qos[0] & IEEE80211_QOS_TID;
 	if (iv32 != (u32)(key->wk_keyrsc[tid] >> 16) || !ctx->rx_phase1_done) {
 		tkip_mixing_phase1(ctx->rx_ttak, key->wk_key,
@@ -1038,7 +1038,7 @@ tkip_decrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 		}
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 			"[%s] TKIP ICV mismatch on decrypt (keyix %d, rsc %llu)\n",
-			ether_sprintf(wh->i_addr2), key->wk_keyix, 
+			ether_sprintf(wh->i_addr2), key->wk_keyix,
 			(unsigned long long)ctx->rx_rsc);
 		vap->iv_stats.is_rx_tkipicv++;
 		return 0;

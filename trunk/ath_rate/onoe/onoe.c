@@ -151,7 +151,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 {
 	struct onoe_node *on = ATH_NODE_ONOE(an);
 	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
-	
+
 	if (ts->ts_status == 0)
 		on->on_tx_ok++;
 	else
@@ -199,7 +199,7 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 		goto done;
 	on->on_tx_rix0 = sc->sc_rixmap[ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
 	on->on_tx_rate0 = rt->info[on->on_tx_rix0].rateCode;
-	
+
 	on->on_tx_rate0sp = on->on_tx_rate0 |
 		rt->info[on->on_tx_rix0].shortPreamble;
 	if (sc->sc_mrretry) {

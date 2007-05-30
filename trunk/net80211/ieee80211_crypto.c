@@ -87,7 +87,7 @@ static void null_key_update(struct ieee80211vap *vap)
 
 #ifdef ATH_SUPERG_COMP
 static void
-null_comp_set(struct ieee80211vap *vap, struct ieee80211_node *ni, 
+null_comp_set(struct ieee80211vap *vap, struct ieee80211_node *ni,
 	int en)
 {
 }
@@ -347,7 +347,7 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 		if ((vap->iv_caps & IEEE80211_C_TKIPMIC) == 0) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 				"%s: no h/w support for TKIP MIC, falling back to s/w\n",
-				__func__);        
+				__func__);
 			flags |= IEEE80211_KEY_SWMIC;
 	    	} else if (((vap->iv_caps & IEEE80211_C_WME_TKIPMIC) == 0) &&
 		    (vap->iv_flags & IEEE80211_F_WME)) {
@@ -355,7 +355,7 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 				"%s: no h/w support for TKIP MIC when WMM is turned on,"
 				" falling back to s/w\n",
 				__func__);
-			flags |= IEEE80211_KEY_SWMIC;            
+			flags |= IEEE80211_KEY_SWMIC;
 		}
 	}
 
@@ -449,7 +449,7 @@ _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	KASSERT(key->wk_cipher != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-		"%s: %s keyix %u flags 0x%x tsc %llu len %u\n", __func__, 
+		"%s: %s keyix %u flags 0x%x tsc %llu len %u\n", __func__,
 		key->wk_cipher->ic_name, key->wk_keyix, key->wk_flags,
 		(unsigned long long)key->wk_keytsc, key->wk_keylen);
 
@@ -477,7 +477,7 @@ _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
  * Remove the specified key.
  */
 int
-ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key, 
+ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	struct ieee80211_node *ni)
 {
 	int status;
@@ -528,9 +528,9 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	KASSERT(cip != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-		"%s: %s keyix %u flags 0x%x mac %s  tsc %llu len %u\n", __func__, 
-		cip->ic_name, key->wk_keyix, key->wk_flags, 
-		ether_sprintf(macaddr), (unsigned long long)key->wk_keytsc, 
+		"%s: %s keyix %u flags 0x%x mac %s  tsc %llu len %u\n", __func__,
+		cip->ic_name, key->wk_keyix, key->wk_flags,
+		ether_sprintf(macaddr), (unsigned long long)key->wk_keytsc,
 		key->wk_keylen);
 
 	/*

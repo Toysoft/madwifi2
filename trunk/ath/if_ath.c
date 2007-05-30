@@ -174,7 +174,7 @@ static int ath_mgtstart(struct ieee80211com *, struct sk_buff *);
 static u_int32_t ath_get_icvlen(struct ieee80211_key *);
 static u_int32_t ath_get_ivlen(struct ieee80211_key *);
 static void ath_setup_comp(struct ieee80211_node *, int);
-static void ath_comp_set(struct ieee80211vap *, struct ieee80211_node *, int);	
+static void ath_comp_set(struct ieee80211vap *, struct ieee80211_node *, int);
 #endif
 static int ath_tx_setup(struct ath_softc *, int, int);
 static int ath_wme_update(struct ieee80211com *);
@@ -259,7 +259,7 @@ static void ath_descdma_cleanup(struct ath_softc *, struct ath_descdma *,
 static void ath_check_dfs_clear(unsigned long);
 static const char *ath_get_hal_status_desc(HAL_STATUS status);
 static int ath_rcv_dev_event(struct notifier_block *, unsigned long, void *);
-	
+
 static int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
 								 * but check every second at first.
@@ -528,7 +528,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 
 	if (rfkill != -1) {
 		printk(KERN_INFO "ath_pci: switching rfkill capability %s\n",
-			rfkill ? "on" : "off");	
+			rfkill ? "on" : "off");
 		ath_hal_setrfsilent(ah, rfkill);
 	}
 
@@ -736,7 +736,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_ath_cap |= (ath_hal_burstsupported(ah) ? IEEE80211_ATHC_BURST : 0);
 
 #ifdef ATH_SUPERG_COMP
-	ic->ic_ath_cap |= (ath_hal_compressionsupported(ah) ? IEEE80211_ATHC_COMP : 0); 
+	ic->ic_ath_cap |= (ath_hal_compressionsupported(ah) ? IEEE80211_ATHC_COMP : 0);
 #endif
 
 #ifdef ATH_SUPERG_DYNTURBO
@@ -824,7 +824,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 * Default 11.h to start enabled.
 	 */
 	ic->ic_flags |= IEEE80211_F_DOTH;
-	
+
 	/*
 	 * Check for misc other capabilities.
 	 */
@@ -938,7 +938,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 			autocreatemode = -1;
 		}
 	}
-	
+
 	if (autocreatemode != -1) {
 		rtnl_lock();
 		vap = ieee80211_create_vap(ic, "ath%d", dev,
@@ -1017,7 +1017,7 @@ ath_detach(struct net_device *dev)
 }
 
 static struct ieee80211vap *
-ath_vap_create(struct ieee80211com *ic, const char *name, 
+ath_vap_create(struct ieee80211com *ic, const char *name,
 	int opmode, int flags, struct net_device *mdev)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
@@ -1043,7 +1043,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		if (flags & IEEE80211_NO_STABEACONS) {
 			sc->sc_nostabeacons = 1;
 			ic_opmode = IEEE80211_M_HOSTAP;	/* Run with chip in AP mode */
-		} else 
+		} else
 			ic_opmode = opmode;
 		break;
 	case IEEE80211_M_IBSS:
@@ -1089,7 +1089,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		/* XXX msg */
 		return NULL;
 	}
-	
+
 	avp = dev->priv;
 	ieee80211_vap_setup(ic, dev, name, opmode, flags);
 	/* override with driver methods */
@@ -1118,19 +1118,19 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	    sc->sc_nvaps != 0 && opmode != IEEE80211_M_WDS && sc->sc_hasbmask) {
 		struct ieee80211vap *v;
 		unsigned int id_mask, id;
-		
+
 		/*
 		 * Hardware supports the bssid mask and a unique
 		 * bssid was requested.  Assign a new mac address
 		 * and expand our bssid mask to cover the active
 		 * virtual ap's with distinct addresses.
 		 */
-		
+
 		/* do a full search to mark all the allocated VAPs */
 		id_mask = 0;
 		TAILQ_FOREACH(v, &ic->ic_vaps, iv_next)
 			id_mask |= (1 << ATH_GET_VAP_ID(v->iv_myaddr));
-		
+
 		for (id = 0; id < ATH_BCBUF; id++) {
 			/* get the first available slot */
 			if ((id_mask & (1 << id)) == 0) {
@@ -1193,10 +1193,10 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		ieee80211_media_change, ieee80211_media_status);
 
 	ic->ic_opmode = ic_opmode;
-	
+
 	if (opmode != IEEE80211_M_WDS)
 		sc->sc_nvaps++;
-		
+
 	if (opmode == IEEE80211_M_STA)
 		sc->sc_nstavaps++;
 	else if (opmode == IEEE80211_M_MONITOR)
@@ -1298,7 +1298,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 	if (decrease)
 		sc->sc_nvaps--;
 
-#ifdef ATH_SUPERG_XR 
+#ifdef ATH_SUPERG_XR
 	/*
 	 * If it's an XR VAP, free the memory allocated explicitly.
 	 * Since the XR VAP is not registered, OS cannot free the memory.
@@ -1442,8 +1442,8 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			continue;
 
 		/* Prepare wireless header for examination */
-		bus_dma_sync_single(sc->sc_bdev, bf->bf_skbaddr, 
-				sizeof(struct ieee80211_qosframe), 
+		bus_dma_sync_single(sc->sc_bdev, bf->bf_skbaddr,
+				sizeof(struct ieee80211_qosframe),
 				BUS_DMA_FROMDEVICE);
 		qwh = (struct ieee80211_qosframe *) skb->data;
 
@@ -1465,10 +1465,10 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 #endif
 			continue;
 		}
-		
+
 		if (!(ni->ni_flags & IEEE80211_NODE_UAPSD))
 			continue;
-		
+
 		/*
 		 * Must deal with change of state here, since otherwise there would
 		 * be a race (on two quick frames from STA) between this code and the
@@ -1493,14 +1493,14 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				ic->ic_uapsdmaxtriggers++;
 				WME_UAPSD_NODE_TRIGSEQINIT(ni);
 				DPRINTF(sc, ATH_DEBUG_UAPSD,
-					"%s: Node (%s) became U-APSD triggerable (%d)\n", 
+					"%s: Node (%s) became U-APSD triggerable (%d)\n",
 					__func__, ether_sprintf(qwh->i_addr2),
 					ic->ic_uapsdmaxtriggers);
 			} else {
 				ni->ni_flags &= ~IEEE80211_NODE_UAPSD_TRIG;
 				ic->ic_uapsdmaxtriggers--;
 				DPRINTF(sc, ATH_DEBUG_UAPSD,
-					"%s: Node (%s) no longer U-APSD triggerable (%d)\n", 
+					"%s: Node (%s) no longer U-APSD triggerable (%d)\n",
 					__func__, ether_sprintf(qwh->i_addr2),
 					ic->ic_uapsdmaxtriggers);
 				/* 
@@ -1513,13 +1513,13 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				 */
 				ath_uapsd_flush(ni);
 			}
-			
+
 			continue;
 		}
 
 		if (ic->ic_uapsdmaxtriggers == 0)
 			continue;
-		
+
 		/* make sure the frame is QoS data/null */
 		/* NB: with current sub-type definitions, the 
 		 * IEEE80211_FC0_SUBTYPE_QOS check, below, covers the 
@@ -1528,7 +1528,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		if (((qwh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA) ||
 		     !(qwh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS))
 			continue;
-		
+
 		/*
 		 * To be a trigger:
 		 *   - node is in triggerable state
@@ -1538,8 +1538,8 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		ac = TID_TO_WME_AC(tid);
 		if (!WME_UAPSD_AC_CAN_TRIGGER(ac, ni))
 			continue;
-		
-		DPRINTF(sc, ATH_DEBUG_UAPSD, 
+
+		DPRINTF(sc, ATH_DEBUG_UAPSD,
 			"%s: U-APSD trigger detected for node (%s) on AC %d\n",
 			__func__, ether_sprintf(ni->ni_macaddr), ac);
 		if (ni->ni_flags & IEEE80211_NODE_UAPSD_SP) {
@@ -1598,7 +1598,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				/* simulate lost EOSP */
 				qwhl->i_addr1[0] |= 0x40;
 			}
-			
+
 			/* more data bit only for EOSP frame */
 			if (an->an_uapsd_overflowqdepth)
 				qwhl->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
@@ -1609,7 +1609,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 
 			bus_dma_sync_single(sc->sc_bdev, last_buf->bf_skbaddr,
 				sizeof(*qwhl), BUS_DMA_TODEVICE);
-			
+
 			if (uapsd_xmit_q->axq_link) {
 #ifdef AH_NEED_DESC_SWAP
 				*uapsd_xmit_q->axq_link = cpu_to_le32(STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr);
@@ -1620,8 +1620,8 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			/* below leaves an_uapsd_q NULL */
 			STAILQ_CONCAT(&uapsd_xmit_q->axq_q, &an->an_uapsd_q);
 			uapsd_xmit_q->axq_link = &last_desc->ds_link;
-			ath_hal_puttxbuf(sc->sc_ah, 
-				uapsd_xmit_q->axq_qnum, 
+			ath_hal_puttxbuf(sc->sc_ah,
+				uapsd_xmit_q->axq_qnum,
 				(STAILQ_FIRST(&uapsd_xmit_q->axq_q))->bf_daddr);
 			ath_hal_txstart(sc->sc_ah, uapsd_xmit_q->axq_qnum);
 		}
@@ -1734,7 +1734,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 					mod_timer(&sc->sc_dturbo_switch_mode,
 							  jiffies + msecs_to_jiffies(10));
 				}
-			} 
+			}
 #endif
 			ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, &needmark);
 		}
@@ -1851,7 +1851,7 @@ ath_init(struct net_device *dev)
 		else
 			ath_hal_setcapability(sc->sc_ah, HAL_CAP_TKIP_MIC, 0, 1, NULL);
 	}
-		
+
 	/*
 	 * Flush the skb's allocated for receive in case the rx
 	 * buffer size changes.  This could be optimized but for
@@ -1935,7 +1935,7 @@ done:
 /* Caller must lock ATH_LOCK 
  *
  * Context: softIRQ
- */ 
+ */
 static int
 ath_stop_locked(struct net_device *dev)
 {
@@ -1990,7 +1990,7 @@ ath_stop_locked(struct net_device *dev)
 
 	if (sc->sc_softled)
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
-	
+
 	return 0;
 }
 
@@ -2032,7 +2032,7 @@ ath_stop(struct net_device *dev)
 	return error;
 }
 
-static int 
+static int
 ar_device(int devid)
 {
 	switch (devid) {
@@ -2071,14 +2071,14 @@ ar_device(int devid)
 	case AR_SUBVENDOR_ID_NOG:
 	case AR_SUBVENDOR_ID_NEW_A:
 		return 5213;
-	default: 
+	default:
 		return 0; /* unknown */
 	}
 }
 
 
-static int 
-ath_set_ack_bitrate(struct ath_softc *sc, int high) 
+static int
+ath_set_ack_bitrate(struct ath_softc *sc, int high)
 {
 	struct ath_hal *ah = sc->sc_ah;
 	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
@@ -2186,8 +2186,8 @@ ath_desc_swap(struct ath_desc *ds)
  * 
  */
 static __inline void
-ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni, 
-	struct ath_txq *txq, struct ath_buf *bf, 
+ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
+	struct ath_txq *txq, struct ath_buf *bf,
 	struct ath_desc *lastds, int framelen)
 {
 	struct ath_hal *ah = sc->sc_ah;
@@ -2247,19 +2247,19 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	sc->sc_devstats.tx_bytes += framelen;
 }
 
-static int 
+static int
 dot11_to_ratecode(struct ath_softc *sc, const HAL_RATE_TABLE *rt, int dot11)
 {
 	int index = sc->sc_rixmap[dot11 & IEEE80211_RATE_VAL];
 	if (index >= 0 && index < rt->rateCount)
 		return rt->info[index].rateCode;
-	
+
 	return rt->info[sc->sc_minrateix].rateCode;
 }
 
 
-static int 
-ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb) 
+static int
+ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
@@ -2271,8 +2271,8 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	u_int8_t antenna, txrate;
 	struct ath_txq *txq=NULL;
 	struct ath_desc *ds=NULL;
-	struct ieee80211_frame *wh; 
-	
+	struct ieee80211_frame *wh;
+
 	wh = (struct ieee80211_frame *) skb->data;
 	try0 = ph->try0;
 	rt = sc->sc_currates;
@@ -2280,27 +2280,27 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	power = ph->power > 60 ? 60 : ph->power;
 	hdrlen = ieee80211_anyhdrsize(wh);
 	pktlen = skb->len + IEEE80211_CRC_LEN;
-	
+
 	flags = HAL_TXDESC_INTREQ | HAL_TXDESC_CLRDMASK; /* XXX needed for crypto errs */
-	
+
 	bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 					skb->data, pktlen, BUS_DMA_TODEVICE);
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: skb %p [data %p len %u] skbaddr %llx\n",
 		__func__, skb, skb->data, skb->len, ito64(bf->bf_skbaddr));
-	
-	
+
+
 	bf->bf_skb = skb;
 	bf->bf_node = NULL;
-#ifdef ATH_SUPERG_FF 
+#ifdef ATH_SUPERG_FF
 	bf->bf_numdescff = 0;
 #endif
-	
+
 	/* setup descriptors */
 	ds = bf->bf_desc;
 	rt = sc->sc_currates;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
-	
-	
+
+
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
 		sc->sc_stats.ast_tx_noack++;
@@ -2308,13 +2308,13 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	}
 	atype = HAL_PKT_TYPE_NORMAL;		/* default */
 	txq = sc->sc_ac2q[skb->priority & 0x3];
-	
-	
+
+
 	flags |= HAL_TXDESC_INTREQ;
 	antenna = sc->sc_txantenna;
-	
+
 	/* XXX check return value? */
-	ath_hal_setuptxdesc(ah, ds, 
+	ath_hal_setuptxdesc(ah, ds,
 			    pktlen, 			/* packet length */
 			    hdrlen, 			/* header length */
 			    atype, 			/* Atheros packet type */
@@ -2335,29 +2335,29 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 			dot11_to_ratecode(sc, rt, ph->rate1), ph->try1, /* series 1 */
 			dot11_to_ratecode(sc, rt, ph->rate2), ph->try2, /* series 2 */
 			dot11_to_ratecode(sc, rt, ph->rate3), ph->try3 	/* series 3 */
-			);	
+			);
 	}
 	bf->bf_flags = flags;	/* record for post-processing */
 
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
-	
+
 	ath_hal_filltxdesc(ah, ds,
 			   skb->len, 	/* segment length */
 			   AH_TRUE, 	/* first segment */
 			   AH_TRUE, 	/* last segment */
 			   ds		/* first descriptor */
 			   );
-	
+
 	/* NB: The desc swap function becomes void, 
 	 * if descriptor swapping is not enabled
 	 */
 	ath_desc_swap(ds);
-	
+
 	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
 		__func__, M_FLAG_GET(skb, M_UAPSD) ? 0 : txq->axq_qnum, ds->ds_link, ds->ds_data,
 		ds->ds_ctl0, ds->ds_ctl1, ds->ds_hw[0], ds->ds_hw[1]);
-		
+
 	ath_tx_txqaddbuf(sc, NULL, txq, bf, ds, pktlen);
 	return 0;
 }
@@ -2631,14 +2631,14 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
 				"%s: Out-Of-Order fast-frame\n", __func__);
 		}
-		
+
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 		if (bf == NULL) {
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 			goto hardstart_fail;
 		}
 	}
-	
+
 	ATH_TXQ_UNLOCK_IRQ(txq);
 
 ff_bypass:
@@ -2674,7 +2674,7 @@ ff_bypass:
 				STAILQ_INSERT_TAIL(&bf_head, tbf, bf_list);
 			} else
 				break;
-			
+
 			ieee80211_ref_node(ni);
 		}
 
@@ -2732,8 +2732,8 @@ hardstart_fail:
 		STAILQ_FOREACH_SAFE(tbf, &bf_head, bf_list, tempbf) {
 			tbf->bf_skb = NULL;
 			tbf->bf_node = NULL;
-			
-			if (ni != NULL) 
+
+			if (ni != NULL)
 				ieee80211_unref_node(&ni);
 
 			STAILQ_INSERT_TAIL(&sc->sc_txbuf, tbf, bf_list);
@@ -3349,8 +3349,8 @@ ath_calcrxfilter(struct ath_softc *sc)
 	    sc->sc_opmode == HAL_M_IBSS ||	/* NB: AHDEMO too */
 	    (sc->sc_nostabeacons) || sc->sc_scanning)
 		rfilt |= HAL_RX_FILTER_BEACON;
-	if (sc->sc_nmonvaps > 0) 
-		rfilt |= (HAL_RX_FILTER_CONTROL | HAL_RX_FILTER_BEACON | 
+	if (sc->sc_nmonvaps > 0)
+		rfilt |= (HAL_RX_FILTER_CONTROL | HAL_RX_FILTER_BEACON |
 			  HAL_RX_FILTER_PROBEREQ | HAL_RX_FILTER_PROM);
 	return rfilt;
 #undef RX_FILTER_PRESERVE
@@ -3501,8 +3501,8 @@ ath_beacon_dturbo_config(struct ieee80211vap *vap, u_int32_t intval)
 		sc->sc_dturbo_turbo_tmax = 120 * 1024 / ic->ic_lintval;
 		sc->sc_dturbo_turbo_tmin = 5 * 1024 / ic->ic_lintval;
 		/* convert the thresholds from BW/sec to BW/beacon period */
-		sc->sc_dturbo_bw_base    = ATH_TURBO_DN_THRESH/(1024/ic->ic_lintval);  
-		sc->sc_dturbo_bw_turbo   = ATH_TURBO_UP_THRESH/(1024/ic->ic_lintval); 
+		sc->sc_dturbo_bw_base    = ATH_TURBO_DN_THRESH/(1024/ic->ic_lintval);
+		sc->sc_dturbo_bw_turbo   = ATH_TURBO_UP_THRESH/(1024/ic->ic_lintval);
 		/* time in hold state in number of beacon */
 		sc->sc_dturbo_hold_max   = (ATH_TURBO_PERIOD_HOLD * 1024)/ic->ic_lintval;
 	} else {
@@ -3550,8 +3550,8 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark,u_int8_t dtim)
   		* make sure that the conditions( low rssi, low bw) to switch mode 
   		* hold for some time and time in turbo exceeds minimum turbo time.
   		*/
- 
-		if (sc->sc_dturbo_tcount >= sc->sc_dturbo_turbo_tmin && 
+
+		if (sc->sc_dturbo_tcount >= sc->sc_dturbo_turbo_tmin &&
 		   sc->sc_dturbo_hold ==0 &&
 		   (bss_traffic < sc->sc_dturbo_bw_base || !sc->sc_rate_recn_state)) {
 			sc->sc_dturbo_hold = 1;
@@ -3577,11 +3577,11 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark,u_int8_t dtim)
 		 *    5. RSSI cannot support at least 18 Mbps rate 
 		 * XXX do bw checks at true beacon interval?
 		 */
-		if (dtim && 
+		if (dtim &&
 			(sc->sc_dturbo_tcount >= sc->sc_dturbo_turbo_tmax ||
-			 ((vap->iv_bss->ni_ath_flags & IEEE80211_ATHC_AR) && 
+			 ((vap->iv_bss->ni_ath_flags & IEEE80211_ATHC_AR) &&
 			  (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE) &&
-			  IEEE80211_IS_CHAN_2GHZ(ic->ic_curchan)) || 
+			  IEEE80211_IS_CHAN_2GHZ(ic->ic_curchan)) ||
 			 !sc->sc_dturbo_hold_count)) {
 			DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Leaving turbo\n",
 					DEV_NAME(sc->sc_dev));
@@ -3605,13 +3605,13 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark,u_int8_t dtim)
 		 * 6. RSSI is good enough to support 36Mbps 
 		 * XXX do bw+rssi checks at true beacon interval?
 		 */
-		if (dtim && 
+		if (dtim &&
 			(sc->sc_dturbo_tcount >= sc->sc_dturbo_base_tmin &&
 			 (ic->ic_dt_sta_assoc != 0 &&
 			  ic->ic_sta_assoc == ic->ic_dt_sta_assoc) &&
-			 ((vap->iv_bss->ni_ath_flags & IEEE80211_ATHC_AR) == 0 || 
+			 ((vap->iv_bss->ni_ath_flags & IEEE80211_ATHC_AR) == 0 ||
 			  (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE) == 0) &&
-			 bss_traffic >= sc->sc_dturbo_bw_turbo && 
+			 bss_traffic >= sc->sc_dturbo_bw_turbo &&
 			 sc->sc_rate_recn_state)) {
 			DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Entering turbo\n",
 					DEV_NAME(sc->sc_dev));
@@ -3626,7 +3626,7 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark,u_int8_t dtim)
 }
 
 
-static int 
+static int
 ath_check_beacon_done(struct ath_softc *sc)
 {
 	struct ieee80211vap *vap = NULL;
@@ -3642,7 +3642,7 @@ ath_check_beacon_done(struct ath_softc *sc)
 	 * check if the last beacon went out with the mode change flag set.
 	 */
 	for (slot = 0; slot < ATH_BCBUF; slot++) {
-		if (sc->sc_bslot[slot]) { 
+		if (sc->sc_bslot[slot]) {
 			vap = sc->sc_bslot[slot];
 			break;
 		}
@@ -3654,7 +3654,7 @@ ath_check_beacon_done(struct ath_softc *sc)
 	skb = bf->bf_skb;
 	ds = bf->bf_desc;
 	ts = &bf->bf_dsstatus.ds_txstat;
-	
+
 	return (ath_hal_txprocdesc(ah, ds, ts) != HAL_EINPROGRESS);
 
 }
@@ -4264,7 +4264,7 @@ ath_bstuck_tasklet(TQUEUE_ARG data)
 	 *     check will be true, in which case return 
 	 *     without resetting the driver.
 	 */
-	if (sc->sc_bmisscount <= BSTUCK_THRESH) 
+	if (sc->sc_bmisscount <= BSTUCK_THRESH)
 		return;
 	printk("%s: stuck beacon; resetting (bmiss count %u)\n",
 		DEV_NAME(dev), sc->sc_bmisscount);
@@ -4335,7 +4335,7 @@ ath_beacon_return(struct ath_softc *sc, struct ath_buf *bf)
 		dev_kfree_skb(bf->bf_skb);
 		bf->bf_skb = NULL;
 	}
-	if (bf->bf_node != NULL) 
+	if (bf->bf_node != NULL)
 		ieee80211_unref_node(&bf->bf_node);
 	STAILQ_INSERT_TAIL(&sc->sc_bbuf, bf, bf_list);
 }
@@ -4498,7 +4498,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		if (bs.bs_sleepduration > bs.bs_dtimperiod)
 			bs.bs_sleepduration = roundup(bs.bs_sleepduration, bs.bs_dtimperiod);
 
-		DPRINTF(sc, ATH_DEBUG_BEACON, 
+		DPRINTF(sc, ATH_DEBUG_BEACON,
 			"%s: tsf %llu tsf:tu %u intval %u nexttbtt %u dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u maxdur %u next %u timoffset %u\n",
 			__func__,
 			(unsigned long long) tsf, tsftu,
@@ -4544,7 +4544,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			ath_beaconq_config(sc);
 		}
 #ifdef ATH_SUPERG_DYNTURBO
-		ath_beacon_dturbo_config(vap, intval & 
+		ath_beacon_dturbo_config(vap, intval &
 				~(HAL_BEACON_RESET_TSF | HAL_BEACON_ENA));
 #endif
 		ath_hal_beaconinit(ah, nexttbtt, intval);
@@ -4728,7 +4728,7 @@ ath_node_alloc(struct ieee80211vap *vap)
 		STAILQ_INIT(&an->an_uapsd_overflowq);
 		an->an_uapsd_overflowqdepth = 0;
 		ATH_NODE_UAPSD_LOCK_INIT(an);
-		
+
 		DPRINTF(sc, ATH_DEBUG_NODE, "%s: an %p\n", __func__, an);
 		return &an->an_node;
 	} else {
@@ -4744,7 +4744,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 	struct ath_node *an = ATH_NODE(ni);
 	struct ath_buf *bf;
 	struct ieee80211_cb *cb = NULL;
-	
+
 	/*
 	 * U-APSD cleanup
 	 */
@@ -4786,7 +4786,7 @@ ath_node_cleanup(struct ieee80211_node *ni)
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 		bf->bf_desc->ds_link = 0;
-		
+
 		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 		ATH_TXBUF_UNLOCK_IRQ(sc);
@@ -4845,7 +4845,7 @@ static u_int8_t
 ath_node_move_data(const struct ieee80211_node *ni)
 {
 #ifdef NOT_YET
-	struct ath_txq *txq = NULL; 
+	struct ath_txq *txq = NULL;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ath_softc *sc = ic->ic_dev->priv;
 	struct ath_buf *bf, *prev, *bf_tmp, *bf_tmp1;
@@ -4857,7 +4857,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 	unsigned int index;
 
 	if (ni->ni_vap->iv_flags & IEEE80211_F_XR) {
-		struct ath_txq tmp_q; 
+		struct ath_txq tmp_q;
 		memset(&tmp_q, 0, sizeof(tmp_q));
 		STAILQ_INIT(&tmp_q.axq_q);
 		/*
@@ -4869,8 +4869,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		 * in to the tmp_q.
 		 */
 		index = WME_AC_VO;
-		while (index >= WME_AC_BE && txq != sc->sc_ac2q[index]) { 
-			txq = sc->sc_ac2q[index]; 
+		while (index >= WME_AC_BE && txq != sc->sc_ac2q[index]) {
+			txq = sc->sc_ac2q[index];
 
 			ATH_TXQ_LOCK_IRQ(txq);
 			ath_hal_stoptxdma(ah, txq->axq_qnum);
@@ -4888,14 +4888,14 @@ ath_node_move_data(const struct ieee80211_node *ni)
 				ts = &ts->bf_dsstatus.ds_txstat;
 				status = ath_hal_txprocdesc(ah, ds, ts);
 				if (status == HAL_EINPROGRESS)
-					break; 
+					break;
 				prev = bf;
 				bf = STAILQ_NEXT(bf, bf_list);
 			}
-			 
+
 			/* save the pointer to the last buf that's done */
 			if (prev == bf)
-				bf_tmp = NULL;  
+				bf_tmp = NULL;
 			else
 				bf_tmp = prev;
 			while (bf) {
@@ -4946,12 +4946,12 @@ ath_node_move_data(const struct ieee80211_node *ni)
 #endif
 						ts = &bf->bf_dsstatus.ds_txstat;
 						status = ath_hal_txprocdesc(ah, ds, ts);
-						if (status == HAL_EINPROGRESS) 
+						if (status == HAL_EINPROGRESS)
 							txq->axq_link = &ds->ds_link;
 						else
-							txq->axq_link = NULL;	
+							txq->axq_link = NULL;
 					}
-				} 
+				}
 			} else
 				txq->axq_link = NULL;
 
@@ -4965,7 +4965,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 				bf = STAILQ_NEXT(bf_tmp, bf_list);
 			else
 				bf = STAILQ_FIRST(&txq->axq_q);
-			if (bf) {	
+			if (bf) {
 				ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
 				ath_hal_txstart(ah, txq->axq_qnum);
 			}
@@ -4982,11 +4982,11 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			skb = bf->bf_skb;
 			bf->bf_skb = NULL;
 			bf->bf_node = NULL;
-			
+
 			ATH_TXBUF_LOCK_IRQ(sc);
 			STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
 			ATH_TXBUF_UNLOCK_IRQ(sc);
-			
+
 			ath_hardstart(skb,sc->sc_dev);
 			ATH_TXQ_REMOVE_HEAD(&tmp_q, bf_list);
 			bf = STAILQ_FIRST(&tmp_q.axq_q);
@@ -4994,8 +4994,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		}
 		printk("moved %d buffers from NORMAL to XR\n", index);
 	} else {
-		struct ath_txq wme_tmp_qs[WME_AC_VO+1]; 
-		struct ath_txq *wmeq = NULL, *prevq; 
+		struct ath_txq wme_tmp_qs[WME_AC_VO+1];
+		struct ath_txq *wmeq = NULL, *prevq;
 		struct ieee80211_frame *wh;
 		struct ath_desc *ds = NULL;
 		unsigned int count = 0;
@@ -5007,8 +5007,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		memset(&wme_tmp_qs, 0, sizeof(wme_tmp_qs));
 		for (index = 0; index <= WME_AC_VO; index++)
 			STAILQ_INIT(&wme_tmp_qs[index].axq_q);
-		txq = sc->sc_xrtxq; 
-		
+		txq = sc->sc_xrtxq;
+
 		ATH_TXQ_LOCK_IRQ(txq);
 		ath_hal_stoptxdma(ah, txq->axq_qnum);
 		bf = prev = STAILQ_FIRST(&txq->axq_q);
@@ -5034,7 +5034,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		 * done
 		 */
 		if (prev == bf)
-			bf_tmp1 = NULL;  
+			bf_tmp1 = NULL;
 		else
 			bf_tmp1 = prev;
 		/*
@@ -5100,12 +5100,12 @@ ath_node_move_data(const struct ieee80211_node *ni)
 #endif
 					ts = &bf->bf_dsstatus.ds_txstat;
 					status = ath_hal_txprocdesc(ah, ds, ts);
-					if (status == HAL_EINPROGRESS) 
+					if (status == HAL_EINPROGRESS)
 						txq->axq_link = &ds->ds_link;
 					else
 						txq->axq_link = NULL;
-				} 
-			} 
+				}
+			}
 		} else {
 			/*
 			 * if the list is empty reset the pointer.
@@ -5113,7 +5113,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			txq->axq_link = NULL;
 		}
 		ATH_TXQ_UNLOCK_IRQ(txq);
-		
+
 		/*
 		 * restart the DMA from the first 
 		 * buffer that was not DMA'd.
@@ -5123,7 +5123,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		else
 			bf = STAILQ_FIRST(&txq->axq_q);
 
-		if (bf) {	
+		if (bf) {
 			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
 			ath_hal_txstart(ah, txq->axq_qnum);
 		}
@@ -5133,7 +5133,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		index = WME_AC_VO;
 		while (index >= WME_AC_BE) {
 			txq = sc->sc_ac2q[index];
-			
+
 			ATH_TXQ_LOCK_IRQ(txq);
 			ath_hal_stoptxdma(ah, txq->axq_qnum);
 
@@ -5148,7 +5148,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 #else
 						*(txq->axq_link) = bf->bf_daddr;
 #endif
-					} 
+					}
 				}
 				index--;
 			}
@@ -5164,7 +5164,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 				ts = &bf->bf_dsstatus.ds_txstat;
 				status = ath_hal_txprocdesc(ah, ds, ts);
 				if (status == HAL_EINPROGRESS)
-					break; 
+					break;
 				bf = STAILQ_NEXT(bf, bf_list);
 			}
 
@@ -5172,7 +5172,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 				ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
 				ath_hal_txstart(ah, txq->axq_qnum);
 			}
-			
+
 			ATH_TXQ_UNLOCK_IRQ(txq);
 		}
 
@@ -5209,9 +5209,9 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	if (skb == NULL) {
  		if (sc->sc_nmonvaps > 0) {
  			u_int off;
-			unsigned int extra = A_MAX(sizeof(struct ath_rx_radiotap_header), 
+			unsigned int extra = A_MAX(sizeof(struct ath_rx_radiotap_header),
 					  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
-						
+
  			/*
  			 * Allocate buffer for monitor mode with space for the
 			 * wlan-ng style physical layer header at the start.
@@ -5274,7 +5274,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds = bf->bf_desc;
 	ds->ds_link = bf->bf_daddr;		/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
-	ath_hal_setuprxdesc(ah, ds, 
+	ath_hal_setuprxdesc(ah, ds,
 		skb_tailroom(skb),  		/* buffer size */
 		0);
 	if (sc->sc_rxlink != NULL)
@@ -5337,14 +5337,14 @@ ath_rx_capture(struct net_device *dev, const struct ath_buf *bf, struct sk_buff 
 
 
 static void
-ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff *skb, 
+ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff *skb,
 		u_int64_t tsf)
 {
 	struct ath_softc *sc = dev->priv;
 	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_frame *wh;
-	unsigned int extra = A_MAX(sizeof(struct ath_tx_radiotap_header), 
+	unsigned int extra = A_MAX(sizeof(struct ath_tx_radiotap_header),
 			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
 	u_int32_t tstamp;
 	/*                                                                      
@@ -5374,13 +5374,13 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 			skb_pull(skb, padbytes);
 		}
 	}
-	
+
 	if (skb_headroom(skb) < extra &&
 	    pskb_expand_head(skb, extra, 0, GFP_ATOMIC)) {
 		printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
 		goto done;
 	}
-	
+
 	if (sc->sc_nmonvaps > 0) {
 		/* Pass up tsf clock in mactime
 		 * TX descriptor contains the transmit time in TU's,
@@ -5491,7 +5491,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	/* Let the 802.11 layer know about the new noise floor */
 	sc->sc_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
 	ic->ic_channoise = sc->sc_channoise;
-	
+
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "%s\n", __func__);
 	do {
 		bf = STAILQ_FIRST(&sc->sc_rxbuf);
@@ -5510,7 +5510,7 @@ ath_rx_tasklet(TQUEUE_ARG data)
 		 */
 		if (!(bf->bf_status & ATH_BUFSTATUS_DONE))
 			break;
-		
+
 		ds = bf->bf_desc;
 		if (ds->ds_link == bf->bf_daddr) {
 			/* NB: never process the self-linked entry at the end */
@@ -5654,7 +5654,7 @@ rx_accept:
 			skb = NULL;
 			goto rx_next;
 		}
-		
+
 		/* remove the CRC */
 		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 
@@ -5702,7 +5702,7 @@ rx_accept:
 			 * No key index or no entry, do a lookup and
 			 * add the node to the mapping table if possible.
 			 */
-			ni = ieee80211_find_rxnode(ic, 
+			ni = ieee80211_find_rxnode(ic,
 				(const struct ieee80211_frame_min *) skb->data);
 			if (ni != NULL) {
 				struct ath_node *an = ATH_NODE(ni);
@@ -5718,7 +5718,7 @@ rx_accept:
 				if (keyix != IEEE80211_KEYIX_NONE &&
 				    sc->sc_keyixmap[keyix] == NULL)
 					sc->sc_keyixmap[keyix] = ieee80211_ref_node(ni);
-				ieee80211_unref_node(&ni); 
+				ieee80211_unref_node(&ni);
 			} else
 				type = ieee80211_input_all(ic, skb,
 					rs->rs_rssi, rs->rs_tstamp);
@@ -5756,7 +5756,7 @@ rx_next:
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 		ATH_RXBUF_UNLOCK_IRQ(sc);
 	} while (ath_rxbuf_init(sc, bf) == 0);
-	
+
 	/* rx signal state monitoring */
 	ath_hal_rxmonitor(ah, &sc->sc_halstats, &sc->sc_curchan);
 #undef PA2DESC
@@ -5764,7 +5764,7 @@ rx_next:
 
 #ifdef ATH_SUPERG_XR
 
-static void 
+static void
 ath_grppoll_period_update(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -5779,7 +5779,7 @@ ath_grppoll_period_update(struct ath_softc *sc)
 	 * if no stations are in XR mode.
 	 * use default poll interval.
 	 */
-	if (xrsta == 0) { 
+	if (xrsta == 0) {
 		if (sc->sc_xrpollint != XR_DEFAULT_POLL_INTERVAL) {
 			sc->sc_xrpollint = XR_DEFAULT_POLL_INTERVAL;
 			ath_grppoll_txq_update(sc,XR_DEFAULT_POLL_INTERVAL);
@@ -5792,7 +5792,7 @@ ath_grppoll_period_update(struct ath_softc *sc)
 	 * if all the stations are in XR mode.
 	 * use minimum poll interval.
 	 */
-	if (allsta == xrsta) { 
+	if (allsta == xrsta) {
 		if (sc->sc_xrpollint != XR_MIN_POLL_INTERVAL) {
 			sc->sc_xrpollint = XR_MIN_POLL_INTERVAL;
 			ath_grppoll_txq_update(sc,XR_MIN_POLL_INTERVAL);
@@ -5809,7 +5809,7 @@ ath_grppoll_period_update(struct ath_softc *sc)
 	    ((XR_DEFAULT_POLL_INTERVAL - XR_MIN_POLL_INTERVAL) * xrsta)/(normalsta * XR_GRPPOLL_PERIOD_FACTOR);
 	if (interval < XR_MIN_POLL_INTERVAL)
 		interval = XR_MIN_POLL_INTERVAL;
-	
+
 	if (sc->sc_xrpollint != interval) {
 		sc->sc_xrpollint = interval;
 		ath_grppoll_txq_update(sc,interval);
@@ -5825,7 +5825,7 @@ ath_grppoll_period_update(struct ath_softc *sc)
 /*
  * update grppoll period.
  */
-static void 
+static void
 ath_grppoll_txq_update(struct ath_softc *sc, int period)
 {
 	struct ath_hal *ah = sc->sc_ah;
@@ -5833,7 +5833,7 @@ ath_grppoll_txq_update(struct ath_softc *sc, int period)
 	struct ath_txq *txq = &sc->sc_grpplq;
 
 	if (sc->sc_grpplq.axq_qnum == -1)
-		return; 
+		return;
 
 	memset(&qi, 0, sizeof(qi));
 	qi.tqi_subtype = 0;
@@ -5850,7 +5850,7 @@ ath_grppoll_txq_update(struct ath_softc *sc, int period)
 /*
  * Setup grppoll  h/w transmit queue.
  */
-static void 
+static void
 ath_grppoll_txq_setup(struct ath_softc *sc, int qtype, int period)
 {
 #define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
@@ -5945,7 +5945,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 		== IEEE80211_F_SHPREAMBLE)
 
 	if (sc->sc_xrgrppoll)
-		return; 
+		return;
 
 	memset(&rates, 0, sizeof(rates));
 	pos = 0;
@@ -6002,7 +6002,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 					ctsduration = ath_hal_computetxtime(ah,	rt,
 							pktlen,	rtindex,
 							AH_FALSE) /* CF-Poll time */
-						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))  
+						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))
 						+ ath_hal_computetxtime(ah, rt,
 							2 * (sizeof(struct ieee80211_frame_min) + 6),
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
@@ -6010,12 +6010,12 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 						+ ath_hal_computetxtime(ah, rt,
 							IEEE80211_ACK_LEN,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
-							AH_FALSE); /* ACK. frame time */ 
+							AH_FALSE); /* ACK. frame time */
 				} else {
 					ctsduration = ath_hal_computetxtime(ah, rt,
 							pktlen, rtindex,
 							AH_FALSE) /* CF-Poll time */
-						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))  
+						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))
 						+ ath_hal_computetxtime(ah,rt,
 							XR_FRAGMENTATION_THRESHOLD,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
@@ -6023,7 +6023,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 						+ ath_hal_computetxtime(ah,rt,
 							IEEE80211_ACK_LEN,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
-							AH_FALSE); /* ACK frame time */ 
+							AH_FALSE); /* ACK frame time */
 				}
 				if ((vap->iv_flags & IEEE80211_F_PRIVACY) &&
 						(keyix == HAL_TXKEYIX_INVALID)) {
@@ -6034,7 +6034,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				}
 			}
 
-			ATH_TXBUF_LOCK_IRQ(sc);					
+			ATH_TXBUF_LOCK_IRQ(sc);
 			bf = STAILQ_FIRST(&sc->sc_grppollbuf);
 			if (bf != NULL)
 				STAILQ_REMOVE_HEAD(&sc->sc_grppollbuf, bf_list);
@@ -6044,11 +6044,11 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				return;
 			}
 			/* XXX use a counter and leave at least one for mgmt frames */
-			if (STAILQ_EMPTY(&sc->sc_grppollbuf)) {				
+			if (STAILQ_EMPTY(&sc->sc_grppollbuf)) {
 				DPRINTF(sc, ATH_DEBUG_XMIT, "%s: No more TxBufs left\n", __func__);
 				ATH_TXBUF_UNLOCK_IRQ_EARLY(sc);
 				return;
-			}					
+			}
 			ATH_TXBUF_UNLOCK_IRQ(sc);
 
 			bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
@@ -6065,10 +6065,10 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				type = HAL_PKT_TYPE_GRP_POLL;
 			}
 			if (i == 0 && amode == HAL_ANTENNA_FIXED_A ) {
-				flags |= HAL_TXDESC_CLRDMASK;  
+				flags |= HAL_TXDESC_CLRDMASK;
 				head = bf;
 			}
-			ath_hal_setuptxdesc(ah, ds, 
+			ath_hal_setuptxdesc(ah, ds,
 				skb->len + IEEE80211_CRC_LEN, 	/* frame length */
 				sizeof(struct ieee80211_frame), /* header length */
 				type, 				/* Atheros packet type */
@@ -6083,7 +6083,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				0, 				/* comp iv len */
 				ATH_COMP_PROC_NO_COMP_NO_CCS 	/* comp scheme */
 				);
-			ath_hal_filltxdesc(ah, ds, 
+			ath_hal_filltxdesc(ah, ds,
 				roundup(skb->len, 4), 	/* buffer length */
 				AH_TRUE, 		/* first segment */
 				AH_TRUE, 		/* last segment */
@@ -6128,10 +6128,10 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 	struct ath_hal *ah = sc->sc_ah;
 	struct ath_txq *txq = &sc->sc_grpplq;
 	struct ath_buf *bf;
-	
-	
+
+
 	if (!sc->sc_xrgrppoll)
-		return; 
+		return;
 	ath_hal_stoptxdma(ah, txq->axq_qnum);
 
 	/* move the grppool bufs back to the grppollbuf */
@@ -6196,17 +6196,17 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 
 #ifdef ATH_SUPERG_COMP
 	/* allocate compression scratch buffer for data queues */
-	if (((qtype == HAL_TX_QUEUE_DATA)|| (qtype == HAL_TX_QUEUE_UAPSD)) 
+	if (((qtype == HAL_TX_QUEUE_DATA)|| (qtype == HAL_TX_QUEUE_UAPSD))
 	    && ath_hal_compressionsupported(ah)) {
-		compbufsz = roundup(HAL_COMP_BUF_MAX_SIZE, 
+		compbufsz = roundup(HAL_COMP_BUF_MAX_SIZE,
 			HAL_COMP_BUF_ALIGN_SIZE) + HAL_COMP_BUF_ALIGN_SIZE;
 		compbuf = (char *)bus_alloc_consistent(sc->sc_bdev,
 			compbufsz, &compbufp);
 		if (compbuf == NULL)
-			sc->sc_ic.ic_ath_cap &= ~IEEE80211_ATHC_COMP;	
+			sc->sc_ic.ic_ath_cap &= ~IEEE80211_ATHC_COMP;
 		else
 			qi.tqi_compBuf = (u_int32_t)compbufp;
-	} 
+	}
 #endif
 	/*
 	 * Enable interrupts only for EOL and DESC conditions.
@@ -6354,7 +6354,7 @@ ath_wme_update(struct ieee80211com *ic)
 /*
  * Callback from 802.11 layer to flush a node's U-APSD queues
  */
-static void	
+static void
 ath_uapsd_flush(struct ieee80211_node *ni)
 {
 	struct ath_node *an = ATH_NODE(ni);
@@ -6447,7 +6447,7 @@ ath_get_ivlen(struct ieee80211_key *k)
 	if (cip->ic_cipher == IEEE80211_CIPHER_AES_CCM ||
 		cip->ic_cipher == IEEE80211_CIPHER_AES_OCB)
 		ivlen += EXT_IV_FIELD_SIZE;
-	
+
 	return ivlen;
 }
 #endif
@@ -6501,16 +6501,16 @@ ath_tx_uapsdqueue(struct ath_softc *sc, struct ath_node *an, struct ath_buf *bf)
 		STAILQ_INSERT_TAIL(&an->an_uapsd_q, bf, bf_list);
 		an->an_uapsd_qdepth++;
 		DPRINTF(sc, ATH_DEBUG_UAPSD,
-				"%s: added AC %d frame to delivery Q, new depth = %d\n", 
+				"%s: added AC %d frame to delivery Q, new depth = %d\n",
 				__func__, bf->bf_skb->priority, an->an_uapsd_qdepth);
 		return;
 	}
-	
+
 	/* check if need to make room on overflow queue */
 	if (an->an_uapsd_overflowqdepth == an->an_node.ni_uapsd_maxsp) {
 		/* 
 		 *  pop oldest from delivery queue and cleanup
-		 */ 
+		 */
 		lastbuf = STAILQ_FIRST(&an->an_uapsd_q);
 		STAILQ_REMOVE_HEAD(&an->an_uapsd_q, bf_list);
 		dev_kfree_skb(lastbuf->bf_skb);
@@ -6520,7 +6520,7 @@ ath_tx_uapsdqueue(struct ath_softc *sc, struct ath_node *an, struct ath_buf *bf)
 		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, lastbuf, bf_list);
 		ATH_TXBUF_UNLOCK_IRQ(sc);
-		
+
 		/*
 		 *  move oldest from overflow to delivery
 		 */
@@ -6578,8 +6578,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	isprot = wh->i_fc[1] & IEEE80211_FC1_PROT;
 	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 	hdrlen = ieee80211_anyhdrsize(wh);
-	istxfrag = (wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG) || 
-		(((le16toh(*(__le16 *) &wh->i_seq[0]) >> 
+	istxfrag = (wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG) ||
+		(((le16toh(*(__le16 *) &wh->i_seq[0]) >>
 		IEEE80211_SEQ_FRAG_SHIFT) & IEEE80211_SEQ_FRAG_MASK) > 0);
 
 	pktlen = skb->len;
@@ -6689,7 +6689,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	/* setup descriptors */
 	ds = bf->bf_desc;
 #ifdef ATH_SUPERG_XR
-	if (vap->iv_flags & IEEE80211_F_XR ) 
+	if (vap->iv_flags & IEEE80211_F_XR )
 		rt = sc->sc_xr_rates;
 	else
 		rt = sc->sc_currates;
@@ -6755,7 +6755,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		break;
 	case IEEE80211_FC0_TYPE_DATA:
 		atype = HAL_PKT_TYPE_NORMAL;		/* default */
-		
+
 		if (ismcast) {
 			rix = ath_tx_findindex(rt, vap->iv_mcast_rate);
 			txrate = rt->info[rix].rateCode;
@@ -6806,7 +6806,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		return -EIO;
 	}
 
-#ifdef ATH_SUPERG_XR 
+#ifdef ATH_SUPERG_XR
 	if (vap->iv_flags & IEEE80211_F_XR ) {
 		txq = sc->sc_xrtxq;
 		if (!txq)
@@ -6834,7 +6834,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		flags |= HAL_TXDESC_NOACK;	/* no ack on broad/multicast */
 		sc->sc_stats.ast_tx_noack++;
 		try0 = ATH_TXMAXTRY;    /* turn off multi-rate retry for multicast traffic */
-	 } else if (pktlen > vap->iv_rtsthreshold) { 
+	 } else if (pktlen > vap->iv_rtsthreshold) {
 #ifdef ATH_SUPERG_FF
 		/* we could refine to only check that the frame of interest
 		 * is a FF, but this seems inconsistent.
@@ -6885,7 +6885,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if ((flags & HAL_TXDESC_NOACK) == 0 &&
 	    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_CTL) {
 		u_int16_t dur;
-		
+
 		/* XXX: not right with fragmentation. */
 		if (shortPreamble)
 			dur = rt->info[rix].spAckDuration;
@@ -6901,7 +6901,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			** The last fragment uses the ACK duration only.
 			** Add time for next fragment.
 			*/
-			dur += ath_hal_computetxtime(ah, rt, nextfraglen, 
+			dur += ath_hal_computetxtime(ah, rt, nextfraglen,
 				rix, shortPreamble);
 		}
 
@@ -6960,7 +6960,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		 * Must disable multi-rate retry when using RTS/CTS.
 		 */
 		try0 = ATH_TXMAXTRY;
-	} else 
+	} else
 		ctsrate = 0;
 
 	if (IFF_DUMPPKTS(sc, ATH_DEBUG_XMIT))
@@ -6990,7 +6990,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	}
 
 #ifdef ATH_SUPERG_COMP
-	if (ATH_NODE(ni)->an_decomp_index != INVALID_DECOMP_INDEX && 
+	if (ATH_NODE(ni)->an_decomp_index != INVALID_DECOMP_INDEX &&
 	    !ismcast &&
 	    ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA) &&
 	    ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) != IEEE80211_FC0_SUBTYPE_NODATA)) {
@@ -6998,7 +6998,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			comp = ATH_COMP_PROC_COMP_OPTIMAL;
 		else
 			comp = ATH_COMP_PROC_NO_COMP_ADD_CCS;
-	} 
+	}
 #endif
 
 	/*
@@ -7017,7 +7017,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * Formulate first tx descriptor with tx controls.
 	 */
 	/* XXX check return value? */
-	ath_hal_setuptxdesc(ah, ds, 
+	ath_hal_setuptxdesc(ah, ds,
 			    pktlen, 			/* packet length */
 			    hdrlen, 			/* header length */
 			    atype, 			/* Atheros packet type */
@@ -7049,7 +7049,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	ds->ds_link = 0;
 	ds->ds_data = bf->bf_skbaddr;
 
-	ath_hal_filltxdesc(ah, ds, 
+	ath_hal_filltxdesc(ah, ds,
 			   skb->len, 	/* segment length */
 			   AH_TRUE, 	/* first segment */
 			   AH_TRUE, 	/* last segment */
@@ -7116,7 +7116,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	if (M_FLAG_GET(skb, M_UAPSD)) {
 		/* must lock against interrupt-time processing (i.e., not just tasklet) */
 		ATH_NODE_UAPSD_LOCK_IRQ(an);
-		DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: Qing U-APSD data frame for node %s \n", 
+		DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: Qing U-APSD data frame for node %s \n",
 			__func__, ether_sprintf(an->an_node.ni_macaddr));
 		ath_tx_uapsdqueue(sc, an, bf);
 		if (IEEE80211_NODE_UAPSD_USETIM(ni) && (an->an_uapsd_qdepth == 1))
@@ -7125,8 +7125,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 		return 0;
 	}
-	
-	
+
+
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE, "%s: %p<%s> refcnt %d\n",
 		__func__, vap->iv_bss, ether_sprintf(vap->iv_bss->ni_macaddr),
 		ieee80211_node_refcnt(vap->iv_bss));
@@ -7154,14 +7154,14 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 	HAL_STATUS status;
 	int uapsdq = 0;
 	u_int64_t tsf = 0; /* Only needed for monitor mode */
-	
+
 	DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: tx queue %d (0x%x), link %p\n", __func__,
 		txq->axq_qnum, ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum),
 		txq->axq_link);
 
-	if (sc->sc_nmonvaps > 0) 
+	if (sc->sc_nmonvaps > 0)
 		tsf = ath_hal_gettsf64(ah);
-		
+
 	if (txq == sc->sc_uapsdq) {
 		DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: reaping U-APSD txq\n", __func__);
 		uapsdq = 1;
@@ -7249,7 +7249,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			 * and retry counts will be meaningless.
 			 */
 			if ((ts->ts_status & HAL_TXERR_FILT) == 0 &&
-			    (bf->bf_flags & HAL_TXDESC_NOACK) == 0) 
+			    (bf->bf_flags & HAL_TXDESC_NOACK) == 0)
 				sc->sc_rc->ops->tx_complete(sc, an, bf);
 			/*
 			 * Reclaim reference to node.
@@ -7258,10 +7258,10 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			 *     this is a DEAUTH message that was sent and the
 			 *     node was timed out due to inactivity.
 			 */
-			 ieee80211_unref_node(&ni); 
+			 ieee80211_unref_node(&ni);
 		}
 
-		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr, 
+		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr,
 				 bf->bf_skb->len, BUS_DMA_TODEVICE);
 		if (ni && uapsdq) {
 			/* detect EOSP for this node */
@@ -7269,7 +7269,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			an = ATH_NODE(ni);
 			KASSERT(ni != NULL, ("Processing U-APSD txq for ath_buf with no node!\n"));
 			if (qwh->i_qos[0] & IEEE80211_QOS_EOSP) {
-				DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: EOSP detected for node (%s) on desc %p\n", 
+				DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: EOSP detected for node (%s) on desc %p\n",
 					__func__, ether_sprintf(ni->ni_macaddr), ds);
 				ATH_NODE_UAPSD_LOCK_IRQ(an);
 				ni->ni_flags &= ~IEEE80211_NODE_UAPSD_SP;
@@ -7288,7 +7288,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: h/w assigned sequence number is not sane (%d), ignoring it\n", __func__,
 				        ts->ts_seqnum);
 			} else {
-				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: updating frame's sequence number from %d to %d\n", __func__, 
+				DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: updating frame's sequence number from %d to %d\n", __func__,
 				        (le16toh(*(__le16 *)&wh->i_seq[0]) & IEEE80211_SEQ_SEQ_MASK) >> IEEE80211_SEQ_SEQ_SHIFT,
 				        ts->ts_seqnum);
 
@@ -7324,7 +7324,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			bf->bf_numdescff = 0;
 #endif
 		}
-		
+
 		bf->bf_skb = NULL;
 		bf->bf_node = NULL;
 
@@ -7709,12 +7709,12 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		sc->sc_curchan.channelFlags), sc->sc_curchan.channel,
 		ath_hal_mhz2ieee(ah, hchan.channel, hchan.channelFlags),
 		hchan.channel);
-	
+
 	/* check if it is turbo mode switch */
 	if (hchan.channel == sc->sc_curchan.channel &&
-	   (hchan.channelFlags & IEEE80211_CHAN_TURBO) != (sc->sc_curchan.channelFlags & IEEE80211_CHAN_TURBO)) 
+	   (hchan.channelFlags & IEEE80211_CHAN_TURBO) != (sc->sc_curchan.channelFlags & IEEE80211_CHAN_TURBO))
 		tswitch = 1;
-	
+
 	if (hchan.channel != sc->sc_curchan.channel ||
 	    hchan.channelFlags != sc->sc_curchan.channelFlags) {
 		HAL_STATUS status;
@@ -7728,7 +7728,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		ath_hal_intrset(ah, 0);	/* disable interrupts */
 		ath_draintxq(sc);	/* clear pending tx frames */
 		ath_stoprecv(sc);	/* turn off frame recv */
-		
+
 		/* Set coverage class */
 		if (sc->sc_scanning || !IEEE80211_IS_CHAN_A(chan))
 			ath_hal_setcoverageclass(sc->sc_ah, 0, 0);
@@ -7747,7 +7747,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 
 		if (sc->sc_softled)
 			ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
-		
+
 		sc->sc_curchan = hchan;
 		ath_update_txpow(sc);		/* update tx power state */
 
@@ -7767,16 +7767,16 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		ath_chan_change(sc, chan);
 		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 			if (sc->sc_curchan.privFlags & CHANNEL_DFS) {
-				if (!(sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR)) { 
+				if (!(sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR)) {
 					dev->watchdog_timeo = 120 * HZ;	/* set the timeout to normal */
-					netif_stop_queue(dev);			
+					netif_stop_queue(dev);
 					if (sc->sc_dfswait)
 						del_timer_sync(&sc->sc_dfswaittimer);
 					DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: start dfs wait period\n",
 						__func__, DEV_NAME(dev));
 					sc->sc_dfswait = 1;
 					sc->sc_dfswaittimer.function = ath_check_dfs_clear;
-					sc->sc_dfswaittimer.expires = 
+					sc->sc_dfswaittimer.expires =
 						jiffies + (ATH_DFS_WAIT_POLL_PERIOD * HZ);
 					sc->sc_dfswaittimer.data = (unsigned long)sc;
 					add_timer(&sc->sc_dfswaittimer);
@@ -7788,8 +7788,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		 * re configure beacons when it is a turbo mode switch.
 		 * HW seems to turn off beacons during turbo mode switch.
 		 */
-		if (sc->sc_beacons && tswitch) 
-			ath_beacon_config(sc, NULL);	
+		if (sc->sc_beacons && tswitch)
+			ath_beacon_config(sc, NULL);
 
 		/*
 		 * Re-enable interrupts.
@@ -7898,12 +7898,12 @@ ath_set_channel(struct ieee80211com *ic)
 }
 
 static void
-ath_set_coverageclass(struct ieee80211com *ic) 
+ath_set_coverageclass(struct ieee80211com *ic)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
 
 	ath_hal_setcoverageclass(sc->sc_ah, ic->ic_coverageclass, 0);
-	
+
 	return;
 }
 
@@ -8010,11 +8010,11 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		DPRINTF(sc, ATH_DEBUG_STATE,
 			"%s(RUN): ic_flags=0x%08x iv=%d bssid=%s "
 			"capinfo=0x%04x chan=%d\n",
-			 __func__, 
-			 vap->iv_flags, 
-			 ni->ni_intval, 
-			 ether_sprintf(ni->ni_bssid), 
-			 ni->ni_capinfo, 
+			 __func__,
+			 vap->iv_flags,
+			 ni->ni_intval,
+			 ether_sprintf(ni->ni_bssid),
+			 ni->ni_capinfo,
 			 ieee80211_chan2ieee(ic, ni->ni_chan));
 
 		switch (vap->iv_opmode) {
@@ -8046,8 +8046,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			 * if the turbo flags have changed, then beacon and turbo
 			 * need to be reconfigured.
 			 */
-			if ((sc->sc_dturbo && !(vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)) || 
-				(!sc->sc_dturbo && (vap->iv_ath_cap & IEEE80211_ATHC_TURBOP))) 
+			if ((sc->sc_dturbo && !(vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)) ||
+				(!sc->sc_dturbo && (vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)))
 				sc->sc_beacons = 0;
 			/* 
 			 * if it is the first AP VAP moving to RUN state then beacon 
@@ -8058,7 +8058,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 					tmpvap->iv_opmode == IEEE80211_M_HOSTAP)
 					break;
 			}
-			if (!tmpvap) 
+			if (!tmpvap)
 				sc->sc_beacons = 0;
 			break;
 		case IEEE80211_M_STA:
@@ -8087,7 +8087,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				 * it's possible the rates of the root bss isn't
 				 * filled yet. 
 				 */
-				if (vap->iv_ic->ic_newassoc != NULL && 
+				if (vap->iv_ic->ic_newassoc != NULL &&
 				    wds_ni->ni_rates.rs_nrates != 0) {
 					/* Fill in the rates based on our own rates
 					 * we rely on the rate selection mechanism
@@ -8125,7 +8125,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			/* push the VAP to RUN state once DFS is cleared */
 			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  -> DFS_WAIT\n",
 				__func__, DEV_NAME(dev));
-			avp->av_dfswait_run = 1; 
+			avp->av_dfswait_run = 1;
 			return 0;
 		}
 	} else {
@@ -8137,15 +8137,15 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  out of DFS_WAIT\n",
 				__func__, DEV_NAME(dev));
 		}
-		
+
 		/* XXX: if it is SCAN state, disable beacons. */
 		if (nstate == IEEE80211_S_SCAN) {
 			ath_hal_intrset(ah,sc->sc_imask &~ (HAL_INT_SWBA | HAL_INT_BMISS));
 			sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 			/* need to reconfigure the beacons when it moves to RUN */
-			sc->sc_beacons = 0; 
+			sc->sc_beacons = 0;
 		}
-		avp->av_dfswait_run = 0; /* reset the dfs wait flag */ 
+		avp->av_dfswait_run = 0; /* reset the dfs wait flag */
 	}
 done:
 	/*
@@ -8183,10 +8183,10 @@ bad:
  *
  * Context: Timer (softIRQ)
  */
-static void 
-ath_check_dfs_clear(unsigned long data ) 
+static void
+ath_check_dfs_clear(unsigned long data )
 {
-	struct ath_softc *sc = (struct ath_softc *)data; 
+	struct ath_softc *sc = (struct ath_softc *)data;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = sc->sc_dev;
 	struct ieee80211vap *vap ;
@@ -8198,10 +8198,10 @@ ath_check_dfs_clear(unsigned long data )
 	ath_hal_radar_wait(sc->sc_ah, &hchan);
 
 	if (hchan.privFlags & CHANNEL_INTERFERENCE)
-		return; 
+		return;
 
 	if ((hchan.privFlags & CHANNEL_DFS_CLEAR) ||
-	    (!(hchan.privFlags & CHANNEL_DFS))) { 
+	    (!(hchan.privFlags & CHANNEL_DFS))) {
 		sc->sc_curchan.privFlags |= CHANNEL_DFS_CLEAR;
 		sc->sc_dfswait = 0;
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
@@ -8279,7 +8279,7 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
 		if ((ni->ni_wpa_ie != NULL) &&
 		    (ni->ni_rsn.rsn_ucastcipher == IEEE80211_CIPHER_TKIP) &&
 		    sc->sc_splitmic) {
-			if ((ni->ni_ucastkey.wk_flags & IEEE80211_KEY_XR) 
+			if ((ni->ni_ucastkey.wk_flags & IEEE80211_KEY_XR)
 							== IEEE80211_KEY_XR)
 				keyix = ni->ni_ucastkey.wk_keyix + 32;
 			else
@@ -8335,7 +8335,7 @@ ath_setup_stationkey(struct ieee80211_node *ni)
 		ath_setup_comp(ni, 1);
 #endif
 	}
-	
+
 	return;
 }
 
@@ -8363,9 +8363,9 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 		("got invalid vap def key index 0x%x", vap->iv_def_txkey));
 
 	/* Allocate a key slot first */
-	if (!ieee80211_crypto_newkey(vap, 
-		IEEE80211_CIPHER_WEP, 
-		IEEE80211_KEY_XMIT|IEEE80211_KEY_RECV, 
+	if (!ieee80211_crypto_newkey(vap,
+		IEEE80211_CIPHER_WEP,
+		IEEE80211_KEY_XMIT|IEEE80211_KEY_RECV,
 		&ni->ni_ucastkey))
 		goto error;
 
@@ -8375,8 +8375,8 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 	/* Do we need separate rx key? */
 	if (ni->ni_ath_defkeyindex != vap->iv_def_txkey) {
 		ni->ni_ucastkey.wk_keyix = IEEE80211_KEYIX_NONE;
-		if (!ieee80211_crypto_newkey(vap, 
-			IEEE80211_CIPHER_WEP, 
+		if (!ieee80211_crypto_newkey(vap,
+			IEEE80211_CIPHER_WEP,
 			IEEE80211_KEY_XMIT|IEEE80211_KEY_RECV,
 			&ni->ni_ucastkey)) {
 			ni->ni_ucastkey.wk_keyix = txkeyidx;
@@ -8405,10 +8405,10 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 	ni_key->wk_keylen = xmit_key->wk_keylen;
 	for (i = 0; i < IEEE80211_TID_SIZE; i++)
 		ni_key->wk_keyrsc[i] = xmit_key->wk_keyrsc[i];
-	ni_key->wk_keytsc = 0; 
+	ni_key->wk_keytsc = 0;
 	memset(ni_key->wk_key, 0, sizeof(ni_key->wk_key));
 	memcpy(ni_key->wk_key, xmit_key->wk_key, xmit_key->wk_keylen);
-	ieee80211_crypto_setkey(vap, &ni->ni_ucastkey, 
+	ieee80211_crypto_setkey(vap, &ni->ni_ucastkey,
 		(rxkeyidx == txkeyidx) ? ni->ni_macaddr:null_macaddr, ni);
 
 	if (rxkeyidx != txkeyidx) {
@@ -8419,9 +8419,9 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 		ni_key->wk_keylen = rcv_key->wk_keylen;
 		for (i = 0; i < IEEE80211_TID_SIZE; i++)
 			ni_key->wk_keyrsc[i] = rcv_key->wk_keyrsc[i];
-		ni_key->wk_keytsc = 0; 
-		ni_key->wk_cipher = rcv_key->wk_cipher; 
-		ni_key->wk_private = rcv_key->wk_private; 
+		ni_key->wk_keytsc = 0;
+		ni_key->wk_cipher = rcv_key->wk_cipher;
+		ni_key->wk_private = rcv_key->wk_private;
 		memset(ni_key->wk_key, 0, sizeof(ni_key->wk_key));
 		memcpy(ni_key->wk_key, rcv_key->wk_key, rcv_key->wk_keylen);
 		ieee80211_crypto_setkey(vap, &tmpkey, ni->ni_macaddr, ni);
@@ -8635,7 +8635,7 @@ ath_update_txpow(struct ath_softc *sc)
 	(void)ath_hal_getmaxtxpow(ah, &maxtxpowlimit);
 	ic->ic_txpowlimit = maxtxpowlimit;
 	ath_hal_settxpowlimit(ah, txpowlimit);
- 	
+
  	/*
 	 * Make sure the VAP's change is within limits, clamp it otherwise
  	 */
@@ -8643,7 +8643,7 @@ ath_update_txpow(struct ath_softc *sc)
 		clamped_txpow = ic->ic_txpowlimit;
 	else
 		clamped_txpow = ic->ic_newtxpowlimit;
-	
+
 	/*
 	 * Search for the VAP that needs a txpow change, if any
 	 */
@@ -8658,7 +8658,7 @@ ath_update_txpow(struct ath_softc *sc)
 		ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
 #endif
 	}
- 	
+
 	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
 
 #ifdef ATH_CAP_TPC
@@ -8669,7 +8669,7 @@ ath_update_txpow(struct ath_softc *sc)
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 #endif
 }
- 
+
 
 #ifdef ATH_SUPERG_XR
 static int
@@ -8933,7 +8933,7 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 
 	/* if the 4 msec limit is set on the channel, take it into account */
 	if (sc->sc_curchan.privFlags & CHANNEL_4MS_LIMIT)
-		txoplimit = MIN(txoplimit, US_PER_4MS); 
+		txoplimit = MIN(txoplimit, US_PER_4MS);
 
 	if (txoplimit != 0 && athff_approx_txtime(sc, an, skb) > txoplimit) {
 		DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
@@ -8968,7 +8968,7 @@ ath_printrxbuf(const struct ath_buf *bf, int done)
 static void
 ath_printtxbuf(const struct ath_buf *bf, int done)
 {
-	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat; 
+	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
 	const struct ath_desc *ds = bf->bf_desc;
 
 	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
@@ -9156,7 +9156,7 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			error = ath_ioctl_ethtool(sc, cmd, ifr->ifr_data);
 		break;
 	case SIOC80211IFCREATE:
-		error = ieee80211_ioctl_create_vap(ic, ifr, dev); 
+		error = ieee80211_ioctl_create_vap(ic, ifr, dev);
 		break;
 	default:
 		error = -EINVAL;
@@ -9309,7 +9309,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				break;
 			}
 #ifdef ATH_SUPERG_XR
-			case ATH_XR_POLL_PERIOD: 
+			case ATH_XR_POLL_PERIOD:
 				if (val > XR_MAX_POLL_INTERVAL)
 					val = XR_MAX_POLL_INTERVAL;
 				else if (val < XR_MIN_POLL_INTERVAL)
@@ -9317,7 +9317,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_xrpollint = val;
 				break;
 
-			case ATH_XR_POLL_COUNT: 
+			case ATH_XR_POLL_COUNT:
 				if (val > XR_MAX_POLL_COUNT)
 					val = XR_MAX_POLL_COUNT;
 				else if (val < XR_MIN_POLL_COUNT)
@@ -9378,10 +9378,10 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val = ath_hal_gettkipmic(ah);
 			break;
 #ifdef ATH_SUPERG_XR
-		case ATH_XR_POLL_PERIOD: 
+		case ATH_XR_POLL_PERIOD:
 			val=sc->sc_xrpollint;
 			break;
-		case ATH_XR_POLL_COUNT: 
+		case ATH_XR_POLL_COUNT:
 			val=sc->sc_xrpollcount;
 			break;
 #endif
@@ -9499,14 +9499,14 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 {
 	unsigned int i, space;
 	char *dev_name = NULL;
-	
+
 	space = 5 * sizeof(struct ctl_table) + sizeof(ath_sysctl_template);
 	sc->sc_sysctls = kmalloc(space, GFP_KERNEL);
 	if (sc->sc_sysctls == NULL) {
 		printk("%s: no memory for sysctl table!\n", __func__);
 		return;
 	}
-	
+
 	/* 
 	 * We want to reserve space for the name of the device separate
 	 * from the net_device structure, because when the name is changed
@@ -9710,7 +9710,7 @@ ath_sysctl_unregister(void)
 		unregister_sysctl_table(ath_sysctl_header);
 }
 
-static const char* 
+static const char*
 ath_get_hal_status_desc(HAL_STATUS status)
 {
 	if (status > 0 && status < sizeof(hal_status_desc)/sizeof(char *))
@@ -9858,40 +9858,40 @@ ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
 			, (v & AR5K_AR5212_PIMR_QTRIG   ?  " QTRIG"          : "")
 			);
 	}
-#undef AR5K_AR5212_PHY_ERR_FIL		
+#undef AR5K_AR5212_PHY_ERR_FIL
 #undef AR5K_AR5212_PHY_ERR_FIL_RADAR
 #undef AR5K_AR5212_PHY_ERR_FIL_OFDM
 #undef AR5K_AR5212_PHY_ERR_FIL_CCK
-#undef AR5K_AR5212_PIMR		    
-#undef AR5K_AR5212_PISR		    
-#undef AR5K_AR5212_PIMR_RXOK		
-#undef AR5K_AR5212_PIMR_RXDESC		
-#undef AR5K_AR5212_PIMR_RXERR		
-#undef AR5K_AR5212_PIMR_RXNOFRM	
-#undef AR5K_AR5212_PIMR_RXEOL		
-#undef AR5K_AR5212_PIMR_RXORN		
-#undef AR5K_AR5212_PIMR_TXOK		
-#undef AR5K_AR5212_PIMR_TXDESC		
-#undef AR5K_AR5212_PIMR_TXERR		
-#undef AR5K_AR5212_PIMR_TXNOFRM	
-#undef AR5K_AR5212_PIMR_TXEOL		
-#undef AR5K_AR5212_PIMR_TXURN		
-#undef AR5K_AR5212_PIMR_MIB		
-#undef AR5K_AR5212_PIMR_SWI		
-#undef AR5K_AR5212_PIMR_RXPHY		
-#undef AR5K_AR5212_PIMR_RXKCM		
-#undef AR5K_AR5212_PIMR_SWBA		
-#undef AR5K_AR5212_PIMR_BRSSI		
-#undef AR5K_AR5212_PIMR_BMISS		
-#undef AR5K_AR5212_PIMR_HIUERR		
-#undef AR5K_AR5212_PIMR_BNR		
-#undef AR5K_AR5212_PIMR_RXCHIRP	
-#undef AR5K_AR5212_PIMR_TIM		
-#undef AR5K_AR5212_PIMR_BCNMISC	
-#undef AR5K_AR5212_PIMR_GPIO		
-#undef AR5K_AR5212_PIMR_QCBRORN	
-#undef AR5K_AR5212_PIMR_QCBRURN	
-#undef AR5K_AR5212_PIMR_QTRIG		
+#undef AR5K_AR5212_PIMR
+#undef AR5K_AR5212_PISR
+#undef AR5K_AR5212_PIMR_RXOK
+#undef AR5K_AR5212_PIMR_RXDESC
+#undef AR5K_AR5212_PIMR_RXERR
+#undef AR5K_AR5212_PIMR_RXNOFRM
+#undef AR5K_AR5212_PIMR_RXEOL
+#undef AR5K_AR5212_PIMR_RXORN
+#undef AR5K_AR5212_PIMR_TXOK
+#undef AR5K_AR5212_PIMR_TXDESC
+#undef AR5K_AR5212_PIMR_TXERR
+#undef AR5K_AR5212_PIMR_TXNOFRM
+#undef AR5K_AR5212_PIMR_TXEOL
+#undef AR5K_AR5212_PIMR_TXURN
+#undef AR5K_AR5212_PIMR_MIB
+#undef AR5K_AR5212_PIMR_SWI
+#undef AR5K_AR5212_PIMR_RXPHY
+#undef AR5K_AR5212_PIMR_RXKCM
+#undef AR5K_AR5212_PIMR_SWBA
+#undef AR5K_AR5212_PIMR_BRSSI
+#undef AR5K_AR5212_PIMR_BMISS
+#undef AR5K_AR5212_PIMR_HIUERR
+#undef AR5K_AR5212_PIMR_BNR
+#undef AR5K_AR5212_PIMR_RXCHIRP
+#undef AR5K_AR5212_PIMR_TIM
+#undef AR5K_AR5212_PIMR_BCNMISC
+#undef AR5K_AR5212_PIMR_GPIO
+#undef AR5K_AR5212_PIMR_QCBRORN
+#undef AR5K_AR5212_PIMR_QCBRURN
+#undef AR5K_AR5212_PIMR_QTRIG
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
@@ -9931,7 +9931,7 @@ ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u
 		address_string[7] = '=';
 		address_string[9] = '\0';
 	}
-	printk(KERN_DEBUG 
+	printk(KERN_DEBUG
 		"%23s: %s0x%08x%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 		, (name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_")) : name)
 		, address_string
@@ -10277,7 +10277,7 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 		case 0xa234: static_label = "PHY_TXPOWER_RATE3";      break;
 		case 0xa238: static_label = "PHY_TXPOWER_RATE4";      break;
 		default:
-			break;            
+			break;
 		}
 		if (static_label) {
 			snprintf(buf,buflen,static_label);
@@ -10295,9 +10295,9 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 			case 1: format = "KEY(%3d).KEYBITS[047:032]"; break;
 			case 2: format = "KEY(%3d).KEYBITS[079:048]"; break;
 			case 3: format = "KEY(%3d).KEYBITS[095:080]"; break;
-			case 4: format = "KEY(%3d).KEYBITS[127:096]"; break; 
-			case 5: format = "KEY(%3d).TYPE............"; break; 
-			case 6: format = "KEY(%3d).MAC[32:01]......"; break; 
+			case 4: format = "KEY(%3d).KEYBITS[127:096]"; break;
+			case 5: format = "KEY(%3d).TYPE............"; break;
+			case 6: format = "KEY(%3d).MAC[32:01]......"; break;
 			case 7: format = "KEY(%3d).MAC[47:33]......"; break;
 			default:
 				BUG();
@@ -10350,7 +10350,7 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 #endif
 	#define UNFILTERED AH_FALSE
 	#define FILTERED   AH_TRUE
-	
+
 	if (ar_device(sc->devid) != 5212 && ar_device(sc->devid) != 5213) return FILTERED;
 	/*
 	Addresses with side effects are never dumped out by bulk debug dump routines
@@ -10433,9 +10433,9 @@ ath_ar5212_registers_dump(struct ath_softc *sc) {
 	char name[MAX_REGISTER_NAME_LEN];
 	unsigned int address = MIN_REGISTER_ADDRESS;
 	unsigned int value   = 0;
-	
+
 	do {
-		if (ath_regdump_filter(sc, address)) 
+		if (ath_regdump_filter(sc, address))
 			continue;
 		ath_lookup_register_name(sc, name, MAX_REGISTER_NAME_LEN, address);
 		value = OS_REG_READ(ah,address);
@@ -10457,9 +10457,9 @@ ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 	unsigned int value   = 0;
 	char name[MAX_REGISTER_NAME_LEN];
 	unsigned int *p_old  = 0;
-	
+
 	do {
-		if (ath_regdump_filter(sc, address)) 
+		if (ath_regdump_filter(sc, address))
 			continue;
 		value = OS_REG_READ(ah,address);
 		p_old = (unsigned int*)&sc->register_snapshot[address];
@@ -10482,9 +10482,9 @@ ath_ar5212_registers_mark(struct ath_softc *sc)
 {
 	struct ath_hal *ah   = sc->sc_ah;
 	unsigned int address = MIN_REGISTER_ADDRESS;
-	
+
 	do {
-	*((unsigned int*)&sc->register_snapshot[address]) = 
+	*((unsigned int*)&sc->register_snapshot[address]) =
 	    ath_regdump_filter(sc, address)
 		? 0x0
 		: OS_REG_READ(ah,address)
@@ -10522,7 +10522,7 @@ seems to get confused if you are writing 0xffffffff or something.  Using the sig
 works, but for some reason 0xffffffff is just as likely to give you something else at the moment.
 */
 #ifdef ATH_REVERSE_ENGINEERING
-static unsigned int 
+static unsigned int
 ath_write_register(struct ieee80211com *ic, unsigned int address, unsigned int value)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;

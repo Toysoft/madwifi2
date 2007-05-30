@@ -55,7 +55,7 @@ struct athl2p_tunnel_hdr {
  * 802.2 + FFHDR + HPAD + 802.3 + 802.2 + 1500 + SPAD + 802.3 + 802.2 + 1500:
  *   8   +   4   +  4   +   14  +   8   + 1500 +  6   +   14  +   8   + 1500
  * = 3066
- */ 
+ */
 #define ATH_FF_MAX_HDR_PAD	4
 #define ATH_FF_MAX_SEP_PAD	6
 #define ATH_FF_MAX_HDR		30

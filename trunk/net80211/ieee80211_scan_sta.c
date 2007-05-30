@@ -236,7 +236,7 @@ sta_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 	SCAN_STA_LOCK_IRQ(st);
 	LIST_FOREACH(se, &st->st_hash[hash], se_hash)
 		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr) &&
-		    sp->ssid[1] == se->base.se_ssid[1] && 
+		    sp->ssid[1] == se->base.se_ssid[1] &&
 		    !memcmp(se->base.se_ssid+2, sp->ssid+2, se->base.se_ssid[1]))
 			goto found;
 
@@ -456,7 +456,7 @@ checktable(const struct scanlist *scan, const struct ieee80211_channel *c)
 
 	for (; scan->list != NULL; scan++) {
 		for (i = 0; i < scan->count; i++)
-			if (scan->list[i] == c->ic_freq) 
+			if (scan->list[i] == c->ic_freq)
 				return 1;
 	}
 	return 0;
@@ -475,7 +475,7 @@ sta_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 	enum ieee80211_phymode mode;
 	struct ieee80211_channel *c;
 	int i;
-	
+
 	ss->ss_last = 0;
 	/*
 	 * Use the table of ordered channels to construct the list
@@ -537,10 +537,10 @@ sta_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 			 * If a desired mode was specified, scan only 
 			 * channels that satisfy that constraint.
 			 */
-			if (vap->iv_des_mode != mode) 
+			if (vap->iv_des_mode != mode)
 				continue;
-			
-		} 
+
+		}
 		if (!checktable(staScanTable, c))
 			ss->ss_chans[ss->ss_last++] = c;
 	}
@@ -667,7 +667,7 @@ check_rate(struct ieee80211vap *vap, const struct ieee80211_scan_entry *se)
 	const u_int8_t *rs;
 
 	okrate = badrate = fixedrate = 0;
-	
+
 	if (IEEE80211_IS_CHAN_HALF(se->se_chan))
 		srs = &ic->ic_sup_half_rates;
 	else if (IEEE80211_IS_CHAN_QUARTER(se->se_chan))
@@ -1070,7 +1070,7 @@ sta_age(struct ieee80211_scan_state *ss)
  * the callback function on each one.
  */
 static int
-sta_iterate(struct ieee80211_scan_state *ss, 
+sta_iterate(struct ieee80211_scan_state *ss,
 	ieee80211_scan_iter_func *f, void *arg)
 {
 	struct sta_table *st = ss->ss_priv;
@@ -1088,7 +1088,7 @@ restart:
 			/* update public state */
 			se->base.se_age = jiffies - se->se_lastupdate;
 			SCAN_STA_UNLOCK_IRQ_EARLY(st);
-			
+
 			res = (*f)(arg, &se->base);
 
 			if (res != 0)
@@ -1170,7 +1170,7 @@ adhoc_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 	struct sta_table *st = ss->ss_priv;
 	const struct scanlist *scan;
 	enum ieee80211_phymode mode;
-	
+
 	ss->ss_last = 0;
 	/*
 	 * Use the table of ordered channels to construct the list
@@ -1390,7 +1390,7 @@ adhoc_default_action(struct ieee80211vap *vap,
 	if (IEEE80211_ADDR_EQ(se->se_bssid, &zeroMacAddr[0])) {
 		ieee80211_create_ibss(vap, se->se_chan);
 		return 1;
-	} else 
+	} else
 		return ieee80211_sta_join(vap,se);
 }
 
@@ -1441,7 +1441,7 @@ action_tasklet(IEEE80211_TQUEUE_ARG data)
 				chan = vap->iv_des_chan;
 			if (chan != NULL) {
 				struct ieee80211_scan_entry se;
-				
+
 				memset(&se, 0, sizeof(se));
 				se.se_chan = chan;
 				if ((*ss->ss_ops->scan_default)(vap, &se))
