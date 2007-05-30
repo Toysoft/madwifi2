@@ -96,7 +96,6 @@ cp -f ${SRC_HAL}/public/*.hal.o.uu ${DST_HAL}/public
 
 
 echo "Patching the build system"
-cp -f $kbuild/Makefile ${MADWIFI}
 if test "$kbuild" = 2.6; then
 cp -f $kbuild/Kconfig ${MADWIFI}
 sed -i '/madwifi/d;/^endmenu/i\
