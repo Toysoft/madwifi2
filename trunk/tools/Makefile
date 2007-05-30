@@ -76,7 +76,7 @@ wlanconfig: wlanconfig.c
 80211debug: 80211debug.c
 	$(CC) -o 80211debug $(ALL_CFLAGS) $(LDFLAGS) 80211debug.c
 
-install: $(ALL)
+install: $(ALL) 
 	install -d $(DESTDIR)$(BINDIR)
 	for i in $(ALL); do \
 		install $$i $(DESTDIR)$(BINDIR)/$$i; \
@@ -84,6 +84,7 @@ install: $(ALL)
 	done
 	install -d $(DESTDIR)$(MANDIR)/man8
 	install -m 0644 man/*.8 $(DESTDIR)$(MANDIR)/man8
+	install $(TOP)/scripts/madwifi-unload.bash $(DESTDIR)$(BINDIR)/madwifi-unload
 
 uninstall:
 	for i in $(ALL); do \
