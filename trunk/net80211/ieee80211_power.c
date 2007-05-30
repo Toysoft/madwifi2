@@ -113,14 +113,14 @@ ieee80211_node_saveq_drain(struct ieee80211_node *ni)
 	struct sk_buff *skb;
 	int qlen;
 
-	IEEE80211_NODE_SAVEQ_LOCK_BH(ni);
+	IEEE80211_NODE_SAVEQ_LOCK_IRQ(ni);
 	qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
 	while ((skb = __skb_dequeue(&ni->ni_savedq)) != NULL) {
 		cb = (struct ieee80211_cb *) skb->cb;
 		ieee80211_unref_node(&cb->ni);
 		dev_kfree_skb_any(skb);
 	}
-	IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
+	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(ni);
 
 	return qlen;
 }
@@ -147,7 +147,7 @@ ieee80211_node_saveq_age(struct ieee80211_node *ni)
 #endif
 		struct sk_buff *skb;
 
-		IEEE80211_NODE_SAVEQ_LOCK_BH(ni);
+		IEEE80211_NODE_SAVEQ_LOCK_IRQ(ni);
 		while ((skb = skb_peek(&ni->ni_savedq)) != NULL &&
 		     M_AGE_GET(skb) < IEEE80211_INACT_WAIT) {
 			IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
@@ -159,7 +159,7 @@ ieee80211_node_saveq_age(struct ieee80211_node *ni)
 		}
 		if (skb != NULL)
 			M_AGE_SUB(skb, IEEE80211_INACT_WAIT);
-		IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
+		IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(ni);
 
 		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
 			"discard %u frames for age", discard);
@@ -212,10 +212,10 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 	struct sk_buff *tail;
 	int qlen, age;
 
-	IEEE80211_NODE_SAVEQ_LOCK_BH(ni);
+	IEEE80211_NODE_SAVEQ_LOCK_IRQ(ni);
 	if (IEEE80211_NODE_SAVEQ_QLEN(ni) >= IEEE80211_PS_MAX_QUEUE) {
 		IEEE80211_NODE_STAT(ni, psq_drops);
-		IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
+		IEEE80211_NODE_SAVEQ_UNLOCK_IRQ_EARLY(ni);
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,
 			"pwr save q overflow, drops %d (size %d)",
 			ni->ni_stats.ns_psq_drops, IEEE80211_PS_MAX_QUEUE);
@@ -244,7 +244,7 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 		__skb_queue_head(&ni->ni_savedq, skb);
 	M_AGE_SET(skb, age);
 	qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
-	IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
+	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(ni);
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
 		"save frame, %u now queued", qlen);
@@ -297,9 +297,9 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 			struct sk_buff *skb;
 			int qlen;
 
-			IEEE80211_NODE_SAVEQ_LOCK_BH(ni);
+			IEEE80211_NODE_SAVEQ_LOCK_IRQ(ni);
 			IEEE80211_NODE_SAVEQ_DEQUEUE(ni, skb, qlen);
-			IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
+			IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(ni);
 			if (skb == NULL)
 				break;
 			/* 
@@ -364,9 +364,9 @@ ieee80211_sta_pwrsave(struct ieee80211vap *vap, int enable)
 			for (;;) {
 				struct sk_buff *skb;
 
-				IEEE80211_NODE_SAVEQ_LOCK_BH(ni);
+				IEEE80211_NODE_SAVEQ_LOCK_IRQ(ni);
 				skb = __skb_dequeue(&ni->ni_savedq);
-				IEEE80211_NODE_SAVEQ_UNLOCK_BH(ni);
+				IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(ni);
 				if (skb == NULL)
 					break;
 				ieee80211_parent_queue_xmit(skb);
