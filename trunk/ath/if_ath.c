@@ -586,6 +586,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 		error = EIO;
 		goto bad2;
 	}
+	/* CAB: Crap After Beacon - a beacon gated queue */
 	sc->sc_cabq = ath_txq_setup(sc, HAL_TX_QUEUE_CAB, 0);
 	if (sc->sc_cabq == NULL) {
 		printk(KERN_ERR "%s: unable to setup CAB xmit queue!\n",
@@ -649,8 +650,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 * CAB queue is handled by these specially so don't
 	 * include them when checking the txq setup mask.
 	 */
-	switch (sc->sc_txqsetup &~ ((1<<sc->sc_cabq->axq_qnum) |
-				(sc->sc_uapsdq ? (1<<sc->sc_uapsdq->axq_qnum) : 0))) {
+	switch (sc->sc_txqsetup & ~((1 << sc->sc_cabq->axq_qnum) |
+				(sc->sc_uapsdq ? (1 << sc->sc_uapsdq->axq_qnum) : 0))) {
 	case 0x01:
 		ATH_INIT_TQUEUE(&sc->sc_txtq, ath_tx_tasklet_q0, dev);
 		break;
@@ -1256,7 +1257,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 		 * particular we need to reclaim all references to the
 		 * VAP state by any frames pending on the tx queues.
 		 *
-		 * XXX can we do this w/o affecting other VAPs?
+		 * XXX: Can we do this w/o affecting other VAPs?
 		 */
 		ath_hal_intrset(ah, 0);		/* disable interrupts */
 		ath_draintxq(sc);		/* stop xmit side */
@@ -1284,15 +1285,15 @@ ath_vap_delete(struct ieee80211vap *vap)
 		if (sc->sc_nbcnvaps == 0)
 			sc->sc_stagbeacons = 0;
 	}
+
 	if (vap->iv_opmode == IEEE80211_M_STA) {
 		sc->sc_nstavaps--;
-		if (sc->sc_nostabeacons)
-			sc->sc_nostabeacons = 0;
-	} else if (vap->iv_opmode == IEEE80211_M_MONITOR) {
+		sc->sc_nostabeacons = 0;
+	} else if (vap->iv_opmode == IEEE80211_M_MONITOR)
 		sc->sc_nmonvaps--;
-	} else if (vap->iv_opmode == IEEE80211_M_WDS) {
+	else if (vap->iv_opmode == IEEE80211_M_WDS)
 		decrease = 0;
-	}
+
 	ieee80211_vap_detach(vap);
 	/* NB: memory is reclaimed through dev->destructor callback */
 	if (decrease)
@@ -1330,10 +1331,8 @@ ath_vap_delete(struct ieee80211vap *vap)
 	}
 
 	if (dev->flags & IFF_RUNNING) {
-		/*
-		 * Restart rx+tx machines if device is still running.
-		 */
-		if (ath_startrecv(sc) != 0)	/* restart recv */
+		/* Restart RX & TX machines if device is still running. */
+		if (ath_startrecv(sc) != 0)		/* restart recv. */
 			printk("%s: %s: unable to start recv logic\n",
 				DEV_NAME(dev), __func__);
 		if (sc->sc_beacons)
@@ -2789,7 +2788,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 		DPRINTF(sc, ATH_DEBUG_XMIT, "%s: stop queue\n", __func__);
 		sc->sc_stats.ast_tx_qstop++;
 		netif_stop_queue(dev);
-		sc->sc_devstopped=1;
+		sc->sc_devstopped = 1;
 		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 	}
 	ATH_TXBUF_UNLOCK_IRQ(sc);
@@ -6143,7 +6142,7 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 		return;
 	ath_hal_stoptxdma(ah, txq->axq_qnum);
 
-	/* move the grppool bufs back to the grppollbuf */
+	/* move the grppoll bufs back to the grppollbuf */
 	for (;;) {
 		ATH_TXQ_LOCK_IRQ(txq);
 		bf = STAILQ_FIRST(&txq->axq_q);
@@ -6166,8 +6165,8 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
 bf_fail:
+	
 	STAILQ_INIT(&txq->axq_q);
-	ATH_TXQ_LOCK_INIT(txq);
 	txq->axq_depth = 0;
 	txq->axq_totalqueued = 0;
 	txq->axq_intrcnt = 0;
@@ -7501,10 +7500,12 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 		if (sc->sc_debug & ATH_DEBUG_RESET)
 			ath_printtxbuf(bf, ath_hal_txprocdesc(ah, bf->bf_desc, &bf->bf_dsstatus.ds_txstat) == HAL_OK);
 #endif /* AR_DEBUG */
+
 		skb = bf->bf_skb->next;
-		bus_unmap_single(sc->sc_bdev,
-			bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
+		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr, 
+				bf->bf_skb->len, BUS_DMA_TODEVICE);
 		dev_kfree_skb_any(bf->bf_skb);
+		bf->bf_skb = NULL;
 #ifdef ATH_SUPERG_FF
 		{
 			unsigned int i = 0;
@@ -7517,11 +7518,9 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 			}
 		}
 #endif /* ATH_SUPERG_FF */
+
 		if (bf->bf_node)
 			ieee80211_unref_node(&bf->bf_node);
-
-		bf->bf_skb = NULL;
-		bf->bf_node = NULL;
 
 		ATH_TXBUF_LOCK_IRQ(sc);
 		STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf, bf_list);
