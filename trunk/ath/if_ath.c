@@ -2398,7 +2398,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		bf_ff = TAILQ_LAST(&txq->axq_stageq, axq_headtype);
 		if ((!bf_ff) || ath_ff_flushdonetest(txq, bf_ff)) {
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
-			break;
+			return;
 		}
 
 		ni = bf_ff->bf_node;
@@ -6150,7 +6150,7 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 		if (bf == NULL) {
 			txq->axq_link = NULL;
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
-			break;
+			goto bf_fail;
 		}
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
 		ATH_TXQ_UNLOCK_IRQ(txq);
@@ -6165,6 +6165,7 @@ static void ath_grppoll_stop(struct ieee80211vap *vap)
 		STAILQ_INSERT_TAIL(&sc->sc_grppollbuf, bf, bf_list);
 		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
+bf_fail:
 	STAILQ_INIT(&txq->axq_q);
 	ATH_TXQ_LOCK_INIT(txq);
 	txq->axq_depth = 0;
@@ -7184,7 +7185,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		if (bf == NULL) {
 			txq->axq_link = NULL;
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
-			break;
+			goto bf_fail;
 		}
 
 #ifdef ATH_SUPERG_FF
@@ -7202,7 +7203,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 #endif
 		if (status == HAL_EINPROGRESS) {
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
-			break;
+			goto bf_fail;
 		}
 
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
@@ -7354,6 +7355,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		}
 		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
+bf_fail:
 #ifdef ATH_SUPERG_FF
 	/* flush ff staging queue if buffer low */
 	if (txq->axq_depth <= sc->sc_fftxqmin - 1) {
@@ -7491,7 +7493,7 @@ ath_tx_draintxq(struct ath_softc *sc, struct ath_txq *txq)
 		if (bf == NULL) {
 			txq->axq_link = NULL;
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
-			break;
+			return;
 		}
 		ATH_TXQ_REMOVE_HEAD(txq, bf_list);
 		ATH_TXQ_UNLOCK_IRQ(txq);
