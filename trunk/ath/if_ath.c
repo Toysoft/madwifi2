@@ -10516,7 +10516,7 @@ ath_read_register(struct ieee80211com *ic, unsigned int address, unsigned int* v
 	return 1;
 	}
 	if (address % 4) {
-	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x \%% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
+	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x %% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
 	return 1;
 	}
 	*value = OS_REG_READ(sc->sc_ah, address);
@@ -10541,7 +10541,7 @@ ath_write_register(struct ieee80211com *ic, unsigned int address, unsigned int v
 	return 1;
 	}
 	if (address % 4) {
-	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x \%% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
+	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x %% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
 	return 1;
 	}
 	OS_REG_WRITE(sc->sc_ah, address, value);
