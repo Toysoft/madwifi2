@@ -123,7 +123,7 @@ struct sta_table {
 	spin_unlock_irqrestore(&(_st)->st_lock, __stlockflags);
 
 #define	SCAN_STA_GEN_LOCK_INIT(_st, _name)				\
-	spin_lock_init(&(_st)->st_lock)
+	spin_lock_init(&(_st)->st_scanlock)
 #define	SCAN_STA_GEN_LOCK_DESTROY(_st)
 #define	SCAN_STA_GEN_LOCK(_st)		spin_lock(&(_st)->st_scanlock);
 #define	SCAN_STA_GEN_UNLOCK(_st)	spin_unlock(&(_st)->st_scanlock);
