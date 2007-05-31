@@ -4070,7 +4070,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		 * to the hardware cab queue.
 		 */
 		ATH_TXQ_LOCK_IRQ(&avp->av_mcastq);
-		ATH_TXQ_LOCK(cabq);
+		ATH_TXQ_LOCK_IRQ_INSIDE(cabq);
 		bfmcast = STAILQ_FIRST(&avp->av_mcastq.axq_q);
 		/* link the descriptors */
 		if (cabq->axq_link == NULL)
@@ -4093,7 +4093,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		ATH_TXQ_MOVE_MCASTQ(&avp->av_mcastq, cabq);
 		/* NB: gated by beacon so safe to start here */
 		ath_hal_txstart(ah, cabq->axq_qnum);
-		ATH_TXQ_UNLOCK(cabq);
+		ATH_TXQ_UNLOCK_IRQ_INSIDE(cabq);
 		ATH_TXQ_UNLOCK_IRQ(&avp->av_mcastq);
 	}
 
