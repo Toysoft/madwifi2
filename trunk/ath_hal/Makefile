@@ -64,7 +64,7 @@ INCS += -I$(ATH_HAL) -I$(HAL)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
 
-ifeq ($(TARGET),xscale-be-elf)
+ifneq (,$(filter xscale% arm%,$(TARGET)))
 LDOPTS += --no-warn-mismatch
 endif
 
