@@ -488,6 +488,8 @@ struct ath_vap {
 } while (0)
 #define ATH_TXQ_UNLOCK_IRQ_EARLY(_tq)					\
 	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags);
+#define ATH_TXQ_LOCK(_tq) spin_lock(&(_tq)->axq_lock);
+#define ATH_TXQ_UNLOCK(_tq) spin_unlock(&(_tq)->axq_lock);
 
 #define	ATH_TXQ_LOCK_ASSERT(_tq) \
 	KASSERT(spin_is_locked(&(_tq)->axq_lock), ("txq not locked!"))
