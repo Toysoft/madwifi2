@@ -677,7 +677,7 @@ ieee80211_input(struct ieee80211_node *ni,
 			ath_hdr = (struct athl2p_tunnel_hdr *)
 				skb_pull(skb, sizeof(struct ether_header) + LLC_SNAPFRAMELEN); 
 			/* ignore invalid frames */ 
-			if(ath_hdr == NULL) 
+			if (ath_hdr == NULL) 
 				goto err;
 
 			/* only implementing FF now. drop all others. */
