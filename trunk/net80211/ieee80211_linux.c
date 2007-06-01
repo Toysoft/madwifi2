@@ -311,8 +311,8 @@ ieee80211_notify_michael_failure(struct ieee80211vap *vap,
 
 	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
 	snprintf(buf, sizeof(buf), "%s(keyid=%d %scast addr=%s)", tag,
-		keyix, IEEE80211_IS_MULTICAST(wh->i_addr1) ?  "broad" : "uni",
-		ether_sprintf(wh->i_addr1));
+		keyix, IEEE80211_IS_MULTICAST(wh->i_addr2) ?  "broad" : "uni",
+		ether_sprintf(wh->i_addr2));
 	memset(&wrqu, 0, sizeof(wrqu));
 	wrqu.data.length = strlen(buf);
 	wireless_send_event(dev, IWEVCUSTOM, &wrqu, buf);
