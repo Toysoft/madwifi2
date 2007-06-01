@@ -993,7 +993,7 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 	struct sample_node *sn;
 	struct ieee80211_node_table *nt =
 		(struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
-	unsigned int x;
+	unsigned int ndx;
 	unsigned int size_bin;
 
 	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
@@ -1013,39 +1013,39 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 		p += sprintf(p, "%s\n", ether_sprintf(ni->ni_macaddr));
 		p += sprintf(p,
 				"rate\ttt\tperfect\tfailed\tpkts\tavg_tries\tlast_tx\n");
-		for (x = 0; x < sn->num_rates; x++) {
+		for (ndx = 0; ndx < sn->num_rates; ndx++) {
 			unsigned int a = 1;
 			unsigned int t = 1;
 
-			p += sprintf(p, "%s",
-					(x == sn->current_rate[size_bin]) ? "*" : " ");
+			p += sprintf(p, "%s", 
+					(ndx == sn->current_rate[size_bin]) ? "*" : " ");
 
 			p += sprintf(p, "%3u%s",
-					sn->rates[x].rate/2,
-					(sn->rates[x].rate & 0x1) != 0 ? ".5" : "  ");
+					sn->rates[ndx].rate / 2,
+					(sn->rates[ndx].rate & 0x1) ? ".5" : ".0");
 
-			p += sprintf(p, "\t%4u\t%4u\t%2u\t%3u",
-					sn->stats[size_bin][x].average_tx_time,
-					sn->stats[size_bin][x].perfect_tx_time,
-					sn->stats[size_bin][x].successive_failures,
-					sn->stats[size_bin][x].total_packets);
+			p += sprintf(p, "\t%4u\t%4u\t%2u\t%6u",
+					sn->stats[size_bin][ndx].average_tx_time,
+					sn->stats[size_bin][ndx].perfect_tx_time,
+					sn->stats[size_bin][ndx].successive_failures,
+					sn->stats[size_bin][ndx].total_packets);
 
-			if (sn->stats[size_bin][x].total_packets) {
-				a = sn->stats[size_bin][x].total_packets;
-				t = sn->stats[size_bin][x].tries;
-			}
-			p += sprintf(p, "\t%u.%02u\t", t/a, (t*100/a) % 100);
+			if (sn->stats[size_bin][ndx].total_packets) {
+				a = sn->stats[size_bin][ndx].total_packets;
+				t = sn->stats[size_bin][ndx].tries;
+  			}
 
-			if (sn->stats[size_bin][x].last_tx) {
-				unsigned d = jiffies -
-					sn->stats[size_bin][x].last_tx;
+			p += sprintf(p, "\t%u.%02u\t\t", t / a, (t * 100 / a) % 100);
+			if (sn->stats[size_bin][ndx].last_tx) {
+  				unsigned int d = jiffies - 
+					sn->stats[size_bin][ndx].last_tx;
 				p += sprintf(p, "%u.%02u", d / HZ, d % HZ);
 			} else {
 				p += sprintf(p, "-");
 			}
+
 			p += sprintf(p, "\n");
 		}
-		printk("\n");
 	}
 	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
 
