@@ -650,7 +650,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 			return;
 		}
 
-		if (vap->iv_fixed_rate != -1) {
+		if (vap->iv_fixed_rate != IEEE80211_FIXED_RATE_NONE) {
 			srate = sn->num_rates - 1;
 
 			/* A fixed rate is to be used; ic_fixed_rate is an
