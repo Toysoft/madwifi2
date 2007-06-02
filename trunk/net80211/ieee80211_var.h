@@ -208,7 +208,7 @@ struct ieee80211vap {
 	void (*iv_set_tim)(struct ieee80211_node *, int);
 	u_int8_t iv_uapsdinfo;				/* sta mode QoS Info flags */
 	struct ieee80211_node *iv_bss;			/* information for this node */
-	int iv_fixed_rate;				/* 802.11 rate or -1 */
+	int iv_fixed_rate;				/* 802.11 rate or IEEE80211_FIXED_RATE_NONE */
 	u_int16_t iv_rtsthreshold;
 	u_int16_t iv_fragthreshold;
 	u_int16_t iv_txmin;				/* min tx retry count */

@@ -268,7 +268,7 @@ ath_rate_ctl_start(struct ath_softc *sc, struct ieee80211_node *ni)
 	int srate;
 
 	KASSERT(ni->ni_rates.rs_nrates > 0, ("no rates"));
-	if (vap->iv_fixed_rate == -1) {
+	if (vap->iv_fixed_rate == IEEE80211_FIXED_RATE_NONE) {
 		/*
 		 * No fixed rate is requested. For 11b start with
 		 * the highest negotiated rate; otherwise, for 11g
@@ -342,7 +342,7 @@ ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state state)
 		ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_cb, NULL);
 		ath_rate_update(sc, vap->iv_bss, 0);
 	}
-	if (vap->iv_fixed_rate == -1 && state == IEEE80211_S_RUN) {
+	if ((vap->iv_fixed_rate == IEEE80211_FIXED_RATE_NONE) && (state == IEEE80211_S_RUN)) {
 		int interval;
 		/*
 		 * Start the background rate control thread if we

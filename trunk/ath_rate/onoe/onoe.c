@@ -212,14 +212,14 @@ ath_rate_update(struct ath_softc *sc, struct ieee80211_node *ni, int rate)
 		 */
 		on->on_tx_try0 = 1 + 3;		/* 4 tries at rate 0 */
 		if (--rate >= 0) {
-			rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
+			rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
 			on->on_tx_rate1 = rt->info[rix].rateCode;
 			on->on_tx_rate1sp = on->on_tx_rate1 |
 				rt->info[rix].shortPreamble;
 		} else
 			on->on_tx_rate1 = on->on_tx_rate1sp = 0;
 		if (--rate >= 0) {
-			rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate]&IEEE80211_RATE_VAL];
+			rix = sc->sc_rixmap[ni->ni_rates.rs_rates[rate] & IEEE80211_RATE_VAL];
 			on->on_tx_rate2 = rt->info[rix].rateCode;
 			on->on_tx_rate2sp = on->on_tx_rate2 |
 				rt->info[rix].shortPreamble;
