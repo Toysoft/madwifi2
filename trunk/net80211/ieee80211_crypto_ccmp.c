@@ -57,13 +57,8 @@
 
 #define AES_BLOCK_LEN 16
 
-/* This function (crypto_alloc_{tfm,cipher} might sleep. Therefore:
- * Context: process
- */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-#define crypto_cipher crypto_tfm
-#define crypto_alloc_cipher(name,type,mask) crypto_alloc_tfm(name,type)
-#define crypto_free_cipher(cipher) crypto_free_tfm(cipher)
+#define	crypto_cipher	crypto_tfm
 #endif
 
 struct ccmp_ctx {
@@ -116,8 +111,19 @@ ccmp_attach(struct ieee80211vap *vap, struct ieee80211_key *k)
 
 	ctx->cc_vap = vap;
 	ctx->cc_ic = vap->iv_ic;
+
+/* This function (crypto_alloc_foo might sleep. Therefore:
+ * Context: process
+ */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+	ctx->cc_tfm = crypto_alloc_tfm("aes", 0);
+#else
 	ctx->cc_tfm = crypto_alloc_cipher("aes", 0,
 					CRYPTO_ALG_ASYNC);
+	if (IS_ERR(ctx->cc_tfm))
+		ctx->cc_tfm = NULL;
+#endif
+	
 	if (ctx->cc_tfm == NULL) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 				"%s: unable to load kernel AES crypto support\n",
@@ -133,7 +139,11 @@ ccmp_detach(struct ieee80211_key *k)
 	struct ccmp_ctx *ctx = k->wk_private;
 
 	if (ctx->cc_tfm != NULL)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
+		crypto_free_tfm(ctx->cc_tfm);
+#else
 		crypto_free_cipher(ctx->cc_tfm);
+#endif
 	FREE(ctx, M_DEVBUF);
 
 	_MOD_DEC_USE(THIS_MODULE);
