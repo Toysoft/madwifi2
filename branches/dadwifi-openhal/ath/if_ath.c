@@ -1555,7 +1555,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		 */
 		return IRQ_NONE;
 	}
-	if (!ath_hw_irq_pending(ah))		/* shared irq, not for us */
+	if (!ath5k_hw_irq_pending(ah))		/* shared irq, not for us */
 		return IRQ_NONE;
 
 	needmark = 0;
@@ -2498,7 +2498,7 @@ hardstart_fail:
 #ifdef AR_DEBUG
 static void
 ath_keyprint(struct ath_softc *sc, const char *tag, u_int ix,
-	const AR5K_KEYVAL *hk, const u_int8_t mac[IEEE80211_ADDR_LEN])
+	const AR5K_KEYVAL *hk, const u_int8_t mac[ETH_ALEN])
 {
 	static const char *ciphers[] = {
 		"WEP",
@@ -2518,13 +2518,13 @@ ath_keyprint(struct ath_softc *sc, const char *tag, u_int ix,
 		printk(" %s ", sc->sc_splitmic ? "mic" : "rxmic");
 		for (i = 0; i < sizeof(hk->wk_mic); i++)
 			printk("%02x", hk->wk_mic[i]);
-#if AR5K_ABI_VERSION > 0x06052200
-		if (!sc->sc_splitmic) {
-			printk(" txmic ");
-			for (i = 0; i < sizeof(hk->kv_txmic); i++)
-				printk("%02x", hk->kv_txmic[i]);
-		}
-#endif
+//#if AR5K_ABI_VERSION > 0x06052200
+//		if (!sc->sc_splitmic) {
+//			printk(" txmic ");
+//			for (i = 0; i < sizeof(hk->kv_txmic); i++)
+//				printk("%02x", hk->kv_txmic[i]);
+//		}
+//#endif
 	}
 	printk("\n");
 }
@@ -2537,9 +2537,9 @@ ath_keyprint(struct ath_softc *sc, const char *tag, u_int ix,
  */
 static int
 ath_keyset_tkip(struct ath_softc *sc, struct ieee80211_key_conf *key,
-		AR5K_KEYVAL *hk, const u_int8_t mac[IEEE80211_ADDR_LEN])
+		AR5K_KEYVAL *hk, const u_int8_t mac[ETH_ALEN])
 {
-	static const u_int8_t zerobssid[IEEE80211_ADDR_LEN];
+	static const u_int8_t zerobssid[ETH_ALEN];
 	struct ath_hal *ah = sc->sc_ah;
 
 	KASSERT(hk->wk_type == AR5K_CIPHER_TKIP,
@@ -2568,10 +2568,10 @@ ath_keyset_tkip(struct ath_softc *sc, struct ieee80211_key_conf *key,
 			 */
 			memcpy(hk->wk_mic, key->key + 24 /* ALG_TKIP_TEMP_AUTH_RX_MIC_KEY */,
 			       8 /* FIXME: define a constant */);
-#if AR5K_ABI_VERSION > 0x06052200
-			memcpy(hk->kv_txmic, key->key + 16 /* ALG_TKIP_TEMP_AUTH_TX_MIC_KEY */,
-			       8 /* FIXME: define a constant */);
-#endif
+//#if AR5K_ABI_VERSION > 0x06052200
+//			memcpy(hk->kv_txmic, key->key + 16 /* ALG_TKIP_TEMP_AUTH_TX_MIC_KEY */,
+//			       8 /* FIXME: define a constant */);
+//#endif
 			KEYPRINTF(sc, key->hw_key_idx, hk, mac);
 			return ath_hal_keyset(ah, key->hw_key_idx, hk, mac);
 		}
@@ -2595,7 +2595,7 @@ ath_keyset_tkip(struct ath_softc *sc, struct ieee80211_key_conf *key,
  */
 int
 ath_keyset(struct ath_softc *sc, struct ieee80211_key_conf *key,
-	const u_int8_t mac[IEEE80211_ADDR_LEN])
+	const u_int8_t mac[ETH_ALEN])
 {
 #define	N(a)	((int)(sizeof(a)/sizeof(a[0])))
 	static const u_int8_t ciphermap[] = {
@@ -2796,7 +2796,7 @@ key_alloc_single(struct ath_softc *sc)
  */
 int
 ath_key_alloc(struct ath_softc *sc, struct ieee80211_key_conf *key,
-	      const u_int8_t addr[IEEE80211_ADDR_LEN])
+	      const u_int8_t addr[ETH_ALEN])
 {
 	struct ieee80211_hw *hw = sc->sc_hw;
 	u_int keyix;
@@ -2943,7 +2943,7 @@ ath_key_update_end(struct ieee80211vap *vap)
 static u_int32_t
 ath_calcrxfilter(struct ath_softc *sc)
 {
-#define	RX_FILTER_PRESERVE	(AR5K_RX_FILTER_PHYERR | AR5K_RX_FILTER_PHYRADAR)
+#define	RX_FILTER_PRESERVE	(AR5K_RX_FILTER_PHYERROR | AR5K_RX_FILTER_PHYRADAR)
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t rfilt;
 
@@ -7858,7 +7858,7 @@ ath_setup_stationwepkey(struct ieee80211_node *ni)
 	struct ieee80211_key tmpkey;
 	struct ieee80211_key *rcv_key, *xmit_key;
 	int txkeyidx, rxkeyidx = IEEE80211_KEYIX_NONE, i;
-	u_int8_t null_macaddr[IEEE80211_ADDR_LEN] = {0, 0, 0, 0, 0, 0};
+	u_int8_t null_macaddr[ETH_ALEN] = {0, 0, 0, 0, 0, 0};
 
 	KASSERT(ni->ni_ath_defkeyindex < IEEE80211_WEP_NKID,
 		("got invalid node key index 0x%x", ni->ni_ath_defkeyindex));

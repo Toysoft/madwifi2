@@ -577,7 +577,7 @@ struct ath_softc {
 	u_int16_t sc_curtxpow;			/* current tx power limit */
 	u_int16_t sc_curaid;			/* current association id */
 	AR5K_CHANNEL sc_curchan;			/* current h/w channel */
-	u_int8_t sc_curbssid[IEEE80211_ADDR_LEN];
+	u_int8_t sc_curbssid[ETH_ALEN];
 	u_int8_t	sc_rixmap[256];			/* IEEE to h/w rate table ix */
 	struct {
 		u_int8_t	ieeerate;		/* IEEE rate */
@@ -601,7 +601,7 @@ struct ath_softc {
 	struct ath_key sc_ath_keys[ATH_KEYMAX]; /* cached key table */
 	u_int8_t sc_keymap[ATH_KEYBYTES];	/* key use bit map */
 	struct ieee80211_node *sc_keyixmap[ATH_KEYMAX];/* key ix->node map */
-	u_int8_t sc_bssidmask[IEEE80211_ADDR_LEN];
+	u_int8_t sc_bssidmask[ETH_ALEN];
 
 	u_int sc_ledpin;				/* GPIO pin for driving LED */
 	u_int sc_ledon;				/* pin setting for LED on */

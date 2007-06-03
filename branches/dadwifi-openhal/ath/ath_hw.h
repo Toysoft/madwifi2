@@ -43,10 +43,12 @@
 
 struct ath_hal;
 
+/*TODO:On cleanup use only ath5k_hw stuff from openhal*/
+
 /*
  * Read from a device register
  */
-static inline u32 ath_hw_reg_read(struct ath_hal *hw, u16 reg)
+static inline u32 ath5k_hw_reg_read(struct ath_hal *hw, u16 reg)
 {
 	return readl(hw->ah_sh + reg);
 }
@@ -54,7 +56,7 @@ static inline u32 ath_hw_reg_read(struct ath_hal *hw, u16 reg)
 /*
  * Write to a device register
  */
-static inline void ath_hw_reg_write(struct ath_hal *hw, u32 val, u16 reg)
+static inline void ath5k_hw_reg_write(struct ath_hal *hw, u32 val, u16 reg)
 {
 	writel(val, hw->ah_sh + reg);
 }
@@ -64,9 +66,9 @@ static inline void ath_hw_reg_write(struct ath_hal *hw, u32 val, u16 reg)
  * Return 1 if there is an interrupt for us, or 0 if there is none or if
  * the device has been removed.
  */
-static inline int ath_hw_irq_pending(struct ath_hal *hw)
+static inline int ath5k_hw_irq_pending(struct ath_hal *hw)
 {
-	if (ath_hw_reg_read(hw, ATH_HW_IRQ_PENDING) == ATH_HW_IRQ_PENDING_TRUE)
+	if (ath5k_hw_reg_read(hw, ATH_HW_IRQ_PENDING) == ATH_HW_IRQ_PENDING_TRUE)
 		return 1;
 	else
 		return 0;
