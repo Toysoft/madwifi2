@@ -950,8 +950,10 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	/* Atheros' RSSI value is SNR: 0 -> 60 for old chipsets. Range 
-	 * for newer chipsets is unknown. */
-	range->max_qual.qual  = 127;
+	 * for newer chipsets is unknown. This value is arbitarily chosen 
+	 * to give an indication that full rate will be available and to be 
+	 * a practicable maximum. */
+	range->max_qual.qual  = 70;
 #if WIRELESS_EXT >= 19
 	/* XXX: This should be updated to use the current noise floor. */
 	/* These are negative full bytes.
