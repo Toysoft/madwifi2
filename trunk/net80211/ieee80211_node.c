@@ -513,7 +513,9 @@ int
 ieee80211_ibss_merge(struct ieee80211_node *ni)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
+#ifdef IEEE80211_DEBUG
 	struct ieee80211com *ic = ni->ni_ic;
+#endif
 
 	if (ni == vap->iv_bss ||
 	    IEEE80211_ADDR_EQ(ni->ni_bssid, vap->iv_bss->ni_bssid)) {
@@ -1338,7 +1340,9 @@ void
 _ieee80211_free_node(struct ieee80211_node *ni)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
+#ifdef IEEE80211_DEBUG
 	struct ieee80211_node_table *nt = ni->ni_table;
+#endif
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
 		"%s: %p<%s> in %s table, refcnt %d\n", __func__, ni,
@@ -1623,7 +1627,9 @@ static void
 ieee80211_node_join_11g(struct ieee80211_node *ni)
 {
 	struct ieee80211com *ic = ni->ni_ic;
+#ifdef IEEE80211_DEBUG
 	struct ieee80211vap *vap = ni->ni_vap;
+#endif
 
 	IEEE80211_LOCK_ASSERT(ic);
 

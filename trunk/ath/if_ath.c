@@ -382,7 +382,7 @@ enum {
 		ath_keyprint(sc, __func__, ix, hk, mac);	\
 } while (0)
 #else /* defined(AR_DEBUG) */
-#define	IFF_DUMPPKTS(sc, _m)	netif_msg_dumppkts(&sc->sc_ic)
+#define	IFF_DUMPPKTS(sc, _m)		0
 #define	DPRINTF(sc, _m, _fmt, ...)
 #define	KEYPRINTF(sc, k, ix, mac)
 #endif /* defined(AR_DEBUG) */

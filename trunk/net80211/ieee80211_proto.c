@@ -312,6 +312,7 @@ ieee80211_print_essid(const u_int8_t *essid, int len)
 }
 EXPORT_SYMBOL(ieee80211_print_essid);
 
+#ifdef IEEE80211_DEBUG
 void
 ieee80211_dump_pkt(struct ieee80211com *ic,
 	const u_int8_t *buf, int len, int rate, int rssi)
@@ -390,6 +391,7 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 	}
 }
 EXPORT_SYMBOL(ieee80211_dump_pkt);
+#endif
 
 int
 ieee80211_fix_rate(struct ieee80211_node *ni, int flags)
@@ -1087,8 +1089,10 @@ EXPORT_SYMBOL(ieee80211_stop_running);
 void
 ieee80211_dturbo_switch(struct ieee80211com *ic, int newflags)
 {
+#ifdef IEEE80211_DEBUG
 	/* XXX use first vap for debug flags */
 	struct ieee80211vap *vap = TAILQ_FIRST(&ic->ic_vaps);
+#endif
 	struct ieee80211_channel *chan;
 
 	chan = ieee80211_find_channel(ic, ic->ic_bsschan->ic_freq, newflags);
