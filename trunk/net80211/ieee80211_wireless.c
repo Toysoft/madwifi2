@@ -394,14 +394,14 @@ static int
 ieee80211_ioctl_siwsens(struct net_device *dev,	struct iw_request_info *info,
 	struct iw_param *sens, char *extra)
 {
-	return 0;
+	return -EOPNOTSUPP;
 }
 
 static int
 ieee80211_ioctl_giwsens(struct net_device *dev,	struct iw_request_info *info,
 	struct iw_param *sens, char *extra)
 {
-	sens->value = 0;
+	sens->value = 1;
 	sens->fixed = 1;
 
 	return 0;
@@ -967,7 +967,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	range->max_qual.noise = 0;
 #endif
 
-	range->sensitivity = 3;
+	range->sensitivity = 1;
 
 	range->max_encoding_tokens = IEEE80211_WEP_NKID;
 	/* XXX query driver to find out supported key sizes */
