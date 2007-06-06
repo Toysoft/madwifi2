@@ -20,6 +20,10 @@ INCS += -I$(ATH_HAL) -I$(HAL)
 
 EXTRA_CFLAGS += $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
 
+ifneq (,$(filter xscale% arm%,$(TARGET)))
+LDFLAGS := --no-warn-mismatch
+endif
+
 ifneq ($(VERSION).$(PATCHLEVEL),2.4)
 obj-$(CONFIG_ATHEROS) += ath_hal.o
 ath_hal-objs	:= ah_os.o $(TARGET).hal.o
