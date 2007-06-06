@@ -7361,6 +7361,8 @@ bf_fail:
 		/* NB: consider only flushing a preset number based on age. */
 		ath_ffstageq_flush(sc, txq, ath_ff_neverflushtestdone);
 	}
+#else
+	;
 #endif /* ATH_SUPERG_FF */
 }
 
