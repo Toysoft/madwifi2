@@ -65,7 +65,7 @@ INCS += -I$(ATH_HAL) -I$(HAL)
 EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
 
 ifneq (,$(filter xscale% arm%,$(TARGET)))
-LDOPTS += --no-warn-mismatch
+LDFLAGS += --no-warn-mismatch
 endif
 
 -include $(TOPDIR)/Rules.make
