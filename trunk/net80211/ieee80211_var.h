@@ -284,6 +284,7 @@ struct ieee80211com {
 	u_int16_t ic_lintval;			/* beacon interval */
 	u_int16_t ic_holdover;			/* PM hold over duration */
 	u_int16_t ic_bmisstimeout;		/* beacon miss threshold (ms) */
+	unsigned long ic_bmiss_guard;		/* when to cease ignoring bmiss (jiffies) */
 	u_int16_t ic_txpowlimit; 		/* global tx power limit (in 0.5 dBm) */
 	u_int16_t ic_newtxpowlimit; 		/* tx power limit to change to (in 0.5 dBm) */
 	u_int16_t ic_uapsdmaxtriggers; 		/* max triggers that could arrive */
