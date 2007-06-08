@@ -1116,7 +1116,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	if (opmode == IEEE80211_M_MONITOR)
 		dev->type = ARPHRD_IEEE80211_RADIOTAP;
 	if ((flags & IEEE80211_CLONE_BSSID) &&
-	    sc->sc_nvaps != 0 && opmode != IEEE80211_M_WDS && sc->sc_hasbmask) {
+	    opmode != IEEE80211_M_WDS && sc->sc_hasbmask) {
 		struct ieee80211vap *v;
 		unsigned int id_mask, id;
 
@@ -1132,7 +1132,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		TAILQ_FOREACH(v, &ic->ic_vaps, iv_next)
 			id_mask |= (1 << ATH_GET_VAP_ID(v->iv_myaddr));
 
-		for (id = 0; id < ATH_BCBUF; id++) {
+		for (id = 1; id < ATH_BCBUF; id++) {
 			/* get the first available slot */
 			if ((id_mask & (1 << id)) == 0) {
 				ATH_SET_VAP_BSSID(vap->iv_myaddr, id);
