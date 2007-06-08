@@ -1110,7 +1110,6 @@ ieee80211_dturbo_switch(struct ieee80211com *ic, int newflags)
 		chan->ic_freq, chan->ic_flags);
 
 	ic->ic_bsschan = chan;
-	ic->ic_prevchan = ic->ic_curchan;
 	ic->ic_curchan = chan;
 	ic->ic_set_channel(ic);
 	/* NB: do not need to reset ERP state because in sta mode */
