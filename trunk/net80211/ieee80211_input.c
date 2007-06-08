@@ -2292,7 +2292,6 @@ ieee80211_doth_switch_channel(struct ieee80211vap *vap)
 	vap->iv_csa_jiffies = 0; /* supress "cancel" msg */
 	ieee80211_doth_cancel_cs(vap);
 
-	ic->ic_prevchan = ic->ic_curchan;
 	ic->ic_curchan = ic->ic_bsschan = vap->iv_csa_chan;
 	ic->ic_set_channel(ic);
 }

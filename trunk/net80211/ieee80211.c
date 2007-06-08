@@ -653,12 +653,6 @@ ieee80211_find_channel(struct ieee80211com *ic, int freq, int flags)
 	struct ieee80211_channel *c;
 	int i;
 
-	flags &= IEEE80211_CHAN_ALLTURBO;
-	c = ic->ic_prevchan;
-	if (c != NULL && c->ic_freq == freq &&
-	    (c->ic_flags & IEEE80211_CHAN_ALLTURBO) == flags)
-		return c;
-
 	/* Brute force search */
 	for (i = 0; i < ic->ic_nchans; i++) {
 		c = &ic->ic_channels[i];

@@ -304,9 +304,6 @@ struct ieee80211com {
 	 *    or otherwise doing background work
 	 * ic_bsschan is the channel selected for operation; it may
 	 *    be undefined (IEEE80211_CHAN_ANYC)
-	 * ic_prevchan is a cached ``previous channel'' used to optimize
-	 *    lookups when switching back+forth between two channels
-	 *    (e.g. for dynamic turbo)
 	 */
 	int ic_nchans;				/* # entries in ic_channels */
 	struct ieee80211_channel ic_channels[IEEE80211_CHAN_MAX+1];
@@ -314,7 +311,6 @@ struct ieee80211com {
 	u_int8_t ic_chan_active[IEEE80211_CHAN_BYTES];
 	struct ieee80211_channel *ic_curchan;	/* current channel */
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
-	struct ieee80211_channel *ic_prevchan;	/* previous channel */
 	int16_t ic_channoise;			/* current channel noise in dBm */
 
 	/* Regulatory class ids */
