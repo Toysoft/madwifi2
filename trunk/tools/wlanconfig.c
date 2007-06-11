@@ -314,7 +314,7 @@ getflag(const char  *s)
 	const char *cp;
 	int flag = 0;
 
-	cp = (s[0] == '-' ? s+1 : s);
+	cp = (s[0] == '-' ? s + 1 : s);
 	if (strcmp(cp, "bssid") == 0)
 		flag = IEEE80211_CLONE_BSSID;
 	if (strcmp(cp, "nosbeacon") == 0)
