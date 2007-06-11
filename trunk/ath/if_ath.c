@@ -943,7 +943,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	if (autocreatemode != -1) {
 		rtnl_lock();
 		vap = ieee80211_create_vap(ic, "ath%d", dev,
-				autocreatemode, IEEE80211_CLONE_BSSID);
+				autocreatemode, 0);
 		rtnl_unlock();
 		if (vap == NULL)
 			printk(KERN_ERR "%s: autocreation of VAP failed.",
@@ -1115,6 +1115,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	 */
 	if (opmode == IEEE80211_M_MONITOR)
 		dev->type = ARPHRD_IEEE80211_RADIOTAP;
+
 	if ((flags & IEEE80211_CLONE_BSSID) &&
 	    opmode != IEEE80211_M_WDS && sc->sc_hasbmask) {
 		struct ieee80211vap *v;
