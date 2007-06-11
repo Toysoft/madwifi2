@@ -271,7 +271,7 @@ static char *autocreate = NULL;
 static char *ratectl = DEF_RATE_CTL;
 static int rfkill = -1;
 #ifdef ATH_CAP_TPC
-static int tpc = -1;
+static int tpc = 0;
 #endif
 static int countrycode = -1;
 static int outdoor = -1;
@@ -533,11 +533,9 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	}
 
 #ifdef ATH_CAP_TPC
-	if (tpc != -1) {
-		printk(KERN_INFO "ath_pci: ath_pci: switching per-packet transmit power control %s\n",
-			tpc ? "on" : "off");
-		ath_hal_settpc(ah, tpc);
-	}
+	printk(KERN_INFO "ath_pci: ath_pci: switching per-packet transmit power control %s\n",
+		tpc ? "on" : "off");
+	ath_hal_settpc(ah, tpc);
 #endif
 
 	/*
