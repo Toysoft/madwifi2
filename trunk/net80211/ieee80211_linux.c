@@ -94,7 +94,7 @@ ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen)
 	u_int len;
 
 	len = roundup(sizeof(struct ieee80211_frame) + pktlen, 4);
-	skb = dev_alloc_skb(len + align-1);
+	skb = dev_alloc_skb(len + align - 1);
 	if (skb != NULL) {
 		u_int off = ((unsigned long) skb->data) % align;
 		if (off != 0)
