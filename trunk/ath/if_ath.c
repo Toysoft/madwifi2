@@ -815,8 +815,13 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 * all parts.  We're a bit pedantic here as all parts
 	 * support a global cap.
 	 */
+#ifdef ATH_CAP_TPC
 	sc->sc_hastpc = ath_hal_hastpc(ah);
 	if (sc->sc_hastpc || ath_hal_hastxpowlimit(ah))
+#else
+	sc->sc_hastpc = 0;
+	if (ath_hal_hastxpowlimit(ah))
+#endif
 		ic->ic_caps |= IEEE80211_C_TXPMGT;
 
 	/*
@@ -1379,12 +1384,12 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
 
 	/* XXXAPSD: build in check against max triggers we could see
-	 *          based on ic->ic_uapsdmaxtriggers.
-	 */
+	 *          based on ic->ic_uapsdmaxtriggers. */
 
 	ATH_RXBUF_LOCK_IRQ(sc);
 	if (sc->sc_rxbufcur == NULL)
 		sc->sc_rxbufcur = STAILQ_FIRST(&sc->sc_rxbuf);
+	
 	for (bf = sc->sc_rxbufcur; bf; bf = STAILQ_NEXT(bf, bf_list)) {
 		ds = bf->bf_desc;
 		if (ds->ds_link == bf->bf_daddr) {
@@ -1392,12 +1397,10 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			break;
 		}
 		if (bf->bf_status & ATH_BUFSTATUS_DONE) {
-			/* 
-			 * already processed this buffer (shouldn't occur if
+			/* already processed this buffer (shouldn't occur if
 			 * we change code to always process descriptors in
 			 * rx intr handler - as opposed to sometimes processing
-			 * in the rx tasklet).
-			 */
+			 * in the rx tasklet). */
 			continue;
 		}
 		skb = bf->bf_skb;
@@ -1406,18 +1409,13 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			continue;
 		}
 
-		/*
-		 * XXXAPSD: consider new HAL call that does only the subset
-		 *          of ath_hal_rxprocdesc we require for trigger search.
-		 */
+		/* XXXAPSD: consider new HAL call that does only the subset
+		 *          of ath_hal_rxprocdesc we require for trigger search. */
 
-		/* 
-		 * NB: descriptor memory doesn't need to be sync'd
-		 *     due to the way it was allocated. 
-		 */
+		/* NB: descriptor memory doesn't need to be sync'd
+		 *     due to the way it was allocated. */
 
-		/*
-		 * Must provide the virtual address of the current
+		/* Must provide the virtual address of the current
 		 * descriptor, the physical address, and the virtual
 		 * address of the next descriptor in the h/w chain.
 		 * This allows the HAL to look ahead to see if the
@@ -1425,8 +1423,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		 * done bit in the following descriptor and the address
 		 * of the current descriptor the DMA engine is working
 		 * on.  All this is necessary because of our use of
-		 * a self-linked list to avoid rx overruns.
-		 */
+		 * a self-linked list to avoid rx overruns. */
 		rs = &bf->bf_dsstatus.ds_rxstat;
 		retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), sc->sc_tsf, rs);
 		if (HAL_EINPROGRESS == retval)
@@ -1445,7 +1442,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				BUS_DMA_FROMDEVICE);
 		qwh = (struct ieee80211_qosframe *) skb->data;
 
-		/* Find the node. it MUST be in the keycache. */
+		/* Find the node; it MUST be in the keycache. */
 		if (rs->rs_keyix == HAL_RXKEYIX_INVALID ||
 		    (ni = sc->sc_keyixmap[rs->rs_keyix]) == NULL) {
 			/* 

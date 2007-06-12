@@ -2285,7 +2285,7 @@ ieee80211_getcfframe(struct ieee80211vap *vap, int type)
 	struct ieee80211com *ic = vap->iv_ic;
 
 
-	skb = ieee80211_getmgtframe(&frm,0);
+	skb = ieee80211_getmgtframe(&frm, 0);
 	if (skb == NULL)
 		return NULL;
 	wh = (struct ieee80211_frame *)
