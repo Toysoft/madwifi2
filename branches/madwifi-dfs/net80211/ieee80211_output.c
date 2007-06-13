@@ -1312,6 +1312,49 @@ ieee80211_add_country(u_int8_t *frm, struct ieee80211com *ic)
 	return frm;
 }
 
+/*
+ * Add Power Constraint information element
+ */
+u_int8_t *
+ieee80211_add_pwrcnstr(u_int8_t *frm, struct ieee80211com *ic)
+{
+	struct ieee80211_ie_pwrcnstr *ie =
+		(struct ieee80211_ie_pwrcnstr *)frm;
+	ie->pc_id = IEEE80211_ELEMID_PWRCNSTR;
+	ie->pc_len = 1;
+	ie->pc_lpc = IEEE80211_PWRCONSTRAINT_VAL(ic);
+	frm += sizeof(*ie);
+	return frm;
+}
+
+/*
+ * Add Power Capability information element
+ */
+static u_int8_t *
+ieee80211_add_pwrcap(u_int8_t *frm, struct ieee80211com *ic)
+{
+	struct ieee80211_ie_pwrcap *ie =
+		(struct ieee80211_ie_pwrcap *)frm;
+	ie->pc_id = IEEE80211_ELEMID_PWRCAP;
+	ie->pc_len = 2;
+	ie->pc_mintxpow = ic->ic_bsschan->ic_minpower;
+	ie->pc_maxtxpow = ic->ic_bsschan->ic_maxpower;
+	frm += sizeof(*ie);
+	return frm;
+}
+
+/*
+ * Add Supported Channels information element
+ */
+static u_int8_t *
+ieee80211_add_suppchan(u_int8_t *frm, struct ieee80211com *ic)
+{
+	memcpy(frm, (u_int8_t *)&ic->ic_sc_ie,
+			ic->ic_sc_ie.sc_len + 2);
+	frm += ic->ic_sc_ie.sc_len + 2;
+	return frm;
+}
+
 static u_int8_t *
 ieee80211_setup_wpa_ie(struct ieee80211vap *vap, u_int8_t *ie)
 {
@@ -1648,40 +1691,6 @@ ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
 }
 #endif
 /*
- * Add 802.11h information elements to a frame.
- */
-static u_int8_t *
-ieee80211_add_doth(u_int8_t *frm, struct ieee80211com *ic)
-{
-	/* XXX ie structures */
-	/*
-	 * Power Capability IE
-	 */
-	*frm++ = IEEE80211_ELEMID_PWRCAP;
-	*frm++ = 2;
-	*frm++ = ic->ic_bsschan->ic_minpower;
-	*frm++ = ic->ic_bsschan->ic_maxpower;
-
-#ifdef WRONG
-	/*
-	 * Supported Channels IE
-	 */
-	*frm++ = IEEE80211_ELEMID_SUPPCHAN;
-
-	/* XXX
-	 * THIS IS WRONG! check 802.11h chapter 7.3.2.19
-	 * we should send channel_number/number_of_channels pairs
-	 * for each subband, not a bitmap
-	 */
-	*frm++ = IEEE80211_SUPPCHAN_LEN;
-	memcpy(frm, ic->ic_chan_avail, IEEE80211_SUPPCHAN_LEN);
-	return frm + IEEE80211_SUPPCHAN_LEN;
-#endif
-
-	return frm;
-}
-
-/*
  * Send a probe request frame with the specified ssid
  * and any optional information element data.
  */
@@ -1907,11 +1916,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			frm = ieee80211_add_country(frm, ic);
 
 		/* power constraint */
-		if (ic->ic_flags & IEEE80211_F_DOTH) {
-			*frm++ = IEEE80211_ELEMID_PWRCNSTR;
-			*frm++ = 1;
-			*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
-		}
+		if (ic->ic_flags & IEEE80211_F_DOTH)
+			frm = ieee80211_add_pwrcnstr(frm, ic);
 
 		/* ERP */
 		if (IEEE80211_IS_CHAN_ANYG(ic->ic_curchan))
@@ -2028,7 +2034,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
 		 *	[4] power capability (802.11h)
-		 *	[28] supported channels element (802.11h)
+		 *	[tlv] supported channels element (802.11h)
 		 *	[tlv] extended supported rates
 		 *	[tlv] WME [if enabled and AP capable]
 		 *      [tlv] Atheros advanced capabilities
@@ -2040,7 +2046,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			IEEE80211_ADDR_LEN +
 			2 + IEEE80211_NWID_LEN +
 			2 + IEEE80211_RATE_SIZE +
-			4 + (2 + IEEE80211_SUPPCHAN_LEN) +
+			4 + (2 + ic->ic_sc_ie.sc_len) +
 			2 + (IEEE80211_RATE_MAXSIZE - IEEE80211_RATE_SIZE) +
 			sizeof(struct ieee80211_ie_wme) +
 			sizeof(struct ieee80211_ie_athAdvCap) +
@@ -2084,8 +2090,10 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		/* supported rates */
 		frm = ieee80211_add_rates(frm, &ni->ni_rates);
 		/* power capability/supported channels */
-		if (ic->ic_flags & IEEE80211_F_DOTH)
-			frm = ieee80211_add_doth(frm, ic);
+		if (ic->ic_flags & IEEE80211_F_DOTH) {
+			frm = ieee80211_add_pwrcap(frm, ic);
+			frm = ieee80211_add_suppchan(frm, ic);
+		}
 		/* ext. supp. rates */
 		frm = ieee80211_add_xrates(frm, &ni->ni_rates);
 

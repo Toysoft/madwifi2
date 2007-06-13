@@ -373,6 +373,38 @@ struct ieee80211_ie_country {
 } __packed;
 
 /*
+ * Power Constraint information element.
+ */
+struct ieee80211_ie_pwrcnstr {
+	u_int8_t pc_id;			/* IEEE80211_ELEMID_PWRCNSTR */
+	u_int8_t pc_len;		/* == 2 */
+	u_int8_t pc_lpc;		/* Local Power Constraint [dB] */
+} __packed;
+
+/*
+ * Power Capability information element.
+ */
+struct ieee80211_ie_pwrcap {
+	u_int8_t pc_id;			/* IEEE80211_ELEMID_PWRCAP */
+	u_int8_t pc_len;		/* == 2 */
+	int8_t pc_mintxpow;		/* Minimum Transmit Power Capability [dBm] */
+	int8_t pc_maxtxpow;		/* Maximum Transmit Power Capability [dBm] */
+} __packed;
+
+/*
+ * Supported Channels information element.
+ */
+#define IEEE80211_SUPPCHAN_MAX_PAIRS (127)
+struct ieee80211_ie_sc {
+	u_int8_t sc_id;			/* IEEE80211_ELEMID_SUPPCHAN */
+	u_int8_t sc_len;		/* == 2 * number of sc_subband elements */
+	struct {
+		u_int8_t sc_first;	/* First Channel Number */
+		u_int8_t sc_number;	/* Number of Channels */
+	} __packed sc_subband[IEEE80211_SUPPCHAN_MAX_PAIRS];
+} __packed;
+
+/*
  * Channel Switch Announcement information element.
  */
 struct ieee80211_ie_csa {
@@ -401,13 +433,13 @@ struct ieee80211_ie_csa {
  * WME/802.11e information element.
  */
 struct ieee80211_ie_wme {
-	u_int8_t wme_id;		/* IEEE80211_ELEMID_VENDOR */
-	u_int8_t wme_len;	/* length in bytes */
+	u_int8_t wme_id;	    /* IEEE80211_ELEMID_VENDOR */
+	u_int8_t wme_len;	    /* length in bytes */
 	u_int8_t wme_oui[3];	/* 0x00, 0x50, 0xf2 */
-	u_int8_t wme_type;	/* OUI type */
+	u_int8_t wme_type;	    /* OUI type */
 	u_int8_t wme_subtype;	/* OUI subtype */
 	u_int8_t wme_version;	/* spec revision */
-	u_int8_t wme_info;	/* QoS info */
+	u_int8_t wme_info;	    /* QoS info */
 } __packed;
 
 /*
@@ -702,8 +734,6 @@ enum {
 	IEEE80211_ELEMID_VENDOR		= 221,	/* vendor private */
 };
 
-#define IEEE80211_CHANSWITCHANN_BYTES 5
-
 struct ieee80211_tim_ie {
 	u_int8_t	tim_ie;			/* IEEE80211_ELEMID_TIM */
 	u_int8_t	tim_len;
@@ -725,8 +755,6 @@ struct ieee80211_country_ie {
 } __packed;
 
 #define IEEE80211_CHALLENGE_LEN		128
-
-#define IEEE80211_SUPPCHAN_LEN		26
 
 #define	IEEE80211_RATE_BASIC		0x80
 #define	IEEE80211_RATE_VAL		0x7f
@@ -845,12 +873,12 @@ enum {
 	IEEE80211_REASON_NOT_ASSOCED		= 7,
 	IEEE80211_REASON_ASSOC_LEAVE		= 8,
 	IEEE80211_REASON_ASSOC_NOT_AUTHED	= 9,
-
+	IEEE80211_REASON_PWRCAP_UNACCEPTABLE	= 10,
+	IEEE80211_REASON_SUPPCHAN_UNACCEPTABLE	= 11,
 	IEEE80211_REASON_RSN_REQUIRED		= 11,
 	IEEE80211_REASON_RSN_INCONSISTENT	= 12,
 	IEEE80211_REASON_IE_INVALID		= 13,
 	IEEE80211_REASON_MIC_FAILURE		= 14,
-
 	IEEE80211_STATUS_SUCCESS		= 0,
 	IEEE80211_STATUS_UNSPECIFIED		= 1,
 	IEEE80211_STATUS_CAPINFO		= 10,
@@ -865,6 +893,9 @@ enum {
 	IEEE80211_STATUS_SP_REQUIRED		= 19,
 	IEEE80211_STATUS_PBCC_REQUIRED		= 20,
 	IEEE80211_STATUS_CA_REQUIRED		= 21,
+	IEEE80211_STATUS_SM_REQUIRED		= 22,
+	IEEE80211_STATUS_PWRCAP_UNACCEPTABLE	= 23,
+	IEEE80211_STATUS_SUPPCHAN_UNACCEPTABLE	= 24,
 	IEEE80211_STATUS_TOO_MANY_STATIONS	= 22,
 	IEEE80211_STATUS_RATES			= 23,
 	IEEE80211_STATUS_SHORTSLOT_REQUIRED	= 25,

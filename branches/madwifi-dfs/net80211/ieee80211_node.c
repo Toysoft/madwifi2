@@ -846,6 +846,13 @@ node_free(struct ieee80211_node *ni)
 		FREE(ni->ni_wme_ie, M_DEVBUF);
 	if (ni->ni_ath_ie != NULL)
 		FREE(ni->ni_ath_ie, M_DEVBUF);
+	if (ni->ni_suppchans != NULL)
+		FREE(ni->ni_suppchans, M_DEVBUF);
+	if (ni->ni_suppchans_new != NULL)
+		FREE(ni->ni_suppchans_new, M_DEVBUF);
+	if (ni->ni_needed_chans != NULL)
+		FREE(ni->ni_needed_chans, M_DEVBUF);
+
 	IEEE80211_NODE_SAVEQ_DESTROY(ni);
 
 	FREE(ni, M_80211_NODE);
@@ -1695,6 +1702,47 @@ ieee80211_node_join_11g(struct ieee80211_node *ni)
 		ni->ni_flags |= IEEE80211_NODE_ERP;
 }
 
+static void
+count_suppchans(struct ieee80211com *ic, struct ieee80211_node *ni, int inc)
+{
+	int i, tmp1, tmp2 = 0;
+
+	if (ni->ni_suppchans == NULL)
+		return;
+
+	CHANNEL_FOREACH(i, ic, tmp1, tmp2)
+		if (isset(ni->ni_suppchans, i))
+			ic->ic_chan_nodes[i] += inc;
+	ic->ic_cn_total += inc;
+}
+
+static void
+remove_worse_nodes(void *arg, struct ieee80211_node *ni)
+{
+	struct ieee80211_node *better = (struct ieee80211_node *)arg;
+	int i;
+
+	if (ni->ni_suppchans == NULL)
+		return;
+
+	if (ni == better)
+		return;
+
+	for (i=0; i<better->ni_n_needed_chans; i++)
+		if (isclr(ni->ni_suppchans, better->ni_needed_chans[i])) {
+			/* this is the one of the nodes to be killed, do it now */
+			IEEE80211_NOTE_MAC(ni->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, better->ni_macaddr,
+					"forcing [%s] (aid %d) to leave", ether_sprintf(ni->ni_macaddr),
+					IEEE80211_NODE_AID(ni));
+			IEEE80211_SEND_MGMT(ni,
+					IEEE80211_FC0_SUBTYPE_DISASSOC,
+					IEEE80211_REASON_SUPPCHAN_UNACCEPTABLE);
+			ni->ni_vap->iv_stats.is_node_fdisassoc++;
+			ieee80211_node_leave(ni);
+			return;
+		}
+}
+
 void
 ieee80211_node_join(struct ieee80211_node *ni, int resp)
 {
@@ -1734,11 +1782,33 @@ ieee80211_node_join(struct ieee80211_node *ni, int resp)
 
 		if (IEEE80211_IS_CHAN_ANYG(ic->ic_bsschan))
 			ieee80211_node_join_11g(ni);
+
+		KASSERT(ni->ni_suppchans == NULL, ("not a reassociation, but suppchans bitmap not NULL\n"));
+		/* Use node's new suppchans as the current */
+		ni->ni_suppchans = ni->ni_suppchans_new;
+		ni->ni_suppchans_new = NULL;
+		/* Add node's suppchans to ic->ic_chan_nodes */
+		count_suppchans(ic, ni, 1);
+
 		IEEE80211_UNLOCK_IRQ(ic);
 
 		newassoc = 1;
-	} else
+	} else {
+		IEEE80211_LOCK_IRQ(ic);
+		/* Remove node's previous suppchans from ic->ic_chan_nodes */
+		count_suppchans(ic, ni, -1);
+		if (ni->ni_suppchans != NULL) {
+			FREE(ni->ni_suppchans, M_DEVBUF);
+			ni->ni_suppchans = NULL;
+		}
+		/* Use node's new suppchans as the current */
+		ni->ni_suppchans = ni->ni_suppchans_new;
+		ni->ni_suppchans_new = NULL;
+		/* Add node's new suppchans to ic->ic_chan_nodes */
+		count_suppchans(ic, ni, 1);
+		IEEE80211_UNLOCK_IRQ(ic);
 		newassoc = 0;
+	}
 
 	IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC | IEEE80211_MSG_DEBUG, ni,
 		"station %sassociated at aid %d: %s preamble, %s slot time"
@@ -1766,6 +1836,14 @@ ieee80211_node_join(struct ieee80211_node *ni, int resp)
 	ni->ni_inact_reload = vap->iv_inact_auth;
 	ni->ni_inact = ni->ni_inact_reload;
 	IEEE80211_SEND_MGMT(ni, resp, IEEE80211_STATUS_SUCCESS);
+
+	if (ni->ni_needed_chans != NULL) {
+		/* remove nodes which don't support one of ni->ni_needed_chans */
+		ieee80211_iterate_nodes(&ic->ic_sta, &remove_worse_nodes, (void*)ni);
+		FREE(ni->ni_needed_chans, M_DEVBUF);
+		ni->ni_needed_chans = NULL;
+	}
+
 	/* tell the authenticator about new station */
 	if (vap->iv_auth->ia_node_join != NULL)
 		vap->iv_auth->ia_node_join(ni);
@@ -1898,6 +1976,10 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 
 	if (IEEE80211_IS_CHAN_ANYG(ic->ic_bsschan))
 		ieee80211_node_leave_11g(ni);
+
+	/* Remove node's suppchans from ic->ic_chan_nodes */
+	if (ni->ni_suppchans != NULL)
+		count_suppchans(ic, ni, -1);
 	IEEE80211_UNLOCK_IRQ(ic);
 
 	/*
