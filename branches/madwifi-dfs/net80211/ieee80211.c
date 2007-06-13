@@ -856,7 +856,8 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 
 	do_gettimeofday(&tv);
 	if_printf(dev, "Radar found on channel %d (%d MHz) -- Time: %ld.%06ld\n", ichan->ic_ieee, ichan->ic_freq, tv.tv_sec, tv.tv_usec);
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
+	if (ic->ic_opmode == IEEE80211_M_HOSTAP ||
+	    ic->ic_opmode == IEEE80211_M_IBSS ) {
 		/* Mark the channel in the ic_chan list */
 		if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
 			if_printf(dev, "Marking channel %d (%d MHz) in ic_chan list -- Time: %ld.%06ld\n", ichan->ic_ieee, ichan->ic_freq, tv.tv_sec, tv.tv_usec);

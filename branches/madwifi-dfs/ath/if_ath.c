@@ -7907,7 +7907,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 
 	/* Need a doth channel availability check?  We do if ... */
 	doth_channel_availability_check_needed = 1
-		&& (ic->ic_opmode == IEEE80211_M_HOSTAP)     /* we are an AP */
+		&& (ic->ic_opmode == IEEE80211_M_HOSTAP
+		    || ic->ic_opmode == IEEE80211_M_IBSS)     /* we are an AP or IBSS STA */
 		&& (hchan.channel != sc->sc_curchan.channel || (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR))) /* the scan wasn't already done */
 		&& ath_is_dfs_required(sc, &hchan)           /* the new channel requires DFS protection */
 		&& (ic->ic_flags & IEEE80211_F_DOTH)
@@ -8338,7 +8339,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 * if it is a DFS channel and has not been checked for radar 
 		 * do not let the 80211 state machine to go to RUN state.
 		 */
-		if (sc->sc_dfs_channel_check && vap->iv_opmode == IEEE80211_M_HOSTAP) {
+		if (sc->sc_dfs_channel_check
+		    && (vap->iv_opmode == IEEE80211_M_HOSTAP || vap->iv_opmode == IEEE80211_M_IBSS) ) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP -> DFSWAIT_PENDING \n",__func__, DEV_NAME(dev));
 			/* start calibration timer with a really small value 1/10 sec */
 			mod_timer(&sc->sc_cal_ch, jiffies + (HZ/10));
@@ -8350,7 +8352,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		}
 	} else {
 		if (sc->sc_dfs_channel_check &&
-			vap->iv_opmode == IEEE80211_M_HOSTAP &&
+		    (vap->iv_opmode == IEEE80211_M_HOSTAP || vap->iv_opmode == IEEE80211_M_IBSS) &&
 			sc->sc_dfs_channel_check_timer.data == (unsigned long)vap) {
 			del_timer_sync(&sc->sc_dfs_channel_check_timer);
 			sc->sc_dfs_channel_check = 0;
@@ -10669,7 +10671,9 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	ath_interrupt_dfs_channel_check(sc, "Radar detected.  Interrupting DFS wait.");
 	DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: invoking ieee80211_mark_dfs!  ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X -- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags, tv.tv_sec, tv.tv_usec);
 	ieee80211_mark_dfs(ic, &ichan);
-	if (((ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) == 0) && (ic->ic_opmode == IEEE80211_M_HOSTAP))
+	if (((ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) == 0)
+	    && (ic->ic_opmode == IEEE80211_M_HOSTAP
+		|| ic->ic_opmode == IEEE80211_M_IBSS))
 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: markdfs is disabled.  ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X\n", DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
 }
 
@@ -11792,7 +11796,8 @@ ath_dfs_expire_channel_non_occupancy_timers(unsigned long arg)
 		TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
 			if (1
 			    && tmpvap->iv_state == IEEE80211_S_RUN			/* running */
-			    && tmpvap->iv_opmode == IEEE80211_M_HOSTAP			/* ap */
+			    && (tmpvap->iv_opmode == IEEE80211_M_HOSTAP
+				|| tmpvap->iv_opmode == IEEE80211_M_IBSS)               /* ap/ibss */
 			    && tmpvap->iv_des_chan->ic_freq > 0				/* with a desired channel */
 			    && tmpvap->iv_des_chan->ic_freq != ic->ic_bsschan->ic_freq	/* operating on a different channel */
 			   ) {
