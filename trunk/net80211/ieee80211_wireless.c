@@ -2293,14 +2293,30 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		}
 		break;
 	case IEEE80211_PARAM_WMM:
+		 /* XXX: We need to reset HAL state when we change this flag */
 		if (ic->ic_caps & IEEE80211_C_WME){
 			if (value) {
 				vap->iv_flags |= IEEE80211_F_WME;
-				vap->iv_ic->ic_flags |= IEEE80211_F_WME; /* XXX needed by ic_reset */
+				vap->iv_ic->ic_flags |= IEEE80211_F_WME;
 			} else {
 				vap->iv_flags &= ~IEEE80211_F_WME;
-				vap->iv_ic->ic_flags &= ~IEEE80211_F_WME; /* XXX needed by ic_reset */
+				
+				{
+					struct ieee80211vap *v = NULL;
+					int all = 1;
+					
+					TAILQ_FOREACH(v, &vap->iv_ic->ic_vaps, iv_next) {
+						if (v->iv_flags & IEEE80211_F_WME) {
+							all = 0;
+							break;
+						}
+					}
+
+					if (all)
+						vap->iv_ic->ic_flags &= ~IEEE80211_F_WME;
+				}
 			}
+
 			retv = ENETRESET;	/* Renegotiate for capabilities */
 		}
 		break;

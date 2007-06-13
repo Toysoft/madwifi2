@@ -1843,9 +1843,15 @@ ath_init(struct net_device *dev)
 #endif
 
 	/* Whether we should enable h/w TKIP MIC */
-	ath_hal_settkipmic(ah, ((ic->ic_caps & IEEE80211_C_WME) && 
-				((ic->ic_caps & IEEE80211_C_WME_TKIPMIC) || 
-				 !(ic->ic_flags & IEEE80211_F_WME))) ? 1 : 0);
+	if ((ic->ic_caps & IEEE80211_C_WME) && 
+	    ((ic->ic_caps & IEEE80211_C_WME_TKIPMIC) || 
+	    !(ic->ic_flags & IEEE80211_F_WME))) {
+		ath_hal_settkipmic(ah, AH_TRUE);
+		ic->ic_flags |= IEEE80211_F_TKIPMIC;
+	} else {
+		ath_hal_settkipmic(ah, AH_FALSE);
+		ic->ic_flags &= ~IEEE80211_F_TKIPMIC;
+	}
 
 	/*
 	 * Flush the skb's allocated for receive in case the rx
@@ -9311,13 +9317,17 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			case ATH_TKIPMIC: {
 				struct ieee80211com *ic = &sc->sc_ic;
 
-				if (!ath_hal_hastkipmic(ah))
+				if (!(ic->ic_caps & IEEE80211_C_TKIPMIC) || 
+				    ((ic->ic_caps & IEEE80211_C_WME) && 
+				     !(ic->ic_caps & IEEE80211_C_WME_TKIPMIC) && 
+				     (ic->ic_flags & IEEE80211_F_WME)))
 					return -EINVAL;
+				
 				ath_hal_settkipmic(ah, val);
 				if (val)
-					ic->ic_caps |= IEEE80211_C_TKIPMIC;
+					ic->ic_flags |= IEEE80211_F_TKIPMIC;
 				else
-					ic->ic_caps &= ~IEEE80211_C_TKIPMIC;
+					ic->ic_flags &= ~IEEE80211_F_TKIPMIC;
 				break;
 			}
 #ifdef ATH_SUPERG_XR
@@ -9387,7 +9397,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val = sc->sc_fftxqmin;
 			break;
 		case ATH_TKIPMIC:
-			val = ath_hal_gettkipmic(ah);
+			val = (ic->ic_flags & IEEE80211_C_WME);
 			break;
 #ifdef ATH_SUPERG_XR
 		case ATH_XR_POLL_PERIOD:
