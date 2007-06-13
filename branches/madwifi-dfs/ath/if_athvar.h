@@ -183,7 +183,10 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 
 #define	ATH_TIMEOUT	1000
 
-#define ATH_DFS_WAIT_POLL_PERIOD	2	/* 2 seconds */
+#define	ATH_DFS_WAIT_MIN_PERIOD		60	 /* dfs wait is 60 seconds, per FCC regulations. */
+#define	ATH_DFS_WAIT_SHORT_POLL_PERIOD	2    /* 2  seconds, for consecutive waits if not done yet. */
+#define	ATH_DFS_AVOID_MIN_PERIOD	1800 /* 30 minutes, per FCC regulations */
+#define	ATH_DFS_TEST_RETURN_PERIOD	15	 /* 15 seconds -- for mute test only */
 
 #define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between calibrations */
 #define	ATH_SHORT_CALINTERVAL		1	/* 1 second between calibrations */
@@ -315,10 +318,10 @@ static inline struct proc_dir_entry *PDE(const struct inode *inode)
 #define	ATH_KEYBYTES	(ATH_KEYMAX / NBBY)	/* storage space in bytes */
 
 #ifdef ATH_REVERSE_ENGINEERING
-#define MIN_REGISTER_ADDRESS 0x0000
-#define MAX_REGISTER_ADDRESS 0xc000 /* 48k address range */
-#define MAX_REGISTER_NAME_LEN 32
-#define UNKNOWN_NAME "(unknown)"
+#define MIN_REGISTER_ADDRESS	0x0000		/* PCI register addresses are taken as releative to the appropriate BAR */
+#define MAX_REGISTER_ADDRESS	0xc000 		/* AR5212/AR5213 seems to have a 48k address range */
+#define MAX_REGISTER_NAME_LEN	32		/* Maximum length of register nicknames in debug output */
+#define UNKNOWN_NAME		"(unknown)"	/* Name used when reading/listing undocumented registers */
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 /*
  * Convert from net80211 layer values to Ath layer values. Hopefully this will
@@ -411,8 +414,12 @@ struct ath_buf {
 #define ATH_RXBUF_RESET(bf)	bf->bf_status=0
 
 /* XXX: only managed for rx at the moment */
-#define ATH_BUFSTATUS_DONE	0x00000001	/* hw processing complete, desc processed by hal */
-
+#define ATH_BUFSTATUS_DONE		0x00000001	/* hw processing complete, desc processed by hal */
+#define ATH_BUFSTATUS_RADAR_DONE	0x00000002	/* marker to indicate a PHYERR for radar pulse
+							   has already been handled.  We may receive
+							   multiple interrupts before the rx_tasklet
+							   clears the queue
+							*/
 /*
  * DMA state for tx/rx descriptors.
  */
@@ -469,7 +476,8 @@ struct ath_vap {
 	struct ieee80211_beacon_offsets av_boff;/* dynamic update state */
 	int av_bslot;			/* beacon slot index */
 	struct ath_txq av_mcastq;	/* multicast transmit queue */
-	u_int8_t	av_dfswait_run;
+	/* DFS state */
+	u_int8_t av_dfs_channel_check_pending;
 };
 #define	ATH_VAP(_v)	((struct ath_vap *)(_v))
 
@@ -567,7 +575,17 @@ struct ath_softc {
 			sc_devstopped:1,	/* stopped due to of no tx bufs */
 			sc_stagbeacons:1,	/* use staggered beacons */
 			sc_dfswait:1,    	/* waiting on channel for radar detect */
-		        sc_ackrate:1;           /* send acks at high bitrate */
+			sc_ackrate:1,		/* send acks at high bitrate */
+			sc_dfs_channel_check:1,	/* waiting on channel for radar detect */
+			sc_txcont:1,        	/* Is continuous transmit enabled? */
+			sc_dfs_testmode:1; 	/* IF this is on, AP vaps will stay in
+						   'channel availability check' indefinately,
+						   reporting radar and interference detections.
+						*/
+
+	unsigned int sc_txcont_power; /* Continuous transmit power in 0.5dBm units */
+	unsigned int sc_txcont_rate;  /* Continuous transmit rate in Mbps */
+
 	/* rate tables */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE *sc_currates;	/* current rate table */
@@ -610,7 +628,8 @@ struct ath_softc {
 	u_int8_t sc_txrate;			/* current tx rate for LED */
 	u_int16_t sc_ledoff;			/* off time for current blink */
 	struct timer_list sc_ledtimer;		/* led off timer */
-	struct timer_list sc_dfswaittimer;	/* dfs wait timer */
+	struct timer_list
+	    sc_dfs_channel_check_timer;		/* dfs wait timer */
 
 	struct ATH_TQ_STRUCT sc_fataltq;	/* fatal error intr tasklet */
 
@@ -662,6 +681,9 @@ struct ath_softc {
 	struct timer_list sc_cal_ch;		/* calibration timer */
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
 
+	struct timer_list
+	    sc_dfs_channel_non_occupancy_expiration_timer; /* mark expiration timer task */
+
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
 
@@ -686,6 +708,16 @@ struct ath_softc {
 	u_int sc_slottimeconf;			/* manual override for slottime */
 	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
 	u_int64_t sc_tsf;			/* TSF at last rx interrupt */
+
+	u_int64_t sc_lastradar_tsf;				/* TSF at last detected radar pulse */
+	u_int32_t sc_dfs_channel_availability_check_time;	/* DFS wait time before accessing a
+								   channel (in seconds).
+								   FCC requires 60s.
+								*/
+	u_int32_t sc_dfs_non_occupancy_period;			/* DFS channel non-occupancy limit
+								   after radar is detected (in seconds).
+								   FCC requires 30m.
+								*/
 };
 
 typedef void (*ath_callback) (struct ath_softc *);

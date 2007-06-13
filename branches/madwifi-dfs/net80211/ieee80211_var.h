@@ -313,6 +313,40 @@ struct ieee80211com {
 	struct ieee80211_channel *ic_curchan;	/* current channel */
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
 	int16_t ic_channoise;			/* current channel noise in dBm */
+	/*
+	 * Spectrum management (IEEE 802.11h-2003):
+	 *
+	 * ic_chan_nodes is an array of numbers of nodes that provide
+	 *    ni_suppchans with the given channel reported as supported. Index
+	 *    of the array is an IEEE channel number (ic_ieee)
+	 * ic_cn_total is the number of nodes counted in ic_chan_nodes
+	 *    (provided ni_suppchans and are associated)
+	 * ic_sc_mincom is the desired minimum number of common channels, the
+	 *    parameter used by SC_TIGHT and SC_STRICT algorithms
+	 * ic_sc_algorithm is the algorithm for (re)association based on
+	 *    supported channels
+	 * ic_sc_slcg is the permil of Stations Lost per Channel Gained, the
+	 *    parameter used by SC_TIGHT and SC_STRICT algorithms. If due to
+	 *    association of the STA and disassociation of x other STAs (out of
+	 *    y associated STAs in total), the number of common channel
+	 *    increases by z, then such an action is performed if
+	 *    1000*x/y < z*ic_sc_slcg
+	 * ic_sc_sldg is the permil of Stations Lost per rssi Db Gained, the
+	 *    parameter used by SC_LOOSE algorithm. If due to the switch,
+	 *    the maximum RSSI of received packets on the current channel would
+	 *    decrease by z decibels and x stations from the set of y stations
+	 *    would be lost, then such a switch will be performed if
+	 *    1000*x/y < z*ic_sc_sldg
+	 * ic_sc_ie is the Supported Channels IE that is about to be sent along
+	 *    with (re)assoc requests (STA mode)
+	 */
+	u_int16_t ic_chan_nodes[IEEE80211_CHAN_MAX+1];
+	u_int16_t ic_cn_total;                  /* # nodes counted in ic_chan nodes */
+	u_int16_t ic_sc_mincom;                 /* minimum number of common channels */
+	enum ieee80211_sc_algorithm ic_sc_algorithm;
+	u_int16_t ic_sc_slcg;                   /* permil of Stations Lost per Channel Gained */
+	u_int16_t ic_sc_sldg;                   /* permil of Stations Lost per rssi Db Gained */
+	struct ieee80211_ie_sc ic_sc_ie;        /* Supported Channels IE */
 
 	/* Regulatory class ids */
 	u_int ic_nregclass;			/* # entries in ic_regclassids */
@@ -390,6 +424,30 @@ struct ieee80211com {
 
 	/* U-APSD support */
 	void (*ic_uapsd_flush)(struct ieee80211_node *);
+
+	/* continuous transmission support */
+	void (*ic_set_txcont)(struct ieee80211com *, int);
+	int (*ic_get_txcont)(struct ieee80211com *);
+	void (*ic_set_txcont_power)(struct ieee80211com *, u_int);
+	int (*ic_get_txcont_power)(struct ieee80211com *);
+	void (*ic_set_txcont_rate)(struct ieee80211com *, u_int);
+	u_int (*ic_get_txcont_rate)(struct ieee80211com *);
+
+	/* DFS test mode prevents marking channel interference and channel switching during
+	detection probability tests */
+	void (*ic_set_dfs_testmode)(struct ieee80211com *, int);
+	int (*ic_get_dfs_testmode)(struct ieee80211com *);
+
+	/* inject a fake radar signal -- used while on a 802.11h DFS channels */
+	unsigned int (*ic_test_radar)(struct ieee80211com *);
+
+	/* DFS radar avoidance channel availability check time (in seconds) */
+	void (*ic_set_dfs_channel_availability_check_time)(struct ieee80211com *, unsigned int);
+	unsigned int (*ic_get_dfs_channel_availability_check_time)(struct ieee80211com *);
+
+	/* DFS radar avoidance channel use delay */
+	void (*ic_set_dfs_non_occupancy_period)(struct ieee80211com *, unsigned int);
+	unsigned int (*ic_get_dfs_non_occupancy_period)(struct ieee80211com *);
 
 	/* Set coverage class */
 	void (*ic_set_coverageclass)(struct ieee80211com *);
@@ -590,6 +648,23 @@ enum ieee80211_phymode ieee80211_chan2mode(const struct ieee80211_channel *);
 void ieee80211_build_countryie(struct ieee80211com *);
 int ieee80211_media_setup(struct ieee80211com *, struct ifmedia *, u_int32_t,
 	ifm_change_cb_t, ifm_stat_cb_t);
+void ieee80211_build_sc_ie(struct ieee80211com *);
+void ieee80211_dfs_action(struct ieee80211com *);
+void ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *);
+
+/*
+ * Iterate through ic_channels to enumerate all distinct ic_ieee channel numbers.
+ * It relies on the assumption that ic_ieee cannot be 0 and that all the
+ * duplicates in ic_channels occur subsequently.
+ *
+ * _i and prevchan are temporary variables
+ */
+#define CHANNEL_FOREACH(i, ic, _i, prevchan) 					    \
+	for (									                        \
+			_i=0, prevchan = 0; 					                \
+			_i<ic->ic_nchans && (i = ic->ic_channels[_i].ic_ieee); 	\
+			prevchan = i, _i++					                    \
+	    ) if (i != prevchan)
 
 /* Key update synchronization methods.  XXX should not be visible. */
 static __inline void

@@ -130,6 +130,7 @@ struct ieee80211_stats {
 	u_int32_t is_rx_assoc_capmismatch;/* rx assoc w/ cap mismatch */
 	u_int32_t is_rx_assoc_norate;	/* rx assoc w/ no rate match */
 	u_int32_t is_rx_assoc_badwpaie;	/* rx assoc w/ bad WPA IE */
+	u_int32_t is_rx_assoc_badscie;	/* rx assoc w/ bad SC IE */
 	u_int32_t is_rx_deauth;		/* rx deauthentication */
 	u_int32_t is_rx_disassoc;	/* rx disassociation */
 	u_int32_t is_rx_badsubtype;	/* rx frame w/ unknown subtype*/
@@ -162,6 +163,7 @@ struct ieee80211_stats {
 	u_int32_t is_scan_active;	/* active scans started */
 	u_int32_t is_scan_passive;	/* passive scans started */
 	u_int32_t is_node_timeout;	/* nodes timed out inactivity */
+	u_int32_t is_node_fdisassoc;	/* forced node disassociation */
 	u_int32_t is_crypto_nomem;	/* no memory for crypto ctx */
 	u_int32_t is_crypto_tkip;	/* tkip crypto done in s/w */
 	u_int32_t is_crypto_tkipenmic;	/* tkip en-MIC done in s/w */
@@ -534,6 +536,8 @@ struct ieee80211req_scan_result {
 #define	IEEE80211_IOCTL_WDSDELMAC	(SIOCIWFIRSTPRIV+28)
 #define	IEEE80211_IOCTL_KICKMAC		(SIOCIWFIRSTPRIV+30)
 
+#define	IEEE80211_IOCTL_RADAR		(SIOCIWFIRSTPRIV+17)
+
 enum {
 	IEEE80211_WMMPARAMS_CWMIN       = 1,
 	IEEE80211_WMMPARAMS_CWMAX       = 2,
@@ -601,8 +605,22 @@ enum {
 	IEEE80211_PARAM_MARKDFS			= 58,	/* mark a dfs interference channel when found */
 	IEEE80211_PARAM_REGCLASS		= 59,	/* enable regclass ids in country IE */
 	IEEE80211_PARAM_DROPUNENC_EAPOL		= 60,	/* drop unencrypted eapol frames */
- 	IEEE80211_PARAM_SHPREAMBLE		= 61,	/* Short Preamble */
+	IEEE80211_PARAM_SHPREAMBLE		= 61,	/* Short Preamble */
 	IEEE80211_PARAM_DUMPREGS		= 62,   /* Pretty printed dump of Atheros hardware registers */
+	IEEE80211_PARAM_DOTH_ALGORITHM		= 63,	/* spectrum management algorithm */
+	IEEE80211_PARAM_DOTH_MINCOM   		= 64,	/* minimum number of common channels */
+	IEEE80211_PARAM_DOTH_SLCG		= 65,	/* permil of Stations Lost per Channel Gained */
+	IEEE80211_PARAM_DOTH_SLDG		= 66,	/* permil of Stations Lost per rssi Db Gained */
+	IEEE80211_PARAM_TXCONT			= 67,	/* continuous transmit mode (boolean) */
+	IEEE80211_PARAM_TXCONT_RATE		= 68,	/* continuous transmit mode data rate (in mbit/sec) - will use closest match from current rate table */
+	IEEE80211_PARAM_TXCONT_POWER		= 69,	/* power level in units of 0.5dBm */
+	IEEE80211_PARAM_DFS_TESTMODE		= 70,	/* do not perform DFS actions (i.e. markng DFS and channel change on interference), just report them via debug. */
+	IEEE80211_PARAM_DFS_CHANCHECKTIME	= 71,	/* how long do we wait for chan availability
+							    scans ?
+							    FCC requires 60s, so that is the default. */
+	IEEE80211_PARAM_DFS_NONOCCUPANCYPERIOD	= 72,	/* DFS no-occupancy limit - how long do we stay
+							   off a channel once radar is detected?
+							   FCC requires 30m, so that is the default. */
 };
 
 #define	SIOCG80211STATS			(SIOCDEVPRIVATE+2)

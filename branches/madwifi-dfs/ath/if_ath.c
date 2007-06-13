@@ -60,6 +60,7 @@
 #include <linux/proc_fs.h>
 #include <linux/if_arp.h>
 #include <linux/rtnetlink.h>
+#include <linux/time.h>
 #include <asm/uaccess.h>
 
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
@@ -94,6 +95,8 @@
 #ifdef ATH_TX99_DIAG
 #include "ath_tx99.h"
 #endif
+
+#include "ah_os.h"
 
 /* unaligned little endian access */
 #define LE_READ_2(p)							\
@@ -256,14 +259,64 @@ static int ath_descdma_setup(struct ath_softc *, struct ath_descdma *,
 	ath_bufhead *, const char *, int, int);
 static void ath_descdma_cleanup(struct ath_softc *, struct ath_descdma *,
 	ath_bufhead *, int);
-static void ath_check_dfs_clear(unsigned long);
 static const char *ath_get_hal_status_desc(HAL_STATUS status);
 static int ath_rcv_dev_event(struct notifier_block *, unsigned long, void *);
+
+/*
+Regulatory agency testing - continuous transmit support
+*/
+static void txcont_on(struct ieee80211com *ic);
+static void txcont_off(struct ieee80211com *ic);
+
+static int ath_get_txcont(struct ieee80211com *);
+static void ath_set_txcont(struct ieee80211com *, int);
+
+static int ath_get_txcont_power(struct ieee80211com *);
+static void ath_set_txcont_power(struct ieee80211com *, unsigned int);
+
+static unsigned int ath_get_txcont_rate(struct ieee80211com *);
+static void ath_set_txcont_rate(struct ieee80211com *ic, unsigned int new_rate);
+
+/*
+802.11h DFS support functions
+*/
+static int ath_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan);
+static int ath_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan);
+HAL_BOOL ath_hal_reset_wrapper(struct ath_softc *sc, HAL_OPMODE opmode, HAL_CHANNEL* chan,  HAL_BOOL outdoor, HAL_STATUS* pstatus);
+static void ath_radar_detected(struct ath_softc *sc, const char* message);
+static int ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc);
+static void ath_dump_phyerr_statistics(struct ath_softc *sc, const char* cause);
+
+static int ath_get_radar(struct ath_softc *sc);
+static int ath_set_radar(struct ath_softc *sc, HAL_CHANNEL* hchan);
+
+static void ath_dfs_channel_check_completed(unsigned long);
+static void ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason);
+
+static int ath_radio_silence_required_for_dfs(struct ath_softc* sc);
+static int ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func);
+
+static void ath_dfs_expire_channel_non_occupancy_timers(unsigned long);
+
+/*
+802.11h DFS testing functions
+*/
+static int ath_get_dfs_testmode(struct ieee80211com *);
+static void ath_set_dfs_testmode(struct ieee80211com *, int);
+
+static unsigned int ath_get_dfs_non_occupancy_period(struct ieee80211com *);
+static void ath_set_dfs_non_occupancy_period(struct ieee80211com *, unsigned int seconds);
+
+static unsigned int ath_get_dfs_channel_availability_check_time(struct ieee80211com *);
+static void ath_set_dfs_channel_availability_check_time(struct ieee80211com *, unsigned int seconds);
+
+static unsigned int ath_test_radar(struct ieee80211com *);
 
 static int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
 								 * but check every second at first.
 								 */
+static int ath_dfs_channel_non_occupancy_expiration_check_interval = 60; /* check once a minute by default, since FCC/ETSI requires 30m duration this means maximum is 31m or so */
 static int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
@@ -473,6 +526,9 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	}
 	sc->sc_ah = ah;
 
+	if (ath_hal_getcapability(sc->sc_ah, HAL_CAP_INTMIT, 0, NULL) == HAL_OK)
+		ath_hal_setcapability(sc->sc_ah, HAL_CAP_INTMIT, 1, 1, NULL);
+
 	/*
 	 * Check if the MAC has multi-rate retry support.
 	 * We do this by trying to setup a fake extended
@@ -537,7 +593,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 		tpc ? "on" : "off");
 	ath_hal_settpc(ah, tpc);
 #endif
-
 	/*
 	 * Setup rate tables for all potential media types.
 	 */
@@ -668,6 +723,13 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) dev;
 
+	init_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
+	sc->sc_dfs_channel_non_occupancy_expiration_timer.function = ath_dfs_expire_channel_non_occupancy_timers;
+	sc->sc_dfs_channel_non_occupancy_expiration_timer.data = (unsigned long) dev;
+
+	sc->sc_dfs_channel_availability_check_time = 0; /* default is used */
+	sc->sc_dfs_non_occupancy_period = 0; /* default is used */
+
 #ifdef ATH_SUPERG_DYNTURBO
 	init_timer(&sc->sc_dturbo_switch_mode);
 	sc->sc_dturbo_switch_mode.function = ath_turbo_switch_mode;
@@ -679,7 +741,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_ledon = 0;			/* low true */
 	sc->sc_ledidle = msecs_to_jiffies(2700);	/* 2.7 sec */
 	init_timer(&sc->sc_ledtimer);
-	init_timer(&sc->sc_dfswaittimer);
+	init_timer(&sc->sc_dfs_channel_check_timer);
 	sc->sc_ledtimer.data = (unsigned long) sc;
 	if (sc->sc_softled) {
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
@@ -890,6 +952,20 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_vap_create = ath_vap_create;
 	ic->ic_vap_delete = ath_vap_delete;
 
+	ic->ic_test_radar           = ath_test_radar;
+
+	ic->ic_set_dfs_testmode     = ath_set_dfs_testmode;
+	ic->ic_get_dfs_testmode     = ath_get_dfs_testmode;
+
+	ic->ic_set_txcont           = ath_set_txcont;
+	ic->ic_get_txcont           = ath_get_txcont;
+
+	ic->ic_set_txcont_power     = ath_set_txcont_power;
+	ic->ic_get_txcont_power     = ath_get_txcont_power;
+
+	ic->ic_set_txcont_rate      = ath_set_txcont_rate;
+	ic->ic_get_txcont_rate      = ath_get_txcont_rate;
+
 	ic->ic_scan_start = ath_scan_start;
 	ic->ic_scan_end = ath_scan_end;
 	ic->ic_set_channel = ath_set_channel;
@@ -904,6 +980,15 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 
 	ic->ic_set_coverageclass = ath_set_coverageclass;
 	ic->ic_mhz2ieee = ath_mhz2ieee;
+
+	/* DFS radar avoidance channel availability check time (in seconds) */
+	ic->ic_set_dfs_channel_availability_check_time = ath_set_dfs_channel_availability_check_time;
+	ic->ic_get_dfs_channel_availability_check_time = ath_get_dfs_channel_availability_check_time;
+
+	/* DFS radar avoidance channel use delay */
+	ic->ic_set_dfs_non_occupancy_period = ath_set_dfs_non_occupancy_period;
+	ic->ic_get_dfs_non_occupancy_period = ath_get_dfs_non_occupancy_period;
+
 
 	if (register_netdev(dev)) {
 		printk(KERN_ERR "%s: unable to register device\n", DEV_NAME(dev));
@@ -981,6 +1066,9 @@ ath_detach(struct net_device *dev)
 	ath_stop(dev);
 
 	ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE);
+  	/* Flush the radar task if it's scheduled */
+ 	if (sc->sc_dfs_channel_check)
+  		flush_scheduled_work();
 
 	sc->sc_invalid = 1;
 
@@ -1363,6 +1451,21 @@ ath_resume(struct net_device *dev)
 	ath_init(dev);
 }
 
+static int
+ath_radio_silence_required_for_dfs(struct ath_softc* sc) {
+	return sc->sc_dfs_channel_check || ((sc->sc_curchan.privFlags & CHANNEL_DFS) && (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE));
+}
+
+static int
+ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
+	struct net_device* dev = sc->sc_dev;
+	if (ath_radio_silence_required_for_dfs(sc)) {
+		DPRINTF(sc,ATH_DEBUG_DOTH, "%s: %s: ERROR: Invoked a transmit function during DFS channel availability check OR while radar interference is detected!\n", DEV_NAME(dev), func);
+		return 1;
+	}
+	return 0;
+}
+
 static void
 ath_uapsd_processtriggers(struct ath_softc *sc)
 {
@@ -1515,6 +1618,10 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		if (ic->ic_uapsdmaxtriggers == 0)
 			continue;
 
+		/* If we are supposed to be not listening or transmitting, don't do triggers */
+		if (ath_check_radio_silence_not_required(sc,__func__))
+			return;
+
 		/* make sure the frame is QoS data/null */
 		/* NB: with current sub-type definitions, the 
 		 * IEEE80211_FC0_SUBTYPE_QOS check, below, covers the 
@@ -1639,6 +1746,7 @@ ath_intr(int irq, void *dev_id)
 ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 {
+#define AR5K_AR5212_PISR		0x0080
 	struct net_device *dev = dev_id;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
@@ -1687,7 +1795,13 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 * this is too slow to meet timing constraints
 			 * under load.
 			 */
-			ath_beacon_send(sc, &needmark);
+			if (!ath_radio_silence_required_for_dfs(sc))
+				ath_beacon_send(sc, &needmark);
+			else {
+				sc->sc_beacons = 0;
+				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
+				ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
+			}
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -1705,6 +1819,11 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		if (status & HAL_INT_RX) {
 			sc->sc_tsf = ath_hal_gettsf64(ah);
 			ath_uapsd_processtriggers(sc);
+			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
+		}
+		if (status & HAL_INT_RXPHY) {
+			sc->sc_tsf = ath_hal_gettsf64(ah);
+			ath_intr_detect_radar_phyerr_in_rx_queue(sc);
 			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
 		}
 		if (status & HAL_INT_TX) {
@@ -1735,7 +1854,13 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		if (status & HAL_INT_BMISS) {
 			sc->sc_stats.ast_bmiss++;
-			ATH_SCHEDULE_TQUEUE(&sc->sc_bmisstq, &needmark);
+			if (!ath_radio_silence_required_for_dfs(sc))
+				ATH_SCHEDULE_TQUEUE(&sc->sc_bmisstq, &needmark);
+			else {
+				sc->sc_beacons = 0;
+				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
+				ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
+			}
 		}
 		if (status & HAL_INT_MIB) {
 			sc->sc_stats.ast_mib++;
@@ -1755,6 +1880,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (needmark)
 		mark_bh(IMMEDIATE_BH);
 	return IRQ_HANDLED;
+#undef AR5K_AR5212_PISR
 }
 
 static void
@@ -1973,10 +2099,17 @@ ath_stop_locked(struct net_device *dev)
 				sc->sc_ledstate = 1;
 			}
 		}
+		if (!sc->sc_invalid) {
+			del_timer_sync(&sc->sc_dfs_channel_check_timer);
+			del_timer_sync(&sc->sc_cal_ch);
+			del_timer_sync(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
+		}
 		ath_draintxq(sc);
 		if (!sc->sc_invalid) {
+			preempt_disable();
 			ath_stoprecv(sc);
 			ath_hal_phydisable(ah);
+			preempt_enable_no_resched();
 		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);		/* XXX needed? */
@@ -2088,6 +2221,9 @@ ath_set_ack_bitrate(struct ath_softc *sc, int high)
 		} else {
 			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) | v);
 		}
+#undef AR5K_AR5212_STA_ID1
+#undef AR5K_AR5212_STA_ID1_BASE_RATE_11B
+#undef AR5K_AR5212_STA_ID1_ACKCTS_6MB
 		return 0;
 	}
 	return 1;
@@ -2116,12 +2252,13 @@ ath_reset(struct net_device *dev)
 	c = ic->ic_curchan;
 	sc->sc_curchan.channel = c->ic_freq;
 	sc->sc_curchan.channelFlags = ath_chan2flags(c);
+	sc->sc_curchan.privFlags = 0;
 
 	ath_hal_intrset(ah, 0);		/* disable interrupts */
 	ath_draintxq(sc);		/* stop xmit side */
 	ath_stoprecv(sc);		/* stop recv side */
 	/* NB: indicate channel change so we do a full reset */
-	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
+	if (!ath_hal_reset_wrapper(sc, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
 			DEV_NAME(dev), __func__, ath_get_hal_status_desc(status), status);
 	ath_update_txpow(sc);		/* update tx power state */
@@ -2158,6 +2295,11 @@ ath_reset(struct net_device *dev)
 	return 0;
 }
 
+HAL_BOOL ath_hal_reset_wrapper(struct ath_softc *sc, HAL_OPMODE opmode, HAL_CHANNEL* chan,  HAL_BOOL outdoor, HAL_STATUS* pstatus) {
+	HAL_BOOL result = ath_hal_reset(sc->sc_ah, opmode, chan,  outdoor, pstatus);
+	ath_set_radar(sc, chan);
+	return result;
+}
 
 /* Swap transmit descriptor.
  * if AH_NEED_DESC_SWAP flag is not defined this becomes a "null"
@@ -2186,7 +2328,8 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	struct ath_desc *lastds, int framelen)
 {
 	struct ath_hal *ah = sc->sc_ah;
-
+	if (ath_check_radio_silence_not_required(sc,__func__))
+		return;
 	/*
 	 * Insert the frame on the outbound list and
 	 * pass it on to the hardware.
@@ -2448,7 +2591,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 	}								\
 	ATH_TXBUF_UNLOCK_IRQ(sc);					\
 	if (bf == NULL) {		/* NB: should not happen */	\
-		DPRINTF(sc,ATH_DEBUG_XMIT,				\
+		DPRINTF(sc, ATH_DEBUG_XMIT,				\
 			"%s: discard, no xmit buf\n", __func__);	\
 		sc->sc_stats.ast_tx_nobuf++;				\
 	}								\
@@ -2844,7 +2987,7 @@ ath_keyprint(struct ath_softc *sc, const char *tag, u_int ix,
 	printk("%s: [%02u] %-7s ", tag, ix, ciphers[hk->kv_type]);
 	for (i = 0, n = hk->kv_len; i < n; i++)
 		printk("%02x", hk->kv_val[i]);
-	printk(" mac %s", ether_sprintf(mac));
+	printk(KERN_DEBUG " mac %s", ether_sprintf(mac));
 	if (hk->kv_type == HAL_CIPHER_TKIP) {
 		printk(" %s ", sc->sc_splitmic ? "mic" : "rxmic");
 		for (i = 0; i < sizeof(hk->kv_mic); i++)
@@ -3347,6 +3490,8 @@ ath_calcrxfilter(struct ath_softc *sc)
 	if (sc->sc_nmonvaps > 0)
 		rfilt |= (HAL_RX_FILTER_CONTROL | HAL_RX_FILTER_BEACON |
 			  HAL_RX_FILTER_PROBEREQ | HAL_RX_FILTER_PROM);
+	if (sc->sc_curchan.privFlags & CHANNEL_DFS)
+		rfilt |= (HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR);
 	return rfilt;
 #undef RX_FILTER_PRESERVE
 }
@@ -3518,7 +3663,6 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark,u_int8_t dtim)
 	struct ath_softc *sc = ic->ic_dev->priv;
 	u_int32_t bss_traffic;
 
-	/* TBD: Age out CHANNEL_INTERFERENCE */
 	if (sc->sc_ignore_ar) {
 		/* 
 		 * Ignore AR for this beacon; a dynamic turbo
@@ -3982,6 +4126,10 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 			__func__, ieee80211_state_name[vap->iv_state]);
 		return NULL;
 	}
+
+	if (ath_check_radio_silence_not_required(sc,__func__))
+		return NULL;
+
 #ifdef ATH_SUPERG_XR
 	if (vap->iv_flags & IEEE80211_F_XR) {
 		vap->iv_xrbcnwait++;
@@ -4111,6 +4259,9 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	struct ath_buf *bf;
 	unsigned int slot;
 	u_int32_t bfaddr;
+
+	if (ath_check_radio_silence_not_required(sc,__func__))
+		return;
 
 	/*
 	 * Check if the previous beacon has gone out.  If
@@ -4288,6 +4439,9 @@ ath_beacon_start_adhoc(struct ath_softc *sc, struct ieee80211vap *vap)
 	struct ieee80211_node *ni;
 	struct ath_vap *avp;
 	struct sk_buff *skb;
+
+	if (ath_check_radio_silence_not_required(sc,__func__))
+		return;
 
 	avp = ATH_VAP(vap);
 	if (avp->av_bcbuf == NULL) {
@@ -4863,6 +5017,9 @@ ath_node_move_data(const struct ieee80211_node *ni)
 	HAL_STATUS status;
 	unsigned int index;
 
+	if (ath_check_radio_silence_not_required(sc,__func__))
+		return;
+
 	if (ni->ni_vap->iv_flags & IEEE80211_F_XR) {
 		struct ath_txq tmp_q;
 		memset(&tmp_q, 0, sizeof(tmp_q));
@@ -4870,7 +5027,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		/*
 		 * move data from Normal txqs to XR queue.
 		 */
-		printk("move data from NORMAL to XR\n");
+		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "move data from NORMAL to XR\n");
 		/*
 		 * collect all the data towards the node
 		 * in to the tmp_q.
@@ -4999,7 +5156,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			bf = STAILQ_FIRST(&tmp_q.axq_q);
 			index++;
 		}
-		printk("moved %d buffers from NORMAL to XR\n", index);
+		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "moved %d buffers from NORMAL to XR\n", index);
 	} else {
 		struct ath_txq wme_tmp_qs[WME_AC_VO+1];
 		struct ath_txq *wmeq = NULL, *prevq;
@@ -5010,7 +5167,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		/*
 		 * move data from XR txq to Normal txqs.
 		 */
-		printk("move buffers from XR to NORMAL\n");
+		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "move buffers from XR to NORMAL\n");
 		memset(&wme_tmp_qs, 0, sizeof(wme_tmp_qs));
 		for (index = 0; index <= WME_AC_VO; index++)
 			STAILQ_INIT(&wme_tmp_qs[index].axq_q);
@@ -5183,7 +5340,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			ATH_TXQ_UNLOCK_IRQ(txq);
 		}
 
-		printk("moved %d buffers from XR to NORMAL\n", count);
+		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "moved %d buffers from XR to NORMAL\n"m count);
 	}
 #endif
 	return 0;
@@ -5760,7 +5917,7 @@ rx_accept:
 rx_next:
 		ATH_RXBUF_LOCK_IRQ(sc);
 		STAILQ_REMOVE_HEAD(&sc->sc_rxbuf, bf_list);
-		bf->bf_status &= ~ATH_BUFSTATUS_DONE;
+		ATH_RXBUF_RESET(bf);
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 		ATH_RXBUF_UNLOCK_IRQ(sc);
 	} while (ath_rxbuf_init(sc, bf) == 0);
@@ -5953,6 +6110,9 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 		== IEEE80211_F_SHPREAMBLE)
 
 	if (sc->sc_xrgrppoll)
+		return;
+
+	if (ath_check_radio_silence_not_required(sc,__func__))
 		return;
 
 	memset(&rates, 0, sizeof(rates));
@@ -7342,14 +7502,16 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 		if (sc->sc_devstopped) {
 			++sc->sc_reapcount;
 			if (sc->sc_reapcount > ATH_TXBUF_FREE_THRESHOLD) {
-				if (!sc->sc_dfswait)
+				if (!ath_radio_silence_required_for_dfs(sc)) {
 					netif_start_queue(sc->sc_dev);
-				DPRINTF(sc, ATH_DEBUG_TX_PROC,
-					"%s: tx tasklet restart the queue\n",
-					__func__);
+					DPRINTF(sc, ATH_DEBUG_TX_PROC,
+					    "%s: tx tasklet restart the queue\n",
+					    __func__);
+				}
 				sc->sc_reapcount = 0;
 				sc->sc_devstopped = 0;
-			} else
+			}
+			else if (!ath_radio_silence_required_for_dfs(sc))
 				ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 		}
 		ATH_TXBUF_UNLOCK_IRQ(sc);
@@ -7460,6 +7622,9 @@ static void
 ath_tx_timeout(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
+
+	if (ath_radio_silence_required_for_dfs(sc))
+		return;
 
 	DPRINTF(sc, ATH_DEBUG_WATCHDOG, "%s: %sRUNNING %svalid\n",
 		__func__, (dev->flags & IFF_RUNNING) ? "" : "!",
@@ -7705,30 +7870,57 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	struct net_device *dev = sc->sc_dev;
 	HAL_CHANNEL hchan;
 	u_int8_t tswitch = 0;
+	u_int8_t doth_channel_availability_check_needed = 0;
+	u_int8_t channel_change_required = 0;
+	struct timeval tv;
 
 	/*
 	 * Convert to a HAL channel description with
 	 * the flags constrained to reflect the current
 	 * operating mode.
 	 */
+	memset(&hchan, 0, sizeof(HAL_CHANNEL));
 	hchan.channel = chan->ic_freq;
 	hchan.channelFlags = ath_chan2flags(chan);
 	KASSERT(hchan.channel != 0,
 		("bogus channel %u/0x%x", hchan.channel, hchan.channelFlags));
-
-	DPRINTF(sc, ATH_DEBUG_RESET, "%s: %u (%u MHz) -> %u (%u MHz)\n",
+	do_gettimeofday(&tv);
+	DPRINTF(sc, ATH_DEBUG_RESET | ATH_DEBUG_DOTH, "%s: %u (%u MHz) -> %u (%u MHz) -- Time: %ld.%06ld\n",
 		__func__, ath_hal_mhz2ieee(ah, sc->sc_curchan.channel,
 		sc->sc_curchan.channelFlags), sc->sc_curchan.channel,
 		ath_hal_mhz2ieee(ah, hchan.channel, hchan.channelFlags),
-		hchan.channel);
+		hchan.channel,
+		tv.tv_sec,
+		tv.tv_usec
+		);
 
 	/* check if it is turbo mode switch */
 	if (hchan.channel == sc->sc_curchan.channel &&
 	   (hchan.channelFlags & IEEE80211_CHAN_TURBO) != (sc->sc_curchan.channelFlags & IEEE80211_CHAN_TURBO))
 		tswitch = 1;
 
-	if (hchan.channel != sc->sc_curchan.channel ||
-	    hchan.channelFlags != sc->sc_curchan.channelFlags) {
+
+	/* Stop any pending channel calibrations or availability check if we are really changing channels.  maybe a turbo mode switch only. */
+	if (hchan.channel != sc->sc_curchan.channel) {
+	if (!sc->sc_dfs_testmode && sc->sc_dfs_channel_check) {
+	ath_interrupt_dfs_channel_check(sc, "Channel change interrupted DFS wait.");
+	}
+	}
+
+	/* Need a doth channel availability check?  We do if ... */
+	doth_channel_availability_check_needed = 1
+		&& (ic->ic_opmode == IEEE80211_M_HOSTAP)     /* we are an AP */
+		&& (hchan.channel != sc->sc_curchan.channel || (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR))) /* the scan wasn't already done */
+		&& ath_is_dfs_required(sc, &hchan)           /* the new channel requires DFS protection */
+		&& (ic->ic_flags & IEEE80211_F_DOTH)
+		;
+
+	channel_change_required = hchan.channel != sc->sc_curchan.channel
+		|| hchan.channelFlags != sc->sc_curchan.channelFlags
+		|| tswitch || doth_channel_availability_check_needed
+		;
+
+	if (channel_change_required) {
 		HAL_STATUS status;
 
 		/*
@@ -7747,6 +7939,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		else
 			ath_hal_setcoverageclass(sc->sc_ah, ic->ic_coverageclass, 0);
 
+		do_gettimeofday(&tv);
+		DPRINTF(sc, ATH_DEBUG_RESET, "%s: %s: resetting in ath_chan_set(sc, chan=%u)-- Time: %ld.%06ld\n",
+			DEV_NAME(dev), __func__,ieee80211_chan2ieee(ic, chan),tv.tv_sec,tv.tv_usec);
 		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
 			printk("%s: %s: unable to reset channel %u (%u MHz) "
 				"flags 0x%x '%s' (HAL status %u)\n",
@@ -7764,6 +7959,11 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		ath_update_txpow(sc);		/* update tx power state */
 
 		/*
+		 * Change channels and update the h/w rate map
+		 * if we're switching; e.g. 11a to 11b/g.
+		 */
+		ath_chan_change(sc, chan);
+		 /*
 		 * Re-enable rx framework.
 		 */
 		if (ath_startrecv(sc) != 0) {
@@ -7772,41 +7972,35 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			return -EIO;
 		}
 
-		/*
-		 * Change channels and update the h/w rate map
-		 * if we're switching; e.g. 11a to 11b/g.
-		 */
-		ath_chan_change(sc, chan);
-		if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-			if (sc->sc_curchan.privFlags & CHANNEL_DFS) {
-				if (!(sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR)) {
-					dev->watchdog_timeo = 120 * HZ;	/* set the timeout to normal */
-					netif_stop_queue(dev);
-					if (sc->sc_dfswait)
-						del_timer_sync(&sc->sc_dfswaittimer);
-					DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: start dfs wait period\n",
-						__func__, DEV_NAME(dev));
-					sc->sc_dfswait = 1;
-					sc->sc_dfswaittimer.function = ath_check_dfs_clear;
-					sc->sc_dfswaittimer.expires =
-						jiffies + (ATH_DFS_WAIT_POLL_PERIOD * HZ);
-					sc->sc_dfswaittimer.data = (unsigned long)sc;
-					add_timer(&sc->sc_dfswaittimer);
-				}
-			} else if (sc->sc_dfswait == 1)
-				mod_timer(&sc->sc_dfswaittimer, jiffies + 2);
+		do_gettimeofday(&tv);
+		if (doth_channel_availability_check_needed && !(ic->ic_flags & IEEE80211_F_SCAN)) {
+			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: Starting DFS wait for channel %u -- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, ieee80211_mhz2ieee(sc->sc_curchan.channel, sc->sc_curchan.channelFlags), tv.tv_sec, tv.tv_usec);
+			dev->watchdog_timeo = 120 * HZ; /* set the timeout to normal */
+			/* Disable beacons and beacon miss interrupts */
+			sc->sc_dfs_channel_check = 1;
+			sc->sc_beacons = 0;
+			sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
+			ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
+			del_timer_sync(&sc->sc_dfs_channel_check_timer);
+			/* Enter DFS wait period */
+			sc->sc_dfs_channel_check_timer.expires  = jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ);
+			sc->sc_dfs_channel_check_timer.data = (unsigned long)sc;
+			sc->sc_dfs_channel_check_timer.function = ath_dfs_channel_check_completed;
+			add_timer(&sc->sc_dfs_channel_check_timer);
 		}
 		/*
 		 * re configure beacons when it is a turbo mode switch.
 		 * HW seems to turn off beacons during turbo mode switch.
 		 */
-		if (sc->sc_beacons && tswitch)
+		if (sc->sc_beacons && tswitch && !sc->sc_dfs_channel_check)
 			ath_beacon_config(sc, NULL);
-
 		/*
 		 * Re-enable interrupts.
 		 */
 		ath_hal_intrset(ah, sc->sc_imask);
+	}
+	else {
+		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: Not performing channel change action: %d -- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, ieee80211_mhz2ieee(sc->sc_curchan.channel, sc->sc_curchan.channelFlags), tv.tv_sec, tv.tv_usec);
 	}
 	return 0;
 }
@@ -7821,21 +8015,25 @@ ath_calibrate(unsigned long arg)
 	struct net_device *dev = (struct net_device *) arg;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
+	struct ieee80211com *ic = &sc->sc_ic;
 	/* u_int32_t nchans; */
 	HAL_BOOL isIQdone = AH_FALSE;
 
 	sc->sc_stats.ast_per_cal++;
-
-	DPRINTF(sc, ATH_DEBUG_CALIBRATE, "%s: channel %u/%x\n",
-		__func__, sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
+	DPRINTF(sc, ATH_DEBUG_CALIBRATE, "%s: channel %u/%x - periodic recalibration\n", __func__, sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
 
 	if (ath_hal_getrfgain(ah) == HAL_RFGAIN_NEED_CHANGE) {
 		/*
 		 * Rfgain is out of bounds, reset the chip
 		 * to load new gain values.
 		 */
+		int txcont_was_active = sc->sc_txcont;
+		DPRINTF(sc, ATH_DEBUG_RESET | ATH_DEBUG_CALIBRATE | ATH_DEBUG_DOTH, "%s: %s: Forcing reset() for (ath_hal_getrfgain(ah) == HAL_RFGAIN_NEED_CHANGE)\n", DEV_NAME(dev), __func__);
 		sc->sc_stats.ast_per_rfgain++;
 		ath_reset(dev);
+		/* Turn txcont back on as necessary */
+		if (txcont_was_active)
+			ath_set_txcont(ic, txcont_was_active);
 	}
 	if (!ath_hal_calibrate(ah, &sc->sc_curchan, &isIQdone)) {
 		DPRINTF(sc, ATH_DEBUG_ANY,
@@ -7849,6 +8047,10 @@ ath_calibrate(unsigned long arg)
 		ath_calinterval = ATH_LONG_CALINTERVAL;
 	else
 		ath_calinterval = ATH_SHORT_CALINTERVAL;
+
+	DPRINTF(sc, ATH_DEBUG_CALIBRATE, "%s: channel %u/%x -- IQ %s.\n",
+		__func__, sc->sc_curchan.channel, sc->sc_curchan.channelFlags,
+		isIQdone ? "done" : "not done" );
 
 	sc->sc_cal_ch.expires = jiffies + (ath_calinterval * HZ);
 	add_timer(&sc->sc_cal_ch);
@@ -7957,6 +8159,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		ieee80211_state_name[nstate]);
 
 	del_timer(&sc->sc_cal_ch);		/* periodic calibration timer */
+	del_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
+
 	ath_hal_setledstate(ah, leds[nstate]);	/* set LED */
 	netif_stop_queue(dev);			/* before we do anything else */
 
@@ -7981,6 +8185,10 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 * Notify the rate control algorithm.
 		 */
 		sc->sc_rc->ops->newstate(vap, nstate);
+		sc->sc_txcont = 0;
+		sc->sc_txcont_rate = 0;
+		sc->sc_txcont_power = -1;
+
 		goto done;
 	}
 	ni = vap->iv_bss;
@@ -8131,22 +8339,24 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		/* 
 		 * if it is a DFS channel and has not been checked for radar 
 		 * do not let the 80211 state machine to go to RUN state.
-		 *
 		 */
-		if (sc->sc_dfswait && vap->iv_opmode == IEEE80211_M_HOSTAP ) {
-			/* push the VAP to RUN state once DFS is cleared */
-			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  -> DFS_WAIT\n",
-				__func__, DEV_NAME(dev));
-			avp->av_dfswait_run = 1;
+		if (sc->sc_dfs_channel_check && vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP -> DFSWAIT_PENDING \n",__func__, DEV_NAME(dev));
+			/* start calibration timer with a really small value 1/10 sec */
+			mod_timer(&sc->sc_cal_ch, jiffies + (HZ/10));
+			/* wake the receiver */
+			netif_wake_queue(dev);
+			/* don't do the other usual stuff... */
+			avp->av_dfs_channel_check_pending = 1;
 			return 0;
 		}
 	} else {
-		if (sc->sc_dfswait &&
+		if (sc->sc_dfs_channel_check &&
 			vap->iv_opmode == IEEE80211_M_HOSTAP &&
-			sc->sc_dfswaittimer.data == (unsigned long)vap) {
-			del_timer_sync(&sc->sc_dfswaittimer);
-			sc->sc_dfswait = 0;
-			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP  out of DFS_WAIT\n",
+			sc->sc_dfs_channel_check_timer.data == (unsigned long)vap) {
+			del_timer_sync(&sc->sc_dfs_channel_check_timer);
+			sc->sc_dfs_channel_check = 0;
+			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP DFSWAIT_PENDING -> run\n",
 				__func__, DEV_NAME(dev));
 		}
 
@@ -8157,8 +8367,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			/* need to reconfigure the beacons when it moves to RUN */
 			sc->sc_beacons = 0;
 		}
-		avp->av_dfswait_run = 0; /* reset the dfs wait flag */
 	}
+
 done:
 	/*
 	 * Invoke the parent method to complete the work.
@@ -8171,6 +8381,8 @@ done:
 	if (nstate == IEEE80211_S_RUN) {
 		/* start periodic recalibration timer */
 		mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
+		/* start DFS marker expiration timer */
+		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer, jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
 	}
 
 #ifdef ATH_SUPERG_XR
@@ -8183,7 +8395,7 @@ done:
 #endif
 bad:
 	netif_start_queue(dev);
-	dev->watchdog_timeo = 5 * HZ;		/* set the timeout to normal */
+	dev->watchdog_timeo = (sc->sc_dfs_channel_check ? 120 : 5) * HZ;		/* set the timeout to normal */
 	return error;
 }
 
@@ -8196,41 +8408,54 @@ bad:
  * Context: Timer (softIRQ)
  */
 static void
-ath_check_dfs_clear(unsigned long data )
+ath_dfs_channel_check_completed(unsigned long data )
 {
 	struct ath_softc *sc = (struct ath_softc *)data;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = sc->sc_dev;
 	struct ieee80211vap *vap ;
-	HAL_CHANNEL hchan;
+	struct timeval tv;
 
-	if (!sc->sc_dfswait) return;
-
-	/* if still need to wait */
-	ath_hal_radar_wait(sc->sc_ah, &hchan);
-
-	if (hchan.privFlags & CHANNEL_INTERFERENCE)
+	if (!sc->sc_dfs_channel_check) {
+		DPRINTF(sc, ATH_DEBUG_DOTH,"%s: %s: Error: DFS wait timer expired, but the driver didn't think we were in dfswait.  Somebody forgot to delete the DFS wait timer.\n", DEV_NAME(dev), __func__);
 		return;
+	}
 
-	if ((hchan.privFlags & CHANNEL_DFS_CLEAR) ||
-	    (!(hchan.privFlags & CHANNEL_DFS))) {
+	if (!sc->sc_dfs_testmode) {
+		do_gettimeofday(&tv);
+		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: DFS wait %s! - Channel: %u Time: %ld.%06ld\n", __func__, DEV_NAME(dev), (sc->sc_curchan.privFlags & CHANNEL_DFS) ? "completed" : "not applicable", ieee80211_mhz2ieee(sc->sc_curchan.channel, sc->sc_curchan.channelFlags), tv.tv_sec, tv.tv_usec);
+		del_timer_sync(&sc->sc_dfs_channel_check_timer);
+		sc->sc_dfs_channel_check = 0;
+		if (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE) {
+			DPRINTF(sc, ATH_DEBUG_DOTH,"%s: %s: Error: DFS wait timer expired but channel was already marked as having CHANNEL_INTERFERENCE.  Somebody forgot to delete the DFS wait timer.\n", DEV_NAME(dev), __func__);
+			return;
+		}
+		if (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS)) {
+			DPRINTF(sc, ATH_DEBUG_DOTH,"%s: %s: Error: DFS wait timer expired but the current channel does not require DFS.  Maybe someone changed channels but forgot to cancel the DFS wait.\n", DEV_NAME(dev), __func__);
+			return;
+		}
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Driver is now MARKING channel as CHANNEL_DFS_CLEAR.\n", DEV_NAME(dev), __func__);
 		sc->sc_curchan.privFlags |= CHANNEL_DFS_CLEAR;
-		sc->sc_dfswait = 0;
+		sc->sc_beacons = 1;
+		sc->sc_imask |= (HAL_INT_SWBA | HAL_INT_BMISS);
+		ath_chan_change(sc, ic->ic_curchan);
+		/* start dfs mark expiration timer */
+		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer, jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
+		/* restart each VAP that was pending... */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			struct ath_vap *avp = ATH_VAP(vap);
-			if (avp->av_dfswait_run) {
-				/* re alloc beacons to update new channel info */
+			if (avp->av_dfs_channel_check_pending) {
 				int error;
+				DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING -> RUN -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
+				/* re alloc beacons to update new channel info */
 				error = ath_beacon_alloc(sc, vap->iv_bss);
 				if (error < 0) {
-					/* XXX */
+					printk(KERN_ERR "beacon alloc failed: %d\n", error);
 					return;
 				}
-				DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP DFS_WAIT -> RUN\n",
-					__func__, DEV_NAME(dev));
+				ath_beacon_config(sc,vap);
+				do_gettimeofday(&tv);
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
-				/* start calibration timer */
-				mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
 #ifdef ATH_SUPERG_XR
 				if (vap->iv_flags & IEEE80211_F_XR ) {
 					u_int32_t rfilt = 0;
@@ -8238,19 +8463,22 @@ ath_check_dfs_clear(unsigned long data )
 					ATH_SETUP_XR_VAP(sc, vap, rfilt);
 				}
 #endif
-				avp->av_dfswait_run = 0;
+				avp->av_dfs_channel_check_pending = 0;
 			}
 		}
-		/* start the device */
 		netif_start_queue(dev);
-		dev->watchdog_timeo = 5 * HZ;	/* set the timeout to normal */
+		dev->watchdog_timeo = 5 * HZ; /* restore normal timeout */
 	} else {
-		/* fire the timer again */
-		sc->sc_dfswaittimer.expires = jiffies + (ATH_DFS_WAIT_POLL_PERIOD * HZ);
-		sc->sc_dfswaittimer.data = (unsigned long)sc;
-		add_timer(&sc->sc_dfswaittimer);
+		do_gettimeofday(&tv);
+		if (sc->sc_dfs_testmode) {
+			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING indefinately.  dfs_testmode is enabled.  Waiting again. -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
+			sc->sc_dfs_channel_check_timer.expires = jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ);
+		} else {
+			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING still.  Waiting again. -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
+			sc->sc_dfs_channel_check_timer.expires = jiffies + (ATH_DFS_WAIT_SHORT_POLL_PERIOD * HZ);
+		}
+		add_timer(&sc->sc_dfs_channel_check_timer);
 	}
-
 }
 
 #ifdef ATH_SUPERG_COMP
@@ -8535,7 +8763,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		u_int32_t rd;
 
 		ath_hal_getregdomain(ah, &rd);
-		printk("%s: unable to collect channel list from HAL; "
+		printk(KERN_ERR "%s: unable to collect channel list from HAL; "
 			"regdomain likely %u country code %u\n",
 			DEV_NAME(dev), rd, cc);
 		kfree(chans);
@@ -8544,16 +8772,55 @@ ath_getchannels(struct net_device *dev, u_int cc,
 	/*
 	 * Convert HAL channels to ieee80211 ones.
 	 */
+	printk(KERN_INFO "HAL returned %d channels.\n", nchan);
 	for (i = 0; i < nchan; i++) {
+
 		HAL_CHANNEL *c = &chans[i];
 		struct ieee80211_channel *ichan = &ic->ic_channels[i];
 
+		/* Correct the DFS flags to account for problems with DFS in older binary HALs returning the wrong answers for FCC... */
+		ath_correct_dfs_flags(sc, c);
+		/*
+		Force re-check.
+		XXX: Unclear whether regs say you can avoid the channel availability check if you've already performed it on the channel within N seconds (and what the legal value of 'N' is in this case).
+		*/
+		c->privFlags          &= ~CHANNEL_DFS_CLEAR;
 		ichan->ic_ieee = ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
 		ichan->ic_freq = c->channel;
 		ichan->ic_flags = c->channelFlags;
 		ichan->ic_maxregpower = c->maxRegTxPower;	/* dBm */
 		ichan->ic_maxpower = c->maxTxPower;		    /* 1/4 dBm */
 		ichan->ic_minpower = c->minTxPower;		    /* 1/4 dBm */
+
+		printk(KERN_INFO "Channel %d (%d MHz) Limit %d dBm Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+			, ichan->ic_ieee
+			, c->channel
+			, c->maxRegTxPower
+			, (c->channelFlags & 0x0001               ? " CF & (1<<0)"          :       "" /* undocumented */)
+			, (c->channelFlags & CHANNEL_CW_INT       ? " CF_CW_INTERFERENCE"   :       "" /* CW interference detected on channel */)
+			, (c->channelFlags & 0x0004               ? " CF & (1<<2)"          :       "" /* undocumented */)
+			, (c->channelFlags & 0x0008               ? " CF & (1<<3)"          :       "" /* undocumented */)
+			, (c->channelFlags & CHANNEL_TURBO        ? " CF_TURBO"             :       "" /* Turbo channel */)
+			, (c->channelFlags & CHANNEL_CCK          ? " CF_CCK"               :       "" /* CCK channel */)
+			, (c->channelFlags & CHANNEL_OFDM         ? " CF_OFDM"              :       "" /* OFDM channel */)
+			, (c->channelFlags & CHANNEL_2GHZ         ? " CF_2GHZ"              :       "" /* 2GHz spectrum channel. */)
+			, (c->channelFlags & CHANNEL_5GHZ         ? " CF_5GHZ"              :       "" /* 5GHz spectrum channel */)
+			, (c->channelFlags & CHANNEL_PASSIVE      ? " CF_PASSIVE_SCAN_ONLY" :       "" /* Only passive scan allowed */)
+			, (c->channelFlags & CHANNEL_DYN          ? " CF_DYNAMIC_TURBO"     :       "" /* Dynamic CCK-OFDM channel */)
+			, (c->channelFlags & CHANNEL_XR           ? " CF_FHSS"              :       "" /* GFSK channel (FHSS  PHY) */)
+			, (c->channelFlags & IEEE80211_CHAN_RADAR ? " CF_RADAR_SEEN"        :       "" /* Radar found on channel */)
+			, (c->channelFlags & CHANNEL_STURBO       ? " CF_STATIC_TURBO"      :       "" /* 11a static turbo channel only  */)
+			, (c->channelFlags & CHANNEL_HALF         ? " CF_HALF_RATE"         :       "" /* Half rate channel */)
+			, (c->channelFlags & CHANNEL_QUARTER      ? " CF_QUARTER_RATE"      :       "" /* Quarter rate channel */)
+			, (c->privFlags    & CHANNEL_INTERFERENCE ? " PF_INTERFERENCE"      :       "" /* Software use: channel interference used for as AR as well as RADAR interference detection */)
+			, (c->privFlags    & CHANNEL_DFS          ? " PF_DFS_REQUIRED"      :       "" /* DFS required on channel */)
+			, (c->privFlags    & CHANNEL_4MS_LIMIT    ? " PF_4MS_LIMIT"         :       "" /* 4msec packet limit on this channel */)
+			, (c->privFlags    & CHANNEL_DFS_CLEAR    ? " PF_DFS_CLEAR"         :       "" /* if channel has been checked for DFS */)
+			, (c->privFlags    & 0x0010               ? " PF & (1<<4)"          :       "" /* undocumented */)
+			, (c->privFlags    & 0x0020               ? " PF & (1<<5)"          :       "" /* undocumented */)
+			, (c->privFlags    & 0x0040               ? " PF & (1<<6)"          :       "" /* undocumented */)
+			, (c->privFlags    & 0x0080               ? " PF & (1<<7)"          :       "" /* undocumented */)
+			);
 	}
 	ic->ic_nchans = nchan;
 	kfree(chans);
@@ -8674,7 +8941,7 @@ ath_update_txpow(struct ath_softc *sc)
 	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
 
 #ifdef ATH_CAP_TPC
-	if (ic->ic_newtxpowlimit >= ic->ic_txpowlimit)
+	if (ic->ic_newtxpowlimit >= txpowlimit)
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 #else
 	if (ic->ic_newtxpowlimit != txpowlimit)
@@ -8969,7 +9236,7 @@ ath_printrxbuf(const struct ath_buf *bf, int done)
 	const struct ath_rx_status *rs = &bf->bf_dsstatus.ds_rxstat;
 	const struct ath_desc *ds = bf->bf_desc;
 
-	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
+	printk(KERN_INFO "R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
@@ -8983,7 +9250,7 @@ ath_printtxbuf(const struct ath_buf *bf, int done)
 	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
 	const struct ath_desc *ds = bf->bf_desc;
 
-	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
+	printk(KERN_DEBUG "T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
@@ -9528,7 +9795,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	space = 5 * sizeof(struct ctl_table) + sizeof(ath_sysctl_template);
 	sc->sc_sysctls = kmalloc(space, GFP_KERNEL);
 	if (sc->sc_sysctls == NULL) {
-		printk("%s: no memory for sysctl table!\n", __func__);
+		printk(KERN_ERR "%s: no memory for sysctl table!\n", __func__);
 		return;
 	}
 
@@ -9742,6 +10009,911 @@ ath_get_hal_status_desc(HAL_STATUS status)
 		return hal_status_desc[status];
 	else
 		return "";
+}
+
+/* Adjust the ratecode used for continuous transmission to the closest rate to the one specified (rounding down) */
+static int
+ath_get_txcont_adj_ratecode(struct ath_softc *sc)
+{
+	const HAL_RATE_TABLE *rt    = sc->sc_currates;
+	int closest_rate_ix         = sc->sc_minrateix;
+	int j;
+
+	if (0 != sc->sc_txcont_rate) {
+		/* Find closest rate to specified rate */
+		for (j = sc->sc_minrateix; j < rt->rateCount; j++) {
+			if (1
+			    && (sc->sc_txcont_rate * 1000) >= rt->info[j].rateKbps
+			    && rt->info[j].rateKbps >= rt->info[closest_rate_ix].rateKbps
+			    ) {
+				closest_rate_ix = j;
+			}
+		}
+	}
+	/* Diagnostic */
+	if (0 == sc->sc_txcont_rate) {
+		printk(KERN_INFO "%s: %s: Using default rate of %dM.\n", DEV_NAME(sc->sc_dev), __func__, (rt->info[closest_rate_ix].rateKbps/1000));
+	} else if (sc->sc_txcont_rate == (rt->info[closest_rate_ix].rateKbps/1000)) {
+		printk(KERN_INFO "%s: %s: Using requested rate of %dM.\n", DEV_NAME(sc->sc_dev), __func__, sc->sc_txcont_rate);
+	} else {
+		printk(KERN_INFO "%s: %s: Rounded down requested rate of %dM to %dM.\n", DEV_NAME(sc->sc_dev), __func__, sc->sc_txcont_rate, (rt->info[closest_rate_ix].rateKbps/1000));
+	}
+	return rt->info[closest_rate_ix].rateCode;
+}
+
+/*
+Configure the radio for continuous transmission
+*/
+static void
+txcont_configure_radio(struct ieee80211com *ic)
+{
+	struct net_device           *dev = ic->ic_dev;
+	struct ath_softc            *sc = dev->priv;
+	struct ath_hal              *ah = sc->sc_ah;
+	struct ieee80211_wme_state  *wme = &ic->ic_wme;
+	struct ieee80211vap         *vap = TAILQ_FIRST(&ic->ic_vaps);
+
+	HAL_STATUS status;
+	int q;
+
+	if (IFF_RUNNING != (ic->ic_dev->flags & IFF_RUNNING)) {
+		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is not in running state.\n", DEV_NAME(dev),__func__);
+		sc->sc_txcont = 0;
+		return;
+	}
+
+	ath_hal_intrset(ah,0);
+	{
+		int ac;
+
+		/* Prepare to reconfigure */
+		ic->ic_caps  &= ~IEEE80211_C_SHPREAMBLE;
+		ic->ic_coverageclass = 0;
+		ic->ic_flags &= ~IEEE80211_F_DOTH;
+		ic->ic_flags &= ~IEEE80211_F_SHPREAMBLE;
+		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
+		ic->ic_flags |= IEEE80211_F_USEBARKER;
+		ic->ic_flags_ext &= ~IEEE80211_FEXT_COUNTRYIE;
+		ic->ic_flags_ext &= ~IEEE80211_FEXT_MARKDFS;
+		ic->ic_flags_ext &= ~IEEE80211_FEXT_REGCLASS;
+		ic->ic_protmode = IEEE80211_PROT_NONE;
+		ic->ic_roaming = IEEE80211_ROAMING_DEVICE;
+		vap->iv_flags &= ~IEEE80211_F_BGSCAN;
+		vap->iv_flags &= ~IEEE80211_F_DROPUNENC;
+		vap->iv_flags &= ~IEEE80211_F_NOBRIDGE;
+		vap->iv_flags &= ~IEEE80211_F_PRIVACY;
+		vap->iv_flags |= IEEE80211_F_PUREG;
+		vap->iv_flags |= IEEE80211_F_WME;
+		vap->iv_flags_ext &= ~IEEE80211_FEXT_UAPSD;
+		vap->iv_flags_ext &= ~IEEE80211_FEXT_WDS;
+		vap->iv_ic->ic_flags |= IEEE80211_F_WME; /* XXX needed by ic_reset */
+		vap->iv_mcast_rate = 54000;
+		vap->iv_uapsdinfo = 0;
+		vap->iv_ath_cap |= IEEE80211_ATHC_BURST;
+		vap->iv_ath_cap |= IEEE80211_ATHC_FF;
+		vap->iv_ath_cap &= ~IEEE80211_ATHC_AR;
+		vap->iv_ath_cap &= ~IEEE80211_ATHC_COMP;
+		vap->iv_des_ssid[0].len = 0;
+		vap->iv_des_nssid = 1;
+		sc->sc_txantenna = sc->sc_defant = sc->sc_mcastantenna = sc->sc_rxotherant = 1;
+		sc->sc_diversity = 0;
+		memset(vap->iv_des_ssid[0].ssid, 0, IEEE80211_ADDR_LEN);
+		ath_hal_setdiversity(sc->sc_ah, 0);
+
+		for (ac = 0; ac < WME_NUM_AC; ac++) {
+
+			/* AIFSN = 1 */
+			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_aifsn     =
+			    wme->wme_bssChanParams.cap_wmeParams[ac].wmep_aifsn        =
+			    wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_aifsn        =
+			    wme->wme_chanParams.cap_wmeParams[ac].wmep_aifsn           =
+			    1;
+
+			/*  CWMIN = 1                                                */
+			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmin  =
+			    wme->wme_bssChanParams.cap_wmeParams[ac].wmep_logcwmin     =
+			    wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_logcwmin     =
+			    wme->wme_chanParams.cap_wmeParams[ac].wmep_logcwmin        =
+			    1;
+
+			/*  CWMAX = 1                                                */
+			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_logcwmax  =
+			    wme->wme_bssChanParams.cap_wmeParams[ac].wmep_logcwmax     =
+			    wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_logcwmax     =
+			    wme->wme_chanParams.cap_wmeParams[ac].wmep_logcwmax        =
+			    1;
+
+			/*  ACM = 1                                                  */
+			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_acm       =
+			    wme->wme_bssChanParams.cap_wmeParams[ac].wmep_acm          =
+			    0;
+
+			/*  NOACK = 1                                                */
+			wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_noackPolicy  =
+			    wme->wme_chanParams.cap_wmeParams[ac].wmep_noackPolicy     =
+			    1;
+
+			/*  TXOPLIMIT = 8192 */
+			wme->wme_wmeBssChanParams.cap_wmeParams[ac].wmep_txopLimit =
+			    wme->wme_bssChanParams.cap_wmeParams[ac].wmep_txopLimit    =
+			    wme->wme_wmeChanParams.cap_wmeParams[ac].wmep_txopLimit    =
+			    wme->wme_chanParams.cap_wmeParams[ac].wmep_txopLimit       =
+			    IEEE80211_US_TO_TXOP(8192);
+		}
+		ieee80211_cancel_scan(vap);	/* anything current */
+		ieee80211_wme_updateparams(vap);
+		/*  reset the WNIC */
+		if (!ath_hal_reset_wrapper(sc, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status)) {
+			printk(KERN_ERR "%s: ath_hal_reset_wrapper failed: '%s' (HAL status %u) in %s at %s:%d\n", DEV_NAME(dev), ath_get_hal_status_desc(status), status,  __func__, __FILE__, __LINE__);
+		}
+		ath_update_txpow(sc);
+
+#ifdef ATH_SUPERG_DYNTURBO
+		/*  Turn on dynamic turbo if necessary -- before we get into our own implementation -- and before we configures */
+		if (   (! IEEE80211_IS_CHAN_STURBO(ic->ic_bsschan))
+		    && ( IEEE80211_ATHC_TURBOP & TAILQ_FIRST(&ic->ic_vaps)->iv_ath_cap )
+		    && ( IEEE80211_IS_CHAN_ANYG(ic->ic_bsschan) || IEEE80211_IS_CHAN_A(ic->ic_bsschan))
+		    ) {
+			u_int32_t newflags = ic->ic_bsschan->ic_flags;
+			if (( IEEE80211_ATHC_TURBOP & TAILQ_FIRST(&ic->ic_vaps)->iv_ath_cap )) {
+				DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Enabling dynamic turbo...\n", DEV_NAME(dev));
+				ic->ic_ath_cap |= IEEE80211_ATHC_BOOST;
+				sc->sc_ignore_ar = 1;
+				newflags |= IEEE80211_CHAN_TURBO;
+			} else {
+				DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Disabling dynamic turbo...\n", DEV_NAME(dev));
+				ic->ic_ath_cap &= ~IEEE80211_ATHC_BOOST;
+				newflags &= ~IEEE80211_CHAN_TURBO;
+			}
+			ieee80211_dturbo_switch(ic, newflags);
+			/*  Keep interupts off, just in case... */
+			ath_hal_intrset(ah,0);
+		}
+#endif /* #ifdef ATH_SUPERG_DYNTURBO */
+		/* clear pending tx frames picked up after reset */
+		ath_draintxq(sc);
+		/* stop receive side */
+		ath_stoprecv(sc);
+		ath_hal_setrxfilter(ah, 0);
+		ath_hal_setmcastfilter(ah,0,0);
+		ath_set_ack_bitrate(sc, sc->sc_ackrate);
+		netif_wake_queue(dev);		/* restart xmit */
+
+		if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
+			/* registers taken from openhal */
+#define AR5K_AR5212_TXCFG				0x0030
+#define AR5K_AR5212_TXCFG_TXCONT_ENABLE			0x00000080
+#define AR5K_AR5212_RSSI_THR				0x8018
+#define AR5K_AR5212_PHY_NF				0x9864
+#define AR5K_AR5212_ADDAC_TEST				0x8054
+#define AR5K_AR5212_DIAG_SW				0x8048
+#define AR5K_AR5212_DIAG_SW_IGNOREPHYCS			0x00100000
+#define AR5K_AR5212_DIAG_SW_IGNORENAV			0x00200000
+#define AR5K_AR5212_DCU_GBL_IFS_SIFS			0x1030
+#define AR5K_AR5212_DCU_GBL_IFS_SIFS_M			0x0000ffff
+#define AR5K_AR5212_DCU_GBL_IFS_EIFS			0x10b0
+#define AR5K_AR5212_DCU_GBL_IFS_EIFS_M			0x0000ffff
+#define AR5K_AR5212_DCU_GBL_IFS_SLOT			0x1070
+#define AR5K_AR5212_DCU_GBL_IFS_SLOT_M			0x0000ffff
+#define AR5K_AR5212_DCU_GBL_IFS_MISC			0x10f0
+#define	AR5K_AR5212_DCU_GBL_IFS_MISC_LFSR_SLICE		0x00000007
+#define	AR5K_AR5212_DCU_GBL_IFS_MISC_TURBO_MODE		0x00000008
+#define	AR5K_AR5212_DCU_GBL_IFS_MISC_SIFS_DUR_USEC	0x000003f0
+#define	AR5K_AR5212_DCU_GBL_IFS_MISC_USEC_DUR		0x000ffc00
+#define	AR5K_AR5212_DCU_GBL_IFS_MISC_DCU_ARB_DELAY	0x00300000
+#define	AR5K_AR5212_DCU_MISC_POST_FR_BKOFF_DIS		0x00200000
+#define	AR5K_AR5212_DCU_CHAN_TIME_DUR			0x000fffff
+#define	AR5K_AR5212_DCU_CHAN_TIME_ENABLE		0x00100000
+#define	AR5K_AR5212_QCU(_n, _a)		                (((_n) << 2) + _a)
+#define	AR5K_AR5212_DCU(_n, _a)		                AR5K_AR5212_QCU(_n, _a)
+#define AR5K_AR5212_DCU_MISC(_n)			AR5K_AR5212_DCU(_n, 0x1100)
+#define AR5K_AR5212_DCU_CHAN_TIME(_n)			AR5K_AR5212_DCU(_n, 0x10c0)
+			/*
+			NOTE: This section of direct hardware access contains a continuous transmit mode
+			derived by reverse engineering.  Many of the settings may be unnecessary to achieve
+			the end result.  Additional testing, selectively commenting out register writes below
+			may result in simpler code with the same results.
+			*/
+
+			/*  Set RSSI threshold to extreme, hear nothing */
+			OS_REG_WRITE(ah, AR5K_AR5212_RSSI_THR, 0xffffffff);
+			/*  Blast away at noise floor, assuming AGC has already set it... we want to trash it. */
+			OS_REG_WRITE(ah, AR5K_AR5212_PHY_NF,   0xffffffff);
+			/* Enable continuous transmit mode / DAC test mode */
+			OS_REG_WRITE(ah, AR5K_AR5212_ADDAC_TEST, OS_REG_READ(ah, AR5K_AR5212_ADDAC_TEST) | 1);
+			/* Ignore real and virtual carrier sensing, and reception */
+			OS_REG_WRITE(ah, AR5K_AR5212_DIAG_SW, OS_REG_READ(ah, AR5K_AR5212_DIAG_SW) | AR5K_AR5212_DIAG_SW_IGNOREPHYCS | AR5K_AR5212_DIAG_SW_IGNORENAV);
+			/*  Set SIFS to rediculously small value...  */
+			OS_REG_WRITE(ah, AR5K_AR5212_DCU_GBL_IFS_SIFS, (OS_REG_READ(ah, AR5K_AR5212_DCU_GBL_IFS_SIFS) & ~AR5K_AR5212_DCU_GBL_IFS_SIFS_M) | 1);
+			/*  Set EIFS to rediculously small value...  */
+			OS_REG_WRITE(ah, AR5K_AR5212_DCU_GBL_IFS_EIFS, (OS_REG_READ(ah, AR5K_AR5212_DCU_GBL_IFS_EIFS) & ~AR5K_AR5212_DCU_GBL_IFS_EIFS_M) | 1);
+			/*  Set slot time to rediculously small value...  */
+			OS_REG_WRITE(ah, AR5K_AR5212_DCU_GBL_IFS_SLOT, (OS_REG_READ(ah, AR5K_AR5212_DCU_GBL_IFS_SLOT) & ~AR5K_AR5212_DCU_GBL_IFS_SLOT_M) | 1);
+			OS_REG_WRITE(ah, AR5K_AR5212_DCU_GBL_IFS_MISC,
+			    OS_REG_READ(ah, AR5K_AR5212_DCU_GBL_IFS_MISC)
+			    & ~AR5K_AR5212_DCU_GBL_IFS_MISC_SIFS_DUR_USEC
+			    & ~AR5K_AR5212_DCU_GBL_IFS_MISC_USEC_DUR
+			    & ~AR5K_AR5212_DCU_GBL_IFS_MISC_DCU_ARB_DELAY
+			    & ~AR5K_AR5212_DCU_GBL_IFS_MISC_LFSR_SLICE
+			    );
+			/*  Disable queue backoff (default was like 256 or 0x100) */
+			for (q = 0; q < 4; q++) {
+				OS_REG_WRITE(ah, AR5K_AR5212_DCU_MISC(q), AR5K_AR5212_DCU_MISC_POST_FR_BKOFF_DIS);
+				/*  Set the channel time (burst time) to the highest setting the register can take, forget this compliant 8192 limit... */
+				OS_REG_WRITE(ah, AR5K_AR5212_DCU_CHAN_TIME(q), AR5K_AR5212_DCU_CHAN_TIME_ENABLE | AR5K_AR5212_DCU_CHAN_TIME_DUR);
+			}
+			/*  Set queue full to continuous */
+			OS_REG_WRITE(ah, AR5K_AR5212_TXCFG, OS_REG_READ(ah, AR5K_AR5212_TXCFG) | AR5K_AR5212_TXCFG_TXCONT_ENABLE);
+#undef AR5K_AR5212_TXCFG
+#undef AR5K_AR5212_TXCFG_TXCONT_ENABLE
+#undef AR5K_AR5212_RSSI_THR
+#undef AR5K_AR5212_PHY_NF
+#undef AR5K_AR5212_ADDAC_TEST
+#undef AR5K_AR5212_DIAG_SW
+#undef AR5K_AR5212_DIAG_SW_IGNOREPHYCS
+#undef AR5K_AR5212_DIAG_SW_IGNORENAV
+#undef AR5K_AR5212_DCU_GBL_IFS_SIFS
+#undef AR5K_AR5212_DCU_GBL_IFS_SIFS_M
+#undef AR5K_AR5212_DCU_GBL_IFS_EIFS
+#undef AR5K_AR5212_DCU_GBL_IFS_EIFS_M
+#undef AR5K_AR5212_DCU_GBL_IFS_SLOT
+#undef AR5K_AR5212_DCU_GBL_IFS_SLOT_M
+#undef AR5K_AR5212_DCU_GBL_IFS_MISC
+#undef AR5K_AR5212_DCU_GBL_IFS_MISC_LFSR_SLICE
+#undef AR5K_AR5212_DCU_GBL_IFS_MISC_TURBO_MODE
+#undef AR5K_AR5212_DCU_GBL_IFS_MISC_SIFS_DUR_USEC
+#undef AR5K_AR5212_DCU_GBL_IFS_MISC_USEC_DUR
+#undef AR5K_AR5212_DCU_GBL_IFS_MISC_DCU_ARB_DELAY
+#undef AR5K_AR5212_DCU_MISC_POST_FR_BKOFF_DIS
+#undef AR5K_AR5212_DCU_CHAN_TIME_DUR
+#undef AR5K_AR5212_DCU_CHAN_TIME_ENABLE
+#undef AR5K_AR5212_QCU
+#undef AR5K_AR5212_DCU
+#undef AR5K_AR5212_DCU_MISC
+#undef AR5K_AR5212_DCU_CHAN_TIME
+		}
+
+		/*  Disable beacons and beacon miss interrupts */
+		sc->sc_beacons = 0;
+		sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
+
+		/*  Enable continuous transmit register bit */
+		sc->sc_txcont = 1;
+	}
+	ath_hal_intrset(ah,sc->sc_imask);
+}
+
+/*
+ * Queue a self-looped packet for the specified hardware queue.
+ */
+static void
+txcont_queue_packet(struct ieee80211com *ic, struct ath_txq* txq)
+{
+	struct net_device *dev             = ic->ic_dev;
+	struct ath_softc *sc               = dev->priv;
+	struct ath_hal *ah                 = sc->sc_ah;
+	struct ath_buf *bf                 = NULL;
+	struct sk_buff *skb                = NULL;
+	unsigned int i;
+	unsigned int datasz                = 4028; /* maximum supported size, subtracting headers and required slack */
+	struct ieee80211_frame* wh         = NULL;
+	unsigned char *data                = NULL;
+	unsigned char *crc                 = NULL;
+
+	if (IFF_RUNNING != (ic->ic_dev->flags & IFF_RUNNING) || (0 == sc->sc_txcont)) {
+		printk(KERN_ERR "%s: %s: Refusing to queue self linked frame when txcont is not enabled.\n", DEV_NAME(dev),__func__);
+		return;
+	}
+
+	ath_hal_intrset(ah,0);
+	{
+		bf  = STAILQ_FIRST(&sc->sc_txbuf);
+		STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
+		skb = alloc_skb(datasz + sizeof(struct ieee80211_frame) + IEEE80211_CRC_LEN, GFP_ATOMIC);
+		wh  = (struct ieee80211_frame*)skb_put(skb, sizeof(struct ieee80211_frame));
+		if (NULL == skb) {
+			printk(KERN_ERR "%s: %s: alloc_skb returned null!\n", DEV_NAME(dev),__func__);
+			BUG();
+		}
+		if (NULL == bf) {
+			printk(KERN_ERR "%s: %s: STAILQ_FIRST(&sc->sc_txbuf) returned null!\n", DEV_NAME(dev),__func__);
+			BUG();
+		}
+
+		/*  Define the SKB format */
+		data   = skb_put(skb, datasz);
+
+		/*  NOTE: little endian byte order (bits 0-7 in [0] and 8-15 in [1], for example)!! */
+		wh->i_fc[0]    = 0xf0; /*  11110000 (protocol = 00, type = 00 "management", subtype = 1111 "reserved/undocumented" */
+		wh->i_fc[1]    = 0x00; /*  leave out to/from ds, frag, retry, pwr mgt, more data, protected frame, and order bit */
+		wh->i_dur      = 0;    /*  NOTE: Duration is left at zero, for broadcast frames. */
+		wh->i_addr1[0] = wh->i_addr1[1] = wh->i_addr1[2] = wh->i_addr1[3] = wh->i_addr1[4] = wh->i_addr1[5] = 0xff; /*  DA (destination address) */
+		wh->i_addr2[0] = wh->i_addr2[1] = wh->i_addr2[2] = wh->i_addr2[3] = wh->i_addr2[4] = wh->i_addr2[5] = 0xff; /*  BSSID */
+		wh->i_addr3[0] = wh->i_addr3[1] = wh->i_addr3[2] = wh->i_addr3[3] = wh->i_addr3[4] = wh->i_addr3[5] = 0x00; /*  SA (source address) */
+		wh->i_seq[0]   = 0x00; /*  Sequence is zero for now, let the hardware assign this or not, depending on how we setup flags (below) */
+		wh->i_seq[1]   = 0x00;
+
+		/*  Initialize the data */
+		if (datasz % 4)	BUG();
+		for (i = 0; i < datasz; i+=4) {
+			data[i+0] = 0x00;
+			data[i+1] = 0xff;
+			data[i+2] = 0x00;
+			data[i+3] = 0xff;
+		}
+
+		/*  Add space for the CRC */
+		crc    = skb_put(skb, IEEE80211_CRC_LEN);
+
+		/*  Clear  */
+		crc[0] = crc[1] = crc[2] = crc[3] = 0x00;
+
+		/*  Initialize the selfed-linked frame */
+		bf->bf_skb      = skb;
+		bf->bf_skbaddr  = bus_map_single(sc->sc_bdev, bf->bf_skb->data, bf->bf_skb->len, BUS_DMA_TODEVICE);
+		bf->bf_flags    = HAL_TXDESC_CLRDMASK | HAL_TXDESC_NOACK;
+		bf->bf_node     = NULL;
+		bf->bf_desc->ds_link = bf->bf_daddr;
+		bf->bf_desc->ds_data = bf->bf_skbaddr;
+
+		ath_hal_setuptxdesc(
+		    ah,
+		    bf->bf_desc,		     /* the descriptor */
+		    skb->len,			     /* packet length */
+		    sizeof(struct ieee80211_frame),  /* header length */
+		    HAL_PKT_TYPE_NORMAL,	     /* Atheros packet type */
+		    sc->sc_txcont_power,	     /* txpower in 0.5dBm increments, range 0-n depending upon card typically 60-100 max */
+		    ath_get_txcont_adj_ratecode(sc),  /* series 0 rate */
+		    0,				     /* series 0 retries */
+		    HAL_TXKEYIX_INVALID,	     /* key cache index */
+		    sc->sc_txantenna,		     /* antenna mode */
+		    bf->bf_flags,		     /* flags */
+		    0,				     /* rts/cts rate */
+		    0,				     /* rts/cts duration */
+		    0,				     /* comp icv len */
+		    0,				     /* comp iv len */
+		    ATH_COMP_PROC_NO_COMP_NO_CCS     /* comp scheme */
+		    );
+
+		ath_hal_filltxdesc(
+		    ah				   /* HAL handle */
+		    , bf->bf_desc		     /* Descriptor to fill */
+		    , skb->len			     /* buffer length */
+		    , AH_TRUE			     /* is first segment */
+		    , AH_TRUE			     /* is last segment */
+		    , bf->bf_desc		     /* first descriptor */
+		    );
+		/*  Byteswap (as necessary) */
+		ath_desc_swap(bf->bf_desc);
+		/*  queue the self-linked frame */
+		ath_tx_txqaddbuf(
+		    sc
+		    , NULL			    /* node */
+		    , txq			    /* hardware queue */
+		    , bf			    /* atheros buffer */
+		    , bf->bf_desc		    /* last descriptor */
+		    , bf->bf_skb->len		    /* frame length */
+		    );
+		ath_hal_txstart(ah, txq->axq_qnum);
+	}
+	ath_hal_intrset(ah,sc->sc_imask);
+}
+
+/*
+Turn on continuous transmission
+*/
+static void
+txcont_on(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+
+	if (IFF_RUNNING != (ic->ic_dev->flags & IFF_RUNNING)) {
+		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is not in running state.\n", DEV_NAME(dev),__func__);
+		sc->sc_txcont = 0;
+		return;
+	}
+
+	txcont_configure_radio(ic);
+	txcont_queue_packet(ic, sc->sc_ac2q[WME_AC_BE]);
+	txcont_queue_packet(ic, sc->sc_ac2q[WME_AC_BK]);
+	txcont_queue_packet(ic, sc->sc_ac2q[WME_AC_VI]);
+	txcont_queue_packet(ic, sc->sc_ac2q[WME_AC_VO]);
+}
+
+/*
+Turn off continuous transmission
+*/
+static void
+txcont_off(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+
+	sc->sc_beacons = 1;
+	ath_reset(sc->sc_dev);
+
+	sc->sc_txcont = 0;
+}
+
+/*
+See ath_set_dfs_testmode for details.
+*/
+static int
+ath_get_dfs_testmode(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	return sc->sc_dfs_testmode;
+}
+
+/*
+In this mode:
+* "doth" flag can be enabled and radar detection will be logged to the syslog (or console) with a timestamp.
+* "markdfs" flag will be ignoredm and the channel will never be marked as having radar interference.
+* If the channel was not already done with channel availability scan before this flag is set, channel availability scan will run perpetually.
+* Therefore you have two modes of usage:
+
+	1.  Bring up an AP and then enable dfs test mode after the channel availability scan, it will report radar errors but will not stop the AP.
+	    (This is useful for demonstrating that even under high duty cycle, radar is still detected... but without changing channels -- for probability testing and debugging)
+
+	2.  Enable dfs test mode before the channel availability scan completes, it will report radar erors but will never begin transmitting beacons or acting as an AP.
+	    (This is useful for demonstrating channel availability check works during FCC and ETSI testing -- for probability testing and debugging)
+*/
+static void
+ath_set_dfs_testmode(struct ieee80211com *ic, int value)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	sc->sc_dfs_testmode = ((0 != value) ? 1 : 0);
+}
+
+/* Is continuous transmission mode enabled?  It may not actually be transmitting if the interface is down, for example. */
+static int
+ath_get_txcont(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	return sc->sc_txcont;
+}
+
+/* Set transmission mode on/off... but know that it may not actually start if the interface is down, for example. */
+static void
+ath_set_txcont(struct ieee80211com *ic, int on)
+{
+	on ? txcont_on(ic) : txcont_off(ic);
+}
+
+/* Set the transmission power to be used during continuous transmission in units of 0.5dBm ranging from 0 to 127. */
+static void
+ath_set_txcont_power(struct ieee80211com *ic, unsigned int txpower)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	int new_txcont_power = txpower > IEEE80211_TXPOWER_MAX ? IEEE80211_TXPOWER_MAX : txpower;
+	if (sc->sc_txcont_power != new_txcont_power) {
+		/*  update */
+		sc->sc_txcont_power = new_txcont_power;
+		/*  restart continuous transmit if necessary */
+		if (sc->sc_txcont) {
+			txcont_on(ic);
+		}
+	}
+}
+
+/* See ath_set_txcont_power for details. */
+static int
+ath_get_txcont_power(struct ieee80211com *ic)
+{
+   struct net_device *dev = ic->ic_dev;
+   struct ath_softc *sc = dev->priv;
+   return sc->sc_txcont_power ? sc->sc_txcont_power : 0; /* VERY conservative default */
+}
+
+/* Set the transmission rate to be used for continuous transmissions(in Mbps) */
+static void
+ath_set_txcont_rate(struct ieee80211com *ic, unsigned int new_rate)
+{
+   struct net_device *dev = ic->ic_dev;
+   struct ath_softc *sc = dev->priv;
+   if (sc->sc_txcont_rate != new_rate) {
+	/*  NOTE: This value is sanity checked and dropped down to closest rate in txcont_on. */
+	sc->sc_txcont_rate = new_rate;
+	/*  restart continuous transmit if necessary */
+	if (sc->sc_txcont) {
+		txcont_on(ic);
+	}
+   }
+}
+
+/* See ath_set_txcont_rate for details. */
+static unsigned int
+ath_get_txcont_rate(struct ieee80211com *ic)
+{
+   struct net_device *dev = ic->ic_dev;
+   struct ath_softc *sc = dev->priv;
+   return sc->sc_txcont_rate ? sc->sc_txcont_rate : 0;
+}
+
+/* For testing, we will allow you to change the channel availability check time.  Do not use this in production, obviously.  */
+static void
+ath_set_dfs_channel_availability_check_time(struct ieee80211com *ic, unsigned int time_s)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	sc->sc_dfs_channel_availability_check_time = time_s;
+}
+
+/* For testing, we will allow you to change the channel availability check time.  Do not use this in production, obviously.  */
+static unsigned int
+ath_get_dfs_channel_availability_check_time(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	return 0 != sc->sc_dfs_channel_availability_check_time ? sc->sc_dfs_channel_availability_check_time : ATH_DFS_WAIT_MIN_PERIOD;
+}
+
+/*
+For testing, we will allow you to change the channel non-occupancy period.  Do not use this in production, obviously.
+This is very handy for verifying and testing that the non-occupancy feature works, and that the uniform channel spreading requirement is met.
+1  Set a short non-occupancy period.
+2  Set the channel to a *fixed* channel requiring DFS.
+3  Wait for radar or use the ioctl to fake an event.
+4  Assumng you are not in dfstest mode, the radio will change to another channel... but it remembers you preferred fixed channel.
+5  Wait (a much shorter period than half an hour) to see that your original channel is returned to service AND that the AP switches back to it.
+*/
+static void
+ath_set_dfs_non_occupancy_period(struct ieee80211com *ic, unsigned int time_s)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	sc->sc_dfs_non_occupancy_period = time_s;
+}
+
+/*
+See ath_set_dfs_non_occupancy_period for details.
+*/
+static unsigned int
+ath_get_dfs_non_occupancy_period(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	return 0 != sc->sc_dfs_non_occupancy_period ? sc->sc_dfs_non_occupancy_period : ATH_DFS_AVOID_MIN_PERIOD;
+}
+
+
+/*
+This is called by a private ioctl (iwpriv) to simulate radar by directly invoking the ath_radar_detected function
+even though we are outside of interrupt context.
+*/
+static unsigned int
+ath_test_radar(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc   = dev->priv;
+	if ((ic->ic_flags & IEEE80211_F_DOTH) && (sc->sc_curchan.privFlags & CHANNEL_DFS))
+		ath_radar_detected(sc, "ath_test_radar from user space");
+	else
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: channel %u MHz is not marked for CHANNEL_DFS.  Radar test not performed!\n", DEV_NAME(dev), __func__, sc->sc_curchan.channel);
+	return 0;
+}
+
+/*
+If we are shutting down or blowing off the DFS channel availability check then we call this
+to stop the behavior before we take the rest of the necessary actions (such as a DFS reaction to radar).
+*/
+static void
+ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason)
+{
+	struct ieee80211com*     ic  = &sc->sc_ic;
+	struct net_device*       dev = sc->sc_dev;
+	struct ieee80211vap *vap ;
+	struct timeval tv;
+	int ended = 0;
+
+	del_timer_sync(&sc->sc_dfs_channel_check_timer);
+	if (sc->sc_dfs_channel_check)
+		ended++;
+	sc->sc_dfs_channel_check = 0;
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+		struct ath_vap *avp = ATH_VAP(vap);
+		if (avp->av_dfs_channel_check_pending) {
+			do_gettimeofday(&tv);
+			avp->av_dfs_channel_check_pending = 0;
+			ended++;
+		}
+	}
+	if (ended)
+		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: %s - Channel: %u Time: %ld.%06ld\n", __func__, DEV_NAME(dev), reason, ieee80211_mhz2ieee(sc->sc_curchan.channel, sc->sc_curchan.channelFlags), tv.tv_sec, tv.tv_usec);
+
+}
+
+/*
+Invoked from interrupt context when radar is detected and positively identified by historical event analysis.
+This guy must report the radar event and perform the "dfs action" which can mean one of two things:
+If markdfs is enabled, it means mark the channel for non-occupancy with an expiration (typically 30m by law),
+and then change channels for at least that long.
+If markdfs is disabled or we are in dfstest mode we may just report the radar or we may go to another channel,
+and sit quietly.  This 'go sit quietly' (or mute test) behavior is an artifact of the previous DFS code in trunk
+and it's left here because it may be used as the basis for implementing AP requested mute tests in station mode later.
+*/
+static void
+ath_radar_detected(struct ath_softc *sc, const char* cause) {
+	/* struct ath_softc *sc = container_of(thr, struct ath_softc, sc_radartask); */
+	struct ath_hal*          ah  = sc->sc_ah;
+	struct ieee80211com*     ic  = &sc->sc_ic;
+	struct net_device*       dev = sc->sc_dev;
+	struct ieee80211_channel ichan;
+	struct timeval tv;
+
+	do_gettimeofday(&tv);
+	DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: radar interference detected at %d MHz. -- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, sc->sc_curchan.channel, tv.tv_sec, tv.tv_usec);
+
+	/* Stop here if we are testing w/o channel switching */
+	if (sc->sc_dfs_testmode) {
+		ath_dump_phyerr_statistics(sc, cause);
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: dfs_testmode enabled -- staying in channel availability check mode!\n", DEV_NAME(dev), __func__);
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: cause: %s\n", DEV_NAME(dev), __func__, cause);
+		return;
+	}
+
+	/*  DFS was found, initiate channel change */
+	ichan.ic_ieee = ath_hal_mhz2ieee(ah, sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
+	ichan.ic_freq = sc->sc_curchan.channel;
+	ichan.ic_flags = sc->sc_curchan.channelFlags;
+	sc->sc_curchan.privFlags &= ~CHANNEL_DFS_CLEAR;
+	sc->sc_curchan.privFlags |= CHANNEL_INTERFERENCE;
+
+	/*  Dump out diags */
+	ath_dump_phyerr_statistics(sc, cause);
+
+	/*  Stop any pending channel availability check (if applicable) */
+	ath_interrupt_dfs_channel_check(sc, "Radar detected.  Interrupting DFS wait.");
+	DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: invoking ieee80211_mark_dfs!  ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X -- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags, tv.tv_sec, tv.tv_usec);
+	ieee80211_mark_dfs(ic, &ichan);
+	if (((ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) == 0) && (ic->ic_opmode == IEEE80211_M_HOSTAP))
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: markdfs is disabled.  ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X\n", DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
+}
+
+/*
+Is radar detection enabled?
+*/
+static int
+ath_get_radar(struct ath_softc *sc)
+{
+/* registers taken from the OpenBSD 5212 HAL */
+#define AR5K_AR5212_PHY_ERR_FIL		    0x810c
+#define AR5K_AR5212_PHY_ERR_FIL_RADAR	0x00000020
+	struct ath_hal *ah = sc->sc_ah;
+	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213)
+		return 1
+		&& (OS_REG_READ(ah, AR5K_AR5212_PHY_ERR_FIL) & AR5K_AR5212_PHY_ERR_FIL_RADAR)
+		&& (sc->sc_imask & HAL_INT_RXPHY)
+		&& (ath_hal_intrget(ah) & HAL_INT_RXPHY)
+		;
+	else
+		return 1
+		&& (sc->sc_imask & HAL_INT_RXPHY)
+		&& (ath_hal_intrget(ah) & HAL_INT_RXPHY)
+		;
+	return 0;
+#undef AR5K_AR5212_PHY_ERR_FIL
+#undef AR5K_AR5212_PHY_ERR_FIL_RADAR
+}
+
+/*
+Enable radar detection for 5212, 5213 and compatible chips.  AR5210 doesn't have radar pulse detector
+*/
+static int
+ath_set_radar(struct ath_softc *sc, HAL_CHANNEL* hchan)
+{
+/* registers taken from bsd open HAL */
+#define AR5K_AR5212_PHY_RADAR               0x9954
+#define AR5K_AR5212_PHY_RADAR_DISABLE   0x00000000
+#define AR5K_AR5212_PHY_RADAR_ENABLE    0x00000001
+#define AR5K_AR5212_PHY_ERR_FIL             0x810c
+#define AR5K_AR5212_PHY_ERR_FIL_RADAR   0x00000020
+
+	struct ath_hal *ah = sc->sc_ah;
+	struct net_device *dev = sc->sc_dev;
+	struct ieee80211com *ic = &sc->sc_ic;
+	int required = 0;
+
+	if (ic->ic_flags & IEEE80211_F_SCAN)
+		return 1;
+
+	/* sanity check */
+	if (ath_correct_dfs_flags(sc, hchan))
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: channel required corrections to private flags.\n", DEV_NAME(dev), __func__);
+
+	required = ath_is_dfs_required(sc, hchan);
+
+	/* registers taken from the OpenBSD 5212 HAL */
+	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
+		HAL_INT old_ier = ath_hal_intrget(ah);
+		HAL_INT new_ier = old_ier;
+		unsigned int old_radar  = OS_REG_READ(ah, AR5K_AR5212_PHY_RADAR);
+		unsigned int old_filter = OS_REG_READ(ah, AR5K_AR5212_PHY_ERR_FIL);
+		unsigned int old_rxfilt = ath_hal_getrxfilter(ah);
+		unsigned int old_mask   = sc->sc_imask;
+		unsigned int new_radar  = old_radar;
+		unsigned int new_filter = old_filter;
+		unsigned int new_mask   = old_mask;
+		unsigned int new_rxfilt = old_rxfilt;
+
+		ath_hal_intrset(ah, old_ier & ~HAL_INT_GLOBAL);
+		if (required) {
+			new_radar    |= AR5K_AR5212_PHY_RADAR_ENABLE;
+			new_filter   |= AR5K_AR5212_PHY_ERR_FIL_RADAR;
+			new_rxfilt   |= (HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR);
+			new_mask     |= HAL_INT_RXPHY;
+			new_ier      |= HAL_INT_RXPHY;
+		} else {
+			new_radar    &= ~AR5K_AR5212_PHY_RADAR_ENABLE;
+			new_filter   &= ~AR5K_AR5212_PHY_ERR_FIL_RADAR;
+			new_rxfilt   &= ~HAL_RX_FILTER_PHYRADAR;
+			new_mask     &= ~HAL_INT_RXPHY;
+			new_ier      &= ~HAL_INT_RXPHY;
+		}
+		if (old_filter != new_filter) {
+			OS_REG_WRITE(ah, AR5K_AR5212_PHY_ERR_FIL, new_filter);
+		}
+		if (old_radar != new_radar) {
+			OS_REG_WRITE(ah, AR5K_AR5212_PHY_RADAR,   new_radar);
+		}
+		if (old_rxfilt != new_rxfilt) {
+			ath_hal_setrxfilter(ah, new_rxfilt);
+		}
+		sc->sc_imask = new_mask;
+		if (IFF_DUMPPKTS(sc, ATH_DEBUG_DOTH) && ((old_radar != new_radar) || (old_filter != new_filter) || (old_rxfilt != new_rxfilt) || (old_mask != new_mask) || (old_ier != new_ier))) {
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Radar detection %s.\n", DEV_NAME(dev), __func__, required ? "enabled" : "disabled");
+		}
+		ath_hal_intrset(ah, new_ier);
+	}
+	return(required == ath_get_radar(sc));
+/* registers taken from bsd open HAL */
+#undef AR5K_AR5212_PHY_RADAR
+#undef AR5K_AR5212_PHY_RADAR_DISABLE
+#undef AR5K_AR5212_PHY_RADAR_ENABLE
+#undef AR5K_AR5212_PHY_ERR_FIL
+#undef AR5K_AR5212_PHY_ERR_FIL_RADAR
+}
+
+/*
+This function executes in interrupt context and is used
+when the HAL_INT_RXPHY interrupt occurs.  We are specifically
+looking to see if ANY pending errors in the queue are for radar,
+and thus react to them before their time normally occurs during
+rx_tasklet.
+
+We will not mark those buffers as done which we found radar in, so that we will still see them in the rx tasklet
+and such, so we can get normal behavior for statistics even though we may have started DFS radar co-channel
+avoidance ecountermeasures.
+*/
+static int
+ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc)
+{
+	struct ath_hal *ah = sc->sc_ah;
+	struct ath_buf *bf;
+	struct ath_desc *ds;
+	struct sk_buff *skb;
+	struct ath_rx_status *rs;
+	unsigned int found_radar = 0;
+	HAL_BOOL retval = AH_FALSE;
+
+#define	PA2DESC(_sc, _pa) \
+	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
+		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
+
+	ATH_RXBUF_LOCK_IRQ(sc);
+	for (bf = sc->sc_rxbufcur ? sc->sc_rxbufcur : STAILQ_FIRST(&sc->sc_rxbuf); bf; bf = STAILQ_NEXT(bf, bf_list)) {
+		ds = bf->bf_desc;
+		if (ds->ds_link == bf->bf_daddr) {
+			break;
+		}
+		if (bf->bf_status & ATH_BUFSTATUS_DONE) {
+			continue;
+		}
+		/*  We don't want to process this request twice... */
+		if (bf->bf_status & ATH_BUFSTATUS_RADAR_DONE) {
+			continue;
+		}
+		skb = bf->bf_skb;
+		if (skb == NULL) {
+			printk(KERN_ERR "%s: no skbuff\n", __func__);
+			continue;
+		}
+		rs = &bf->bf_dsstatus.ds_rxstat;
+		retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), sc->sc_tsf, rs);
+		if (HAL_EINPROGRESS == retval)
+			break;
+
+		if ((HAL_RXERR_PHY == rs->rs_status) && (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f))) {
+			/*
+			XXX: This diagnostic output and setting found_radar flag are a temporary solution.
+			The correct solution is to capture radar pulse events over time and perform
+			analysis of the patterns detected to figure out noise from radar bursts.
+			*/
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: RADAR PULSE: width=%u rssi=%u (dBm) tsf delta=%llu (usec) signal=%u (dBm) noise=%u (dBm) tstamp=%u (TU) sc->sc_tsf=%llu (usec)\n"
+			    , DEV_NAME(sc->sc_dev)
+			    , __func__
+			    , rs->rs_datalen ? skb->data[0] : -1
+			    , rs->rs_rssi
+			    , sc->sc_lastradar_tsf ? ath_extend_tsf(sc->sc_tsf, rs->rs_tstamp) - sc->sc_lastradar_tsf : 0
+			    , (sc->sc_channoise + rs->rs_rssi)
+			    , sc->sc_channoise
+			    , rs->rs_tstamp
+			    , ath_extend_tsf(sc->sc_tsf, rs->rs_tstamp)
+			    );
+			found_radar++;
+			sc->sc_lastradar_tsf = ath_extend_tsf(sc->sc_tsf, rs->rs_tstamp);
+			bf->bf_status |= ATH_BUFSTATUS_RADAR_DONE;
+			continue;
+		}
+		continue;
+	}
+	ATH_RXBUF_UNLOCK_IRQ(sc);
+	if (found_radar)
+		ath_radar_detected(sc, "RADAR: ath_intr got RXPHY and found HAL_PHYERR_RADAR enqueued.");
+	return found_radar;
+#undef PA2DESC
+}
+
+/*
+Ideally we replace this with a HAL call, based upon country code.  Atheros HAL has this I think because I've seen other binary HAL besides Sam's that has this function.
+*/
+static int
+ath_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan)
+{
+	/*
+	For FCC: 5.25 to 5.35GHz (channel 52 to 60) and for Europe added 5.47 to 5.725GHz (channel 100 to 140).
+	Being conservative, go with the entire band from 5225-5725 MHz.
+	*/
+	return ((hchan->channel >= 5225 && hchan->channel <= 5725)) ? 1 : 0;
+}
+
+/*
+Update DFS flags based upon applying DFS to everybody... we need the HAL function that tells us if a country code is in a DFS regulatory domain.
+*/
+static int
+ath_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
+{
+	u_int32_t old_channelFlags  = hchan->channelFlags;
+	u_int32_t old_privFlags     = hchan->privFlags;
+	if (ath_is_dfs_required(sc, hchan)) {
+		hchan->channelFlags |= CHANNEL_PASSIVE;
+		hchan->privFlags    |= CHANNEL_DFS;
+	}
+	else {
+		hchan->channelFlags &= ~CHANNEL_PASSIVE;
+		hchan->privFlags    &= ~CHANNEL_DFS;
+	}
+	return (old_privFlags != hchan->privFlags) || (old_channelFlags != hchan->channelFlags);
+}
+
+/*
+This is helpful for comparing OFDM timing vs radar event occurrances
+*/
+static void
+ath_dump_phyerr_statistics(struct ath_softc *sc, const char* cause)
+{
+	if (IFF_DUMPPKTS(sc, ATH_DEBUG_DOTH))
+	{
+		struct net_device*  dev = sc->sc_dev;
+		printk(KERN_DEBUG "-----------------------------------------------------------------------------\n");
+		printk(KERN_DEBUG "%s: %s: %s\n", DEV_NAME(dev),__func__, cause);
+		printk(KERN_DEBUG " HAL_PHYERR_RADAR.................%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_RADAR]);
+		printk(KERN_DEBUG " HAL_PHYERR_TIMING................%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_TIMING]);
+		printk(KERN_DEBUG " HAL_PHYERR_LENGTH................%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_LENGTH]);
+		printk(KERN_DEBUG " HAL_PHYERR_OFDM_TIMING...........%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_OFDM_TIMING]);
+		printk(KERN_DEBUG " HAL_PHYERR_OFDM_SIGNAL_PARITY....%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_OFDM_SIGNAL_PARITY]);
+		printk(KERN_DEBUG " HAL_PHYERR_OFDM_RATE_ILLEGAL.....%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_OFDM_RATE_ILLEGAL]);
+		printk(KERN_DEBUG " HAL_PHYERR_OFDM_LENGTH_ILLEGAL...%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_OFDM_LENGTH_ILLEGAL]);
+		printk(KERN_DEBUG " HAL_PHYERR_OFDM_POWER_DROP.......%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_OFDM_POWER_DROP]);
+		printk(KERN_DEBUG " HAL_PHYERR_OFDM_SERVICE..........%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_OFDM_SERVICE]);
+		printk(KERN_DEBUG " HAL_PHYERR_OFDM_RESTART..........%6d\n", sc->sc_stats.ast_rx_phy[HAL_PHYERR_OFDM_RESTART]);
+		printk(KERN_DEBUG "-----------------------------------------------------------------------------\n");
+	}
 }
 
 static int
@@ -10602,4 +11774,48 @@ ath_registers_dump_delta(struct ieee80211com *ic)
 	ath_ar5212_registers_dump_delta(sc);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+
+/*
+ * Periodically expire radar avoidance marks.
+ */
+static void
+ath_dfs_expire_channel_non_occupancy_timers(unsigned long arg)
+{
+	struct net_device *dev = (struct net_device *) arg;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211vap *tmpvap;
+
+	if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
+		/* Make sure there are no channels that have just become available */
+		ieee80211_expire_channel_non_occupancy_restrictions(ic);
+		/* Go through and clear any interference flag we have, if we just got it cleared up for us */
+		TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
+			if (1
+			    && tmpvap->iv_state == IEEE80211_S_RUN			/* running */
+			    && tmpvap->iv_opmode == IEEE80211_M_HOSTAP			/* ap */
+			    && tmpvap->iv_des_chan->ic_freq > 0				/* with a desired channel */
+			    && tmpvap->iv_des_chan->ic_freq != ic->ic_bsschan->ic_freq	/* operating on a different channel */
+			   ) {
+				struct ieee80211_channel *desired_channel = ieee80211_find_channel(ic, tmpvap->iv_des_chan->ic_freq, tmpvap->iv_des_chan->ic_flags);
+				/* Can we switch to it? */
+				if (NULL == desired_channel) {
+					DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Desired channel not found: %u/%x\n", DEV_NAME(dev), __func__, tmpvap->iv_des_chan->ic_freq, tmpvap->iv_des_chan->ic_flags);
+				} else if (0 == (desired_channel->ic_flags & IEEE80211_CHAN_RADAR)) {
+					DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Desired channel found and available.  Switching to %u/%x\n", DEV_NAME(dev), __func__, tmpvap->iv_des_chan->ic_freq, tmpvap->iv_des_chan->ic_flags);
+					ic->ic_chanchange_chan = desired_channel->ic_ieee;
+					ic->ic_chanchange_tbtt = IEEE80211_RADAR_11HCOUNT;
+					ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+				} else {
+					DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Desired channel found and not available until Time: %ld.%06ld\n", DEV_NAME(dev), __func__, desired_channel->ic_non_occupancy_timer_expiration.tv_sec, desired_channel->ic_non_occupancy_timer_expiration.tv_usec);
+				}
+			}
+		}
+	}
+
+	/* Restart the timer */
+	sc->sc_dfs_channel_non_occupancy_expiration_timer.expires = jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ);
+	add_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
+}
 

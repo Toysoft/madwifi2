@@ -2242,6 +2242,335 @@ ieee80211_saveath(struct ieee80211_node *ni, u_int8_t *ie)
 	ieee80211_saveie(&ni->ni_ath_ie, ie);
 }
 
+/*
+ * Structure to be passed through ieee80211_iterate_nodes() to count_nodes()
+ */
+struct count_nodes_arg {
+	const int k;
+	const int *subset;
+	int count;
+	struct ieee80211_node *new;
+};
+
+/*
+ * Count nodes which don't support at least one of arg->subset
+ * Context: channel_combination()
+ */
+static void
+count_nodes(void *_arg, struct ieee80211_node *ni)
+{
+	struct count_nodes_arg *arg = (struct count_nodes_arg *)_arg;
+	int i;
+
+	if (ni->ni_suppchans == NULL)
+		return;
+
+	if (ni == arg->new)
+		return;
+
+	for (i=0; i<arg->k; i++)
+		if (isclr(ni->ni_suppchans, arg->subset[i])) {
+			arg->count++;
+			return;
+		}
+}
+
+/*
+ * Structure to be passed through combinations() to channel_combination()
+ */
+struct channel_combination_arg {
+	struct ieee80211com *ic;
+	struct ieee80211_node *new;
+	int *best;
+	int benefit;
+};
+
+/*
+ * sprintf() set[] array consisting of k integers
+ */
+static const char*
+ints_sprintf(const int k, const int set[])
+{
+	static char buf[915]; 	/* 0-255: 10*2 + 90*3 + 156*4 + '\0' */
+	char *ptr = buf;
+	int i;
+	for (i=0; i<k; i++)
+		ptr += snprintf(ptr, buf + sizeof(buf) - ptr, "%d ", set[i]);
+	return buf;
+}
+/*
+ * Action done for each combination of channels that are not supported by currently joining station.
+ * Context: combinations()
+ */
+static void
+channel_combination(const int k, const int subset[], void *_arg)
+{
+	struct channel_combination_arg *arg = (struct channel_combination_arg *)_arg;
+	struct ieee80211com *ic = arg->ic;
+	struct count_nodes_arg cn_arg = { k, subset, 0, arg->new };
+	int permil, allowed;
+	int sta_assoc = ic->ic_sta_assoc;	/* make > 0 check consistent with / operation */
+
+	ieee80211_iterate_nodes(&arg->ic->ic_sta, &count_nodes, (void*)&cn_arg);
+
+	/* The following two sanity checks can theoretically fail due to lack
+	 * of locking, but since it is not fatal, we will just print a debug
+	 * msg and neglect it */
+	if (cn_arg.count == 0) {
+		IEEE80211_NOTE(arg->new->ni_vap, IEEE80211_MSG_ANY, arg->new, "%s",
+				"ic_chan_nodes incosistency (incorrect uncommon channel count)");
+		return;
+	}
+	if (sta_assoc == 0) {
+		IEEE80211_NOTE(arg->new->ni_vap, IEEE80211_MSG_ANY, arg->new, "%s",
+				"no STAs associated, so there should be no \"uncommon\" channels");
+		return;
+	}
+
+	permil = 1000 * cn_arg.count / sta_assoc;
+	allowed = ic->ic_sc_slcg * k;
+	/* clamp it to provide more sensible output */
+	if (allowed > 1000)
+		allowed = 1000;
+
+	IEEE80211_NOTE(arg->new->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, arg->new,
+			"Making channels %savailable would require kicking out %d stations,",
+			ints_sprintf(k, subset), cn_arg.count);
+	IEEE80211_NOTE(arg->new->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, arg->new,
+			"what is %d permils of all associated STAs (slcg permits < %d).", permil, allowed);
+
+	if (permil > allowed)
+		return;
+	if (allowed - permil > arg->benefit) {
+		memcpy(arg->best, subset, k * sizeof(*subset));
+		arg->benefit = allowed - permil;
+	}
+}
+
+/*
+ * Enumerate all combinations of k-element subset of n-element set via a callback function
+ */
+static void
+combinations(int n, int set[], int k, void (*callback)(const int, const int [], void *), void *arg)
+{
+	int subset[k], pos[k], i;
+	for (i=0;i<k;i++)
+		pos[i] = 0;
+	i=0;
+forward:
+	if (i > 0) {
+		while (set[pos[i]] < subset[i-1] && pos[i] < n)
+			pos[i]++;
+		if (pos[i] == n)
+			goto backward;
+	}
+	subset[i] = set[pos[i]];
+	set[pos[i]] = set[n-1];
+	n--;
+
+	i++;
+	if (i == k) {
+		callback(k, subset, arg);
+	} else {
+		pos[i] = 0;
+		goto forward;
+	}
+backward:
+	i--;
+	if (i < 0)
+		return;
+	set[pos[i]] = subset[i];
+	n++;
+
+	pos[i]++;
+	if (pos[i] == n)
+		goto backward;
+	goto forward;
+}
+
+static __inline int
+find_worse_nodes(struct ieee80211com *ic, struct ieee80211_node *new)
+{
+	int i, tmp1, tmp2;
+	u_int16_t n_common, n_uncommon;
+	u_int16_t cn_total = ic->ic_cn_total;
+	u_int16_t to_gain;
+
+	if (cn_total == 0)
+		/* should not happen */
+		return 1;
+
+	n_common = n_uncommon = 0;
+
+	CHANNEL_FOREACH(i, ic, tmp1, tmp2) {
+		if (isset(new->ni_suppchans_new, i)) {
+			if (ic->ic_chan_nodes[i] == ic->ic_cn_total) {
+				n_common++;
+			} else {
+				n_uncommon++;
+			}
+		}
+	}
+
+	to_gain = ic->ic_sc_mincom - n_common + 1;
+	IEEE80211_NOTE(new->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, new,
+			"By accepting STA we would need to gain at least %d common channels.", to_gain);
+	IEEE80211_NOTE(new->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, new,
+			"%d channels supported by the joining STA are not commonly supported by others.", n_uncommon);
+
+	if (to_gain > n_uncommon) {
+		IEEE80211_NOTE(new->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, new,
+				"%s", "Even disassociating all the nodes will not be enough.");
+		return 0;
+	}
+
+	{
+		int uncommon[n_uncommon];
+		int best[to_gain];
+		struct channel_combination_arg arg = { ic, new, best, -1 };
+		int j = 0;
+
+		CHANNEL_FOREACH(i, ic, tmp1, tmp2)
+			if (isset(new->ni_suppchans_new, i) && ic->ic_chan_nodes[i] != ic->ic_cn_total) {
+				if (j == n_uncommon)
+					/* silent assert */
+					break;
+				uncommon[j++] = i;
+			}
+
+		combinations(n_uncommon, uncommon, to_gain, &channel_combination, &arg);
+		if (arg.benefit < 0) {
+			IEEE80211_NOTE(new->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, new,
+					"%s", "No combination of channels allows a beneficial trade-off.");
+			return 0;
+		}
+		IEEE80211_NOTE(new->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, new,
+				"Nodes which don't support channels %swill be forced to leave.",
+				ints_sprintf(to_gain, best));
+
+		if (new->ni_needed_chans != NULL)
+			FREE(new->ni_needed_chans, M_DEVBUF);
+		MALLOC(new->ni_needed_chans, void*, to_gain * sizeof(*new->ni_needed_chans), M_DEVBUF, M_NOWAIT);
+		if (new->ni_needed_chans == NULL) {
+			IEEE80211_NOTE(new->ni_vap,
+					IEEE80211_MSG_DEBUG | IEEE80211_MSG_DOTH, new,
+					"%s", "needed_chans allocation failed");
+			return 0;
+		}
+
+		/* store the list of channels to remove nodes which don't support them */
+		for (i=0; i<to_gain; i++)
+			new->ni_needed_chans[i] = best[i];
+		new->ni_n_needed_chans = to_gain;
+		return 1;
+	}
+}
+
+static int
+ieee80211_parse_sc_ie(struct ieee80211_node *ni, u_int8_t *frm,
+	const struct ieee80211_frame *wh)
+{
+	struct ieee80211_ie_sc *sc_ie = (struct ieee80211_ie_sc *)frm;
+	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211vap *vap = ni->ni_vap;
+	int reassoc = (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
+		IEEE80211_FC0_SUBTYPE_REASSOC_REQ;
+	int i, tmp1, tmp2;
+	int count;
+
+	if (sc_ie == NULL) {
+		if (ni->ni_ic->ic_sc_algorithm == IEEE80211_SC_STRICT) {
+			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+					"deny %s request, no supported channels ie",
+					reassoc ? "reassoc" : "assoc");
+			return IEEE80211_STATUS_SUPPCHAN_UNACCEPTABLE;
+		}
+		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+				"%s request: no supported channels ie",
+				reassoc ? "reassoc" : "assoc");
+		return IEEE80211_STATUS_SUCCESS;
+	}
+	if (sc_ie->sc_len % 2 != 0) {
+		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+				"deny %s request, malformed supported channels ie (len)",
+				reassoc ? "reassoc" : "assoc");
+		/* XXX: deauth with IEEE80211_REASON_IE_INVALID? */
+		return IEEE80211_STATUS_SUPPCHAN_UNACCEPTABLE;
+	}
+	if (ni->ni_suppchans_new == NULL) {
+		MALLOC(ni->ni_suppchans_new, void*, IEEE80211_CHAN_BYTES,
+				M_DEVBUF, M_NOWAIT);
+		if (ni->ni_suppchans_new == NULL) {
+			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+					"deny %s request, couldn't allocate memory for sc ie!",
+					reassoc ? "reassoc" : "assoc");
+			return IEEE80211_STATUS_SUPPCHAN_UNACCEPTABLE;
+		}
+	}
+	memset(ni->ni_suppchans_new, 0, IEEE80211_CHAN_BYTES);
+	for (i=0; i<sc_ie->sc_len/2; i++) {
+		u_int8_t chan = sc_ie->sc_subband[i].sc_first;
+		/* XXX: see 802.11d-2001-4-05-03-interp,
+		 * but what about .11j, turbo, etc.? */
+		u_int8_t step = (chan <= 14 ? 1 : 4);
+		u_int16_t last = chan + step * (sc_ie->sc_subband[i].sc_number - 1);
+
+		/* check for subband under- (sc_number == 0) or overflow */
+		if ((last < chan) || (chan <= 14 && last > 14) || (chan > 14 && last > 200)) {
+			/* XXX: deauth with IEEE80211_REASON_IE_INVALID? */
+			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+					"deny %s request, malformed supported channels ie "
+					"(subbands, %d, %d)", reassoc ? "reassoc" : "assoc", chan, last);
+			return IEEE80211_STATUS_SUPPCHAN_UNACCEPTABLE;
+		}
+
+		for (; chan <= last; chan += step)
+			setbit(ni->ni_suppchans_new, chan);
+	}
+	/* forbid STAs that claim they don't support the channel they are
+	 * currently operating at */
+	if (isclr(ni->ni_suppchans_new, ic->ic_bsschan->ic_ieee)) {
+		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+				"deny %s request, sc ie does not contain bss channel"
+				"(subbands)", reassoc ? "reassoc" : "assoc");
+		return IEEE80211_STATUS_SUPPCHAN_UNACCEPTABLE;
+	}
+
+	if (ic->ic_sc_algorithm != IEEE80211_SC_TIGHT &&
+			ic->ic_sc_algorithm != IEEE80211_SC_STRICT)
+		goto success;
+
+	/* count number of channels that will be common to all STAs after the
+	 * new one joins */
+	count = 0;
+	CHANNEL_FOREACH(i, ic, tmp1, tmp2)
+		if (isset(ni->ni_suppchans_new, i) && ic->ic_chan_nodes[i] == ic->ic_cn_total)
+			count++;
+
+	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+			"%s request: %d common channels, %d required",
+			reassoc ? "reassoc" : "assoc", count, ic->ic_sc_mincom);
+	if (count < ic->ic_sc_mincom) {
+		/* common channel count decreases below the required minimum */
+		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+				"%s request: not enough common channels available, tight/strict algorithm engaged",
+				reassoc ? "reassoc" : "assoc");
+
+		if (!find_worse_nodes(ic, ni)) {
+			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, wh->i_addr2,
+					"deny %s request, tight/strict criterium not met",
+					reassoc ? "reassoc" : "assoc");
+			return IEEE80211_STATUS_SUPPCHAN_UNACCEPTABLE;
+		}
+	}
+
+success:
+	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_DOTH|IEEE80211_MSG_ASSOC|IEEE80211_MSG_ELEMID, wh->i_addr2,
+			"%s", "supported channels ie parsing successful");
+	return IEEE80211_STATUS_SUCCESS;
+}
+
+
 struct ieee80211_channel *
 ieee80211_doth_findchan(struct ieee80211vap *vap, u_int8_t chan)
 {
@@ -2538,7 +2867,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_frame *wh;
 	u_int8_t *frm, *efrm;
-	u_int8_t *ssid, *rates, *xrates, *wpa, *rsn, *wme, *ath;
+	u_int8_t *ssid, *rates, *xrates, *suppchan, *wpa, *rsn, *wme, *ath;
 	u_int8_t rate;
 	int reassoc, resp, allocbs = 0;
 	u_int8_t qosinfo;
@@ -3132,6 +3461,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 *	[tlv] ssid
 		 *	[tlv] supported rates
 		 *	[tlv] extended supported rates
+		 *	[tlv] supported channels
 		 *	[tlv] wpa or RSN
 		 *      [tlv] WME
 		 *	[tlv] Atheros Advanced Capabilities
@@ -3151,7 +3481,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		frm += 2;
 		if (reassoc)
 			frm += 6;	/* ignore current AP info */
-		ssid = rates = xrates = wpa = rsn = wme = ath = NULL;
+		ssid = rates = xrates = suppchan = wpa = rsn = wme = ath = NULL;
 		while (frm < efrm) {
 			IEEE80211_VERIFY_LENGTH(efrm - frm, frm[1]);
 			switch (*frm) {
@@ -3163,6 +3493,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				break;
 			case IEEE80211_ELEMID_XRATES:
 				xrates = frm;
+				break;
+			case IEEE80211_ELEMID_SUPPCHAN:
+				suppchan = frm;
 				break;
 			/* XXX verify only one of RSN and WPA ie's? */
 			case IEEE80211_ELEMID_RSN:
@@ -3210,6 +3543,23 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 				IEEE80211_REASON_ASSOC_NOT_AUTHED);
 			vap->iv_stats.is_rx_assoc_notauth++;
 			return;
+		}
+
+		if (ni->ni_needed_chans != NULL) {
+			FREE(ni->ni_needed_chans, M_DEVBUF);
+			ni->ni_needed_chans = NULL;
+		}
+
+		if (ic->ic_flags & IEEE80211_F_DOTH) {
+			u_int8_t status;
+			status = ieee80211_parse_sc_ie(ni, suppchan, wh);
+			if (status != IEEE80211_STATUS_SUCCESS) {
+				/* ieee80211_parse_sc_ie already printed dbg msg */
+				IEEE80211_SEND_MGMT(ni, resp, status);
+				ieee80211_node_leave(ni); /* XXX */
+				vap->iv_stats.is_rx_assoc_badscie++; /* XXX */
+				return;
+			}
 		}
 
 		/* Assert right associstion security credentials */
