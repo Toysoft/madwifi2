@@ -1838,19 +1838,14 @@ ath_init(struct net_device *dev)
 	ath_stop_locked(dev);
 
 #ifdef ATH_CAP_TPC
-	ath_hal_setcapability(sc->sc_ah, HAL_CAP_TPC, 0, 1, NULL);
+	/* Re-enable after suspend (?) */
+	ath_hal_settpc(ah, tpc);
 #endif
 
 	/* Whether we should enable h/w TKIP MIC */
-	if ((ic->ic_caps & IEEE80211_C_WME) == 0)
-		ath_hal_setcapability(sc->sc_ah, HAL_CAP_TKIP_MIC, 0, 0, NULL);
-	else {
-		if (((ic->ic_caps & IEEE80211_C_WME_TKIPMIC) == 0) &&
-		    (ic->ic_flags & IEEE80211_F_WME))
-			ath_hal_setcapability(sc->sc_ah, HAL_CAP_TKIP_MIC, 0, 0, NULL);
-		else
-			ath_hal_setcapability(sc->sc_ah, HAL_CAP_TKIP_MIC, 0, 1, NULL);
-	}
+	ath_hal_settkipmic(ah, ((ic->ic_caps & IEEE80211_C_WME) && 
+				((ic->ic_caps & IEEE80211_C_WME_TKIPMIC) || 
+				 !(ic->ic_flags & IEEE80211_F_WME))) ? 1 : 0);
 
 	/*
 	 * Flush the skb's allocated for receive in case the rx
