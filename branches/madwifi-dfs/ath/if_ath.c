@@ -1746,7 +1746,6 @@ ath_intr(int irq, void *dev_id)
 ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 #endif
 {
-#define AR5K_AR5212_PISR		0x0080
 	struct net_device *dev = dev_id;
 	struct ath_softc *sc = dev->priv;
 	struct ath_hal *ah = sc->sc_ah;
@@ -1880,7 +1879,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (needmark)
 		mark_bh(IMMEDIATE_BH);
 	return IRQ_HANDLED;
-#undef AR5K_AR5212_PISR
 }
 
 static void
