@@ -130,6 +130,8 @@ struct ieee80211_channel {
 #define	IEEE80211_CHAN_ANYC 	((struct ieee80211_channel *) IEEE80211_CHAN_ANY)
 
 #define	IEEE80211_RADAR_11HCOUNT	3	/* equal to IEEE80211_CSA_PROTECTION_PERIOD */
+#define IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT	3
+
 #define	IEEE80211_RADAR_TEST_MUTE_CHAN	36	/* Move to channel 36 for mute test */
 
 /* bits 0-3 are for private use by drivers */

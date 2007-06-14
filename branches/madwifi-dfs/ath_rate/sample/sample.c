@@ -569,7 +569,7 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 		short_tries,
 		MIN(tries0, tries) - 1);
 	tries_so_far += tries0;
-	if (tries1 && tries0 < tries) {
+	if (tries1 && (tries0 < tries)) {
 		if (!(0 <= ndx1 && ndx1 < sn->num_rates)) {
 			printk("%s: bogus ndx1 %d, max %u, mode %u\n",
 					__func__, ndx1, sn->num_rates, sc->sc_curmode);
@@ -581,7 +581,7 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 	}
 	tries_so_far += tries1;
 
-	if (tries2 && tries0 + tries1 < tries) {
+	if (tries2 && ((tries0 + tries1) < tries)) {
 		if (!(0 <= ndx2 && ndx2 < sn->num_rates)) {
 			printk("%s: bogus ndx2 %d, max %u, mode %u\n",
 					__func__, ndx2, sn->num_rates, sc->sc_curmode);
@@ -594,7 +594,7 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 
 	tries_so_far += tries2;
 
-	if (tries3 && tries0 + tries1 + tries2 < tries) {
+	if (tries3 && ((tries0 + tries1 + tries2) < tries)) {
 		if (!(0 <= ndx3 && ndx3 < sn->num_rates)) {
 			printk("%s: bogus ndx3 %d, max %u, mode %u\n",
 					__func__, ndx3, sn->num_rates, sc->sc_curmode);
@@ -638,7 +638,6 @@ update_stats(struct ath_softc *sc, struct ath_node *an,
 	sn->stats[size_bin][ndx0].tries += tries;
 	sn->stats[size_bin][ndx0].last_tx = jiffies;
 	sn->stats[size_bin][ndx0].total_packets++;
-
 
 	if (ndx0 == sn->current_sample_ndx[size_bin]) {
 		DPRINTF(sc, ATH_DEBUG_RATE, "%s: %s size %u sample rate %u tries (%u/%u) tt %u avg_tt (%u/%u) status %u\n",
@@ -707,7 +706,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 	if (!mrr || !(ts->ts_rate & HAL_TXSTAT_ALTRATE)) {
 		/* only one rate was used */
 		int ndx = rate_to_ndx(sn, final_rate);
-		if (ndx >= 0 && ndx < sn->num_rates) {
+		if ((ndx >= 0) && (ndx < sn->num_rates)) {
 			update_stats(sc, an, frame_size,
 				ndx, long_tries,
 				0, 0,
