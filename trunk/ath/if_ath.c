@@ -2092,6 +2092,9 @@ ath_set_ack_bitrate(struct ath_softc *sc, int high)
 		} else {
 			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) | v);
 		}
+#undef AR5K_AR5212_STA_ID1
+#undef AR5K_AR5212_STA_ID1_BASE_RATE_11B
+#undef AR5K_AR5212_STA_ID1_ACKCTS_6MB
 		return 0;
 	}
 	return 1;
@@ -2120,6 +2123,7 @@ ath_reset(struct net_device *dev)
 	c = ic->ic_curchan;
 	sc->sc_curchan.channel = c->ic_freq;
 	sc->sc_curchan.channelFlags = ath_chan2flags(c);
+	sc->sc_curchan.privFlags = 0;
 
 	ath_hal_intrset(ah, 0);		/* disable interrupts */
 	ath_draintxq(sc);		/* stop xmit side */
@@ -2452,7 +2456,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 	}								\
 	ATH_TXBUF_UNLOCK_IRQ(sc);					\
 	if (bf == NULL) {		/* NB: should not happen */	\
-		DPRINTF(sc,ATH_DEBUG_XMIT,				\
+		DPRINTF(sc, ATH_DEBUG_XMIT,				\
 			"%s: discard, no xmit buf\n", __func__);	\
 		sc->sc_stats.ast_tx_nobuf++;				\
 	}								\
@@ -5003,7 +5007,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			bf = STAILQ_FIRST(&tmp_q.axq_q);
 			index++;
 		}
-		printk("moved %d buffers from NORMAL to XR\n", index);
+		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "moved %d buffers from NORMAL to XR\n", index);
 	} else {
 		struct ath_txq wme_tmp_qs[WME_AC_VO+1];
 		struct ath_txq *wmeq = NULL, *prevq;
@@ -5014,7 +5018,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		/*
 		 * move data from XR txq to Normal txqs.
 		 */
-		printk("move buffers from XR to NORMAL\n");
+		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "move buffers from XR to NORMAL\n");
 		memset(&wme_tmp_qs, 0, sizeof(wme_tmp_qs));
 		for (index = 0; index <= WME_AC_VO; index++)
 			STAILQ_INIT(&wme_tmp_qs[index].axq_q);
@@ -5187,7 +5191,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			ATH_TXQ_UNLOCK_IRQ(txq);
 		}
 
-		printk("moved %d buffers from XR to NORMAL\n", count);
+		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "moved %d buffers from XR to NORMAL\n"m count);
 	}
 #endif
 	return 0;
@@ -5764,7 +5768,7 @@ rx_accept:
 rx_next:
 		ATH_RXBUF_LOCK_IRQ(sc);
 		STAILQ_REMOVE_HEAD(&sc->sc_rxbuf, bf_list);
-		bf->bf_status &= ~ATH_BUFSTATUS_DONE;
+		ATH_RXBUF_RESET(bf);
 		STAILQ_INSERT_TAIL(&sc->sc_rxbuf, bf, bf_list);
 		ATH_RXBUF_UNLOCK_IRQ(sc);
 	} while (ath_rxbuf_init(sc, bf) == 0);
@@ -8678,7 +8682,7 @@ ath_update_txpow(struct ath_softc *sc)
 	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
 
 #ifdef ATH_CAP_TPC
-	if (ic->ic_newtxpowlimit >= ic->ic_txpowlimit)
+	if (ic->ic_newtxpowlimit >= txpowlimit)
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 #else
 	if (ic->ic_newtxpowlimit != txpowlimit)
@@ -10384,15 +10388,6 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 		UNFILTERED : FILTERED;
 #else /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 
-	/* In this mode, we only filter out large blocks of unused registers 
-	 * that are either known to be uninteresting or known to cause a PCI 
-	 * bus hang because it is not mapped by the hardware decoder on some 
-	 * PCI boards.
-	 * 
-	 * There ARE undocumented registers that will be output by this 
-	 * routine, but it will crash on some boards with 
-	 * ATH_REVERSE_ENGINEERING_WITH_NO_FEAR defined!
-	 */
 	return UNFILTERED;
 #endif /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 	#undef UNFILTERED
