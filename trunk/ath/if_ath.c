@@ -10012,7 +10012,7 @@ ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u
  * for). Names were taken from openhal ar5212regs.h. Return AH_TRUE if the 
  * name is a known ar5212 register, and AH_FALSE otherwise. */
 #ifdef ATH_REVERSE_ENGINEERING
-static const HAL_BOOL
+static HAL_BOOL
 ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t address) {
 	const char* static_label = NULL;
 	memset(buf, 0, buflen);
@@ -10392,49 +10392,8 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 	 * There ARE undocumented registers that will be output by this 
 	 * routine, but it will crash on some boards with 
 	 * ATH_REVERSE_ENGINEERING_WITH_NO_FEAR defined!
-	 *
-	 * XXX: Figure out whether I handle the errors instead and still make 
-	 * these requests without screwing up the ATH PCI device. */
-	/* ALLOW - General registers */
-	if (address < 0x00c0) return UNFILTERED;
-	/* SKIP  - read and clear registers */
-	if (address < 0x00e0) return FILTERED;
-	/* ALLOW - Unknown, rest of 8-bit addresses */
-	if (address < 0x01e0) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x0800) return FILTERED;
-	/* ALLOW - QCU Registers (0x0800-0x0B00 block) */
-	if (address < 0x0B00) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x1000) return FILTERED;
-	/* ALLOW - DCU Registers (0x1000-0x1500 block) */
-	if (address < 0x1500) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x4000) return FILTERED;
-	/* SKIP - PCI Domain Registers (0x4000-0x5000 block) */
-	if (address < 0x5000) return FILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x8000) return FILTERED;
-	/* ALLOW - PCU Registers */
-	if (address < 0x8140) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x8600) return FILTERED;
-	/* ALLOW - RATE_DUR  */
-	if (address < 0x8800) return UNFILTERED;
-	/* ALLOW - WEP Key Table  */
-	if (address < 0x9800) return UNFILTERED;
-	/* ALLOW - PHY Registers */
-	if (address < 0x9a00) return UNFILTERED;
-	/* SKIP  - PHY Register space, unused portion */
-	if (address < 0x9c00) return FILTERED;
-	/* ALLOW - PHY Registers */
-	if (address < 0x9c20) return UNFILTERED;
-	/* SKIP  - PHY Register space, unused portion */
-	if (address < 0xA200) return FILTERED;
-	/* ALLOW - PHY Registers */
-	if (address < 0xA210) return FILTERED;
-	/* SKIP  - Unknown*/
-	return FILTERED;
+	 */
+	return UNFILTERED;
 #endif /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 	#undef UNFILTERED
 	#undef FILTERED
