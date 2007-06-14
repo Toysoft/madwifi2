@@ -1967,9 +1967,13 @@ ath_init(struct net_device *dev)
 #endif
 
 	/* Whether we should enable h/w TKIP MIC */
-	ath_hal_settkipmic(ah, ((ic->ic_caps & IEEE80211_C_WME) && 
-				((ic->ic_caps & IEEE80211_C_WME_TKIPMIC) || 
-				 !(ic->ic_flags & IEEE80211_F_WME))) ? 1 : 0);
+	if ((ic->ic_caps & IEEE80211_C_WME) && 
+	    ((ic->ic_caps & IEEE80211_C_WME_TKIPMIC) || 
+	    !(ic->ic_flags & IEEE80211_F_WME))) {
+		ath_hal_settkipmic(ah, AH_TRUE);
+	} else {
+		ath_hal_settkipmic(ah, AH_FALSE);
+	}
 
 	/*
 	 * Flush the skb's allocated for receive in case the rx
@@ -2985,7 +2989,7 @@ ath_keyprint(struct ath_softc *sc, const char *tag, u_int ix,
 	printk("%s: [%02u] %-7s ", tag, ix, ciphers[hk->kv_type]);
 	for (i = 0, n = hk->kv_len; i < n; i++)
 		printk("%02x", hk->kv_val[i]);
-	printk(KERN_DEBUG " mac %s", ether_sprintf(mac));
+	printk(" mac %s", ether_sprintf(mac));
 	if (hk->kv_type == HAL_CIPHER_TKIP) {
 		printk(" %s ", sc->sc_splitmic ? "mic" : "rxmic");
 		for (i = 0; i < sizeof(hk->kv_mic); i++)
@@ -8763,7 +8767,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		u_int32_t rd;
 
 		ath_hal_getregdomain(ah, &rd);
-		printk(KERN_ERR "%s: unable to collect channel list from HAL; "
+		printk("%s: unable to collect channel list from HAL; "
 			"regdomain likely %u country code %u\n",
 			DEV_NAME(dev), rd, cc);
 		kfree(chans);
@@ -9236,7 +9240,7 @@ ath_printrxbuf(const struct ath_buf *bf, int done)
 	const struct ath_rx_status *rs = &bf->bf_dsstatus.ds_rxstat;
 	const struct ath_desc *ds = bf->bf_desc;
 
-	printk(KERN_INFO "R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
+	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
@@ -9250,7 +9254,7 @@ ath_printtxbuf(const struct ath_buf *bf, int done)
 	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
 	const struct ath_desc *ds = bf->bf_desc;
 
-	printk(KERN_DEBUG "T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
+	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
@@ -9588,13 +9592,13 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			case ATH_TKIPMIC: {
 				struct ieee80211com *ic = &sc->sc_ic;
 
-				if (!ath_hal_hastkipmic(ah))
-					ret = -EINVAL;
+				if (!(ic->ic_caps & IEEE80211_C_TKIPMIC) || 
+				    ((ic->ic_caps & IEEE80211_C_WME) && 
+				     !(ic->ic_caps & IEEE80211_C_WME_TKIPMIC) && 
+				     (ic->ic_flags & IEEE80211_F_WME)))
+					return -EINVAL;
+				
 				ath_hal_settkipmic(ah, val);
-				if (val)
-					ic->ic_caps |= IEEE80211_C_TKIPMIC;
-				else
-					ic->ic_caps &= ~IEEE80211_C_TKIPMIC;
 				break;
 			}
 #ifdef ATH_SUPERG_XR
@@ -9795,7 +9799,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	space = 5 * sizeof(struct ctl_table) + sizeof(ath_sysctl_template);
 	sc->sc_sysctls = kmalloc(space, GFP_KERNEL);
 	if (sc->sc_sysctls == NULL) {
-		printk(KERN_ERR "%s: no memory for sysctl table!\n", __func__);
+		printk("%s: no memory for sysctl table!\n", __func__);
 		return;
 	}
 
@@ -11261,7 +11265,7 @@ ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u
  * for). Names were taken from openhal ar5212regs.h. Return AH_TRUE if the 
  * name is a known ar5212 register, and AH_FALSE otherwise. */
 #ifdef ATH_REVERSE_ENGINEERING
-static const HAL_BOOL
+static HAL_BOOL
 ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t address) {
 	const char* static_label = NULL;
 	memset(buf, 0, buflen);
@@ -11633,56 +11637,6 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 		UNFILTERED : FILTERED;
 #else /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 
-	/* In this mode, we only filter out large blocks of unused registers 
-	 * that are either known to be uninteresting or known to cause a PCI 
-	 * bus hang because it is not mapped by the hardware decoder on some 
-	 * PCI boards.
-	 * 
-	 * There ARE undocumented registers that will be output by this 
-	 * routine, but it will crash on some boards with 
-	 * ATH_REVERSE_ENGINEERING_WITH_NO_FEAR defined!
-	 *
-	 * XXX: Figure out whether I handle the errors instead and still make 
-	 * these requests without screwing up the ATH PCI device. */
-	/* ALLOW - General registers */
-	if (address < 0x00c0) return UNFILTERED;
-	/* SKIP  - read and clear registers */
-	if (address < 0x00e0) return FILTERED;
-	/* ALLOW - Unknown, rest of 8-bit addresses */
-	if (address < 0x01e0) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x0800) return FILTERED;
-	/* ALLOW - QCU Registers (0x0800-0x0B00 block) */
-	if (address < 0x0B00) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x1000) return FILTERED;
-	/* ALLOW - DCU Registers (0x1000-0x1500 block) */
-	if (address < 0x1500) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x4000) return FILTERED;
-	/* SKIP - PCI Domain Registers (0x4000-0x5000 block) */
-	if (address < 0x5000) return FILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x8000) return FILTERED;
-	/* ALLOW - PCU Registers */
-	if (address < 0x8140) return UNFILTERED;
-	/* SKIP  - Unknown */
-	if (address < 0x8600) return FILTERED;
-	/* ALLOW - RATE_DUR  */
-	if (address < 0x8800) return UNFILTERED;
-	/* ALLOW - WEP Key Table  */
-	if (address < 0x9800) return UNFILTERED;
-	/* ALLOW - PHY Registers */
-	if (address < 0x9a00) return UNFILTERED;
-	/* SKIP  - PHY Register space, unused portion */
-	if (address < 0x9c00) return FILTERED;
-	/* ALLOW - PHY Registers */
-	if (address < 0x9c20) return UNFILTERED;
-	/* SKIP  - PHY Register space, unused portion */
-	if (address < 0xA200) return FILTERED;
-	/* ALLOW - PHY Registers */
-	if (address < 0xA210) return FILTERED;
-	/* SKIP  - Unknown*/
 	return FILTERED;
 #endif /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 	#undef UNFILTERED
@@ -11843,7 +11797,6 @@ ath_registers_dump_delta(struct ieee80211com *ic)
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-
 /* Periodically expire radar avoidance marks. */
 static void
 ath_dfs_expire_channel_non_occupancy_timers(unsigned long arg)
@@ -11901,4 +11854,3 @@ ath_dfs_expire_channel_non_occupancy_timers(unsigned long arg)
 		(ath_dfs_channel_non_occupancy_expiration_check_interval * HZ);
 	add_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
 }
-
