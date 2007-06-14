@@ -11637,7 +11637,7 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 		UNFILTERED : FILTERED;
 #else /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 
-	return FILTERED;
+	return UNFILTERED;
 #endif /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 	#undef UNFILTERED
 	#undef FILTERED
