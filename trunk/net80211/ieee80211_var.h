@@ -474,19 +474,19 @@ MALLOC_DECLARE(M_80211_VAP);
 #define IEEE80211_F_CHANSWITCH	0x80000000		/* force chanswitch */
 
 /* ic_flags_ext */
-#define	IEEE80211_FEXT_WDS	0x00000001		/* CONF: 4 addr allowed */
-#define IEEE80211_FEXT_COUNTRYIE 0x00000002		/* CONF: enable country IE */
-#define IEEE80211_FEXT_SCAN_PENDING 0x00000004		/* STATE: scan pending */
-#define	IEEE80211_FEXT_BGSCAN	0x00000008		/* STATE: enable full bgscan completion */
-#define IEEE80211_FEXT_UAPSD	0x00000010		/* CONF: enable U-APSD */
-#define IEEE80211_FEXT_SLEEP	0x00000020		/* STATUS: sleeping */
-#define IEEE80211_FEXT_EOSPDROP	0x00000040		/* drop uapsd EOSP frames for test */
-#define	IEEE80211_FEXT_MARKDFS	0x00000080		/* Enable marking of dfs interference */
-#define IEEE80211_FEXT_REGCLASS	0x00000100		/* CONF: send regclassids in country ie */
-#define IEEE80211_FEXT_ERPUPDATE 0x00000200		/* STATUS: update ERP element */
-#define IEEE80211_FEXT_SWBMISS 0x00000400		/* CONF: use software beacon timer */
-#define IEEE80211_FEXT_DROPUNENC_EAPOL 0x00000800	/* CONF: drop unencrypted eapol frames */
-#define IEEE80211_FEXT_APPIE_UPDATE 0x00001000		/* STATE: beacon APP IE updated */
+#define	IEEE80211_FEXT_WDS		0x00000001	/* CONF: 4 addr allowed */
+#define IEEE80211_FEXT_COUNTRYIE	0x00000002	/* CONF: enable country IE */
+#define IEEE80211_FEXT_SCAN_PENDING	0x00000004	/* STATE: scan pending */
+#define	IEEE80211_FEXT_BGSCAN		0x00000008	/* STATE: enable full bgscan completion */
+#define IEEE80211_FEXT_UAPSD		0x00000010	/* CONF: enable U-APSD */
+#define IEEE80211_FEXT_SLEEP		0x00000020	/* STATUS: sleeping */
+#define IEEE80211_FEXT_EOSPDROP		0x00000040	/* drop uapsd EOSP frames for test */
+#define	IEEE80211_FEXT_MARKDFS		0x00000080	/* Enable marking of dfs interference */
+#define IEEE80211_FEXT_REGCLASS		0x00000100	/* CONF: send regclassids in country ie */
+#define IEEE80211_FEXT_ERPUPDATE	0x00000200	/* STATUS: update ERP element */
+#define IEEE80211_FEXT_SWBMISS		0x00000400	/* CONF: use software beacon timer */
+#define IEEE80211_FEXT_DROPUNENC_EAPOL	0x00000800	/* CONF: drop unencrypted eapol frames */
+#define IEEE80211_FEXT_APPIE_UPDATE	0x00001000	/* STATE: beacon APP IE updated */
 
 #define IEEE80211_COM_UAPSD_ENABLE(_ic)		((_ic)->ic_flags_ext |= IEEE80211_FEXT_UAPSD)
 #define IEEE80211_COM_UAPSD_DISABLE(_ic)	((_ic)->ic_flags_ext &= ~IEEE80211_FEXT_UAPSD)

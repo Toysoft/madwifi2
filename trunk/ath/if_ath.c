@@ -1847,10 +1847,8 @@ ath_init(struct net_device *dev)
 	    ((ic->ic_caps & IEEE80211_C_WME_TKIPMIC) || 
 	    !(ic->ic_flags & IEEE80211_F_WME))) {
 		ath_hal_settkipmic(ah, AH_TRUE);
-		ic->ic_flags |= IEEE80211_F_TKIPMIC;
 	} else {
 		ath_hal_settkipmic(ah, AH_FALSE);
-		ic->ic_flags &= ~IEEE80211_F_TKIPMIC;
 	}
 
 	/*
@@ -9324,10 +9322,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 					return -EINVAL;
 				
 				ath_hal_settkipmic(ah, val);
-				if (val)
-					ic->ic_flags |= IEEE80211_F_TKIPMIC;
-				else
-					ic->ic_flags &= ~IEEE80211_F_TKIPMIC;
 				break;
 			}
 #ifdef ATH_SUPERG_XR
@@ -9397,7 +9391,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val = sc->sc_fftxqmin;
 			break;
 		case ATH_TKIPMIC:
-			val = (ic->ic_flags & IEEE80211_C_WME);
+			val = ath_hal_gettkipmic(ah);
 			break;
 #ifdef ATH_SUPERG_XR
 		case ATH_XR_POLL_PERIOD:
