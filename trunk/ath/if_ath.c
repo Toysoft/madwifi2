@@ -9735,7 +9735,7 @@ ath_sysctl_unregister(void)
 static const char*
 ath_get_hal_status_desc(HAL_STATUS status)
 {
-	if (status > 0 && status < sizeof(hal_status_desc)/sizeof(char *))
+	if ((status > 0) && (status < (sizeof(hal_status_desc) / sizeof(char *))))
 		return hal_status_desc[status];
 	else
 		return "";
@@ -9762,10 +9762,9 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
 	return 0;
 }
 
-/*
-For any addresses we wish to get a symbolic representation of (i.e. flag names) we can add it to 
-this helper function and a subsequent line is printed with the status in symbolic form.
-*/
+/* For any addresses we wish to get a symbolic representation of (i.e. flag 
+ * names) we can add it to this helper function and a subsequent line is 
+ * printed with the status in symbolic form. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
@@ -9775,109 +9774,113 @@ ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
 #define AR5K_AR5212_PHY_ERR_FIL_RADAR	0x00000020
 #define AR5K_AR5212_PHY_ERR_FIL_OFDM	0x00020000
 #define AR5K_AR5212_PHY_ERR_FIL_CCK     0x02000000
-#define AR5K_AR5212_PIMR		        0x00a0
-#define AR5K_AR5212_PISR		        0x0080
-#define AR5K_AR5212_PIMR_RXOK		    0x00000001
-#define AR5K_AR5212_PIMR_RXDESC		    0x00000002
-#define AR5K_AR5212_PIMR_RXERR		    0x00000004
-#define AR5K_AR5212_PIMR_RXNOFRM	    0x00000008
-#define AR5K_AR5212_PIMR_RXEOL		    0x00000010
-#define AR5K_AR5212_PIMR_RXORN		    0x00000020
-#define AR5K_AR5212_PIMR_TXOK		    0x00000040
-#define AR5K_AR5212_PIMR_TXDESC		    0x00000080
-#define AR5K_AR5212_PIMR_TXERR		    0x00000100
-#define AR5K_AR5212_PIMR_TXNOFRM	    0x00000200
-#define AR5K_AR5212_PIMR_TXEOL		    0x00000400
-#define AR5K_AR5212_PIMR_TXURN		    0x00000800
-#define AR5K_AR5212_PIMR_MIB		    0x00001000
-#define AR5K_AR5212_PIMR_SWI		    0x00002000
-#define AR5K_AR5212_PIMR_RXPHY		    0x00004000
-#define AR5K_AR5212_PIMR_RXKCM		    0x00008000
-#define AR5K_AR5212_PIMR_SWBA		    0x00010000
-#define AR5K_AR5212_PIMR_BRSSI		    0x00020000
-#define AR5K_AR5212_PIMR_BMISS		    0x00040000
-#define AR5K_AR5212_PIMR_HIUERR		    0x00080000
-#define AR5K_AR5212_PIMR_BNR		    0x00100000
-#define AR5K_AR5212_PIMR_RXCHIRP	    0x00200000
-#define AR5K_AR5212_PIMR_TIM		    0x00800000
-#define AR5K_AR5212_PIMR_BCNMISC	    0x00800000
-#define AR5K_AR5212_PIMR_GPIO		    0x01000000
-#define AR5K_AR5212_PIMR_QCBRORN	    0x02000000
-#define AR5K_AR5212_PIMR_QCBRURN	    0x04000000
-#define AR5K_AR5212_PIMR_QTRIG		    0x08000000
+#define AR5K_AR5212_PIMR		    0x00a0
+#define AR5K_AR5212_PISR		    0x0080
+#define AR5K_AR5212_PIMR_RXOK		0x00000001
+#define AR5K_AR5212_PIMR_RXDESC		0x00000002
+#define AR5K_AR5212_PIMR_RXERR		0x00000004
+#define AR5K_AR5212_PIMR_RXNOFRM	0x00000008
+#define AR5K_AR5212_PIMR_RXEOL		0x00000010
+#define AR5K_AR5212_PIMR_RXORN		0x00000020
+#define AR5K_AR5212_PIMR_TXOK		0x00000040
+#define AR5K_AR5212_PIMR_TXDESC		0x00000080
+#define AR5K_AR5212_PIMR_TXERR		0x00000100
+#define AR5K_AR5212_PIMR_TXNOFRM	0x00000200
+#define AR5K_AR5212_PIMR_TXEOL		0x00000400
+#define AR5K_AR5212_PIMR_TXURN		0x00000800
+#define AR5K_AR5212_PIMR_MIB		0x00001000
+#define AR5K_AR5212_PIMR_SWI		0x00002000
+#define AR5K_AR5212_PIMR_RXPHY		0x00004000
+#define AR5K_AR5212_PIMR_RXKCM		0x00008000
+#define AR5K_AR5212_PIMR_SWBA		0x00010000
+#define AR5K_AR5212_PIMR_BRSSI		0x00020000
+#define AR5K_AR5212_PIMR_BMISS		0x00040000
+#define AR5K_AR5212_PIMR_HIUERR		0x00080000
+#define AR5K_AR5212_PIMR_BNR		0x00100000
+#define AR5K_AR5212_PIMR_RXCHIRP	0x00200000
+#define AR5K_AR5212_PIMR_TIM		0x00800000
+#define AR5K_AR5212_PIMR_BCNMISC	0x00800000
+#define AR5K_AR5212_PIMR_GPIO		0x01000000
+#define AR5K_AR5212_PIMR_QCBRORN	0x02000000
+#define AR5K_AR5212_PIMR_QCBRURN	0x04000000
+#define AR5K_AR5212_PIMR_QTRIG		0x08000000
 
 	if (address == AR5K_AR5212_PHY_ERR_FIL) {
-		printk(KERN_DEBUG "%18s info:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
-		       , (name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_")) : name)
-		       , (v & (1 << 31)                ? " (1 << 31)"     : "")
-		       , (v & (1 << 30)                ? " (1 << 30)"     : "")
-		       , (v & (1 << 29)                ? " (1 << 29)"     : "")
-		       , (v & (1 << 28)                ? " (1 << 28)"     : "")
-		       , (v & (1 << 27)                ? " (1 << 27)"     : "")
-		       , (v & (1 << 26)                ? " (1 << 26)"     : "")
-		       , (v & AR5K_AR5212_PHY_ERR_FIL_CCK  ? " CCK"       : "")
-		       , (v & (1 << 24)                ? " (1 << 24)"     : "")
-		       , (v & (1 << 23)                ? " (1 << 23)"     : "")
-		       , (v & (1 << 22)                ? " (1 << 22)"     : "")
-		       , (v & (1 << 21)                ? " (1 << 21)"     : "")
-		       , (v & (1 << 20)                ? " (1 << 20)"     : "")
-		       , (v & (1 << 19)                ? " (1 << 19)"     : "")
-		       , (v & (1 << 18)                ? " (1 << 18)"     : "")
-		       , (v & AR5K_AR5212_PHY_ERR_FIL_OFDM ? " OFDM"      : "")
-		       , (v & (1 << 16)                ? " (1 << 16)"     : "")
-		       , (v & (1 << 15)                ? " (1 << 15)"     : "")
-		       , (v & (1 << 14)                ? " (1 << 14)"     : "")
-		       , (v & (1 << 13)                ? " (1 << 13)"     : "")
-		       , (v & (1 << 12)                ? " (1 << 12)"     : "")
-		       , (v & (1 << 11)                ? " (1 << 11)"     : "")
-		       , (v & (1 << 10)                ? " (1 << 10)"     : "")
-		       , (v & (1 <<  9)                ? " (1 <<  9)"     : "")
-		       , (v & (1 <<  8)                ? " (1 <<  8)"     : "")
-		       , (v & (1 <<  7)                ? " (1 <<  7)"     : "")
-		       , (v & (1 <<  6)                ? " (1 <<  6)"     : "")
-		       , (v & AR5K_AR5212_PHY_ERR_FIL_RADAR ? " RADAR"    : "")
-		       , (v & (1 <<  4)                ? " (1 <<  4)"     : "")
-		       , (v & (1 <<  3)                ? " (1 <<  3)"     : "")
-		       , (v & (1 <<  2)                ? " (1 <<  2)"     : "")
-		       , (v & (1 <<  1)                ? " (1 <<  1)"     : "")
-		       , (v & (1 <<  0)                ? " (1 <<  0)"     : "")
+		printk(KERN_DEBUG "%18s info:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s"
+				"%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+		       (name == strstr(name,"AR5K_AR5212_") ? (name + strlen("AR5K_AR5212_"))
+				: name),
+		       (v & (1 << 31)                ? " (1 << 31)"     : ""),
+		       (v & (1 << 30)                ? " (1 << 30)"     : ""),
+		       (v & (1 << 29)                ? " (1 << 29)"     : ""),
+		       (v & (1 << 28)                ? " (1 << 28)"     : ""),
+		       (v & (1 << 27)                ? " (1 << 27)"     : ""),
+		       (v & (1 << 26)                ? " (1 << 26)"     : ""),
+		       (v & AR5K_AR5212_PHY_ERR_FIL_CCK  ? " CCK"       : ""),
+		       (v & (1 << 24)                ? " (1 << 24)"     : ""),
+		       (v & (1 << 23)                ? " (1 << 23)"     : ""),
+		       (v & (1 << 22)                ? " (1 << 22)"     : ""),
+		       (v & (1 << 21)                ? " (1 << 21)"     : ""),
+		       (v & (1 << 20)                ? " (1 << 20)"     : ""),
+		       (v & (1 << 19)                ? " (1 << 19)"     : ""),
+		       (v & (1 << 18)                ? " (1 << 18)"     : ""),
+		       (v & AR5K_AR5212_PHY_ERR_FIL_OFDM ? " OFDM"      : ""),
+		       (v & (1 << 16)                ? " (1 << 16)"     : ""),
+		       (v & (1 << 15)                ? " (1 << 15)"     : ""),
+		       (v & (1 << 14)                ? " (1 << 14)"     : ""),
+		       (v & (1 << 13)                ? " (1 << 13)"     : ""),
+		       (v & (1 << 12)                ? " (1 << 12)"     : ""),
+		       (v & (1 << 11)                ? " (1 << 11)"     : ""),
+		       (v & (1 << 10)                ? " (1 << 10)"     : ""),
+		       (v & (1 <<  9)                ? " (1 <<  9)"     : ""),
+		       (v & (1 <<  8)                ? " (1 <<  8)"     : ""),
+		       (v & (1 <<  7)                ? " (1 <<  7)"     : ""),
+		       (v & (1 <<  6)                ? " (1 <<  6)"     : ""),
+		       (v & AR5K_AR5212_PHY_ERR_FIL_RADAR ? " RADAR"    : ""),
+		       (v & (1 <<  4)                ? " (1 <<  4)"     : ""),
+		       (v & (1 <<  3)                ? " (1 <<  3)"     : ""),
+		       (v & (1 <<  2)                ? " (1 <<  2)"     : ""),
+		       (v & (1 <<  1)                ? " (1 <<  1)"     : ""),
+		       (v & (1 <<  0)                ? " (1 <<  0)"     : "")
 		      );
 	}
 	if (address == AR5K_AR5212_PISR || address == AR5K_AR5212_PIMR) {
-		printk(KERN_DEBUG "%18s info:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
-			, (name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_")) : name)
-			, (v & HAL_INT_GLOBAL           ?  " HAL_INT_GLOBAL" : "")
-			, (v & HAL_INT_FATAL            ?  " HAL_INT_FATAL"  : "")
-			, (v & (1 << 29)                ?  " (1  << 29)"     : "")
-			, (v & (1 << 28)                ?  " (1  << 28)"     : "")
-			, (v & AR5K_AR5212_PIMR_RXOK    ?  " RXOK"           : "")
-			, (v & AR5K_AR5212_PIMR_RXDESC  ?  " RXDESC"         : "")
-			, (v & AR5K_AR5212_PIMR_RXERR   ?  " RXERR"          : "")
-			, (v & AR5K_AR5212_PIMR_RXNOFRM ?  " RXNOFRM"        : "")
-			, (v & AR5K_AR5212_PIMR_RXEOL   ?  " RXEOL"          : "")
-			, (v & AR5K_AR5212_PIMR_RXORN   ?  " RXORN"          : "")
-			, (v & AR5K_AR5212_PIMR_TXOK    ?  " TXOK"           : "")
-			, (v & AR5K_AR5212_PIMR_TXDESC  ?  " TXDESC"         : "")
-			, (v & AR5K_AR5212_PIMR_TXERR   ?  " TXERR"          : "")
-			, (v & AR5K_AR5212_PIMR_TXNOFRM ?  " TXNOFRM"        : "")
-			, (v & AR5K_AR5212_PIMR_TXEOL   ?  " TXEOL"          : "")
-			, (v & AR5K_AR5212_PIMR_TXURN   ?  " TXURN"          : "")
-			, (v & AR5K_AR5212_PIMR_MIB     ?  " MIB"            : "")
-			, (v & AR5K_AR5212_PIMR_SWI     ?  " SWI"            : "")
-			, (v & AR5K_AR5212_PIMR_RXPHY   ?  " RXPHY"          : "")
-			, (v & AR5K_AR5212_PIMR_RXKCM   ?  " RXKCM"          : "")
-			, (v & AR5K_AR5212_PIMR_SWBA    ?  " SWBA"           : "")
-			, (v & AR5K_AR5212_PIMR_BRSSI   ?  " BRSSI"          : "")
-			, (v & AR5K_AR5212_PIMR_BMISS   ?  " BMISS"          : "")
-			, (v & AR5K_AR5212_PIMR_HIUERR  ?  " HIUERR"         : "")
-			, (v & AR5K_AR5212_PIMR_BNR     ?  " BNR"            : "")
-			, (v & AR5K_AR5212_PIMR_RXCHIRP ?  " RXCHIRP"        : "")
-			, (v & AR5K_AR5212_PIMR_TIM     ?  " TIM"            : "")
-			, (v & AR5K_AR5212_PIMR_BCNMISC ?  " BCNMISC"        : "")
-			, (v & AR5K_AR5212_PIMR_GPIO    ?  " GPIO"           : "")
-			, (v & AR5K_AR5212_PIMR_QCBRORN ?  " QCBRORN"        : "")
-			, (v & AR5K_AR5212_PIMR_QCBRURN ?  " QCBRURN"        : "")
-			, (v & AR5K_AR5212_PIMR_QTRIG   ?  " QTRIG"          : "")
+		printk(KERN_DEBUG "%18s info:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s"
+				"%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+			(name == strstr(name,"AR5K_AR5212_") ? (name + strlen("AR5K_AR5212_"))
+			 	: name),
+			(v & HAL_INT_GLOBAL           ?  " HAL_INT_GLOBAL" : ""),
+			(v & HAL_INT_FATAL            ?  " HAL_INT_FATAL"  : ""),
+			(v & (1 << 29)                ?  " (1  << 29)"     : ""),
+			(v & (1 << 28)                ?  " (1  << 28)"     : ""),
+			(v & AR5K_AR5212_PIMR_RXOK    ?  " RXOK"           : ""),
+			(v & AR5K_AR5212_PIMR_RXDESC  ?  " RXDESC"         : ""),
+			(v & AR5K_AR5212_PIMR_RXERR   ?  " RXERR"          : ""),
+			(v & AR5K_AR5212_PIMR_RXNOFRM ?  " RXNOFRM"        : ""),
+			(v & AR5K_AR5212_PIMR_RXEOL   ?  " RXEOL"          : ""),
+			(v & AR5K_AR5212_PIMR_RXORN   ?  " RXORN"          : ""),
+			(v & AR5K_AR5212_PIMR_TXOK    ?  " TXOK"           : ""),
+			(v & AR5K_AR5212_PIMR_TXDESC  ?  " TXDESC"         : ""),
+			(v & AR5K_AR5212_PIMR_TXERR   ?  " TXERR"          : ""),
+			(v & AR5K_AR5212_PIMR_TXNOFRM ?  " TXNOFRM"        : ""),
+			(v & AR5K_AR5212_PIMR_TXEOL   ?  " TXEOL"          : ""),
+			(v & AR5K_AR5212_PIMR_TXURN   ?  " TXURN"          : ""),
+			(v & AR5K_AR5212_PIMR_MIB     ?  " MIB"            : ""),
+			(v & AR5K_AR5212_PIMR_SWI     ?  " SWI"            : ""),
+			(v & AR5K_AR5212_PIMR_RXPHY   ?  " RXPHY"          : ""),
+			(v & AR5K_AR5212_PIMR_RXKCM   ?  " RXKCM"          : ""),
+			(v & AR5K_AR5212_PIMR_SWBA    ?  " SWBA"           : ""),
+			(v & AR5K_AR5212_PIMR_BRSSI   ?  " BRSSI"          : ""),
+			(v & AR5K_AR5212_PIMR_BMISS   ?  " BMISS"          : ""),
+			(v & AR5K_AR5212_PIMR_HIUERR  ?  " HIUERR"         : ""),
+			(v & AR5K_AR5212_PIMR_BNR     ?  " BNR"            : ""),
+			(v & AR5K_AR5212_PIMR_RXCHIRP ?  " RXCHIRP"        : ""),
+			(v & AR5K_AR5212_PIMR_TIM     ?  " TIM"            : ""),
+			(v & AR5K_AR5212_PIMR_BCNMISC ?  " BCNMISC"        : ""),
+			(v & AR5K_AR5212_PIMR_GPIO    ?  " GPIO"           : ""),
+			(v & AR5K_AR5212_PIMR_QCBRORN ?  " QCBRORN"        : ""),
+			(v & AR5K_AR5212_PIMR_QCBRURN ?  " QCBRURN"        : ""),
+			(v & AR5K_AR5212_PIMR_QTRIG   ?  " QTRIG"          : "")
 			);
 	}
 #undef AR5K_AR5212_PHY_ERR_FIL
@@ -9917,11 +9920,11 @@ ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Print out a register with name, address and value in hex and binary.  
-If v_old and v_new are the same we just dump the binary out (zeros are listed using dots for easier reading).
-If v_old and v_new are NOT the same, we indicate which bits were activated or de-activated using differnet characters than 1.
-*/
+/* Print out a register with name, address and value in hex and binary. If 
+ * v_old and v_new are the same we just dump the binary out (zeros are listed 
+ * using dots for easier reading). If v_old and v_new are NOT the same, we 
+ * indicate which bits were activated or de-activated using differnet 
+ * characters than 1. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u_int32_t v_new)
@@ -9930,15 +9933,14 @@ ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u
 #define BIT_UNCHANGED_OFF "."
 #define BIT_CHANGED_ON    "+"
 #define BIT_CHANGED_OFF   "-"
-#define NYBLE_SEPARATOR   ""
+#define NYBBLE_SEPARATOR   ""
 #define BYTE_SEPARATOR    " "
 #define BIT_STATUS(_shift) \
-	( \
-	((v_old & (1<<_shift)) == (v_new & (1<<_shift))) \
-		? (v_new & (1<<_shift) ? BIT_UNCHANGED_ON : BIT_UNCHANGED_OFF) \
-		: (v_new & (1<<_shift) ? BIT_CHANGED_ON   : BIT_CHANGED_OFF) \
-	)
-/* Used for formatting hex data with spacing */
+	(((v_old & (1 << _shift)) == (v_new & (1 << _shift))) ? \
+		(v_new & (1 << _shift) ? BIT_UNCHANGED_ON : BIT_UNCHANGED_OFF) :\
+		(v_new & (1 << _shift) ? BIT_CHANGED_ON   : BIT_CHANGED_OFF))
+
+	/* Used for formatting hex data with spacing */
 	static char nybles[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 	char address_string[10] = "";
 
@@ -9954,74 +9956,74 @@ ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u
 		address_string[9] = '\0';
 	}
 	printk(KERN_DEBUG
-		"%23s: %s0x%08x%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
-		, (name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_")) : name)
-		, address_string
-		, v_new
-		, "  "
-		, BIT_STATUS(31)
-		, BIT_STATUS(30)
-		, BIT_STATUS(29)
-		, BIT_STATUS(28)
-		, NYBLE_SEPARATOR
-		, BIT_STATUS(27)
-		, BIT_STATUS(26)
-		, BIT_STATUS(25)
-		, BIT_STATUS(24)
-		, BYTE_SEPARATOR
-		, BIT_STATUS(23)
-		, BIT_STATUS(22)
-		, BIT_STATUS(21)
-		, BIT_STATUS(20)
-		, NYBLE_SEPARATOR
-		, BIT_STATUS(19)
-		, BIT_STATUS(18)
-		, BIT_STATUS(17)
-		, BIT_STATUS(16)
-		, BYTE_SEPARATOR
-		, BIT_STATUS(15)
-		, BIT_STATUS(14)
-		, BIT_STATUS(13)
-		, BIT_STATUS(12)
-		, NYBLE_SEPARATOR
-		, BIT_STATUS(11)
-		, BIT_STATUS(10)
-		, BIT_STATUS( 9)
-		, BIT_STATUS( 8)
-		, BYTE_SEPARATOR
-		, BIT_STATUS( 7)
-		, BIT_STATUS( 6)
-		, BIT_STATUS( 5)
-		, BIT_STATUS( 4)
-		, NYBLE_SEPARATOR
-		, BIT_STATUS( 3)
-		, BIT_STATUS( 2)
-		, BIT_STATUS( 1)
-		, BIT_STATUS( 0)
-		, ""
+		"%23s: %s0x%08x%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s"
+			"%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+		(name == strstr(name,"AR5K_AR5212_") ? (name+strlen("AR5K_AR5212_"))
+			: name),
+		address_string,
+		v_new,
+		"  ",
+		BIT_STATUS(31),
+		BIT_STATUS(30),
+		BIT_STATUS(29),
+		BIT_STATUS(28),
+		NYBBLE_SEPARATOR,
+		BIT_STATUS(27),
+		BIT_STATUS(26),
+		BIT_STATUS(25),
+		BIT_STATUS(24),
+		BYTE_SEPARATOR,
+		BIT_STATUS(23),
+		BIT_STATUS(22),
+		BIT_STATUS(21),
+		BIT_STATUS(20),
+		NYBBLE_SEPARATOR,
+		BIT_STATUS(19),
+		BIT_STATUS(18),
+		BIT_STATUS(17),
+		BIT_STATUS(16),
+		BYTE_SEPARATOR,
+		BIT_STATUS(15),
+		BIT_STATUS(14),
+		BIT_STATUS(13),
+		BIT_STATUS(12),
+		NYBBLE_SEPARATOR,
+		BIT_STATUS(11),
+		BIT_STATUS(10),
+		BIT_STATUS( 9),
+		BIT_STATUS( 8),
+		BYTE_SEPARATOR,
+		BIT_STATUS( 7),
+		BIT_STATUS( 6),
+		BIT_STATUS( 5),
+		BIT_STATUS( 4),
+		NYBBLE_SEPARATOR,
+		BIT_STATUS( 3),
+		BIT_STATUS( 2),
+		BIT_STATUS( 1),
+		BIT_STATUS( 0),
+		""
 		);
 #undef BIT_UNCHANGED_ON
 #undef BIT_UNCHANGED_OFF
 #undef BIT_CHANGED_ON
 #undef BIT_CHANGED_OFF
-#undef NYBLE_SEPARATOR
+#undef NYBBLE_SEPARATOR
 #undef BYTE_SEPARATOR
 #undef BIT_STATUS
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Lookup a friendly name for a register address (for any we have nicknames for)
-Names were taken from openhal ar5212regs.h
-Return AH_TRUE if the name is a known ar5212 register, and AH_FALSE otherwise.
-*/
+/* Lookup a friendly name for a register address (for any we have nicknames 
+ * for). Names were taken from openhal ar5212regs.h. Return AH_TRUE if the 
+ * name is a known ar5212 register, and AH_FALSE otherwise. */
 #ifdef ATH_REVERSE_ENGINEERING
 static const HAL_BOOL
 ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t address) {
 	const char* static_label = NULL;
-	memset(buf,0,buflen);
+	memset(buf, 0, buflen);
 
-	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
+	if ((ar_device(sc->devid) == 5212) || (ar_device(sc->devid) == 5213)) {
 		/* Handle Static Register Labels (unique stuff we know about) */
 		switch (address) {
 		case 0x0008: static_label = "CR";                     break;
@@ -10305,8 +10307,9 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 			snprintf(buf,buflen,static_label);
 			return AH_TRUE;
 		}
-/* Handle Key Table */
-		if (address >= 0x8800 && address < 0x9800) {
+
+		/* Handle Key Table */
+		if ((address >= 0x8800) && (address < 0x9800)) {
 #define keytable_entry_reg_count (8)
 #define keytable_entry_size      (keytable_entry_reg_count * sizeof(u_int32_t))
 			int key = ((address - 0x8800) / keytable_entry_size);
@@ -10329,15 +10332,18 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 #undef keytable_entry_size
 			return AH_TRUE;
 		}
-/* Handle Rate Duration Table */
+
+		/* Handle Rate Duration Table */
 		if (address >= 0x8700 && address < 0x8800) {
-			snprintf(buf, buflen, "RATE(%2d).DURATION", ((address - 0x8700) / sizeof(u_int32_t)));
+			snprintf(buf, buflen, "RATE(%2d).DURATION", 
+					((address - 0x8700) / sizeof(u_int32_t)));
 			return AH_TRUE;
 		}
 
-/* Handle txpower Table */
+		/* Handle txpower Table */
 		if (address >= 0xa180 && address < 0xa200) {
-			snprintf(buf, buflen, "PCDAC_TXPOWER(%2d)", ((address - 0xa180) / sizeof(u_int32_t)));
+			snprintf(buf, buflen, "PCDAC_TXPOWER(%2d)", 
+					((address - 0xa180) / sizeof(u_int32_t)));
 			return AH_TRUE;
 		}
 	}
@@ -10348,9 +10354,7 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Print out a single register name/address/value in hex and binary
-*/
+/* Print out a single register name/address/value in hex and binary */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_print_register(const char* name, u_int32_t address, u_int32_t v)
@@ -10360,10 +10364,9 @@ ath_print_register(const char* name, u_int32_t address, u_int32_t v)
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-A filter for hiding the addresses we don't think are very interesting or which have adverse side effects.
-Return AH_TRUE if the address should be exlucded, and AH_FALSE otherwise.
-*/
+/* A filter for hiding the addresses we don't think are very interesting or 
+ * which have adverse side effects. Return AH_TRUE if the address should be 
+ * exlucded, and AH_FALSE otherwise. */
 #ifdef ATH_REVERSE_ENGINEERING
 static HAL_BOOL
 ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
@@ -10373,32 +10376,31 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 	#define UNFILTERED AH_FALSE
 	#define FILTERED   AH_TRUE
 
-	if (ar_device(sc->devid) != 5212 && ar_device(sc->devid) != 5213) return FILTERED;
-	/*
-	Addresses with side effects are never dumped out by bulk debug dump routines
-	*/
-	if (address >= 0x00c0 && address <= 0x00df) return FILTERED;
-	if (address >= 0x143c && address <= 0x143f) return FILTERED;
+	if ((ar_device(sc->devid) != 5212) && (ar_device(sc->devid) != 5213)) return FILTERED;
+	/* Addresses with side effects are never dumped out by bulk debug dump routines. */
+	if ((address >= 0x00c0) && (address <= 0x00df)) return FILTERED;
+	if ((address >= 0x143c) && (address <= 0x143f)) return FILTERED;
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
-	/* 
-	We are being conservative, and do not want to access addresses that may
-	crash the system, so we will only consider addresses we know the names of from previous
-	reverse engineering efforts (aka. openhal).
-	*/
-	return (AH_TRUE == ath_lookup_register_name(sc, buf, MAX_REGISTER_NAME_LEN, address)) ? UNFILTERED : FILTERED;
+	/* We are being conservative, and do not want to access addresses that 
+	 * may crash the system, so we will only consider addresses we know 
+	 * the names of from previous reverse engineering efforts (AKA 
+	 * openHAL). */
+	return (AH_TRUE == ath_lookup_register_name(sc, buf, MAX_REGISTER_NAME_LEN, address)) ? 
+		UNFILTERED : FILTERED;
 #else /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 
-	/* 
-	In this mode, we only filter out large blocks of unused registers that are either known to be 
-	uninteresting or known to cause a PCI bus hang because it is not mapped by the hardware decoder
-	on some PCI boards. 
-	
-	There ARE still undocumented registers that will be output by this routine, but it will crash on some boards
-	with ATH_REVERSE_ENGINEERING_WITH_NO_FEAR defined!
-	
-	XXX: Figure out whether I handle the errors instead and still make these requests without screwing up the ATH PCI device.
-	*/
+	/* In this mode, we only filter out large blocks of unused registers 
+	 * that are either known to be uninteresting or known to cause a PCI 
+	 * bus hang because it is not mapped by the hardware decoder on some 
+	 * PCI boards.
+	 * 
+	 * There ARE undocumented registers that will be output by this 
+	 * routine, but it will crash on some boards with 
+	 * ATH_REVERSE_ENGINEERING_WITH_NO_FEAR defined!
+	 *
+	 * XXX: Figure out whether I handle the errors instead and still make 
+	 * these requests without screwing up the ATH PCI device. */
 	/* ALLOW - General registers */
 	if (address < 0x00c0) return UNFILTERED;
 	/* SKIP  - read and clear registers */
@@ -10445,9 +10447,7 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Dump any Atheros registers we think might be interesting,
-*/
+/* Dump any Atheros registers we think might be interesting. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_ar5212_registers_dump(struct ath_softc *sc) {
@@ -10462,14 +10462,12 @@ ath_ar5212_registers_dump(struct ath_softc *sc) {
 		ath_lookup_register_name(sc, name, MAX_REGISTER_NAME_LEN, address);
 		value = OS_REG_READ(ah,address);
 		ath_print_register(name, address, value);
-	} while ( (address+=4) < MAX_REGISTER_ADDRESS);
+	} while ((address += 4) < MAX_REGISTER_ADDRESS);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Dump any changes that were made to Atheros registers we think might be interesting,
-since the last call to ath_ar5212_registers_mark.
-*/
+/* Dump any changes that were made to Atheros registers we think might be 
+ * interesting, since the last call to ath_ar5212_registers_mark. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_ar5212_registers_dump_delta(struct ath_softc *sc)
@@ -10490,14 +10488,13 @@ ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 			ath_print_register_delta(name, address, *p_old, value);
 			ath_print_register_details(name, address, value);
 		}
-	} while ( (address+=4) < MAX_REGISTER_ADDRESS);
+	} while ((address += 4) < MAX_REGISTER_ADDRESS);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Mark the current values of all Atheros registers we think might be interesting,
-so any changes can be dumped out by a subsequent call to ath_ar5212_registers_dump_delta.
-*/
+/* Mark the current values of all Atheros registers we think might be 
+ * interesting, so any changes can be dumped out by a subsequent call to 
+ * ath_ar5212_registers_dump_delta. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_ar5212_registers_mark(struct ath_softc *sc)
@@ -10506,30 +10503,31 @@ ath_ar5212_registers_mark(struct ath_softc *sc)
 	unsigned int address = MIN_REGISTER_ADDRESS;
 
 	do {
-	*((unsigned int*)&sc->register_snapshot[address]) =
-	    ath_regdump_filter(sc, address)
-		? 0x0
-		: OS_REG_READ(ah,address)
-		;
-	} while ( (address+=4) < MAX_REGISTER_ADDRESS);
+		*((unsigned int*)&sc->register_snapshot[address]) =
+			ath_regdump_filter(sc, address) ? 
+			0x0 : OS_REG_READ(ah,address);
+	} while ((address += 4) < MAX_REGISTER_ADDRESS);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Read an Atheros register...for reverse engineering.
-*/
+/* Read an Atheros register...for reverse engineering. */
 #ifdef ATH_REVERSE_ENGINEERING
 static unsigned int
 ath_read_register(struct ieee80211com *ic, unsigned int address, unsigned int* value)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
 	if (address >= MAX_REGISTER_ADDRESS) {
-	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x >= 0x%04x\n", DEV_NAME(sc->sc_dev), __func__, address, MAX_REGISTER_ADDRESS);
-	return 1;
+		printk(KERN_ERR "%s: %s: Illegal Atheros register access "
+				"attempted: 0x%04x >= 0x%04x\n", 
+				DEV_NAME(sc->sc_dev), __func__, address, 
+				MAX_REGISTER_ADDRESS);
+		return 1;
 	}
 	if (address % 4) {
-	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x %% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
-	return 1;
+		printk(KERN_ERR "%s: %s: Illegal Atheros register access "
+				"attempted: 0x%04x %% 4 != 0\n", 
+				DEV_NAME(sc->sc_dev), __func__, address);
+		return 1;
 	}
 	*value = OS_REG_READ(sc->sc_ah, address);
 	printk(KERN_DEBUG "*0x%04x -> 0x%08x\n", address, *value);
@@ -10537,33 +10535,38 @@ ath_read_register(struct ieee80211com *ic, unsigned int address, unsigned int* v
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Write to a Atheros register...for reverse engineering.
-XXX: known issue with iwpriv argument handling.  It only knows how to handle signed 32-bit integers and
-seems to get confused if you are writing 0xffffffff or something.  Using the signed integer equivalent always
-works, but for some reason 0xffffffff is just as likely to give you something else at the moment.
-*/
+/* Write to a Atheros register...for reverse engineering.
+ * XXX: known issue with iwpriv argument handling.  It only knows how to 
+ * handle signed 32-bit integers and seems to get confused if you are writing 
+ * 0xffffffff or something. Using the signed integer equivalent always works, 
+ * but for some reason 0xffffffff is just as likely to give you something else 
+ * at the moment. */
 #ifdef ATH_REVERSE_ENGINEERING
 static unsigned int
 ath_write_register(struct ieee80211com *ic, unsigned int address, unsigned int value)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
 	if (address >= MAX_REGISTER_ADDRESS) {
-	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x >= 0x%04x\n", DEV_NAME(sc->sc_dev), __func__, address, MAX_REGISTER_ADDRESS);
-	return 1;
+		printk(KERN_ERR "%s: %s: Illegal Atheros register access "
+				"attempted: 0x%04x >= 0x%04x\n", 
+				DEV_NAME(sc->sc_dev), __func__, address, 
+				MAX_REGISTER_ADDRESS);
+		return 1;
 	}
 	if (address % 4) {
-	printk(KERN_ERR "%s: %s: Illegal Atheros register access attempted: 0x%04x %% 4 != 0\n", DEV_NAME(sc->sc_dev), __func__, address);
-	return 1;
+		printk(KERN_ERR "%s: %s: Illegal Atheros register access "
+				"attempted: 0x%04x %% 4 != 0\n", 
+				DEV_NAME(sc->sc_dev), __func__, address);
+		return 1;
 	}
 	OS_REG_WRITE(sc->sc_ah, address, value);
-	printk(KERN_DEBUG "*0x%04x <- 0x%08x = 0x%08x\n", address, value, OS_REG_READ(sc->sc_ah, address));
+	printk(KERN_DEBUG "*0x%04x <- 0x%08x = 0x%08x\n", address, value, 
+			OS_REG_READ(sc->sc_ah, address));
 	return 0;
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
-/*
-Dump out Atheros registers (excluding known duplicate mappings, unmapped zones, etc.)
-*/
+
+/* Dump out Atheros registers (excluding known duplicate mappings, unmapped zones, etc.) */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_registers_dump(struct ieee80211com *ic)
@@ -10574,9 +10577,8 @@ ath_registers_dump(struct ieee80211com *ic)
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Make a copy of significant registers in the Atheros chip for later comparison and dump with ath_registers_dump_delta
-*/
+/* Make a copy of significant registers in the Atheros chip for later 
+ * comparison and dump with ath_registers_dump_delta */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_registers_mark(struct ieee80211com *ic)
@@ -10587,9 +10589,7 @@ ath_registers_mark(struct ieee80211com *ic)
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
-/*
-Dump out any registers changed since the last call to ath_registers_mark
-*/
+/* Dump out any registers changed since the last call to ath_registers_mark */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_registers_dump_delta(struct ieee80211com *ic)
@@ -10599,4 +10599,3 @@ ath_registers_dump_delta(struct ieee80211com *ic)
 	ath_ar5212_registers_dump_delta(sc);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
-
