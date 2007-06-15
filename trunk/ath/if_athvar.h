@@ -47,6 +47,7 @@
 #include "ah_os.h"
 #include "if_athioctl.h"
 #include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
+#include <asm/io.h>
 
 /*
  * Deduce if tasklets are available.  If not then
@@ -535,6 +536,7 @@ struct ath_softc {
 	void (*sc_node_free)(struct ieee80211_node *);
 	void *sc_bdev;				/* associated bus device */
 	struct ath_hal *sc_ah;			/* Atheros HAL */
+	spinlock_t sc_hal_lock;                 /* hardware access lock */
 	struct ath_ratectrl *sc_rc;		/* tx rate control support */
 	struct ath_tx99 *sc_tx99; 		/* tx99 support */
 	void (*sc_setdefantenna)(struct ath_softc *, u_int);
@@ -736,7 +738,5 @@ int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);
 void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
-
-#include "ath_hal_api.h"
 
 #endif /* _DEV_ATH_ATHVAR_H */

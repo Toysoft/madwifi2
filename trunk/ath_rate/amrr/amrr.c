@@ -65,6 +65,7 @@
 #include <net80211/ieee80211_rate.h>
 
 #include "if_athvar.h"
+#include "if_ath_hal.h"
 #include "ah_desc.h"
 
 #include "amrr.h"
