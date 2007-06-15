@@ -329,7 +329,7 @@ static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static char *autocreate = NULL;
 static char *ratectl = DEF_RATE_CTL;
-static int rfkill = -1;
+static int rfkill = 0;
 #ifdef ATH_CAP_TPC
 static int tpc = 0;
 #endif
@@ -11672,6 +11672,8 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 	/* Addresses with side effects are never dumped out by bulk debug dump routines. */
 	if ((address >= 0x00c0) && (address <= 0x00df)) return FILTERED;
 	if ((address >= 0x143c) && (address <= 0x143f)) return FILTERED;
+	/* PCI timing registers are not interesting */
+	if ((address >= 0x4000) && (address <= 0x5000)) return FILTERED; 
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
 	/* We are being conservative, and do not want to access addresses that 
