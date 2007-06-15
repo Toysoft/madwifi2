@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -263,7 +263,7 @@ static const char *ath_get_hal_status_desc(HAL_STATUS status);
 static int ath_rcv_dev_event(struct notifier_block *, unsigned long, void *);
 
 /*
-Regulatory agency testing - continuous transmit support
+Regulatory agency testing - continuous transmit support 
 */
 static void txcont_on(struct ieee80211com *ic);
 static void txcont_off(struct ieee80211com *ic);
@@ -311,6 +311,10 @@ static unsigned int ath_get_dfs_channel_availability_check_time(struct ieee80211
 static void ath_set_dfs_channel_availability_check_time(struct ieee80211com *, unsigned int seconds);
 
 static unsigned int ath_test_radar(struct ieee80211com *);
+
+static u_int32_t ath_get_clamped_maxtxpower(struct ath_softc *sc);
+static u_int32_t ath_set_clamped_maxtxpower(struct ath_softc *sc, u_int32_t new_clamped_maxtxpower);
+static u_int32_t ath_get_real_maxtxpower(struct ath_softc *sc);
 
 static int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
@@ -989,7 +993,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_set_dfs_non_occupancy_period = ath_set_dfs_non_occupancy_period;
 	ic->ic_get_dfs_non_occupancy_period = ath_get_dfs_non_occupancy_period;
 
-
 	if (register_netdev(dev)) {
 		printk(KERN_ERR "%s: unable to register device\n", DEV_NAME(dev));
 		goto bad3;
@@ -1004,6 +1007,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 #ifdef ATH_TX99_DIAG
 	printk("%s: TX99 support enabled\n", DEV_NAME(dev));
 #endif
+	
 	sc->sc_invalid = 0;
 
 	if (autocreate) {
@@ -2008,6 +2012,9 @@ ath_init(struct net_device *dev)
 	 * but it's best done after a reset.
 	 */
 	ath_update_txpow(sc);
+	
+	/* Find the radio's maximum output power in 0.5dBm units -- at this point it should be the hw max, not capped by us */
+	printk(KERN_INFO "%s: %s: Maximum txpower: %d.\n", DEV_NAME(sc->sc_dev), __func__, ( ath_get_real_maxtxpower(sc) / 2) );
 
 	/*
 	 * Setup the hardware after reset: the key cache
@@ -2305,8 +2312,7 @@ HAL_BOOL ath_hal_reset_wrapper(struct ath_softc *sc, HAL_OPMODE opmode, HAL_CHAN
 
 /* Swap transmit descriptor.
  * if AH_NEED_DESC_SWAP flag is not defined this becomes a "null"
- * function.
- */
+ * function. */
 static __inline void
 ath_desc_swap(struct ath_desc *ds)
 {
@@ -8786,20 +8792,25 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ath_correct_dfs_flags(sc, c);
 		/*
 		Force re-check.
-		XXX: Unclear whether regs say you can avoid the channel availability check if you've already performed it on the channel within N seconds (and what the legal value of 'N' is in this case).
+		XXX: Unclear whether regs say you can avoid the channel availability check if 
+		you've already performed it on the channel within N seconds 
+		(and what the legal value of 'N' is in this case).
 		*/
-		c->privFlags          &= ~CHANNEL_DFS_CLEAR;
-		ichan->ic_ieee = ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
-		ichan->ic_freq = c->channel;
-		ichan->ic_flags = c->channelFlags;
-		ichan->ic_maxregpower = c->maxRegTxPower;	/* dBm */
-		ichan->ic_maxpower = c->maxTxPower;		    /* 1/4 dBm */
-		ichan->ic_minpower = c->minTxPower;		    /* 1/4 dBm */
+		c->privFlags		&= ~CHANNEL_DFS_CLEAR;
+		ichan->ic_ieee 		= ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
+		ichan->ic_freq 		= c->channel;
+		ichan->ic_flags 	= c->channelFlags;
+		ichan->ic_maxregpower 	= c->maxRegTxPower;	/* dBm */
+		ichan->ic_maxpower 	= c->maxTxPower;	/* 1/2 dBm */
+		ichan->ic_minpower 	= c->minTxPower;	/* 1/2 dBm */
 
-		printk(KERN_INFO "Channel %d (%d MHz) Limit %d dBm Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+		printk(KERN_INFO "Channel %d (%d MHz) Max Tx Power %d dBm%s [%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 			, ichan->ic_ieee
 			, c->channel
-			, c->maxRegTxPower
+		        , c->maxRegTxPower > (c->maxTxPower/2) ? (c->maxTxPower/2) : c->maxRegTxPower
+			, ( c->maxRegTxPower == (c->maxTxPower/2) ? "" : ( (c->maxRegTxPower > (c->maxTxPower/2)) ? " (hw limited)" : " (reg limited)" ) )
+			, (c->maxTxPower/2)
+		        , c->maxRegTxPower
 			, (c->channelFlags & 0x0001               ? " CF & (1<<0)"          :       "" /* undocumented */)
 			, (c->channelFlags & CHANNEL_CW_INT       ? " CF_CW_INTERFERENCE"   :       "" /* CW interference detected on channel */)
 			, (c->channelFlags & 0x0004               ? " CF & (1<<2)"          :       "" /* undocumented */)
@@ -8899,6 +8910,48 @@ set_node_txpower(void *arg, struct ieee80211_node *ni)
 	ni->ni_txpower = *value;
 }
 
+/* The HAL supports a maxtxpow which is something we can configure to be the 
+minimum of the regulatory constraint and the limits of the radio.
+XXX: this function needs some locking to avoid being called twice/interrupted 
+Returns the value actually stored. */
+static u_int32_t
+ath_set_clamped_maxtxpower(struct ath_softc *sc, u_int32_t new_clamped_maxtxpower)
+{
+	(void)ath_hal_settxpowlimit(sc->sc_ah, new_clamped_maxtxpower);
+	return ath_get_clamped_maxtxpower(sc);
+}
+
+/* The HAL supports a maxtxpow which is something we can configure to be the 
+minimum of the regulatory constraint and the limits of the radio.
+XXX: this function needs some locking to avoid being called twice/interrupted */
+static u_int32_t
+ath_get_clamped_maxtxpower(struct ath_softc *sc)
+{
+	u_int32_t clamped_maxtxpower;
+	(void)ath_hal_getmaxtxpow(sc->sc_ah, &clamped_maxtxpower);
+	return clamped_maxtxpower;
+}
+
+/* XXX: this function needs some locking to avoid being called twice/interrupted */
+/* 1.  Save the currently specified maximum txpower (as clamped by madwifi)
+ * 2.  Determine the real maximum txpower the card can support by 
+ *     setting a value that exceeds the maximum range (by one) and 
+ *     finding out what it limits us to.
+ * 3.  Restore the saved maxtxpower value we had previously specified */
+static u_int32_t
+ath_get_real_maxtxpower(struct ath_softc *sc)
+{
+
+	u_int32_t saved_clamped_maxtxpower;
+	u_int32_t real_maxtxpower;
+
+	saved_clamped_maxtxpower = ath_get_clamped_maxtxpower(sc);
+	real_maxtxpower = ath_set_clamped_maxtxpower(sc, IEEE80211_TXPOWER_MAX + 1);
+	ath_set_clamped_maxtxpower(sc, saved_clamped_maxtxpower);
+	return real_maxtxpower;
+}
+
+
 /* XXX: this function needs some locking to avoid being called twice/interrupted */
 static void
 ath_update_txpow(struct ath_softc *sc)
@@ -8906,51 +8959,40 @@ ath_update_txpow(struct ath_softc *sc)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211vap *vap = NULL;
 	struct ath_hal *ah = sc->sc_ah;
-	u_int32_t txpowlimit = 0;
-	u_int32_t maxtxpowlimit = 9999;
-	u_int32_t clamped_txpow = 0;
+	u_int32_t prev_clamped_maxtxpower = 0;
+	u_int32_t new_clamped_maxtxpower = 0;
 
-	/*
-	 * Find the maxtxpow of the card and regulatory constraints
-	 */
-	(void)ath_hal_getmaxtxpow(ah, &txpowlimit);
-	ath_hal_settxpowlimit(ah, maxtxpowlimit);
-	(void)ath_hal_getmaxtxpow(ah, &maxtxpowlimit);
-	ic->ic_txpowlimit = maxtxpowlimit;
-	ath_hal_settxpowlimit(ah, txpowlimit);
-
- 	/*
-	 * Make sure the VAP's change is within limits, clamp it otherwise
- 	 */
+	/* Determine the previous value of maxtxpower */
+	prev_clamped_maxtxpower = ath_get_clamped_maxtxpower(sc);
+	/* Determine the real maximum txpower the card can support */
+	ic->ic_txpowlimit = ath_get_real_maxtxpower(sc);
+ 	/* Grab the new maxtxpower setting (which may have changed) */
+	new_clamped_maxtxpower = ic->ic_newtxpowlimit;
+	/* Make sure the change is within limits, clamp it otherwise */
 	if (ic->ic_newtxpowlimit > ic->ic_txpowlimit)
-		clamped_txpow = ic->ic_txpowlimit;
-	else
-		clamped_txpow = ic->ic_newtxpowlimit;
-
-	/*
-	 * Search for the VAP that needs a txpow change, if any
-	 */
+		new_clamped_maxtxpower = ic->ic_txpowlimit;
+	/* * Search for the VAP that needs a txpow change, if any */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 #ifdef ATH_CAP_TPC
 		if (ic->ic_newtxpowlimit == vap->iv_bss->ni_txpower) {
-			vap->iv_bss->ni_txpower = clamped_txpow;
-			ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
+			vap->iv_bss->ni_txpower = new_clamped_maxtxpower;
+			ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &new_clamped_maxtxpower);
 		}
 #else
 		vap->iv_bss->ni_txpower = clamped_txpow;
-		ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
+		ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &new_clamped_maxtxpower);
 #endif
 	}
 
-	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
+	/* Store the assigned (clamped) maximum txpower and update the HAL */
+	ic->ic_newtxpowlimit = sc->sc_curtxpow = new_clamped_maxtxpower;
 
 #ifdef ATH_CAP_TPC
-	if (ic->ic_newtxpowlimit >= txpowlimit)
-		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
+	if (new_clamped_maxtxpower >= prev_clamped_maxtxpower)
 #else
-	if (ic->ic_newtxpowlimit != txpowlimit)
-		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
+	if (new_clamped_maxtxpower != prev_clamped_maxtxpower)
 #endif
+		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 }
 
 
