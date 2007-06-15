@@ -223,11 +223,13 @@ sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 		return ath_hal_setlogging(enable);
 }
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 static struct ale *
 ath_hal_alq_get(struct ath_hal *ah)
 {
 	struct ale *ale;
-
 	if (ath_hal_alq_emitdev) {
 		ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
 		if (ale) {
@@ -247,6 +249,9 @@ ath_hal_alq_get(struct ath_hal *ah)
 	return ale;
 }
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 void __ahdecl
 ath_hal_reg_write(struct ath_hal *ah, u_int32_t reg, u_int32_t val)
 {
@@ -269,17 +274,18 @@ ath_hal_reg_write(struct ath_hal *ah, u_int32_t reg, u_int32_t val)
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int32_t reg)
 {
 	u_int32_t val;
-
 	val = _OS_REG_READ(ah, reg);
 	if (ath_hal_alq) {
 		unsigned long flags;
 		struct ale *ale;
 
-		local_irq_save(flags);
 		ale = ath_hal_alq_get(ah);
 		if (ale) {
 			struct athregrec *r = (struct athregrec *) ale->ae_data;
@@ -288,20 +294,20 @@ ath_hal_reg_read(struct ath_hal *ah, u_int32_t reg)
 			r->val = val;
 			alq_post(ath_hal_alq, ale);
 		}
-		local_irq_restore(flags);
 	}
 	return val;
 }
 EXPORT_SYMBOL(ath_hal_reg_read);
 
+/* 
+ * This should only be called while holding the lock, sc->sc_hal_lock.
+ */
 void __ahdecl
 OS_MARK(struct ath_hal *ah, u_int id, u_int32_t v)
 {
 	if (ath_hal_alq) {
-		unsigned long flags;
 		struct ale *ale;
 
-		local_irq_save(flags);
 		ale = ath_hal_alq_get(ah);
 		if (ale) {
 			struct athregrec *r = (struct athregrec *) ale->ae_data;
@@ -310,7 +316,6 @@ OS_MARK(struct ath_hal *ah, u_int id, u_int32_t v)
 			r->val = v;
 			alq_post(ath_hal_alq, ale);
 		}
-		local_irq_restore(flags);
 	}
 }
 EXPORT_SYMBOL(OS_MARK);
@@ -321,6 +326,8 @@ EXPORT_SYMBOL(OS_MARK);
  * explicitly configured to use function calls.  The latter is
  * for architectures that might need to do something before
  * referencing memory (e.g. remap an i/o window).
+ *
+ * This should only be called while holding the lock, sc->sc_hal_lock.
  *
  * NB: see the comments in ah_osdep.h about byte-swapping register
  *     reads and writes to understand what's going on below.
@@ -336,6 +343,9 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {

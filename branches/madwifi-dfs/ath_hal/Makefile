@@ -49,7 +49,7 @@ TOP = $(obj)/..
 include $(TOP)/Makefile.inc
 
 obj-m		+= ath_hal.o
-ath_hal-objs	:= ah_os.o ath_hal_api.o $(TARGET).hal.o
+ath_hal-objs	:= ah_os.o $(TARGET).hal.o
 
 hostprogs-y	:= uudecode
 
