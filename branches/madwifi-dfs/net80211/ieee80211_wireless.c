@@ -72,6 +72,9 @@
 	 (_vap)->iv_ic->ic_roaming == IEEE80211_ROAMING_AUTO)
 #define	RESCAN	1
 
+static void
+pre_announced_chanswitch(struct net_device *dev, u_int32_t channel, u_int32_t tbtt);
+
 static int
 preempt_scan(struct net_device *dev, int max_grace, int max_wait)
 {
@@ -747,19 +750,27 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 	if ((vap->iv_opmode == IEEE80211_M_MONITOR ||
 	    vap->iv_opmode == IEEE80211_M_WDS) &&
 	    vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
-		/*
-		 * Monitor and wds modes can switch directly.
-		 */
+		/* Monitor and wds modes can switch directly. */
 		ic->ic_curchan = vap->iv_des_chan;
 		if (vap->iv_state == IEEE80211_S_RUN) {
 			ic->ic_set_channel(ic);
 		}
+	} else if(vap->iv_opmode == IEEE80211_M_HOSTAP) {
+		/* Need to use channel switch announcement on beacon if we are 
+		 * up and running.  We use ic_set_channel directly if we are 
+		 * "running" but not "up".  Otherwise, iv_des_chan will take
+		 * effect when we are transitioned to RUN state later. */
+		if(IS_UP(vap->iv_dev)) {
+			pre_announced_chanswitch(dev, ieee80211_chan2ieee(ic, vap->iv_des_chan), IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT);
+		}
+		else if (vap->iv_state == IEEE80211_S_RUN) {
+			ic->ic_curchan = vap->iv_des_chan;
+			ic->ic_set_channel(ic);
+		}
 	} else {
-		/*
-		 * Need to go through the state machine in case we need
+		/* Need to go through the state machine in case we need
 		 * to reassociate or the like.  The state machine will
-		 * pickup the desired channel and avoid scanning.
-		 */
+		 * pickup the desired channel and avoid scanning. */
 		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 	}
@@ -4309,6 +4320,16 @@ ieee80211_ioctl_getstainfo(struct net_device *dev, struct iwreq *iwr)
 	return (error ? -EFAULT : 0);
 }
 
+static void
+pre_announced_chanswitch(struct net_device *dev, u_int32_t channel, u_int32_t tbtt) {
+	struct ieee80211vap *vap = dev->priv;
+	struct ieee80211com *ic = vap->iv_ic;
+	/* now flag the beacon update to include the channel switch IE */
+	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+	ic->ic_chanchange_chan = channel;
+	ic->ic_chanchange_tbtt = tbtt;
+}
+
 static int
 ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 	void *w, char *extra)
@@ -4320,10 +4341,7 @@ ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 	if (!(ic->ic_flags & IEEE80211_F_DOTH))
 		return 0;
 
-	/* now flag the beacon update to include the channel switch IE */
-	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
-	ic->ic_chanchange_chan = param[0];
-	ic->ic_chanchange_tbtt = param[1];
+	pre_announced_chanswitch(dev, param[0], param[1]);
 
 	return 0;
 }
