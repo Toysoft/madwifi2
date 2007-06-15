@@ -91,6 +91,9 @@
 #include "if_ath_ahb.h"
 #endif			/* AHB BUS */
 
+#include "ah.h"
+#include "if_ath_hal.h"
+
 #ifdef ATH_TX99_DIAG
 #include "ath_tx99.h"
 #endif
@@ -440,6 +443,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_cachelsz = csz << 2;		/* convert to bytes */
 
 	ATH_LOCK_INIT(sc);
+	ATH_HAL_LOCK_INIT(sc);
 	ATH_TXBUF_LOCK_INIT(sc);
 	ATH_RXBUF_LOCK_INIT(sc);
 
@@ -526,11 +530,9 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_country_code = ath_countrycode;
 	ic->ic_country_outdoor = ath_outdoor;
 
-	if (rfkill != -1) {
-		printk(KERN_INFO "ath_pci: switching rfkill capability %s\n",
-			rfkill ? "on" : "off");
-		ath_hal_setrfsilent(ah, rfkill);
-	}
+	printk(KERN_INFO "ath_pci: switching rfkill capability %s\n",
+		rfkill ? "on" : "off");
+	ath_hal_setrfsilent(ah, rfkill);
 
 #ifdef ATH_CAP_TPC
 	printk(KERN_INFO "ath_pci: ath_pci: switching per-packet transmit power control %s\n",
@@ -965,6 +967,7 @@ bad:
 		ath_hal_detach(ah);
 	ATH_TXBUF_LOCK_DESTROY(sc);
 	ATH_LOCK_DESTROY(sc);
+	ATH_HAL_LOCK_DESTROY(sc);
 	sc->sc_invalid = 1;
 
 	return error;
@@ -980,7 +983,7 @@ ath_detach(struct net_device *dev)
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: flags %x\n", __func__, dev->flags);
 	ath_stop(dev);
 
-	ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE);
+	ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE, AH_TRUE);
 
 	sc->sc_invalid = 1;
 
@@ -1015,6 +1018,7 @@ ath_detach(struct net_device *dev)
 
 	ath_dynamic_sysctl_unregister(sc);
 	ATH_LOCK_DESTROY(sc);
+	ATH_HAL_LOCK_DESTROY(sc);
 	dev->stop = NULL; /* prevent calling ath_stop again */
 	unregister_netdev(dev);
 	return 0;
@@ -2008,7 +2012,7 @@ ath_stop(struct net_device *dev)
 	ATH_LOCK(sc);
 
 	if (!sc->sc_invalid)
-		ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE);
+		ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE, AH_TRUE);
 
 	error = ath_stop_locked(dev);
 
@@ -2079,7 +2083,6 @@ ar_device(int devid)
 static int
 ath_set_ack_bitrate(struct ath_softc *sc, int high)
 {
-	struct ath_hal *ah = sc->sc_ah;
 	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
 		/* set ack to be sent at low bit-rate */
 		/* registers taken from the OpenBSD 5212 HAL */
@@ -2088,9 +2091,9 @@ ath_set_ack_bitrate(struct ath_softc *sc, int high)
 #define AR5K_AR5212_STA_ID1_BASE_RATE_11B       0x02000000
 		u_int32_t v = AR5K_AR5212_STA_ID1_BASE_RATE_11B | AR5K_AR5212_STA_ID1_ACKCTS_6MB;
 		if (high) {
-			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) & ~v);
+			ath_reg_write(sc, AR5K_AR5212_STA_ID1, ath_reg_read(sc, AR5K_AR5212_STA_ID1) & ~v);
 		} else {
-			OS_REG_WRITE(ah, AR5K_AR5212_STA_ID1, OS_REG_READ(ah, AR5K_AR5212_STA_ID1) | v);
+			ath_reg_write(sc, AR5K_AR5212_STA_ID1, ath_reg_read(sc, AR5K_AR5212_STA_ID1) | v);
 		}
 #undef AR5K_AR5212_STA_ID1
 #undef AR5K_AR5212_STA_ID1_BASE_RATE_11B
@@ -2892,13 +2895,13 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 			 */
 			memcpy(hk->kv_mic, k->wk_txmic, sizeof(hk->kv_mic));
 			KEYPRINTF(sc, k->wk_keyix, hk, zerobssid);
-			if (!ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, zerobssid))
+			if (!ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, zerobssid, AH_FALSE))
 				return 0;
 
 			memcpy(hk->kv_mic, k->wk_rxmic, sizeof(hk->kv_mic));
 			KEYPRINTF(sc, k->wk_keyix + 32, hk, mac);
 			/* XXX delete tx key on failure? */
-			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix + 32), hk, mac);
+			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix + 32), hk, mac, AH_FALSE);
 		} else {
 			/*
 			 * Room for both TX+RX MIC keys in one key cache
@@ -2910,7 +2913,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 			memcpy(hk->kv_txmic, k->wk_txmic, sizeof(hk->kv_txmic));
 #endif
 			KEYPRINTF(sc, k->wk_keyix, hk, mac);
-			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac);
+			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac, AH_FALSE);
 		}
 	} else if (k->wk_flags & IEEE80211_KEY_XR) {
 		/*
@@ -2920,7 +2923,7 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 		memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
 			k->wk_txmic : k->wk_rxmic, sizeof(hk->kv_mic));
 		KEYPRINTF(sc, k->wk_keyix, hk, mac);
-		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac);
+		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, mac, AH_FALSE);
 	}
 	return 0;
 #undef IEEE80211_KEY_XR
@@ -2984,7 +2987,7 @@ ath_keyset(struct ath_softc *sc, const struct ieee80211_key *k,
 		return ath_keyset_tkip(sc, k, &hk, mac);
 	} else {
 		KEYPRINTF(sc, k->wk_keyix, &hk, mac);
-		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), &hk, mac);
+		return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), &hk, mac, AH_FALSE);
 	}
 #undef N
 }
@@ -10408,7 +10411,7 @@ ath_ar5212_registers_dump(struct ath_softc *sc) {
 		if (ath_regdump_filter(sc, address))
 			continue;
 		ath_lookup_register_name(sc, name, MAX_REGISTER_NAME_LEN, address);
-		value = OS_REG_READ(ah,address);
+		value = ath_reg_read(sc,address);
 		ath_print_register(name, address, value);
 	} while ((address += 4) < MAX_REGISTER_ADDRESS);
 }
@@ -10429,7 +10432,7 @@ ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 	do {
 		if (ath_regdump_filter(sc, address))
 			continue;
-		value = OS_REG_READ(ah,address);
+		value = ath_reg_read(sc,address);
 		p_old = (unsigned int*)&sc->register_snapshot[address];
 		if (*p_old != value) {
 			ath_lookup_register_name(sc, name, MAX_REGISTER_NAME_LEN, address);
@@ -10453,7 +10456,7 @@ ath_ar5212_registers_mark(struct ath_softc *sc)
 	do {
 		*((unsigned int*)&sc->register_snapshot[address]) =
 			ath_regdump_filter(sc, address) ? 
-			0x0 : OS_REG_READ(ah,address);
+			0x0 : ath_reg_read(sc,address);
 	} while ((address += 4) < MAX_REGISTER_ADDRESS);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
@@ -10477,7 +10480,7 @@ ath_read_register(struct ieee80211com *ic, unsigned int address, unsigned int* v
 				DEV_NAME(sc->sc_dev), __func__, address);
 		return 1;
 	}
-	*value = OS_REG_READ(sc->sc_ah, address);
+	*value = ath_reg_read(sc, address);
 	printk(KERN_DEBUG "*0x%04x -> 0x%08x\n", address, *value);
 	return 0;
 }
@@ -10507,9 +10510,9 @@ ath_write_register(struct ieee80211com *ic, unsigned int address, unsigned int v
 				DEV_NAME(sc->sc_dev), __func__, address);
 		return 1;
 	}
-	OS_REG_WRITE(sc->sc_ah, address, value);
+	ath_reg_write(sc, address, value);
 	printk(KERN_DEBUG "*0x%04x <- 0x%08x = 0x%08x\n", address, value, 
-			OS_REG_READ(sc->sc_ah, address));
+			ath_reg_read(sc, address));
 	return 0;
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
