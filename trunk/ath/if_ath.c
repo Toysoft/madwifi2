@@ -269,7 +269,7 @@ static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static char *autocreate = NULL;
 static char *ratectl = DEF_RATE_CTL;
-static int rfkill = -1;
+static int rfkill = 0;
 #ifdef ATH_CAP_TPC
 static int tpc = 0;
 #endif
