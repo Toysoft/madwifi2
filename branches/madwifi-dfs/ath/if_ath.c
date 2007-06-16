@@ -9461,12 +9461,9 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	int error = -EINVAL;
 
 	if(SIOC80211IFCREATE == cmd) {
-/* 
-XXX: ATH_UNLOCK and ATH_LOCK are temporary evil until I figure out a fix for 
-	ieee80211_ioctl_create_vap working when interrupts are disabled 
-	Ideally interrupts are disabled while we are playing with the driver
-	configuration.
-*/
+		/* XXX: ATH_UNLOCK and ATH_LOCK are temporary evil until I 
+		 * figure out a fix for ieee80211_ioctl_create_vap working 
+		 * when interrupts are disabled */
 		ATH_LOCK(sc);
 		error = ieee80211_ioctl_create_vap(ic, ifr, dev);
 		ATH_UNLOCK(sc);
@@ -11601,7 +11598,7 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 		}
 
 		/* Handle Key Table */
-		if ((address >= 0x8800) && (address < 0x9800)) {
+		if ((address >= 0x8800) && (address < 0x8780)) {
 #define keytable_entry_reg_count (8)
 #define keytable_entry_size      (keytable_entry_reg_count * sizeof(u_int32_t))
 			int key = ((address - 0x8800) / keytable_entry_size);
