@@ -10344,7 +10344,7 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 		}
 
 		/* Handle Rate Duration Table */
-		if (address >= 0x8700 && address < 0x8800) {
+		if (address >= 0x8700 && address < 0x8780) {
 			snprintf(buf, buflen, "RATE(%2d).DURATION", 
 					((address - 0x8700) / sizeof(u_int32_t)));
 			return AH_TRUE;
