@@ -115,12 +115,13 @@ $if_ath_hal_h = 'if_ath_hal.h';
 	"ah_waitForBeaconDone"        => "ath_hal_waitforbeacon",
 	"ah_writeAssocid"             => "ath_hal_setassocid",
 	"ah_clrMulticastFilterIndex"  => "ath_hal_clearmcastfilter",
+	"ah_detach"		      => "ath_hal_detach",
 	"ah_detectCardPresent"        => "ath_hal_detectcardpresent" );
 #
 # List any functions that should NOT be generated here (such as those that conflict with
 # other functions, perhaps.
 #
-@hal_functions_not_to_wrap = ( "ah_detach" );
+@hal_functions_not_to_wrap = (  );
 #
 # Boilerplate text
 #

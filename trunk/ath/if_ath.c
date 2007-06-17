@@ -964,7 +964,7 @@ bad2:
 	ath_desc_free(sc);
 bad:
 	if (ah)
-		ath_hal_detach(ah);
+		_ath_hal_detach(ah);
 	ATH_TXBUF_LOCK_DESTROY(sc);
 	ATH_LOCK_DESTROY(sc);
 	ATH_HAL_LOCK_DESTROY(sc);
@@ -1014,7 +1014,7 @@ ath_detach(struct net_device *dev)
 	ieee80211_rate_detach(sc->sc_rc);
 	ath_desc_free(sc);
 	ath_tx_cleanup(sc);
-	ath_hal_detach(ah);
+	_ath_hal_detach(ah);
 
 	ath_dynamic_sysctl_unregister(sc);
 	ATH_LOCK_DESTROY(sc);
@@ -1035,6 +1035,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	struct ieee80211vap *vap;
 	int ic_opmode;
 
+	ATH_LOCK_IRQ(sc);
 	if (ic->ic_dev->flags & IFF_RUNNING) {
 		/* needs to disable hardware too */
 		ath_hal_intrset(ah, 0);		/* disable interrupts */
@@ -1044,10 +1045,14 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	/* XXX ic unlocked and race against add */
 	switch (opmode) {
 	case IEEE80211_M_STA:	/* ap+sta for repeater application */
-		if (sc->sc_nstavaps != 0)  /* only one sta regardless */
+		if (sc->sc_nstavaps != 0) { /* only one sta regardless */
+			ATH_UNLOCK_IRQ_EARLY(sc);
 			return NULL;
-		if ((sc->sc_nvaps != 0) && (!(flags & IEEE80211_NO_STABEACONS)))
+		}
+		if ((sc->sc_nvaps != 0) && (!(flags & IEEE80211_NO_STABEACONS))) {
+			ATH_UNLOCK_IRQ_EARLY(sc);
 			return NULL;   /* If using station beacons, must first up */
+		}
 		if (flags & IEEE80211_NO_STABEACONS) {
 			sc->sc_nostabeacons = 1;
 			ic_opmode = IEEE80211_M_HOSTAP;	/* Run with chip in AP mode */
@@ -1055,8 +1060,10 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 			ic_opmode = opmode;
 		break;
 	case IEEE80211_M_IBSS:
-		if (sc->sc_nvaps != 0)		/* only one */
+		if (sc->sc_nvaps != 0) { /* only one */
+			ATH_UNLOCK_IRQ_EARLY(sc);
 			return NULL;
+		}
 		ic_opmode = opmode;
 		break;
 	case IEEE80211_M_AHDEMO:
@@ -1071,11 +1078,15 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	case IEEE80211_M_WDS:
 		/* permit multiple ap's and/or wds links */
 		/* XXX sta+ap for repeater/bridge application */
-		if ((sc->sc_nvaps != 0) && (ic->ic_opmode == IEEE80211_M_STA))
+		if ((sc->sc_nvaps != 0) && (ic->ic_opmode == IEEE80211_M_STA)) {
+			ATH_UNLOCK_IRQ_EARLY(sc);
 			return NULL;
+		}
 		/* XXX not right, beacon buffer is allocated on RUN trans */
-		if (opmode == IEEE80211_M_HOSTAP && STAILQ_EMPTY(&sc->sc_bbuf))
+		if (opmode == IEEE80211_M_HOSTAP && STAILQ_EMPTY(&sc->sc_bbuf)) {
+			ATH_UNLOCK_IRQ_EARLY(sc);
 			return NULL;
+		}
 		/*
 		 * XXX Not sure if this is correct when operating only
 		 * with WDS links.
@@ -1084,17 +1095,20 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 
 		break;
 	default:
+		ATH_UNLOCK_IRQ_EARLY(sc);
 		return NULL;
 	}
 
 	if (sc->sc_nvaps >= ATH_BCBUF) {
 		printk(KERN_WARNING "too many virtual ap's (already got %d)\n", sc->sc_nvaps);
+		ATH_UNLOCK_IRQ_EARLY(sc);
 		return NULL;
 	}
 
 	dev = alloc_etherdev(sizeof(struct ath_vap) + sc->sc_rc->arc_vap_space);
 	if (dev == NULL) {
 		/* XXX msg */
+		ATH_UNLOCK_IRQ_EARLY(sc);
 		return NULL;
 	}
 
@@ -1197,9 +1211,15 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	if (sc->sc_hastsfadd)
 		ath_hal_settsfadjust(sc->sc_ah, sc->sc_stagbeacons);
 	SET_NETDEV_DEV(dev, ATH_GET_NETDEV_DEV(mdev));
-	/* complete setup */
+	/* Release the lock and re-enable IRQs then re-obtain the lock.
+	 * Finish processing with interrupts enabled. */
+	ATH_UNLOCK_IRQ(sc);
+	spin_lock(&sc->sc_lock);
 	(void) ieee80211_vap_attach(vap,
 		ieee80211_media_change, ieee80211_media_status);
+	spin_unlock(&sc->sc_lock);
+	/* Re-enable the lock with IRQ disabled */
+	ATH_LOCK_IRQ(sc);
 
 	ic->ic_opmode = ic_opmode;
 
@@ -1245,6 +1265,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 
+	ATH_UNLOCK_IRQ(sc);
 	return vap;
 }
 
@@ -9153,23 +9174,22 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct ath_stats stats;
 	int error = -EINVAL;
 
 	if(SIOC80211IFCREATE == cmd) {
-		/* XXX: We cannot currently disable interrupts when
-		 * calling ieee80211_ioctl_create_vap. */
-		spin_lock(&sc->sc_lock);
 		error = ieee80211_ioctl_create_vap(ic, ifr, dev);
-		spin_unlock(&sc->sc_lock);
 	}
 	else {
-		ATH_LOCK_IRQ(sc);
 		switch (cmd) {
 		case SIOCGATHSTATS:
+			ATH_LOCK_IRQ(sc);
 			sc->sc_stats.ast_tx_packets = sc->sc_devstats.tx_packets;
 			sc->sc_stats.ast_rx_packets = sc->sc_devstats.rx_packets;
 			sc->sc_stats.ast_rx_rssi = ieee80211_getrssi(ic);
-			if (copy_to_user(ifr->ifr_data, &sc->sc_stats, sizeof (sc->sc_stats)))
+			memcpy(&stats, &sc->sc_stats, sizeof (sc->sc_stats));
+			ATH_UNLOCK_IRQ(sc);
+			if (copy_to_user(ifr->ifr_data, &stats, sizeof (stats)))
 				error = -EFAULT;
 			else
 				error = 0;
@@ -9189,7 +9209,6 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		default:
 			break;
 		}
-		ATH_UNLOCK_IRQ(sc);
 	}
 	return error;
 }

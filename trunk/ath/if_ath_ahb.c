@@ -486,8 +486,10 @@ ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr)
 		return -EOPNOTSUPP;
 	memset(&info, 0, sizeof(info));
 	info.cmd = cmd;
+	ATH_LOCK_IRQ(sc);
 	strncpy(info.driver, dev_info, sizeof(info.driver) - 1);
 	strncpy(info.version, version, sizeof(info.version) - 1);
+	ATH_UNLOCK_IRQ(sc);
 	return copy_to_user(addr, &info, sizeof(info)) ? -EFAULT : 0;
 }
 
