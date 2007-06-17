@@ -786,5 +786,7 @@ int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);
 void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
+int ar_device(int devid);
+#define DEV_NAME(_d) ((0 == _d || 0 == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? "MadWifi" : _d->name)
 
 #endif /* _DEV_ATH_ATHVAR_H */
