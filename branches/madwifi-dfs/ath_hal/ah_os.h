@@ -222,6 +222,6 @@ extern	void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
  */
 extern	struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
 		HAL_BUS_TAG, HAL_BUS_HANDLE, HAL_STATUS*);
-extern	void ath_hal_detach(struct ath_hal *);
+extern	void _ath_hal_detach(struct ath_hal *);
 
 #endif /* _ATH_AH_OSDEP_H_ */

@@ -7,8 +7,6 @@
  * of the struct ath_hal (usually named ah). */
 
 
-#include "if_ath_radar.h"
-
 #ifndef _IF_ATH_HAL_H
 #define _IF_ATH_HAL_H
 
@@ -306,6 +304,14 @@ __hal_wrapper void ath_hal_putrxbuf(struct ath_hal* ah, u_int32_t rxdp)
 		ATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));
 		ah->ah_setRxDP(ah, rxdp);
 		ATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));
+	})
+__hal_wrapper HAL_BOOL ath_hal_reset(struct ath_hal* ah, HAL_OPMODE a1, HAL_CHANNEL* a2, HAL_BOOL bChannelChange, HAL_STATUS* status)
+	IMPLEMENTATION({
+		HAL_BOOL ret;
+		ATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));
+		ret = ah->ah_reset(ah, a1, a2, bChannelChange, status);
+		ATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));
+		return ret;
 	})
 __hal_wrapper HAL_BOOL ath_hal_setdecompmask(struct ath_hal* ah, u_int16_t a1, int a2)
 	IMPLEMENTATION({
@@ -723,19 +729,6 @@ IMPLEMENTATION({
 	ATH_HAL_UNLOCK_IRQ(sc);
 	return ret;
         })
-/* This is implemented in if_ath.c, but we need it in ath_hal_reset. */
-extern void ath_update_txpow(struct ath_softc *);
-
-__hal_wrapper HAL_BOOL ath_hal_reset(struct ath_hal* ah, HAL_OPMODE opMode, HAL_CHANNEL* chan, HAL_BOOL bChannelChange, HAL_STATUS* status)
-	IMPLEMENTATION({
-	HAL_BOOL  ret;
-	ATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));
-	ret = ah->ah_reset(ah, opMode, chan, bChannelChange, status);
-	ATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));
-	ath_radar_update(GET_ATH_SOFTC(ah), chan);
-	ath_update_txpow(GET_ATH_SOFTC(ah));
-	return ret;
-	})
 __hal_wrapper HAL_BOOL ath_hal_burstsupported(struct ath_hal * ah)
 	IMPLEMENTATION({ 
 		return (ath_hal_getcapability(ah, HAL_CAP_BURST, 0, NULL) == HAL_OK); 

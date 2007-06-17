@@ -69,6 +69,7 @@ $if_ath_hal_h = 'if_ath_hal.h';
 	"ah_radarWait"                => "ath_hal_radar_wait",
 	"ah_releaseTxQueue"           => "ath_hal_releasetxqueue",
 	"ah_reqTxIntrDesc"            => "ath_hal_txreqintrdesc",
+	"ah_reset"                    => "ath_hal_reset",
 	"ah_resetKeyCacheEntry"       => "ath_hal_keyreset",
 	"ah_resetStationBeaconTimers" => "ath_hal_beaconreset",
 	"ah_resetTsf"                 => "ath_hal_resettsf",
@@ -119,7 +120,8 @@ $if_ath_hal_h = 'if_ath_hal.h';
 # List any functions that should NOT be generated here (such as those that conflict with
 # other functions, perhaps.
 #
-@hal_functions_not_to_wrap = ( "ah_detach", "ah_reset" );
+@hal_functions_not_to_wrap = ( "ah_detach" );
+
 #
 # Boilerplate text
 #
@@ -140,8 +142,6 @@ EOF
 #
 $header_for_h = <<EOF
 $header_comment
-
-#include "if_ath_radar.h"
 
 #ifndef _IF_ATH_HAL_H
 #define _IF_ATH_HAL_H
@@ -191,19 +191,6 @@ IMPLEMENTATION({
 	ATH_HAL_UNLOCK_IRQ(sc);
 	return ret;
         })
-/* This is implemented in if_ath.c, but we need it in ath_hal_reset. */
-extern void ath_update_txpow(struct ath_softc *);
-
-__hal_wrapper HAL_BOOL ath_hal_reset(struct ath_hal* ah, HAL_OPMODE opMode, HAL_CHANNEL* chan, HAL_BOOL bChannelChange, HAL_STATUS* status)
-	IMPLEMENTATION({
-	HAL_BOOL  ret;
-	ATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));
-	ret = ah->ah_reset(ah, opMode, chan, bChannelChange, status);
-	ATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));
-	ath_radar_update(GET_ATH_SOFTC(ah), chan);
-	ath_update_txpow(GET_ATH_SOFTC(ah));
-	return ret;
-	})
 __hal_wrapper HAL_BOOL ath_hal_burstsupported(struct ath_hal * ah)
 	IMPLEMENTATION({ 
 		return (ath_hal_getcapability(ah, HAL_CAP_BURST, 0, NULL) == HAL_OK); 

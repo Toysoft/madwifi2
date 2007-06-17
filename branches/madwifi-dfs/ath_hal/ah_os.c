@@ -96,7 +96,7 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 }
 
 void
-ath_hal_detach(struct ath_hal *ah)
+_ath_hal_detach(struct ath_hal *ah)
 {
 	(*ah->ah_detach)(ah);
 	AH_MOD_DEC_USE_COUNT(THIS_MODULE);
@@ -564,7 +564,7 @@ MODULE_LICENSE("Proprietary");
 
 EXPORT_SYMBOL(ath_hal_probe);
 EXPORT_SYMBOL(_ath_hal_attach);
-EXPORT_SYMBOL(ath_hal_detach);
+EXPORT_SYMBOL(_ath_hal_detach);
 EXPORT_SYMBOL(ath_hal_init_channels);
 EXPORT_SYMBOL(ath_hal_getwirelessmodes);
 EXPORT_SYMBOL(ath_hal_computetxtime);
