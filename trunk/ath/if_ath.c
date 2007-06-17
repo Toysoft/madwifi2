@@ -9230,10 +9230,11 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	struct ath_softc *sc = ctl->extra1;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
-	int ret;
+	int ret = 0;
 
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
+	ATH_LOCK(sc);
 	if (write) {
 		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
 		if (ret == 0) {
@@ -9281,7 +9282,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 2 = antenna port 2
 				 */
 				if (val > 2)
-					return -EINVAL;
+					ret = -EINVAL;
 				else
 					sc->sc_txantenna = val;
 				break;
@@ -9293,7 +9294,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 2 = antenna port 2
 				 */
 				if (val > 2)
-					return -EINVAL;
+					ret = -EINVAL;
 				else
 					ath_setdefantenna(sc, val);
 				break;
@@ -9302,11 +9303,15 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 0 = disallow use of diversity
 				 * 1 = allow use of diversity
 				 */
-				if (val > 1)
-					return -EINVAL;
+				if (val > 1) {
+					ret = -EINVAL;
+					break;
+				}
 				/* Don't enable diversity if XR is enabled */
-				if (((!sc->sc_hasdiversity) || (sc->sc_xrtxq != NULL)) && val)
-					return -EINVAL;
+				if (((!sc->sc_hasdiversity) || (sc->sc_xrtxq != NULL)) && val) {
+					ret = -EINVAL;
+					break;
+				}
 				sc->sc_diversity = val;
 				ath_hal_setdiversity(ah, val);
 				break;
@@ -9339,8 +9344,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_ackrate = val;
 				ath_set_ack_bitrate(sc, sc->sc_ackrate);
 				break;
-			default:
-				return -EINVAL;
+			default: 
+				ret = -EINVAL;
+				break;
 			}
 		}
 	} else {
@@ -9396,10 +9402,14 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val = sc->sc_ackrate;
 			break;
 		default:
-			return -EINVAL;
+			ret = -EINVAL;
+			break;
 		}
-		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
+		if(!ret) {
+			ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
+		}
 	}
+	ATH_UNLOCK(sc);
 	return ret;
 }
 
