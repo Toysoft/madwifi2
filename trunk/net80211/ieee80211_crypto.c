@@ -332,7 +332,7 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 	 * If the hardware does not support the cipher then
 	 * fallback to a host-based implementation.
 	 */
-	if ((vap->iv_caps & (1<<cipher)) == 0) {
+	if ((vap->iv_caps & !(1 << cipher))) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 		    "%s: no h/w support for cipher %s, falling back to s/w\n",
 		    __func__, cip->ic_name);
@@ -344,12 +344,12 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 	 * the cipher modules honor it.
 	 */
 	if (cipher == IEEE80211_CIPHER_TKIP) {
-		if ((vap->iv_caps & IEEE80211_C_TKIPMIC) == 0) {
+		if (!(vap->iv_caps & IEEE80211_C_TKIPMIC)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 				"%s: no h/w support for TKIP MIC, falling back to s/w\n",
 				__func__);
 			flags |= IEEE80211_KEY_SWMIC;
-	    	} else if (((vap->iv_caps & IEEE80211_C_WME_TKIPMIC) == 0) &&
+	    	} else if (!((vap->iv_caps & IEEE80211_C_WME_TKIPMIC)) &&
 		    (vap->iv_flags & IEEE80211_F_WME)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 				"%s: no h/w support for TKIP MIC when WMM is turned on,"
@@ -365,7 +365,7 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 	 * cipher module can optimize space usage based on
 	 * whether or not it needs to do the cipher work.
 	 */
-	if (key->wk_cipher != cip || key->wk_flags != flags) {
+	if ((key->wk_cipher != cip) || (key->wk_flags != flags)) {
 again:
 		/*
 		 * Fill in the flags so cipher modules can see s/w
