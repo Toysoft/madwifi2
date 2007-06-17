@@ -30,14 +30,6 @@ $path_to_if_ath_hal_c = "$path_to_ath/$if_ath_hal_c";
 %hal_functionname_to_parameter_name_array = ();
 # hash of string->list of strings (ordered list of parameter types)
 %hal_functionname_to_parameter_types_array = ();
-# hash of string->string (hal's function name to return type)
-%wrapper_functionname_to_return_type = ();
-# hash of string->string (hal's function name to expression)
-%wrapper_functionname_to_expression = ();
-# hash of string->list of strings (ordered list of wrapper function parameter names)
-%wrapper_functionname_to_parameter_name_array = ();
-# hash of string->list of strings (ordered list of wrapper function parameter types)
-%wrapper_functionname_to_parameter_types_array = ();
 
 # Open the files we need
 if(!open AH_H, "<$path_to_ah_h") {
@@ -77,7 +69,7 @@ foreach (<AH_H>) {
 
 # Now pick apart the return type, parameter types, and parameter names for each HAL function
 foreach $proto (@hal_prototypes) {
-   $proto =~ /^((?:(?:const|struct)\s*)*[^\s]+[\s]*\*?)[\s]*__ahdecl\(\*([^\)]*)\)\((.*)\);/;
+   $proto =~ /^((?:(?:const|struct)\s*)*[^\s]+(?:[\s]*\*)?)[\s]*__ahdecl\(\*([^\)]*)\)\((.*)\);/;
    my $return_type   = $1;
    my $member_name   = $2;
    my $parameterlist = $3;
@@ -110,40 +102,6 @@ foreach $proto (@hal_prototypes) {
    }
 }
 
-# Now pick apart the return type, parameter types, and parameter names for each HAL wrapper
-foreach $proto (keys %custom_wrappers) {
-   $proto =~ /^((?:(?:const|struct|\*))*\s*[^\s]+)[\s]*([^\(]*)\((.*)\)/;
-   my $return_type   = $1;
-   my $wrapper_name   = $2;
-   my $parameterlist = $3;
-   $wrapper_functionname_to_return_type{$wrapper_name} = $return_type;
-   $wrapper_functionname_to_expression{$wrapper_name} = $custom_wrappers{$proto};
-   @{$wrapper_functionname_to_parameter_name_array{$wrapper_name}} = ();
-   @{$wrapper_functionname_to_parameter_types_array{$wrapper_name}} = ();
-   my @parameters = split /,\s?/, $parameterlist;
-   $argnum = 0;
-   $first = 1;
-   foreach(@parameters) {
-      $_ =~ s/ \*/\* /;
-      $_ =~ /^((?:(?:const|struct|\*)\s*)*)([^\s]+\*?)\s*([^\s]*)\s*/;
-      my $type = "$1$2";
-      my $name = "$3";
-      if(0 == length($name)) {
-	 if($argnum == 0 && $type =~ /ath_hal/) {
-	    $name = "ah";
-	 }
-	 else {
-	    $name = "a" . $argnum;
-	 }
-      }
-      
-      push @{$wrapper_functionname_to_parameter_name_array{$wrapper_name}}, $name;
-      push @{$wrapper_functionname_to_parameter_types_array{$wrapper_name}}, $type;
-      $first = 0;
-      $argnum++;
-   }
-}
-
 # Generate the header file
 print ATH_HAL_API_H $header_for_h;
 
@@ -164,10 +122,10 @@ for $member_name (keys %hal_functionname_to_return_type) {
    }
    print ATH_HAL_API_H ")\n\tIMPLEMENTATION({";
    if(! ($api_return_type =~ /void/ )) {
-      print ATH_HAL_API_H "\n\t" . $api_return_type . " ret;";
+      print ATH_HAL_API_H "\n\t\t" . $api_return_type . " ret;";
    }
-   print ATH_HAL_API_H "\n\tATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));";
-   print ATH_HAL_API_H "\n\t";
+   print ATH_HAL_API_H "\n\t\tATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));";
+   print ATH_HAL_API_H "\n\t\t";
    if(! ($api_return_type =~ /void/ )) {
       print ATH_HAL_API_H "ret = ";
    }
@@ -180,40 +138,12 @@ for $member_name (keys %hal_functionname_to_return_type) {
       print ATH_HAL_API_H $names[$j];
    }
    print ATH_HAL_API_H ");";
-   print ATH_HAL_API_H "\n\tATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));";
+   print ATH_HAL_API_H "\n\t\tATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));";
    if(! ($api_return_type =~ /void/ )) {
-      print ATH_HAL_API_H "\n\treturn ret;";
+      print ATH_HAL_API_H "\n\t\treturn ret;";
    }
    print ATH_HAL_API_H "\n\t})\n";
 }
-print ATH_HAL_API_H <<EOF
-/* These custom wrappers are defined in scripts/regenerate_ath_hal_api.pl and 
- * are used as shortcut accessors for HAL functions. */
-EOF
-;
-for $wrapper_name (keys %wrapper_functionname_to_return_type) {
-   my $api_return_type   = $wrapper_functionname_to_return_type{$wrapper_name};
-   my $api_name      = $wrapper_name;
-   if(exists $hal_function_name_to_madwifi_name{$wrapper_name}) {
-      $api_name = $hal_function_name_to_madwifi_name{$wrapper_name};
-   }
-   print ATH_HAL_API_H "__hal_wrapper " . $api_return_type . " " . $api_name . "(";
-   my @names = @{$wrapper_functionname_to_parameter_name_array{$wrapper_name}};
-   my @types = @{$wrapper_functionname_to_parameter_types_array{$wrapper_name}};
-   for $i (0..$#names) {
-      if($i) {
-	 print ATH_HAL_API_H ", ";
-      }
-      print ATH_HAL_API_H $types[$i] . " " . $names[$i];
-   }
-   print ATH_HAL_API_H ")";
-   print ATH_HAL_API_H "\n\tIMPLEMENTATION({ ";
-   if(! ($api_return_type =~ /void/ )) {
-      print ATH_HAL_API_H "return ";
-   }
-   print ATH_HAL_API_H "(" . $wrapper_functionname_to_expression{"$wrapper_name"} . "); })\n";
-}
-
 print ATH_HAL_API_H $footer_for_h;
 
 #
