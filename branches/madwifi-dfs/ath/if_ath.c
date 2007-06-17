@@ -42,6 +42,8 @@
  * This software is derived from work of Atsushi Onoe; his contribution
  * is greatly appreciated.
  */
+#define	AR_DEBUG
+#include "if_ath_debug.h"
 #include "opt_ah.h"
 
 #ifndef AUTOCONF_INCLUDED
@@ -76,7 +78,6 @@
 #include <net80211/if_llc.h>
 #endif
 
-#define	AR_DEBUG
 
 #include "net80211/if_athproto.h"
 #include "if_athvar.h"
@@ -94,6 +95,7 @@
 
 #include "ah.h"
 #include "if_ath_hal.h"
+#include "if_ath_radar.h"
 
 #ifdef ATH_TX99_DIAG
 #include "ath_tx99.h"
@@ -224,7 +226,7 @@ static void ath_setup_keycacheslot(struct ath_softc *, struct ieee80211_node *);
 static void ath_newassoc(struct ieee80211_node *, int);
 static int ath_getchannels(struct net_device *, u_int, HAL_BOOL, HAL_BOOL);
 static void ath_led_event(struct ath_softc *, int);
-static void ath_update_txpow(struct ath_softc *);
+void ath_update_txpow(struct ath_softc *);
 
 #ifdef ATH_REVERSE_ENGINEERING
 /* Reverse engineering utility commands */
@@ -283,23 +285,16 @@ static void ath_set_txcont_rate(struct ieee80211com *ic, unsigned int new_rate);
 /*
 802.11h DFS support functions
 */
-static int ath_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan);
-static int ath_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan);
-HAL_BOOL ath_hal_reset_wrapper(struct ath_softc *sc, HAL_OPMODE opmode, HAL_CHANNEL* chan,  HAL_BOOL outdoor, HAL_STATUS* pstatus);
 static void ath_radar_detected(struct ath_softc *sc, const char* message);
 static int ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc);
 static void ath_dump_phyerr_statistics(struct ath_softc *sc, const char* cause);
 
-static int ath_get_radar(struct ath_softc *sc);
-static int ath_set_radar(struct ath_softc *sc, HAL_CHANNEL* hchan);
-
+static void ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long arg);
 static void ath_dfs_channel_check_completed(unsigned long);
 static void ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason);
 
 static int ath_radio_silence_required_for_dfs(struct ath_softc* sc);
 static int ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func);
-
-static void ath_dfs_expire_channel_non_occupancy_timers(unsigned long);
 
 /*
 802.11h DFS testing functions
@@ -336,8 +331,6 @@ static int tpc = 0;
 static int countrycode = -1;
 static int outdoor = -1;
 static int xchanmode = -1;
-
-#define DEV_NAME(_d) ((0 == _d || 0 == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? "MadWifi" : _d->name)
 
 static const char *hal_status_desc[] = {
 	"No error",
@@ -402,49 +395,8 @@ MODULE_PARM(ath_debug, "i");
 module_param(ath_debug, int, 0600);
 #endif
 MODULE_PARM_DESC(ath_debug, "Load-time debug output enable");
-
-#define	IFF_DUMPPKTS(sc, _m) \
-	((sc->sc_debug & _m))
 static void ath_printrxbuf(const struct ath_buf *, int);
 static void ath_printtxbuf(const struct ath_buf *, int);
-enum {
-	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
-	ATH_DEBUG_XMIT_DESC	= 0x00000002,	/* xmit descriptors */
-	ATH_DEBUG_RECV		= 0x00000004,	/* basic recv operation */
-	ATH_DEBUG_RECV_DESC	= 0x00000008,	/* recv descriptors */
-	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
-	ATH_DEBUG_RESET		= 0x00000020,	/* reset processing */
-	/* 0x00000040 was ATH_DEBUG_MODE */
-	ATH_DEBUG_BEACON 	= 0x00000080,	/* beacon handling */
-	ATH_DEBUG_WATCHDOG 	= 0x00000100,	/* watchdog timeout */
-	ATH_DEBUG_INTR		= 0x00001000,	/* ISR */
-	ATH_DEBUG_TX_PROC	= 0x00002000,	/* tx ISR proc */
-	ATH_DEBUG_RX_PROC	= 0x00004000,	/* rx ISR proc */
-	ATH_DEBUG_BEACON_PROC	= 0x00008000,	/* beacon ISR proc */
-	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
-	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
-	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
-	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
-	ATH_DEBUG_LED		= 0x00100000,	/* led management */
-	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
-	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
-	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
-	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
-	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
-	ATH_DEBUG_ANY		= 0xffffffff
-};
-#define	DPRINTF(sc, _m, _fmt, ...) do {				\
-	if (sc->sc_debug & (_m))				\
-		printk(_fmt, __VA_ARGS__);			\
-} while (0)
-#define	KEYPRINTF(sc, ix, hk, mac) do {				\
-	if (sc->sc_debug & ATH_DEBUG_KEYCACHE)			\
-		ath_keyprint(sc, __func__, ix, hk, mac);	\
-} while (0)
-#else /* defined(AR_DEBUG) */
-#define	IFF_DUMPPKTS(sc, _m)		0
-#define	DPRINTF(sc, _m, _fmt, ...)
-#define	KEYPRINTF(sc, k, ix, mac)
 #endif /* defined(AR_DEBUG) */
 
 #define ATH_SETUP_XR_VAP(sc,vap,rfilt) \
@@ -730,7 +682,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_cal_ch.data = (unsigned long) dev;
 
 	init_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
-	sc->sc_dfs_channel_non_occupancy_expiration_timer.function = ath_dfs_expire_channel_non_occupancy_timers;
+	sc->sc_dfs_channel_non_occupancy_expiration_timer.function = ath_radar_expire_dfs_channel_non_occupancy_timers;
 	sc->sc_dfs_channel_non_occupancy_expiration_timer.data = (unsigned long) dev;
 
 	sc->sc_dfs_channel_availability_check_time = 0; /* default is used */
@@ -2011,14 +1963,6 @@ ath_init(struct net_device *dev)
 
 	if (sc->sc_softled)
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
-	/*
-	 * This is needed only to setup initial state
-	 * but it's best done after a reset.
-	 */
-	ath_update_txpow(sc);
-	
-	/* Find the radio's maximum output power in 0.5dBm units -- at this point it should be the hw max, not capped by us */
-	printk(KERN_INFO "%s: %s: Maximum txpower: %d.\n", DEV_NAME(sc->sc_dev), __func__, ( ath_get_real_maxtxpower(sc) / 2) );
 
 	/*
 	 * Setup the hardware after reset: the key cache
@@ -2173,7 +2117,7 @@ ath_stop(struct net_device *dev)
 	return error;
 }
 
-static int
+int
 ar_device(int devid)
 {
 	switch (devid) {
@@ -2270,10 +2214,9 @@ ath_reset(struct net_device *dev)
 	ath_draintxq(sc);		/* stop xmit side */
 	ath_stoprecv(sc);		/* stop recv side */
 	/* NB: indicate channel change so we do a full reset */
-	if (!ath_hal_reset_wrapper(sc, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
+	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
 			DEV_NAME(dev), __func__, ath_get_hal_status_desc(status), status);
-	ath_update_txpow(sc);		/* update tx power state */
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
 			DEV_NAME(dev), __func__);
@@ -2305,12 +2248,6 @@ ath_reset(struct net_device *dev)
 	}
 #endif
 	return 0;
-}
-
-HAL_BOOL ath_hal_reset_wrapper(struct ath_softc *sc, HAL_OPMODE opmode, HAL_CHANNEL* chan,  HAL_BOOL outdoor, HAL_STATUS* pstatus) {
-	HAL_BOOL result = ath_hal_reset(sc->sc_ah, opmode, chan,  outdoor, pstatus);
-	ath_set_radar(sc, chan);
-	return result;
 }
 
 /* Swap transmit descriptor.
@@ -7863,6 +7800,8 @@ ath_chan_change(struct ath_softc *sc, struct ieee80211_channel *chan)
 	sc->sc_tx_th.wt_chan_flags = sc->sc_rx_th.wr_chan_flags =
 		htole16(chan->ic_flags);
 #endif
+	ath_update_txpow(sc);
+	printk(KERN_INFO "%s: %s: Maximum txpower: %d.\n", DEV_NAME(sc->sc_dev), __func__, ( ath_get_real_maxtxpower(sc) / 2) );
 	if (ic->ic_curchanmaxpwr == 0)
 		ic->ic_curchanmaxpwr = chan->ic_maxregpower;
 }
@@ -7923,7 +7862,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		&& (ic->ic_opmode == IEEE80211_M_HOSTAP
 		    || ic->ic_opmode == IEEE80211_M_IBSS)     /* we are an AP or IBSS STA */
 		&& (hchan.channel != sc->sc_curchan.channel || (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR))) /* the scan wasn't already done */
-		&& ath_is_dfs_required(sc, &hchan)           /* the new channel requires DFS protection */
+		&& ath_radar_is_dfs_required(sc, &hchan)           /* the new channel requires DFS protection */
 		&& (ic->ic_flags & IEEE80211_F_DOTH)
 		;
 
@@ -7968,8 +7907,6 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 
 		sc->sc_curchan = hchan;
-		ath_update_txpow(sc);		/* update tx power state */
-
 		/*
 		 * Change channels and update the h/w rate map
 		 * if we're switching; e.g. 11a to 11b/g.
@@ -8791,14 +8728,13 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		HAL_CHANNEL *c = &chans[i];
 		struct ieee80211_channel *ichan = &ic->ic_channels[i];
 
-		/* Correct the DFS flags to account for problems with DFS in older binary HALs returning the wrong answers for FCC... */
-		ath_correct_dfs_flags(sc, c);
-		/*
-		Force re-check.
-		XXX: Unclear whether regs say you can avoid the channel availability check if 
-		you've already performed it on the channel within N seconds 
-		(and what the legal value of 'N' is in this case).
-		*/
+		/* Correct the DFS flags to account for problems with DFS in 
+		 * older binary HALs returning the wrong answers for FCC... */
+		ath_radar_correct_dfs_flags(sc, c);
+		/* Force re-check.
+		 * XXX: Unclear whether regs say you can avoid the channel 
+		 * availability check if you've already performed it on the 
+		 * channel within some more brief interval. */
 		c->privFlags		&= ~CHANNEL_DFS_CLEAR;
 		ichan->ic_ieee 		= ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
 		ichan->ic_freq 		= c->channel;
@@ -8956,7 +8892,7 @@ ath_get_real_maxtxpower(struct ath_softc *sc)
 
 
 /* XXX: this function needs some locking to avoid being called twice/interrupted */
-static void
+void
 ath_update_txpow(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -10192,13 +10128,13 @@ txcont_configure_radio(struct ieee80211com *ic)
 		ieee80211_cancel_scan(vap);	/* anything current */
 		ieee80211_wme_updateparams(vap);
 		/*  reset the WNIC */
-		if (!ath_hal_reset_wrapper(sc, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status)) {
-			printk(KERN_ERR "%s: ath_hal_reset_wrapper failed: '%s' "
+		if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status)) {
+			printk(KERN_ERR "%s: ath_hal_reset failed: '%s' "
 					"(HAL status %u) in %s at %s:%d\n", 
 					DEV_NAME(dev), ath_get_hal_status_desc(status), 
 					status,  __func__, __FILE__, __LINE__);
 		}
-		ath_update_txpow(sc);
+		
 
 #ifdef ATH_SUPERG_DYNTURBO
 		/*  Turn on dynamic turbo if necessary -- before we get into our own implementation -- and before we configures */
@@ -10778,110 +10714,6 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 				DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
 }
 
-/*
-Is radar detection enabled?
-*/
-static int
-ath_get_radar(struct ath_softc *sc)
-{
-/* registers taken from the OpenBSD 5212 HAL */
-#define AR5K_AR5212_PHY_ERR_FIL		    0x810c
-#define AR5K_AR5212_PHY_ERR_FIL_RADAR	0x00000020
-	struct ath_hal *ah = sc->sc_ah;
-	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213)
-		return (OS_REG_READ(ah, AR5K_AR5212_PHY_ERR_FIL) & 
-				AR5K_AR5212_PHY_ERR_FIL_RADAR) && 
-			(sc->sc_imask & HAL_INT_RXPHY) && 
-			(ath_hal_intrget(ah) & HAL_INT_RXPHY);
-	else
-		return (sc->sc_imask & HAL_INT_RXPHY) && 
-			(ath_hal_intrget(ah) & HAL_INT_RXPHY);
-	return 0;
-#undef AR5K_AR5212_PHY_ERR_FIL
-#undef AR5K_AR5212_PHY_ERR_FIL_RADAR
-}
-
-/*
-Enable radar detection for 5212, 5213 and compatible chips.  AR5210 doesn't have radar pulse detector
-*/
-static int
-ath_set_radar(struct ath_softc *sc, HAL_CHANNEL* hchan)
-{
-/* registers taken from bsd open HAL */
-#define AR5K_AR5212_PHY_RADAR               0x9954
-#define AR5K_AR5212_PHY_RADAR_DISABLE   0x00000000
-#define AR5K_AR5212_PHY_RADAR_ENABLE    0x00000001
-#define AR5K_AR5212_PHY_ERR_FIL             0x810c
-#define AR5K_AR5212_PHY_ERR_FIL_RADAR   0x00000020
-
-	struct ath_hal *ah = sc->sc_ah;
-	struct net_device *dev = sc->sc_dev;
-	struct ieee80211com *ic = &sc->sc_ic;
-	int required = 0;
-
-	if (ic->ic_flags & IEEE80211_F_SCAN)
-		return 1;
-
-	/* sanity check */
-	if (ath_correct_dfs_flags(sc, hchan))
-		DPRINTF(sc, ATH_DEBUG_DOTH, 
-				"%s: %s: channel required corrections to private flags.\n", 
-				DEV_NAME(dev), __func__);
-
-	required = ath_is_dfs_required(sc, hchan);
-
-	/* registers taken from the OpenBSD 5212 HAL */
-	if (ar_device(sc->devid) == 5212 || ar_device(sc->devid) == 5213) {
-		HAL_INT old_ier = ath_hal_intrget(ah);
-		HAL_INT new_ier = old_ier;
-		unsigned int old_radar  = OS_REG_READ(ah, AR5K_AR5212_PHY_RADAR);
-		unsigned int old_filter = OS_REG_READ(ah, AR5K_AR5212_PHY_ERR_FIL);
-		unsigned int old_rxfilt = ath_hal_getrxfilter(ah);
-		unsigned int old_mask   = sc->sc_imask;
-		unsigned int new_radar  = old_radar;
-		unsigned int new_filter = old_filter;
-		unsigned int new_mask   = old_mask;
-		unsigned int new_rxfilt = old_rxfilt;
-
-		ath_hal_intrset(ah, old_ier & ~HAL_INT_GLOBAL);
-		if (required) {
-			new_radar    |= AR5K_AR5212_PHY_RADAR_ENABLE;
-			new_filter   |= AR5K_AR5212_PHY_ERR_FIL_RADAR;
-			new_rxfilt   |= (HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR);
-			new_mask     |= HAL_INT_RXPHY;
-			new_ier      |= HAL_INT_RXPHY;
-		} else {
-			new_radar    &= ~AR5K_AR5212_PHY_RADAR_ENABLE;
-			new_filter   &= ~AR5K_AR5212_PHY_ERR_FIL_RADAR;
-			new_rxfilt   &= ~HAL_RX_FILTER_PHYRADAR;
-			new_mask     &= ~HAL_INT_RXPHY;
-			new_ier      &= ~HAL_INT_RXPHY;
-		}
-
-		if (old_filter != new_filter)
-			OS_REG_WRITE(ah, AR5K_AR5212_PHY_ERR_FIL, new_filter);
-		if (old_radar != new_radar)
-			OS_REG_WRITE(ah, AR5K_AR5212_PHY_RADAR,   new_radar);
-		if (old_rxfilt != new_rxfilt)
-			ath_hal_setrxfilter(ah, new_rxfilt);
-
-		sc->sc_imask = new_mask;
-		if (IFF_DUMPPKTS(sc, ATH_DEBUG_DOTH) && ((old_radar != new_radar) || 
-				(old_filter != new_filter) || (old_rxfilt != new_rxfilt) || 
-				(old_mask != new_mask) || (old_ier != new_ier)))
-			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Radar detection %s.\n", DEV_NAME(dev), __func__, required ? "enabled" : "disabled");
-		ath_hal_intrset(ah, new_ier);
-	}
-
-	return (required == ath_get_radar(sc));
-/* registers taken from bsd open HAL */
-#undef AR5K_AR5212_PHY_RADAR
-#undef AR5K_AR5212_PHY_RADAR_DISABLE
-#undef AR5K_AR5212_PHY_RADAR_ENABLE
-#undef AR5K_AR5212_PHY_ERR_FIL
-#undef AR5K_AR5212_PHY_ERR_FIL_RADAR
-}
-
 /* This function executes in interrupt context and is used when the 
  * HAL_INT_RXPHY interrupt occurs.  We are specifically looking to see if ANY 
  * pending errors in the queue are for radar, and thus react to them before 
@@ -10962,37 +10794,6 @@ ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc)
 		ath_radar_detected(sc, "RADAR: ath_intr got RXPHY and found HAL_PHYERR_RADAR enqueued.");
 	return found_radar;
 #undef PA2DESC
-}
-
-/* Ideally we replace this with a HAL call, based upon country code. Atheros 
- * HAL has this I think because I've seen other binary HAL besides Sam's that 
- * has this function. */
-static int
-ath_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan)
-{
-	/* For FCC: 5.25 to 5.35GHz (channel 52 to 60) and for Europe added 
-	 * 5.47 to 5.725GHz (channel 100 to 140). Being conservative, go with 
-	 * the entire band from 5225-5725 MHz. */
-	return ((hchan->channel >= 5225) && (hchan->channel <= 5725)) ? 1 : 0;
-}
-
-/* Update DFS flags based upon applying DFS to everybody... we need the HAL 
- * function that tells us if a country code is in a DFS regulatory domain. */
-static int
-ath_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
-{
-	u_int32_t old_channelFlags  = hchan->channelFlags;
-	u_int32_t old_privFlags     = hchan->privFlags;
-	if (ath_is_dfs_required(sc, hchan)) {
-		hchan->channelFlags |= CHANNEL_PASSIVE;
-		hchan->privFlags    |= CHANNEL_DFS;
-	}
-	else {
-		hchan->channelFlags &= ~CHANNEL_PASSIVE;
-		hchan->privFlags    &= ~CHANNEL_DFS;
-	}
-	return (old_privFlags != hchan->privFlags) || 
-		(old_channelFlags != hchan->channelFlags);
 }
 
 /* This is helpful for comparing OFDM timing vs radar event occurrances */
@@ -11598,7 +11399,7 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 		}
 
 		/* Handle Key Table */
-		if ((address >= 0x8800) && (address < 0x8780)) {
+		if ((address >= 0x8800) && (address < 0x9780)) {
 #define keytable_entry_reg_count (8)
 #define keytable_entry_size      (keytable_entry_reg_count * sizeof(u_int32_t))
 			int key = ((address - 0x8800) / keytable_entry_size);
@@ -11692,7 +11493,6 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_ar5212_registers_dump(struct ath_softc *sc) {
-	struct ath_hal *ah   = sc->sc_ah;
 	char name[MAX_REGISTER_NAME_LEN];
 	unsigned int address = MIN_REGISTER_ADDRESS;
 	unsigned int value   = 0;
@@ -11713,7 +11513,6 @@ ath_ar5212_registers_dump(struct ath_softc *sc) {
 static void
 ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 {
-	struct ath_hal *ah   = sc->sc_ah;
 	unsigned int address = MIN_REGISTER_ADDRESS;
 	unsigned int value   = 0;
 	char name[MAX_REGISTER_NAME_LEN];
@@ -11740,7 +11539,6 @@ ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 static void
 ath_ar5212_registers_mark(struct ath_softc *sc)
 {
-	struct ath_hal *ah   = sc->sc_ah;
 	unsigned int address = MIN_REGISTER_ADDRESS;
 
 	do {
@@ -11840,10 +11638,8 @@ ath_registers_dump_delta(struct ieee80211com *ic)
 	ath_ar5212_registers_dump_delta(sc);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
-
 /* Periodically expire radar avoidance marks. */
-static void
-ath_dfs_expire_channel_non_occupancy_timers(unsigned long arg)
+void ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long arg)
 {
 	struct net_device *dev = (struct net_device *) arg;
 	struct ath_softc *sc = dev->priv;
@@ -11898,3 +11694,4 @@ ath_dfs_expire_channel_non_occupancy_timers(unsigned long arg)
 		(ath_dfs_channel_non_occupancy_expiration_check_interval * HZ);
 	add_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
 }
+
