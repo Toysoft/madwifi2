@@ -152,7 +152,7 @@ void ath_radar_set_params(struct ath_softc *sc, RADAR_PARAM* rp) {
 }
 /* This is called on channel change to enable radar detection for 5211+ chips.  
  * NOTE: AR5210 doesn't have radar pulse detection support. */
-int ath_radar_update(struct ath_softc *sc, HAL_CHANNEL* hchan) {
+int ath_radar_update(struct ath_softc *sc) {
 
 	struct ath_hal *ah = sc->sc_ah;
 	struct net_device *dev = sc->sc_dev;
@@ -164,11 +164,11 @@ int ath_radar_update(struct ath_softc *sc, HAL_CHANNEL* hchan) {
 		return 1;
 
 	/* Update the DFS flags (as a sanity check) */
-	if (ath_radar_correct_dfs_flags(sc, hchan))
+	if (ath_radar_correct_dfs_flags(sc, &sc->sc_curchan))
 		DPRINTF(sc, ATH_DEBUG_DOTH, 
 			"%s: %s: channel required corrections to private flags.\n", 
 			DEV_NAME(dev), __func__);
-	required = ath_radar_is_dfs_required(sc, hchan);
+	required = ath_radar_is_dfs_required(sc, &sc->sc_curchan);
 	/* configure radar pulse detector register using default values, but do
 	 * not toggle the enable bit.  XXX: allow tweaking?? */
 	ath_radar_set_params(sc, NULL);

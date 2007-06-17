@@ -47,7 +47,7 @@
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/utsname.h>
-#include <linux/if_arp.h>		/* XXX for ARPHRD_ETHER */
+#include <linux/if_arp.h>		/* for ARPHRD_ETHER */
 #include <linux/delay.h>
 
 #include <linux/wireless.h>
@@ -2436,15 +2436,38 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_WMM:
 		if (ic->ic_caps & IEEE80211_C_WME){
+			retv = ENETRESET;	/* Renegotiate for capabilities */
+			
 			if (value) {
-				vap->iv_flags |= IEEE80211_F_WME;
-				vap->iv_ic->ic_flags |= IEEE80211_F_WME; /* XXX needed by ic_reset */
+				/* All TKIP keys need resetting to use software MIC.
+				 * They aren't, so this is disabled.
+				 * XXX: Can never turn it back on. */
+				if (!(vap->iv_ic->ic_caps & IEEE80211_C_WME_TKIPMIC))
+					retv = EBUSY;
+				else {
+					vap->iv_flags |= IEEE80211_F_WME;
+					vap->iv_ic->ic_flags |= IEEE80211_F_WME;
+				}
 			} else {
 				vap->iv_flags &= ~IEEE80211_F_WME;
-				vap->iv_ic->ic_flags &= ~IEEE80211_F_WME; /* XXX needed by ic_reset */
+				
+				{
+					struct ieee80211vap *v = NULL;
+					int all = 1;
+					
+					TAILQ_FOREACH(v, &vap->iv_ic->ic_vaps, iv_next) {
+						if (v->iv_flags & IEEE80211_F_WME) {
+							all = 0;
+							break;
+						}
+					}
+
+					if (all)
+						vap->iv_ic->ic_flags &= ~IEEE80211_F_WME;
+				}
 			}
-			retv = ENETRESET;	/* Renegotiate for capabilities */
 		}
+
 		break;
 	case IEEE80211_PARAM_HIDESSID:
 		if (value)
@@ -2766,7 +2789,8 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	/* set the same params on the xr vap device if exists */
 	if (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR)) {
 		ieee80211_ioctl_setparam(vap->iv_xrvap->iv_dev, info, w, extra);
-		vap->iv_xrvap->iv_ath_cap &= IEEE80211_ATHC_XR; /* XR vap does not support  any superG features */
+		/* XR vap does not support any superG features */
+		vap->iv_xrvap->iv_ath_cap &= IEEE80211_ATHC_XR;
 	}
 	/*
 	 * do not reset the xr vap , which is automatically 

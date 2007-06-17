@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -226,7 +226,7 @@ static void ath_setup_keycacheslot(struct ath_softc *, struct ieee80211_node *);
 static void ath_newassoc(struct ieee80211_node *, int);
 static int ath_getchannels(struct net_device *, u_int, HAL_BOOL, HAL_BOOL);
 static void ath_led_event(struct ath_softc *, int);
-void ath_update_txpow(struct ath_softc *);
+static void ath_update_txpow(struct ath_softc *);
 
 #ifdef ATH_REVERSE_ENGINEERING
 /* Reverse engineering utility commands */
@@ -961,7 +961,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 #ifdef ATH_TX99_DIAG
 	printk("%s: TX99 support enabled\n", DEV_NAME(dev));
 #endif
-	
 	sc->sc_invalid = 0;
 
 	if (autocreate) {
@@ -1005,7 +1004,7 @@ bad2:
 	ath_desc_free(sc);
 bad:
 	if (ah)
-		ath_hal_detach(ah);
+		_ath_hal_detach(ah);
 	ATH_TXBUF_LOCK_DESTROY(sc);
 	ATH_LOCK_DESTROY(sc);
 	ATH_HAL_LOCK_DESTROY(sc);
@@ -1058,7 +1057,7 @@ ath_detach(struct net_device *dev)
 	ieee80211_rate_detach(sc->sc_rc);
 	ath_desc_free(sc);
 	ath_tx_cleanup(sc);
-	ath_hal_detach(ah);
+	_ath_hal_detach(ah);
 
 	ath_dynamic_sysctl_unregister(sc);
 	ATH_LOCK_DESTROY(sc);
@@ -1911,7 +1910,7 @@ ath_init(struct net_device *dev)
 	HAL_STATUS status;
 	int error = 0;
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: mode %d\n", __func__, ic->ic_opmode);
 
@@ -1963,6 +1962,12 @@ ath_init(struct net_device *dev)
 
 	if (sc->sc_softled)
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
+	/*
+	 * This is needed only to setup initial state
+	 * but it's best done after a reset.
+	 */
+	ath_update_txpow(sc);
+	ath_radar_update(sc);
 
 	/*
 	 * Setup the hardware after reset: the key cache
@@ -2006,7 +2011,7 @@ ath_init(struct net_device *dev)
 #endif
 
 done:
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 	return error;
 }
 
@@ -2091,7 +2096,7 @@ ath_stop(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	int error;
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 
 	if (!sc->sc_invalid)
 		ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE, AH_TRUE);
@@ -2112,7 +2117,7 @@ ath_stop(struct net_device *dev)
 		ath_hal_setpower(sc->sc_ah, HAL_PM_FULL_SLEEP);
 	}
 #endif
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 
 	return error;
 }
@@ -2217,6 +2222,8 @@ ath_reset(struct net_device *dev)
 	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
 			DEV_NAME(dev), __func__, ath_get_hal_status_desc(status), status);
+	ath_update_txpow(sc);		/* update tx power state */
+	ath_radar_update(sc);
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
 			DEV_NAME(dev), __func__);
@@ -2250,9 +2257,11 @@ ath_reset(struct net_device *dev)
 	return 0;
 }
 
+
 /* Swap transmit descriptor.
  * if AH_NEED_DESC_SWAP flag is not defined this becomes a "null"
- * function. */
+ * function.
+ */
 static __inline void
 ath_desc_swap(struct ath_desc *ds)
 {
@@ -2276,6 +2285,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	struct ath_desc *lastds, int framelen)
 {
 	struct ath_hal *ah = sc->sc_ah;
+
 	if (ath_check_radio_silence_not_required(sc,__func__))
 		return;
 	/*
@@ -4975,7 +4985,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		/*
 		 * move data from Normal txqs to XR queue.
 		 */
-		DPRINTF(sc, ATH_DEBUG_XMIT_PROC, "move data from NORMAL to XR\n");
+		printk("move data from NORMAL to XR\n");
 		/*
 		 * collect all the data towards the node
 		 * in to the tmp_q.
@@ -7800,8 +7810,6 @@ ath_chan_change(struct ath_softc *sc, struct ieee80211_channel *chan)
 	sc->sc_tx_th.wt_chan_flags = sc->sc_rx_th.wr_chan_flags =
 		htole16(chan->ic_flags);
 #endif
-	ath_update_txpow(sc);
-	printk(KERN_INFO "%s: %s: Maximum txpower: %d.\n", DEV_NAME(sc->sc_dev), __func__, ( ath_get_real_maxtxpower(sc) / 2) );
 	if (ic->ic_curchanmaxpwr == 0)
 		ic->ic_curchanmaxpwr = chan->ic_maxregpower;
 }
@@ -7851,11 +7859,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 
 
 	/* Stop any pending channel calibrations or availability check if we are really changing channels.  maybe a turbo mode switch only. */
-	if (hchan.channel != sc->sc_curchan.channel) {
-	if (!sc->sc_dfs_testmode && sc->sc_dfs_channel_check) {
-	ath_interrupt_dfs_channel_check(sc, "Channel change interrupted DFS wait.");
-	}
-	}
+	if (hchan.channel != sc->sc_curchan.channel)
+		if (!sc->sc_dfs_testmode && sc->sc_dfs_channel_check)
+			ath_interrupt_dfs_channel_check(sc, "Channel change interrupted DFS wait.");
 
 	/* Need a doth channel availability check?  We do if ... */
 	doth_channel_availability_check_needed = 1
@@ -7866,10 +7872,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		&& (ic->ic_flags & IEEE80211_F_DOTH)
 		;
 
-	channel_change_required = hchan.channel != sc->sc_curchan.channel
-		|| hchan.channelFlags != sc->sc_curchan.channelFlags
-		|| tswitch || doth_channel_availability_check_needed
-		;
+	channel_change_required = hchan.channel != sc->sc_curchan.channel ||
+		hchan.channelFlags != sc->sc_curchan.channelFlags ||
+		tswitch || doth_channel_availability_check_needed;
 
 	if (channel_change_required) {
 		HAL_STATUS status;
@@ -7907,10 +7912,11 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 
 		sc->sc_curchan = hchan;
-		/*
-		 * Change channels and update the h/w rate map
-		 * if we're switching; e.g. 11a to 11b/g.
-		 */
+		ath_update_txpow(sc);		/* update tx power state */
+		ath_radar_update(sc);
+
+		/* Change channels and update the h/w rate map
+		 * if we're switching; e.g. 11a to 11b/g. */
 		ath_chan_change(sc, chan);
 		 /*
 		 * Re-enable rx framework.
@@ -9289,7 +9295,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 		mac->sa_data[0], mac->sa_data[1], mac->sa_data[2],
 		mac->sa_data[3], mac->sa_data[4], mac->sa_data[5]);
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 	/* XXX not right for multiple VAPs */
 	IEEE80211_ADDR_COPY(ic->ic_myaddr, mac->sa_data);
 	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
@@ -9297,7 +9303,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
 		error = ath_reset(dev);
 	}
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 
 	return error;
 }
@@ -9315,7 +9321,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
 	}
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: %d\n", __func__, mtu);
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 	dev->mtu = mtu;
 	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
 		/* NB: the rx buffers may need to be reallocated */
@@ -9323,7 +9329,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
 		error = ath_reset(dev);
 		tasklet_enable(&sc->sc_rxtq);
 	}
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 
 	return error;
 }
@@ -9394,45 +9400,39 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	int error = -EINVAL;
+	int error;
 
-	if(SIOC80211IFCREATE == cmd) {
-		/* XXX: ATH_UNLOCK and ATH_LOCK are temporary evil until I 
-		 * figure out a fix for ieee80211_ioctl_create_vap working 
-		 * when interrupts are disabled */
-		ATH_LOCK(sc);
+	ATH_LOCK(sc);
+	switch (cmd) {
+	case SIOCGATHSTATS:
+		sc->sc_stats.ast_tx_packets = sc->sc_devstats.tx_packets;
+		sc->sc_stats.ast_rx_packets = sc->sc_devstats.rx_packets;
+		sc->sc_stats.ast_rx_rssi = ieee80211_getrssi(ic);
+		if (copy_to_user(ifr->ifr_data, &sc->sc_stats, sizeof (sc->sc_stats)))
+			error = -EFAULT;
+		else
+			error = 0;
+		break;
+	case SIOCGATHDIAG:
+		if (!capable(CAP_NET_ADMIN))
+			error = -EPERM;
+		else
+			error = ath_ioctl_diag(sc, (struct ath_diag *) ifr);
+		break;
+	case SIOCETHTOOL:
+		if (copy_from_user(&cmd, ifr->ifr_data, sizeof(cmd)))
+			error = -EFAULT;
+		else
+			error = ath_ioctl_ethtool(sc, cmd, ifr->ifr_data);
+		break;
+	case SIOC80211IFCREATE:
 		error = ieee80211_ioctl_create_vap(ic, ifr, dev);
-		ATH_UNLOCK(sc);
+		break;
+	default:
+		error = -EINVAL;
+		break;
 	}
-	else {
-		ATH_LOCK_IRQ(sc);
-		switch (cmd) {
-		case SIOCGATHSTATS:
-			sc->sc_stats.ast_tx_packets = sc->sc_devstats.tx_packets;
-			sc->sc_stats.ast_rx_packets = sc->sc_devstats.rx_packets;
-			sc->sc_stats.ast_rx_rssi = ieee80211_getrssi(ic);
-			if (copy_to_user(ifr->ifr_data, &sc->sc_stats, sizeof (sc->sc_stats)))
-				error = -EFAULT;
-			else
-				error = 0;
-			break;
-		case SIOCGATHDIAG:
-			if (!capable(CAP_NET_ADMIN))
-				error = -EPERM;
-			else
-				error = ath_ioctl_diag(sc, (struct ath_diag *) ifr);
-			break;
-		case SIOCETHTOOL:
-			if (copy_from_user(&cmd, ifr->ifr_data, sizeof(cmd)))
-				error = -EFAULT;
-			else
-				error = ath_ioctl_ethtool(sc, cmd, ifr->ifr_data);
-			break;
-		default:
-			break;
-		}
-		ATH_UNLOCK_IRQ(sc);
-	}
+	ATH_UNLOCK(sc);
 	return error;
 }
 
@@ -9466,10 +9466,9 @@ enum {
 	ATH_DIVERSITY		= 11,
 	ATH_TXINTRPERIOD 	= 12,
 	ATH_FFTXQMIN		= 18,
-	ATH_TKIPMIC		= 19,
-	ATH_XR_POLL_PERIOD 	= 20,
-	ATH_XR_POLL_COUNT 	= 21,
-	ATH_ACKRATE             = 22,
+	ATH_XR_POLL_PERIOD 	= 19,
+	ATH_XR_POLL_COUNT 	= 20,
+	ATH_ACKRATE             = 21,
 };
 
 static int
@@ -9478,11 +9477,11 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	struct ath_softc *sc = ctl->extra1;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
-	int ret;
+	int ret = 0;
 
-	ATH_LOCK_IRQ(sc);
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
+	ATH_LOCK(sc);
 	if (write) {
 		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
 		if (ret == 0) {
@@ -9551,11 +9550,15 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 0 = disallow use of diversity
 				 * 1 = allow use of diversity
 				 */
-				if (val > 1)
+				if (val > 1) {
 					ret = -EINVAL;
+					break;
+				}
 				/* Don't enable diversity if XR is enabled */
-				if (((!sc->sc_hasdiversity) || (sc->sc_xrtxq != NULL)) && val)
+				if (((!sc->sc_hasdiversity) || (sc->sc_xrtxq != NULL)) && val) {
 					ret = -EINVAL;
+					break;
+				}
 				sc->sc_diversity = val;
 				ath_hal_setdiversity(ah, val);
 				break;
@@ -9567,18 +9570,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				/* XXX validate? */
 				sc->sc_fftxqmin = val;
 				break;
-			case ATH_TKIPMIC: {
-				struct ieee80211com *ic = &sc->sc_ic;
-
-				if (!(ic->ic_caps & IEEE80211_C_TKIPMIC) || 
-				    ((ic->ic_caps & IEEE80211_C_WME) && 
-				     !(ic->ic_caps & IEEE80211_C_WME_TKIPMIC) && 
-				     (ic->ic_flags & IEEE80211_F_WME)))
-					return -EINVAL;
-				
-				ath_hal_settkipmic(ah, val);
-				break;
-			}
 #ifdef ATH_SUPERG_XR
 			case ATH_XR_POLL_PERIOD:
 				if (val > XR_MAX_POLL_INTERVAL)
@@ -9600,7 +9591,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_ackrate = val;
 				ath_set_ack_bitrate(sc, sc->sc_ackrate);
 				break;
-			default:
+			default: 
 				ret = -EINVAL;
 				break;
 			}
@@ -9646,9 +9637,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 		case ATH_FFTXQMIN:
 			val = sc->sc_fftxqmin;
 			break;
-		case ATH_TKIPMIC:
-			val = ath_hal_gettkipmic(ah);
-			break;
 #ifdef ATH_SUPERG_XR
 		case ATH_XR_POLL_PERIOD:
 			val=sc->sc_xrpollint;
@@ -9664,9 +9652,11 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			ret = -EINVAL;
 			break;
 		}
-		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
+		if(!ret) {
+			ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
+		}
 	}
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 	return ret;
 }
 
@@ -9740,11 +9730,6 @@ static const ctl_table ath_sysctl_template[] = {
 	},
 	{ .ctl_name	= ATH_FFTXQMIN,
 	  .procname	= "fftxqmin",
-	  .mode		= 0644,
-	  .proc_handler	= ath_sysctl_halparam
-	},
-	{ .ctl_name	= ATH_TKIPMIC,
-	  .procname	= "tkipmic",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
@@ -10134,6 +10119,8 @@ txcont_configure_radio(struct ieee80211com *ic)
 					DEV_NAME(dev), ath_get_hal_status_desc(status), 
 					status,  __func__, __FILE__, __LINE__);
 		}
+		ath_update_txpow(sc);
+		ath_radar_update(sc);
 		
 
 #ifdef ATH_SUPERG_DYNTURBO
@@ -11399,7 +11386,7 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 		}
 
 		/* Handle Key Table */
-		if ((address >= 0x8800) && (address < 0x9780)) {
+		if ((address >= 0x8800) && (address < 0x9800)) {
 #define keytable_entry_reg_count (8)
 #define keytable_entry_size      (keytable_entry_reg_count * sizeof(u_int32_t))
 			int key = ((address - 0x8800) / keytable_entry_size);
@@ -11424,7 +11411,7 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 		}
 
 		/* Handle Rate Duration Table */
-		if (address >= 0x8700 && address < 0x8800) {
+		if (address >= 0x8700 && address < 0x8780) {
 			snprintf(buf, buflen, "RATE(%2d).DURATION", 
 					((address - 0x8700) / sizeof(u_int32_t)));
 			return AH_TRUE;

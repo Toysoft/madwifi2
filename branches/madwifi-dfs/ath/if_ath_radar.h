@@ -102,7 +102,7 @@ the default for that field */
 
 /* This is called on channel change to enable radar detection for 5211+ chips.  
  * NOTE: AR5210 doesn't have radar pulse detection support. */
-int ath_radar_update(struct ath_softc *sc, HAL_CHANNEL* hchan);
+int ath_radar_update(struct ath_softc *sc);
 /* Returns true if radar detection is enabled. */
 int ath_radar_is_enabled(struct ath_softc *sc);
 /* Read the radar pulse detection parameters. */
