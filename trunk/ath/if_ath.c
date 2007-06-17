@@ -9224,10 +9224,9 @@ enum {
 	ATH_DIVERSITY		= 11,
 	ATH_TXINTRPERIOD 	= 12,
 	ATH_FFTXQMIN		= 18,
-	ATH_TKIPMIC		= 19,
-	ATH_XR_POLL_PERIOD 	= 20,
-	ATH_XR_POLL_COUNT 	= 21,
-	ATH_ACKRATE             = 22,
+	ATH_XR_POLL_PERIOD 	= 21,
+	ATH_XR_POLL_COUNT 	= 22,
+	ATH_ACKRATE             = 23,
 };
 
 static int
@@ -9325,18 +9324,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				/* XXX validate? */
 				sc->sc_fftxqmin = val;
 				break;
-			case ATH_TKIPMIC: {
-				struct ieee80211com *ic = &sc->sc_ic;
-
-				if (!(ic->ic_caps & IEEE80211_C_TKIPMIC) || 
-				    ((ic->ic_caps & IEEE80211_C_WME) && 
-				     !(ic->ic_caps & IEEE80211_C_WME_TKIPMIC) && 
-				     (ic->ic_flags & IEEE80211_F_WME)))
-					ret = -EINVAL;
-				
-				ath_hal_settkipmic(ah, val);
-				break;
-			}
 #ifdef ATH_SUPERG_XR
 			case ATH_XR_POLL_PERIOD:
 				if (val > XR_MAX_POLL_INTERVAL)
@@ -9403,9 +9390,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			break;
 		case ATH_FFTXQMIN:
 			val = sc->sc_fftxqmin;
-			break;
-		case ATH_TKIPMIC:
-			val = ath_hal_gettkipmic(ah);
 			break;
 #ifdef ATH_SUPERG_XR
 		case ATH_XR_POLL_PERIOD:
@@ -9498,11 +9482,6 @@ static const ctl_table ath_sysctl_template[] = {
 	},
 	{ .ctl_name	= ATH_FFTXQMIN,
 	  .procname	= "fftxqmin",
-	  .mode		= 0644,
-	  .proc_handler	= ath_sysctl_halparam
-	},
-	{ .ctl_name	= ATH_TKIPMIC,
-	  .procname	= "tkipmic",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
 	},
