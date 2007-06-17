@@ -1035,7 +1035,6 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	struct ieee80211vap *vap;
 	int ic_opmode;
 
-	ATH_LOCK_IRQ(sc);
 	if (ic->ic_dev->flags & IFF_RUNNING) {
 		/* needs to disable hardware too */
 		ath_hal_intrset(ah, 0);		/* disable interrupts */
@@ -1045,14 +1044,10 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	/* XXX ic unlocked and race against add */
 	switch (opmode) {
 	case IEEE80211_M_STA:	/* ap+sta for repeater application */
-		if (sc->sc_nstavaps != 0) { /* only one sta regardless */
-			ATH_UNLOCK_IRQ_EARLY(sc);
+		if (sc->sc_nstavaps != 0)  /* only one sta regardless */
 			return NULL;
-		}
-		if ((sc->sc_nvaps != 0) && (!(flags & IEEE80211_NO_STABEACONS))) {
-			ATH_UNLOCK_IRQ_EARLY(sc);
+		if ((sc->sc_nvaps != 0) && (!(flags & IEEE80211_NO_STABEACONS)))
 			return NULL;   /* If using station beacons, must first up */
-		}
 		if (flags & IEEE80211_NO_STABEACONS) {
 			sc->sc_nostabeacons = 1;
 			ic_opmode = IEEE80211_M_HOSTAP;	/* Run with chip in AP mode */
@@ -1060,10 +1055,8 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 			ic_opmode = opmode;
 		break;
 	case IEEE80211_M_IBSS:
-		if (sc->sc_nvaps != 0) { /* only one */
-			ATH_UNLOCK_IRQ_EARLY(sc);
+		if (sc->sc_nvaps != 0)		/* only one */
 			return NULL;
-		}
 		ic_opmode = opmode;
 		break;
 	case IEEE80211_M_AHDEMO:
@@ -1078,15 +1071,11 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	case IEEE80211_M_WDS:
 		/* permit multiple ap's and/or wds links */
 		/* XXX sta+ap for repeater/bridge application */
-		if ((sc->sc_nvaps != 0) && (ic->ic_opmode == IEEE80211_M_STA)) {
-			ATH_UNLOCK_IRQ_EARLY(sc);
+		if ((sc->sc_nvaps != 0) && (ic->ic_opmode == IEEE80211_M_STA))
 			return NULL;
-		}
 		/* XXX not right, beacon buffer is allocated on RUN trans */
-		if (opmode == IEEE80211_M_HOSTAP && STAILQ_EMPTY(&sc->sc_bbuf)) {
-			ATH_UNLOCK_IRQ_EARLY(sc);
+		if (opmode == IEEE80211_M_HOSTAP && STAILQ_EMPTY(&sc->sc_bbuf))
 			return NULL;
-		}
 		/*
 		 * XXX Not sure if this is correct when operating only
 		 * with WDS links.
@@ -1095,20 +1084,17 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 
 		break;
 	default:
-		ATH_UNLOCK_IRQ_EARLY(sc);
 		return NULL;
 	}
 
 	if (sc->sc_nvaps >= ATH_BCBUF) {
 		printk(KERN_WARNING "too many virtual ap's (already got %d)\n", sc->sc_nvaps);
-		ATH_UNLOCK_IRQ_EARLY(sc);
 		return NULL;
 	}
 
 	dev = alloc_etherdev(sizeof(struct ath_vap) + sc->sc_rc->arc_vap_space);
 	if (dev == NULL) {
 		/* XXX msg */
-		ATH_UNLOCK_IRQ_EARLY(sc);
 		return NULL;
 	}
 
@@ -1211,15 +1197,9 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	if (sc->sc_hastsfadd)
 		ath_hal_settsfadjust(sc->sc_ah, sc->sc_stagbeacons);
 	SET_NETDEV_DEV(dev, ATH_GET_NETDEV_DEV(mdev));
-	/* Release the lock and re-enable IRQs then re-obtain the lock.
-	 * Finish processing with interrupts enabled. */
-	ATH_UNLOCK_IRQ(sc);
-	spin_lock(&sc->sc_lock);
+	/* complete setup */
 	(void) ieee80211_vap_attach(vap,
 		ieee80211_media_change, ieee80211_media_status);
-	spin_unlock(&sc->sc_lock);
-	/* Re-enable the lock with IRQ disabled */
-	ATH_LOCK_IRQ(sc);
 
 	ic->ic_opmode = ic_opmode;
 
@@ -1265,7 +1245,6 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 
-	ATH_UNLOCK_IRQ(sc);
 	return vap;
 }
 
@@ -1852,7 +1831,7 @@ ath_init(struct net_device *dev)
 	HAL_STATUS status;
 	int error = 0;
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 
 	DPRINTF(sc, ATH_DEBUG_RESET, "%s: mode %d\n", __func__, ic->ic_opmode);
 
@@ -1952,7 +1931,7 @@ ath_init(struct net_device *dev)
 #endif
 
 done:
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 	return error;
 }
 
@@ -2030,7 +2009,7 @@ ath_stop(struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	int error;
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 
 	if (!sc->sc_invalid)
 		ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE, AH_TRUE);
@@ -2051,7 +2030,7 @@ ath_stop(struct net_device *dev)
 		ath_hal_setpower(sc->sc_ah, HAL_PM_FULL_SLEEP);
 	}
 #endif
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 
 	return error;
 }
@@ -9069,7 +9048,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 		mac->sa_data[0], mac->sa_data[1], mac->sa_data[2],
 		mac->sa_data[3], mac->sa_data[4], mac->sa_data[5]);
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 	/* XXX not right for multiple VAPs */
 	IEEE80211_ADDR_COPY(ic->ic_myaddr, mac->sa_data);
 	IEEE80211_ADDR_COPY(dev->dev_addr, mac->sa_data);
@@ -9077,7 +9056,7 @@ ath_set_mac_address(struct net_device *dev, void *addr)
 	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
 		error = ath_reset(dev);
 	}
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 
 	return error;
 }
@@ -9095,7 +9074,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
 	}
 	DPRINTF(sc, ATH_DEBUG_ANY, "%s: %d\n", __func__, mtu);
 
-	ATH_LOCK_IRQ(sc);
+	ATH_LOCK(sc);
 	dev->mtu = mtu;
 	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
 		/* NB: the rx buffers may need to be reallocated */
@@ -9103,7 +9082,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
 		error = ath_reset(dev);
 		tasklet_enable(&sc->sc_rxtq);
 	}
-	ATH_UNLOCK_IRQ(sc);
+	ATH_UNLOCK(sc);
 
 	return error;
 }
@@ -9174,42 +9153,39 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ath_stats stats;
-	int error = -EINVAL;
+	int error;
 
-	if(SIOC80211IFCREATE == cmd) {
+	ATH_LOCK(sc);
+	switch (cmd) {
+	case SIOCGATHSTATS:
+		sc->sc_stats.ast_tx_packets = sc->sc_devstats.tx_packets;
+		sc->sc_stats.ast_rx_packets = sc->sc_devstats.rx_packets;
+		sc->sc_stats.ast_rx_rssi = ieee80211_getrssi(ic);
+		if (copy_to_user(ifr->ifr_data, &sc->sc_stats, sizeof (sc->sc_stats)))
+			error = -EFAULT;
+		else
+			error = 0;
+		break;
+	case SIOCGATHDIAG:
+		if (!capable(CAP_NET_ADMIN))
+			error = -EPERM;
+		else
+			error = ath_ioctl_diag(sc, (struct ath_diag *) ifr);
+		break;
+	case SIOCETHTOOL:
+		if (copy_from_user(&cmd, ifr->ifr_data, sizeof(cmd)))
+			error = -EFAULT;
+		else
+			error = ath_ioctl_ethtool(sc, cmd, ifr->ifr_data);
+		break;
+	case SIOC80211IFCREATE:
 		error = ieee80211_ioctl_create_vap(ic, ifr, dev);
+		break;
+	default:
+		error = -EINVAL;
+		break;
 	}
-	else {
-		switch (cmd) {
-		case SIOCGATHSTATS:
-			ATH_LOCK_IRQ(sc);
-			sc->sc_stats.ast_tx_packets = sc->sc_devstats.tx_packets;
-			sc->sc_stats.ast_rx_packets = sc->sc_devstats.rx_packets;
-			sc->sc_stats.ast_rx_rssi = ieee80211_getrssi(ic);
-			memcpy(&stats, &sc->sc_stats, sizeof (sc->sc_stats));
-			ATH_UNLOCK_IRQ(sc);
-			if (copy_to_user(ifr->ifr_data, &stats, sizeof (stats)))
-				error = -EFAULT;
-			else
-				error = 0;
-			break;
-		case SIOCGATHDIAG:
-			if (!capable(CAP_NET_ADMIN))
-				error = -EPERM;
-			else
-				error = ath_ioctl_diag(sc, (struct ath_diag *) ifr);
-			break;
-		case SIOCETHTOOL:
-			if (copy_from_user(&cmd, ifr->ifr_data, sizeof(cmd)))
-				error = -EFAULT;
-			else
-				error = ath_ioctl_ethtool(sc, cmd, ifr->ifr_data);
-			break;
-		default:
-			break;
-		}
-	}
+	ATH_UNLOCK(sc);
 	return error;
 }
 
@@ -9256,7 +9232,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	u_int val;
 	int ret;
 
-	ATH_LOCK_IRQ(sc);
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
 	if (write) {
@@ -9306,7 +9281,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 2 = antenna port 2
 				 */
 				if (val > 2)
-					ret = -EINVAL;
+					return -EINVAL;
 				else
 					sc->sc_txantenna = val;
 				break;
@@ -9318,7 +9293,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 2 = antenna port 2
 				 */
 				if (val > 2)
-					ret = -EINVAL;
+					return -EINVAL;
 				else
 					ath_setdefantenna(sc, val);
 				break;
@@ -9328,10 +9303,10 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 1 = allow use of diversity
 				 */
 				if (val > 1)
-					ret = -EINVAL;
+					return -EINVAL;
 				/* Don't enable diversity if XR is enabled */
 				if (((!sc->sc_hasdiversity) || (sc->sc_xrtxq != NULL)) && val)
-					ret = -EINVAL;
+					return -EINVAL;
 				sc->sc_diversity = val;
 				ath_hal_setdiversity(ah, val);
 				break;
@@ -9365,8 +9340,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				ath_set_ack_bitrate(sc, sc->sc_ackrate);
 				break;
 			default:
-				ret = -EINVAL;
-				break;
+				return -EINVAL;
 			}
 		}
 	} else {
@@ -9422,12 +9396,10 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val = sc->sc_ackrate;
 			break;
 		default:
-			ret = -EINVAL;
-			break;
+			return -EINVAL;
 		}
 		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
 	}
-	ATH_UNLOCK_IRQ(sc);
 	return ret;
 }
 

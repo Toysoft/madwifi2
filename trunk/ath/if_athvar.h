@@ -526,7 +526,7 @@ struct ath_softc {
 	struct ieee80211com sc_ic;		/* NB: must be first */
 	struct net_device *sc_dev;
 	void __iomem *sc_iobase;		/* address of the device */
-	spinlock_t sc_lock;                     /* dev-level lock */
+	struct semaphore sc_lock;		/* dev-level lock */
 	struct net_device_stats	sc_devstats;	/* device statistics */
 	struct ath_stats sc_stats;		/* private statistics */
 	int devid;
@@ -720,16 +720,10 @@ typedef void (*ath_callback) (struct ath_softc *);
 	spin_unlock_irqrestore(&(_sc)->sc_rxbuflock, __rxbuflockflags);
 
 /* Protects the device from concurrent accesses */
-#define	ATH_LOCK_INIT(_sc)		spin_lock_init(&(_sc)->sc_lock)
+#define	ATH_LOCK_INIT(_sc)		init_MUTEX(&(_sc)->sc_lock)
 #define	ATH_LOCK_DESTROY(_sc)
-#define	ATH_LOCK_IRQ(_sc)		do {	\
-	unsigned long __lockflags;		\
-	spin_lock_irqsave(&(_sc)->sc_lock, __lockflags);
-#define	ATH_UNLOCK_IRQ(_sc)			\
-	spin_unlock_irqrestore(&(_sc)->sc_lock, __lockflags); \
-} while (0)
-#define	ATH_UNLOCK_IRQ_EARLY(_sc)		\
-	spin_unlock_irqrestore(&(_sc)->sc_lock, __lockflags);
+#define	ATH_LOCK(_sc)			down(&(_sc)->sc_lock)
+#define	ATH_UNLOCK(_sc)			up(&(_sc)->sc_lock)
 
 int ath_attach(u_int16_t, struct net_device *, HAL_BUS_TAG);
 int ath_detach(struct net_device *);
