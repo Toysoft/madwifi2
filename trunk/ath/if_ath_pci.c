@@ -363,9 +363,11 @@ ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr)
 		return -EOPNOTSUPP;
 	memset(&info, 0, sizeof(info));
 	info.cmd = cmd;
+	ATH_LOCK_IRQ(sc);
 	strncpy(info.driver, dev_info, sizeof(info.driver) - 1);
 	strncpy(info.version, version, sizeof(info.version) - 1);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,22)
+	ATH_UNLOCK_IRQ(sc);
 	/* include the device name so later versions of kudzu DTRT */
 	strncpy(info.bus_info, pci_name((struct pci_dev *)sc->sc_bdev),
 		sizeof(info.bus_info) - 1);

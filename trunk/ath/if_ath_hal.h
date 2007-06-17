@@ -113,6 +113,12 @@ __hal_wrapper HAL_BOOL  ath_hal_gpioset(struct ath_hal* ah, u_int32_t gpio, u_in
 	ATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));
 	return ret;
 	})
+__hal_wrapper void  ath_hal_detach(struct ath_hal* ah)
+	IMPLEMENTATION({
+	ATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));
+	ah->ah_detach(ah);
+	ATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));
+	})
 __hal_wrapper HAL_BOOL  ath_hal_gpioCfgOutput(struct ath_hal* ah, u_int32_t gpio)
 	IMPLEMENTATION({
 	HAL_BOOL  ret;
