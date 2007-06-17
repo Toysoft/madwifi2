@@ -10370,6 +10370,8 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 	/* Addresses with side effects are never dumped out by bulk debug dump routines. */
 	if ((address >= 0x00c0) && (address <= 0x00df)) return FILTERED;
 	if ((address >= 0x143c) && (address <= 0x143f)) return FILTERED;
+	/* PCI timing registers are not interesting */
+	if ((address >= 0x4000) && (address <= 0x5000)) return FILTERED; 
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
 	/* We are being conservative, and do not want to access addresses that 
@@ -10391,7 +10393,6 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 #ifdef ATH_REVERSE_ENGINEERING
 static void
 ath_ar5212_registers_dump(struct ath_softc *sc) {
-	struct ath_hal *ah   = sc->sc_ah;
 	char name[MAX_REGISTER_NAME_LEN];
 	unsigned int address = MIN_REGISTER_ADDRESS;
 	unsigned int value   = 0;
@@ -10412,7 +10413,6 @@ ath_ar5212_registers_dump(struct ath_softc *sc) {
 static void
 ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 {
-	struct ath_hal *ah   = sc->sc_ah;
 	unsigned int address = MIN_REGISTER_ADDRESS;
 	unsigned int value   = 0;
 	char name[MAX_REGISTER_NAME_LEN];
@@ -10439,7 +10439,6 @@ ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 static void
 ath_ar5212_registers_mark(struct ath_softc *sc)
 {
-	struct ath_hal *ah   = sc->sc_ah;
 	unsigned int address = MIN_REGISTER_ADDRESS;
 
 	do {
