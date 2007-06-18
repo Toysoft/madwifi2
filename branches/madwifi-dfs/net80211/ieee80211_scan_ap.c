@@ -320,7 +320,7 @@ ap_cancel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
  */
 static int
 ap_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
-	const struct ieee80211_frame *wh, int subtype, int rssi, int rstamp)
+	const struct ieee80211_frame *wh, int subtype, int rssi, u_int64_t rtsf)
 {
 	struct ap_state *as = ss->ss_priv;
 	struct ieee80211vap *vap = ss->ss_vap;

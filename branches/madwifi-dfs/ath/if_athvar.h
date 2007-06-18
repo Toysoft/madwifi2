@@ -395,6 +395,7 @@ struct ath_buf {
 	struct ieee80211_node *bf_node;			/* pointer to the node */
 	u_int32_t bf_status;				/* status flags */
 	u_int16_t bf_flags;				/* tx descriptor flags */
+	u_int64_t bf_tsf;
 #ifdef ATH_SUPERG_FF
 	/* XXX: combine this with bf_skbaddr if it ever changes to accommodate
 	 *      multiple segments.
@@ -539,7 +540,7 @@ struct ath_softc {
 	struct ath_stats sc_stats;		/* private statistics */
 	int devid;
 	int sc_debug;
-	void (*sc_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int, int, u_int32_t);
+	void (*sc_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int, int, u_int64_t);
 	void (*sc_node_cleanup)(struct ieee80211_node *);
 	void (*sc_node_free)(struct ieee80211_node *);
 	void *sc_bdev;				/* associated bus device */
