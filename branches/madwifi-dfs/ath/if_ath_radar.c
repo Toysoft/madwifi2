@@ -98,21 +98,21 @@ int ath_radar_is_enabled(struct ath_softc *sc) {
 /* Read the radar pulse detection parameters. */
 void ath_radar_get_params(struct ath_softc *sc, RADAR_PARAM* rp) {
 	u_int32_t radar = ath_reg_read(sc, AR5K_PHY_RADAR);
-	rp->rp_fir_filter_output_power_threshold = 
+	rp->rp_fir_filter_output_power_thr = 
 		(radar & AR5K_PHY_RADAR_FIRPWROUTTHR) 
 		>> AR5K_PHY_RADAR_FIRPWROUTTHR_S;
-	rp->rp_inband_threshold = 
-		(radar & AR5K_PHY_RADAR_INBANDTHR) 
-		>> AR5K_PHY_RADAR_INBANDTHR_S;
-	rp->rp_radar_rssi_threshold = 
+	rp->rp_radar_rssi_thr = 
 		(radar & AR5K_PHY_RADAR_PULSERSSITHR) 
 		>> AR5K_PHY_RADAR_PULSERSSITHR_S;
-	rp->rp_pulse_rssi_threshold = 
-		(radar & AR5K_PHY_RADAR_RADARRSSITHR) 
-		>> AR5K_PHY_RADAR_RADARRSSITHR_S;
-	rp->rp_pulse_rssi_threshold = 
+	rp->rp_pulse_height_thr = 
 		(radar & AR5K_PHY_RADAR_PULSEHEIGHTTHR) 
 		>> AR5K_PHY_RADAR_PULSEHEIGHTTHR_S;
+	rp->rp_pulse_rssi_thr = 
+		(radar & AR5K_PHY_RADAR_RADARRSSITHR) 
+		>> AR5K_PHY_RADAR_RADARRSSITHR_S;
+	rp->rp_inband_thr = 
+		(radar & AR5K_PHY_RADAR_INBANDTHR) 
+		>> AR5K_PHY_RADAR_INBANDTHR_S;
 }
 
 /* Update the radar pulse detection parameters. 
@@ -125,28 +125,27 @@ void ath_radar_set_params(struct ath_softc *sc, RADAR_PARAM* rp) {
 	((NULL == rp || (rp->_FIELD == RADAR_PARAM_USE_DEFAULT)) ? \
 		((AR5K_PHY_RADAR_ENABLED_AR5213 & (_MASK))) : \
 		((rp->_FIELD << (_SHIFT)) & (_MASK)))
-
 	ath_reg_write(sc, AR5K_PHY_RADAR, 
 		BUILD_PHY_RADAR_FIELD(
 			AR5K_PHY_RADAR_FIRPWROUTTHR,
 			AR5K_PHY_RADAR_FIRPWROUTTHR_S, 
-			rp_fir_filter_output_power_threshold) |
-		BUILD_PHY_RADAR_FIELD(
-			AR5K_PHY_RADAR_INBANDTHR,
-			AR5K_PHY_RADAR_INBANDTHR_S,
-			rp_inband_threshold) |
-		BUILD_PHY_RADAR_FIELD(
-			AR5K_PHY_RADAR_PULSERSSITHR,
-			AR5K_PHY_RADAR_PULSERSSITHR_S,
-			rp_radar_rssi_threshold) |
+			rp_fir_filter_output_power_thr) |
 		BUILD_PHY_RADAR_FIELD(
 			AR5K_PHY_RADAR_RADARRSSITHR,
 			AR5K_PHY_RADAR_RADARRSSITHR_S,
-			rp_pulse_rssi_threshold) |
+			rp_pulse_rssi_thr) |
 		BUILD_PHY_RADAR_FIELD(
 			AR5K_PHY_RADAR_PULSEHEIGHTTHR,
-                        AR5K_PHY_RADAR_PULSEHEIGHTTHR_S,
-			rp_pulse_height_threshold)
+			AR5K_PHY_RADAR_PULSEHEIGHTTHR_S,
+			rp_pulse_height_thr) |
+		BUILD_PHY_RADAR_FIELD(
+			AR5K_PHY_RADAR_PULSERSSITHR,
+			AR5K_PHY_RADAR_PULSERSSITHR_S,
+			rp_radar_rssi_thr) |
+		BUILD_PHY_RADAR_FIELD(
+			AR5K_PHY_RADAR_INBANDTHR,
+			AR5K_PHY_RADAR_INBANDTHR_S,
+			rp_inband_thr)
 		);
 #undef BUILD_PHY_RADAR_FIELD
 }
