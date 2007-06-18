@@ -75,25 +75,26 @@ after DFS is enabled */
 /* This struct defines the supported PHY error detection parameters for radar
 pulse detection logic */
 typedef struct {
-	/* Pulse height threshold 
-	 * 6-bits, dBm range {0..63} in dBm units. */
-	int32_t rp_pulse_height_threshold;
-
-	/* Pulse RSSI/SNR threshold
-	 * 6-bits, dBm range {0..63} in dBm units. */
-	int32_t rp_pulse_rssi_threshold;
+	/* Finite Impulse Response (FIR) filter - power out threshold.
+	 * 7-bits, standard power range {0..127} in 1/2 dBm units. */
+	int32_t rp_fir_filter_output_power_thr; 		
 
 	/* Radar RSSI/SNR threshold.
 	 * 6-bits, dBm range {0..63} in dBm units. */
-	int32_t rp_radar_rssi_threshold;	
+	int32_t rp_radar_rssi_thr;	
+
+	/* Pulse height threshold
+	 * 6-bits, dBm range {0..63} in dBm units. */
+	int32_t rp_pulse_height_thr;
+
+	/* Pulse RSSI/SNR threshold
+	 * 6-bits, dBm range {0..63} in dBm units. */
+	int32_t rp_pulse_rssi_thr;
 
  	/* Inband threshold.  
 	 * 5-bits, units unknown {0..31} (? MHz ?) */
-	int32_t rp_inband_threshold;
+	int32_t rp_inband_thr;
 
-	/* Finite Impulse Response (FIR) filter - power out threshold.
-	 * 7-bits, standard power range {0..127} in 1/2 dBm units. */
-	int32_t rp_fir_filter_output_power_threshold; 		
 } RADAR_PARAM;
 
 /* Any value in RADAR_PARAM can be set to this magic value in order to use
