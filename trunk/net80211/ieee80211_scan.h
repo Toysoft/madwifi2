@@ -39,7 +39,7 @@ struct ieee80211_scanner;
 struct ieee80211_scan_entry;
 
 struct ieee80211_scan_ssid {
-	int len;					/* length in bytes */
+	int len;				/* length in bytes */
 	u_int8_t ssid[IEEE80211_NWID_LEN];	/* ssid contents */
 };
 #define	IEEE80211_SCAN_MAX_SSID	1
@@ -100,7 +100,7 @@ int ieee80211_scan_dfs_action(struct ieee80211vap *, const struct ieee80211_scan
 
 struct ieee80211_scanparams;
 void ieee80211_add_scan(struct ieee80211vap *, const struct ieee80211_scanparams *,
-	const struct ieee80211_frame *, int, int, int);
+	const struct ieee80211_frame *, int, int, u_int64_t);
 void ieee80211_scan_timeout(struct ieee80211com *);
 
 void ieee80211_scan_assoc_success(struct ieee80211com *,
@@ -156,7 +156,7 @@ struct ieee80211_scan_entry {
 	u_int8_t se_ssid[2 + IEEE80211_NWID_LEN];
 	u_int8_t se_rates[2 + IEEE80211_RATE_MAXSIZE];
 	u_int8_t se_xrates[2 + IEEE80211_RATE_MAXSIZE];
-	u_int32_t se_rstamp;		/* recv timestamp */
+	u_int64_t se_rtsf;		/* recv timestamp */
 	union {
 		u_int8_t data[8];
 		__le64 tsf;
@@ -196,7 +196,7 @@ struct ieee80211_scanner {
 	/* add an entry to the cache */
 	int (*scan_add)(struct ieee80211_scan_state *,
 		const struct ieee80211_scanparams *,
-		const struct ieee80211_frame *, int, int, int);
+		const struct ieee80211_frame *, int, int, u_int64_t);
 	/* age and/or purge entries in the cache */
 	void (*scan_age)(struct ieee80211_scan_state *);
 	/* note that association failed for an entry */
