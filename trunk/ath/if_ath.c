@@ -8110,16 +8110,15 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				wds_ni->ni_rates = vap->iv_bss->ni_rates;
 				/* Depending on the sequence of bringing up devices
 				 * it's possible the rates of the root bss isn't
-				 * filled yet. 
-				 */
-				if (vap->iv_ic->ic_newassoc != NULL &&
-				    wds_ni->ni_rates.rs_nrates != 0) {
+				 * filled yet. */
+				if ((vap->iv_ic->ic_newassoc != NULL) &&
+				    (wds_ni->ni_rates.rs_nrates != 0)) {
 					/* Fill in the rates based on our own rates
 					 * we rely on the rate selection mechanism
-					 * to find out which rates actually work!
-					 */
+					 * to find out which rates actually work! */
 					vap->iv_ic->ic_newassoc(wds_ni, 1);
 				}
+				ieee80211_unref_node(&wds_ni);
 			}
 			break;
 		default:

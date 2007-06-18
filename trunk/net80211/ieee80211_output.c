@@ -268,6 +268,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		 * We'll get the frame back when the time is right.
 		 */
 		ieee80211_pwrsave(ni, skb);
+		ieee80211_unref_node(&ni);
 		return 0;
 	}
 
@@ -282,7 +283,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	    vap->iv_xrvap->iv_sta_assoc) {
 		struct sk_buff *skb1;
 		ni = ieee80211_find_txnode(vap->iv_xrvap, eh->ether_dhost);
-		skb1 = skb_clone(skb,GFP_ATOMIC);
+		skb1 = skb_clone(skb, GFP_ATOMIC);
 		if (skb1) {
 			cb = (struct ieee80211_cb *) skb1->cb;
 			cb->ni = ni;
