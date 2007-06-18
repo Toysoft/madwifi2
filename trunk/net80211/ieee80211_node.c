@@ -659,7 +659,7 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 	IEEE80211_ADDR_COPY(ni->ni_bssid, se->se_bssid);
 	ni->ni_esslen = se->se_ssid[1];
 	memcpy(ni->ni_essid, se->se_ssid + 2, ni->ni_esslen);
-	ni->ni_rstamp = se->se_rstamp;
+	ni->ni_rtsf = se->se_rtsf;
 	ni->ni_tstamp.tsf = se->se_tstamp.tsf;
 	ni->ni_intval = IEEE80211_BINTVAL_SANITISE(se->se_intval);
 	ni->ni_capinfo = se->se_capinfo;
@@ -1601,8 +1601,8 @@ ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 		       ni->ni_rxseqs[i] >> IEEE80211_SEQ_SEQ_SHIFT,
 		       ni->ni_rxseqs[i] & IEEE80211_SEQ_FRAG_MASK);
 	}
-	printf("\trstamp %u rssi %u intval %u capinfo 0x%x\n",
-		ni->ni_rstamp, ni->ni_rssi, ni->ni_intval, ni->ni_capinfo);
+	printf("\trtsf %10llu rssi %u intval %u capinfo 0x%x\n",
+		ni->ni_rtsf, ni->ni_rssi, ni->ni_intval, ni->ni_capinfo);
 	printf("\tbssid %s essid \"%.*s\" channel %u:0x%x\n",
 		ether_sprintf(ni->ni_bssid),
 		ni->ni_esslen, ni->ni_essid,

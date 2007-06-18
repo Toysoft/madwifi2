@@ -215,7 +215,7 @@ saveie(u_int8_t **iep, const u_int8_t *ie)
  */
 static int
 sta_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
-	const struct ieee80211_frame *wh, int subtype, int rssi, int rstamp)
+	const struct ieee80211_frame *wh, int subtype, int rssi, u_int64_t rtsf)
 {
 #define	ISPROBE(_st)	((_st) == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
 #define	PICK1ST(_ss) \
@@ -272,7 +272,7 @@ found:
 	else					/* avg w/ previous samples */
 		RSSI_LPF(se->se_avgrssi, rssi);
 	se->base.se_rssi = RSSI_GET(se->se_avgrssi);
-	ise->se_rstamp = rstamp;
+	ise->se_rtsf = rtsf;
 	memcpy(ise->se_tstamp.data, sp->tstamp, sizeof(ise->se_tstamp));
 	ise->se_intval = sp->bintval;
 	ise->se_capinfo = sp->capinfo;

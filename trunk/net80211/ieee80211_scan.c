@@ -831,7 +831,7 @@ void
 ieee80211_add_scan(struct ieee80211vap *vap,
 	const struct ieee80211_scanparams *sp,
 	const struct ieee80211_frame *wh,
-	int subtype, int rssi, int rstamp)
+	int subtype, int rssi, u_int64_t rtsf)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
@@ -851,7 +851,7 @@ ieee80211_add_scan(struct ieee80211vap *vap,
 		dump_probe_beacon(subtype, 1, wh->i_addr2, sp);
 #endif
 	if (ss->ss_ops != NULL &&
-	    ss->ss_ops->scan_add(ss, sp, wh, subtype, rssi, rstamp)) {
+	    ss->ss_ops->scan_add(ss, sp, wh, subtype, rssi, rtsf)) {
 		/*
 		 * If we've reached the min dwell time terminate
 		 * the timer so we'll switch to the next channel.
