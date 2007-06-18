@@ -65,14 +65,15 @@
 #include <ah_os.h>
 
 #ifndef __MOD_INC_USE_COUNT
-#define	AH_MOD_INC_USE_COUNT(_m)					\
+#define	AH_MOD_INC_USE_COUNT(_m, _err)					\
 	if (!try_module_get(_m)) {					\
-		printk(KERN_WARNING "try_module_get failed\n");		\
-		return NULL;						\
+		printk(KERN_WARNING "%s: try_module_get failed\n",	\
+			__func__); 					\
+		_err;							\
 	}
 #define	AH_MOD_DEC_USE_COUNT(_m)	module_put(_m)
 #else
-#define	AH_MOD_INC_USE_COUNT(_m)	MOD_INC_USE_COUNT
+#define	AH_MOD_INC_USE_COUNT(_m, _err)	MOD_INC_USE_COUNT
 #define	AH_MOD_DEC_USE_COUNT(_m)	MOD_DEC_USE_COUNT
 #endif
 
@@ -91,7 +92,7 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 	struct ath_hal *ah = ath_hal_attach(devid, sc, t, h, s);
 
 	if (ah)
-		AH_MOD_INC_USE_COUNT(THIS_MODULE);
+		AH_MOD_INC_USE_COUNT(THIS_MODULE, return NULL);
 	return ah;
 }
 
