@@ -140,7 +140,7 @@ struct ieee80211_node {
 	int ni_rxkeyoff;    			/* Receive key offset */
 
 	/* hardware */
-	u_int32_t ni_rstamp;			/* recv timestamp */
+	u_int64_t ni_rtsf;			/* recv timestamp */
 	u_int32_t ni_last_rx;			/* recv jiffies */
 	u_int8_t ni_rssi;			/* recv ssi */
 

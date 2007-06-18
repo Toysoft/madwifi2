@@ -131,7 +131,7 @@ struct ieee80211_nsparams {
 #define IW_MAX_SPY 8
 struct ieee80211_spy {
 	u_int8_t mac[IW_MAX_SPY * IEEE80211_ADDR_LEN];
-	u_int32_t ts_rssi[IW_MAX_SPY];		/* ts of rssi value from last read */
+	u_int64_t ts_rssi[IW_MAX_SPY];		/* ts of rssi value from last read */
 	u_int8_t thr_low;			/* 1 byte rssi value, 0 = threshold is off */
 	u_int8_t thr_high;			/* 1 byte rssi value */
 	u_int8_t num;
@@ -395,7 +395,7 @@ struct ieee80211com {
 	/* Send/recv 802.11 management frame */
 	int (*ic_send_mgmt)(struct ieee80211_node *, int, int);
 	void (*ic_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int,
-		int, u_int32_t);
+		int, u_int64_t);
 
 	/* Send management frame to driver (like hardstart) */
 	int (*ic_mgtstart)(struct ieee80211com *, struct sk_buff *);

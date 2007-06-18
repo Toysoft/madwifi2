@@ -193,7 +193,7 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
  */
 int
 ieee80211_input(struct ieee80211_node *ni,
-	struct sk_buff *skb, int rssi, u_int32_t rstamp)
+	struct sk_buff *skb, int rssi, u_int64_t rtsf)
 {
 #define	HAS_SEQ(type)	((type & 0x4) == 0)
 	struct ieee80211vap *vap = ni->ni_vap;
@@ -385,7 +385,7 @@ ieee80211_input(struct ieee80211_node *ni,
 			goto out;
 		}
 		ni->ni_rssi = rssi;
-		ni->ni_rstamp = rstamp;
+		ni->ni_rtsf = rtsf;
 		ni->ni_last_rx = jiffies;
 		if (HAS_SEQ(type)) {
 			u_int8_t tid;
@@ -793,7 +793,7 @@ ieee80211_input(struct ieee80211_node *ni,
 			wh = (struct ieee80211_frame *)skb->data;
 			wh->i_fc[1] &= ~IEEE80211_FC1_PROT;
 		}
-		ic->ic_recv_mgmt(ni, skb, subtype, rssi, rstamp);
+		ic->ic_recv_mgmt(ni, skb, subtype, rssi, rtsf);
 		goto out;
 
 	case IEEE80211_FC0_TYPE_CTL:
@@ -894,7 +894,7 @@ static int accept_data_frame(struct ieee80211vap *vap,
  */
 int
 ieee80211_input_all(struct ieee80211com *ic,
-	struct sk_buff *skb, int rssi, u_int32_t rstamp)
+	struct sk_buff *skb, int rssi, u_int64_t rtsf)
 {
 	struct ieee80211vap *vap;
 	int type = -1;
@@ -915,7 +915,7 @@ ieee80211_input_all(struct ieee80211com *ic,
 			skb = NULL;
 		}
 		ni = ieee80211_ref_node(vap->iv_bss);
-		type = ieee80211_input(ni, skb1, rssi, rstamp);
+		type = ieee80211_input(ni, skb1, rssi, rtsf);
 		ieee80211_unref_node(&ni);
 	}
 	if (skb != NULL)		/* no vaps, reclaim skb */
@@ -1229,7 +1229,7 @@ ieee80211_setup_rates(struct ieee80211_node *ni,
 
 static void
 ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
-	int rssi, u_int32_t rstamp, u_int16_t seq, u_int16_t status)
+	int rssi, u_int64_t rtsf, u_int16_t seq, u_int16_t status)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	unsigned int tmpnode = 0;
@@ -1372,7 +1372,7 @@ alloc_challenge(struct ieee80211_node *ni)
 /* XXX TODO: add statistics */
 static void
 ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
-	u_int8_t *frm, u_int8_t *efrm, int rssi, u_int32_t rstamp,
+	u_int8_t *frm, u_int8_t *efrm, int rssi, u_int64_t rtsf,
 	u_int16_t seq, u_int16_t status)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
@@ -1480,7 +1480,7 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			}
 
 			ni->ni_rssi = rssi;
-			ni->ni_rstamp = rstamp;
+			ni->ni_rtsf = rtsf;
 			ni->ni_last_rx = jiffies;
 			if (!alloc_challenge(ni)) {
 				/* NB: don't return error so they rexmit */
@@ -2859,7 +2859,7 @@ startbgscan(struct ieee80211vap *vap)
  */
 void
 ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
-	int subtype, int rssi, u_int32_t rstamp)
+	int subtype, int rssi, u_int64_t rtsf)
 {
 #define	ISPROBE(_st)	((_st) == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
 #define	ISREASSOC(_st)	((_st) == IEEE80211_FC0_SUBTYPE_REASSOC_RESP)
@@ -3190,7 +3190,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 */
 			if (ic->ic_flags & IEEE80211_F_SCAN)
 				ieee80211_add_scan(vap, &scan, wh,
-					subtype, rssi, rstamp);
+					subtype, rssi, rtsf);
 			else if (contbgscan(vap) || startbgscan(vap))
 				ieee80211_bg_scan(vap);
 			return;
@@ -3199,7 +3199,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		 * If scanning, just pass information to the scan module.
 		 */
 		if (ic->ic_flags & IEEE80211_F_SCAN) {
-			ieee80211_add_scan(vap, &scan, wh, subtype, rssi, rstamp);
+			ieee80211_add_scan(vap, &scan, wh, subtype, rssi, rtsf);
 			return;
 		}
 		if (scan.capinfo & IEEE80211_CAPINFO_IBSS) {
@@ -3240,7 +3240,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			}
 			if (ni != NULL) {
 				ni->ni_rssi = rssi;
-				ni->ni_rstamp = rstamp;
+				ni->ni_rtsf = rtsf;
 				ni->ni_last_rx = jiffies;
 			}
 		}
@@ -3329,7 +3329,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_INPUT, wh->i_addr2,
 			"%s", "recv probe req");
 		ni->ni_rssi = rssi;
-		ni->ni_rstamp = rstamp;
+		ni->ni_rtsf = rtsf;
 		ni->ni_last_rx = jiffies;
 		rate = ieee80211_setup_rates(ni, rates, xrates,
 			IEEE80211_F_DOSORT | IEEE80211_F_DOFRATE |
@@ -3415,9 +3415,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 		if (algo == IEEE80211_AUTH_ALG_SHARED)
 			ieee80211_auth_shared(ni, wh, frm + 6, efrm, rssi,
-				rstamp, seq, status);
+				rtsf, seq, status);
 		else if (algo == IEEE80211_AUTH_ALG_OPEN)
-			ieee80211_auth_open(ni, wh, rssi, rstamp, seq, status);
+			ieee80211_auth_open(ni, wh, rssi, rtsf, seq, status);
 		else {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY,
 				wh, "auth", "unsupported alg %d", algo);
@@ -3662,7 +3662,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 
 		ni->ni_rssi = rssi;
-		ni->ni_rstamp = rstamp;
+		ni->ni_rtsf = rtsf;
 		ni->ni_last_rx = jiffies;
 		ni->ni_intval = IEEE80211_BINTVAL_SANITISE(bintval);
 		ni->ni_capinfo = capinfo;

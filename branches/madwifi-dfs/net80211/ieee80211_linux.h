@@ -419,7 +419,7 @@ extern	void skb_queue_drain(struct sk_buff_head *q);
 #define	_MOD_INC_USE(_m, _err)						\
 	if (!try_module_get(_m)) {					\
 		printk(KERN_WARNING "%s: try_module_get failed\n",	\
-			__func__); \
+			__func__); 					\
 		_err;							\
 	}
 #define	_MOD_DEC_USE(_m)		module_put(_m)

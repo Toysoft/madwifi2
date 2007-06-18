@@ -1064,8 +1064,8 @@ ieee80211_ioctl_setspy(struct net_device *dev, struct iw_request_info *info,
 		for (i = 0; i < number; i++)
 			memcpy(&vap->iv_spy.mac[i * IEEE80211_ADDR_LEN],
 				address[i].sa_data, IEEE80211_ADDR_LEN);
-		/* init rssi timestamps */
-		memset(vap->iv_spy.ts_rssi, 0, IW_MAX_SPY * sizeof(u_int32_t));
+		/* init rssi timestamps to 0 */
+		memset(vap->iv_spy.ts_rssi, 0, sizeof(vap->iv_spy.ts_rssi));
 	}
 	vap->iv_spy.num = number;
 
@@ -1105,8 +1105,8 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 		/* check we are associated w/ this vap */
 		if (ni && (ni->ni_vap == vap)) {
 			set_quality(&spy_stat[i], ni->ni_rssi, ic->ic_channoise);
-			if (ni->ni_rstamp != vap->iv_spy.ts_rssi[i]) {
-				vap->iv_spy.ts_rssi[i] = ni->ni_rstamp;
+			if (ni->ni_rtsf != vap->iv_spy.ts_rssi[i]) {
+				vap->iv_spy.ts_rssi[i] = ni->ni_rtsf;
 			} else {
 				spy_stat[i].updated = 0;
 			}
