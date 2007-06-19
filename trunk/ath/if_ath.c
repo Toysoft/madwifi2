@@ -5345,21 +5345,18 @@ ath_rx_capture(struct net_device *dev, const struct ath_buf *bf,
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_frame *wh;
+	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+	unsigned int headersize = ieee80211_anyhdrsize(wh);
+	int padbytes = roundup(headersize, 4) - headersize;
 
 	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
 		("data padding not enabled?"));
 
-	wh = (struct ieee80211_frame *) skb->data;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) {
-		struct sk_buff *skb1 = skb_copy(skb, GFP_ATOMIC);
+	if (padbytes > 0) {
 		/* Remove hw pad bytes */
-		unsigned int headersize = ieee80211_hdrsize(wh);
-		int padbytes = roundup(headersize, 4) - headersize;
-		if (padbytes > 0) {
-			memmove(skb1->data + padbytes, skb1->data, headersize);
-			skb_pull(skb1, padbytes);
-		}
+		struct sk_buff *skb1 = skb_copy(skb, GFP_ATOMIC);
+		memmove(skb1->data + padbytes, skb1->data, headersize);
+		skb_pull(skb1, padbytes);
 		ieee80211_input_monitor(ic, skb1, bf, 0, rtsf, sc);
 		dev_kfree_skb(skb1);
 	} else {
@@ -5379,6 +5376,8 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 	unsigned int extra = A_MAX(sizeof(struct ath_tx_radiotap_header),
 			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
 	u_int32_t tstamp;
+	unsigned int headersize;
+	int padbytes;
 	/*                                                                      
 	 * release the owner of this skb since we're basically                  
 	 * recycling it                                                         
@@ -5396,15 +5395,13 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 		skb_orphan(skb);
 
 	wh = (struct ieee80211_frame *) skb->data;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) {
+	headersize = ieee80211_anyhdrsize(wh);
+	padbytes = roundup(headersize, 4) - headersize;
+	if (padbytes > 0) {
 		/* Unlike in rx_capture, we're freeing the skb at the end
 		 * anyway, so we don't need to worry about using a copy */
-		unsigned int headersize = ieee80211_hdrsize(wh);
-		int padbytes = roundup(headersize, 4) - headersize;
-		if (padbytes > 0) {
-			memmove(skb->data + padbytes, skb->data, headersize);
-			skb_pull(skb, padbytes);
-		}
+		memmove(skb->data + padbytes, skb->data, headersize);
+		skb_pull(skb, padbytes);
 	}
 
 	if (skb_headroom(skb) < extra &&
