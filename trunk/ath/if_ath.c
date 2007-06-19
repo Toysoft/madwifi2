@@ -2546,8 +2546,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto hardstart_fail;
 	}
 
-	/* NB: use this lock to protect an->an_ff_txbuf in athff_can_aggregate()
-	 *     call too.
+	/* NB: use this lock to protect an->an_tx_ffbuf (and txq->axq_stageq)
+	 *	in athff_can_aggregate() call too.
 	 */
 	ATH_TXQ_LOCK_IRQ(txq);
 	if (athff_can_aggregate(sc, eh, an, skb, vap->iv_fragthreshold, &ff_flush)) {
@@ -2604,6 +2604,9 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			TAILQ_REMOVE(&txq->axq_stageq, bf_ff, bf_stagelist);
 			an->an_tx_ffbuf[skb->priority] = NULL;
 
+			/* NB: ath_tx_start -> ath_tx_txqaddbuf uses ATH_TXQ_LOCK too */
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
+
 			/* encap and xmit */
 			bf_ff->bf_skb = ieee80211_encap(ni, bf_ff->bf_skb, &framecnt);
 
@@ -2632,6 +2635,15 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
 				ATH_TXBUF_UNLOCK_IRQ(sc);
 			}
+
+			ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+			if (bf == NULL) {
+				goto hardstart_fail;
+			}
+
+			goto ff_flush_done;
+
+
 		}
 		/*
 		 * XXX: out-of-order condition only occurs for AP mode and multicast.
@@ -2651,11 +2663,16 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	ATH_TXQ_UNLOCK_IRQ(txq);
 
+ff_flush_done:
 ff_bypass:
 
 #else /* ATH_SUPERG_FF */
 
 	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+	if (bf == NULL) {
+		ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
+		goto hardstart_fail;
+	}
 
 #endif /* ATH_SUPERG_FF */
 

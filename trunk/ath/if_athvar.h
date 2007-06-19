@@ -341,7 +341,9 @@ struct ath_node {
 	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
 	u_int16_t an_minffrate;			/* min rate in kbps for ff to aggregate */
 	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
+	
 	struct ath_buf *an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
+
 	ath_bufhead an_uapsd_q;			/* U-APSD delivery queue */
 	int an_uapsd_qdepth; 			/* U-APSD delivery queue depth */
 	ath_bufhead an_uapsd_overflowq; 	/* U-APSD overflow queue (for > MaxSp frames) */
@@ -407,7 +409,7 @@ struct ath_buf {
  * reset the rx buffer.
  * any new fields added to the athbuf and require 
  * reset need to be added to this macro.
- * currently bf_status is the only one requires that
+ * currently bf_status is the only one that
  * requires reset.
  */
 #define ATH_RXBUF_RESET(bf)	bf->bf_status=0
