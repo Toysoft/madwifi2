@@ -57,7 +57,7 @@ endif
 include $(TOP)/Makefile.inc
 
 obj-m		+= ath_$(BUSNAME).o
-ath_$(BUSNAME)-objs	:= if_ath.o if_ath_hal.o if_ath_$(BUSNAME).o
+ath_$(BUSNAME)-objs	:= if_ath.o if_ath_hal.o if_ath_hal_wrappers.o if_ath_$(BUSNAME).o
 
 INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
