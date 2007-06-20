@@ -114,7 +114,7 @@ clean:
 	-$(MAKE) -C $(TOOLS) clean
 	rm -rf .tmp_versions
 	rm -f *.symvers svnversion.h
-	rm ath/if_ath_hal.c ath/if_ath_hal.h
+	rm -f ath/if_ath_hal.c ath/if_ath_hal.h
 
 info:
 	@echo "The following settings will be used for compilation:"
