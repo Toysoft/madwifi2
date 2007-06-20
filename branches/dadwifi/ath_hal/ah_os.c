@@ -61,25 +61,13 @@
 #include <ah.h>
 #include <ah_os.h>
 
-#ifndef __MOD_INC_USE_COUNT
-#define	AH_MOD_INC_USE_COUNT(_m)					\
-	if (!try_module_get(_m)) {					\
-		printk(KERN_WARNING "try_module_get failed\n");		\
-		return NULL;						\
-	}
-#define	AH_MOD_DEC_USE_COUNT(_m)	module_put(_m)
-#else
-#define	AH_MOD_INC_USE_COUNT(_m)	MOD_INC_USE_COUNT
-#define	AH_MOD_DEC_USE_COUNT(_m)	MOD_DEC_USE_COUNT
-#endif
-
 #ifdef AH_DEBUG
 static	int ath_hal_debug = 0;
 #endif
 
-int	ath_hal_dma_beacon_response_time = 2;	/* in TU's */
-int	ath_hal_sw_beacon_response_time = 10;	/* in TU's */
-int	ath_hal_additional_swba_backoff = 0;	/* in TU's */
+int	ath_hal_dma_beacon_response_time = 2;	/* in TUs */
+int	ath_hal_sw_beacon_response_time = 10;	/* in TUs */
+int	ath_hal_additional_swba_backoff = 0;	/* in TUs */
 
 struct ath_hal *
 _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
@@ -88,7 +76,17 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 	struct ath_hal *ah = ath_hal_attach(devid, sc, t, h, s);
 
 	if (ah)
-		AH_MOD_INC_USE_COUNT(THIS_MODULE);
+#ifndef __MOD_INC_USE_COUNT
+		if (!try_module_get(THIS_MODULE)) {
+			printk(KERN_WARNING "%s: try_module_get failed\n",
+					__func__);
+			_ath_hal_detach(ah);
+			return NULL;
+		}
+#else
+		MOD_INC_USE_COUNT;
+#endif
+
 	return ah;
 }
 
@@ -96,7 +94,11 @@ void
 ath_hal_detach(struct ath_hal *ah)
 {
 	(*ah->ah_detach)(ah);
-	AH_MOD_DEC_USE_COUNT(THIS_MODULE);
+#ifndef __MOD_INC_USE_COUNT
+	module_put(THIS_MODULE);
+#else
+	MOD_DEC_USE_COUNT;
+#endif
 }
 
 /*
