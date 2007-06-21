@@ -70,7 +70,7 @@ all:
 
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
-	cp ath_$(BUSNAME).$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+	install ath_$(BUSNAME).$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	rm -f *~ *.o *.ko *.mod.c .*.cmd
