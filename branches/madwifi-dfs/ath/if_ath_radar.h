@@ -73,26 +73,79 @@ after DFS is enabled */
 #define AR5K_PHY_RADAR_INBANDTHR_S	1
 
 /* This struct defines the supported PHY error detection parameters for radar
-pulse detection logic */
+ * pulse detection logic.  Reference US patent US6891496 B2 for pseudocode for 
+ * the chips' operations and pseudocode for how the parameters are used.
+*/
 typedef struct {
+
 	/* Finite Impulse Response (FIR) filter - power out threshold.
-	 * 7-bits, standard power range {0..127} in 1/2 dBm units. */
+	 * 
+	 * If a signal is received with a pulse width that is too short,
+	 * the AR chip cannot fine-adjust gain fast enough to get an accurate
+	 * reading of RSSI.  If this signal has an power value after filtering
+	 * that exceeds a fixed threshold (rp_fir_filter_output_power_thr) 
+	 * and then drops by rp_pulse_height_thr then it may be considered a 
+	 * radar pulse.
+	 *
+	 * Reference: 405 in Figure 4A of US patent US6891496 B2.
+	 * Default: Default value is -41dBm.
+	 * Units: Signed integer, value in dBm {-63..63} in 1 dBm units. */
 	int32_t rp_fir_filter_output_power_thr; 		
 
-	/* Radar RSSI/SNR threshold.
-	 * 6-bits, dBm range {0..63} in dBm units. */
-	int32_t rp_radar_rssi_thr;	
-
 	/* Pulse height threshold
-	 * 6-bits, dBm range {0..63} in dBm units. */
+	 * This is delta between the max and min RSSI for short pulse radar 
+	 * bursts where AGC cannot be adjusted enough times to get an accurate
+	 * sizing of the pulse.  
+	 * 
+	 * If a signal is received with a pulse width that is too short,
+	 * the AR chip cannot fine-adjust gain fast enough to get an accurate
+	 * reading of RSSI.  If this signal has an power value after filtering
+	 * that exceeds a fixed threshold (rp_fir_filter_output_power_thr) 
+	 * and then drops by rp_pulse_height_thr then it may be considered a 
+	 * radar pulse.
+	 *
+	 * Refernece: See Figure 4A.
+	 * Default: value is 20 dBm.
+	 * Units: 6-bits, dBm range {0..63} in dBm units. */
 	int32_t rp_pulse_height_thr;
 
+	/* Radar RSSI/SNR threshold.
+	 *
+	 * This is the threshold that RSSI must exceed for the pulse when AGC 
+	 * is ok and we actually know the power of the signal (not the chip)
+	 * and reach an initial peak greater than this threshold.  
+	 * 
+	 * For pulses long enough for AGC to be used to detect
+	 * pulse width (approximately >3us), we will start counting the pulse 
+	 * width if it reaches this level as this may be the rise of a radar 
+	 * pulse.
+	 *
+	 * Reference: See 450 on Figure 4B in US patent US6891496 B2.
+	 * Default: value is 12, or 6 dBm.
+	 * Units: 6-bits, dBm range {0..63} in dBm units. */
+	int32_t rp_radar_rssi_thr;
+
 	/* Pulse RSSI/SNR threshold
-	 * 6-bits, dBm range {0..63} in dBm units. */
+	 * 
+	 * This is how much the RSSI of the pulse must drop, relative to
+	 * rp_radar_rssi_thr before we will stop counting the pulse width.
+	 *  
+	 * If we see a pulse reach rp_radar_rssi_thr we start thinking it might
+	 * be radar, but if it subsequently reached 
+	 * (rp_radar_rssi_thr - rp_pulse_height_thr) and it wasn't part of a 
+	 * WLAN signal, then we would know it was radar. 
+	 *
+	 * In other words, we are looking for a 6dBm drop in gain that happens
+	 * after a pulse on the down swing as shown in figure 4A and 4B.
+	 * 
+	 * Default: 22, or 11 dBm.
+	 * Units: 6-bits, dBm range {0..63} in dBm units. 
+	 */
 	int32_t rp_pulse_rssi_thr;
 
- 	/* Inband threshold.  
-	 * 5-bits, units unknown {0..31} (? MHz ?) */
+	/* Inband threshold.
+	 * Units: 5-bits, units unknown {0..31} (? MHz ?) 
+	 */
 	int32_t rp_inband_thr;
 
 } RADAR_PARAM;
