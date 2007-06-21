@@ -1101,7 +1101,6 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 	/* locate a node, read its rssi, check if updated, convert to dBm */
 	for (i = 0; i < number; i++) {
 		ni = ieee80211_find_node(nt, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]);
-		/* TODO: free node ? */
 		/* check we are associated w/ this vap */
 		if (ni && (ni->ni_vap == vap)) {
 			set_quality(&spy_stat[i], ni->ni_rssi, ic->ic_channoise);
@@ -1113,6 +1112,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 		} else {
 			spy_stat[i].updated = IW_QUAL_ALL_INVALID;
 		}
+		ieee80211_unref_node(&ni);
 	}
 
 	/* copy results to userspace */
@@ -3381,6 +3381,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 	/* NB: this also checks ik->ik_keylen > sizeof(wk->wk_key) */
 	if (ik->ik_keylen > sizeof(ik->ik_keydata))
 		return -E2BIG;
+
 	kix = ik->ik_keyix;
 	if (kix == IEEE80211_KEYIX_NONE) {
 		/* XXX unicast keys currently must be tx/rx */
@@ -3404,6 +3405,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 		if ((ik->ik_flags & IEEE80211_KEY_XMIT) == 0)	/* XXX */
 			ik->ik_flags |= IEEE80211_KEY_GROUP;	/* XXX */
 	}
+
 	error = 0;
 	flags = ik->ik_flags & IEEE80211_KEY_COMMON;
 	ieee80211_key_update_begin(vap);
@@ -3418,12 +3420,13 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 		memset(wk->wk_key, 0, sizeof(wk->wk_key));
 		memcpy(wk->wk_key, ik->ik_keydata, ik->ik_keylen);
 		if (!ieee80211_crypto_setkey(vap, wk,
-		    ni != NULL ? ni->ni_macaddr : ik->ik_macaddr, ni))
+		    (ni != NULL) ? ni->ni_macaddr : ik->ik_macaddr, ni))
 			error = -EIO;
 		else if ((ik->ik_flags & IEEE80211_KEY_DEFAULT))
 			vap->iv_def_txkey = kix;
 	} else
 		error = -ENXIO;
+
 	ieee80211_key_update_end(vap);
 	if (ni != NULL)
 		ieee80211_unref_node(&ni);

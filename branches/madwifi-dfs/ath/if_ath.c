@@ -2636,8 +2636,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto hardstart_fail;
 	}
 
-	/* NB: use this lock to protect an->an_ff_txbuf in athff_can_aggregate()
-	 *     call too.
+	/* NB: use this lock to protect an->an_tx_ffbuf (and txq->axq_stageq)
+	 *	in athff_can_aggregate() call too.
 	 */
 	ATH_TXQ_LOCK_IRQ(txq);
 	if (athff_can_aggregate(sc, eh, an, skb, vap->iv_fragthreshold, &ff_flush)) {
@@ -2694,6 +2694,9 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			TAILQ_REMOVE(&txq->axq_stageq, bf_ff, bf_stagelist);
 			an->an_tx_ffbuf[skb->priority] = NULL;
 
+			/* NB: ath_tx_start -> ath_tx_txqaddbuf uses ATH_TXQ_LOCK too */
+			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
+
 			/* encap and xmit */
 			bf_ff->bf_skb = ieee80211_encap(ni, bf_ff->bf_skb, &framecnt);
 
@@ -2722,6 +2725,15 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
 				ATH_TXBUF_UNLOCK_IRQ(sc);
 			}
+
+			ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+			if (bf == NULL) {
+				goto hardstart_fail;
+			}
+
+			goto ff_flush_done;
+
+
 		}
 		/*
 		 * XXX: out-of-order condition only occurs for AP mode and multicast.
@@ -2741,11 +2753,16 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	ATH_TXQ_UNLOCK_IRQ(txq);
 
+ff_flush_done:
 ff_bypass:
 
 #else /* ATH_SUPERG_FF */
 
 	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
+	if (bf == NULL) {
+		ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
+		goto hardstart_fail;
+	}
 
 #endif /* ATH_SUPERG_FF */
 
@@ -5432,21 +5449,18 @@ ath_rx_capture(struct net_device *dev, const struct ath_buf *bf,
 {
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211_frame *wh;
+	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+	unsigned int headersize = ieee80211_anyhdrsize(wh);
+	int padbytes = roundup(headersize, 4) - headersize;
 
 	KASSERT(ic->ic_flags & IEEE80211_F_DATAPAD,
 		("data padding not enabled?"));
 
-	wh = (struct ieee80211_frame *) skb->data;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) {
-		struct sk_buff *skb1 = skb_copy(skb, GFP_ATOMIC);
+	if (padbytes > 0) {
 		/* Remove hw pad bytes */
-		unsigned int headersize = ieee80211_hdrsize(wh);
-		int padbytes = roundup(headersize, 4) - headersize;
-		if (padbytes > 0) {
-			memmove(skb1->data + padbytes, skb1->data, headersize);
-			skb_pull(skb1, padbytes);
-		}
+		struct sk_buff *skb1 = skb_copy(skb, GFP_ATOMIC);
+		memmove(skb1->data + padbytes, skb1->data, headersize);
+		skb_pull(skb1, padbytes);
 		ieee80211_input_monitor(ic, skb1, bf, 0, rtsf, sc);
 		dev_kfree_skb(skb1);
 	} else {
@@ -5466,6 +5480,8 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 	unsigned int extra = A_MAX(sizeof(struct ath_tx_radiotap_header),
 			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
 	u_int32_t tstamp;
+	unsigned int headersize;
+	int padbytes;
 	/*                                                                      
 	 * release the owner of this skb since we're basically                  
 	 * recycling it                                                         
@@ -5483,15 +5499,13 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 		skb_orphan(skb);
 
 	wh = (struct ieee80211_frame *) skb->data;
-	if (IEEE80211_QOS_HAS_SEQ(wh)) {
+	headersize = ieee80211_anyhdrsize(wh);
+	padbytes = roundup(headersize, 4) - headersize;
+	if (padbytes > 0) {
 		/* Unlike in rx_capture, we're freeing the skb at the end
 		 * anyway, so we don't need to worry about using a copy */
-		unsigned int headersize = ieee80211_hdrsize(wh);
-		int padbytes = roundup(headersize, 4) - headersize;
-		if (padbytes > 0) {
-			memmove(skb->data + padbytes, skb->data, headersize);
-			skb_pull(skb, padbytes);
-		}
+		memmove(skb->data + padbytes, skb->data, headersize);
+		skb_pull(skb, padbytes);
 	}
 
 	if (skb_headroom(skb) < extra &&
@@ -8262,16 +8276,15 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				wds_ni->ni_rates = vap->iv_bss->ni_rates;
 				/* Depending on the sequence of bringing up devices
 				 * it's possible the rates of the root bss isn't
-				 * filled yet. 
-				 */
-				if (vap->iv_ic->ic_newassoc != NULL &&
-				    wds_ni->ni_rates.rs_nrates != 0) {
+				 * filled yet. */
+				if ((vap->iv_ic->ic_newassoc != NULL) &&
+				    (wds_ni->ni_rates.rs_nrates != 0)) {
 					/* Fill in the rates based on our own rates
 					 * we rely on the rate selection mechanism
-					 * to find out which rates actually work!
-					 */
+					 * to find out which rates actually work! */
 					vap->iv_ic->ic_newassoc(wds_ni, 1);
 				}
+				ieee80211_unref_node(&wds_ni);
 			}
 			break;
 		default:
