@@ -56,7 +56,10 @@ obj-y := ath/ ath_hal/ ath_rate/ net80211/
 
 all: modules tools
 
-modules: configcheck svnversion.h
+ath/if_ath_hal.c ath/if_ath_hal.h: hal/ah.h
+	scripts/if_ath_hal_generator.pl
+
+modules: configcheck ath/if_ath_hal.h ath/if_ath_hal.c svnversion.h
 ifdef LINUX24
 	for i in $(DIRS_MODULES); do \
 		$(MAKE) -C $$i || exit 1; \
@@ -111,6 +114,7 @@ clean:
 	-$(MAKE) -C $(TOOLS) clean
 	rm -rf .tmp_versions
 	rm -f *.symvers svnversion.h
+	rm -f ath/if_ath_hal.c ath/if_ath_hal.h
 
 info:
 	@echo "The following settings will be used for compilation:"

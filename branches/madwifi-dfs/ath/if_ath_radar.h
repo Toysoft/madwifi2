@@ -48,34 +48,33 @@ after DFS is enabled */
 
 /* Finite Impulse Response (FIR) filter .1111111 ........ ........ ........ 
  * power out threshold.
- * 7-bits, standard power range {0..127} in 1/2 dBm units. */
+ * 7-bits signed integer, standard power range {-63..63} in 1 dBm units. */
 #define AR5K_PHY_RADAR_FIRPWROUTTHR    	0x7f000000 
 #define AR5K_PHY_RADAR_FIRPWROUTTHR_S	24
 
 /* Radar RSSI/SNR threshold.		........ 111111.. ........ ........ 
- * 6-bits, dBm range {0..63} in dBm units. */
+ * 6-bits unsigned integer, 1 dBm, range {0..63} in dBm units. */
 #define AR5K_PHY_RADAR_RADARRSSITHR    	0x00fc0000 
 #define AR5K_PHY_RADAR_RADARRSSITHR_S	18
 
 /* Pulse height threshold 		........ ......11 1111.... ........ 
- * 6-bits, dBm range {0..63} in dBm units. */
+ * 6-bits unsigned integer, 1 dBm, range {0..63} in dBm units. */
 #define AR5K_PHY_RADAR_PULSEHEIGHTTHR   0x0003f000
 #define AR5K_PHY_RADAR_PULSEHEIGHTTHR_S	12
 
 /* Pulse RSSI/SNR threshold		........ ........ ....1111 11...... 
- * 6-bits, dBm range {0..63} in dBm units. */
+ * 6-bits unsigned integer, 1 dBm, range {0..63} in dBm units. */
 #define AR5K_PHY_RADAR_PULSERSSITHR    	0x00000fc0
 #define AR5K_PHY_RADAR_PULSERSSITHR_S	6
 
 /* Inband threshold  			........ ........ ........ ..11111. 
- * 5-bits, dBm range {0..31} in 0.5 dBm units */
+ * 5-bits unsigned integer, 1/2 dBm, range {0..31} in 0.5 dBm units */
 #define AR5K_PHY_RADAR_INBANDTHR    	0x0000003e
 #define AR5K_PHY_RADAR_INBANDTHR_S	1
 
 /* This struct defines the supported PHY error detection parameters for radar
  * pulse detection logic.  Reference US patent US6891496 B2 for pseudocode for 
- * the chips' operations and pseudocode for how the parameters are used.
-*/
+ * the chips' operations and pseudocode for how the parameters are used. */
 typedef struct {
 
 	/* Finite Impulse Response (FIR) filter - power out threshold.
