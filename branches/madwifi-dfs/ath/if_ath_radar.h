@@ -68,7 +68,7 @@ after DFS is enabled */
 #define AR5K_PHY_RADAR_PULSERSSITHR_S	6
 
 /* Inband threshold  			........ ........ ........ ..11111. 
- * 5-bits, units unknown {0..31} (? MHz ?) */
+ * 5-bits, dBm range {0..31} in 0.5 dBm units */
 #define AR5K_PHY_RADAR_INBANDTHR    	0x0000003e
 #define AR5K_PHY_RADAR_INBANDTHR_S	1
 
@@ -106,7 +106,7 @@ typedef struct {
 	 *
 	 * Refernece: See Figure 4A.
 	 * Default: value is 20 dBm.
-	 * Units: 6-bits, dBm range {0..63} in dBm units. */
+	 * Units: Unsigned 6-bits, dBm range {0..63} in dBm units. */
 	int32_t rp_pulse_height_thr;
 
 	/* Radar RSSI/SNR threshold.
@@ -139,13 +139,11 @@ typedef struct {
 	 * after a pulse on the down swing as shown in figure 4A and 4B.
 	 * 
 	 * Default: 22, or 11 dBm.
-	 * Units: 6-bits, dBm range {0..63} in dBm units. 
-	 */
+	 * Units: Unsigned 6-bits, dBm range {0..63} in dBm units. */
 	int32_t rp_pulse_rssi_thr;
 
 	/* Inband threshold.
-	 * Units: 5-bits, units unknown {0..31} (? MHz ?) 
-	 */
+	 * Units: Unsigned 5-bits, dBm range {0..31} in half dBm units. */
 	int32_t rp_inband_thr;
 
 } RADAR_PARAM;
