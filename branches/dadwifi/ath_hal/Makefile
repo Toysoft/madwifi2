@@ -62,10 +62,10 @@ endif
 
 INCS += -I$(ATH_HAL) -I$(HAL)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
 
-ifeq ($(TARGET),xscale-be-elf)
-LDOPTS += --no-warn-mismatch
+ifneq (,$(filter xscale% arm%,$(TARGET)))
+LDFLAGS += --no-warn-mismatch
 endif
 
 -include $(TOPDIR)/Rules.make
@@ -90,7 +90,7 @@ endif
 
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
-	cp ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+	install ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd
