@@ -41,6 +41,9 @@
 #define	EXPORT_SYMTAB
 #endif
 
+/* Don't use virtualized timer in Linux 2.6.20+ */
+#define USE_REAL_TIME_DELAY
+
 #ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
 #endif
@@ -86,12 +89,11 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 #else
 		MOD_INC_USE_COUNT;
 #endif
-
 	return ah;
 }
 
 void
-ath_hal_detach(struct ath_hal *ah)
+_ath_hal_detach(struct ath_hal *ah)
 {
 	(*ah->ah_detach)(ah);
 #ifndef __MOD_INC_USE_COUNT
@@ -215,18 +217,20 @@ sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 	ctl->data = &enable;
 	ctl->maxlen = sizeof(enable);
 	enable = (ath_hal_alq != NULL);
-        error = proc_dointvec(AH_SYSCTL_ARGS);
-        if (error || !write)
-                return error;
+	error = proc_dointvec(AH_SYSCTL_ARGS);
+	if (error || !write)
+		return error;
 	else
 		return ath_hal_setlogging(enable);
 }
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 static struct ale *
 ath_hal_alq_get(struct ath_hal *ah)
 {
 	struct ale *ale;
-
 	if (ath_hal_alq_emitdev) {
 		ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
 		if (ale) {
@@ -246,6 +250,9 @@ ath_hal_alq_get(struct ath_hal *ah)
 	return ale;
 }
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 void __ahdecl
 ath_hal_reg_write(struct ath_hal *ah, u_int32_t reg, u_int32_t val)
 {
@@ -268,17 +275,18 @@ ath_hal_reg_write(struct ath_hal *ah, u_int32_t reg, u_int32_t val)
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int32_t reg)
 {
 	u_int32_t val;
-
 	val = _OS_REG_READ(ah, reg);
 	if (ath_hal_alq) {
 		unsigned long flags;
 		struct ale *ale;
 
-		local_irq_save(flags);
 		ale = ath_hal_alq_get(ah);
 		if (ale) {
 			struct athregrec *r = (struct athregrec *) ale->ae_data;
@@ -287,20 +295,20 @@ ath_hal_reg_read(struct ath_hal *ah, u_int32_t reg)
 			r->val = val;
 			alq_post(ath_hal_alq, ale);
 		}
-		local_irq_restore(flags);
 	}
 	return val;
 }
 EXPORT_SYMBOL(ath_hal_reg_read);
 
+/* 
+ * This should only be called while holding the lock, sc->sc_hal_lock.
+ */
 void __ahdecl
 OS_MARK(struct ath_hal *ah, u_int id, u_int32_t v)
 {
 	if (ath_hal_alq) {
-		unsigned long flags;
 		struct ale *ale;
 
-		local_irq_save(flags);
 		ale = ath_hal_alq_get(ah);
 		if (ale) {
 			struct athregrec *r = (struct athregrec *) ale->ae_data;
@@ -309,7 +317,6 @@ OS_MARK(struct ath_hal *ah, u_int id, u_int32_t v)
 			r->val = v;
 			alq_post(ath_hal_alq, ale);
 		}
-		local_irq_restore(flags);
 	}
 }
 EXPORT_SYMBOL(OS_MARK);
@@ -320,6 +327,8 @@ EXPORT_SYMBOL(OS_MARK);
  * explicitly configured to use function calls.  The latter is
  * for architectures that might need to do something before
  * referencing memory (e.g. remap an i/o window).
+ *
+ * This should only be called while holding the lock, sc->sc_hal_lock.
  *
  * NB: see the comments in ah_osdep.h about byte-swapping register
  *     reads and writes to understand what's going on below.
@@ -335,6 +344,9 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
 
+/* 
+This should only be called while holding the lock, sc->sc_hal_lock.
+*/
 u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
@@ -403,7 +415,7 @@ ath_hal_malloc(size_t size)
 	if (p)
 		OS_MEMZERO(p, size);
 	return p;
-		
+
 }
 
 void __ahdecl
@@ -456,7 +468,7 @@ static ctl_table ath_hal_sysctls[] = {
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
-	{ .ctl_name	= CTL_AUTO,	
+	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "sw_beacon_response_time",
 	  .mode		= 0644,
 	  .data		= &ath_hal_sw_beacon_response_time,
@@ -553,7 +565,7 @@ MODULE_LICENSE("Proprietary");
 
 EXPORT_SYMBOL(ath_hal_probe);
 EXPORT_SYMBOL(_ath_hal_attach);
-EXPORT_SYMBOL(ath_hal_detach);
+EXPORT_SYMBOL(_ath_hal_detach);
 EXPORT_SYMBOL(ath_hal_init_channels);
 EXPORT_SYMBOL(ath_hal_getwirelessmodes);
 EXPORT_SYMBOL(ath_hal_computetxtime);

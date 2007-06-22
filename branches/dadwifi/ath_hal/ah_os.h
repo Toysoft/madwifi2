@@ -38,11 +38,40 @@
 #ifndef _ATH_AH_OS_H_
 #define _ATH_AH_OS_H_
 
-#include <ah.h>
-
 /*
  * Atheros Hardware Access Layer (HAL) OS Dependent Definitions.
  */
+
+/* 
+MadWifi safe register operations:
+
+	When hacking on registers directly we need to use the macros
+	below, to avoid concurrent PCI access and abort mode errors.
+
+	* ath_reg_read
+	* ATH_REG_WRITE
+
+HAL-ONLY register operations: 
+
+	* _OS_REG_READ
+	* _OS_REG_WRITE
+	* OS_REG_READ
+	* OS_REG_WRITE
+	* ath_hal_reg_read.
+	* ath_hal_reg_write
+
+	When compiled in HAL:
+		* We do not require locking overhead and function call unless user is debugging.
+		* All HAL operations are executed in the context of a MadWifi wrapper call which holds 
+		  the HAL lock.
+		* Normally HAL is build with the non-modified version of this file so it doesnt have our 
+		  funny macros anyway.
+
+	When compiled in MadWifi:
+		* The HAL wrapper API takes the HAL lock before invoking the HAL.
+		* HAL access is already protected, and MadWifi must NOT access the functions listed above.
+
+*/
 
 /*
  * When building the HAL proper we use no GPL-contaminated include
@@ -143,17 +172,18 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
  * never byte-swapped by PCI chipsets or bridges, but always 
  * written directly (i.e. the format defined by the manufacturer).
  */
-
 #if (AH_BYTE_ORDER == AH_BIG_ENDIAN)
-#define _OS_REG_WRITE(_ah, _reg, _val) do {				\
-	(0x4000 <= (_reg) && (_reg) < 0x5000) ?				\
-	 writel((_val), (_ah)->ah_sh + (_reg)) :	\
-	 __raw_writel((_val), (_ah)->ah_sh + (_reg));	\
+#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+	(0x4000 <= (_reg) && (_reg) < 0x5000) ?			\
+	 writel((_val), (_ah)->ah_sh + (_reg)) :		\
+	 ({__raw_writel((_val), (_ah)->ah_sh + (_reg)); 	\
+	   mb(); });						\
 } while (0)
 #define _OS_REG_READ(_ah, _reg)					\
 	((0x4000 <= (_reg) && (_reg) < 0x5000) ?		\
-	 readl((_ah)->ah_sh + (_reg)) :	\
-	 __raw_readl((_ah)->ah_sh + (_reg)))
+	 readl((_ah)->ah_sh + (_reg)) :				\
+	 ({unsigned long __v = __raw_readl((_ah)->ah_sh + 	\
+	  (_reg)); mb(); __v; }))
 #else /* AH_LITTLE_ENDIAN */
 #define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	writel(_val, (_ah)->ah_sh + (_reg));			\
@@ -162,16 +192,17 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 	readl((_ah)->ah_sh + (_reg))
 #endif /* AH_BYTE_ORDER */
 
+/* 
+The functions in this section are not intended to be invoked by MadWifi driver
+code, but by the HAL.  They are NOT safe for direct invocation when the 
+sc->sc_hal_lock is not held.  Use ath_reg_read and ATH_REG_WRITE instead!
+*/
 #if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC) || defined(AH_DEBUG_ALQ)
-/* use functions to do register operations */
 #define	OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
 #define	OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
-
-extern	void __ahdecl ath_hal_reg_write(struct ath_hal *ah,
-		u_int reg, u_int32_t val);
+extern	void __ahdecl ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val);
 extern	u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 #else
-/* inline register operations */
 #define OS_REG_WRITE(_ah, _reg, _val)	_OS_REG_WRITE(_ah, _reg, _val)
 #define OS_REG_READ(_ah, _reg)		_OS_REG_READ(_ah, _reg)
 #endif /* AH_DEBUG || AH_REGFUNC || AH_DEBUG_ALQ */
@@ -191,6 +222,6 @@ extern	void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
  */
 extern	struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
 		HAL_BUS_TAG, HAL_BUS_HANDLE, HAL_STATUS*);
-extern	void ath_hal_detach(struct ath_hal *);
+extern	void _ath_hal_detach(struct ath_hal *);
 
 #endif /* _ATH_AH_OSDEP_H_ */
