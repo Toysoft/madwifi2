@@ -319,16 +319,15 @@ scan_restart(struct scan_state *ss, u_int duration)
 {
 	struct ieee80211vap *vap = ss->base.ss_vap;
 	struct ieee80211com *ic = vap->iv_ic;
-	int defer = 0;
 
 	if (ss->base.ss_next == ss->base.ss_last) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: no channels to scan\n", __func__);
 		return 0;
-	}
-	if (vap->iv_opmode == IEEE80211_M_STA &&
-	    vap->iv_state == IEEE80211_S_RUN) {
-		if (!(IEEE80211_VAP_IS_SLEEPING(vap))) {
+	} else {
+		if ((vap->iv_opmode == IEEE80211_M_STA) &&
+			(vap->iv_state == IEEE80211_S_RUN) &&
+			!(IEEE80211_VAP_IS_SLEEPING(vap))) {
 			/*
 			 * Initiate power save before going off-channel.
 			 * Note that we cannot do this directly because
@@ -337,17 +336,14 @@ scan_restart(struct scan_state *ss, u_int duration)
 			 */
 			ss->ss_duration = duration;
 			tasklet_schedule(&ss->ss_pwrsav);
-			defer = 1;
+		} else {
+			ic->ic_scan_start(ic);		/* notify driver */
+			ss->ss_scanend = jiffies + duration;
+			ss->ss_iflags |= ISCAN_START;
+			mod_timer(&ss->ss_scan_timer, jiffies);
 		}
+		return 1;
 	}
-
-	if (!defer) {
-		ic->ic_scan_start(ic);		/* notify driver */
-		ss->ss_scanend = jiffies + duration;
-		ss->ss_iflags |= ISCAN_START;
-		mod_timer(&ss->ss_scan_timer, jiffies);
-	}
-	return 1;
 }
 
 static void
