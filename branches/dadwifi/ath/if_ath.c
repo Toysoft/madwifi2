@@ -866,7 +866,7 @@ bad2:
 	ath_desc_free(sc);
 bad:
 	if (ah)
-		ath_hal_detach(ah);
+		_ath_hal_detach(ah);
 	ATH_TXBUF_LOCK_DESTROY(sc);
 	ATH_LOCK_DESTROY(sc);
 	sc->sc_invalid = 1;
@@ -914,7 +914,7 @@ ath_detach(struct ath_softc *sc)
 #endif
 	ath_desc_free(sc);
 	ath_tx_cleanup(sc);
-	ath_hal_detach(ah);
+	_ath_hal_detach(ah);
 
 	ath_dynamic_sysctl_unregister(sc);
 	ATH_LOCK_DESTROY(sc);
