@@ -576,7 +576,7 @@ list_stations(const char *ifname)
 		return;
 	close(s);
 
-	printf("%-17.17s %4s %4s %4s %4s %4s %4s %6s %7s %6s %7s %4s %5s %3s %8s %8s\n",
+	printf("%-17.17s %4s %4s %4s %4s %4s %5s %6s %7s %6s %7s %4s %5s %3s %8s %8s\n",
 		"ADDR",
 		"AID",
 		"CHAN",
@@ -600,7 +600,7 @@ list_stations(const char *ifname)
 
 		si = (struct ieee80211req_sta_info *) cp;
 		vp = (u_int8_t *)(si+1);
-		printf("%s %4u %4d %3dM %4d %4d %4d %6d %7d %6d %7d %-4.4s %-5.5s %3x %8x %8s",
+		printf("%s %4u %4d %3dM %4d %4d %5d %6d %7d %6d %7d %-4.4s %-5.5s %3x %8x %8s",
 			ieee80211_ntoa(si->isi_macaddr),
 			IEEE80211_AID(si->isi_associd),
 			ieee80211_mhz2ieee(si->isi_freq),
