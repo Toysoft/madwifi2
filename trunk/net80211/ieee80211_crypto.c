@@ -332,7 +332,7 @@ ieee80211_crypto_newkey(struct ieee80211vap *vap,
 	 * If the hardware does not support the cipher then
 	 * fallback to a host-based implementation.
 	 */
-	if ((vap->iv_caps & !(1 << cipher))) {
+	if (!(vap->iv_caps & (1 << cipher))) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 		    "%s: no h/w support for cipher %s, falling back to s/w\n",
 		    __func__, cip->ic_name);
