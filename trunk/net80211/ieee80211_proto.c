@@ -1005,7 +1005,7 @@ ieee80211_open(struct net_device *dev)
 }
 
 /*
- * Start all runnable vap's on a device.
+ * Start all runnable VAPs on a device.
  */
 void
 ieee80211_start_running(struct ieee80211com *ic)
@@ -1024,7 +1024,7 @@ EXPORT_SYMBOL(ieee80211_start_running);
 
 /*
  * Stop a vap.  We force it down using the state machine
- * then mark it's device not running.  If this is the last
+ * then mark its device not running.  If this is the last
  * vap running on the underlying device then we close it
  * too to ensure it will be properly initialized when the
  * next vap is brought up.
@@ -1062,7 +1062,7 @@ ieee80211_stop(struct net_device *dev)
 EXPORT_SYMBOL(ieee80211_stop);
 
 /*
- * Stop all vap's running on a device.
+ * Stop all VAPs running on a device.
  */
 void
 ieee80211_stop_running(struct ieee80211com *ic)
@@ -1628,7 +1628,7 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 				vap->iv_flags_ext |= IEEE80211_FEXT_SCAN_PENDING;
 			}
 		} else {
-			/* the VAP is forced to scan, we need to change all other vap's state
+			/* the VAP is forced to scan, we need to change all other VAPs state
 			 * to INIT and pend for the scan completion */
 			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
 				if (vap != tmpvap && tmpvap->iv_state != IEEE80211_S_INIT) {

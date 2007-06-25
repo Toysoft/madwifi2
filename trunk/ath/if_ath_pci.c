@@ -81,7 +81,7 @@ struct ath_pci_softc {
 };
 
 /*
- * User a static table of PCI id's for now.  While this is the
+ * User a static table of PCI IDs for now.  While this is the
  * "new way" to do things, we may want to switch back to having
  * the HAL check them by defining a probe method.
  */

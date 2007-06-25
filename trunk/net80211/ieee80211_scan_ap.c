@@ -259,7 +259,7 @@ ap_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 
 	chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 	/* XXX better quantification of channel use? */
-	/* XXX count bss's? */
+	/* XXX: count BSSs? */
 	if (rssi > as->as_maxrssi[chan])
 		as->as_maxrssi[chan] = rssi;
 	/* XXX interference, turbo requirements */
@@ -337,7 +337,7 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 	} else {
 		struct ieee80211_channel *c;
 		struct ieee80211_scan_entry se;
-		/* XXX notify all vap's? */
+		/* XXX: notify all VAPs? */
 		/* if this is a dynamic turbo frequency , start with normal mode first */
 
 		c = ss->ss_chans[bestchanix];

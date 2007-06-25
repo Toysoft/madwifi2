@@ -909,7 +909,7 @@ enum {
 
 /*
  * The 802.11 spec says at most 2007 stations may be
- * associated at once.  For most AP's this is way more
+ * associated at once.  For most APs this is way more
  * than is feasible so we use a default of 128.  This
  * number may be overridden by the driver and/or by
  * user configuration.

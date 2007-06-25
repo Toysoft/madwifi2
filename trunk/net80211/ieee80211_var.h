@@ -90,7 +90,7 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 
 #define	IEEE80211_FIXED_RATE_NONE	-1
 
-#define IEEE80211_SWBMISS_THRESHOLD	10 	/* software beacon miss threshold, in TU's */
+#define IEEE80211_SWBMISS_THRESHOLD	10 	/* software beacon miss threshold, in TUs */
 
 #define	IEEE80211_MS_TO_TU(x)	(((x) * 1000) / 1024)
 #define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
@@ -104,14 +104,14 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 	    (ic)->ic_bsschan->ic_maxregpower - (ic)->ic_curchanmaxpwr : 0)
 
 /* 802.11 control state is split into a common portion that maps
- * 1-1 to a physical device and one or more "Virtual AP's" (VAP)
+ * 1-1 to a physical device and one or more "Virtual APs" (VAP)
  * that are bound to an ieee80211com instance and share a single
  * underlying device.  Each VAP has a corresponding OS device
  * entity through which traffic flows and that applications use
  * for issuing ioctls, etc.
  */
 
-/* Data common to one or more virtual AP's.  State shared by
+/* Data common to one or more virtual APs.  State shared by
  * the underlying device and the net80211 layer is exposed here;
  * e.g. device-specific callbacks.
  */
@@ -199,7 +199,7 @@ struct ieee80211vap {
 	u_int16_t iv_max_aid;
 	u_int16_t iv_sta_assoc;				/* stations associated */
 	u_int16_t iv_ps_sta;				/* stations in power save */
-	u_int16_t iv_ps_pending;			/* ps sta's w/ pending frames */
+	u_int16_t iv_ps_pending;			/* PS STAs w/ pending frames */
 	u_int8_t *iv_tim_bitmap;			/* power-save stations w/ data*/
 	u_int16_t iv_tim_len;				/* ic_tim_bitmap size (bytes) */
 	u_int8_t iv_dtim_period;			/* DTIM period */
@@ -215,7 +215,7 @@ struct ieee80211vap {
 	u_int16_t iv_txmax;				/* max tx retry count */
 	u_int16_t iv_txlifetime;			/* tx lifetime */
 	int iv_inact_timer;				/* inactivity timer wait */
-	void *iv_opt_ie;				/* user-specified IE's */
+	void *iv_opt_ie;				/* user-specified IEs */
 	u_int16_t iv_opt_ie_len;			/* length of ni_opt_ie */
 	ieee80211_keyix_t iv_def_txkey;			/* default/group TX key index */
 	struct ieee80211_key iv_nw_keys[IEEE80211_WEP_NKID];
@@ -272,9 +272,9 @@ struct ieee80211com {
 	u_int32_t ic_flags_ext;			/* extension of state flags */
 	u_int32_t ic_caps;			/* capabilities */
 	u_int8_t ic_ath_cap;			/* Atheros adv. capabilities */
-	u_int8_t ic_promisc;			/* vap's needing promisc mode */
-	u_int8_t ic_allmulti;			/* vap's needing all multicast*/
-	u_int8_t ic_nopened;			/* vap's been opened */
+	u_int8_t ic_promisc;			/* VAPs needing promisc mode */
+	u_int8_t ic_allmulti;			/* VAPs needing all multicast*/
+	u_int8_t ic_nopened;			/* VAPs been opened */
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211_rateset ic_sup_xr_rates;
 	struct ieee80211_rateset ic_sup_half_rates;
@@ -442,7 +442,7 @@ MALLOC_DECLARE(M_80211_VAP);
 #define	IEEE80211_F_ALLMULTI	0x00000008		/* STATUS: all multicast mode */
 /* NB: this is intentionally setup to be IEEE80211_CAPINFO_PRIVACY */
 #define	IEEE80211_F_PRIVACY	0x00000010		/* CONF: privacy enabled */
-#define	IEEE80211_F_PUREG	0x00000020		/* CONF: 11g w/o 11b sta's */
+#define	IEEE80211_F_PUREG	0x00000020		/* CONF: 11g w/o 11b STAs */
 #define	IEEE80211_F_XRUPDATE	0x00000040		/* CONF: update beacon XR element*/
 #define	IEEE80211_F_SCAN	0x00000080		/* STATUS: scanning */
 #define	IEEE80211_F_XR		0x00000100		/* CONF: operate in XR mode */

@@ -228,7 +228,7 @@ ieee80211_pwrsave(struct ieee80211_node *ni, struct sk_buff *skb)
 	}
 
 	/*
-	 * Tag the frame with it's expiry time and insert
+	 * Tag the frame with its expiry time and insert
 	 * it in the queue.  The aging interval is 4 times
 	 * the listen interval specified by the station.
 	 * Frames that sit around too long are reclaimed
@@ -270,14 +270,15 @@ ieee80211_node_pwrsave(struct ieee80211_node *ni, int enable)
 			vap->iv_ps_sta++;
 		ni->ni_flags |= IEEE80211_NODE_PWR_MGT;
 		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-			"power save mode on, %u sta's in ps mode",
+			"power save mode on, %u STAs in PS mode",
 			vap->iv_ps_sta);
 	} else {
 		if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT))
 			vap->iv_ps_sta--;
 		ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
 		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-				"power save mode off, %u sta's in ps mode", vap->iv_ps_sta);
+				"power save mode off, %u STAs in PS mode", 
+				vap->iv_ps_sta);
 		/* XXX if no stations in ps mode, flush mc frames */
 
 		/*

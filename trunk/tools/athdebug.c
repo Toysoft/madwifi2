@@ -162,7 +162,7 @@ sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp,
 		fd = fopen(path, "r");
 		if (fd == NULL)
 			return -1;
-		/* XXX only handle int's */
+		/* XXX: only handle ints */
 		if (fscanf(fd, "%u", (int *) oldp) != 1) {
 			fclose(fd);
 			return -1;
@@ -171,7 +171,7 @@ sysctlbyname(const char *oid0, void *oldp, size_t *oldlenp, void *newp,
 		fd = fopen(path, "w");
 		if (fd == NULL)
 			return -1;
-		/* XXX only handle int's */
+		/* XXX: only handle ints */
 		(void) fprintf(fd, "%u", *(int *)newp);
 	}
 	fclose(fd);

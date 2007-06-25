@@ -56,9 +56,9 @@ struct ieee80211_scan_state {
 #define	IEEE80211_SCAN_ONCE	0x0010		/* do one complete pass */
 #define	IEEE80211_SCAN_GOTPICK	0x1000		/* got candidate, can stop */
 
-	u_int8_t	ss_nssid;			/* # ssid's to probe/match */
+	u_int8_t	ss_nssid;			/* # SSIDs to probe/match */
 	struct ieee80211_scan_ssid ss_ssid[IEEE80211_SCAN_MAX_SSID];
-						/* ssid's to probe/match */
+						/* SSIDs to probe/match */
 						/* ordered channel set */
 	struct ieee80211_channel *ss_chans[IEEE80211_SCAN_MAX];
 	u_int16_t ss_next;			/* ix of next chan to scan */
