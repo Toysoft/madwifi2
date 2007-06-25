@@ -231,8 +231,10 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		ieee80211_parent_queue_xmit(skb);
 		return 0;
 	}
-	if (ic->ic_flags & IEEE80211_F_SCAN) /* cancel bg scan */
-		ieee80211_cancel_scan(vap);
+	
+	/* Cancel any running BG scan */
+	ieee80211_cancel_scan(vap);
+
 	/* 
 	 * Find the node for the destination so we can do
 	 * things like power save.
