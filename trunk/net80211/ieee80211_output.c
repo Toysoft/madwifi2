@@ -195,7 +195,7 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 }
 
 /*
- * Context: process context (BH's disabled)
+ * Context: process context (BHs disabled)
  */
 int
 ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
@@ -264,7 +264,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	} else if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT)) {
 		/*
 		 * Station in power save mode; stick the frame
-		 * on the sta's power save queue and continue.
+		 * on the STA's power save queue and continue.
 		 * We'll get the frame back when the time is right.
 		 */
 		ieee80211_pwrsave(ni, skb);
@@ -1718,7 +1718,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
 	 *	[tlv] extended supported rates
-	 *	[tlv] user-specified ie's
+	 *	[tlv] user-specified IEs
 	 */
 	skb = ieee80211_getmgtframe(&frm, 2 + IEEE80211_NWID_LEN +
 		2 + IEEE80211_RATE_SIZE +
@@ -2033,7 +2033,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		 *	[tlv] extended supported rates
 		 *	[tlv] WME [if enabled and AP capable]
 		 *      [tlv] Atheros advanced capabilities
-		 *	[tlv] user-specified ie's
+		 *	[tlv] user-specified IEs
 		 */
 		skb = ieee80211_getmgtframe(&frm,
 			sizeof(u_int16_t) +
@@ -2058,7 +2058,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (vap->iv_flags & IEEE80211_F_PRIVACY)
 			capinfo |= IEEE80211_CAPINFO_PRIVACY;
 		/*
-		 * NB: Some 11a AP's reject the request when
+		 * NB: Some 11a APs reject the request when
 		 *     short premable is set.
 		 */
 		/* Capability information */

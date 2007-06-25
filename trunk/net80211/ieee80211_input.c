@@ -3164,7 +3164,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			case IEEE80211_ELEMID_XRATES:
 				xrates = frm;
 				break;
-			/* XXX verify only one of RSN and WPA ie's? */
+			/* XXX verify only one of RSN and WPA IEs? */
 			case IEEE80211_ELEMID_RSN:
 				if (vap->iv_flags & IEEE80211_F_WPA2)
 					rsn = frm;

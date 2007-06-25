@@ -45,7 +45,7 @@
  * (waiting for a response to a management frame when operating
  * as a station), and node inactivity processing (when operating
  * as an AP).  For inactivity processing each node has a timeout
- * set in it's ni_inact field that is decremented on each timeout
+ * set in its ni_inact field that is decremented on each timeout
  * and the node is reclaimed when the counter goes to zero.  We
  * use different inactivity timeout values depending on whether
  * the node is associated and authorized (either by 802.1x or

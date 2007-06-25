@@ -41,7 +41,7 @@
  * module.  It should automatically run all test cases and print
  * information for each.  To run one or more tests you can specify a
  * tests parameter to the module that is a bit mask of the set of tests
- * you want; e.g. insmod wep_test tests=7 will run only test mpdu's
+ * you want; e.g. insmod wep_test tests=7 will run only test MPDUs
  * 1, 2, and 3.
  */
 #ifndef AUTOCONF_INCLUDED

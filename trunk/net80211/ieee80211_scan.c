@@ -73,7 +73,7 @@ struct scan_state {
 /*
  * Amount of time to go off-channel during a background
  * scan.  This value should be large enough to catch most
- * ap's but short enough that we can return on-channel
+ * APs but short enough that we can return on-channel
  * before our listen interval expires.
  *
  * XXX tunable

@@ -113,7 +113,7 @@ ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen)
 
 #if 0
 /*
- * Drain a queue of sk_buff's.
+ * Drain a queue of sk_buffs.
  */
 void
 __skb_queue_drain(struct sk_buff_head *q)
