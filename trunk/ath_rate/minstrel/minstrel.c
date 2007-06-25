@@ -1049,16 +1049,14 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static int __init ath_rate_minstrel_init(void)
 {
-		printk(KERN_INFO "%s: %s\n", dev_info, version);
-		printk(KERN_ERR "\n");
-		printk(KERN_ERR "Minstrel automatic rate control algorithm.\n");
-		printk(KERN_ERR "\n");
-
-		printk(KERN_ERR "Look around rate set to %d%%\n", ath_lookaround_rate);
-		printk(KERN_ERR "EWMA rolloff level set to %d%%\n", ath_ewma_level);
-		printk(KERN_ERR "Max Segment size in the mrr set to %d us\n", ath_segment_size);
-
-		printk(KERN_ERR "\n");
+		printk(KERN_INFO "%s: Minstrel automatic rate control "
+		       "algorithm %s\n", dev_info, version);
+		printk(KERN_INFO "%s: look around rate set to %d%%\n",
+		       dev_info, ath_lookaround_rate);
+		printk(KERN_INFO "%s: EWMA rolloff level set to %d%%\n",
+		       dev_info, ath_ewma_level);
+		printk(KERN_INFO "%s: max segment size in the mrr set "
+		       "to %d us\n", dev_info, ath_segment_size);
 		return ieee80211_rate_register(&ath_rate_ops);
 }
 module_init(ath_rate_minstrel_init);
