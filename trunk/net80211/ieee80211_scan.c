@@ -371,6 +371,7 @@ ieee80211_start_scan(struct ieee80211vap *vap, int flags, u_int duration,
 	struct ieee80211com *ic = vap->iv_ic;
 	const struct ieee80211_scanner *scan;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
+	int scanning;
 
 	scan = ieee80211_scanner_get(vap->iv_opmode, 0);
 	if (scan == NULL) {
@@ -430,10 +431,11 @@ ieee80211_start_scan(struct ieee80211vap *vap, int flags, u_int duration,
 			"%s: %s scan already in progress\n", __func__,
 			ss->ss_flags & IEEE80211_SCAN_ACTIVE ? "active" : "passive");
 	}
+	
+	scanning = (ic->ic_flags & IEEE80211_F_SCAN);
 	IEEE80211_UNLOCK_IRQ(ic);
 
-	/* NB: racey, does it matter? */
-	return (ic->ic_flags & IEEE80211_F_SCAN);
+	return scanning;
 }
 EXPORT_SYMBOL(ieee80211_start_scan);
 
@@ -525,6 +527,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
+	int scanning;
 
 	IEEE80211_LOCK_IRQ(ic);
 	if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
@@ -586,10 +589,11 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 			"%s: %s scan already in progress\n", __func__,
 			ss->ss_flags & IEEE80211_SCAN_ACTIVE ? "active" : "passive");
 	}
+	
+	scanning = (ic->ic_flags & IEEE80211_F_SCAN);
 	IEEE80211_UNLOCK_IRQ(ic);
 
-	/* NB: racey, does it matter? */
-	return (ic->ic_flags & IEEE80211_F_SCAN);
+	return scanning;
 }
 EXPORT_SYMBOL(ieee80211_bg_scan);
 
