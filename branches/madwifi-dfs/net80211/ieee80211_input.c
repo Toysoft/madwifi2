@@ -2268,7 +2268,7 @@ count_nodes(void *_arg, struct ieee80211_node *ni)
 	if (ni == arg->new)
 		return;
 
-	for (i=0; i<arg->k; i++)
+	for (i = 0; i < arg->k; i++)
 		if (isclr(ni->ni_suppchans, arg->subset[i])) {
 			arg->count++;
 			return;
@@ -2294,7 +2294,7 @@ ints_sprintf(const int k, const int set[])
 	static char buf[915]; 	/* 0-255: 10*2 + 90*3 + 156*4 + '\0' */
 	char *ptr = buf;
 	int i;
-	for (i=0; i<k; i++)
+	for (i = 0; i < k; i++)
 		ptr += snprintf(ptr, buf + sizeof(buf) - ptr, "%d ", set[i]);
 	return buf;
 }
@@ -2354,18 +2354,18 @@ static void
 combinations(int n, int set[], int k, void (*callback)(const int, const int [], void *), void *arg)
 {
 	int subset[k], pos[k], i;
-	for (i=0;i<k;i++)
+	for (i = 0; i < k; i++)
 		pos[i] = 0;
-	i=0;
+	i = 0;
 forward:
 	if (i > 0) {
-		while (set[pos[i]] < subset[i-1] && pos[i] < n)
+		while (set[pos[i]] < subset[i - 1] && pos[i] < n)
 			pos[i]++;
 		if (pos[i] == n)
 			goto backward;
 	}
 	subset[i] = set[pos[i]];
-	set[pos[i]] = set[n-1];
+	set[pos[i]] = set[n - 1];
 	n--;
 
 	i++;
@@ -2459,7 +2459,7 @@ find_worse_nodes(struct ieee80211com *ic, struct ieee80211_node *new)
 		}
 
 		/* store the list of channels to remove nodes which don't support them */
-		for (i=0; i<to_gain; i++)
+		for (i = 0; i < to_gain; i++)
 			new->ni_needed_chans[i] = best[i];
 		new->ni_n_needed_chans = to_gain;
 		return 1;
@@ -2508,7 +2508,7 @@ ieee80211_parse_sc_ie(struct ieee80211_node *ni, u_int8_t *frm,
 		}
 	}
 	memset(ni->ni_suppchans_new, 0, IEEE80211_CHAN_BYTES);
-	for (i=0; i<sc_ie->sc_len/2; i++) {
+	for (i = 0; i < (sc_ie->sc_len / 2); i++) {
 		u_int8_t chan = sc_ie->sc_subband[i].sc_first;
 		/* XXX: see 802.11d-2001-4-05-03-interp,
 		 * but what about .11j, turbo, etc.? */

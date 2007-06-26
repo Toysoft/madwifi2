@@ -659,11 +659,10 @@ void ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *);
  *
  * _i and prevchan are temporary variables
  */
-#define CHANNEL_FOREACH(i, ic, _i, prevchan) 					    \
-	for (									                        \
-			_i=0, prevchan = 0; 					                \
-			_i<ic->ic_nchans && (i = ic->ic_channels[_i].ic_ieee); 	\
-			prevchan = i, _i++					                    \
+#define CHANNEL_FOREACH(i, ic, _i, prevchan)				\
+	for (_i = 0, prevchan = 0;					\
+	     _i<ic->ic_nchans && (i = ic->ic_channels[_i].ic_ieee); 	\
+	     prevchan = i, _i++						\
 	    ) if (i != prevchan)
 
 /* Key update synchronization methods.  XXX should not be visible. */

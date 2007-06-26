@@ -421,8 +421,6 @@ ap_pc_cmp_orig(struct channel *a, struct channel *b)
 	return a->orig - b->orig;
 }
 
-
-
 static int
 ap_pc_cmp(const void *_a, const void *_b)
 {
@@ -478,23 +476,23 @@ ap_pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int
 	struct channel chans[ss_last]; /* actually ss_last-1 is required */
 	struct ap_pc_params params = { vap, ss, flags };
 
-	for (i=0; i<ss_last; i++) {
+	for (i = 0; i < ss_last; i++) {
 		chans[i].chan = ss->ss_chans[i];
 		chans[i].orig = i;
 		chans[i].params = &params;
-			}
+	}
 
 	sort(chans, ss_last, sizeof(*chans), ap_pc_cmp, ap_pc_swap);
 
-	for (i=0; i<ss_last; i++) {
+	for (i = 0; i < ss_last; i++) {
 		int chan = ieee80211_chan2ieee(ic, chans[i].chan);
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-			"%s: channel %u, rssi %d, radar %d, cn %d, km %d\n",
-			__func__, chan, as->as_maxrssi[chan], IEEE80211_IS_CHAN_RADAR(chans[i].chan),
-			ic->ic_chan_nodes[chans[i].chan->ic_ieee],
-			!!IEEE80211_ARE_CHANS_SAME_MODE(chans[i].chan, ic->ic_bsschan));
-		}
+				"%s: channel %u, rssi %d, radar %d, cn %d, km %d\n",
+				__func__, chan, as->as_maxrssi[chan], IEEE80211_IS_CHAN_RADAR(chans[i].chan),
+				ic->ic_chan_nodes[chans[i].chan->ic_ieee],
+				!!IEEE80211_ARE_CHANS_SAME_MODE(chans[i].chan, ic->ic_bsschan));
+	}
 
 	best = chans[0].chan;
 	best_rssi = -1;
@@ -534,6 +532,7 @@ ap_pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int
 		best = chans[i].chan;
 		best_rssi = as->as_maxrssi[best->ic_ieee];
 	}
+
 	i = best->ic_ieee;
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: best: channel %u rssi %d\n",
