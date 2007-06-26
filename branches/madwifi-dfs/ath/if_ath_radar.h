@@ -169,4 +169,21 @@ int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan);
  * combination in use. */
 int ath_radar_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan);
 
+/* Maximum number of radar pulse recorded */
+#define ATH_RADAR_PULSE_NR 100
+
+/* init/done function for radar pulse stuff */
+void ath_radar_pulse_init(struct ath_softc *sc);
+void ath_radar_pulse_done(struct ath_softc *sc);
+
+/* Record a radar pulse event in a circular array */
+void ath_radar_pulse_record(struct ath_softc *sc,
+			    u_int64_t tsf, u_int8_t rssi, u_int8_t width);
+
+/* Print the content of the radar pulse circular array */
+void ath_radar_pulse_print(struct ath_softc *sc);
+
+/* Empty the radar pulse circular array */
+void ath_radar_pulse_flush(struct ath_softc *sc);
+
 #endif /* #ifndef _IF_ATH_RADAR_H */

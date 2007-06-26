@@ -48,6 +48,7 @@
 #include "if_athioctl.h"
 #include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
 #include <asm/io.h>
+#include <linux/list.h>
 
 /*
  * Deduce if tasklets are available.  If not then
@@ -533,6 +534,17 @@ struct ath_vap {
 
 #define	BSTUCK_THRESH	10	/* # of stuck beacons before resetting NB: this is a guess*/
 
+struct ath_radar_pulse {
+	struct list_head list;
+	u_int64_t rp_tsf;
+	u_int8_t  rp_rssi;
+	u_int8_t  rp_width;
+	
+	int       rp_index;
+	int       rp_allocated;
+	int       rp_analyzed;
+};
+
 struct ath_softc {
 	struct ieee80211com sc_ic;		/* NB: must be first */
 	struct net_device *sc_dev;
@@ -723,6 +735,13 @@ struct ath_softc {
 								   after radar is detected (in seconds).
 								   FCC requires 30m.
 								*/
+	/* radar pulse circular array */
+	struct ath_radar_pulse * sc_radar_pulse_mem;
+	struct list_head sc_radar_pulse_head;
+	int sc_radar_pulse_nr;
+	int sc_radar_pulse_burst_min;
+	void (*sc_radar_pulse_analyze)(struct ath_softc *sc);
+	struct ATH_TQ_STRUCT sc_radartq;
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
@@ -775,5 +794,7 @@ void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
 int ar_device(int devid);
 #define DEV_NAME(_d) ((0 == _d || 0 == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? "MadWifi" : _d->name)
+
+void ath_radar_detected(struct ath_softc *sc, const char* message);
 
 #endif /* _DEV_ATH_ATHVAR_H */
