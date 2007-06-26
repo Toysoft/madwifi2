@@ -285,7 +285,6 @@ static void ath_set_txcont_rate(struct ieee80211com *ic, unsigned int new_rate);
 /*
 802.11h DFS support functions
 */
-static void ath_radar_detected(struct ath_softc *sc, const char* message);
 static int ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc);
 static void ath_dump_phyerr_statistics(struct ath_softc *sc, const char* cause);
 
@@ -688,6 +687,9 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_dfs_channel_availability_check_time = 0; /* default is used */
 	sc->sc_dfs_non_occupancy_period = 0; /* default is used */
 
+	/* initialize radar stuff */
+	ath_radar_pulse_init(sc);
+
 #ifdef ATH_SUPERG_DYNTURBO
 	init_timer(&sc->sc_dturbo_switch_mode);
 	sc->sc_dturbo_switch_mode.function = ath_turbo_switch_mode;
@@ -1058,6 +1060,9 @@ ath_detach(struct net_device *dev)
 	ath_desc_free(sc);
 	ath_tx_cleanup(sc);
 	_ath_hal_detach(ah);
+
+	/* free radar pulse stuff */
+	ath_radar_pulse_done(sc);
 
 	ath_dynamic_sysctl_unregister(sc);
 	ATH_LOCK_DESTROY(sc);
@@ -7912,8 +7917,12 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			ath_hal_setcoverageclass(sc->sc_ah, ic->ic_coverageclass, 0);
 
 		do_gettimeofday(&tv);
-		DPRINTF(sc, ATH_DEBUG_RESET, "%s: %s: resetting in ath_chan_set(sc, chan=%u)-- Time: %ld.%06ld\n",
-			DEV_NAME(dev), __func__,ieee80211_chan2ieee(ic, chan),tv.tv_sec,tv.tv_usec);
+
+		DPRINTF(sc, ATH_DEBUG_DOTH, "RADAR CHANNEL  interface:%s channel:%u jiffies:%lu\n",
+			DEV_NAME(sc->sc_dev),
+			hchan.channel,
+			jiffies);
+
 		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
 			printk("%s: %s: unable to reset channel %u (%u MHz) "
 				"flags 0x%x '%s' (HAL status %u)\n",
@@ -9484,6 +9493,9 @@ enum {
 	ATH_XR_POLL_PERIOD 	= 19,
 	ATH_XR_POLL_COUNT 	= 20,
 	ATH_ACKRATE             = 21,
+	ATH_RADAR_PULSE         = 22,
+	ATH_RADAR_PULSE_PRINT   = 23,
+	ATH_PANIC               = 24,
 };
 
 static int
@@ -9492,10 +9504,18 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	struct ath_softc *sc = ctl->extra1;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
+	int tab_3_val[3];
 	int ret = 0;
 
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
+
+	/* special case for ATH_RADAR_PULSE which expect 3 integers */
+	if (ctl->ctl_name == ATH_RADAR_PULSE) {
+	  ctl->data = &tab_3_val;
+	  ctl->maxlen = sizeof(tab_3_val);
+	}
+
 	ATH_LOCK(sc);
 	if (write) {
 		ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
@@ -9606,6 +9626,25 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_ackrate = val;
 				ath_set_ack_bitrate(sc, sc->sc_ackrate);
 				break;
+			case ATH_RADAR_PULSE:
+			  ath_radar_pulse_record(sc,
+						 tab_3_val[0],
+						 tab_3_val[1],
+						 tab_3_val[2]);
+			  /* we analyze pulses in a separate tasklet */
+			  ATH_SCHEDULE_TQUEUE(&sc->sc_radartq, NULL);
+			  break;
+			case ATH_RADAR_PULSE_PRINT:
+			  if (val) {
+			    ath_radar_pulse_print(sc);
+			  }
+			  break;
+			case ATH_PANIC:
+			  if (val) {
+			    int * p = (int *)0xdeadbeef;
+			    *p = 0xcacadede;
+			  }
+			  break;
 			default: 
 				ret = -EINVAL;
 				break;
@@ -9764,6 +9803,24 @@ static const ctl_table ath_sysctl_template[] = {
 	  .procname	= "ackrate",
 	  .mode		= 0644,
 	  .proc_handler	= ath_sysctl_halparam
+	},
+	{
+	  .ctl_name     = ATH_RADAR_PULSE,
+	  .procname     = "radar_pulse",
+	  .mode         = 0644,
+	  .proc_handler = ath_sysctl_halparam
+	},
+	{
+	  .ctl_name     = ATH_RADAR_PULSE_PRINT,
+	  .procname     = "radar_pulse_print",
+	  .mode         = 0644,
+	  .proc_handler = ath_sysctl_halparam
+	},
+	{
+	  .ctl_name     = ATH_PANIC,
+	  .procname     = "panic",
+	  .mode         = 0644,
+	  .proc_handler = ath_sysctl_halparam
 	},
 	{ 0 }
 };
@@ -10668,7 +10725,8 @@ ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason)
  * quietly' (or mute test) behavior is an artifact of the previous DFS code in 
  * trunk and it's left here because it may be used as the basis for 
  * implementing AP requested mute tests in station mode later. */
-static void
+
+void
 ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	/* struct ath_softc *sc = container_of(thr, struct ath_softc, sc_radartask); */
 	struct ath_hal*          ah  = sc->sc_ah;
@@ -10677,10 +10735,12 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	struct ieee80211_channel ichan;
 	struct timeval tv;
 
+	DPRINTF(sc, ATH_DEBUG_DOTH, "RADAR DETECTED interface:%s channel:%u jiffies:%lu\n",
+		DEV_NAME(sc->sc_dev),
+		sc->sc_curchan.channel,
+		jiffies);
+
 	do_gettimeofday(&tv);
-	DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: radar interference detected at %d MHz. -- "
-			"Time: %ld.%06ld\n", DEV_NAME(dev), __func__, 
-			sc->sc_curchan.channel, tv.tv_sec, tv.tv_usec);
 
 	/* Stop here if we are testing w/o channel switching */
 	if (sc->sc_dfs_testmode) {
@@ -10725,6 +10785,7 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
  * will still see them in the rx tasklet and such, so we can get normal 
  * behavior for statistics even though we may have started DFS radar 
  * co-channel avoidance ecountermeasures. */
+
 static int
 ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc)
 {
@@ -10764,36 +10825,46 @@ ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc)
 		if (HAL_EINPROGRESS == retval)
 			break;
 
+		/* update the per packet TSF with sc_tsf, sc_tsf is updated on
+		   each RX interrupt. */
+		bf->bf_tsf = sc->sc_tsf;
+
 		if ((HAL_RXERR_PHY == rs->rs_status) && (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f))) {
-			/* XXX: This diagnostic output and setting found_radar flag are a temporary 
-			 * solution. The correct solution is to capture radar pulse events over 
-			 * time and perform analysis of the patterns detected to figure out noise 
-			 * from radar bursts. */
-			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: RADAR PULSE: width=%u rssi=%u (dBm) "
-					"tsf delta=%llu (usec) signal=%u (dBm) noise=%u (dBm) "
-					"tstamp=%u (TU) sc->sc_tsf=%llu (usec)\n",
-					DEV_NAME(sc->sc_dev),
-					__func__,
-					rs->rs_datalen ? skb->data[0] : -1,
-					rs->rs_rssi,
-					sc->sc_lastradar_tsf ? 
-						ath_extend_tsf(sc->sc_tsf, rs->rs_tstamp) - 
-						sc->sc_lastradar_tsf : 0,
-					(sc->sc_channoise + rs->rs_rssi),
-					sc->sc_channoise,
-					rs->rs_tstamp,
-					ath_extend_tsf(sc->sc_tsf, rs->rs_tstamp)
-			       );
-			found_radar++;
-			sc->sc_lastradar_tsf = ath_extend_tsf(sc->sc_tsf, rs->rs_tstamp);
+
+		  /* record the radar pulse event */
+		  ath_radar_pulse_record (sc,
+		    ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp),
+		    rs->rs_rssi, skb->data[0]);
+
+			/* XXX: This diagnostic output and setting
+			 * found_radar flag are a temporary
+			 * solution. The correct solution is to
+			 * capture radar pulse events over time and
+			 * perform analysis of the patterns detected
+			 * to figure out noise from radar bursts. */
+
+		  DPRINTF(sc, ATH_DEBUG_DOTH, "RADAR PULSE    interface:%s channel:%u jiffies:%lu fulltsf:%llu tstamp:%u rssi:%u width:%u\n",
+			  DEV_NAME(sc->sc_dev),
+			  sc->sc_curchan.channel,
+			  jiffies,
+			  ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp),
+			  rs->rs_tstamp,
+			  rs->rs_rssi,
+			  skb->data[0]);
+		  found_radar ++;
+		  sc->sc_lastradar_tsf = ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp);
 			bf->bf_status |= ATH_BUFSTATUS_RADAR_DONE;
 			continue;
 		}
 		continue;
 	}
 	ATH_RXBUF_UNLOCK_IRQ(sc);
-	if (found_radar)
-		ath_radar_detected(sc, "RADAR: ath_intr got RXPHY and found HAL_PHYERR_RADAR enqueued.");
+
+	/* radar pulses have been found, look if it match a radar pattern */
+	if (found_radar) {
+		ATH_SCHEDULE_TQUEUE(&sc->sc_radartq, NULL);
+	}
+
 	return found_radar;
 #undef PA2DESC
 }
