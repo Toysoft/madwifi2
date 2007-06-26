@@ -1728,7 +1728,7 @@ remove_worse_nodes(void *arg, struct ieee80211_node *ni)
 	if (ni == better)
 		return;
 
-	for (i=0; i<better->ni_n_needed_chans; i++)
+	for (i = 0; i < better->ni_n_needed_chans; i++)
 		if (isclr(ni->ni_suppchans, better->ni_needed_chans[i])) {
 			/* this is the one of the nodes to be killed, do it now */
 			IEEE80211_NOTE_MAC(ni->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, better->ni_macaddr,
