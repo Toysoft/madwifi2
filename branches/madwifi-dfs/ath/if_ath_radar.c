@@ -90,7 +90,7 @@ struct etsi_pulse_prf {
 	int burst_min;
 };
 
-struct etsi_pulse_prf etsi_possible_prf[] = {
+static struct etsi_pulse_prf etsi_possible_prf[] = {
 	{  200, 4900, 5100, 10 },
 	{  300, 3267, 3399, 10 },
 	{  500, 1960, 2040, 10 },
@@ -265,8 +265,7 @@ int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan) {
 
 /* Returns true if DFS is required for the regulatory domain, country and 
  * combination in use. 
- * XXX: Need to add regulatory rules in here.  This is too conservative!
- */
+ * XXX: Need to add regulatory rules in here.  This is too conservative! */
 int ath_radar_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan)
 {
 	/* For FCC: 5250 to 5350MHz (channel 52 to 60) and for Europe added 
@@ -275,144 +274,140 @@ int ath_radar_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan)
 	return ((hchan->channel >= 5250) && (hchan->channel <= 5725)) ? 1 : 0;
 }
 
-struct ath_radar_pulse * pulse_head(struct ath_softc *sc)
+static struct ath_radar_pulse * pulse_head(struct ath_softc *sc)
 {
-    return list_entry(sc->sc_radar_pulse_head.next,
-                      struct ath_radar_pulse, list);
+	return list_entry(sc->sc_radar_pulse_head.next,
+			struct ath_radar_pulse, list);
 }
 
-struct ath_radar_pulse * pulse_tail(struct ath_softc *sc)
+static struct ath_radar_pulse * pulse_tail(struct ath_softc *sc)
 {
-    return list_entry(sc->sc_radar_pulse_head.prev,
-                      struct ath_radar_pulse, list);
+	return list_entry(sc->sc_radar_pulse_head.prev,
+			struct ath_radar_pulse, list);
 }
 
-struct ath_radar_pulse * pulse_prev(struct ath_radar_pulse *pulse)
+static struct ath_radar_pulse * pulse_prev(struct ath_radar_pulse *pulse)
 {
-    return list_entry(pulse->list.prev,
-                      struct ath_radar_pulse, list);
+	return list_entry(pulse->list.prev,
+			struct ath_radar_pulse, list);
 }
 
-struct ath_radar_pulse * pulse_next(struct ath_radar_pulse *pulse)
+#if 0
+static struct ath_radar_pulse * pulse_next(struct ath_radar_pulse *pulse)
 {
-    return list_entry(pulse->list.next,
-                      struct ath_radar_pulse, list);
+	return list_entry(pulse->list.next,
+			struct ath_radar_pulse, list);
 }
+#endif
 
-int etsi_radar_match(int count, int miss, int burst)
+static int etsi_radar_match(int count, int miss, int burst)
 {
-    /* ideal case */
-    if (count == burst && miss == 0)
-        return 1;
+	/* ideal case */
+	if (count == burst && miss == 0)
+		return 1;
 
-    /* start/end pulse missing */
-    if (count == (burst-1) && miss == 0)
-        return 1;
+	/* start/end pulse missing */
+	if (count == (burst - 1) && miss == 0)
+		return 1;
 
-    /* mid pulse missing */
-    if (count == (burst-1) && miss == 1)
-        return 1;
+	/* mid pulse missing */
+	if (count == (burst - 1) && miss == 1)
+		return 1;
 
-    /* start + end pulse missing */
-    if (count == (burst-2) && miss == 0)
-        return 1;
+	/* start + end pulse missing */
+	if (count == (burst - 2) && miss == 0)
+		return 1;
 
-    /* start/end + mid pulse missing */
-    if (count == (burst-2) && miss == 1)
-        return 1;
+	/* start/end + mid pulse missing */
+	if (count == (burst - 2) && miss == 1)
+		return 1;
 
-    return 0;
+	return 0;
 }
 
 void etsi_radar_pulse_analyze_one_pulse(struct ath_softc *sc,
-										struct ath_radar_pulse * last_pulse)
+		struct ath_radar_pulse * last_pulse)
 {
 	struct net_device *dev = sc->sc_dev;
-    int i;
+	int i;
 
-	/*
-	  we use int64_t instead of u_int64_t since:
-	  - we compute negative values
-	  - u_int64_t wrapped around every 507 356 years only !
-	*/
+	/* We use int64_t instead of u_int64_t since:
+	 *  - we compute negative values
+	 *  - u_int64_t wrapped around every 507,356 years only ! */
 
-    int64_t t0, t1, t_min, t_max;
-    int count, miss, partial_miss;
-    struct ath_radar_pulse * pulse;
-    
-    DPRINTF(sc, ATH_DEBUG_DOTH,
+	int64_t t0, t1, t_min, t_max;
+	int count, miss, partial_miss;
+	struct ath_radar_pulse * pulse;
+
+	DPRINTF(sc, ATH_DEBUG_DOTH,
 			"%s: ath_radar_pulse_etsi\n", DEV_NAME(dev));
 
-    /* we need at least (burst_min - 2) pulses and 2 pulses */
-    if ((sc->sc_radar_pulse_nr < sc->sc_radar_pulse_burst_min -2)
-        || (sc->sc_radar_pulse_nr < 2)) {
-        return;
-    }
+	/* we need at least (burst_min - 2) pulses and 2 pulses */
+	if ((sc->sc_radar_pulse_nr < sc->sc_radar_pulse_burst_min -2)
+			|| (sc->sc_radar_pulse_nr < 2)) {
+		return;
+	}
 
-    /*
-      Search algorithm:
+	/* Search algorithm:
+	 *
+	 *  - since we have a limited and known number of radar patterns, we
+	 *  loop on all possible radar pulse period
+	 *
+	 *  - we start the search from the last timestamp (t0), going
+	 *  backward in time, up to the point for the first possible radar
+	 *  pulse, ie t0 - PERIOD * BURST_MAX
+	 *
+	 *  - on this timescale, we count the number of hit/miss using T -
+	 *  PERIOD*n taking into account the 2% error margin (using
+	 *  period_min, period_max)
+	 *
+	 *  At the end, we have a number of pulse hit for each PRF
+	 *
+	 * Improvements: the PRF can be found using the most common 
+	 * interval found */
 
-      - since we have a limited and known number of radar patterns, we
-      loop on all possible radar pulse period
+	/* t1 is the timestamp of the last radar pulse */
+	t1 = (int64_t)last_pulse->rp_tsf;
 
-      - we start the search from the last timestamp (t0), going
-      backward in time, up to the point for the first possible radar
-      pulse, ie t0 - PERIOD * BURST_MAX
-
-      - on this timescale, we count the number of hit/miss using T -
-      PERIOD*n taking into account the 2% error margin (using
-      period_min, period_max)
-
-      At the end, we have a number of pulse hit for each PRF
-
-      Improvements: the PRF can be found using the most common
-      interval found
-    */
-
-    /* t1 is the timestamp of the last radar pulse */
-    t1 = (int64_t)last_pulse->rp_tsf;
-
-    for (i=0;i<sizetab(etsi_possible_prf);i++) {
-
+	for (i = 0; i < sizetab(etsi_possible_prf); i++) {
 		/* this min formula is to check for underflow */
-
 		t0 = t1 - etsi_possible_prf[i].period_max *
 			etsi_possible_prf[i].burst_min;
 
-        /* we directly start with the timestamp before t1 */
-        pulse = pulse_prev(last_pulse);
+		/* we directly start with the timestamp before t1 */
+		pulse = pulse_prev(last_pulse);
 
-        /* initial values for t_min, t_max */
-        t_min = t1 - etsi_possible_prf[i].period_max;
-        t_max = t1 - etsi_possible_prf[i].period_min;
+		/* initial values for t_min, t_max */
+		t_min = t1 - etsi_possible_prf[i].period_max;
+		t_max = t1 - etsi_possible_prf[i].period_min;
 
 		count = 0;
-        miss  = 0;
+		miss  = 0;
 		partial_miss = 0;
-/*
+#if 0
 		DPRINTF(sc, ATH_DEBUG_DOTH,
 				"%s: PRF=%4d t1=%10lld t0=%10lld t_min=%10lld "
 				"t_max=%10lld\n",
 				DEV_NAME(dev),
 				etsi_possible_prf[i].prf, t1, t0, t_min, t_max);
-*/
-        for (;;) {
-/*
-            DPRINTF(sc, ATH_DEBUG_DOTH,
+#endif
+		for (;;) {
+#if 0
+			DPRINTF(sc, ATH_DEBUG_DOTH,
 					"%s: rp_tsf=%10llu t_min = %10lld, t_max = %10lld, "
 					"count=%d miss=%d partial_miss=%d\n",
 					DEV_NAME(dev),
 					pulse->rp_tsf, t_min, t_max, count, miss, partial_miss);
-*/		
-            /* check if we are at the end of the list */
-            if ((&pulse->list == &sc->sc_radar_pulse_head)
-                || (!pulse->rp_allocated)) {
-                break;
-            }
+#endif
+			/* check if we are at the end of the list */
+			if ((&pulse->list == &sc->sc_radar_pulse_head)
+					|| (!pulse->rp_allocated)) {
+				break;
+			}
 
-            /* if we are below t0, stop the loop */
-            if ((int64_t)pulse->rp_tsf < t0) {
-                break;
+			/* if we are below t0, stop the loop */
+			if ((int64_t)pulse->rp_tsf < t0) {
+				break;
 			}
 
 			/* if we miss more than 2 pulses, we stop searching */
@@ -420,50 +415,42 @@ void etsi_radar_pulse_analyze_one_pulse(struct ath_softc *sc,
 				break;
 			}
 
-            if ((int64_t)pulse->rp_tsf > t_max) {
+			if ((int64_t)pulse->rp_tsf > t_max) {
+				/* this event is noise, ignores it */
+				pulse = pulse_prev(pulse);
+			} else if ((int64_t)pulse->rp_tsf >= t_min) {
+				/* we found a match */
+				count++;
+				miss  += partial_miss;
 
-                /* this event is noise, ignores it */
-                pulse = pulse_prev(pulse);
-                
-            } else if ((int64_t)pulse->rp_tsf >= t_min) {
-
-                /* we found a match */
-                count ++;
-                miss  += partial_miss;
-                
-                pulse = pulse_prev(pulse);
-                t_min = t_min - etsi_possible_prf[i].period_max;
-                t_max = t_max - etsi_possible_prf[i].period_min;
-                partial_miss = 0;
-
-            } else {
-                
-                t_min = t_min - etsi_possible_prf[i].period_max;
-                t_max = t_max - etsi_possible_prf[i].period_min;
-                partial_miss ++;
-
-            }
-        }
+				pulse = pulse_prev(pulse);
+				t_min = t_min - etsi_possible_prf[i].period_max;
+				t_max = t_max - etsi_possible_prf[i].period_min;
+				partial_miss = 0;
+			} else {
+				t_min = t_min - etsi_possible_prf[i].period_max;
+				t_max = t_max - etsi_possible_prf[i].period_min;
+				partial_miss++;
+			}
+		}
 
 		/* print counters for this PRF */
 		if (count != 0) {
-			
 			/* we add one to the count since we counted only the time
-			   differences */
-			count ++;
-			
+			 * differences */
+			count++;
+
 			DPRINTF(sc, ATH_DEBUG_DOTH,
 					"%s: PRF [%4d] : %3d pulses %3d miss\n",
 					DEV_NAME(dev),
 					etsi_possible_prf[i].prf,
 					count, miss);
-			
+
 			/* check if PRF counters match a known radar, if we are
 			   confident enought */
-            
+
 			if (etsi_radar_match(count, miss,
-								 etsi_possible_prf[i].burst_min))
-			{
+						etsi_possible_prf[i].burst_min)) {
 				DPRINTF(sc, ATH_DEBUG_DOTH,
 						"%s: RADAR detected at PRF %4d\n",
 						DEV_NAME(dev),
@@ -474,15 +461,13 @@ void etsi_radar_pulse_analyze_one_pulse(struct ath_softc *sc,
 	}
 }
 
-void etsi_radar_pulse_analyze(struct ath_softc *sc)
+static void etsi_radar_pulse_analyze(struct ath_softc *sc)
 {
 	struct ath_radar_pulse * pulse;
 
 	/* start the analysis by the last pulse since it might speed up
 	   things and then move backward for all non-analyzed pulses */
-
 	list_for_each_entry_reverse(pulse, &sc->sc_radar_pulse_head, list) {
-
 		if (!pulse->rp_allocated) {
 			break;
 		}
@@ -497,12 +482,12 @@ void etsi_radar_pulse_analyze(struct ath_softc *sc)
 }
 
 /* initialize ath_softc members so sensible values */
-void ath_radar_pulse_safety_belt(struct ath_softc *sc)
+static void ath_radar_pulse_safety_belt(struct ath_softc *sc)
 {
-    sc->sc_radar_pulse_mem     = NULL;
-    INIT_LIST_HEAD(&sc->sc_radar_pulse_head);
-    sc->sc_radar_pulse_nr      = 0;
-    sc->sc_radar_pulse_analyze = NULL;
+	sc->sc_radar_pulse_mem     = NULL;
+	INIT_LIST_HEAD(&sc->sc_radar_pulse_head);
+	sc->sc_radar_pulse_nr      = 0;
+	sc->sc_radar_pulse_analyze = NULL;
 }
 
 static void
@@ -519,33 +504,33 @@ ath_radar_pulse_tasklet(TQUEUE_ARG data)
 void ath_radar_pulse_init(struct ath_softc *sc)
 {
 	struct net_device *dev = sc->sc_dev;
-    int i;
-    
-    ath_radar_pulse_safety_belt(sc);
-    
-    sc->sc_radar_pulse_mem = (struct ath_radar_pulse *) kmalloc(
-        sizeof(struct ath_radar_pulse) * ATH_RADAR_PULSE_NR, GFP_KERNEL);
-    if (sc->sc_radar_pulse_mem == NULL)
-        return ;
+	int i;
 
-    /* initialize the content of the array */
-    memset(sc->sc_radar_pulse_mem, 0,
-           sizeof(struct ath_radar_pulse) * ATH_RADAR_PULSE_NR);
-    
-    /* initialize the circular list */
-    INIT_LIST_HEAD(&sc->sc_radar_pulse_head);
-    for (i=0;i<ATH_RADAR_PULSE_NR;i++) {
-        sc->sc_radar_pulse_mem[i].rp_index = i;
-        list_add_tail(&sc->sc_radar_pulse_mem[i].list,
-                      &sc->sc_radar_pulse_head);
-    }
+	ath_radar_pulse_safety_belt(sc);
 
-    sc->sc_radar_pulse_nr = 0;
-    sc->sc_radar_pulse_analyze = etsi_radar_pulse_analyze;
+	sc->sc_radar_pulse_mem = (struct ath_radar_pulse *) kmalloc(
+			sizeof(struct ath_radar_pulse) * ATH_RADAR_PULSE_NR, GFP_KERNEL);
+	if (sc->sc_radar_pulse_mem == NULL)
+		return ;
+
+	/* initialize the content of the array */
+	memset(sc->sc_radar_pulse_mem, 0,
+			sizeof(struct ath_radar_pulse) * ATH_RADAR_PULSE_NR);
+
+	/* initialize the circular list */
+	INIT_LIST_HEAD(&sc->sc_radar_pulse_head);
+	for (i = 0; i < ATH_RADAR_PULSE_NR; i++) {
+		sc->sc_radar_pulse_mem[i].rp_index = i;
+		list_add_tail(&sc->sc_radar_pulse_mem[i].list,
+				&sc->sc_radar_pulse_head);
+	}
+
+	sc->sc_radar_pulse_nr = 0;
+	sc->sc_radar_pulse_analyze = etsi_radar_pulse_analyze;
 
 	/* compute sc_radar_pulse_burst_min */
 	sc->sc_radar_pulse_burst_min = etsi_possible_prf[0].burst_min;
-	for (i=1;i<sizetab(etsi_possible_prf);i++) {
+	for (i = 1; i < sizetab(etsi_possible_prf); i++) {
 		if (sc->sc_radar_pulse_burst_min > etsi_possible_prf[i].burst_min)
 			sc->sc_radar_pulse_burst_min = etsi_possible_prf[i].burst_min;
 	}
@@ -565,71 +550,51 @@ void ath_radar_pulse_record(struct ath_softc *sc,
                             u_int64_t tsf, u_int8_t rssi, u_int8_t width)
 {
 	struct net_device *dev = sc->sc_dev;
-    struct ath_radar_pulse * pulse;
+	struct ath_radar_pulse * pulse;
 
-    DPRINTF(sc, ATH_DEBUG_DOTH,
+	DPRINTF(sc, ATH_DEBUG_DOTH,
 			"%s: ath_radar_pulse_record: tsf=%10llu rssi=%3u width=%3u\n",
 			DEV_NAME(dev),
 			tsf, rssi, width);
 
 	/* check if the new radar pulse is after the last one recorded, or
 	 * else, we flush the history */
-
 	pulse = pulse_tail(sc);
 	if (tsf < pulse->rp_tsf) {
 		ath_radar_pulse_flush(sc);
 	}
-    
-    /* remove the head of the list */
-    pulse = pulse_head(sc);
-    list_del(&pulse->list);
-    
-    pulse->rp_tsf       = tsf;
-    pulse->rp_rssi      = rssi;
-    pulse->rp_width     = width;
-    pulse->rp_allocated = 1;
+
+	/* remove the head of the list */
+	pulse = pulse_head(sc);
+	list_del(&pulse->list);
+
+	pulse->rp_tsf       = tsf;
+	pulse->rp_rssi      = rssi;
+	pulse->rp_width     = width;
+	pulse->rp_allocated = 1;
 	pulse->rp_analyzed  = 0;
-    
-    /* add at the tail of the list */
-    list_add_tail(&pulse->list, &sc->sc_radar_pulse_head);
-    sc->sc_radar_pulse_nr ++;
+
+	/* add at the tail of the list */
+	list_add_tail(&pulse->list, &sc->sc_radar_pulse_head);
+	sc->sc_radar_pulse_nr++;
 }
 
 void ath_radar_pulse_print(struct ath_softc *sc)
 {
 	struct net_device *dev = sc->sc_dev;
-    struct ath_radar_pulse * pulse;
-    int i;
-    
-    DPRINTF(sc, ATH_DEBUG_DOTH,
+	struct ath_radar_pulse * pulse;
+	int i;
+
+	DPRINTF(sc, ATH_DEBUG_DOTH,
 			"%s: pulse number : %d\n",
 			DEV_NAME(dev), sc->sc_radar_pulse_nr);
-    
-    DPRINTF(sc, ATH_DEBUG_DOTH,
+
+	DPRINTF(sc, ATH_DEBUG_DOTH,
 			"%s: pulse dump using sc_radar_pulse_mem\n",
 			DEV_NAME(dev));
-    for (i=0;i<ATH_RADAR_PULSE_NR;i++) {
-        pulse = &sc->sc_radar_pulse_mem[i];
-		if (!pulse->rp_allocated)
-			break;
-		
-		DPRINTF(sc, ATH_DEBUG_DOTH,
-				"%s: pulse [%3d, %p] : tsf=%10llu rssi=%3u width=%3u "
-				"allocated=%d next=%p prev=%p\n",
-				DEV_NAME(dev),
-				pulse->rp_index, pulse,
-				pulse->rp_tsf,
-				pulse->rp_rssi,
-				pulse->rp_width,
-				pulse->rp_allocated,
-				pulse->list.next,
-				pulse->list.prev);
-    }
-    
-    DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: pulse dump using sc_radar_pulse_head\n",
-			DEV_NAME(dev));
-    list_for_each_entry(pulse, &sc->sc_radar_pulse_head, list) {
+
+	for (i = 0; i < ATH_RADAR_PULSE_NR; i++) {
+		pulse = &sc->sc_radar_pulse_mem[i];
 		if (!pulse->rp_allocated)
 			break;
 
@@ -644,16 +609,36 @@ void ath_radar_pulse_print(struct ath_softc *sc)
 				pulse->rp_allocated,
 				pulse->list.next,
 				pulse->list.prev);
-    }
+	}
+
+	DPRINTF(sc, ATH_DEBUG_DOTH,
+			"%s: pulse dump using sc_radar_pulse_head\n",
+			DEV_NAME(dev));
+	list_for_each_entry(pulse, &sc->sc_radar_pulse_head, list) {
+		if (!pulse->rp_allocated)
+			break;
+
+		DPRINTF(sc, ATH_DEBUG_DOTH,
+				"%s: pulse [%3d, %p] : tsf=%10llu rssi=%3u width=%3u "
+				"allocated=%d next=%p prev=%p\n",
+				DEV_NAME(dev),
+				pulse->rp_index, pulse,
+				pulse->rp_tsf,
+				pulse->rp_rssi,
+				pulse->rp_width,
+				pulse->rp_allocated,
+				pulse->list.next,
+				pulse->list.prev);
+	}
 }
 
 void ath_radar_pulse_flush(struct ath_softc *sc)
 {
-    struct ath_radar_pulse * pulse;
-    
-    list_for_each_entry(pulse, &sc->sc_radar_pulse_head, list) {
-        pulse->rp_allocated = 0;
-    }
-    sc->sc_radar_pulse_nr = 0;
+	struct ath_radar_pulse * pulse;
+
+	list_for_each_entry(pulse, &sc->sc_radar_pulse_head, list) {
+		pulse->rp_allocated = 0;
+	}
+	sc->sc_radar_pulse_nr = 0;
 }
 
