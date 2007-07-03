@@ -40,35 +40,24 @@
 # binary API that adds locking and (optionally) tracing with human readable 
 # names.
 #
-strict;
+use strict;
 use warnings;
 require 'dumpvar.pl';
-
-# Workaround for perl's warning mechanism, avoids 'possible typo' for every setting used only one time.
-$header_for_c = undef;
-$footer_for_c = undef;
-$header_for_h = undef; 
-$footer_for_h = undef;
-$if_ath_hal_c = undef;
-$if_ath_hal_h = undef;
-$path_to_hal = undef;
-$hal_functions_not_to_wrap = undef;
-$hal_h = undef;
 
 #
 # This section contains the output file paths
 #
-$path_to_hal  = 'hal';
-$path_to_ath  = 'ath';
-$hal_h        = 'ah.h';
-$if_ath_hal_c = 'if_ath_hal.c';
-$if_ath_hal_h = 'if_ath_hal.h';
+my $path_to_hal  = 'hal';
+my $path_to_ath  = 'ath';
+my $hal_h        = 'ah.h';
+my $if_ath_hal_c = 'if_ath_hal.c';
+my $if_ath_hal_h = 'if_ath_hal.h';
 
 #
 # This section defines the name translation from the binary HAL's function
 # pointers to our API names.
 #
-%hal_function_name_to_madwifi_name = (
+my %hal_function_name_to_madwifi_name = (
 	"ah_beaconInit"               => "ath_hal_beaconinit",
 	"ah_disablePhyErrDiag"        => "ath_hal_disablePhyDiag",
 	"ah_enablePhyErrDiag"         => "ath_hal_enablePhyDiag",
@@ -169,12 +158,12 @@ $if_ath_hal_h = 'if_ath_hal.h';
 # List any functions that should NOT be generated here (such as those that conflict with
 # other functions, perhaps.
 #
-@hal_functions_not_to_wrap = ( "ah_detach" );
+my @hal_functions_not_to_wrap = ( "ah_detach" );
 
 #
 # Boilerplate text
 #
-$header_comment = <<EOF
+my $header_comment = <<EOF
 /*-
  * Copyright (c) 2007 Michael Taylor
  * All rights reserved.
@@ -220,7 +209,7 @@ EOF
 # This text is generated verbatim at the top of the .h file,
 # before generated content is added.
 #
-$header_for_h = <<EOF
+my $header_for_h = <<EOF
 $header_comment
 
 #include "if_ath_hal_macros.h"
@@ -229,7 +218,7 @@ $header_comment
 #define _IF_ATH_HAL_H_
 EOF
 ;
-$footer_for_h = <<EOF
+my $footer_for_h = <<EOF
 
 #include "if_ath_hal_wrappers.h"
 
@@ -243,7 +232,7 @@ EOF
 #
 # This text is generated verbatim at the top of the .c file
 #
-$header_for_c = <<EOF
+my $header_for_c = <<EOF
 $header_comment
 
 #ifdef ATH_HALOPS_TRACEABLE
@@ -272,7 +261,7 @@ EOF
 #
 # This text is generated verbatim at the bottom of the .c file
 #
-$footer_for_c = <<EOF
+my $footer_for_c = <<EOF
 #endif /* #ifdef ATH_HALOPS_TRACEABLE */
  /* *** THIS IS A GENERATED FILE -- DO NOT EDIT *** */
  /* *** THIS IS A GENERATED FILE -- DO NOT EDIT *** */
@@ -281,20 +270,20 @@ EOF
 ;
 
 # Include settings, calculate a few new ones
-$path_to_ah_h = "$path_to_hal/$hal_h";
-$path_to_if_ath_hal_h = "$path_to_ath/$if_ath_hal_h";
-$path_to_if_ath_hal_c = "$path_to_ath/$if_ath_hal_c";
+my $path_to_ah_h = "$path_to_hal/$hal_h";
+my $path_to_if_ath_hal_h = "$path_to_ath/$if_ath_hal_h";
+my $path_to_if_ath_hal_c = "$path_to_ath/$if_ath_hal_c";
 
 # Parsed Function Data 
 
 # list of declarations in document order
-@hal_prototypes = ();
+my @hal_prototypes = ();
 # hash of string->string (hal's function name to return type)
-%hal_functionname_to_return_type = ();
+my %hal_functionname_to_return_type = ();
 # hash of string->list of strings (ordered list of parameter names)
-%hal_functionname_to_parameter_name_array = ();
+my %hal_functionname_to_parameter_name_array = ();
 # hash of string->list of strings (ordered list of parameter types)
-%hal_functionname_to_parameter_types_array = ();
+my %hal_functionname_to_parameter_types_array = ();
 
 # Open the files we need
 if(!open AH_H, "<$path_to_ah_h") {
@@ -311,8 +300,8 @@ if(!open ATH_HAL_API_C, ">$path_to_if_ath_hal_c") {
 }
 
 # Parse and scrub the hal structure's member function declarations 
-$line_continued = 0;
-$line_buffer = "";
+my $line_continued = 0;
+my $line_buffer = "";
 foreach (<AH_H>) {
    chomp($_);
    s/\s+$//g;
@@ -333,7 +322,7 @@ foreach (<AH_H>) {
 }
 
 # Now pick apart the return type, parameter types, and parameter names for each HAL function
-foreach $proto (@hal_prototypes) {
+foreach my $proto (@hal_prototypes) {
    $proto =~ /^((?:(?:const|struct)\s*)*[^\s]+(?:[\s]*\*)?)[\s]*__ahdecl\(\*([^\)]*)\)\((.*)\);/;
    my $return_type   = $1;
    my $member_name   = $2;
@@ -343,8 +332,8 @@ foreach $proto (@hal_prototypes) {
       @{$hal_functionname_to_parameter_name_array{"$member_name"}} = ();
       @{$hal_functionname_to_parameter_types_array{"$member_name"}} = ();
       my @parameters = split /,\s?/, $parameterlist;
-      $argnum = 0;
-      $first = 1;
+      my $argnum = 0;
+      my $first = 1;
       foreach(@parameters) {
 	 $_ =~ s/ \*/\* /;
 	 $_ =~ /^((?:(?:const|struct|\*)\s*)*)([^\s]+\*?)\s*([^\s]*)\s*/;
@@ -370,7 +359,7 @@ foreach $proto (@hal_prototypes) {
 # Generate the header file
 print ATH_HAL_API_H $header_for_h;
 
-for $member_name (keys %hal_functionname_to_return_type) {
+for my $member_name (keys %hal_functionname_to_return_type) {
    my $api_return_type   = $hal_functionname_to_return_type{$member_name};
    my $api_name      	 = $member_name;
    if(exists $hal_function_name_to_madwifi_name{$member_name}) {
@@ -379,7 +368,7 @@ for $member_name (keys %hal_functionname_to_return_type) {
    print ATH_HAL_API_H "__hal_wrapper " . $api_return_type . " " . $api_name . "(";
    my @names = @{$hal_functionname_to_parameter_name_array{$member_name}};
    my @types = @{$hal_functionname_to_parameter_types_array{$member_name}};
-   for $i (0..$#names) {
+   for my $i (0..$#names) {
       if($i) {
 	 print ATH_HAL_API_H ", ";
       }
@@ -396,7 +385,7 @@ for $member_name (keys %hal_functionname_to_return_type) {
    }
 
    print ATH_HAL_API_H "ah->$member_name(";
-   for $j (0..$#names) {
+   for my $j (0..$#names) {
       if($j) {
 	 print ATH_HAL_API_H ", ";
       }
