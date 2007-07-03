@@ -151,10 +151,9 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #undef alloc_netdev
 #define alloc_netdev(s,m,d) _alloc_netdev(s,m,d)
 
-static inline struct proc_dir_entry *PDE(const struct inode *inode)
-{
-	return (struct proc_dir_entry *)inode->u.generic_ip;
-}
+/* Some vendors backport PDE, so make it a macro here */
+#undef PDE
+#define PDE(inode) ((struct proc_dir_entry *)(inode)->u.generic_ip)
 #endif
 
 
@@ -626,9 +625,9 @@ struct ath_softc {
 	u_int8_t sc_protrix;			/* protection rate index */
 	u_int8_t sc_mcastantenna;		/* Multicast antenna number */
 	u_int8_t sc_txantenna;			/* data tx antenna (fixed or auto) */
-	u_int16_t sc_nvaps;			/* # of active virtual ap's */
-	u_int8_t sc_nstavaps;			/* # of active station vaps */
-	u_int8_t sc_nmonvaps;			/* # of monitor vaps */
+	u_int16_t sc_nvaps;			/* # of active virtual APs */
+	u_int8_t sc_nstavaps;			/* # of active station VAPs */
+	u_int8_t sc_nmonvaps;			/* # of monitor VAPs */
 	u_int8_t sc_nbcnvaps;			/* # of vaps sending beacons */
 	u_int sc_fftxqmin;			/* aggregation threshold */
 	HAL_INT sc_imask;			/* interrupt mask copy */
@@ -659,7 +658,7 @@ struct ath_softc {
 	struct ATH_TQ_STRUCT sc_rxtq;		/* rx intr tasklet */
 	struct ATH_TQ_STRUCT sc_rxorntq;	/* rxorn intr tasklet */
 	u_int8_t sc_defant;			/* current default antenna */
-	u_int8_t sc_rxotherant;			/* rx's on non-default antenna*/
+	u_int8_t sc_rxotherant;			/* RXs on non-default antenna */
 	u_int16_t sc_cachelsz;			/* cache line size */
 
 	struct ath_descdma sc_txdma;		/* TX descriptors */

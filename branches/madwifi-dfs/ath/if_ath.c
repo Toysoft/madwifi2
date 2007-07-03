@@ -491,8 +491,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	/*
 	 * Check if the MAC has multi-rate retry support.
 	 * We do this by trying to setup a fake extended
-	 * descriptor.  MAC's that don't have support will
-	 * return false w/o doing anything.  MAC's that do
+	 * descriptor.  MACs that don't have support will
+	 * return false w/o doing anything.  MACs that do
 	 * support it will return true w/o doing anything.
 	 */
 	sc->sc_mrretry = ath_hal_setupxtxdesc(ah, NULL, 0,0, 0,0, 0,0);
@@ -1117,7 +1117,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		break;
 	case IEEE80211_M_HOSTAP:
 	case IEEE80211_M_WDS:
-		/* permit multiple ap's and/or wds links */
+		/* permit multiple APs and/or WDS links */
 		/* XXX sta+ap for repeater/bridge application */
 		if ((sc->sc_nvaps != 0) && (ic->ic_opmode == IEEE80211_M_STA))
 			return NULL;
@@ -1136,7 +1136,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	}
 
 	if (sc->sc_nvaps >= ATH_BCBUF) {
-		printk(KERN_WARNING "too many virtual ap's (already got %d)\n", sc->sc_nvaps);
+		printk(KERN_WARNING "too many virtual APs (already got %d)\n", sc->sc_nvaps);
 		return NULL;
 	}
 
@@ -1180,7 +1180,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		 * Hardware supports the bssid mask and a unique
 		 * bssid was requested.  Assign a new mac address
 		 * and expand our bssid mask to cover the active
-		 * virtual ap's with distinct addresses.
+		 * virtual APs with distinct addresses.
 		 */
 
 		/* do a full search to mark all the allocated VAPs */
@@ -1260,7 +1260,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		sc->sc_nmonvaps++;
 	/*
 	 * Adhoc demo mode is a pseudo mode; to the HAL it's
-	 * just ibss mode and the driver doesn't use management
+	 * just IBSS mode and the driver doesn't use management
 	 * frames.  Other modes carry over directly to the HAL.
 	 */
 	if (ic->ic_opmode == IEEE80211_M_AHDEMO)
@@ -1944,7 +1944,7 @@ ath_init(struct net_device *dev)
 	}
 
 	/*
-	 * Flush the skb's allocated for receive in case the rx
+	 * Flush the skbs allocated for receive in case the rx
 	 * buffer size changes.  This could be optimized but for
 	 * now we do it each time under the assumption it does
 	 * not happen often.
@@ -2568,7 +2568,7 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
  * Transmit a data packet.  On failure caller is
  * assumed to reclaim the resources.
  *
- * Context: process context with BH's disabled
+ * Context: process context with BHs disabled
  */
 static int
 ath_hardstart(struct sk_buff *skb, struct net_device *dev)
@@ -2582,6 +2582,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ath_buf *tbf, *tempbf;
 	struct sk_buff *tskb;
 	int framecnt;
+	int requeue = 0;
 #ifdef ATH_SUPERG_FF
 	unsigned int pktlen;
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -2599,14 +2600,14 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		return -ENETDOWN;
 	}
 
-
 	STAILQ_INIT(&bf_head);
 
 	if (cb->flags & M_RAW) {
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 		if (bf == NULL)
 			goto hardstart_fail;
-		return ath_tx_startraw(dev, bf, skb);
+		ath_tx_startraw(dev, bf, skb);
+		return NETDEV_TX_OK;
 	}
 
 	eh = (struct ether_header *) skb->data;
@@ -2638,6 +2639,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	if (txq->axq_depth > TAIL_DROP_COUNT) {
 		sc->sc_stats.ast_tx_discard++;
+		/* queue is full, let the kernel backlog the skb */
+		requeue = 1;
 		goto hardstart_fail;
 	}
 
@@ -2689,7 +2692,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 
-			return 0;
+			return NETDEV_TX_OK;
 		}
 	} else {
 		if (ff_flush) {
@@ -2730,15 +2733,12 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 				STAILQ_INSERT_TAIL(&sc->sc_txbuf, bf_ff, bf_list);
 				ATH_TXBUF_UNLOCK_IRQ(sc);
 			}
-
 			ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 			if (bf == NULL) {
 				goto hardstart_fail;
 			}
 
 			goto ff_flush_done;
-
-
 		}
 		/*
 		 * XXX: out-of-order condition only occurs for AP mode and multicast.
@@ -2765,7 +2765,6 @@ ff_bypass:
 
 	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 	if (bf == NULL) {
-		ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 		goto hardstart_fail;
 	}
 
@@ -2846,7 +2845,7 @@ ff_bypass:
 		ath_ffstageq_flush(sc, txq, ath_ff_ageflushtestdone);
 #endif
 
-	return 0;
+	return NETDEV_TX_OK;
 
 hardstart_fail:
 	if (!STAILQ_EMPTY(&bf_head)) {
@@ -2863,6 +2862,10 @@ hardstart_fail:
 		ATH_TXBUF_UNLOCK_IRQ(sc);
 	}
 
+	/* let the kernel requeue the skb (dont free it!) */
+ 	if (requeue)
+		return NETDEV_TX_BUSY;
+
 	/* free sk_buffs */
 	while (skb) {
 		tskb = skb->next;
@@ -2870,7 +2873,7 @@ hardstart_fail:
 		dev_kfree_skb(skb);
 		skb = tskb;
 	}
-	return 0;	/* NB: return !0 only in a ``hard error condition'' */
+	return NETDEV_TX_OK;	
 }
 #undef ATH_HARDSTART_GET_TX_BUF_WITH_LOCK
 
@@ -3260,7 +3263,7 @@ ath_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	 * functionality.  For those parts the key id must match
 	 * the h/w key index so lookups find the right key.  On
 	 * parts w/ the key search facility we install the sender's
-	 * mac address (with the high bit set) and let the hardware
+	 * MAC address (with the high bit set) and let the hardware
 	 * find the key w/o using the key id.  This is preferred as
 	 * it permits us to support multiple users for adhoc and/or
 	 * multi-station operation.
@@ -3950,8 +3953,8 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 		uint64_t tuadjust;
 		__le64 tsfadjust;
 		/*
-		 * The beacon interval is in TU's; the TSF in usecs.
-		 * We figure out how many TU's to add to align the
+		 * The beacon interval is in TUs; the TSF in usecs.
+		 * We figure out how many TUs to add to align the
 		 * timestamp then convert to TSF units and handle
 		 * byte swapping before writing it in the frame.
 		 * The hardware will then add this each time a beacon
@@ -4022,9 +4025,9 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		ds->ds_link = 0;
 		/*
 		 * Switch antenna every beacon if txantenna is not set
-		 * Should only switch every beacon period, not for every
-		 * SWBA's
-		 * XXX assumes two antenna
+		 * Should only switch every beacon period, not for all
+		 * SWBAs
+		 * XXX: assumes two antennae
 		 */
 		if (antenna == 0) {
 			if (sc->sc_stagbeacons)
@@ -4167,7 +4170,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	 *  1) if there is only one VAP let the cab traffic continue. 
 	 *  2) if there are more than one VAP and we are using staggered
 	 *     beacons, then drain the cabq by dropping all the frames in
-	 *     the cabq so that the current VAP's cab traffic can be scheduled.
+	 *     the cabq so that the current VAPs CAB traffic can be scheduled.
 	 * XXX: Need to handle the last MORE_DATA bit here.
 	 */
 	if (ncabq && (avp->av_boff.bo_tim[4] & 1) && sc->sc_cabq->axq_depth) {
@@ -4194,7 +4197,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		struct ath_txq *cabq = sc->sc_cabq;
 		struct ath_buf *bfmcast;
 		/*
-		 * Move everything from the VAP's mcast queue 
+		 * Move everything from the VAPs mcast queue 
 		 * to the hardware cab queue.
 		 */
 		ATH_TXQ_LOCK_IRQ(&avp->av_mcastq);
@@ -4543,7 +4546,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		 * arrange for the SWBA to be delivered for each slot.
 		 * Slots that are not occupied will generate nothing. 
 		 */
-		/* NB: the beacon interval is kept internally in TU's */
+		/* NB: the beacon interval is kept internally in TUs */
 		intval = ic->ic_lintval & HAL_BEACON_PERIOD;
 		if (sc->sc_stagbeacons)
 			intval /= ATH_BCBUF;	/* for staggered beacons */
@@ -5521,7 +5524,7 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 
 	if (sc->sc_nmonvaps > 0) {
 		/* Pass up tsf clock in mactime
-		 * TX descriptor contains the transmit time in TU's,
+		 * TX descriptor contains the transmit time in TUs,
 		 * (bits 25-10 of the TSF).
 		 */
 		tstamp = ts->ts_tstamp << 10;
@@ -5570,11 +5573,11 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		if (vap->iv_opmode == IEEE80211_M_IBSS &&
 		    vap->iv_state == IEEE80211_S_RUN) {
 			/*
-			 * Handle ibss merge as needed; check the tsf on the
+			 * Handle IBSS merge as needed; check the TSF on the
 			 * frame before attempting the merge.  The 802.11 spec
-			 * says the station should change it's bssid to match
-			 * the oldest station with the same ssid, where oldest
-			 * is determined by the tsf.  Note that hardware
+			 * says the station should change its BSSID to match
+			 * the oldest station with the same SSID, where oldest
+			 * is determined by the TSF.  Note that hardware
 			 * reconfiguration happens through callback to
 			 * ath_newstate as the state machine will go from
 			 * RUN -> RUN when this happens.
@@ -6425,9 +6428,9 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
  * Setup a hardware data transmit queue for the specified
  * access control.  The HAL may not support all requested
  * queues in which case it will return a reference to a
- * previously setup queue.  We record the mapping from ac's
- * to h/w queues for use by ath_tx_start and also track
- * the set of h/w queues being used to optimize work in the
+ * previously setup queue.  We record the mapping from ACs
+ * to H/W queues for use by ath_tx_start and also track
+ * the set of H/W queues being used to optimize work in the
  * transmit interrupt handler and related routines.
  */
 static int
@@ -7790,7 +7793,7 @@ ath_startrecv(struct ath_softc *sc)
 }
 
 /*
- * Flush skb's allocate for receive.
+ * Flush skbs allocated for receiving.
  */
 static void
 ath_flushrecv(struct ath_softc *sc)
@@ -8083,7 +8086,7 @@ ath_set_channel(struct ieee80211com *ic)
 	(void) ath_chan_set(sc, ic->ic_curchan);
 	/*
 	 * If we are returning to our bss channel then mark state
-	 * so the next recv'd beacon's tsf will be used to sync the
+	 * so the next recv'd beacon's TSF will be used to sync the
 	 * beacon timers.  Note that since we only hear beacons in
 	 * sta/ibss mode this has no effect in other operating modes.
 	 */
@@ -8284,7 +8287,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				/* XXX no rate negotiation; just dup */
 				wds_ni->ni_rates = vap->iv_bss->ni_rates;
 				/* Depending on the sequence of bringing up devices
-				 * it's possible the rates of the root bss isn't
+				 * it's possible the rates of the root BSS isn't
 				 * filled yet. */
 				if ((vap->iv_ic->ic_newassoc != NULL) &&
 				    (wds_ni->ni_rates.rs_nrates != 0)) {

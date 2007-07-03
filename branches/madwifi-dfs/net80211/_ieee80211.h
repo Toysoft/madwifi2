@@ -42,7 +42,7 @@ enum ieee80211_phytype {
 };
 #define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
 
-/* XXX not really a mode; there are really multiple PHY's */
+/* XXX: not really a mode; there are really multiple PHYs */
 enum ieee80211_phymode {
 	IEEE80211_MODE_AUTO	= 0,	/* autoselect */
 	IEEE80211_MODE_11A	= 1,	/* 5GHz, OFDM */

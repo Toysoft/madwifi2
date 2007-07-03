@@ -3202,7 +3202,8 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			ieee80211_add_scan(vap, &scan, wh, subtype, rssi, rtsf);
 			return;
 		}
-		if (scan.capinfo & IEEE80211_CAPINFO_IBSS) {
+		if ((vap->iv_opmode == IEEE80211_M_IBSS) && 
+				(scan.capinfo & IEEE80211_CAPINFO_IBSS)) {
 			if (!IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_macaddr)) {
 				/* Create a new entry in the neighbor table. */
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
@@ -3494,10 +3495,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			case IEEE80211_ELEMID_XRATES:
 				xrates = frm;
 				break;
-			case IEEE80211_ELEMID_SUPPCHAN:
-				suppchan = frm;
-				break;
-			/* XXX verify only one of RSN and WPA ie's? */
+			/* XXX verify only one of RSN and WPA IEs? */
 			case IEEE80211_ELEMID_RSN:
 				if (vap->iv_flags & IEEE80211_F_WPA2)
 					rsn = frm;

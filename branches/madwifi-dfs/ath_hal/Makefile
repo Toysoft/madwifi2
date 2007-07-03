@@ -90,7 +90,7 @@ endif
 
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
-	cp ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+	install ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd
@@ -98,4 +98,4 @@ clean:
 	rm -rf .tmp_versions
 
 ath_hal.o: $(ath_hal-objs)
-	$(LD) $(LDOPTS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)
+	$(LD) $(LDFLAGS) -o ath_hal.$(KMODSUF) -r $(ath_hal-objs)

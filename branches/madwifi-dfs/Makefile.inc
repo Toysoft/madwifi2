@@ -99,6 +99,7 @@ export ARCH
 # Determine TARGET
 include $(TOP)/ath_hal/ah_target.inc
 export TARGET
+COPTS += -DTARGET='"$(TARGET)"'
 
 # KMODPATH nominates the directory where the modules will be
 # installed to

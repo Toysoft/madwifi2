@@ -252,7 +252,7 @@ struct ieee80211req_mlme {
  * MAC ACL operations.
  */
 enum {
-	IEEE80211_MACCMD_POLICY_OPEN	= 0,	/* set policy: no ACL's */
+	IEEE80211_MACCMD_POLICY_OPEN	= 0,	/* set policy: no ACLs */
 	IEEE80211_MACCMD_POLICY_ALLOW	= 1,	/* set policy: allow traffic */
 	IEEE80211_MACCMD_POLICY_DENY	= 2,	/* set policy: deny traffic */
 	IEEE80211_MACCMD_FLUSH		= 3,	/* flush ACL database */

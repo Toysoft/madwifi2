@@ -73,7 +73,7 @@ struct scan_state {
 /*
  * Amount of time to go off-channel during a background
  * scan.  This value should be large enough to catch most
- * ap's but short enough that we can return on-channel
+ * APs but short enough that we can return on-channel
  * before our listen interval expires.
  *
  * XXX tunable
@@ -319,16 +319,15 @@ scan_restart(struct scan_state *ss, u_int duration)
 {
 	struct ieee80211vap *vap = ss->base.ss_vap;
 	struct ieee80211com *ic = vap->iv_ic;
-	int defer = 0;
 
 	if (ss->base.ss_next == ss->base.ss_last) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: no channels to scan\n", __func__);
 		return 0;
-	}
-	if (vap->iv_opmode == IEEE80211_M_STA &&
-	    vap->iv_state == IEEE80211_S_RUN) {
-		if (!(IEEE80211_VAP_IS_SLEEPING(vap))) {
+	} else {
+		if ((vap->iv_opmode == IEEE80211_M_STA) &&
+			(vap->iv_state == IEEE80211_S_RUN) &&
+			!(IEEE80211_VAP_IS_SLEEPING(vap))) {
 			/*
 			 * Initiate power save before going off-channel.
 			 * Note that we cannot do this directly because
@@ -337,17 +336,14 @@ scan_restart(struct scan_state *ss, u_int duration)
 			 */
 			ss->ss_duration = duration;
 			tasklet_schedule(&ss->ss_pwrsav);
-			defer = 1;
+		} else {
+			ic->ic_scan_start(ic);		/* notify driver */
+			ss->ss_scanend = jiffies + duration;
+			ss->ss_iflags |= ISCAN_START;
+			mod_timer(&ss->ss_scan_timer, jiffies);
 		}
+		return 1;
 	}
-
-	if (!defer) {
-		ic->ic_scan_start(ic);		/* notify driver */
-		ss->ss_scanend = jiffies + duration;
-		ss->ss_iflags |= ISCAN_START;
-		mod_timer(&ss->ss_scan_timer, jiffies);
-	}
-	return 1;
 }
 
 static void
@@ -375,6 +371,7 @@ ieee80211_start_scan(struct ieee80211vap *vap, int flags, u_int duration,
 	struct ieee80211com *ic = vap->iv_ic;
 	const struct ieee80211_scanner *scan;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
+	int scanning;
 
 	scan = ieee80211_scanner_get(vap->iv_opmode, 0);
 	if (scan == NULL) {
@@ -434,10 +431,11 @@ ieee80211_start_scan(struct ieee80211vap *vap, int flags, u_int duration,
 			"%s: %s scan already in progress\n", __func__,
 			ss->ss_flags & IEEE80211_SCAN_ACTIVE ? "active" : "passive");
 	}
+	
+	scanning = (ic->ic_flags & IEEE80211_F_SCAN);
 	IEEE80211_UNLOCK_IRQ(ic);
 
-	/* NB: racey, does it matter? */
-	return (ic->ic_flags & IEEE80211_F_SCAN);
+	return scanning;
 }
 EXPORT_SYMBOL(ieee80211_start_scan);
 
@@ -529,6 +527,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_scan_state *ss = ic->ic_scan;
+	int scanning;
 
 	IEEE80211_LOCK_IRQ(ic);
 	if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
@@ -590,10 +589,11 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 			"%s: %s scan already in progress\n", __func__,
 			ss->ss_flags & IEEE80211_SCAN_ACTIVE ? "active" : "passive");
 	}
+	
+	scanning = (ic->ic_flags & IEEE80211_F_SCAN);
 	IEEE80211_UNLOCK_IRQ(ic);
 
-	/* NB: racey, does it matter? */
-	return (ic->ic_flags & IEEE80211_F_SCAN);
+	return scanning;
 }
 EXPORT_SYMBOL(ieee80211_bg_scan);
 EXPORT_SYMBOL(ieee80211_cancel_scan);

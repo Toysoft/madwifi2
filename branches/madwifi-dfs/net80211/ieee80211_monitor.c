@@ -49,7 +49,7 @@
 
 #include <net/iw_handler.h>
 #include <linux/wireless.h>
-#include <linux/if_arp.h>		/* XXX for ARPHRD_* */
+#include <linux/if_arp.h>		/* for ARPHRD_* */
 
 #include <asm/uaccess.h>
 
@@ -349,7 +349,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			pkttype = PACKET_HOST;
 		} else {
 			/* 
-			 * The frame passed it's CRC, so we can rely
+			 * The frame passed its CRC, so we can rely
 			 * on the contents of the frame to set pkttype.
 			 */
 			if (tx)

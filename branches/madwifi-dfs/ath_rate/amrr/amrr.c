@@ -336,7 +336,7 @@ ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state state)
 	} else {
 		/*
 		 * When operating as a station the node table holds
-		 * the AP's that were discovered during scanning.
+		 * the APs that were discovered during scanning.
 		 * For any other operating mode we want to reset the
 		 * tx rate state of each node.
 		 */
