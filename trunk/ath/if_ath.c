@@ -2670,7 +2670,6 @@ ff_bypass:
 
 	ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 	if (bf == NULL) {
-		ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
 		goto hardstart_fail;
 	}
 
