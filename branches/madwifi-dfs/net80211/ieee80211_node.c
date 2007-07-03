@@ -54,7 +54,7 @@
 #include <net80211/if_athproto.h>
 
 /*
- * Association id's are managed with a bit vector.
+ * Association IDs are managed with a bit vector.
  */
 #define	IEEE80211_AID_SET(_vap, _b) \
 	((_vap)->iv_aid_bitmap[IEEE80211_AID(_b) / 32] |= \
@@ -505,7 +505,7 @@ check_bss_debug(struct ieee80211vap *vap, struct ieee80211_node *ni)
  * has the station's desired SSID.  The "oldest" 802.11 network
  * sends beacons with the greatest TSF timestamp.
  *
- * The caller is assumed to validate TSF's before attempting a merge.
+ * The caller is assumed to validate TSFs before attempting a merge.
  *
  * Return !0 if the BSSID changed, 0 otherwise.
  */
@@ -785,7 +785,7 @@ node_cleanup(struct ieee80211_node *ni)
 			vap->iv_ps_sta--;
 		ni->ni_flags &= ~IEEE80211_NODE_PWR_MGT;
 		IEEE80211_NOTE(vap, IEEE80211_MSG_POWER, ni,
-			"power save mode off, %u sta's in ps mode",
+			"power save mode off, %u STAs in PS mode",
 			vap->iv_ps_sta);
 
 		if (ni->ni_flags & IEEE80211_NODE_UAPSD_TRIG) {
@@ -805,7 +805,7 @@ node_cleanup(struct ieee80211_node *ni)
 	ni->ni_associd = 0;
 
 	/*
-	 * Preserve SSID, WPA, and WME ie's so the bss node is
+	 * Preserve SSID, WPA, and WME IEs so the bss node is
 	 * reusable during a re-auth/re-assoc state transition.
 	 * If we remove these data they will not be recreated
 	 * because they come from a probe-response or beacon frame
@@ -1156,7 +1156,7 @@ EXPORT_SYMBOL(ieee80211_find_node);
  * Fake up a node; this handles node discovery in adhoc mode.
  * Note that for the driver's benefit we we treat this like
  * an association so the driver has an opportunity to setup
- * it's private state.
+ * its private state.
  *
  * Caller must ieee80211_ref_node()
  */
@@ -1186,7 +1186,7 @@ ieee80211_fakeup_adhoc_node(struct ieee80211vap *vap,
  * Do node discovery in adhoc mode on receipt of a beacon
  * or probe response frame.  Note that for the driver's
  * benefit we treat this like an association so the
- * driver has an opportunity to setup it's private state.
+ * driver has an opportunity to setup its private state.
  */
 struct ieee80211_node *
 ieee80211_add_neighbor(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
@@ -1228,7 +1228,7 @@ ieee80211_add_neighbor(struct ieee80211vap *vap, const struct ieee80211_frame *w
 			/*
 			 * Blindly propagate capabilities based on the
 			 * local configuration.  In particular this permits
-			 * us to use QoS to disable ACK's and to use short
+			 * us to use QoS to disable ACKs and to use short
 			 * preamble on 2.4G channels.
 			 */
 			if (vap->iv_flags & IEEE80211_F_WME)
@@ -1656,7 +1656,7 @@ ieee80211_node_join_11g(struct ieee80211_node *ni)
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
 			"station needs long slot time, count %d",
 			ic->ic_longslotsta);
-		/* XXX vap's w/ conflicting needs won't work */
+		/* XXX VAPs w/ conflicting needs won't work */
 		if (!IEEE80211_IS_CHAN_108G(ic->ic_bsschan)) {
 			/*
 			 * Don't force slot time when switched to turbo
@@ -1953,7 +1953,7 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 	 * Tell the authenticator the station is leaving.
 	 * Note that we must do this before yanking the
 	 * association id as the authenticator uses the
-	 * associd to locate it's state block.
+	 * associd to locate its state block.
 	 */
 	if (vap->iv_auth->ia_node_leave != NULL)
 		vap->iv_auth->ia_node_leave(ni);

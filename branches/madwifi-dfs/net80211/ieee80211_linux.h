@@ -296,7 +296,7 @@ typedef spinlock_t acl_lock_t;
  * held in the sk_buff control buffer.  This is used to
  * communicate various inter-procedural state that needs
  * to be associated with the frame for the duration of
- * it's existence.
+ * its existence.
  *
  * NB: sizeof(cb) == 48 and the vlan code grabs the first
  *     8 bytes so we reserve/avoid it.

@@ -901,7 +901,7 @@ notfound:
 		 * If nothing suitable was found decrement
 		 * the failure counts so entries will be
 		 * reconsidered the next time around.  We
-		 * really want to do this only for sta's
+		 * really want to do this only for STAs
 		 * where we've previously had some success.
 		 */
 		sta_dec_fails(st);
@@ -1333,7 +1333,7 @@ adhoc_pick_bss(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 		 * If nothing suitable was found decrement
 		 * the failure counts so entries will be
 		 * reconsidered the next time around.  We
-		 * really want to do this only for sta's
+		 * really want to do this only for STAs
 		 * where we've previously had some success.
 		 */
 		sta_dec_fails(st);
@@ -1447,7 +1447,7 @@ action_tasklet(IEEE80211_TQUEUE_ARG data)
 		 * If nothing suitable was found decrement
 		 * the failure counts so entries will be
 		 * reconsidered the next time around.  We
-		 * really want to do this only for sta's
+		 * really want to do this only for STAs
 		 * where we've previously had some success.
 		 */
 		sta_dec_fails(st);

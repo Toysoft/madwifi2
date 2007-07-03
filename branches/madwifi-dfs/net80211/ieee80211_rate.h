@@ -58,7 +58,7 @@
  * rate for each outgoing frame and provided status from each transmitted
  * frame.  Any ancillary processing is the responsibility of the module
  * (e.g. if periodic processing is required then the module should setup
- * it's own timer).
+ * its own timer).
  *
  * In addition to the transmit rate for each frame the module must also
  * indicate the number of attempts to make at the specified rate.  If this

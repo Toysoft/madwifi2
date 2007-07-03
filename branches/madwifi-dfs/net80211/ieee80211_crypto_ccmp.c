@@ -36,7 +36,7 @@
  *
  * Part of this module is derived from similar code in the Host
  * AP driver. The code is used with the consent of the author and
- * it's license is included below.
+ * its license is included below.
  */
 #ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>

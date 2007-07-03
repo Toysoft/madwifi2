@@ -176,13 +176,13 @@ Virtual APs (VAPs) and wlanconfig
 An interesting feature of MadWifi is Virtual AP (VAP) mode, which allows
 the operation of multiple concurrent (virtual) access points, and
 concurrent interfaces running in both AP and station mode.  To 
-manipulate VAP's, MadWifi comes with a tool called wlanconfig which is
+manipulate VAPs, MadWifi comes with a tool called wlanconfig which is
 used to create and destroy VAPS with various different modes.
 
 The following examples assume that the "autocreate=none" option has been
 parsed to the module at load time.  This allows fine control over
-management of VAP's, as the creation of a Managed mode station should be
-delayed until all other required VAP's are first created, as only one
+management of VAPs, as the creation of a Managed mode station should be
+delayed until all other required VAPs are first created, as only one
 sta mode VAP can exist per physical device.
 
 To create an access point, use:
@@ -204,7 +204,7 @@ Finally, to destroy a VAP, issue the command:
 
   wlanconfig ath0 destroy
 
-For more information about Virtual AP's, please refer to the users-guide
+For more information about Virtual APs, please refer to the users-guide
 document distributed with the MadWifi source code.
 
 For more information about wlanconfig, see its manpage, it is installed
@@ -273,10 +273,10 @@ wpa_supplicant also supports a wide range of 802.1x EAP methods, either
 together with WPA/WPA2 or without; consult the wpa_supplicant
 documentation for an up to date list.
 
-MadWifi supports the use of the Wireless Extensions ioctl's equal to or
+MadWifi supports the use of the Wireless Extensions ioctls equal to or
 greater than WE18 (linux 2.6.15).  When using wpa_supplicant with a
 recent linux kernel, it is preferred to use the 'wext' driver backend,
-rather than the private MadWifi ioctl's.  This means that '-D wext'
+rather than the private MadWifi ioctls.  This means that '-D wext'
 option should be used with wpa_supplicant when the linux kernel version
 is 2.6.15 or above.
 

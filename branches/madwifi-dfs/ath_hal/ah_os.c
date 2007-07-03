@@ -557,7 +557,7 @@ MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Atheros Hardware Access Layer (HAL)");
 MODULE_SUPPORTED_DEVICE("Atheros WLAN devices");
 #ifdef MODULE_VERSION
-MODULE_VERSION(ATH_HAL_VERSION);
+MODULE_VERSION(TARGET ": " ATH_HAL_VERSION);
 #endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Proprietary");

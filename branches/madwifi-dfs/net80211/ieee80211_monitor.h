@@ -149,7 +149,7 @@ struct ath_tx_radiotap_header {
 }__attribute__((__packed__));
 
 /*
- * Dispatch an skb to monitor-mode vap's.  The skb is assumed
+ * Dispatch an skb to monitor-mode VAPs.  The skb is assumed
  * to have space at the front to push a wlan_ng_prims2_header.
  */
 void ieee80211_input_monitor(struct ieee80211com *, struct sk_buff *,
