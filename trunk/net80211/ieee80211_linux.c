@@ -342,7 +342,7 @@ ieee80211_load_module(const char *modname)
 	return rv;
 #else /* CONFIG_KMOD */
 	printk(KERN_ERR "Unable to load needed module: %s; no support for " \
-			"automatic module loading", modname );
+			"automatic module loading\n", modname);
 	return -ENOSYS;
 #endif /* CONFIG_KMOD */
 }
