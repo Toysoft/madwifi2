@@ -65,6 +65,12 @@
 #include <linux/rtnetlink.h>
 #include <asm/uaccess.h>
 
+#include "if_media.h"
+#include <net80211/ieee80211_var.h>
+
+#include "ah.h"
+#include "if_athvar.h"
+
 /* Include header file for declarations */
 #include "ath/if_ath_hal_wrappers.h"
 
