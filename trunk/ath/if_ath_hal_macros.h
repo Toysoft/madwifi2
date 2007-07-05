@@ -36,19 +36,16 @@
  * $Id: foo mtaylor $
  */
 /* 
- * This file provides some macros that are used by if_ath_hal.h, if_ath_hal.c, 
- * if_ath_hal_wrappers.h, and , if_ath_hal_wrappers.c.
+ * This file provides some macros that are used by if_ath_hal.h,
+ * if_ath_hal_wrappers.h, and if_ath_hal_wrappers.c.
  * 
  * The macros are provided for the HAL lock and for dynamically deciding whether
  * to define the HAL wrapper functions as inline or in the implementation file
  * at build time.  i.e. inline for speed, or non-inline for debugging visibility
  * into the HAL methods being called (despite obfuscation).
  * 
- * The if_ath_hal.* files are generated from hal/ah.h at build time by the build
- * system and the files if_ath_hal_custom.h and if_ath_hal_custom.c are hand
- * created additions to the API that are just wrappers to the functions in
- * declared in if_ath_hal.h.
- * 
+ * The if_ath_hal.h file is generated from hal/ah.h at build time by the build
+ * system.
  */
 #ifndef _IF_ATH_HAL_MACROS_H_
 #define _IF_ATH_HAL_MACROS_H_

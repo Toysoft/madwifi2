@@ -73,5 +73,13 @@
 #include "ath/if_ath_hal_wrappers.h"
 #undef  TRACEABLE_IMPL
 
+/* Include header file for declarations */
+#include "ath/if_ath_hal.h"
+
+/* Include header file for implementations (if necessary) */
+#define TRACEABLE_IMPL
+#include "ath/if_ath_hal.h"
+#undef  TRACEABLE_IMPL
+
 #endif /* #ifdef ATH_HALOPS_TRACEABLE */
 
