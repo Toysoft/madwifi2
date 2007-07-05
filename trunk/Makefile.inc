@@ -166,7 +166,7 @@ endif
 # stack traces are more decipherable.
 
 ifdef HAL_DEBUG
-COPTS+= -DAH_HALOPS_TRACEABLE -fno-inline
+COPTS+= -DATH_HALOPS_TRACEABLE -fno-inline
 endif
 
 # Don't let HAL mess with the toolchain - save toolchain variables
