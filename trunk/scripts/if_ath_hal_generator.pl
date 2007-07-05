@@ -50,7 +50,6 @@ require 'dumpvar.pl';
 my $path_to_hal  = 'hal';
 my $path_to_ath  = 'ath';
 my $hal_h        = 'ah.h';
-my $if_ath_hal_c = 'if_ath_hal.c';
 my $if_ath_hal_h = 'if_ath_hal.h';
 
 #
@@ -272,7 +271,6 @@ EOF
 # Include settings, calculate a few new ones
 my $path_to_ah_h = "$path_to_hal/$hal_h";
 my $path_to_if_ath_hal_h = "$path_to_ath/$if_ath_hal_h";
-my $path_to_if_ath_hal_c = "$path_to_ath/$if_ath_hal_c";
 
 # Parsed Function Data 
 
@@ -292,11 +290,6 @@ if(!open AH_H, "<$path_to_ah_h") {
 if(!open ATH_HAL_API_H, ">$path_to_if_ath_hal_h") {
    close AH_H;
    die "Cannot open $path_to_if_ath_hal_h: $!";
-}
-if(!open ATH_HAL_API_C, ">$path_to_if_ath_hal_c") {
-   close AH_H;
-   close ATH_HAL_API_H;
-   die "Cannot open $path_to_if_ath_hal_c: $!";
 }
 
 # Parse and scrub the hal structure's member function declarations 
@@ -400,22 +393,7 @@ for my $member_name (keys %hal_functionname_to_return_type) {
 }
 print ATH_HAL_API_H $footer_for_h;
 
-#
-# Generate the implementation file
-# 
-print ATH_HAL_API_C $header_for_c;
-print ATH_HAL_API_C "/* Include header file for declarations */\n";
-print ATH_HAL_API_C "#include \"$path_to_if_ath_hal_h\"\n";
-print ATH_HAL_API_C "\n";
-print ATH_HAL_API_C "/* Include header file for implementations (if necessary) */\n";
-print ATH_HAL_API_C "#define TRACEABLE_IMPL\n";
-print ATH_HAL_API_C "#include \"$path_to_if_ath_hal_h\"\n";
-print ATH_HAL_API_C "#undef  TRACEABLE_IMPL\n";
-print ATH_HAL_API_C "\n";
-print ATH_HAL_API_C $footer_for_c;
-
 # Close up the files
 close AH_H;
 close ATH_HAL_API_H;
-close ATH_HAL_API_C;
 
