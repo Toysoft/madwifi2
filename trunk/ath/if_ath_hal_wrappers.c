@@ -46,6 +46,7 @@
 #include "opt_ah.h"
 
 #ifdef ATH_HALOPS_TRACEABLE
+#define TRACEABLE_IMPL
 
 #ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
@@ -71,21 +72,11 @@
 #include "ah.h"
 #include "if_athvar.h"
 
-/* Include header file for declarations */
-#include "ath/if_ath_hal_wrappers.h"
-
-/* Include header file for implementations (if necessary) */
-#define TRACEABLE_IMPL
-#include "ath/if_ath_hal_wrappers.h"
-#undef  TRACEABLE_IMPL
-
-/* Include header file for declarations */
+/* Include generated wrappers for implementations */
 #include "ath/if_ath_hal.h"
 
-/* Include header file for implementations (if necessary) */
-#define TRACEABLE_IMPL
-#include "ath/if_ath_hal.h"
-#undef  TRACEABLE_IMPL
+/* Include other wrappers for implementations */
+#include "ath/if_ath_hal_wrappers.h"
 
 #endif /* #ifdef ATH_HALOPS_TRACEABLE */
 
