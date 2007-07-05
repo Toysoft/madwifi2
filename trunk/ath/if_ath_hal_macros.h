@@ -67,7 +67,7 @@
 #ifdef TRACEABLE_IMPL
 #define IMPLEMENTATION(_CODEBLOCK) _CODEBLOCK
 #else /* #ifdef TRACEABLE_IMPL */
-#define IMPLEMENTATION(_CODEBLOCK)
+#define IMPLEMENTATION(_CODEBLOCK) ;
 #endif /* #ifdef TRACEABLE_IMPL */
 #else /* #ifdef ATH_HALOPS_TRACEABLE */
 #define __hal_wrapper static inline
