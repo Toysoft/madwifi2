@@ -818,7 +818,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			key = ieee80211_crypto_getucastkey(vap, ni);
 		else
 			key = ieee80211_crypto_getmcastkey(vap, ni);
-		if (key == NULL && eh.ether_type != htons(ETHERTYPE_PAE)) {
+		if ((key == NULL) && (eh.ether_type != htons(ETHERTYPE_PAE))) {
 			IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO,
 				eh.ether_dhost,
 				"no default transmit key (%s) deftxkey %u",
@@ -828,46 +828,43 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		}
 	} else
 		key = NULL;
+
 	addqos = (ni->ni_flags & IEEE80211_NODE_QOS) &&
-		eh.ether_type != htons(ETHERTYPE_PAE);
+		 (eh.ether_type != htons(ETHERTYPE_PAE));
 	if (addqos)
 		hdrsize = sizeof(struct ieee80211_qosframe);
 	else
 		hdrsize = sizeof(struct ieee80211_frame);
+
 	switch (vap->iv_opmode) {
 	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
 		ismulticast = IEEE80211_IS_MULTICAST(eh.ether_dhost);
 		break;
 	case IEEE80211_M_WDS:
-		hdrsize += IEEE80211_ADDR_LEN;
 		use4addr = 1;
 		ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
 		break;
 	case IEEE80211_M_HOSTAP:
 		if (!IEEE80211_IS_MULTICAST(eh.ether_dhost) &&
 		    !IEEE80211_ADDR_EQ(eh.ether_dhost, ni->ni_macaddr)) {
-			hdrsize += IEEE80211_ADDR_LEN;
 			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
-		}
-		else
+		} else
 			ismulticast = IEEE80211_IS_MULTICAST(eh.ether_dhost);
 		break;
 	case IEEE80211_M_STA:
 		if ((vap->iv_flags_ext & IEEE80211_FEXT_WDS) &&
-		    (!IEEE80211_ADDR_EQ(eh.ether_shost, vap->iv_myaddr))) {
-			hdrsize += IEEE80211_ADDR_LEN;
+		    !IEEE80211_ADDR_EQ(eh.ether_shost, vap->iv_myaddr)) {
 			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
-			/* add a wds entry to the station vap */
+			/* Add a wds entry to the station VAP */
 			if (IEEE80211_IS_MULTICAST(eh.ether_dhost)) {
-				struct ieee80211_node_table *nt;
-				struct ieee80211_node *ni_wds = NULL;
-				nt = &ic->ic_sta;
-				ni_wds = ieee80211_find_wds_node(nt, eh.ether_shost);
+				struct ieee80211_node_table *nt = &ic->ic_sta;
+				struct ieee80211_node *ni_wds 
+					= ieee80211_find_wds_node(nt, eh.ether_shost);
 				if (ni_wds)
-					ieee80211_unref_node(&ni_wds); /* Decr ref count */
+					ieee80211_unref_node(&ni_wds); /* Decr. ref. count */
 				else
 					ieee80211_add_wds_addr(nt, ni, eh.ether_shost, 0);
 			}
@@ -877,6 +874,9 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	default:
 		break;
 	}
+
+	if (use4addr)
+		hdrsize += IEEE80211_ADDR_LEN;
 
 	hdrsize_nopad = hdrsize;
 	if (ic->ic_flags & IEEE80211_F_DATAPAD)
