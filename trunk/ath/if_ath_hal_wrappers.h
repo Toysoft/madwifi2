@@ -42,8 +42,6 @@
  * additional helper functions.  Mostly these just provide a series of nicknames
  * for specific sets of arguments to HAL functions that are commonly needed. */
 
-#include "if_ath_hal.h"
-
 #ifndef _IF_ATH_HAL_WRAPPERS_H_
 #define _IF_ATH_HAL_WRAPPERS_H_
 
