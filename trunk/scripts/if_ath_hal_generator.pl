@@ -358,7 +358,7 @@ for my $member_name (keys %hal_functionname_to_return_type) {
    if(exists $hal_function_name_to_madwifi_name{$member_name}) {
       $api_name = $hal_function_name_to_madwifi_name{$member_name};
    }   
-   print ATH_HAL_API_H "__hal_wrapper " . $api_return_type . " " . $api_name . "(";
+   print ATH_HAL_API_H "static inline " . $api_return_type . " " . $api_name . "(";
    my @names = @{$hal_functionname_to_parameter_name_array{$member_name}};
    my @types = @{$hal_functionname_to_parameter_types_array{$member_name}};
    for my $i (0..$#names) {
@@ -367,7 +367,7 @@ for my $member_name (keys %hal_functionname_to_return_type) {
       }
       print ATH_HAL_API_H $types[$i] . " " . $names[$i];
    }
-   print ATH_HAL_API_H ")\n\tIMPLEMENTATION({";
+   print ATH_HAL_API_H ")\n\t{";
    if(! ($api_return_type =~ /void/ )) {
       print ATH_HAL_API_H "\n\t\t" . $api_return_type . " ret;";
    }
@@ -389,7 +389,7 @@ for my $member_name (keys %hal_functionname_to_return_type) {
    if(! ($api_return_type =~ /void/ )) {
       print ATH_HAL_API_H "\n\t\treturn ret;";
    }
-   print ATH_HAL_API_H "\n\t})\n";
+   print ATH_HAL_API_H "\n\t}\n";
 }
 print ATH_HAL_API_H $footer_for_h;
 
