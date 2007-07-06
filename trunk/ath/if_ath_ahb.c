@@ -388,14 +388,14 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
 static int ahb_wmac_probe(struct platform_device *pdev)
 {
-	u32 devid;
+	u_int16_t devid;
 	struct ar531x_config *config;
 
 	config = (struct ar531x_config *) pdev->dev.platform_data;
-	devid = (u32) config->tag;
+	devid = (long) config->tag;
 	config->tag = NULL;
 
-	return init_ath_wmac((u_int16_t) devid, pdev->id, config);
+	return init_ath_wmac(devid, pdev->id, config);
 }
 
 
