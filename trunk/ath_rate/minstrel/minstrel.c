@@ -387,7 +387,6 @@ ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
 {
 		struct minstrel_node *sn = ATH_NODE_MINSTREL(an);
 		int rc1, rc2, rc3;         /* Index into the rate table, so for example, it is  0..11 */
-		int rixc1, rixc2, rixc3;   /* The actual bit rate used */
 
 		if (sn->is_sampling) {
 			rc1 = sn->max_tp_rate;
@@ -415,20 +414,17 @@ ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
 			     ether_sprintf(an->an_node.ni_macaddr)));
 
 		if (shortPreamble) {
-			rixc1 = sn->rates[rc1].shortPreambleRateCode;
-			rixc2 = sn->rates[rc2].shortPreambleRateCode;
-			rixc3 = sn->rates[rc3].shortPreambleRateCode;
+			mrr->rate1 = sn->rates[rc1].shortPreambleRateCode;
+			mrr->rate2 = sn->rates[rc2].shortPreambleRateCode;
+			mrr->rate3 = sn->rates[rc3].shortPreambleRateCode;
 		} else {
-			rixc1 = sn->rates[rc1].rateCode;
-			rixc2 = sn->rates[rc2].rateCode;
-			rixc3 = sn->rates[rc3].rateCode;
+			mrr->rate1 = sn->rates[rc1].rateCode;
+			mrr->rate2 = sn->rates[rc2].rateCode;
+			mrr->rate3 = sn->rates[rc3].rateCode;
 		}
 
-		mrr->rate1 = rixc1;
 		mrr->retries1 = sn->retry_adjusted_count[rc1];
-		mrr->rate2 = rixc2;
 		mrr->retries2 = sn->retry_adjusted_count[rc2];
-		mrr->rate3 = rixc3;
 		mrr->retries3 = sn->retry_adjusted_count[rc3];
 }
 
