@@ -134,16 +134,17 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 }
 
 static void
-ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
-	struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
+ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
+		 size_t frame_size, u_int8_t rix, struct ieee80211_mrr *mrr)
 {
 	struct onoe_node *on = ATH_NODE_ONOE(an);
 
-	ath_hal_setupxtxdesc(sc->sc_ah, ds
-		, on->on_tx_rate1sp, 2	/* series 1 */
-		, on->on_tx_rate2sp, 2	/* series 2 */
-		, on->on_tx_rate3sp, 2	/* series 3 */
-	);
+	mrr->rate1 = on->on_tx_rate1sp;
+	mrr->retries1 = 2;
+	mrr->rate2 = on->on_tx_rate2sp;
+	mrr->retries2 = 2;
+	mrr->rate3 = on->on_tx_rate3sp;
+	mrr->retries3 = 2;
 }
 
 static void
@@ -498,7 +499,7 @@ static struct ieee80211_rate_ops ath_rate_ops = {
 	.node_init = ath_rate_node_init,
 	.node_cleanup = ath_rate_node_cleanup,
 	.findrate = ath_rate_findrate,
-	.setupxtxdesc = ath_rate_setupxtxdesc,
+	.get_mrr = ath_rate_get_mrr,
 	.tx_complete = ath_rate_tx_complete,
 	.newassoc = ath_rate_newassoc,
 	.newstate = ath_rate_newstate,

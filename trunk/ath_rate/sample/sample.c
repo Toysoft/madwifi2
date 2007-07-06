@@ -506,8 +506,8 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 }
 
 static void
-ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
-	struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
+ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
+		 size_t frame_size, u_int8_t rix, struct ieee80211_mrr *mrr)
 {
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	unsigned int size_bin;
@@ -524,11 +524,13 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 		rateCode = sn->rates[ndx].shortPreambleRateCode;
 	else
 		rateCode = sn->rates[ndx].rateCode;
-	ath_hal_setupxtxdesc(sc->sc_ah, ds,
-			     rateCode, 3, 	        /* series 1 */
-			     sn->rates[0].rateCode, 3, 	/* series 2 */
-			     0, 0	                /* series 3 */
-			    );
+
+	mrr->rate1 = rateCode;
+	mrr->retries1 = 3;
+	mrr->rate2 = sn->rates[0].rateCode;
+	mrr->retries2 = 3;
+	mrr->rate3 = 0;
+	mrr->retries3 = 0;
 }
 
 static void
@@ -1112,7 +1114,7 @@ static struct ieee80211_rate_ops ath_rate_ops = {
 	.node_init = ath_rate_node_init,
 	.node_cleanup = ath_rate_node_cleanup,
 	.findrate = ath_rate_findrate,
-	.setupxtxdesc = ath_rate_setupxtxdesc,
+	.get_mrr = ath_rate_get_mrr,
 	.tx_complete = ath_rate_tx_complete,
 	.newassoc = ath_rate_newassoc,
 	.newstate = ath_rate_newstate,
