@@ -512,7 +512,6 @@ ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
 	struct sample_node *sn = ATH_NODE_SAMPLE(an);
 	unsigned int size_bin;
 	int ndx;
-	int rateCode;
 
 	size_bin = size_to_bin(frame_size);
 	ndx = sn->current_rate[size_bin]; /* retry at the current bit-rate */
@@ -521,11 +520,10 @@ ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
 		ndx = 0;  /* use the lowest bit-rate */
 
 	if (shortPreamble)
-		rateCode = sn->rates[ndx].shortPreambleRateCode;
+		mrr->rate1 = sn->rates[ndx].shortPreambleRateCode;
 	else
-		rateCode = sn->rates[ndx].rateCode;
+		mrr->rate1 = sn->rates[ndx].rateCode;
 
-	mrr->rate1 = rateCode;
 	mrr->retries1 = 3;
 	mrr->rate2 = sn->rates[0].rateCode;
 	mrr->retries2 = 3;
