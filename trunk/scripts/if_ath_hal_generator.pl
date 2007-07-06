@@ -373,7 +373,7 @@ for my $member_name (keys %hal_functionname_to_return_type) {
    if(! ($api_return_type =~ /void/ )) {
       print ATH_HAL_API_H "\n\t" . $api_return_type . " ret;";
    }
-   print ATH_HAL_API_H "\n\tATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));";
+   print ATH_HAL_API_H "\n\tATH_HAL_LOCK_IRQ(ah->ah_sc);";
    print ATH_HAL_API_H "\n\t";
    if(! ($api_return_type =~ /void/ )) {
       print ATH_HAL_API_H "ret = ";
@@ -387,7 +387,7 @@ for my $member_name (keys %hal_functionname_to_return_type) {
       print ATH_HAL_API_H $names[$j];
    }
    print ATH_HAL_API_H ");";
-   print ATH_HAL_API_H "\n\tATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));";
+   print ATH_HAL_API_H "\n\tATH_HAL_UNLOCK_IRQ(ah->ah_sc);";
    if(! ($api_return_type =~ /void/ )) {
       print ATH_HAL_API_H "\n\treturn ret;";
    }
