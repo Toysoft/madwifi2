@@ -6613,6 +6613,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ath_node *an;
 	struct ath_vap *avp = ATH_VAP(vap);
 	u_int8_t antenna;
+	struct ieee80211_mrr mrr;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	isprot = wh->i_fc[1] & IEEE80211_FC1_PROT;
@@ -7081,9 +7082,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * when the hardware supports multi-rate retry and
 	 * we don't use it.
 	 */
-	if (try0 != ATH_TXMAXTRY)
-		sc->sc_rc->ops->setupxtxdesc(sc, an, ds, shortPreamble,
-					     skb->len, rix);
+	if (try0 != ATH_TXMAXTRY) {
+		sc->sc_rc->ops->get_mrr(sc, an, shortPreamble, skb->len, rix,
+					&mrr);
+		ath_hal_setupxtxdesc(sc->sc_ah, ds, mrr.rate1, mrr.retries1,
+				     mrr.rate2, mrr.retries2,
+				     mrr.rate3, mrr.retries3);
+	}
 
 #ifndef ATH_SUPERG_FF
 	ds->ds_link = 0;

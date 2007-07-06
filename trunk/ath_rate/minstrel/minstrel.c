@@ -382,8 +382,8 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 
 
 static void
-ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
-		struct ath_desc *ds, int shortPreamble, size_t frame_size, u_int8_t rix)
+ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
+		 size_t frame_size, u_int8_t rix, struct ieee80211_mrr *mrr)
 {
 		struct minstrel_node *sn = ATH_NODE_MINSTREL(an);
 		int rc1, rc2, rc3;         /* Index into the rate table, so for example, it is  0..11 */
@@ -424,11 +424,12 @@ ath_rate_setupxtxdesc(struct ath_softc *sc, struct ath_node *an,
 			rixc3 = sn->rates[rc3].rateCode;
 		}
 
-		ath_hal_setupxtxdesc(sc->sc_ah, ds,
-				     rixc1, sn->retry_adjusted_count[rc1],   /* series 1 */
-				     rixc2, sn->retry_adjusted_count[rc2],   /* series 2 */
-				     rixc3, sn->retry_adjusted_count[rc3]    /* series 3 */
-				     );
+		mrr->rate1 = rixc1;
+		mrr->retries1 = sn->retry_adjusted_count[rc1];
+		mrr->rate2 = rixc2;
+		mrr->retries2 = sn->retry_adjusted_count[rc2];
+		mrr->rate3 = rixc3;
+		mrr->retries3 = sn->retry_adjusted_count[rc3];
 }
 
 static void
@@ -1029,7 +1030,7 @@ static struct ieee80211_rate_ops ath_rate_ops = {
 		.node_init = ath_rate_node_init,
 		.node_cleanup = ath_rate_node_cleanup,
 		.findrate = ath_rate_findrate,
-		.setupxtxdesc = ath_rate_setupxtxdesc,
+		.get_mrr = ath_rate_get_mrr,
 		.tx_complete = ath_rate_tx_complete,
 		.newassoc = ath_rate_newassoc,
 		.newstate = ath_rate_newstate,
