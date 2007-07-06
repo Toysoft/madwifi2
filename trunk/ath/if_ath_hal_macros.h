@@ -50,7 +50,6 @@
 #ifndef _IF_ATH_HAL_MACROS_H_
 #define _IF_ATH_HAL_MACROS_H_
 
-#define GET_ATH_SOFTC(_ah) 	((struct ath_softc*)(_ah->ah_sc))
 #define ATH_HAL_LOCK_INIT(_sc) 	spin_lock_init(&(_sc)->sc_hal_lock)
 #define ATH_HAL_LOCK_DESTROY(_sc)
 #define ATH_HAL_LOCK_IRQ(_sc) 	do { \

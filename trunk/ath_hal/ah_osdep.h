@@ -54,6 +54,9 @@
 #define	__packed	__attribute__((__packed__))
 #endif
 
+/* Safer HAL_SOFTC definition */
+#define HAL_SOFTC struct ath_softc *
+
 /* Replace non-annotated HAL_BUS_HANDLE from ah.h */
 typedef void __iomem* ath_iomem_t;
 #define HAL_BUS_HANDLE ath_iomem_t
