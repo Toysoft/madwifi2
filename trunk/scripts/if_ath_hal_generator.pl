@@ -209,7 +209,7 @@ my $footer = <<EOF
 
 #include "if_ath_hal_wrappers.h"
 
-#endif /* #ifndef _IF_ATH_HAL_H_ */
+#endif				/* #ifndef _IF_ATH_HAL_H_ */
  /* *** THIS IS A GENERATED FILE -- DO NOT EDIT *** */
  /* *** THIS IS A GENERATED FILE -- DO NOT EDIT *** */
  /* *** THIS IS A GENERATED FILE -- DO NOT EDIT *** */
@@ -298,11 +298,15 @@ sub generate_output() {
     for my $member_name ( keys %return_types ) {
         my $api_return_type = $return_types{$member_name};
         my $api_name        = $member_name;
+        my $ret_void        = ( $api_return_type =~ /void/ );
+        if ( !( $api_return_type =~ /\*$/ ) ) {
+            $api_return_type .= " ";
+        }
         if ( exists $hal_name_to_madwifi_name{$member_name} ) {
             $api_name = $hal_name_to_madwifi_name{$member_name};
         }
         print OUTPUT "\nstatic inline "
-          . $api_return_type . " "
+          . $api_return_type
           . $api_name . "(";
         my @names = @{ $parameter_names{$member_name} };
         my @types = @{ $parameter_types{$member_name} };
@@ -315,12 +319,12 @@ sub generate_output() {
             print OUTPUT $arg;
         }
         print OUTPUT ")\n{";
-        if ( !( $api_return_type =~ /void/ ) ) {
-            print OUTPUT "\n\t" . $api_return_type . " ret;";
+        if ( !$ret_void ) {
+            print OUTPUT "\n\t" . $api_return_type . "ret;";
         }
         print OUTPUT "\n\tATH_HAL_LOCK_IRQ(ah->ah_sc);";
         print OUTPUT "\n\t";
-        if ( !( $api_return_type =~ /void/ ) ) {
+        if ( !$ret_void ) {
             print OUTPUT "ret = ";
         }
 
@@ -333,7 +337,7 @@ sub generate_output() {
         }
         print OUTPUT ");";
         print OUTPUT "\n\tATH_HAL_UNLOCK_IRQ(ah->ah_sc);";
-        if ( !( $api_return_type =~ /void/ ) ) {
+        if ( !$ret_void ) {
             print OUTPUT "\n\treturn ret;";
         }
         print OUTPUT "\n}\n";
