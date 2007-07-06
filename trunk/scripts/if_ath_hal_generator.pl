@@ -366,7 +366,7 @@ for my $member_name (keys %hal_functionname_to_return_type) {
 	 print ATH_HAL_API_H ", ";
       }
       my $arg = $types[$i] . " " . $names[$i];
-      $arg =~ s/(\*+) / \1/;
+      $arg =~ s/(\*+) / $1/;
       print ATH_HAL_API_H $arg;
    }
    print ATH_HAL_API_H ")\n{";
