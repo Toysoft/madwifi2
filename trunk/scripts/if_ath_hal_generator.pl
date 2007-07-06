@@ -358,21 +358,23 @@ for my $member_name (keys %hal_functionname_to_return_type) {
    if(exists $hal_function_name_to_madwifi_name{$member_name}) {
       $api_name = $hal_function_name_to_madwifi_name{$member_name};
    }   
-   print ATH_HAL_API_H "static inline " . $api_return_type . " " . $api_name . "(";
+   print ATH_HAL_API_H "\nstatic inline " . $api_return_type . " " . $api_name . "(";
    my @names = @{$hal_functionname_to_parameter_name_array{$member_name}};
    my @types = @{$hal_functionname_to_parameter_types_array{$member_name}};
    for my $i (0..$#names) {
       if($i) {
 	 print ATH_HAL_API_H ", ";
       }
-      print ATH_HAL_API_H $types[$i] . " " . $names[$i];
+      my $arg = $types[$i] . " " . $names[$i];
+      $arg =~ s/(\*+) / \1/;
+      print ATH_HAL_API_H $arg;
    }
-   print ATH_HAL_API_H ")\n\t{";
+   print ATH_HAL_API_H ")\n{";
    if(! ($api_return_type =~ /void/ )) {
-      print ATH_HAL_API_H "\n\t\t" . $api_return_type . " ret;";
+      print ATH_HAL_API_H "\n\t" . $api_return_type . " ret;";
    }
-   print ATH_HAL_API_H "\n\t\tATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));";
-   print ATH_HAL_API_H "\n\t\t";
+   print ATH_HAL_API_H "\n\tATH_HAL_LOCK_IRQ(GET_ATH_SOFTC(ah));";
+   print ATH_HAL_API_H "\n\t";
    if(! ($api_return_type =~ /void/ )) {
       print ATH_HAL_API_H "ret = ";
    }
@@ -385,11 +387,11 @@ for my $member_name (keys %hal_functionname_to_return_type) {
       print ATH_HAL_API_H $names[$j];
    }
    print ATH_HAL_API_H ");";
-   print ATH_HAL_API_H "\n\t\tATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));";
+   print ATH_HAL_API_H "\n\tATH_HAL_UNLOCK_IRQ(GET_ATH_SOFTC(ah));";
    if(! ($api_return_type =~ /void/ )) {
-      print ATH_HAL_API_H "\n\t\treturn ret;";
+      print ATH_HAL_API_H "\n\treturn ret;";
    }
-   print ATH_HAL_API_H "\n\t}\n";
+   print ATH_HAL_API_H "\n}\n";
 }
 print ATH_HAL_API_H $footer_for_h;
 
