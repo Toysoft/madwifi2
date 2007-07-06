@@ -57,7 +57,7 @@ obj-y := ath/ ath_hal/ ath_rate/ net80211/
 all: modules tools
 
 ath/if_ath_hal.h: hal/ah.h
-	scripts/if_ath_hal_generator.pl
+	scripts/if_ath_hal_generator.pl $< $@
 
 modules: configcheck ath/if_ath_hal.h svnversion.h
 ifdef LINUX24
