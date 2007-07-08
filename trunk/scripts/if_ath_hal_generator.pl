@@ -214,9 +214,6 @@ EOF
 
 # Parsed Function Data
 
-# list of declarations in document order
-my @hal_prototypes = ();
-
 # hash of string->string (hal's function name to return type)
 my %return_types = ();
 
@@ -225,6 +222,52 @@ my %parameter_names = ();
 
 # hash of string->list of strings (ordered list of parameter types)
 my %parameter_types = ();
+
+# Pick apart the return type, parameter types, and parameter names for each HAL function
+sub parse_prototype($) {
+    my $proto = shift @_;
+    $proto =~
+/^((?:(?:const|struct)\s*)*[^\s]+(?:[\s]*\*)?)[\s]*__ahdecl\(\*([^\)]*)\)\((.*)\);/;
+    my $return_type   = $1;
+    my $member_name   = $2;
+    my $parameterlist = $3;
+
+    my $api_name = $wrapper_names{$member_name};
+    if ( exists $wrapper_names{$member_name} ) {
+        if ( !defined $api_name ) {
+            return;    # known name, but no wrapper needed
+        }
+    }
+    else {
+        print STDERR "No wrapper name for $member_name\n";
+        exit 1;
+    }
+
+    $return_types{"$member_name"} = $return_type;
+    @{ $parameter_names{"$member_name"} } = ();
+    @{ $parameter_types{"$member_name"} } = ();
+    my @parameters = split /,\s?/, $parameterlist;
+    my $argnum = 0;
+
+    foreach (@parameters) {
+        s/ \*/\* /;
+        /^((?:(?:const|struct|\*)\s*)*)([^\s]+\*?)\s*([^\s]*)\s*/;
+        my $type = "$1$2";
+        my $name = "$3";
+        if ( 0 == length($name) ) {
+            if ( $argnum == 0 && $type =~ /ath_hal/ ) {
+                $name = "ah";
+            }
+            else {
+                $name = "a$argnum";
+            }
+        }
+
+        push @{ $parameter_names{$member_name} }, $name;
+        push @{ $parameter_types{$member_name} }, $type;
+        $argnum++;
+    }
+}
 
 # Parse and scrub the hal structure's member function declarations
 sub parse_input() {
@@ -238,7 +281,7 @@ sub parse_input() {
         if ( /__ahdecl\s*\(.*/ || $line_continued ) {
             $line_buffer .= "$_";
             if ( /__ahdecl.*;/ || ( $line_continued && /;/ ) ) {
-                push @hal_prototypes, $line_buffer;
+                parse_prototype($line_buffer);
                 $line_buffer    = "";
                 $line_continued = 0;
             }
@@ -246,52 +289,6 @@ sub parse_input() {
                 $line_buffer .= " ";
                 $line_continued = 1;
             }
-        }
-    }
-}
-
-# Now pick apart the return type, parameter types, and parameter names for each HAL function
-sub analyze() {
-    foreach (@hal_prototypes) {
-/^((?:(?:const|struct)\s*)*[^\s]+(?:[\s]*\*)?)[\s]*__ahdecl\(\*([^\)]*)\)\((.*)\);/;
-        my $return_type   = $1;
-        my $member_name   = $2;
-        my $parameterlist = $3;
-
-        my $api_name = $wrapper_names{$member_name};
-        if ( exists $wrapper_names{$member_name} ) {
-            if ( !defined $api_name ) {
-                next;    # known name, but no wrapper needed
-            }
-        }
-        else {
-            print STDERR "No wrapper name for $member_name\n";
-            exit 1;
-        }
-
-        $return_types{"$member_name"} = $return_type;
-        @{ $parameter_names{"$member_name"} } = ();
-        @{ $parameter_types{"$member_name"} } = ();
-        my @parameters = split /,\s?/, $parameterlist;
-        my $argnum = 0;
-
-        foreach (@parameters) {
-            s/ \*/\* /;
-            /^((?:(?:const|struct|\*)\s*)*)([^\s]+\*?)\s*([^\s]*)\s*/;
-            my $type = "$1$2";
-            my $name = "$3";
-            if ( 0 == length($name) ) {
-                if ( $argnum == 0 && $type =~ /ath_hal/ ) {
-                    $name = "ah";
-                }
-                else {
-                    $name = "a$argnum";
-                }
-            }
-
-            push @{ $parameter_names{$member_name} }, $name;
-            push @{ $parameter_types{$member_name} }, $type;
-            $argnum++;
         }
     }
 }
@@ -370,8 +367,6 @@ sub main () {
     }
     parse_input();
     close INPUT;
-
-    analyze();
 
     if ( !open OUTPUT, ">$output_header" ) {
         close INPUT;
