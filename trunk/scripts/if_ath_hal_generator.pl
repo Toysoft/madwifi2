@@ -273,7 +273,7 @@ sub analyze() {
         @{ $parameter_names{"$member_name"} } = ();
         @{ $parameter_types{"$member_name"} } = ();
         my @parameters = split /,\s?/, $parameterlist;
-        my $argnum     = 0;
+        my $argnum = 0;
 
         foreach (@parameters) {
             s/ \*/\* /;
@@ -296,6 +296,18 @@ sub analyze() {
     }
 }
 
+# Arrange spaces in the type name nicely
+sub format_type($) {
+    my $type = shift @_;
+    if ( $type =~ /\*$/ ) {
+        $type =~ s/^([^*]*[^*\s])\s*(\*+)$/$1 $2/;
+    }
+    else {
+        $type .= " ";
+    }
+    return $type;
+}
+
 # Generate the header file
 sub generate_output() {
     print OUTPUT $header;
@@ -304,23 +316,20 @@ sub generate_output() {
         my $api_name        = $wrapper_names{$member_name};
         my $api_return_type = $return_types{$member_name};
         my $ret_void        = ( $api_return_type =~ /void/ );
-        if ( !( $api_return_type =~ /\*$/ ) ) {
-            $api_return_type .= " ";
-        }
-        print OUTPUT "\nstatic inline $api_return_type$api_name(";
+        print OUTPUT "\nstatic inline "
+          . format_type($api_return_type)
+          . "$api_name(";
         my @names = @{ $parameter_names{$member_name} };
         my @types = @{ $parameter_types{$member_name} };
         for my $i ( 0 .. $#names ) {
             if ($i) {
                 print OUTPUT ", ";
             }
-            my $arg = "$types[$i] $names[$i]";
-            $arg =~ s/(\*+) / $1/;
-            print OUTPUT $arg;
+            print OUTPUT format_type( $types[$i] ) . $names[$i];
         }
         print OUTPUT ")\n{";
         if ( !$ret_void ) {
-            print OUTPUT "\n\t${api_return_type}ret;";
+            print OUTPUT "\n\t" . format_type($api_return_type) . "ret;";
         }
         print OUTPUT "\n\tATH_HAL_LOCK_IRQ(ah->ah_sc);";
         print OUTPUT "\n\t";
