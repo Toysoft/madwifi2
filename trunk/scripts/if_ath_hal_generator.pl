@@ -45,10 +45,12 @@ use warnings;
 
 #
 # This section defines the name translation from the binary HAL's function
-# pointers to our API names.
+# pointers to our API names.  Please provide all function names here.  If
+# the wrapper is not needed, use undef.
 #
-my %hal_name_to_madwifi_name = (
+my %wrapper_names = (
     "ah_beaconInit"               => "ath_hal_beaconinit",
+    "ah_detach"                   => undef,
     "ah_disablePhyErrDiag"        => "ath_hal_disablePhyDiag",
     "ah_enablePhyErrDiag"         => "ath_hal_enablePhyDiag",
     "ah_enableReceive"            => "ath_hal_rxena",
@@ -145,12 +147,6 @@ my %hal_name_to_madwifi_name = (
     "ah_clrMulticastFilterIndex"  => "ath_hal_clearmcastfilter",
     "ah_detectCardPresent"        => "ath_hal_detectcardpresent"
 );
-
-#
-# List any functions that should NOT be generated here (such as those that conflict with
-# other functions, perhaps.
-#
-my @hal_functions_not_to_wrap = ("ah_detach");
 
 #
 # This text is copied verbatim to the top of the output header file
@@ -261,32 +257,41 @@ sub analyze() {
         my $return_type   = $1;
         my $member_name   = $2;
         my $parameterlist = $3;
-        if ( !grep { /$member_name/ } @hal_functions_not_to_wrap ) {
-            $return_types{"$member_name"} = $return_type;
-            @{ $parameter_names{"$member_name"} } = ();
-            @{ $parameter_types{"$member_name"} } = ();
-            my @parameters = split /,\s?/, $parameterlist;
-            my $argnum     = 0;
-            my $first      = 1;
-            foreach (@parameters) {
-                s/ \*/\* /;
-                /^((?:(?:const|struct|\*)\s*)*)([^\s]+\*?)\s*([^\s]*)\s*/;
-                my $type = "$1$2";
-                my $name = "$3";
-                if ( 0 == length($name) ) {
-                    if ( $argnum == 0 && $type =~ /ath_hal/ ) {
-                        $name = "ah";
-                    }
-                    else {
-                        $name = "a" . $argnum;
-                    }
-                }
 
-                push @{ $parameter_names{$member_name} }, $name;
-                push @{ $parameter_types{$member_name} }, $type;
-                $first = 0;
-                $argnum++;
+        my $api_name = $wrapper_names{$member_name};
+        if ( exists $wrapper_names{$member_name} ) {
+            if ( !defined $api_name ) {
+                next;    # known name, but no wrapper needed
             }
+        }
+        else {
+            print STDERR "No wrapper name for $member_name\n";
+            exit 1;
+        }
+
+        $return_types{"$member_name"} = $return_type;
+        @{ $parameter_names{"$member_name"} } = ();
+        @{ $parameter_types{"$member_name"} } = ();
+        my @parameters = split /,\s?/, $parameterlist;
+        my $argnum     = 0;
+
+        foreach (@parameters) {
+            s/ \*/\* /;
+            /^((?:(?:const|struct|\*)\s*)*)([^\s]+\*?)\s*([^\s]*)\s*/;
+            my $type = "$1$2";
+            my $name = "$3";
+            if ( 0 == length($name) ) {
+                if ( $argnum == 0 && $type =~ /ath_hal/ ) {
+                    $name = "ah";
+                }
+                else {
+                    $name = "a$argnum";
+                }
+            }
+
+            push @{ $parameter_names{$member_name} }, $name;
+            push @{ $parameter_types{$member_name} }, $type;
+            $argnum++;
         }
     }
 }
@@ -296,31 +301,26 @@ sub generate_output() {
     print OUTPUT $header;
 
     for my $member_name ( keys %return_types ) {
+        my $api_name        = $wrapper_names{$member_name};
         my $api_return_type = $return_types{$member_name};
-        my $api_name        = $member_name;
         my $ret_void        = ( $api_return_type =~ /void/ );
         if ( !( $api_return_type =~ /\*$/ ) ) {
             $api_return_type .= " ";
         }
-        if ( exists $hal_name_to_madwifi_name{$member_name} ) {
-            $api_name = $hal_name_to_madwifi_name{$member_name};
-        }
-        print OUTPUT "\nstatic inline "
-          . $api_return_type
-          . $api_name . "(";
+        print OUTPUT "\nstatic inline $api_return_type$api_name(";
         my @names = @{ $parameter_names{$member_name} };
         my @types = @{ $parameter_types{$member_name} };
         for my $i ( 0 .. $#names ) {
             if ($i) {
                 print OUTPUT ", ";
             }
-            my $arg = $types[$i] . " " . $names[$i];
+            my $arg = "$types[$i] $names[$i]";
             $arg =~ s/(\*+) / $1/;
             print OUTPUT $arg;
         }
         print OUTPUT ")\n{";
         if ( !$ret_void ) {
-            print OUTPUT "\n\t" . $api_return_type . "ret;";
+            print OUTPUT "\n\t${api_return_type}ret;";
         }
         print OUTPUT "\n\tATH_HAL_LOCK_IRQ(ah->ah_sc);";
         print OUTPUT "\n\t";
