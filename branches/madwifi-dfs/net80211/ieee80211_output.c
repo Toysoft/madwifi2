@@ -201,14 +201,12 @@ int
 ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ieee80211vap *vap = dev->priv;
-	struct ieee80211com *ic = vap->iv_ic;
-	struct net_device *parent = ic->ic_dev;
 	struct ieee80211_node *ni = NULL;
 	struct ieee80211_cb *cb;
 	struct ether_header *eh;
 
 	/* NB: parent must be up and running */
-	if ((parent->flags & (IFF_RUNNING|IFF_UP)) != (IFF_RUNNING|IFF_UP))
+	if (!VAP_IS_UP(vap))
 		goto bad;
 	/*
 	 * No data frames go out unless we're running.
