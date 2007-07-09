@@ -41,6 +41,7 @@
 /* Compatibility with older Linux kernels */
 #ifdef __KERNEL__
 #include <linux/types.h>
+#include <linux/time.h>
 #endif
 #if !defined(__KERNEL__) || !defined (__bitwise)
 #define __le16 u_int16_t
@@ -130,6 +131,17 @@
 #define __user
 #define __kernel
 #define __iomem
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
+static inline int timeval_compare(struct timeval *lhs, struct timeval *rhs)
+{
+	if (lhs->tv_sec < rhs->tv_sec)
+		return -1;
+	if (lhs->tv_sec > rhs->tv_sec)
+		return 1;
+	return lhs->tv_usec - rhs->tv_usec;
+}
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
