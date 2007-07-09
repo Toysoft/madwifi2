@@ -409,7 +409,7 @@ static void ath_printtxbuf(const struct ath_buf *, int);
 			ath_grppoll_start(vap, sc->sc_xrpollcount); \
 			ath_hal_setrxfilter(sc->sc_ah, rfilt|HAL_RX_FILTER_XRPOLL); \
 		} \
-   	} while (0)
+	} while (0)
 
 /*
  * Define the scheme that we select MAC address for multiple BSS on the same radio.
@@ -680,9 +680,21 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) dev;
 
+	/* initialize DFS related variables */
+	sc->sc_dfswait = 0;
+	sc->sc_dfs_channel_check = 0;
+	sc->sc_dfs_testmode = 0;
+
+	init_timer(&sc->sc_dfs_channel_check_timer);
+	sc->sc_dfs_channel_check_timer.function = 
+		ath_dfs_channel_check_completed; 
+	sc->sc_dfs_channel_check_timer.data = (unsigned long) sc ; 
+
 	init_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
-	sc->sc_dfs_channel_non_occupancy_expiration_timer.function = ath_radar_expire_dfs_channel_non_occupancy_timers;
-	sc->sc_dfs_channel_non_occupancy_expiration_timer.data = (unsigned long) dev;
+	sc->sc_dfs_channel_non_occupancy_expiration_timer.function = 
+		ath_radar_expire_dfs_channel_non_occupancy_timers;
+	sc->sc_dfs_channel_non_occupancy_expiration_timer.data = 
+		(unsigned long) sc;
 
 	sc->sc_dfs_channel_availability_check_time = 0; /* default is used */
 	sc->sc_dfs_non_occupancy_period = 0; /* default is used */
@@ -701,7 +713,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_ledon = 0;			/* low true */
 	sc->sc_ledidle = msecs_to_jiffies(2700);	/* 2.7 sec */
 	init_timer(&sc->sc_ledtimer);
-	init_timer(&sc->sc_dfs_channel_check_timer);
 	sc->sc_ledtimer.data = (unsigned long) sc;
 	if (sc->sc_softled) {
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
@@ -718,7 +729,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	dev->do_ioctl = ath_ioctl;
 	dev->get_stats = ath_getstats;
 	dev->set_mac_address = ath_set_mac_address;
- 	dev->change_mtu = ath_change_mtu;
+	dev->change_mtu = ath_change_mtu;
 	dev->tx_queue_len = ATH_TXBUF - 1;		/* 1 for mgmt frame */
 #ifdef USE_HEADERLEN_RESV
 	dev->hard_header_len += sizeof(struct ieee80211_qosframe) +
@@ -1026,9 +1037,9 @@ ath_detach(struct net_device *dev)
 	ath_stop(dev);
 
 	ath_hal_setpower(sc->sc_ah, HAL_PM_AWAKE, AH_TRUE);
-  	/* Flush the radar task if it's scheduled */
- 	if (sc->sc_dfs_channel_check)
-  		flush_scheduled_work();
+	/* Flush the radar task if it's scheduled */
+	if (sc->sc_dfs_channel_check)
+		flush_scheduled_work();
 
 	sc->sc_invalid = 1;
 
@@ -1292,6 +1303,12 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 			ath_beacon_config(sc, NULL);	/* restart beacons */
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
+
+	/* initialize DFS state */
+	DPRINTF(sc, ATH_DEBUG_DOTH,
+		"%s: marking VAP %p: DFS CAC not in progress\n",
+		DEV_NAME(dev), vap);
+	avp->av_dfs_channel_check_pending = 0;
 
 	return vap;
 }
@@ -1756,6 +1773,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		ATH_SCHEDULE_TQUEUE(&sc->sc_rxorntq, &needmark);
 	} else {
 		if (status & HAL_INT_SWBA) {
+			DPRINTF(sc, ATH_DEBUG_BEACON, "%s: ath_intr HAL_INT_SWBA\n",
+				DEV_NAME(sc->sc_dev));
+
 			/*
 			 * Software beacon alert--time to send a beacon.
 			 * Handle beacon transmission directly; deferring
@@ -2123,7 +2143,7 @@ ath_stop(struct net_device *dev)
 		 * (and system).  This varies by chip and is mostly an
 		 * issue with newer parts that go to sleep more quickly.
 		 */
-		ath_hal_setpower(sc->sc_ah, HAL_PM_FULL_SLEEP);
+		ath_hal_setpower(sc->sc_ah, HAL_PM_FULL_SLEEP, AH_TRUE);
 	}
 #endif
 	ATH_UNLOCK(sc);
@@ -2420,15 +2440,15 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 
 	/* XXX check return value? */
 	ath_hal_setuptxdesc(ah, ds,
-			    pktlen, 			/* packet length */
-			    hdrlen, 			/* header length */
-			    atype, 			/* Atheros packet type */
-			    power, 			/* txpower */
-			    txrate, try0, 		/* series 0 rate/tries */
+			    pktlen,			/* packet length */
+			    hdrlen,			/* header length */
+			    atype,			/* Atheros packet type */
+			    power,			/* txpower */
+			    txrate, try0,		/* series 0 rate/tries */
 			    HAL_TXKEYIX_INVALID,	/* key cache index */
-			    antenna, 			/* antenna mode */
-			    flags, 			/* flags */
-			    0, 				/* rts/cts rate */
+			    antenna,			/* antenna mode */
+			    flags,			/* flags */
+			    0,				/* rts/cts rate */
 			    0,				/* rts/cts duration */
 			    0,				/* comp icv len */
 			    0,				/* comp iv len */
@@ -2439,7 +2459,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 		ath_hal_setupxtxdesc(sc->sc_ah, ds,
 			dot11_to_ratecode(sc, rt, ph->rate1), ph->try1, /* series 1 */
 			dot11_to_ratecode(sc, rt, ph->rate2), ph->try2, /* series 2 */
-			dot11_to_ratecode(sc, rt, ph->rate3), ph->try3 	/* series 3 */
+			dot11_to_ratecode(sc, rt, ph->rate3), ph->try3	/* series 3 */
 			);
 	}
 	bf->bf_flags = flags;	/* record for post-processing */
@@ -2448,9 +2468,9 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	ds->ds_data = bf->bf_skbaddr;
 
 	ath_hal_filltxdesc(ah, ds,
-			   skb->len, 	/* segment length */
-			   AH_TRUE, 	/* first segment */
-			   AH_TRUE, 	/* last segment */
+			   skb->len,	/* segment length */
+			   AH_TRUE,	/* first segment */
+			   AH_TRUE,	/* last segment */
 			   ds		/* first descriptor */
 			   );
 
@@ -2552,9 +2572,9 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 		DPRINTF(sc, ATH_DEBUG_XMIT,				\
 			"%s: stop queue\n", __func__);			\
 		sc->sc_stats.ast_tx_qstop++;				\
-		netif_stop_queue(dev); 					\
+		netif_stop_queue(dev);					\
 		sc->sc_devstopped = 1;					\
-		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL); 		\
+		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);		\
 	}								\
 	ATH_TXBUF_UNLOCK_IRQ(sc);					\
 	if (bf == NULL) {		/* NB: should not happen */	\
@@ -2863,7 +2883,7 @@ hardstart_fail:
 	}
 
 	/* let the kernel requeue the skb (dont free it!) */
- 	if (requeue)
+	if (requeue)
 		return NETDEV_TX_BUSY;
 
 	/* free sk_buffs */
@@ -3671,11 +3691,11 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark, u_int8_t dtim)
 	sc->sc_dturbo_bytes = sc->sc_devstats.tx_bytes
 			    + sc->sc_devstats.rx_bytes;
 	if (ic->ic_ath_cap & IEEE80211_ATHC_BOOST) {
- 		/* 
-  		* before switching to base mode,
-  		* make sure that the conditions( low rssi, low bw) to switch mode 
-  		* hold for some time and time in turbo exceeds minimum turbo time.
-  		*/
+		/* 
+		* before switching to base mode,
+		* make sure that the conditions( low rssi, low bw) to switch mode 
+		* hold for some time and time in turbo exceeds minimum turbo time.
+		*/
 
 		if (sc->sc_dturbo_tcount >= sc->sc_dturbo_turbo_tmin &&
 		   sc->sc_dturbo_hold ==0 &&
@@ -3856,7 +3876,7 @@ ath_beaconq_setup(struct ath_softc *sc)
 	qnum = ath_hal_setuptxqueue(sc->sc_ah, HAL_TX_QUEUE_BEACON, &qi);
 	txq = &sc->sc_txq[qnum];
 	memset(txq, 0, sizeof(struct ath_txq));
-	txq->axq_qnum 		= qnum;
+	txq->axq_qnum		= qnum;
 	STAILQ_INIT(&txq->axq_q);
 	ATH_TXQ_LOCK_INIT(txq);
 	TAILQ_INIT(&txq->axq_stageq);
@@ -4065,26 +4085,26 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	}
 #endif
 	ath_hal_setuptxdesc(ah, ds,
-		skb->len + IEEE80211_CRC_LEN, 	/* frame length */
+		skb->len + IEEE80211_CRC_LEN,	/* frame length */
 		sizeof(struct ieee80211_frame), /* header length */
-		HAL_PKT_TYPE_BEACON, 		/* Atheros packet type */
-		ni->ni_txpower, 		/* txpower XXX */
-		rate, 1, 			/* series 0 rate/tries */
-		HAL_TXKEYIX_INVALID, 		/* no encryption */
-		antenna, 			/* antenna mode */
-		flags, 				/* no ack, veol for beacons */
-		ctsrate, 			/* rts/cts rate */
-		ctsduration, 			/* rts/cts duration */
-		0, 				/* comp icv len */
-		0, 				/* comp iv len */
+		HAL_PKT_TYPE_BEACON,		/* Atheros packet type */
+		ni->ni_txpower,		/* txpower XXX */
+		rate, 1,			/* series 0 rate/tries */
+		HAL_TXKEYIX_INVALID,		/* no encryption */
+		antenna,			/* antenna mode */
+		flags,				/* no ack, veol for beacons */
+		ctsrate,			/* rts/cts rate */
+		ctsduration,			/* rts/cts duration */
+		0,				/* comp icv len */
+		0,				/* comp iv len */
 		ATH_COMP_PROC_NO_COMP_NO_CCS	/* comp scheme */
 	);
 
 	/* NB: beacon's BufLen must be a multiple of 4 bytes */
 	ath_hal_filltxdesc(ah, ds,
-		roundup(skb->len, 4), 	/* buffer length */
-		AH_TRUE, 		/* first segment */
-		AH_TRUE, 		/* last segment */
+		roundup(skb->len, 4),	/* buffer length */
+		AH_TRUE,		/* first segment */
+		AH_TRUE,		/* last segment */
 		ds			/* first descriptor */
 	);
 
@@ -4246,6 +4266,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	struct ath_buf *bf;
 	unsigned int slot;
 	u_int32_t bfaddr;
+	u_int32_t n_beacon;
 
 	if (ath_check_radio_silence_not_required(sc,__func__))
 		return;
@@ -4257,7 +4278,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	 * a problem and should not occur.  If we miss too
 	 * many consecutive beacons reset the device.
 	 */
-	if (ath_hal_numtxpending(ah, sc->sc_bhalq) != 0) {
+	if ( ( n_beacon = ath_hal_numtxpending(ah, sc->sc_bhalq)) != 0 ) {
 		sc->sc_bmisscount++;
 		/* XXX: 802.11h needs the chanchange IE countdown decremented.
 		 *      We should consider adding a net80211 call to indicate
@@ -4265,8 +4286,8 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		 *      (in that layer).
 		 */
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
-			"%s: missed %u consecutive beacons\n",
-			__func__, sc->sc_bmisscount);
+			"%s: missed %u consecutive beacons (n_beacon=%u)\n",
+			__func__, sc->sc_bmisscount, n_beacon);
 		if (sc->sc_bmisscount > BSTUCK_THRESH)
 			ATH_SCHEDULE_TQUEUE(&sc->sc_bstucktq, needmark);
 		return;
@@ -5358,34 +5379,34 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 
 	skb = bf->bf_skb;
 	if (skb == NULL) {
- 		if (sc->sc_nmonvaps > 0) {
- 			u_int off;
+		if (sc->sc_nmonvaps > 0) {
+			u_int off;
 			unsigned int extra = A_MAX(sizeof(struct ath_rx_radiotap_header),
 					  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
 
- 			/*
- 			 * Allocate buffer for monitor mode with space for the
+			/*
+			 * Allocate buffer for monitor mode with space for the
 			 * wlan-ng style physical layer header at the start.
- 			 */
- 			skb = dev_alloc_skb(sc->sc_rxbufsize + extra + sc->sc_cachelsz - 1);
- 			if (skb == NULL) {
- 				DPRINTF(sc, ATH_DEBUG_ANY,
+			 */
+			skb = dev_alloc_skb(sc->sc_rxbufsize + extra + sc->sc_cachelsz - 1);
+			if (skb == NULL) {
+				DPRINTF(sc, ATH_DEBUG_ANY,
 					"%s: skbuff alloc of size %u failed\n",
 					__func__,
 					sc->sc_rxbufsize + extra + sc->sc_cachelsz - 1);
- 				sc->sc_stats.ast_rx_nobuf++;
- 				return -ENOMEM;
- 			}
- 			/*
-			 * Reserve space for the Prism header.
- 			 */
- 			skb_reserve(skb, sizeof(wlan_ng_prism2_header));
+				sc->sc_stats.ast_rx_nobuf++;
+				return -ENOMEM;
+			}
 			/*
- 			 * Align to cache line.
+			 * Reserve space for the Prism header.
 			 */
- 			off = ((unsigned long) skb->data) % sc->sc_cachelsz;
- 			if (off != 0)
- 				skb_reserve(skb, sc->sc_cachelsz - off);
+			skb_reserve(skb, sizeof(wlan_ng_prism2_header));
+			/*
+			 * Align to cache line.
+			 */
+			off = ((unsigned long) skb->data) % sc->sc_cachelsz;
+			if (off != 0)
+				skb_reserve(skb, sc->sc_cachelsz - off);
 		} else {
 			/*
 			 * Cache-line-align.  This is important (for the
@@ -5426,7 +5447,7 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 	ds->ds_link = bf->bf_daddr;		/* link to self */
 	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_setuprxdesc(ah, ds,
-		skb_tailroom(skb),  		/* buffer size */
+		skb_tailroom(skb),		/* buffer size */
 		0);
 	if (sc->sc_rxlink != NULL)
 		*sc->sc_rxlink = bf->bf_daddr;
@@ -6219,29 +6240,29 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				head = bf;
 			}
 			ath_hal_setuptxdesc(ah, ds,
-				skb->len + IEEE80211_CRC_LEN, 	/* frame length */
+				skb->len + IEEE80211_CRC_LEN,	/* frame length */
 				sizeof(struct ieee80211_frame), /* header length */
-				type, 				/* Atheros packet type */
-				ic->ic_txpowlimit, 		/* max txpower */
-				rate, 0, 			/* series 0 rate/tries */
-				keyix, 				/* HAL_TXKEYIX_INVALID */ /* use key index */
-				amode, 				/* antenna mode */
+				type,				/* Atheros packet type */
+				ic->ic_txpowlimit,		/* max txpower */
+				rate, 0,			/* series 0 rate/tries */
+				keyix,				/* HAL_TXKEYIX_INVALID */ /* use key index */
+				amode,				/* antenna mode */
 				flags,
-				ctsrate, 			/* rts/cts rate */
-				ctsduration, 			/* rts/cts duration */
-				0, 				/* comp icv len */
-				0, 				/* comp iv len */
-				ATH_COMP_PROC_NO_COMP_NO_CCS 	/* comp scheme */
+				ctsrate,			/* rts/cts rate */
+				ctsduration,			/* rts/cts duration */
+				0,				/* comp icv len */
+				0,				/* comp iv len */
+				ATH_COMP_PROC_NO_COMP_NO_CCS	/* comp scheme */
 				);
 			ath_hal_filltxdesc(ah, ds,
-				roundup(skb->len, 4), 	/* buffer length */
-				AH_TRUE, 		/* first segment */
-				AH_TRUE, 		/* last segment */
+				roundup(skb->len, 4),	/* buffer length */
+				AH_TRUE,		/* first segment */
+				AH_TRUE,		/* last segment */
 				ds			/* first descriptor */
 				);
 			/* NB: The desc swap function becomes void, 
-	 		 * if descriptor swapping is not enabled
-	 		 */
+			 * if descriptor swapping is not enabled
+			 */
 			ath_desc_swap(ds);
 			if (txq->axq_link) {
 #ifdef AH_NEED_DESC_SWAP
@@ -7169,19 +7190,19 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 */
 	/* XXX check return value? */
 	ath_hal_setuptxdesc(ah, ds,
-			    pktlen, 			/* packet length */
-			    hdrlen, 			/* header length */
-			    atype, 			/* Atheros packet type */
-			    MIN(ni->ni_txpower, 60), 	/* txpower */
-			    txrate, try0, 		/* series 0 rate/tries */
-			    keyix, 			/* key cache index */
-			    antenna, 			/* antenna mode */
-			    flags, 			/* flags */
-			    ctsrate, 			/* rts/cts rate */
-			    ctsduration, 		/* rts/cts duration */
-			    icvlen, 			/* comp icv len */
-			    ivlen, 			/* comp iv len */
-			    comp 			/* comp scheme */
+			    pktlen,			/* packet length */
+			    hdrlen,			/* header length */
+			    atype,			/* Atheros packet type */
+			    MIN(ni->ni_txpower, 60),	/* txpower */
+			    txrate, try0,		/* series 0 rate/tries */
+			    keyix,			/* key cache index */
+			    antenna,			/* antenna mode */
+			    flags,			/* flags */
+			    ctsrate,			/* rts/cts rate */
+			    ctsduration,		/* rts/cts duration */
+			    icvlen,			/* comp icv len */
+			    ivlen,			/* comp iv len */
+			    comp			/* comp scheme */
 		);
 	bf->bf_flags = flags;	/* record for post-processing */
 
@@ -7201,9 +7222,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	ds->ds_data = bf->bf_skbaddr;
 
 	ath_hal_filltxdesc(ah, ds,
-			   skb->len, 	/* segment length */
-			   AH_TRUE, 	/* first segment */
-			   AH_TRUE, 	/* last segment */
+			   skb->len,	/* segment length */
+			   AH_TRUE,	/* first segment */
+			   AH_TRUE,	/* last segment */
 			   ds		/* first descriptor */
 		);
 
@@ -7225,8 +7246,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		ds->ds_link = (skb->next == NULL) ? 0 : bf->bf_daddr + sizeof(*ds);
 
 		ath_hal_filltxdesc(ah, ds,
-			skbtmp->len, 		/* segment length */
-			AH_TRUE, 		/* first segment */
+			skbtmp->len,		/* segment length */
+			AH_TRUE,		/* first segment */
 			(skbtmp->next == NULL), /* last segment */
 			ds			/* first descriptor */
 		);
@@ -7245,15 +7266,15 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			ds->ds_link = (skbtmp->next == NULL) ? 0 : bf->bf_daddr + (sizeof(*ds) * (i + 2));
 			ds->ds_data = bf->bf_skbaddrff[i];
 			ath_hal_filltxdesc(ah, ds,
-				skbtmp->len, 		/* segment length */
-				AH_FALSE, 		/* first segment */
+				skbtmp->len,		/* segment length */
+				AH_FALSE,		/* first segment */
 				(skbtmp->next == NULL), /* last segment */
 				ds0			/* first descriptor */
 			);
 
 			/* NB: The desc swap function becomes void, 
-		 	 * if descriptor swapping is not enabled
-		 	 */
+			 * if descriptor swapping is not enabled
+			 */
 			ath_desc_swap(ds);
 
 			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
@@ -7888,13 +7909,14 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			ath_interrupt_dfs_channel_check(sc, "Channel change interrupted DFS wait.");
 
 	/* Need a doth channel availability check?  We do if ... */
-	doth_channel_availability_check_needed = 1
-		&& (ic->ic_opmode == IEEE80211_M_HOSTAP
-		    || ic->ic_opmode == IEEE80211_M_IBSS)     /* we are an AP or IBSS STA */
-		&& (hchan.channel != sc->sc_curchan.channel || (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR))) /* the scan wasn't already done */
-		&& ath_radar_is_dfs_required(sc, &hchan)           /* the new channel requires DFS protection */
-		&& (ic->ic_flags & IEEE80211_F_DOTH)
-		;
+	doth_channel_availability_check_needed = 1 &&
+		/* we are an AP (BSS) or Ad-Hoc STA (IBSS) */
+		(ic->ic_opmode == IEEE80211_M_HOSTAP ||
+		 ic->ic_opmode == IEEE80211_M_IBSS) && 
+		(hchan.channel != sc->sc_curchan.channel ||
+		 (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR))) && /* the scan wasn't already done */
+		ath_radar_is_dfs_required(sc, &hchan) &&           /* the new channel requires DFS protection */
+		(ic->ic_flags & IEEE80211_F_DOTH);
 
 	channel_change_required = hchan.channel != sc->sc_curchan.channel ||
 		hchan.channelFlags != sc->sc_curchan.channelFlags ||
@@ -7903,12 +7925,10 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	if (channel_change_required) {
 		HAL_STATUS status;
 
-		/*
-		 * To switch channels clear any pending DMA operations;
+		/* To switch channels clear any pending DMA operations;
 		 * wait long enough for the RX fifo to drain, reset the
 		 * hardware at the new frequency, and then re-enable
-		 * the relevant bits of the h/w.
-		 */
+		 * the relevant bits of the h/w. */
 		ath_hal_intrset(ah, 0);	/* disable interrupts */
 		ath_draintxq(sc);	/* clear pending tx frames */
 		ath_stoprecv(sc);	/* turn off frame recv */
@@ -7946,9 +7966,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		/* Change channels and update the h/w rate map
 		 * if we're switching; e.g. 11a to 11b/g. */
 		ath_chan_change(sc, chan);
-		 /*
-		 * Re-enable rx framework.
-		 */
+		 /* Re-enable rx framework. */
 		if (ath_startrecv(sc) != 0) {
 			printk("%s: %s: unable to restart recv logic\n",
 				DEV_NAME(dev), __func__);
@@ -7964,12 +7982,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			sc->sc_beacons = 0;
 			sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 			ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
-			del_timer_sync(&sc->sc_dfs_channel_check_timer);
 			/* Enter DFS wait period */
-			sc->sc_dfs_channel_check_timer.expires  = jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ);
-			sc->sc_dfs_channel_check_timer.data = (unsigned long)sc;
-			sc->sc_dfs_channel_check_timer.function = ath_dfs_channel_check_completed;
-			add_timer(&sc->sc_dfs_channel_check_timer);
+			mod_timer(&sc->sc_dfs_channel_check_timer,
+				jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ));
 		}
 		/*
 		 * re configure beacons when it is a turbo mode switch.
@@ -8109,7 +8124,7 @@ ath_mhz2ieee(struct ieee80211com *ic, u_int freq, u_int flags)
 {
 	struct ath_softc *sc = ic->ic_dev->priv;
 
- 	return (ath_hal_mhz2ieee(sc->sc_ah, freq, flags));
+	return (ath_hal_mhz2ieee(sc->sc_ah, freq, flags));
 }
 
 
@@ -8133,8 +8148,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		HAL_LED_INIT,	/* IEEE80211_S_INIT */
 		HAL_LED_SCAN,	/* IEEE80211_S_SCAN */
 		HAL_LED_AUTH,	/* IEEE80211_S_AUTH */
-		HAL_LED_ASSOC, 	/* IEEE80211_S_ASSOC */
-		HAL_LED_RUN, 	/* IEEE80211_S_RUN */
+		HAL_LED_ASSOC,	/* IEEE80211_S_ASSOC */
+		HAL_LED_RUN,	/* IEEE80211_S_RUN */
 	};
 
 	DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: %s -> %s\n", __func__, DEV_NAME(dev),
@@ -8305,23 +8320,13 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 		ath_hal_process_noisefloor(ah);
 		/*
-		 * Configure the beacon and sleep timers.
-		 */
-		if (!sc->sc_beacons && vap->iv_opmode!=IEEE80211_M_WDS) {
-			ath_beacon_config(sc, vap);
-			sc->sc_beacons = 1;
-		}
-
-		/*
 		 * Reset rssi stats; maybe not the best place...
 		 */
 		sc->sc_halstats.ns_avgbrssi = ATH_RSSI_DUMMY_MARKER;
 		sc->sc_halstats.ns_avgrssi = ATH_RSSI_DUMMY_MARKER;
 		sc->sc_halstats.ns_avgtxrssi = ATH_RSSI_DUMMY_MARKER;
-		/* 
-		 * if it is a DFS channel and has not been checked for radar 
-		 * do not let the 80211 state machine to go to RUN state.
-		 */
+		/* if it is a DFS channel and has not been checked for radar 
+		 * do not let the 80211 state machine to go to RUN state. */
 		if (sc->sc_dfs_channel_check
 		    && (vap->iv_opmode == IEEE80211_M_HOSTAP || vap->iv_opmode == IEEE80211_M_IBSS) ) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP -> DFSWAIT_PENDING \n",__func__, DEV_NAME(dev));
@@ -8330,13 +8335,24 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			/* wake the receiver */
 			netif_wake_queue(dev);
 			/* don't do the other usual stuff... */
+
+			DPRINTF(sc, ATH_DEBUG_DOTH,
+				"%s: marking VAP %p: DFS CAC in progress\n",
+				DEV_NAME(dev), vap);
 			avp->av_dfs_channel_check_pending = 1;
 			return 0;
+		}
+
+		/* Configure the beacon and sleep timers. */
+		if (!sc->sc_beacons && vap->iv_opmode!=IEEE80211_M_WDS) {
+			ath_beacon_config(sc, vap);
+			sc->sc_beacons = 1;
 		}
 	} else {
 		if (sc->sc_dfs_channel_check &&
 		    (vap->iv_opmode == IEEE80211_M_HOSTAP || vap->iv_opmode == IEEE80211_M_IBSS) &&
-			sc->sc_dfs_channel_check_timer.data == (unsigned long)vap) {
+		    sc->sc_dfs_channel_check_timer.data == (unsigned long)vap) 
+		{
 			del_timer_sync(&sc->sc_dfs_channel_check_timer);
 			sc->sc_dfs_channel_check = 0;
 			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP DFSWAIT_PENDING -> run\n",
@@ -8353,19 +8369,16 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 	}
 
 done:
-	/*
-	 * Invoke the parent method to complete the work.
-	 */
+	/* Invoke the parent method to complete the work. */
 	error = avp->av_newstate(vap, nstate, arg);
 
-	/*
-	 * Finally, start any timers.
-	 */
+	/* Finally, start any timers. */
 	if (nstate == IEEE80211_S_RUN) {
 		/* start periodic recalibration timer */
 		mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
 		/* start DFS marker expiration timer */
-		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer, jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
+		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer,
+			  jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
 	}
 
 #ifdef ATH_SUPERG_XR
@@ -8382,14 +8395,12 @@ bad:
 	return error;
 }
 
-/*
- * periodically checks for the HAL to set
+/* periodically checks for the HAL to set
  * CHANNEL_DFS_CLEAR flag on current channel.
  * if the flag is set and a VAP is waiting for it, push 
  * transition the VAP to RUN state.
  *
- * Context: Timer (softIRQ)
- */
+ * Context: Timer (softIRQ) */
 static void
 ath_dfs_channel_check_completed(unsigned long data )
 {
@@ -8407,7 +8418,6 @@ ath_dfs_channel_check_completed(unsigned long data )
 	if (!sc->sc_dfs_testmode) {
 		do_gettimeofday(&tv);
 		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: DFS wait %s! - Channel: %u Time: %ld.%06ld\n", __func__, DEV_NAME(dev), (sc->sc_curchan.privFlags & CHANNEL_DFS) ? "completed" : "not applicable", ieee80211_mhz2ieee(sc->sc_curchan.channel, sc->sc_curchan.channelFlags), tv.tv_sec, tv.tv_usec);
-		del_timer_sync(&sc->sc_dfs_channel_check_timer);
 		sc->sc_dfs_channel_check = 0;
 		if (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE) {
 			DPRINTF(sc, ATH_DEBUG_DOTH,"%s: %s: Error: DFS wait timer expired but channel was already marked as having CHANNEL_INTERFERENCE.  Somebody forgot to delete the DFS wait timer.\n", DEV_NAME(dev), __func__);
@@ -8419,11 +8429,10 @@ ath_dfs_channel_check_completed(unsigned long data )
 		}
 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Driver is now MARKING channel as CHANNEL_DFS_CLEAR.\n", DEV_NAME(dev), __func__);
 		sc->sc_curchan.privFlags |= CHANNEL_DFS_CLEAR;
-		sc->sc_beacons = 1;
-		sc->sc_imask |= (HAL_INT_SWBA | HAL_INT_BMISS);
 		ath_chan_change(sc, ic->ic_curchan);
 		/* start dfs mark expiration timer */
-		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer, jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
+		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer,
+			jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
 		/* restart each VAP that was pending... */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			struct ath_vap *avp = ATH_VAP(vap);
@@ -8436,7 +8445,11 @@ ath_dfs_channel_check_completed(unsigned long data )
 					printk(KERN_ERR "beacon alloc failed: %d\n", error);
 					return;
 				}
-				ath_beacon_config(sc,vap);
+				if (!sc->sc_beacons &&
+				    vap->iv_opmode!=IEEE80211_M_WDS) {
+					ath_beacon_config(sc,vap);
+					sc->sc_beacons = 1;
+				}
 				do_gettimeofday(&tv);
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
 #ifdef ATH_SUPERG_XR
@@ -8446,6 +8459,9 @@ ath_dfs_channel_check_completed(unsigned long data )
 					ATH_SETUP_XR_VAP(sc, vap, rfilt);
 				}
 #endif
+				DPRINTF(sc, ATH_DEBUG_DOTH,
+					"%s: VAP %p: end of DFS CAC\n",
+					DEV_NAME(dev), vap);
 				avp->av_dfs_channel_check_pending = 0;
 			}
 		}
@@ -8455,12 +8471,13 @@ ath_dfs_channel_check_completed(unsigned long data )
 		do_gettimeofday(&tv);
 		if (sc->sc_dfs_testmode) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING indefinately.  dfs_testmode is enabled.  Waiting again. -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
-			sc->sc_dfs_channel_check_timer.expires = jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ);
+			mod_timer(&sc->sc_dfs_channel_check_timer,
+				  jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ));
 		} else {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING still.  Waiting again. -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
-			sc->sc_dfs_channel_check_timer.expires = jiffies + (ATH_DFS_WAIT_SHORT_POLL_PERIOD * HZ);
+			mod_timer(&sc->sc_dfs_channel_check_timer,
+				  jiffies + (ATH_DFS_WAIT_SHORT_POLL_PERIOD * HZ));
 		}
-		add_timer(&sc->sc_dfs_channel_check_timer);
 	}
 }
 
@@ -8769,12 +8786,12 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		 * availability check if you've already performed it on the 
 		 * channel within some more brief interval. */
 		c->privFlags		&= ~CHANNEL_DFS_CLEAR;
-		ichan->ic_ieee 		= ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
-		ichan->ic_freq 		= c->channel;
-		ichan->ic_flags 	= c->channelFlags;
-		ichan->ic_maxregpower 	= c->maxRegTxPower;	/* dBm */
-		ichan->ic_maxpower 	= c->maxTxPower;	/* 1/2 dBm */
-		ichan->ic_minpower 	= c->minTxPower;	/* 1/2 dBm */
+		ichan->ic_ieee		= ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
+		ichan->ic_freq		= c->channel;
+		ichan->ic_flags	= c->channelFlags;
+		ichan->ic_maxregpower	= c->maxRegTxPower;	/* dBm */
+		ichan->ic_maxpower	= c->maxTxPower;	/* 1/2 dBm */
+		ichan->ic_minpower	= c->minTxPower;	/* 1/2 dBm */
 
 		printk(KERN_INFO "Channel %d (%d MHz) Max Tx Power %d dBm%s [%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 			, ichan->ic_ieee
@@ -8938,7 +8955,7 @@ ath_update_txpow(struct ath_softc *sc)
 	prev_clamped_maxtxpower = ath_get_clamped_maxtxpower(sc);
 	/* Determine the real maximum txpower the card can support */
 	ic->ic_txpowlimit = ath_get_real_maxtxpower(sc);
- 	/* Grab the new maxtxpower setting (which may have changed) */
+	/* Grab the new maxtxpower setting (which may have changed) */
 	new_clamped_maxtxpower = ic->ic_newtxpowlimit;
 	/* Make sure the change is within limits, clamp it otherwise */
 	if (ic->ic_newtxpowlimit > ic->ic_txpowlimit)
@@ -9491,10 +9508,10 @@ enum {
 	ATH_TXANTENNA		= 9,
 	ATH_RXANTENNA		= 10,
 	ATH_DIVERSITY		= 11,
-	ATH_TXINTRPERIOD 	= 12,
+	ATH_TXINTRPERIOD	= 12,
 	ATH_FFTXQMIN		= 18,
-	ATH_XR_POLL_PERIOD 	= 19,
-	ATH_XR_POLL_COUNT 	= 20,
+	ATH_XR_POLL_PERIOD	= 19,
+	ATH_XR_POLL_COUNT	= 20,
 	ATH_ACKRATE             = 21,
 	ATH_RADAR_PULSE         = 22,
 	ATH_RADAR_PULSE_PRINT   = 23,
@@ -10202,7 +10219,7 @@ txcont_configure_radio(struct ieee80211com *ic)
 		/*  Turn on dynamic turbo if necessary -- before we get into our own implementation -- and before we configures */
 		if ((!IEEE80211_IS_CHAN_STURBO(ic->ic_bsschan)) && 
 				(IEEE80211_ATHC_TURBOP & 
-				 	TAILQ_FIRST(&ic->ic_vaps)->iv_ath_cap) && 
+					TAILQ_FIRST(&ic->ic_vaps)->iv_ath_cap) && 
 				(IEEE80211_IS_CHAN_ANYG(ic->ic_bsschan) || 
 				 IEEE80211_IS_CHAN_A(ic->ic_bsschan))) {
 			u_int32_t newflags = ic->ic_bsschan->ic_flags;
@@ -10702,6 +10719,9 @@ ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason)
 		struct ath_vap *avp = ATH_VAP(vap);
 		if (avp->av_dfs_channel_check_pending) {
 			do_gettimeofday(&tv);
+			DPRINTF(sc, ATH_DEBUG_DOTH,
+				"%s: VAP %p: end of DFS CAC\n",
+				DEV_NAME(dev), vap);
 			avp->av_dfs_channel_check_pending = 0;
 			ended++;
 		}
@@ -11014,7 +11034,7 @@ ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
 		printk(KERN_DEBUG "%18s info:%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s"
 				"%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
 			(name == strstr(name, "AR5K_AR5212_") ? (name + strlen("AR5K_AR5212_"))
-			 	: name),
+				: name),
 			(v & HAL_INT_GLOBAL           ?  " HAL_INT_GLOBAL" : ""),
 			(v & HAL_INT_FATAL            ?  " HAL_INT_FATAL"  : ""),
 			(v & (1 << 29)                ?  " (1  << 29)"     : ""),
@@ -11714,60 +11734,61 @@ ath_registers_dump_delta(struct ieee80211com *ic)
 	ath_ar5212_registers_dump_delta(sc);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
 /* Periodically expire radar avoidance marks. */
-void ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long arg)
+void 
+ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long data)
 {
-	struct net_device *dev = (struct net_device *) arg;
-	struct ath_softc *sc = dev->priv;
+	struct ath_softc *sc = (struct ath_softc *) data;
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211vap *tmpvap;
+	struct ieee80211vap *vap;
 
 	if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
 		/* Make sure there are no channels that have just become available */
 		ieee80211_expire_channel_non_occupancy_restrictions(ic);
 		/* Go through and clear any interference flag we have, if we 
 		 * just got it cleared up for us */
-		TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
-			if ((tmpvap->iv_state == IEEE80211_S_RUN) && 
-					((tmpvap->iv_opmode == IEEE80211_M_HOSTAP) ||
-					 (tmpvap->iv_opmode == IEEE80211_M_IBSS)) &&
-					/* Operating on channel other than desired. */
-					(tmpvap->iv_des_chan->ic_freq > 0) &&
-					(tmpvap->iv_des_chan->ic_freq != ic->ic_bsschan->ic_freq)) {
+		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+			if ((vap->iv_state == IEEE80211_S_RUN) && 
+			    ((vap->iv_opmode == IEEE80211_M_HOSTAP) ||
+			     (vap->iv_opmode == IEEE80211_M_IBSS)) &&
+			    /* Operating on channel other than desired. */
+			    (vap->iv_des_chan->ic_freq > 0) &&
+			    (vap->iv_des_chan->ic_freq != ic->ic_bsschan->ic_freq)) {
 				struct ieee80211_channel *des_chan = 
-					ieee80211_find_channel(ic, tmpvap->iv_des_chan->ic_freq, 
-							tmpvap->iv_des_chan->ic_flags);
+					ieee80211_find_channel(ic, vap->iv_des_chan->ic_freq, 
+							       vap->iv_des_chan->ic_flags);
 				/* Can we switch to it? */
 				if (NULL == des_chan) {
 					DPRINTF(sc, ATH_DEBUG_DOTH, 
 						"%s: %s: Desired channel not found: %u/%x\n", 
-						DEV_NAME(dev), __func__, 
-						tmpvap->iv_des_chan->ic_freq, 
-						tmpvap->iv_des_chan->ic_flags);
+						DEV_NAME(sc->sc_dev),__func__, 
+						vap->iv_des_chan->ic_freq, 
+						vap->iv_des_chan->ic_flags);
 				} else if (0 == (des_chan->ic_flags & IEEE80211_CHAN_RADAR)) {
 					DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Desired channel"
 						" found and available.  Switching to %u/%x\n", 
-						DEV_NAME(dev), __func__, 
-						tmpvap->iv_des_chan->ic_freq, 
-						tmpvap->iv_des_chan->ic_flags);
+						DEV_NAME(sc->sc_dev),__func__, 
+						vap->iv_des_chan->ic_freq, 
+						vap->iv_des_chan->ic_flags);
 					ic->ic_chanchange_chan = des_chan->ic_ieee;
 					ic->ic_chanchange_tbtt = IEEE80211_RADAR_11HCOUNT;
 					ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 				} else {
 					DPRINTF(sc, ATH_DEBUG_DOTH, 
 						"%s: %s: Desired channel found"
-						" and not available until Time: %ld.%06ld\n", 
-						DEV_NAME(dev), __func__, 
+						" and not available until Time: %10ld.%06ld\n", 
+						DEV_NAME(sc->sc_dev),__func__, 
 						des_chan->ic_non_occupancy_timer_expiration.tv_sec, 
 						des_chan->ic_non_occupancy_timer_expiration.tv_usec);
 				}
 			}
 		}
 	}
-
+  
 	/* Restart the timer */
-	sc->sc_dfs_channel_non_occupancy_expiration_timer.expires = jiffies + 
-		(ath_dfs_channel_non_occupancy_expiration_check_interval * HZ);
-	add_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
+	mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer,
+		  jiffies +
+		  (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
 }
 

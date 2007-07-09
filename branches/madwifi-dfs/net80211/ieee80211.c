@@ -46,7 +46,7 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>		/* XXX for rtnl_lock */
-
+#include "compat.h"
 #include "if_media.h"
 
 #include <net80211/ieee80211_var.h>
@@ -466,6 +466,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 		break;
 	}
 	vap->iv_opmode = opmode;
+	vap->iv_state  = IEEE80211_S_INIT;
 	IEEE80211_INIT_TQUEUE(&vap->iv_stajoin1tq, ieee80211_sta_join1_tasklet, vap);
 
 	vap->iv_chanchange_count = 0;
@@ -828,16 +829,25 @@ ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *ic)
 	struct net_device *dev = ic->ic_dev;
 	struct timeval tv_now;
 	int i;
+
+	do_gettimeofday(&tv_now);
 	for (i = 0; i < ic->ic_nchans; i++) {
 		c = &ic->ic_channels[i];
 		if (c->ic_flags & IEEE80211_CHAN_RADAR) {
-			do_gettimeofday(&tv_now);
-			if (c->ic_non_occupancy_timer_expiration.tv_sec < tv_now.tv_sec || (c->ic_non_occupancy_timer_expiration.tv_sec == tv_now.tv_sec && c->ic_non_occupancy_timer_expiration.tv_usec <= tv_now.tv_usec)) {
-				if_printf(dev, "Returning channel %d (%d MHz) radar avoidance marker expired.  Channel now available again. -- Time: %ld.%06ld\n", c->ic_ieee, c->ic_freq, tv_now.tv_sec, tv_now.tv_usec);
+			if (timeval_compare(&c->ic_non_occupancy_timer_expiration,
+					    &tv_now) < 0) {
+				if_printf(dev,
+					  "Returning channel %d (%d MHz) radar avoidance marker expired.  Channel now available again. -- Time: %10ld.%06ld\n",
+					  c->ic_ieee, c->ic_freq, tv_now.tv_sec, 
+					  tv_now.tv_usec);
 				c->ic_flags &= ~IEEE80211_CHAN_RADAR;
-			}
-			else {
-				if_printf(dev, "Channel %d (%d MHz) is still marked for radar.  Channel will become usable in %u seconds at Time: %ld.%06ld\n", c->ic_ieee, c->ic_freq, c->ic_non_occupancy_timer_expiration.tv_sec - tv_now.tv_sec, c->ic_non_occupancy_timer_expiration.tv_sec, c->ic_non_occupancy_timer_expiration.tv_usec);
+			} else {
+				if_printf(dev,
+					  "Channel %d (%d MHz) is still marked for radar.  Channel will become usable in %u seconds at Time: %10ld.%06ld\n",
+					  c->ic_ieee, c->ic_freq,
+					  c->ic_non_occupancy_timer_expiration.tv_sec - tv_now.tv_sec,
+					  c->ic_non_occupancy_timer_expiration.tv_sec,
+					  c->ic_non_occupancy_timer_expiration.tv_usec);
 			}
 		}
 	}
