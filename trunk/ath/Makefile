@@ -79,3 +79,7 @@ clean:
 
 ath_$(BUSNAME).o: $(ath_$(BUSNAME)-objs)
 	$(LD) $(LDOPTS) -o ath_$(BUSNAME).$(KMODSUF) -r $(ath_$(BUSNAME)-objs)
+
+if_ath_hal.h: $(HAL)/ah.h
+	$(TOP)/scripts/if_ath_hal_generator.pl $< $@
+	$(TOP)/scripts/madwifi-indent $@
