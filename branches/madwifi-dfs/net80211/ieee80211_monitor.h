@@ -79,29 +79,29 @@ enum {
 	P80211ENUM_truth_true			= 0x01
 };
 
-typedef struct {
+struct p80211item_uint32 {
 	u_int32_t did;
 	u_int16_t status;
 	u_int16_t len;
 	u_int32_t data;
-} p80211item_uint32_t;
+};
 
-typedef struct {
+struct wlan_ng_prism2_header {
 	u_int32_t msgcode;
 	u_int32_t msglen;
 #define WLAN_DEVNAMELEN_MAX 16
 	u_int8_t devname[WLAN_DEVNAMELEN_MAX];
-	p80211item_uint32_t hosttime;
-	p80211item_uint32_t mactime;
-	p80211item_uint32_t channel;
-	p80211item_uint32_t rssi;
-	p80211item_uint32_t sq;
-	p80211item_uint32_t signal;
-	p80211item_uint32_t noise;
-	p80211item_uint32_t rate;
-	p80211item_uint32_t istx;
-	p80211item_uint32_t frmlen;
-} wlan_ng_prism2_header;
+	struct p80211item_uint32 hosttime;
+	struct p80211item_uint32 mactime;
+	struct p80211item_uint32 channel;
+	struct p80211item_uint32 rssi;
+	struct p80211item_uint32 sq;
+	struct p80211item_uint32 signal;
+	struct p80211item_uint32 noise;
+	struct p80211item_uint32 rate;
+	struct p80211item_uint32 istx;
+	struct p80211item_uint32 frmlen;
+};
 
 #define ATH_RX_RADIOTAP_PRESENT (               \
 	(1 << IEEE80211_RADIOTAP_TSFT)		| \

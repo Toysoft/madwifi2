@@ -57,7 +57,7 @@ endif
 include $(TOP)/Makefile.inc
 
 obj-m		+= ath_$(BUSNAME).o
-ath_$(BUSNAME)-objs	:= if_ath.o if_ath_radar.o if_ath_hal.o if_ath_hal_wrappers.o if_ath_$(BUSNAME).o
+ath_$(BUSNAME)-objs	:= if_ath.o if_ath_radar.o if_ath_$(BUSNAME).o
 
 INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
@@ -79,3 +79,7 @@ clean:
 
 ath_$(BUSNAME).o: $(ath_$(BUSNAME)-objs)
 	$(LD) $(LDOPTS) -o ath_$(BUSNAME).$(KMODSUF) -r $(ath_$(BUSNAME)-objs)
+
+if_ath_hal.h: $(HAL)/ah.h
+	$(TOP)/scripts/if_ath_hal_generator.pl $< $@
+	$(TOP)/scripts/madwifi-indent $@

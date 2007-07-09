@@ -60,11 +60,10 @@
  * (e.g. if periodic processing is required then the module should setup
  * its own timer).
  *
- * In addition to the transmit rate for each frame the module must also
+ * In addition to the transmit rate for each frame, the module must also
  * indicate the number of attempts to make at the specified rate.  If this
- * number is != ATH_TXMAXTRY then an additional callback is made to setup
- * additional transmit state.  The rate control code is assumed to write
- * this additional data directly to the transmit descriptor.
+ * number is != ATH_TXMAXTRY, an additional callback is made to request
+ * 3 additional rate/retry pairs.
  */
 
 enum {
@@ -77,9 +76,18 @@ enum {
 
 struct ath_softc;
 struct ath_node;
-struct ath_desc;
 struct ath_buf;
 struct ieee80211vap;
+
+/* Multi-rare retry: 3 additional rate/retry pairs */
+struct ieee80211_mrr {
+	int rate1;
+	int retries1;
+	int rate2;
+	int retries2;
+	int rate3;
+	int retries3;
+};
 
 struct ieee80211_rate_ops {
 	int ratectl_id;
@@ -122,11 +130,11 @@ struct ieee80211_rate_ops {
 			 int shortPreamble, size_t frameLen,
 			 u_int8_t *rix, unsigned int *try0, u_int8_t *txrate);
 
-	/* Setup any extended (multi-rate) descriptor state for a data packet.
+	/* Return 3 more rates to try and corresponding number of retries.
 	 * The rate index returned by findrate is passed back in. */
-	void (*setupxtxdesc)(struct ath_softc *sc, struct ath_node *an,
-			     struct ath_desc *ds, int shortPreamble,
-			     size_t frame_size, u_int8_t rix);
+	void (*get_mrr)(struct ath_softc *sc, struct ath_node *an,
+			int shortPreamble, size_t frame_size, u_int8_t rix,
+			struct ieee80211_mrr *mrr);
 
 	/* Update rate control state for a packet associated with the
 	 * supplied transmit descriptor.  The routine is invoked both
