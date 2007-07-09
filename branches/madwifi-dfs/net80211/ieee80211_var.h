@@ -251,6 +251,22 @@ struct ieee80211vap {
 	u_int32_t app_filter;				/* filters which management frames are forwarded to app */
 };
 
+#define	VAP_IS_UP(_vap) \
+	(((_vap)->iv_dev->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
+#define VAP_IS_READY(_vap) \
+	(VAP_IS_UP((_vap)) && \
+	 !(_vap)->iv_ic->ic_get_dfs_test_in_progress((_vap)->iv_ic))
+#define VAP_IS_MANUAL(_vap) \
+	 ((_vap)->iv_ic->ic_roaming == IEEE80211_ROAMING_MANUAL)
+#define VAP_IS_AUTO(_vap) \
+	 ((_vap)->iv_ic->ic_roaming == IEEE80211_ROAMING_AUTO)
+#define	VAP_IS_UP_AUTO(_vap) \
+	(VAP_IS_UP(_vap) && \
+	 VAP_IS_AUTO(_vap))
+#define	VAP_IS_READY_AUTO(_vap) \
+	(VAP_IS_READY(_vap) && \
+	 VAP_IS_AUTO(_vap))
+
 /* Debug functions need the defintion of struct ieee80211vap because iv_debug 
  * is used at runtime to determine if we should log an event
  */
@@ -437,6 +453,9 @@ struct ieee80211com {
 	detection probability tests */
 	void (*ic_set_dfs_testmode)(struct ieee80211com *, int);
 	int (*ic_get_dfs_testmode)(struct ieee80211com *);
+
+	/* Is a DFS test in progress */
+	int (*ic_get_dfs_test_in_progress)(struct ieee80211com *);
 
 	/* inject a fake radar signal -- used while on a 802.11h DFS channels */
 	unsigned int (*ic_test_radar)(struct ieee80211com *);

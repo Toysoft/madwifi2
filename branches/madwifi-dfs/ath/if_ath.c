@@ -300,6 +300,7 @@ static int ath_check_radio_silence_not_required(struct ath_softc *sc, const char
 */
 static int ath_get_dfs_testmode(struct ieee80211com *);
 static void ath_set_dfs_testmode(struct ieee80211com *, int);
+static int ath_get_dfs_test_in_progress(struct ieee80211com *ic);
 
 static unsigned int ath_get_dfs_non_occupancy_period(struct ieee80211com *);
 static void ath_set_dfs_non_occupancy_period(struct ieee80211com *, unsigned int seconds);
@@ -927,6 +928,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 
 	ic->ic_set_dfs_testmode     = ath_set_dfs_testmode;
 	ic->ic_get_dfs_testmode     = ath_get_dfs_testmode;
+	ic->ic_get_dfs_test_in_progress = ath_get_dfs_test_in_progress;
 
 	ic->ic_set_txcont           = ath_set_txcont;
 	ic->ic_get_txcont           = ath_get_txcont;
@@ -1300,7 +1302,8 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 			printk("%s: %s: unable to start recv logic\n",
 				DEV_NAME(dev), __func__);
 		if (sc->sc_beacons)
-			ath_beacon_config(sc, NULL);	/* restart beacons */
+			if(VAP_IS_READY(vap))
+				ath_beacon_config(sc, NULL);	/* restart beacons */
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 
@@ -1409,7 +1412,8 @@ ath_vap_delete(struct ieee80211vap *vap)
 			printk("%s: %s: unable to start recv logic\n",
 				DEV_NAME(dev), __func__);
 		if (sc->sc_beacons)
-			ath_beacon_config(sc, NULL);	/* restart beacons */
+			if(VAP_IS_READY(vap))
+				ath_beacon_config(sc, NULL);	/* restart beacons */
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 }
@@ -2265,7 +2269,7 @@ ath_reset(struct net_device *dev)
 	 * might change as a result.
 	 */
 	ath_chan_change(sc, c);
-	if (sc->sc_beacons)
+	if(sc->sc_beacons && !ath_radio_silence_required_for_dfs(sc))
 		ath_beacon_config(sc, NULL);	/* restart beacons */
 	ath_hal_intrset(ah, sc->sc_imask);
 	ath_set_ack_bitrate(sc, sc->sc_ackrate);
@@ -2921,6 +2925,11 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 			__func__, sc->sc_invalid, dev->flags);
 		sc->sc_stats.ast_tx_invalid++;
 		error = -ENETDOWN;
+		goto bad;
+	}
+	if(ath_radio_silence_required_for_dfs(sc)) {
+		printk("ath_mgtstart: discard, dfs test in progress.\n");
+		error = -EBUSY;
 		goto bad;
 	}
 	/*
@@ -4554,6 +4563,19 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	if (vap == NULL)
 		vap = TAILQ_FIRST(&ic->ic_vaps);   /* XXX */
 
+	if (IFF_RUNNING != (sc->sc_dev->flags & IFF_RUNNING)) {
+		printk(KERN_ERR "%s: %s: Cannot configure beacons when interface is"
+			" not in running state.\n", DEV_NAME(sc->sc_dev),__func__);
+		sc->sc_txcont = 0;
+		return;
+	}
+	if(!VAP_IS_READY(vap)) {
+		printk(KERN_ERR "%s: %s: Cannot configure beacons when interface is"
+			" performing DFS channel availability check.\n", 
+		       DEV_NAME(sc->sc_dev), __func__);
+		return;
+	}
+
 	ni = vap->iv_bss;
 
 	/* extract tstamp from last beacon and convert to TU */
@@ -5589,7 +5611,8 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			 * beacon frame we just received.
 			 */
 			vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;
-			ath_beacon_config(sc, vap);
+			if(VAP_IS_READY(vap)) 
+				ath_beacon_config(sc, vap);
 		}
 		/* fall thru... */
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
@@ -7997,7 +8020,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		 * re configure beacons when it is a turbo mode switch.
 		 * HW seems to turn off beacons during turbo mode switch.
 		 */
-		if (sc->sc_beacons && tswitch && !sc->sc_dfs_channel_check)
+		if (sc->sc_beacons && tswitch && !ath_radio_silence_required_for_dfs(sc))
 			ath_beacon_config(sc, NULL);
 		/*
 		 * Re-enable interrupts.
@@ -8245,46 +8268,51 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		switch (vap->iv_opmode) {
 		case IEEE80211_M_HOSTAP:
 		case IEEE80211_M_IBSS:
-			/*
-			 * Allocate and setup the beacon frame.
-			 *
-			 * Stop any previous beacon DMA.  This may be
-			 * necessary, for example, when an ibss merge
-			 * causes reconfiguration; there will be a state
-			 * transition from RUN->RUN that means we may
-			 * be called with beacon transmission active.
-			 */
-			ath_hal_stoptxdma(ah, sc->sc_bhalq);
+			if(!ath_radio_silence_required_for_dfs(sc)) {
+				/*
+				 * Allocate and setup the beacon frame.
+				 *
+				 * Stop any previous beacon DMA.  This may be
+				 * necessary, for example, when an ibss merge
+				 * causes reconfiguration; there will be a state
+				 * transition from RUN->RUN that means we may
+				 * be called with beacon transmission active.
+				 */
+				ath_hal_stoptxdma(ah, sc->sc_bhalq);
 
-			/* Set default key index for static wep case */
-			ni->ni_ath_defkeyindex = IEEE80211_INVAL_DEFKEY;
-			if (((vap->iv_flags & IEEE80211_F_WPA) == 0) &&
-			    (ni->ni_authmode != IEEE80211_AUTH_8021X) &&
-			    (vap->iv_def_txkey != IEEE80211_KEYIX_NONE)) {
-				ni->ni_ath_defkeyindex = vap->iv_def_txkey;
-			}
+				/* Set default key index for static wep case */
+				ni->ni_ath_defkeyindex = IEEE80211_INVAL_DEFKEY;
+				if (((vap->iv_flags & IEEE80211_F_WPA) == 0) &&
+				    (ni->ni_authmode != IEEE80211_AUTH_8021X) &&
+				    (vap->iv_def_txkey != IEEE80211_KEYIX_NONE)) {
+					ni->ni_ath_defkeyindex = vap->iv_def_txkey;
+				}
 
-			error = ath_beacon_alloc(sc, ni);
-			if (error < 0)
-				goto bad;
-			/* 
-			 * if the turbo flags have changed, then beacon and turbo
-			 * need to be reconfigured.
-			 */
-			if ((sc->sc_dturbo && !(vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)) ||
-				(!sc->sc_dturbo && (vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)))
-				sc->sc_beacons = 0;
-			/* 
-			 * if it is the first AP VAP moving to RUN state then beacon 
-			 * needs to be reconfigured.
-			 */
-			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
-				if (tmpvap != vap && tmpvap->iv_state == IEEE80211_S_RUN &&
-					tmpvap->iv_opmode == IEEE80211_M_HOSTAP)
-					break;
+				error = ath_beacon_alloc(sc, ni);
+				if (error < 0)
+					goto bad;
+				/* 
+				 * if the turbo flags have changed, then beacon and turbo
+				 * need to be reconfigured.
+				 */
+				if ((sc->sc_dturbo && !(vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)) ||
+					(!sc->sc_dturbo && (vap->iv_ath_cap & IEEE80211_ATHC_TURBOP)))
+					sc->sc_beacons = 0;
+				/* 
+				 * if it is the first AP VAP moving to RUN state then beacon 
+				 * needs to be reconfigured.
+				 */
+				TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
+					if (tmpvap != vap && tmpvap->iv_state == IEEE80211_S_RUN &&
+						tmpvap->iv_opmode == IEEE80211_M_HOSTAP)
+						break;
+				}
+				if (!tmpvap)
+					sc->sc_beacons = 0;
 			}
-			if (!tmpvap)
+			else {
 				sc->sc_beacons = 0;
+			}
 			break;
 		case IEEE80211_M_STA:
 #ifdef ATH_SUPERG_COMP
@@ -8351,7 +8379,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		}
 
 		/* Configure the beacon and sleep timers. */
-		if (!sc->sc_beacons && vap->iv_opmode!=IEEE80211_M_WDS) {
+		if (!sc->sc_beacons && vap->iv_opmode != IEEE80211_M_WDS && !ath_radio_silence_required_for_dfs(sc)) {
 			ath_beacon_config(sc, vap);
 			sc->sc_beacons = 1;
 		}
@@ -8445,6 +8473,7 @@ ath_dfs_channel_check_completed(unsigned long data )
 			struct ath_vap *avp = ATH_VAP(vap);
 			if (avp->av_dfs_channel_check_pending) {
 				int error;
+				avp->av_dfs_channel_check_pending = 0;
 				DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING -> RUN -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
 				/* re alloc beacons to update new channel info */
 				error = ath_beacon_alloc(sc, vap->iv_bss);
@@ -8469,7 +8498,6 @@ ath_dfs_channel_check_completed(unsigned long data )
 				DPRINTF(sc, ATH_DEBUG_DOTH,
 					"%s: VAP %p: end of DFS CAC\n",
 					DEV_NAME(dev), vap);
-				avp->av_dfs_channel_check_pending = 0;
 			}
 		}
 		netif_start_queue(dev);
@@ -9374,7 +9402,7 @@ ath_change_mtu(struct net_device *dev, int mtu)
 
 	ATH_LOCK(sc);
 	dev->mtu = mtu;
-	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid) {
+	if ((dev->flags & IFF_RUNNING) && !sc->sc_invalid && !ath_radio_silence_required_for_dfs(sc)) {
 		/* NB: the rx buffers may need to be reallocated */
 		tasklet_disable(&sc->sc_rxtq);
 		error = ath_reset(dev);
@@ -10130,6 +10158,12 @@ txcont_configure_radio(struct ieee80211com *ic)
 		sc->sc_txcont = 0;
 		return;
 	}
+	if(ath_radio_silence_required_for_dfs(sc)) {
+		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is"
+			" performing DFS channel availability check.\n", 
+		       DEV_NAME(dev), __func__);
+		return;
+	}
 
 	ath_hal_intrset(ah,0);
 	{
@@ -10392,6 +10426,12 @@ txcont_queue_packet(struct ieee80211com *ic, struct ath_txq* txq)
 				"when txcont is not enabled.\n", DEV_NAME(dev),__func__);
 		return;
 	}
+	if(ath_radio_silence_required_for_dfs(sc)) {
+		printk(KERN_ERR "%s: %s: Refusing to queue self linked frame "
+			" during DFS channel availability check.\n", 
+		       DEV_NAME(dev), __func__);
+		return;
+	}
 
 	ath_hal_intrset(ah,0);
 	{
@@ -10507,8 +10547,15 @@ txcont_on(struct ieee80211com *ic)
 	struct ath_softc *sc = dev->priv;
 
 	if (IFF_RUNNING != (ic->ic_dev->flags & IFF_RUNNING)) {
-		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is not in running state.\n", DEV_NAME(dev),__func__);
+		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is"
+			" not in running state.\n", DEV_NAME(dev),__func__);
 		sc->sc_txcont = 0;
+		return;
+	}
+	if(ath_radio_silence_required_for_dfs(sc)) {
+		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is"
+			" performing DFS channel availability check.\n", 
+		       DEV_NAME(dev), __func__);
 		return;
 	}
 
@@ -10532,6 +10579,13 @@ txcont_off(struct ieee80211com *ic)
 	sc->sc_txcont = 0;
 }
 
+static int
+ath_get_dfs_test_in_progress(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	return ath_radio_silence_required_for_dfs(sc);
+}
 /* See ath_set_dfs_testmode for details. */
 static int
 ath_get_dfs_testmode(struct ieee80211com *ic)
@@ -11214,7 +11268,8 @@ ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, u
 static HAL_BOOL
 ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t address) {
 	const char* static_label = NULL;
-	memset(buf, 0, buflen);
+	if(buf) 
+		memset(buf, 0, buflen);
 
 	if ((ar_device(sc->devid) == 5212) || (ar_device(sc->devid) == 5213)) {
 		/* Handle Static Register Labels (unique stuff we know about) */
@@ -11497,7 +11552,8 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 			break;
 		}
 		if (static_label) {
-			snprintf(buf, buflen, static_label);
+			if(buf) 
+				snprintf(buf, buflen, static_label);
 			return AH_TRUE;
 		}
 
@@ -11520,7 +11576,8 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 			default:
 				BUG();
 			}
-			snprintf(buf, buflen, format, key);
+			if(buf) 
+				snprintf(buf, buflen, format, key);
 #undef keytable_entry_reg_count
 #undef keytable_entry_size
 			return AH_TRUE;
@@ -11528,21 +11585,24 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen, u_int32_t 
 
 		/* Handle Rate Duration Table */
 		if (address >= 0x8700 && address < 0x8780) {
-			snprintf(buf, buflen, "RATE(%2d).DURATION", 
+			if(buf) 
+				snprintf(buf, buflen, "RATE(%2d).DURATION", 
 					((address - 0x8700) / sizeof(u_int32_t)));
 			return AH_TRUE;
 		}
 
 		/* Handle txpower Table */
 		if (address >= 0xa180 && address < 0xa200) {
-			snprintf(buf, buflen, "PCDAC_TXPOWER(%2d)", 
+			if(buf) 
+				snprintf(buf, buflen, "PCDAC_TXPOWER(%2d)", 
 					((address - 0xa180) / sizeof(u_int32_t)));
 			return AH_TRUE;
 		}
 	}
 
 	/* Everything else... */
-	snprintf(buf, buflen, UNKNOWN_NAME);
+	if(buf) 
+		snprintf(buf, buflen, UNKNOWN_NAME);
 	return AH_FALSE;
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
@@ -11563,25 +11623,35 @@ ath_print_register(const char* name, u_int32_t address, u_int32_t v)
 #ifdef ATH_REVERSE_ENGINEERING
 static HAL_BOOL
 ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
-#ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
-	char buf[MAX_REGISTER_NAME_LEN];
-#endif
 	#define UNFILTERED AH_FALSE
 	#define FILTERED   AH_TRUE
 
 	if ((ar_device(sc->devid) != 5212) && (ar_device(sc->devid) != 5213)) return FILTERED;
 	/* Addresses with side effects are never dumped out by bulk debug dump routines. */
-	if ((address >= 0x00c0) && (address <= 0x00df)) return FILTERED;
-	if ((address >= 0x143c) && (address <= 0x143f)) return FILTERED;
+	if ((address >= 0x00c0) && (address < 0x00e0)) return FILTERED;
+	if ((address >= 0x143c) && (address < 0x1440)) return FILTERED;
 	/* PCI timing registers are not interesting */
-	if ((address >= 0x4000) && (address <= 0x5000)) return FILTERED; 
+	if ((address >= 0x4000) && (address < 0x5000)) return FILTERED; 
+	/* Unmapped addresses known to cause crashes on specific parts... */
+	if(sc->devid == 0x001b) {
+		/*
+		if(0 ||
+		  ((address >= 0x08c0) && (address < 0x2000)) ||
+		  ((address >= 0x1480) && (address < 0x4000)) || 
+		  ((address >= 0x6014) && (address < 0x8000)) || 
+		  ((address >= 0x84a0) && (address < 0x8700)) || 
+		  ((address >= 0x9000) && (address < 0x9800)) )  
+		  */
+		if(address < 0x9800) 
+			return (AH_TRUE == ath_lookup_register_name(sc, NULL, 0, address) ? UNFILTERED : FILTERED);
+	}
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
 	/* We are being conservative, and do not want to access addresses that 
 	 * may crash the system, so we will only consider addresses we know 
 	 * the names of from previous reverse engineering efforts (AKA 
 	 * openHAL). */
-	return (AH_TRUE == ath_lookup_register_name(sc, buf, MAX_REGISTER_NAME_LEN, address)) ? 
+	return (AH_TRUE == ath_lookup_register_name(sc, NULL, 0, address)) ? 
 		UNFILTERED : FILTERED;
 #else /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 

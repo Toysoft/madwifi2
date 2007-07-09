@@ -759,7 +759,8 @@ ath_timer_function(unsigned long data)
 			if (ic->ic_opmode == IEEE80211_M_STA) {
 				struct ieee80211vap *tmpvap;
 				TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
-					ath_rate_statistics(sc, tmpvap->iv_bss);/* NB: no reference */
+					if(VAP_IS_READY(tmpvap)) 
+						ath_rate_statistics(sc, tmpvap->iv_bss);/* NB: no reference */
 				}
 			} else
 			            ieee80211_iterate_nodes(&ic->ic_sta, ath_rate_statistics, sc);
