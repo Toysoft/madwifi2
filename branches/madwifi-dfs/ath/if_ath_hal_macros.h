@@ -36,24 +36,20 @@
  * $Id: foo mtaylor $
  */
 /* 
- * This file provides some macros that are used by if_ath_hal.h, if_ath_hal.c, 
- * if_ath_hal_wrappers.h, and , if_ath_hal_wrappers.c.
+ * This file provides some macros that are used by if_ath_hal.h,
+ * if_ath_hal_wrappers.h, and if_ath_hal_wrappers.c.
  * 
  * The macros are provided for the HAL lock and for dynamically deciding whether
  * to define the HAL wrapper functions as inline or in the implementation file
  * at build time.  i.e. inline for speed, or non-inline for debugging visibility
  * into the HAL methods being called (despite obfuscation).
  * 
- * The if_ath_hal.* files are generated from hal/ah.h at build time by the build
- * system and the files if_ath_hal_custom.h and if_ath_hal_custom.c are hand
- * created additions to the API that are just wrappers to the functions in
- * declared in if_ath_hal.h.
- * 
+ * The if_ath_hal.h file is generated from hal/ah.h at build time by the build
+ * system.
  */
 #ifndef _IF_ATH_HAL_MACROS_H_
 #define _IF_ATH_HAL_MACROS_H_
 
-#define GET_ATH_SOFTC(_ah) 	((struct ath_softc*)(_ah->ah_sc))
 #define ATH_HAL_LOCK_INIT(_sc) 	spin_lock_init(&(_sc)->sc_hal_lock)
 #define ATH_HAL_LOCK_DESTROY(_sc)
 #define ATH_HAL_LOCK_IRQ(_sc) 	do { \
@@ -64,17 +60,5 @@
    } while(0)
 #define ATH_HAL_UNLOCK_IRQ_EARLY(_sc) \
    spin_unlock_irqrestore(&(_sc)->sc_hal_lock, __sc_halLockflags);
-
-#ifdef ATH_HALOPS_TRACEABLE
-#define __hal_wrapper
-#ifdef TRACEABLE_IMPL
-#define IMPLEMENTATION(_CODEBLOCK) _CODEBLOCK
-#else /* #ifdef TRACEABLE_IMPL */
-#define IMPLEMENTATION(_CODEBLOCK)
-#endif /* #ifdef TRACEABLE_IMPL */
-#else /* #ifdef ATH_HALOPS_TRACEABLE */
-#define __hal_wrapper static inline
-#define IMPLEMENTATION(_CODEBLOCK) _CODEBLOCK
-#endif /* #ifdef ATH_HALOPS_TRACEABLE */
 
 #endif /* #ifndef _IF_ATH_HAL_MACROS_H_ */

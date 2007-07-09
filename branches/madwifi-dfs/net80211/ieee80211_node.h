@@ -108,6 +108,7 @@ struct ieee80211_node {
 #define IEEE80211_NODE_UAPSD	0x0040		/* U-APSD power save enabled */
 #define IEEE80211_NODE_UAPSD_TRIG 0x0080	/* U-APSD triggerable state */
 #define IEEE80211_NODE_UAPSD_SP	0x0100		/* U-APSD SP in progress */
+#define IEEE80211_NODE_PS_CHANGED	0x0200	/* PS state change */
 	u_int8_t ni_ath_flags;			/* Atheros feature flags */
 	/* NB: These must have the same values as IEEE80211_ATHC_* */
 #define IEEE80211_NODE_TURBOP	0x0001		/* Turbo prime enable */
@@ -116,7 +117,6 @@ struct ieee80211_node {
 #define IEEE80211_NODE_XR	0x0008		/* Atheros WME enable */
 #define IEEE80211_NODE_AR	0x0010		/* AR capable */
 #define IEEE80211_NODE_BOOST	0x0080
-#define IEEE80211_NODE_PS_CHANGED	0x0200	/* PS state change */
 	u_int16_t ni_ath_defkeyindex;		/* Atheros def key index */
 #define IEEE80211_INVAL_DEFKEY	0x7FFF
 	u_int16_t ni_associd;			/* assoc response */

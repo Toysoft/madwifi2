@@ -5382,7 +5382,8 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 		if (sc->sc_nmonvaps > 0) {
 			u_int off;
 			unsigned int extra = A_MAX(sizeof(struct ath_rx_radiotap_header),
-					  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
+						   A_MAX(sizeof(struct wlan_ng_prism2_header),
+							 ATHDESC_HEADER_SIZE));
 
 			/*
 			 * Allocate buffer for monitor mode with space for the
@@ -5399,8 +5400,8 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 			}
 			/*
 			 * Reserve space for the Prism header.
-			 */
-			skb_reserve(skb, sizeof(wlan_ng_prism2_header));
+ 			 */
+ 			skb_reserve(skb, sizeof(struct wlan_ng_prism2_header));
 			/*
 			 * Align to cache line.
 			 */
@@ -5507,7 +5508,8 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ieee80211_frame *wh;
 	unsigned int extra = A_MAX(sizeof(struct ath_tx_radiotap_header),
-			  A_MAX(sizeof(wlan_ng_prism2_header), ATHDESC_HEADER_SIZE));
+				   A_MAX(sizeof(struct wlan_ng_prism2_header),
+					 ATHDESC_HEADER_SIZE));
 	u_int32_t tstamp;
 	unsigned int headersize;
 	int padbytes;
@@ -6091,12 +6093,12 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 	struct ath_desc *ds = NULL;
 	int rates[XR_NUM_RATES];
 	u_int8_t ratestr[16], numpollstr[16];
-	typedef struct rate_to_str_map {
+	struct rate_to_str_map {
 		u_int8_t str[4];
 		int ratekbps;
-	} RATE_TO_STR_MAP;
+	};
 
-	static const RATE_TO_STR_MAP ratestrmap[] = {
+	static const struct rate_to_str_map ratestrmap[] = {
 		{"0.25",    250},
 		{ ".25",    250},
 		{ "0.5",    500},
@@ -6745,6 +6747,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	struct ath_node *an;
 	struct ath_vap *avp = ATH_VAP(vap);
 	u_int8_t antenna;
+	struct ieee80211_mrr mrr;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	isprot = wh->i_fc[1] & IEEE80211_FC1_PROT;
@@ -7213,9 +7216,13 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 * when the hardware supports multi-rate retry and
 	 * we don't use it.
 	 */
-	if (try0 != ATH_TXMAXTRY)
-		sc->sc_rc->ops->setupxtxdesc(sc, an, ds, shortPreamble,
-					     skb->len, rix);
+	if (try0 != ATH_TXMAXTRY) {
+		sc->sc_rc->ops->get_mrr(sc, an, shortPreamble, skb->len, rix,
+					&mrr);
+		ath_hal_setupxtxdesc(sc->sc_ah, ds, mrr.rate1, mrr.retries1,
+				     mrr.rate2, mrr.retries2,
+				     mrr.rate3, mrr.retries3);
+	}
 
 #ifndef ATH_SUPERG_FF
 	ds->ds_link = 0;
