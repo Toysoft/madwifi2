@@ -645,16 +645,16 @@ ieee80211_wme_initparams_locked(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_wme_state *wme = &ic->ic_wme;
-	typedef struct phyParamType {
+	struct phyParamType {
 		u_int8_t aifsn;
 		u_int8_t logcwmin;
 		u_int8_t logcwmax;
 		u_int16_t txopLimit;
 		u_int8_t acm;
-	} paramType;
+	};
 	enum ieee80211_phymode mode;
 
-	paramType *pPhyParam, *pBssPhyParam;
+	struct phyParamType *pPhyParam, *pBssPhyParam;
 
 	static struct phyParamType phyParamForAC_BE[IEEE80211_MODE_MAX] = {
 		/* IEEE80211_MODE_AUTO  */ { 3, 4,  6,   0, 0 },
