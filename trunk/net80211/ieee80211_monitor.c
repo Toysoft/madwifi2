@@ -151,14 +151,14 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 	}
 	case ARPHRD_IEEE80211_PRISM: {
 		struct ieee80211_frame *wh = NULL;
-		wlan_ng_prism2_header *p2h =
-			(wlan_ng_prism2_header *) skb->data;
+		struct wlan_ng_prism2_header *p2h =
+			(struct wlan_ng_prism2_header *) skb->data;
 		/* does it look like there is a prism header here? */
-		if (skb->len > sizeof (wlan_ng_prism2_header) &&
+		if (skb->len > sizeof(struct wlan_ng_prism2_header) &&
 	                p2h->msgcode == DIDmsg_lnxind_wlansniffrm &&
 		    p2h->rate.did == DIDmsg_lnxind_wlansniffrm_rate) {
 	                    ph->rate0 = p2h->rate.data;
-	                    skb_pull(skb, sizeof(wlan_ng_prism2_header));
+	                    skb_pull(skb, sizeof(struct wlan_ng_prism2_header));
 		}
 		wh = (struct ieee80211_frame *) skb->data;
 		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
@@ -385,19 +385,19 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		case ARPHRD_IEEE80211:
 			break;
 		case ARPHRD_IEEE80211_PRISM: {
-			wlan_ng_prism2_header *ph;
-			if (skb_headroom(skb1) < sizeof(wlan_ng_prism2_header)) {
+			struct wlan_ng_prism2_header *ph;
+			if (skb_headroom(skb1) < sizeof(struct wlan_ng_prism2_header)) {
 				dev_kfree_skb(skb1);
 				skb1 = NULL;
 				break;
 			}
 
-			ph = (wlan_ng_prism2_header *)
-				skb_push(skb1, sizeof(wlan_ng_prism2_header));
-			memset(ph, 0, sizeof(wlan_ng_prism2_header));
+			ph = (struct wlan_ng_prism2_header *)
+				skb_push(skb1, sizeof(struct wlan_ng_prism2_header));
+			memset(ph, 0, sizeof(struct wlan_ng_prism2_header));
 
 			ph->msgcode = DIDmsg_lnxind_wlansniffrm;
-			ph->msglen = sizeof(wlan_ng_prism2_header);
+			ph->msglen = sizeof(struct wlan_ng_prism2_header);
 			strncpy(ph->devname, dev->name, sizeof(ph->devname));
 
 			ph->hosttime.did = DIDmsg_lnxind_wlansniffrm_hosttime;
