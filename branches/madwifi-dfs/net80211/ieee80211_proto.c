@@ -935,6 +935,8 @@ ieee80211_wme_updateparams(struct ieee80211vap *vap)
 int
 ieee80211_init(struct net_device *dev, int forcescan)
 {
+#define	IS_RUNNING(_dev) \
+	((_dev->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct net_device *parent = ic->ic_dev;
@@ -959,7 +961,8 @@ ieee80211_init(struct net_device *dev, int forcescan)
 	 * 802.11 state machine as appropriate.
 	 * XXX parent should always be up+running
 	 */
-	if (VAP_IS_READY_AUTO(vap) && !VAP_IS_MANUAL(vap)) {
+	if (IS_RUNNING(ic->ic_dev) &&
+	    ic->ic_roaming != IEEE80211_ROAMING_MANUAL) {
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			/*
 			 * Try to be intelligent about clocking the state

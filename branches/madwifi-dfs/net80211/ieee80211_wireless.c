@@ -65,7 +65,11 @@
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_linux.h>
 
- 
+#define	IS_UP(_dev) \
+	(((_dev)->flags & (IFF_RUNNING|IFF_UP)) == (IFF_RUNNING|IFF_UP))
+#define	IS_UP_AUTO(_vap) \
+	(IS_UP((_vap)->iv_dev) && \
+	 (_vap)->iv_ic->ic_roaming == IEEE80211_ROAMING_AUTO)
 #define	RESCAN	1
 
 static void
@@ -269,7 +273,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 				vap->iv_flags &= ~IEEE80211_F_DROPUNENC;
 		}
 	}
-	if (error == 0 && VAP_IS_READY(vap)) {
+	if (error == 0 && IS_UP(vap->iv_dev)) {
 		/*
 		 * Device is up and running; we must kick it to
 		 * effect the change.  If we're enabling/disabling
@@ -277,7 +281,7 @@ ieee80211_ioctl_siwencode(struct net_device *dev,
 		 * so the 802.11 state machine is reset.  Otherwise
 		 * the key state should have been updated above.
 		 */
-		if (wepchange && VAP_IS_READY_AUTO(vap))
+		if (wepchange && IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 	}
 #ifdef ATH_SUPERG_XR
@@ -364,7 +368,7 @@ ieee80211_ioctl_siwrate(struct net_device *dev, struct iw_request_info *info,
 
 	retv = ifmedia_ioctl(vap->iv_dev, &ifr, &vap->iv_media, SIOCSIFMEDIA);
 	if (retv == -ENETRESET)
-		retv = VAP_IS_READY_AUTO(vap) ? ieee80211_open(vap->iv_dev) : 0;
+		retv = IS_UP_AUTO(vap) ? ieee80211_open(vap->iv_dev) : 0;
 	return retv;
 }
 
@@ -423,7 +427,7 @@ ieee80211_ioctl_siwrts(struct net_device *dev, struct iw_request_info *info,
 		return -EINVAL;
 	if (val != vap->iv_rtsthreshold) {
 		vap->iv_rtsthreshold = val;
-		if (VAP_IS_READY(vap))
+		if (IS_UP(vap->iv_dev))
 			return ic->ic_reset(ic->ic_dev);
 	}
 	return 0;
@@ -459,7 +463,7 @@ ieee80211_ioctl_siwfrag(struct net_device *dev,	struct iw_request_info *info,
 
 	if (val != vap->iv_fragthreshold) {
 		vap->iv_fragthreshold = val;
-		if (VAP_IS_READY(vap))
+		if (IS_UP(ic->ic_dev))
 			return ic->ic_reset(ic->ic_dev);
 	}
 	return 0;
@@ -507,7 +511,7 @@ ieee80211_ioctl_siwap(struct net_device *dev, struct iw_request_info *info,
 			vap->iv_flags |= IEEE80211_F_DESBSSID;
 
 		IEEE80211_ADDR_COPY(vap->iv_des_bssid, &ap_addr->sa_data);
-		if (VAP_IS_READY_AUTO(vap))
+		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 	}
 	return 0;
@@ -756,7 +760,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		 * up and running.  We use ic_set_channel directly if we are 
 		 * "running" but not "up".  Otherwise, iv_des_chan will take
 		 * effect when we are transitioned to RUN state later. */
-		if(VAP_IS_READY(vap)) {
+		if(IS_UP(vap->iv_dev)) {
 			pre_announced_chanswitch(dev, ieee80211_chan2ieee(ic, vap->iv_des_chan), IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT);
 		}
 		else if (vap->iv_state == IEEE80211_S_RUN) {
@@ -767,7 +771,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		/* Need to go through the state machine in case we need
 		 * to reassociate or the like.  The state machine will
 		 * pickup the desired channel and avoid scanning. */
-		if (VAP_IS_READY_AUTO(vap))
+		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 	}
 	return 0;
@@ -856,7 +860,7 @@ ieee80211_ioctl_siwessid(struct net_device *dev, struct iw_request_info *info,
 			copy_des_ssid(vap->iv_xrvap, vap);
 	}
 #endif
-	return VAP_IS_READY_AUTO(vap) ? ieee80211_init(vap->iv_dev, RESCAN) : 0;
+	return IS_UP_AUTO(vap) ? ieee80211_init(vap->iv_dev, RESCAN) : 0;
 }
 
 static int
@@ -1260,7 +1264,7 @@ ieee80211_ioctl_siwpower(struct net_device *dev, struct iw_request_info *info,
 		}
 	}
 
-	return VAP_IS_READY(vap) ? ic->ic_reset(ic->ic_dev) : 0;
+	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
 static int
@@ -1316,7 +1320,7 @@ ieee80211_ioctl_siwretry(struct net_device *dev, struct iw_request_info *info,
 		return 0;
 	}
 done:
-	return VAP_IS_READY(vap) ? ic->ic_reset(vap->iv_dev) : 0;
+	return IS_UP(vap->iv_dev) ? ic->ic_reset(vap->iv_dev) : 0;
 }
 
 static int
@@ -1402,7 +1406,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
 	}
 done:
-	return VAP_IS_READY(vap) ? ic->ic_reset(ic->ic_dev) : 0;
+	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
 static int
@@ -1657,10 +1661,8 @@ ieee80211_ioctl_siwscan(struct net_device *dev,	struct iw_request_info *info,
 	 * scanning prior to being up but that'll require some
 	 * changes to the infrastructure.
 	 */
-	if(!VAP_IS_UP(vap))
-		return -ENETDOWN;
-	if(!VAP_IS_READY(vap))
-		return -EBUSY;
+	if (!IS_UP(vap->iv_dev))
+		return -ENETDOWN;	/* XXX */
 	/* XXX always manual... */
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 		"%s: active scan request\n", __func__);
@@ -2124,7 +2126,7 @@ ieee80211_ioctl_setmode(struct net_device *dev, struct iw_request_info *info,
 			return -ETIMEDOUT;
 
 		vap->iv_des_mode = mode;
-		if (VAP_IS_READY_AUTO(vap))
+		if (IS_UP_AUTO(vap))
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 
 		retv = 0;
@@ -2683,7 +2685,7 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	case IEEE80211_PARAM_COVERAGE_CLASS:
 		if (value <= IEEE80211_COVERAGE_CLASS_MAX) {
 			ic->ic_coverageclass = value;
-			if (VAP_IS_READY_AUTO(vap))
+			if (IS_UP_AUTO(vap))
 				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 			retv = 0;
 		} else
@@ -2796,12 +2798,12 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 	 */
 	if (!vap->iv_xrvap || (vap->iv_xrvap && !(vap->iv_flags & IEEE80211_F_XR))) {
 		if (retv == ENETRESET)
-			retv = VAP_IS_READY_AUTO(vap) ? ieee80211_open(vap->iv_dev) : 0;
+			retv = IS_UP_AUTO(vap) ? ieee80211_open(vap->iv_dev) : 0;
 	}
 #else
 	/* XXX should any of these cause a rescan? */
 	if (retv == ENETRESET)
-		retv = VAP_IS_READY_AUTO(vap) ? ieee80211_open(vap->iv_dev) : 0;
+		retv = IS_UP_AUTO(vap) ? ieee80211_open(vap->iv_dev) : 0;
 #endif
 	return -retv;
 }
@@ -3574,7 +3576,7 @@ ieee80211_ioctl_setmlme(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211req_mlme *mlme = (struct ieee80211req_mlme *)extra;
 	struct ieee80211_node *ni;
 
-	if (!VAP_IS_READY(vap)) {
+	if (!IS_UP(dev)) {
 		switch (mlme->im_op) {
 		case IEEE80211_MLME_DISASSOC:
 		case IEEE80211_MLME_DEAUTH:
@@ -3682,7 +3684,7 @@ ieee80211_ioctl_wdsmac(struct net_device *dev, struct iw_request_info *info,
 	printk("%s: Added WDS MAC: %s\n", dev->name,
 		ether_sprintf(vap->wds_mac));
 
-	if (VAP_IS_READY(vap))
+	if (IS_UP(vap->iv_dev))
 		return ic->ic_reset(ic->ic_dev);
 
 	return 0;
@@ -3705,7 +3707,7 @@ ieee80211_ioctl_wdsdelmac(struct net_device *dev, struct iw_request_info *info,
 	 */
 	if (memcmp(vap->wds_mac, sa->sa_data, IEEE80211_ADDR_LEN) == 0) {
 		memset(vap->wds_mac, 0x00, IEEE80211_ADDR_LEN);
-		if (VAP_IS_READY(vap))
+		if (IS_UP(vap->iv_dev))
 			return ic->ic_reset(ic->ic_dev);
 		return 0;
 	}
@@ -3814,7 +3816,7 @@ ieee80211_ioctl_setchanlist(struct net_device *dev,
 	memcpy(ic->ic_chan_active, chanlist, sizeof(ic->ic_chan_active));
 	/* update Supported Channels information element */
 	ieee80211_build_sc_ie(ic);
-	if (VAP_IS_READY_AUTO(vap))
+	if (IS_UP_AUTO(vap))
 		ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 
 	return 0;
