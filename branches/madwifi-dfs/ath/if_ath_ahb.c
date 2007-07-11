@@ -434,7 +434,7 @@ init_ahb(void)
 	config.unit = wlanNum;
 	config.tag = NULL;
 
-	if (!strcmp(sysType,"Atheros AR5315")) {
+	if (!strcmp(sysType, "Atheros AR5315")) {
 		devid = (u_int16_t) (sysRegRead(AR5315_SREV) &
 			(AR5315_REV_MAJ_M | AR5315_REV_MIN_M));
 		if (((devid & AR5315_REV_MAJ_M) == AR5315_REV_MAJ) ||

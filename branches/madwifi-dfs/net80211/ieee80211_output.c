@@ -1656,7 +1656,7 @@ ieee80211_add_athAdvCap(u_int8_t *frm, u_int8_t capability, u_int16_t defaultKey
  */
 #ifdef ATH_SUPERG_XR
 u_int8_t *
-ieee80211_add_xr_param(u_int8_t *frm,struct ieee80211vap *vap)
+ieee80211_add_xr_param(u_int8_t *frm, struct ieee80211vap *vap)
 {
 	static const u_int8_t oui[6] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
 					((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE_XR,

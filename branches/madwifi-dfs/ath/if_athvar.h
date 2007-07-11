@@ -57,7 +57,7 @@
 #include <linux/interrupt.h>
 #ifdef DECLARE_TASKLET			/* native tasklets */
 #define ATH_TQ_STRUCT tasklet_struct
-#define ATH_INIT_TQUEUE(a,b,c)		tasklet_init((a),(b),(unsigned long)(c))
+#define ATH_INIT_TQUEUE(a,b,c)		tasklet_init((a), (b), (unsigned long)(c))
 #define ATH_SCHEDULE_TQUEUE(a,b)	tasklet_schedule((a))
 typedef unsigned long TQUEUE_ARG;
 #define mark_bh(a) do {} while (0)
@@ -79,7 +79,7 @@ typedef void *TQUEUE_ARG;
 #define schedule_work(t)		schedule_task((t))
 #define flush_scheduled_work()		flush_scheduled_tasks()
 #define ATH_INIT_WORK(t, f) do { 			\
-	memset((t),0,sizeof(struct tq_struct)); \
+	memset((t), 0, sizeof(struct tq_struct)); \
 	(t)->routine = (void (*)(void*)) (f); 	\
 	(t)->data=(void *) (t);			\
 } while (0)
@@ -154,7 +154,7 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 
 /* Avoid name collision - some vendor kernels backport alloc_netdev() */
 #undef alloc_netdev
-#define alloc_netdev(s,m,d) _alloc_netdev(s,m,d)
+#define alloc_netdev(s,m,d) _alloc_netdev(s, m, d)
 
 /* Some vendors backport PDE, so make it a macro here */
 #undef PDE
@@ -525,7 +525,7 @@ struct ath_vap {
 	(_tqd)->axq_depth += (_tqs)->axq_depth; \
 	(_tqd)->axq_totalqueued += (_tqs)->axq_totalqueued; \
 	(_tqd)->axq_link = (_tqs)->axq_link; \
-	STAILQ_CONCAT(&(_tqd)->axq_q,&(_tqs)->axq_q); \
+	STAILQ_CONCAT(&(_tqd)->axq_q, &(_tqs)->axq_q); \
 	(_tqs)->axq_depth=0; \
 	(_tqs)->axq_totalqueued = 0; \
 	(_tqs)->axq_link = NULL; \

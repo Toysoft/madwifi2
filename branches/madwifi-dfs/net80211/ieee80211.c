@@ -882,17 +882,17 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 
 			c = ieee80211_find_channel(ic, ichan->ic_freq, ichan->ic_flags);
 			if (c == NULL) {
-				if_printf(dev,"%s: Couldn't find matching channel for dfs mark (%d, 0x%x)\n",
+				if_printf(dev, "%s: Couldn't find matching channel for dfs mark (%d, 0x%x)\n",
 					  __func__, ichan->ic_freq, ichan->ic_flags);
 				return;
 			}
 			if  (ic->ic_curchan->ic_freq == c->ic_freq) {
-				if_printf(dev,"%s: Invoking ieee80211_dfs_action (%d, 0x%x)\n", __func__, ichan->ic_freq, ichan->ic_flags);
+				if_printf(dev, "%s: Invoking ieee80211_dfs_action (%d, 0x%x)\n", __func__, ichan->ic_freq, ichan->ic_flags);
  				/* The current channel has been marked. We need to move away from it. */
  				ieee80211_dfs_action(ic);
 			}
 			else
-				if_printf(dev, "Channel frequency doesn't match expectation!  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n",ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
+				if_printf(dev, "Channel frequency doesn't match expectation!  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n", ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
 		} else {
 #if 0 /* disabled until radar detection algorithm has filtering */
 			/* Change to a radar free 11a channel for dfstesttime seconds */
@@ -901,7 +901,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 #endif /* #if 0 -- disabled until radar detection algorithm has filtering */
 
-			if_printf(dev, "Mute test - markdfs is off, we are in hostap mode, found radar on %d.  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n",ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
+			if_printf(dev, "Mute test - markdfs is off, we are in hostap mode, found radar on %d.  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n", ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
 		}
 	} else {
 		/* Are we in STA mode? If so, send an action msg to AP saying we found a radar? */

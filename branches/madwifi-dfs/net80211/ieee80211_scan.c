@@ -973,7 +973,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		return 0;
 	if (se != NULL) {
 		/* A suitable scan entry was found, so change channels */
-		if_printf(dev,"Changing to channel %d (%d MHz)\n",
+		if_printf(dev, "Changing to channel %d (%d MHz)\n",
 			  se->se_chan->ic_ieee,
 			  se->se_chan->ic_freq);
 		if (vap->iv_state == IEEE80211_S_RUN) {
@@ -985,7 +985,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 			 * vap is not in run state yet. so
 			 * change the channel here.
 			 */
-			change_channel(ic,se->se_chan);
+			change_channel(ic, se->se_chan);
 			ic->ic_bsschan = se->se_chan;
 			if (vap->iv_bss)
 				vap->iv_bss->ni_chan = se->se_chan;
@@ -1011,7 +1011,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 					chanStart = 0;
 			}
 			if (n < ic->ic_nchans) {
-				if_printf(dev,"Changing to channel %d (%d MHz)\n",
+				if_printf(dev, "Changing to channel %d (%d MHz)\n",
 					  ic->ic_channels[chanStart].ic_ieee,
 					  ic->ic_channels[chanStart].ic_freq);
 				ic->ic_chanchange_chan = ic->ic_channels[chanStart].ic_ieee;

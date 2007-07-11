@@ -183,7 +183,7 @@ getdata(const char *arg, u_int8_t *data, int maxlen)
 static int
 getcipher(const char *name)
 {
-#define	streq(a,b)	(strcasecmp(a,b) == 0)
+#define	streq(a,b)	(strcasecmp(a, b) == 0)
 
 	if (streq(name, "wep"))
 		return IEEE80211_CIPHER_WEP;

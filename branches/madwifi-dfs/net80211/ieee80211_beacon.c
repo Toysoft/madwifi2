@@ -470,7 +470,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			struct ieee80211_ie_csa *csa_ie =
 				(struct ieee80211_ie_csa *)bo->bo_chanswitch;
 
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, "%s: Sending 802.11h chanswitch IE: %d/%d\n",__func__,ic->ic_chanchange_chan,ic->ic_chanchange_tbtt);
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, "%s: Sending 802.11h chanswitch IE: %d/%d\n", __func__, ic->ic_chanchange_chan, ic->ic_chanchange_tbtt);
 			if (!vap->iv_chanchange_count) {
 				vap->iv_flags |= IEEE80211_F_CHANSWITCH;
 
@@ -540,7 +540,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 
 			len_changed = 1;
 		}
-		memcpy(bo->bo_appie_buf,vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].ie,
+		memcpy(bo->bo_appie_buf, vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].ie,
 			vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].length);
 
 		vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;
