@@ -273,9 +273,7 @@ static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
 static char *autocreate = NULL;
 static char *ratectl = DEF_RATE_CTL;
 static int rfkill = 0;
-#ifdef ATH_CAP_TPC
 static int tpc = 0;
-#endif
 static int countrycode = -1;
 static int outdoor = -1;
 static int xchanmode = -1;
@@ -533,12 +531,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	printk(KERN_INFO "ath_pci: switching rfkill capability %s\n",
 		rfkill ? "on" : "off");
 	ath_hal_setrfsilent(ah, rfkill);
-
-#ifdef ATH_CAP_TPC
-	printk(KERN_INFO "ath_pci: ath_pci: switching per-packet transmit power control %s\n",
-		tpc ? "on" : "off");
-	ath_hal_settpc(ah, tpc);
-#endif
 
 	/*
 	 * Setup rate tables for all potential media types.
@@ -819,11 +811,18 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 */
 #ifdef ATH_CAP_TPC
 	sc->sc_hastpc = ath_hal_hastpc(ah);
-	if (sc->sc_hastpc || ath_hal_hastxpowlimit(ah))
+	if(tpc && !sc->sc_hastpc) {
+		printk(KERN_WARNING "ath_pci: WARNING: per-packet transmit power control was requested, but is not supported by the hardware.\n");
+		tpc = 0;
+	}
+	printk(KERN_INFO "ath_pci: switching per-packet transmit power control %s\n",
+		tpc ? "on" : "off");
+	ath_hal_settpc(ah, tpc);
 #else
 	sc->sc_hastpc = 0;
-	if (ath_hal_hastxpowlimit(ah))
+	tpc = 0; /* TPC is always zero, when compiled without ATH_CAP_TPC */
 #endif
+	if (sc->sc_hastpc || ath_hal_hastxpowlimit(ah))
 		ic->ic_caps |= IEEE80211_C_TXPMGT;
 
 	/*
@@ -1846,7 +1845,7 @@ ath_init(struct net_device *dev)
 	ath_stop_locked(dev);
 
 #ifdef ATH_CAP_TPC
-	/* Re-enable after suspend (?) */
+	/* Re-enable after suspend */
 	ath_hal_settpc(ah, tpc);
 #endif
 
@@ -8697,26 +8696,17 @@ ath_update_txpow(struct ath_softc *sc)
 	 * Search for the VAP that needs a txpow change, if any
 	 */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-#ifdef ATH_CAP_TPC
-		if (ic->ic_newtxpowlimit == vap->iv_bss->ni_txpower) {
+		if (!tpc || ic->ic_newtxpowlimit >= vap->iv_bss->ni_txpower) {
 			vap->iv_bss->ni_txpower = clamped_txpow;
 			ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
 		}
-#else
-		vap->iv_bss->ni_txpower = clamped_txpow;
-		ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
-#endif
 	}
 
 	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
 
-#ifdef ATH_CAP_TPC
-	if (ic->ic_newtxpowlimit >= txpowlimit)
+	if ((tpc && ic->ic_newtxpowlimit >= txpowlimit) ||
+	    (ic->ic_newtxpowlimit != txpowlimit))
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
-#else
-	if (ic->ic_newtxpowlimit != txpowlimit)
-		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
-#endif
 }
 
 
