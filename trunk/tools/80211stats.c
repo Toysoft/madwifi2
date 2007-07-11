@@ -71,8 +71,6 @@
 #define INT64FMT "%llu"
 #endif
 
-const char *progname;
-
 static void
 printstats(FILE *fd, const struct ieee80211_stats *stats)
 {
@@ -163,8 +161,8 @@ printstats(FILE *fd, const struct ieee80211_stats *stats)
 #undef N
 }
 
-struct ifreq ifr;
-int	s;
+static struct ifreq ifr;
+static int s;
 
 static void
 print_sta_stats(FILE *fd, const u_int8_t macaddr[IEEE80211_ADDR_LEN])
