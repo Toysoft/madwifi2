@@ -60,7 +60,7 @@
 #include "net80211/ieee80211_ioctl.h"
 
 static	int s = -1;
-const char *progname;
+static const char *progname;
 
 static void
 checksocket()
@@ -69,7 +69,7 @@ checksocket()
 		perror("socket(SOCK_DGRAM)");
 }
 
-#define IOCTL_ERR(x) [x - SIOCIWFIRSTPRIV] "ioctl[" #x "]"
+#define IOCTL_ERR(x) [x - SIOCIWFIRSTPRIV] = "ioctl[" #x "]"
 static int
 set80211priv(const char *dev, int op, void *data, int len, int show_err)
 {

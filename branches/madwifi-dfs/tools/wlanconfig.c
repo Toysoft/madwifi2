@@ -94,7 +94,7 @@ static const char *getstamode(u_int8_t);
 
 size_t strlcat(char *, const char *, size_t);
 
-int verbose = 0;
+static int verbose = 0;
 
 int
 main(int argc, char *argv[])
@@ -497,19 +497,19 @@ copy_essid(char buf[], size_t bufsize, const u_int8_t *essid, size_t essid_len)
 	  (((const u_int8_t *)(p))[2] << 16) |		\
 	  (((const u_int8_t *)(p))[3] << 24)))
 
-static int __inline
+static __inline int
 iswpaoui(const u_int8_t *frm)
 {
 	return frm[1] > 3 && LE_READ_4(frm + 2) == ((WPA_OUI_TYPE << 24) | WPA_OUI);
 }
 
-static int __inline
+static __inline int
 iswmeoui(const u_int8_t *frm)
 {
 	return frm[1] > 3 && LE_READ_4(frm + 2) == ((WME_OUI_TYPE << 24) | WME_OUI);
 }
 
-static int __inline
+static __inline int
 isatherosoui(const u_int8_t *frm)
 {
 	return frm[1] > 3 && LE_READ_4(frm + 2) == ((ATH_OUI_TYPE << 24) | ATH_OUI);
@@ -775,7 +775,7 @@ list_keys(const char *ifname)
 /*
  * Print a value a la the %b format of the kernel's printf
  */
-void
+static void
 printb(const char *s, unsigned v, const char *bits)
 {
 	int i, any = 0;
@@ -918,7 +918,7 @@ get80211param(const char *ifname, int param, void *data, size_t len)
 	return iwr.u.data.length;
 }
 
-#define IOCTL_ERR(x) [x - SIOCIWFIRSTPRIV] "ioctl[" #x "]"
+#define IOCTL_ERR(x) [x - SIOCIWFIRSTPRIV] = "ioctl[" #x "]"
 static int
 do80211priv(struct iwreq *iwr, const char *ifname, int op, void *data, size_t len)
 {
