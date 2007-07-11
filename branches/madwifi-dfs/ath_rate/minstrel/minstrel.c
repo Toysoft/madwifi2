@@ -452,7 +452,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		final_rate = sc->sc_hwmap[ts->ts_rate & ~HAL_TXSTAT_ALTRATE].ieeerate;
 		final_ndx = rate_to_ndx(sn, final_rate);
 		if (final_ndx >= sn->num_rates) {
-			DPRINTF(sc,"%s: final ndx too high\n", __func__);
+			DPRINTF(sc, "%s: final ndx too high\n", __func__);
 			final_ndx = 0;
 		}
 		if (final_ndx < 0) {
@@ -699,7 +699,7 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 #if 0
 		DPRINTF(sc, "%s: Retry table for this node\n", __func__);
 		  for (x = 0; x < ni->ni_rates.rs_nrates; x++)
-			     DPRINTF(sc, "%2d  %2d %6d  \n",x, sn->retry_count[x], sn->perfect_tx_time[x]);
+			     DPRINTF(sc, "%2d  %2d %6d  \n", x, sn->retry_count[x], sn->perfect_tx_time[x]);
 #endif
 
 		/* Set the initial rate */

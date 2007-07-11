@@ -1441,7 +1441,7 @@ static int
 ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
 	struct net_device* dev = sc->sc_dev;
 	if (ath_radio_silence_required_for_dfs(sc)) {
-		DPRINTF(sc,ATH_DEBUG_DOTH, "%s: %s: ERROR: Invoked a transmit function during DFS channel availability check OR while radar interference is detected!\n", DEV_NAME(dev), func);
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: ERROR: Invoked a transmit function during DFS channel availability check OR while radar interference is detected!\n", DEV_NAME(dev), func);
 		return 1;
 	}
 	return 0;
@@ -1604,7 +1604,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			continue;
 
 		/* If we are supposed to be not listening or transmitting, don't do triggers */
-		if (ath_check_radio_silence_not_required(sc,__func__))
+		if (ath_check_radio_silence_not_required(sc, __func__))
 			return;
 
 		/* make sure the frame is QoS data/null */
@@ -2315,7 +2315,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 {
 	struct ath_hal *ah = sc->sc_ah;
 
-	if (ath_check_radio_silence_not_required(sc,__func__))
+	if (ath_check_radio_silence_not_required(sc, __func__))
 		return;
 	/*
 	 * Insert the frame on the outbound list and
@@ -4134,7 +4134,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		return NULL;
 	}
 
-	if (ath_check_radio_silence_not_required(sc,__func__))
+	if (ath_check_radio_silence_not_required(sc, __func__))
 		return NULL;
 
 #ifdef ATH_SUPERG_XR
@@ -4268,7 +4268,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	u_int32_t bfaddr;
 	u_int32_t n_beacon;
 
-	if (ath_check_radio_silence_not_required(sc,__func__))
+	if (ath_check_radio_silence_not_required(sc, __func__))
 		return;
 
 	/*
@@ -4278,7 +4278,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	 * a problem and should not occur.  If we miss too
 	 * many consecutive beacons reset the device.
 	 */
-	if ( ( n_beacon = ath_hal_numtxpending(ah, sc->sc_bhalq)) != 0 ) {
+	if ((n_beacon = ath_hal_numtxpending(ah, sc->sc_bhalq)) != 0 ) {
 		sc->sc_bmisscount++;
 		/* XXX: 802.11h needs the chanchange IE countdown decremented.
 		 *      We should consider adding a net80211 call to indicate
@@ -4448,7 +4448,7 @@ ath_beacon_start_adhoc(struct ath_softc *sc, struct ieee80211vap *vap)
 	struct ath_vap *avp;
 	struct sk_buff *skb;
 
-	if (ath_check_radio_silence_not_required(sc,__func__))
+	if (ath_check_radio_silence_not_required(sc, __func__))
 		return;
 
 	avp = ATH_VAP(vap);
@@ -5025,7 +5025,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 	HAL_STATUS status;
 	unsigned int index;
 
-	if (ath_check_radio_silence_not_required(sc,__func__))
+	if (ath_check_radio_silence_not_required(sc, __func__))
 		return;
 
 	if (ni->ni_vap->iv_flags & IEEE80211_F_XR) {
@@ -5952,7 +5952,7 @@ ath_grppoll_period_update(struct ath_softc *sc)
 	if (xrsta == 0) {
 		if (sc->sc_xrpollint != XR_DEFAULT_POLL_INTERVAL) {
 			sc->sc_xrpollint = XR_DEFAULT_POLL_INTERVAL;
-			ath_grppoll_txq_update(sc,XR_DEFAULT_POLL_INTERVAL);
+			ath_grppoll_txq_update(sc, XR_DEFAULT_POLL_INTERVAL);
 		}
 		return;
 	}
@@ -6117,7 +6117,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 	if (sc->sc_xrgrppoll)
 		return;
 
-	if (ath_check_radio_silence_not_required(sc,__func__))
+	if (ath_check_radio_silence_not_required(sc, __func__))
 		return;
 
 	memset(&rates, 0, sizeof(rates));
@@ -6189,7 +6189,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 							pktlen, rtindex,
 							AH_FALSE) /* CF-Poll time */
 						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))
-						+ ath_hal_computetxtime(ah,rt,
+						+ ath_hal_computetxtime(ah, rt,
 							XR_FRAGMENTATION_THRESHOLD,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
 							AH_FALSE) /* Data packet time */
@@ -8336,7 +8336,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 * do not let the 80211 state machine to go to RUN state. */
 		if (sc->sc_dfs_channel_check
 		    && (vap->iv_opmode == IEEE80211_M_HOSTAP || vap->iv_opmode == IEEE80211_M_IBSS) ) {
-			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP -> DFSWAIT_PENDING \n",__func__, DEV_NAME(dev));
+			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP -> DFSWAIT_PENDING \n", 
+				__func__, DEV_NAME(dev));
 			/* start calibration timer with a really small value 1/10 sec */
 			mod_timer(&sc->sc_cal_ch, jiffies + (HZ/10));
 			/* wake the receiver */
@@ -8351,14 +8352,15 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		}
 
 		/* Configure the beacon and sleep timers. */
-		if (!sc->sc_beacons && vap->iv_opmode!=IEEE80211_M_WDS) {
+		if (!sc->sc_beacons && (vap->iv_opmode != IEEE80211_M_WDS)) {
 			ath_beacon_config(sc, vap);
 			sc->sc_beacons = 1;
 		}
 	} else {
 		if (sc->sc_dfs_channel_check &&
-		    (vap->iv_opmode == IEEE80211_M_HOSTAP || vap->iv_opmode == IEEE80211_M_IBSS) &&
-		    sc->sc_dfs_channel_check_timer.data == (unsigned long)vap) 
+		    ((vap->iv_opmode == IEEE80211_M_HOSTAP) || 
+		     (vap->iv_opmode == IEEE80211_M_IBSS)) &&
+		    (sc->sc_dfs_channel_check_timer.data == (unsigned long)vap))
 		{
 			del_timer_sync(&sc->sc_dfs_channel_check_timer);
 			sc->sc_dfs_channel_check = 0;
@@ -8418,7 +8420,7 @@ ath_dfs_channel_check_completed(unsigned long data )
 	struct timeval tv;
 
 	if (!sc->sc_dfs_channel_check) {
-		DPRINTF(sc, ATH_DEBUG_DOTH,"%s: %s: Error: DFS wait timer expired, but the driver didn't think we were in dfswait.  Somebody forgot to delete the DFS wait timer.\n", DEV_NAME(dev), __func__);
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Error: DFS wait timer expired, but the driver didn't think we were in dfswait.  Somebody forgot to delete the DFS wait timer.\n", DEV_NAME(dev), __func__);
 		return;
 	}
 
@@ -8427,11 +8429,11 @@ ath_dfs_channel_check_completed(unsigned long data )
 		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: DFS wait %s! - Channel: %u Time: %ld.%06ld\n", __func__, DEV_NAME(dev), (sc->sc_curchan.privFlags & CHANNEL_DFS) ? "completed" : "not applicable", ieee80211_mhz2ieee(sc->sc_curchan.channel, sc->sc_curchan.channelFlags), tv.tv_sec, tv.tv_usec);
 		sc->sc_dfs_channel_check = 0;
 		if (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE) {
-			DPRINTF(sc, ATH_DEBUG_DOTH,"%s: %s: Error: DFS wait timer expired but channel was already marked as having CHANNEL_INTERFERENCE.  Somebody forgot to delete the DFS wait timer.\n", DEV_NAME(dev), __func__);
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Error: DFS wait timer expired but channel was already marked as having CHANNEL_INTERFERENCE.  Somebody forgot to delete the DFS wait timer.\n", DEV_NAME(dev), __func__);
 			return;
 		}
 		if (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS)) {
-			DPRINTF(sc, ATH_DEBUG_DOTH,"%s: %s: Error: DFS wait timer expired but the current channel does not require DFS.  Maybe someone changed channels but forgot to cancel the DFS wait.\n", DEV_NAME(dev), __func__);
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Error: DFS wait timer expired but the current channel does not require DFS.  Maybe someone changed channels but forgot to cancel the DFS wait.\n", DEV_NAME(dev), __func__);
 			return;
 		}
 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Driver is now MARKING channel as CHANNEL_DFS_CLEAR.\n", DEV_NAME(dev), __func__);
@@ -8454,7 +8456,7 @@ ath_dfs_channel_check_completed(unsigned long data )
 				}
 				if (!sc->sc_beacons &&
 				    vap->iv_opmode!=IEEE80211_M_WDS) {
-					ath_beacon_config(sc,vap);
+					ath_beacon_config(sc, vap);
 					sc->sc_beacons = 1;
 				}
 				do_gettimeofday(&tv);
@@ -9733,7 +9735,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			ret = -EINVAL;
 			break;
 		}
-		if(!ret) {
+		if (!ret) {
 			ret = ATH_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer, lenp, ppos);
 		}
 	}
@@ -10126,12 +10128,12 @@ txcont_configure_radio(struct ieee80211com *ic)
 
 	if (IFF_RUNNING != (ic->ic_dev->flags & IFF_RUNNING)) {
 		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is"
-			" not in running state.\n", DEV_NAME(dev),__func__);
+			" not in running state.\n", DEV_NAME(dev), __func__);
 		sc->sc_txcont = 0;
 		return;
 	}
 
-	ath_hal_intrset(ah,0);
+	ath_hal_intrset(ah, 0);
 	{
 		int ac;
 
@@ -10244,7 +10246,7 @@ txcont_configure_radio(struct ieee80211com *ic)
 			}
 			ieee80211_dturbo_switch(ic, newflags);
 			/*  Keep interupts off, just in case... */
-			ath_hal_intrset(ah,0);
+			ath_hal_intrset(ah, 0);
 		}
 #endif /* #ifdef ATH_SUPERG_DYNTURBO */
 		/* clear pending tx frames picked up after reset */
@@ -10252,7 +10254,7 @@ txcont_configure_radio(struct ieee80211com *ic)
 		/* stop receive side */
 		ath_stoprecv(sc);
 		ath_hal_setrxfilter(ah, 0);
-		ath_hal_setmcastfilter(ah,0,0);
+		ath_hal_setmcastfilter(ah, 0, 0);
 		ath_set_ack_bitrate(sc, sc->sc_ackrate);
 		netif_wake_queue(dev);		/* restart xmit */
 
@@ -10368,7 +10370,7 @@ txcont_configure_radio(struct ieee80211com *ic)
 		/* Enable continuous transmit register bit */
 		sc->sc_txcont = 1;
 	}
-	ath_hal_intrset(ah,sc->sc_imask);
+	ath_hal_intrset(ah, sc->sc_imask);
 }
 
 /* Queue a self-looped packet for the specified hardware queue. */
@@ -10389,22 +10391,22 @@ txcont_queue_packet(struct ieee80211com *ic, struct ath_txq* txq)
 
 	if (IFF_RUNNING != (ic->ic_dev->flags & IFF_RUNNING) || (0 == sc->sc_txcont)) {
 		printk(KERN_ERR "%s: %s: Refusing to queue self linked frame "
-				"when txcont is not enabled.\n", DEV_NAME(dev),__func__);
+				"when txcont is not enabled.\n", DEV_NAME(dev), __func__);
 		return;
 	}
 
-	ath_hal_intrset(ah,0);
+	ath_hal_intrset(ah, 0);
 	{
 		bf  = STAILQ_FIRST(&sc->sc_txbuf);
 		STAILQ_REMOVE_HEAD(&sc->sc_txbuf, bf_list);
 		skb = alloc_skb(datasz + sizeof(struct ieee80211_frame) + IEEE80211_CRC_LEN, GFP_ATOMIC);
 		wh  = (struct ieee80211_frame*)skb_put(skb, sizeof(struct ieee80211_frame));
 		if (NULL == skb) {
-			printk(KERN_ERR "%s: %s: alloc_skb returned null!\n", DEV_NAME(dev),__func__);
+			printk(KERN_ERR "%s: %s: alloc_skb returned null!\n", DEV_NAME(dev), __func__);
 			BUG();
 		}
 		if (NULL == bf) {
-			printk(KERN_ERR "%s: %s: STAILQ_FIRST(&sc->sc_txbuf) returned null!\n", DEV_NAME(dev),__func__);
+			printk(KERN_ERR "%s: %s: STAILQ_FIRST(&sc->sc_txbuf) returned null!\n", DEV_NAME(dev), __func__);
 			BUG();
 		}
 
@@ -10496,7 +10498,7 @@ txcont_queue_packet(struct ieee80211com *ic, struct ath_txq* txq)
 		    );
 		ath_hal_txstart(ah, txq->axq_qnum);
 	}
-	ath_hal_intrset(ah,sc->sc_imask);
+	ath_hal_intrset(ah, sc->sc_imask);
 }
 
 /* Turn on continuous transmission */
@@ -10507,7 +10509,7 @@ txcont_on(struct ieee80211com *ic)
 	struct ath_softc *sc = dev->priv;
 
 	if (IFF_RUNNING != (ic->ic_dev->flags & IFF_RUNNING)) {
-		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is not in running state.\n", DEV_NAME(dev),__func__);
+		printk(KERN_ERR "%s: %s: Cannot enable txcont when interface is not in running state.\n", DEV_NAME(dev), __func__);
 		sc->sc_txcont = 0;
 		return;
 	}
@@ -10908,7 +10910,7 @@ ath_dump_phyerr_statistics(struct ath_softc *sc, const char* cause)
 		struct net_device*  dev = sc->sc_dev;
 		printk(KERN_DEBUG "-----------------------------------------"
 				"------------------------------------\n");
-		printk(KERN_DEBUG "%s: %s: %s\n", DEV_NAME(dev),__func__, cause);
+		printk(KERN_DEBUG "%s: %s: %s\n", DEV_NAME(dev), __func__, cause);
 		printk(KERN_DEBUG " HAL_PHYERR_RADAR.................%6d\n", 
 				sc->sc_stats.ast_rx_phy[HAL_PHYERR_RADAR]);
 		printk(KERN_DEBUG " HAL_PHYERR_TIMING................%6d\n", 
@@ -11769,13 +11771,13 @@ ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long data)
 				if (NULL == des_chan) {
 					DPRINTF(sc, ATH_DEBUG_DOTH, 
 						"%s: %s: Desired channel not found: %u/%x\n", 
-						DEV_NAME(sc->sc_dev),__func__, 
+						DEV_NAME(sc->sc_dev), __func__, 
 						vap->iv_des_chan->ic_freq, 
 						vap->iv_des_chan->ic_flags);
 				} else if (0 == (des_chan->ic_flags & IEEE80211_CHAN_RADAR)) {
 					DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Desired channel"
 						" found and available.  Switching to %u/%x\n", 
-						DEV_NAME(sc->sc_dev),__func__, 
+						DEV_NAME(sc->sc_dev), __func__, 
 						vap->iv_des_chan->ic_freq, 
 						vap->iv_des_chan->ic_flags);
 					ic->ic_chanchange_chan = des_chan->ic_ieee;
@@ -11785,7 +11787,7 @@ ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long data)
 					DPRINTF(sc, ATH_DEBUG_DOTH, 
 						"%s: %s: Desired channel found"
 						" and not available until Time: %10ld.%06ld\n", 
-						DEV_NAME(sc->sc_dev),__func__, 
+						DEV_NAME(sc->sc_dev), __func__, 
 						des_chan->ic_non_occupancy_timer_expiration.tv_sec, 
 						des_chan->ic_non_occupancy_timer_expiration.tv_usec);
 				}
