@@ -54,7 +54,7 @@
 
 #define	N(a)	(sizeof(a)/sizeof(a[0]))
 
-const char *progname;
+static const char *progname;
 
 enum {
 	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
