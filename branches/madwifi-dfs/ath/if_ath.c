@@ -11758,10 +11758,14 @@ ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long data)
 		/* Go through and clear any interference flag we have, if we 
 		 * just got it cleared up for us */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+		  /* We need to check for the special value
+		     IEEE80211_CHAN_ANYC before using vap->iv_des_chan
+		     since it will cause a kernel panic */
 			if ((vap->iv_state == IEEE80211_S_RUN) && 
 			    ((vap->iv_opmode == IEEE80211_M_HOSTAP) ||
 			     (vap->iv_opmode == IEEE80211_M_IBSS)) &&
 			    /* Operating on channel other than desired. */
+			    (vap->iv_des_chan != IEEE80211_CHAN_ANYC) &&
 			    (vap->iv_des_chan->ic_freq > 0) &&
 			    (vap->iv_des_chan->ic_freq != ic->ic_bsschan->ic_freq)) {
 				struct ieee80211_channel *des_chan = 
