@@ -48,7 +48,7 @@
 #include <linux/netdevice.h>
 #include <linux/random.h>
 
-#include "if_ethersubr.h"		/* XXX ETHER_HDR_LEN */
+#include "if_ethersubr.h"		/* for ETHER_HDR_LEN */
 #include "if_media.h"
 
 #include <net80211/ieee80211_var.h>
@@ -160,14 +160,14 @@ ieee80211_crypto_detach(struct ieee80211com *ic)
 EXPORT_SYMBOL(ieee80211_crypto_detach);
 
 /*
- * Setup crypto support for a vap.
+ * Setup crypto support for a VAP.
  */
 void
 ieee80211_crypto_vattach(struct ieee80211vap *vap)
 {
 	int i;
 
-	/* NB: we assume everything is pre-zero'd */
+	/* NB: We assume everything is pre-zeroed */
 	vap->iv_def_txkey = IEEE80211_KEYIX_NONE;
 	for (i = 0; i < IEEE80211_WEP_NKID; i++)
 		ieee80211_crypto_resetkey(vap, &vap->iv_nw_keys[i],
@@ -208,7 +208,7 @@ ieee80211_crypto_register(const struct ieee80211_cipher *cip)
 			__func__, cip->ic_name, cip->ic_cipher);
 		return;
 	}
-	if (ciphers[cip->ic_cipher] != NULL && ciphers[cip->ic_cipher] != cip) {
+	if ((ciphers[cip->ic_cipher] != NULL) && (ciphers[cip->ic_cipher] != cip)) {
 		printf("%s: cipher %s registered with a different template\n",
 			__func__, cip->ic_name);
 		return;
@@ -234,12 +234,12 @@ ieee80211_crypto_unregister(const struct ieee80211_cipher *cip)
 		return;
 	}
 	/* NB: don't complain about not being registered */
-	/* XXX disallow if references */
+	/* XXX: disallow if referenced */
 	ciphers[cip->ic_cipher] = NULL;
 }
 EXPORT_SYMBOL(ieee80211_crypto_unregister);
 
-/* XXX well-known names! */
+/* XXX: well-known names! */
 static const char *cipher_modnames[] = {
 	"wlan_wep",	/* IEEE80211_CIPHER_WEP     */
 	"wlan_tkip",	/* IEEE80211_CIPHER_TKIP    */
@@ -373,8 +373,8 @@ again:
 		 * different state and/or attach different method
 		 * pointers.
 		 *
-		 * XXX this is not right when s/w crypto fallback
-		 *     fails and we try to restore previous state.
+		 * XXX: This is not right when s/w crypto fallback
+		 *      fails and we try to restore previous state.
 		 */
 		key->wk_flags = flags;
 		keyctx = cip->ic_attach(vap, key);
@@ -387,7 +387,7 @@ again:
 			return 0;
 		}
 		cipher_detach(key);
-		key->wk_cipher = cip;		/* XXX refcnt? */
+		key->wk_cipher = cip;		/* XXX: refcnt? */
 		key->wk_private = keyctx;
 	}
 	/*
@@ -455,16 +455,14 @@ _ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 
 	keyix = key->wk_keyix;
 	if (keyix != IEEE80211_KEYIX_NONE) {
-		/*
-		 * Remove hardware entry.
-		 */
-		/* XXX key cache */
+		/* Remove hardware entry. */
+		/* XXX: key cache */
 		if (!dev_key_delete(vap, key, ni)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 				"%s: driver did not delete key index %u\n",
 				__func__, keyix);
 			vap->iv_stats.is_crypto_delkey++;
-			/* XXX recovery? */
+			/* XXX: recovery? */
 		}
 	}
 	cipher_detach(key);
@@ -483,7 +481,7 @@ ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	int status;
 
 #ifdef ATH_SUPERG_COMP
-	/* if valid node entry is present cleanup the compression state */
+	/* If valid node entry is present cleanup the compression state */
 	if (ni)
 		dev_comp_set(vap, ni, 0);
 #endif
@@ -535,7 +533,7 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 
 	/*
 	 * Give cipher a chance to validate key contents.
-	 * XXX should happen before modifying state.
+	 * XXX: Should happen before modifying state.
 	 */
 	if (!cip->ic_setkey(key)) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
@@ -546,7 +544,7 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 		return 0;
 	}
 	if (key->wk_keyix == IEEE80211_KEYIX_NONE) {
-		/* XXX nothing allocated, should not happen */
+		/* NB: Nothing allocated, should not happen */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
 			"%s: no key index; should not happen!\n", __func__);
 		vap->iv_stats.is_crypto_setkey_nokey++;
@@ -555,7 +553,7 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	ret = dev_key_set(vap, key, macaddr);
 #ifdef ATH_SUPERG_COMP
 	if (ret && ni) {
-		/* Enable decompression only receive key entries */
+		/* Enable decompression only on receive key entries */
 		if (key->wk_flags & IEEE80211_KEY_RECV)
 			dev_comp_set(vap, ni, 1);
 	}
@@ -639,7 +637,7 @@ ieee80211_crypto_decap(struct ieee80211_node *ni, struct sk_buff *skb, int hdrle
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,
 			"%s: WEP data frame too short, len %u",
 			__func__, skb->len);
-		vap->iv_stats.is_rx_tooshort++;	/* XXX need unique stat? */
+		vap->iv_stats.is_rx_tooshort++;	/* XXX: unique stat? */
 		return NULL;
 	}
 	/*
