@@ -584,7 +584,8 @@ ieee80211_sta_join1(struct ieee80211_node *selbs)
 	vap->iv_bss = selbs;
 	if (obss != NULL)
 		ieee80211_unref_node(&obss);
-	ic->ic_curchan = ic->ic_bsschan = selbs->ni_chan;
+	ic->ic_bsschan = selbs->ni_chan;
+	ic->ic_curchan = ic->ic_bsschan;
 	ic->ic_curmode = ieee80211_chan2mode(ic->ic_curchan);
 	ic->ic_set_channel(ic);
 	/*
@@ -913,6 +914,7 @@ ieee80211_alloc_node(struct ieee80211vap *vap, const u_int8_t *macaddr)
 
 		ni->ni_chan = IEEE80211_CHAN_ANYC;
 		ni->ni_authmode = IEEE80211_AUTH_OPEN;
+		ni->ni_txpower = ic->ic_txpowlimit;
 
 		ieee80211_crypto_resetkey(vap, &ni->ni_ucastkey,
 			IEEE80211_KEYIX_NONE);
@@ -1427,15 +1429,26 @@ restart:
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		if (ni->ni_scangen == gen)	/* previously handled */
 			continue;
+		/* Temporary entries should no longer be in the node table */
+		/*
+		 * Ignore entries for which have yet to receive an
+		 * authentication frame.  These are transient and
+		 * will be reclaimed when the last reference to them
+		 * goes away (when frame xmits complete).
+		 */
+		/*
+		 *if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
+		 *   (ni->ni_flags & IEEE80211_NODE_AREF) == 0)
+		 *	continue;
+		 */
 		ni->ni_scangen = gen;
-		
 		/*
 		 * Free fragment if not needed anymore
 		 * (last fragment older than 1s).
-		 * XXX: Doesn't belong here
+		 * XXX doesn't belong here
 		 */
-		if ((ni->ni_rxfrag != NULL) &&
-		    (jiffies > ni->ni_rxfragstamp + HZ)) {
+		if (ni->ni_rxfrag != NULL &&
+		    jiffies > ni->ni_rxfragstamp + HZ) {
 			dev_kfree_skb(ni->ni_rxfrag);
 			ni->ni_rxfrag = NULL;
 		}
@@ -1443,76 +1456,74 @@ restart:
 		 * Special case ourself; we may be idle for extended periods
 		 * of time and regardless reclaiming our state is wrong.
 		 */
-		ni->ni_inact--;
 		if (ni == ni->ni_vap->iv_bss) {
-			if (ni->ni_inact < 0)
-				ni->ni_inact = 0;
-		} else {
-			if ((ni->ni_associd != 0) || isadhoc) {
-				struct ieee80211vap *vap = ni->ni_vap;
+			/* NB: don't permit it to go negative */
+			if (ni->ni_inact > 0)
+				ni->ni_inact--;
+			continue;
+		}
+		ni->ni_inact--;
+		if (ni->ni_associd != 0 || isadhoc) {
+			struct ieee80211vap *vap = ni->ni_vap;
+			/*
+			 * Age frames on the power save queue.
+			 */
+			if (ieee80211_node_saveq_age(ni) != 0 &&
+			    IEEE80211_NODE_SAVEQ_QLEN(ni) == 0 &&
+			    vap->iv_set_tim != NULL)
+				vap->iv_set_tim(ni, 0);
+			/*
+			 * Probe the station before time it out.  We
+			 * send a null data frame which may not be
+			 * universally supported by drivers (need it
+			 * for ps-poll support so it should be...).
+			 */
+			if (0 < ni->ni_inact &&
+			    ni->ni_inact <= vap->iv_inact_probe) {
+				IEEE80211_NOTE(vap,
+					IEEE80211_MSG_INACT | IEEE80211_MSG_NODE,
+					ni, "%s",
+					"probe station due to inactivity");
 				/*
-				 * Age frames on the power save queue.
+				 * Grab a reference before unlocking the table
+				 * so the node cannot be reclaimed before we
+				 * send the frame. ieee80211_send_nulldata
+				 * understands we've done this and reclaims the
+				 * ref for us as needed.
 				 */
-				if (ieee80211_node_saveq_age(ni) != 0 &&
-						IEEE80211_NODE_SAVEQ_QLEN(ni) == 0 &&
-						vap->iv_set_tim != NULL)
-					vap->iv_set_tim(ni, 0);
-				
-				/* Probe the station before time it out.  We
-				 * send a null data frame which may not be
-				 * universally supported by drivers (need it
-				 * for ps-poll support so it should be...). */
-				if ((0 < ni->ni_inact) &&
-						(ni->ni_inact <= vap->iv_inact_probe)) {
-					IEEE80211_NOTE(vap,
-							IEEE80211_MSG_INACT | IEEE80211_MSG_NODE,
-							ni, "%s",
-							"probe station due to inactivity");
-					/*
-					 * Grab a reference before unlocking the table
-					 * so the node cannot be reclaimed before we
-					 * send the frame. ieee80211_send_nulldata
-					 * understands we've done this and reclaims the
-					 * ref. for us as needed.
-					 */
-					ieee80211_ref_node(ni);
-					IEEE80211_NODE_TABLE_UNLOCK_IRQ_EARLY(nt);
-
-					ieee80211_send_nulldata(PASS_NODE(ni));
-
-					/* XXX stat? */
-					goto restart;
-				}
-			}
-
-			if (ni->ni_inact <= 0) {
-				IEEE80211_NOTE(ni->ni_vap,
-						IEEE80211_MSG_INACT | IEEE80211_MSG_NODE, ni,
-						"station timed out due to inactivity (refcnt %u)",
-						ieee80211_node_refcnt(ni));
-				/*
-				 * Send a deauthenticate frame and drop the station.
-				 * We grab a reference before unlocking the table so
-				 * the node cannot be reclaimed before we complete our
-				 * work.
-				 *
-				 * Separately we must drop the node lock before sending
-				 * in case the driver takes a lock, as this may result
-				 * in a LOR between the node lock and the driver lock.
-				 */
-				ni->ni_vap->iv_stats.is_node_timeout++;
 				ieee80211_ref_node(ni);
 				IEEE80211_NODE_TABLE_UNLOCK_IRQ_EARLY(nt);
-				
-				if (ni->ni_associd != 0) {
-					IEEE80211_SEND_MGMT(ni,
-							IEEE80211_FC0_SUBTYPE_DEAUTH,
-							IEEE80211_REASON_AUTH_EXPIRE);
-				}
-				ieee80211_node_leave(ni);
-				ieee80211_unref_node(&ni);
+				ieee80211_send_nulldata(ni);
+				/* XXX stat? */
 				goto restart;
 			}
+		}
+		if (ni->ni_inact <= 0) {
+			IEEE80211_NOTE(ni->ni_vap,
+				IEEE80211_MSG_INACT | IEEE80211_MSG_NODE, ni,
+				"station timed out due to inactivity (refcnt %u)",
+				ieee80211_node_refcnt(ni));
+			/*
+			 * Send a deauthenticate frame and drop the station.
+			 * We grab a reference before unlocking the table so
+			 * the node cannot be reclaimed before we complete our
+			 * work.
+			 *
+			 * Separately we must drop the node lock before sending
+			 * in case the driver takes a lock, as this may result
+			 * in a LOR between the node lock and the driver lock.
+			 */
+			ni->ni_vap->iv_stats.is_node_timeout++;
+			ieee80211_ref_node(ni);
+			IEEE80211_NODE_TABLE_UNLOCK_IRQ_EARLY(nt);
+			if (ni->ni_associd != 0) {
+				IEEE80211_SEND_MGMT(ni,
+					IEEE80211_FC0_SUBTYPE_DEAUTH,
+					IEEE80211_REASON_AUTH_EXPIRE);
+			}
+			ieee80211_node_leave(ni);
+			ieee80211_unref_node(&ni);
+			goto restart;
 		}
 	}
 	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
