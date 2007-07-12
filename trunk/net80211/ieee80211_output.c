@@ -1909,12 +1909,14 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		    (ic->ic_flags_ext & IEEE80211_FEXT_COUNTRYIE))
 			frm = ieee80211_add_country(frm, ic);
 
+#if 0
 		/* power constraint */
 		if (ic->ic_flags & IEEE80211_F_DOTH) {
 			*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 			*frm++ = 1;
 			*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
 		}
+#endif
 
 		/* ERP */
 		if (IEEE80211_IS_CHAN_ANYG(ic->ic_curchan))

@@ -1079,6 +1079,12 @@ ieee80211_stop_running(struct ieee80211com *ic)
 }
 EXPORT_SYMBOL(ieee80211_stop_running);
 
+void ieee80211_set_channel(struct ieee80211com *ic, struct ieee80211_channel *chan)
+{
+	ic->ic_curchan = chan;
+	ic->ic_set_channel(ic);
+}
+
 #ifdef ATH_SUPERG_DYNTURBO
 /*
  * Switch between turbo and non-turbo operating modes.

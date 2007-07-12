@@ -136,12 +136,14 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		frm = ieee80211_add_country(frm, ic);
 	}
 
+#if 0
 	/* power constraint */
 	if (ic->ic_flags & IEEE80211_F_DOTH) {
 		*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 		*frm++ = 1;
 		*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
 	}
+#endif
 
 	/* XXX: channel switch announcement ? */
 	bo->bo_chanswitch = frm;
