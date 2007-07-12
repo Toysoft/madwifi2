@@ -571,6 +571,7 @@ enum {
 	IEEE80211_PARAM_DTIM_PERIOD		= 28,	/* DTIM period (beacons) */
 	IEEE80211_PARAM_BEACON_INTERVAL		= 29,	/* beacon interval (ms) */
 	IEEE80211_PARAM_DOTH			= 30,	/* 11.h is on/off */
+	IEEE80211_PARAM_PWRTARGET		= 31,	/* Current Channel Pwr Constraint */
 	IEEE80211_PARAM_GENREASSOC		= 32,	/* Generate a reassociation request */
 	IEEE80211_PARAM_COMPRESSION		= 33,	/* compression */
 	IEEE80211_PARAM_FF			= 34,	/* fast frames support  */

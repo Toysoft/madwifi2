@@ -904,21 +904,20 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	struct iw_range *range = (struct iw_range *) extra;
 	struct ieee80211_rateset *rs;
 	u_int8_t reported[IEEE80211_CHAN_BYTES];	/* XXX stack usage? */
-	int i, r, maxtxpow;
+	int i, r;
+	int step = 0;
 
 	data->length = sizeof(struct iw_range);
 	memset(range, 0, sizeof(struct iw_range));
 
 	/* txpower (128 values, but will print out only IW_MAX_TXPOWER) */
-	range->num_txpower = IW_MAX_TXPOWER;
-	maxtxpow = (ic->ic_bsschan == IEEE80211_CHAN_ANYC) ? 
-		IEEE80211_TXPOWER_MAX : ic->ic_bsschan->ic_maxpower;
+	range->num_txpower = (ic->ic_txpowlimit >= 8) ? IW_MAX_TXPOWER : ic->ic_txpowlimit;
+	step = ic->ic_txpowlimit / (2 * (IW_MAX_TXPOWER - 1));
 
 	range->txpower[0] = 0;
-	range->txpower[IW_MAX_TXPOWER - 1] = maxtxpow;
-	for (i = 1; i < (IW_MAX_TXPOWER - 1); i++)
-		range->txpower[i] = i * (maxtxpow  
-			/ (IW_MAX_TXPOWER - 1));
+	for (i = 1; i < IW_MAX_TXPOWER; i++)
+		range->txpower[i] = (ic->ic_txpowlimit/2)
+			- (IW_MAX_TXPOWER - i - 1) * step;
 
 	range->txpower_capa = IW_TXPOW_DBM;
 
@@ -935,7 +934,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	range->we_version_compiled = WIRELESS_EXT;
-	range->we_version_source = 21;
+	range->we_version_source = 18;
 
 	range->retry_capa = IW_RETRY_LIMIT;
 	range->retry_flags = IW_RETRY_LIMIT;
@@ -1361,37 +1360,52 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-	int fixed, halfdbm;
-  
-	if ((ic->ic_caps & IEEE80211_C_TXPMGT) == 0)
-		return -EOPNOTSUPP;
+	int fixed, disabled;
 
-  	fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED);
-  	if (rrq->disabled) {
-		if (fixed && (vap->iv_txpower == 0))	/* No change */
-			return 0;
-		ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
-		vap->iv_txpower = 0;
-	} else if (rrq->fixed) {
-  		if (rrq->flags != IW_TXPOW_DBM)
-  			return -EOPNOTSUPP;
-
-		/* Set 'halfdbm' to requested TX power in 0.5 dBm units */
-		halfdbm = 2 * rrq->value;
-		if (!(ic->ic_bsschan != IEEE80211_CHAN_ANYC) || 
-				(ic->ic_bsschan->ic_maxpower >= rrq->value)) {
+	fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED);
+	disabled = (fixed && vap->iv_bss->ni_txpower == 0);
+	if (rrq->disabled) {
+		if (!disabled) {
+			if ((ic->ic_caps & IEEE80211_C_TXPMGT) == 0)
+				return -EOPNOTSUPP;
 			ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
+			vap->iv_bss->ni_txpower = 0;
+			goto done;
+		}
+		return 0;
+	}
 
-			vap->iv_txpower = halfdbm;
-			ic->ic_set_txpow(ic, halfdbm);
-		} else
-			return -EINVAL;
-  	} else {
-  		if (!fixed)		/* no change */
-  			return 0;
-  		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
-  	}
-
+	if (rrq->fixed) {
+		if ((ic->ic_caps & IEEE80211_C_TXPMGT) == 0)
+			return -EOPNOTSUPP;
+		if (rrq->flags != IW_TXPOW_DBM)
+			return -EOPNOTSUPP;
+		if (ic->ic_bsschan != IEEE80211_CHAN_ANYC) {
+			if (ic->ic_bsschan->ic_maxregpower >= rrq->value &&
+			    ic->ic_txpowlimit/2 >= rrq->value) {
+				vap->iv_bss->ni_txpower = 2 * rrq->value;
+				ic->ic_newtxpowlimit = 2 * rrq->value;
+				ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
+			} else
+				return -EINVAL;
+		} else {
+			/*
+			 * No channel set yet
+			 */
+			if (ic->ic_txpowlimit/2 >= rrq->value) {
+				vap->iv_bss->ni_txpower = 2 * rrq->value;
+				ic->ic_newtxpowlimit = 2 * rrq->value;
+				ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
+			}
+			else
+				return -EINVAL;
+		}
+	} else {
+		if (!fixed)		/* no change */
+			return 0;
+		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
+	}
+done:
 	return IS_UP(ic->ic_dev) ? ic->ic_reset(ic->ic_dev) : 0;
 }
 
@@ -1402,9 +1416,9 @@ ieee80211_ioctl_giwtxpow(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 
-	rrq->value = vap->iv_txpower / 2;
+	rrq->value = vap->iv_bss->ni_txpower / 2;
 	rrq->fixed = (ic->ic_flags & IEEE80211_F_TXPOW_FIXED) != 0;
-	rrq->disabled = (rrq->fixed && (rrq->value == 0));
+	rrq->disabled = (rrq->fixed && rrq->value == 0);
 	rrq->flags = IW_TXPOW_DBM;
 	return 0;
 }
@@ -2423,6 +2437,9 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 		}
 		retv = ENETRESET;	/* requires restart */
 		break;
+	case IEEE80211_PARAM_PWRTARGET:
+		ic->ic_curchanmaxpwr = value;
+		break;
 	case IEEE80211_PARAM_GENREASSOC:
 		IEEE80211_SEND_MGMT(vap->iv_bss, IEEE80211_FC0_SUBTYPE_REASSOC_REQ, 0);
 		break;
@@ -2823,6 +2840,9 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IEEE80211_PARAM_SHPREAMBLE:
 		param[0] = (ic->ic_caps & IEEE80211_C_SHPREAMBLE) != 0;
+		break;
+	case IEEE80211_PARAM_PWRTARGET:
+		param[0] = ic->ic_curchanmaxpwr;
 		break;
 	case IEEE80211_PARAM_PUREG:
 		param[0] = (vap->iv_flags & IEEE80211_F_PUREG) != 0;
@@ -5104,6 +5124,10 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "doth" },
 	{ IEEE80211_PARAM_DOTH,
 	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_doth" },
+	{ IEEE80211_PARAM_PWRTARGET,
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "doth_pwrtgt" },
+	{ IEEE80211_PARAM_PWRTARGET,
+	  0, IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, "get_doth_pwrtgt" },
 	{ IEEE80211_PARAM_GENREASSOC,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "doth_reassoc" },
 	{ IEEE80211_PARAM_COMPRESSION,
