@@ -72,19 +72,19 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 	(IEEE80211_BINTVAL_VALID(_bi) ? \
 	 (_bi) : IEEE80211_BINTVAL_DEFAULT)
 
-#define	IEEE80211_BGSCAN_INTVAL_MIN	15	/* min bg scan intvl (secs) */
+#define	IEEE80211_BGSCAN_INTVAL_MIN	15	/* min BG scan intvl (s) */
 #define	IEEE80211_BGSCAN_INTVAL_DEFAULT	(5*60)	/* default bg scan intvl */
 
 #define	IEEE80211_BGSCAN_IDLE_MIN	100	/* min idle time (ms) */
 #define	IEEE80211_BGSCAN_IDLE_DEFAULT	250	/* default idle time (ms) */
 
 #define IEEE80211_COVERAGE_CLASS_MAX	31	/* max coverage class */
-#define IEEE80211_REGCLASSIDS_MAX	10	/* max regclass id list */
+#define IEEE80211_REGCLASSIDS_MAX	10	/* max regclass ID list */
 
 #define	IEEE80211_PS_SLEEP	0x1		/* STA is in power saving mode */
 #define	IEEE80211_PS_MAX_QUEUE	50		/* maximum saved packets */
 
-#define	IEEE80211_XR_BEACON_FACTOR	3	/* factor between xr Beacon interval and normal beacon interval */
+#define	IEEE80211_XR_BEACON_FACTOR	3	/* factor between XR beacon interval and normal beacon interval */
 #define	IEEE80211_XR_DEFAULT_RATE_INDEX	0
 #define	IEEE80211_XR_FRAG_THRESHOLD	540
 
@@ -98,10 +98,6 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 #define	IEEE80211_JIFFIES_TO_TU(x) IEEE80211_MS_TO_TU((x) * 1000 / HZ)
 
 #define	IEEE80211_APPIE_MAX	1024
-
-#define IEEE80211_PWRCONSTRAINT_VAL(ic) \
-	(((ic)->ic_bsschan->ic_maxregpower > (ic)->ic_curchanmaxpwr) ? \
-	    (ic)->ic_bsschan->ic_maxregpower - (ic)->ic_curchanmaxpwr : 0)
 
 /* 802.11 control state is split into a common portion that maps
  * 1-1 to a physical device and one or more "Virtual APs" (VAP)
@@ -213,6 +209,7 @@ struct ieee80211vap {
 	u_int16_t iv_fragthreshold;
 	u_int16_t iv_txmin;				/* min tx retry count */
 	u_int16_t iv_txmax;				/* max tx retry count */
+	u_int16_t iv_txpower;				/* TX power */
 	u_int16_t iv_txlifetime;			/* tx lifetime */
 	int iv_inact_timer;				/* inactivity timer wait */
 	void *iv_opt_ie;				/* user-specified IEs */
@@ -286,7 +283,6 @@ struct ieee80211com {
 	u_int16_t ic_bmisstimeout;		/* beacon miss threshold (ms) */
 	unsigned long ic_bmiss_guard;		/* when to cease ignoring bmiss (jiffies) */
 	u_int16_t ic_txpowlimit; 		/* global tx power limit (in 0.5 dBm) */
-	u_int16_t ic_newtxpowlimit; 		/* tx power limit to change to (in 0.5 dBm) */
 	u_int16_t ic_uapsdmaxtriggers; 		/* max triggers that could arrive */
 	u_int8_t ic_coverageclass; 		/* coverage class */
 
@@ -349,7 +345,6 @@ struct ieee80211com {
 	 *     be detected dynamically, we cannot maintain a table (i.e., will not
 	 *     know value until change to channel and detect).
 	 */
-	u_int8_t ic_curchanmaxpwr;
 	u_int8_t ic_chanchange_tbtt;
 	u_int8_t ic_chanchange_chan;
 
@@ -387,6 +382,10 @@ struct ieee80211com {
 	void (*ic_scan_start)(struct ieee80211com *);
 	void (*ic_scan_end)(struct ieee80211com *);
 	void (*ic_set_channel)(struct ieee80211com *);
+	
+	/* TX power support */
+	void (*ic_set_txpow)(struct ieee80211com *, 
+			int);		/* Units of 0.5 dBm */
 
 	/* U-APSD support */
 	void (*ic_uapsd_flush)(struct ieee80211_node *);
