@@ -5562,6 +5562,12 @@ ath_rx_tasklet(TQUEUE_ARG data)
 			ath_printrxbuf(bf, 1);
 #endif
 		rs = &bf->bf_dsstatus.ds_rxstat;
+		
+		len = rs->rs_datalen;
+		/* DMA sync. dies spectacularly if len == 0 */
+		if (len == 0)
+			goto rx_next;
+		
 		if (rs->rs_more) {
 			/*
 			 * Frame spans multiple descriptors; this
@@ -5612,7 +5618,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				 * the 802.11 header for notification.
 				 */
 				/* XXX frag's and QoS frames */
-				len = rs->rs_datalen;
 				if (len >= sizeof (struct ieee80211_frame)) {
 					bus_dma_sync_single(sc->sc_bdev,
 					    bf->bf_skbaddr, len,
@@ -5642,7 +5647,6 @@ rx_accept:
 		 * allocated when the rx descriptor is setup again
 		 * to receive another frame.
 		 */
-		len = rs->rs_datalen;
 		bus_dma_sync_single(sc->sc_bdev,
 			bf->bf_skbaddr, len, BUS_DMA_FROMDEVICE);
 		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr,
