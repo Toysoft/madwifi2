@@ -3675,9 +3675,8 @@ ieee80211_ioctl_getchaninfo(struct net_device *dev,
 
 			if (c1)
 				c = c1;
-			chans->ic_chans[chans->ic_nchans].ic_ieee = c->ic_ieee;
-			chans->ic_chans[chans->ic_nchans].ic_freq = c->ic_freq;
-			chans->ic_chans[chans->ic_nchans].ic_flags = c->ic_flags;
+			/* Copy the entire structure, whereas it used to just copy a few fields */
+			memcpy(&chans->ic_chans[chans->ic_nchans], c, sizeof(struct ieee80211_channel));
 			if (++chans->ic_nchans >= IEEE80211_CHAN_MAX)
 				break;
 		}
