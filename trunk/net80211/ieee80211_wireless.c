@@ -1403,6 +1403,7 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 	} else {
 		if (!fixed)		/* no change */
 			return 0;
+		ic->ic_newtxpowlimit = IEEE80211_TXPOWER_MAX;
 		ic->ic_flags &= ~IEEE80211_F_TXPOW_FIXED;
 	}
 done:
