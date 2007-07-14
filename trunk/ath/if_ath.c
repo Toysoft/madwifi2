@@ -8700,17 +8700,15 @@ ath_update_txpow(struct ath_softc *sc)
 	 * Search for the VAP that needs a txpow change, if any
 	 */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		if (!tpc || ic->ic_newtxpowlimit >= vap->iv_bss->ni_txpower) {
+		if (!tpc || ic->ic_newtxpowlimit != vap->iv_bss->ni_txpower) {
 			vap->iv_bss->ni_txpower = clamped_txpow;
 			ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
 		}
 	}
 
-	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
-
-	if ((tpc && ic->ic_newtxpowlimit >= txpowlimit) ||
-	    (ic->ic_newtxpowlimit != txpowlimit))
-		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
+	sc->sc_curtxpow = clamped_txpow;
+	if (clamped_txpow != txpowlimit)
+		ath_hal_settxpowlimit(ah, clamped_txpow);
 }
 
 
