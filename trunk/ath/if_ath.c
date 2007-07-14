@@ -8992,18 +8992,27 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 #endif
 
 #ifdef AR_DEBUG
+
 static void
 ath_printrxbuf(const struct ath_buf *bf, int done)
 {
 	const struct ath_rx_status *rs = &bf->bf_dsstatus.ds_rxstat;
 	const struct ath_desc *ds = bf->bf_desc;
-
-	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
+	u_int8_t status = done ? rs->rs_status : 0;
+	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x%s%s%s%s%s%s%s%s%s\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
 	    ds->ds_hw[0], ds->ds_hw[1],
-	    !done ? ' ' : (rs->rs_status == 0) ? '*' : '!');
+	    status                              ? ""            	: " OK",
+	    status & HAL_RXERR_CRC 		? " ERR_CRC" 		: "",
+	    status & HAL_RXERR_PHY 		? " ERR_PHY" 		: "",
+	    status & HAL_RXERR_FIFO 		? " ERR_FIFO"		: "",
+	    status & HAL_RXERR_DECRYPT	 	? " ERR_DECRYPT"	: "",
+	    status & HAL_RXERR_MIC 		? " ERR_MIC" 		: "",
+	    status & 0x20 			? " (1<<5)" 		: "",
+	    status & 0x40 			? " (1<<6)"		: "",
+	    status & 0x80 			? " (1<<7)"		: "");
 }
 
 static void
@@ -9011,13 +9020,21 @@ ath_printtxbuf(const struct ath_buf *bf, int done)
 {
 	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
 	const struct ath_desc *ds = bf->bf_desc;
-
-	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
+	u_int8_t status = done ? ts->ts_status : 0;
+	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x%s%s%s%s%s%s%s%s%s\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
 	    ds->ds_hw[0], ds->ds_hw[1], ds->ds_hw[2], ds->ds_hw[3],
-	    !done ? ' ' : (ts->ts_status == 0) ? '*' : '!');
+	    status 				? "" 			: " OK",
+	    status & HAL_TXERR_XRETRY		? " ERR_XRETRY" 	: "",
+	    status & HAL_TXERR_FILT		? " ERR_FILT" 		: "",
+	    status & HAL_TXERR_FIFO 		? " ERR_FIFO" 		: "",
+	    status & HAL_TXERR_XTXOP 		? " ERR_XTXOP" 		: "",
+	    status & HAL_TXERR_DESC_CFG_ERR 	? " ERR_DESC_CFG_ERR" 	: "",
+	    status & HAL_TXERR_DATA_UNDERRUN	? " ERR_DATA_UNDERRUN" 	: "",
+	    status & HAL_TXERR_DELIM_UNDERRUN	? " ERR_DELIM_UNDERRUN" : "",
+	    status & 0x80 			? " (1<<7)" 		: "");
 }
 #endif /* AR_DEBUG */
 
