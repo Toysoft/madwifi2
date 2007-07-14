@@ -56,8 +56,8 @@
  * on the performance figures.
  *
  * This code is called minstrel, because we have taken a wandering minstrel
- * apporoch. Wander around the different rates, singing wherever 
- * you can. And then, look at the performacnce, and make a choice.
+ * approach. Wander around the different rates, singing wherever 
+ * you can. And then, look at the performance, and make a choice.
  *
  * It is not an aimless search, there is some direction to the search
  * pattern. But then, the minstels of old only sung where they thought

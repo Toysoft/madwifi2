@@ -61,7 +61,7 @@ int ieee80211_rate_register(struct ieee80211_rate_ops *ops)
 {
 	int id = ops->ratectl_id;
 
-	if (id >= 0 && id < IEEE80211_RATE_MAX) {
+	if ((0 <= id) && (id < IEEE80211_RATE_MAX)) {
 		memcpy(&ratectls[id], ops, sizeof(*ops));
 		return 0;
 	}
@@ -73,7 +73,7 @@ void ieee80211_rate_unregister(struct ieee80211_rate_ops *ops)
 {
 	int id = ops->ratectl_id;
 
-	if (id > 0 && id < IEEE80211_RATE_MAX)
+	if ((0 <= id) && (id < IEEE80211_RATE_MAX))
 		memset(&ratectls[id], 0, sizeof(ratectls[0]));
 }
 EXPORT_SYMBOL(ieee80211_rate_unregister);

@@ -5692,6 +5692,12 @@ ath_rx_tasklet(TQUEUE_ARG data)
 			ath_printrxbuf(bf, 1);
 #endif
 		rs = &bf->bf_dsstatus.ds_rxstat;
+		
+		len = rs->rs_datalen;
+		/* DMA sync. dies spectacularly if len == 0 */
+		if (len == 0)
+			goto rx_next;
+		
 		if (rs->rs_more) {
 			/*
 			 * Frame spans multiple descriptors; this
@@ -5742,7 +5748,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 				 * the 802.11 header for notification.
 				 */
 				/* XXX frag's and QoS frames */
-				len = rs->rs_datalen;
 				if (len >= sizeof (struct ieee80211_frame)) {
 					bus_dma_sync_single(sc->sc_bdev,
 					    bf->bf_skbaddr, len,
@@ -5772,7 +5777,6 @@ rx_accept:
 		 * allocated when the rx descriptor is setup again
 		 * to receive another frame.
 		 */
-		len = rs->rs_datalen;
 		bus_dma_sync_single(sc->sc_bdev,
 			bf->bf_skbaddr, len, BUS_DMA_FROMDEVICE);
 		bus_unmap_single(sc->sc_bdev, bf->bf_skbaddr,
@@ -8971,18 +8975,17 @@ ath_update_txpow(struct ath_softc *sc)
 		new_clamped_maxtxpower = ic->ic_txpowlimit;
 	/* * Search for the VAP that needs a txpow change, if any */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		if (!tpc || ic->ic_newtxpowlimit >= vap->iv_bss->ni_txpower) {
+		if (!tpc || ic->ic_newtxpowlimit != vap->iv_bss->ni_txpower) {
 			vap->iv_bss->ni_txpower = new_clamped_maxtxpower;
 			ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &new_clamped_maxtxpower);
 		}
 	}
 
 	/* Store the assigned (clamped) maximum txpower and update the HAL */
-	ic->ic_newtxpowlimit = sc->sc_curtxpow = new_clamped_maxtxpower;
+	sc->sc_curtxpow = new_clamped_maxtxpower;
 
-	if ((tpc && ic->ic_newtxpowlimit >= prev_clamped_maxtxpower) ||
-	    (ic->ic_newtxpowlimit != prev_clamped_maxtxpower))
-		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
+	if (new_clamped_maxtxpower != prev_clamped_maxtxpower)
+		ath_hal_settxpowlimit(ah, new_clamped_maxtxpower);
 }
 
 
@@ -9271,13 +9274,21 @@ ath_printrxbuf(const struct ath_buf *bf, int done)
 {
 	const struct ath_rx_status *rs = &bf->bf_dsstatus.ds_rxstat;
 	const struct ath_desc *ds = bf->bf_desc;
-
-	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x %c\n",
+	u_int8_t status = done ? rs->rs_status : 0;
+	printk("R (%p %llx) %08x %08x %08x %08x %08x %08x%s%s%s%s%s%s%s%s%s\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
 	    ds->ds_hw[0], ds->ds_hw[1],
-	    !done ? ' ' : (rs->rs_status == 0) ? '*' : '!');
+	    status                              ? ""            	: " OK",
+	    status & HAL_RXERR_CRC 		? " ERR_CRC" 		: "",
+	    status & HAL_RXERR_PHY 		? " ERR_PHY" 		: "",
+	    status & HAL_RXERR_FIFO 		? " ERR_FIFO"		: "",
+	    status & HAL_RXERR_DECRYPT	 	? " ERR_DECRYPT"	: "",
+	    status & HAL_RXERR_MIC 		? " ERR_MIC" 		: "",
+	    status & 0x20 			? " (1<<5)" 		: "",
+	    status & 0x40 			? " (1<<6)"		: "",
+	    status & 0x80 			? " (1<<7)"		: "");
 }
 
 static void
@@ -9285,13 +9296,21 @@ ath_printtxbuf(const struct ath_buf *bf, int done)
 {
 	const struct ath_tx_status *ts = &bf->bf_dsstatus.ds_txstat;
 	const struct ath_desc *ds = bf->bf_desc;
-
-	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x %c\n",
+	u_int8_t status = done ? ts->ts_status : 0;
+	printk("T (%p %llx) %08x %08x %08x %08x %08x %08x %08x %08x%s%s%s%s%s%s%s%s%s\n",
 	    ds, ito64(bf->bf_daddr),
 	    ds->ds_link, ds->ds_data,
 	    ds->ds_ctl0, ds->ds_ctl1,
 	    ds->ds_hw[0], ds->ds_hw[1], ds->ds_hw[2], ds->ds_hw[3],
-	    !done ? ' ' : (ts->ts_status == 0) ? '*' : '!');
+	    status 				? "" 			: " OK",
+	    status & HAL_TXERR_XRETRY		? " ERR_XRETRY" 	: "",
+	    status & HAL_TXERR_FILT		? " ERR_FILT" 		: "",
+	    status & HAL_TXERR_FIFO 		? " ERR_FIFO" 		: "",
+	    status & HAL_TXERR_XTXOP 		? " ERR_XTXOP" 		: "",
+	    status & HAL_TXERR_DESC_CFG_ERR 	? " ERR_DESC_CFG_ERR" 	: "",
+	    status & HAL_TXERR_DATA_UNDERRUN	? " ERR_DATA_UNDERRUN" 	: "",
+	    status & HAL_TXERR_DELIM_UNDERRUN	? " ERR_DELIM_UNDERRUN" : "",
+	    status & 0x80 			? " (1<<7)" 		: "");
 }
 #endif /* AR_DEBUG */
 
