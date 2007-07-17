@@ -144,7 +144,7 @@ release:
 
 .PHONY: unload 
 unload:
-	bash scripts/madwifi-unload.bash
+	bash scripts/madwifi-unload
 
 configcheck: sanitycheck
 	@echo -n "Checking kernel configuration... "
