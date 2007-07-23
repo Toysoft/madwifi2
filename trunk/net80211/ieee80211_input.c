@@ -2875,7 +2875,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 		if ((vap->iv_opmode == IEEE80211_M_IBSS) && 
 				(scan.capinfo & IEEE80211_CAPINFO_IBSS)) {
-			if (!IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_macaddr)) {
+			if (ni == vap->iv_bss) {
 				/* Create a new entry in the neighbor table. */
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
 			} else {
