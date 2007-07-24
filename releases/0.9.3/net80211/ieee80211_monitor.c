@@ -373,7 +373,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		if (vap->iv_monitor_txf_len && tx) {
 			/* truncate transmit feedback packets */
 			skb_trim(skb1, vap->iv_monitor_txf_len);
-			skb1->nh.raw = skb1->data;
+			skb_reset_network_header(skb1);
 		}
 		switch (vap->iv_dev->type) {
 		case ARPHRD_IEEE80211:
@@ -555,7 +555,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				skb_trim(skb1, skb1->len - IEEE80211_CRC_LEN);
 			}
 			skb1->dev = dev; /* NB: deliver to wlanX */
-			skb1->mac.raw = skb1->data;
+			skb_reset_mac_header(skb1);
+
 			skb1->ip_summed = CHECKSUM_NONE;
 			skb1->pkt_type = pkttype;
 			skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
