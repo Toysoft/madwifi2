@@ -75,7 +75,7 @@ svnversion.h:
 		echo "#define SVNVERSION \"svn r$$ver\"" > $@.tmp; \
 	else \
 		touch $@.tmp; \
-	fi; \
+	fi || exit 1; \
 	diff $@ $@.tmp >/dev/null 2>&1 || cp -f $@.tmp $@; rm -f $@.tmp
 
 # conflicts with the 'tools' subdirectory
