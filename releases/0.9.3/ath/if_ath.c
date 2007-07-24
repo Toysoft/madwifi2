@@ -1906,6 +1906,9 @@ ath_init(struct net_device *dev)
 	 */
 	ath_update_txpow(sc);
 
+	/* Set the default RX antenna; it may get lost on reset. */
+	ath_setdefantenna(sc, sc->sc_defant);
+
 	/*
 	 * Setup the hardware after reset: the key cache
 	 * is filled as needed and the receive engine is
