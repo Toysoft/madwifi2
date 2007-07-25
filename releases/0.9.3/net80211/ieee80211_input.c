@@ -52,10 +52,10 @@
 #include <linux/wireless.h> /* SIOCGIWTHRSPY */
 #include <linux/if_arp.h> /* ARPHRD_ETHER */
 
-#include "if_llc.h"
-#include "if_ethersubr.h"
-#include "if_media.h"
-#include "if_athproto.h"
+#include <net80211/if_llc.h>
+#include <net80211/if_ethersubr.h>
+#include <net80211/if_media.h>
+#include <net80211/if_athproto.h>
 
 #include <net80211/ieee80211_var.h>
 
@@ -131,37 +131,15 @@ static void athff_decap(struct sk_buff *);
 static __be16 ath_eth_type_trans(struct sk_buff *, struct net_device *);
 #endif
 
-/* Enhanced iwspy support */
 #if WIRELESS_EXT >= 16
-
-#ifndef IW_QUAL_QUAL_UPDATED
-#define IW_QUAL_QUAL_UPDATED	0x01
-#define IW_QUAL_LEVEL_UPDATED	0x02
-#define IW_QUAL_NOISE_UPDATED	0x04
-#endif /* IW_QUAL_QUAL_UPDATED */
-
 /**
- * This function is a clone of set_quality(..) in ieee80211_wireless.c
- */
-static void
-set_quality(struct iw_quality *iq, u_int rssi, int noise)
-{
-	iq->qual = rssi;
-
-	iq->noise = noise;	
-	iq->level = iq->noise + iq->qual;
-	iq->updated = IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED |
-		IW_QUAL_NOISE_UPDATED;
-}
-
-/**
- * Given a node and the rssi value of a just received frame from the node, this
- * function checks if to raise an iwspy event because we iwspy the node and rssi
+ * Given a node and the RSSI value of a just received frame from the node, this
+ * function checks if to raise an iwspy event because we iwspy the node and RSSI
  * exceeds threshold (if active).
  * 
- * @param vap: vap
+ * @param vap: VAP
  * @param ni: sender node
- * @param rssi: rssi value of received frame
+ * @param rssi: RSSI value of received frame
  */
 static void
 iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)

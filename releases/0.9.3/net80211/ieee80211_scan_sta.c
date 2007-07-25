@@ -64,9 +64,6 @@
 #define	STA_FAILS_AGE	(2 * 60)	/* time before clearing fails (secs) */
 #define	STA_PURGE_SCANS	2		/* age for purging entries (scans) */
 
-/* XXX tunable */
-#define	STA_RSSI_MIN	8		/* min acceptable rssi */
-
 #define RSSI_LPF_LEN	10
 #define	RSSI_EP_MULTIPLIER	(1<<7)	/* pow2 to optimize out * and / */
 #define RSSI_IN(x)		((x) * RSSI_EP_MULTIPLIER)
@@ -759,8 +756,6 @@ match_bss(struct ieee80211vap *vap,
 		fail |= 0x40;
 	if (se0->se_notseen >= STA_PURGE_SCANS)
 		fail |= 0x80;
-	if (se->se_rssi < STA_RSSI_MIN)
-		fail |= 0x100;
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_msg(vap, IEEE80211_MSG_SCAN | IEEE80211_MSG_ROAM)) {
 		printf(" %03x", fail);
@@ -771,7 +766,7 @@ match_bss(struct ieee80211vap *vap,
 			fail & 0x20 ? '!' : ' ');
 		printf(" %3d%c", ieee80211_chan2ieee(ic, se->se_chan),
 			fail & 0x01 ? '!' : ' ');
-		printf(" %+4d%c", se->se_rssi, fail & 0x100 ? '!' : ' ');
+		printf(" %+4d", se->se_rssi);
 		printf(" %2dM%c", (rate & IEEE80211_RATE_VAL) / 2,
 			fail & 0x08 ? '!' : ' ');
 		printf(" %4s%c",

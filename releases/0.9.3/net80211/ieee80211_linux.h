@@ -32,6 +32,52 @@
 #include <linux/wireless.h>
 
 /*
+ * Compatibility definition of statistics flags
+ * (bitmask in (struct iw_quality *)->updated)
+ */
+#ifndef IW_QUAL_QUAL_UPDATED
+#define IW_QUAL_QUAL_UPDATED	0x01	/* Value was updated since last read */
+#define IW_QUAL_LEVEL_UPDATED	0x02
+#define IW_QUAL_NOISE_UPDATED	0x04
+#define IW_QUAL_QUAL_INVALID	0x10	/* Driver doesn't provide value */
+#define IW_QUAL_LEVEL_INVALID	0x20
+#define IW_QUAL_NOISE_INVALID	0x40
+#endif /* IW_QUAL_QUAL_UPDATED */
+
+#ifndef IW_QUAL_ALL_UPDATED
+#define IW_QUAL_ALL_UPDATED \
+	(IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_UPDATED)
+#endif
+#ifndef IW_QUAL_ALL_INVALID
+#define IW_QUAL_ALL_INVALID \
+	(IW_QUAL_QUAL_INVALID | IW_QUAL_LEVEL_INVALID | IW_QUAL_NOISE_INVALID)
+#endif
+
+/*
+ * The RSSI values reported in the TX/RX descriptors in the driver are the SNR 
+ * expressed in dBm. Thus 'rssi' is signal level above the noise floor in dBm.
+ *
+ * Noise is measured in dBm and is negative unless there is an unimaginable 
+ * level of RF noise. 
+ *
+ * The signal level is noise + rssi.
+ *
+ * Note that the iw_quality values are 1 byte unsigned.
+ *
+ */
+static __inline void
+set_quality(struct iw_quality *iq, u_int rssi, int noise)
+{
+	iq->qual = rssi;
+	iq->noise = noise; 
+	iq->level = ((rssi + noise) <= 0 ? (rssi + noise) : 0);
+	iq->updated = IW_QUAL_ALL_UPDATED;
+#if WIRELESS_EXT >= 19
+	iq->updated |= IW_QUAL_DBM;
+#endif
+}
+
+/*
  * Task deferral
  *
  * Deduce if tasklets are available.  If not then

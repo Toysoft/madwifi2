@@ -247,7 +247,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		/* NB: ieee80211_find_txnode does stat+msg */
 		goto bad;
 	}
-	/* calculate priority so drivers can find the tx queue */
+	/* calculate priority so drivers can find the TX queue */
 	if (ieee80211_classify(ni, skb)) {
 		IEEE80211_NOTE(vap, IEEE80211_MSG_OUTPUT, ni,
 			"%s: discard, classification failure", __func__);

@@ -59,7 +59,8 @@
 
 #include <asm/uaccess.h>
 
-#include "if_media.h"
+#include <net80211/if_media.h>
+#include <net80211/if_athproto.h>
 
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_linux.h>
@@ -70,48 +71,6 @@
 	(IS_UP((_vap)->iv_dev) && \
 	 (_vap)->iv_ic->ic_roaming == IEEE80211_ROAMING_AUTO)
 #define	RESCAN	1
-
-/*
- * Compatibility definition of statistics flags
- * (bitmask in (struct iw_quality *)->updated)
- */
-#ifndef IW_QUAL_QUAL_UPDATED
-#define IW_QUAL_QUAL_UPDATED	0x01	/* Value was updated since last read */
-#define IW_QUAL_LEVEL_UPDATED	0x02
-#define IW_QUAL_NOISE_UPDATED	0x04
-#define IW_QUAL_QUAL_INVALID	0x10	/* Driver doesn't provide value */
-#define IW_QUAL_LEVEL_INVALID	0x20
-#define IW_QUAL_NOISE_INVALID	0x40
-#endif /* IW_QUAL_QUAL_UPDATED */
-
-#ifndef IW_QUAL_ALL_UPDATED
-#define IW_QUAL_ALL_UPDATED \
-	(IW_QUAL_QUAL_UPDATED | IW_QUAL_LEVEL_UPDATED | IW_QUAL_NOISE_UPDATED)
-#endif
-#ifndef IW_QUAL_ALL_INVALID
-#define IW_QUAL_ALL_INVALID \
-	(IW_QUAL_QUAL_INVALID | IW_QUAL_LEVEL_INVALID | IW_QUAL_NOISE_INVALID)
-#endif
-
-/*
- * Units are in db above the noise floor. That means the
- * rssi values reported in the tx/rx descriptors in the
- * driver are the SNR expressed in db.
- *
- * noise is measured in dBm. Signal becomes the noise +
- * the rssi.
- *
- * NB: various calculations are based on the orinoco/wavelan
- *     drivers for compatibility
- */
-static void
-set_quality(struct iw_quality *iq, u_int rssi, int noise)
-{
-	iq->qual = rssi;
-	iq->noise = noise; 
-	iq->level = iq->noise + iq->qual;
-	iq->updated = IW_QUAL_ALL_UPDATED;
-}
 
 static void
 preempt_scan(struct net_device *dev, int max_grace, int max_wait)
@@ -427,14 +386,14 @@ static int
 ieee80211_ioctl_siwsens(struct net_device *dev,	struct iw_request_info *info,
 	struct iw_param *sens, char *extra)
 {
-	return 0;
+	return -EOPNOTSUPP;
 }
 
 static int
 ieee80211_ioctl_giwsens(struct net_device *dev,	struct iw_request_info *info,
 	struct iw_param *sens, char *extra)
 {
-	sens->value = 0;
+	sens->value = 1;
 	sens->fixed = 1;
 
 	return 0;
@@ -982,21 +941,23 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 		}
 	}
 
-	/* Max quality is max field value minus noise floor */
-	/* XXX Should this be updated to use the current noise floor? */
-	range->max_qual.qual  = 0xff - 161;
+	/* If IW_QUAL_DBM, then these values are assumed to be negative,
+	 * and values are taken to be in the range -max_qual .. 0. Not 
+	 * sure about WIRELESS_EXT < 19 */
+	/* Atheros' RSSI value is SNR: 0 -> 60 for old chipsets. Range 
+	 * for newer chipsets is unknown. This value is arbitarily chosen 
+	 * to give an indication that full rate will be available and to be 
+	 * a practicable maximum. */
+	range->max_qual.qual  = 70;
+	/* Min. quality is noise + 1 */
+	range->max_qual.level = ATH_DEFAULT_NOISE + 1;
+	/* XXX: This should be updated to use the current noise floor. */
+	range->max_qual.noise = ATH_DEFAULT_NOISE;
+#if WIRELESS_EXT >= 19
+	range->max_qual.updated |= IW_QUAL_DBM;
+#endif
 
-	/*
-	 * In order to use dBm measurements, 'level' must be lower
-	 * than any possible measurement (see iw_print_stats() in
-	 * wireless tools).  It's unclear how this is meant to be
-	 * done, but setting zero in these values forces dBm and
-	 * the actual numbers are not used.
-	 */
-	range->max_qual.level = 0;
-	range->max_qual.noise = 0;
-
-	range->sensitivity = 3;
+	range->sensitivity = 1;
 
 	range->max_encoding_tokens = IEEE80211_WEP_NKID;
 	/* XXX query driver to find out supported key sizes */
@@ -1165,10 +1126,11 @@ ieee80211_ioctl_setthrspy(struct net_device *dev, struct iw_request_info *info,
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG,
 			"%s: disabled iw_spy threshold\n", __func__);
 	} else {
-		/* calculate corresponding rssi values */
-		/* XXX Should we use current noise value? */
-		vap->iv_spy.thr_low = threshold.low.level - 161;
-		vap->iv_spy.thr_high = threshold.high.level - 161;
+		/* We are passed a signal level/strength - calculate 
+		 * corresponding RSSI values */
+		/* XXX: We should use current noise value. */
+		vap->iv_spy.thr_low = threshold.low.level + ATH_DEFAULT_NOISE;
+		vap->iv_spy.thr_high = threshold.high.level + ATH_DEFAULT_NOISE;
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DEBUG,
 			"%s: enabled iw_spy threshold\n", __func__);
 	}
@@ -1465,7 +1427,7 @@ waplist_cb(void *arg, const struct ieee80211_scan_entry *se)
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_macaddr);
 	else
 		IEEE80211_ADDR_COPY(req->addr[i].sa_data, se->se_bssid);
-	set_quality(&req->qual[i], se->se_rssi, -95);
+	set_quality(&req->qual[i], se->se_rssi, ATH_DEFAULT_NOISE);
 	req->i = i + 1;
 
 	return 0;
@@ -1669,7 +1631,7 @@ giwscan_cb(void *arg, const struct ieee80211_scan_entry *se)
 	memset(&iwe, 0, sizeof(iwe));
 	last_ev = current_ev;
 	iwe.cmd = IWEVQUAL;
-	set_quality(&iwe.u.qual, se->se_rssi, -95);
+	set_quality(&iwe.u.qual, se->se_rssi, ATH_DEFAULT_NOISE);
 	current_ev = iwe_stream_add_event(current_ev,
 		end_buf, &iwe, IW_EV_QUAL_LEN);
 
