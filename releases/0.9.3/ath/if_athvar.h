@@ -148,10 +148,9 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #undef alloc_netdev
 #define alloc_netdev(s,m,d) _alloc_netdev(s,m,d)
 
-static inline struct proc_dir_entry *PDE(const struct inode *inode)
-{
-	return (struct proc_dir_entry *)inode->u.generic_ip;
-}
+/* Some vendors backport PDE, so make it a macro here */
+#undef PDE
+#define PDE(inode) ((struct proc_dir_entry *)(inode)->u.generic_ip)
 #endif
 
 
