@@ -148,7 +148,12 @@ struct ieee80211_node {
 		u_int8_t data[8];
 		__le64 tsf;
 	} ni_tstamp;				/* from last rcv'd beacon */
+
 	u_int16_t ni_intval;			/* beacon interval */
+	u_int16_t ni_intval_old;		/* beacon interval before first change */
+	u_int16_t ni_intval_cnt;		/* count of ni_intval != ni_intval_old */
+	unsigned long ni_intval_end;		/* end of transition interval jiffies */
+
 	u_int16_t ni_capinfo;			/* capabilities */
 	u_int8_t ni_esslen;
 	u_int8_t ni_essid[IEEE80211_NWID_LEN];

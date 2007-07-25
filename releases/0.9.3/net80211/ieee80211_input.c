@@ -2758,6 +2758,48 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			/* record tsf of last beacon */
 			memcpy(ni->ni_tstamp.data, scan.tstamp,
 				sizeof(ni->ni_tstamp));
+			if (ni->ni_intval != scan.bintval) {
+				IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
+                                              "beacon interval divergence: was %u, now %u",
+					ni->ni_intval, scan.bintval);
+                               if (!ni->ni_intval_end) {
+                                       int msecs = 0; /* silence compiler */
+                                       ni->ni_intval_cnt = 0;
+                                       ni->ni_intval_old = ni->ni_intval;
+                                       msecs = (ni->ni_intval_old * 1024 * 10) / 1000;
+                                       ni->ni_intval_end = jiffies +
+                                               msecs_to_jiffies(msecs);
+                                       IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
+                                                      "scheduling beacon interval measurement for %u msecs",
+                                                      msecs);
+                               }
+                               if (scan.bintval > ni->ni_intval) {
+                                       ni->ni_intval = scan.bintval;
+                                       vap->iv_flags_ext |= IEEE80211_FEXT_APPIE_UPDATE;
+                               }
+                               /* XXX statistic */
+                       }
+                       if (ni->ni_intval_end) {
+                               if (scan.bintval == ni->ni_intval_old)
+                                       ni->ni_intval_cnt++;
+                               if (!time_before(jiffies, ni->ni_intval_end)) {
+                                       IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
+                                                      "beacon interval measurement finished, old value repeated: %u times",
+                                                      ni->ni_intval_cnt);
+                                       ni->ni_intval_end = 0;
+                                       if (ni->ni_intval_cnt == 0) {
+                                               IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
+                                                              "reprogramming bmiss timer from %u to %u",
+                                                              ni->ni_intval_old, scan.bintval);
+				ni->ni_intval = scan.bintval;
+                                               vap->iv_flags_ext |= IEEE80211_FEXT_APPIE_UPDATE;
+                                       } else {
+                                               IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
+                                                              "ignoring the divergence (maybe someone tried to spoof the AP?)", 0);
+                                       }
+                                }
+				/* XXX statistic */
+			}
 			if (ni->ni_erp != scan.erp) {
 				IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC, ni,
 					"erp change: was 0x%x, now 0x%x",
