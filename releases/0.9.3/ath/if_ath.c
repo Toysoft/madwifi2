@@ -1805,9 +1805,14 @@ ath_bmiss_tasklet(TQUEUE_ARG data)
 	struct net_device *dev = (struct net_device *)data;
 	struct ath_softc *sc = dev->priv;
 
-	DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
-
-	ieee80211_beacon_miss(&sc->sc_ic);
+	if (time_before(jiffies, sc->sc_ic.ic_bmiss_guard)) {
+		/* Beacon miss interrupt occured too short after last beacon
+		 * timer configuration. Ignore it as it could be spurious. */
+		DPRINTF(sc, ATH_DEBUG_ANY, "%s: ignored\n", __func__);
+	} else {
+		DPRINTF(sc, ATH_DEBUG_ANY, "%s\n", __func__);
+		ieee80211_beacon_miss(&sc->sc_ic);
+	}
 }
 
 static u_int
@@ -4521,8 +4526,8 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		bs.bs_bmissthreshold = howmany(ic->ic_bmisstimeout, intval);
 		if (bs.bs_bmissthreshold > 10)
 			bs.bs_bmissthreshold = 10;
-		else if (bs.bs_bmissthreshold <= 0)
-			bs.bs_bmissthreshold = 1;
+		else if (bs.bs_bmissthreshold < 2)
+			bs.bs_bmissthreshold = 2;
 
 		/*
 		 * Calculate sleep duration.  The configuration is
@@ -4553,6 +4558,9 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			, bs.bs_cfpnext
 			, bs.bs_timoffset
 		);
+
+		ic->ic_bmiss_guard = jiffies +
+			IEEE80211_TU_TO_JIFFIES(bs.bs_intval * bs.bs_bmissthreshold);
 
 		ath_hal_intrset(ah, 0);
 		ath_hal_beacontimers(ah, &bs);
@@ -5439,12 +5447,13 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* update rssi statistics for use by the HAL */
 		ATH_RSSI_LPF(ATH_NODE(ni)->an_halstats.ns_avgbrssi, rssi);
-		if (sc->sc_syncbeacon &&
+		if ((sc->sc_syncbeacon || (vap->iv_flags_ext & IEEE80211_FEXT_APPIE_UPDATE)) &&
 		    ni == vap->iv_bss && vap->iv_state == IEEE80211_S_RUN) {
 			/*
 			 * Resync beacon timers using the tsf of the
 			 * beacon frame we just received.
 			 */
+			vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;
 			ath_beacon_config(sc, vap);
 		}
 		/* fall thru... */
