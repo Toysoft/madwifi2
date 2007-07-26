@@ -827,17 +827,18 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 			if  (ic->ic_curchan->ic_freq == c->ic_freq) {
 				/* get an AP vap */
 				vap = TAILQ_FIRST(&ic->ic_vaps);
-				while ((vap->iv_state != IEEE80211_S_RUN) && (vap != NULL) &&
+				while ((vap != NULL) && (vap->iv_state != IEEE80211_S_RUN) &&
 				       (vap->iv_ic != ic)) {
 					vap = TAILQ_NEXT(vap, iv_next);
 				}
+				
 				if (vap == NULL) {
 					/*
 					 * No running VAP was found, check
 					 * any one is scanning.
 					 */
 					vap = TAILQ_FIRST(&ic->ic_vaps);
-					while ((vap->iv_state != IEEE80211_S_SCAN) && (vap != NULL) &&
+					while ((vap != NULL) && (vap->iv_state != IEEE80211_S_SCAN) &&
 					       (vap->iv_ic != ic)) {
 						vap = TAILQ_NEXT(vap, iv_next);
 					}
