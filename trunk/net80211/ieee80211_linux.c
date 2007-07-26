@@ -60,6 +60,36 @@
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_monitor.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#include <linux/device.h>
+
+/* madwifi_name_type - device name type:
+ * values:	0:	automatically assigned
+ * 		1:	administratively assigned
+ * 		else:	reserved			*/
+
+static ssize_t show_madwifi_name_type(struct class_device *cdev,
+			      char *buf)
+{
+	ssize_t len = 0;
+
+	len = snprintf(buf, PAGE_SIZE, "1");
+
+	return len;
+}
+
+static CLASS_DEVICE_ATTR(madwifi_name_type, S_IRUGO, show_madwifi_name_type, NULL);
+
+static struct attribute *ieee80211_sysfs_attrs[] = {
+	&class_device_attr_madwifi_name_type.attr
+};
+
+static struct attribute_group ieee80211_attr_grp = {
+	.name	= NULL,	/* No seperate (sub-)directory */
+	.attrs	= ieee80211_sysfs_attrs
+};
+#endif
+
 /*
  * Print a console message with the device name prepended.
  */
@@ -529,6 +559,7 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_dev_type, ctl, write, filp, buffer,
 	}
 	return ret;
 }
+
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_nods_only, ctl, write, filp, buffer,
 	lenp, ppos)
@@ -551,6 +582,7 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_nods_only, ctl, write, filp, buff
 	}
 	return ret;
 }
+
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_txf_len, ctl, write, filp, buffer,
 	lenp, ppos)
@@ -573,6 +605,7 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_txf_len, ctl, write, filp, buffer
 	}
 	return ret;
 }
+
 static int
 IEEE80211_SYSCTL_DECL(ieee80211_sysctl_monitor_phy_errors, ctl, write, filp, buffer,
 	lenp, ppos)
@@ -665,11 +698,22 @@ static const ctl_table ieee80211_sysctl_template[] = {
 };
 
 void
-ieee80211_sysctl_vattach(struct ieee80211vap *vap)
+ieee80211_virtfs_vattach(struct ieee80211vap *vap)
 {
 	int i, space;
 	char *devname = NULL;
-	struct ieee80211_proc_entry *tmp=NULL;
+	struct ieee80211_proc_entry *tmp = NULL;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	int ret;
+
+	ret = sysfs_create_group(&vap->iv_dev->class_dev.kobj, &ieee80211_attr_grp);
+	if (ret) {
+		sysfs_remove_group(&vap->iv_dev->class_dev.kobj, &ieee80211_attr_grp);
+		printk("%s: %s - unable to create sysfs attribute group\n", 
+				__func__, vap->iv_dev->name);
+		return;
+	}
+#endif
 
 	space = 5 * sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	vap->iv_sysctls = kmalloc(space, GFP_KERNEL);
@@ -738,7 +782,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 	ieee80211_proc_vcreate(vap, &proc_ieee80211_ops, "associated_sta");
 
 	/* Recreate any other proc entries that have been registered */
-		if (vap->iv_proc) {
+	if (vap->iv_proc) {
 		tmp = vap->iv_proc_entries;
 		while (tmp) {
 			if (!tmp->entry) {
@@ -756,7 +800,7 @@ ieee80211_sysctl_vattach(struct ieee80211vap *vap)
 void
 ieee80211_proc_cleanup(struct ieee80211vap *vap)
 {
-	struct ieee80211_proc_entry *tmp=vap->iv_proc_entries;
+	struct ieee80211_proc_entry *tmp = vap->iv_proc_entries;
 	struct ieee80211_proc_entry *next = NULL;
 	while (tmp) {
 		next = tmp->next;
@@ -771,7 +815,7 @@ ieee80211_proc_vcreate(struct ieee80211vap *vap,
 		struct file_operations *fileops, char *name)
 {
 	struct ieee80211_proc_entry *entry;
-	struct ieee80211_proc_entry *tmp=NULL;
+	struct ieee80211_proc_entry *tmp = NULL;
 
 	/* Ignore if already in the list */
 	if (vap->iv_proc_entries) {
@@ -833,9 +877,13 @@ ieee80211_proc_vcreate(struct ieee80211vap *vap,
 EXPORT_SYMBOL(ieee80211_proc_vcreate);
 
 void
-ieee80211_sysctl_vdetach(struct ieee80211vap *vap)
+ieee80211_virtfs_vdetach(struct ieee80211vap *vap)
 {
 	struct ieee80211_proc_entry *tmp=NULL;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	sysfs_remove_group(&vap->iv_dev->class_dev.kobj, &ieee80211_attr_grp);
+#endif
 
 	if (vap->iv_sysctl_header) {
 		unregister_sysctl_table(vap->iv_sysctl_header);
@@ -900,11 +948,11 @@ ieee80211_rcv_dev_event(struct notifier_block *this, unsigned long event,
 
 	switch (event) {
 	case NETDEV_CHANGENAME:
-		ieee80211_sysctl_vdetach(dev->priv);
-		ieee80211_sysctl_vattach(dev->priv);
+		ieee80211_virtfs_vdetach(dev->priv);
+		ieee80211_virtfs_vattach(dev->priv);
 		return NOTIFY_DONE;
 	default:
-	break;
+		break;
 	}
 	return 0;
 }

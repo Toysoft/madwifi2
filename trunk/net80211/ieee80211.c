@@ -496,7 +496,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	ieee80211_scan_vattach(vap);
 	ieee80211_vlan_vattach(vap);
 	ieee80211_ioctl_vattach(vap);
-	ieee80211_sysctl_vattach(vap);
+	ieee80211_virtfs_vattach(vap);
 
 	return 1;
 #undef IEEE80211_C_OPMODE
@@ -559,7 +559,7 @@ ieee80211_vap_detach(struct ieee80211vap *vap)
 
 	ifmedia_removeall(&vap->iv_media);
 
-	ieee80211_sysctl_vdetach(vap);
+	ieee80211_virtfs_vdetach(vap);
 	ieee80211_proc_cleanup(vap);
 	ieee80211_ioctl_vdetach(vap);
 	ieee80211_vlan_vdetach(vap);
