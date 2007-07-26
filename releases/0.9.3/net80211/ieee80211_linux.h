@@ -62,7 +62,8 @@
  *
  * The signal level is noise + rssi.
  *
- * Note that the iw_quality values are 1 byte unsigned.
+ * Note that the iw_quality values are 1 byte, and can be signed, unsigned or 
+ * negative depending on context.
  *
  */
 static __inline void
@@ -70,7 +71,7 @@ set_quality(struct iw_quality *iq, u_int rssi, int noise)
 {
 	iq->qual = rssi;
 	iq->noise = noise; 
-	iq->level = ((rssi + noise) <= 0 ? (rssi + noise) : 0);
+	iq->level = ((((int)rssi + noise) <= 0) ? ((int)rssi + noise) : 0);
 	iq->updated = IW_QUAL_ALL_UPDATED;
 #if WIRELESS_EXT >= 19
 	iq->updated |= IW_QUAL_DBM;
