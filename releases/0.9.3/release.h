@@ -36,10 +36,10 @@
  * $Id$
  */
 
-#define	RELEASE_TYPE	"RELEASE"
+#define	RELEASE_TYPE	"BETA"
 
 #ifdef SVNVERSION
 #define RELEASE_VERSION	SVNVERSION
 #else
-#define RELEASE_VERSION	"0.9.3.1"
+#define RELEASE_VERSION	"0.9.3.2-rc1"
 #endif
