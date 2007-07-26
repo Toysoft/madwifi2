@@ -2511,6 +2511,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ath_buf *tbf, *tempbf;
 	struct sk_buff *tskb;
 	int framecnt;
+	int requeue = 0;
 #ifdef ATH_SUPERG_FF
 	int pktlen;
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -2528,14 +2529,14 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		return -ENETDOWN;
 	}
 
-
 	STAILQ_INIT(&bf_head);
 
 	if (cb->flags & M_RAW) {
 		ATH_HARDSTART_GET_TX_BUF_WITH_LOCK;
 		if (bf == NULL)
 			goto hardstart_fail;
-		return ath_tx_startraw(dev, bf, skb);
+		ath_tx_startraw(dev, bf,skb);
+		return NETDEV_TX_OK;
 	}
 
 	eh = (struct ether_header *) skb->data;
@@ -2567,6 +2568,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	if (txq->axq_depth > TAIL_DROP_COUNT) {
 		sc->sc_stats.ast_tx_discard++;
+		/* queue is full, let the kernel backlog the skb */
+		requeue = 1;
 		goto hardstart_fail;
 	}
 
@@ -2624,7 +2627,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 			ATH_TXQ_UNLOCK(txq);
 
-			return 0;
+			return NETDEV_TX_OK;
 		}
 	} else {
 		if (ff_flush) {
@@ -2771,7 +2774,7 @@ ff_bypass:
 		ath_ffstageq_flush(sc, txq, ath_ff_ageflushtestdone);
 #endif
 
-	return 0;
+	return NETDEV_TX_OK;
 
 hardstart_fail:
 	if (!STAILQ_EMPTY(&bf_head)) {
@@ -2787,6 +2790,10 @@ hardstart_fail:
 		}
 		ATH_TXBUF_UNLOCK(sc);
 	}
+	
+	/* let the kernel requeue the skb (don't free it!) */
+	if (requeue)
+		return NETDEV_TX_BUSY;
 
 	/* free sk_buffs */
 	while (skb) {
@@ -2795,7 +2802,7 @@ hardstart_fail:
 		dev_kfree_skb(skb);
 		skb = tskb;
 	}
-	return 0;	/* NB: return !0 only in a ``hard error condition'' */
+	return NETDEV_TX_OK;
 }
 #undef ATH_HARDSTART_GET_TX_BUF_WITH_LOCK
 
