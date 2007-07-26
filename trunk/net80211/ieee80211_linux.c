@@ -68,8 +68,13 @@
  * 		1:	administratively assigned
  * 		else:	reserved			*/
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
+static ssize_t show_madwifi_name_type(struct device *dev,
+		struct device_attribute *attr, char *buf)
+#else
 static ssize_t show_madwifi_name_type(struct class_device *cdev,
-			      char *buf)
+		char *buf)
+#endif
 {
 	ssize_t len = 0;
 
@@ -78,17 +83,25 @@ static ssize_t show_madwifi_name_type(struct class_device *cdev,
 	return len;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
+static DEVICE_ATTR(madwifi_name_type, S_IRUGO, show_madwifi_name_type, NULL);
+#else
 static CLASS_DEVICE_ATTR(madwifi_name_type, S_IRUGO, show_madwifi_name_type, NULL);
+#endif
 
 static struct attribute *ieee80211_sysfs_attrs[] = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
+	&dev_attr_madwifi_name_type.attr
+#else
 	&class_device_attr_madwifi_name_type.attr
+#endif
 };
 
 static struct attribute_group ieee80211_attr_grp = {
 	.name	= NULL,	/* No seperate (sub-)directory */
 	.attrs	= ieee80211_sysfs_attrs
 };
-#endif
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) */
 
 /*
  * Print a console message with the device name prepended.
@@ -706,14 +719,22 @@ ieee80211_virtfs_vattach(struct ieee80211vap *vap)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	int ret;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
+	ret = sysfs_create_group(&vap->iv_dev->dev.kobj, &ieee80211_attr_grp);
+#else
 	ret = sysfs_create_group(&vap->iv_dev->class_dev.kobj, &ieee80211_attr_grp);
+#endif
 	if (ret) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
+		sysfs_remove_group(&vap->iv_dev->dev.kobj, &ieee80211_attr_grp);
+#else
 		sysfs_remove_group(&vap->iv_dev->class_dev.kobj, &ieee80211_attr_grp);
+#endif
 		printk("%s: %s - unable to create sysfs attribute group\n", 
 				__func__, vap->iv_dev->name);
 		return;
 	}
-#endif
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) */
 
 	space = 5 * sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	vap->iv_sysctls = kmalloc(space, GFP_KERNEL);
@@ -881,7 +902,9 @@ ieee80211_virtfs_vdetach(struct ieee80211vap *vap)
 {
 	struct ieee80211_proc_entry *tmp=NULL;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
+	sysfs_remove_group(&vap->iv_dev->dev.kobj, &ieee80211_attr_grp);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	sysfs_remove_group(&vap->iv_dev->class_dev.kobj, &ieee80211_attr_grp);
 #endif
 
