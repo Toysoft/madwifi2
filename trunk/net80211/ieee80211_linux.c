@@ -711,7 +711,7 @@ static const ctl_table ieee80211_sysctl_template[] = {
 };
 
 void
-ieee80211_virtfs_vattach(struct ieee80211vap *vap)
+ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 {
 	int i, space;
 	char *devname = NULL;
@@ -972,7 +972,7 @@ ieee80211_rcv_dev_event(struct notifier_block *this, unsigned long event,
 	switch (event) {
 	case NETDEV_CHANGENAME:
 		ieee80211_virtfs_vdetach(dev->priv);
-		ieee80211_virtfs_vattach(dev->priv);
+		ieee80211_virtfs_latevattach(dev->priv);
 		return NOTIFY_DONE;
 	default:
 		break;

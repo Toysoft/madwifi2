@@ -496,7 +496,6 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	ieee80211_scan_vattach(vap);
 	ieee80211_vlan_vattach(vap);
 	ieee80211_ioctl_vattach(vap);
-	ieee80211_virtfs_vattach(vap);
 
 	return 1;
 #undef IEEE80211_C_OPMODE
@@ -511,6 +510,7 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ifmediareq imr;
 
+	ieee80211_virtfs_latevattach(vap);
 	ieee80211_node_latevattach(vap);	/* XXX: move into vattach */
 	ieee80211_power_latevattach(vap);	/* XXX: move into vattach */
 
