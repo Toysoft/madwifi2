@@ -431,7 +431,7 @@ init_ahb(void)
 
 	config.board = ar5312_boardConfig;
 	config.radio = radioConfig;
-	config.unit = wlanNum;
+	config.unit = 0;
 	config.tag = NULL;
 
 	if (!strcmp(sysType,"Atheros AR5315")) {
