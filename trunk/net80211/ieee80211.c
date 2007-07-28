@@ -510,7 +510,6 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ifmediareq imr;
 
-	ieee80211_virtfs_latevattach(vap);
 	ieee80211_node_latevattach(vap);	/* XXX: move into vattach */
 	ieee80211_power_latevattach(vap);	/* XXX: move into vattach */
 
@@ -539,8 +538,13 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 	if (register_netdevice(dev)) {
 		printk(KERN_ERR "%s: unable to register device\n", dev->name);
 		return 0;
-	} else
-		return 1;
+	}
+	
+	/* SysFS needs to be initialised after the device, as it uses the 
+	 * device koject */
+	ieee80211_virtfs_latevattach(vap);
+
+	return 1;
 }
 EXPORT_SYMBOL(ieee80211_vap_attach);
 
