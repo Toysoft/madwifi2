@@ -91,10 +91,11 @@ static CLASS_DEVICE_ATTR(madwifi_name_type, S_IRUGO, show_madwifi_name_type, NUL
 
 static struct attribute *ieee80211_sysfs_attrs[] = {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
-	&dev_attr_madwifi_name_type.attr
+	&dev_attr_madwifi_name_type.attr,
 #else
-	&class_device_attr_madwifi_name_type.attr
+	&class_device_attr_madwifi_name_type.attr,
 #endif
+	NULL
 };
 
 static struct attribute_group ieee80211_attr_grp = {
