@@ -177,8 +177,8 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 #define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	(0x4000 <= (_reg) && (_reg) < 0x5000) ?			\
 	 iowrite32((_val), (_ah)->ah_sh + (_reg)) :		\
-	 iowrite32be((_val), (_ah)->ah_sh + (_reg));
-} while (0)
+	 iowrite32be((_val), (_ah)->ah_sh + (_reg));		\
+	} while (0)
 #define _OS_REG_READ(_ah, _reg)					\
 	((0x4000 <= (_reg) && (_reg) < 0x5000) ?		\
 	 ioread32((_ah)->ah_sh + (_reg)) :			\
@@ -186,7 +186,7 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 # else /* AH_LITTLE_ENDIAN */
 #define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	iowrite32(_val, (_ah)->ah_sh + (_reg));			\
-} while (0)
+	} while (0)
 #define _OS_REG_READ(_ah, _reg)					\
 	ioread32((_ah)->ah_sh + (_reg))
 	
@@ -197,7 +197,7 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 	 writel((0x4000 <= (_reg) && (_reg) < 0x5000) ? 	\
 	 	(_val) : cpu_to_le32(_val), 			\
 		(_ah)->ah_sh + (_reg));				\
-} while (0)
+	} while (0)
 #define _OS_REG_READ(_ah, _reg)					\
 	((0x4000 <= (_reg) && (_reg) < 0x5000) ?		\
 	 readl((_ah)->ah_sh + (_reg)) :				\
@@ -205,7 +205,7 @@ extern	u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 # else /* AH_LITTLE_ENDIAN */
 #define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	writel(_val, (_ah)->ah_sh + (_reg));			\
-} while (0)
+	} while (0)
 #define _OS_REG_READ(_ah, _reg)					\
 	readl((_ah)->ah_sh + (_reg))
 # endif /* AH_BYTE_ORDER */
