@@ -512,7 +512,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			vap->iv_flags &= ~IEEE80211_F_XRUPDATE;
 		}
 #endif
-		if (ic->ic_flags_ext & IEEE80211_FEXT_ERPUPDATE) {
+		if ((ic->ic_flags_ext & IEEE80211_FEXT_ERPUPDATE) && (bo->bo_erp != NULL)) {
 			(void) ieee80211_add_erp(bo->bo_erp, ic);
 			ic->ic_flags_ext &= ~IEEE80211_FEXT_ERPUPDATE;
 		}
