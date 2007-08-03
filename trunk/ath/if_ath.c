@@ -203,6 +203,7 @@ static int ath_startrecv(struct ath_softc *);
 static void ath_flushrecv(struct ath_softc *);
 static void ath_chan_change(struct ath_softc *, struct ieee80211_channel *);
 static void ath_calibrate(unsigned long);
+static void ath_mib_enable(unsigned long);
 static int ath_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 
 static void ath_scan_start(struct ieee80211com *);
@@ -661,6 +662,10 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	init_timer(&sc->sc_cal_ch);
 	sc->sc_cal_ch.function = ath_calibrate;
 	sc->sc_cal_ch.data = (unsigned long) dev;
+
+	init_timer(&sc->sc_mib_enable);
+	sc->sc_mib_enable.function = ath_mib_enable;
+	sc->sc_mib_enable.data = (unsigned long) sc;
 
 #ifdef ATH_SUPERG_DYNTURBO
 	init_timer(&sc->sc_dturbo_switch_mode);
@@ -1747,16 +1752,19 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		if (status & HAL_INT_MIB) {
 			sc->sc_stats.ast_mib++;
 			/*
-			 * Disable interrupts until we service the MIB
-			 * interrupt; otherwise it will continue to fire.
+			 * When the card receives lots of PHY errors, the MIB
+			 * interrupt will fire at a very rapid rate. We will use
+			 * a timer to enforce at least 1 jiffy delay between
+			 * MIB interrupts. This should be unproblematic, since
+			 * the hardware will continue to update the counters in the
+			 * mean time.
 			 */
-			ath_hal_intrset(ah, 0);
-			/*
-			 * Let the HAL handle the event.  We assume it will
-			 * clear whatever condition caused the interrupt.
-			 */
-			ath_hal_mibevent(ah, &sc->sc_halstats);
+			sc->sc_imask &= ~HAL_INT_MIB;
 			ath_hal_intrset(ah, sc->sc_imask);
+			mod_timer(&sc->sc_mib_enable, jiffies + 1);
+
+			/* Let the HAL handle the event. */
+			ath_hal_mibevent(ah, &sc->sc_halstats);
 		}
 	}
 	if (needmark)
@@ -7853,6 +7861,19 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 	return 0;
+}
+
+/*
+ * Enable MIB interrupts again, after the ISR disabled them
+ * to slow down the rate of PHY error reporting.
+ */
+static void
+ath_mib_enable(unsigned long arg)
+{
+	struct ath_softc *sc = (struct ath_softc *) arg;
+
+	sc->sc_imask |= HAL_INT_MIB;
+	ath_hal_intrset(sc->sc_ah, sc->sc_imask);
 }
 
 /*
