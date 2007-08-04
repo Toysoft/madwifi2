@@ -289,45 +289,48 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	IEEE80211_LOCK_IRQ(ic);
 
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
-	    (vap->iv_flags & IEEE80211_F_CHANSWITCH) &&
-	    (vap->iv_chanchange_count == ic->ic_chanchange_tbtt)) {
-		u_int8_t *frm;
-		struct ieee80211_channel *c;
+			(vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
+		struct ieee80211_channel *c = 
+			ieee80211_doth_findchan(vap, ic->ic_chanchange_chan);
+		
+		if (!vap->iv_chanchange_count && !c) {
+			vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
+			ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
+		} else if (vap->iv_chanchange_count == ic->ic_chanchange_tbtt) {
+			u_int8_t *frm;
 
-		vap->iv_chanchange_count = 0;
-
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-			"%s: reinit beacon\n", __func__);
-
-		/* 
-		 * NB: ic_bsschan is in the DSPARMS beacon IE, so must set this
-		 *     prior to the beacon re-init, below.
-		 */
-		c = ieee80211_doth_findchan(vap, ic->ic_chanchange_chan);
-		if (c == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				"%s: find channel failure\n", __func__);
-			IEEE80211_UNLOCK_IRQ_EARLY(ic);
-			return 0;
+					"%s: reinit beacon\n", __func__);
+
+			/* NB: ic_bsschan is in the DSPARMS beacon IE, so must set this
+			 *     prior to the beacon re-init, below. */
+			if (c == NULL) {
+				/* Requested channel invalid; drop the channel switch 
+				 * announcement and do nothing. */
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+						"%s: find channel failure\n", __func__);
+			} else
+				ic->ic_bsschan = c;
+
+			skb_pull(skb, sizeof(struct ieee80211_frame));
+			skb_trim(skb, 0);
+			frm = skb->data;
+			skb_put(skb, ieee80211_beacon_init(ni, bo, frm) - frm);
+			skb_push(skb, sizeof(struct ieee80211_frame));
+
+			vap->iv_chanchange_count = 0;
+			vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
+			ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
+
+			/* NB: Only for the first VAP to get here, and when we have a 
+			 * valid channel to which to change. */
+			if (c && (ic->ic_curchan != c)) {
+				ic->ic_curchan = c;
+				ic->ic_set_channel(ic);
+			}
+
+			len_changed = 1;
 		}
-		ic->ic_bsschan = c;
-
-		skb_pull(skb, sizeof(struct ieee80211_frame));
-		skb_trim(skb, 0);
-		frm = skb->data;
-		skb_put(skb, ieee80211_beacon_init(ni, bo, frm) - frm);
-		skb_push(skb, sizeof(struct ieee80211_frame));
-
-		vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
-		ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
-
-		/* NB: only for the first VAP to get here */
-		if (ic->ic_curchan != c) {
-			ic->ic_curchan = c;
-			ic->ic_set_channel(ic);
-		}
-
-		len_changed = 1;
 	}
 
 	/* XXX faster to recalculate entirely or just changes? */
@@ -335,6 +338,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		capinfo = IEEE80211_CAPINFO_IBSS;
 	else
 		capinfo = IEEE80211_CAPINFO_ESS;
+
 	if (vap->iv_flags & IEEE80211_F_PRIVACY)
 		capinfo |= IEEE80211_CAPINFO_PRIVACY;
 	if ((ic->ic_flags & IEEE80211_F_SHPREAMBLE) &&
@@ -497,9 +501,9 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				/* indicate new beacon length so other layers may manage memory */
 				skb_put(skb, IEEE80211_CHANSWITCHANN_BYTES);
 				len_changed = 1;
-			}
-			else
+			} else
 				bo->bo_chanswitch[4]--;
+			
 			vap->iv_chanchange_count++;
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				"%s: CHANSWITCH IE, change in %d\n",
