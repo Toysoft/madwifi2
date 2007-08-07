@@ -41,6 +41,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/time.h>
 #include <asm/uaccess.h>
+#include <linux/param.h>
 
 #include "if_ethersubr.h"		/* for ETHER_IS_MULTICAST */
 #include "if_media.h"
@@ -83,91 +84,71 @@
 
 #define sizetab(t) (sizeof(t)/sizeof(t[0]))
 
-struct etsi_pulse_prf {
-  int width; /* value as specified in the ETSI standards, ie us */
-  int width_min; /* value as reported by Atheros hardware */
-  int width_max; /* value as reported by Atheros hardware */
-	int prf;
-	int period_min; /* 1000000 / PRF - 2% */
-	int period_max; /* 1000000 / PRF + 2% */
-	int burst_min;
+struct radar_pattern_specification {
+ 	/* The name of the rule/specification (i.e. what did we detect) */
+ 	const char* 	name;
+ 	/* Interval MIN = 1000000 / FREQ - 2% (a.k.a. Pulse/Burst Repetition Interval) */
+ 	u_int32_t	repetition_interval_min; 	
+ 	/* Interval MAX = 1000000 / FREQ + 2% (a.k.a. Pulse/Burst Repetition Interval) */
+ 	u_int32_t	repetition_interval_max; 	
+ 	/* Do we adjust the min/max interval values dynamically based upon running mean interval? */
+ 	HAL_BOOL 	dynamic_interval_adjustment;
+ 	/* Fuzz factor dynamic matching, as unsigned integer percentage of variation (i.e. 2 for +/- 2% timing) */
+ 	u_int32_t 	dynamic_interval_adjustment_fuzz_pct;
+ 	/* Match MIN (Minimum Pulse/Burst events required) */
+ 	u_int32_t	required_matches;
+ 	/* Match MIN duration (Minimum Pulse/Burst events required including missed) */
+ 	u_int32_t	duration_in_intervals_min;
+ 	/* Match MAX duration (Maximum Pulse/Burst events required including missed) */
+ 	u_int32_t	duration_in_intervals_max;
+ 	/* Maximum consecutive missing pulses */
+ 	u_int32_t       maximum_consecutive_missing;
+ 	/* Maximum missing pulses */
+ 	u_int32_t       maximum_missing;
 };
 
-static struct etsi_pulse_prf etsi_possible_prf[] = {
-  /* ETSI radar #1 */
-  {  1,  0,  0, 750, 1307, 1359, 15 },
-  /* ETSI radar #2 */
-  {  1,  0,  0, 200, 4900, 5100, 10 },
-  {  1,  0,  0,  300, 3267, 3399, 10 },
-  {  1,  0,  0,  500, 1960, 2040, 10 },
-  {  1,  0,  0,  800, 1225, 1275, 10 },
-  {  1,  0,  0, 1000,  980, 1020, 10 },
-  {  2,  4,  5,  200, 4900, 5100, 10 },
-  {  2,  4,  5,  300, 3267, 3399, 10 },
-  {  2,  4,  5,  500, 1960, 2040, 10 },
-  {  2,  4,  5,  800, 1225, 1275, 10 },
-  {  2,  4,  5, 1000,  980, 1020, 10 },
-  {  5,  7,  9,  200, 4900, 5100, 10 },
-  {  5,  7,  9,  300, 3267, 3399, 10 },
-  {  5,  7,  9,  500, 1960, 2040, 10 },
-  {  5,  7,  9,  800, 1225, 1275, 10 },
-  {  5,  7,  9, 1000,  980, 1020, 10 },
-  /* ETSI radar #3 */
-  { 10, 14, 16,  200, 4900, 5100, 15 },
-  { 10, 14, 16,  300, 3267, 3399, 15 },
-  { 10, 14, 16,  500, 1960, 2040, 15 },
-  { 10, 14, 16,  800, 1225, 1275, 15 },
-  { 10, 14, 16, 1000,  980, 1020, 15 },
-  { 15, 21, 23,  200, 4900, 5100, 15 },
-  { 15, 21, 23,  300, 3267, 3399, 15 },
-  { 15, 21, 23,  500, 1960, 2040, 15 },
-  { 15, 21, 23,  800, 1225, 1275, 15 },
-  { 15, 21, 23, 1000,  980, 1020, 15 },
-  /* ETSI radar #4 */
-  {  1,  0,  0, 1200,  817,  849, 15 },
-  {  1,  0,  0, 1500,  653,  679, 15 },
-  {  1,  0,  0, 1600,  613,  637, 15 },
-  {  2,  4,  5, 1200,  817,  849, 15 },
-  {  2,  4,  5, 1500,  653,  679, 15 },
-  {  2,  4,  5, 1600,  613,  637, 15 },
-  {  5,  7,  9, 1200,  817,  849, 15 },
-  {  5,  7,  9, 1500,  653,  679, 15 },
-  {  5,  7,  9, 1600,  613,  637, 15 },
-  { 10, 14, 16, 1200,  817,  849, 15 },
-  { 10, 14, 16, 1500,  653,  679, 15 },
-  { 10, 14, 16, 1600,  613,  637, 15 },
-  { 15, 21, 23, 1200,  817,  849, 15 },
-  { 15, 21, 23, 1500,  653,  679, 15 },
-  { 15, 21, 23, 1600,  613,  637, 15 },
-  /* ETSI radar #5 */
-  {  1,  0,  0, 2300,  426,  442, 25 },
-  {  1,  0,  0, 3000,  327,  339, 25 },
-  {  1,  0,  0, 3500,  280,  290, 25 },
-  {  1,  0,  0, 4000,  245,  255, 25 },
-  {  2,  4,  5, 2300,  426,  442, 25 },
-  {  2,  4,  5, 3000,  327,  339, 25 },
-  {  2,  4,  5, 3500,  280,  290, 25 },
-  {  2,  4,  5, 4000,  245,  255, 25 },
-  {  5,  7,  9, 2300,  426,  442, 25 },
-  {  5,  7,  9, 3000,  327,  339, 25 },
-  {  5,  7,  9, 3500,  280,  290, 25 },
-  {  5,  7,  9, 4000,  245,  255, 25 },
-  { 10, 14, 16, 2300,  426,  442, 25 },
-  { 10, 14, 16, 3000,  327,  339, 25 },
-  { 10, 14, 16, 3500,  280,  290, 25 },
-  { 10, 14, 16, 4000,  245,  255, 25 },
-  { 15, 21, 23, 2300,  426,  442, 25 },
-  { 15, 21, 23, 3000,  327,  339, 25 },
-  { 15, 21, 23, 3500,  280,  290, 25 },
-  { 15, 21, 23, 4000,  245,  255, 25 },
-  /* ETSI radar #6 */
-  { 20, 27, 29, 2000,  490,  510, 20 },
-  { 20, 27, 29, 3000,  327,  339, 20 },
-  { 20, 27, 29, 4000,  245,  255, 20 },
-  { 30, 39, 41, 2000,  490,  510, 20 },
-  { 30, 39, 41, 3000,  327,  339, 20 },
-  { 30, 39, 41, 4000,  245,  255, 20 }
+/* We will use 1% after initial pulse for FCC */
+#define FUZZF 10
+/* We will use 2% after initial pulse for ETSI */
+#define FUZZE 20
+
+/*
+PRF are ordered from high to low, because lower frequencies will match higher ones
+and the debug output is more reassuring the closer we get to actual PRF.
+*/
+static struct radar_pattern_specification radar_patterns[] = {
+/*        name                   min intvl     max intvl     dynamic   fuzz   min     interval  max    max    
+                                 pulse 0       pulse 0       intvl     1/10%  matches range     consec total  
+			                                                              min,max   miss   miss   
+*/                               
+	{ "ETSI [ 200]",         4900,         5100,         AH_TRUE,  FUZZE, 3,      4, 10,    4,     8     },
+	{ "ETSI [ 300]",         3267,         3399,         AH_TRUE,  FUZZE, 3,      4, 10,    4,     6     },
+	{ "ETSI [ 500]",         1960,         2040,         AH_TRUE,  FUZZE, 4,      4, 10,    4,     8     },
+	{ "ETSI [ 750]",         1307,         1359,         AH_TRUE,  FUZZE, 4,      4, 15,    4,     13    },
+	{ "ETSI [ 800]",         1225,         1275,         AH_TRUE,  FUZZE, 4,      4, 10,    4,     8     },
+	{ "ETSI [1000]",         980,          1020,         AH_TRUE,  FUZZE, 4,      4, 10,    4,     8     },
+	{ "ETSI [1200]",         817,          849,          AH_TRUE,  FUZZE, 4,      4, 15,    4,     13    },
+        { "ETSI [1500]",         653,          679,          AH_TRUE,  FUZZE, 4,      4, 15,    4,     6     },
+	{ "ETSI [1600]",         613,          637,          AH_TRUE,  FUZZE, 4,      4, 15,    4,     7     },
+	{ "ETSI [2000]",         490,          510,          AH_TRUE,  FUZZE, 4,      4, 20,    4,     10    },
+	{ "ETSI [2300]",         426,          442,          AH_TRUE,  FUZZE, 4,      4, 25,    4,     20    },
+	{ "ETSI [3000]",         327,          339,          AH_TRUE,  FUZZE, 3,      4, 25,    5,     20    },
+	{ "ETSI [3500]",         280,          290,          AH_TRUE,  FUZZE, 4,      4, 25,    2,     20    },
+	{ "ETSI [4000]",         245,          255,          AH_TRUE,  FUZZE, 4,      4, 25,    5,     20    },
+        { "FCC [1,1399-1714]",   1399,         1714,         AH_TRUE,  FUZZF, 5,      10,18,    4,     6     },
+        { "FCC [2,147-235]",     147,          235,          AH_TRUE,  FUZZF, 8,      10,29,    6,     12    },
+        { "FCC [3-4,196-273]",   196,          273,          AH_TRUE,  FUZZF, 8,      8, 18,    2,     16    },
+        { "FCC [3-4,275-352]",   275,          352,          AH_TRUE,  FUZZF, 8,      8, 18,    2,     16    },
+        { "FCC [3-4,354-431]",   354,          431,          AH_TRUE,  FUZZF, 8,      8, 18,    2,     16    },
+        { "FCC [3-4,433-510]",   433,          510,          AH_TRUE,  FUZZF, 8,      8, 18,    2,     16    },
+        { "FCC [3-4,235-313]",   235,          313,          AH_TRUE,  FUZZF, 8,      8, 18,    2,     16    },
+        { "FCC [3-4,314-392]",   314,          392,          AH_TRUE,  FUZZF, 8,      8, 18,    2,     16    },
+        { "FCC [3-4,393-471]",   393,          471,          AH_TRUE,  FUZZF, 8,      8, 18,    2,     16    },
 };
+#undef MN5
+#undef MX5
+
+static inline u_int32_t interval_to_frequency(u_int32_t pri);
 
 /* Returns true if radar detection is enabled. */
 int ath_radar_is_enabled(struct ath_softc *sc) {
@@ -251,7 +232,7 @@ int ath_radar_update(struct ath_softc *sc) {
 	if (ic->ic_flags & IEEE80211_F_SCAN)
 		return 1;
 
-	/* Update the DFS flags (as a sanity check) */
+	/* Update the DfFS flags (as a sanity check) */
 	if (ath_radar_correct_dfs_flags(sc, &sc->sc_curchan))
 		DPRINTF(sc, ATH_DEBUG_DOTH, 
 			"%s: %s: channel required corrections to private flags.\n", 
@@ -295,15 +276,12 @@ int ath_radar_update(struct ath_softc *sc) {
 			ath_hal_setrxfilter(ah, new_rxfilt);
 
 		sc->sc_imask = new_mask;
-		if (IFF_DUMPPKTS(sc, ATH_DEBUG_DOTH) && ((old_radar != new_radar) || 
+		if (DFLAG_ISSET(sc, ATH_DEBUG_DOTH) && ((old_radar != new_radar) || 
 				(old_filter != new_filter) || (old_rxfilt != new_rxfilt) || 
 				(old_mask != new_mask) || (old_ier != new_ier)))
-			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Radar detection %s.\n", DEV_NAME(dev), __func__, required ? "enabled" : "disabled");
+				DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Radar detection %s.\n", DEV_NAME(dev), __func__, required ? "enabled" : "disabled");
 		ath_hal_intrset(ah, new_ier);
 	}
-
-	/* reset the radar pulse circular array */
-	ath_radar_pulse_flush(sc);
 
 	return (required == ath_radar_is_enabled(sc));
 }
@@ -362,212 +340,533 @@ static struct ath_radar_pulse * pulse_next(struct ath_radar_pulse *pulse)
 }
 #endif
 
-#define ETSI_MAX_MISS 2
-
 /*
-  burst : expected number of pulses
+ * This accounts for hardware inconsistencies when detecting/returning pulses.  4% was not good enough for FCC bin 5 matching.
 */
-
-static int etsi_radar_match(int count, int miss, int burst)
-{
-	/* ideal case */
-	if (count == burst && miss == 0)
-		return 1;
-
-	if ((burst - count) < (burst/2)) {
-	  return 1;
-	}
-
-	if ((count >= burst / 3)
-	    && (miss <= (2*burst)/3)) {
-	  return 1;
-	}
-
-	/* X start/end pulse missing */
-	if ((count+miss+ETSI_MAX_MISS >= burst)
-	  && (miss <= ETSI_MAX_MISS)) {
-	  return 1;
-	}
-
-	/* mid pulse missing */
-	if (count == (burst - 1) && miss == 1)
-		return 1;
-
-	/* start + end pulse missing */
-	if (count == (burst - 2) && miss == 0)
-		return 1;
-
-	/* start/end + mid pulse missing */
-	if (count == (burst - 2) && miss == 1)
-		return 1;
-
-	return 0;
-}
-
-void etsi_radar_pulse_analyze_one_pulse(struct ath_softc *sc,
-		struct ath_radar_pulse * last_pulse)
+static HAL_BOOL radar_pulse_analyze_one_pulse(
+	struct ath_softc *sc, 
+	struct ath_radar_pulse * last_pulse,
+	u_int32_t* index,
+	u_int32_t* pri,
+	u_int32_t* matching_pulses,
+	u_int32_t* missed_pulses,
+	u_int32_t* noise_pulses
+	)
 {
 	struct net_device *dev = sc->sc_dev;
 	int i;
+	int best_index = -1;
+	unsigned int best_matched   = 0;
+	unsigned int best_noise  = 0;
+	unsigned int best_missed = 0;
+	unsigned int best_pri    = 0;
+	unsigned int best_code = 0;
 
-	/* We use int64_t instead of u_int64_t since:
-	 *  - we compute negative values
-	 *  - u_int64_t wrapped around every 507,356 years only ! */
-
-	int64_t t0, t1, t_min, t_max;
-	int count, miss, partial_miss;
+	u_int64_t t0_min, t0_max, t1, t_min, t_max;
+	u_int32_t noise = 0, matched = 0, missed = 0, partial_miss = 0;
 	struct ath_radar_pulse * pulse;
+	u_int32_t pulse_count_minimum = 0;
 
-	DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: ath_radar_pulse_etsi\n", DEV_NAME(dev));
+	u_int32_t new_period       = 0;
+	u_int64_t last_seen_tsf    = 0;
+	u_int32_t last_seen_period = 0;
+	u_int32_t sum_periods      = 0;
+	u_int32_t mean_period 	   = 0;
+	u_int32_t adjusted_repetition_interval_max = 0;
+	u_int32_t adjusted_repetition_interval_min = 0;
 
-	/* we need at least (burst_min - 2) pulses and 2 pulses */
-	if ((sc->sc_radar_pulse_nr < sc->sc_radar_pulse_burst_min -2)
-			|| (sc->sc_radar_pulse_nr < 2)) {
-		return;
-	}
+	if(index) 
+		*index = 0;
+	if(pri) 
+		*pri = 0;
+	if(noise_pulses)
+		*noise_pulses = 0;
+	if(matching_pulses)
+		*matching_pulses = 0;
+	if(missed_pulses)
+		*missed_pulses = 0;
+
+	/* we need at least sc_radar_pulse_minimum_to_match pulses or 2 pulses */
+	pulse_count_minimum = sc->sc_radar_pulse_minimum_to_match;
+	if ((sc->sc_radar_pulse_nr < pulse_count_minimum) || (sc->sc_radar_pulse_nr < 2))
+		return 0;
 
 	/* Search algorithm:
 	 *
 	 *  - since we have a limited and known number of radar patterns, we
 	 *  loop on all possible radar pulse period
 	 *
-	 *  - we start the search from the last timestamp (t0), going
+	 *  - we start the search from the last timestamp (t1), going
 	 *  backward in time, up to the point for the first possible radar
-	 *  pulse, ie t0 - PERIOD * BURST_MAX
+	 *  pulse, ie t0_min - PERIOD * BURST_MAX
 	 *
-	 *  - on this timescale, we count the number of hit/miss using T -
+	 *  - on this timescale, we matched the number of hit/missed using T -
 	 *  PERIOD*n taking into account the 2% error margin (using
-	 *  period_min, period_max)
+	 *  repetition_interval_min, repetition_interval_max)
 	 *
 	 *  At the end, we have a number of pulse hit for each PRF
 	 *
-	 * Improvements: the PRF can be found using the most common 
-	 * interval found */
+         * TSF will roll over after just over 584,542 years of operation without restart.
+	 * This exceeds all known Atheros MTBF so, forget about TSF roll over.
+	 */
 
 	/* t1 is the timestamp of the last radar pulse */
-	t1 = (int64_t)last_pulse->rp_tsf;
+	t1 = (u_int64_t)last_pulse->rp_tsf;
 
-	for (i = 0; i < sizetab(etsi_possible_prf); i++) {
-		/* this min formula is to check for underflow */
-		t0 = t1 - etsi_possible_prf[i].period_max *
-			etsi_possible_prf[i].burst_min;
+	/* loop through all patterns */
+	for (i = 0; i < sizetab(radar_patterns); i++) {
+
+		/* underflow */
+		if ((radar_patterns[i].repetition_interval_min * (radar_patterns[i].duration_in_intervals_min-1)) >= t1) {
+			DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+				"%s: %s skipped (last pulse isn't old enough to match this pattern).  %10llu >= %10llu.\n",
+				DEV_NAME(dev),
+				radar_patterns[i].name, (u_int64_t)(radar_patterns[i].repetition_interval_min * radar_patterns[i].duration_in_intervals_min), (u_int64_t)t1);
+			continue;
+		}
+
+		/* this min formula is to check for underflow.  It's the minimum needed duration to gather
+		 * specified number of matches, assuming minimum match interval. */
+		t0_min  = (radar_patterns[i].repetition_interval_min * radar_patterns[i].duration_in_intervals_min) < t1 ? 
+			t1 - (radar_patterns[i].repetition_interval_min * radar_patterns[i].duration_in_intervals_min) :
+			0;
+		/* this max formula is to stop when we exceed maximum time period for the pattern.  It's the 
+		   oldest possible TSF that could match. */
+		t0_max  = (radar_patterns[i].repetition_interval_max * radar_patterns[i].duration_in_intervals_max) < t1 ? 
+			t1 - (radar_patterns[i].repetition_interval_max * radar_patterns[i].duration_in_intervals_max) :
+			0;
 
 		/* we directly start with the timestamp before t1 */
 		pulse = pulse_prev(last_pulse);
 
 		/* initial values for t_min, t_max */
-		t_min = t1 - etsi_possible_prf[i].period_max;
-		t_max = t1 - etsi_possible_prf[i].period_min;
+		t_min = radar_patterns[i].repetition_interval_max < t1 ?
+			t1 - radar_patterns[i].repetition_interval_max :
+			0;
+		t_max = radar_patterns[i].repetition_interval_min < t1 ?
+			t1 - radar_patterns[i].repetition_interval_min :
+			0;
 
-		count = 0;
-		miss  = 0;
+		last_seen_tsf = t1;
+		last_seen_period = 0;
+		sum_periods = 0;
+		matched = 0;
+		noise = 0;
+		missed  = 0;
 		partial_miss = 0;
-#if 0
-		DPRINTF(sc, ATH_DEBUG_DOTH,
-				"%s: PRF=%4d t1=%10lld t0=%10lld t_min=%10lld "
-				"t_max=%10lld\n",
+		mean_period = 0;
+		adjusted_repetition_interval_max = radar_patterns[i].repetition_interval_max;
+		adjusted_repetition_interval_min = radar_patterns[i].repetition_interval_min;
+		/* DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+				"%s: %s t1=%10lld t0_min=%10lld t_min=%10lld t_max=%10lld\n",
 				DEV_NAME(dev),
-				etsi_possible_prf[i].prf, t1, t0, t_min, t_max);
-#endif
+				radar_patterns[i].name, t1, t0_min, t_min, t_max); */
 		for (;;) {
-#if 0
-			DPRINTF(sc, ATH_DEBUG_DOTH,
+			adjusted_repetition_interval_max = ((radar_patterns[i].dynamic_interval_adjustment == AH_TRUE) && mean_period && (mean_period * (1000+radar_patterns[i].dynamic_interval_adjustment_fuzz_pct) / 1000) < radar_patterns[i].repetition_interval_max) ? 
+				(mean_period * (1000+radar_patterns[i].dynamic_interval_adjustment_fuzz_pct) / 1000) : 
+				radar_patterns[i].repetition_interval_max;
+			adjusted_repetition_interval_min = ((radar_patterns[i].dynamic_interval_adjustment == AH_TRUE) && mean_period && (mean_period *  (1000-radar_patterns[i].dynamic_interval_adjustment_fuzz_pct) / 1000) > radar_patterns[i].repetition_interval_min) ? 
+				(mean_period * (1000-radar_patterns[i].dynamic_interval_adjustment_fuzz_pct) / 1000) : 
+				radar_patterns[i].repetition_interval_min;
+			/* DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
 					"%s: rp_tsf=%10llu t_min = %10lld, t_max = %10lld, "
-					"count=%d miss=%d partial_miss=%d\n",
+					"matched=%d missed=%d partial_miss=%d\n",
 					DEV_NAME(dev),
-					pulse->rp_tsf, t_min, t_max, count, miss, partial_miss);
-#endif
+					pulse->rp_tsf, t_min, t_max, matched, missed, partial_miss); */
 			/* check if we are at the end of the list */
-			if ((&pulse->list == &sc->sc_radar_pulse_head)
-					|| (!pulse->rp_allocated)) {
+			if ((&pulse->list == &sc->sc_radar_pulse_head) || (!pulse->rp_allocated)) {
 				break;
 			}
 
-			/* if we are below t0, stop the loop */
-			if ((int64_t)pulse->rp_tsf < t0) {
+			/* Do not go too far... this is an optimization to not keep checking after we hit maximum time span 
+			 * for the pattern. */
+			if (pulse->rp_tsf < t0_max) {
+				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+					"%s: %s matching stopped (pulse->rp_tsf < t0_max).  t1=%10llu t0_max=%10llu t_min=%10llu "
+					"t_max=%10llu matched=%u missed=%u\n",
+					DEV_NAME(dev),
+					radar_patterns[i].name, t1, t0_max, t_min, t_max, matched, missed);
+				break;
+			}
+			/* if we missed more than specified number of pulses, we stop searching */
+			if (partial_miss > radar_patterns[i].maximum_consecutive_missing) {
+				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+						"%s: %s matching stopped (too many consecutive pulses missing). %d>%d  matched=%u. missed=%u.\n",
+						DEV_NAME(dev),
+						radar_patterns[i].name, partial_miss, radar_patterns[i].maximum_consecutive_missing, matched, missed);
 				break;
 			}
 
-			/* check pulse width */
-			if (pulse->rp_width < etsi_possible_prf[i].width_min
-			    || pulse->rp_width > etsi_possible_prf[i].width_max) {
-			  /* ignores this pulse */
-#if 1
-			  pulse = pulse_prev(pulse);
-			  continue ;
-#endif
-			}
-
-			/* if we miss more than 2 pulses, we stop searching */
-			if (partial_miss >= etsi_possible_prf[i].burst_min/2) {
-				break;
-			}
-
-			if ((int64_t)pulse->rp_tsf > t_max) {
-				/* this event is noise, ignores it */
+		        new_period = (u_int64_t)(last_seen_tsf && last_seen_tsf > pulse->rp_tsf) ? last_seen_tsf - pulse->rp_tsf : 0;
+			if ( pulse->rp_tsf > t_max ) {
+				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+					"%s: %-17s [%2d] %5s [**:**] tsf: %10llu [range: %5llu-%5llu].  width: %3d. period: %4llu. last_period: %4llu. mean_period: %4llu. last_tsf: %10llu.\n", 
+				       DEV_NAME(dev),
+				       radar_patterns[i].name,
+					pulse->rp_index,
+					"noise",
+				       (u_int64_t)pulse->rp_tsf,
+				       (u_int64_t)t_min, 
+				       (u_int64_t)t_max,
+				       (u_int8_t)pulse->rp_width,
+				       (u_int64_t)new_period,
+				       (u_int64_t)last_seen_period,
+				       (u_int64_t)mean_period,
+				       (u_int64_t)last_seen_tsf
+				       );
+				/* this event is noise, ignore it */
 				pulse = pulse_prev(pulse);
-			} else if ((int64_t)pulse->rp_tsf >= t_min) {
+				noise++;
+			} else if (pulse->rp_tsf >= t_min) {
 				/* we found a match */
-				count++;
-				miss  += partial_miss;
-
-				pulse = pulse_prev(pulse);
-				t_min = t_min - etsi_possible_prf[i].period_max;
-				t_max = t_max - etsi_possible_prf[i].period_min;
+				matched++;
+				new_period = partial_miss ? new_period/(partial_miss+1) : new_period;
+				missed  += partial_miss;
 				partial_miss = 0;
+				sum_periods += new_period;
+				mean_period = matched ? (sum_periods/matched) : 0;
+				if(mean_period && 
+				   (AH_TRUE == radar_patterns[i].dynamic_interval_adjustment) &&
+				   (mean_period > radar_patterns[i].repetition_interval_max || 
+				    mean_period < radar_patterns[i].repetition_interval_min)) {
+					DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+							"%s: %s mean period deviated from original range [period: %4u, range: %4u-%4u]\n",
+							DEV_NAME(dev),
+							radar_patterns[i].name,
+							mean_period,
+							radar_patterns[i].repetition_interval_min,
+							radar_patterns[i].repetition_interval_max);
+					break;
+				}
+
+				/* Remember we are scanning backwards... */
+				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+					"%s: %-17s [%2d] %5s [%2d:%-2d] tsf: %10llu [range: %5llu-%5llu].  width: %3d. period: %4llu. last_period: %4llu. mean_period: %4llu. last_tsf: %10llu.\n", 
+				       DEV_NAME(dev),
+				       radar_patterns[i].name,
+					pulse->rp_index,
+					"match",
+					(matched + missed + partial_miss) ? (matched + missed + partial_miss) - 1 : 0,
+					(matched + missed + partial_miss),
+				       (u_int64_t)pulse->rp_tsf,
+				       (u_int64_t)t_min, 
+				       (u_int64_t)t_max,
+				       (u_int8_t)pulse->rp_width,
+				       (u_int64_t)new_period,
+				       (u_int64_t)last_seen_period,
+				       (u_int64_t)mean_period,
+				       (u_int64_t)last_seen_tsf
+				       );
+				/* record tsf and period */
+				last_seen_period  = new_period;
+				last_seen_tsf     = pulse->rp_tsf;
+
+				/* advance to next pulse */
+				pulse = pulse_prev(pulse);
+
+				/* update bounds */
+				t_min = adjusted_repetition_interval_max < t_min ? 
+					t_min - adjusted_repetition_interval_max :
+					0;
+				t_max = adjusted_repetition_interval_min < t_max ?
+					t_max - adjusted_repetition_interval_min :
+					0;
 			} else {
-				t_min = t_min - etsi_possible_prf[i].period_max;
-				t_max = t_max - etsi_possible_prf[i].period_min;
 				partial_miss++;
+				/* if we missed more than specified number of pulses, we stop searching */
+				if ((missed+partial_miss) > radar_patterns[i].maximum_missing) {
+					DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+							"%s: %s matching stopped (too many total pulses missing). %d>%d  matched=%u. missed=%u.\n",
+							DEV_NAME(dev),
+							radar_patterns[i].name, missed, radar_patterns[i].maximum_missing, matched, missed);
+					break;
+				}
+				/* Default mean period to approximate center of range */
+				/* Remember we are scanning backwards... */
+				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+					"%s: %-17s [**] %5s [%2d:%-2d] tsf:  (missing) [range: %5llu-%5llu].  width: ***. period: ****. last_period: %4llu. mean_period: %4llu. last_tsf: %10llu.\n", 
+				        DEV_NAME(dev),
+				        radar_patterns[i].name,
+					"missed",
+					(matched + missed + partial_miss) ? (matched + missed + partial_miss) - 1 : 0,
+					(matched + missed + partial_miss),
+					(u_int64_t)t_min, 
+					(u_int64_t)t_max,
+					(u_int64_t)last_seen_period,
+					(u_int64_t)mean_period,
+					(u_int64_t)last_seen_tsf);
+
+				/* update bounds */
+				t_min = adjusted_repetition_interval_max < t_min ? 
+					t_min - adjusted_repetition_interval_max :
+					0;
+				t_max = adjusted_repetition_interval_min < t_max ?
+					t_max - adjusted_repetition_interval_min :
+					0;
 			}
 		}
 
 		/* print counters for this PRF */
-		if (count != 0) {
-			/* we add one to the count since we counted only the time
+		if (matched > 1) {
+			const char* match_status = NULL;
+			/* we add one to the matched since we counted only the time
 			 * differences */
-			count++;
+			matched++;
 
-			DPRINTF(sc, ATH_DEBUG_DOTH,
-					"%s: PRF [%4d] : %3d pulses %3d miss\n",
-					DEV_NAME(dev),
-					etsi_possible_prf[i].prf,
-					count, miss);
+			match_status =
+				(matched+missed) < radar_patterns[i].duration_in_intervals_min ? 
+					"TOO-SHORT" :
+				(matched > radar_patterns[i].duration_in_intervals_max) ?
+					"TOO-LONG" :
+				(matched < radar_patterns[i].required_matches) ?
+					"TOO-LOSSY" :
+				"MATCH";
+
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
+				"%s: [%02d] %13s: %-17s"
+				"[match=%2u {%2u..%2u},missed=%2u/%2u,dur=%2d {%2u..%2u},noise=%2u/%2u]\n",
+				DEV_NAME(dev),
+				last_pulse->rp_index,
+				match_status,
+				radar_patterns[i].name,
+				matched, radar_patterns[i].required_matches, radar_patterns[i].duration_in_intervals_max, 
+				missed, radar_patterns[i].maximum_missing, 
+				matched+missed,
+				radar_patterns[i].duration_in_intervals_min, 
+				radar_patterns[i].duration_in_intervals_max, 
+				noise, matched+noise);
 
 			/* check if PRF counters match a known radar, if we are
 			   confident enought */
-
-			if (etsi_radar_match(count, miss,
-						etsi_possible_prf[i].burst_min)) {
-				DPRINTF(sc, ATH_DEBUG_DOTH,
-						"%s: RADAR detected at PRF %4d\n",
-						DEV_NAME(dev),
-						etsi_possible_prf[i].prf);
-				ath_radar_detected(sc, "ETSI RADAR detected");
+			if ((matched+missed) >= radar_patterns[i].duration_in_intervals_min &&
+			    matched >= radar_patterns[i].required_matches) {
+				/*
+				Scoring: 
+					matches <= max 
+					closer matches 
+					duration <= max, 
+					closer duration
+                                */
+				int better = (-1 == best_index) ? 1 : 0;
+				/* best hits is over maximum and new one is not */
+				if(!better && 
+				    (matched    	 		<= radar_patterns[i].duration_in_intervals_max) && 
+				    (best_matched 			> radar_patterns[best_index].duration_in_intervals_max) ) {
+					better = 2;
+				}
+				/* both hits are under maximum and new one is higher */
+				else if(!better &&
+					(matched     			<= radar_patterns[i].duration_in_intervals_max) && 
+					(best_matched 			<= radar_patterns[best_index].duration_in_intervals_max) && 
+					(matched     			> best_matched)) {
+					better = 3;
+				}
+				/* both hits are over maximum and new one is lower */
+				else if(!better && 
+					(matched     			> radar_patterns[i].duration_in_intervals_max) && 
+					(best_matched 			> radar_patterns[best_index].duration_in_intervals_max) && 
+					(matched     			< best_matched)) {
+					better = 4;
+				}
+				/* best duration is over maximum and new one is not */
+				else if(!better && 
+					(matched == best_matched) && 
+					((matched + missed) 		<= radar_patterns[i].duration_in_intervals_max) && 
+					((best_matched + best_missed) 	>  radar_patterns[best_index].duration_in_intervals_max)) {
+					better = 5;
+				}
+				/* both durations are under maximum and new one is LONGER */
+				else if(!better && 
+					(matched == best_matched) && 
+					((matched + missed) 			<= radar_patterns[i].duration_in_intervals_max) && 
+					((best_matched + best_missed) 		<= radar_patterns[best_index].duration_in_intervals_max) && 
+					(((matched + missed) * mean_period) 	> ((best_matched + best_missed) * best_pri))) {
+					better = 6;
+				}
+				/* both durations are over maximum and new one is SHORTER */
+				else if(!better && 
+					(matched == best_matched) && 
+					((matched + missed) 			> radar_patterns[i].duration_in_intervals_max) && 
+					((best_matched + best_missed) 		> radar_patterns[best_index].duration_in_intervals_max) && 
+					(((matched + missed) * mean_period) 	< ((best_matched + best_missed) * best_pri))) {
+					better = 7;
+				}
+				/* both durations are under maximum and new match has shorter max duration in intervals  */
+				else if(!better && 
+					(matched == best_matched) && 
+					((matched + missed) 			<= radar_patterns[i].duration_in_intervals_max) && 
+					((best_matched + best_missed) 		<= radar_patterns[best_index].duration_in_intervals_max) && 
+					(((matched + missed) * mean_period) 	== ((best_matched + best_missed) * best_pri)) &&
+					(radar_patterns[i].duration_in_intervals_max < radar_patterns[best_index].duration_in_intervals_max)) {
+					better = 8;
+				}
+				/* both durations are under maximum and new match has closer to original center frequency */
+/*				else if(!better && 
+					(matched == best_matched) && 
+					((matched + missed) 			<= radar_patterns[i].duration_in_intervals_max) && 
+					((best_matched + best_missed) 		<= radar_patterns[best_index].duration_in_intervals_max) && 
+					labs(mean_period - (radar_patterns[i].repetition_interval_min 		+ ((radar_patterns[i].repetition_interval_max - radar_patterns[i].repetition_interval_min) / 2))) <
+					labs(best_pri    - (radar_patterns[best_index].repetition_interval_min 	+ ((radar_patterns[best_index].repetition_interval_max - radar_patterns[best_index].repetition_interval_min) / 2)))) {
+					better = 9;
+				}
+*/
+				if (better) {
+					best_matched 	= matched;
+					best_missed 	= missed;
+					best_index 	= i;
+					best_pri 	= mean_period;
+					best_noise	= noise;
+					best_code       = better;
+				}
+				/* If nobody is looking, short-circuilt on first match. */
+//				if (!(DFLAG_ISSET(sc, ATH_DEBUG_DOTHFILTNOSC) && !DFLAG_ISSET(sc, ATH_DEBUG_DOTHFILT)))
+//					break;
+			}
+			else {
+				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+					"%s: %s matching failed (insufficient score) matched: %d missed: %d duration_in_intervals_min: %d\n",
+					DEV_NAME(dev),
+					radar_patterns[i].name,
+					matched,missed,radar_patterns[i].duration_in_intervals_min);
 			}
 		}
 	}
+	if (-1 != best_index) {
+		DPRINTF(sc, ATH_DEBUG_DOTHFILT,
+			"%s: [%02d] %10s: %-17s"
+			"[match=%2u {%2u..%2u},missed=%2u/%2u,dur=%2d {%2u..%2u},noise=%2u/%2u,code=%2d] RI=%-9u RF=%-4u\n",
+			DEV_NAME(dev),
+			last_pulse->rp_index,
+			"BEST MATCH",
+			radar_patterns[best_index].name,
+			best_matched, radar_patterns[best_index].required_matches, radar_patterns[best_index].duration_in_intervals_max, 
+			best_missed, radar_patterns[best_index].maximum_missing, 
+			best_matched + best_missed,
+			radar_patterns[best_index].duration_in_intervals_min, 
+			radar_patterns[best_index].duration_in_intervals_max, 
+			best_noise,
+			best_matched + best_noise,
+			best_code,
+			best_pri,
+			interval_to_frequency(best_pri));
+
+		if(index) 
+			*index 		 = best_index;
+		if(pri) 
+			*pri 		 = best_pri;
+		if(matching_pulses)
+			*matching_pulses = best_matched;
+		if(noise_pulses)
+			*noise_pulses    = best_noise;
+		if(missed_pulses)
+			*missed_pulses   = best_missed;
+	}
+
+    return -1 != best_index ? AH_TRUE : AH_FALSE;
 }
 
-static void etsi_radar_pulse_analyze(struct ath_softc *sc)
+static inline u_int32_t interval_to_frequency(u_int32_t interval)
 {
+	/* Calculate BRI from PRI */
+	u_int32_t frequency = interval ? (1000000 / interval) : 0;
+	/* Round to nearest multiple of 50 */
+//	return frequency + ((frequency % 10) >= 5 ? 10 : 0) - (frequency % 10);
+	return frequency + ((frequency % 50) >= 25 ? 50 : 0) - (frequency % 50);
+}
+
+static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
+{
+        HAL_BOOL radar = 0;
 	struct ath_radar_pulse * pulse;
+	u_int32_t best_index = 0;
+	u_int32_t best_pri = 0;
+	u_int32_t best_matched = 0;
+	u_int32_t best_missed = 0;
+	u_int32_t best_noise = 0;
+	u_int32_t pass = 0;
 
 	/* start the analysis by the last pulse since it might speed up
-	   things and then move backward for all non-analyzed pulses */
-	list_for_each_entry_reverse(pulse, &sc->sc_radar_pulse_head, list) {
-		if (!pulse->rp_allocated) {
-			break;
+	 * things and then move backward for all non-analyzed pulses.
+	 * For debugging ONLY - we continue to run this scan after radar is detected,
+	 * processing all pulses... even when they come in after an iteration of all 
+	 * pulses that were present when this function was invoked.  This can happen
+	 * at some radar waveforms where we will match the first few pulses and then the
+	 * rest of the burst will come in, but never be analyzed.
+	 * Under normal conditions, skip all that and just detect the darn radar.
+	 * This doesn't actually work as the tasklet must finish for the rx tasklet to run and fill the queue again,
+	 * but it should work for simulation/debugging.
+	 */
+	while(pulse_tail(sc)->rp_allocated && !pulse_tail(sc)->rp_analyzed && 
+	      (AH_FALSE == radar || (DFLAG_ISSET(sc, ATH_DEBUG_DOTHFILT) && ++pass <= 3)))
+	{
+		list_for_each_entry_reverse(pulse, &sc->sc_radar_pulse_head, list) {
+			if (!pulse->rp_allocated) {
+				break;
+			}
+	
+			if (pulse->rp_analyzed) {
+				break;
+			}
+	
+			/* Skip pulse analysis after we have confirmed radar presence unless we 
+			 * are debugging and have disabled short-circuit logic.  In this case,
+			 * we'll go through ALL the signatures and find the best match.
+			 */
+			if(AH_FALSE == radar || DFLAG_ISSET(sc, ATH_DEBUG_DOTHFILTNOSC)) {
+				u_int32_t index = 0, pri = 0, hit = 0, missed = 0, noise = 0;
+				if(AH_TRUE == radar_pulse_analyze_one_pulse(sc, pulse, &index, &pri, &hit, &missed, &noise)) {
+					if ((AH_FALSE == radar) || (hit > best_matched) || (hit == best_matched && missed < best_missed)) {
+						best_matched   = hit;
+						best_missed = missed;
+						best_index  = index;
+						best_pri    = pri;
+						best_noise  = noise;
+						radar       = AH_TRUE;
+					}
+				}
+			}
+			pulse->rp_analyzed = 1;
 		}
-
-		if (pulse->rp_analyzed) {
-			break;
-		}
-
-		etsi_radar_pulse_analyze_one_pulse(sc, pulse);
-		pulse->rp_analyzed = 1;
 	}
+	if (AH_TRUE == radar) {
+		if (DFLAG_ISSET(sc, ATH_DEBUG_DOTHPULSES)) {
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+					"%s: ========================================\n",
+					DEV_NAME(sc->sc_dev));	
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+					"%s: ==BEGIN RADAR SAMPLE====================\n",
+					DEV_NAME(sc->sc_dev));	
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+					"%s: ========================================\n",
+					DEV_NAME(sc->sc_dev));	
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+				"%s: Sample contains data matching %s "
+				"[match=%2u {%2u..%2u},missed=%2u/%2u,dur=%2d {%2u..%2u},noise=%2u/%2u] RI=%-9u RF=%-4u\n",
+				DEV_NAME(sc->sc_dev),
+				radar_patterns[best_index].name, 
+				best_matched, radar_patterns[best_index].required_matches, radar_patterns[best_index].duration_in_intervals_max, 
+				best_missed, radar_patterns[best_index].maximum_missing, 
+				best_matched + best_missed,
+				radar_patterns[best_index].duration_in_intervals_min, 
+				radar_patterns[best_index].duration_in_intervals_max, 
+				best_noise,
+				best_noise + best_matched,
+				best_pri,
+				interval_to_frequency(best_pri));
+			ath_radar_pulse_print(sc, 0 /* analyzed pulses only */);
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+					"%s: ========================================\n",
+					DEV_NAME(sc->sc_dev));	
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+					"%s: ==END RADAR SAMPLE======================\n",
+					DEV_NAME(sc->sc_dev));	
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+					"%s: ========================================\n",
+					DEV_NAME(sc->sc_dev));	
+		}
+		ath_radar_detected(sc, radar_patterns[best_index].name);
+	}
+	return radar;
 }
 
 /* initialize ath_softc members so sensible values */
@@ -615,13 +914,13 @@ void ath_radar_pulse_init(struct ath_softc *sc)
 	}
 
 	sc->sc_radar_pulse_nr = 0;
-	sc->sc_radar_pulse_analyze = etsi_radar_pulse_analyze;
+	sc->sc_radar_pulse_analyze = radar_pulse_analyze;
 
-	/* compute sc_radar_pulse_burst_min */
-	sc->sc_radar_pulse_burst_min = etsi_possible_prf[0].burst_min;
-	for (i = 1; i < sizetab(etsi_possible_prf); i++) {
-		if (sc->sc_radar_pulse_burst_min > etsi_possible_prf[i].burst_min)
-			sc->sc_radar_pulse_burst_min = etsi_possible_prf[i].burst_min;
+	/* compute sc_radar_pulse_minimum_to_match */
+	sc->sc_radar_pulse_minimum_to_match = radar_patterns[0].duration_in_intervals_min;
+	for (i = 1; i < sizetab(radar_patterns); i++) {
+		if (sc->sc_radar_pulse_minimum_to_match > radar_patterns[i].duration_in_intervals_min)
+			sc->sc_radar_pulse_minimum_to_match = radar_patterns[i].duration_in_intervals_min;
 	}
 
 	ATH_INIT_TQUEUE(&sc->sc_radartq, ath_radar_pulse_tasklet, dev);
@@ -636,21 +935,44 @@ void ath_radar_pulse_done(struct ath_softc *sc)
 }
 
 void ath_radar_pulse_record(struct ath_softc *sc,
-                            u_int64_t tsf, u_int8_t rssi, u_int8_t width)
+                            u_int64_t tsf, u_int8_t rssi, u_int8_t width,
+			    HAL_BOOL is_simulated)
 {
 	struct net_device *dev = sc->sc_dev;
 	struct ath_radar_pulse * pulse;
 
-	DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: ath_radar_pulse_record: tsf=%10llu rssi=%3u width=%3u\n",
-			DEV_NAME(dev),
-			tsf, rssi, width);
+	DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+		"%s: ath_radar_pulse_record: tsf=%10llu rssi=%3u width=%3u\n",
+		DEV_NAME(dev),
+		tsf, rssi, width);
 
 	/* check if the new radar pulse is after the last one recorded, or
 	 * else, we flush the history */
 	pulse = pulse_tail(sc);
 	if (tsf < pulse->rp_tsf) {
-		ath_radar_pulse_flush(sc);
+		if (is_simulated == AH_TRUE && 0 == tsf) {
+			DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+					"%s: %s: ath_radar_pulse_flush: simulated tsf reset.  tsf =%10llu, rptsf =%10llu\n",
+					DEV_NAME(dev),
+					__func__,
+					tsf, pulse->rp_tsf);
+			ath_radar_pulse_flush(sc);
+		}
+		else if ((pulse->rp_tsf - tsf) > (1<<15)) {
+			DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
+					"%s: %s: ath_radar_pulse_flush: tsf reset.  (rp_tsf - tsf > 0x8000) tsf =%10llu, rptsf =%10llu\n",
+					DEV_NAME(dev),
+					__func__,
+					tsf, pulse->rp_tsf);
+			ath_radar_pulse_flush(sc);
+		}
+		else {
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
+					"%s: %s: tsf jitter/bug detected: tsf =%10llu, rptsf =%10llu, rp_tsf - tsf = %10llu\n",
+					DEV_NAME(dev),
+					__func__,
+					tsf, pulse->rp_tsf, pulse->rp_tsf - tsf);
+		}
 	}
 
 	/* remove the head of the list */
@@ -665,57 +987,82 @@ void ath_radar_pulse_record(struct ath_softc *sc,
 
 	/* add at the tail of the list */
 	list_add_tail(&pulse->list, &sc->sc_radar_pulse_head);
-	sc->sc_radar_pulse_nr++;
+	if (ATH_RADAR_PULSE_NR > sc->sc_radar_pulse_nr)
+		sc->sc_radar_pulse_nr++;
 }
 
-void ath_radar_pulse_print(struct ath_softc *sc)
+void ath_radar_pulse_print_mem(struct ath_softc *sc, int analyzed_pulses_only)
 {
 	struct net_device *dev = sc->sc_dev;
 	struct ath_radar_pulse * pulse;
+	u_int64_t oldest_tsf = ~0;
 	int i;
+	printk("%s: pulse dump of %spulses using sc_radar_pulse_mem containing  %d allocated pulses.\n",
+		DEV_NAME(dev),
+		analyzed_pulses_only ? "analyzed " : "",
+		sc->sc_radar_pulse_nr);
 
-	DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: pulse number : %d\n",
-			DEV_NAME(dev), sc->sc_radar_pulse_nr);
-
-	DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: pulse dump using sc_radar_pulse_mem\n",
-			DEV_NAME(dev));
+	/* Find oldest TSF value so we can print relative times */
+	for (i = 0; i < ATH_RADAR_PULSE_NR; i++) {
+		pulse = &sc->sc_radar_pulse_mem[i];
+		if (pulse->rp_allocated && pulse->rp_tsf < oldest_tsf)
+			oldest_tsf = pulse->rp_tsf;
+	}
 
 	for (i = 0; i < ATH_RADAR_PULSE_NR; i++) {
 		pulse = &sc->sc_radar_pulse_mem[i];
 		if (!pulse->rp_allocated)
 			break;
-
-		DPRINTF(sc, ATH_DEBUG_DOTH,
-				"%s: pulse [%3d, %p] : tsf=%10llu rssi=%3u width=%3u "
-				"allocated=%d next=%p prev=%p\n",
+		if ( (!analyzed_pulses_only) || pulse->rp_analyzed) 
+			printk("%s: pulse [%3d, %p] : relative_tsf=%10llu tsf=%10llu rssi=%3u width=%3u "
+				"allocated=%d analyzed=%d next=%p prev=%p\n",
 				DEV_NAME(dev),
-				pulse->rp_index, pulse,
+				pulse->rp_index, 
+				pulse,
+				pulse->rp_tsf - oldest_tsf,
 				pulse->rp_tsf,
 				pulse->rp_rssi,
 				pulse->rp_width,
 				pulse->rp_allocated,
+				pulse->rp_analyzed,
 				pulse->list.next,
 				pulse->list.prev);
 	}
+}
 
-	DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: pulse dump using sc_radar_pulse_head\n",
-			DEV_NAME(dev));
-	list_for_each_entry(pulse, &sc->sc_radar_pulse_head, list) {
+void ath_radar_pulse_print(struct ath_softc *sc, int analyzed_pulses_only)
+{
+	struct net_device *dev = sc->sc_dev;
+	struct ath_radar_pulse * pulse;
+	u_int64_t oldest_tsf = ~0;
+
+	printk("%s: pulse dump of %spulses from ring buffer containing %d pulses.\n",
+		DEV_NAME(dev),
+		analyzed_pulses_only ? "analyzed " : "", 
+		sc->sc_radar_pulse_nr);
+
+	/* Find oldest TSF value so we can print relative times */
+	oldest_tsf = ~0;
+	list_for_each_entry_reverse(pulse, &sc->sc_radar_pulse_head, list) {
+		if (pulse->rp_allocated && pulse->rp_tsf < oldest_tsf)
+			oldest_tsf = pulse->rp_tsf;
+	}
+
+	list_for_each_entry_reverse(pulse, &sc->sc_radar_pulse_head, list) {
 		if (!pulse->rp_allocated)
-			break;
-
-		DPRINTF(sc, ATH_DEBUG_DOTH,
-				"%s: pulse [%3d, %p] : tsf=%10llu rssi=%3u width=%3u "
-				"allocated=%d next=%p prev=%p\n",
+			continue;
+		if ( (!analyzed_pulses_only) || pulse->rp_analyzed) 
+			printk("%s: pulse [%3d, %p] : relative_tsf=%10llu tsf=%10llu rssi=%3u width=%3u "
+				"allocated=%d analyzed=%d next=%p prev=%p\n",
 				DEV_NAME(dev),
-				pulse->rp_index, pulse,
+				pulse->rp_index, 
+				pulse,
+				pulse->rp_tsf - oldest_tsf,
 				pulse->rp_tsf,
 				pulse->rp_rssi,
 				pulse->rp_width,
 				pulse->rp_allocated,
+				pulse->rp_analyzed,
 				pulse->list.next,
 				pulse->list.prev);
 	}
@@ -725,7 +1072,7 @@ void ath_radar_pulse_flush(struct ath_softc *sc)
 {
 	struct ath_radar_pulse * pulse;
 
-	list_for_each_entry(pulse, &sc->sc_radar_pulse_head, list) {
+	list_for_each_entry_reverse(pulse, &sc->sc_radar_pulse_head, list) {
 		pulse->rp_allocated = 0;
 	}
 	sc->sc_radar_pulse_nr = 0;

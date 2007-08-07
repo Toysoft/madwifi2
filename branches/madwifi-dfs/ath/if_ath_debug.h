@@ -21,7 +21,7 @@
 #ifndef _IF_ATH_DEBUG_H_
 
 #ifdef AR_DEBUG
-#define	IFF_DUMPPKTS(sc, _m) \
+#define	DFLAG_ISSET(sc, _m) \
 	((sc->sc_debug & _m))
 enum {
 	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
@@ -46,6 +46,10 @@ enum {
 	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
 	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
 	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
+	ATH_DEBUG_DOTHFILT	= 0x02000000,	/* 11.h radar pulse filter algorithm */
+	ATH_DEBUG_DOTHFILTVBSE	= 0x04000000,	/* 11.h radar pulse filter algorithm - pulse level debug */
+	ATH_DEBUG_DOTHFILTNOSC  = 0x08000000,	/* 11.h radar pulse filter algorithm - disable short circuit of processing after detection */
+	ATH_DEBUG_DOTHPULSES    = 0x10000000,   /* 11.h radar pulse events */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
@@ -58,9 +62,10 @@ enum {
 		ath_keyprint(sc, __func__, ix, hk, mac);	\
 } while (0)
 #else /* defined(AR_DEBUG) */
-#define	IFF_DUMPPKTS(sc, _m)		0
+#define	DFLAG_ISSET(sc, _m)		0
 #define	DPRINTF(sc, _m, _fmt, ...)
 #define	KEYPRINTF(sc, k, ix, mac)
 #endif /* defined(AR_DEBUG) */
+#define	IFF_DUMPPKTS(sc, _m) DFLAG_ISSET(sc,_m)
 
 #endif /* #ifndef _IF_ATH_DEBUG_H_ */
