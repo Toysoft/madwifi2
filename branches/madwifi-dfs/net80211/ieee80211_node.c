@@ -517,8 +517,7 @@ ieee80211_ibss_merge(struct ieee80211_node *ni)
 	struct ieee80211com *ic = ni->ni_ic;
 #endif
 
-	if (ni == vap->iv_bss ||
-	    IEEE80211_ADDR_EQ(ni->ni_bssid, vap->iv_bss->ni_bssid)) {
+	if (ni == vap->iv_bss) {
 		/* unchanged, nothing to do */
 		return 0;
 	}
@@ -1195,7 +1194,7 @@ ieee80211_add_neighbor(struct ieee80211vap *vap, const struct ieee80211_frame *w
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_node *ni;
 
-	ni = ieee80211_dup_bss(vap, wh->i_addr2, 1);
+	ni = ieee80211_dup_bss(vap, wh->i_addr2, 0);
 	if (ni != NULL) {
 		ni->ni_esslen = sp->ssid[1];
 		memcpy(ni->ni_essid, sp->ssid + 2, sp->ssid[1]);
