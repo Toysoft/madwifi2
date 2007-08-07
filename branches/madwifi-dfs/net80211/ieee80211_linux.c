@@ -360,20 +360,23 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 
 	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
+	        struct timespec t;
+
 		/* Assume each node needs 500 bytes */
 		if (buf + space < p + 500)
 			break;
-
-		if (ni->ni_vap == vap &&
-		    0 != memcmp(vap->iv_myaddr, ni->ni_macaddr, IEEE80211_ADDR_LEN)) {
-			struct timespec t;
+		if ((ni->ni_vap == vap) && (memcmp(vap->iv_myaddr,
+			        ni->ni_macaddr, IEEE80211_ADDR_LEN) != 0)) {
 			jiffies_to_timespec(jiffies - ni->ni_last_rx, &t);
-			p += sprintf(p, "macaddr: <%s>\n", ether_sprintf(ni->ni_macaddr));
+			p += sprintf(p, "ni: %p%s vap: %p macaddr: <%s>\n",
+				     ni, ni == ni->ni_vap->iv_bss ? "*" : " ",
+				     ni->ni_vap, ether_sprintf(ni->ni_macaddr));
 			p += sprintf(p, " rssi %d\n", ni->ni_rssi);
 
 			p += sprintf(p, " last_rx %ld.%06ld\n",
 				     t.tv_sec, t.tv_nsec / 1000);
-
+			p += sprintf(p, " ni_tstamp %10llu ni_rtsf %10llu\n",
+				     le64_to_cpu(ni->ni_tstamp.tsf), ni->ni_rtsf);
 		}
         }
 	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
