@@ -783,43 +783,42 @@ void
 ieee80211_dfs_action(struct ieee80211com *ic) {
 	struct ieee80211vap *vap;
 
-				/* Get an AP mode VAP */
-				vap = TAILQ_FIRST(&ic->ic_vaps);
-				while ((vap != NULL) && (vap->iv_state != IEEE80211_S_RUN) &&
-				       (vap->iv_ic != ic)) {
-					vap = TAILQ_NEXT(vap, iv_next);
-				}
+	/* Get an AP mode VAP */
+	vap = TAILQ_FIRST(&ic->ic_vaps);
+	while ((vap != NULL) && (vap->iv_state != IEEE80211_S_RUN) &&
+	       (vap->iv_ic != ic)) {
+		vap = TAILQ_NEXT(vap, iv_next);
+	}
 
-				if (vap == NULL) {
-					/*
-					 * No running VAP was found, check
-					 * if any one is scanning.
-					 */
-					vap = TAILQ_FIRST(&ic->ic_vaps);
-					while ((vap != NULL) && (vap->iv_state != IEEE80211_S_SCAN) &&
-					       (vap->iv_ic != ic)) {
-						vap = TAILQ_NEXT(vap, iv_next);
-					}
-					/*
-					 * No running/scanning VAP was found, so they're all in
-					 * INIT state, no channel change needed
-					 */
-					if (!vap)
-						return;
-					/* Is it really Scanning */
-					/* XXX: Race condition? */
-					if (ic->ic_flags & IEEE80211_F_SCAN)
-						return;
-					/* It is not scanning, but waiting for ath driver to move the vap to RUN */
-				}
-
-				/* Check the scan results using only cached results */
-				if (!(ieee80211_check_scan(vap, IEEE80211_SCAN_NOSSID | IEEE80211_SCAN_KEEPMODE, 0, // IEEE80211_SCAN_USECACHE |
-							   vap->iv_des_nssid, vap->iv_des_ssid,
-							   ieee80211_scan_dfs_action))) {
-					/* No channel was found, so call the scan action with no result */
-					ieee80211_scan_dfs_action(vap, NULL);
-				}
+	if (vap == NULL) {
+		/*
+		 * No running VAP was found, check
+		 * if any one is scanning.
+		 */
+		vap = TAILQ_FIRST(&ic->ic_vaps);
+		while ((vap != NULL) && (vap->iv_state != IEEE80211_S_SCAN) &&
+		       (vap->iv_ic != ic)) {
+			vap = TAILQ_NEXT(vap, iv_next);
+		}
+		/*
+		 * No running/scanning VAP was found, so they're all in
+		 * INIT state, no channel change needed
+		 */
+		if (!vap)
+			return;
+		/* Is it really Scanning */
+		/* XXX: Race condition? */
+		if (ic->ic_flags & IEEE80211_F_SCAN)
+			return;
+		/* It is not scanning, but waiting for ath driver to move the vap to RUN */
+	}
+	/* Check the scan results using only cached results */
+	if (!(ieee80211_check_scan(vap, IEEE80211_SCAN_NOSSID | IEEE80211_SCAN_KEEPMODE | IEEE80211_SCAN_USECACHE, 0, 
+				   vap->iv_des_nssid, vap->iv_des_ssid,
+				   ieee80211_scan_dfs_action))) {
+		/* No channel was found, so call the scan action with no result */
+		ieee80211_scan_dfs_action(vap, NULL);
+	}
 }
 
 void
@@ -897,7 +896,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 #if 0 /* disabled until radar detection algorithm has filtering */
 			/* Change to a radar free 11a channel for dfstesttime seconds */
 			ic->ic_chanchange_chan = IEEE80211_RADAR_TEST_MUTE_CHAN;
-			ic->ic_chanchange_tbtt = IEEE80211_RADAR_11HCOUNT;
+			ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 #endif /* #if 0 -- disabled until radar detection algorithm has filtering */
 
@@ -918,7 +917,7 @@ ieee80211_dfs_test_return(struct ieee80211com *ic, u_int8_t ieeeChan)
 	if_printf(dev, "Returning to channel %d\n", ieeeChan);
 	printk("Returning to chan %d\n", ieeeChan);
 	ic->ic_chanchange_chan = ieeeChan;
-	ic->ic_chanchange_tbtt = IEEE80211_RADAR_11HCOUNT;
+	ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 }
 EXPORT_SYMBOL(ieee80211_dfs_test_return);

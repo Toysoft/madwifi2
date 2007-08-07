@@ -968,58 +968,67 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct net_device *dev = ic->ic_dev;
+	struct ieee80211_channel *new_channel = NULL;
 
-	if (vap->iv_opmode != IEEE80211_M_HOSTAP)
+	if (vap->iv_opmode != IEEE80211_M_HOSTAP &&
+	    vap->iv_opmode != IEEE80211_M_IBSS)
 		return 0;
 	if (se != NULL) {
-		/* A suitable scan entry was found, so change channels */
-		if_printf(dev, "Changing to channel %d (%d MHz)\n",
-			  se->se_chan->ic_ieee,
-			  se->se_chan->ic_freq);
-		if (vap->iv_state == IEEE80211_S_RUN) {
-			ic->ic_chanchange_chan = se->se_chan->ic_ieee;
-			ic->ic_chanchange_tbtt = IEEE80211_RADAR_11HCOUNT;
-			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
-		} else {
-			/* 
-			 * vap is not in run state yet. so
-			 * change the channel here.
-			 */
-			change_channel(ic, se->se_chan);
-			ic->ic_bsschan = se->se_chan;
-			if (vap->iv_bss)
-				vap->iv_bss->ni_chan = se->se_chan;
-		}
+		new_channel = se->se_chan;
 	} else {
 		/* No channel wa found via scan module, means no good scanlist
 		   was found */
 		int chanStart, n = 0;
 		u_int32_t curChanFlags;
 
-		/* Only pick a random channel if we're in RUN state.  In scan 
-		 * state, we don't need to pick a channel
-		 */
-		if (vap->iv_state == IEEE80211_S_RUN) {
-			/* Pick a random channel */
-			chanStart = jiffies % ic->ic_nchans;
-			curChanFlags = (ic->ic_curchan->ic_flags) & ~(IEEE80211_CHAN_RADAR);
-			while (ic->ic_channels[chanStart].ic_flags != curChanFlags) {
-				if (++n >= ic->ic_nchans)
-					break;
-				chanStart++;
-				if (chanStart == ic->ic_nchans)
-					chanStart = 0;
-			}
-			if (n < ic->ic_nchans) {
-				if_printf(dev, "Changing to channel %d (%d MHz)\n",
-					  ic->ic_channels[chanStart].ic_ieee,
-					  ic->ic_channels[chanStart].ic_freq);
-				ic->ic_chanchange_chan = ic->ic_channels[chanStart].ic_ieee;
-				ic->ic_chanchange_tbtt = IEEE80211_RADAR_11HCOUNT;
-				ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+		/* Pick a random channel */
+		chanStart = jiffies % ic->ic_nchans;
+		curChanFlags = (ic->ic_curchan->ic_flags) & ~(IEEE80211_CHAN_RADAR);
+		while (ic->ic_channels[chanStart].ic_flags != curChanFlags) {
+			if (++n >= ic->ic_nchans)
+				break;
+			chanStart++;
+			if (chanStart == ic->ic_nchans)
+				chanStart = 0;
+		}
+		if (n < ic->ic_nchans)
+			new_channel = &ic->ic_channels[n];
+	}
+	if(!new_channel) {
+		int n = 0;
+		for(n = 0; n < ic->ic_nchans; n++) {
+			if(0 == (ic->ic_channels[n].ic_flags & IEEE80211_CHAN_RADAR)) {
+				new_channel = &ic->ic_channels[n];
+				break;
 			}
 		}
 	}
+	if(new_channel) {
+		/* A suitable scan entry was found, so change channels */
+		if_printf(dev, "Changing to channel %d (%d MHz)\n",
+			  new_channel->ic_ieee,
+			  new_channel->ic_freq);
+		if (vap->iv_state == IEEE80211_S_RUN) {
+			ic->ic_chanchange_chan = new_channel->ic_ieee;
+			ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
+			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+		} else {
+			/* 
+			 * vap is not in run state yet. so
+			 * change the channel here.
+			 */
+			change_channel(ic, new_channel);
+			ic->ic_bsschan = new_channel;
+			if (vap->iv_bss)
+				vap->iv_bss->ni_chan = new_channel;
+		}
+	}
+	else {
+		/* A suitable scan entry was found, so change channels */
+		if_printf(dev, "Failed to find a safe channel to change to.\n");
+		return 0;
+	}
+
 	return 1;
 }
 EXPORT_SYMBOL(ieee80211_scan_dfs_action);
