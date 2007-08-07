@@ -93,9 +93,6 @@ install-modules: modules
 	for i in $(DIRS_MODULES); do \
 		$(MAKE) -C $$i install || exit 1; \
 	done
-	mkdir -p $(DESTDIR)/etc/modutils $(DESTDIR)/etc/modprobe.d
-	cp conf/ath_pci $(DESTDIR)/etc/modutils # For 2.4 kernels
-	cp conf/ath_pci $(DESTDIR)/etc/modprobe.d # For 2.6 kernels
 ifeq ($(DESTDIR),)
 	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae $(KERNELRELEASE))
 endif
