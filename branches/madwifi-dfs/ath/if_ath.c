@@ -1491,12 +1491,14 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	struct ath_buf *prev_rxbufcur;
 	u_int8_t tid;
 	u_int16_t frame_seq;
+	u_int64_t hw_tsf;
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
 
 	/* XXXAPSD: build in check against max triggers we could see
 	 *          based on ic->ic_uapsdmaxtriggers. */
+	hw_tsf = ath_hal_gettsf64(ah);
 
 	ATH_RXBUF_LOCK_IRQ(sc);
 	if (sc->sc_rxbufcur == NULL)
@@ -1541,20 +1543,20 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			 * on.  All this is necessary because of our use of
 			 * a self-linked list to avoid rx overruns. */
 			rs = &bf->bf_dsstatus.ds_rxstat;
-			retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), sc->sc_tsf, rs);
+			retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), hw_tsf, rs);
 			if (HAL_EINPROGRESS == retval)
 				break;
 	
-			/* update the per packet TSF with sc_tsf, sc_tsf is updated on
-			   each RX interrupt. */
-			bf->bf_tsf = sc->sc_tsf;
+			/* update the per packet TSF with hw_tsf, hw_tsf is updated on each RX interrupt. 
+			   at the start of this routine. */
+			bf->bf_tsf = hw_tsf;
 			/* If we detect a rollover on rs_tstamp values, then we know that all packets
 			 * we have seen already MUST be decremented by 0x8000 (1<<15) because the last packet
-			 * in the queue is for sc->sc_tsf and any rollover we encounter means prior packets were not
+			 * in the queue is for hw_tsf and any rollover we encounter means prior packets were not
 			 * tagged with correct bf_tsf because of this rollover.  This assumes that when rollover happens, 
 			 * we get packets afterwards.  But, if not, we still have TSF values that do not go backward in time!
 			 */
-			if(rs->rs_tstamp < last_rs_tstamp) {
+			if(rs->rs_tstamp < last_rs_tstamp || ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp) > hw_tsf) {
 				struct ath_buf *p;
 				for (p = sc->sc_rxbufcur; p && p != bf; p = STAILQ_NEXT(p, bf_list))
 					p->bf_tsf -= 0x8000;
@@ -1792,7 +1794,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				continue;
 			}
 			rs = &p->bf_dsstatus.ds_rxstat;
-			retval = ath_hal_rxprocdesc(ah, ds, p->bf_daddr, PA2DESC(sc, ds->ds_link), sc->sc_tsf, rs);
+			retval = ath_hal_rxprocdesc(ah, ds, p->bf_daddr, PA2DESC(sc, ds->ds_link), hw_tsf, rs);
 			if (HAL_EINPROGRESS == retval)
 				break;
 
@@ -1919,7 +1921,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			ath_hal_updatetxtriglevel(ah, AH_TRUE);
 		}
 		if (status & (HAL_INT_RX | HAL_INT_RXPHY)) {
-			sc->sc_tsf = ath_hal_gettsf64(ah);
 			ath_uapsd_processtriggers(sc);
 			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
 		}
