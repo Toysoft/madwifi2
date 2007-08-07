@@ -285,7 +285,6 @@ static void ath_set_txcont_rate(struct ieee80211com *ic, unsigned int new_rate);
 /*
 802.11h DFS support functions
 */
-static int ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc);
 static void ath_dump_phyerr_statistics(struct ath_softc *sc, const char* cause);
 
 static void ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long arg);
@@ -1447,6 +1446,19 @@ ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
 	return 0;
 }
 
+/*
+ * Extend 15-bit time stamp from rx descriptor to
+ * a full 64-bit TSF using the current h/w TSF.
+ */
+/* NB: Not all chipsets return the same precision rstamp */
+static __inline u_int64_t
+ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
+{
+	if ((tsf & 0x7fff) < rstamp)
+		tsf -= 0x8000;
+	return ((tsf &~ 0x7fff) | rstamp);
+}
+
 static void
 ath_uapsd_processtriggers(struct ath_softc *sc)
 {
@@ -1463,6 +1475,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	int ac, retval;
 	u_int8_t tid;
 	u_int16_t frame_seq;
+	int found_radar = 0;
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
@@ -1521,6 +1534,24 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		bf->bf_status |= ATH_BUFSTATUS_DONE;
 
 		/* Errors? */
+		if ((HAL_RXERR_PHY == rs->rs_status)
+		    && (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f))) {
+
+		  /* record the radar pulse event */
+		  ath_radar_pulse_record (sc,
+		    ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp),
+		    rs->rs_rssi, skb->data[0]);
+		  DPRINTF(sc, ATH_DEBUG_DOTH, "RADAR PULSE    interface:%s channel:%u jiffies:%lu fulltsf:%llu tstamp:%u rssi:%u width:%u\n",
+			  DEV_NAME(sc->sc_dev),
+			  sc->sc_curchan.channel,
+			  jiffies,
+			  ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp),
+			  rs->rs_tstamp,
+			  rs->rs_rssi,
+			  skb->data[0]);
+		  found_radar = 1;
+		}
+
 		if (rs->rs_status)
 			continue;
 
@@ -1719,6 +1750,11 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	sc->sc_rxbufcur = bf;
 	ATH_RXBUF_UNLOCK_IRQ(sc);
 #undef PA2DESC
+
+	/* radar pulses have been found, look if it match a radar pattern */
+	if (found_radar) {
+		ATH_SCHEDULE_TQUEUE(&sc->sc_radartq, NULL);
+	}
 }
 
 /*
@@ -1761,7 +1797,15 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 * value to ensure we only process bits we requested.
 	 */
 	ath_hal_getisr(ah, &status);		/* NB: clears ISR too */
-	DPRINTF(sc, ATH_DEBUG_INTR, "%s: status 0x%x\n", __func__, status);
+	DPRINTF(sc, ATH_DEBUG_INTR,
+		"%s: status 0x%x%s%s%s%s%s%s\n", __func__, status,
+		(status & HAL_INT_RX)      ? " HAL_INT_RX"      : "",
+		(status & HAL_INT_RXNOFRM) ? " HAL_INT_RXNOFRM" : "",
+		(status & HAL_INT_TX)      ? " HAL_INT_TX"      : "",
+		(status & HAL_INT_MIB)     ? " HAL_INT_MIB"     : "",
+		(status & HAL_INT_RXPHY)   ? " HAL_INT_RXPHY"   : "",
+		(status & HAL_INT_SWBA)    ? " HAL_INT_SWBA"    : "");
+
 	status &= sc->sc_imask;			/* discard unasked for bits */
 	if (status & HAL_INT_FATAL) {
 		sc->sc_stats.ast_hardware++;
@@ -1803,14 +1847,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			/* bump tx trigger level */
 			ath_hal_updatetxtriglevel(ah, AH_TRUE);
 		}
-		if (status & HAL_INT_RX) {
+		if (status & (HAL_INT_RX|HAL_INT_RXPHY)) {
 			sc->sc_tsf = ath_hal_gettsf64(ah);
 			ath_uapsd_processtriggers(sc);
-			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
-		}
-		if (status & HAL_INT_RXPHY) {
-			sc->sc_tsf = ath_hal_gettsf64(ah);
-			ath_intr_detect_radar_phyerr_in_rx_queue(sc);
 			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
 		}
 		if (status & HAL_INT_TX) {
@@ -2016,7 +2055,7 @@ ath_init(struct net_device *dev)
 	/* Enable interrupts. */
 	sc->sc_imask = HAL_INT_RX | HAL_INT_TX
 		  | HAL_INT_RXEOL | HAL_INT_RXORN
-		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
+	          | HAL_INT_FATAL | HAL_INT_GLOBAL;
 	/*
 	 * Enable MIB interrupts when there are hardware phy counters.
 	 * Note we only do this (at the moment) for station mode.
@@ -5454,19 +5493,6 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 		*sc->sc_rxlink = bf->bf_daddr;
 	sc->sc_rxlink = &ds->ds_link;
 	return 0;
-}
-
-/*
- * Extend 15-bit time stamp from rx descriptor to
- * a full 64-bit TSF using the current h/w TSF.
- */
-/* NB: Not all chipsets return the same precision rstamp */
-static __inline u_int64_t
-ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
-{
-	if ((tsf & 0x7fff) < rstamp)
-		tsf -= 0x8000;
-	return ((tsf &~ 0x7fff) | rstamp);
 }
 
 /*
@@ -10817,99 +10843,6 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: markdfs is disabled.  "
 				"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X\n", 
 				DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
-}
-
-/* This function executes in interrupt context and is used when the 
- * HAL_INT_RXPHY interrupt occurs.  We are specifically looking to see if ANY 
- * pending errors in the queue are for radar, and thus react to them before 
- * their time normally occurs during rx_tasklet.
- *
- * We will not mark those buffers as done which we found radar in, so that we 
- * will still see them in the rx tasklet and such, so we can get normal 
- * behavior for statistics even though we may have started DFS radar 
- * co-channel avoidance ecountermeasures. */
-
-static int
-ath_intr_detect_radar_phyerr_in_rx_queue(struct ath_softc *sc)
-{
-	struct ath_hal *ah = sc->sc_ah;
-	struct ath_buf *bf;
-	struct ath_desc *ds;
-	struct sk_buff *skb;
-	struct ath_rx_status *rs;
-	unsigned int found_radar = 0;
-	HAL_BOOL retval = AH_FALSE;
-
-#define	PA2DESC(_sc, _pa) \
-	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
-		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
-
-	ATH_RXBUF_LOCK_IRQ(sc);
-	for (bf = sc->sc_rxbufcur ? sc->sc_rxbufcur : STAILQ_FIRST(&sc->sc_rxbuf); bf; bf = STAILQ_NEXT(bf, bf_list)) {
-		ds = bf->bf_desc;
-		if (ds->ds_link == bf->bf_daddr) {
-			break;
-		}
-		if (bf->bf_status & ATH_BUFSTATUS_DONE) {
-			continue;
-		}
-		/*  We don't want to process this request twice... */
-		if (bf->bf_status & ATH_BUFSTATUS_RADAR_DONE) {
-			continue;
-		}
-		skb = bf->bf_skb;
-		if (skb == NULL) {
-			printk(KERN_ERR "%s: no skbuff\n", __func__);
-			continue;
-		}
-		rs = &bf->bf_dsstatus.ds_rxstat;
-		retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, 
-				PA2DESC(sc, ds->ds_link), sc->sc_tsf, rs);
-		if (HAL_EINPROGRESS == retval)
-			break;
-
-		/* update the per packet TSF with sc_tsf, sc_tsf is updated on
-		   each RX interrupt. */
-		bf->bf_tsf = sc->sc_tsf;
-
-		if ((HAL_RXERR_PHY == rs->rs_status) && (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f))) {
-
-		  /* record the radar pulse event */
-		  ath_radar_pulse_record (sc,
-		    ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp),
-		    rs->rs_rssi, skb->data[0]);
-
-			/* XXX: This diagnostic output and setting
-			 * found_radar flag are a temporary
-			 * solution. The correct solution is to
-			 * capture radar pulse events over time and
-			 * perform analysis of the patterns detected
-			 * to figure out noise from radar bursts. */
-
-		  DPRINTF(sc, ATH_DEBUG_DOTH, "RADAR PULSE    interface:%s channel:%u jiffies:%lu fulltsf:%llu tstamp:%u rssi:%u width:%u\n",
-			  DEV_NAME(sc->sc_dev),
-			  sc->sc_curchan.channel,
-			  jiffies,
-			  ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp),
-			  rs->rs_tstamp,
-			  rs->rs_rssi,
-			  skb->data[0]);
-		  found_radar ++;
-		  sc->sc_lastradar_tsf = ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp);
-			bf->bf_status |= ATH_BUFSTATUS_RADAR_DONE;
-			continue;
-		}
-		continue;
-	}
-	ATH_RXBUF_UNLOCK_IRQ(sc);
-
-	/* radar pulses have been found, look if it match a radar pattern */
-	if (found_radar) {
-		ATH_SCHEDULE_TQUEUE(&sc->sc_radartq, NULL);
-	}
-
-	return found_radar;
-#undef PA2DESC
 }
 
 /* This is helpful for comparing OFDM timing vs radar event occurrances */
