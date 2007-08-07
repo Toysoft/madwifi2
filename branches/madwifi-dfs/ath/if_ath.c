@@ -1462,10 +1462,11 @@ ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
 	return 0;
 }
 
-/*
- * Extend 15-bit time stamp from rx descriptor to
- * a full 64-bit TSF using the current h/w TSF.
- */
+
+/* Extend 15-bit time stamp from rx descriptor to a full 64-bit TSF
+ * using the current h/w TSF. We no longer make an adjustement since
+ * tsf should always be bf_tsf and bf_tsf is adjusted. */
+
 /* NB: Not all chipsets return the same precision rstamp */
 static __inline u_int64_t
 ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
@@ -1556,12 +1557,22 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			 * tagged with correct bf_tsf because of this rollover.  This assumes that when rollover happens, 
 			 * we get packets afterwards.  But, if not, we still have TSF values that do not go backward in time!
 			 */
-			if(rs->rs_tstamp < last_rs_tstamp || ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp) > hw_tsf) {
+			if (rs->rs_tstamp < last_rs_tstamp) {
 				struct ath_buf *p;
 				for (p = sc->sc_rxbufcur; p && p != bf; p = STAILQ_NEXT(p, bf_list))
 					p->bf_tsf -= 0x8000;
 			}
 			last_rs_tstamp = rs->rs_tstamp;
+
+			/* We can detect another rollover on the last packet */
+			if (STAILQ_NEXT(bf, bf_list) != NULL) {
+			  if (ath_extend_tsf(bf->bf_tsf,
+					     rs->rs_tstamp) > hw_tsf) {
+			    struct ath_buf *p;
+			    for (p = sc->sc_rxbufcur; p; p = STAILQ_NEXT(p, bf_list))
+			      p->bf_tsf -= 0x8000;
+			  }
+			}
 	
 			/* XXX: We do not support frames spanning multiple descriptors */
 			bf->bf_status |= ATH_BUFSTATUS_DONE;
