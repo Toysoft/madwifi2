@@ -728,7 +728,6 @@ struct ath_softc {
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
 	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
-	u_int64_t sc_tsf;			/* TSF at last rx interrupt */
 
 	u_int64_t sc_lastradar_tsf;				/* TSF at last detected radar pulse */
 	u_int32_t sc_dfs_channel_availability_check_time;	/* DFS wait time before accessing a
