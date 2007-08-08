@@ -1565,7 +1565,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			last_rs_tstamp = rs->rs_tstamp;
 
 			/* We can detect another rollover on the last packet */
-			if (STAILQ_NEXT(bf, bf_list) != NULL) {
+			if (STAILQ_NEXT(bf, bf_list) == NULL) {
 			  if (ath_extend_tsf(bf->bf_tsf,
 					     rs->rs_tstamp) > hw_tsf) {
 			    struct ath_buf *p;
