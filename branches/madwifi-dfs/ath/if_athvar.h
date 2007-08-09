@@ -742,7 +742,7 @@ struct ath_softc {
 	struct ath_radar_pulse * sc_radar_pulse_mem;
 	struct list_head sc_radar_pulse_head;
 	int sc_radar_pulse_nr;
-	int sc_radar_pulse_minimum_to_match;
+	int sc_radar_pulse_min_to_match;
 	HAL_BOOL (*sc_radar_pulse_analyze)(struct ath_softc *sc);
 	struct ATH_TQ_STRUCT sc_radartq;
 };

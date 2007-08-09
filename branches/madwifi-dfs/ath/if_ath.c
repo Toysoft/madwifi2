@@ -1433,20 +1433,24 @@ ath_resume(struct net_device *dev)
 
 static int
 ath_total_radio_silence_required_for_dfs(struct ath_softc* sc) {
-	// ((sc->sc_curchan.privFlags & CHANNEL_DFS) && (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE));
 	return sc->sc_dfs_channel_check;
 }
 
 static int
 ath_radio_silence_required_for_dfs(struct ath_softc* sc) {
-	return sc->sc_dfs_channel_check || ((sc->sc_curchan.privFlags & CHANNEL_DFS) && (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE));
+	return sc->sc_dfs_channel_check || 
+		((sc->sc_curchan.privFlags & CHANNEL_DFS) && 
+		 (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE));
 }
 
 static int
-ath_check_total_radio_silence_not_required(struct ath_softc *sc, const char* func) {
+ath_check_total_radio_silence_not_required(struct ath_softc *sc, 
+					   const char* func) {
 	struct net_device* dev = sc->sc_dev;
 	if (ath_total_radio_silence_required_for_dfs(sc)) {
-		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: ERROR: Invoked a transmit function during DFS channel availability check!\n", DEV_NAME(dev), func);
+		DPRINTF(sc, ATH_DEBUG_DOTH, 
+			"%s: %s: ERROR: Invoked a transmit function during DFS "
+			"channel availability check!\n", DEV_NAME(dev), func);
 		return 1;
 	}
 	return 0;
@@ -1456,7 +1460,10 @@ static int
 ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
 	struct net_device* dev = sc->sc_dev;
 	if (ath_radio_silence_required_for_dfs(sc)) {
-		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: ERROR: Invoked a transmit function during DFS channel availability check OR while radar interference is detected!\n", DEV_NAME(dev), func);
+		DPRINTF(sc, ATH_DEBUG_DOTH, 
+			"%s: %s: ERROR: Invoked a transmit function during DFS "
+			"channel availability check OR while radar interference"
+			" is detected!\n", DEV_NAME(dev), func);
 		return 1;
 	}
 	return 0;
@@ -1512,24 +1519,26 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		for (bf = prev_rxbufcur; bf; bf = STAILQ_NEXT(bf, bf_list)) {
 			ds = bf->bf_desc;
 			if (ds->ds_link == bf->bf_daddr) {
-				/* NB: never process the self-linked entry at the end */
+				/* NB: never process the self-linked entry at 
+				 * the end */
 				break;
 			}
 			if (bf->bf_status & ATH_BUFSTATUS_DONE) {
-				/* already processed this buffer (shouldn't occur if
-				 * we change code to always process descriptors in
-				 * rx intr handler - as opposed to sometimes processing
-				 * in the rx tasklet). */
+				/* already processed this buffer (shouldn't 
+				 * occur if we change code to always process 
+				 * descriptors in rx intr handler - as opposed 
+				 * to sometimes processing in the rx tasklet) */
 				continue;
 			}
 			skb = bf->bf_skb;
-			if (skb == NULL) {		/* XXX ??? can this happen */
+			if (skb == NULL) {
 				printk("%s: no skbuff\n", __func__);
 				continue;
 			}
 	
-			/* XXXAPSD: consider new HAL call that does only the subset
-			 *          of ath_hal_rxprocdesc we require for trigger search. */
+			/* XXXAPSD: consider new HAL call that does only the 
+			 *          subset of ath_hal_rxprocdesc we require 
+			 *          for trigger search. */
 	
 			/* NB: descriptor memory doesn't need to be sync'd
 			 *     due to the way it was allocated. */
@@ -1544,43 +1553,48 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			 * on.  All this is necessary because of our use of
 			 * a self-linked list to avoid rx overruns. */
 			rs = &bf->bf_dsstatus.ds_rxstat;
-			retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), hw_tsf, rs);
+			retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, 
+						    PA2DESC(sc, ds->ds_link), 
+						    hw_tsf, rs);
 			if (HAL_EINPROGRESS == retval)
 				break;
 	
-			/* update the per packet TSF with hw_tsf, hw_tsf is updated on each RX interrupt. 
-			   at the start of this routine. */
+			/* update the per packet TSF with hw_tsf, hw_tsf is 
+			 * updated on each RX interrupt, at the start of this 
+			 * routine. */
 			bf->bf_tsf = hw_tsf;
-			/* If we detect a rollover on rs_tstamp values, then we know that all packets
-			 * we have seen already MUST be decremented by 0x8000 (1<<15) because the last packet
-			 * in the queue is for hw_tsf and any rollover we encounter means prior packets were not
-			 * tagged with correct bf_tsf because of this rollover.  This assumes that when rollover happens, 
-			 * we get packets afterwards.  But, if not, we still have TSF values that do not go backward in time!
+			/* If we detect a rollover on rs_tstamp values, then we 
+			 * know that all packets we have seen already MUST be 
+			 * decremented by 0x8000 (1<<15) because the last packet
+			 * in the queue is for hw_tsf and any rollover we 
+			 * encounter means prior packets were not tagged with 
+			 * correct bf_tsf because of this rollover.  This 
+			 * assumes that when rollover happens, we get packets 
+			 * afterwards.  But, if not, we still have TSF values 
+			 * that do not go backward in time!
 			 */
-			if (rs->rs_tstamp < last_rs_tstamp) {
-				struct ath_buf *p;
-				for (p = sc->sc_rxbufcur; p && p != bf; p = STAILQ_NEXT(p, bf_list))
+			if (rs->rs_tstamp < last_rs_tstamp || 
+			    (STAILQ_NEXT(bf, bf_list) == NULL && 
+			     ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp) > 
+			     hw_tsf)) {
+				/* Adjust TSF of this and all prior packets */
+				struct ath_buf *p = sc->sc_rxbufcur;
+				for (;p && p != bf; p = STAILQ_NEXT(p, bf_list))
 					p->bf_tsf -= 0x8000;
 			}
-			last_rs_tstamp = rs->rs_tstamp;
 
-			/* We can detect another rollover on the last packet */
-			if (STAILQ_NEXT(bf, bf_list) == NULL) {
-			  if (ath_extend_tsf(bf->bf_tsf,
-					     rs->rs_tstamp) > hw_tsf) {
-			    struct ath_buf *p;
-			    for (p = sc->sc_rxbufcur; p; p = STAILQ_NEXT(p, bf_list))
-			      p->bf_tsf -= 0x8000;
-			  }
-			}
+			last_rs_tstamp = rs->rs_tstamp;
 	
-			/* XXX: We do not support frames spanning multiple descriptors */
+			/* XXX: We do not support frames spanning multiple 
+			 *      descriptors */
 			bf->bf_status |= ATH_BUFSTATUS_DONE;
 	
-			/* Errors?  */
 			if (rs->rs_status) {
-				if ((HAL_RXERR_PHY == rs->rs_status) && (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f)) &&
-				    0 == (bf->bf_status & ATH_BUFSTATUS_RADAR_DONE)) {		
+				if ((HAL_RXERR_PHY == rs->rs_status) && 
+				    (HAL_PHYERR_RADAR == 
+				     (rs->rs_phyerr & 0x1f)) &&
+				    (0 == (bf->bf_status & 
+					   ATH_BUFSTATUS_RADAR_DONE))) {
 					check_for_radar = 1;
 				}
 				/* Skip past the error now */
@@ -1597,18 +1611,22 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			if (rs->rs_keyix == HAL_RXKEYIX_INVALID ||
 			    (ni = sc->sc_keyixmap[rs->rs_keyix]) == NULL) {
 				/* 
-				 * XXX: this can occur if WEP mode is used for non-Atheros clients
-				 *      (since we do not know which of the 4 WEP keys will be used
-				 *      at association time, so cannot setup a key-cache entry.
-				 *      The Atheros client can convey this in the Atheros IE.)
+				 * XXX: this can occur if WEP mode is used for 
+				 *      non-Atheros clients (since we do not 
+				 *      know which of the 4 WEP keys will be 
+				 *      used at association time, so cannot 
+				 *      setup a key-cache entry.
+				 *      The Atheros client can convey this in 
+				 *      the Atheros IE.)
 				 *
-				 * TODO: The fix is to use the hash lookup on the node here.
+				 *      The fix is to use the hash lookup on 
+				 *      the node here.
 				 */
-	#if 0
+#if 0
 				/* This print is very chatty, so removing for now. */
 				DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: U-APSD node (%s) has invalid keycache entry\n",
 					__func__, ether_sprintf(qwh->i_addr2));
-	#endif
+#endif
 				continue;
 			}
 	
@@ -1616,18 +1634,21 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				continue;
 	
 			/* 
-			 * Must deal with change of state here, since otherwise there would
-			 * be a race (on two quick frames from STA) between this code and the
-			 * tasklet where we would:
-			 *   - miss a trigger on entry to PS if we're already trigger hunting
-			 *   - generate spurious SP on exit (due to frame following exit frame)
+			 * Must deal with change of state here, since otherwise 
+			 * there would be a race (on two quick frames from STA) 
+			 * between this code and the tasklet where we would:
+			 *   - miss a trigger on entry to PS if we're already 
+			 *     trigger hunting
+			 *   - generate spurious SP on exit (due to frame 
+			 *     following exit frame)
 			 */
 			if (((qwh->i_fc[1] & IEEE80211_FC1_PWR_MGT) ^
 			     (ni->ni_flags & IEEE80211_NODE_PWR_MGT))) {
 				/*
-				 * NB: do not require lock here since this runs at intr
-				 * "proper" time and cannot be interrupted by RX tasklet
-				 * (code there has lock). May want to place a macro here
+				 * NB: do not require lock here since this runs 
+				 * at intr "proper" time and cannot be 
+				 * interrupted by RX tasklet (code there has 
+				 * lock). May want to place a macro here
 				 * (that does nothing) to make this more clear.
 				 */
 				ni->ni_flags |= IEEE80211_NODE_PS_CHANGED;
@@ -1635,27 +1656,34 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				ni->ni_flags &= ~IEEE80211_NODE_UAPSD_SP;
 				ni->ni_flags ^= IEEE80211_NODE_PWR_MGT;
 				if (qwh->i_fc[1] & IEEE80211_FC1_PWR_MGT) {
-					ni->ni_flags |= IEEE80211_NODE_UAPSD_TRIG;
+					ni->ni_flags |= 
+						IEEE80211_NODE_UAPSD_TRIG;
 					ic->ic_uapsdmaxtriggers++;
 					WME_UAPSD_NODE_TRIGSEQINIT(ni);
 					DPRINTF(sc, ATH_DEBUG_UAPSD,
-						"%s: Node (%s) became U-APSD triggerable (%d)\n",
-						__func__, ether_sprintf(qwh->i_addr2),
+						"%s: Node (%s) became U-APSD "
+						"triggerable (%d)\n",
+						__func__, 
+						ether_sprintf(qwh->i_addr2),
 						ic->ic_uapsdmaxtriggers);
 				} else {
-					ni->ni_flags &= ~IEEE80211_NODE_UAPSD_TRIG;
+					ni->ni_flags &= 
+						~IEEE80211_NODE_UAPSD_TRIG;
 					ic->ic_uapsdmaxtriggers--;
 					DPRINTF(sc, ATH_DEBUG_UAPSD,
-						"%s: Node (%s) no longer U-APSD triggerable (%d)\n",
-						__func__, ether_sprintf(qwh->i_addr2),
+						"%s: Node (%s) no longer U-APSD"
+						" triggerable (%d)\n",
+						__func__, 
+						ether_sprintf(qwh->i_addr2),
 						ic->ic_uapsdmaxtriggers);
 					/* 
 					 * XXX: Rapidly thrashing sta could get 
-					 * out-of-order frames due this flush placing
-					 * frames on backlogged regular AC queue and
-					 * re-entry to PS having fresh arrivals onto
-					 * faster UPSD delivery queue. if this is a
-					 * big problem we may need to drop these.
+					 * out-of-order frames due this flush 
+					 * placing frames on backlogged regular 
+					 * AC queue and re-entry to PS having 
+					 * fresh arrivals onto faster UPSD 
+					 * delivery queue. if this is a big 
+					 * problem we may need to drop these.
 					 */
 					ath_uapsd_flush(ni);
 				}
@@ -1666,15 +1694,16 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			if (ic->ic_uapsdmaxtriggers == 0)
 				continue;
 	
-			/* If we are supposed to be not listening or transmitting, don't do uapsd triggers */
+			/* If we are supposed to be not listening or 
+			 * transmitting, don't do uapsd triggers */
 			if (!ath_check_radio_silence_not_required(sc, __func__)) {
-	
 				/* make sure the frame is QoS data/null */
 				/* NB: with current sub-type definitions, the 
-				 * IEEE80211_FC0_SUBTYPE_QOS check, below, covers the 
-				 * QoS null case too.
+				 * IEEE80211_FC0_SUBTYPE_QOS check, below, 
+				 * covers the QoS null case too.
 				 */
-				if (((qwh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA) ||
+				if (((qwh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != 
+				     IEEE80211_FC0_TYPE_DATA) ||
 				     !(qwh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS))
 					continue;
 	
@@ -1689,12 +1718,16 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 					continue;
 	
 				DPRINTF(sc, ATH_DEBUG_UAPSD,
-					"%s: U-APSD trigger detected for node (%s) on AC %d\n",
-					__func__, ether_sprintf(ni->ni_macaddr), ac);
+					"%s: U-APSD trigger detected for node "
+					"(%s) on AC %d\n",
+					__func__, 
+					ether_sprintf(ni->ni_macaddr), ac);
 				if (ni->ni_flags & IEEE80211_NODE_UAPSD_SP) {
-					/* have trigger, but SP in progress, so ignore */
+					/* have trigger, but SP in progress, 
+					 * so ignore */
 					DPRINTF(sc, ATH_DEBUG_UAPSD,
-						"%s:   SP already in progress - ignoring\n",
+						"%s:   SP already in progress -"
+						" ignoring\n",
 						__func__);
 					continue;
 				}
@@ -1705,7 +1738,9 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				frame_seq = le16toh(*(__le16 *)qwh->i_seq);
 				if ((qwh->i_fc[1] & IEEE80211_FC1_RETRY) &&
 				    frame_seq == ni->ni_uapsd_trigseq[ac]) {
-					DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: dropped dup trigger, ac %d, seq %d\n",
+					DPRINTF(sc, ATH_DEBUG_UAPSD, 
+						"%s: dropped dup trigger, ac %d"
+						", seq %d\n",
 						__func__, ac, frame_seq);
 					continue;
 				}
@@ -1722,25 +1757,34 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				ATH_TXQ_LOCK_IRQ(uapsd_xmit_q);
 				if (STAILQ_EMPTY(&an->an_uapsd_q)) {
 					DPRINTF(sc, ATH_DEBUG_UAPSD,
-						"%s: Queue empty, generating QoS NULL to send\n",
+						"%s: Queue empty, generating "
+						"QoS NULL to send\n",
 						__func__);
 					/* 
-					 * Empty queue, so need to send QoS null on this ac. Make a
-					 * call that will dump a QoS null onto the node's queue, then
-					 * we can proceed as normal.
+					 * Empty queue, so need to send QoS null 
+					 * on this ac. Make a call that will 
+					 * dump a QoS null onto the node's 
+					 * queue, then we can proceed as normal.
 					 */
 					ieee80211_send_qosnulldata(ni, ac);
 				}
 	
 				if (STAILQ_FIRST(&an->an_uapsd_q)) {
-					struct ath_buf *last_buf = STAILQ_LAST(&an->an_uapsd_q, ath_buf, bf_list);
-					struct ath_desc *last_desc = last_buf->bf_desc;
-					struct ieee80211_qosframe *qwhl = (struct ieee80211_qosframe *)last_buf->bf_skb->data;
+					struct ath_buf *last_buf = 
+						STAILQ_LAST(&an->an_uapsd_q, 
+							    ath_buf, bf_list);
+					struct ath_desc *last_desc = 
+						last_buf->bf_desc;
+					struct ieee80211_qosframe *qwhl = 
+						(struct ieee80211_qosframe *)
+						last_buf->bf_skb->data;
 					/* 
-					 * NB: flip the bit to cause intr on the EOSP desc,
-					 * which is the last one
+					 * NB: flip the bit to cause intr on the 
+					 * EOSP desc, which is the last one
 					 */
-					ath_hal_txreqintrdesc(sc->sc_ah, last_desc);
+					ath_hal_txreqintrdesc(sc->sc_ah, 
+							      last_desc);
+
 					qwhl->i_qos[0] |= IEEE80211_QOS_EOSP;
 	
 					if (IEEE80211_VAP_EOSPDROP_ENABLED(ni->ni_vap)) {
@@ -1750,29 +1794,39 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	
 					/* more data bit only for EOSP frame */
 					if (an->an_uapsd_overflowqdepth)
-						qwhl->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
+						qwhl->i_fc[1] |= 
+							IEEE80211_FC1_MORE_DATA;
 					else if (IEEE80211_NODE_UAPSD_USETIM(ni))
 						ni->ni_vap->iv_set_tim(ni, 0);
 	
-					ni->ni_stats.ns_tx_uapsd += an->an_uapsd_qdepth;
+					ni->ni_stats.ns_tx_uapsd += 
+						an->an_uapsd_qdepth;
 	
-					bus_dma_sync_single(sc->sc_bdev, last_buf->bf_skbaddr,
-						sizeof(*qwhl), BUS_DMA_TODEVICE);
+					bus_dma_sync_single(sc->sc_bdev, 
+							    last_buf->bf_skbaddr,
+							    sizeof(*qwhl), 
+							    BUS_DMA_TODEVICE);
 	
 					if (uapsd_xmit_q->axq_link) {
-		#ifdef AH_NEED_DESC_SWAP
-						*uapsd_xmit_q->axq_link = cpu_to_le32(STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr);
-		#else
-						*uapsd_xmit_q->axq_link = STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr;
-		#endif
+#ifdef AH_NEED_DESC_SWAP
+						*uapsd_xmit_q->axq_link = 
+							cpu_to_le32(STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr);
+#else
+						*uapsd_xmit_q->axq_link = 
+							STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr;
+#endif
 					}
 					/* below leaves an_uapsd_q NULL */
-					STAILQ_CONCAT(&uapsd_xmit_q->axq_q, &an->an_uapsd_q);
-					uapsd_xmit_q->axq_link = &last_desc->ds_link;
+					STAILQ_CONCAT(&uapsd_xmit_q->axq_q, 
+						      &an->an_uapsd_q);
+					uapsd_xmit_q->axq_link = 
+						&last_desc->ds_link;
 					ath_hal_puttxbuf(sc->sc_ah,
 						uapsd_xmit_q->axq_qnum,
 						(STAILQ_FIRST(&uapsd_xmit_q->axq_q))->bf_daddr);
-					ath_hal_txstart(sc->sc_ah, uapsd_xmit_q->axq_qnum);
+
+					ath_hal_txstart(sc->sc_ah, 
+							uapsd_xmit_q->axq_qnum);
 				}
 				an->an_uapsd_qdepth = 0;
 				ATH_TXQ_UNLOCK_IRQ(uapsd_xmit_q);
@@ -1780,48 +1834,56 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		}
 		sc->sc_rxbufcur = bf;
 	}
-	/* OPTIONAL SECOND PASS - PROCESS RADAR, WITH ADJUSTED TSF DATA */
+	/* Process radar after we have done everything else */
 	if (check_for_radar) {
 		/* Collect pulse events */
 		struct ath_buf *p;
 		for (p = prev_rxbufcur; p; p = STAILQ_NEXT(p, bf_list)) {
 			ds = p->bf_desc;
-			if (ds->ds_link == p->bf_daddr) {
-				/* NB: never process the self-linked entry at the end */
+
+			/* NB: never process the self-linked entry at end */
+			if (ds->ds_link == p->bf_daddr)
 				break;
-			}
-			if (0 == (p->bf_status & ATH_BUFSTATUS_DONE)) {
-				/* should have already been processed, above */
+			/* should have already been processed, above */
+			if (0 == (p->bf_status & ATH_BUFSTATUS_DONE))
 				continue;
-			}
-			if (p->bf_status & ATH_BUFSTATUS_RADAR_DONE) {
-				/* should not have already been processed for radar */
+			/* should not have already been processed for radar */
+			if (p->bf_status & ATH_BUFSTATUS_RADAR_DONE)
 				continue;
-			}			
-			
 			skb = p->bf_skb;
-			if (skb == NULL) {		/* XXX ??? can this happen */
-				printk("%s: no skbuff\n", __func__);
+			if (skb == NULL) 
 				continue;
-			}
 			rs = &p->bf_dsstatus.ds_rxstat;
-			retval = ath_hal_rxprocdesc(ah, ds, p->bf_daddr, PA2DESC(sc, ds->ds_link), hw_tsf, rs);
+			retval = ath_hal_rxprocdesc(ah, ds, p->bf_daddr, 
+						    PA2DESC(sc, ds->ds_link), 
+						    hw_tsf, rs);
 			if (HAL_EINPROGRESS == retval)
 				break;
-
-			if ((HAL_RXERR_PHY == rs->rs_status) && (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f)) &&
-			    0 == (p->bf_status & ATH_BUFSTATUS_RADAR_DONE)) {		
+			if ((HAL_RXERR_PHY == rs->rs_status) && 
+			    (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f)) &&
+			    (0 == (p->bf_status & ATH_BUFSTATUS_RADAR_DONE))) {		
 				/* record the radar pulse event */
-				ath_radar_pulse_record (sc, 
-							ath_extend_tsf(p->bf_tsf, rs->rs_tstamp),
-							rs->rs_rssi, skb->data[0], 0 /* not simulated */);
+				ath_radar_pulse_record (
+					sc, 
+					ath_extend_tsf(p->bf_tsf, rs->
+						       rs_tstamp),
+					rs->rs_rssi, 
+					skb->data[0], 
+					0 /* not simulated */);
 #if 0
-				DPRINTF(sc, ATH_DEBUG_DOTH, "RADAR PULSE interface:%s channel:%u jiffies:%lu fulltsf:%llu fulltsf_high49:%llu tstamp:%u bf_tsf:%llu bf_tsf_high49:%llu bf_tsf_low15:%llu rssi:%u width:%u\n",
+				DPRINTF(sc, ATH_DEBUG_DOTH, 
+					"RADAR PULSE interface:%s channel:%u "
+					"jiffies:%lu fulltsf:%llu "
+					"fulltsf_high49:%llu tstamp:%u "
+					"bf_tsf:%llu bf_tsf_high49:%llu "
+					"bf_tsf_low15:%llu rssi:%u width:%u\n",
 					DEV_NAME(sc->sc_dev),
 					sc->sc_curchan.channel,
 					jiffies,
-					ath_extend_tsf(p->bf_tsf, rs->rs_tstamp),
-					ath_extend_tsf(p->bf_tsf, rs->rs_tstamp) &~ 0x7fff,
+					ath_extend_tsf(p->bf_tsf, 
+						       rs->rs_tstamp),
+					ath_extend_tsf(p->bf_tsf, 
+						       rs->rs_tstamp) &~ 0x7fff,
 					rs->rs_tstamp,
 					p->bf_tsf,
 					p->bf_tsf &~ 0x7fff, 
@@ -1829,11 +1891,14 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 					rs->rs_rssi,
 					skb->data[0]);
 #endif
-				sc->sc_lastradar_tsf = ath_extend_tsf(p->bf_tsf, rs->rs_tstamp);
+				sc->sc_lastradar_tsf = 
+					ath_extend_tsf(p->bf_tsf, 
+						       rs->rs_tstamp);
 				p->bf_status |= ATH_BUFSTATUS_RADAR_DONE;
 			}
 		}
-		/* radar pulses have been found, check them against known patterns */
+		/* radar pulses have been found, 
+		 * check them against known patterns */
 		ATH_SCHEDULE_TQUEUE(&sc->sc_radartq, NULL);
 	}
 
@@ -1915,7 +1980,8 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			else {
 				sc->sc_beacons = 0;
 				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
-				ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
+				ath_hal_intrset(ah, ath_hal_intrget(ah) & 
+					~(HAL_INT_SWBA | HAL_INT_BMISS));
 			}
 		}
 		if (status & HAL_INT_RXEOL) {
@@ -1968,7 +2034,8 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			else {
 				sc->sc_beacons = 0;
 				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
-				ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
+				ath_hal_intrset(ah, ath_hal_intrget(ah) & 
+					~(HAL_INT_SWBA | HAL_INT_BMISS));
 			}
 		}
 		if (status & HAL_INT_MIB) {
