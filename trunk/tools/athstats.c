@@ -325,7 +325,7 @@ main(int argc, char *argv[])
 		}
 		fflush(stdout);
 		sigemptyset(&nmask);
-		sigaddset(&nmask,SIGALRM);
+		sigaddset(&nmask, SIGALRM);
 		sigprocmask(SIG_BLOCK, &nmask, &omask);
 		sigemptyset(&nmask);
 		if (!signalled)

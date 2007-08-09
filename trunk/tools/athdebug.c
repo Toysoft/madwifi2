@@ -79,6 +79,10 @@ enum {
 	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
 	ATH_DEBUG_UAPSD		= 0x00800000,	/* uapsd */
 	ATH_DEBUG_DOTH		= 0x01000000,	/* 11.h */
+	ATH_DEBUG_DOTHFILT	= 0x02000000,	/* 11.h radar pulse analysis */
+	ATH_DEBUG_DOTHFILTVBSE	= 0x04000000,	/* 11.h radar pulse analysis - verbose */
+	ATH_DEBUG_DOTHFILTNOSC  = 0x08000000,	/* 11.h radar pulse analysis - don't short circuit analysis when detected */
+	ATH_DEBUG_DOTHPULSES    = 0x10000000,   /* 11.h radar pulse events */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
@@ -88,29 +92,33 @@ static struct {
 	u_int bit;
 	const char *desc;
 } flags[] = {
-	{ "xmit",	ATH_DEBUG_XMIT, "transmission of packets before out to HW"},
-	{ "xmit_desc",	ATH_DEBUG_XMIT_DESC, "transmit descriptors" },
-	{ "recv",	ATH_DEBUG_RECV, "received packets directly from HW" },
-	{ "recv_desc",	ATH_DEBUG_RECV_DESC, "recv descriptors" },
-	{ "rate",	ATH_DEBUG_RATE, "rate control modules" },
-	{ "reset",	ATH_DEBUG_RESET, "reset processing and initialization" },
-	{ "mode",	ATH_DEBUG_MODE, "mode initialization and changes" },
-	{ "beacon",	ATH_DEBUG_BEACON, "beacon handling" },
-	{ "watchdog",	ATH_DEBUG_WATCHDOG, "watchdog timer" },
-	{ "intr",	ATH_DEBUG_INTR, "interrupt processing" },
-	{ "xmit_proc",	ATH_DEBUG_TX_PROC, "processing of transmit descriptors" },
-	{ "recv_proc",	ATH_DEBUG_RX_PROC, "processing of receive descriptors" },
-	{ "beacon_proc",ATH_DEBUG_BEACON_PROC, "beacon processing" },
-	{ "calibrate",	ATH_DEBUG_CALIBRATE, "periodic re-calibration" },
-	{ "keycache",	ATH_DEBUG_KEYCACHE, "key cache management" },
-	{ "state",	ATH_DEBUG_STATE, "802.11 state transitions" },
-	{ "node",	ATH_DEBUG_NODE, "node management" },
-	{ "led",        ATH_DEBUG_LED, "led management" },
-	{ "ff",		ATH_DEBUG_FF, "fast frame handling" },
-	{ "turbo",	ATH_DEBUG_TURBO, "dynamic turbo handling" },
-	{ "uapsd",	ATH_DEBUG_UAPSD, "WME/UAPSD handling" },
-	{ "doth",	ATH_DEBUG_DOTH, "802.11h handling" },
-	{ "fatal",	ATH_DEBUG_FATAL, "fatal errors" },
+	{ "xmit",	 ATH_DEBUG_XMIT, 	"transmission of packets before out to HW"},
+	{ "xmit_desc",	 ATH_DEBUG_XMIT_DESC, 	"transmit descriptors" },
+	{ "recv",	 ATH_DEBUG_RECV, 	"received packets directly from HW" },
+	{ "recv_desc",	 ATH_DEBUG_RECV_DESC, 	"recv descriptors" },
+	{ "rate",	 ATH_DEBUG_RATE, 	"rate control modules" },
+	{ "reset",	 ATH_DEBUG_RESET, 	"reset processing and initialization" },
+	{ "mode",	 ATH_DEBUG_MODE, 	"mode initialization and changes" },
+	{ "beacon",	 ATH_DEBUG_BEACON, 	"beacon handling" },
+	{ "watchdog",	 ATH_DEBUG_WATCHDOG, 	"watchdog timer" },
+	{ "intr",	 ATH_DEBUG_INTR, 	"interrupt processing" },
+	{ "xmit_proc",	 ATH_DEBUG_TX_PROC, 	"processing of transmit descriptors" },
+	{ "recv_proc",	 ATH_DEBUG_RX_PROC, 	"processing of receive descriptors" },
+	{ "beacon_proc", ATH_DEBUG_BEACON_PROC,	"beacon processing" },
+	{ "calibrate",	 ATH_DEBUG_CALIBRATE, 	"periodic re-calibration" },
+	{ "keycache",	 ATH_DEBUG_KEYCACHE, 	"key cache management" },
+	{ "state",	 ATH_DEBUG_STATE, 	"802.11 state transitions" },
+	{ "node",	 ATH_DEBUG_NODE, 	"node management" },
+	{ "led",         ATH_DEBUG_LED, 	"led management" },
+	{ "ff",		 ATH_DEBUG_FF, 		"fast frame handling" },
+	{ "turbo",	 ATH_DEBUG_TURBO, 	"dynamic turbo handling" },
+	{ "uapsd",	 ATH_DEBUG_UAPSD, 	"WME/UAPSD handling" },
+	{ "doth",	 ATH_DEBUG_DOTH, 	"802.11h handling" },
+	{ "dothfilt", 	 ATH_DEBUG_DOTHFILT,    "802.11h radar pulse filter" },
+	{ "dothfiltvbse",ATH_DEBUG_DOTHFILTVBSE,"802.11h radar pulse filter - verbose" },
+	{ "dothfiltnosc",ATH_DEBUG_DOTHFILTNOSC,"802.11h radar pulse filter - disable short circuit" },
+	{ "dothpulses",  ATH_DEBUG_DOTHPULSES,  "802.11h radar pulse events" },
+	{ "fatal",	 ATH_DEBUG_FATAL, 	"fatal errors" },
 };
 
 static u_int

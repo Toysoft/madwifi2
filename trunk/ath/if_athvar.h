@@ -320,10 +320,10 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #define	ATH_KEYBYTES	(ATH_KEYMAX / NBBY)	/* storage space in bytes */
 
 #ifdef ATH_REVERSE_ENGINEERING
-#define MIN_REGISTER_ADDRESS 0x0000
-#define MAX_REGISTER_ADDRESS 0xc000 /* 48k address range */
-#define MAX_REGISTER_NAME_LEN 32
-#define UNKNOWN_NAME "(unknown)"
+#define MIN_REGISTER_ADDRESS	0x0000		/* PCI register addresses are taken as releative to the appropriate BAR */
+#define MAX_REGISTER_ADDRESS	0xc000 		/* AR5212/AR5213 seems to have a 48k address range */
+#define MAX_REGISTER_NAME_LEN	32		/* Maximum length of register nicknames in debug output */
+#define UNKNOWN_NAME		"(unknown)"	/* Name used when reading/listing undocumented registers */
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 /*
  * Convert from net80211 layer values to Ath layer values. Hopefully this will
@@ -419,11 +419,12 @@ struct ath_buf {
 #define ATH_RXBUF_RESET(bf)	bf->bf_status=0
 
 /* XXX: only managed for rx at the moment */
-#define ATH_BUFSTATUS_DONE	0x00000001	/* hw processing complete, desc processed by hal */
-
-/*
- * DMA state for tx/rx descriptors.
- */
+#define ATH_BUFSTATUS_DONE		0x00000001	/* hw processing complete, desc processed by hal */
+#define ATH_BUFSTATUS_RADAR_DONE	0x00000002	/* marker to indicate a PHYERR for radar pulse
+							   has already been handled.  We may receive
+							   multiple interrupts before the rx_tasklet
+							   clears the queue */
+/* DMA state for tx/rx descriptors. */
 struct ath_descdma {
 	const char *dd_name;
 	struct ath_desc	*dd_desc;	/* descriptors */

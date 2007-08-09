@@ -110,6 +110,7 @@ set80211priv(const char *dev, int op, void *data, int len, int show_err)
 				IOCTL_ERR(IEEE80211_IOCTL_SETOPTIE),
 				IOCTL_ERR(IEEE80211_IOCTL_GETOPTIE),
 				IOCTL_ERR(IEEE80211_IOCTL_SETMLME),
+				IOCTL_ERR(IEEE80211_IOCTL_RADAR),
 				IOCTL_ERR(IEEE80211_IOCTL_SETKEY),
 				IOCTL_ERR(IEEE80211_IOCTL_DELKEY),
 				IOCTL_ERR(IEEE80211_IOCTL_ADDMAC),
@@ -182,7 +183,7 @@ getdata(const char *arg, u_int8_t *data, int maxlen)
 static int
 getcipher(const char *name)
 {
-#define	streq(a,b)	(strcasecmp(a,b) == 0)
+#define	streq(a,b)	(strcasecmp(a, b) == 0)
 
 	if (streq(name, "wep"))
 		return IEEE80211_CIPHER_WEP;
