@@ -72,7 +72,7 @@
 #define IEEE80211_NODE_AR	0x0010		/* AR capable */
 #define IEEE80211_NODE_BOOST	0x0080
 
-#define	streq(a,b)	(strncasecmp(a,b,sizeof(b)-1) == 0)
+#define	streq(a,b)	(strncasecmp(a, b, sizeof(b) - 1) == 0)
 
 static int if_split_name(const char *, char **, unsigned int *);
 static void vap_create(struct ifreq *);
@@ -106,7 +106,7 @@ main(int argc, char *argv[])
 	int res = 0;
 
 	if (argc < 2 ||
-	  strncmp(argv[1],"-h",2) == 0 || strncmp(argv[1],"--h",3) == 0)
+	  strncmp(argv[1], "-h", 2) == 0 || strncmp(argv[1], "--h", 3) == 0)
 		usage();
 
 	ifname = argv[1];
@@ -761,9 +761,9 @@ list_keys(const char *ifname)
 {
 	char cmd[256];
 	puts("[list_keys not implemented (yet). Spawning iwlist...]");
-	strcpy(cmd,"iwlist ");
-	strcat(cmd,ifname);
-	strcat(cmd," key");
+	strcpy(cmd, "iwlist ");
+	strcat(cmd, ifname);
+	strcat(cmd, " key");
 	system(cmd);
 }
 
@@ -878,8 +878,8 @@ ieee80211_status(const char *ifname)
 	/* XXX fill in */
 	char cmd[256];
 	puts("[status not implemented (yet). Spawning iwconfig...]");
-	strcpy(cmd,"iwconfig ");
-	strcat(cmd,ifname);
+	strcpy(cmd, "iwconfig ");
+	strcat(cmd, ifname);
 	system(cmd);
 }
 
@@ -956,6 +956,7 @@ do80211priv(struct iwreq *iwr, const char *ifname, int op, void *data, size_t le
 			IOCTL_ERR(IEEE80211_IOCTL_SETOPTIE),
 			IOCTL_ERR(IEEE80211_IOCTL_GETOPTIE),
 			IOCTL_ERR(IEEE80211_IOCTL_SETMLME),
+			IOCTL_ERR(IEEE80211_IOCTL_RADAR),
 			IOCTL_ERR(IEEE80211_IOCTL_SETKEY),
 			IOCTL_ERR(IEEE80211_IOCTL_DELKEY),
 			IOCTL_ERR(IEEE80211_IOCTL_ADDMAC),

@@ -1386,7 +1386,7 @@ adhoc_default_action(struct ieee80211vap *vap,
 		ieee80211_create_ibss(vap, se->se_chan);
 		return 1;
 	} else
-		return ieee80211_sta_join(vap,se);
+		return ieee80211_sta_join(vap, se);
 }
 
 static const struct ieee80211_scanner adhoc_default = {
