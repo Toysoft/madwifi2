@@ -1473,8 +1473,10 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 				}
 
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-				"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr),
-				ieee80211_node_refcnt(ni));
+						"%s: %p<%s> refcnt %d\n", 
+						__func__, ni, 
+						ether_sprintf(ni->ni_macaddr),
+						ieee80211_node_refcnt(ni));
 
 				allocbs = 1;
 			}
@@ -1578,7 +1580,9 @@ bad:
 		ieee80211_send_error(ni, wh->i_addr2,
 			IEEE80211_FC0_SUBTYPE_AUTH,
 			(seq + 1) | (estatus<<16));
-		ieee80211_node_leave(ni);
+		/* Remove node state if it exists. */
+		if (ni != vap->iv_bss)
+			ieee80211_node_leave(ni);
 	} else if (vap->iv_opmode == IEEE80211_M_STA) {
 		/*
 		 * Kick the state machine.  This short-circuits
@@ -3204,7 +3208,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		}
 		if ((vap->iv_opmode == IEEE80211_M_IBSS) && 
 				(scan.capinfo & IEEE80211_CAPINFO_IBSS)) {
-			if (!IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_macaddr)) {
+			if (ni == vap->iv_bss) {
 				/* Create a new entry in the neighbor table. */
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
 			} else {

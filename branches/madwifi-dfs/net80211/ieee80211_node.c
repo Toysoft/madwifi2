@@ -546,7 +546,7 @@ static __inline int
 ssid_equal(const struct ieee80211_node *a, const struct ieee80211_node *b)
 {
 	return (a->ni_esslen == b->ni_esslen &&
-		memcmp(a->ni_essid, b->ni_bssid, a->ni_esslen) == 0);
+		memcmp(a->ni_essid, b->ni_essid, a->ni_esslen) == 0);
 }
 
 /*

@@ -133,7 +133,6 @@ static __inline void bus_unmap_single(void *hwdev, dma_addr_t dma_addr,
 void *bus_alloc_consistent(void *, size_t, dma_addr_t *);
 void bus_free_consistent(void *, size_t, void *, dma_addr_t);
 
-extern const char * get_system_type(void);
 #define sysRegRead(phys)      (*(volatile u_int32_t *)phys)
 
 /* Allow compiling on non-mips platforms for code verification */
@@ -141,7 +140,6 @@ extern const char * get_system_type(void);
 #define CAC_ADDR(addr) (addr)
 #define UNCAC_ADDR(addr) (addr)
 #define KSEG1ADDR(addr) (addr)
-#define get_system_type() "Non-MIPS"
 #endif
 
 #endif    /* _DEV_ATH_AHB_H_ */

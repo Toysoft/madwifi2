@@ -286,6 +286,7 @@ ieee80211_aclator_get(const char *name)
 }
 EXPORT_SYMBOL(ieee80211_aclator_get);
 
+#ifdef IEEE80211_DEBUG
 void
 ieee80211_print_essid(const u_int8_t *essid, int len)
 {
@@ -312,7 +313,6 @@ ieee80211_print_essid(const u_int8_t *essid, int len)
 }
 EXPORT_SYMBOL(ieee80211_print_essid);
 
-#ifdef IEEE80211_DEBUG
 void
 ieee80211_dump_pkt(struct ieee80211com *ic,
 	const u_int8_t *buf, int len, int rate, int rssi)
