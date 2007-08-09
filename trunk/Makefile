@@ -88,7 +88,7 @@ install: install-modules install-tools
 install-modules: modules
 	@# check if there are modules left from an old installation
 	@# might cause make to abort the build
-	sh scripts/find-madwifi-modules.sh $(KERNELRELEASE) $(DESTDIR)
+	sh scripts/find-madwifi-modules.sh -r $(KERNELRELEASE) $(DESTDIR)
 
 	for i in $(DIRS_MODULES); do \
 		$(MAKE) -C $$i install || exit 1; \
@@ -100,9 +100,20 @@ endif
 install-tools: tools
 	$(MAKE) -C $(TOOLS) install || exit 1
 
-uninstall:
-	sh scripts/find-madwifi-modules.sh $(KERNELRELEASE) $(DESTDIR)
+uninstall: uninstall-tools uninstall-modules
+uninstall-modules:
+	sh scripts/find-madwifi-modules.sh -r $(KERNELRELEASE) $(DESTDIR)
+
+list-modules: find-modules
+find-modules:
+	sh scripts/find-madwifi-modules.sh -l $(KERNELRELEASE)
+
+uninstall-tools:
 	$(MAKE) -C $(TOOLS) uninstall
+
+reinstall: uninstall install
+reinstall-tools: uninstall-tools install-tools
+reinstall-modules: uninstall-modules install-modules
 
 clean:
 	for i in $(DIRS_MODULES); do \
