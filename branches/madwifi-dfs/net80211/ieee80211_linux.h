@@ -30,6 +30,7 @@
 #define _NET80211_IEEE80211_LINUX_H_
 
 #include <linux/wireless.h>
+#include <linux/fs.h>
 
 /*
  * Compatibility definition of statistics flags
@@ -539,8 +540,8 @@ static __inline unsigned long msecs_to_jiffies(const unsigned int m)
 	proc_dointvec(ctl, write, filp, buffer, lenp, ppos)
 #endif
 
-void ieee80211_sysctl_vattach(struct ieee80211vap *);
-void ieee80211_sysctl_vdetach(struct ieee80211vap *);
+void ieee80211_virtfs_latevattach(struct ieee80211vap *);
+void ieee80211_virtfs_vdetach(struct ieee80211vap *);
 int ieee80211_proc_vcreate(struct ieee80211vap *, struct file_operations *,
 	       char *);
 void ieee80211_proc_cleanup(struct ieee80211vap *);
