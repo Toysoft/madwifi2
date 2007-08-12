@@ -60,7 +60,7 @@
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_monitor.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,17)
 #include <linux/device.h>
 
 /* madwifi_name_type - device name type:
@@ -102,7 +102,7 @@ static struct attribute_group ieee80211_attr_grp = {
 	.name	= NULL,	/* No seperate (sub-)directory */
 	.attrs	= ieee80211_sysfs_attrs
 };
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) */
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,17) */
 
 /*
  * Print a console message with the device name prepended.
@@ -717,7 +717,7 @@ ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 	int i, space;
 	char *devname = NULL;
 	struct ieee80211_proc_entry *tmp = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,17)
 	int ret;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
@@ -735,7 +735,7 @@ ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 				__func__, vap->iv_dev->name);
 		return;
 	}
-#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0) */
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,17) */
 
 	space = 5 * sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
 	vap->iv_sysctls = kmalloc(space, GFP_KERNEL);
@@ -905,7 +905,7 @@ ieee80211_virtfs_vdetach(struct ieee80211vap *vap)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
 	sysfs_remove_group(&vap->iv_dev->dev.kobj, &ieee80211_attr_grp);
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,17)
 	sysfs_remove_group(&vap->iv_dev->class_dev.kobj, &ieee80211_attr_grp);
 #endif
 
