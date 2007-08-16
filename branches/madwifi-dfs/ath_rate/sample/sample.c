@@ -896,6 +896,11 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		sn->last_sample_ndx[y] = 0;
 
 		for (x = 0; x < ni->ni_rates.rs_nrates; x++) {
+			if (sn->rates[x].rix == 0xff) {
+				DPRINTF(sc, ATH_DEBUG_RATE, "%s: %s ignore bogus rix at %u\n",
+					dev_info, __func__, x);
+				continue;
+			}
 			sn->stats[y][x].successive_failures = 0;
 			sn->stats[y][x].tries = 0;
 			sn->stats[y][x].total_packets = 0;

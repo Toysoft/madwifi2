@@ -672,6 +672,12 @@ ath_rate_ctl_reset(struct ath_softc *sc, struct ieee80211_node *ni)
 		}
 
 		for (x = 0; x < ni->ni_rates.rs_nrates; x++) {
+			if (sn->rates[x].rix == 0xff) {
+				DPRINTF(sc, "%s: %s ignore bogus rix at %d\n",
+					dev_info, __func__, x);
+				continue;
+			}
+
 			sn->rs_rateattempts	[x] = 0;
 			sn->rs_thisprob		[x] = 0;
 			sn->rs_ratesuccess 	[x] = 0;

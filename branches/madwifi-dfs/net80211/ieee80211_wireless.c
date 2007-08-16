@@ -1109,10 +1109,11 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 			} else {
 				spy_stat[i].updated = 0;
 			}
+
+			ieee80211_unref_node(&ni);
 		} else {
 			spy_stat[i].updated = IW_QUAL_ALL_INVALID;
 		}
-		ieee80211_unref_node(&ni);
 	}
 
 	/* copy results to userspace */
