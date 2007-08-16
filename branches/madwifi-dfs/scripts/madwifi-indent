@@ -16,3 +16,7 @@ indent -npro -kr -i8 -ts8 -sob -l80 -ss -ncs \
  -T HAL_TXQ_INFO -T HAL_INT -T HAL_KEYVAL -T HAL_MIB_STATS \
  -T HAL_NODE_STATS -T HAL_RATE_TABLE -T HAL_STATUS \
  "$@"
+
+for i in "$@"; do
+	sed -i -e 's/^ *\([^ :]\+:\)$/\1/;s/\(__attribute__\) ((/\1((/g' $i
+done
