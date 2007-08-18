@@ -2488,6 +2488,9 @@ ieee80211_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 			retv = ENETRESET;
 		break;
 	case IEEE80211_PARAM_WDS:
+		if ((vap->iv_opmode == IEEE80211_M_IBSS) ||
+				(vap->iv_opmode == IEEE80211_M_AHDEMO))
+			return -EOPNOTSUPP;
 		if (value)
 			vap->iv_flags_ext |= IEEE80211_FEXT_WDS;
 		else
