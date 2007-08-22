@@ -15,34 +15,35 @@
  */
 
 
-/*So here is how it works:
-
-First compile...
-
-gcc ath_info.c -o ath_info
-
-then find card's physical address
-
-lspci -v
-
-02:02.0 Ethernet controller: Atheros Communications, Inc. AR5212 802.11abg NIC (rev 01)
-        Subsystem: Fujitsu Limited. Unknown device 1234
-        Flags: bus master, medium devsel, latency 168, IRQ 23
-        Memory at c2000000 (32-bit, non-prefetchable) [size=64K]
-        Capabilities: [44] Power Management version 2
-
-address here is 0xc2000000
-
-load madwifi-ng or madwifi-old if not already loaded (be sure the interface is down !)
-
-modprobe ath_pci
-
-and we run the thing...
-
-./ath_info 0xc2000000
-
-Use at your own risk, entering a false device address will have really nasty results !!!
-*/
+/* So here is how it works:
+ * 
+ * First compile...
+ * 
+ * gcc ath_info.c -o ath_info
+ * 
+ * then find card's physical address
+ * 
+ * lspci -v
+ * 
+ * 02:02.0 Ethernet controller: Atheros Communications, Inc. AR5212 802.11abg NIC (rev 01)
+ *         Subsystem: Fujitsu Limited. Unknown device 1234
+ *         Flags: bus master, medium devsel, latency 168, IRQ 23
+ *         Memory at c2000000 (32-bit, non-prefetchable) [size=64K]
+ *         Capabilities: [44] Power Management version 2
+ * 
+ * address here is 0xc2000000
+ * 
+ * load madwifi-ng or madwifi-old if not already loaded (be sure the 
+ * interface is down!)
+ * 
+ * modprobe ath_pci
+ * 
+ * and we run the thing...
+ * 
+ * ./ath_info 0xc2000000
+ * 
+ * Use at your own risk, entering a false device address will have really 
+ * nasty results! */
 
 
 #include <stdio.h>
@@ -285,7 +286,8 @@ ath5k_hw_radio_revision(u_int16_t mac_version, void *mem, u_int8_t chip)
 	} else {
 		srev = (AR5K_REG_READ(AR5K_PHY(0x100)) >> 24) & 0xff;
 
-		ret = (u_int16_t) ath5k_hw_bitswap(((srev & 0xf0) >> 4) | ((srev & 0x0f) << 4), 8);
+		ret = (u_int16_t) ath5k_hw_bitswap(((srev & 0xf0) >> 4) | 
+				((srev & 0x0f) << 4), 8);
 	}
 
 	/* Reset to the 5GHz mode */
@@ -298,7 +300,8 @@ ath5k_hw_radio_revision(u_int16_t mac_version, void *mem, u_int8_t chip)
  * Read from eeprom
  */
 int
-ath5k_hw_eeprom_read(void *mem, u_int32_t offset, u_int16_t *data, u_int8_t mac_version)
+ath5k_hw_eeprom_read(void *mem, u_int32_t offset, u_int16_t *data, 
+		u_int8_t mac_version)
 {
 	u_int32_t status, timeout;
 
@@ -350,8 +353,8 @@ ath5k_hw_get_part_name(enum ath5k_srev_type type, u_int32_t val)
 }
 
 int
-main(int argc, char *argv[]){
-
+main(int argc, char *argv[])
+{
 	u_int32_t dev_addr;
 	u_int16_t eeprom_header, srev, phy_rev_5ghz, phy_rev_2ghz;
 	u_int16_t eeprom_version, mac_version, regdomain, has_crystal, ee_magic;
@@ -359,26 +362,26 @@ main(int argc, char *argv[]){
 	void *mem;
 	int fd;
 
-	if((argc < 2)||(argc > 2)){
+	if ((argc < 2)||(argc > 2)) {
 		printf("Usage: ath5k_info <phys address> \n");
 		return -1;
 	}
 
-	dev_addr = strtoul( argv[1], NULL, 0 );
+	dev_addr = strtoul(argv[1], NULL, 0);
 
-	fd = open( "/dev/mem", O_RDWR ) ;
-	if ( fd < 0 ) {
-		printf("Open of /dev/mem failed!\n") ;
-		return -2 ;
+	fd = open("/dev/mem", O_RDWR);
+	if (fd < 0) {
+		printf("Open of /dev/mem failed!\n");
+		return -2;
 	}
 
-	mem = mmap( 0, AR5K_PCI_MEM_SIZE, PROT_READ|PROT_WRITE,
-			MAP_SHARED|MAP_FILE, fd, dev_addr ) ;
+	mem = mmap(0, AR5K_PCI_MEM_SIZE, PROT_READ|PROT_WRITE,
+			MAP_SHARED|MAP_FILE, fd, dev_addr);
 
-	if ( mem == (void *) -1 ) {
-		printf( "Mmap of device at 0x%08X for 0x%X bytes failed!\n",
-			dev_addr, AR5K_PCI_MEM_SIZE ) ;
-		return -3 ;
+	if (mem == (void *) -1) {
+		printf("Mmap of device at 0x%08X for 0x%X bytes failed!\n",
+			dev_addr, AR5K_PCI_MEM_SIZE);
+		return -3;
 	}
 
 	srev = AR5K_REG_READ(AR5K_SREV);
@@ -388,12 +391,12 @@ main(int argc, char *argv[]){
 	error = ath5k_hw_eeprom_read(mem, AR5K_EEPROM_MAGIC, &ee_magic,
 					mac_version);
 
-	if(error){
+	if (error) {
 		printf("Unable to read EEPROM Magic value !\n");
 		return -1;
 	}
 
-	if(ee_magic != AR5K_EEPROM_MAGIC_VALUE){
+	if (ee_magic != AR5K_EEPROM_MAGIC_VALUE) {
 		printf("Invalid EEPROM Magic number !\n");
 		return -1;
 	}
@@ -401,7 +404,7 @@ main(int argc, char *argv[]){
 	error = ath5k_hw_eeprom_read(mem, AR5K_EEPROM_HDR, &eeprom_header,
 					mac_version);
 
-	if(error){
+	if (error) {
 		printf("Unable to read EEPROM Header !\n");
 		return -1;
 	}
@@ -409,7 +412,7 @@ main(int argc, char *argv[]){
 	error = ath5k_hw_eeprom_read(mem, AR5K_EEPROM_VERSION, &eeprom_version,
 					mac_version);
 
-	if(error){
+	if (error) {
 		printf("Unable to read EEPROM version !\n");
 		return -1;
 	}
@@ -417,16 +420,16 @@ main(int argc, char *argv[]){
 	error = ath5k_hw_eeprom_read(mem, AR5K_EEPROM_REG_DOMAIN, &regdomain,
 					mac_version);
 
-	if(error){
+	if (error) {
 		printf("Unable to read Regdomain !\n");
 		return -1;
 	}
 
-	if(eeprom_version >= 0x4000){
-		error = ath5k_hw_eeprom_read(mem, AR5K_EEPROM_MISC0, &has_crystal,
-						mac_version);
+	if (eeprom_version >= 0x4000) {
+		error = ath5k_hw_eeprom_read(mem, AR5K_EEPROM_MISC0, 
+				&has_crystal, mac_version);
 
-		if(error){
+		if (error) {
 			printf("Unable to read EEPROM Misc data !\n");
 			return -1;
 		}
@@ -436,47 +439,46 @@ main(int argc, char *argv[]){
 		has_crystal = 2;
 	}
 
-	eeprom_size = AR5K_REG_MS(AR5K_REG_READ(AR5K_PCICFG),AR5K_PCICFG_EESIZE);
+	eeprom_size = AR5K_REG_MS(AR5K_REG_READ(AR5K_PCICFG), 
+			AR5K_PCICFG_EESIZE);
 
 	has_a = AR5K_EEPROM_HDR_11A(eeprom_header);
 	has_b = AR5K_EEPROM_HDR_11B(eeprom_header);
 	has_g = AR5K_EEPROM_HDR_11G(eeprom_header);
 	has_rfkill = AR5K_EEPROM_HDR_RFKILL(eeprom_header);
 
-	if(has_a){
+	if (has_a)
 		phy_rev_5ghz = ath5k_hw_radio_revision(mac_version, mem, 1);
-	} else {
+	else
 		phy_rev_5ghz = 0;
-	}
 
-	if(has_b){
+	if (has_b)
 		phy_rev_2ghz = ath5k_hw_radio_revision(mac_version, mem, 0);
-	} else {
+	else
 		phy_rev_2ghz = 0;
-	}
 
 	printf(" -==Device Information==-\n");
 
 	printf("MAC Version:  %s(0x%x) \n",
-		ath5k_hw_get_part_name(AR5K_VERSION_VER,mac_version),
+		ath5k_hw_get_part_name(AR5K_VERSION_VER, mac_version),
 		mac_version);
 		
 	printf("MAC Revision: %s(0x%x) \n",
-		ath5k_hw_get_part_name(AR5K_VERSION_VER,srev),
+		ath5k_hw_get_part_name(AR5K_VERSION_VER, srev),
 		srev);
 
 	/* Single-chip PHY with a/b/g support */
-	if ((has_b && !phy_rev_2ghz)){
+	if (has_b && !phy_rev_2ghz) {
 		printf("PHY Revision: %s(0x%x) \n",
-			ath5k_hw_get_part_name(AR5K_VERSION_RAD,phy_rev_5ghz),
+			ath5k_hw_get_part_name(AR5K_VERSION_RAD, phy_rev_5ghz),
 			phy_rev_5ghz);
 		phy_rev_5ghz = 0;
 	}
 
 	/* Single-chip PHY with b/g support */
-	if (!has_a){
+	if (!has_a) {
 		printf("PHY Revision: %s(0x%x) \n",
-			ath5k_hw_get_part_name(AR5K_VERSION_RAD,phy_rev_2ghz),
+			ath5k_hw_get_part_name(AR5K_VERSION_RAD, phy_rev_2ghz),
 			phy_rev_2ghz);
 		phy_rev_2ghz = 0;
 	}
@@ -484,12 +486,12 @@ main(int argc, char *argv[]){
 	/* Different chip for 5Ghz and 2Ghz */
 	if (phy_rev_5ghz) {
 		printf("5Ghz PHY Revision: %s(0x%x) \n",
-			ath5k_hw_get_part_name(AR5K_VERSION_RAD,phy_rev_5ghz),
+			ath5k_hw_get_part_name(AR5K_VERSION_RAD, phy_rev_5ghz),
 			phy_rev_5ghz);
 	}
 	if (phy_rev_2ghz) {
 		printf("2Ghz PHY Revision: %s(0x%x) \n",
-			ath5k_hw_get_part_name(AR5K_VERSION_RAD,phy_rev_2ghz),
+			ath5k_hw_get_part_name(AR5K_VERSION_RAD, phy_rev_2ghz),
 			phy_rev_2ghz);
 	}
 
@@ -500,43 +502,46 @@ main(int argc, char *argv[]){
 
 	printf("EEPROM Size: ");
 
-	if(eeprom_size == 0){
+	if (eeprom_size == 0)
 		printf("       4K\n");
-	} else if(eeprom_size == 1){
+	else if (eeprom_size == 1)
 		printf("       8K\n");
-	} else if(eeprom_size == 2){
+	else if (eeprom_size == 2)
 		printf("       16K\n");
-	} else {
+	else
 		printf("       ??\n");
-	}
-	printf("Regulatory Domain:  0x%X \n",regdomain);
+	
+	printf("Regulatory Domain:  0x%X \n", regdomain);
 
 	printf(" -==== Capabilities ====-\n");
 
 	printf("|  802.11a Support: ");
-	if(has_a)
+	if (has_a)
 		printf("yes  |\n");
 	else
 		printf("no   |\n");
 
 	printf("|  802.11b Support: ");
-	if(has_b)
+	if (has_b)
 		printf("yes  |\n");
 	else
 		printf("no   |\n");
+
 	printf("|  802.11g Support: ");
-	if(has_g)
+	if (has_g)
 		printf("yes  |\n");
 	else
 		printf("no   |\n");
+
 	printf("|  RFKill  Support: ");
-	if(has_rfkill)
+	if (has_rfkill)
 		printf("yes  |\n");
 	else
 		printf("no   |\n");
-	if(has_crystal != 2){
+
+	if (has_crystal != 2) {
 		printf("|  32KHz   Crystal: ");
-		if(has_crystal)
+		if (has_crystal)
 			printf("yes  |\n");
 		else
 			printf("no   |\n");
