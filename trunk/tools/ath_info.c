@@ -49,6 +49,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 
@@ -371,16 +373,16 @@ main(int argc, char *argv[])
 
 	fd = open("/dev/mem", O_RDWR);
 	if (fd < 0) {
-		printf("Open of /dev/mem failed!\n");
+		printf("Opening /dev/mem failed!\n");
 		return -2;
 	}
 
 	mem = mmap(0, AR5K_PCI_MEM_SIZE, PROT_READ | PROT_WRITE,
 			MAP_SHARED | MAP_FILE, fd, dev_addr);
 
-	if (mem == (void *) -1) {
-		printf("Mmap of device at 0x%08X for 0x%X bytes failed!\n",
-			dev_addr, AR5K_PCI_MEM_SIZE);
+	if (mem == MAP_FAILED) {
+		printf("Mmap of device at 0x%08X for 0x%X bytes failed - "
+			"%s", dev_addr, AR5K_PCI_MEM_SIZE, strerror(errno));
 		return -3;
 	}
 
