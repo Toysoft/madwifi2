@@ -84,8 +84,8 @@ struct ath5k_srev_name {
 	{ "5112  ",	AR5K_VERSION_RAD,	AR5K_SREV_RAD_5112 },	\
 	{ "5112a ",	AR5K_VERSION_RAD,	AR5K_SREV_RAD_5112A },	\
 	{ "2112  ",	AR5K_VERSION_RAD,	AR5K_SREV_RAD_2112 },	\
-	{ "2112a",	AR5K_VERSION_RAD,	AR5K_SREV_RAD_2112A },	\
-	{ "xxxx",	AR5K_VERSION_RAD,	AR5K_SREV_UNKNOWN },	\
+	{ "2112a ",	AR5K_VERSION_RAD,	AR5K_SREV_RAD_2112A },	\
+	{ "xxxxx ",	AR5K_VERSION_RAD,	AR5K_SREV_UNKNOWN },	\
 }
 
 #define AR5K_SREV_UNKNOWN	0xffff
@@ -333,7 +333,7 @@ const char *
 ath5k_hw_get_part_name(enum ath5k_srev_type type, u_int32_t val)
 {
 	struct ath5k_srev_name names[] = AR5K_SREV_NAME;
-	const char *name = "xxxx";
+	const char *name = "xxxxx ";
 	int i;
 
 	for (i = 0; i < AR5K_ELEMENTS(names); i++) {
