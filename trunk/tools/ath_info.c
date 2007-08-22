@@ -229,7 +229,7 @@ struct ath5k_srev_name {
 	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) | (_flags))
 
 #define AR5K_REG_DISABLE_BITS(_reg, _flags)	\
-	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) &~ (_flags))
+	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) & ~(_flags))
 
 #define AR5K_TUNE_REGISTER_TIMEOUT		20000
 
@@ -297,7 +297,7 @@ ath5k_hw_radio_revision(u_int16_t mac_version, void *mem, u_int8_t chip)
 }
 
 /*
- * Read from eeprom
+ * Read from EEPROM
  */
 int
 ath5k_hw_eeprom_read(void *mem, u_int32_t offset, u_int16_t *data, 
@@ -362,7 +362,7 @@ main(int argc, char *argv[])
 	void *mem;
 	int fd;
 
-	if ((argc < 2)||(argc > 2)) {
+	if ((argc < 2) || (argc > 2)) {
 		printf("Usage: ath5k_info <phys address> \n");
 		return -1;
 	}
@@ -375,8 +375,8 @@ main(int argc, char *argv[])
 		return -2;
 	}
 
-	mem = mmap(0, AR5K_PCI_MEM_SIZE, PROT_READ|PROT_WRITE,
-			MAP_SHARED|MAP_FILE, fd, dev_addr);
+	mem = mmap(0, AR5K_PCI_MEM_SIZE, PROT_READ | PROT_WRITE,
+			MAP_SHARED | MAP_FILE, fd, dev_addr);
 
 	if (mem == (void *) -1) {
 		printf("Mmap of device at 0x%08X for 0x%X bytes failed!\n",
