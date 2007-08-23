@@ -329,6 +329,7 @@ sub generate_output() {
             print OUTPUT "\n\t" . format_type($api_return_type) . "ret;";
         }
         print OUTPUT "\n\tATH_HAL_LOCK_IRQ(ah->ah_sc);";
+        print OUTPUT "\n\tath_hal_set_function(__func__);";
         print OUTPUT "\n\t";
         if ( !$ret_void ) {
             print OUTPUT "ret = ";
@@ -342,6 +343,7 @@ sub generate_output() {
             print OUTPUT $names[$j];
         }
         print OUTPUT ");";
+        print OUTPUT "\n\tath_hal_set_function(NULL);";
         print OUTPUT "\n\tATH_HAL_UNLOCK_IRQ(ah->ah_sc);";
         if ( !$ret_void ) {
             print OUTPUT "\n\treturn ret;";
