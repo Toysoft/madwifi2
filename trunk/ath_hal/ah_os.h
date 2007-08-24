@@ -226,10 +226,14 @@ extern	u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 #define OS_REG_READ(_ah, _reg)		_OS_REG_READ(_ah, _reg)
 #endif /* AH_DEBUG || AH_REGFUNC || AH_DEBUG_ALQ */
 
+extern char *ath_hal_func;
+static inline void ath_hal_set_function(const char *name)
 #if defined(AH_DEBUG)
-static inline void ath_hal_set_function(const char *name);
+{
+	ath_hal_func = (char *)name;
+}
 #else
-static inline void ath_hal_set_function(const char *name) { }
+{ }
 #endif
 
 #ifdef AH_DEBUG_ALQ

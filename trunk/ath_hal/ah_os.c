@@ -326,12 +326,7 @@ EXPORT_SYMBOL(OS_MARK);
 /* Store the current function name (should be called by wrapper functions)
  * useful for debugging and figuring out, which hal function sets which 
  * registers */
-static char *ath_hal_func = NULL;
-void ath_hal_set_function(const char *name)
-{
-	ath_hal_func = (char *)name;
-}
-EXPORT_SYMBOL(ath_hal_set_function);
+char *ath_hal_func = NULL;
 #endif
 
 /*
