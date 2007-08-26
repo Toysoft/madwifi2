@@ -304,7 +304,7 @@ static const struct ath5k_ini ar5211_ini[] = {
 	{ AR5K_DIAG_SW_5211,	0x00000000 },
 	{ AR5K_ADDAC_TEST,	0x00000000 },
 	{ AR5K_DEFAULT_ANTENNA,	0x00000000 },
-        /* PHY registers */
+	/* PHY registers */
 	{ AR5K_PHY_AGC,	0x00000000 },
 	{ AR5K_PHY(3),	0x2d849093 },
 	{ AR5K_PHY(4),	0x7d32e000 },
@@ -699,7 +699,7 @@ static const struct ath5k_ini ar5212_ini[] = {
 	{ AR5K_PHY_PCDAC_TXPOWER(28), 0x10ff10ff },
 	{ AR5K_PHY_PCDAC_TXPOWER(29), 0x10ff10ff },
 	{ AR5K_PHY_PCDAC_TXPOWER(30), 0x10ff10ff },
-	{ AR5K_PHY_PCDAC_TXPOWER(31),0x10ff10ff },
+	{ AR5K_PHY_PCDAC_TXPOWER(31), 0x10ff10ff },
 	{ AR5K_PHY(644), 0x0080a333 },
 	{ AR5K_PHY(645), 0x00206c10 },
 	{ AR5K_PHY(646), 0x009c4060 },
@@ -1020,9 +1020,9 @@ ath5k_hw_ini_registers(struct ath_hal *hal, int size,
 	for (i = 0; i < size ; i++) {
 		/* On channel change there is 
 		 * no need to mess with PCU */
-		if (change_channel == TRUE &&
-		    ini_regs[i].ini_register >= AR5K_PCU_MIN &&
-		    ini_regs[i].ini_register <= AR5K_PCU_MAX)
+		if ((change_channel == TRUE) &&
+				(ini_regs[i].ini_register >= AR5K_PCU_MIN) &&
+				(ini_regs[i].ini_register <= AR5K_PCU_MAX))
 			continue;
 
 		switch (ini_regs[i].ini_mode) {
@@ -1052,7 +1052,7 @@ ath5k_hw_ini_mode_registers(struct ath_hal *hal, int size,
 	for (i = 0; i < size; i++) {
 		AR5K_REG_WAIT(i);
 		AR5K_REG_WRITE((u_int32_t)ini_mode[i].mode_register,
-		    ini_mode[i].mode_value[mode]);
+				ini_mode[i].mode_value[mode]);
 	}
 
 }
@@ -1080,50 +1080,50 @@ void ath5k_write_initvals(struct ath_hal *hal, u_int8_t mode, AR5K_BOOL change_c
 
 	/*For 5211*/
 #if defined(CONFIG_ATHEROS_AR5K_AR5211)
-	if (hal->ah_version == AR5K_AR5211) {
+	if (hal->ah_version == AR5K_AR5211)
 		ath5k_hw_ini_mode_registers(hal, AR5K_ELEMENTS(ar5211_ini_mode),
 						ar5211_ini_mode, mode);
-	}
 #endif
 	/* For 5210 mode settings check out ath5k_hw_reset_tx_queue */
 
 	/*
 	 * Write initial settings common for all modes
 	 */
+	switch (hal->ah_version) {
 #if defined(CONFIG_ATHEROS_AR5K_AR5212)
-	if (hal->ah_version == AR5K_AR5212) {
+	case AR5K_AR5212:
 		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(ar5212_ini),
-					ar5212_ini, change_channel);
+				ar5212_ini, change_channel);
 		if (hal->ah_radio == AR5K_RF5112) {
 			AR5K_REG_WRITE(AR5K_PHY_PAPD_PROBE,
 					AR5K_PHY_PAPD_PROBE_INI_5112);
 			ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(rf5112_ini_bbgain),
-						rf5112_ini_bbgain, change_channel);
+					rf5112_ini_bbgain, change_channel);
 		} else if (hal->ah_radio == AR5K_RF5111) {
 			AR5K_REG_WRITE( AR5K_PHY_GAIN_2GHZ,
 					AR5K_PHY_GAIN_2GHZ_INI_5111); 
 			AR5K_REG_WRITE( AR5K_PHY_PAPD_PROBE,
 					AR5K_PHY_PAPD_PROBE_INI_5111 );
 			ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(rf5111_ini_bbgain),
-						rf5111_ini_bbgain, change_channel);
+					rf5111_ini_bbgain, change_channel);
 		}
-	} else
+		break;
 #endif
 #if defined(CONFIG_ATHEROS_AR5K_AR5211)
-	if (hal->ah_version == AR5K_AR5211) {
+	case AR5K_AR5211:
 		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(ar5211_ini),
 					ar5211_ini, change_channel);
 		/* AR5211 only comes with 5111 */
 		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(rf5111_ini_bbgain),
 					rf5111_ini_bbgain, change_channel);
-	} else
+		break;
 #endif
 #if defined(CONFIG_ATHEROS_AR5K_AR5210)
-	if (hal->ah_version == AR5K_AR5210) {
+	case AR5K_AR5210:
 		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(ar5210_ini),
 					ar5210_ini, change_channel);
-	} else
+		break;
 #endif
-	return;
+	}
 }
 

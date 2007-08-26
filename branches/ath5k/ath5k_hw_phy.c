@@ -38,8 +38,8 @@ struct ath5k_ini_rfgain {
 };
 
 struct ath5k_gain_opt {
-	u_int32_t			go_default;
-	u_int32_t			go_steps_count;
+	u_int32_t				go_default;
+	u_int32_t				go_steps_count;
 	const struct ath5k_gain_opt_step	go_step[AR5K_GAIN_STEP_COUNT];
 };
 
@@ -212,11 +212,11 @@ static const struct ath5k_gain_opt rfgain_opt_5111 = {
 	4,
 	9,
 	{
-		{ { 4, 1, 1, 1 }, 6 },
-		{ { 4, 0, 1, 1 }, 4 },
-		{ { 3, 1, 1, 1 }, 3 },
-		{ { 4, 0, 0, 1 }, 1 },
-		{ { 4, 1, 1, 0 }, 0 },
+		{ { 4, 1, 1, 1 },  6 },
+		{ { 4, 0, 1, 1 },  4 },
+		{ { 3, 1, 1, 1 },  3 },
+		{ { 4, 0, 0, 1 },  1 },
+		{ { 4, 1, 1, 0 },  0 },
 		{ { 4, 0, 1, 0 }, -2 },
 		{ { 3, 1, 1, 0 }, -3 },
 		{ { 4, 0, 0, 0 }, -4 },
@@ -530,8 +530,8 @@ static const struct ath5k_gain_opt rfgain_opt_5112 = {
 	1,
 	8,
 	{
-		{ { 3, 0, 0, 0, 0, 0, 0 }, 6 },
-		{ { 2, 0, 0, 0, 0, 0, 0 }, 0 },
+		{ { 3, 0, 0, 0, 0, 0, 0 },  6 },
+		{ { 2, 0, 0, 0, 0, 0, 0 },  0 },
 		{ { 1, 0, 0, 0, 0, 0, 0 }, -3 },
 		{ { 0, 0, 0, 0, 0, 0, 0 }, -6 },
 		{ { 0, 1, 1, 0, 0, 0, 0 }, -8 },
@@ -586,8 +586,8 @@ static void ath5k_hw_txpower_table(struct ath_hal *hal, AR5K_CHANNEL *channel,
  * Used to modify RF Banks before writing them to AR5K_RF_BUFFER
  */
 static u_int
-ath5k_hw_rfregs_op(u_int32_t *rf, u_int32_t offset, u_int32_t reg, u_int32_t bits,
-    u_int32_t first, u_int32_t col, AR5K_BOOL set)
+ath5k_hw_rfregs_op(u_int32_t *rf, u_int32_t offset, u_int32_t reg, 
+	u_int32_t bits, u_int32_t first, u_int32_t col, AR5K_BOOL set)
 {
 	u_int32_t mask, entry, last, data, shift, position;
 	int32_t left;
@@ -599,7 +599,7 @@ ath5k_hw_rfregs_op(u_int32_t *rf, u_int32_t offset, u_int32_t reg, u_int32_t bit
 		/* should not happen */
 		return (0);
 
-	if (!(col <= 3 && bits <= 32 && first + bits <= 319)) {
+	if (!((col <= 3) && (bits <= 32) && ((first + bits) <= 319))) {
 		AR5K_PRINTF("invalid values at offset %u\n", offset);
 		return (0);
 	}
@@ -621,7 +621,7 @@ ath5k_hw_rfregs_op(u_int32_t *rf, u_int32_t offset, u_int32_t reg, u_int32_t bit
 			data >>= (8 - position);
 		} else {
 			data = (((rf[entry] & mask) >> (col * 8)) >>
-			    position) << shift;
+					position) << shift;
 			shift += last - position;
 		}
 
@@ -682,19 +682,19 @@ ath5k_hw_rfregs_gain_readback(struct ath_hal *hal)
 
 	if (hal->ah_radio == AR5K_RF5111) {
 		step = ath5k_hw_rfregs_op(rf, hal->ah_offset[7],
-		    0, 6, 37, 0, FALSE);
+				0, 6, 37, 0, FALSE);
 		level[0] = 0;
 		level[1] = (step == 0x3f) ? 0x32 : step + 4;
 		level[2] = (step != 0x3f) ? 0x40 : level[0];
 		level[3] = level[2] + 0x32;
 
 		hal->ah_gain.g_high = level[3] -
-		    (step == 0x3f ? AR5K_GAIN_DYN_ADJUST_HI_MARGIN : -5);
+			(step == 0x3f ? AR5K_GAIN_DYN_ADJUST_HI_MARGIN : -5);
 		hal->ah_gain.g_low = level[0] +
-		    (step == 0x3f ? AR5K_GAIN_DYN_ADJUST_LO_MARGIN : 0);
+			(step == 0x3f ? AR5K_GAIN_DYN_ADJUST_LO_MARGIN : 0);
 	} else {
 		mix = ath5k_hw_rfregs_op(rf, hal->ah_offset[7],
-		    0, 1, 36, 0, FALSE);
+				0, 1, 36, 0, FALSE);
 		level[0] = level[2] = 0;
 
 		if (mix == 1) {
@@ -706,9 +706,9 @@ ath5k_hw_rfregs_gain_readback(struct ath_hal *hal)
 	}
 
 	return ((hal->ah_gain.g_current >= level[0] &&
-	    hal->ah_gain.g_current <= level[1]) ||
-	    (hal->ah_gain.g_current >= level[2] &&
-	    hal->ah_gain.g_current <= level[3]));
+			 hal->ah_gain.g_current <= level[1]) ||
+			(hal->ah_gain.g_current >= level[2] &&
+			 hal->ah_gain.g_current <= level[3]));
 }
 
 static int32_t
@@ -738,13 +738,14 @@ ath5k_hw_rfregs_gain_adjust(struct ath_hal *hal)
 		if (hal->ah_gain.g_step_idx == 0)
 			return (-1);
 		for (hal->ah_gain.g_target = hal->ah_gain.g_current;
-		    hal->ah_gain.g_target >=  hal->ah_gain.g_high &&
-		    hal->ah_gain.g_step_idx > 0;
-		    hal->ah_gain.g_step =
-		    &go->go_step[hal->ah_gain.g_step_idx]) {
+				hal->ah_gain.g_target >=  hal->ah_gain.g_high &&
+				hal->ah_gain.g_step_idx > 0;
+				hal->ah_gain.g_step =
+				&go->go_step[hal->ah_gain.g_step_idx]) {
+
 			hal->ah_gain.g_target -= 2 *
-			    (go->go_step[--(hal->ah_gain.g_step_idx)].gos_gain -
-			    hal->ah_gain.g_step->gos_gain);
+				(go->go_step[--(hal->ah_gain.g_step_idx)].gos_gain -
+				 hal->ah_gain.g_step->gos_gain);
 		}
 
 		ret = 1;
@@ -755,13 +756,14 @@ ath5k_hw_rfregs_gain_adjust(struct ath_hal *hal)
 		if (hal->ah_gain.g_step_idx == (go->go_steps_count - 1))
 			return (-2);
 		for (hal->ah_gain.g_target = hal->ah_gain.g_current;
-		    hal->ah_gain.g_target <=  hal->ah_gain.g_low &&
-		    hal->ah_gain.g_step_idx < (go->go_steps_count - 1);
-		    hal->ah_gain.g_step =
-		    &go->go_step[hal->ah_gain.g_step_idx]) {
+				hal->ah_gain.g_target <=  hal->ah_gain.g_low &&
+				hal->ah_gain.g_step_idx < (go->go_steps_count - 1);
+				hal->ah_gain.g_step =
+				&go->go_step[hal->ah_gain.g_step_idx]) {
+
 			hal->ah_gain.g_target -= 2 *
-			    (go->go_step[++(hal->ah_gain.g_step_idx)].gos_gain -
-			    hal->ah_gain.g_step->gos_gain);
+				(go->go_step[++(hal->ah_gain.g_step_idx)].gos_gain -
+				 hal->ah_gain.g_step->gos_gain);
 		}
 
 		ret = 2;
@@ -771,10 +773,8 @@ ath5k_hw_rfregs_gain_adjust(struct ath_hal *hal)
  done:
 #ifdef AR5K_DEBUG
 	AR5K_PRINTF("ret %d, gain step %u, current gain %u, target gain %u\n",
-	    ret,
-	    hal->ah_gain.g_step_idx,
-	    hal->ah_gain.g_current,
-	    hal->ah_gain.g_target);
+			ret, hal->ah_gain.g_step_idx, hal->ah_gain.g_current,
+			hal->ah_gain.g_target);
 #endif
 
 	return (ret);
@@ -790,34 +790,36 @@ ath5k_hw_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode)
 	ath5k_rfgain_t *func = NULL;
 	AR5K_BOOL ret;
 
+	switch (hal->ah_radio) {
 #if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
-	if (hal->ah_radio == AR5K_RF5111) {
+	case AR5K_RF5111:
 		hal->ah_rf_banks_size = sizeof(rfregs_5111);
 		func = ath5k_hw_rf5111_rfregs;
-	} else
+		break;
 #endif
 #if defined(CONFIG_ATHEROS_AR5K_AR5212)
-	if (hal->ah_radio == AR5K_RF5112) {
+	case AR5K_RF5112:
 		if (hal->ah_radio_5ghz_revision >= AR5K_SREV_RAD_5112A)
 			hal->ah_rf_banks_size = sizeof(rfregs_5112a);
 		else
 		hal->ah_rf_banks_size = sizeof(rfregs_5112);
 		func = ath5k_hw_rf5112_rfregs;
-	} else
+		break;
 #endif
-		return (FALSE);
-
+	default:
+		return FALSE;
+	}
+	
 	if (hal->ah_rf_banks == NULL) {
 		/* XXX do extra checks? */
 		if ((hal->ah_rf_banks = kmalloc(hal->ah_rf_banks_size,
-		    GFP_KERNEL)) == NULL) {
+						GFP_KERNEL)) == NULL) {
 			AR5K_PRINT("out of memory\n");
 			return (FALSE);
 		}
 	}
 
 	ret = (func)(hal, channel, mode);
-
 	if (ret == TRUE)
 		hal->ah_rf_gain = AR5K_RFGAIN_INACTIVE;
 
@@ -843,8 +845,7 @@ ath5k_hw_rf5111_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode)
 
 	/* Copy values to modify them */
 	for (i = 0; i < rf_size; i++) {
-		if (rfregs_5111[i].rf_bank >=
-		    AR5K_RF5111_INI_RF_MAX_BANKS) {
+		if (rfregs_5111[i].rf_bank >= AR5K_RF5111_INI_RF_MAX_BANKS) {
 			AR5K_PRINT("invalid bank\n");
 			return (FALSE);
 		}
@@ -879,42 +880,44 @@ ath5k_hw_rf5111_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode)
 		/* For 11a, Turbo and XR */
 		ee_mode = AR5K_EEPROM_MODE_11A;
 		obdb = channel->freq >= 5725 ? 3 :
-		    (channel->freq >= 5500 ? 2 :
-			(channel->freq >= 5260 ? 1 :
-			    (channel->freq > 4000 ? 0 : -1)));
+			(channel->freq >= 5500 ? 2 :
+			 (channel->freq >= 5260 ? 1 :
+			  (channel->freq > 4000 ? 0 : -1)));
 
 		if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-			ee->ee_pwd_84, 1, 51, 3, TRUE))
+					ee->ee_pwd_84, 1, 51, 3, TRUE))
 			return (FALSE);
 
 		if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-			ee->ee_pwd_90, 1, 45, 3, TRUE))
+					ee->ee_pwd_90, 1, 45, 3, TRUE))
 			return (FALSE);
 	}
 
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-		!ee->ee_xpd[ee_mode], 1, 95, 0, TRUE))
+				!ee->ee_xpd[ee_mode], 1, 95, 0, TRUE))
 		return (FALSE);
 
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-		ee->ee_x_gain[ee_mode], 4, 96, 0, TRUE))
+				ee->ee_x_gain[ee_mode], 4, 96, 0, TRUE))
 		return (FALSE);
 
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-		obdb >= 0 ? ee->ee_ob[ee_mode][obdb] : 0, 3, 104, 0, TRUE))
+				obdb >= 0 ? ee->ee_ob[ee_mode][obdb] : 0, 
+				3, 104, 0, TRUE))
 		return (FALSE);
 
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-		obdb >= 0 ? ee->ee_db[ee_mode][obdb] : 0, 3, 107, 0, TRUE))
+				obdb >= 0 ? ee->ee_db[ee_mode][obdb] : 0, 
+				3, 107, 0, TRUE))
 		return (FALSE);
 
 	/* Modify bank 7 */
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[7],
-		ee->ee_i_gain[ee_mode], 6, 29, 0, TRUE))
+				ee->ee_i_gain[ee_mode], 6, 29, 0, TRUE))
 		return (FALSE);
 
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[7],
-		ee->ee_xpd[ee_mode], 1, 4, 0, TRUE))
+				ee->ee_xpd[ee_mode], 1, 4, 0, TRUE))
 		return (FALSE);
 
 	/* Write RF values */
@@ -955,8 +958,7 @@ ath5k_hw_rf5112_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode)
 
 	/* Copy values to modify them */
 	for (i = 0; i < rf_size; i++) {
-		if (rf_ini[i].rf_bank >=
-		    AR5K_RF5112_INI_RF_MAX_BANKS) {
+		if (rf_ini[i].rf_bank >= AR5K_RF5112_INI_RF_MAX_BANKS) {
 			AR5K_PRINT("invalid bank\n");
 			return (FALSE);
 		}
@@ -978,43 +980,43 @@ ath5k_hw_rf5112_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode)
 		obdb = 0;
 
 		if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-			ee->ee_ob[ee_mode][obdb], 3, 287, 0, TRUE))
+					ee->ee_ob[ee_mode][obdb], 3, 287, 0, TRUE))
 			return (FALSE);
 
 		if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-			ee->ee_ob[ee_mode][obdb], 3, 290, 0, TRUE))
+					ee->ee_ob[ee_mode][obdb], 3, 290, 0, TRUE))
 			return (FALSE);
 	} else {
 		/* For 11a, Turbo and XR */
 		ee_mode = AR5K_EEPROM_MODE_11A;
 		obdb = channel->freq >= 5725 ? 3 :
-		    (channel->freq >= 5500 ? 2 :
-			(channel->freq >= 5260 ? 1 :
-			    (channel->freq > 4000 ? 0 : -1)));
+			(channel->freq >= 5500 ? 2 :
+			 (channel->freq >= 5260 ? 1 :
+			  (channel->freq > 4000 ? 0 : -1)));
 
 		if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-			ee->ee_ob[ee_mode][obdb], 3, 279, 0, TRUE))
+					ee->ee_ob[ee_mode][obdb], 3, 279, 0, TRUE))
 			return (FALSE);
 
 		if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-			ee->ee_ob[ee_mode][obdb], 3, 282, 0, TRUE))
+					ee->ee_ob[ee_mode][obdb], 3, 282, 0, TRUE))
 			return (FALSE);
 	}
 
 #ifdef notyet
 	ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-	    ee->ee_x_gain[ee_mode], 2, 270, 0, TRUE);
+			ee->ee_x_gain[ee_mode], 2, 270, 0, TRUE);
 	ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-	    ee->ee_x_gain[ee_mode], 2, 257, 0, TRUE);
+			ee->ee_x_gain[ee_mode], 2, 257, 0, TRUE);
 #endif
 
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6],
-		ee->ee_xpd[ee_mode], 1, 302, 0, TRUE))
+				ee->ee_xpd[ee_mode], 1, 302, 0, TRUE))
 		return (FALSE);
 
 	/* Modify bank 7 */
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[7],
-		ee->ee_i_gain[ee_mode], 6, 14, 0, TRUE))
+				ee->ee_i_gain[ee_mode], 6, 14, 0, TRUE))
 		return (FALSE);
 
 	/* Write RF values */
@@ -1060,7 +1062,7 @@ ath5k_hw_rfgain(struct ath_hal *hal, u_int freq)
 	for (i = 0; i < size; i++) {
 		AR5K_REG_WAIT(i);
 		AR5K_REG_WRITE((u_int32_t)ath5k_rfg[i].rfg_register,
-		    ath5k_rfg[i].rfg_value[freq]);
+				ath5k_rfg[i].rfg_value[freq]);
 	}
 
 	return (TRUE);
@@ -1073,8 +1075,8 @@ ath5k_hw_get_rf_gain(struct ath_hal *hal)
 
 	AR5K_TRACE;
 
-	if ((hal->ah_rf_banks == NULL) || (!hal->ah_gain.g_active) 
-			|| (hal->ah_version <= AR5K_AR5211))
+	if ((hal->ah_rf_banks == NULL) || (!hal->ah_gain.g_active) || 
+			(hal->ah_version <= AR5K_AR5211))
 		return (AR5K_RFGAIN_INACTIVE);
 
 	if (hal->ah_rf_gain != AR5K_RFGAIN_READ_REQUESTED)
@@ -1099,8 +1101,8 @@ ath5k_hw_get_rf_gain(struct ath_hal *hal)
 		}
 
 		if (ath5k_hw_rfregs_gain_readback(hal) &&
-		AR5K_GAIN_CHECK_ADJUST(&hal->ah_gain) &&
-		ath5k_hw_rfregs_gain_adjust(hal))
+				AR5K_GAIN_CHECK_ADJUST(&hal->ah_gain) &&
+				ath5k_hw_rfregs_gain_adjust(hal))
 			hal->ah_rf_gain = AR5K_RFGAIN_NEED_CHANGE;
 	}
 
@@ -1118,7 +1120,7 @@ ath5k_hw_set_rfgain_opt(struct ath_hal *hal)
 	case AR5K_RF5111:
 		hal->ah_gain.g_step_idx = rfgain_opt_5111.go_default;
 		hal->ah_gain.g_step =
-		    &rfgain_opt_5111.go_step[hal->ah_gain.g_step_idx];
+			&rfgain_opt_5111.go_step[hal->ah_gain.g_step_idx];
 		hal->ah_gain.g_low = 20;
 		hal->ah_gain.g_high = 35;
 		hal->ah_gain.g_active = 1;
@@ -1130,7 +1132,7 @@ ath5k_hw_set_rfgain_opt(struct ath_hal *hal)
 	case AR5K_RF5112:
 		hal->ah_gain.g_step_idx = rfgain_opt_5112.go_default;
 		hal->ah_gain.g_step =
-		    &rfgain_opt_5112.go_step[hal->ah_gain.g_step_idx];
+			&rfgain_opt_5112.go_step[hal->ah_gain.g_step_idx];
 		hal->ah_gain.g_low = 20;
 		hal->ah_gain.g_high = 85;
 		hal->ah_gain.g_active = 1;
@@ -1178,11 +1180,11 @@ ath5k_hw_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	 * (don't care about regulation restrictions at this point)
 	 */
 	if ((channel->freq < hal->ah_capabilities.cap_range.range_2ghz_min ||
-	    channel->freq > hal->ah_capabilities.cap_range.range_2ghz_max) &&
-	    (channel->freq < hal->ah_capabilities.cap_range.range_5ghz_min ||
-	    channel->freq > hal->ah_capabilities.cap_range.range_5ghz_max)) {
+			 channel->freq > hal->ah_capabilities.cap_range.range_2ghz_max) &&
+			(channel->freq < hal->ah_capabilities.cap_range.range_5ghz_min ||
+			 channel->freq > hal->ah_capabilities.cap_range.range_5ghz_max)) {
 		AR5K_PRINTF("channel out of supported range (%u MHz)\n",
-		    channel->freq);
+				channel->freq);
 		return (FALSE);
 	}
 
@@ -1201,8 +1203,7 @@ ath5k_hw_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 
 	hal->ah_current_channel.freq = channel->freq;
 	hal->ah_current_channel.channel_flags = channel->channel_flags;
-	hal->ah_turbo = channel->channel_flags == CHANNEL_T ?
-	    TRUE : FALSE;
+	hal->ah_turbo = channel->channel_flags == CHANNEL_T ? TRUE : FALSE;
 
 	return (TRUE);
 }
@@ -1214,6 +1215,7 @@ static u_int32_t
 ath5k_hw_rf5110_chan2athchan(AR5K_CHANNEL *channel)
 {
 	u_int32_t athchan;
+	unsigned int ieee_channel;
 
 	/*
 	 * Convert IEEE channel/MHz to an internal channel value used
@@ -1221,9 +1223,9 @@ ath5k_hw_rf5110_chan2athchan(AR5K_CHANNEL *channel)
 	 * newer chipsets like the AR5212A who have a completely
 	 * different RF/PHY part.
 	 */
-	athchan = (ath5k_hw_bitswap((ath5k_mhz2ieee(channel->freq,
-	    channel->channel_flags) - 24) / 2, 5) << 1) |
-	    (1 << 6) | 0x1;
+	ieee_channel = ath5k_mhz2ieee(channel->freq, channel->channel_flags);
+	athchan = ath5k_hw_bitswap(ieee_channel / 2 - 12, 5) << 1; 
+	athchan |= (1 << 6) | 0x1;
 
 	return (athchan);
 }
@@ -1267,7 +1269,7 @@ ath5k_hw_rf5111_chan2athchan(u_int ieee, struct ath5k_athchan_2ghz *athchan)
 	} else if (channel == 14) {
 		athchan->a2_athchan = 124;
 		athchan->a2_flags = 0x44;
-	} else if (channel >= 15 && channel <= 26) {
+	} else if ((channel >= 15) && (channel <= 26)) {
 		athchan->a2_athchan = ((channel - 14) * 4) + 132;
 		athchan->a2_flags = 0x46;
 	} else
@@ -1290,13 +1292,13 @@ ath5k_hw_rf5111_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	 * Set the channel on the RF5111 radio
 	 */
 	data0 = data1 = 0;
-	ath_channel = ieee_channel = ath5k_mhz2ieee(channel->freq,
-	    channel->channel_flags);
+	ath_channel = ieee_channel = 
+		ath5k_mhz2ieee(channel->freq, channel->channel_flags);
 
 	if (channel->channel_flags & CHANNEL_2GHZ) {
 		/* Map 2GHz channel to 5GHz Atheros channel ID */
 		if (ath5k_hw_rf5111_chan2athchan(ieee_channel,
-			&ath_channel_2ghz) == FALSE)
+					&ath_channel_2ghz) == FALSE)
 			return (FALSE);
 
 		ath_channel = ath_channel_2ghz.a2_athchan;
@@ -1306,12 +1308,12 @@ ath5k_hw_rf5111_channel(struct ath_hal *hal, AR5K_CHANNEL *channel)
 
 	if (ath_channel < 145 || !(ath_channel & 1)) {
 		clock = 1;
-		data1 = ((ath5k_hw_bitswap(ath_channel - 24, 8) & 0xff) << 2)
-		    | (clock << 1) | (1 << 10) | 1;
+		data1 = ((ath5k_hw_bitswap(ath_channel - 24, 8) & 0xff) << 2) | 
+			(clock << 1) | (1 << 10) | 1;
 	} else {
 		clock = 0;
-		data1 = ((ath5k_hw_bitswap((ath_channel - 24) / 2, 8) & 0xff) << 2)
-		    | (clock << 1) | (1 << 10) | 1;
+		data1 = ((ath5k_hw_bitswap((ath_channel - 24) / 2, 8) & 0xff) << 2) | 
+			(clock << 1) | (1 << 10) | 1;
 	}
 
 	AR5K_REG_WRITE(AR5K_RF_BUFFER, (data1 & 0xff) | ((data0 & 0xff) << 8));
@@ -1383,9 +1385,9 @@ ath5k_hw_phy_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel){
 	AR5K_BOOL ret;
 
 	if (hal->ah_radio == AR5K_RF5110)
-		ret = ath5k_hw_rf5110_calibrate(hal,channel);
+		ret = ath5k_hw_rf5110_calibrate(hal, channel);
 	else
-		ret = ath5k_hw_rf511x_calibrate(hal,channel);
+		ret = ath5k_hw_rf511x_calibrate(hal, channel);
 
 	return (ret);
 }
@@ -1415,7 +1417,7 @@ ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	 * Disable beacons and RX/TX queues, wait
 	 */
 	AR5K_REG_ENABLE_BITS(AR5K_DIAG_SW_5210,
-	    AR5K_DIAG_SW_DIS_TX | AR5K_DIAG_SW_DIS_RX_5210);
+			AR5K_DIAG_SW_DIS_TX | AR5K_DIAG_SW_DIS_RX_5210);
 	beacon = AR5K_REG_READ(AR5K_BEACON_5210);
 	AR5K_REG_WRITE(AR5K_BEACON_5210, beacon & ~AR5K_BEACON_ENABLE);
 
@@ -1449,20 +1451,20 @@ ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 
 	/* Update radio registers */
 	AR5K_REG_WRITE(AR5K_PHY_SIG,
-		(phy_sig & ~(AR5K_PHY_SIG_FIRPWR)) |
-		AR5K_REG_SM(-1, AR5K_PHY_SIG_FIRPWR));
+			(phy_sig & ~(AR5K_PHY_SIG_FIRPWR)) |
+			AR5K_REG_SM(-1, AR5K_PHY_SIG_FIRPWR));
 
 	AR5K_REG_WRITE(AR5K_PHY_AGCCOARSE,
-		(phy_agc & ~(AR5K_PHY_AGCCOARSE_HI |
-			AR5K_PHY_AGCCOARSE_LO)) |
-		AR5K_REG_SM(-1, AR5K_PHY_AGCCOARSE_HI) |
-		AR5K_REG_SM(-127, AR5K_PHY_AGCCOARSE_LO));
+			(phy_agc & ~(AR5K_PHY_AGCCOARSE_HI |
+				     AR5K_PHY_AGCCOARSE_LO)) |
+			AR5K_REG_SM(-1, AR5K_PHY_AGCCOARSE_HI) |
+			AR5K_REG_SM(-127, AR5K_PHY_AGCCOARSE_LO));
 
 	AR5K_REG_WRITE(AR5K_PHY_ADCSAT,
-		(phy_sat & ~(AR5K_PHY_ADCSAT_ICNT |
-			AR5K_PHY_ADCSAT_THR)) |
-		AR5K_REG_SM(2, AR5K_PHY_ADCSAT_ICNT) |
-		AR5K_REG_SM(12, AR5K_PHY_ADCSAT_THR));
+			(phy_sat & ~(AR5K_PHY_ADCSAT_ICNT |
+				     AR5K_PHY_ADCSAT_THR)) |
+			AR5K_REG_SM(2, AR5K_PHY_ADCSAT_ICNT) |
+			AR5K_REG_SM(12, AR5K_PHY_ADCSAT_THR));
 
 	udelay(20);
 
@@ -1476,12 +1478,12 @@ ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	 * Enable calibration and wait until completion
 	 */
 	AR5K_REG_ENABLE_BITS(AR5K_PHY_AGCCTL,
-				AR5K_PHY_AGCCTL_CAL);
+			AR5K_PHY_AGCCTL_CAL);
 
 	if (ath5k_hw_register_timeout(hal, AR5K_PHY_AGCCTL,
-		AR5K_PHY_AGCCTL_CAL, 0, FALSE) == FALSE) {
+				AR5K_PHY_AGCCTL_CAL, 0, FALSE) == FALSE) {
 		AR5K_PRINTF("calibration timeout (%uMHz)\n",
-			channel->freq);
+				channel->freq);
 		ret = FALSE;
 	}
 
@@ -1497,10 +1499,10 @@ ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
  	 * Enable noise floor calibration and wait until completion
  	 */
 	AR5K_REG_ENABLE_BITS(AR5K_PHY_AGCCTL,
-				AR5K_PHY_AGCCTL_NF);
+			AR5K_PHY_AGCCTL_NF);
 
 	if (ath5k_hw_register_timeout(hal, AR5K_PHY_AGCCTL,
-		AR5K_PHY_AGCCTL_NF, 0, FALSE) == FALSE) {
+				AR5K_PHY_AGCCTL_NF, 0, FALSE) == FALSE) {
 		AR5K_PRINTF("noise floor calibration timeout (%uMHz)\n",
 				channel->freq);
 		return (FALSE);
@@ -1511,8 +1513,7 @@ ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 		udelay(1000);
 		noise_floor = AR5K_REG_READ(AR5K_PHY_NF);
 
-		if (AR5K_PHY_NF_RVAL(noise_floor) &
-		AR5K_PHY_NF_ACTIVE)
+		if (AR5K_PHY_NF_RVAL(noise_floor) & AR5K_PHY_NF_ACTIVE)
 			noise_floor = AR5K_PHY_NF_AVAL(noise_floor);
 	
 		if (noise_floor <= AR5K_TUNE_NOISE_FLOOR)
@@ -1521,7 +1522,7 @@ ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 
 	if (noise_floor > AR5K_TUNE_NOISE_FLOOR) {
 		AR5K_PRINTF("noise floor calibration failed (%uMHz)\n",
-			channel->freq);
+				channel->freq);
 		return (FALSE);
 	}
 
@@ -1530,7 +1531,7 @@ ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	 * Re-enable RX/TX and beacons
 	 */
 	AR5K_REG_DISABLE_BITS(AR5K_DIAG_SW_5210,
-		AR5K_DIAG_SW_DIS_TX | AR5K_DIAG_SW_DIS_RX_5210);
+			AR5K_DIAG_SW_DIS_TX | AR5K_DIAG_SW_DIS_RX_5210);
 	AR5K_REG_WRITE(AR5K_BEACON_5210, beacon);
 
 #undef AGC_ENABLE
@@ -1551,7 +1552,7 @@ ath5k_hw_rf511x_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	AR5K_TRACE;
 
 	if (hal->ah_calibration == FALSE ||
-	    AR5K_REG_READ(AR5K_PHY_IQ) & AR5K_PHY_IQ_RUN)
+			AR5K_REG_READ(AR5K_PHY_IQ) & AR5K_PHY_IQ_RUN)
 		goto done;
 
 	hal->ah_calibration = FALSE;
@@ -1562,7 +1563,7 @@ ath5k_hw_rf511x_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 	i_coffd = ((i_pwr >> 1) + (q_pwr >> 1)) >> 7;
 	q_coffd = q_pwr >> 6;
 
-	if (i_coffd == 0 || q_coffd == 0)
+	if ((i_coffd == 0) || (q_coffd == 0))
 		goto done;
 
 	i_coff = ((-iq_corr) / i_coffd) & 0x3f;
@@ -1570,21 +1571,21 @@ ath5k_hw_rf511x_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel)
 
 	/* Commit new IQ value */
 	AR5K_REG_ENABLE_BITS(AR5K_PHY_IQ,
-		AR5K_PHY_IQ_CORR_ENABLE |
-		((u_int32_t)q_coff) |
-		((u_int32_t)i_coff << AR5K_PHY_IQ_CORR_Q_I_COFF_S));
+			AR5K_PHY_IQ_CORR_ENABLE |
+			((u_int32_t)q_coff) |
+			((u_int32_t)i_coff << AR5K_PHY_IQ_CORR_Q_I_COFF_S));
 
  done:
 	/* Start noise floor calibration */
 	AR5K_REG_ENABLE_BITS(AR5K_PHY_AGCCTL,
-		AR5K_PHY_AGCCTL_NF);
+			AR5K_PHY_AGCCTL_NF);
 
 	/* Request RF gain */
 	if (channel->channel_flags & CHANNEL_5GHZ) {
 		AR5K_REG_WRITE(AR5K_PHY_PAPD_PROBE,
-			AR5K_REG_SM(hal->ah_txpower.txp_max,
-			AR5K_PHY_PAPD_PROBE_TXPOWER) |
-			AR5K_PHY_PAPD_PROBE_TX_NEXT);
+				AR5K_REG_SM(hal->ah_txpower.txp_max,
+				AR5K_PHY_PAPD_PROBE_TXPOWER) |
+				AR5K_PHY_PAPD_PROBE_TX_NEXT);
 		hal->ah_rf_gain = AR5K_RFGAIN_READ_REQUESTED;
 	}
 
@@ -1654,9 +1655,10 @@ ath5k_hw_radio_revision(struct ath_hal *hal, AR5K_CHIP chip)
 	return (ret);
 }
 
-void /*TODO:Boundary check*/
+void 
 ath5k_hw_set_def_antenna(struct ath_hal *hal, u_int ant)
 {
+	/*TODO: Boundary check*/
 	AR5K_TRACE;
 	/*Just a try M.F.*/
 	if (hal->ah_version != AR5K_AR5210)
@@ -1694,7 +1696,7 @@ ath5k_hw_txpower_table(struct ath_hal *hal, AR5K_CHANNEL *channel, int16_t max_p
 	txpower = AR5K_TUNE_DEFAULT_TXPOWER * 2;
 	if (max_power > txpower)
 		txpower = max_power > AR5K_TUNE_MAX_TXPOWER ?
-		    AR5K_TUNE_MAX_TXPOWER : max_power;
+			AR5K_TUNE_MAX_TXPOWER : max_power;
 
 	for (i = 0; i < AR5K_MAX_RATES; i++)
 		rates[i] = txpower;
@@ -1720,8 +1722,9 @@ ath5k_hw_txpower_table(struct ath_hal *hal, AR5K_CHANNEL *channel, int16_t max_p
 
 /*
  * Set transmition power
+ * XXX: txpower_table is unimplemented so this doesn't work.
  */
-AR5K_BOOL /*O.K. - txpower_table is unimplemented so this doesn't work*/
+AR5K_BOOL 
 ath5k_hw_txpower(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int txpower)
 {
 	AR5K_BOOL tpc = hal->ah_txpower.txp_tpc;
@@ -1744,37 +1747,38 @@ ath5k_hw_txpower(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int txpower)
 	 * Write TX power values
 	 */
 	for (i = 0; i < (AR5K_EEPROM_POWER_TABLE_SIZE / 2); i++) {
+		u_int16_t txp_pcdac1 = hal->ah_txpower.txp_pcdac[2*i + 1];
+		u_int16_t txp_pcdac0 = hal->ah_txpower.txp_pcdac[2*i];
 		AR5K_REG_WRITE(AR5K_PHY_PCDAC_TXPOWER(i),
-		      ((((hal->ah_txpower.txp_pcdac[(i << 1) + 1] << 8) | 0xff) & 0xffff) << 16) 
-		    | ((((hal->ah_txpower.txp_pcdac[(i << 1)    ] << 8) | 0xff) & 0xffff)      )
-		    );
+				((((txp_pcdac1 << 8) | 0xff) & 0xffff) << 16) | 
+				((((txp_pcdac0 << 8) | 0xff) & 0xffff))
+			      );
 	}
 
-	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE1,
-	    AR5K_TXPOWER_OFDM(3, 24) | AR5K_TXPOWER_OFDM(2, 16)
-	    | AR5K_TXPOWER_OFDM(1, 8) | AR5K_TXPOWER_OFDM(0, 0));
+	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE1, AR5K_TXPOWER_OFDM(3, 24) | 
+			AR5K_TXPOWER_OFDM(2, 16) | AR5K_TXPOWER_OFDM(1, 8) | 
+			AR5K_TXPOWER_OFDM(0, 0));
 
-	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE2,
-	    AR5K_TXPOWER_OFDM(7, 24) | AR5K_TXPOWER_OFDM(6, 16)
-	    | AR5K_TXPOWER_OFDM(5, 8) | AR5K_TXPOWER_OFDM(4, 0));
+	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE2, AR5K_TXPOWER_OFDM(7, 24) | 
+			AR5K_TXPOWER_OFDM(6, 16) | AR5K_TXPOWER_OFDM(5, 8) | 
+			AR5K_TXPOWER_OFDM(4, 0));
 
-	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE3,
-	    AR5K_TXPOWER_CCK(10, 24) | AR5K_TXPOWER_CCK(9, 16)
-	    | AR5K_TXPOWER_CCK(15, 8) | AR5K_TXPOWER_CCK(8, 0));
+	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE3, AR5K_TXPOWER_CCK(10, 24) | 
+			AR5K_TXPOWER_CCK(9, 16) | AR5K_TXPOWER_CCK(15, 8) | 
+			AR5K_TXPOWER_CCK(8, 0));
 
-	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE4,
-	    AR5K_TXPOWER_CCK(14, 24) | AR5K_TXPOWER_CCK(13, 16)
-	    | AR5K_TXPOWER_CCK(12, 8) | AR5K_TXPOWER_CCK(11, 0));
+	AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE4, AR5K_TXPOWER_CCK(14, 24) | 
+			AR5K_TXPOWER_CCK(13, 16) | AR5K_TXPOWER_CCK(12, 8) | 
+			AR5K_TXPOWER_CCK(11, 0));
 
-	if (hal->ah_txpower.txp_tpc == TRUE) {
+	if (hal->ah_txpower.txp_tpc == TRUE)
 		AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE_MAX,
-		    AR5K_PHY_TXPOWER_RATE_MAX_TPC_ENABLE |
-		    AR5K_TUNE_MAX_TXPOWER);
-	} else {
+				AR5K_PHY_TXPOWER_RATE_MAX_TPC_ENABLE |
+				AR5K_TUNE_MAX_TXPOWER);
+	else
 		AR5K_REG_WRITE(AR5K_PHY_TXPOWER_RATE_MAX,
-		    AR5K_PHY_TXPOWER_RATE_MAX |
-		    AR5K_TUNE_MAX_TXPOWER);
-	}
+				AR5K_PHY_TXPOWER_RATE_MAX |
+				AR5K_TUNE_MAX_TXPOWER);
 
 	return (TRUE);
 }
@@ -1786,6 +1790,6 @@ ath5k_hw_set_txpower_limit(struct ath_hal *hal, u_int power)
 	AR5K_CHANNEL *channel = &hal->ah_current_channel;
 
 	AR5K_TRACE;
-	AR5K_PRINTF("changing txpower to %d\n",power);
+	AR5K_PRINTF("changing txpower to %d\n", power);
 	return (ath5k_hw_txpower(hal, channel, power));
 }
