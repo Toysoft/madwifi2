@@ -57,8 +57,8 @@
  * and results timeouts). It's also illegal to tune to some of the supported frequencies
  * in some countries, so use this at your own risk, you 've been warned. */
 #define CHAN_DEBUG    0
-/* Uncomment this for debuging (warning that results TOO much output) */
-//#define AR5K_DEBUG    1
+/* Define this for debuging (warning that results TOO much output) */
+#undef AR5K_DEBUG
 
 
 /****************************\
