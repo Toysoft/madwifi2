@@ -1,5 +1,6 @@
-obj-m += ath5k_pci.o
-ath5k_pci-objs := ath5k.o ath5k_hw.o ath5k_hw_phy.o ath5k_hw_inivals.o ieee80211_regdomain.o
+
+# obj-$(CONFIG_ATH5K) += ath5k.o
+obj-m += ath5k.o
 
 all:
 	make -C /lib/modules/$(shell uname -r)/build/ M=$(PWD) modules
