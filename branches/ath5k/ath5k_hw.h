@@ -55,13 +55,13 @@ struct ath5k_gain_opt_step {
 };
 
 struct ath5k_gain {
-	u_int32_t			g_step_idx;
-	u_int32_t			g_current;
-	u_int32_t			g_target;
-	u_int32_t			g_low;
-	u_int32_t			g_high;
-	u_int32_t			g_f_corr;
-	u_int32_t			g_active;
+	u_int32_t				g_step_idx;
+	u_int32_t				g_current;
+	u_int32_t				g_target;
+	u_int32_t				g_low;
+	u_int32_t				g_high;
+	u_int32_t				g_f_corr;
+	u_int32_t				g_active;
 	const struct ath5k_gain_opt_step	*g_step;
 };
 
@@ -111,16 +111,16 @@ struct ath5k_gain {
 
 /* Struct to hold EEPROM calibration data */
 struct ath5k_eeprom_info {
-	u_int16_t	ee_magic;		/* Magic Number */
-	u_int16_t	ee_protect;		/* Protection bits (ath5kreg.h) */
-	u_int16_t	ee_regdomain;		/* Regulatory Domain */
-	u_int16_t	ee_version;		/* EEPROM Revision */
-	u_int16_t	ee_header;		/* EEPROM Header (ath5kreg.h,get_capabilities) */
-	u_int16_t	ee_ant_gain;		/* Antenna Gain (ath5kreg.h) */
+	u_int16_t	ee_magic;		 /* Magic Number */
+	u_int16_t	ee_protect;		 /* Protection bits (ath5kreg.h) */
+	u_int16_t	ee_regdomain;		 /* Regulatory Domain */
+	u_int16_t	ee_version;		 /* EEPROM Revision */
+	u_int16_t	ee_header;		 /* EEPROM Header (ath5kreg.h, get_capabilities) */
+	u_int16_t	ee_ant_gain;		 /* Antenna Gain (ath5kreg.h) */
 	u_int16_t	ee_misc0;
 	u_int16_t	ee_misc1;
-	u_int16_t	ee_cck_ofdm_gain_delta;	/* CCK to OFDM gain delta */
-	u_int16_t	ee_cck_ofdm_power_delta;/* CCK to OFDM power delta */
+	u_int16_t	ee_cck_ofdm_gain_delta;	 /* CCK to OFDM gain delta */
+	u_int16_t	ee_cck_ofdm_power_delta; /* CCK to OFDM power delta */
 	u_int16_t	ee_scaled_cck_delta;
 
 	/* Used for tx thermal adjustment (eeprom_init, rfregs) */
@@ -462,7 +462,7 @@ struct ath5k_hw_tx_status {
 #define AR5K_INIT_CFG	0x00000000
 #endif
 
-#define AR5K_REG_READ(_reg)	ath5k_hw_reg_read(hal, _reg)
+#define AR5K_REG_READ(_reg)		ath5k_hw_reg_read(hal, _reg)
 
 #define AR5K_REG_WRITE(_reg, _val)	ath5k_hw_reg_write(hal, _val, _reg)
 
@@ -474,12 +474,12 @@ struct ath5k_hw_tx_status {
 
 /* Some registers can hold multiple values of interest. For this
  * reason when we want to write to these registers we must first
- * retrieve the values which we do not want to clear (lets call this 
+ * retrieve the values which we do not want to clear (let's call this 
  * old_data) and then set the register with this and our new_value: 
  * ( old_data | new_value) */
 #define AR5K_REG_WRITE_BITS(_reg, _flags, _val)				\
-	AR5K_REG_WRITE(_reg, (AR5K_REG_READ(_reg) &~ (_flags)) |	\
-	    (((_val) << _flags##_S) & (_flags)))
+	AR5K_REG_WRITE(_reg, (AR5K_REG_READ(_reg) & ~(_flags)) |	\
+			(((_val) << _flags##_S) & (_flags)))
 
 #define AR5K_REG_MASKED_BITS(_reg, _flags, _mask)			\
 	AR5K_REG_WRITE(_reg, (AR5K_REG_READ(_reg) & (_mask)) | (_flags))
@@ -488,7 +488,7 @@ struct ath5k_hw_tx_status {
 	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) | (_flags))
 
 #define AR5K_REG_DISABLE_BITS(_reg, _flags)				\
-	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) &~ (_flags))
+	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) & ~(_flags))
 
 #define AR5K_PHY_WRITE(_reg, _val)					\
 	AR5K_REG_WRITE(hal->ah_phy + ((_reg) << 2), _val)
@@ -638,5 +638,4 @@ ath5k_hw_bitswap(u_int32_t val, u_int bits)
 
 	return (retval);
 }
-
 

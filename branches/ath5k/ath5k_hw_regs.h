@@ -126,7 +126,7 @@
  * Beacon status register [5210]
  *
  * As i can see in ar5k_ar5210_tx_start Reyk uses some of the values of BCR
- * for this register, so i guess TQ1V,TQ1FV and BDMAE have the same meaning
+ * for this register, so i guess TQ1V, TQ1FV and BDMAE have the same meaning
  * here and SNP/SNAP means "snapshot" (so this register gets synced with BCR). 
  * So SNAPPEDBCRVALID sould also stand for "snapped BCR -values- valid", so i
  * renamed it to SNAPSHOTSVALID to make more sense. I realy have no idea what
@@ -1758,7 +1758,7 @@
 						 * Used to read radio revision */
 
 #define AR5K_RF_BUFFER_CONTROL_4	0x98d4  /* RF Stage register on 5110
-						 * Bank 0,1,2,6 on 5111 &
+						 * Bank 0, 1, 2, 6 on 5111 &
 						 * Bank 1 on 5112 &
 						 * Used during activation on 5111 */
 

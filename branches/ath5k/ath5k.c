@@ -34,8 +34,8 @@
  */
 
 static struct ieee80211_channel*
-ath5k_ar5k_to_mac80211_channel( AR5K_CHANNEL *ar5k_channel ){
-
+ath5k_ar5k_to_mac80211_channel(AR5K_CHANNEL *ar5k_channel)
+{
 	struct ieee80211_channel *mac80211_channel;
 
 	mac80211_channel = kmalloc(sizeof(struct ieee80211_channel), GFP_KERNEL);
@@ -57,8 +57,8 @@ ath5k_ar5k_to_mac80211_channel( AR5K_CHANNEL *ar5k_channel ){
 }
 
 static AR5K_CHANNEL*
-ath5k_mac80211_to_ar5k_channel( struct ieee80211_channel *mac80211_channel ){
-
+ath5k_mac80211_to_ar5k_channel(struct ieee80211_channel *mac80211_channel)
+{
 	AR5K_CHANNEL *ar5k_channel;
 	
 	ar5k_channel = kmalloc(sizeof(AR5K_CHANNEL), GFP_KERNEL);
@@ -66,21 +66,20 @@ ath5k_mac80211_to_ar5k_channel( struct ieee80211_channel *mac80211_channel ){
 
 	ar5k_channel->freq = mac80211_channel->freq;
 	/* XXX: Is this ok ? */
-	if ( !mac80211_channel->val ){
+	if (!mac80211_channel->val) {
 		ar5k_channel->channel_flags = mac80211_channel->val;
 	} else {
 	/* Try to set the flags based on freq */
 		printk(KERN_ALERT "No channel flags passed FIX it !\n");
 		ar5k_channel->channel_flags = 0;
-		if (( ar5k_channel->freq >= 2412) && /* chan 1 */
-		(ar5k_channel->freq < 2512)) {	/* chan 26 */
-			ar5k_channel->channel_flags |= CHANNEL_2GHZ;
-			ar5k_channel->channel_flags |= CHANNEL_CCK;
-			ar5k_channel->channel_flags |= CHANNEL_OFDM;
+		if ((ar5k_channel->freq >= 2412) && /* chan 1 */
+				(ar5k_channel->freq < 2512)) {	/* chan 26 */
+			ar5k_channel->channel_flags |= 
+				CHANNEL_2GHZ | CHANNEL_CCK | CHANNEL_OFDM;
 		} else if ((ar5k_channel->freq >= 5150) &&
-		(ar5k_channel->freq <= 5825)) {
-			ar5k_channel->channel_flags |= CHANNEL_2GHZ;
-			ar5k_channel->channel_flags |= CHANNEL_OFDM;
+				(ar5k_channel->freq <= 5825)) {
+			ar5k_channel->channel_flags |= 
+				CHANNEL_2GHZ | CHANNEL_OFDM;
 		}
 	}
 
@@ -88,12 +87,12 @@ ath5k_mac80211_to_ar5k_channel( struct ieee80211_channel *mac80211_channel ){
 }
 
 static struct ieee80211_tx_queue_params*
-ath5k_ar5k_to_mac80211_queue_params( AR5K_TXQ_INFO *ar5k_queueparams ){
-
+ath5k_ar5k_to_mac80211_queue_params(AR5K_TXQ_INFO *ar5k_queueparams)
+{
 	struct ieee80211_tx_queue_params *mac80211_queue_params;
 
 	mac80211_queue_params = kmalloc(sizeof(struct ieee80211_tx_queue_params),
-				GFP_KERNEL);
+					GFP_KERNEL);
 	memset(mac80211_queue_params, 0, sizeof(struct ieee80211_tx_queue_params));
 
 	mac80211_queue_params->aifs = ar5k_queueparams->tqi_aifs;
@@ -102,7 +101,6 @@ ath5k_ar5k_to_mac80211_queue_params( AR5K_TXQ_INFO *ar5k_queueparams ){
 	mac80211_queue_params->burst_time = ar5k_queueparams->tqi_burst_time;
 
 	return mac80211_queue_params;
-
 }
 
 /* From dadwifi */
@@ -110,11 +108,11 @@ static struct {
 	u_int   ar5k_mode;	/* ar5k phy mode */
 	int     mac80211_mode;	/* mac80211 hw mode */
 } ar5k_mode_map[] = {
-	{ AR5K_MODE_11A,  MODE_IEEE80211A       },
-	{ AR5K_MODE_11B,  MODE_IEEE80211B       },
-	{ AR5K_MODE_11G,  MODE_IEEE80211G       }, /* Dynamic b/g */
-	{ AR5K_MODE_TURBO, MODE_ATHEROS_TURBO   },
-	{ AR5K_MODE_108G, MODE_ATHEROS_TURBOG   },
+	{ AR5K_MODE_11A,	MODE_IEEE80211A     },
+	{ AR5K_MODE_11B,	MODE_IEEE80211B     },
+	{ AR5K_MODE_11G,	MODE_IEEE80211G     }, /* Dynamic b/g */
+	{ AR5K_MODE_TURBO,	MODE_ATHEROS_TURBO  },
+	{ AR5K_MODE_108G,	MODE_ATHEROS_TURBOG },
 };
 
 /**
@@ -127,16 +125,18 @@ static struct {
 static int
 ath5k_ar5k_to_mac80211_mode(u_int ar5k_mode)
 {
-        int i;
-printk("ar5k_to_mac80211_mode called\n");
-        for (i = 0; i < ARRAY_SIZE(ar5k_mode_map); i++) {
-                if (ar5k_mode_map[i].ar5k_mode == ar5k_mode){
-printk("ar5k_mode = %d, mac80211_mode = %d\n", ar5k_mode, ar5k_mode_map[i].mac80211_mode);
-                        return ar5k_mode_map[i].mac80211_mode;
+	int i;
+
+	printk("ar5k_to_mac80211_mode called\n");
+	for (i = 0; i < ARRAY_SIZE(ar5k_mode_map); i++) {
+		if (ar5k_mode_map[i].ar5k_mode == ar5k_mode) {
+			printk("ar5k_mode = %d, mac80211_mode = %d\n", 
+					`ar5k_mode, ar5k_mode_map[i].mac80211_mode);
+			return ar5k_mode_map[i].mac80211_mode;
 		}
-        }
-        printk(KERN_ERR "Invalid ar5k phy operation mode.\n");
-        return -EINVAL ;
+	}
+	printk(KERN_ERR "Invalid ar5k phy operation mode.\n");
+	return -EINVAL ;
 }
 
 /**
@@ -146,16 +146,16 @@ printk("ar5k_mode = %d, mac80211_mode = %d\n", ar5k_mode, ar5k_mode_map[i].mac80
  * Maps the given mac80211 hw operation mode to it's equivalent ar5k phy 
  * operation mode (MODE_IEEE80211*). Returns -1 on failure.
  */
-static int
+	static int
 ath5k_mac80211_to_ar5k_mode(u_int mac80211_mode)
 {
-        int i;
-        for (i = 0; i < sizeof(ar5k_mode_map) / sizeof(ar5k_mode_map[0]); i++) {
-                if (ar5k_mode_map[i].mac80211_mode == mac80211_mode)
-                        return ar5k_mode_map[i].ar5k_mode;
-        }
-        printk(KERN_ERR "Invalid mac80211 hw mode.\n");
-        return -EINVAL ;
+	int i;
+	for (i = 0; i < sizeof(ar5k_mode_map) / sizeof(ar5k_mode_map[0]); i++) {
+		if (ar5k_mode_map[i].mac80211_mode == mac80211_mode)
+			return ar5k_mode_map[i].ar5k_mode;
+	}
+	printk(KERN_ERR "Invalid mac80211 hw mode.\n");
+	return -EINVAL ;
 }
 
 int
@@ -169,8 +169,8 @@ ath5k_calc_bssid_mask(struct ieee80211_hw *hw)
 	for (i = 0; i < sc->sc_num_bss; i++) {
 		dev = dev_get_by_index(sc->sc_bss[i].ab_if_id);
 		for (j = 0; j < ETH_ALEN; j++) {
-			mask[j] &= ~(hw->wiphy->perm_addr[j] ^ 
-				dev->dev_addr[j]);
+			mask[j] &= 
+				~(hw->wiphy->perm_addr[j] ^ dev->dev_addr[j]);
 		}
 		dev_put(dev);
 	}
@@ -190,7 +190,7 @@ u_int
 ath5k_mhz2ieee(u_int freq, u_int flags)
 {
 	if (flags & CHANNEL_2GHZ) {	/* 2GHz band */
-		if (freq == 2484)		/* Japan */
+		if (freq == 2484)	/* Japan */
 			return 14;
 		/* don't number non-IEEE channels unless we do channel tests */
 		if ((freq >= 2412) && (freq < 2484))
@@ -340,7 +340,7 @@ ath5k_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct ath5k_softc *sc;
 	u_int32_t val;
 	u_int8_t csz;
-	int error=0;
+	int error = 0;
 
 	if (pci_enable_device(pdev))
 		return -EIO;
@@ -429,8 +429,8 @@ ath5k_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	sc->sc_iobase = mem;
 
 	/* Finish private driver data initialization */
-	error = ath5k_init(hw,id->device);
-	if(error){
+	error = ath5k_init(hw, id->device);
+	if (error) {
 		printk(KERN_ERR "ath5k: Unable to initialize private driver data !\n");
 		goto bad3;
 	}
@@ -488,13 +488,11 @@ ath5k_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
 	struct ath5k_softc *sc = hw->priv;
 
-	if(ath5k_tx_stop(hw)){
-		printk(KERN_ERR "ath5k_pci: Could not stop tx !\n");
-	}
+	if (ath5k_tx_stop(hw))
+		printk(KERN_ERR "ath5k_pci: Could not stop tx!\n");
 
-	if(ath5k_rx_stop(hw)){
-		printk(KERN_ERR "ath5k_pci: Could not stop rx !\n");
-	}
+	if (ath5k_rx_stop(hw))
+		printk(KERN_ERR "ath5k_pci: Could not stop rx!\n");
 
 	/*
 	 * TODO: Stop interrupts on hw, put chip on sleep, disable phy
@@ -541,13 +539,11 @@ ath5k_pci_resume(struct pci_dev *pdev)
 	 * Chip reset
 	 */
 
-	if(ath5k_rx_start(hw)){
-		printk(KERN_ERR "ath5k_pci: Could not start rx !\n");
-	}
+	if (ath5k_rx_start(hw))
+		printk(KERN_ERR "ath5k_pci: Could not start rx!\n");
 
-	if(ath5k_tx_start(hw)){
-		printk(KERN_ERR "ath5k_pci: Could not start tx !\n");
-	}
+	if (ath5k_tx_start(hw))
+		printk(KERN_ERR "ath5k_pci: Could not start tx!\n");
 
 	/* TODO: Resume interrupts on sw */
 
@@ -579,7 +575,7 @@ static const char *ath5k_hw_status_msg[] = {
 static const char* 
 ath5k_get_hw_status_message(AR5K_STATUS status)
 {
-	if (status > 0 && status < ARRAY_SIZE(ath5k_hw_status_msg))
+	if ((status > 0) && (status < ARRAY_SIZE(ath5k_hw_status_msg)))
 		return ath5k_hw_status_msg[status];
 	else
 		return "";
@@ -592,14 +588,13 @@ ath5k_init(struct ieee80211_hw *hw, u_int16_t devid)
 	AR5K_STATUS status;
 	struct ath5k_softc *sc = hw->priv;
 	struct pci_dev *pdev = (struct pci_dev *)sc->sc_bdev;
-	int error,i=0;
+	int error, i = 0;
 
 	/*
 	 * Initialize hw
 	 */
 	ah = ath5k_hw_init(devid, sc, 0,
-			     (__force AR5K_BUS_HANDLE) sc->sc_iobase,
-			     &status);
+			(__force AR5K_BUS_HANDLE) sc->sc_iobase, &status);
 
 	if (!ah) {
 		printk(KERN_ERR "ath5k: unable to attach hardware: '%s'\n",
@@ -633,10 +628,11 @@ ath5k_init(struct ieee80211_hw *hw, u_int16_t devid)
 		ath5k_hw_reset_key(ah, i);
 
 	/* Initialize PHY calibration timer */
-//	init_timer(&sc->sc_cal_ch);
-//	sc->sc_cal_ch.function = ath5k_hw_phy_calibrate;
-//	sc->sc_cal_ch.data = (unsigned long) sc;
-
+#if 0
+	init_timer(&sc->sc_cal_ch);
+	sc->sc_cal_ch.function = ath5k_hw_phy_calibrate;
+	sc->sc_cal_ch.data = (unsigned long) sc;
+#endif
 
 	if (sc->sc_softled) {
 		ath5k_hw_set_gpio_output(ah, sc->sc_ledpin);
@@ -673,50 +669,43 @@ ath5k_init(struct ieee80211_hw *hw, u_int16_t devid)
 
 	/* Setup supported hw modes */
 
-	if(sc->sc_ah->ah_capabilities.cap_mode & AR5K_MODE_11A) {
+	if (sc->sc_ah->ah_capabilities.cap_mode & AR5K_MODE_11A)
 		ath5k_mode_setup(hw, AR5K_MODE_11A);
-	}
-	if(sc->sc_ah->ah_capabilities.cap_mode & AR5K_MODE_11B){
+	if (sc->sc_ah->ah_capabilities.cap_mode & AR5K_MODE_11B)
 		ath5k_mode_setup(hw, AR5K_MODE_11B);
-	}
-	if(sc->sc_ah->ah_capabilities.cap_mode & AR5K_MODE_11G){
+	if (sc->sc_ah->ah_capabilities.cap_mode & AR5K_MODE_11G)
 		ath5k_mode_setup(hw, AR5K_MODE_11G);
-	}
 	/* XXX: Turbo ? */
 
 	/* Register device on 80211 stack */
 	SET_IEEE80211_DEV(hw, &pdev->dev);
-	if(ieee80211_register_hw(hw)){
+	if (ieee80211_register_hw(hw)) {
 		printk(KERN_ERR "ath5k: Could not register device on 80211 stack !\n");
 		error = -EINVAL;
 	}
 
 	/* Set the first mode/channel on the channel list */
 	if ((sc->sc_num_modes > 0) && (sc->sc_hw_modes[0].num_channels > 0)) {
-	    hw->conf.freq = sc->sc_hw_modes[0].channels[0].freq;
-	    hw->conf.channel_val = sc->sc_hw_modes[0].channels[0].val;
+		hw->conf.freq = sc->sc_hw_modes[0].channels[0].freq;
+		hw->conf.channel_val = sc->sc_hw_modes[0].channels[0].val;
 	}
 
 	/* Set up rx */
-	if(ath5k_rx_setup(hw)){
+	if (ath5k_rx_setup(hw))
 		printk(KERN_ERR "ath5k: Could not set up rx !\n");
-	}
 
 	/* Set up tx */
-	if(ath5k_rx_setup(hw)){
+	if (ath5k_rx_setup(hw))
 		printk(KERN_ERR "ath5k: Could not set up rx !\n");
-	}
 
 	/* Start interrupt processing */
 	sc->sc_intr_pause = 0;
 
 	/* Start rx */
-	if(ath5k_rx_start(hw)){
+	if (ath5k_rx_start(hw))
 		printk(KERN_ERR "ath5k: Could not start rx !\n");
-	}
 
 	return 0;
-
 
 bad:
 	if (ah)
@@ -734,7 +723,7 @@ ath5k_detach(struct ieee80211_hw *hw)
 	u_int32_t tmp;
 
 	sc = hw->priv;
-	ath5k_hw_set_power(sc->sc_ah, AR5K_PM_AWAKE,TRUE,0);
+	ath5k_hw_set_power(sc->sc_ah, AR5K_PM_AWAKE, TRUE, 0);
 
 	/* Stop interrupt handling */
 	sc->sc_intr_pause = 1;
@@ -753,18 +742,18 @@ ath5k_detach(struct ieee80211_hw *hw)
 	 */
 	ieee80211_unregister_hw(hw);	
 
-	/* Temporarily commented out to avoid null pointer */
-//	ath5k_hw_set_intr(ah, 0);	/* disable further intr's */
-//	ath5k_hw_get_isr(ah, &tmp);	/* clear ISR */
+#if 0
+	/* Temporarily disable to avoid null pointer */
+	ath5k_hw_set_intr(ah, 0);	/* disable further intr's */
+	ath5k_hw_get_isr(ah, &tmp);	/* clear ISR */
+#endif
 
 
-	if(ath5k_rx_stop(hw)){
+	if (ath5k_rx_stop(hw))
 		printk(KERN_ERR "ath5k: Could not stop rx !\n");
-	}
 
-	if(ath5k_tx_stop(hw)){
+	if (ath5k_tx_stop(hw))
 		printk(KERN_ERR "ath5k: Could not stop rx !\n");
-	}
 
 	/* XXX: This function needs work */
 	ath5k_hw_detach(ah);
@@ -790,16 +779,16 @@ ath5k_mode_setup(struct ieee80211_hw *hw, u_int ar5k_mode)
 
 	sc = hw->priv;
 
-	mode = kmalloc(sizeof(struct ieee80211_hw_mode),GFP_KERNEL);
+	mode = kmalloc(sizeof(struct ieee80211_hw_mode), GFP_KERNEL);
 	memset(mode, 0, sizeof(struct ieee80211_hw_mode));
 
 	ar5k_rt = ath5k_hw_get_rate_table(sc->sc_ah, ar5k_mode);
 
-	mac80211_rates = kmalloc((sizeof(struct ieee80211_rate) * ar5k_rt->rate_count),
-				GFP_KERNEL);
+	mac80211_rates = kmalloc((sizeof(struct ieee80211_rate) * 
+				ar5k_rt->rate_count), GFP_KERNEL);
 	memset(mode, 0, (sizeof(struct ieee80211_rate) * ar5k_rt->rate_count));
 
-	if(!ar5k_rt)
+	if (!ar5k_rt)
 		return -EINVAL;
 
 	mode = &sc->sc_hw_modes[sc->sc_num_modes];
@@ -813,7 +802,7 @@ ath5k_mode_setup(struct ieee80211_hw *hw, u_int ar5k_mode)
 	 * domain restrictions are handled
 	 * in init_channels_for_mode.
 	 */
-	switch(ar5k_mode){
+	switch(ar5k_mode) {
 	case AR5K_MODE_11A:
 		max_chans = 221;
 		break;
@@ -822,11 +811,11 @@ ath5k_mode_setup(struct ieee80211_hw *hw, u_int ar5k_mode)
 		max_chans = 26;
 		break;
 	default:
-		printk(KERN_ERR "ath5k: Unsupported ar5k_mode passed on mode_setup !\n");
+		printk(KERN_ERR "ath5k: Unsupported ar5k_mode passed on mode_setup!\n");
 		return -EINVAL;
 	}
 
-	if(ath5k_init_channels_for_mode(sc->sc_ah,mode, max_chans)){
+	if (ath5k_init_channels_for_mode(sc->sc_ah, mode, max_chans)) {
 		printk(KERN_ERR "ath5k: Could not set up channels for mode: %d !\n",
 			mode->mode);
 		return -EINVAL;
@@ -836,24 +825,23 @@ ath5k_mode_setup(struct ieee80211_hw *hw, u_int ar5k_mode)
 	mode->num_rates = 0;
 	mode->rates = mac80211_rates;
 	for (i = 0; i < ar5k_rt->rate_count; i++) {
-
 		mac80211_rates[i].rate = ar5k_rt->rates[i].rate_kbps / 100;
 		mac80211_rates[i].val = ar5k_rt->rates[i].rate_code;
 		mac80211_rates[i].flags = ar5k_rt->rates[i].modulation;
 		mac80211_rates[i].val2 = 0 ;
 
 		/* XXX: not used in mac80211 */
-		/*	
+#if 0
 		mac80211_rate->min_rssi_ack;
 		mac80211_rate->min_rssi_ack_delta;
-		*/
+#endif
 
 		mode->num_rates++;
 
 	}
 
 	/* Register mode */
-	if(ieee80211_register_hwmode(hw, mode)){
+	if (ieee80211_register_hwmode(hw, mode)) {
 		printk(KERN_ERR "Could not register phymode to stack !\n");
 		return -EINVAL;
 	} else {
@@ -878,12 +866,12 @@ ath5k_init_channels_for_mode(struct ath_hal *hal,
 	channels = kmalloc((sizeof(struct ieee80211_channel) * max_chans),
 			GFP_KERNEL);
 
-	if(!channels)
+	if (!channels)
 		return -ENOMEM;
 
 	memset(channels, 0, (sizeof(struct ieee80211_channel) * max_chans));
 
-	switch(mode->mode){
+	switch(mode->mode) {
 	case MODE_IEEE80211B:
 		flags = CHANNEL_B;
 		break;
@@ -898,10 +886,10 @@ ath5k_init_channels_for_mode(struct ath_hal *hal,
 		return -EINVAL;
 	}
 
-	for(i = 1; i < max_chans; i++){
+	for (i = 1; i < max_chans; i++) {
 		/* TODO: Channel Restrictions based on reg domain !!*/
-		freq = 	ath5k_ieee2mhz(i,flags);
-		if(!ath5k_hw_check_channel(hal,freq,flags)){
+		freq = ath5k_ieee2mhz(i, flags);
+		if (!ath5k_hw_check_channel(hal, freq, flags)) {
 			printk(KERN_DEBUG "ath5k: Channel out of hw limits !\n");
 			i--;
 			break;
@@ -958,7 +946,7 @@ ath5k_tx_queue_setup(struct ieee80211_hw *hw,
  * Tx Queue start
  */
 static int
-ath5k_tx_queue_start(struct ieee80211_hw *hw, u_int8_t qnum){
+ath5k_tx_queue_start(struct ieee80211_hw *hw, u_int8_t qnum) {
 
 	return 0;
 }
@@ -967,7 +955,7 @@ ath5k_tx_queue_start(struct ieee80211_hw *hw, u_int8_t qnum){
  * Tx Queue stop
  */
 static int
-ath5k_tx_queue_stop(struct ieee80211_hw *hw, u_int8_t qnum){
+ath5k_tx_queue_stop(struct ieee80211_hw *hw, u_int8_t qnum) {
 
 	return 0;
 }
@@ -976,7 +964,7 @@ ath5k_tx_queue_stop(struct ieee80211_hw *hw, u_int8_t qnum){
  * Tx Setup
  */
 int
-ath5k_tx_setup(struct ieee80211_hw *hw){
+ath5k_tx_setup(struct ieee80211_hw *hw) {
 
 	return 0;
 }
@@ -985,7 +973,7 @@ ath5k_tx_setup(struct ieee80211_hw *hw){
  * Tx start
  */
 int
-ath5k_tx_start(struct ieee80211_hw *hw){
+ath5k_tx_start(struct ieee80211_hw *hw) {
 
 	return 0;
 }
@@ -994,7 +982,7 @@ ath5k_tx_start(struct ieee80211_hw *hw){
  * Tx stop
  */
 int
-ath5k_tx_stop(struct ieee80211_hw *hw){
+ath5k_tx_stop(struct ieee80211_hw *hw) {
 
 	return 0;
 }
@@ -1007,8 +995,8 @@ ath5k_tx_stop(struct ieee80211_hw *hw){
  * 2 -> just change channel
  */
 int
-ath5k_state_reset(struct ieee80211_hw *hw, u_int8_t action){
-
+ath5k_state_reset(struct ieee80211_hw *hw, u_int8_t action)
+{
 	return 0;
 }
 
@@ -1039,7 +1027,7 @@ int ath5k_tx(struct ieee80211_hw *hw, struct sk_buff *skb,
 	 * -Sync dma stuff
 	 * -Start tx dma on hw for this q (tx_start)
 	 */
-        return 0;
+	return 0;
 }
 
 int
@@ -1058,7 +1046,7 @@ ath5k_open(struct ieee80211_hw *hw)
 	return error;
 }
 
-int
+	int
 ath5k_stop(struct ieee80211_hw *hw)
 {
 	/* TODO:
@@ -1074,9 +1062,9 @@ ath5k_stop(struct ieee80211_hw *hw)
 	return 0;
 }
 
-int
+	int
 ath5k_add_interface(struct ieee80211_hw *hw,
-	struct ieee80211_if_init_conf *conf)
+		struct ieee80211_if_init_conf *conf)
 {
 	struct ath5k_softc *sc = hw->priv;
 	int error = 0;
@@ -1084,19 +1072,19 @@ ath5k_add_interface(struct ieee80211_hw *hw,
 	/* TODO: Use mac80211 definitions
 	 * inside openhal */
 	switch (conf->type) {
-	case IEEE80211_IF_TYPE_STA:
-		sc->sc_opmode = AR5K_M_STA;
-		break;
-	case IEEE80211_IF_TYPE_IBSS:
-		sc->sc_opmode = AR5K_M_IBSS;
-		break;
-	case IEEE80211_IF_TYPE_MNTR:
-		sc->sc_opmode = AR5K_M_MONITOR;
-		break;
-	case IEEE80211_IF_TYPE_AP: /* Notyet */
-        default:
-                error = -EINVAL;
-                goto done;
+		case IEEE80211_IF_TYPE_STA:
+			sc->sc_opmode = AR5K_M_STA;
+			break;
+		case IEEE80211_IF_TYPE_IBSS:
+			sc->sc_opmode = AR5K_M_IBSS;
+			break;
+		case IEEE80211_IF_TYPE_MNTR:
+			sc->sc_opmode = AR5K_M_MONITOR;
+			break;
+		case IEEE80211_IF_TYPE_AP: /* Notyet */
+		default:
+			error = -EINVAL;
+			goto done;
 	}
 	if (ath5k_calc_bssid_mask(hw))
 		error = ath5k_state_reset(hw, 0);
@@ -1105,9 +1093,9 @@ done:
 	return error;
 }
 
-void
+	void
 ath5k_remove_interface(struct ieee80211_hw *hw,
-	struct ieee80211_if_init_conf *conf)
+		struct ieee80211_if_init_conf *conf)
 {
 	struct ath5k_softc *sc = hw->priv;
 
@@ -1119,7 +1107,7 @@ ath5k_remove_interface(struct ieee80211_hw *hw,
 	up(&(sc)->sc_lock);
 }
 
-int
+	int
 ath5k_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 {
 	struct ath5k_softc *sc = hw->priv;
@@ -1131,7 +1119,7 @@ ath5k_config(struct ieee80211_hw *hw, struct ieee80211_conf *conf)
 	sc->sc_mode = conf->phymode;
 	/* XXX: How about conf->mode ? */
 	sc->sc_beacon_interval = (conf->beacon_int * 1000) >> 10;
-	
+
 	/* TODO:
 	 * -Set regulatory domain on sc and 
 	 * if it's changed reinitialize channels
@@ -1179,7 +1167,7 @@ ath5k_config_interface(struct ieee80211_hw *hw, int if_id,
 
 	if (conf->bssid)
 		ath5k_hw_set_associd(ah, conf->bssid, 0 /* FIXME: aid */);
-	return ath5k_state_reset(hw,0);
+	return ath5k_state_reset(hw, 0);
 }
 
 u64

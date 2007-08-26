@@ -96,16 +96,16 @@ typedef u_int32_t AR5K_BUS_ADDR;
  * Error codes reported from HAL to the driver
  */
 typedef enum {
-	AR5K_OK		= 0,	/* Everything went O.K.*/
-	AR5K_ENOMEM	= 1,	/* Unable to allocate memory for ath_hal*/
-	AR5K_EIO	= 2,	/* Hardware I/O Error*/
-	AR5K_EELOCKED	= 3,	/* Unable to access EEPROM*/
-	AR5K_EEBADSUM	= 4,	/* Invalid EEPROM checksum*/
-	AR5K_EEREAD	= 5,	/* Unable to get device caps from EEPROM */
-	AR5K_EEBADMAC	= 6,	/* Unable to read MAC address from EEPROM */
-	AR5K_EINVAL	= 7,	/* Invalid parameter to function */
-	AR5K_ENOTSUPP	= 8,	/* Hardware revision not supported */
-	AR5K_EINPROGRESS= 9,	/* Unexpected error ocured during process */
+	AR5K_OK		 = 0,	/* Everything went O.K.*/
+	AR5K_ENOMEM	 = 1,	/* Unable to allocate memory for ath_hal*/
+	AR5K_EIO	 = 2,	/* Hardware I/O Error*/
+	AR5K_EELOCKED	 = 3,	/* Unable to access EEPROM*/
+	AR5K_EEBADSUM	 = 4,	/* Invalid EEPROM checksum*/
+	AR5K_EEREAD	 = 5,	/* Unable to get device caps from EEPROM */
+	AR5K_EEBADMAC	 = 6,	/* Unable to read MAC address from EEPROM */
+	AR5K_EINVAL	 = 7,	/* Invalid parameter to function */
+	AR5K_ENOTSUPP	 = 8,	/* Hardware revision not supported */
+	AR5K_EINPROGRESS = 9,	/* Unexpected error ocured during process */
 } AR5K_STATUS;
 
 /*
@@ -305,12 +305,12 @@ struct ath5k_tx_status {
  * Queue types used to classify tx queues.
  */
 typedef enum {
-	AR5K_TX_QUEUE_INACTIVE = 0,/*This queue is not used -see ath_hal_releasetxqueue*/
-	AR5K_TX_QUEUE_DATA,	  /*A normal data queue*/
-	AR5K_TX_QUEUE_XR_DATA,	  /*An XR-data queue*/
-	AR5K_TX_QUEUE_BEACON,	  /*The beacon queue*/
-	AR5K_TX_QUEUE_CAB,	  /*The ater-beacon queue*/
-	AR5K_TX_QUEUE_UAPSD,	  /*Unscheduled Automatic Power Save Delivery queue*/
+	AR5K_TX_QUEUE_INACTIVE = 0,	/*This queue is not used -see ath_hal_releasetxqueue*/
+	AR5K_TX_QUEUE_DATA,	  	/*A normal data queue*/
+	AR5K_TX_QUEUE_XR_DATA,	  	/*An XR-data queue*/
+	AR5K_TX_QUEUE_BEACON,	  	/*The beacon queue*/
+	AR5K_TX_QUEUE_CAB,	  	/*The ater-beacon queue*/
+	AR5K_TX_QUEUE_UAPSD,	  	/*Unscheduled Automatic Power Save Delivery queue*/
 } AR5K_TX_QUEUE;
 
 #define	AR5K_NUM_TX_QUEUES		10
@@ -665,10 +665,10 @@ typedef struct {
 #define	CHANNEL_108G	CHANNEL_TG
 #define	CHANNEL_X	(CHANNEL_5GHZ|CHANNEL_OFDM|CHANNEL_XR)
 
-#define	CHANNEL_ALL 	(CHANNEL_OFDM|CHANNEL_CCK| CHANNEL_2GHZ |\
+#define	CHANNEL_ALL 	(CHANNEL_OFDM|CHANNEL_CCK| CHANNEL_2GHZ | \
 			 CHANNEL_5GHZ | CHANNEL_TURBO)
 
-#define	CHANNEL_ALL_NOTURBO 	(CHANNEL_ALL &~ CHANNEL_TURBO)
+#define	CHANNEL_ALL_NOTURBO 	(CHANNEL_ALL & ~CHANNEL_TURBO)
 #define CHANNEL_MODES	CHANNEL_ALL
 
 /*
@@ -676,10 +676,10 @@ typedef struct {
  * for reset_tx_queue). Also see struct AR5K_CHANNEL.
  */
 #define IS_CHAN_XR(_c) \
-        ((_c.channel_flags & CHANNEL_XR) != 0)
+	((_c.channel_flags & CHANNEL_XR) != 0)
 
 #define IS_CHAN_B(_c) \
-        ((_c.channel_flags & CHANNEL_B) != 0)
+	((_c.channel_flags & CHANNEL_B) != 0)
 
 typedef enum {
 	AR5K_CHIP_5GHZ = CHANNEL_5GHZ,
@@ -830,7 +830,7 @@ typedef struct {
 /*
  * Misc definitions
  */
-#define	AR5K_RSSI_EP_MULTIPLIER	(1<<7)
+#define	AR5K_RSSI_EP_MULTIPLIER	(1 << 7)
 
 #define AR5K_ASSERT_ENTRY(_e, _s) do {		\
 	if (_e >= _s)				\
@@ -868,37 +868,37 @@ typedef enum {
  * easier. Some of them are not used yet inside OpenHAL.
  */
 typedef enum {
-	AR5K_INT_RX	= 0x00000001,
-	AR5K_INT_RXDESC	= 0x00000002,
+	AR5K_INT_RX	 = 0x00000001,
+	AR5K_INT_RXDESC	 = 0x00000002,
 	AR5K_INT_RXNOFRM = 0x00000008,
-	AR5K_INT_RXEOL	= 0x00000010,
-	AR5K_INT_RXORN	= 0x00000020,
-	AR5K_INT_TX	= 0x00000040,
-	AR5K_INT_TXDESC	= 0x00000080,
-	AR5K_INT_TXURN	= 0x00000800,
-	AR5K_INT_MIB	= 0x00001000,
-	AR5K_INT_RXPHY	= 0x00004000,
-	AR5K_INT_RXKCM	= 0x00008000,
-	AR5K_INT_SWBA	= 0x00010000,
-	AR5K_INT_BMISS	= 0x00040000,
-	AR5K_INT_BNR	= 0x00100000,
-	AR5K_INT_GPIO	= 0x01000000,
-	AR5K_INT_FATAL	= 0x40000000,
-	AR5K_INT_GLOBAL	= 0x80000000,
+	AR5K_INT_RXEOL	 = 0x00000010,
+	AR5K_INT_RXORN	 = 0x00000020,
+	AR5K_INT_TX	 = 0x00000040,
+	AR5K_INT_TXDESC	 = 0x00000080,
+	AR5K_INT_TXURN	 = 0x00000800,
+	AR5K_INT_MIB	 = 0x00001000,
+	AR5K_INT_RXPHY	 = 0x00004000,
+	AR5K_INT_RXKCM	 = 0x00008000,
+	AR5K_INT_SWBA	 = 0x00010000,
+	AR5K_INT_BMISS	 = 0x00040000,
+	AR5K_INT_BNR	 = 0x00100000,
+	AR5K_INT_GPIO	 = 0x01000000,
+	AR5K_INT_FATAL	 = 0x40000000,
+	AR5K_INT_GLOBAL	 = 0x80000000,
 
 	/*A sum of all the common bits*/
-	AR5K_INT_COMMON  = AR5K_INT_RXNOFRM
-			| AR5K_INT_RXDESC
-			| AR5K_INT_RXEOL
-			| AR5K_INT_RXORN
-			| AR5K_INT_TXURN
-			| AR5K_INT_TXDESC
-			| AR5K_INT_MIB
-			| AR5K_INT_RXPHY
-			| AR5K_INT_RXKCM
-			| AR5K_INT_SWBA
-			| AR5K_INT_BMISS
-			| AR5K_INT_GPIO,
+	AR5K_INT_COMMON  = AR5K_INT_RXNOFRM |
+		AR5K_INT_RXDESC	|
+		AR5K_INT_RXEOL	|
+		AR5K_INT_RXORN	|
+		AR5K_INT_TXURN	|
+		AR5K_INT_TXDESC	|
+		AR5K_INT_MIB	|
+		AR5K_INT_RXPHY	|
+		AR5K_INT_RXKCM	|
+		AR5K_INT_SWBA	|
+		AR5K_INT_BMISS	|
+		AR5K_INT_GPIO,
 	AR5K_INT_NOCARD	= 0xffffffff /*Declare that the card 
 				       has been removed*/
 } AR5K_INT;
@@ -1051,11 +1051,13 @@ struct ath_hal {
 	AR5K_BOOL		ah_single_chip;
 	AR5K_RFGAIN		ah_rf_gain;
 
-//	AR5K_RATE_TABLE		ah_rt_11a;
-//	AR5K_RATE_TABLE		ah_rt_11b;
-//	AR5K_RATE_TABLE		ah_rt_11g;
-//	AR5K_RATE_TABLE		ah_rt_turbo;
-//	AR5K_RATE_TABLE		ah_rt_xr;
+#if 0
+	AR5K_RATE_TABLE		ah_rt_11a;
+	AR5K_RATE_TABLE		ah_rt_11b;
+	AR5K_RATE_TABLE		ah_rt_11g;
+	AR5K_RATE_TABLE		ah_rt_turbo;
+	AR5K_RATE_TABLE		ah_rt_xr;
+#endif
 
 	u_int32_t		ah_mac_srev;
 	u_int16_t		ah_mac_version;
@@ -1142,7 +1144,9 @@ struct ath_hal {
  * Needs review */
 struct ath5k_bss_info {
 	int		ab_if_id;	/* if_id from ieee80211_if_init_conf */
-//	struct ath_buf *ab_bcbuf;	/* beacon buffer */
+#if 0
+	struct ath_buf *ab_bcbuf;	/* beacon buffer */
+#endif
 };
 
 struct ath5k_softc {
@@ -1160,8 +1164,8 @@ struct ath5k_softc {
 			sc_hasbmask:1,		/* bssid mask support */
 			sc_beacons:1,		/* beacons running */
 			sc_syncbeacon:1,	/* sync/resync beacon timers */
-		        sc_ackrate:1,           /* send acks at high bitrate */
-		        sc_shortslottime:1;     /* use short slot time */
+			sc_ackrate:1,           /* send acks at high bitrate */
+			sc_shortslottime:1;     /* use short slot time */
 	int		sc_mode;		/* current ieee80211 phy mode */
 	u_int16_t	sc_curtxpow;		/* current tx power limit */
 	u_int16_t	sc_curaid;		/* current association id */
@@ -1184,7 +1188,7 @@ struct ath5k_softc {
 	struct ieee80211_hw_mode sc_hw_modes[ATH_MAX_HW_MODES];	/* hw_modes array */
 	int sc_num_modes;			/* number of modes in sc_hw_modes */
 	struct ieee80211_channel sc_channels[ATH_MAX_HW_MODES *
-					     ATH_MAX_CHANNELS]; /* channels array */
+		ATH_MAX_CHANNELS];		/* channels array */
 	struct ieee80211_rate sc_ieee80211_rates[ATH_MAX_HW_MODES *
 						 ATH_MAX_RATES];
 	AR5K_OPMODE sc_opmode;			/* current hal operating mode */
@@ -1193,9 +1197,11 @@ struct ath5k_softc {
 	int sc_num_alloced_bss;			/* total # of elements in sc_bss */
 	spinlock_t sc_bss_lock;			/* for access to sc_num_bss, sc_bss */
 	int sc_num_bss;				/* # of used elements in sc_bss */
-	struct ath5k_bss_info *sc_bss;			/* array of per bss info */
+	struct ath5k_bss_info *sc_bss;		/* array of per bss info */
 	int sc_beacon_interval;			/* beacon interval in units of TU */
-	int16_t sc_channoise;			/* Measured noise of current channel (dBm) TODO: Implement in openhal*/
+	int16_t sc_channoise;			/* Measured noise of current 
+						 * channel (dBm) 
+						 * TODO: Implement in openhal */
 };
 
 
@@ -1276,7 +1282,7 @@ extern void		ath5k_hw_stop_pcu_recv(struct ath_hal*);
 extern void		ath5k_hw_set_mcast_filter(struct ath_hal*, u_int32_t filter0,
 						u_int32_t filter1);
 extern AR5K_BOOL	ath5k_hw_set_mcast_filterindex(struct ath_hal*, u_int32_t index);
-extern AR5K_BOOL	ath5k_hw_clear_mcast_filter_idx(struct ath_hal*,u_int32_t index);
+extern AR5K_BOOL	ath5k_hw_clear_mcast_filter_idx(struct ath_hal*, u_int32_t index);
 extern u_int32_t	ath5k_hw_get_rx_filter(struct ath_hal*);
 extern void		ath5k_hw_set_rx_filter(struct ath_hal*, u_int32_t);
 /* beacon */
@@ -1328,7 +1334,7 @@ extern AR5K_BOOL	ath5k_hw_setup_4word_tx_desc(struct ath_hal *, struct ath5k_des
 				u_int rtscts_duration);
 extern AR5K_BOOL	ath5k_hw_setup_xr_tx_desc(struct ath_hal *, struct ath5k_desc *,
 				u_int tx_rate1, u_int tx_tries1, u_int tx_rate2,
-				u_int tx_tries2,u_int tx_rate3, u_int tx_tries3);
+				u_int tx_tries2, u_int tx_rate3, u_int tx_tries3);
 extern AR5K_BOOL	ath5k_hw_fill_2word_tx_desc(struct ath_hal *, struct ath5k_desc *, u_int segLen,
 				AR5K_BOOL firstSeg, AR5K_BOOL lastSeg, const struct ath5k_desc *);
 extern AR5K_BOOL	ath5k_hw_fill_4word_tx_desc(struct ath_hal *, struct ath5k_desc *, u_int segLen,
@@ -1375,7 +1381,7 @@ extern void		ath5k_hw_set_rfgain_opt(struct ath_hal *hal);
 extern AR5K_BOOL	ath5k_hw_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode);
 extern u_int16_t	ath5k_hw_radio_revision(struct ath_hal *hal, AR5K_CHIP chip);
 
-/* Misc TODO: Clean them up ! */
+/* Misc. TODO: Clean them up! */
 extern void 		ath5k_write_initvals(struct ath_hal *hal, u_int8_t mode, AR5K_BOOL change_channel);
 extern AR5K_BOOL	ath5k_hw_register_timeout(struct ath_hal *hal, u_int32_t reg, u_int32_t flag,
 						u_int32_t val, AR5K_BOOL is_set);
@@ -1383,13 +1389,13 @@ extern void		ath5k_hw_dump_state(struct ath_hal *);
 extern AR5K_BOOL 	ath5k_hw_has_veol(struct ath_hal *);
 extern void		ath5k_hw_get_tx_inter_queue(struct ath_hal *, u_int32_t *);
 extern void		ath5k_hw_set_rx_signal_monitor(struct ath_hal *, const AR5K_NODE_STATS *);
-extern AR5K_BOOL	ath5k_hw_get_diag_state(struct ath_hal *, int request,const void *args,
+extern AR5K_BOOL	ath5k_hw_get_diag_state(struct ath_hal *, int request, const void *args,
 				u_int32_t argsize, void **result, u_int32_t *resultsize);
 extern AR5K_BOOL	ath5k_hw_detect_card_present(struct ath_hal*);
 extern AR5K_STATUS 	ath5k_hw_get_capability(struct ath_hal *, AR5K_CAPABILITY_TYPE,
 						u_int32_t, u_int32_t *);
 extern AR5K_BOOL	ath5k_hw_set_capability(struct ath_hal *, AR5K_CAPABILITY_TYPE, u_int32_t,\
-						u_int32_t,AR5K_STATUS *) ;
+						u_int32_t, AR5K_STATUS *) ;
 extern AR5K_BOOL	ath5k_hw_query_pspoll_support(struct ath_hal*);
 extern AR5K_BOOL	ath5k_hw_init_pspoll(struct ath_hal*);
 extern AR5K_BOOL	ath5k_hw_enable_pspoll(struct ath_hal *, u_int8_t *, u_int16_t);
