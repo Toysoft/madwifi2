@@ -44,7 +44,7 @@
 #include <net/mac80211.h>
 
 /* Register addresses and values */
-#include "ath5kreg.h"
+#include "ath5k_hw_regs.h"
 /* HW structures and misc defines used by hw functions */
 #include "ath5k_hw.h"
 
@@ -1201,7 +1201,7 @@ struct ath5k_softc {
 
 
 /*
- * Prototypes - hw functions
+ * Prototypes - MAC functions
  */
 
 /* General TODO: Clean them up */
@@ -1215,10 +1215,9 @@ void			ath5k_rt_copy(AR5K_RATE_TABLE *, const AR5K_RATE_TABLE *);
 extern const AR5K_RATE_TABLE* ath5k_hw_get_rate_table(struct ath_hal*, u_int mode);
 
 /* Attach/detach */
-struct ath_hal*		ath5k_hw_init(u_int16_t device, AR5K_SOFTC sc, AR5K_BUS_TAG,
+extern struct ath_hal*	ath5k_hw_init(u_int16_t device, AR5K_SOFTC sc, AR5K_BUS_TAG,
 					AR5K_BUS_HANDLE, AR5K_STATUS *);
 AR5K_BOOL		ath5k_hw_nic_wakeup(struct ath_hal *, u_int16_t, AR5K_BOOL);
-u_int16_t		ath5k_hw_radio_revision(struct ath_hal *, AR5K_CHIP);
 extern void		ath5k_hw_detach(struct ath_hal *);	
 
 /* Reset */
@@ -1344,7 +1343,6 @@ extern AR5K_STATUS	ath5k_hw_proc_old_rx_status(struct ath_hal *, struct ath5k_de
 extern AR5K_STATUS	ath5k_hw_proc_new_rx_status(struct ath_hal *, struct ath5k_desc *,
 						u_int32_t phyAddr, struct ath5k_desc *next);
 
-
 /* GPIO */
 extern void		ath5k_hw_set_ledstate(struct ath_hal*, AR5K_LED_STATE);
 extern AR5K_BOOL	ath5k_hw_set_gpio_output(struct ath_hal *, u_int32_t gpio);
@@ -1356,38 +1354,31 @@ u_int16_t		ath5k_regdomain_from_ieee(ieee80211_regdomain_t);
 ieee80211_regdomain_t	ath5k_regdomain_to_ieee(u_int16_t);
 extern u_int16_t	ath5k_hw_get_regdomain(struct ath_hal*);
 
+
+/*
+ * Prototypes - PHY functions
+ */
+
 /* Channel/RF setup */
-AR5K_BOOL		ath5k_hw_check_channel(struct ath_hal *, u_int16_t, u_int flags);
+extern AR5K_BOOL	ath5k_hw_check_channel(struct ath_hal *, u_int16_t, u_int flags);
 extern AR5K_BOOL	ath5k_hw_phy_calibrate(struct ath_hal*, AR5K_CHANNEL *);
-AR5K_BOOL		ath5k_hw_channel(struct ath_hal *, AR5K_CHANNEL *);
-u_int32_t		ath5k_hw_rf5110_chan2athchan(AR5K_CHANNEL *);
-AR5K_BOOL		ath5k_hw_rf5110_channel(struct ath_hal *, AR5K_CHANNEL *);
-AR5K_BOOL		ath5k_hw_rf5111_chan2athchan(u_int, struct ath5k_athchan_2ghz *);
-AR5K_BOOL		ath5k_hw_rf5111_channel(struct ath_hal *, AR5K_CHANNEL *);
-AR5K_BOOL		ath5k_hw_rf5112_channel(struct ath_hal *, AR5K_CHANNEL *);
-AR5K_BOOL		ath5k_hw_phy_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel);
-AR5K_BOOL		ath5k_hw_rf5110_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel);
-AR5K_BOOL		ath5k_hw_rf511x_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel);
+extern AR5K_BOOL	ath5k_hw_channel(struct ath_hal *, AR5K_CHANNEL *);
+extern AR5K_BOOL	ath5k_hw_phy_calibrate(struct ath_hal *hal, AR5K_CHANNEL *channel);
 extern AR5K_BOOL	ath5k_hw_phy_disable(struct ath_hal *);
 extern void		ath5k_hw_set_def_antenna(struct ath_hal *, u_int);
 extern u_int		ath5k_hw_get_def_antenna(struct ath_hal *);
-u_int			ath5k_hw_rfregs_op(u_int32_t *, u_int32_t, u_int32_t, u_int32_t,
-						u_int32_t, u_int32_t, AR5K_BOOL);
-u_int32_t		ath5k_hw_rfregs_gainf_corr(struct ath_hal *);
-AR5K_BOOL		ath5k_hw_rfregs_gain_readback(struct ath_hal *);
-int32_t			ath5k_hw_rfregs_gain_adjust(struct ath_hal *);
-AR5K_BOOL		ath5k_hw_rfregs(struct ath_hal *, AR5K_CHANNEL *, u_int);
-AR5K_BOOL		ath5k_hw_rf5111_rfregs(struct ath_hal *, AR5K_CHANNEL *, u_int);
-AR5K_BOOL		ath5k_hw_rf5112_rfregs(struct ath_hal *, AR5K_CHANNEL *, u_int);
-void	 		ath5k_hw_ar5211_rfregs(struct ath_hal *, AR5K_CHANNEL *, u_int, u_int);
-AR5K_BOOL		ath5k_hw_rfgain(struct ath_hal *, u_int);
+extern AR5K_BOOL	ath5k_hw_rfgain(struct ath_hal *, u_int);
 extern AR5K_RFGAIN	ath5k_hw_get_rf_gain(struct ath_hal*);
-void			ath5k_hw_txpower_table(struct ath_hal *, AR5K_CHANNEL *, int16_t);
-AR5K_BOOL		ath5k_hw_txpower(struct ath_hal *, AR5K_CHANNEL *, u_int);
+extern AR5K_BOOL	ath5k_hw_txpower(struct ath_hal *, AR5K_CHANNEL *, u_int);
 extern AR5K_BOOL	ath5k_hw_set_txpower_limit(struct ath_hal *, u_int);
+extern void		ath5k_hw_set_rfgain_opt(struct ath_hal *hal);
+extern AR5K_BOOL	ath5k_hw_rfregs(struct ath_hal *hal, AR5K_CHANNEL *channel, u_int mode);
+extern u_int16_t	ath5k_hw_radio_revision(struct ath_hal *hal, AR5K_CHIP chip);
 
-
-/* Misc */
+/* Misc TODO: Clean them up ! */
+extern void 		ath5k_write_initvals(struct ath_hal *hal, u_int8_t mode, AR5K_BOOL change_channel);
+extern AR5K_BOOL	ath5k_hw_register_timeout(struct ath_hal *hal, u_int32_t reg, u_int32_t flag,
+						u_int32_t val, AR5K_BOOL is_set);
 extern void		ath5k_hw_dump_state(struct ath_hal *);
 extern AR5K_BOOL 	ath5k_hw_has_veol(struct ath_hal *);
 extern void		ath5k_hw_get_tx_inter_queue(struct ath_hal *, u_int32_t *);
@@ -1453,8 +1444,41 @@ u64 ath5k_get_tsf(struct ieee80211_hw *hw);
 void ath5k_reset_tsf(struct ieee80211_hw *hw);
 
 
-/*ah_osdep.c*/
-struct ath_hal * _ath_hal_attach(u_int16_t devid, AR5K_SOFTC sc, AR5K_BUS_TAG t,
-					AR5K_BUS_HANDLE h, void* s);
-void ath_hal_detach(struct ath_hal *hal);
+/*
+ * Read from a device register
+ */
+static inline u32 ath5k_hw_reg_read(struct ath_hal *hal, u16 reg)
+{
+	return readl(hal->ah_sh + reg);
+}
+
+/*
+ * Write to a device register
+ */
+static inline void ath5k_hw_reg_write(struct ath_hal *hal, u32 val, u16 reg)
+{
+	writel(val, hal->ah_sh + reg);
+}
+
+static inline __u16 ath5k_hw_unaligned_read_16(__le16 *p)
+{
+	return le16_to_cpu(get_unaligned(p));
+}
+
+static inline void ath5k_hw_unaligned_write_16(__u16 v, __le16* p)
+{
+	put_unaligned(cpu_to_le16(v), p);
+}
+
+static inline __u32 ath5k_hw_unaligned_read_32(__le32 *p)
+{
+	return le32_to_cpu(get_unaligned(p));
+}
+
+static inline void ath5k_hw_unaligned_write_32(__u32 v, __le32 *p)
+{
+	put_unaligned(cpu_to_le32(v), p);
+}
+
+
 #endif /* _AR5K_H */

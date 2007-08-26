@@ -12,3 +12,18 @@ config ATHEROS_AR5K
 	  To compile this driver as a module, choose M here: the module will be
 	  called ath5k_pci.  If unsure, say N.
 
+config ATHEROS_AR5K_AR5210
+	bool "Support AR5210"
+	depends on ATHEROS_AR5K
+	default y
+
+config ATHEROS_AR5K_AR5211
+	bool "Support AR5211"
+	depends on ATHEROS_AR5K
+	default y
+
+config ATHEROS_AR5K_AR5212
+	bool "Support AR5212"
+	depends on ATHEROS_AR5K
+	default y
+
