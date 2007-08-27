@@ -131,7 +131,7 @@ ath5k_ar5k_to_mac80211_mode(u_int ar5k_mode)
 	for (i = 0; i < ARRAY_SIZE(ar5k_mode_map); i++) {
 		if (ar5k_mode_map[i].ar5k_mode == ar5k_mode) {
 			printk("ar5k_mode = %d, mac80211_mode = %d\n", 
-					`ar5k_mode, ar5k_mode_map[i].mac80211_mode);
+					ar5k_mode, ar5k_mode_map[i].mac80211_mode);
 			return ar5k_mode_map[i].mac80211_mode;
 		}
 	}
