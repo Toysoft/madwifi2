@@ -453,36 +453,6 @@ struct ath5k_hw_tx_status {
  * AR5K REGISTER ACCESS
  */
 
-static inline u32 ath5k_hw_reg_read(struct ath_hal *hal, u16 reg)
-{
-	return ioread32(hal->ah_sh + reg);
-}
-
-static inline void ath5k_hw_reg_write(struct ath_hal *hal, u32 val, u16 reg)
-{
-	iowrite32(val, hal->ah_sh + reg);
-}
-
-static inline __u16 ath5k_hw_unaligned_read_16(__le16 *p)
-{
-	return le16_to_cpu(get_unaligned(p));
-}
-
-static inline void ath5k_hw_unaligned_write_16(__u16 v, __le16* p)
-{
-	put_unaligned(cpu_to_le16(v), p);
-}
-
-static inline __u32 ath5k_hw_unaligned_read_32(__le32 *p)
-{
-	return le32_to_cpu(get_unaligned(p));
-}
-
-static inline void ath5k_hw_unaligned_write_32(__u32 v, __le32 *p)
-{
-	put_unaligned(cpu_to_le32(v), p);
-}
-
 /*Swap RX/TX Descriptor for big endian archs*/
 #if defined(__BIG_ENDIAN)
 #define AR5K_INIT_CFG	(		\
