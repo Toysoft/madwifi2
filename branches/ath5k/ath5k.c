@@ -486,7 +486,6 @@ int
 ath5k_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
-	struct ath5k_softc *sc = hw->priv;
 
 	if (ath5k_tx_stop(hw))
 		printk(KERN_ERR "ath5k_pci: Could not stop tx!\n");
@@ -507,7 +506,6 @@ int
 ath5k_pci_resume(struct pci_dev *pdev)
 {
 	struct ieee80211_hw *hw = pci_get_drvdata(pdev);
-	struct ath5k_softc *sc = hw->priv;
 	u32 val;
 	int err;
 
@@ -720,7 +718,9 @@ ath5k_detach(struct ieee80211_hw *hw)
 {
 	struct ath5k_softc *sc;
 	struct ath_hal *ah = sc->sc_ah;
+#if 0
 	u_int32_t tmp;
+#endif
 
 	sc = hw->priv;
 	ath5k_hw_set_power(sc->sc_ah, AR5K_PM_AWAKE, TRUE, 0);
