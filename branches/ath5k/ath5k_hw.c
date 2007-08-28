@@ -1,4 +1,5 @@
- /*
+/*
+ * Copyright (c) 2007 The MadWiFi Team <www.madwifi.org> 
  * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
  * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
  * Copyright (c) 2007 Jiri Slaby <jirislaby@gmail.com>
