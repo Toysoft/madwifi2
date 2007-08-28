@@ -800,7 +800,6 @@ static int ath5k_hw_rf5111_rfregs(struct ath_hw *hal,
 				3, 104, 0, true))
 		return -EINVAL;
 
-<<<<<<< .working
 	if (!ath5k_hw_rfregs_op(rf, hal->ah_offset[6], 
 				(obdb >= 0) ? ee->ee_db[ee_mode][obdb] : 0, 
 				3, 107, 0, true))
