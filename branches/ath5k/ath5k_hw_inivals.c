@@ -1,39 +1,27 @@
 /*
+ * Initial register settings functions
+ *
  * Copyright (c) 2007 The MadWiFi Team <www.madwifi.org>
- * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2004, 2005 Reyk Floeter <reyk@vantronix.net>
  *
- * This program is free software you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as 
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY, without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * $Id$
+ * This file is released under GPLv2
  */
 
 #include "ath5k.h"
-
-/*************************************\
-  Initial register settings functions
-\*************************************/
+#include "ath5k_reg.h"
 
 /*
  * MAC/PHY REGISTERS
  */
 
+
 /*
- * Mode-independed initial register writes
+ * Mode-independent initial register writes
  */
 
 struct ath5k_ini {
-	u_int16_t	ini_register;
-	u_int32_t	ini_value;
+	u16	ini_register;
+	u32	ini_value;
 
 	enum {
 		AR5K_INI_WRITE = 0,	/* Default */
@@ -46,11 +34,11 @@ struct ath5k_ini {
  */
 
 struct ath5k_ini_mode {
-	u_int16_t	mode_register;
-	u_int32_t	mode_value[5];
+	u16	mode_register;
+	u32	mode_value[5];
 };
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5210)
+#ifdef CONFIG_ATHEROS_AR5K_AR5210
 /* Initial register settings for AR5210 */
 static const struct ath5k_ini ar5210_ini[] = {
 	/* PCU and MAC registers */
@@ -264,7 +252,7 @@ static const struct ath5k_ini ar5210_ini[] = {
 };
 #endif
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5211)
+#ifdef CONFIG_ATHEROS_AR5K_AR5211
 /* Initial register settings for AR5211 */
 static const struct ath5k_ini ar5211_ini[] = {
 	{ AR5K_RXDP,		0x00000000 },
@@ -388,10 +376,11 @@ static const struct ath5k_ini ar5211_ini[] = {
 };
 
 /* Initial mode-specific settings for AR5211
- * XXX: how about gTurbo ? RF5111 supports it, how about AR5211 ? */
+ * XXX: how about gTurbo ? RF5111 supports it, how about AR5211 ?
+ */
 static const struct ath5k_ini_mode ar5211_ini_mode[] = {
 	{ AR5K_TXCFG,
-	/*         mode a/XR  mode aTurbo   mode b   mode g(OFDM?) mode gTurbo (N/A) */
+	/*	  a/XR	      aTurbo	  b	      g(OFDM?)	  gTurbo (N/A) */
  		{ 0x00000017, 0x00000017, 0x00000017, 0x00000017, 0x00000017 } },
 	{ AR5K_QUEUE_DFS_LOCAL_IFS(0),
 		{ 0x002ffc0f, 0x002ffc0f, 0x002ffc1f, 0x002ffc0f, 0x002ffc0f } },
@@ -462,10 +451,9 @@ static const struct ath5k_ini_mode ar5211_ini_mode[] = {
 	{ AR5K_RF_BUFFER_CONTROL_4,
 		{ 0x00000010, 0x00000014, 0x00000010, 0x00000010, 0x00000010 } },
 };
-
 #endif
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5212)
+#ifdef CONFIG_ATHEROS_AR5K_AR5212
 /* Initial register settings for AR5212 */
 static const struct ath5k_ini ar5212_ini[] = {
 	{ AR5K_RXDP,		0x00000000 },
@@ -720,7 +708,7 @@ static const struct ath5k_ini ar5212_ini[] = {
 /* Initial mode-specific settings for AR5212 */
 static const struct ath5k_ini_mode ar5212_ini_mode[] = {
 	{ AR5K_TXCFG,
-	/*         mode a/XR  mode aTurbo   mode b   mode g (DYN) mode gTurbo */
+	/*	  a/XR	      aTurbo	  b	      g (DYN)	  gTurbo */
 		{ 0x00008107, 0x00008107, 0x00008107, 0x00008107, 0x00008107 } },
 	{ AR5K_QUEUE_DFS_LOCAL_IFS(0),
 		{ 0x002ffc0f, 0x002ffc0f, 0x002ffc1f, 0x002ffc0f, 0x002ffc0f } },
@@ -757,7 +745,7 @@ static const struct ath5k_ini_mode ar5212_ini_mode[] = {
 /* Initial mode-specific settings for AR5212 + RF5111 */
 static const struct ath5k_ini_mode ar5212_rf5111_ini_mode[] = {
 	{ AR5K_USEC_5211,
-	/*         mode a/XR  mode aTurbo   mode b     mode g     mode gTurbo */
+	/*	  a/XR	      aTurbo	  b	      g		  gTurbo */
 		{ 0x128d8fa7, 0x09880fcf, 0x04e00f95, 0x128d8fab, 0x09880fcf } },
 	{ AR5K_PHY_TURBO,
 		{ 0x00000000, 0x00000003, 0x00000000, 0x00000000, 0x00000003 } },
@@ -807,68 +795,67 @@ static const struct ath5k_ini_mode ar5212_rf5111_ini_mode[] = {
 
 /* Initial mode-specific settings for AR5212 + RF5112 */
 static const struct ath5k_ini_mode ar5212_rf5112_ini_mode[] = {
-	{ AR5K_USEC_5211,								\
-	/*         mode a/XR  mode aTurbo   mode b     mode g     mode gTurbo */	\
-		{ 0x128d93a7, 0x098813cf, 0x04e01395, 0x128d93ab, 0x098813cf } },	\
-	{ AR5K_PHY_TURBO,								\
-		{ 0x00000000, 0x00000003, 0x00000000, 0x00000000, 0x00000003 } },	\
-	{ 0x9820,									\
-		{ 0x02020200, 0x02020200, 0x02010200, 0x02020200, 0x02020200 } },	\
-	{ 0x9824,									\
-		{ 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e } },	\
-	{ 0x9828,									\
-		{ 0x0a020001, 0x0a020001, 0x05020100, 0x0a020001, 0x0a020001 } },	\
-	{ 0x9834,									\
-		{ 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e } },	\
-	{ 0x9838,									\
-		{ 0x00000007, 0x00000007, 0x0000000b, 0x0000000b, 0x0000000b } },	\
-	{ 0x9844,									\
-		{ 0x1372161c, 0x13721c25, 0x13721728, 0x137216a2, 0x13721c25 } },	\
-	{ 0x9848,									\
-		{ 0x0018da6d, 0x0018da6d, 0x0018ca75, 0x0018ca75, 0x0018ca75 } },	\
-	{ 0x9850,									\
-		{ 0x0de8b4e0, 0x0de8b4e0, 0x0de8b4e0, 0x0de8b4e0, 0x0de8b4e0 } },	\
-	{ AR5K_PHY_SIG,									\
-		{ 0x7e800d2e, 0x7e800d2e, 0x7ee84d2e, 0x7ee84d2e, 0x7e800d2e } },	\
-	{ AR5K_PHY_AGCCOARSE,								\
-		{ 0x3137665e, 0x3137665e, 0x3137665e, 0x3137665e, 0x3137665e } },	\
-	{ AR5K_PHY_AGCCTL,								\
-		{ 0x00009d10, 0x00009d10, 0x00009d18, 0x00009d10, 0x00009d10 } },	\
-	{ AR5K_PHY_NF,									\
-		{ 0x0001ce00, 0x0001ce00, 0x0001ce00, 0x0001ce00, 0x0001ce00 } },	\
-	{ AR5K_PHY_ADCSAT,								\
-		{ 0x409a4190, 0x409a4190, 0x409a4190, 0x409a4190, 0x409a4190 } },	\
-	{ 0x986c,									\
-		{ 0x050cb081, 0x050cb081, 0x050cb081, 0x050cb081, 0x050cb081 } },	\
-	{ AR5K_PHY_RX_DELAY,								\
-		{ 0x000007d0, 0x000007d0, 0x0000044c, 0x00000898, 0x000007d0 } },	\
-	{ 0x9918,									\
-		{ 0x000001b8, 0x000001b8, 0x00000084, 0x00000108, 0x000001b8 } },	\
-	{ 0x9924,									\
-		{ 0x10058a05, 0x10058a05, 0x10058a05, 0x10058a05, 0x10058a05 } },	\
-	{ AR5K_PHY_FRAME_CTL_5211,							\
-		{ 0xffb81020, 0xffb81020, 0xffb80d10, 0xffb81010, 0xffb81010 } },	\
-	{ AR5K_PHY_PCDAC_TXPOWER(0),							\
-		{ 0x10ff14ff, 0x10ff14ff, 0x10ff10ff, 0x10ff19ff, 0x10ff19ff } },	\
-	{ 0xa230,									\
-		{ 0x00000000, 0x00000000, 0x00000000, 0x00000108, 0x00000000 } },	\
-	{ AR5K_PHY_CCKTXCTL,								\
-		{ 0x00000000, 0x00000000, 0x00000004, 0x00000004, 0x00000004 } },	\
-	{ 0xa208,									\
-		{ 0xd6be6788, 0xd6be6788, 0xd03e6788, 0xd03e6788, 0xd03e6788 } },	\
-	{ AR5K_PHY_GAIN_2GHZ,								\
-		{ 0x642c0140, 0x642c0140, 0x6442c160, 0x6442c160, 0x6442c160 } },	\
+	{ AR5K_USEC_5211,
+	/*	  a/XR	      aTurbo	  b	      g		  gTurbo */
+		{ 0x128d93a7, 0x098813cf, 0x04e01395, 0x128d93ab, 0x098813cf } },
+	{ AR5K_PHY_TURBO,
+		{ 0x00000000, 0x00000003, 0x00000000, 0x00000000, 0x00000003 } },
+	{ 0x9820,
+		{ 0x02020200, 0x02020200, 0x02010200, 0x02020200, 0x02020200 } },
+	{ 0x9824,
+		{ 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e } },
+	{ 0x9828,
+		{ 0x0a020001, 0x0a020001, 0x05020100, 0x0a020001, 0x0a020001 } },
+	{ 0x9834,
+		{ 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e, 0x00000e0e } },
+	{ 0x9838,
+		{ 0x00000007, 0x00000007, 0x0000000b, 0x0000000b, 0x0000000b } },
+	{ 0x9844,
+		{ 0x1372161c, 0x13721c25, 0x13721728, 0x137216a2, 0x13721c25 } },
+	{ 0x9848,
+		{ 0x0018da6d, 0x0018da6d, 0x0018ca75, 0x0018ca75, 0x0018ca75 } },
+	{ 0x9850,
+		{ 0x0de8b4e0, 0x0de8b4e0, 0x0de8b4e0, 0x0de8b4e0, 0x0de8b4e0 } },
+	{ AR5K_PHY_SIG,
+		{ 0x7e800d2e, 0x7e800d2e, 0x7ee84d2e, 0x7ee84d2e, 0x7e800d2e } },
+	{ AR5K_PHY_AGCCOARSE,
+		{ 0x3137665e, 0x3137665e, 0x3137665e, 0x3137665e, 0x3137665e } },
+	{ AR5K_PHY_AGCCTL,
+		{ 0x00009d10, 0x00009d10, 0x00009d18, 0x00009d10, 0x00009d10 } },
+	{ AR5K_PHY_NF,
+		{ 0x0001ce00, 0x0001ce00, 0x0001ce00, 0x0001ce00, 0x0001ce00 } },
+	{ AR5K_PHY_ADCSAT,
+		{ 0x409a4190, 0x409a4190, 0x409a4190, 0x409a4190, 0x409a4190 } },
+	{ 0x986c,
+		{ 0x050cb081, 0x050cb081, 0x050cb081, 0x050cb081, 0x050cb081 } },
+	{ AR5K_PHY_RX_DELAY,
+		{ 0x000007d0, 0x000007d0, 0x0000044c, 0x00000898, 0x000007d0 } },
+	{ 0x9918,
+		{ 0x000001b8, 0x000001b8, 0x00000084, 0x00000108, 0x000001b8 } },
+	{ 0x9924,
+		{ 0x10058a05, 0x10058a05, 0x10058a05, 0x10058a05, 0x10058a05 } },
+	{ AR5K_PHY_FRAME_CTL_5211,
+		{ 0xffb81020, 0xffb81020, 0xffb80d10, 0xffb81010, 0xffb81010 } },
+	{ AR5K_PHY_PCDAC_TXPOWER(0),
+		{ 0x10ff14ff, 0x10ff14ff, 0x10ff10ff, 0x10ff19ff, 0x10ff19ff } },
+	{ 0xa230,
+		{ 0x00000000, 0x00000000, 0x00000000, 0x00000108, 0x00000000 } },
+	{ AR5K_PHY_CCKTXCTL,
+		{ 0x00000000, 0x00000000, 0x00000004, 0x00000004, 0x00000004 } },
+	{ 0xa208,
+		{ 0xd6be6788, 0xd6be6788, 0xd03e6788, 0xd03e6788, 0xd03e6788 } },
+	{ AR5K_PHY_GAIN_2GHZ,
+		{ 0x642c0140, 0x642c0140, 0x6442c160, 0x6442c160, 0x6442c160 } },
 };
 #endif
 
 /*
- * Initial BaseBand Gain settings for RF5111/5112
- * (only AR5210 comes with RF5110 so initial
- * BB Gain settings are included in AR5K_AR5210_INI)
+ * Initial BaseBand Gain settings for RF5111/5112 (only AR5210 comes with
+ * RF5110 so initial BB Gain settings are included in AR5K_AR5210_INI)
  */
 
+#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined (CONFIG_ATHEROS_AR5K_AR5212)
 /* RF5111 Initial BaseBand Gain settings */
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 static const struct ath5k_ini rf5111_ini_bbgain[] = {
 	{ AR5K_BB_GAIN(0), 0x00000000 },
 	{ AR5K_BB_GAIN(1), 0x00000020 },
@@ -937,10 +924,10 @@ static const struct ath5k_ini rf5111_ini_bbgain[] = {
 };
 #endif
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5212)
+#ifdef CONFIG_ATHEROS_AR5K_AR5212
 /* RF 5112 Initial BaseBand Gain settings */
 static const struct ath5k_ini rf5112_ini_bbgain[] = {
- 	{ AR5K_BB_GAIN(0), 0x00000000 },
+	{ AR5K_BB_GAIN(0), 0x00000000 },
 	{ AR5K_BB_GAIN(1), 0x00000001 },
 	{ AR5K_BB_GAIN(2), 0x00000002 },
 	{ AR5K_BB_GAIN(3), 0x00000003 },
@@ -1007,18 +994,19 @@ static const struct ath5k_ini rf5112_ini_bbgain[] = {
 };
 #endif
 
+#if defined(CONFIG_ATHEROS_AR5K_AR5210) || defined(CONFIG_ATHEROS_AR5K_AR5211) \
+	|| defined(CONFIG_ATHEROS_AR5K_AR5212)
 /*
- * Write initial mode-independed register settings
+ * Write initial register dump
  */
-static void
-ath5k_hw_ini_registers(struct ath_hal *hal, int size,
-		const struct ath5k_ini *ini_regs, AR5K_BOOL change_channel)
+static void ath5k_hw_ini_registers(struct ath_hw *hal, unsigned int size,
+		const struct ath5k_ini *ini_regs, bool change_channel)
 {
-	int i;
+	unsigned int i;
 
 	/* Write initial registers */
-	for (i = 0; i < size ; i++) {
-		/* On channel change there is 
+	for (i = 0; i < size; i++) {
+		/* On channel change there is
 		 * no need to mess with PCU */
 		if ((change_channel == TRUE) &&
 				(ini_regs[i].ini_register >= AR5K_PCU_MIN) &&
@@ -1028,61 +1016,62 @@ ath5k_hw_ini_registers(struct ath_hal *hal, int size,
 		switch (ini_regs[i].ini_mode) {
 		case AR5K_INI_READ:
 			/* Cleared on read */
-			AR5K_REG_READ(ini_regs[i].ini_register);
+			ath5k_hw_reg_read(hal, ini_regs[i].ini_register);
 			break;
 		case AR5K_INI_WRITE:
 		default:
 			AR5K_REG_WAIT(i);
-			AR5K_REG_WRITE(ini_regs[i].ini_register,
-					ini_regs[i].ini_value);
+			ath5k_hw_reg_write(hal, ini_regs[i].ini_value,
+					ini_regs[i].ini_register);
 		}
 	}
 }
+#endif
 
+#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 /*
  * Write initial mode-specific register dump
  */
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
-static void
-ath5k_hw_ini_mode_registers(struct ath_hal *hal, int size,
-		const struct ath5k_ini_mode *ini_mode, u_int8_t mode)
+static void ath5k_hw_ini_mode_registers(struct ath_hw *hal,
+		unsigned int size, const struct ath5k_ini_mode *ini_mode,
+		u8 mode)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < size; i++) {
 		AR5K_REG_WAIT(i);
-		AR5K_REG_WRITE((u_int32_t)ini_mode[i].mode_register,
-				ini_mode[i].mode_value[mode]);
+		ath5k_hw_reg_write(hal, ini_mode[i].mode_value[mode],
+				(u32)ini_mode[i].mode_register);
 	}
 
 }
 #endif
 
-void ath5k_write_initvals(struct ath_hal *hal, u_int8_t mode, AR5K_BOOL change_channel)
+int ath5k_hw_write_initvals(struct ath_hw *hal, u8 mode, bool change_channel)
 {
 	/*
 	 * Write initial mode-specific settings
 	 */
 	/*For 5212*/
-#if defined(CONFIG_ATHEROS_AR5K_AR5212)
+#ifdef CONFIG_ATHEROS_AR5K_AR5212
 	if (hal->ah_version == AR5K_AR5212) {
-		ath5k_hw_ini_mode_registers(hal, AR5K_ELEMENTS(ar5212_ini_mode),
-						ar5212_ini_mode, mode);
-		if (hal->ah_radio == AR5K_RF5111) {
-			ath5k_hw_ini_mode_registers(hal, AR5K_ELEMENTS(ar5212_rf5111_ini_mode),
-							ar5212_rf5111_ini_mode, mode);
-		} else if (hal->ah_radio == AR5K_RF5112) {
-			ath5k_hw_ini_mode_registers(hal, AR5K_ELEMENTS(ar5212_rf5112_ini_mode),
-							ar5212_rf5112_ini_mode, mode);
-		}
+		ath5k_hw_ini_mode_registers(hal, ARRAY_SIZE(ar5212_ini_mode),
+				ar5212_ini_mode, mode);
+		if (hal->ah_radio == AR5K_RF5111)
+			ath5k_hw_ini_mode_registers(hal,
+					ARRAY_SIZE(ar5212_rf5111_ini_mode),
+					ar5212_rf5111_ini_mode, mode);
+		else if (hal->ah_radio == AR5K_RF5112)
+			ath5k_hw_ini_mode_registers(hal,
+					ARRAY_SIZE(ar5212_rf5112_ini_mode),
+					ar5212_rf5112_ini_mode, mode);
 	}
 #endif
-
+#ifdef CONFIG_ATHEROS_AR5K_AR5211
 	/*For 5211*/
-#if defined(CONFIG_ATHEROS_AR5K_AR5211)
 	if (hal->ah_version == AR5K_AR5211)
-		ath5k_hw_ini_mode_registers(hal, AR5K_ELEMENTS(ar5211_ini_mode),
-						ar5211_ini_mode, mode);
+		ath5k_hw_ini_mode_registers(hal, ARRAY_SIZE(ar5211_ini_mode),
+				ar5211_ini_mode, mode);
 #endif
 	/* For 5210 mode settings check out ath5k_hw_reset_tx_queue */
 
@@ -1092,38 +1081,42 @@ void ath5k_write_initvals(struct ath_hal *hal, u_int8_t mode, AR5K_BOOL change_c
 	switch (hal->ah_version) {
 #if defined(CONFIG_ATHEROS_AR5K_AR5212)
 	case AR5K_AR5212:
-		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(ar5212_ini),
+		ath5k_hw_ini_registers(hal, ARRAY_SIZE(ar5212_ini),
 				ar5212_ini, change_channel);
 		if (hal->ah_radio == AR5K_RF5112) {
-			AR5K_REG_WRITE(AR5K_PHY_PAPD_PROBE,
-					AR5K_PHY_PAPD_PROBE_INI_5112);
-			ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(rf5112_ini_bbgain),
+			ath5k_hw_reg_write(hal, AR5K_PHY_PAPD_PROBE_INI_5112,
+					AR5K_PHY_PAPD_PROBE);
+			ath5k_hw_ini_registers(hal,
+					ARRAY_SIZE(rf5112_ini_bbgain),
 					rf5112_ini_bbgain, change_channel);
 		} else if (hal->ah_radio == AR5K_RF5111) {
-			AR5K_REG_WRITE( AR5K_PHY_GAIN_2GHZ,
-					AR5K_PHY_GAIN_2GHZ_INI_5111); 
-			AR5K_REG_WRITE( AR5K_PHY_PAPD_PROBE,
-					AR5K_PHY_PAPD_PROBE_INI_5111 );
-			ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(rf5111_ini_bbgain),
+			ath5k_hw_reg_write(hal, AR5K_PHY_GAIN_2GHZ_INI_5111,
+					AR5K_PHY_GAIN_2GHZ);
+			ath5k_hw_reg_write(hal, AR5K_PHY_PAPD_PROBE_INI_5111,
+					AR5K_PHY_PAPD_PROBE);
+			ath5k_hw_ini_registers(hal,
+					ARRAY_SIZE(rf5111_ini_bbgain),
 					rf5111_ini_bbgain, change_channel);
 		}
 		break;
 #endif
-#if defined(CONFIG_ATHEROS_AR5K_AR5211)
+#ifdef CONFIG_ATHEROS_AR5K_AR5211
 	case AR5K_AR5211:
-		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(ar5211_ini),
-					ar5211_ini, change_channel);
+		ath5k_hw_ini_registers(hal, ARRAY_SIZE(ar5211_ini),
+				ar5211_ini, change_channel);
 		/* AR5211 only comes with 5111 */
-		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(rf5111_ini_bbgain),
-					rf5111_ini_bbgain, change_channel);
+		ath5k_hw_ini_registers(hal, ARRAY_SIZE(rf5111_ini_bbgain),
+				rf5111_ini_bbgain, change_channel);
+	}
 		break;
 #endif
-#if defined(CONFIG_ATHEROS_AR5K_AR5210)
+#ifdef CONFIG_ATHEROS_AR5K_AR5210
 	case AR5K_AR5210:
-		ath5k_hw_ini_registers(hal, AR5K_ELEMENTS(ar5210_ini),
-					ar5210_ini, change_channel);
+		ath5k_hw_ini_registers(hal, ARRAY_SIZE(ar5210_ini),
+				ar5210_ini, change_channel);
 		break;
 #endif
 	}
-}
 
+	return 0;
+}

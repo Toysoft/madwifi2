@@ -1,9 +1,21 @@
-obj-m += ath5k_pci.o
-ath5k_pci-objs := ath5k.o ath5k_hw.o ath5k_hw_phy.o ath5k_hw_inivals.o ieee80211_regdomain.o
+KDIR=/lib/modules/$(shell uname -r)/build
+KBUILD=$(MAKE) -C $(KDIR) M=$(PWD)
+
+EXTRA_CFLAGS += -DCONFIG_ATHEROS_AR5K_AR5210 -DCONFIG_ATHEROS_AR5K_AR5211 \
+		-DCONFIG_ATHEROS_AR5K_AR5212
+
+ath5k-objs	:= ath5k_base.o ath5k_hw.o ath5k_regdom.o ath5k_hw_phy.o \
+		   ath5k_hw_inivals.o
+
+obj-m		+= ath5k.o
 
 all:
-	make -C $(KERNELPATH) M=$(PWD) modules
-clean:
-	make -C $(KERNELPATH) M=$(PWD) clean
+	$(KBUILD) modules
 
-clean-files := Module.symvers
+clean:
+	$(KBUILD) clean
+
+cscope:
+	cscope -b `find $(src) -type f -name '*.[ch]'`
+
+.PHONY: all clean cscope
