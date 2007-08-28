@@ -1,31 +1,19 @@
 /*
- * Copyright (c) 2007 The MadWiFi Team <www.madwifi.org>
  * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
  *
- * This program is free software you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as 
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY, without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- * $Id$
+ * This file is released under GPLv2
  */
 
 /*
  * Gain settings
  */
 
-typedef enum {
+enum ath5k_rfgain {
 	AR5K_RFGAIN_INACTIVE = 0,
 	AR5K_RFGAIN_READ_REQUESTED,
 	AR5K_RFGAIN_NEED_CHANGE,
-} AR5K_RFGAIN;
+};
 
 #define AR5K_GAIN_CRN_FIX_BITS_5111		4
 #define AR5K_GAIN_CRN_FIX_BITS_5112		7
@@ -50,22 +38,22 @@ typedef enum {
 	((_g)->g_current <= (_g)->g_low || (_g)->g_current >= (_g)->g_high)
 
 struct ath5k_gain_opt_step {
-	int16_t				gos_param[AR5K_GAIN_CRN_MAX_FIX_BITS];
-	int32_t				gos_gain;
+	s16				gos_param[AR5K_GAIN_CRN_MAX_FIX_BITS];
+	s32				gos_gain;
 };
 
 struct ath5k_gain {
-	u_int32_t				g_step_idx;
-	u_int32_t				g_current;
-	u_int32_t				g_target;
-	u_int32_t				g_low;
-	u_int32_t				g_high;
-	u_int32_t				g_f_corr;
-	u_int32_t				g_active;
+	u32					g_step_idx;
+	u32					g_current;
+	u32					g_target;
+	u32					g_low;
+	u32					g_high;
+	u32					g_f_corr;
+	u32					g_active;
 	const struct ath5k_gain_opt_step	*g_step;
 };
 
-/* 
+/*
  * HW SPECIFIC STRUCTS
  */
 
@@ -111,88 +99,81 @@ struct ath5k_gain {
 
 /* Struct to hold EEPROM calibration data */
 struct ath5k_eeprom_info {
-	u_int16_t	ee_magic;		 /* Magic Number */
-	u_int16_t	ee_protect;		 /* Protection bits (ath5kreg.h) */
-	u_int16_t	ee_regdomain;		 /* Regulatory Domain */
-	u_int16_t	ee_version;		 /* EEPROM Revision */
-	u_int16_t	ee_header;		 /* EEPROM Header (ath5kreg.h, get_capabilities) */
-	u_int16_t	ee_ant_gain;		 /* Antenna Gain (ath5kreg.h) */
-	u_int16_t	ee_misc0;
-	u_int16_t	ee_misc1;
-	u_int16_t	ee_cck_ofdm_gain_delta;	 /* CCK to OFDM gain delta */
-	u_int16_t	ee_cck_ofdm_power_delta; /* CCK to OFDM power delta */
-	u_int16_t	ee_scaled_cck_delta;
+	u16	ee_magic;
+	u16	ee_protect;
+	u16	ee_regdomain;
+	u16	ee_version;
+	u16	ee_header;
+	u16	ee_ant_gain;
+	u16	ee_misc0;
+	u16	ee_misc1;
+	u16	ee_cck_ofdm_gain_delta;
+	u16	ee_cck_ofdm_power_delta;
+	u16	ee_scaled_cck_delta;
 
 	/* Used for tx thermal adjustment (eeprom_init, rfregs) */
-	u_int16_t	ee_tx_clip;
-	u_int16_t	ee_pwd_84;
-	u_int16_t	ee_pwd_90;
-	u_int16_t	ee_gain_select;
+	u16	ee_tx_clip;
+	u16	ee_pwd_84;
+	u16	ee_pwd_90;
+	u16	ee_gain_select;
 
 	/* RF Calibration settings (reset, rfregs) */
-	u_int16_t	ee_i_cal[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_q_cal[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_fixed_bias[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_turbo_max_power[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_xr_power[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_switch_settling[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_ant_tx_rx[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_ant_control[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_PCDAC];
-	u_int16_t	ee_ob[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_OBDB];
-	u_int16_t	ee_db[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_OBDB];
-	u_int16_t	ee_tx_end2xlna_enable[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_tx_end2xpa_disable[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_tx_frm2xpa_enable[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_thr_62[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_xlna_gain[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_xpd[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_x_gain[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_i_gain[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_margin_tx_rx[AR5K_EEPROM_N_MODES];
-	u_int16_t	ee_false_detect[AR5K_EEPROM_N_MODES];	/* Unused */
-	u_int16_t	ee_cal_pier[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_2GHZ_CHAN]; /* Unused */
-	u_int16_t	ee_channel[AR5K_EEPROM_N_MODES][AR5K_EEPROM_MAX_CHAN];	/* Empty ! */
+	u16	ee_i_cal[AR5K_EEPROM_N_MODES];
+	u16	ee_q_cal[AR5K_EEPROM_N_MODES];
+	u16	ee_fixed_bias[AR5K_EEPROM_N_MODES];
+	u16	ee_turbo_max_power[AR5K_EEPROM_N_MODES];
+	u16	ee_xr_power[AR5K_EEPROM_N_MODES];
+	u16	ee_switch_settling[AR5K_EEPROM_N_MODES];
+	u16	ee_ant_tx_rx[AR5K_EEPROM_N_MODES];
+	u16	ee_ant_control[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_PCDAC];
+	u16	ee_ob[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_OBDB];
+	u16	ee_db[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_OBDB];
+	u16	ee_tx_end2xlna_enable[AR5K_EEPROM_N_MODES];
+	u16	ee_tx_end2xpa_disable[AR5K_EEPROM_N_MODES];
+	u16	ee_tx_frm2xpa_enable[AR5K_EEPROM_N_MODES];
+	u16	ee_thr_62[AR5K_EEPROM_N_MODES];
+	u16	ee_xlna_gain[AR5K_EEPROM_N_MODES];
+	u16	ee_xpd[AR5K_EEPROM_N_MODES];
+	u16	ee_x_gain[AR5K_EEPROM_N_MODES];
+	u16	ee_i_gain[AR5K_EEPROM_N_MODES];
+	u16	ee_margin_tx_rx[AR5K_EEPROM_N_MODES];
+
+	/* Unused */
+	u16	ee_false_detect[AR5K_EEPROM_N_MODES];
+	u16	ee_cal_pier[AR5K_EEPROM_N_MODES][AR5K_EEPROM_N_2GHZ_CHAN];
+	u16	ee_channel[AR5K_EEPROM_N_MODES][AR5K_EEPROM_MAX_CHAN]; /*empty*/
 
 	/* Conformance test limits (Unused) */
-	u_int16_t	ee_ctls;
-	u_int16_t	ee_ctl[AR5K_EEPROM_MAX_CTLS];
+	u16	ee_ctls;
+	u16	ee_ctl[AR5K_EEPROM_MAX_CTLS];
 
 	/* Noise Floor Calibration settings */
-	int16_t		ee_noise_floor_thr[AR5K_EEPROM_N_MODES];
-	int8_t		ee_adc_desired_size[AR5K_EEPROM_N_MODES];
-	int8_t		ee_pga_desired_size[AR5K_EEPROM_N_MODES];
+	s16	ee_noise_floor_thr[AR5K_EEPROM_N_MODES];
+	s8	ee_adc_desired_size[AR5K_EEPROM_N_MODES];
+	s8	ee_pga_desired_size[AR5K_EEPROM_N_MODES];
 };
 
 /*
- * Internal HW RX/TX descriptor structures
+ * Internal RX/TX descriptor structures
  * (rX: reserved fields possibily used by future versions of the ar5k chipset)
  */
 
-/*
- * Common rx control descriptor
- */
 struct ath5k_rx_desc {
-
-	/* RX control word 0 */
-	u_int32_t	rx_control_0;
+	u32	rx_control_0; /* RX control word 0 */
 
 #define AR5K_DESC_RX_CTL0			0x00000000
 
-	/* RX control word 1 */
-	u_int32_t	rx_control_1;
+	u32	rx_control_1; /* RX control word 1 */
 
 #define AR5K_DESC_RX_CTL1_BUF_LEN		0x00000fff
 #define AR5K_DESC_RX_CTL1_INTREQ		0x00002000
-
 } __packed;
 
 /*
  * 5210/5211 rx status descriptor
  */
 struct ath5k_hw_old_rx_status {
-
-	/*`RX status word 0`*/
-	u_int32_t	rx_status_0;
+	u32	rx_status_0; /* RX status word 0 */
 
 #define AR5K_OLD_RX_DESC_STATUS0_DATA_LEN		0x00000fff
 #define AR5K_OLD_RX_DESC_STATUS0_MORE			0x00001000
@@ -203,8 +184,7 @@ struct ath5k_hw_old_rx_status {
 #define AR5K_OLD_RX_DESC_STATUS0_RECEIVE_ANTENNA	0x38000000
 #define AR5K_OLD_RX_DESC_STATUS0_RECEIVE_ANTENNA_S	27
 
-	/* RX status word 1 */
-	u_int32_t	rx_status_1;
+	u32	rx_status_1; /* RX status word 1 */
 
 #define AR5K_OLD_RX_DESC_STATUS1_DONE			0x00000001
 #define AR5K_OLD_RX_DESC_STATUS1_FRAME_RECEIVE_OK	0x00000002
@@ -219,16 +199,13 @@ struct ath5k_hw_old_rx_status {
 #define AR5K_OLD_RX_DESC_STATUS1_RECEIVE_TIMESTAMP	0x0fff8000
 #define AR5K_OLD_RX_DESC_STATUS1_RECEIVE_TIMESTAMP_S	15
 #define AR5K_OLD_RX_DESC_STATUS1_KEY_CACHE_MISS		0x10000000
-
 } __packed;
 
 /*
  * 5212 rx status descriptor
  */
 struct ath5k_hw_new_rx_status {
-
-	/* RX status word 0 */
-	u_int32_t	rx_status_0;
+	u32	rx_status_0; /* RX status word 0 */
 
 #define AR5K_NEW_RX_DESC_STATUS0_DATA_LEN		0x00000fff
 #define AR5K_NEW_RX_DESC_STATUS0_MORE			0x00001000
@@ -240,8 +217,7 @@ struct ath5k_hw_new_rx_status {
 #define AR5K_NEW_RX_DESC_STATUS0_RECEIVE_ANTENNA	0xf0000000
 #define AR5K_NEW_RX_DESC_STATUS0_RECEIVE_ANTENNA_S	28
 
-	/* RX status word 1 */
-	u_int32_t	rx_status_1;
+	u32	rx_status_1; /* RX status word 1 */
 
 #define AR5K_NEW_RX_DESC_STATUS1_DONE			0x00000001
 #define AR5K_NEW_RX_DESC_STATUS1_FRAME_RECEIVE_OK	0x00000002
@@ -257,22 +233,15 @@ struct ath5k_hw_new_rx_status {
 #define AR5K_NEW_RX_DESC_STATUS1_KEY_CACHE_MISS		0x80000000
 } __packed;
 
-/*
- * 5212 rx error descriptor
- */
 struct ath5k_hw_rx_error {
-
-	/* RX error word 0 */
-	u_int32_t	rx_error_0;
+	u32	rx_error_0; /* RX error word 0 */
 
 #define AR5K_RX_DESC_ERROR0			0x00000000
 
-	/* RX error word 1 */
-	u_int32_t	rx_error_1;
+	u32	rx_error_1; /* RX error word 1 */
 
 #define AR5K_RX_DESC_ERROR1_PHY_ERROR_CODE	0x0000ff00
 #define AR5K_RX_DESC_ERROR1_PHY_ERROR_CODE_S	8
-
 } __packed;
 
 #define AR5K_DESC_RX_PHY_ERROR_NONE		0x00
@@ -284,13 +253,8 @@ struct ath5k_hw_rx_error {
 #define AR5K_DESC_RX_PHY_ERROR_SERVICE		0xc0
 #define AR5K_DESC_RX_PHY_ERROR_TRANSMITOVR	0xe0
 
-/*
- * 5210/5211 2-word tx control descriptor
- */
 struct ath5k_hw_2w_tx_desc {
-
-	/* TX control word 0 */
-	u_int32_t	tx_control_0;
+	u32	tx_control_0; /* TX control word 0 */
 
 #define AR5K_2W_TX_DESC_CTL0_FRAME_LEN		0x00000fff
 #define AR5K_2W_TX_DESC_CTL0_HEADER_LEN		0x0003f000 /*[5210 ?]*/
@@ -312,8 +276,7 @@ struct ath5k_hw_2w_tx_desc {
 #define AR5K_2W_TX_DESC_CTL0_INTREQ		0x20000000
 #define AR5K_2W_TX_DESC_CTL0_ENCRYPT_KEY_VALID	0x40000000
 
-	/* TX control word 1 */
-	u_int32_t	tx_control_1;
+	u32	tx_control_1; /* TX control word 1 */
 
 #define AR5K_2W_TX_DESC_CTL1_BUF_LEN		0x00000fff
 #define AR5K_2W_TX_DESC_CTL1_MORE		0x00001000
@@ -327,7 +290,6 @@ struct ath5k_hw_2w_tx_desc {
 #define AR5K_2W_TX_DESC_CTL1_FRAME_TYPE_S	20
 #define AR5K_2W_TX_DESC_CTL1_NOACK		0x00800000 /*[5211]*/
 #define AR5K_2W_TX_DESC_CTL1_RTS_DURATION	0xfff80000 /*[5210 ?]*/
-
 } __packed;
 
 #define AR5K_AR5210_TX_DESC_FRAME_TYPE_NORMAL   0x00
@@ -340,9 +302,7 @@ struct ath5k_hw_2w_tx_desc {
  * 5212 4-word tx control descriptor
  */
 struct ath5k_hw_4w_tx_desc {
-
-	/* TX control word 0 */
-	u_int32_t	tx_control_0;
+	u32	tx_control_0; /* TX control word 0 */
 
 #define AR5K_4W_TX_DESC_CTL0_FRAME_LEN		0x00000fff
 #define AR5K_4W_TX_DESC_CTL0_XMIT_POWER		0x003f0000
@@ -356,8 +316,7 @@ struct ath5k_hw_4w_tx_desc {
 #define AR5K_4W_TX_DESC_CTL0_ENCRYPT_KEY_VALID	0x40000000
 #define AR5K_4W_TX_DESC_CTL0_CTSENA		0x80000000
 
-	/* TX control word 1 */
-	u_int32_t	tx_control_1;
+	u32	tx_control_1; /* TX control word 1 */
 
 #define AR5K_4W_TX_DESC_CTL1_BUF_LEN		0x00000fff
 #define AR5K_4W_TX_DESC_CTL1_MORE		0x00001000
@@ -373,8 +332,7 @@ struct ath5k_hw_4w_tx_desc {
 #define AR5K_4W_TX_DESC_CTL1_COMP_ICV_LEN	0x60000000
 #define AR5K_4W_TX_DESC_CTL1_COMP_ICV_LEN_S	29
 
-	/* TX control word 2 */
-	u_int32_t	tx_control_2;
+	u32	tx_control_2; /* TX control word 2 */
 
 #define AR5K_4W_TX_DESC_CTL2_RTS_DURATION		0x00007fff
 #define AR5K_4W_TX_DESC_CTL2_DURATION_UPDATE_ENABLE	0x00008000
@@ -387,8 +345,7 @@ struct ath5k_hw_4w_tx_desc {
 #define AR5K_4W_TX_DESC_CTL2_XMIT_TRIES3		0xf0000000
 #define AR5K_4W_TX_DESC_CTL2_XMIT_TRIES3_S		28
 
-	/* TX control word 3 */
-	u_int32_t	tx_control_3;
+	u32	tx_control_3; /* TX control word 3 */
 
 #define AR5K_4W_TX_DESC_CTL3_XMIT_RATE0		0x0000001f
 #define AR5K_4W_TX_DESC_CTL3_XMIT_RATE1		0x000003e0
@@ -399,17 +356,13 @@ struct ath5k_hw_4w_tx_desc {
 #define AR5K_4W_TX_DESC_CTL3_XMIT_RATE3_S	15
 #define AR5K_4W_TX_DESC_CTL3_RTS_CTS_RATE	0x01f00000
 #define AR5K_4W_TX_DESC_CTL3_RTS_CTS_RATE_S	20
-
 } __packed;
-
 
 /*
  * Common tx status descriptor
  */
 struct ath5k_hw_tx_status {
-
-	/* TX status word 0 */
-	u_int32_t	tx_status_0;
+	u32	tx_status_0; /* TX status word 0 */
 
 #define AR5K_DESC_TX_STATUS0_FRAME_XMIT_OK	0x00000001
 #define AR5K_DESC_TX_STATUS0_EXCESSIVE_RETRIES	0x00000002
@@ -432,8 +385,7 @@ struct ath5k_hw_tx_status {
 #define AR5K_DESC_TX_STATUS0_SEND_TIMESTAMP	0xffff0000
 #define AR5K_DESC_TX_STATUS0_SEND_TIMESTAMP_S	16
 
-	/* TX status word 1 */
-	u_int32_t	tx_status_1;
+	u32	tx_status_1; /* TX status word 1 */
 
 #define AR5K_DESC_TX_STATUS1_DONE		0x00000001
 #define AR5K_DESC_TX_STATUS1_SEQ_NUM		0x00001ffe
@@ -444,9 +396,7 @@ struct ath5k_hw_tx_status {
 #define AR5K_DESC_TX_STATUS1_FINAL_TS_INDEX_S	21
 #define AR5K_DESC_TX_STATUS1_COMP_SUCCESS	0x00800000
 #define AR5K_DESC_TX_STATUS1_XMIT_ANTENNA	0x01000000
-
 } __packed;
-
 
 
 /*
@@ -462,9 +412,11 @@ struct ath5k_hw_tx_status {
 #define AR5K_INIT_CFG	0x00000000
 #endif
 
+#if 0
 #define AR5K_REG_READ(_reg)		ath5k_hw_reg_read(hal, _reg)
 
 #define AR5K_REG_WRITE(_reg, _val)	ath5k_hw_reg_write(hal, _val, _reg)
+#endif
 
 #define AR5K_REG_SM(_val, _flags)					\
 	(((_val) << _flags##_S) & (_flags))
@@ -481,40 +433,41 @@ struct ath5k_hw_tx_status {
 	AR5K_REG_WRITE(_reg, (AR5K_REG_READ(_reg) & ~(_flags)) |	\
 			(((_val) << _flags##_S) & (_flags)))
 
-#define AR5K_REG_MASKED_BITS(_reg, _flags, _mask)			\
-	AR5K_REG_WRITE(_reg, (AR5K_REG_READ(_reg) & (_mask)) | (_flags))
+#define AR5K_REG_MASKED_BITS(hal, _reg, _flags, _mask)			\
+	ath5k_hw_reg_write(hal, (ath5k_hw_reg_read(hal, _reg) &		\
+			(_mask)) | (_flags), _reg)
 
-#define AR5K_REG_ENABLE_BITS(_reg, _flags)				\
-	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) | (_flags))
+#define AR5K_REG_ENABLE_BITS(hal, _reg, _flags)				\
+	ath5k_hw_reg_write(hal, ath5k_hw_reg_read(hal, _reg) | (_flags), _reg)
 
 #define AR5K_REG_DISABLE_BITS(_reg, _flags)				\
 	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) & ~(_flags))
 
-#define AR5K_PHY_WRITE(_reg, _val)					\
-	AR5K_REG_WRITE(hal->ah_phy + ((_reg) << 2), _val)
+#define AR5K_PHY_WRITE(hal, _reg, _val)					\
+	ath5k_hw_reg_write(hal, _val, (hal)->ah_phy + ((_reg) << 2))
 
-#define AR5K_PHY_READ(_reg)						\
-	AR5K_REG_READ(hal->ah_phy + ((_reg) << 2))
+#define AR5K_PHY_READ(hal, _reg)					\
+	ath5k_hw_reg_read(hal, (hal)->ah_phy + ((_reg) << 2))
 
-#define AR5K_REG_WAIT(_i)						\
+#define AR5K_REG_WAIT(_i) do {						\
 	if (_i % 64)							\
-		udelay(1);
+		udelay(1);						\
+} while (0)
 
-#define AR5K_EEPROM_READ(_o, _v)	{				\
-	if ((ret = ath5k_hw_eeprom_read(hal, (_o),			\
-		 &(_v))) != 0)						\
+#define AR5K_EEPROM_READ(_o, _v) do {					\
+	if ((ret = ath5k_hw_eeprom_read(hal, (_o), &(_v))) != 0)	\
 		return (ret);						\
-}
+} while (0)
 
 #define AR5K_EEPROM_READ_HDR(_o, _v)					\
 	AR5K_EEPROM_READ(_o, hal->ah_capabilities.cap_eeprom._v);	\
 
 /* Read status of selected queue */
-#define AR5K_REG_READ_Q(_reg, _queue)					\
-	(AR5K_REG_READ(_reg) & (1 << _queue))				\
+#define AR5K_REG_READ_Q(hal, _reg, _queue)				\
+	(ath5k_hw_reg_read(hal, _reg) & (1 << _queue))			\
 
-#define AR5K_REG_WRITE_Q(_reg, _queue)					\
-	AR5K_REG_WRITE(_reg, (1 << _queue))
+#define AR5K_REG_WRITE_Q(hal, _reg, _queue)				\
+	ath5k_hw_reg_write(hal, (1 << _queue), _reg)
 
 #define AR5K_Q_ENABLE_BITS(_reg, _queue) do {				\
 	_reg |= 1 << _queue;						\
@@ -530,10 +483,8 @@ struct ath5k_hw_tx_status {
 
 #define AR5K_HIGH_ID(_a)	((_a)[4] | (_a)[5] << 8)
 
-
-
 /*
- * INITIAL REGISTER VALUES
+ * Initial register values
  */
 
 /*
@@ -583,7 +534,7 @@ struct ath5k_hw_tx_status {
 	(AR5K_INIT_PROG_IFS)						\
 )
 #define AR5K_INIT_PROTO_TIME_CNTRL_TURBO	(			\
-	(AR5K_INIT_CARR_SENSE_EN << 26) | (AR5K_INIT_EIFS_TURBO << 12) |\
+	(AR5K_INIT_CARR_SENSE_EN << 26) | (AR5K_INIT_EIFS_TURBO << 12) | \
 	(AR5K_INIT_PROG_IFS_TURBO)					\
 )
 #define AR5K_INIT_BEACON_CONTROL		(			\
@@ -591,21 +542,14 @@ struct ath5k_hw_tx_status {
 	(AR5K_INIT_TIM_OFFSET << 16) | (AR5K_INIT_BEACON_PERIOD)	\
 )
 
-
-
 /*
  * Non-common initial register values which have to be loaded into the
  * card at boot time and after each reset.
  */
 
-
-/*
- * RF REGISTERS
- */
-
 /* Register dumps are done per operation mode */
-#define AR5K_INI_RFGAIN_5GHZ	0
-#define AR5K_INI_RFGAIN_2GHZ	1
+#define AR5K_INI_RFGAIN_5GHZ		0
+#define AR5K_INI_RFGAIN_2GHZ		1
 
 #define AR5K_INI_VAL_11A		0
 #define AR5K_INI_VAL_11A_TURBO		1
@@ -618,16 +562,14 @@ struct ath5k_hw_tx_status {
 #define AR5K_RF5111_INI_RF_MAX_BANKS	AR5K_MAX_RF_BANKS
 #define AR5K_RF5112_INI_RF_MAX_BANKS	AR5K_MAX_RF_BANKS
 
-static inline u_int32_t
-ath5k_hw_bitswap(u_int32_t val, u_int bits)
+static inline u32 ath5k_hw_bitswap(u32 val, unsigned int bits)
 {
-	u_int32_t retval = 0, bit, i;
+	u32 retval = 0, bit, i;
 
 	for (i = 0; i < bits; i++) {
 		bit = (val >> i) & 1;
 		retval = (retval << 1) | bit;
 	}
 
-	return (retval);
+	return retval;
 }
-
