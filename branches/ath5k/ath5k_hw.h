@@ -476,14 +476,6 @@ struct ath5k_hw_tx_status {
 	_reg &= ~(1 << _queue);						\
 } while (0)
 
-/*
- * Unaligned little endian access
- */
-#define AR5K_LE_READ_2	ath5k_hw_read_unaligned_16
-#define AR5K_LE_READ_4	ath5k_hw_read_unaligned_32
-#define AR5K_LE_WRITE_2	ath5k_hw_write_unaligned_16
-#define AR5K_LE_WRITE_4	ath5k_hw_write_unaligned_32
-
 #define AR5K_LOW_ID(_a)(				\
 (_a)[0] | (_a)[1] << 8 | (_a)[2] << 16 | (_a)[3] << 24	\
 )
