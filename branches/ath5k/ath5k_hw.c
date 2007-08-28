@@ -289,8 +289,9 @@ struct ath_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	if (hal->ah_version == AR5K_AR5210)
 		hal->ah_radio = AR5K_RF5110;
 	else
-		hal->ah_radio = hal->ah_radio_5ghz_revision <
-			AR5K_SREV_RAD_5112 ? AR5K_RF5111 : AR5K_RF5112;
+		hal->ah_radio = 
+			(hal->ah_radio_5ghz_revision < AR5K_SREV_RAD_5112) ? 
+			AR5K_RF5111 : AR5K_RF5112;
 
 	hal->ah_phy = AR5K_PHY(0);
 
@@ -2508,7 +2509,7 @@ void ath5k_hw_set_rx_filter(struct ath_hw *ah, u32 filter)
 	/*
 	 * The AR5210 uses promiscous mode to detect radar activity
 	 */
-	if (ah->ah_version == AR5K_AR5210 &&
+	if ((ah->ah_version == AR5K_AR5210) &&
 			(filter & AR5K_RX_FILTER_RADARERR)) {
 		filter &= ~AR5K_RX_FILTER_RADARERR;
 		filter |= AR5K_RX_FILTER_PROM;
@@ -2701,20 +2702,20 @@ int ath5k_hw_set_beacon_timers(struct ath_hw *hal,
 	 * Set enhanced sleep registers on 5212
 	 */
 	if (hal->ah_version == AR5K_AR5212) {
-		if (state->bs_sleep_duration > state->bs_interval &&
-				roundup(state->bs_sleep_duration, interval) ==
-				state->bs_sleep_duration)
+		if ((state->bs_sleep_duration > state->bs_interval) &&
+				(roundup(state->bs_sleep_duration, interval) ==
+				 state->bs_sleep_duration))
 			interval = state->bs_sleep_duration;
 
-		if (state->bs_sleep_duration > dtim && (dtim == 0 ||
-				roundup(state->bs_sleep_duration, dtim) ==
-				state->bs_sleep_duration))
+		if ((state->bs_sleep_duration > dtim) && (dtim == 0 ||
+				(roundup(state->bs_sleep_duration, dtim) ==
+				 state->bs_sleep_duration)))
 			dtim = state->bs_sleep_duration;
 
 		if (interval > dtim)
 			return -EINVAL;
 
-		next_beacon = interval == dtim ? state->bs_next_dtim :
+		next_beacon = (interval == dtim) ? state->bs_next_dtim :
 			state->bs_next_beacon;
 
 		ath5k_hw_reg_write(hal,
@@ -2773,9 +2774,10 @@ int ath5k_hw_wait_for_beacon(struct ath_hw *hal, unsigned long phys_addr)
 		 * Control Register and Beacon Status Register.
 		 */
 		for (i = AR5K_TUNE_BEACON_INTERVAL / 2; i > 0; i--) {
-			if (!(ath5k_hw_reg_read(hal, AR5K_BSR) & AR5K_BSR_TXQ1F)
-					||
-			    !(ath5k_hw_reg_read(hal, AR5K_CR) & AR5K_BSR_TXQ1F))
+			if (!(ath5k_hw_reg_read(hal, AR5K_BSR) & 
+						AR5K_BSR_TXQ1F) ||
+			    !(ath5k_hw_reg_read(hal, AR5K_CR) & 
+				    AR5K_BSR_TXQ1F))
 				break;
 			udelay(10);
 		}
@@ -3739,7 +3741,7 @@ static int ath5k_hw_proc_2word_tx_status(struct ath_hw *hal,
 	desc->ds_us.tx.ts_rate = AR5K_REG_MS(tx_desc->tx_control_0,
 			AR5K_2W_TX_DESC_CTL0_XMIT_RATE);
 
-	if ((tx_status->tx_status_0 & AR5K_DESC_TX_STATUS0_FRAME_XMIT_OK) == 0){
+	if (!(tx_status->tx_status_0 & AR5K_DESC_TX_STATUS0_FRAME_XMIT_OK)) {
 		if (tx_status->tx_status_0 &
 				AR5K_DESC_TX_STATUS0_EXCESSIVE_RETRIES)
 			desc->ds_us.tx.ts_status |= AR5K_TXERR_XRETRY;
@@ -3846,7 +3848,7 @@ int ath5k_hw_setup_rx_desc(struct ath_hw *hal, struct ath_desc *desc,
 	rx_desc = (struct ath5k_rx_desc *)&desc->ds_ctl0;
 
 	/*
-	 *Clear ds_hw
+	 * Clear ds_hw
 	 * If we don't clean the status descriptor,
 	 * while scanning we get too many results,
 	 * most of them virtual, after some secs

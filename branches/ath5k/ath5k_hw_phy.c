@@ -575,7 +575,7 @@ static unsigned int ath5k_hw_rfregs_op(u32 *rf, u32 offset, u32 reg, u32 bits,
 		left -= 8 - position;
 	}
 
-	data = set == true ? 1 : ath5k_hw_bitswap(data, bits);
+	data = (set == true) ? 1 : ath5k_hw_bitswap(data, bits);
 
 	return data;
 }
@@ -1029,9 +1029,10 @@ enum ath5k_rfgain ath5k_hw_get_rf_gain(struct ath_hw *hal)
 
 		if (hal->ah_radio == AR5K_RF5112) {
 			ath5k_hw_rfregs_gainf_corr(hal);
-			hal->ah_gain.g_current =
-				hal->ah_gain.g_current>=hal->ah_gain.g_f_corr ?
-				(hal->ah_gain.g_current-hal->ah_gain.g_f_corr) :
+			hal->ah_gain.g_current = hal->ah_gain.g_current >= 
+				hal->ah_gain.g_f_corr ?
+				(hal->ah_gain.g_current - 
+				 hal->ah_gain.g_f_corr) :
 				0;
 		}
 
