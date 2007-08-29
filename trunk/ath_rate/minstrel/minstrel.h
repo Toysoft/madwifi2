@@ -119,7 +119,19 @@ struct minstrel_node {
 
 	u_int32_t               rs_this_tp     [IEEE80211_RATE_MAXSIZE]; /*Throughput, each rate */
 
+       /**This flag on indicates to try other than the optimal rate,
+          to see what we find */
 	int                     is_sampling;
+
+        /**The current minstrel sample rate - which could be anything
+         from 1..11 - assuming there are 12 possible rates. Note that
+         we never ever sample at the base rate of 0.*/
+       int                     rs_sample_rate;
+
+       /**Flag to indicate that the sample rate is slower than the
+          current maximum throughput rate. This determines the order
+          of the retry chain. */
+       int                     rs_sample_rate_slower;
 
 	/** These four parameters are indexes into the current rate
 	    table, and are calculated in ath_rate_statistics(), which
