@@ -4,8 +4,8 @@ Minstrel
 Introduction
 ==================================================================
 This code is called minstrel, because we have taken a wandering minstrel
-apporoch. Wander around the different rates, singing wherever you
-can. And then, look at the performacnce, and make a choice. Note that the
+approach. Wander around the different rates, singing wherever you
+can. And then, look at the performance, and make a choice. Note that the
 wandering minstrel will always wander in directions where he/she feels he/she
 will get paid the best for his/her work.
 
@@ -36,7 +36,7 @@ rewrite based on sample and the module we released in January 2005.
 Theory of operation
 ==================================================================
 
-We defined the measure of successfulnes (of packet transmission)  as
+We defined the measure of successfulness (of packet transmission)  as
 
                                   mega-bits-transmitted
     Prob_success_transmission *  ----------------------
@@ -51,7 +51,7 @@ We decided that the module should record the successfulness of all packets
 that are transmitted. From this data, the module has sufficient information to
 decide which packets are more successful than others. However, a variability
 element was required. We had to force the module to examine bit rates other
-than optimal. Consquently, some percent of the packets have to be sent at
+than optimal. Consequently, some percent of the packets have to be sent at
 rates regarded as non optimal.
 
 10 times a second (this frequency is alterable by changing the driver code)
@@ -63,11 +63,11 @@ This data is used for populating the retry chain during the next 100 ms.
 
 As stated above, the minstrel algorithm collects statistics from all packet
 attempts.  Minstrel spends a particular percentage of frames, doing "look
-arounds" i.e. randomly trying other rates, to gather statistics. The
+around" i.e. randomly trying other rates, to gather statistics. The
 percentage of "look around" frames, is set at boot time via the module
 parameter "ath_lookaround_rate" and defaults to 10%. The distribution of
 lookaround frames is also randomised somewhat to avoid any potential
-"strobing" of lookarounds between similar nodes. 
+"strobing" of lookaround between similar nodes. 
 
 TCP theory tells us that each packet sent must be delivered in under 26ms. Any
 longer duration, and the TCP network layers will start to back off. A delay of
@@ -84,7 +84,7 @@ packet at some rate, with a fixed number of retry attempts. Once the packet is
 successfully transmitted, the remainder of the retry chain is
 ignored. Selection of the number of retry attempts was based on the desire to
 get the packet out in under 26ms, or fail. We provided a module parameter,
-ath_segment_size, which has units of micoseconds, and specifies the maximum
+ath_segment_size, which has units of microseconds, and specifies the maximum
 duration one segment in the retry chain can last. This module parameter has a
 default of 6000. Our view is that a segment size of between 4000 and 6000
 seems to fit most situations.
@@ -97,13 +97,13 @@ it as an area for future improvement.
 
 
 The (re)try segment chain is calculated in two possible manners. If this
-packet is a normal trnamission packet (90% of packets are this) then the retry
+packet is a normal tranmission packet (90% of packets are this) then the retry
 count is best throughput, next best throughput, best probability, lowest
 baserate. If it is a sample packet (10% of packets are this), then the retry
 chain is random lookaround, best throughput, best probability, lowest base
 rate. In tabular format:
 
-        Try | lookaround rate    | Normal rate         
+        Try | Lookaround rate    | Normal rate         
         ------------------------------------------------
          1  | Random lookaround  | Best throughput     
          2  | Best throughput    | Next best throughput
@@ -126,6 +126,33 @@ rates that never work (54mb, 500m range) there is no point in sending
 10 sample packets (<6ms time). Consequently, for the very very low
 probability rates, we sample at most twice.
 
+The retry chain above does "work", but performance is suboptimal. The
+key problem being that when the link is good, too much time is spent
+sampling the slower rates. Thus, for two nodes adjacent to each other,
+the throughput between them was several megabits/sec below using a
+fixed rate. The view was that minstrel should not sample at the slower
+rates if the link is doing well. However, if the link deteriorates,
+minstrel should immediately sample at the lower rates.
+
+Some time later, we realised that the only way to code this reliably
+was to use the retry chain as the method of determining if the slower
+rates are sampled. The retry chain was modified as:
+
+Try |         Lookaround rate              | Normal rate         
+    | random < best    | random > best     |
+--------------------------------------------------------------
+ 1  | Best throughput  | Random rate       | Best throughput     
+ 2  | Random rate      | Best throughput   | Next best throughput
+ 3  | Best probability | Best probability  | Best probability    
+ 4  | Lowest Baserate  | Lowest baserate   | Lowest baserate     
+
+With this retry chain, if the randomly selected rate is slower than the
+current best throughput, the randomly selected rate is placed second in the
+chain. If the link is not good, then there will be data collected at the
+randomly selected rate.  Thus, if the best throughput rate is currently 54mbs,
+the only time slower rates are sampled is when a packet fails in
+transmission. Consequently, if the link is ideal, all packets will be sent at
+the full rate of 54mbs. Which is good.
 
 EWMA
 ==================================================================
@@ -165,7 +192,7 @@ calculation is carried out. The Psuccess value for this rate is not changed.
 If the new time interval is the first time interval (the module has just been
 inserted), then Pnew is calculated from above with Pold set to 0.
 
-The appropriate update interval was selected on the basis of choosing a comprimise
+The appropriate update interval was selected on the basis of choosing a compromise
 between
  *collecting enough success/failure information to be meaningful
  *minimising the amount of cpu time spent do the updates
@@ -295,7 +322,7 @@ appear similar to above.
 The possible datarates for this node are listed in the column at the left. The
 calculated throughput and "ewma prob" are listed next, from which the rates
 used in retry chain are selected. The rates with the maximum throughput,
-second meximum throughput and maximum probability are indicated by the letters
+second maximum throughput and maximum probability are indicated by the letters
 T, t, and P respectively.
 
 The statistics gathered in the last 100ms time period are displayed in the
