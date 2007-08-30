@@ -430,25 +430,25 @@ struct ath5k_hw_tx_status {
  * retrieve the values which we do not want to clear (let's call this 
  * old_data) and then set the register with this and our new_value: 
  * ( old_data | new_value) */
-#define AR5K_REG_WRITE_BITS(_reg, _flags, _val)				\
-	AR5K_REG_WRITE(_reg, (AR5K_REG_READ(_reg) & ~(_flags)) |	\
-			(((_val) << _flags##_S) & (_flags)))
+#define AR5K_REG_WRITE_BITS(hal, _reg, _flags, _val)	\
+	ath5k_hw_reg_write(hal, (ath5k_hw_reg_read(hal, _reg) & ~(_flags)) | \
+				(((_val) << _flags##_S) & (_flags)), _reg)
 
-#define AR5K_REG_MASKED_BITS(hal, _reg, _flags, _mask)			\
-	ath5k_hw_reg_write(hal, (ath5k_hw_reg_read(hal, _reg) &		\
-			(_mask)) | (_flags), _reg)
+#define AR5K_REG_MASKED_BITS(hal, _reg, _flags, _mask)	\
+	ath5k_hw_reg_write(hal, (ath5k_hw_reg_read(hal, _reg) &	\
+					(_mask)) | (_flags), _reg)
 
-#define AR5K_REG_ENABLE_BITS(hal, _reg, _flags)				\
+#define AR5K_REG_ENABLE_BITS(hal, _reg, _flags)		\
 	ath5k_hw_reg_write(hal, ath5k_hw_reg_read(hal, _reg) | (_flags), _reg)
 
-#define AR5K_REG_DISABLE_BITS(_reg, _flags)				\
-	AR5K_REG_WRITE(_reg, AR5K_REG_READ(_reg) & ~(_flags))
+#define AR5K_REG_DISABLE_BITS(hal, _reg, _flags)	\
+	ath5k_hw_reg_write(hal, ath5k_hw_reg_read(hal, _reg) & ~(_flags), _reg)
 
-#define AR5K_PHY_WRITE(hal, _reg, _val)					\
+#define AR5K_PHY_WRITE(hal, _reg, _val)	\
 	ath5k_hw_reg_write(hal, _val, (hal)->ah_phy + ((_reg) << 2))
 
-#define AR5K_PHY_READ(hal, _reg)					\
-	ath5k_hw_reg_read(hal, (hal)->ah_phy + ((_reg) << 2))
+#define AR5K_PHY_READ(hal, _reg)	\
+	ath5k_hw_reg_read(hal, (hal)->ah_phy + ((_reg) << 2)) 
 
 #define AR5K_REG_WAIT(_i) do {						\
 	if (_i % 64)							\

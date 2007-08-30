@@ -94,7 +94,7 @@ ath_hal_computetxtime(struct ath_hw *hal, const struct ath5k_rate_table *rates,
 		 */
 		value = AR5K_CCK_TX_TIME(rate->rate_kbps, frame_length,
 				(short_preamble && 
-				 (rate->modulation == MODULATION_CCK_SP)));
+				 (rate->modulation == IEEE80211_RATE_CCK_2)));
 		break;
 
 	case IEEE80211_RATE_OFDM:
@@ -1773,7 +1773,7 @@ static int ath5k_eeprom_read_ants(struct ath_hw *hal, u32 *offset,
 	ee->ee_ant_control[mode][i++]	= val & 0x3f;
 
 	/* Get antenna modes */
-	hal->ah_antenna[mode][0]
+	hal->ah_antenna[mode][0] =
 		(ee->ee_ant_control[mode][0] << 4) | 0x1;
 	hal->ah_antenna[mode][AR5K_ANT_FIXED_A] =
 		ee->ee_ant_control[mode][1] 		|

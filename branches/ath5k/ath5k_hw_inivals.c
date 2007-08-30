@@ -1008,7 +1008,7 @@ static void ath5k_hw_ini_registers(struct ath_hw *hal, unsigned int size,
 	for (i = 0; i < size; i++) {
 		/* On channel change there is
 		 * no need to mess with PCU */
-		if ((change_channel == TRUE) &&
+		if ((change_channel == 1) &&
 				(ini_regs[i].ini_register >= AR5K_PCU_MIN) &&
 				(ini_regs[i].ini_register <= AR5K_PCU_MAX))
 			continue;
@@ -1107,7 +1107,6 @@ int ath5k_hw_write_initvals(struct ath_hw *hal, u8 mode, bool change_channel)
 		/* AR5211 only comes with 5111 */
 		ath5k_hw_ini_registers(hal, ARRAY_SIZE(rf5111_ini_bbgain),
 				rf5111_ini_bbgain, change_channel);
-	}
 		break;
 #endif
 #ifdef CONFIG_ATHEROS_AR5K_AR5210

@@ -18,6 +18,14 @@
 
 #include "ath5k.h"
 
+#ifndef PCI_VENDOR_ID_ATHEROS
+#define PCI_VENDOR_ID_ATHEROS	0x168c
+#endif
+
+#ifndef PCI_VENDOR_ID_3COM_2
+#define PCI_VENDOR_ID_3COM_2	0xa727
+#endif
+
 #define	ATH_TIMEOUT		1000
 
 #define ATH_LONG_CALIB		30 /* seconds */
