@@ -20,6 +20,7 @@
 /*#define AR5K_DEBUG	1 */
 
 #include <linux/types.h>
+#include <asm/io.h>
 #include <net/mac80211.h>
 
 #include "ath5k_hw.h"

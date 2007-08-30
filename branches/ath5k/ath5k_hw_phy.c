@@ -537,6 +537,7 @@ static const struct ath5k_gain_opt rfgain_opt_5112 = {
  */
 static unsigned int ath5k_hw_rfregs_op(u32 *rf, u32 offset, u32 reg, u32 bits,
 		u32 first, u32 col, bool set)
+{
 	u32 mask, entry, last, data, shift, position;
 	s32 left;
 	int i;
@@ -723,6 +724,7 @@ done:
 /*
  * Read EEPROM Calibration data, modify RF Banks and Initialize RF5111
  */
+#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 static int ath5k_hw_rf5111_rfregs(struct ath_hw *hal,
 		struct ieee80211_channel *channel, unsigned int mode)
 {
@@ -1105,7 +1107,6 @@ bool ath5k_channel_ok(struct ath_hw *hal, u16 freq, unsigned int flags)
 static u32 ath5k_hw_rf5110_chan2athchan(struct ieee80211_channel *channel)
 {
 	u32 athchan;
-	unsigned int ieee_channel;
 
 	/*
 	 * Convert IEEE channel/MHz to an internal channel value used
