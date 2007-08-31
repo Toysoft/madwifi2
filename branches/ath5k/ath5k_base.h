@@ -8,8 +8,8 @@
 /*
  * Defintions for the Atheros Wireless LAN controller driver.
  */
-#ifndef _DEV_ATH_ATHVAR_H
-#define _DEV_ATH_ATHVAR_H
+#ifndef _DEV_ATH5K_BASE_H
+#define _DEV_ATH5K_BASE_H
 
 #include <linux/interrupt.h>
 #include <linux/list.h>
@@ -26,45 +26,16 @@
 #define PCI_VENDOR_ID_3COM_2	0xa727
 #endif
 
-#define	ATH_TIMEOUT		1000
 
-#define ATH_LONG_CALIB		30 /* seconds */
-#define ATH_SHORT_CALIB		1
+#define	ATH5K_RXBUF	40		/* number of RX buffers */
+#define	ATH5K_TXBUF	200		/* number of TX buffers */
+#define ATH5K_BCBUF	1		/* number of beacon buffers */
 
-/*
- * Maximum acceptable MTU
- * MAXFRAMEBODY - WEP - QOS - RSN/WPA:
- * 2312 - 8 - 2 - 12 = 2290
- */
-#define ATH_MAX_MTU	2290
-#define ATH_MIN_MTU	32
-
-#define	ATH_RXBUF	40		/* number of RX buffers */
-#define	ATH_TXBUF	200		/* number of TX buffers */
-#define	ATH_TXDESC	1		/* number of descriptors per buffer */
-#define ATH_BCBUF	1		/* number of beacon buffers */
-#define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
-#define	ATH_TXINTR_PERIOD 5		/* max number of batched tx descriptors */
-
-#define ATH_BEACON_AIFS_DEFAULT  0	/* default aifs for ap beacon q */
-#define ATH_BEACON_CWMIN_DEFAULT 0	/* default cwmin for ap beacon q */
-#define ATH_BEACON_CWMAX_DEFAULT 0	/* default cwmax for ap beacon q */
-
-#define ATH_RSSI_LPF_LEN	10
-#define ATH_RSSI_DUMMY_MARKER	0x127
-#define ATH_EP_MUL(x, mul)	((x) * (mul))
-#define ATH_RSSI_IN(x)		(ATH_EP_MUL((x), AR5K_RSSI_EP_MULTIPLIER))
-#define ATH_LPF_RSSI(x, y, len) \
-    ((x != ATH_RSSI_DUMMY_MARKER) ? (((x) * ((len) - 1) + (y)) / (len)) : (y))
-#define ATH_RSSI_LPF(x, y) do {						\
-	if ((y) >= -20)							\
-		x = ATH_LPF_RSSI((x), ATH_RSSI_IN((y)), ATH_RSSI_LPF_LEN); \
-} while (0)
-
-struct ath_buf {
+/* Struct to hold buffer and the corresponding descriptor */
+struct ath5k_buf {
 	struct list_head	list;
 	unsigned int		flags;	/* tx descriptor flags */
-	struct ath_desc		*desc;	/* virtual addr of desc */
+	struct ath5k_desc	*desc;	/* virtual addr of desc */
 	dma_addr_t		daddr;	/* physical addr of desc */
 	struct sk_buff		*skb;	/* skbuff for buf */
 	dma_addr_t		skbaddr;/* physical addr of skb data */
@@ -80,7 +51,7 @@ struct ath_buf {
  * priorities to fewer hardware queues (typically all to one
  * hardware queue).
  */
-struct ath_txq {
+struct ath5k_txq {
 	unsigned int	qnum;		/* hardware q number */
 	u32		*link;		/* link ptr in last TX desc */
 	struct list_head q;		/* transmit queue */
@@ -89,12 +60,12 @@ struct ath_txq {
 };
 
 #if CHAN_DEBUG
-#define ATH_CHAN_MAX	(26+26+26+200+200)
+#define MAX_CHANS	(26+26+26+200+200)
 #else
-#define ATH_CHAN_MAX	(14+14+14+252+20)	/* XXX what's the max? */
+#define MAX_CHANS	(14+14+14+252+20)
 #endif
 
-struct ath_softc {
+struct ath5k_softc {
 	struct pci_dev		*pdev;		/* for dma mapping */
 	void __iomem		*iobase;	/* address of the device */
 	struct mutex		lock;		/* dev-level lock */
@@ -102,26 +73,26 @@ struct ath_softc {
 	struct ieee80211_low_level_stats ll_stats;
 	struct ieee80211_hw	*hw;		/* IEEE 802.11 common */
 	struct ieee80211_hw_mode modes[NUM_IEEE80211_MODES];
-	struct ieee80211_channel channels[ATH_CHAN_MAX];
+	struct ieee80211_channel channels[MAX_CHANS];
 	struct ieee80211_rate	rates[AR5K_MAX_RATES * NUM_IEEE80211_MODES];
 	enum ieee80211_if_types	opmode;
-	struct ath_hw		*ah;		/* Atheros HW */
+	struct ath5k_hw		*ah;		/* Atheros HW */
 
 	int			debug;
 
-	struct ath_buf		*bufptr;	/* allocated buffer ptr */
-	struct ath_desc		*desc;		/* TX/RX descriptors */
+	struct ath5k_buf	*bufptr;	/* allocated buffer ptr */
+	struct ath5k_desc	*desc;		/* TX/RX descriptors */
 	dma_addr_t		desc_daddr;	/* DMA (physical) address */
 	size_t			desc_len;	/* size of TX/RX descriptors */
 	u16			cachelsz;	/* cache line size */
 
 	DECLARE_BITMAP(status, 6);
-#define ATH_STAT_INVALID	0		/* disable hardware accesses */
-#define ATH_STAT_MRRETRY	1		/* multi-rate retry support */
-#define ATH_STAT_PROMISC	2
-#define ATH_STAT_LEDBLINKING	3		/* LED blink operation active */
-#define ATH_STAT_LEDENDBLINK	4		/* finish LED blink operation */
-#define ATH_STAT_LEDSOFT	5		/* enable LED gpio status */
+#define ATH5K_STAT_INVALID	0		/* disable hardware accesses */
+#define ATH5K_STAT_MRRETRY	1		/* multi-rate retry support */
+#define ATH5K_STAT_PROMISC	2
+#define ATH5K_STAT_LEDBLINKING	3		/* LED blink operation active */
+#define ATH5K_STAT_LEDENDBLINK	4		/* finish LED blink operation */
+#define ATH5K_STAT_LEDSOFT	5		/* enable LED gpio status */
 
 	unsigned int		curmode;	/* current phy mode */
 	struct ieee80211_channel *curchan;	/* current h/w channel */
@@ -159,12 +130,12 @@ struct ath_softc {
 	struct list_head	txbuf;		/* transmit buffer */
 	spinlock_t		txbuflock;
 	unsigned int		txbuf_len;	/* buf count in txbuf list */
-	struct ath_txq		txqs[2];	/* beacon and tx */
+	struct ath5k_txq	txqs[2];	/* beacon and tx */
 
-	struct ath_txq		*txq;		/* beacon and tx*/
+	struct ath5k_txq	*txq;		/* beacon and tx*/
 	struct tasklet_struct	txtq;		/* tx intr tasklet */
 
-	struct ath_buf		*bbuf;		/* beacon buffer */
+	struct ath5k_buf	*bbuf;		/* beacon buffer */
 	unsigned int		bhalq,		/* HAL q for outgoing beacons */
 				bmisscount,	/* missed beacon transmits */
 				bintval,	/* beacon interval */
