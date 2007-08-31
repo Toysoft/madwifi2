@@ -581,7 +581,7 @@ static unsigned int ath5k_hw_rfregs_op(u32 *rf, u32 offset, u32 reg, u32 bits,
 	return data;
 }
 
-static u32 ath5k_hw_rfregs_gainf_corr(struct ath_hw *hal)
+static u32 ath5k_hw_rfregs_gainf_corr(struct ath5k_hw *hal)
 {
 	u32 mix, step;
 	u32 *rf;
@@ -616,7 +616,7 @@ static u32 ath5k_hw_rfregs_gainf_corr(struct ath_hw *hal)
 	return hal->ah_gain.g_f_corr;
 }
 
-static bool ath5k_hw_rfregs_gain_readback(struct ath_hw *hal)
+static bool ath5k_hw_rfregs_gain_readback(struct ath5k_hw *hal)
 {
 	u32 step, mix, level[4];
 	u32 *rf;
@@ -657,7 +657,7 @@ static bool ath5k_hw_rfregs_gain_readback(struct ath_hw *hal)
 		 	 hal->ah_gain.g_current <= level[3]);
 }
 
-static s32 ath5k_hw_rfregs_gain_adjust(struct ath_hw *hal)
+static s32 ath5k_hw_rfregs_gain_adjust(struct ath5k_hw *hal)
 {
 	const struct ath5k_gain_opt *go;
 	int ret = 0;
@@ -725,7 +725,7 @@ done:
  * Read EEPROM Calibration data, modify RF Banks and Initialize RF5111
  */
 #if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
-static int ath5k_hw_rf5111_rfregs(struct ath_hw *hal,
+static int ath5k_hw_rf5111_rfregs(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel, unsigned int mode)
 {
 	struct ath5k_eeprom_info *ee = &hal->ah_capabilities.cap_eeprom;
@@ -830,7 +830,7 @@ static int ath5k_hw_rf5111_rfregs(struct ath_hw *hal,
 /*
  * Read EEPROM Calibration data, modify RF Banks and Initialize RF5112
  */
-static int ath5k_hw_rf5112_rfregs(struct ath_hw *hal,
+static int ath5k_hw_rf5112_rfregs(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel, unsigned int mode)
 {
 	const struct ath5k_ini_rf *rf_ini;
@@ -926,10 +926,10 @@ static int ath5k_hw_rf5112_rfregs(struct ath_hw *hal,
 /*
  * Initialize RF
  */
-int ath5k_hw_rfregs(struct ath_hw *hal, struct ieee80211_channel *channel,
+int ath5k_hw_rfregs(struct ath5k_hw *hal, struct ieee80211_channel *channel,
 		unsigned int mode)
 {
-	int (*func)(struct ath_hw *, struct ieee80211_channel *, unsigned int);
+	int (*func)(struct ath5k_hw *, struct ieee80211_channel *, unsigned int);
 	int ret;
 
 	switch (hal->ah_radio) {
@@ -968,7 +968,7 @@ int ath5k_hw_rfregs(struct ath_hw *hal, struct ieee80211_channel *channel,
 	return ret;
 }
 
-int ath5k_hw_rfgain(struct ath_hw *hal, unsigned int freq)
+int ath5k_hw_rfgain(struct ath5k_hw *hal, unsigned int freq)
 {
 	const struct ath5k_ini_rfgain *ath5k_rfg;
 	unsigned int i, size;
@@ -1007,7 +1007,7 @@ int ath5k_hw_rfgain(struct ath_hw *hal, unsigned int freq)
 	return 0;
 }
 
-enum ath5k_rfgain ath5k_hw_get_rf_gain(struct ath_hw *hal)
+enum ath5k_rfgain ath5k_hw_get_rf_gain(struct ath5k_hw *hal)
 {
 	u32 data, type;
 
@@ -1048,7 +1048,7 @@ done:
 	return hal->ah_rf_gain;
 }
 
-int ath5k_hw_set_rfgain_opt(struct ath_hw *hal)
+int ath5k_hw_set_rfgain_opt(struct ath5k_hw *hal)
 {
 	/* Initialize the gain optimization values */
 	switch (hal->ah_radio) {
@@ -1086,7 +1086,7 @@ int ath5k_hw_set_rfgain_opt(struct ath_hw *hal)
 /*
  * Check if a channel is supported
  */
-bool ath5k_channel_ok(struct ath_hw *hal, u16 freq, unsigned int flags)
+bool ath5k_channel_ok(struct ath5k_hw *hal, u16 freq, unsigned int flags)
 {
 	/* Check if the channel is in our supported range */
 	if (flags & CHANNEL_2GHZ) {
@@ -1123,7 +1123,7 @@ static u32 ath5k_hw_rf5110_chan2athchan(struct ieee80211_channel *channel)
 /*
  * Set channel on RF5110
  */
-static int ath5k_hw_rf5110_channel(struct ath_hw *hal,
+static int ath5k_hw_rf5110_channel(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel)
 {
 	u32 data;
@@ -1171,7 +1171,7 @@ static int ath5k_hw_rf5111_chan2athchan(unsigned int ieee,
 /*
  * Set channel on 5111
  */
-static int ath5k_hw_rf5111_channel(struct ath_hw *hal,
+static int ath5k_hw_rf5111_channel(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel)
 {
 	struct ath5k_athchan_2ghz ath_channel_2ghz;
@@ -1217,7 +1217,7 @@ static int ath5k_hw_rf5111_channel(struct ath_hw *hal,
 /*
  * Set channel on 5112
  */
-static int ath5k_hw_rf5112_channel(struct ath_hw *hal,
+static int ath5k_hw_rf5112_channel(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel)
 {
 	u32 data, data0, data1, data2;
@@ -1265,7 +1265,7 @@ static int ath5k_hw_rf5112_channel(struct ath_hw *hal,
 /*
  * Set a channel on the radio chip
  */
-int ath5k_hw_channel(struct ath_hw *hal, struct ieee80211_channel *channel)
+int ath5k_hw_channel(struct ath5k_hw *hal, struct ieee80211_channel *channel)
 {
 	int ret;
 
@@ -1316,7 +1316,7 @@ int ath5k_hw_channel(struct ath_hw *hal, struct ieee80211_channel *channel)
  * -Fix BPSK/QAM Constellation (I/Q correction)
  * -Calculate Noise Floor
  */
-static int ath5k_hw_rf5110_calibrate(struct ath_hw *hal,
+static int ath5k_hw_rf5110_calibrate(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel)
 {
 	u32 phy_sig, phy_agc, phy_sat, beacon, noise_floor;
@@ -1446,7 +1446,7 @@ static int ath5k_hw_rf5110_calibrate(struct ath_hw *hal,
 /*
  * Perform a PHY calibration on RF5111/5112
  */
-static int ath5k_hw_rf511x_calibrate(struct ath_hw *hal,
+static int ath5k_hw_rf511x_calibrate(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel)
 {
 	u32 i_pwr, q_pwr;
@@ -1494,7 +1494,7 @@ done:
 /*
  * Perform a PHY calibration
  */
-int ath5k_hw_phy_calibrate(struct ath_hw *hal,
+int ath5k_hw_phy_calibrate(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel)
 {
 	int ret;
@@ -1507,7 +1507,7 @@ int ath5k_hw_phy_calibrate(struct ath_hw *hal,
 	return ret;
 }
 
-int ath5k_hw_phy_disable(struct ath_hw *hal)
+int ath5k_hw_phy_disable(struct ath5k_hw *hal)
 {
 	AR5K_TRACE;
 	/*Just a try M.F.*/
@@ -1523,7 +1523,7 @@ int ath5k_hw_phy_disable(struct ath_hw *hal)
 /*
  * Get the PHY Chip revision
  */
-u16 ath5k_hw_radio_revision(struct ath_hw *hal, unsigned int chan)
+u16 ath5k_hw_radio_revision(struct ath5k_hw *hal, unsigned int chan)
 {
 	unsigned int i;
 	u32 srev;
@@ -1569,7 +1569,7 @@ u16 ath5k_hw_radio_revision(struct ath_hw *hal, unsigned int chan)
 }
 
 void 
-ath5k_hw_set_def_antenna(struct ath_hw *hal, unsigned int ant)
+ath5k_hw_set_def_antenna(struct ath5k_hw *hal, unsigned int ant)
 {
 	/*TODO: Boundary check*/
 	AR5K_TRACE;
@@ -1578,7 +1578,7 @@ ath5k_hw_set_def_antenna(struct ath_hw *hal, unsigned int ant)
 		ath5k_hw_reg_write(hal, ant, AR5K_DEFAULT_ANTENNA);
 }
 
-unsigned int ath5k_hw_get_def_antenna(struct ath_hw *hal)
+unsigned int ath5k_hw_get_def_antenna(struct ath5k_hw *hal)
 {
 	AR5K_TRACE;
 	/*Just a try M.F.*/
@@ -1595,7 +1595,7 @@ unsigned int ath5k_hw_get_def_antenna(struct ath_hw *hal)
 /*
  * Initialize the tx power table (not fully implemented)
  */
-static void ath5k_txpower_table(struct ath_hw *hal,
+static void ath5k_txpower_table(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel, s16 max_power)
 {
 	unsigned int i, min, max, n;
@@ -1635,7 +1635,7 @@ static void ath5k_txpower_table(struct ath_hw *hal,
  * XXX: txpower_table is unimplemented so this doesn't work.
  */
 int 
-ath5k_hw_txpower(struct ath_hw *hal, struct ieee80211_channel *channel,
+ath5k_hw_txpower(struct ath5k_hw *hal, struct ieee80211_channel *channel,
 		unsigned int txpower)
 {
 	bool tpc = hal->ah_txpower.txp_tpc;
@@ -1694,7 +1694,7 @@ ath5k_hw_txpower(struct ath_hw *hal, struct ieee80211_channel *channel,
 	return 0;
 }
 
-int ath5k_hw_set_txpower_limit(struct ath_hw *hal, unsigned int power)
+int ath5k_hw_set_txpower_limit(struct ath5k_hw *hal, unsigned int power)
 {
 	/*Just a try M.F.*/
 	struct ieee80211_channel *channel = &hal->ah_current_channel;

@@ -999,7 +999,7 @@ static const struct ath5k_ini rf5112_ini_bbgain[] = {
 /*
  * Write initial register dump
  */
-static void ath5k_hw_ini_registers(struct ath_hw *hal, unsigned int size,
+static void ath5k_hw_ini_registers(struct ath5k_hw *hal, unsigned int size,
 		const struct ath5k_ini *ini_regs, bool change_channel)
 {
 	unsigned int i;
@@ -1032,7 +1032,7 @@ static void ath5k_hw_ini_registers(struct ath_hw *hal, unsigned int size,
 /*
  * Write initial mode-specific register dump
  */
-static void ath5k_hw_ini_mode_registers(struct ath_hw *hal,
+static void ath5k_hw_ini_mode_registers(struct ath5k_hw *hal,
 		unsigned int size, const struct ath5k_ini_mode *ini_mode,
 		u8 mode)
 {
@@ -1047,7 +1047,7 @@ static void ath5k_hw_ini_mode_registers(struct ath_hw *hal,
 }
 #endif
 
-int ath5k_hw_write_initvals(struct ath_hw *hal, u8 mode, bool change_channel)
+int ath5k_hw_write_initvals(struct ath5k_hw *hal, u8 mode, bool change_channel)
 {
 	/*
 	 * Write initial mode-specific settings
