@@ -10,19 +10,3 @@ config ATH5K
 
 	  To compile this driver as a module, choose M here: the module will be
 	  called ath5k.  If unsure, say M.
-
-config ATH5K_AR5210
-	bool "Support AR5210"
-	depends on ATH5K
-	default y
-
-config ATH5K_AR5211
-	bool "Support AR5211"
-	depends on ATH5K
-	default y
-
-config ATH5K_AR5212
-	bool "Support AR5212"
-	depends on ATH5K
-	default y
-
