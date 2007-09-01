@@ -126,6 +126,7 @@ static inline void ath5k_dump_skb(struct sk_buff *skb, const char *prefix) {}
 
 /* Module info */
 MODULE_AUTHOR("Jiri Slaby");
+MODULE_AUTHOR("Nick Kossifidis");
 MODULE_DESCRIPTION("Support for Atheros 802.11 wireless LAN cards.");
 MODULE_SUPPORTED_DEVICE("Atheros WLAN cards");
 MODULE_LICENSE("GPL v2");

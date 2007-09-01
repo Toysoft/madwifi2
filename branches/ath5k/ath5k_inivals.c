@@ -1,5 +1,6 @@
- /*
+/*-
  * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
+ *
  *  This file is free software: you can copy, redistribute and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 2 of the License, or (at
@@ -70,7 +71,6 @@ struct ath5k_ini_mode {
 	u32	mode_value[5];
 };
 
-#ifdef CONFIG_ATHEROS_AR5K_AR5210
 /* Initial register settings for AR5210 */
 static const struct ath5k_ini ar5210_ini[] = {
 	/* PCU and MAC registers */
@@ -282,9 +282,7 @@ static const struct ath5k_ini ar5210_ini[] = {
 	{ AR5K_PHY(52), 0x00000014 },
 	{ AR5K_PHY_ACT, AR5K_PHY_ACT_ENABLE },
 };
-#endif
 
-#ifdef CONFIG_ATHEROS_AR5K_AR5211
 /* Initial register settings for AR5211 */
 static const struct ath5k_ini ar5211_ini[] = {
 	{ AR5K_RXDP,		0x00000000 },
@@ -483,9 +481,9 @@ static const struct ath5k_ini_mode ar5211_ini_mode[] = {
 	{ AR5K_RF_BUFFER_CONTROL_4,
 		{ 0x00000010, 0x00000014, 0x00000010, 0x00000010, 0x00000010 } },
 };
-#endif
 
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
+
+
 /* Initial register settings for AR5212 */
 static const struct ath5k_ini ar5212_ini[] = {
 	{ AR5K_RXDP,		0x00000000 },
@@ -879,14 +877,13 @@ static const struct ath5k_ini_mode ar5212_rf5112_ini_mode[] = {
 	{ AR5K_PHY_GAIN_2GHZ,
 		{ 0x642c0140, 0x642c0140, 0x6442c160, 0x6442c160, 0x6442c160 } },
 };
-#endif
+
 
 /*
  * Initial BaseBand Gain settings for RF5111/5112 (only AR5210 comes with
  * RF5110 so initial BB Gain settings are included in AR5K_AR5210_INI)
  */
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined (CONFIG_ATHEROS_AR5K_AR5212)
 /* RF5111 Initial BaseBand Gain settings */
 static const struct ath5k_ini rf5111_ini_bbgain[] = {
 	{ AR5K_BB_GAIN(0), 0x00000000 },
@@ -954,9 +951,7 @@ static const struct ath5k_ini rf5111_ini_bbgain[] = {
 	{ AR5K_BB_GAIN(62), 0x00000002 },
 	{ AR5K_BB_GAIN(63), 0x00000016 },
 };
-#endif
 
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
 /* RF 5112 Initial BaseBand Gain settings */
 static const struct ath5k_ini rf5112_ini_bbgain[] = {
 	{ AR5K_BB_GAIN(0), 0x00000000 },
@@ -1024,10 +1019,9 @@ static const struct ath5k_ini rf5112_ini_bbgain[] = {
 	{ AR5K_BB_GAIN(62), 0x00000010 },
 	{ AR5K_BB_GAIN(63), 0x0000001a },
 };
-#endif
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5210) || defined(CONFIG_ATHEROS_AR5K_AR5211) \
-	|| defined(CONFIG_ATHEROS_AR5K_AR5212)
+
+
 /*
  * Write initial register dump
  */
@@ -1058,9 +1052,7 @@ static void ath5k_hw_ini_registers(struct ath5k_hw *hal, unsigned int size,
 		}
 	}
 }
-#endif
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 /*
  * Write initial mode-specific register dump
  */
@@ -1077,7 +1069,6 @@ static void ath5k_hw_ini_mode_registers(struct ath5k_hw *hal,
 	}
 
 }
-#endif
 
 int ath5k_hw_write_initvals(struct ath5k_hw *hal, u8 mode, bool change_channel)
 {
@@ -1085,7 +1076,6 @@ int ath5k_hw_write_initvals(struct ath5k_hw *hal, u8 mode, bool change_channel)
 	 * Write initial mode-specific settings
 	 */
 	/*For 5212*/
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
 	if (hal->ah_version == AR5K_AR5212) {
 		ath5k_hw_ini_mode_registers(hal, ARRAY_SIZE(ar5212_ini_mode),
 				ar5212_ini_mode, mode);
@@ -1098,20 +1088,16 @@ int ath5k_hw_write_initvals(struct ath5k_hw *hal, u8 mode, bool change_channel)
 					ARRAY_SIZE(ar5212_rf5112_ini_mode),
 					ar5212_rf5112_ini_mode, mode);
 	}
-#endif
-#ifdef CONFIG_ATHEROS_AR5K_AR5211
 	/*For 5211*/
 	if (hal->ah_version == AR5K_AR5211)
 		ath5k_hw_ini_mode_registers(hal, ARRAY_SIZE(ar5211_ini_mode),
 				ar5211_ini_mode, mode);
-#endif
 	/* For 5210 mode settings check out ath5k_hw_reset_tx_queue */
 
 	/*
 	 * Write initial settings common for all modes
 	 */
 	switch (hal->ah_version) {
-#if defined(CONFIG_ATHEROS_AR5K_AR5212)
 	case AR5K_AR5212:
 		ath5k_hw_ini_registers(hal, ARRAY_SIZE(ar5212_ini),
 				ar5212_ini, change_channel);
@@ -1131,8 +1117,6 @@ int ath5k_hw_write_initvals(struct ath5k_hw *hal, u8 mode, bool change_channel)
 					rf5111_ini_bbgain, change_channel);
 		}
 		break;
-#endif
-#ifdef CONFIG_ATHEROS_AR5K_AR5211
 	case AR5K_AR5211:
 		ath5k_hw_ini_registers(hal, ARRAY_SIZE(ar5211_ini),
 				ar5211_ini, change_channel);
@@ -1140,13 +1124,10 @@ int ath5k_hw_write_initvals(struct ath5k_hw *hal, u8 mode, bool change_channel)
 		ath5k_hw_ini_registers(hal, ARRAY_SIZE(rf5111_ini_bbgain),
 				rf5111_ini_bbgain, change_channel);
 		break;
-#endif
-#ifdef CONFIG_ATHEROS_AR5K_AR5210
 	case AR5K_AR5210:
 		ath5k_hw_ini_registers(hal, ARRAY_SIZE(ar5210_ini),
 				ar5210_ini, change_channel);
 		break;
-#endif
 	}
 
 	return 0;

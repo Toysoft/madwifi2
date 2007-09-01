@@ -1,5 +1,6 @@
- /*
+/*-
  * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
+ *
  *  This file is free software: you can copy, redistribute and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 2 of the License, or (at
@@ -65,7 +66,6 @@ struct ath5k_gain_opt {
 	const struct ath5k_gain_opt_step	go_step[AR5K_GAIN_STEP_COUNT];
 };
 
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 /* RF5111 mode-specific init registers */
 static const struct ath5k_ini_rf rfregs_5111[] = {
 	{ 0, 0x989c,
@@ -245,10 +245,9 @@ static const struct ath5k_gain_opt rfgain_opt_5111 = {
 		{ { 2, 1, 1, 0 }, -6 }
 	}
 };
-#endif
+
 
 /* RF5112 mode-specific init registers */
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
 static const struct ath5k_ini_rf rfregs_5112[] = {
 	{ 1, 0x98d4,
 	/*    mode a/XR   mode aTurbo mode b      mode g      mode gTurbo */
@@ -562,7 +561,7 @@ static const struct ath5k_gain_opt rfgain_opt_5112 = {
 		{ { 0, 1, 0, 1, 1, 0, 1 }, -16 },
 	}
 };
-#endif
+
 
 /*
  * Used to modify RF Banks before writing them to AR5K_RF_BUFFER
@@ -695,16 +694,12 @@ static s32 ath5k_hw_rfregs_gain_adjust(struct ath5k_hw *hal)
 	int ret = 0;
 
 	switch (hal->ah_radio) {
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 	case AR5K_RF5111:
 		go = &rfgain_opt_5111;
 		break;
-#endif
-#if defined(CONFIG_ATHEROS_AR5K_AR5212)
 	case AR5K_RF5112:
 		go = &rfgain_opt_5112;
 		break;
-#endif
 	default:
 		return 0;
 	}
@@ -756,7 +751,6 @@ done:
 /*
  * Read EEPROM Calibration data, modify RF Banks and Initialize RF5111
  */
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 static int ath5k_hw_rf5111_rfregs(struct ath5k_hw *hal,
 		struct ieee80211_channel *channel, unsigned int mode)
 {
@@ -856,9 +850,8 @@ static int ath5k_hw_rf5111_rfregs(struct ath5k_hw *hal,
 
 	return 0;
 }
-#endif
 
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
+
 /*
  * Read EEPROM Calibration data, modify RF Banks and Initialize RF5112
  */
@@ -953,7 +946,7 @@ static int ath5k_hw_rf5112_rfregs(struct ath5k_hw *hal,
 
 	return 0;
 }
-#endif
+
 
 /*
  * Initialize RF
@@ -965,13 +958,10 @@ int ath5k_hw_rfregs(struct ath5k_hw *hal, struct ieee80211_channel *channel,
 	int ret;
 
 	switch (hal->ah_radio) {
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 	case AR5K_RF5111:
 		hal->ah_rf_banks_size = sizeof(rfregs_5111);
 		func = ath5k_hw_rf5111_rfregs;
 		break;
-#endif
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
 	case AR5K_RF5112:
 		if (hal->ah_radio_5ghz_revision >= AR5K_SREV_RAD_5112A)
 			hal->ah_rf_banks_size = sizeof(rfregs_5112a);
@@ -979,7 +969,6 @@ int ath5k_hw_rfregs(struct ath5k_hw *hal, struct ieee80211_channel *channel,
 			hal->ah_rf_banks_size = sizeof(rfregs_5112);
 		func = ath5k_hw_rf5112_rfregs;
 		break;
-#endif
 	default:
 		return -EINVAL;
 	}
@@ -1006,18 +995,14 @@ int ath5k_hw_rfgain(struct ath5k_hw *hal, unsigned int freq)
 	unsigned int i, size;
 
 	switch (hal->ah_radio) {
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 	case AR5K_RF5111:
 		ath5k_rfg = rfgain_5111;
 		size = ARRAY_SIZE(rfgain_5111);
 		break;
-#endif
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
 	case AR5K_RF5112:
 		ath5k_rfg = rfgain_5112;
 		size = ARRAY_SIZE(rfgain_5112);
 		break;
-#endif
 	default:
 		return -EINVAL;
 	}
@@ -1084,7 +1069,6 @@ int ath5k_hw_set_rfgain_opt(struct ath5k_hw *hal)
 {
 	/* Initialize the gain optimization values */
 	switch (hal->ah_radio) {
-#if defined(CONFIG_ATHEROS_AR5K_AR5211) || defined(CONFIG_ATHEROS_AR5K_AR5212)
 	case AR5K_RF5111:
 		hal->ah_gain.g_step_idx = rfgain_opt_5111.go_default;
 		hal->ah_gain.g_step =
@@ -1093,8 +1077,6 @@ int ath5k_hw_set_rfgain_opt(struct ath5k_hw *hal)
 		hal->ah_gain.g_high = 35;
 		hal->ah_gain.g_active = 1;
 		break;
-#endif
-#ifdef CONFIG_ATHEROS_AR5K_AR5212
 	case AR5K_RF5112:
 		hal->ah_gain.g_step_idx = rfgain_opt_5112.go_default;
 		hal->ah_gain.g_step =
@@ -1103,7 +1085,6 @@ int ath5k_hw_set_rfgain_opt(struct ath5k_hw *hal)
 		hal->ah_gain.g_high = 85;
 		hal->ah_gain.g_active = 1;
 		break;
-#endif
 	default:
 		return -EINVAL;
 	}
