@@ -1139,6 +1139,10 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 static struct sk_buff *
 ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 {
+	const struct llc snap_hdr = {.llc_dsap = LLC_SNAP_LSAP,
+				     .llc_ssap = LLC_SNAP_LSAP,
+				     .llc_control = LLC_UI,
+				     .llc_snap.org_code = {0x0, 0x0, 0x0}};
 	struct ieee80211_qosframe_addr4 wh;	/* Max size address frames */
 	struct ether_header *eh;
 	struct llc *llc;
@@ -1147,11 +1151,12 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 	memcpy(&wh, skb->data, hdrlen);	/* Make a copy of the variably sized .11 header */
 
 	llc = (struct llc *) skb_pull(skb, hdrlen);
-	if (skb->len >= LLC_SNAPFRAMELEN &&
-	    llc->llc_dsap == LLC_SNAP_LSAP && llc->llc_ssap == LLC_SNAP_LSAP &&
-	    llc->llc_control == LLC_UI && llc->llc_snap.org_code[0] == 0 &&
-	    llc->llc_snap.org_code[1] == 0 && llc->llc_snap.org_code[2] == 0) {
-
+	/* XXX: For some unknown reason some APs think they are from DEC and 
+	 * use an OUI of 00-00-f8. This should be killed as soon as sanity is 
+	 * restored. */
+	if ((skb->len >= LLC_SNAPFRAMELEN) && (memcmp(&snap_hdr, llc, 5) == 0) &&
+			((llc->llc_snap.org_code[2] == 0x0) || 
+			 (llc->llc_snap.org_code[2] == 0xf8))) {
 		ether_type = llc->llc_un.type_snap.ether_type;
 		skb_pull(skb, LLC_SNAPFRAMELEN);
 		llc = NULL;
