@@ -263,27 +263,36 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	hal->ah_software_retry = false;
 	hal->ah_ant_diversity = AR5K_TUNE_ANT_DIVERSITY;
 
-	switch (device) {
-	case PCI_DEVICE_ID_ATHEROS_AR2413:
-	case PCI_DEVICE_ID_ATHEROS_AR5413:
-	case PCI_DEVICE_ID_ATHEROS_AR5424:
-		/*
-		 * Known single chip solutions
-		 */
-		hal->ah_single_chip = true;
-		break;
-	default:
-		/*
-		 * Multi chip solutions
-		 */
-		hal->ah_single_chip = false;
-		break;
-	}
-
 	/*
-	 * Set the mac revision based on the pci id
+	 * Set the mac version based on the pci id
 	 */
 	hal->ah_version = mac_version;
+
+	/*
+	 * Set the mac revision based by reading SREV
+	 */
+	srev = ath5k_hw_reg_read(hal, AR5K_SREV);
+	hal->ah_mac_srev = srev;
+	hal->ah_mac_version = AR5K_REG_MS(srev, AR5K_SREV_VER);
+	hal->ah_mac_revision = AR5K_REG_MS(srev, AR5K_SREV_REV);
+
+	switch (srev) {
+		case AR5K_SREV_VER_AR2424:
+		case AR5K_SREV_VER_AR5424:
+		case AR5K_SREV_VER_AR5413:
+		case AR5K_SREV_VER_AR5414:
+			/*
+			 * Known single chip solutions
+			 */
+			hal->ah_single_chip = true;
+			break;
+		default:
+			/*
+			 * Multi chip solutions
+			 */
+			hal->ah_single_chip = false;
+			break;
+	}
 
 	/*Fill the hal struct with the needed functions*/
 	if (hal->ah_version == AR5K_AR5212)
@@ -313,11 +322,7 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	if (ret)
 		goto err_free;
 
-	/* Get MAC, PHY and RADIO revisions */
-	srev = ath5k_hw_reg_read(hal, AR5K_SREV);
-	hal->ah_mac_srev = srev;
-	hal->ah_mac_version = AR5K_REG_MS(srev, AR5K_SREV_VER);
-	hal->ah_mac_revision = AR5K_REG_MS(srev, AR5K_SREV_REV);
+	/* Get PHY and RADIO revisions */
 	hal->ah_phy_revision = ath5k_hw_reg_read(hal, AR5K_PHY_CHIP_ID) &
 			0xffffffff;
 	hal->ah_radio_5ghz_revision = ath5k_hw_radio_revision(hal,
