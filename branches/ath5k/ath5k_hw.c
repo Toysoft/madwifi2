@@ -276,9 +276,15 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	hal->ah_mac_version = AR5K_REG_MS(srev, AR5K_SREV_VER);
 	hal->ah_mac_revision = AR5K_REG_MS(srev, AR5K_SREV_REV);
 
+	/* Return on unsupported devices */
+	if((srev >= AR5K_SREV_VER_AR5416) || ((srev >= AR5K_SREV_VER_AR2424)
+					&& (srev < AR5K_SREV_VER_AR5413))){
+		printk(KERN_ERR "ath5k: Device not supported (0x%x)\n", srev);
+		ret = -ENODEV;
+		goto err_free;
+	}
+
 	switch (srev) {
-		case AR5K_SREV_VER_AR2424:
-		case AR5K_SREV_VER_AR5424:
 		case AR5K_SREV_VER_AR5413:
 		case AR5K_SREV_VER_AR5414:
 			/*
