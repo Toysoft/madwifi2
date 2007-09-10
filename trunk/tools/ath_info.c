@@ -1,5 +1,7 @@
+/* -*- linux-c -*- */
 /*-
  * Copyright (c) 2007 Nick Kossifidis <mickflemm@gmail.com>
+ * Copyright (c) 2007 Joerg Albert    <jal2 *at* gmx.de>
  * 
  * This program is free software you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as 
@@ -35,15 +37,58 @@
  * 
  * load madwifi-ng or madwifi-old if not already loaded (be sure the 
  * interface is down!)
- * 
+ *
  * modprobe ath_pci
  * 
+ * OR
+ *
+ * call:
+ * setpci -s 02:02.0 command=0x41f cache_line_size=0x10
+ *
+ * to enable access to the PCI device.
+ *
  * and we run the thing...
  * 
  * ./ath_info 0xc2000000
  * 
+ * In order to change the regdomain to 0 , call:
+ *
+ * ./ath_info -w 0xc2000000 regdomain 0
+ *
+ * to change any PCI ID value, say:
+ *
+ * ./ath_info -w 0xc2000000 <name> X
+ *
+ * with <name> ::= pci_dev_id | pci_vendor_id | pci_class | 
+ *                 pci_subsys_dev_id | pci_subsys_vendor_id
+ *
+ * With newer chipsets (>= AR5004x, i.e. MAC >= AR5213), Atheros introduced
+ * write protection on the EEPROM. On a GIGABYTE GN-WI01HT you can set GPIO 4
+ * to low to be able to write the EEPROM. This depends highly on the PCB layout,
+ * so there may be different GPIO used.
+ * This program currently sets GPIO 4 to low for a MAC >= AR5213, but you can
+ * override this with the -g option:
+ *
+ * ./ath_info -g 5:0 -w 0xc2000000 regdomain X
+ *
+ * would set GPIO 5 to low (and wouldn't touch GPIO 4). -g can be given several times.
+ *
+ * The write function is currently not tested with 5210 devices.
+ *
  * Use at your own risk, entering a false device address will have really 
- * nasty results! */
+ * nasty results!
+ *
+ * Writing wrong values to the PCI id fields may prevent the driver from
+ * detecting the card!
+ *
+ * Transmitting on illegal frequencies may violate state laws. Stick to the local
+ * regulations!
+ *
+ * DISCLAIMER:
+ * The authors are in no case responsible for damaged hardware or violation of
+ * local laws by operating modified hardware.
+ *  
+ */
 
 
 #include <stdio.h>
@@ -54,8 +99,28 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+#define dbg(fmt , __args__...) do { if (verbose) printf("#DBG %s: " fmt "\n", __FUNCTION__, ##__args__ ); } while (0)
+
+#define err(fmt , __args__...) fprintf(stderr, "#ERR %s: " fmt "\n", __FUNCTION__, ##__args__ )
+
 #define AR5K_PCI_MEM_SIZE 0x10000
 #define AR5K_ELEMENTS(_array)	(sizeof(_array) / sizeof(_array[0]))
+
+#define AR5K_NUM_GPIO	6
+
+#define AR5K_GPIOCR		0x4014				/*Register Address*/
+#define AR5K_GPIOCR_OUT(n)	(3 << ((n) * 2))	/*Mode 3 for pin n*/
+#define AR5K_GPIOCR_INT_SEL(n)	((n) << 12)		/*Interrupt for GPIO pin n*/
+
+/*
+ * "General Purpose Input/Output" (GPIO) data output register
+ */
+#define AR5K_GPIODO	0x4018
+
+/*
+ * "General Purpose Input/Output" (GPIO) data input register
+ */
+#define AR5K_GPIODI	0x401c
 
 /*
  * Common silicon revision/version values
@@ -134,6 +199,29 @@ struct ath5k_srev_name {
 #define AR5K_PHY_SHIFT_2GHZ		0x00004007
 #define AR5K_PHY_SHIFT_5GHZ		0x00000007
 
+#define AR5K_RESET_CTL		0x4000			/* Register Address */
+#define AR5K_RESET_CTL_PCU	0x00000001	/* Protocol Control Unit reset */
+#define AR5K_RESET_CTL_DMA	0x00000002	/* DMA (Rx/Tx) reset -5210 only */
+#define	AR5K_RESET_CTL_BASEBAND	0x00000002	/* Baseband reset (5211/5212) */
+#define AR5K_RESET_CTL_MAC	0x00000004	/* MAC reset (PCU+Baseband ?) -5210 only */
+#define AR5K_RESET_CTL_PHY	0x00000008	/* PHY reset -5210 only */
+#define AR5K_RESET_CTL_PCI	0x00000010	/* PCI Core reset (interrupts etc) */
+#define AR5K_RESET_CTL_CHIP	(AR5K_RESET_CTL_PCU | AR5K_RESET_CTL_DMA |	\
+				AR5K_RESET_CTL_MAC | AR5K_RESET_CTL_PHY)
+
+/*
+ * Sleep control register
+ */
+#define AR5K_SLEEP_CTL			0x4004			/*Register Address*/
+#define AR5K_SLEEP_CTL_SLDUR		0x0000ffff	/*Sleep duration mask*/
+#define AR5K_SLEEP_CTL_SLDUR_S		0
+#define AR5K_SLEEP_CTL_SLE		0x00030000	/*Sleep enable mask*/
+#define AR5K_SLEEP_CTL_SLE_S		16
+#define AR5K_SLEEP_CTL_SLE_WAKE		0x00000000	/*Force chip awake*/
+#define AR5K_SLEEP_CTL_SLE_SLP		0x00010000	/*Force chip sleep*/
+#define AR5K_SLEEP_CTL_SLE_ALLOW	0x00020000	
+#define AR5K_SLEEP_CTL_SLE_UNITS	0x00000008	/*non 5210*/
+
 #define AR5K_PCICFG			0x4010			/* Register Address */
 #define AR5K_PCICFG_EEAE		0x00000001	/* Eeprom access enable [5210] */
 #define AR5K_PCICFG_CLKRUNEN		0x00000004	/* CLKRUN enable [5211+] */
@@ -143,6 +231,8 @@ struct ath5k_srev_name {
 #define AR5K_PCICFG_EESIZE_8K		1		/* 8K */
 #define AR5K_PCICFG_EESIZE_16K		2		/* 16K */
 #define AR5K_PCICFG_EESIZE_FAIL		3		/* Failed to get size (?) [5211+] */
+
+#define AR5K_PCICFG_SPWR_DN		0x00010000	/*Mask for power status (5210)*/
 
 #define AR5K_EEPROM_BASE	0x6000
 
@@ -236,6 +326,29 @@ struct ath5k_srev_name {
 #define AR5K_TUNE_REGISTER_TIMEOUT		20000
 
 
+/* names for eeprom fields */
+static const struct {
+	const char *name;
+	int addr;
+} eeprom_addr[] = {
+	{"pci_dev_id", 0},
+	{"pci_vendor_id", 1},
+	{"pci_class", 2},
+	{"pci_rev_id", 3},
+	{"pci_subsys_dev_id", 7},
+	{"pci_subsys_vendor_id", 8},
+
+	{"regdomain", AR5K_EEPROM_REG_DOMAIN},
+};
+static const int eeprom_addr_len = sizeof(eeprom_addr)/sizeof(eeprom_addr[0]);
+
+static int force_write=0;
+static int verbose=0;
+
+/* forward decl. */
+static void usage(const char *n);
+
+
 static u_int32_t
 ath5k_hw_bitswap(u_int32_t val, u_int bits)
 {
@@ -299,6 +412,58 @@ ath5k_hw_radio_revision(u_int16_t mac_version, void *mem, u_int8_t chip)
 }
 
 /*
+ * Write to EEPROM
+ */
+int
+ath5k_hw_eeprom_write(void *mem, u_int32_t offset, u_int16_t data, 
+		      u_int8_t mac_version)
+{
+	u_int32_t status, timeout;
+
+	/*
+	 * Initialize EEPROM access
+	 */
+
+	if (mac_version == AR5K_SREV_VER_AR5210) {
+
+		AR5K_REG_ENABLE_BITS(AR5K_PCICFG, AR5K_PCICFG_EEAE);
+
+		/* data to write */
+		(void)AR5K_REG_WRITE(AR5K_EEPROM_BASE + (4 * offset), data);
+
+	} else {
+		/* !=  5210 */
+		/* reset eeprom access */
+		AR5K_REG_WRITE(AR5K_EEPROM_CMD, AR5K_EEPROM_CMD_RESET);
+		usleep(5);
+		
+		AR5K_REG_WRITE(AR5K_EEPROM_DATA, data);
+	
+		/* set offset in EEPROM to write to */
+		AR5K_REG_WRITE(AR5K_EEPROM_BASE, offset);
+		usleep(5);
+
+		/* issue write command */
+		AR5K_REG_WRITE(AR5K_EEPROM_CMD, AR5K_EEPROM_CMD_WRITE);
+	}
+
+	for (timeout = AR5K_TUNE_REGISTER_TIMEOUT; timeout > 0; timeout--) {
+		status = AR5K_REG_READ(AR5K_EEPROM_STATUS);
+		if (status & AR5K_EEPROM_STAT_WRDONE) {
+			if (status & AR5K_EEPROM_STAT_WRERR) {
+				err("eeprom write access to 0x%04x failed", offset);
+				return 1;
+			}
+			return 0;
+		}
+		usleep(15);
+	}
+
+	return 1;
+}
+
+
+/*
  * Read from EEPROM
  */
 int
@@ -354,6 +519,187 @@ ath5k_hw_get_part_name(enum ath5k_srev_type type, u_int32_t val)
 	return (name);
 }
 
+/* returns -1 on unknown name */
+int eeprom_name2addr(const char *name)
+{
+	int i;
+	if (!name || !name[0])
+		return -1;
+	for(i=0; i < eeprom_addr_len; i++)
+		if (!strcmp(name, eeprom_addr[i].name))
+			return eeprom_addr[i].addr;
+	return -1;
+} /* eeprom_name2addr */
+
+/* returns "<unknown>" on unknown address */
+const char *eeprom_addr2name(int addr)
+{
+	int i;
+	for(i=0; i < eeprom_addr_len; i++)
+		if (eeprom_addr[i].addr == addr)
+			return eeprom_addr[i].name;
+	return "<unknown>";
+} /* eeprom_addr2name */
+
+
+static int 
+do_write_pairs(int anr, int argc, char **argv, unsigned char *mem, int mac_version)
+{
+#define MAX_NR_WRITES 16
+	struct {
+		int addr;
+		unsigned int val;
+	} wr_ops[MAX_NR_WRITES];
+	int wr_ops_len = 0;
+	int i;
+	char *end;
+	int errors = 0; /* count errors during write/verify */
+
+	if (anr >= argc) {
+		err("missing values to write.");
+		usage(argv[0]);
+		return 1;
+	}
+
+	if ((argc-anr) % 2) {
+		err("write spec. needs an even number of arguments.");
+		usage(argv[0]);
+		return 2;
+	}
+
+	if ((argc-anr)/2 > MAX_NR_WRITES) {
+		err("too many values to write (max. %d)", MAX_NR_WRITES);
+		return 3;
+	}
+
+	/* get the (addr,val) pairs we have to write */
+	i=0;
+	while (anr < (argc-1)) {
+		wr_ops[i].addr = strtoul(argv[anr], &end, 0);
+		if (end == argv[anr]) {
+			/* maybe a symbolic name for the address ? */
+			if ((wr_ops[i].addr = eeprom_name2addr(argv[anr])) == -1) {
+				err("pair %d: bad address %s", i, argv[anr]);
+				return 4;
+			}
+		}
+
+		if (wr_ops[i].addr >= AR5K_EEPROM_INFO_BASE) {
+			err("offset 0x%04x in CRC protected area is not supported",
+			    wr_ops[i].addr);
+			return 5;
+		}
+
+		anr++;
+		wr_ops[i].val = strtoul(argv[anr], &end, 0);
+		if (end == argv[anr]) {
+			err("pair %d: bad val %s", i, argv[anr]);
+			return 5;
+		}
+
+		if (wr_ops[i].val > 0xffff) {
+			err("pair %d: value %u too large", i, wr_ops[i].val);
+			return 6;
+		}
+		anr++;
+		i++;
+	} /* while (anr < (argc-1)) */
+
+	if (!(wr_ops_len=i)) {
+		err("no (addr,val) pairs given");
+		return 7;
+	}
+
+	if (verbose || !force_write) {
+		for(i=0; i < wr_ops_len; i++)
+			printf("%20s (0x%04x) := 0x%04x\n",
+			       eeprom_addr2name(wr_ops[i].addr), wr_ops[i].addr, wr_ops[i].val);
+	}
+
+	if (!force_write) {
+		int c;
+		printf(
+			"WARNING: The write function may easy brick your device or\n"
+			"violate state regulation on frequency usage.\n"
+			"Proceed on your own risk!\n"
+			"Shall I write the above value(s)? (y/n)\n");
+		c=getchar();
+		if (c != 'y' && c != 'Y') {
+			printf("user abort\n");
+			return 0;
+		}
+	}
+
+	for(i=0; i < wr_ops_len; i++) {
+		u_int16_t oldval,u;
+
+		if (ath5k_hw_eeprom_read(mem, wr_ops[i].addr, &oldval, mac_version)) {
+			err("failed to read old value from offset 0x%04x ", wr_ops[i].addr);
+			errors++;
+		}
+
+		if (oldval == wr_ops[i].val) {
+			dbg("pair %d: skipped, value already there", i);
+			continue;
+		}
+		
+		dbg("writing *0x%04x := 0x%04x", wr_ops[i].addr, wr_ops[i].val); 
+		if (ath5k_hw_eeprom_write(mem, wr_ops[i].addr, wr_ops[i].val, mac_version)) {
+			err("failed to write 0x%04x to offset 0x%04x",
+			    wr_ops[i].val, wr_ops[i].addr);
+			errors++;
+		} else {
+			if (ath5k_hw_eeprom_read(mem, wr_ops[i].addr, &u, mac_version)) {
+				err("failed to read offset 0x%04x for verification", wr_ops[i].addr);
+				errors++;
+			} else {
+				if (u != wr_ops[i].val) {
+					err("offset 0x%04x: wrote 0x%04x but read 0x%04x", 
+					    wr_ops[i].addr, wr_ops[i].val, u);
+					errors++;
+				}
+			}
+		}
+	}
+
+	return errors ? 11 : 0;
+} /* do_write_pairs */
+
+static void
+usage(const char *n)
+{
+	int i;
+
+	fprintf(stderr, "%s [-w [-g N:M]] [-v] [-f] <base_address> "
+		"[<name1> <val1> [<name2> <val2> ...]]\n\n", n);
+	fprintf(stderr,
+		"-w      write values into EEPROM\n"
+		"-g N:M  set GPIO N to level M (only used with -w)\n"
+		"-v      verbose output\n"
+		"-f      force; suppress question before writing\n"
+		"<base_address>  device base address (see lspci output)\n\n");
+
+	fprintf(stderr,
+		"- read info:\n"
+		"  %s <base_address>\n\n"
+		"- set regdomain to N:\n"
+		"  %s -w <base_address> regdomain N\n\n"
+		"- set a PCI id field to value N:\n"
+		"  %s -w <base_address> <field> N\n"
+		"  where <field> is on of:\n    ", n,n,n);
+	for(i=0; i < eeprom_addr_len; i++)
+		fprintf(stderr, " %s", eeprom_addr[i].name);
+	fprintf(stderr,"\n\n");
+	fprintf(stderr,
+		"You may need to set a GPIO to a certain value in order to enable\n"
+		"writing to the EEPROM with newer chipsets, e.g. set GPIO 4 to low:\n"
+		"  %s -g 4:0 -w <base_address> regdomain N\n", n);
+	fprintf(stderr,
+		"\nDISCLAIMER: The authors are not responsible for any damages caused by\n"
+		"this program. Writing improper values may damage the card or cause\n"
+		"unlawful radio transmissions!\n\n");
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -363,13 +709,69 @@ main(int argc, char *argv[])
 	u_int8_t error, has_a, has_b, has_g, has_rfkill, eeprom_size;
 	void *mem;
 	int fd;
+	int i, anr=1;
+	int do_write=0; /* default: read only */
+	struct {
+		int valid;
+		int value;
+	} gpio_set[AR5K_NUM_GPIO];
+	int nr_gpio_set=0;
 
-	if ((argc < 2) || (argc > 2)) {
-		printf("Usage: ath5k_info <phys address> \n");
+	for(i=0; i < sizeof(gpio_set)/sizeof(gpio_set[0]); i++)
+		gpio_set[i].valid = 0;
+
+
+	if (argc < 2) {
+		usage(argv[0]);
 		return -1;
 	}
 
-	dev_addr = strtoul(argv[1], NULL, 0);
+	while (anr < argc && argv[anr][0] == '-') {
+		switch (argv[anr][1]) {
+		case 'w':
+			do_write=1;
+			break;
+		case 'g':
+			anr++;
+			if (strlen(argv[anr]) != 3 || argv[anr][1] != ':' ||
+			    argv[anr][0] < '0' || argv[anr][0] > '5' ||
+			    (argv[anr][2] != '0' && argv[anr][2] != '1')) {
+				err("invalid gpio spec. %s", argv[anr]);
+				return 2;
+			}
+			gpio_set[argv[anr][0] - '0'].valid = 1;
+			gpio_set[argv[anr][0] - '0'].value = argv[anr][2]-'0';
+			nr_gpio_set++;
+			break;
+
+		case 'f':
+			force_write=1;
+			break;
+
+		case 'v':
+			verbose=1;
+			break;
+
+		case 'h':
+			usage(argv[0]);
+			return 0;
+			break;
+
+		default:
+			err("unknown option %s", argv[anr]);
+			return 2;
+		} /* switch (argv[anr][1]) */
+    
+		anr++;
+	} /* while (anr < argc && ...) */
+  
+	if (anr >= argc) {
+		err("missing device address");
+		usage(argv[0]);
+		return 3;
+	}
+
+	dev_addr = strtoul(argv[anr], NULL, 0);
 
 	fd = open("/dev/mem", O_RDWR);
 	if (fd < 0) {
@@ -385,6 +787,29 @@ main(int argc, char *argv[])
 			"%s", dev_addr, AR5K_PCI_MEM_SIZE, strerror(errno));
 		return -3;
 	}
+
+	/* wake from power-down and remove reset (in case the driver isn't running) */
+	{
+		unsigned long int
+			sleep_ctl=AR5K_REG_READ(AR5K_SLEEP_CTL), 
+			reset_ctl=AR5K_REG_READ(AR5K_RESET_CTL);
+
+		dbg("sleep_ctl reg %08lx   reset_ctl reg %08lx",
+		    sleep_ctl, reset_ctl);
+		if (sleep_ctl & AR5K_SLEEP_CTL_SLE_SLP) {
+			dbg("waking up the chip");
+			AR5K_REG_WRITE(AR5K_SLEEP_CTL, 
+				       (sleep_ctl & ~AR5K_SLEEP_CTL_SLE_SLP));
+		}
+		
+		if (reset_ctl) {
+			dbg("removing resets");
+			AR5K_REG_WRITE(AR5K_RESET_CTL, 0);
+		}
+	}
+
+	AR5K_REG_DISABLE_BITS(AR5K_PCICFG, AR5K_PCICFG_SPWR_DN);
+	usleep(500);                                                        
 
 	srev = AR5K_REG_READ(AR5K_SREV);
 	mac_version = AR5K_REG_MS(srev, AR5K_SREV_VER) << 4;
@@ -549,6 +974,74 @@ main(int argc, char *argv[])
 			printf("no   |\n");
 	}
 	printf(" ========================\n");
+
+	/* print current GPIO settings */
+	printf("GPIO registers: CR %08lx DO %08lx DI %08lx\n",
+	       AR5K_REG_READ(AR5K_GPIOCR), AR5K_REG_READ(AR5K_GPIODO),
+	       AR5K_REG_READ(AR5K_GPIODI));
+
+	if (do_write) {
+		unsigned long int rcr=AR5K_REG_READ(AR5K_GPIOCR),
+			rdo=AR5K_REG_READ(AR5K_GPIODO);
+		unsigned long int old_cr=rcr, old_do= rdo;
+		int rc;
+ 
+		if (mac_version >= AR5K_SREV_VER_AR5213 && !nr_gpio_set) {
+			dbg("new MAC %x (>= AR5213) set gpio4 to low", mac_version);
+			gpio_set[4].valid=1;
+			gpio_set[4].value=0;
+		}
+
+		/* set gpios */
+		dbg("old GPIO CR %08lx DO %08lx DI %08lx",
+		    rcr, rdo, AR5K_REG_READ(AR5K_GPIODI));
+
+		for(i=0; i < sizeof(gpio_set)/sizeof(gpio_set[0]); i++) {
+			if (gpio_set[i].valid) {
+				rcr |= AR5K_GPIOCR_OUT(i); /* we use mode 3 */
+				rcr &= ~AR5K_GPIOCR_INT_SEL(i);
+				rdo &= ~(1<<i);
+				rdo |= (gpio_set[i].value<<i); 
+			}
+		}
+
+		if (rcr != old_cr) {
+			dbg("GPIO CR %lx -> %lx", old_cr, rcr);
+			AR5K_REG_WRITE(AR5K_GPIOCR, rcr);
+		}
+		usleep(5);
+
+		if (rdo != old_do) {
+			dbg("GPIO CR %lx -> %lx", old_do, rdo);
+			AR5K_REG_WRITE(AR5K_GPIODO, rdo);
+		}
+
+		/*dump current values again if we have written anything */
+		if (rcr != old_cr || rdo != old_do)
+			dbg("new GPIO CR %08lx DO %08lx DI %08lx",
+			    AR5K_REG_READ(AR5K_GPIOCR), 
+			    AR5K_REG_READ(AR5K_GPIODO), 
+			    AR5K_REG_READ(AR5K_GPIODI));
+
+		/* let argv[anr] be the first write parameter */
+		anr++;
+
+		rc=do_write_pairs(anr, argc, argv, mem, mac_version);
+
+		/* restore old GPIO settings */
+		if (rcr != old_cr) {
+			dbg("restoring GPIO CR %lx -> %lx", rcr, old_cr);
+			AR5K_REG_WRITE(AR5K_GPIOCR, old_cr);
+		}
+		usleep(5);
+
+		if (rdo != old_do) {
+			dbg("restoring GPIO CR %lx -> %lx", rdo, old_do);
+			AR5K_REG_WRITE(AR5K_GPIODO, old_do);
+		}
+
+		return rc;
+	}
 	return 0;
 }
 
