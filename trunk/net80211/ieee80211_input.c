@@ -1141,7 +1141,7 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 {
 	const struct llc snap_hdr = {.llc_dsap = LLC_SNAP_LSAP,
 				     .llc_ssap = LLC_SNAP_LSAP,
-				     .llc_control = LLC_UI,
+				     .llc_snap.control = LLC_UI,
 				     .llc_snap.org_code = {0x0, 0x0, 0x0}};
 	struct ieee80211_qosframe_addr4 wh;	/* Max size address frames */
 	struct ether_header *eh;
