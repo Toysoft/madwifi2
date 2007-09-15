@@ -15,6 +15,9 @@ all:
 clean:
 	$(KBUILD) clean
 
+install:
+	$(KBUILD) modules_install
+
 cscope:
 	cscope -b `find $(src) -type f -name '*.[ch]'`
 
