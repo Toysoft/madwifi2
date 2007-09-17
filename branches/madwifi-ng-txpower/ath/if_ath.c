@@ -114,6 +114,13 @@
 #define DEF_RATE_CTL "sample"
 #endif
 
+#ifndef MIN
+#define MIN(a,b)        ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a,b)        ((a) > (b) ? (a) : (b))
+#endif
+
 enum {
 	ATH_LED_TX,
 	ATH_LED_RX,
@@ -209,6 +216,7 @@ static int ath_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 static void ath_scan_start(struct ieee80211com *);
 static void ath_scan_end(struct ieee80211com *);
 static void ath_set_channel(struct ieee80211com *);
+static void ath_set_txpow(struct ieee80211com *, int);
 static void ath_set_coverageclass(struct ieee80211com *);
 static u_int ath_mhz2ieee(struct ieee80211com *, u_int, u_int);
 #ifdef ATH_SUPERG_FF
@@ -907,6 +915,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_registers_dump_delta = ath_registers_dump_delta;
 	ic->ic_registers_mark       = ath_registers_mark;
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
+
+	ic->ic_set_txpow = ath_set_txpow;
 
 	ic->ic_set_coverageclass = ath_set_coverageclass;
 	ic->ic_mhz2ieee = ath_mhz2ieee;
@@ -2217,7 +2227,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	 * pass it on to the hardware.
 	 */
 	ATH_TXQ_LOCK_IRQ(txq);
-	if (ni && ni->ni_vap && txq == &ATH_VAP(ni->ni_vap)->av_mcastq) {
+	if (ni && ni->ni_vap && (txq == &ATH_VAP(ni->ni_vap)->av_mcastq)) {
 		/*
 		 * The CAB queue is started from the SWBA handler since
 		 * frames only go out on DTIM and to avoid possible races.
@@ -2335,19 +2345,19 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 
 	/* XXX check return value? */
 	ath_hal_setuptxdesc(ah, ds,
-			    pktlen, 			/* packet length */
-			    hdrlen, 			/* header length */
-			    atype, 			/* Atheros packet type */
-			    power, 			/* txpower */
-			    txrate, try0, 		/* series 0 rate/tries */
-			    HAL_TXKEYIX_INVALID,	/* key cache index */
-			    antenna, 			/* antenna mode */
-			    flags, 			/* flags */
-			    0, 				/* rts/cts rate */
-			    0,				/* rts/cts duration */
-			    0,				/* comp icv len */
-			    0,				/* comp iv len */
-			    ATH_COMP_PROC_NO_COMP_NO_CCS /* comp scheme */
+			    pktlen, 				/* packet length */
+			    hdrlen, 				/* header length */
+			    atype, 				/* Atheros packet type */
+			    power, 				/* txpower */
+			    txrate, try0, 			/* series 0 rate/tries */
+			    HAL_TXKEYIX_INVALID,		/* key cache index */
+			    antenna, 				/* antenna mode */
+			    flags, 				/* flags */
+			    0, 					/* rts/cts rate */
+			    0,					/* rts/cts duration */
+			    0,					/* comp icv len */
+			    0,					/* comp iv len */
+			    ATH_COMP_PROC_NO_COMP_NO_CCS	/* comp scheme */
 			   );
 
 	if (ph->try1) {
@@ -3983,7 +3993,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		skb->len + IEEE80211_CRC_LEN, 	/* frame length */
 		sizeof(struct ieee80211_frame), /* header length */
 		HAL_PKT_TYPE_BEACON, 		/* Atheros packet type */
-		ni->ni_txpower, 		/* txpower XXX */
+		ni->ni_vap->iv_txpower,		/* txpower XXX */
 		rate, 1, 			/* series 0 rate/tries */
 		HAL_TXKEYIX_INVALID, 		/* no encryption */
 		antenna, 			/* antenna mode */
@@ -6608,7 +6618,6 @@ ath_tx_uapsdqueue(struct ath_softc *sc, struct ath_node *an, struct ath_buf *bf)
 static int
 ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *bf, struct sk_buff *skb, int nextfraglen)
 {
-#define	MIN(a,b)	((a) < (b) ? (a) : (b))
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ieee80211vap *vap = ni->ni_vap;
@@ -7075,19 +7084,19 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 */
 	/* XXX check return value? */
 	ath_hal_setuptxdesc(ah, ds,
-			    pktlen, 			/* packet length */
-			    hdrlen, 			/* header length */
-			    atype, 			/* Atheros packet type */
-			    MIN(ni->ni_txpower, 60), 	/* txpower */
-			    txrate, try0, 		/* series 0 rate/tries */
-			    keyix, 			/* key cache index */
-			    antenna, 			/* antenna mode */
-			    flags, 			/* flags */
-			    ctsrate, 			/* rts/cts rate */
-			    ctsduration, 		/* rts/cts duration */
-			    icvlen, 			/* comp icv len */
-			    ivlen, 			/* comp iv len */
-			    comp 			/* comp scheme */
+			    pktlen, 		/* packet length */
+			    hdrlen, 		/* header length */
+			    atype, 		/* Atheros packet type */
+			    vap->iv_txpower,	/* txpower */
+			    txrate, try0, 	/* series 0 rate/tries */
+			    keyix, 		/* key cache index */
+			    antenna, 		/* antenna mode */
+			    flags, 		/* flags */
+			    ctsrate, 		/* rts/cts rate */
+			    ctsduration, 	/* rts/cts duration */
+			    icvlen, 		/* comp icv len */
+			    ivlen, 		/* comp iv len */
+			    comp 		/* comp scheme */
 		);
 	bf->bf_flags = flags;	/* record for post-processing */
 
@@ -7195,7 +7204,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 
 	ath_tx_txqaddbuf(sc, ni, txq, bf, ds, pktlen);
 	return 0;
-#undef MIN
 }
 
 /*
@@ -7739,8 +7747,6 @@ ath_chan_change(struct ath_softc *sc, struct ieee80211_channel *chan)
 	sc->sc_tx_th.wt_chan_flags = sc->sc_rx_th.wr_chan_flags =
 		htole16(chan->ic_flags);
 #endif
-	if (ic->ic_curchanmaxpwr == 0)
-		ic->ic_curchanmaxpwr = chan->ic_maxregpower;
 }
 
 /*
@@ -8616,8 +8622,8 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ichan->ic_freq = c->channel;
 		ichan->ic_flags = c->channelFlags;
 		ichan->ic_maxregpower = c->maxRegTxPower;	/* dBm */
-		ichan->ic_maxpower = c->maxTxPower;		    /* 1/4 dBm */
-		ichan->ic_minpower = c->minTxPower;		    /* 1/4 dBm */
+		ichan->ic_maxpower = c->maxTxPower / 2;		/* dBm */
+		ichan->ic_minpower = c->minTxPower / 2;		/* dBm */
 	}
 	ic->ic_nchans = nchan;
 	kfree(chans);
@@ -8685,56 +8691,41 @@ ath_led_event(struct ath_softc *sc, int event)
 	}
 }
 
-static void
-set_node_txpower(void *arg, struct ieee80211_node *ni)
-{
-	int *value = (int *)arg;
-	ni->ni_txpower = *value;
-}
-
 /* XXX: this function needs some locking to avoid being called twice/interrupted */
 static void
 ath_update_txpow(struct ath_softc *sc)
 {
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211vap *vap = NULL;
-	struct ath_hal *ah = sc->sc_ah;
-	u_int32_t txpowlimit = 0;
-	u_int32_t maxtxpowlimit = 9999;
-	u_int32_t clamped_txpow = 0;
-
-	/*
-	 * Find the maxtxpow of the card and regulatory constraints
-	 */
-	(void)ath_hal_getmaxtxpow(ah, &txpowlimit);
-	ath_hal_settxpowlimit(ah, maxtxpowlimit);
-	(void)ath_hal_getmaxtxpow(ah, &maxtxpowlimit);
-	ic->ic_txpowlimit = maxtxpowlimit;
-	ath_hal_settxpowlimit(ah, txpowlimit);
-
- 	/*
-	 * Make sure the VAPs change is within limits, clamp it otherwise
- 	 */
-	if (ic->ic_newtxpowlimit > ic->ic_txpowlimit)
-		clamped_txpow = ic->ic_txpowlimit;
-	else
-		clamped_txpow = ic->ic_newtxpowlimit;
-
-	/*
-	 * Search for the VAP that needs a txpow change, if any
-	 */
-	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		if (!tpc || ic->ic_newtxpowlimit != vap->iv_bss->ni_txpower) {
-			vap->iv_bss->ni_txpower = clamped_txpow;
-			ieee80211_iterate_nodes(&vap->iv_ic->ic_sta, set_node_txpower, &clamped_txpow);
-		}
-	}
-
-	sc->sc_curtxpow = clamped_txpow;
-	if (clamped_txpow != txpowlimit)
-		ath_hal_settxpowlimit(ah, clamped_txpow);
+  	struct ieee80211com *ic = &sc->sc_ic;
+  	struct ath_hal *ah = sc->sc_ah;
+	u_int32_t txpow;
+  
+	if (!sc->sc_hastpc) {
+		ath_hal_settxpowlimit(ah, ic->ic_txpowlimit);
+		
+		(void)ath_hal_gettxpowlimit(ah, &txpow);
+		ic->ic_txpowlimit = txpow;
+  	}
 }
-
+   
+static void
+ath_set_txpow(struct ieee80211com *ic, int txpow)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+	struct ieee80211vap *vap = NULL;
+	u_int32_t mintxpow;
+  
+	if (!sc->sc_hastpc) {
+		/* Find the minimum TX power of all VAPs and set that;
+		 * i.e., we guarantee that the set TX power is the 
+		 * _maximum_ TX power. */
+		mintxpow = txpow;
+		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+			mintxpow = MIN(mintxpow, vap->iv_txpower);
+		}
+		ic->ic_txpowlimit = mintxpow;
+	}
+}
 
 #ifdef ATH_SUPERG_XR
 static int
@@ -8971,7 +8962,6 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 	u_int32_t txoplimit;
 
 #define US_PER_4MS 4000
-#define	MIN(a,b)	((a) < (b) ? (a) : (b))
 
 	*flushq = AH_FALSE;
 
@@ -9011,7 +9001,6 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 	return AH_TRUE;
 
 #undef US_PER_4MS
-#undef MIN
 }
 #endif
 

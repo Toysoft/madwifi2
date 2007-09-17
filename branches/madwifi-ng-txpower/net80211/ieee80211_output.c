@@ -1913,7 +1913,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		if (ic->ic_flags & IEEE80211_F_DOTH) {
 			*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 			*frm++ = 1;
-			*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
+			*frm++ = 0;
 		}
 
 		/* ERP */

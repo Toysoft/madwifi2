@@ -240,7 +240,7 @@ static void
 change_channel(struct ieee80211com *ic,
 	struct ieee80211_channel *chan)
 {
-	ic->ic_curchan = chan;
+	ieee80211_set_channel(ic, chan);
 	ic->ic_set_channel(ic);
 }
 
@@ -530,7 +530,7 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 	int scanning;
 
 	IEEE80211_LOCK_IRQ(ic);
-	if ((ic->ic_flags & IEEE80211_F_SCAN) == 0) {
+	if (!(ic->ic_flags & IEEE80211_F_SCAN)) {
 		u_int duration;
 		/*
 		 * Go off-channel for a fixed interval that is large
@@ -582,7 +582,9 @@ ieee80211_bg_scan(struct ieee80211vap *vap)
 				ic->ic_flags_ext |= IEEE80211_FEXT_BGSCAN;
 			}
 		} else {
-			/* XXX msg+stat */
+			/* XXX: No stat. */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+				"%s: No scanner (module) available.\n", __func__);
 		}
 	} else {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,

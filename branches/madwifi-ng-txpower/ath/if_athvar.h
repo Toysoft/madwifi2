@@ -289,6 +289,7 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #define GRP_POLL_PERIOD_FACTOR_XR_STA	30	/* When XR Stations associated freq is 30% higher */
 
 #define A_MAX(a,b) ((a) > (b) ? (a) : (b))
+#define A_MIN(a,b) ((a) < (b) ? (a) : (b))
 
 /*
  * Macros to obtain the Group Poll Periodicity in various situations
@@ -586,7 +587,6 @@ struct ath_softc {
 	const HAL_RATE_TABLE *sc_quarter_rates;	/* quarter rate table */
 	HAL_OPMODE sc_opmode;			/* current hal operating mode */
 	enum ieee80211_phymode sc_curmode;	/* current phy mode */
-	u_int16_t sc_curtxpow;			/* current tx power limit */
 	u_int16_t sc_curaid;			/* current association id */
 	HAL_CHANNEL sc_curchan;			/* current h/w channel */
 	u_int8_t sc_curbssid[IEEE80211_ADDR_LEN];
