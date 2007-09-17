@@ -140,7 +140,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 	if (ic->ic_flags & IEEE80211_F_DOTH) {
 		*frm++ = IEEE80211_ELEMID_PWRCNSTR;
 		*frm++ = 1;
-		*frm++ = IEEE80211_PWRCONSTRAINT_VAL(ic);
+		*frm++ = 0;
 	}
 
 	/* XXX: channel switch announcement ? */
@@ -325,7 +325,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			/* NB: Only for the first VAP to get here, and when we have a 
 			 * valid channel to which to change. */
 			if (c && (ic->ic_curchan != c)) {
-				ic->ic_curchan = c;
+				ieee80211_set_channel(ic, c);
 				ic->ic_set_channel(ic);
 			}
 

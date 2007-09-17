@@ -309,7 +309,7 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	/* Setup initial channel settings */
 	ic->ic_bsschan = IEEE80211_CHAN_ANYC;
 	/* Arbitrarily pick the first channel */
-	ic->ic_curchan = &ic->ic_channels[0];
+	ieee80211_set_channel(ic, &ic->ic_channels[0]);
 
 	/* Enable marking of dfs by default */
 	ic->ic_flags_ext |= IEEE80211_FEXT_MARKDFS;
@@ -325,10 +325,6 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	IEEE80211_LOCK_INIT(ic, "ieee80211com");
 	IEEE80211_VAPS_LOCK_INIT(ic, "ieee80211com_vaps");
 	TAILQ_INIT(&ic->ic_vaps);
-
-	ic->ic_txpowlimit = IEEE80211_TXPOWER_MAX;
-	ic->ic_txpowlimit = IEEE80211_TXPOWER_MIN;
-	ic->ic_newtxpowlimit = IEEE80211_TXPOWER_MAX;
 
 	ieee80211_crypto_attach(ic);
 	ieee80211_node_attach(ic);
@@ -420,6 +416,9 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	vap->iv_flags_ext = ic->ic_flags_ext;
 	vap->iv_ath_cap = ic->ic_ath_cap;
 	vap->iv_mcast_rate = 1000;		/* Default multicast traffic to lowest rate of 1Mbps */
+
+	vap->iv_txpower = IEEE80211_TXPOWER_MAX;
+	ic->ic_set_txpow(ic, vap->iv_txpower);
 
 #ifdef ATH_SUPERG_XR
 	/*
