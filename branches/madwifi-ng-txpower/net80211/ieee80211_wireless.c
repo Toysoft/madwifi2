@@ -935,7 +935,7 @@ ieee80211_ioctl_giwrange(struct net_device *dev, struct iw_request_info *info,
 	}
 
 	range->we_version_compiled = WIRELESS_EXT;
-	range->we_version_source = 21;
+	range->we_version_source = 18;
 
 	range->retry_capa = IW_RETRY_LIMIT;
 	range->retry_flags = IW_RETRY_LIMIT;
