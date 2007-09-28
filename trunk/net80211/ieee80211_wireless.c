@@ -678,7 +678,8 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		i = (ic->ic_mhz2ieee)(ic, freq->m / 100000, 0);
 	else
 		i = freq->m;
-	if (i != 0) {
+
+	if ((i != 0) && (i != -1)) {
 		if (i > IEEE80211_CHAN_MAX)
 			return -EINVAL;
 		c = findchannel(ic, i, vap->iv_des_mode);
