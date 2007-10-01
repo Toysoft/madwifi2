@@ -510,6 +510,17 @@ struct ieee80211req_scan_result {
 #ifdef __KERNEL__
 #include <linux/if.h>
 #endif
+#define IW_PRIV_BLOB_LENGTH_ENCODING(_SIZE) \
+	(((_SIZE) == ((_SIZE) & IW_PRIV_SIZE_MASK)) ? \
+		(_SIZE) : \
+		(((_SIZE) / sizeof(uint32_t)) + \
+			(((_SIZE) == (((_SIZE) / sizeof(uint32_t)) * sizeof(int))) ? \
+				0 : 1)))
+#define IW_PRIV_BLOB_TYPE_ENCODING(_SIZE) \
+	(((_SIZE) == ((_SIZE) & IW_PRIV_SIZE_MASK)) ? \
+		(IW_PRIV_TYPE_BYTE | (_SIZE)) : \
+		(IW_PRIV_TYPE_INT  | IW_PRIV_BLOB_LENGTH_ENCODING((_SIZE))))
+
 #define	IEEE80211_IOCTL_SETPARAM	(SIOCIWFIRSTPRIV+0)
 #define	IEEE80211_IOCTL_GETPARAM	(SIOCIWFIRSTPRIV+1)
 #define	IEEE80211_IOCTL_SETMODE		(SIOCIWFIRSTPRIV+2)

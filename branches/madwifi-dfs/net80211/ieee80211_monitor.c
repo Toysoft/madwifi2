@@ -316,7 +316,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 	/* We don't have access to the noise value in the descriptor, but it's saved
 	 * in the softc during the last receive interrupt. */
-	noise = sc->sc_channoise;
+	noise = bf->bf_channoise;
 
 	/* XXX locking */
 	for (vap = TAILQ_FIRST(&ic->ic_vaps); vap != NULL; vap = next) {

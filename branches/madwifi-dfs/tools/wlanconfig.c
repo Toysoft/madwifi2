@@ -694,8 +694,6 @@ list_scan(const char *ifname)
 static void
 print_chaninfo(const struct ieee80211_channel *c)
 {
-#define	IEEE80211_IS_CHAN_PASSIVE(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_PASSIVE))
 	char buf[14];
 
 	buf[0] = '\0';

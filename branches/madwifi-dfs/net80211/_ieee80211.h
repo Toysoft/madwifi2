@@ -129,7 +129,7 @@ struct ieee80211_channel {
 #define	IEEE80211_CHAN_ANY	0xffff	/* token for ``any channel'' */
 #define	IEEE80211_CHAN_ANYC 	((struct ieee80211_channel *) IEEE80211_CHAN_ANY)
 
-#define	IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT	1	/* equal to IEEE80211_CSA_PROTECTION_PERIOD */
+#define	IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT	0
 #define IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT	3
 
 #define	IEEE80211_RADAR_TEST_MUTE_CHAN	36	/* Move to channel 36 for mute test */
@@ -218,6 +218,8 @@ struct ieee80211_channel {
 
 #define	IEEE80211_IS_CHAN_RADAR(_c) \
 	(((_c)->ic_flags & IEEE80211_CHAN_RADAR) != 0)
+#define	IEEE80211_IS_CHAN_PASSIVE(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_PASSIVE) != 0)
 #define	IEEE80211_ARE_CHANS_SAME_MODE(_a, _b) \
 	(((_a)->ic_flags & IEEE80211_CHAN_ALLTURBO) == ((_b)->ic_flags & IEEE80211_CHAN_ALLTURBO))
 

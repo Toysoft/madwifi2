@@ -1237,7 +1237,7 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 	if (ni->ni_authmode == IEEE80211_AUTH_SHARED) {
 		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_AUTH,
 			ni->ni_macaddr, "open auth",
-			"bad sta auth mode %u", ni->ni_authmode);
+			"obad sta auth mode %u", ni->ni_authmode);
 		vap->iv_stats.is_rx_bad_auth++;	/* XXX maybe a unique error? */
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
 			if (ni == vap->iv_bss) {
@@ -2756,8 +2756,10 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 		/* CSA wasn't received recently, so this is the first one in
 		 * the sequence. */
 
+		/*
+		Needed for DFS / FCC ...
+
 		if (csa_ie->csa_count < IEEE80211_CSA_PROTECTION_PERIOD) {
-			/* XXX abuse? */
 			IEEE80211_DISCARD_IE(vap,
 					IEEE80211_MSG_ELEMID |
 					IEEE80211_MSG_DOTH,
@@ -2767,6 +2769,7 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 					csa_ie->csa_count);
 			return 0;
 		}
+		*/
 
 		vap->iv_csa_mode = csa_ie->csa_mode;
 		vap->iv_csa_count = csa_ie->csa_count;

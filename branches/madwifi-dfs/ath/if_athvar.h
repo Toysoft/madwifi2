@@ -403,6 +403,7 @@ struct ath_buf {
 	u_int32_t bf_status;				/* status flags */
 	u_int16_t bf_flags;				/* tx descriptor flags */
 	u_int64_t bf_tsf;
+	int16_t bf_channoise;
 #ifdef ATH_SUPERG_FF
 	/* XXX: combine this with bf_skbaddr if it ever changes to accommodate
 	 *      multiple segments.
@@ -728,7 +729,6 @@ struct ath_softc {
 	u_int32_t sc_dturbo_bw_turbo;		/* bandwidth threshold */
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
-	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
 
 	u_int64_t sc_lastradar_tsf;				/* TSF at last detected radar pulse */
 	u_int32_t sc_dfs_channel_availability_check_time;	/* DFS wait time before accessing a
