@@ -1242,7 +1242,7 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 	if (ni->ni_authmode == IEEE80211_AUTH_SHARED) {
 		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_AUTH,
 			ni->ni_macaddr, "open auth",
-			"obad sta auth mode %u", ni->ni_authmode);
+			"bad sta auth mode %u", ni->ni_authmode);
 		vap->iv_stats.is_rx_bad_auth++;	/* XXX maybe a unique error? */
 		if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
 			if (ni == vap->iv_bss) {

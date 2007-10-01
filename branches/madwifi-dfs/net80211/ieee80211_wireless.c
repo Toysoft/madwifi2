@@ -5116,14 +5116,22 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 }
 #endif /* WIRELESS_EXT >= 18 */
 
-#define	IW_PRIV_TYPE_OPTIE	IW_PRIV_BLOB_TYPE_ENCODING(IEEE80211_MAX_OPT_IE)
-#define	IW_PRIV_TYPE_KEY 	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_key))
-#define	IW_PRIV_TYPE_DELKEY 	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_del_key))
-#define	IW_PRIV_TYPE_MLME 	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_mlme))
-#define	IW_PRIV_TYPE_CHANLIST 	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_chanlist))
-#define	IW_PRIV_TYPE_CHANINFO 	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_chaninfo))
-#define IW_PRIV_TYPE_APPIEBUF 	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_getset_appiebuf) + IEEE80211_APPIE_MAX)
-#define IW_PRIV_TYPE_FILTER 	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_set_filter))
+#define	IW_PRIV_TYPE_OPTIE	\
+	IW_PRIV_BLOB_TYPE_ENCODING(IEEE80211_MAX_OPT_IE)
+#define	IW_PRIV_TYPE_KEY 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_key))
+#define	IW_PRIV_TYPE_DELKEY 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_del_key))
+#define	IW_PRIV_TYPE_MLME 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_mlme))
+#define	IW_PRIV_TYPE_CHANLIST 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_chanlist))
+#define	IW_PRIV_TYPE_CHANINFO 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_chaninfo))
+#define IW_PRIV_TYPE_APPIEBUF 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_getset_appiebuf) + IEEE80211_APPIE_MAX)
+#define IW_PRIV_TYPE_FILTER 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_set_filter))
 
 static const struct iw_priv_args ieee80211_priv_args[] = {
 	/* NB: setoptie & getoptie are !IW_PRIV_SIZE_FIXED */

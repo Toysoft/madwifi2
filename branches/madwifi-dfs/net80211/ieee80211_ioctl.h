@@ -510,6 +510,10 @@ struct ieee80211req_scan_result {
 #ifdef __KERNEL__
 #include <linux/if.h>
 #endif
+/* The maximum size of a iwpriv structure is IW_PRIV_SIZE_MASK, which was 
+ * exceeded for some time by chaninfo ioctl.  These macros change the size 
+ * encoding for anything larger than IW_PRIV_SIZE_MASK from bytes to 4-byte
+ * multiples so that the padded size fits under IW_PRIV_SIZE_MASK. */
 #define IW_PRIV_BLOB_LENGTH_ENCODING(_SIZE) \
 	(((_SIZE) == ((_SIZE) & IW_PRIV_SIZE_MASK)) ? \
 		(_SIZE) : \
@@ -547,8 +551,6 @@ struct ieee80211req_scan_result {
 #define	IEEE80211_IOCTL_WDSADDMAC	(SIOCIWFIRSTPRIV+26)
 #define	IEEE80211_IOCTL_WDSDELMAC	(SIOCIWFIRSTPRIV+28)
 #define	IEEE80211_IOCTL_KICKMAC		(SIOCIWFIRSTPRIV+30)
-
-#define	IEEE80211_IOCTL_RADAR		(SIOCIWFIRSTPRIV+17)
 
 enum {
 	IEEE80211_WMMPARAMS_CWMIN       = 1,
@@ -618,7 +620,7 @@ enum {
 	IEEE80211_PARAM_REGCLASS		= 59,	/* enable regclass ids in country IE */
 	IEEE80211_PARAM_DROPUNENC_EAPOL		= 60,	/* drop unencrypted eapol frames */
 	IEEE80211_PARAM_SHPREAMBLE		= 61,	/* Short Preamble */
-	IEEE80211_PARAM_DUMPREGS		= 62,   /* Pretty printed dump of Atheros hardware registers */
+	IEEE80211_PARAM_DUMPREGS		= 62,	/* Pretty printed dump of Atheros hardware registers */
 	IEEE80211_PARAM_DOTH_ALGORITHM		= 63,	/* spectrum management algorithm */
 	IEEE80211_PARAM_DOTH_MINCOM   		= 64,	/* minimum number of common channels */
 	IEEE80211_PARAM_DOTH_SLCG		= 65,	/* permil of Stations Lost per Channel Gained */
@@ -628,8 +630,8 @@ enum {
 	IEEE80211_PARAM_TXCONT_POWER		= 69,	/* power level in units of 0.5dBm */
 	IEEE80211_PARAM_DFS_TESTMODE		= 70,	/* do not perform DFS actions (i.e. markng DFS and channel change on interference), just report them via debug. */
 	IEEE80211_PARAM_DFS_CHANCHECKTIME	= 71,	/* how long do we wait for chan availability
-							    scans ?
-							    FCC requires 60s, so that is the default. */
+							   scans ?
+							   FCC requires 60s, so that is the default. */
 	IEEE80211_PARAM_DFS_NONOCCUPANCYPERIOD	= 72,	/* DFS no-occupancy limit - how long do we stay
 							   off a channel once radar is detected?
 							   FCC requires 30m, so that is the default. */
