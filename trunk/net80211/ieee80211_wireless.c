@@ -3656,13 +3656,12 @@ ieee80211_ioctl_getchaninfo(struct net_device *dev,
 {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-	struct ieee80211req_chaninfo *chans =
-		(struct ieee80211req_chaninfo *) extra;
+	struct ieee80211req_chaninfo chans;
 	u_int8_t reported[IEEE80211_CHAN_BYTES];	/* XXX stack usage? */
 	int i;
 
-	memset(chans, 0, sizeof(*chans));
-	memset(reported, 0, sizeof(reported));
+	memset(&chans, 0, sizeof(chans));
+	memset(&reported, 0, sizeof(reported));
 	for (i = 0; i < ic->ic_nchans; i++) {
 		const struct ieee80211_channel *c = &ic->ic_channels[i];
 		const struct ieee80211_channel *c1 = c;
@@ -3685,11 +3684,12 @@ ieee80211_ioctl_getchaninfo(struct net_device *dev,
 			if (c1)
 				c = c1;
 			/* Copy the entire structure, whereas it used to just copy a few fields */
-			memcpy(&chans->ic_chans[chans->ic_nchans], c, sizeof(struct ieee80211_channel));
-			if (++chans->ic_nchans >= IEEE80211_CHAN_MAX)
+			memcpy(&chans.ic_chans[chans.ic_nchans], c, sizeof(struct ieee80211_channel));
+			if (++chans.ic_nchans >= IEEE80211_CHAN_MAX)
 				break;
 		}
 	}
+	memcpy(extra, &chans, sizeof(struct ieee80211req_chaninfo));
 	return 0;
 }
 
@@ -4917,21 +4917,22 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 }
 #endif /* WIRELESS_EXT >= 18 */
 
-#define	IW_PRIV_TYPE_OPTIE	IW_PRIV_TYPE_BYTE | IEEE80211_MAX_OPT_IE
-#define	IW_PRIV_TYPE_KEY \
-	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_key)
-#define	IW_PRIV_TYPE_DELKEY \
-	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_del_key)
-#define	IW_PRIV_TYPE_MLME \
-	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_mlme)
-#define	IW_PRIV_TYPE_CHANLIST \
-	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chanlist)
-#define	IW_PRIV_TYPE_CHANINFO \
-	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_chaninfo)
-#define IW_PRIV_TYPE_APPIEBUF \
-	(IW_PRIV_TYPE_BYTE | (sizeof(struct ieee80211req_getset_appiebuf) + IEEE80211_APPIE_MAX))
-#define IW_PRIV_TYPE_FILTER \
-	IW_PRIV_TYPE_BYTE | sizeof(struct ieee80211req_set_filter)
+#define	IW_PRIV_TYPE_OPTIE	\
+	IW_PRIV_BLOB_TYPE_ENCODING(IEEE80211_MAX_OPT_IE)
+#define	IW_PRIV_TYPE_KEY 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_key))
+#define	IW_PRIV_TYPE_DELKEY 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_del_key))
+#define	IW_PRIV_TYPE_MLME 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_mlme))
+#define	IW_PRIV_TYPE_CHANLIST 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_chanlist))
+#define	IW_PRIV_TYPE_CHANINFO 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_chaninfo))
+#define IW_PRIV_TYPE_APPIEBUF 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_getset_appiebuf) + IEEE80211_APPIE_MAX)
+#define IW_PRIV_TYPE_FILTER 	\
+	IW_PRIV_BLOB_TYPE_ENCODING(sizeof(struct ieee80211req_set_filter))
 
 static const struct iw_priv_args ieee80211_priv_args[] = {
 	/* NB: setoptie & getoptie are !IW_PRIV_SIZE_FIXED */

@@ -508,6 +508,21 @@ struct ieee80211req_scan_result {
 #ifdef __KERNEL__
 #include <linux/if.h>
 #endif
+/* The maximum size of a iwpriv structure is IW_PRIV_SIZE_MASK, which was 
+ * exceeded for some time by chaninfo ioctl.  These macros change the size 
+ * encoding for anything larger than IW_PRIV_SIZE_MASK from bytes to 4-byte
+ * multiples so that the padded size fits under IW_PRIV_SIZE_MASK. */
+#define IW_PRIV_BLOB_LENGTH_ENCODING(_SIZE) \
+	(((_SIZE) == ((_SIZE) & IW_PRIV_SIZE_MASK)) ? \
+		(_SIZE) : \
+		(((_SIZE) / sizeof(uint32_t)) + \
+			(((_SIZE) == (((_SIZE) / sizeof(uint32_t)) * sizeof(int))) ? \
+				0 : 1)))
+#define IW_PRIV_BLOB_TYPE_ENCODING(_SIZE) \
+	(((_SIZE) == ((_SIZE) & IW_PRIV_SIZE_MASK)) ? \
+		(IW_PRIV_TYPE_BYTE | (_SIZE)) : \
+		(IW_PRIV_TYPE_INT  | IW_PRIV_BLOB_LENGTH_ENCODING((_SIZE))))
+
 #define	IEEE80211_IOCTL_SETPARAM	(SIOCIWFIRSTPRIV+0)
 #define	IEEE80211_IOCTL_GETPARAM	(SIOCIWFIRSTPRIV+1)
 #define	IEEE80211_IOCTL_SETMODE		(SIOCIWFIRSTPRIV+2)
@@ -602,7 +617,7 @@ enum {
 	IEEE80211_PARAM_MARKDFS			= 58,	/* mark a dfs interference channel when found */
 	IEEE80211_PARAM_REGCLASS		= 59,	/* enable regclass ids in country IE */
 	IEEE80211_PARAM_DROPUNENC_EAPOL		= 60,	/* drop unencrypted eapol frames */
- 	IEEE80211_PARAM_SHPREAMBLE		= 61,	/* Short Preamble */
+	IEEE80211_PARAM_SHPREAMBLE		= 61,	/* Short Preamble */
 	IEEE80211_PARAM_DUMPREGS		= 62,   /* Pretty printed dump of Atheros hardware registers */
 };
 
