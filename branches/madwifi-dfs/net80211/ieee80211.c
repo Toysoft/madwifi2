@@ -885,7 +885,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 
 			c = ieee80211_find_channel(ic, ichan->ic_freq, ichan->ic_flags);
 			if (c == NULL) {
-				if_printf(dev, "%s: Couldn't find matching channel for dfs mark (%d, 0x%x)\n",
+				if_printf(dev, "%s: Couldn't find matching channel for dfs chanchange (%d, 0x%x)\n",
 					  __func__, ichan->ic_freq, ichan->ic_flags);
 				return;
 			}
@@ -897,13 +897,10 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 			else
 				if_printf(dev, "Channel frequency doesn't match expectation!  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n", ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
 		} else {
-#if 0 /* disabled until radar detection algorithm has filtering */
 			/* Change to a radar free 11a channel for dfstesttime seconds */
 			ic->ic_chanchange_chan = IEEE80211_RADAR_TEST_MUTE_CHAN;
 			ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
-#endif /* #if 0 -- disabled until radar detection algorithm has filtering */
-
 			if_printf(dev, "Mute test - markdfs is off, we are in hostap mode, found radar on %d.  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n", ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
 		}
 	} else {

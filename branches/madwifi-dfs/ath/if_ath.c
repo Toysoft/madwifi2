@@ -1513,6 +1513,9 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	 *          based on ic->ic_uapsdmaxtriggers. */
 	hw_tsf = ath_hal_gettsf64(ah);
 
+	/* Let the 802.11 layer know about the new noise floor */
+	ic->ic_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
+
 	ATH_RXBUF_LOCK_IRQ(sc);
 	if (sc->sc_rxbufcur == NULL)
 		sc->sc_rxbufcur = STAILQ_FIRST(&sc->sc_rxbuf);
@@ -1593,6 +1596,11 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			/* XXX: We do not support frames spanning multiple 
 			 *      descriptors */
 			bf->bf_status |= ATH_BUFSTATUS_DONE;
+			/* Capture noise per-interrupt, since it may change
+			 * by the time the receive queue gets around to
+			 * processing these buffers, and multiple interrupts
+			 * may have occurred in the intervening timeframe. */
+			bf->bf_channoise = ic->ic_channoise;
 	
 			if (rs->rs_status) {
 				if ((HAL_RXERR_PHY == rs->rs_status) && 
@@ -5937,9 +5945,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	u_int phyerr;
 	u_int64_t rs_tsf;
 
-	/* Let the 802.11 layer know about the new noise floor */
-	sc->sc_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
-	ic->ic_channoise = sc->sc_channoise;
 
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "%s\n", __func__);
 	do {
@@ -8141,8 +8146,7 @@ ath_chan_change(struct ath_softc *sc, struct ieee80211_channel *chan)
 	ath_rate_setup(dev, mode);
 	ath_setcurmode(sc, mode);
 	/* Reset noise floor on channelc hange and let ieee layer know */
-	sc->sc_channoise = ath_hal_get_channel_noise(sc->sc_ah, &(sc->sc_curchan));
-	ic->ic_channoise = sc->sc_channoise;
+	ic->ic_channoise = ath_hal_get_channel_noise(sc->sc_ah, &(sc->sc_curchan));
 
 #ifdef notyet
 	/*
@@ -8338,12 +8342,22 @@ ath_calibrate(unsigned long arg)
 		 * to load new gain values.
 		 */
 		int txcont_was_active = sc->sc_txcont;
-		DPRINTF(sc, ATH_DEBUG_RESET | ATH_DEBUG_CALIBRATE | ATH_DEBUG_DOTH, "%s: %s: Forcing reset() for (ath_hal_getrfgain(ah) == HAL_RFGAIN_NEED_CHANGE)\n", DEV_NAME(dev), __func__);
+		DPRINTF(sc, ATH_DEBUG_RESET | ATH_DEBUG_CALIBRATE | ATH_DEBUG_DOTH, 
+			"%s: %s: Forcing reset() for (ath_hal_getrfgain(ah) == "
+			"HAL_RFGAIN_NEED_CHANGE)\n", DEV_NAME(dev), __func__);
 		sc->sc_stats.ast_per_rfgain++;
+/* XXX: Ugly workaround */
+if (!sc->sc_beacons &&
+    TAILQ_FIRST(&ic->ic_vaps)->iv_opmode != IEEE80211_M_WDS &&
+    !txcont_was_active &&
+    !ath_total_radio_silence_required_for_dfs(sc)) {
+	sc->sc_beacons = 1;
+}
 		ath_reset(dev);
 		/* Turn txcont back on as necessary */
 		if (txcont_was_active)
 			ath_set_txcont(ic, txcont_was_active);
+
 	}
 	if (!ath_hal_calibrate(ah, &sc->sc_curchan, &isIQdone)) {
 		DPRINTF(sc, ATH_DEBUG_ANY,
@@ -8555,7 +8569,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			 *
 			 * Stop any previous beacon DMA.  This may be
 			 * necessary, for example, when an ibss merge
-			 * causes reconfiguration; there will be a state
+		     8766 41:					ath_beacon_config(sc, vap);
+      * causes reconfiguration; there will be a state
 			 * transition from RUN->RUN that means we may
 			 * be called with beacon transmission active.
 			 */
@@ -8752,6 +8767,7 @@ ath_dfs_channel_check_completed(unsigned long data )
 			struct ath_vap *avp = ATH_VAP(vap);
 			if (avp->av_dfs_channel_check_pending) {
 				int error;
+				do_gettimeofday(&tv);
 				DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING -> RUN -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
 				/* re alloc beacons to update new channel info */
 				error = ath_beacon_alloc(sc, vap->iv_bss);
@@ -8759,12 +8775,10 @@ ath_dfs_channel_check_completed(unsigned long data )
 					printk(KERN_ERR "beacon alloc failed: %d\n", error);
 					return;
 				}
-				if (!sc->sc_beacons &&
-				    vap->iv_opmode!=IEEE80211_M_WDS) {
-					ath_beacon_config(sc, vap);
-					sc->sc_beacons = 1;
-				}
-				do_gettimeofday(&tv);
+if (!sc->sc_beacons &&
+    vap->iv_opmode != IEEE80211_M_WDS) {
+	sc->sc_beacons = 1;
+}
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
 #ifdef ATH_SUPERG_XR
 				if (vap->iv_flags & IEEE80211_F_XR ) {
@@ -8780,6 +8794,10 @@ ath_dfs_channel_check_completed(unsigned long data )
 			}
 		}
 		netif_start_queue(dev);
+		ath_reset(dev);
+		if(sc->sc_beacons) {
+			ath_beacon_config(sc, NULL);
+		}
 		dev->watchdog_timeo = 5 * HZ; /* restore normal timeout */
 	} else {
 		do_gettimeofday(&tv);
@@ -10889,7 +10907,8 @@ txcont_off(struct ieee80211com *ic)
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
 
-	sc->sc_beacons = 1;
+	if(TAILQ_FIRST(&ic->ic_vaps)->iv_opmode != IEEE80211_M_WDS)
+		sc->sc_beacons = 1;
 	ath_reset(sc->sc_dev);
 
 	sc->sc_txcont = 0;
@@ -11147,28 +11166,33 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 		return;
 	}
 
-	/*  DFS was found, initiate channel change */
+	/*  Stop any pending channel availability check (if applicable) */
+	ath_interrupt_dfs_channel_check(sc, "Radar detected.  Interrupting DFS wait.");
+
+	/*  radar was found, initiate channel change */
 	ichan.ic_ieee = ath_hal_mhz2ieee(ah, sc->sc_curchan.channel, sc->sc_curchan.channelFlags);
 	ichan.ic_freq = sc->sc_curchan.channel;
 	ichan.ic_flags = sc->sc_curchan.channelFlags;
-	sc->sc_curchan.privFlags &= ~CHANNEL_DFS_CLEAR;
-	sc->sc_curchan.privFlags |= CHANNEL_INTERFERENCE;
 
-	/*  Stop any pending channel availability check (if applicable) */
-	ath_interrupt_dfs_channel_check(sc, "Radar detected.  Interrupting DFS wait.");
-	if (((ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) == 0)
-	    && (ic->ic_opmode == IEEE80211_M_HOSTAP
-		|| ic->ic_opmode == IEEE80211_M_IBSS))
-		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: markdfs is disabled.  "
-				"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X\n", 
-				DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
- 	else
- 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: invoking ieee80211_mark_dfs!  "
- 			"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X "
- 			"-- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, 
- 			ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags, tv.tv_sec, tv.tv_usec);
- 
- 	ieee80211_mark_dfs(ic, &ichan);
+	if(ic->ic_opmode == IEEE80211_M_HOSTAP || 
+	   ic->ic_opmode == IEEE80211_M_IBSS)
+	{
+		if (!(ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS))
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: markdfs is disabled.  "
+					"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X\n", 
+					DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
+		else {
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: dfs marked!  "
+				"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X "
+				"-- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, 
+				ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags, tv.tv_sec, tv.tv_usec);
+			/* Mark the channel */
+			sc->sc_curchan.privFlags &= ~CHANNEL_DFS_CLEAR;
+			sc->sc_curchan.privFlags |= CHANNEL_INTERFERENCE;
+			/* notify 80211 layer so it can change channels... */
+			ieee80211_mark_dfs(ic, &ichan);
+		}
+	}
 }
 
 static int
