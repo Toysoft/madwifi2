@@ -1371,6 +1371,17 @@ ath_resume(struct net_device *dev)
 	ath_init(dev);
 }
 
+/* Extend 15-bit time stamp from rx descriptor to a full 64-bit TSF
+ * using the current h/w TSF. We no longer make an adjustement since
+ * tsf should always be bf_tsf and bf_tsf is adjusted. */
+
+/* NB: Not all chipsets return the same precision rstamp */
+static __inline u_int64_t
+ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
+{
+	return ((tsf &~ 0x7fff) | rstamp);
+}
+
 static void
 ath_uapsd_processtriggers(struct ath_softc *sc)
 {
@@ -1385,8 +1396,12 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	struct ath_txq *uapsd_xmit_q = sc->sc_uapsdq;
 	struct ieee80211com *ic = &sc->sc_ic;
 	int ac, retval;
+	unsigned long last_rs_tstamp = 0;
+	int check_for_radar = 0;
+	struct ath_buf *prev_rxbufcur;
 	u_int8_t tid;
 	u_int16_t frame_seq;
+	u_int64_t hw_tsf;
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
@@ -1394,31 +1409,52 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	/* XXXAPSD: build in check against max triggers we could see
 	 *          based on ic->ic_uapsdmaxtriggers. */
 
+	/* Do not move hw_tsf processing and noise processing out to the rx 
+	 * tasklet.  The ONLY place we can properly correct for TSF errors and
+	 * get accurate noise floor information is in the interrupt handler. 
+	 * The HW returns a 15-bit TS on rx.  We get interrupts after multiple
+	 * packets are queued up.  Sometimes (read often), the 15-bit counter
+	 * in the hardware has rolled over one or more times.  We correct for
+	 * this in the interrupt function and store the adjusted TSF in the 
+	 * buffer.  
+	 * 
+	 * We also store noise during interrupt, since HW does not log
+	 * this per packet and the rx queue is too late. Multiple interrupts
+	 * will have occurred, and the noise value at that point is totally
+	 * unrelated to conditions during receiption.  This is as close as we
+	 * get to reality.  This value is used in monitor mode and by tools like
+	 * Wireshark and Kismet.
+	 */
+	hw_tsf = ath_hal_gettsf64(ah);
+	ic->ic_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
+
 	ATH_RXBUF_LOCK_IRQ(sc);
 	if (sc->sc_rxbufcur == NULL)
 		sc->sc_rxbufcur = STAILQ_FIRST(&sc->sc_rxbuf);
-	
-	for (bf = sc->sc_rxbufcur; bf; bf = STAILQ_NEXT(bf, bf_list)) {
+	prev_rxbufcur = sc->sc_rxbufcur;
+	for (bf = prev_rxbufcur; bf; bf = STAILQ_NEXT(bf, bf_list)) {
 		ds = bf->bf_desc;
 		if (ds->ds_link == bf->bf_daddr) {
-			/* NB: never process the self-linked entry at the end */
+			/* NB: never process the self-linked entry at 
+			 * the end */
 			break;
 		}
 		if (bf->bf_status & ATH_BUFSTATUS_DONE) {
-			/* already processed this buffer (shouldn't occur if
-			 * we change code to always process descriptors in
-			 * rx intr handler - as opposed to sometimes processing
-			 * in the rx tasklet). */
+			/* already processed this buffer (shouldn't 
+			 * occur if we change code to always process 
+			 * descriptors in rx intr handler - as opposed 
+			 * to sometimes processing in the rx tasklet) */
 			continue;
 		}
 		skb = bf->bf_skb;
-		if (skb == NULL) {		/* XXX ??? can this happen */
+		if (skb == NULL) {
 			printk("%s: no skbuff\n", __func__);
 			continue;
 		}
 
-		/* XXXAPSD: consider new HAL call that does only the subset
-		 *          of ath_hal_rxprocdesc we require for trigger search. */
+		/* XXXAPSD: consider new HAL call that does only the 
+		 *          subset of ath_hal_rxprocdesc we require 
+		 *          for trigger search. */
 
 		/* NB: descriptor memory doesn't need to be sync'd
 		 *     due to the way it was allocated. */
@@ -1433,20 +1469,58 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		 * on.  All this is necessary because of our use of
 		 * a self-linked list to avoid rx overruns. */
 		rs = &bf->bf_dsstatus.ds_rxstat;
-		retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, PA2DESC(sc, ds->ds_link), sc->sc_tsf, rs);
+		retval = ath_hal_rxprocdesc(ah, ds, bf->bf_daddr, 
+					    PA2DESC(sc, ds->ds_link), 
+					    hw_tsf, rs);
 		if (HAL_EINPROGRESS == retval)
 			break;
 
-		/* update the per packet TSF with sc_tsf, sc_tsf is updated on
-		   each RX interrupt. */
-		bf->bf_tsf = sc->sc_tsf;
+		/* update the per packet TSF with hw_tsf, hw_tsf is 
+		 * updated on each RX interrupt, at the start of this 
+		 * routine. */
+		bf->bf_tsf = hw_tsf;
+		/* If we detect a rollover on rs_tstamp values, then we 
+		 * know that all packets we have seen already MUST be 
+		 * decremented by 0x8000 (1<<15) because the last packet
+		 * in the queue is for hw_tsf and any rollover we 
+		 * encounter means prior packets were not tagged with 
+		 * correct bf_tsf because of this rollover.  This 
+		 * assumes that when rollover happens, we get packets 
+		 * afterwards.  But, if not, we still have TSF values 
+		 * that do not go backward in time!
+		 */
+		if (rs->rs_tstamp < last_rs_tstamp || 
+		    (STAILQ_NEXT(bf, bf_list) == NULL && 
+		     ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp) > 
+		     hw_tsf)) {
+			/* Adjust TSF of this and all prior packets */
+			struct ath_buf *p = sc->sc_rxbufcur;
+			for (;p && p != bf; p = STAILQ_NEXT(p, bf_list))
+				p->bf_tsf -= 0x8000;
+		}
 
-		/* XXX: We do not support frames spanning multiple descriptors */
+		last_rs_tstamp = rs->rs_tstamp;
+
+		/* XXX: We do not support frames spanning multiple 
+		 *      descriptors */
 		bf->bf_status |= ATH_BUFSTATUS_DONE;
+		/* Capture noise per-interrupt, since it may change
+		 * by the time the receive queue gets around to
+		 * processing these buffers, and multiple interrupts
+		 * may have occurred in the intervening timeframe. */
+		bf->bf_channoise = ic->ic_channoise;
 
-		/* Errors? */
-		if (rs->rs_status)
+		if (rs->rs_status) {
+			if ((HAL_RXERR_PHY == rs->rs_status) && 
+			    (HAL_PHYERR_RADAR == 
+			     (rs->rs_phyerr & 0x1f)) &&
+			    (0 == (bf->bf_status & 
+				   ATH_BUFSTATUS_RADAR_DONE))) {
+				check_for_radar = 1;
+			}
+			/* Skip past the error now */
 			continue;
+		}
 
 		/* Prepare wireless header for examination */
 		bus_dma_sync_single(sc->sc_bdev, bf->bf_skbaddr,
@@ -1458,12 +1532,16 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		if (rs->rs_keyix == HAL_RXKEYIX_INVALID ||
 		    (ni = sc->sc_keyixmap[rs->rs_keyix]) == NULL) {
 			/* 
-			 * XXX: this can occur if WEP mode is used for non-Atheros clients
-			 *      (since we do not know which of the 4 WEP keys will be used
-			 *      at association time, so cannot setup a key-cache entry.
-			 *      The Atheros client can convey this in the Atheros IE.)
+			 * XXX: this can occur if WEP mode is used for 
+			 *      non-Atheros clients (since we do not 
+			 *      know which of the 4 WEP keys will be 
+			 *      used at association time, so cannot 
+			 *      setup a key-cache entry.
+			 *      The Atheros client can convey this in 
+			 *      the Atheros IE.)
 			 *
-			 * TODO: The fix is to use the hash lookup on the node here.
+			 *      The fix is to use the hash lookup on 
+			 *      the node here.
 			 */
 #if 0
 			/* This print is very chatty, so removing for now. */
@@ -1476,19 +1554,22 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		if (!(ni->ni_flags & IEEE80211_NODE_UAPSD))
 			continue;
 
-		/*
-		 * Must deal with change of state here, since otherwise there would
-		 * be a race (on two quick frames from STA) between this code and the
-		 * tasklet where we would:
-		 *   - miss a trigger on entry to PS if we're already trigger hunting
-		 *   - generate spurious SP on exit (due to frame following exit frame)
+		/* 
+		 * Must deal with change of state here, since otherwise 
+		 * there would be a race (on two quick frames from STA) 
+		 * between this code and the tasklet where we would:
+		 *   - miss a trigger on entry to PS if we're already 
+		 *     trigger hunting
+		 *   - generate spurious SP on exit (due to frame 
+		 *     following exit frame)
 		 */
 		if (((qwh->i_fc[1] & IEEE80211_FC1_PWR_MGT) ^
 		     (ni->ni_flags & IEEE80211_NODE_PWR_MGT))) {
 			/*
-			 * NB: do not require lock here since this runs at intr
-			 * "proper" time and cannot be interrupted by RX tasklet
-			 * (code there has lock). May want to place a macro here
+			 * NB: do not require lock here since this runs 
+			 * at intr "proper" time and cannot be 
+			 * interrupted by RX tasklet (code there has 
+			 * lock). May want to place a macro here
 			 * (that does nothing) to make this more clear.
 			 */
 			ni->ni_flags |= IEEE80211_NODE_PS_CHANGED;
@@ -1496,27 +1577,34 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			ni->ni_flags &= ~IEEE80211_NODE_UAPSD_SP;
 			ni->ni_flags ^= IEEE80211_NODE_PWR_MGT;
 			if (qwh->i_fc[1] & IEEE80211_FC1_PWR_MGT) {
-				ni->ni_flags |= IEEE80211_NODE_UAPSD_TRIG;
+				ni->ni_flags |= 
+					IEEE80211_NODE_UAPSD_TRIG;
 				ic->ic_uapsdmaxtriggers++;
 				WME_UAPSD_NODE_TRIGSEQINIT(ni);
 				DPRINTF(sc, ATH_DEBUG_UAPSD,
-					"%s: Node (%s) became U-APSD triggerable (%d)\n",
-					__func__, ether_sprintf(qwh->i_addr2),
+					"%s: Node (%s) became U-APSD "
+					"triggerable (%d)\n",
+					__func__, 
+					ether_sprintf(qwh->i_addr2),
 					ic->ic_uapsdmaxtriggers);
 			} else {
-				ni->ni_flags &= ~IEEE80211_NODE_UAPSD_TRIG;
+				ni->ni_flags &= 
+					~IEEE80211_NODE_UAPSD_TRIG;
 				ic->ic_uapsdmaxtriggers--;
 				DPRINTF(sc, ATH_DEBUG_UAPSD,
-					"%s: Node (%s) no longer U-APSD triggerable (%d)\n",
-					__func__, ether_sprintf(qwh->i_addr2),
+					"%s: Node (%s) no longer U-APSD"
+					" triggerable (%d)\n",
+					__func__, 
+					ether_sprintf(qwh->i_addr2),
 					ic->ic_uapsdmaxtriggers);
 				/* 
 				 * XXX: Rapidly thrashing sta could get 
-				 * out-of-order frames due this flush placing
-				 * frames on backlogged regular AC queue and
-				 * re-entry to PS having fresh arrivals onto
-				 * faster UPSD delivery queue. if this is a
-				 * big problem we may need to drop these.
+				 * out-of-order frames due this flush 
+				 * placing frames on backlogged regular 
+				 * AC queue and re-entry to PS having 
+				 * fresh arrivals onto faster UPSD 
+				 * delivery queue. if this is a big 
+				 * problem we may need to drop these.
 				 */
 				ath_uapsd_flush(ni);
 			}
@@ -1529,10 +1617,11 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 
 		/* make sure the frame is QoS data/null */
 		/* NB: with current sub-type definitions, the 
-		 * IEEE80211_FC0_SUBTYPE_QOS check, below, covers the 
-		 * QoS null case too.
+		 * IEEE80211_FC0_SUBTYPE_QOS check, below, 
+		 * covers the QoS null case too.
 		 */
-		if (((qwh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != IEEE80211_FC0_TYPE_DATA) ||
+		if (((qwh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) != 
+		     IEEE80211_FC0_TYPE_DATA) ||
 		     !(qwh->i_fc[0] & IEEE80211_FC0_SUBTYPE_QOS))
 			continue;
 
@@ -1547,12 +1636,16 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			continue;
 
 		DPRINTF(sc, ATH_DEBUG_UAPSD,
-			"%s: U-APSD trigger detected for node (%s) on AC %d\n",
-			__func__, ether_sprintf(ni->ni_macaddr), ac);
+			"%s: U-APSD trigger detected for node "
+			"(%s) on AC %d\n",
+			__func__, 
+			ether_sprintf(ni->ni_macaddr), ac);
 		if (ni->ni_flags & IEEE80211_NODE_UAPSD_SP) {
-			/* have trigger, but SP in progress, so ignore */
+			/* have trigger, but SP in progress, 
+			 * so ignore */
 			DPRINTF(sc, ATH_DEBUG_UAPSD,
-				"%s:   SP already in progress - ignoring\n",
+				"%s:   SP already in progress -"
+				" ignoring\n",
 				__func__);
 			continue;
 		}
@@ -1563,7 +1656,9 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		frame_seq = le16toh(*(__le16 *)qwh->i_seq);
 		if ((qwh->i_fc[1] & IEEE80211_FC1_RETRY) &&
 		    frame_seq == ni->ni_uapsd_trigseq[ac]) {
-			DPRINTF(sc, ATH_DEBUG_UAPSD, "%s: dropped dup trigger, ac %d, seq %d\n",
+			DPRINTF(sc, ATH_DEBUG_UAPSD, 
+				"%s: dropped dup trigger, ac %d"
+				", seq %d\n",
 				__func__, ac, frame_seq);
 			continue;
 		}
@@ -1580,25 +1675,34 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		ATH_TXQ_LOCK_IRQ(uapsd_xmit_q);
 		if (STAILQ_EMPTY(&an->an_uapsd_q)) {
 			DPRINTF(sc, ATH_DEBUG_UAPSD,
-				"%s: Queue empty, generating QoS NULL to send\n",
+				"%s: Queue empty, generating "
+				"QoS NULL to send\n",
 				__func__);
 			/* 
-			 * Empty queue, so need to send QoS null on this ac. Make a
-			 * call that will dump a QoS null onto the node's queue, then
-			 * we can proceed as normal.
+			 * Empty queue, so need to send QoS null 
+			 * on this ac. Make a call that will 
+			 * dump a QoS null onto the node's 
+			 * queue, then we can proceed as normal.
 			 */
 			ieee80211_send_qosnulldata(ni, ac);
 		}
 
 		if (STAILQ_FIRST(&an->an_uapsd_q)) {
-			struct ath_buf *last_buf = STAILQ_LAST(&an->an_uapsd_q, ath_buf, bf_list);
-			struct ath_desc *last_desc = last_buf->bf_desc;
-			struct ieee80211_qosframe *qwhl = (struct ieee80211_qosframe *)last_buf->bf_skb->data;
+			struct ath_buf *last_buf = 
+				STAILQ_LAST(&an->an_uapsd_q, 
+					    ath_buf, bf_list);
+			struct ath_desc *last_desc = 
+				last_buf->bf_desc;
+			struct ieee80211_qosframe *qwhl = 
+				(struct ieee80211_qosframe *)
+				last_buf->bf_skb->data;
 			/* 
-			 * NB: flip the bit to cause intr on the EOSP desc,
-			 * which is the last one
+			 * NB: flip the bit to cause intr on the 
+			 * EOSP desc, which is the last one
 			 */
-			ath_hal_txreqintrdesc(sc->sc_ah, last_desc);
+			ath_hal_txreqintrdesc(sc->sc_ah, 
+					      last_desc);
+
 			qwhl->i_qos[0] |= IEEE80211_QOS_EOSP;
 
 			if (IEEE80211_VAP_EOSPDROP_ENABLED(ni->ni_vap)) {
@@ -1608,35 +1712,45 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 
 			/* more data bit only for EOSP frame */
 			if (an->an_uapsd_overflowqdepth)
-				qwhl->i_fc[1] |= IEEE80211_FC1_MORE_DATA;
+				qwhl->i_fc[1] |= 
+					IEEE80211_FC1_MORE_DATA;
 			else if (IEEE80211_NODE_UAPSD_USETIM(ni))
 				ni->ni_vap->iv_set_tim(ni, 0);
 
-			ni->ni_stats.ns_tx_uapsd += an->an_uapsd_qdepth;
+			ni->ni_stats.ns_tx_uapsd += 
+				an->an_uapsd_qdepth;
 
-			bus_dma_sync_single(sc->sc_bdev, last_buf->bf_skbaddr,
-				sizeof(*qwhl), BUS_DMA_TODEVICE);
+			bus_dma_sync_single(sc->sc_bdev, 
+					    last_buf->bf_skbaddr,
+					    sizeof(*qwhl), 
+					    BUS_DMA_TODEVICE);
 
 			if (uapsd_xmit_q->axq_link) {
 #ifdef AH_NEED_DESC_SWAP
-				*uapsd_xmit_q->axq_link = cpu_to_le32(STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr);
+				*uapsd_xmit_q->axq_link = 
+					cpu_to_le32(STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr);
 #else
-				*uapsd_xmit_q->axq_link = STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr;
+				*uapsd_xmit_q->axq_link = 
+					STAILQ_FIRST(&an->an_uapsd_q)->bf_daddr;
 #endif
 			}
 			/* below leaves an_uapsd_q NULL */
-			STAILQ_CONCAT(&uapsd_xmit_q->axq_q, &an->an_uapsd_q);
-			uapsd_xmit_q->axq_link = &last_desc->ds_link;
+			STAILQ_CONCAT(&uapsd_xmit_q->axq_q, 
+				      &an->an_uapsd_q);
+			uapsd_xmit_q->axq_link = 
+				&last_desc->ds_link;
 			ath_hal_puttxbuf(sc->sc_ah,
 				uapsd_xmit_q->axq_qnum,
 				(STAILQ_FIRST(&uapsd_xmit_q->axq_q))->bf_daddr);
-			ath_hal_txstart(sc->sc_ah, uapsd_xmit_q->axq_qnum);
+
+			ath_hal_txstart(sc->sc_ah, 
+					uapsd_xmit_q->axq_qnum);
 		}
 		an->an_uapsd_qdepth = 0;
-
 		ATH_TXQ_UNLOCK_IRQ(uapsd_xmit_q);
 	}
 	sc->sc_rxbufcur = bf;
+
 	ATH_RXBUF_UNLOCK_IRQ(sc);
 #undef PA2DESC
 }
@@ -1681,7 +1795,15 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	 * value to ensure we only process bits we requested.
 	 */
 	ath_hal_getisr(ah, &status);		/* NB: clears ISR too */
-	DPRINTF(sc, ATH_DEBUG_INTR, "%s: status 0x%x\n", __func__, status);
+	DPRINTF(sc, ATH_DEBUG_INTR,
+		"%s: status 0x%x%s%s%s%s%s%s\n", __func__, status,
+		(status & HAL_INT_RX)      ? " HAL_INT_RX"      : "",
+		(status & HAL_INT_RXNOFRM) ? " HAL_INT_RXNOFRM" : "",
+		(status & HAL_INT_TX)      ? " HAL_INT_TX"      : "",
+		(status & HAL_INT_MIB)     ? " HAL_INT_MIB"     : "",
+		(status & HAL_INT_RXPHY)   ? " HAL_INT_RXPHY"   : "",
+		(status & HAL_INT_SWBA)    ? " HAL_INT_SWBA"    : "");
+
 	status &= sc->sc_imask;			/* discard unasked for bits */
 	if (status & HAL_INT_FATAL) {
 		sc->sc_stats.ast_hardware++;
@@ -1693,6 +1815,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		ATH_SCHEDULE_TQUEUE(&sc->sc_rxorntq, &needmark);
 	} else {
 		if (status & HAL_INT_SWBA) {
+			DPRINTF(sc, ATH_DEBUG_BEACON, "%s: ath_intr HAL_INT_SWBA\n",
+				DEV_NAME(sc->sc_dev));
+
 			/*
 			 * Software beacon alert--time to send a beacon.
 			 * Handle beacon transmission directly; deferring
@@ -1714,8 +1839,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			/* bump tx trigger level */
 			ath_hal_updatetxtriglevel(ah, AH_TRUE);
 		}
-		if (status & HAL_INT_RX) {
-			sc->sc_tsf = ath_hal_gettsf64(ah);
+		if (status & (HAL_INT_RX | HAL_INT_RXPHY)) {
 			ath_uapsd_processtriggers(sc);
 			ATH_SCHEDULE_TQUEUE(&sc->sc_rxtq, &needmark);
 		}
@@ -5338,19 +5462,6 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 }
 
 /*
- * Extend 15-bit time stamp from rx descriptor to
- * a full 64-bit TSF using the current h/w TSF.
- */
-/* NB: Not all chipsets return the same precision rstamp */
-static __inline u_int64_t
-ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
-{
-	if ((tsf & 0x7fff) < rstamp)
-		tsf -= 0x8000;
-	return ((tsf &~ 0x7fff) | rstamp);
-}
-
-/*
  * Add a prism2 header to a received frame and
  * dispatch it to capture tools like kismet.
  */
@@ -5534,9 +5645,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	u_int phyerr;
 	u_int64_t rs_tsf;
 
-	/* Let the 802.11 layer know about the new noise floor */
-	sc->sc_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
-	ic->ic_channoise = sc->sc_channoise;
 
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "%s\n", __func__);
 	do {
@@ -5837,7 +5945,7 @@ ath_grppoll_period_update(struct ath_softc *sc)
 	if (xrsta == 0) {
 		if (sc->sc_xrpollint != XR_DEFAULT_POLL_INTERVAL) {
 			sc->sc_xrpollint = XR_DEFAULT_POLL_INTERVAL;
-			ath_grppoll_txq_update(sc,XR_DEFAULT_POLL_INTERVAL);
+			ath_grppoll_txq_update(sc, XR_DEFAULT_POLL_INTERVAL);
 		}
 		return;
 	}
@@ -6071,7 +6179,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 							pktlen, rtindex,
 							AH_FALSE) /* CF-Poll time */
 						+ (XR_AIFS + (XR_CWMIN_CWMAX * XR_SLOT_DELAY))
-						+ ath_hal_computetxtime(ah,rt,
+						+ ath_hal_computetxtime(ah, rt,
 							XR_FRAGMENTATION_THRESHOLD,
 							IEEE80211_XR_DEFAULT_RATE_INDEX,
 							AH_FALSE) /* Data packet time */
@@ -6124,29 +6232,28 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				head = bf;
 			}
 			ath_hal_setuptxdesc(ah, ds,
-				skb->len + IEEE80211_CRC_LEN, 	/* frame length */
+				skb->len + IEEE80211_CRC_LEN,	/* frame length */
 				sizeof(struct ieee80211_frame), /* header length */
-				type, 				/* Atheros packet type */
-				ic->ic_txpowlimit, 		/* max txpower */
-				rate, 0, 			/* series 0 rate/tries */
-				keyix, 				/* HAL_TXKEYIX_INVALID */ /* use key index */
-				amode, 				/* antenna mode */
+				type,				/* Atheros packet type */
+				ic->ic_txpowlimit,		/* max txpower */
+				rate, 0,			/* series 0 rate/tries */
+				keyix,				/* HAL_TXKEYIX_INVALID */ /* use key index */
+				amode,				/* antenna mode */
 				flags,
-				ctsrate, 			/* rts/cts rate */
-				ctsduration, 			/* rts/cts duration */
-				0, 				/* comp icv len */
-				0, 				/* comp iv len */
-				ATH_COMP_PROC_NO_COMP_NO_CCS 	/* comp scheme */
+				ctsrate,			/* rts/cts rate */
+				ctsduration,			/* rts/cts duration */
+				0,				/* comp icv len */
+				0,				/* comp iv len */
+				ATH_COMP_PROC_NO_COMP_NO_CCS	/* comp scheme */
 				);
 			ath_hal_filltxdesc(ah, ds,
-				roundup(skb->len, 4), 	/* buffer length */
-				AH_TRUE, 		/* first segment */
-				AH_TRUE, 		/* last segment */
+				roundup(skb->len, 4),	/* buffer length */
+				AH_TRUE,		/* first segment */
+				AH_TRUE,		/* last segment */
 				ds			/* first descriptor */
 				);
 			/* NB: The desc swap function becomes void, 
-	 		 * if descriptor swapping is not enabled
-	 		 */
+			 * if descriptor swapping is not enabled */
 			ath_desc_swap(ds);
 			if (txq->axq_link) {
 #ifdef AH_NEED_DESC_SWAP
@@ -7075,19 +7182,19 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	 */
 	/* XXX check return value? */
 	ath_hal_setuptxdesc(ah, ds,
-			    pktlen, 			/* packet length */
-			    hdrlen, 			/* header length */
-			    atype, 			/* Atheros packet type */
-			    MIN(ni->ni_txpower, 60), 	/* txpower */
-			    txrate, try0, 		/* series 0 rate/tries */
-			    keyix, 			/* key cache index */
-			    antenna, 			/* antenna mode */
-			    flags, 			/* flags */
-			    ctsrate, 			/* rts/cts rate */
-			    ctsduration, 		/* rts/cts duration */
-			    icvlen, 			/* comp icv len */
-			    ivlen, 			/* comp iv len */
-			    comp 			/* comp scheme */
+			    pktlen,			/* packet length */
+			    hdrlen,			/* header length */
+			    atype,			/* Atheros packet type */
+			    MIN(ni->ni_txpower, 60),	/* txpower */
+			    txrate, try0,		/* series 0 rate/tries */
+			    keyix,			/* key cache index */
+			    antenna,			/* antenna mode */
+			    flags,			/* flags */
+			    ctsrate,			/* rts/cts rate */
+			    ctsduration,		/* rts/cts duration */
+			    icvlen,			/* comp icv len */
+			    ivlen,			/* comp iv len */
+			    comp			/* comp scheme */
 		);
 	bf->bf_flags = flags;	/* record for post-processing */
 
@@ -7111,9 +7218,9 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	ds->ds_data = bf->bf_skbaddr;
 
 	ath_hal_filltxdesc(ah, ds,
-			   skb->len, 	/* segment length */
-			   AH_TRUE, 	/* first segment */
-			   AH_TRUE, 	/* last segment */
+			   skb->len,	/* segment length */
+			   AH_TRUE,	/* first segment */
+			   AH_TRUE,	/* last segment */
 			   ds		/* first descriptor */
 		);
 
@@ -7135,8 +7242,8 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 		ds->ds_link = (skb->next == NULL) ? 0 : bf->bf_daddr + sizeof(*ds);
 
 		ath_hal_filltxdesc(ah, ds,
-			skbtmp->len, 		/* segment length */
-			AH_TRUE, 		/* first segment */
+			skbtmp->len,		/* segment length */
+			AH_TRUE,		/* first segment */
 			(skbtmp->next == NULL), /* last segment */
 			ds			/* first descriptor */
 		);
@@ -7155,15 +7262,15 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 			ds->ds_link = (skbtmp->next == NULL) ? 0 : bf->bf_daddr + (sizeof(*ds) * (i + 2));
 			ds->ds_data = bf->bf_skbaddrff[i];
 			ath_hal_filltxdesc(ah, ds,
-				skbtmp->len, 		/* segment length */
-				AH_FALSE, 		/* first segment */
+				skbtmp->len,		/* segment length */
+				AH_FALSE,		/* first segment */
 				(skbtmp->next == NULL), /* last segment */
 				ds0			/* first descriptor */
 			);
 
 			/* NB: The desc swap function becomes void, 
-		 	 * if descriptor swapping is not enabled
-		 	 */
+			 * if descriptor swapping is not enabled
+			 */
 			ath_desc_swap(ds);
 
 			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: Q%d: %08x %08x %08x %08x %08x %08x\n",
