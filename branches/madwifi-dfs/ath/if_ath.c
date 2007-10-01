@@ -1512,8 +1512,6 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	/* XXXAPSD: build in check against max triggers we could see
 	 *          based on ic->ic_uapsdmaxtriggers. */
 	hw_tsf = ath_hal_gettsf64(ah);
-
-	/* Let the 802.11 layer know about the new noise floor */
 	ic->ic_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
 
 	ATH_RXBUF_LOCK_IRQ(sc);
@@ -6556,8 +6554,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 				ds			/* first descriptor */
 				);
 			/* NB: The desc swap function becomes void, 
-			 * if descriptor swapping is not enabled
-			 */
+			 * if descriptor swapping is not enabled */
 			ath_desc_swap(ds);
 			if (txq->axq_link) {
 #ifdef AH_NEED_DESC_SWAP
