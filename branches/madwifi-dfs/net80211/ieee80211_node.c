@@ -1435,19 +1435,8 @@ restart:
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
 		if (ni->ni_scangen == gen)	/* previously handled */
 			continue;
-		/* Temporary entries should no longer be in the node table */
-		/*
-		 * Ignore entries for which have yet to receive an
-		 * authentication frame.  These are transient and
-		 * will be reclaimed when the last reference to them
-		 * goes away (when frame xmits complete).
-		 */
-		/*
-		 *if (ic->ic_opmode == IEEE80211_M_HOSTAP &&
-		 *   (ni->ni_flags & IEEE80211_NODE_AREF) == 0)
-		 *	continue;
-		 */
 		ni->ni_scangen = gen;
+
 		/*
 		 * Free fragment if not needed anymore
 		 * (last fragment older than 1s).

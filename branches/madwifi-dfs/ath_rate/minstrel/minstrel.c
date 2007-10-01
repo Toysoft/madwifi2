@@ -359,6 +359,11 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 					if (sn->rs_sampleColumn >= MINSTREL_COLUMNS)
 						sn->rs_sampleColumn = 0;
 				}
+				sn->rs_sample_rate = ndx;
+				sn->rs_sample_rate_slower =
+					sn->perfect_tx_time[ndx] >  sn->perfect_tx_time[sn->max_tp_rate];
+				if (sn->rs_sample_rate_slower)
+					ndx = sn->max_tp_rate;				
 			} else
 				ndx = sn->max_tp_rate;
 		 }
@@ -389,8 +394,11 @@ ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
 		int rc1, rc2, rc3;         /* Index into the rate table, so for example, it is  0..11 */
 
 		if (sn->is_sampling) {
-			rc1 = sn->max_tp_rate;
 			sn->is_sampling = 0;
+			if (sn->rs_sample_rate_slower)
+				rc1 = sn->rs_sample_rate;
+			else
+				rc1 = sn->max_tp_rate;
 		} else {
 			rc1 = sn->max_tp_rate2;
 		}
@@ -843,12 +851,12 @@ ath_rate_statistics(void *arg, struct ieee80211_node *ni)
 		/* This code could have been moved up into the previous
 		 * loop. More readable to have it here */
 		for (i = 0; i < rs->rs_nrates; i++) {
-			if (max_tp <= rn->rs_this_tp[i]) {
+			if (max_tp < rn->rs_this_tp[i]) {
 				index_max_tp = i;
 				max_tp = rn->rs_this_tp[i];
 			}
 
-			if (max_prob <= rn->rs_probability[i]) {
+			if (max_prob <  rn->rs_probability[i]) {
 				index_max_prob = i;
 				max_prob = rn->rs_probability[i];
 			}
@@ -856,7 +864,7 @@ ath_rate_statistics(void *arg, struct ieee80211_node *ni)
 
 		max_tp = 0;
 		for (i = 0; i < rs->rs_nrates; i++) {
-			if ((i != index_max_tp) && (max_tp <= rn->rs_this_tp[i])) {
+			if ((i != index_max_tp) && (max_tp < rn->rs_this_tp[i])) {
 				index_max_tp2 = i;
 				max_tp = rn->rs_this_tp[i];
 			}

@@ -321,6 +321,14 @@ OS_MARK(struct ath_hal *ah, u_int id, u_int32_t v)
 }
 EXPORT_SYMBOL(OS_MARK);
 #elif defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
+
+#ifdef AH_DEBUG
+/* Store the current function name (should be called by wrapper functions)
+ * useful for debugging and figuring out, which hal function sets which 
+ * registers */
+char *ath_hal_func = NULL;
+#endif
+
 /*
  * Memory-mapped device register read/write.  These are here
  * as routines when debugging support is enabled and/or when
@@ -338,15 +346,14 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 {
 #ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
-		ath_hal_printf(ah, "WRITE 0x%x <= 0x%x\n", reg, val);
+		ath_hal_printf(ah, "%s: WRITE 0x%x <= 0x%x\n", 
+				(ath_hal_func ?: "unknown"), reg, val);
 #endif
 	_OS_REG_WRITE(ah, reg, val);
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
 
-/* 
-This should only be called while holding the lock, sc->sc_hal_lock.
-*/
+/* This should only be called while holding the lock, sc->sc_hal_lock. */
 u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
@@ -355,7 +362,8 @@ ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 	val = _OS_REG_READ(ah, reg);
 #ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
-		ath_hal_printf(ah, "READ 0x%x => 0x%x\n", reg, val);
+		ath_hal_printf(ah, "%s: READ 0x%x => 0x%x\n", 
+				(ath_hal_func ?: "unknown"), reg, val);
 #endif
 	return val;
 }
