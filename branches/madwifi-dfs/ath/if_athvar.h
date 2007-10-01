@@ -428,11 +428,8 @@ struct ath_buf {
 #define ATH_BUFSTATUS_RADAR_DONE	0x00000002	/* marker to indicate a PHYERR for radar pulse
 							   has already been handled.  We may receive
 							   multiple interrupts before the rx_tasklet
-							   clears the queue
-							*/
-/*
- * DMA state for tx/rx descriptors.
- */
+							   clears the queue */
+/* DMA state for tx/rx descriptors. */
 struct ath_descdma {
 	const char *dd_name;
 	struct ath_desc	*dd_desc;	/* descriptors */
