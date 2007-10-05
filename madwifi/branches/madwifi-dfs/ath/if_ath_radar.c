@@ -498,6 +498,8 @@ static int32_t compare_radar_matches(
 	return -CR_FALLTHROUGH;
 }
 
+#ifdef ATH_RADAR_LONG_PULSE
+
 struct lp_burst {
 	u_int32_t lpb_num_pulses;
 	u_int32_t lpb_num_noise;
@@ -601,7 +603,6 @@ static void radar_pulse_analyze_long_pulse_bscan(
 			bursts[waveform_num_bursts-1].lpb_min_possible_tsf;
 }
 
-
 static HAL_BOOL radar_pulse_analyze_long_pulse(
 	struct ath_softc *sc, struct ath_radar_pulse *last_pulse,
 	u_int32_t* bc, 
@@ -672,8 +673,6 @@ static HAL_BOOL radar_pulse_analyze_long_pulse(
 			waveform_offset = MAX(waveform_offset, d);
 		}
 		waveform_offset *= -1;
-//		waveform_offset = -(waveform_offset/matching_burst_count);
-//		DPRINTF(sc, ATH_DEBUG_DOTHFILT, "offset: %d\n", waveform_offset);
 
 		found_burst_index = 0;
 		for (match_burst_index = 0; match_burst_index < matching_burst_count; match_burst_index++) {
@@ -744,7 +743,7 @@ static HAL_BOOL radar_pulse_analyze_long_pulse(
 
 	return found_radar ? AH_TRUE : AH_FALSE;
 }
-
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 
 static HAL_BOOL radar_pulse_analyze_short_pulse(
 	struct ath_softc *sc, struct ath_radar_pulse *last_pulse, 
@@ -1198,6 +1197,7 @@ static u_int32_t interval_to_frequency(u_int32_t interval)
 	return frequency + ((frequency % 50) >= 25 ? 50 : 0) - (frequency % 50);
 }
 
+#ifdef ATH_RADAR_LONG_PULSE
 static const char* get_longpulse_desc(int lp) {
 	switch(lp) {
 	case  8:  return "FCC [5,  8 pulses]";
@@ -1216,6 +1216,7 @@ static const char* get_longpulse_desc(int lp) {
 	default:  return "FCC [5, invalid pulses]";
 	}
 }
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 
 static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 {
@@ -1230,14 +1231,16 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 	u_int32_t best_noise = 0;
 	int32_t best_cr = 0;
 
+#ifdef ATH_RADAR_LONG_PULSE
 	/* Best long pulse match */
 	u_int32_t best_lp_bc	  = 0;
 	u_int32_t best_lp_matched = 0;
 	u_int32_t best_lp_missed  = 0;
 	u_int32_t best_lp_noise   = 0;
 	u_int32_t best_lp_pulses  = 0;
-
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 	u_int32_t pass = 0;
+	struct radar_pattern_specification *best_pattern = NULL;
 
 	/* start the analysis by the last pulse since it might speed up
 	 * things and then move backward for all non-analyzed pulses.
@@ -1274,13 +1277,15 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 				u_int32_t matched 	= 0;
 				u_int32_t missed 	= 0;
 				u_int32_t noise 	= 0;
+#ifdef ATH_RADAR_LONG_PULSE
+
 				/* long pulse match status */
 				u_int32_t lp_bc	  	= 0;
 				u_int32_t lp_matched 	= 0;
 				u_int32_t lp_missed  	= 0;
 				u_int32_t lp_noise   	= 0;
 				u_int32_t lp_pulses  	= 0;
-
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 				if (radar_pulse_analyze_short_pulse(sc, 
 								  pulse, 
 								  &index, 
@@ -1345,7 +1350,7 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 						pri, 
 						interval_to_frequency(pri));
 				}
-#if 0
+#ifdef ATH_RADAR_LONG_PULSE
 				if(radar_pulse_analyze_long_pulse(sc, 
 								  pulse, 
 								  &lp_bc, 
@@ -1361,14 +1366,16 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 					best_lp_noise 	= lp_noise;
 					best_lp_pulses 	= lp_pulses;
 				}
-#endif
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 			}
 			pulse->rp_analyzed = 1;
 		}
 	}
 	if (AH_TRUE == radar) {
+#ifdef ATH_RADAR_LONG_PULSE
 		if(!best_lp_bc) {
-			struct radar_pattern_specification *best_pattern = 
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
+			best_pattern = 
 				&radar_patterns[best_index];
 			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
 				"%s: %10s: %-17s [match=%2u {%2u..%2u},missed="
@@ -1390,6 +1397,7 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 				best_cr, 
 				best_pri, 
 				interval_to_frequency(best_pri));
+#ifdef ATH_RADAR_LONG_PULSE
 		}
 		else {
 			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
@@ -1407,7 +1415,7 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 				(best_lp_pulses + best_lp_noise)
 				);
 		}
-	
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 		if (DFLAG_ISSET(sc, ATH_DEBUG_DOTHPULSES)) {
 			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
 				"%s: ========================================\n", 
@@ -1419,8 +1427,10 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 				"%s: ========================================\n", 
 				DEV_NAME(sc->sc_dev));
 
+#ifdef ATH_RADAR_LONG_PULSE
 			if(!best_lp_bc) {
-				struct radar_pattern_specification *best_pattern = 
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
+				best_pattern = 
 					&radar_patterns[best_index];
 				DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 					"%s: Sample contains data matching %s "
@@ -1441,12 +1451,14 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 					best_cr,
 					best_pri, 
 					interval_to_frequency(best_pri));
+#ifdef ATH_RADAR_LONG_PULSE
 			} else {
 				DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 					"%s: Sample contains data matching %s\n",
 					DEV_NAME(sc->sc_dev),
 					get_longpulse_desc(best_lp_bc));
 			}
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 
 			ath_radar_pulse_print(sc, 0 /* analyzed pulses only */ );
 			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
@@ -1459,10 +1471,14 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 				"%s: ========================================\n", 
 				DEV_NAME(sc->sc_dev));
 		}
+#ifdef ATH_RADAR_LONG_PULSE
 		if(!best_lp_bc)
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 			ath_radar_detected(sc, radar_patterns[best_index].name);
+#ifdef ATH_RADAR_LONG_PULSE
 		else 
 			ath_radar_detected(sc, get_longpulse_desc(best_lp_bc));
+#endif /* #ifdef ATH_RADAR_LONG_PULSE */
 	}
 	return radar;
 }
