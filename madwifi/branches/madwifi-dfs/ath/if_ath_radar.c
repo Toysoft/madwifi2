@@ -1345,6 +1345,7 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 						pri, 
 						interval_to_frequency(pri));
 				}
+#if 0
 				if(radar_pulse_analyze_long_pulse(sc, 
 								  pulse, 
 								  &lp_bc, 
@@ -1360,6 +1361,7 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 					best_lp_noise 	= lp_noise;
 					best_lp_pulses 	= lp_pulses;
 				}
+#endif
 			}
 			pulse->rp_analyzed = 1;
 		}
