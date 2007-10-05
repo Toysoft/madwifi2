@@ -514,8 +514,6 @@ static const u_int64_t LP_TSF_FUZZ_US = 32768; /* (1<<15) because rs_tstamp roll
 static const u_int32_t LP_MIN_PRI = 1000;
 static const u_int32_t LP_MAX_PRI = 2000;
 
-#undef current
-
 static void radar_pulse_analyze_long_pulse_bscan(
 	struct ath_softc *sc, 
 	struct ath_radar_pulse *last_pulse,
@@ -525,7 +523,7 @@ static void radar_pulse_analyze_long_pulse_bscan(
 {
 	int i = 0;
 	struct ath_radar_pulse *newer = NULL;
-	struct ath_radar_pulse *current = last_pulse;
+	struct ath_radar_pulse *cur = last_pulse;
 	struct ath_radar_pulse *older = pulse_prev(last_pulse);
 	u_int32_t waveform_num_bursts = 0;
 
@@ -535,9 +533,9 @@ static void radar_pulse_analyze_long_pulse_bscan(
 
 	for (;;) {
 		/* check if we are at the end of the list */
-		if (&current->list == &sc->sc_radar_pulse_head) 
+		if (&cur->list == &sc->sc_radar_pulse_head) 
 			break;
-		if (!current->rp_allocated)
+		if (!cur->rp_allocated)
 			break;
 
 		if(NULL != newer) {
@@ -547,7 +545,7 @@ static void radar_pulse_analyze_long_pulse_bscan(
 			/* Figure out TSF delta, taking into account
 			 * up to one multiple of (1<<15) of clock jitter 
 			 * due to interrupt latency */
-			tsf_delta = newer->rp_tsf - current->rp_tsf;
+			tsf_delta = newer->rp_tsf - cur->rp_tsf;
 			if ((tsf_delta - LP_TSF_FUZZ_US) >= LP_MIN_PRI && 
 			    (tsf_delta - LP_TSF_FUZZ_US) <= LP_MAX_PRI) {
 				tsf_adjustment = LP_TSF_FUZZ_US;
@@ -558,18 +556,18 @@ static void radar_pulse_analyze_long_pulse_bscan(
 			if((tsf_delta >= LP_MIN_PRI) && (tsf_delta <= LP_MAX_PRI)) {
 				bursts[waveform_num_bursts].lpb_num_pulses++;
 				bursts[waveform_num_bursts].lpb_min_possible_tsf = 
-					current->rp_tsf - tsf_adjustment;
+					cur->rp_tsf - tsf_adjustment;
 			}
 			else if(tsf_delta < LP_MIN_PRI) {
 				bursts[waveform_num_bursts].lpb_num_noise++;
 				/* It may have been THE pulse after all... */
 				bursts[waveform_num_bursts].lpb_min_possible_tsf = 
-					current->rp_tsf - tsf_adjustment;
+					cur->rp_tsf - tsf_adjustment;
 			}
 			else /* tsf_delta > LP_MAX_PRI */ {
 				bursts[waveform_num_bursts].lpb_num_pulses++;
 				bursts[waveform_num_bursts].lpb_min_possible_tsf = 
-					current->rp_tsf;
+					cur->rp_tsf;
 				/* Do not overrun bursts_buflen */
 				if((waveform_num_bursts+1) >= bursts_buflen) {
 					break;
@@ -577,20 +575,20 @@ static void radar_pulse_analyze_long_pulse_bscan(
 				waveform_num_bursts++;
 				bursts[waveform_num_bursts].lpb_tsf_delta = tsf_delta;
 				bursts[waveform_num_bursts].lpb_min_possible_tsf = 
-					current->rp_tsf;
+					cur->rp_tsf;
 				bursts[waveform_num_bursts].lpb_max_possible_tsf = 
-					current->rp_tsf;
+					cur->rp_tsf;
 			}
 		}
 		else {
 			bursts[waveform_num_bursts].lpb_max_possible_tsf = 
-				current->rp_tsf;
+				cur->rp_tsf;
 		}
 		
 		/* advance to next pulse */
-		newer   = current;
-		current = pulse_prev(current);
-		older   = pulse_prev(current);
+		newer   = cur;
+		cur = pulse_prev(cur);
+		older   = pulse_prev(cur);
 	}
 	if(num_bursts) {
 		bursts[waveform_num_bursts].lpb_num_pulses++;
