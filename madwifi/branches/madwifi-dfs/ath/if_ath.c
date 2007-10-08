@@ -9271,7 +9271,7 @@ ath_get_real_maxtxpower(struct ath_softc *sc)
 
 
 /* XXX: this function needs some locking to avoid being called twice/interrupted */
-void
+static void
 ath_update_txpow(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
@@ -12001,7 +12001,7 @@ ath_registers_dump_delta(struct ieee80211com *ic)
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
 /* Periodically expire radar avoidance marks. */
-void 
+static void 
 ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long data)
 {
 	struct ath_softc *sc = (struct ath_softc *) data;

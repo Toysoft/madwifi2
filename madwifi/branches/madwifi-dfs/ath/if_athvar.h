@@ -794,7 +794,7 @@ void bus_read_cachesize(struct ath_softc *, u_int8_t *);
 void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
 int ar_device(int devid);
-#define DEV_NAME(_d) ((0 == _d || 0 == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? "MadWifi" : _d->name)
+#define DEV_NAME(_d) ((NULL == _d || NULL == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? "MadWifi" : _d->name)
 
 void ath_radar_detected(struct ath_softc *sc, const char* message);
 
