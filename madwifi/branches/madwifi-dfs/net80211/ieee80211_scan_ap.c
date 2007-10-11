@@ -780,10 +780,12 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_
 		beas_rssi = as->as_maxrssi[best->ic_ieee];
 	}
 
-	i = best->ic_ieee;
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-			"%s: best: channel %u rssi %d\n",
-			__func__, i, as->as_maxrssi[i]);
+	if (best != NULL) {
+	  i = best->ic_ieee;
+	  IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
+			    "%s: best: channel %u rssi %d\n",
+			    __func__, i, as->as_maxrssi[i]);
+	}
 	return best;
 }
 
