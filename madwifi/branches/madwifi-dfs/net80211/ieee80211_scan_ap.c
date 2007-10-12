@@ -512,31 +512,30 @@ ap_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 	IEEE80211_ADDR_COPY(se->base.se_macaddr, macaddr);
 	TAILQ_INSERT_TAIL(&as->as_entry, se, se_list);
 	LIST_INSERT_HEAD(&as->as_hash[hash], se, se_hash);
+
 found:
 	ise = &se->base;
-	/* XXX ap beaconing multiple ssid w/ same bssid */
-	if (sp->ssid[1] != 0 &&
-	    ((subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP) || ise->se_ssid[1] == 0))
-	{
+
+	/* XXX: AP beaconing multiple SSID w/ same BSSID */
+	if ((sp->ssid[1] != 0) &&
+	    ((subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP) || 
+	     (ise->se_ssid[1] == 0)))
 		memcpy(ise->se_ssid, sp->ssid, 2 + sp->ssid[1]);
-        }
-	KASSERT(sp->rates[1] <= IEEE80211_RATE_MAXSIZE,
-		("rate set too large: %u", sp->rates[1]));
-	memcpy(ise->se_rates, sp->rates, 2 + sp->rates[1]);
+
+	memcpy(ise->se_rates, sp->rates, 
+		IEEE80211_SANITISE_RATESIZE(2 + sp->rates[1]));
 	if (sp->xrates != NULL) {
-		/* XXX validate xrates[1] */
-		KASSERT(sp->xrates[1] <= IEEE80211_RATE_MAXSIZE,
-			("xrate set too large: %u", sp->xrates[1]));
-		memcpy(ise->se_xrates, sp->xrates, 2 + sp->xrates[1]);
+		memcpy(ise->se_xrates, sp->xrates, 
+				IEEE80211_SANITISE_RATESIZE(2 + sp->xrates[1]));
 	} else
 		ise->se_xrates[1] = 0;
+
 	IEEE80211_ADDR_COPY(ise->se_bssid, wh->i_addr3);
-	/*
-	 * Record rssi data using extended precision LPF filter.
-	 */
-	if (se->se_lastupdate == 0)		/* first sample */
+
+	/* Record RSSI data using extended precision LPF filter.*/
+	if (se->se_lastupdate == 0)			/* First sample */
 		se->se_avgrssi = RSSI_IN(rssi);
-	else					/* avg w/ previous samples */
+	else					/* Avg. w/ previous samples */
 		RSSI_LPF(se->se_avgrssi, rssi);
 	se->base.se_rssi = RSSI_GET(se->se_avgrssi);
 	ise->se_rtsf = rtsf;
@@ -696,7 +695,7 @@ static struct ieee80211_channel *
 pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_t flags)
 {
 	struct ieee80211com *ic = vap->iv_ic;
-	int i, beas_rssi;
+	int i, best_rssi;
 	int ss_last = ss->ss_last;
 	struct ieee80211_channel *best;
 	struct ap_state *as = ss->ss_priv;
@@ -725,11 +724,11 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_
 	}
 
 	best = NULL;
-	beas_rssi = -1;
+	best_rssi = -1;
 
 	for (i = 0; i < ss_last; i++) {
 		c = &chans[i];
-		benefit = beas_rssi - as->as_maxrssi[c->chan->ic_ieee];
+		benefit = best_rssi - as->as_maxrssi[c->chan->ic_ieee];
 		sta_assoc = ic->ic_sta_assoc;
 
 		/* Don't switch... */
@@ -777,7 +776,7 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_
 		}
 	}
 		best = c->chan;
-		beas_rssi = as->as_maxrssi[best->ic_ieee];
+		best_rssi = as->as_maxrssi[best->ic_ieee];
 	}
 
 	if (best != NULL) {
@@ -791,8 +790,9 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_
 
 static int
 ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
-   int (*action)(struct ieee80211vap *, const struct ieee80211_scan_entry *),
-   u_int32_t flags)
+		int (*action)(struct ieee80211vap *, 
+			const struct ieee80211_scan_entry *), 
+			u_int32_t flags)
 {
 	struct ap_state *as = ss->ss_priv;
 	struct ieee80211_channel *bestchan = NULL;
@@ -822,6 +822,7 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 			if ((bestchan = ieee80211_find_channel(ic, bestchan->ic_freq,
 				bestchan->ic_flags & ~IEEE80211_CHAN_TURBO)) == NULL) {
 				/* should never happen ?? */
+				SCAN_AP_UNLOCK_IRQ_EARLY(as);
 				return 0;
 			}
 		}
