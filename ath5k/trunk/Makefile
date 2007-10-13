@@ -1,9 +1,9 @@
 MOD:=		ath5k
 MODULE:=	$(MOD).ko
-KLIB:=		/lib/modules/$(shell uname -r)
-KLIB_BUILD:=	$(KLIB)/build
-KLIB_UPDATES:=	$(KLIB)/updates
-KLIB_ATH5K:=	$(KLIB)/kernel/drivers/net/wireless/$(MOD)/$(MODULE)
+KLIB?=		/lib/modules/$(shell uname -r)
+KLIB_BUILD?=	$(KLIB)/build
+KLIB_UPDATES?=	$(KLIB)/updates
+KLIB_ATH5K?=	$(KLIB)/kernel/drivers/net/wireless/$(MOD)/$(MODULE)
 
 $(MOD)-objs		= base.o hw.o regdom.o initvals.o phy.o
 obj-m			+= $(MOD).o
