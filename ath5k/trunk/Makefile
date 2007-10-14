@@ -2,7 +2,7 @@ MOD:=		ath5k
 MODULE:=	$(MOD).ko
 
 KMODDIR?=	updates
-KMODDIR_ARG:=	"INSTALL_MOD_DIR=$(UPDATE)"
+KMODDIR_ARG:=	"INSTALL_MOD_DIR=$(KMODDIR)"
 ifneq ($(origin $(KLIB)), undefined)
 KMODPATH_ARG:=	"INSTALL_MOD_PATH=$(KLIB)"
 else
