@@ -64,6 +64,27 @@ enum ieee80211_opmode {
 };
 
 /*
+ * True if this mode will send beacon on a regular interval, like AP
+ * or IBSS
+ */
+#define IEEE80211_IS_MODE_BEACON(_opmode) \
+	((_opmode == IEEE80211_M_IBSS) || \
+	 (_opmode == IEEE80211_M_HOSTAP))
+
+/*
+ * True if this mode must behave like a DFS master, ie do Channel
+ * Check Availability and In Service Monitoring. We need to make sure
+ * that all modes cannot send data without being authorized. Such
+ * enforcement is not done in monitor mode however.
+ */
+
+#define IEEE80211_IS_MODE_DFS_MASTER(_opmode) \
+	((_opmode == IEEE80211_M_IBSS) || \
+	 (_opmode == IEEE80211_M_AHDEMO) || \
+	 (_opmode == IEEE80211_M_HOSTAP) || \
+	 (_opmode == IEEE80211_M_WDS))
+
+/*
  * 802.11g protection mode.
  */
 enum ieee80211_protmode {
