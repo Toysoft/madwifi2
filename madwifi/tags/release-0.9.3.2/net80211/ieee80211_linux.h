@@ -30,7 +30,6 @@
 #define _NET80211_IEEE80211_LINUX_H_
 
 #include <linux/wireless.h>
-#include <linux/fs.h>
 
 /*
  * Compatibility definition of statistics flags
