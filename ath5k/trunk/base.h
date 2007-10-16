@@ -116,7 +116,6 @@ struct ath_txq {
 #define ATH_CHAN_MAX	(14+14+14+252+20)	/* XXX what's the max? */
 #endif
 
-
 /* Software Carrier, keeps track of the driver state
  * associated with an instance of a device */
 struct ath_softc {
@@ -126,9 +125,9 @@ struct ath_softc {
 	struct ieee80211_tx_queue_stats tx_stats;
 	struct ieee80211_low_level_stats ll_stats;
 	struct ieee80211_hw	*hw;		/* IEEE 802.11 common */
-	struct ieee80211_hw_mode modes[NUM_IEEE80211_MODES];
+	struct ieee80211_hw_mode modes[NUM_DRIVER_MODES];
 	struct ieee80211_channel channels[ATH_CHAN_MAX];
-	struct ieee80211_rate	rates[AR5K_MAX_RATES * NUM_IEEE80211_MODES];
+	struct ieee80211_rate	rates[AR5K_MAX_RATES * NUM_DRIVER_MODES];
 	enum ieee80211_if_types	opmode;
 	struct ath_hw		*ah;		/* Atheros HW */
 

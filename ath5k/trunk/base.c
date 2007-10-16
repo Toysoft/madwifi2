@@ -375,6 +375,8 @@ static void ath_tasklet_rx(unsigned long data)
 	u16 len;
 	u8 stat;
 	int ret;
+	int hdrlen;
+	int pad;
 
 	spin_lock(&sc->rxbuflock);
 	do {
@@ -449,12 +451,19 @@ accept:
 				PCI_DMA_FROMDEVICE);
 		bf->skb = NULL;
 
-		if (unlikely((ieee80211_get_hdrlen_from_skb(skb) & 3) &&
-					net_ratelimit()))
-			printk(KERN_DEBUG "rx len is not %%4: %u\n",
-					ieee80211_get_hdrlen_from_skb(skb));
-
 		skb_put(skb, len);
+
+		/*
+		 * the hardware adds a padding to 4 byte boundaries between
+		 * the header and the payload data if the header length is
+		 * not multiples of 4 - remove it
+		 */
+		hdrlen = ieee80211_get_hdrlen_from_skb(skb);
+		if (hdrlen & 3) {
+			pad = hdrlen % 4;
+			memmove(skb->data + pad, skb->data, hdrlen);
+			skb_pull(skb, pad);
+		}
 
 		if (sc->opmode == IEEE80211_IF_TYPE_MNTR)
 			rxs.mactime = ath_extend_tsf(sc->ah,
@@ -1153,7 +1162,7 @@ static int ath_tx_bf(struct ath_softc *sc, struct ath_buf *bf,
 	struct ath_txq *txq = sc->txq;
 	struct ath_desc *ds = bf->desc;
 	struct sk_buff *skb = bf->skb;
-	unsigned int hdrpad, pktlen, flags, keyidx = AR5K_TXKEYIX_INVALID;
+	unsigned int pktlen, flags, keyidx = AR5K_TXKEYIX_INVALID;
 	int ret;
 
 	flags = AR5K_TXDESC_INTREQ | AR5K_TXDESC_CLRDMASK;
@@ -1165,12 +1174,7 @@ static int ath_tx_bf(struct ath_softc *sc, struct ath_buf *bf,
 	if (ctl->flags & IEEE80211_TXCTL_NO_ACK)
 		flags |= AR5K_TXDESC_NOACK;
 
-	if ((ieee80211_get_hdrlen_from_skb(skb) & 3) && net_ratelimit())
-		printk(KERN_DEBUG "tx len is not %%4: %u\n",
-				ieee80211_get_hdrlen_from_skb(skb));
-
-	hdrpad = 0;
-	pktlen = skb->len - hdrpad + FCS_LEN;
+	pktlen = skb->len + FCS_LEN;
 
 	if (!(ctl->flags & IEEE80211_TXCTL_DO_NOT_ENCRYPT)) {
 		keyidx = ctl->key_idx;
@@ -1214,11 +1218,31 @@ static int ath_tx(struct ieee80211_hw *hw, struct sk_buff *skb,
 	struct ath_softc *sc = hw->priv;
 	struct ath_buf *bf;
 	unsigned long flags;
+	int hdrlen;
+	int pad;
 
 	ath_dump_skb(skb, "t");
 
 	if (sc->opmode == IEEE80211_IF_TYPE_MNTR)
 		DPRINTF(sc, ATH_DEBUG_XMIT, "tx in monitor (scan?)\n");
+
+	/*
+	 * the hardware expects the header padded to 4 byte boundaries
+	 * if this is not the case we add the padding after the header
+	 */
+	hdrlen = ieee80211_get_hdrlen_from_skb(skb);
+	if (hdrlen & 3) {
+		pad = hdrlen % 4;
+		if (skb_headroom(skb) < pad) {
+			if (net_ratelimit())
+				printk(KERN_ERR "ath: tx hdrlen not %%4: %d "
+					"not enough headroom to pad %d\n",
+					hdrlen, pad);
+			return -1;
+		}
+		skb_push(skb, pad);
+		memmove(skb->data, skb->data+pad, hdrlen);
+	}
 
 	sc->led_txrate = ctl->tx_rate;
 
@@ -1368,6 +1392,7 @@ static int ath_config_interface(struct ieee80211_hw *hw, int if_id,
 		struct ieee80211_if_conf *conf)
 {
 	struct ath_softc *sc = hw->priv;
+	struct ath_hw *ah = sc->ah;
 	int ret;
 
 	/* Set to a reasonable value. Note that this will
@@ -1378,8 +1403,13 @@ static int ath_config_interface(struct ieee80211_hw *hw, int if_id,
 		ret = -EIO;
 		goto unlock;
 	}
-	if (conf->bssid)
-		ath5k_hw_set_associd(sc->ah, conf->bssid, 0 /* FIXME: aid */);
+	if (conf->bssid) {
+		/* Cache for later use during resets */
+		memcpy(ah->bssid, conf->bssid, ETH_ALEN);
+		/* XXX: assoc id is set to 0 for now, mac80211 doesn't have
+		 * a clean way of letting us retrieve this yet. */
+		ath5k_hw_set_associd(ah, ah->bssid, 0);
+	}
 	mutex_unlock(&sc->lock);
 
 	return ath_reset(hw);
@@ -1394,8 +1424,12 @@ unlock:
 	FIF_BCN_PRBRESP_PROMISC
 /*
  * o always accept unicast, broadcast, and multicast traffic
- * o maintain current state of phy error reception (the hal
- *   may enable phy error frames for noise immunity work)
+ * o multicast traffic for all BSSIDs will be enabled if mac80211
+ *   says it should be
+ * o maintain current state of phy ofdm or phy cck error reception.
+ *   If the hardware detects any of these type of errors then
+ *   ath5k_hw_get_rx_filter() will pass to us the respective
+ *   hardware filters to be able to receive these type of frames.
  * o probe request frames are accepted only when operating in
  *   hostap, adhoc, or monitor modes
  * o enable promiscuous mode according to the interface state
@@ -1413,15 +1447,23 @@ static void ath_configure_filter(struct ieee80211_hw *hw,
 {
 	struct ath_softc *sc = hw->priv;
 	struct ath_hw *ah = sc->ah;
-	u32 rfilt;
+	u32 mfilt[2], val, rfilt;
+	u8 pos;
+	int i;
+
+	mfilt[0] = 0;
+	mfilt[1] = 0;
 
 	/* Only deal with supported flags */
 	changed_flags &= SUPPORTED_FIF_FLAGS;
 	*new_flags &= SUPPORTED_FIF_FLAGS;
 
-	/* XXX: Start by enabling broadcasts and Unicast, move this later
-	 * to mac802111 and add a flag for these */
-	rfilt = AR5K_RX_FILTER_UCAST | AR5K_RX_FILTER_BCAST;
+	/* If HW detects any phy or radar errors, leave those filters on.
+	 * Also, always enable Unicast, Broadcasts and Multicast
+	 * XXX: move unicast, bssid broadcasts and multicast to mac80211 */
+	rfilt = (ath5k_hw_get_rx_filter(ah) & (AR5K_RX_FILTER_PHYERR)) |
+		(AR5K_RX_FILTER_UCAST | AR5K_RX_FILTER_BCAST |
+		AR5K_RX_FILTER_MCAST);
 
 	if (changed_flags & (FIF_PROMISC_IN_BSS | FIF_OTHER_BSS)) {
 		if (*new_flags & FIF_PROMISC_IN_BSS) {
@@ -1432,18 +1474,44 @@ static void ath_configure_filter(struct ieee80211_hw *hw,
 			__clear_bit(ATH_STAT_PROMISC, sc->status);
 	}
 
-	if (*new_flags & FIF_ALLMULTI)
-		rfilt |= AR5K_RX_FILTER_MCAST;
+	/* Note, AR5K_RX_FILTER_MCAST is already enabled */
+	if (*new_flags & FIF_ALLMULTI) {
+		mfilt[0] =  ~0;
+		mfilt[1] =  ~0;
+	} else {
+		for (i = 0; i < mc_count; i++) {
+			if (!mclist)
+				break;
+			/* calculate XOR of eight 6-bit values */
+			val = LE_READ_4(mclist->dmi_addr + 0);
+			pos = (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
+			val = LE_READ_4(mclist->dmi_addr + 3);
+			pos ^= (val >> 18) ^ (val >> 12) ^ (val >> 6) ^ val;
+			pos &= 0x3f;
+			mfilt[pos / 32] |= (1 << (pos % 32));
+			/* XXX: we might be able to just do this instead,
+			* but not sure, needs testing, if we do use this we'd
+			* neet to inform below to not reset the mcast */
+			/* ath5k_hw_set_mcast_filterindex(ah,
+			 *      mclist->dmi_addr[5]); */
+			mclist = mclist->next;
+		}
+	}
+
 	/* This is the best we can do */
 	if (*new_flags & (FIF_FCSFAIL | FIF_PLCPFAIL))
 		rfilt |= AR5K_RX_FILTER_PHYERR;
+
 	/* FIF_BCN_PRBRESP_PROMISC really means to enable beacons
 	* and probes for any BSSID, this needs testing */
 	if (*new_flags & FIF_BCN_PRBRESP_PROMISC)
 		rfilt |= AR5K_RX_FILTER_BEACON | AR5K_RX_FILTER_PROBEREQ;
-	/* FIF_CONTROL doc says that FIF_PROMISC_IN_BSS is not set we should
-	* only pass on control frames for this station. This needs testing.
-	* I believe right now this enables *all* control frames */
+
+	/* FIF_CONTROL doc says that if FIF_PROMISC_IN_BSS is not
+	 * set we should only pass on control frames for this
+	 * station. This needs testing. I believe right now this
+	 * enables *all* control frames, which is OK.. but
+	 * but we should see if we can improve on granularity */
 	if (*new_flags & FIF_CONTROL)
 		rfilt |= AR5K_RX_FILTER_CONTROL;
 
@@ -1462,13 +1530,10 @@ static void ath_configure_filter(struct ieee80211_hw *hw,
 	if (sc->opmode == IEEE80211_IF_TYPE_STA ||
 		sc->opmode == IEEE80211_IF_TYPE_IBSS) {
 		rfilt |= AR5K_RX_FILTER_BEACON;
-		/* Note: AR5212 requires AR5K_RX_FILTER_PROM to receive broadcasts,
-		 * perhaps the flags are off, for now to be safe we'll enable it for
-		 * STA and ADHOC until we have this properly mapped */
-		if (ah->ah_version == AR5K_AR5212)
-			rfilt |= AR5K_RX_FILTER_PROM;
 	}
 
+	/* Set multicast bits */
+	ath5k_hw_set_mcast_filter(ah, mfilt[0], mfilt[1]);
 	/* Set the cached hw filter flags, this will alter actually
 	 * be set in HW */
 	sc->filter_flags = rfilt;
@@ -1855,7 +1920,7 @@ static void ath_dump_modes(struct ieee80211_hw_mode *modes)
 {
 	unsigned int m, i;
 
-	for (m = 0; m < NUM_IEEE80211_MODES; m++) {
+	for (m = 0; m < NUM_DRIVER_MODES; m++) {
 		printk(KERN_DEBUG "Mode %u: channels %d, rates %d\n", m,
 				modes[m].num_channels, modes[m].num_rates);
 		printk(KERN_DEBUG " channels:\n");
@@ -1878,71 +1943,92 @@ static void ath_dump_modes(struct ieee80211_hw_mode *modes)
 static inline void ath_dump_modes(struct ieee80211_hw_mode *modes) {}
 #endif
 
+static inline int ath5k_register_mode(struct ieee80211_hw *hw, u8 m)
+{
+	struct ath_softc *sc = hw->priv;
+	struct ieee80211_hw_mode *modes = sc->modes;
+	int i, ret;
+
+	for (i = 0; i < NUM_DRIVER_MODES; i++) {
+		if (modes[i].mode != m || !modes[i].num_channels)
+			continue;
+		ret = ieee80211_register_hwmode(hw, &modes[i]);
+		if (ret) {
+			printk(KERN_ERR "can't register hwmode %u\n", m);
+			return ret;
+		}
+		return 0;
+	}
+	return 1;
+}
+
+/* Only tries to register modes our EEPROM says it can support */
+#define REGISTER_MODE(m) do { \
+	if (test_bit(m, ah->ah_capabilities.cap_mode)) { \
+		ret = ath5k_register_mode(hw, m); \
+		if (ret) \
+			return ret; \
+	} \
+} while (0) \
+
 static int ath_getchannels(struct ieee80211_hw *hw)
 {
 	struct ath_softc *sc = hw->priv;
 	struct ath_hw *ah = sc->ah;
 	struct ieee80211_hw_mode *modes = sc->modes;
-	unsigned int i, max;
+	unsigned int i, max_r, max_c;
 	int ret;
-	enum {
-		A = MODE_IEEE80211A,
-		B = MODE_IEEE80211G, /* this is not a typo, but workaround */
-		G = MODE_IEEE80211B, /* to prefer g over b */
-		T = MODE_ATHEROS_TURBO,
-		TG = MODE_ATHEROS_TURBOG,
-	};
 
 	BUILD_BUG_ON(ARRAY_SIZE(sc->modes) < 3);
 
 	ah->ah_country_code = countrycode;
 
-	modes[A].mode = MODE_IEEE80211A;
-	modes[B].mode = MODE_IEEE80211B;
-	modes[G].mode = MODE_IEEE80211G;
+	/* The order here does not matter */
+	modes[0].mode = MODE_IEEE80211G;
+	modes[1].mode = MODE_IEEE80211B;
+	modes[2].mode = MODE_IEEE80211A;
 
-	max = ARRAY_SIZE(sc->rates);
-	modes[A].rates = sc->rates;
-	max -= modes[A].num_rates = ath_copy_rates(modes[A].rates,
-			ath5k_hw_get_rate_table(ah, MODE_IEEE80211A), max);
-	modes[B].rates = &modes[A].rates[modes[A].num_rates];
-	max -= modes[B].num_rates = ath_copy_rates(modes[B].rates,
-			ath5k_hw_get_rate_table(ah, MODE_IEEE80211B), max);
-	modes[G].rates = &modes[B].rates[modes[B].num_rates];
-	max -= modes[G].num_rates = ath_copy_rates(modes[G].rates,
-			ath5k_hw_get_rate_table(ah, MODE_IEEE80211G), max);
+	max_r = ARRAY_SIZE(sc->rates);
+	max_c = ARRAY_SIZE(sc->channels);
 
-	if (!max)
-		printk(KERN_WARNING "yet another rates found, but there is not "
-				"sufficient space to store them\n");
+	for (i = 0; i < NUM_DRIVER_MODES; i++) {
+		struct ieee80211_hw_mode *mode = &modes[i];
+		const struct ath5k_rate_table *hw_rates;
 
-	max = ARRAY_SIZE(sc->channels);
-	modes[A].channels = sc->channels;
-	max -= modes[A].num_channels = ath_copy_channels(ah, modes[A].channels,
-			MODE_IEEE80211A, max);
-	modes[B].channels = &modes[A].channels[modes[A].num_channels];
-	max -= modes[B].num_channels = ath_copy_channels(ah, modes[B].channels,
-			MODE_IEEE80211B, max);
-	modes[G].channels = &modes[B].channels[modes[B].num_channels];
-	max -= modes[G].num_channels = ath_copy_channels(ah, modes[G].channels,
-			MODE_IEEE80211G, max);
-
-	if (!max)
-		printk(KERN_WARNING "yet another modes found, but there is not "
-				"sufficient space to store them\n");
-
-	for (i = 0; i < ARRAY_SIZE(sc->modes); i++)
-		if (modes[i].num_channels) {
-			ret = ieee80211_register_hwmode(hw, &modes[i]);
-			if (ret) {
-				printk(KERN_ERR "can't register hwmode %u\n",i);
-				goto err;
-			}
+		if (i == 0) {
+			modes[0].rates	= sc->rates;
+			modes->channels	= sc->channels;
+		} else {
+			struct ieee80211_hw_mode *prev_mode = &modes[i-1];
+			int prev_num_r	= prev_mode->num_rates;
+			int prev_num_c	= prev_mode->num_channels;
+			mode->rates	= &prev_mode->rates[prev_num_r];
+			mode->channels	= &prev_mode->channels[prev_num_c];
 		}
+
+		hw_rates = ath5k_hw_get_rate_table(ah, mode->mode);
+		mode->num_rates    = ath_copy_rates(mode->rates, hw_rates,
+			max_r);
+		mode->num_channels = ath_copy_channels(ah, mode->channels,
+			mode->mode, max_c);
+		max_r -= mode->num_rates;
+		max_c -= mode->num_channels;
+	}
+
+	/* We try to register all modes this driver supports. We don't bother
+	 * with MODE_IEEE80211B for AR5212 as MODE_IEEE80211G already accounts
+	 * for that as per mac80211. Then, REGISTER_MODE() will will actually
+	 * check the eeprom reading for more reliable capability information.
+	 * Order matters here as per mac80211's latest preference. This will
+	 * all hopefullly soon go away. */
+
+	REGISTER_MODE(MODE_IEEE80211G);
+	if (ah->ah_version != AR5K_AR5212)
+		REGISTER_MODE(MODE_IEEE80211B);
+	REGISTER_MODE(MODE_IEEE80211A);
+
 	ath_dump_modes(modes);
 
-	return 0;
-err:
 	return ret;
 }
 
@@ -2203,10 +2289,9 @@ static int ath_attach(struct pci_dev *pdev, struct ieee80211_hw *hw)
 
 	ath5k_hw_get_lladdr(ah, mac);
 	SET_IEEE80211_PERM_ADDR(hw, mac);
-	if (ath5k_hw_hasbssidmask(ah)) {
-		memset(sc->bssidmask, 0xff, ETH_ALEN);
-		ath5k_hw_set_bssid_mask(ah, sc->bssidmask);
-	}
+	/* All MAC address bits matter for ACKs */
+	memset(sc->bssidmask, 0xff, ETH_ALEN);
+	ath5k_hw_set_bssid_mask(sc->ah, sc->bssidmask);
 
 	ret = ieee80211_register_hw(hw);
 	if (ret) {
