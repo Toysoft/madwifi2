@@ -1252,10 +1252,13 @@
 #define	AR5K_RX_FILTER_RADARERR_5212 	0x00000200	/* Don't filter phy radar errors [5212+] */
 #define AR5K_RX_FILTER_PHYERR_5211	0x00000040	/* [5211] */
 #define AR5K_RX_FILTER_RADARERR_5211	0x00000080	/* [5211] */
-#define AR5K_RX_FILTER_PHYERR	(ah->ah_version == AR5K_AR5211 ? \
-				AR5K_RX_FILTER_PHYERR_5211 : AR5K_RX_FILTER_PHYERR_5212)
-#define	AR5K_RX_FILTER_RADARERR	(ah->ah_version == AR5K_AR5211 ? \
-				AR5K_RX_FILTER_RADARERR_5211 : AR5K_RX_FILTER_RADARERR_5212)
+#define AR5K_RX_FILTER_PHYERR  \
+	((ah->ah_version == AR5K_AR5211 ? \
+	AR5K_RX_FILTER_PHYERR_5211 : AR5K_RX_FILTER_PHYERR_5212))
+#define        AR5K_RX_FILTER_RADARERR \
+	((ah->ah_version == AR5K_AR5211 ? \
+	AR5K_RX_FILTER_RADARERR_5211 : AR5K_RX_FILTER_RADARERR_5212))
+
 /*
  * Multicast filter register (lower 32 bits)
  */
@@ -1755,8 +1758,10 @@
  * packet, i have no idea. So i'll name them BUFFER_CONTROL_X registers
  * for now. It's interesting that they are also used for some other operations.
  *
- * Also check out ath5k_hw.h and U.S. Patent 6677779 B1 (about buffer
- * registers and control registers)
+ * Also check out hw.h and U.S. Patent 6677779 B1 (about buffer
+ * registers and control registers):
+ *
+ * http://www.google.com/patents?id=qNURAAAAEBAJ
  */
 
 #define AR5K_RF_BUFFER			0x989c

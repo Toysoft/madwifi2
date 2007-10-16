@@ -309,15 +309,6 @@ struct ath_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 
 	hal->ah_phy = AR5K_PHY(0);
 
-	/* Set MAC to bcast: ff:ff:ff:ff:ff:ff, this is using 'mac' as a
-	 * temporary variable for setting our BSSID. Right bellow we update
-	 * it with ath5k_hw_get_lladdr() */
-	memset(mac, 0xff, ETH_ALEN);
-	ath5k_hw_set_associd(hal, mac, 0);
-
-	ath5k_hw_get_lladdr(hal, mac);
-	ath5k_hw_set_opmode(hal);
-
 #ifdef AR5K_DEBUG
 	ath5k_hw_dump_state(hal);
 #endif
@@ -349,6 +340,10 @@ struct ath_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	}
 
 	ath5k_hw_set_lladdr(hal, mac);
+	/* Set BSSID to bcast address: ff:ff:ff:ff:ff:ff for now */
+	memset(hal->bssid, 0xff, ETH_ALEN);
+	ath5k_hw_set_associd(hal, hal->bssid, 0);
+	ath5k_hw_set_opmode(hal);
 
 	ath5k_hw_set_rfgain_opt(hal);
 
@@ -546,7 +541,6 @@ int ath5k_hw_reset(struct ath_hw *hal, enum ieee80211_if_types op_mode,
 	const struct ath5k_rate_table *rt;
 	struct ath5k_eeprom_info *ee = &hal->ah_capabilities.cap_eeprom;
 	u32 data, noise_floor, s_seq, s_ant, s_led[3];
-	u8 mac[ETH_ALEN];
 	unsigned int i, mode, freq, ee_mode, ant[2];
 	int ret;
 
@@ -864,8 +858,9 @@ int ath5k_hw_reset(struct ath_hw *hal, enum ieee80211_if_types op_mode,
 	/*
 	 * Misc
 	 */
-	memset(mac, 0xff, ETH_ALEN);
-	ath5k_hw_set_associd(hal, mac, 0);
+	/* XXX: add hal->aid once mac80211 gives this to us */
+	ath5k_hw_set_associd(hal, hal->bssid, 0);
+
 	ath5k_hw_set_opmode(hal);
 	/*PISR/SISR Not available on 5210*/
 	if (hal->ah_version != AR5K_AR5210) {
@@ -1061,7 +1056,9 @@ static int ath5k_hw_nic_reset(struct ath_hw *hal, u32 val)
 	ret = ath5k_hw_register_timeout(hal, AR5K_RESET_CTL, mask, val, false);
 
 	/*
-	 * Reset configuration register (for hw byte-swap)
+	 * Reset configuration register (for hw byte-swap). Note that this
+	 * is only set for big endian. We do the necessary magic in
+	 * AR5K_INIT_CFG.
 	 */
 	if ((val & AR5K_RESET_CTL_PCU) == 0)
 		ath5k_hw_reg_write(hal, AR5K_INIT_CFG, AR5K_CFG);
@@ -1473,12 +1470,13 @@ int ath5k_hw_get_isr(struct ath_hw *hal, enum ath5k_int *interrupt_mask)
 			*interrupt_mask = data;
 			return -ENODEV;
 		}
+	} else {
+		/*
+		 * Read interrupt status from the Read-And-Clear shadow register
+		 * Note: PISR/SISR Not available on 5210
+		 */
+		data = ath5k_hw_reg_read(hal, AR5K_RAC_PISR);
 	}
-
-	/*
-	 * Read interrupt status from the Read-And-Clear shadow register
-	 */
-	data = ath5k_hw_reg_read(hal, AR5K_RAC_PISR);
 
 	/*
 	 * Get abstract interrupt mask (HAL-compatible)
@@ -1506,7 +1504,9 @@ int ath5k_hw_get_isr(struct ath_hw *hal, enum ath5k_int *interrupt_mask)
 
 	/*
 	 * XXX: BMISS interrupts may occur after association.
-	 * I found this on 5210 code but it needs testing
+	 * I found this on 5210 code but it needs testing. If this is
+	 * true we should disable them before assoc and re-enable them
+	 * after a successfull assoc + some jiffies.
 	 */
 #if 0
 	interrupt_mask &= ~AR5K_INT_BMISS;
@@ -2131,8 +2131,8 @@ static int ath5k_hw_get_capabilities(struct ath_hw *hal)
 		hal->ah_capabilities.cap_range.range_2ghz_max = 0;
 
 		/* Set supported modes */
-		set_bit(MODE_IEEE80211A, hal->ah_capabilities.cap_mode);
-		set_bit(MODE_ATHEROS_TURBO, hal->ah_capabilities.cap_mode);
+		__set_bit(MODE_IEEE80211A, hal->ah_capabilities.cap_mode);
+		__set_bit(MODE_ATHEROS_TURBO, hal->ah_capabilities.cap_mode);
 	} else {
 		/*
 		 * XXX The tranceiver supports frequencies from 4920 to 6100GHz
@@ -2154,11 +2154,12 @@ static int ath5k_hw_get_capabilities(struct ath_hw *hal)
 			hal->ah_capabilities.cap_range.range_5ghz_max = 6100;
 
 			/* Set supported modes */
-			set_bit(MODE_IEEE80211A, hal->ah_capabilities.cap_mode);
-			set_bit(MODE_ATHEROS_TURBO,
+			__set_bit(MODE_IEEE80211A,
+					hal->ah_capabilities.cap_mode);
+			__set_bit(MODE_ATHEROS_TURBO,
 					hal->ah_capabilities.cap_mode);
 			if (hal->ah_version == AR5K_AR5212)
-				set_bit(MODE_ATHEROS_TURBOG,
+				__set_bit(MODE_ATHEROS_TURBOG,
 						hal->ah_capabilities.cap_mode);
 		}
 
@@ -2170,11 +2171,11 @@ static int ath5k_hw_get_capabilities(struct ath_hw *hal)
 			hal->ah_capabilities.cap_range.range_2ghz_max = 2732;
 
 			if (AR5K_EEPROM_HDR_11B(ee_header))
-				set_bit(MODE_IEEE80211B,
+				__set_bit(MODE_IEEE80211B,
 						hal->ah_capabilities.cap_mode);
 
 			if (AR5K_EEPROM_HDR_11G(ee_header))
-				set_bit(MODE_IEEE80211G,
+				__set_bit(MODE_IEEE80211G,
 						hal->ah_capabilities.cap_mode);
 		}
 	}
@@ -2323,9 +2324,99 @@ void ath5k_hw_set_associd(struct ath_hw *hal, const u8 *bssid, u16 assoc_id)
 
 	ath5k_hw_enable_pspoll(hal, NULL, 0);
 }
-
-/*
- * Set BSSID mask on 5212
+/**
+ * ath5k_hw_set_bssid_mask - set common bits we should listen to
+ *
+ * The bssid_mask is a utility used by AR5212 hardware to inform the hardware
+ * which bits of the interface's MAC address should be looked at when trying
+ * to decide which packets to ACK. In station mode every bit matters. In AP
+ * mode with a single BSS every bit matters as well. In AP mode with
+ * multiple BSSes not every bit matters.
+ *
+ * @hal: the &struct ath_hw
+ * @mask: the bssid_mask, a u8 array of size ETH_ALEN
+ *
+ * Note that this is a simple filter and *does* not filter out all
+ * relevant frames. Some non-relevant frames will get through, probability
+ * jocks are welcomed to compute.
+ *
+ * When handling multiple BSSes (or VAPs) you can get the BSSID mask by
+ * computing the set of:
+ *
+ *     ~ ( MAC XOR BSSID )
+ *
+ * When you do this you are essentially computing the common bits. Later it
+ * is assumed the harware will "and" (&) the BSSID mask with the MAC address
+ * to obtain the relevant bits which should match on the destination frame.
+ *
+ * Simple example: on your card you have have two BSSes you have created with
+ * BSSID-01 and BSSID-02. Lets assume BSSID-01 will not use the MAC address.
+ * There is another BSSID-03 but you are not part of it. For simplicity's sake,
+ * assuming only 4 bits for a mac address and for BSSIDs you can then have:
+ *
+ *                  \
+ * MAC:                0001 |
+ * BSSID-01:   0100 | --> Belongs to us
+ * BSSID-02:   1001 |
+ *                  /
+ * -------------------
+ * BSSID-03:   0110  | --> External
+ * -------------------
+ *
+ * Our bssid_mask would then be:
+ *
+ *             On loop iteration for BSSID-01:
+ *             ~(0001 ^ 0100)  -> ~(0101)
+ *                             ->   1010
+ *             bssid_mask      =    1010
+ *
+ *             On loop iteration for BSSID-02:
+ *             bssid_mask &= ~(0001   ^   1001)
+ *             bssid_mask =   (1010)  & ~(0001 ^ 1001)
+ *             bssid_mask =   (1010)  & ~(1001)
+ *             bssid_mask =   (1010)  &  (0110)
+ *             bssid_mask =   0010
+ *
+ * A bssid_mask of 0010 means "only pay attention to the second least
+ * significant bit". This is because its the only bit common
+ * amongst the MAC and all BSSIDs we support. To findout what the real
+ * common bit is we can simply "&" the bssid_mask now with any BSSID we have
+ * or our MAC address (we assume the hardware uses the MAC address).
+ *
+ * Now, suppose there's an incoming frame for BSSID-03:
+ *
+ * IFRAME-01:  0110
+ *
+ * An easy eye-inspeciton of this already should tell you that this frame
+ * will not pass our check. This is beacuse the bssid_mask tells the
+ * hardware to only look at the second least significant bit and the
+ * common bit amongst the MAC and BSSIDs is 0, this frame has the 2nd LSB
+ * as 1, which does not match 0.
+ *
+ * So with IFRAME-01 we *assume* the hardware will do:
+ *
+ *     allow = (IFRAME-01 & bssid_mask) == (bssid_mask & MAC) ? 1 : 0;
+ *  --> allow = (0110 & 0010) == (0010 & 0001) ? 1 : 0;
+ *  --> allow = (0010) == 0000 ? 1 : 0;
+ *  --> allow = 0
+ *
+ *  Lets now test a frame that should work:
+ *
+ * IFRAME-02:  0001 (we should allow)
+ *
+ *     allow = (0001 & 1010) == 1010
+ *
+ *     allow = (IFRAME-02 & bssid_mask) == (bssid_mask & MAC) ? 1 : 0;
+ *  --> allow = (0001 & 0010) ==  (0010 & 0001) ? 1 :0;
+ *  --> allow = (0010) == (0010)
+ *  --> allow = 1
+ *
+ * Other examples:
+ *
+ * IFRAME-03:  0100 --> allowed
+ * IFRAME-04:  1001 --> allowed
+ * IFRAME-05:  1101 --> allowed but its not for us!!!
+ *
  */
 int ath5k_hw_set_bssid_mask(struct ath_hw *hal, const u8 *mask)
 {
