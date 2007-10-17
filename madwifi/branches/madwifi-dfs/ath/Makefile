@@ -54,6 +54,9 @@ BUSNAME=pci
 COPTS+= -DATH_PCI
 endif
 
+# You need to either define DFS_DOMAIN_ETSI or DFS_DOMAIN_FCC
+COPTS	+= -DDFS_DOMAIN_ETSI
+
 include $(TOP)/Makefile.inc
 
 obj-m		+= ath_$(BUSNAME).o
