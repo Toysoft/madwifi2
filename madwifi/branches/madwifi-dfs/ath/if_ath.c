@@ -159,7 +159,9 @@ static void ath_turbo_switch_mode(unsigned long);
 static int ath_check_beacon_done(struct ath_softc *);
 #endif
 static void ath_beacon_send(struct ath_softc *, int *);
+#if 0
 static void ath_beacon_start_adhoc(struct ath_softc *, struct ieee80211vap *);
+#endif
 static void ath_beacon_return(struct ath_softc *, struct ath_buf *);
 static void ath_beacon_free(struct ath_softc *);
 static void ath_beacon_config(struct ath_softc *, struct ieee80211vap *);
@@ -1214,39 +1216,38 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	avp->av_bslot = -1;
 	STAILQ_INIT(&avp->av_mcastq.axq_q);
 	ATH_TXQ_LOCK_INIT(&avp->av_mcastq);
-	if (opmode == IEEE80211_M_HOSTAP || opmode == IEEE80211_M_IBSS) {
+	if (IEEE80211_IS_MODE_BEACON(opmode)) {
+		unsigned int slot;
 		/*
 		 * Allocate beacon state for hostap/ibss.  We know
 		 * a buffer is available because of the check above.
 		 */
 		avp->av_bcbuf = STAILQ_FIRST(&sc->sc_bbuf);
 		STAILQ_REMOVE_HEAD(&sc->sc_bbuf, bf_list);
-		if (opmode == IEEE80211_M_HOSTAP || !sc->sc_hasveol) {
-			unsigned int slot;
-			/*
-			 * Assign the VAP to a beacon xmit slot.  As
-			 * above, this cannot fail to find one.
-			 */
-			avp->av_bslot = 0;
-			for (slot = 0; slot < ATH_BCBUF; slot++)
-				if (sc->sc_bslot[slot] == NULL) {
-					/*
-					 * XXX hack, space out slots to better
-					 * deal with misses
-					 */
-					if (slot + 1 < ATH_BCBUF &&
-					    sc->sc_bslot[slot+1] == NULL) {
-						avp->av_bslot = slot + 1;
-						break;
-					}
-					avp->av_bslot = slot;
-					/* NB: keep looking for a double slot */
+		/*
+		 * Assign the VAP to a beacon xmit slot.  As
+		 * above, this cannot fail to find one.
+		 */
+		avp->av_bslot = 0;
+		for (slot = 0; slot < ATH_BCBUF; slot++)
+			if (sc->sc_bslot[slot] == NULL) {
+				/*
+				 * XXX hack, space out slots to better
+				 * deal with misses
+				 */
+				if (slot + 1 < ATH_BCBUF &&
+				    sc->sc_bslot[slot+1] == NULL) {
+					avp->av_bslot = slot + 1;
+					break;
 				}
-			KASSERT(sc->sc_bslot[avp->av_bslot] == NULL,
-				("beacon slot %u not empty?", avp->av_bslot));
-			sc->sc_bslot[avp->av_bslot] = vap;
-			sc->sc_nbcnvaps++;
-		}
+				avp->av_bslot = slot;
+				/* NB: keep looking for a double slot */
+			}
+		KASSERT(sc->sc_bslot[avp->av_bslot] == NULL,
+			("beacon slot %u not empty?", avp->av_bslot));
+		sc->sc_bslot[avp->av_bslot] = vap;
+		sc->sc_nbcnvaps++;
+
 		if ((opmode == IEEE80211_M_HOSTAP) && (sc->sc_hastsfadd)) {
 			/*
 			 * Multiple VAPs are to transmit beacons and we
@@ -4121,11 +4122,17 @@ ath_beaconq_config(struct ath_softc *sc)
 		qi.tqi_cwmax = ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmax);
 	}
 
+	DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+		"%s: ath_hal_settxqueuepropos tqi_aifs:%d tqi_cwmin:%d tqi_cwmax:%d\n",
+		__func__, qi.tqi_aifs, qi.tqi_cwmin, qi.tqi_cwmax);
 	if (!ath_hal_settxqueueprops(ah, sc->sc_bhalq, &qi)) {
 		printk("%s: unable to update h/w beacon queue parameters\n",
 			DEV_NAME(sc->sc_dev));
 		return 0;
 	} else {
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: ath_hal_resettxqueue sc_bhalq:%d\n",
+			__func__, sc->sc_bhalq);
 		ath_hal_resettxqueue(ah, sc->sc_bhalq);	/* push to h/w */
 		return 1;
 	}
@@ -4213,7 +4220,13 @@ ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 
 /*
  * Setup the beacon frame for transmit.
- */
+ *
+ * If the part supports the ``virtual EOL'' mechanism in the xmit descriptor,
+ * we can use it to periodically send the beacon frame w/o having to do
+ * setup. Otherwise we have to explicitly submit the beacon frame at each SWBA
+ * interrupt. In order to minimize change, we always use the SWBA interrupt
+ * mechanism.
+ */ 
 static void
 ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 {
@@ -4243,26 +4256,18 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		flags |= HAL_TXDESC_INTREQ;
 #endif
 
-	if (ic->ic_opmode == IEEE80211_M_IBSS && sc->sc_hasveol) {
-		ds->ds_link = bf->bf_daddr;	/* self-linked */
-		flags |= HAL_TXDESC_VEOL;
-		/*
-		 * Let hardware handle antenna switching if txantenna is not set
-		 */
-	} else {
-		ds->ds_link = 0;
-		/*
-		 * Switch antenna every beacon if txantenna is not set
-		 * Should only switch every beacon period, not for all
-		 * SWBAs
-		 * XXX: assumes two antennae
-		 */
-		if (antenna == 0) {
-			if (sc->sc_stagbeacons)
-				antenna = ((sc->sc_stats.ast_be_xmit / sc->sc_nbcnvaps) & 1 ? 2 : 1);
-			else
-				antenna = (sc->sc_stats.ast_be_xmit & 1 ? 2 : 1);
-		}
+	ds->ds_link = 0;
+	/*
+	 * Switch antenna every beacon if txantenna is not set
+	 * Should only switch every beacon period, not for all
+	 * SWBAs
+	 * XXX: assumes two antennae
+	 */
+	if (antenna == 0) {
+		if (sc->sc_stagbeacons)
+			antenna = ((sc->sc_stats.ast_be_xmit / sc->sc_nbcnvaps) & 1 ? 2 : 1);
+		else
+			antenna = (sc->sc_stats.ast_be_xmit & 1 ? 2 : 1);
 	}
 
 	ds->ds_data = bf->bf_skbaddr;
@@ -4421,7 +4426,10 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	 * Enable the CAB queue before the beacon queue to
 	 * ensure cab frames are triggered by this beacon.
 	 */
-	if (avp->av_boff.bo_tim[4] & 1)	{	/* NB: only at DTIM */
+	/*
+	 * This code is currently disabled since it prevents beacons to be sent
+	 * in adhoc mode */
+	if (0 && (avp->av_boff.bo_tim[4] & 1))	{	/* NB: only at DTIM */
 		struct ath_txq *cabq = sc->sc_cabq;
 		struct ath_buf *bfmcast;
 		/*
@@ -4431,15 +4439,18 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		ATH_TXQ_LOCK_IRQ(&avp->av_mcastq);
 		ATH_TXQ_LOCK_IRQ_INSIDE(cabq);
 		bfmcast = STAILQ_FIRST(&avp->av_mcastq.axq_q);
-		/* link the descriptors */
-		if (cabq->axq_link == NULL)
-			ath_hal_puttxbuf(ah, cabq->axq_qnum, bfmcast->bf_daddr);
-		else {
+		if (bfmcast != NULL) {
+			/* link the descriptors */
+			if (cabq->axq_link == NULL) {
+				ath_hal_puttxbuf(ah, cabq->axq_qnum,
+						 bfmcast->bf_daddr);
+			} else {
 #ifdef AH_NEED_DESC_SWAP
 			*cabq->axq_link = cpu_to_le32(bfmcast->bf_daddr);
 #else
 			*cabq->axq_link = bfmcast->bf_daddr;
 #endif
+			}
 		}
 
 		/* Set the MORE_DATA bit for each packet except the last one */
@@ -4604,6 +4615,9 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		 * This should never fail since we check above that no frames
 		 * are still pending on the queue.
 		 */
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: ath_hal_stoptxdma sc_bhalq:%d\n",
+			__func__, sc->sc_bhalq);
 		if (!ath_hal_stoptxdma(ah, sc->sc_bhalq)) {
 			DPRINTF(sc, ATH_DEBUG_ANY,
 				"%s: beacon queue %u did not stop?\n",
@@ -4611,7 +4625,14 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 			/* NB: the HAL still stops DMA, so proceed */
 		}
 		/* NB: cabq traffic should already be queued and primed */
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: ath_hal_puttxbuf sc_bhalq:%d bfaddr:%x\n",
+			__func__, sc->sc_bhalq, bfaddr);
 		ath_hal_puttxbuf(ah, sc->sc_bhalq, bfaddr);
+
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: ath_hal_txstart sc_bhalq:%d\n",
+			__func__, sc->sc_bhalq);
 		ath_hal_txstart(ah, sc->sc_bhalq);
 
 		sc->sc_stats.ast_be_xmit++;		/* XXX per-VAP? */
@@ -4640,6 +4661,7 @@ ath_bstuck_tasklet(TQUEUE_ARG data)
 	ath_reset(dev);
 }
 
+#if 0 /* We no longer use this function */
 /*
  * Startup beacon transmission for adhoc mode when
  * they are sent entirely by the hardware using the
@@ -4689,11 +4711,19 @@ ath_beacon_start_adhoc(struct ath_softc *sc, struct ieee80211vap *vap)
 		bf->bf_skbaddr, bf->bf_skb->len, BUS_DMA_TODEVICE);
 
 	/* NB: caller is known to have already stopped tx DMA */
+	DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+		"%s: ath_hal_puttxbuf sc_bhalq:%d data:%p len:%d\n",
+		__func__, sc->sc_bhalq, skb->data, skb->len);
 	ath_hal_puttxbuf(ah, sc->sc_bhalq, bf->bf_daddr);
+
+	DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+		"%s: ath_hal_txtstart sc_bhalq:%d\n",
+		__func__, sc->sc_bhalq);
 	ath_hal_txstart(ah, sc->sc_bhalq);
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: TXDP%u = %llx (%p)\n", __func__,
 		sc->sc_bhalq, ito64(bf->bf_daddr), bf->bf_desc);
 }
+#endif
 
 /*
  * Reclaim beacon resources and return buffer to the pool.
@@ -4951,21 +4981,9 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		ath_hal_intrset(ah, 0);
 		if (reset_tsf)
 			intval |= HAL_BEACON_RESET_TSF;
-		if (ic->ic_opmode == IEEE80211_M_IBSS) {
+		if (IEEE80211_IS_MODE_BEACON(ic->ic_opmode)) {
 			/*
-			 * In IBSS mode enable the beacon timers but only
-			 * enable SWBA interrupts if we need to manually
-			 * prepare beacon frames.  Otherwise we use a
-			 * self-linked tx descriptor and let the hardware
-			 * deal with things.
-			 */
-			intval |= HAL_BEACON_ENA;
-			if (!sc->sc_hasveol)
-				sc->sc_imask |= HAL_INT_SWBA;
-			ath_beaconq_config(sc);
-		} else if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
-			/*
-			 * In AP mode we enable the beacon timers and
+			 * In AP/IBSS mode we enable the beacon timers and
 			 * SWBA interrupts to prepare beacon frames.
 			 */
 			intval |= HAL_BEACON_ENA;
@@ -4979,12 +4997,6 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		ath_hal_beaconinit(ah, nexttbtt, intval);
 		sc->sc_bmisscount = 0;
 		ath_hal_intrset(ah, sc->sc_imask);
-		/*
-		 * When using a self-linked beacon descriptor in
-		 * ibss mode load it once here.
-		 */
-		if (ic->ic_opmode == IEEE80211_M_IBSS && sc->sc_hasveol)
-			ath_beacon_start_adhoc(sc, vap);
 	}
 #undef TSF_TO_TU
 
@@ -8015,6 +8027,9 @@ ath_draintxq(struct ath_softc *sc)
 
 	/* XXX return value */
 	if (!sc->sc_invalid) {
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+			"%s: ath_hal_stoptxdma sc_bhalq:%d\n",
+			__func__, sc->sc_bhalq);
 		(void) ath_hal_stoptxdma(ah, sc->sc_bhalq);
 		DPRINTF(sc, ATH_DEBUG_RESET, "%s: beacon queue 0x%x\n",
 			__func__, ath_hal_gettxbuf(ah, sc->sc_bhalq));
@@ -8569,6 +8584,9 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			 * transition from RUN->RUN that means we may
 			 * be called with beacon transmission active.
 			 */
+			DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
+				"%s: ath_hal_stoptxdma sc_bhalq:%d\n",
+				__func__, sc->sc_bhalq);
 			ath_hal_stoptxdma(ah, sc->sc_bhalq);
 
 			/* Set default key index for static wep case */
