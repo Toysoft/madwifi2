@@ -8222,9 +8222,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 
 	/* Need a doth channel availability check?  We do if ... */
 	doth_channel_availability_check_needed = 1 &&
-		/* we are an AP (BSS) or Ad-Hoc STA (IBSS) */
-		(ic->ic_opmode == IEEE80211_M_HOSTAP ||
-		 ic->ic_opmode == IEEE80211_M_IBSS) && 
+		IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode) &&
 		(hchan.channel != sc->sc_curchan.channel ||
 		 (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR))) && /* the scan wasn't already done */
 		ath_radar_is_dfs_required(sc, &hchan) &&           /* the new channel requires DFS protection */
@@ -8668,7 +8666,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		/* if it is a DFS channel and has not been checked for radar 
 		 * do not let the 80211 state machine to go to RUN state. */
 		if (sc->sc_dfs_channel_check
-		    && (vap->iv_opmode == IEEE80211_M_HOSTAP || vap->iv_opmode == IEEE80211_M_IBSS) ) {
+		    && IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP -> DFSWAIT_PENDING \n", 
 				__func__, DEV_NAME(dev));
 			/* start calibration timer with a really small value 1/10 sec */
@@ -8691,8 +8689,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		}
 	} else {
 		if (sc->sc_dfs_channel_check &&
-		    ((vap->iv_opmode == IEEE80211_M_HOSTAP) || 
-		     (vap->iv_opmode == IEEE80211_M_IBSS)) &&
+		    IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode) &&
 		    (sc->sc_dfs_channel_check_timer.data == (unsigned long)vap))
 		{
 			del_timer_sync(&sc->sc_dfs_channel_check_timer);
@@ -11187,9 +11184,7 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	ichan.ic_freq = sc->sc_curchan.channel;
 	ichan.ic_flags = sc->sc_curchan.channelFlags;
 
-	if(ic->ic_opmode == IEEE80211_M_HOSTAP || 
-	   ic->ic_opmode == IEEE80211_M_IBSS)
-	{
+	if (IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode)) {
 		if (!(ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS))
 			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: markdfs is disabled.  "
 					"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X\n", 
