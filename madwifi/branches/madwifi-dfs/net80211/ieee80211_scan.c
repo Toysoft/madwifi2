@@ -970,14 +970,13 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_channel *new_channel = NULL;
 
-	if (vap->iv_opmode != IEEE80211_M_HOSTAP &&
-	    vap->iv_opmode != IEEE80211_M_IBSS)
+	if (!IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode))
 		return 0;
 	if (se != NULL) {
 		new_channel = se->se_chan;
 	} else {
 		/* No channel wa found via scan module, means no good scanlist
-		   was found */
+		 * was found */
 		int chanStart, n = 0;
 		u_int32_t curChanFlags;
 
@@ -1024,7 +1023,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		}
 	}
 	else {
-		/* A suitable scan entry was found, so change channels */
+		/* A suitable scan entry was not found */
 		if_printf(dev, "Failed to find a safe channel to change to.\n");
 		return 0;
 	}
