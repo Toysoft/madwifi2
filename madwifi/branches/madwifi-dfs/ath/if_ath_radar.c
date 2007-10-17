@@ -124,6 +124,7 @@ struct radar_pattern_specification {
 };
 
 static struct radar_pattern_specification radar_patterns[] = {
+#ifdef DFS_DOMAIN_ETSI
 	{"ETSI [ 200]", 4900, 5100, AH_TRUE, 20, 3, 4, 10, 4, 8, AH_TRUE},
 	{"ETSI [ 300]", 3267, 3399, AH_TRUE, 20, 3, 4, 10, 4, 6, AH_TRUE},
 	{"ETSI [ 500]", 1960, 2040, AH_TRUE, 20, 4, 4, 10, 4, 8, AH_TRUE},
@@ -138,6 +139,8 @@ static struct radar_pattern_specification radar_patterns[] = {
 	{"ETSI [3000]", 327, 339, AH_TRUE, 20, 3, 4, 25, 5, 20, AH_TRUE},
 	{"ETSI [3500]", 280, 290, AH_TRUE, 20, 4, 4, 25, 2, 20, AH_TRUE},
 	{"ETSI [4000]", 245, 255, AH_TRUE, 20, 4, 4, 25, 5, 20, AH_TRUE},
+#endif
+#ifdef DFS_DOMAIN_FCC
 	{"FCC [1,1399-1714]", 1399, 1714, AH_TRUE, 10, 5, 10, 18, 4, 6, AH_FALSE},
 	{"FCC [2,147-235]", 147, 235, AH_TRUE, 10, 8, 10, 29, 6, 12, AH_FALSE},
 	{"FCC [3-4,196-273]", 196, 273, AH_TRUE, 10, 8, 8, 18, 2, 16, AH_FALSE},
@@ -147,6 +150,7 @@ static struct radar_pattern_specification radar_patterns[] = {
 	{"FCC [3-4,235-313]", 235, 313, AH_TRUE, 10, 8, 8, 18, 2, 16, AH_FALSE},
 	{"FCC [3-4,314-392]", 314, 392, AH_TRUE, 10, 8, 8, 18, 2, 16, AH_FALSE},
 	{"FCC [3-4,393-471]", 393, 471, AH_TRUE, 10, 8, 8, 18, 2, 16, AH_FALSE}
+#endif
 };
 
 static u_int32_t interval_to_frequency(u_int32_t pri);
@@ -1556,6 +1560,14 @@ void ath_radar_pulse_record(struct ath_softc *sc, u_int64_t tsf, u_int8_t rssi,
 	DPRINTF(sc, ATH_DEBUG_DOTHPULSES, "%s: ath_radar_pulse_record: "
 		"tsf=%10llu rssi=%3u width=%3u\n", 
 		DEV_NAME(dev), tsf, rssi, width);
+
+	/* pulses with 0 or 255 width seems to trigger false detection of
+	 * radar. we ignored it then. */
+
+	if (width==0 || width==255) {
+		/* ignored */
+		return ;
+	}
 
 	/* check if the new radar pulse is after the last one recorded, or
 	 * else, we flush the history */
