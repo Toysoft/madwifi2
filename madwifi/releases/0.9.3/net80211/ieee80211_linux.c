@@ -60,6 +60,10 @@
 #include <net80211/ieee80211_var.h>
 #include <net80211/ieee80211_monitor.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
+#define proc_net init_net.proc_net
+#endif
+
 /*
  * Print a console message with the device name prepended.
  */
