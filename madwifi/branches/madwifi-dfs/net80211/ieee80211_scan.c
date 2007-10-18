@@ -967,13 +967,17 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 			  const struct ieee80211_scan_entry *se)
 {
 	struct ieee80211com *ic = vap->iv_ic;
-	struct net_device *dev = ic->ic_dev;
 	struct ieee80211_channel *new_channel = NULL;
 
 	if (!IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode))
 		return 0;
 	if (se != NULL) {
 		new_channel = se->se_chan;
+		if (new_channel != NULL) {
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: new channel found in scan cache\n",
+					  __func__);
+		}
 	} else {
 		/* No channel wa found via scan module, means no good scanlist
 		 * was found */
@@ -992,6 +996,11 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		}
 		if (n < ic->ic_nchans)
 			new_channel = &ic->ic_channels[n];
+		if (new_channel != NULL) {
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: new random channel found\n",
+					  __func__);
+		}
 	}
 	if(!new_channel) {
 		int n = 0;
@@ -1001,12 +1010,18 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 				break;
 			}
 		}
+		if (new_channel != NULL) {
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: new non-radar channel found\n",
+					  __func__);
+		}
 	}
 	if(new_channel) {
 		/* A suitable scan entry was found, so change channels */
-		if_printf(dev, "Changing to channel %d (%d MHz)\n",
-			  new_channel->ic_ieee,
-			  new_channel->ic_freq);
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: switching to channel %d/%d Mhz%s\n",
+				  __func__,
+				  new_channel->ic_ieee, new_channel->ic_freq);
 		if (vap->iv_state == IEEE80211_S_RUN) {
 			ic->ic_chanchange_chan = new_channel->ic_ieee;
 			ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
@@ -1024,7 +1039,9 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 	}
 	else {
 		/* A suitable scan entry was not found */
-		if_printf(dev, "Failed to find a safe channel to change to.\n");
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: new channel not found\n",
+				  __func__);
 		return 0;
 	}
 
