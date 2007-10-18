@@ -9129,12 +9129,17 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		 * availability check if you've already performed it on the 
 		 * channel within some more brief interval. */
 		c->privFlags		&= ~CHANNEL_DFS_CLEAR;
-		ichan->ic_ieee		= ath_hal_mhz2ieee(ah, c->channel, c->channelFlags);
+
 		ichan->ic_freq		= c->channel;
-		ichan->ic_flags	= c->channelFlags;
+		ichan->ic_flags	        = c->channelFlags;
+		ichan->ic_ieee		= ath_hal_mhz2ieee(ah,
+							   c->channel,
+							   c->channelFlags);
 		ichan->ic_maxregpower	= c->maxRegTxPower;	/* dBm */
 		ichan->ic_maxpower	= c->maxTxPower;	/* 1/2 dBm */
 		ichan->ic_minpower	= c->minTxPower;	/* 1/2 dBm */
+		ichan->ic_non_occupancy_timer_expiration.tv_sec  = 0;
+		ichan->ic_non_occupancy_timer_expiration.tv_usec = 0;
 
 		printk(KERN_INFO "Channel %d (%d MHz) Max Tx Power %d dBm%s [%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 			, ichan->ic_ieee
