@@ -224,11 +224,18 @@ EXPORT_SYMBOL(ieee80211_node_unauthorize);
  * to ensure a consistent view by drivers.
  */
 static __inline void
-ieee80211_node_set_chan(struct ieee80211com *ic, struct ieee80211_node *ni)
+ieee80211_node_set_chan(struct ieee80211vap *vap, struct ieee80211_node *ni)
 {
+	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_channel *chan = ic->ic_bsschan;
 
-	KASSERT(chan != IEEE80211_CHAN_ANYC, ("bss channel not setup"));
+	if (chan == IEEE80211_CHAN_ANYC) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
+				  "%s: bss channel not setup for %s\n",
+				  __func__, ether_sprintf(ni->ni_macaddr));
+		return ;
+	}
+
 	ni->ni_chan = chan;
 #ifdef ATH_SUPERG_XR
 	if (ni->ni_vap->iv_flags & IEEE80211_F_XR)
@@ -326,7 +333,7 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 	 * Fix the channel and related attributes.
 	 */
 	ic->ic_bsschan = chan;
-	ieee80211_node_set_chan(ic, ni);
+	ieee80211_node_set_chan(vap, ni);
 	ic->ic_curmode = ieee80211_chan2mode(chan);
 
 	/* Update country ie information */
@@ -1052,7 +1059,7 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr,
 		/* Do this only for nodes that already have a BSS. Otherwise
 		 * ic_bsschan is not set and we get a KASSERT failure.
 		 * Required by ieee80211_fix_rate */
-		ieee80211_node_set_chan(vap->iv_ic, ni);
+		ieee80211_node_set_chan(vap, ni);
 	}
 	return ni;
 }
