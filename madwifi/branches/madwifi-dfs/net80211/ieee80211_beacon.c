@@ -284,8 +284,10 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 
 	IEEE80211_LOCK_IRQ(ic);
 
+	/* Check if we need to change channel right now */
+
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
-			(vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
+	    (vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
 		struct ieee80211_channel *c = 
 			ieee80211_doth_findchan(vap, ic->ic_chanchange_chan);
 		
@@ -300,11 +302,11 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 					"%s: reinit beacon\n", __func__);
 
-			/* NB: ic_bsschan is in the DSPARMS beacon IE, so must set this
-			 *     prior to the beacon re-init, below. */
+			/* NB: ic_bsschan is in the DSPARMS beacon IE, so must
+			 * set this prior to the beacon re-init, below. */
 			if (c == NULL) {
-				/* Requested channel invalid; drop the channel switch 
-				 * announcement and do nothing. */
+				/* Requested channel invalid; drop the channel
+				 * switch announcement and do nothing. */
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 						"%s: find channel failure\n", __func__);
 			} else
@@ -320,8 +322,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
 			ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
 
-			/* NB: Only for the first VAP to get here, and when we have a 
-			 * valid channel to which to change. */
+			/* NB: Only for the first VAP to get here, and when we
+			 * have a valid channel to which to change. */
 			if (c && (ic->ic_curchan != c)) {
 				ic->ic_curchan = c;
 				ic->ic_set_channel(ic);
@@ -391,6 +393,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		}
 	}
 
+	/* FIXME : should this code be enabled for IBSS VAP ? */
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {	/* NB: no IBSS support*/
 		struct ieee80211_tim_ie *tie =
 			(struct ieee80211_tim_ie *) bo->bo_tim;
@@ -470,6 +473,18 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			tie->tim_bitctl |= 1;
 		else
 			tie->tim_bitctl &= ~1;
+	}
+
+	/* Whenever we want to switch to a new channel, we need to follow the
+	 * following steps:
+	 *
+	 * - iv_chanchange_count= number of beacon intervals elapsed (0)
+	 * - ic_chanchange_tbtt = number of beacon intervals before switching
+	 * - ic_chanchange_chan = IEEE channel number after switching
+	 * - ic_flags |= IEEE80211_F_CHANSWITCH
+	 */
+
+	if (IEEE80211_IS_MODE_BEACON(vap->iv_opmode)) {
 
 		if ((ic->ic_flags & IEEE80211_F_DOTH) &&
 		    (ic->ic_flags & IEEE80211_F_CHANSWITCH)) {
