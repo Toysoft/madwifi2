@@ -1309,12 +1309,6 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 
-	/* initialize DFS state */
-	DPRINTF(sc, ATH_DEBUG_DOTH,
-		"%s: marking VAP %p: DFS CAC not in progress\n",
-		DEV_NAME(dev), vap);
-	avp->av_dfs_channel_check_pending = 0;
-
 	return vap;
 }
 
@@ -8676,10 +8670,6 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			netif_wake_queue(dev);
 			/* don't do the other usual stuff... */
 			ieee80211_cancel_scan(vap);
-			DPRINTF(sc, ATH_DEBUG_DOTH,
-				"%s: marking VAP %p: DFS CAC in progress\n",
-				DEV_NAME(dev), vap);
-			avp->av_dfs_channel_check_pending = 1;
 			return 0;
 		}
 
@@ -8776,9 +8766,8 @@ ath_dfs_channel_check_completed(unsigned long data )
 		/* restart each VAP that was pending... */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			struct ath_vap *avp = ATH_VAP(vap);
-			if (avp->av_dfs_channel_check_pending) {
+			if (IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 				int error;
-				do_gettimeofday(&tv);
 				DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING -> RUN -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
 				/* re alloc beacons to update new channel info */
 				error = ath_beacon_alloc(sc, vap->iv_bss);
@@ -8798,10 +8787,6 @@ if (!sc->sc_beacons &&
 					ATH_SETUP_XR_VAP(sc, vap, rfilt);
 				}
 #endif
-				DPRINTF(sc, ATH_DEBUG_DOTH,
-					"%s: VAP %p: end of DFS CAC\n",
-					DEV_NAME(dev), vap);
-				avp->av_dfs_channel_check_pending = 0;
 			}
 		}
 		netif_start_queue(dev);
@@ -11104,41 +11089,26 @@ ath_test_radar(struct ieee80211com *ic)
 	return 0;
 }
 
-/* If we are shutting down or blowing off the DFS channel availability check 
- * then we call this to stop the behavior before we take the rest of the 
+/* If we are shutting down or blowing off the DFS channel availability check
+ * then we call this to stop the behavior before we take the rest of the
  * necessary actions (such as a DFS reaction to radar). */
 static void
 ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason)
 {
-	struct ieee80211com*     ic  = &sc->sc_ic;
 	struct net_device*       dev = sc->sc_dev;
-	struct ieee80211vap *vap ;
 	struct timeval tv;
-	int ended = 0;
 
 	del_timer_sync(&sc->sc_dfs_channel_check_timer);
-	if (sc->sc_dfs_channel_check)
-		ended++;
-	sc->sc_dfs_channel_check = 0;
-	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		struct ath_vap *avp = ATH_VAP(vap);
-		if (avp->av_dfs_channel_check_pending) {
-			do_gettimeofday(&tv);
-			DPRINTF(sc, ATH_DEBUG_DOTH,
-				"%s: VAP %p: end of DFS CAC\n",
-				DEV_NAME(dev), vap);
-			avp->av_dfs_channel_check_pending = 0;
-			ended++;
-		}
-	}
-	if (ended)
+	if (sc->sc_dfs_channel_check) {
+		do_gettimeofday(&tv);
 		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
 				"%s: %s: %s - Channel: %u Time: %ld.%06ld\n", 
 				__func__, DEV_NAME(dev), reason, 
 				ieee80211_mhz2ieee(sc->sc_curchan.channel, 
 					sc->sc_curchan.channelFlags), 
 				tv.tv_sec, tv.tv_usec);
-
+	}
+	sc->sc_dfs_channel_check = 0;
 }
 
 /* Invoked from interrupt context when radar is detected and positively 

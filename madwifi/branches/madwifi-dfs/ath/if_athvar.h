@@ -497,8 +497,6 @@ struct ath_vap {
 	struct ieee80211_beacon_offsets av_boff;/* dynamic update state */
 	int av_bslot;			/* beacon slot index */
 	struct ath_txq av_mcastq;	/* multicast transmit queue */
-	/* DFS state */
-	u_int8_t av_dfs_channel_check_pending;
 };
 #define	ATH_VAP(_v)	((struct ath_vap *)(_v))
 
