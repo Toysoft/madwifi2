@@ -691,7 +691,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_dfs_channel_non_occupancy_expiration_timer.data = 
 		(unsigned long) sc;
 
-	sc->sc_dfs_channel_availability_check_time = 0; /* default is used */
+	sc->sc_dfs_channel_availability_check_time = ATH_DFS_WAIT_MIN_PERIOD;
 	sc->sc_dfs_non_occupancy_period = 0; /* default is used */
 
 	/* initialize radar stuff */
@@ -8296,7 +8296,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
 			/* Enter DFS wait period */
 			mod_timer(&sc->sc_dfs_channel_check_timer,
-				jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ));
+				jiffies + (sc->sc_dfs_channel_availability_check_time * HZ));
 		}
 		/*
 		 * re configure beacons when it is a turbo mode switch.
@@ -8815,7 +8815,7 @@ if (!sc->sc_beacons &&
 		if (sc->sc_dfs_testmode) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING indefinitely.  dfs_testmode is enabled.  Waiting again. -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
 			mod_timer(&sc->sc_dfs_channel_check_timer,
-				  jiffies + (ATH_DFS_WAIT_MIN_PERIOD * HZ));
+				  jiffies +(sc->sc_dfs_channel_availability_check_time * HZ));
 		} else {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, "%s: %s: VAP DFSWAIT_PENDING still.  Waiting again. -- Time: %ld.%06ld\n", __func__, DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
 			mod_timer(&sc->sc_dfs_channel_check_timer,
