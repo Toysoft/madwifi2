@@ -193,13 +193,23 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 
 #define	ATH_TIMEOUT	1000
 
-#define	ATH_DFS_WAIT_MIN_PERIOD		60	 /* dfs wait is 60 seconds, per FCC regulations. */
-#define	ATH_DFS_WAIT_SHORT_POLL_PERIOD	2    /* 2  seconds, for consecutive waits if not done yet. */
-#define	ATH_DFS_AVOID_MIN_PERIOD	1800 /* 30 minutes, per FCC regulations */
-#define	ATH_DFS_TEST_RETURN_PERIOD	15	 /* 15 seconds -- for mute test only */
+#define	ATH_DFS_WAIT_MIN_PERIOD		60	/* DFS wait is 60 seconds, per
+						 * FCC/ETSI regulations. */
 
-#define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between calibrations */
-#define	ATH_SHORT_CALINTERVAL		1	/* 1 second between calibrations */
+#define	ATH_DFS_WAIT_SHORT_POLL_PERIOD	2	/* 2 seconds, for consecutive
+						 * waits if not done yet. */
+
+#define	ATH_DFS_AVOID_MIN_PERIOD	1800	/* 30 minutes, per FCC/ETSI
+						 * regulations */
+
+#define	ATH_DFS_TEST_RETURN_PERIOD	15	/* 15 seconds -- for mute test
+						 * only */
+
+#define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between
+						 * calibrations */
+
+#define	ATH_SHORT_CALINTERVAL		1	/* 1 second between
+						 * calibrations */
 
 /*
  * Maximum acceptable MTU
