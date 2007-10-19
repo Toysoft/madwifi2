@@ -918,7 +918,6 @@ struct ath_hw {
 
 	void			*ah_sc;
 	void __iomem		*ah_sh;
-	enum ath5k_countrycode	ah_country_code;
 
 	enum ath5k_int		ah_imr;
 

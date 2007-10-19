@@ -214,8 +214,7 @@ struct ath_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	 * HAL information
 	 */
 
-	/* Regulation Stuff */
-	hal->ah_country_code = AR5K_TUNE_CTRY;
+	/* Get reg domain from eeprom */
 	ath5k_get_regdomain(hal);
 
 	hal->ah_op_mode = IEEE80211_IF_TYPE_STA;
@@ -670,6 +669,8 @@ int ath5k_hw_reset(struct ath_hw *hal, enum ieee80211_if_types op_mode,
 				/*Get rate table for this operation mode*/
 				rt = ath5k_hw_get_rate_table(hal,
 						MODE_IEEE80211B);
+				if (!rt)
+					return -EINVAL;
 
 				/*Write rate duration table*/
 				for (i = 0; i < rt->rate_count; i++) {
@@ -695,6 +696,8 @@ int ath5k_hw_reset(struct ath_hw *hal, enum ieee80211_if_types op_mode,
 				rt = ath5k_hw_get_rate_table(hal,
 				    channel->val & CHANNEL_TURBO ?
 				    MODE_ATHEROS_TURBO : MODE_ATHEROS_TURBOG);
+				if (!rt)
+					return -EINVAL;
 
 				/* Write rate duration table */
 				for (i = 0; i < rt->rate_count; i++)

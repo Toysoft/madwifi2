@@ -96,17 +96,7 @@ enum {
 	ATH_LED_RX,
 };
 
-static int ath_calinterval = ATH_SHORT_CALIB;
-
-static int countrycode = CTRY_DEFAULT;
-static int outdoor = true;
-static int xchanmode = true;
-module_param(countrycode, int, 0);
-MODULE_PARM_DESC(countrycode, "Override default country code");
-module_param(outdoor, int, 0);
-MODULE_PARM_DESC(outdoor, "Enable/disable outdoor use");
-module_param(xchanmode, int, 0);
-MODULE_PARM_DESC(xchanmode, "Enable/disable extended channel mode");
+static int ath_calinterval = 1; /* Calibrate PHY every 1 sec (TODO: Fixme) */
 
 #if AR_DEBUG
 static unsigned int ath_debug;
@@ -478,7 +468,7 @@ accept:
 		rxs.rate = ds->ds_rxstat.rs_rate;
 		rxs.flag |= ath_rx_decrypted(sc, ds, skb);
 
-		ath_dump_skb(skb, "r");
+		ath_dump_skb(skb, "RX  ");
 
 		__ieee80211_rx(sc->hw, skb, &rxs);
 		sc->led_rxrate = ds->ds_rxstat.rs_rate;
@@ -630,11 +620,12 @@ static int ath_beaconq_config(struct ath_softc *sc)
 	if (sc->opmode == IEEE80211_IF_TYPE_AP ||
 			sc->opmode == IEEE80211_IF_TYPE_IBSS) {
 		/*
-		* Always burst out beacon and CAB traffic.
-		*/
-		qi.tqi_aifs = ATH_BEACON_AIFS_DEFAULT;
-		qi.tqi_cw_min = ATH_BEACON_CWMIN_DEFAULT;
-		qi.tqi_cw_max = ATH_BEACON_CWMAX_DEFAULT;
+		 * Always burst out beacon and CAB traffic
+		 * (aifs = cwmin = cwmax = 0)
+		 */
+		qi.tqi_aifs = 0;
+		qi.tqi_cw_min = 0;
+		qi.tqi_cw_max = 0;
 	}
 
 	ret = ath5k_hw_setup_tx_queueprops(ah, sc->bhalq, &qi);
@@ -1221,7 +1212,7 @@ static int ath_tx(struct ieee80211_hw *hw, struct sk_buff *skb,
 	int hdrlen;
 	int pad;
 
-	ath_dump_skb(skb, "t");
+	ath_dump_skb(skb, "TX  ");
 
 	if (sc->opmode == IEEE80211_IF_TYPE_MNTR)
 		DPRINTF(sc, ATH_DEBUG_XMIT, "tx in monitor (scan?)\n");
@@ -1623,7 +1614,7 @@ static int ath_beacon_update(struct ieee80211_hw *hw, struct sk_buff *skb,
 	struct ath_softc *sc = hw->priv;
 	int ret;
 
-	ath_dump_skb(skb, "b");
+	ath_dump_skb(skb, "BC  ");
 
 	mutex_lock(&sc->lock);
 
@@ -1981,8 +1972,6 @@ static int ath_getchannels(struct ieee80211_hw *hw)
 
 	BUILD_BUG_ON(ARRAY_SIZE(sc->modes) < 3);
 
-	ah->ah_country_code = countrycode;
-
 	/* The order here does not matter */
 	modes[0].mode = MODE_IEEE80211G;
 	modes[1].mode = MODE_IEEE80211B;
@@ -2007,6 +1996,9 @@ static int ath_getchannels(struct ieee80211_hw *hw)
 		}
 
 		hw_rates = ath5k_hw_get_rate_table(ah, mode->mode);
+		if (!hw_rates)
+			return -EINVAL;
+
 		mode->num_rates    = ath_copy_rates(mode->rates, hw_rates,
 			max_r);
 		mode->num_channels = ath_copy_channels(ah, mode->channels,
@@ -2042,7 +2034,7 @@ static int ath_desc_alloc(struct ath_softc *sc, struct pci_dev *pdev)
 
 	/* allocate descriptors */
 	sc->desc_len = sizeof(struct ath_desc) *
-			(ATH_TXBUF * ATH_TXDESC + ATH_RXBUF + ATH_BCBUF + 1);
+			(ATH_TXBUF + ATH_RXBUF + ATH_BCBUF + 1);
 	sc->desc = pci_alloc_consistent(pdev, sc->desc_len, &sc->desc_daddr);
 	if (sc->desc == NULL) {
 		dev_err(&pdev->dev, "can't allocate descriptors\n");
@@ -2072,8 +2064,8 @@ static int ath_desc_alloc(struct ath_softc *sc, struct pci_dev *pdev)
 
 	INIT_LIST_HEAD(&sc->txbuf);
 	sc->txbuf_len = ATH_TXBUF;
-	for (i = 0; i < ATH_TXBUF; i++, bf++, ds += ATH_TXDESC,
-			da += ATH_TXDESC * sizeof(*ds)) {
+	for (i = 0; i < ATH_TXBUF; i++, bf++, ds++,
+			da += sizeof(*ds)) {
 		bf->desc = ds;
 		bf->daddr = da;
 		list_add_tail(&bf->list, &sc->txbuf);
@@ -2214,10 +2206,10 @@ static int ath_attach(struct pci_dev *pdev, struct ieee80211_hw *hw)
 		ath5k_hw_reset_key(ah, i);
 
 	/*
-	 * Collect the channel list using the default country
-	 * code and including outdoor channels.  The 802.11 layer
-	 * is resposible for filtering this list based on settings
-	 * like the phy mode.
+	 * Collect the channel list.  The 802.11 layer
+	 * is resposible for filtering this list based
+	 * on settings like the phy mode and regulatory
+	 * domain restrictions.
 	 */
 	ret = ath_getchannels(hw);
 	if (ret) {
@@ -2584,27 +2576,6 @@ static ctl_table ath_static_sysctls[] = {
 	  .proc_handler	= proc_dointvec
 	},
 #endif
-	{
-	  .procname	= "countrycode",
-	  .mode		= 0444,
-	  .data		= &countrycode,
-	  .maxlen	= sizeof(countrycode),
-	  .proc_handler	= proc_dointvec
-	},
-	{
-	  .procname	= "outdoor",
-	  .mode		= 0444,
-	  .data		= &outdoor,
-	  .maxlen	= sizeof(outdoor),
-	  .proc_handler	= proc_dointvec
-	},
-	{
-	  .procname	= "xchanmode",
-	  .mode		= 0444,
-	  .data		= &xchanmode,
-	  .maxlen	= sizeof(xchanmode),
-	  .proc_handler	= proc_dointvec
-	},
 	{
 	  .procname	= "calibrate",
 	  .mode		= 0644,

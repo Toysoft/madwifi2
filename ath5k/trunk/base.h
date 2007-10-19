@@ -48,40 +48,9 @@
 
 #include "ath5k.h"
 
-#define	ATH_TIMEOUT		1000
-
-#define ATH_LONG_CALIB		30 /* seconds */
-#define ATH_SHORT_CALIB		1
-
-/*
- * Maximum acceptable MTU
- * MAXFRAMEBODY - WEP - QOS - RSN/WPA:
- * 2312 - 8 - 2 - 12 = 2290
- */
-#define ATH_MAX_MTU	2290
-#define ATH_MIN_MTU	32
-
 #define	ATH_RXBUF	40		/* number of RX buffers */
 #define	ATH_TXBUF	200		/* number of TX buffers */
-#define	ATH_TXDESC	1		/* number of descriptors per buffer */
 #define ATH_BCBUF	1		/* number of beacon buffers */
-#define	ATH_TXMAXTRY	11		/* max number of transmit attempts */
-#define	ATH_TXINTR_PERIOD 5		/* max number of batched tx descriptors */
-
-#define ATH_BEACON_AIFS_DEFAULT  0	/* default aifs for ap beacon q */
-#define ATH_BEACON_CWMIN_DEFAULT 0	/* default cwmin for ap beacon q */
-#define ATH_BEACON_CWMAX_DEFAULT 0	/* default cwmax for ap beacon q */
-
-#define ATH_RSSI_LPF_LEN	10
-#define ATH_RSSI_DUMMY_MARKER	0x127
-#define ATH_EP_MUL(x, mul)	((x) * (mul))
-#define ATH_RSSI_IN(x)		(ATH_EP_MUL((x), AR5K_RSSI_EP_MULTIPLIER))
-#define ATH_LPF_RSSI(x, y, len) \
-    ((x != ATH_RSSI_DUMMY_MARKER) ? (((x) * ((len) - 1) + (y)) / (len)) : (y))
-#define ATH_RSSI_LPF(x, y) do {						\
-	if ((y) >= -20)							\
-		x = ATH_LPF_RSSI((x), ATH_RSSI_IN((y)), ATH_RSSI_LPF_LEN); \
-} while (0)
 
 struct ath_buf {
 	struct list_head	list;
