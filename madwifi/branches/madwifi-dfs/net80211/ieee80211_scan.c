@@ -979,19 +979,18 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 					  __func__);
 		}
 	} else {
-		/* No channel wa found via scan module, means no good scanlist
+		/* No channel was found via scan module, means no good scanlist
 		 * was found */
-		int chanStart, i, n;
+		int chanStart, i, count;
 		u_int32_t curChanFlags;
 
-		/* Pick a random channel */
-		chanStart = jiffies % ic->ic_nchans;
-		curChanFlags = (ic->ic_curchan->ic_flags) & ~(IEEE80211_CHAN_RADAR);
-
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				  "%s: ic_curchan is %d/%d Mhz\n",
-				  __func__, ic->ic_curchan->ic_ieee,
-				  ic->ic_curchan->ic_freq);
+		if ((ic->ic_curchan != NULL) &&
+		    (ic->ic_curchan != IEEE80211_CHAN_ANYC)) {
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: ic_curchan is %d/%d Mhz\n",
+					  __func__, ic->ic_curchan->ic_ieee,
+					  ic->ic_curchan->ic_freq);
+		}
 
 		if ((ic->ic_bsschan != NULL) &&
 		    (ic->ic_bsschan != IEEE80211_CHAN_ANYC)) {
@@ -1001,21 +1000,48 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 					  ic->ic_bsschan->ic_freq);
 		}
 
+		/* According to FCC/ETSI rules on uniform spreading, we shall
+		 * select a channel out of the list of usable channels so that
+		 * the probability of selecting a given channel shall be the
+		 * same for all channels (reference: ETSI 301 893 v1.3.1
+		 * $4.6.2.5.1 */
+
+		/* First, we count the usable channels */
+
+		count = 0;
+		curChanFlags = (ic->ic_bsschan->ic_flags) & ~(IEEE80211_CHAN_RADAR);
 		for (i=0; i<ic->ic_nchans; i++) {
-			n = (i + chanStart) % ic->ic_nchans;
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: testing new channel %d/%d Mhz\n",
-					  __func__, ic->ic_channels[n].ic_ieee,
-					  ic->ic_channels[n].ic_freq);
-			if (ic->ic_channels[n].ic_flags == curChanFlags) {
-				new_channel = &ic->ic_channels[n];
-				break;
+			if ((ic->ic_channels[i].ic_ieee != ic->ic_bsschan->ic_ieee) &&
+			    (ic->ic_channels[i].ic_flags == curChanFlags)) {
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+						  "%s: usable channel %d/%d Mhz\n",
+						  __func__, ic->ic_channels[i].ic_ieee,
+						  ic->ic_channels[i].ic_freq);
+				count ++;
 			}
 		}
+
+		if (count != 0) {
+			
+			/* Next, we pickup a random usable channel */
+			chanStart = jiffies % count;
+
+			count = 0;
+			for (i=0; i<ic->ic_nchans; i++) {
+				if ((ic->ic_channels[i].ic_ieee != ic->ic_bsschan->ic_ieee) &&
+				    (ic->ic_channels[i].ic_flags == curChanFlags)) {
+					if (count++ == chanStart) {
+						new_channel = &ic->ic_channels[i];
+						break;
+					}
+				}
+			}
+		}
+
 		if (new_channel != NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: new random channel found\n",
-					  __func__);
+					  "%s: new random channel found %d/%d Mhz\n",
+					  __func__, new_channel->ic_ieee, new_channel->ic_freq);
 		}
 	}
 	if(!new_channel) {
