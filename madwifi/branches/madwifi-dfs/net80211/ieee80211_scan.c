@@ -981,21 +981,37 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 	} else {
 		/* No channel wa found via scan module, means no good scanlist
 		 * was found */
-		int chanStart, n = 0;
+		int chanStart, i, n;
 		u_int32_t curChanFlags;
 
 		/* Pick a random channel */
 		chanStart = jiffies % ic->ic_nchans;
 		curChanFlags = (ic->ic_curchan->ic_flags) & ~(IEEE80211_CHAN_RADAR);
-		while (ic->ic_channels[chanStart].ic_flags != curChanFlags) {
-			if (++n >= ic->ic_nchans)
-				break;
-			chanStart++;
-			if (chanStart == ic->ic_nchans)
-				chanStart = 0;
+
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: ic_curchan is %d/%d Mhz\n",
+				  __func__, ic->ic_curchan->ic_ieee,
+				  ic->ic_curchan->ic_freq);
+
+		if ((ic->ic_bsschan != NULL) &&
+		    (ic->ic_bsschan != IEEE80211_CHAN_ANYC)) {
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: ic_bsschan is %d/%d Mhz\n",
+					  __func__, ic->ic_bsschan->ic_ieee,
+					  ic->ic_bsschan->ic_freq);
 		}
-		if (n < ic->ic_nchans)
-			new_channel = &ic->ic_channels[n];
+
+		for (i=0; i<ic->ic_nchans; i++) {
+			n = (i + chanStart) % ic->ic_nchans;
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: testing new channel %d/%d Mhz\n",
+					  __func__, ic->ic_channels[n].ic_ieee,
+					  ic->ic_channels[n].ic_freq);
+			if (ic->ic_channels[n].ic_flags == curChanFlags) {
+				new_channel = &ic->ic_channels[n];
+				break;
+			}
+		}
 		if (new_channel != NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 					  "%s: new random channel found\n",
@@ -1003,6 +1019,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		}
 	}
 	if(!new_channel) {
+		/* Search for the first channel with no radar detected */
 		int n = 0;
 		for(n = 0; n < ic->ic_nchans; n++) {
 			if(0 == (ic->ic_channels[n].ic_flags & IEEE80211_CHAN_RADAR)) {
@@ -1016,10 +1033,10 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 					  __func__);
 		}
 	}
-	if(new_channel) {
+	if (new_channel != NULL) {
 		/* A suitable scan entry was found, so change channels */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				  "%s: switching to channel %d/%d Mhz%s\n",
+				  "%s: switching to channel %d/%d Mhz\n",
 				  __func__,
 				  new_channel->ic_ieee, new_channel->ic_freq);
 		if (vap->iv_state == IEEE80211_S_RUN) {
@@ -1036,8 +1053,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 			if (vap->iv_bss)
 				vap->iv_bss->ni_chan = new_channel;
 		}
-	}
-	else {
+	} else {
 		/* A suitable scan entry was not found */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: new channel not found\n",
