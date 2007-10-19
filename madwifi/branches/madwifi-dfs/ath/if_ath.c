@@ -8210,7 +8210,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		tswitch = 1;
 
 
-	/* Stop any pending channel calibrations or availability check if we are really changing channels.  maybe a turbo mode switch only. */
+	/* Stop any pending channel calibrations or availability check if we
+	 * are really changing channels.  maybe a turbo mode switch only. */
 	if (hchan.channel != sc->sc_curchan.channel)
 		if (!sc->sc_dfs_testmode && sc->sc_dfs_channel_check)
 			ath_interrupt_dfs_channel_check(sc, "Channel change interrupted DFS wait.");
@@ -8775,10 +8776,10 @@ ath_dfs_channel_check_completed(unsigned long data )
 					printk(KERN_ERR "beacon alloc failed: %d\n", error);
 					return;
 				}
-if (!sc->sc_beacons &&
-    vap->iv_opmode != IEEE80211_M_WDS) {
-	sc->sc_beacons = 1;
-}
+				if (!sc->sc_beacons &&
+				    vap->iv_opmode != IEEE80211_M_WDS) {
+					sc->sc_beacons = 1;
+				}
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
 #ifdef ATH_SUPERG_XR
 				if (vap->iv_flags & IEEE80211_F_XR ) {
