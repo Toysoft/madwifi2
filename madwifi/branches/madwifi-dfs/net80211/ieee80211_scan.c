@@ -987,7 +987,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		if ((ic->ic_curchan != NULL) &&
 		    (ic->ic_curchan != IEEE80211_CHAN_ANYC)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: ic_curchan is %d/%d Mhz\n",
+					  "%s: ic_curchan is %3d (%4d MHz)\n",
 					  __func__, ic->ic_curchan->ic_ieee,
 					  ic->ic_curchan->ic_freq);
 		}
@@ -995,7 +995,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		if ((ic->ic_bsschan != NULL) &&
 		    (ic->ic_bsschan != IEEE80211_CHAN_ANYC)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: ic_bsschan is %d/%d Mhz\n",
+					  "%s: ic_bsschan is %3d (%4d MHz)\n",
 					  __func__, ic->ic_bsschan->ic_ieee,
 					  ic->ic_bsschan->ic_freq);
 		}
@@ -1014,7 +1014,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 			if ((ic->ic_channels[i].ic_ieee != ic->ic_bsschan->ic_ieee) &&
 			    (ic->ic_channels[i].ic_flags == curChanFlags)) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-						  "%s: usable channel %d/%d Mhz\n",
+						  "%s: usable channel %3d (%4d MHz)\n",
 						  __func__, ic->ic_channels[i].ic_ieee,
 						  ic->ic_channels[i].ic_freq);
 				count ++;
@@ -1040,7 +1040,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 
 		if (new_channel != NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: new random channel found %d/%d Mhz\n",
+					  "%s: new random channel found %3d (%4d MHz)\n",
 					  __func__, new_channel->ic_ieee, new_channel->ic_freq);
 		}
 	}
@@ -1062,7 +1062,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 	if (new_channel != NULL) {
 		/* A suitable scan entry was found, so change channels */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				  "%s: switching to channel %d/%d Mhz\n",
+				  "%s: switching to channel %3d (%4d MHz)\n",
 				  __func__,
 				  new_channel->ic_ieee, new_channel->ic_freq);
 		if (vap->iv_state == IEEE80211_S_RUN) {

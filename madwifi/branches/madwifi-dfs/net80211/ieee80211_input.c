@@ -2602,8 +2602,10 @@ ieee80211_doth_cancel_cs(struct ieee80211vap *vap)
 	del_timer(&vap->iv_csa_timer);
 	if (vap->iv_csa_jiffies)
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				"channel switch canceled (was: to %u in %u "
-				"tbtt, mode %u)\n", vap->iv_csa_chan->ic_ieee,
+				"channel switch canceled (was: to %3d (%4d MHz) in %u "
+				"TBTT, mode %u)\n",
+				  vap->iv_csa_chan->ic_ieee,
+				  vap->iv_csa_chan->ic_freq,
 				vap->iv_csa_count, vap->iv_csa_mode);
 	vap->iv_csa_jiffies = 0;
 }
@@ -2614,8 +2616,10 @@ ieee80211_doth_switch_channel(struct ieee80211vap *vap)
 	struct ieee80211com *ic = vap->iv_ic;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-			"%s: Channel switch to %d NOW!\n",
-			__func__, vap->iv_csa_chan->ic_ieee);
+			  "%s: Channel switch to %3d (%4d MHz) NOW!\n",
+			  __func__,
+			  vap->iv_csa_chan->ic_ieee,
+			  vap->iv_csa_chan->ic_freq);
 #if 0
 	/* XXX does not belong here? */
 	/* XXX doesn't stop management frames */
@@ -2698,9 +2702,11 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 			/* XXX abuse? */
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 					"%s: channel switch channel "
-					"changed from %u to %u!\n", __func__,
-					vap->iv_csa_chan->ic_ieee,
-					csa_ie->csa_chan);
+					"changed from %3d (%4d MHz) to %u!\n",
+					  __func__,
+					  vap->iv_csa_chan->ic_ieee,
+					  vap->iv_csa_chan->ic_freq,
+					  csa_ie->csa_chan);
 
 			if (vap->iv_csa_count > IEEE80211_CSA_PROTECTION_PERIOD)
 				ieee80211_doth_cancel_cs(vap);

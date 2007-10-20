@@ -8188,7 +8188,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	KASSERT(hchan.channel != 0,
 		("bogus channel %u/0x%x", hchan.channel, hchan.channelFlags));
 	do_gettimeofday(&tv);
-	DPRINTF(sc, ATH_DEBUG_RESET | ATH_DEBUG_DOTH, "%s: %u (%u MHz) -> %u (%u MHz) -- Time: %ld.%06ld\n",
+	DPRINTF(sc, ATH_DEBUG_RESET | ATH_DEBUG_DOTH, "%s: %3d (%4d MHz) -> %3d (%4d MHz) -- Time: %ld.%06ld\n",
 		__func__, ath_hal_mhz2ieee(ah, sc->sc_curchan.channel,
 		sc->sc_curchan.channelFlags), sc->sc_curchan.channel,
 		ath_hal_mhz2ieee(ah, hchan.channel, hchan.channelFlags),
@@ -9115,7 +9115,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ichan->ic_non_occupancy_period.tv_sec  = 0;
 		ichan->ic_non_occupancy_period.tv_usec = 0;
 
-		printk(KERN_INFO "Channel %d (%d MHz) Max Tx Power %d dBm%s [%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
+		printk(KERN_INFO "Channel %3d (%4d MHz) Max Tx Power %d dBm%s [%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 			, ichan->ic_ieee
 			, c->channel
 		        , c->maxRegTxPower > (c->maxTxPower/2) ? (c->maxTxPower/2) : c->maxRegTxPower
@@ -11152,11 +11152,11 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	if (IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode)) {
 		if (!(ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS))
 			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: markdfs is disabled.  "
-					"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X\n", 
+					"ichan=%3d (%4d MHz) ichan.icflags=0x%08X\n", 
 					DEV_NAME(dev), __func__, ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
 		else {
 			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: dfs marked!  "
-				"ichan.ic_ieee=%d, ichan.ic_freq=%d MHz, ichan.icflags=0x%08X "
+				"ichan=%3d (%4d MHz), ichan.icflags=0x%08X "
 				"-- Time: %ld.%06ld\n", DEV_NAME(dev), __func__, 
 				ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags, tv.tv_sec, tv.tv_usec);
 			/* Mark the channel */
