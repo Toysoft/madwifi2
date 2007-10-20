@@ -288,7 +288,6 @@ static void ath_set_txcont_rate(struct ieee80211com *ic, unsigned int new_rate);
 /*
 802.11h DFS support functions
 */
-static void ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long arg);
 static void ath_dfs_channel_check_completed(unsigned long);
 static void ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason);
 
@@ -319,7 +318,6 @@ static int ath_calinterval = ATH_SHORT_CALINTERVAL;		/*
 								 * calibrate every 30 secs in steady state
 								 * but check every second at first.
 								 */
-static int ath_dfs_channel_non_occupancy_expiration_check_interval = 60; /* check once a minute by default, since FCC/ETSI requires 30m duration this means maximum is 31m or so */
 static int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
@@ -685,14 +683,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 		ath_dfs_channel_check_completed; 
 	sc->sc_dfs_channel_check_timer.data = (unsigned long) sc ; 
 
-	init_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
-	sc->sc_dfs_channel_non_occupancy_expiration_timer.function = 
-		ath_radar_expire_dfs_channel_non_occupancy_timers;
-	sc->sc_dfs_channel_non_occupancy_expiration_timer.data = 
-		(unsigned long) sc;
-
 	sc->sc_dfs_channel_availability_check_time = ATH_DFS_WAIT_MIN_PERIOD;
-	sc->sc_dfs_non_occupancy_period = 0; /* default is used */
+	sc->sc_dfs_non_occupancy_period = ATH_DFS_AVOID_MIN_PERIOD;
 
 	/* initialize radar stuff */
 	ath_radar_pulse_init(sc);
@@ -1972,8 +1964,10 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		ATH_SCHEDULE_TQUEUE(&sc->sc_rxorntq, &needmark);
 	} else {
 		if (status & HAL_INT_SWBA) {
-			DPRINTF(sc, ATH_DEBUG_BEACON, "%s: ath_intr HAL_INT_SWBA\n",
-				DEV_NAME(sc->sc_dev));
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"%s: ath_intr HAL_INT_SWBA at tsf %llu\n",
+				DEV_NAME(sc->sc_dev),
+				ath_hal_gettsf64(ah));
 
 			/*
 			 * Software beacon alert--time to send a beacon.
@@ -2295,7 +2289,6 @@ ath_stop_locked(struct net_device *dev)
 		if (!sc->sc_invalid) {
 			del_timer_sync(&sc->sc_dfs_channel_check_timer);
 			del_timer_sync(&sc->sc_cal_ch);
-			del_timer_sync(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
 		}
 		ath_draintxq(sc);
 		if (!sc->sc_invalid) {
@@ -8487,7 +8480,6 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		ieee80211_state_name[nstate]);
 
 	del_timer(&sc->sc_cal_ch);		/* periodic calibration timer */
-	del_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer);
 
 	ath_hal_setledstate(ah, leds[nstate]);	/* set LED */
 	netif_stop_queue(dev);			/* before we do anything else */
@@ -8707,9 +8699,6 @@ done:
 	if (nstate == IEEE80211_S_RUN) {
 		/* start periodic recalibration timer */
 		mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
-		/* start DFS marker expiration timer */
-		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer,
-			  jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
 	}
 
 #ifdef ATH_SUPERG_XR
@@ -8761,9 +8750,6 @@ ath_dfs_channel_check_completed(unsigned long data )
 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Driver is now MARKING channel as CHANNEL_DFS_CLEAR.\n", DEV_NAME(dev), __func__);
 		sc->sc_curchan.privFlags |= CHANNEL_DFS_CLEAR;
 		ath_chan_change(sc, ic->ic_curchan);
-		/* start dfs mark expiration timer */
-		mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer,
-			jiffies + (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
 		/* restart each VAP that was pending... */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			struct ath_vap *avp = ATH_VAP(vap);
@@ -9116,6 +9102,8 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		 * channel within some more brief interval. */
 		c->privFlags		&= ~CHANNEL_DFS_CLEAR;
 
+		/* Initialize all fields of ieee80211_channel here */
+
 		ichan->ic_freq		= c->channel;
 		ichan->ic_flags	        = c->channelFlags;
 		ichan->ic_ieee		= ath_hal_mhz2ieee(ah,
@@ -9124,8 +9112,8 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ichan->ic_maxregpower	= c->maxRegTxPower;	/* dBm */
 		ichan->ic_maxpower	= c->maxTxPower;	/* 1/2 dBm */
 		ichan->ic_minpower	= c->minTxPower;	/* 1/2 dBm */
-		ichan->ic_non_occupancy_timer_expiration.tv_sec  = 0;
-		ichan->ic_non_occupancy_timer_expiration.tv_usec = 0;
+		ichan->ic_non_occupancy_period.tv_sec  = 0;
+		ichan->ic_non_occupancy_period.tv_usec = 0;
 
 		printk(KERN_INFO "Channel %d (%d MHz) Max Tx Power %d dBm%s [%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 			, ichan->ic_ieee
@@ -11039,7 +11027,7 @@ ath_get_dfs_channel_availability_check_time(struct ieee80211com *ic)
 {
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
-	return 0 != sc->sc_dfs_channel_availability_check_time ? sc->sc_dfs_channel_availability_check_time : ATH_DFS_WAIT_MIN_PERIOD;
+	return sc->sc_dfs_channel_availability_check_time;
 }
 
 /* For testing, we will allow you to change the channel non-occupancy period. 
@@ -11068,8 +11056,7 @@ ath_get_dfs_non_occupancy_period(struct ieee80211com *ic)
 {
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = dev->priv;
-	return 0 != sc->sc_dfs_non_occupancy_period ? 
-		sc->sc_dfs_non_occupancy_period : ATH_DFS_AVOID_MIN_PERIOD;
+	return sc->sc_dfs_non_occupancy_period;
 }
 
 
@@ -11114,15 +11101,16 @@ ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason)
 
 /* Invoked from interrupt context when radar is detected and positively 
  * identified by historical event analysis. This guy must report the radar 
- * event and perform the "dfs action" which can mean one of two things: If 
- * markdfs is enabled, it means mark the channel for non-occupancy with an 
- * expiration (typically 30m by law), and then change channels for at least 
+ * event and perform the "dfs action" which can mean one of two things:
+ *
+ * If markdfs is enabled, it means mark the channel for non-occupancy with an
+ * expiration (typically 30min by law), and then change channels for at least
  * that long.
  *
- * If markdfs is disabled or we are in dfstest mode we may just report the 
- * radar or we may go to another channel, and sit quietly.  This 'go sit 
- * quietly' (or mute test) behavior is an artifact of the previous DFS code in 
- * trunk and it's left here because it may be used as the basis for 
+ * If markdfs is disabled or we are in dfstest mode we may just report the
+ * radar or we may go to another channel, and sit quietly.  This 'go sit
+ * quietly' (or mute test) behavior is an artifact of the previous DFS code in
+ * trunk and it's left here because it may be used as the basis for
  * implementing AP requested mute tests in station mode later. */
 
 void
@@ -11987,65 +11975,3 @@ ath_registers_dump_delta(struct ieee80211com *ic)
 	ath_ar5212_registers_dump_delta(sc);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
-
-/* Periodically expire radar avoidance marks. */
-static void 
-ath_radar_expire_dfs_channel_non_occupancy_timers(unsigned long data)
-{
-	struct ath_softc *sc = (struct ath_softc *) data;
-	struct ieee80211com *ic = &sc->sc_ic;
-	struct ieee80211vap *vap;
-
-	if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
-		/* Make sure there are no channels that have just become available */
-		ieee80211_expire_channel_non_occupancy_restrictions(ic);
-		/* Go through and clear any interference flag we have, if we 
-		 * just got it cleared up for us */
-		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		  /* We need to check for the special value
-		     IEEE80211_CHAN_ANYC before using vap->iv_des_chan
-		     since it will cause a kernel panic */
-			if ((vap->iv_state == IEEE80211_S_RUN) && 
-			    ((vap->iv_opmode == IEEE80211_M_HOSTAP) ||
-			     (vap->iv_opmode == IEEE80211_M_IBSS)) &&
-			    /* Operating on channel other than desired. */
-			    (vap->iv_des_chan != IEEE80211_CHAN_ANYC) &&
-			    (vap->iv_des_chan->ic_freq > 0) &&
-			    (vap->iv_des_chan->ic_freq != ic->ic_bsschan->ic_freq)) {
-				struct ieee80211_channel *des_chan = 
-					ieee80211_find_channel(ic, vap->iv_des_chan->ic_freq, 
-							       vap->iv_des_chan->ic_flags);
-				/* Can we switch to it? */
-				if (NULL == des_chan) {
-					DPRINTF(sc, ATH_DEBUG_DOTH, 
-						"%s: %s: Desired channel not found: %u/%x\n", 
-						DEV_NAME(sc->sc_dev), __func__, 
-						vap->iv_des_chan->ic_freq, 
-						vap->iv_des_chan->ic_flags);
-				} else if (0 == (des_chan->ic_flags & IEEE80211_CHAN_RADAR)) {
-					DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Desired channel"
-						" found and available.  Switching to %u/%x\n", 
-						DEV_NAME(sc->sc_dev), __func__, 
-						vap->iv_des_chan->ic_freq, 
-						vap->iv_des_chan->ic_flags);
-					ic->ic_chanchange_chan = des_chan->ic_ieee;
-					ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
-					ic->ic_flags |= IEEE80211_F_CHANSWITCH;
-				} else {
-					DPRINTF(sc, ATH_DEBUG_DOTH, 
-						"%s: %s: Desired channel found"
-						" and not available until Time: %10ld.%06ld\n", 
-						DEV_NAME(sc->sc_dev), __func__, 
-						des_chan->ic_non_occupancy_timer_expiration.tv_sec, 
-						des_chan->ic_non_occupancy_timer_expiration.tv_usec);
-				}
-			}
-		}
-	}
-  
-	/* Restart the timer */
-	mod_timer(&sc->sc_dfs_channel_non_occupancy_expiration_timer,
-		  jiffies +
-		  (ath_dfs_channel_non_occupancy_expiration_check_interval * HZ));
-}
-

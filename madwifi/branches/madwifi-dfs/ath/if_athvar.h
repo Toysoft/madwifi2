@@ -712,9 +712,6 @@ struct ath_softc {
 	struct timer_list sc_cal_ch;		/* calibration timer */
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
 
-	struct timer_list
-	    sc_dfs_channel_non_occupancy_expiration_timer; /* mark expiration timer task */
-
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
 

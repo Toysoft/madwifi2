@@ -502,7 +502,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				/* add ie in opened slot */
 				csa_ie->csa_id = IEEE80211_ELEMID_CHANSWITCHANN;
 				csa_ie->csa_len = sizeof(*csa_ie) - 2;	/* fixed length */
-				csa_ie->csa_mode = 1;			/* stas get off for now */
+				csa_ie->csa_mode = 1;			/* STA shall transmit no further frames */
 				csa_ie->csa_chan = ic->ic_chanchange_chan;
 				csa_ie->csa_count = ic->ic_chanchange_tbtt;
 
@@ -522,7 +522,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			
 			vap->iv_chanchange_count++;
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				"%s: CHANSWITCH IE, change in %d\n",
+				"%s: CHANSWITCH IE, change in %d TBTT\n",
 				__func__, csa_ie->csa_count);
 		}
 #ifdef ATH_SUPERG_XR
