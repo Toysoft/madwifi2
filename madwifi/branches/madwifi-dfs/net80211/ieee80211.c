@@ -850,13 +850,13 @@ ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *ic)
 			if (timeval_compare(&c->ic_non_occupancy_period,
 					    &tv_now) < 0) {
 				if_printf(dev,
-					  "Returning channel %d (%d MHz) radar avoidance marker expired.  Channel now available again. -- Time: %10ld.%06ld\n",
+					  "Returning channel %3d (%4d MHz) radar avoidance marker expired.  Channel now available again. -- Time: %10ld.%06ld\n",
 					  c->ic_ieee, c->ic_freq, tv_now.tv_sec, 
 					  tv_now.tv_usec);
 				c->ic_flags &= ~IEEE80211_CHAN_RADAR;
 			} else {
 				if_printf(dev,
-					  "Channel %d (%d MHz) is still marked for radar.  Channel will become usable in %u seconds at Time: %10ld.%06ld\n",
+					  "Channel %3d (%4d MHz) is still marked for radar.  Channel will become usable in %u seconds at Time: %10ld.%06ld\n",
 					  c->ic_ieee, c->ic_freq,
 					  c->ic_non_occupancy_period.tv_sec - tv_now.tv_sec,
 					  c->ic_non_occupancy_period.tv_sec,
@@ -983,12 +983,12 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 	int i;
 
 	do_gettimeofday(&tv_now);
-	if_printf(dev, "Radar found on channel %d (%d MHz) -- Time: %ld.%06ld\n",
+	if_printf(dev, "Radar found on channel %3d (%4d MHz) -- Time: %ld.%06ld\n",
 		  ichan->ic_ieee, ichan->ic_freq, tv_now.tv_sec, tv_now.tv_usec);
 	if (IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode)) {
 		/* Mark the channel in the ic_chan list */
 		if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
-			if_printf(dev, "Marking channel %d (%d MHz) in ic_chan list -- Time: %ld.%06ld\n",
+			if_printf(dev, "Marking channel %3d (%4d MHz) in ic_chan list -- Time: %ld.%06ld\n",
 				  ichan->ic_ieee, ichan->ic_freq,
 				  tv_now.tv_sec, tv_now.tv_usec);
 			for (i = 0; i < ic->ic_nchans; i++) {
@@ -998,7 +998,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 					c->ic_non_occupancy_period.tv_sec = tv_now.tv_sec + avoidance_time;
 					c->ic_non_occupancy_period.tv_usec = tv_now.tv_usec;
 
-					if_printf(dev, "Channel %d (%d MHz) will become usable in %u seconds.  Suspending use of the channel until: %ld.%06ld\n",
+					if_printf(dev, "Channel %3d (%4d MHz) will become usable in %u seconds.  Suspending use of the channel until: %ld.%06ld\n",
 						  ichan->ic_ieee, ichan->ic_freq,
 						  avoidance_time,
 						  c->ic_non_occupancy_period.tv_sec,
@@ -1022,13 +1022,19 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
  				ieee80211_dfs_action(ic);
 			}
 			else
-				if_printf(dev, "Channel frequency doesn't match expectation!  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n", ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
+				if_printf(dev,
+					  "Channel frequency doesn't match expectation! ichan=%3d (%4d MHz) ic_curchan=%3d (%4d MHz).  Not invoking ieee80211_dfs_action.\n",
+					  ichan->ic_ieee, ichan->ic_freq,
+					  ic->ic_curchan->ic_ieee, ic->ic_curchan->ic_freq);
 		} else {
 			/* Change to a radar free 11a channel for dfstesttime seconds */
 			ic->ic_chanchange_chan = IEEE80211_RADAR_TEST_MUTE_CHAN;
 			ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
-			if_printf(dev, "Mute test - markdfs is off, we are in hostap mode, found radar on %d.  c->ic_freq=%d ic->ic_curchan->ic_freq=%d.  Not invoking ieee80211_dfs_action.\n", ichan->ic_ieee, ichan->ic_freq, ic->ic_curchan->ic_freq);
+			if_printf(dev,
+				  "Mute test - markdfs is off, we are in hostap mode, found radar on channel %3d (%4d MHz) ic->ic_curchan=%3d (%4d MHz).  Not invoking ieee80211_dfs_action.\n",
+				  ichan->ic_ieee, ichan->ic_freq,
+				  ic->ic_curchan->ic_ieee, ic->ic_curchan->ic_freq);
 		}
 	} else {
 		/* Are we in STA mode? If so, send an action msg to AP saying we found a radar? */
