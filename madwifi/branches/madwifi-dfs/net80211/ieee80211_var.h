@@ -313,6 +313,7 @@ struct ieee80211com {
 	struct ieee80211_channel *ic_curchan;	/* current channel */
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
 	int16_t ic_channoise;			/* current channel noise in dBm */
+	struct timer_list ic_dfs_non_occupancy_timer;
 	/*
 	 * Spectrum management (IEEE 802.11h-2003):
 	 *
@@ -441,11 +442,11 @@ struct ieee80211com {
 	/* inject a fake radar signal -- used while on a 802.11h DFS channels */
 	unsigned int (*ic_test_radar)(struct ieee80211com *);
 
-	/* DFS radar avoidance channel availability check time (in seconds) */
+	/* DFS channel availability check time (in seconds) */
 	void (*ic_set_dfs_channel_availability_check_time)(struct ieee80211com *, unsigned int);
 	unsigned int (*ic_get_dfs_channel_availability_check_time)(struct ieee80211com *);
 
-	/* DFS radar avoidance channel use delay */
+	/* DFS non-occupancy period (in seconds) */
 	void (*ic_set_dfs_non_occupancy_period)(struct ieee80211com *, unsigned int);
 	unsigned int (*ic_get_dfs_non_occupancy_period)(struct ieee80211com *);
 
