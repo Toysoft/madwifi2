@@ -1061,15 +1061,25 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 	}
 	if (new_channel != NULL) {
 		/* A suitable scan entry was found, so change channels */
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				  "%s: switching to channel %3d (%4d MHz)\n",
-				  __func__,
-				  new_channel->ic_ieee, new_channel->ic_freq);
 		if (vap->iv_state == IEEE80211_S_RUN) {
+
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+			  "%s: CSA switching to channel %3d (%4d MHz)\n",
+					  __func__,
+					  new_channel->ic_ieee,
+					  new_channel->ic_freq);
+
 			ic->ic_chanchange_chan = new_channel->ic_ieee;
 			ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 		} else {
+
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+			  "%s: directly switching to channel %3d (%4d MHz)\n",
+					  __func__,
+					  new_channel->ic_ieee,
+					  new_channel->ic_freq);
+
 			/* 
 			 * vap is not in run state yet. so
 			 * change the channel here.
