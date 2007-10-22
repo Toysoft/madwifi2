@@ -1561,10 +1561,10 @@ void ath_radar_pulse_record(struct ath_softc *sc, u_int64_t tsf, u_int8_t rssi,
 		"tsf=%10llu rssi=%3u width=%3u\n", 
 		DEV_NAME(dev), tsf, rssi, width);
 
-	/* pulses with 0 or 255 width seems to trigger false detection of
-	 * radar. we ignored it then. */
+	/* pulses width 255 seems to trigger false detection of radar. we
+	 * ignored it then. */
 
-	if (width==0 || width==255) {
+	if (width==255) {
 		/* ignored */
 		return ;
 	}
