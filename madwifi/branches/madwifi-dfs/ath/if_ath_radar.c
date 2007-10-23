@@ -1420,14 +1420,14 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 				);
 		}
 #endif /* #ifdef ATH_RADAR_LONG_PULSE */
-		if (DFLAG_ISSET(sc, ATH_DEBUG_DOTHPULSES)) {
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+		if (DFLAG_ISSET(sc, ATH_DEBUG_DOTHFILT)) {
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT, 
 				"%s: ========================================\n", 
 				DEV_NAME(sc->sc_dev));
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
 				"%s: ==BEGIN RADAR SAMPLE====================\n", 
 				DEV_NAME(sc->sc_dev));
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
 				"%s: ========================================\n", 
 				DEV_NAME(sc->sc_dev));
 
@@ -1465,13 +1465,13 @@ static HAL_BOOL radar_pulse_analyze(struct ath_softc *sc)
 #endif /* #ifdef ATH_RADAR_LONG_PULSE */
 
 			ath_radar_pulse_print(sc, 0 /* analyzed pulses only */ );
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT, 
 				"%s: ========================================\n", 
 				DEV_NAME(sc->sc_dev));
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT, 
 				"%s: ==END RADAR SAMPLE======================\n", 
 				DEV_NAME(sc->sc_dev));
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+			DPRINTF(sc, ATH_DEBUG_DOTHFILT, 
 				"%s: ========================================\n", 
 				DEV_NAME(sc->sc_dev));
 		}
