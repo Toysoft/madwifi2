@@ -125,20 +125,20 @@ struct radar_pattern_specification {
 
 static struct radar_pattern_specification radar_patterns[] = {
 #ifdef DFS_DOMAIN_ETSI
-	{"ETSI [ 200]", 4900, 5100, AH_TRUE, 20, 3, 4, 10, 4, 8, AH_TRUE},
-	{"ETSI [ 300]", 3267, 3399, AH_TRUE, 20, 3, 4, 10, 4, 6, AH_TRUE},
-	{"ETSI [ 500]", 1960, 2040, AH_TRUE, 20, 4, 4, 10, 4, 8, AH_TRUE},
-	{"ETSI [ 750]", 1307, 1359, AH_TRUE, 20, 4, 4, 15, 4, 13, AH_TRUE},
-	{"ETSI [ 800]", 1225, 1275, AH_TRUE, 20, 4, 4, 10, 4, 8, AH_TRUE},
-	{"ETSI [1000]", 980, 1020, AH_TRUE, 20, 4, 4, 10, 4, 8, AH_TRUE},
-	{"ETSI [1200]", 817, 849, AH_TRUE, 20, 4, 4, 15, 4, 13, AH_TRUE},
-	{"ETSI [1500]", 653, 679, AH_TRUE, 20, 4, 4, 15, 4, 6, AH_TRUE},
-	{"ETSI [1600]", 613, 637, AH_TRUE, 20, 4, 4, 15, 4, 7, AH_TRUE},
-	{"ETSI [2000]", 490, 510, AH_TRUE, 20, 4, 4, 20, 4, 10, AH_TRUE},
-	{"ETSI [2300]", 426, 442, AH_TRUE, 20, 4, 4, 25, 6, 20, AH_TRUE},
-	{"ETSI [3000]", 327, 339, AH_TRUE, 20, 3, 4, 25, 5, 20, AH_TRUE},
-	{"ETSI [3500]", 280, 290, AH_TRUE, 20, 4, 4, 25, 2, 20, AH_TRUE},
-	{"ETSI [4000]", 245, 255, AH_TRUE, 20, 4, 4, 25, 5, 20, AH_TRUE},
+	{"ETSI [ 200]", 4900, 5100, AH_FALSE, 20, 3, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI [ 300]", 3267, 3399, AH_FALSE, 20, 3, 4, 10, 4,  6, AH_TRUE},
+	{"ETSI [ 500]", 1960, 2040, AH_FALSE, 20, 4, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI [ 750]", 1307, 1359, AH_FALSE, 20, 5, 4, 15, 4, 13, AH_TRUE},
+	{"ETSI [ 800]", 1225, 1275, AH_FALSE, 20, 4, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI [1000]",  980, 1020, AH_FALSE, 20, 4, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI [1200]",  817,  849, AH_FALSE, 20, 5, 4, 15, 4, 13, AH_TRUE},
+	{"ETSI [1500]",  653,  679, AH_FALSE, 20, 5, 4, 15, 4,  6, AH_TRUE},
+	{"ETSI [1600]",  613,  637, AH_FALSE, 20, 5, 4, 15, 4,  7, AH_TRUE},
+	{"ETSI [2000]",  490,  510, AH_FALSE, 20, 7, 4, 20, 4, 10, AH_TRUE},
+	{"ETSI [2300]",  426,  442, AH_FALSE, 20, 9, 4, 25, 6, 20, AH_TRUE},
+	{"ETSI [3000]",  327,  339, AH_FALSE, 20, 7, 4, 20, 5, 20, AH_TRUE},
+	{"ETSI [3500]",  280,  290, AH_FALSE, 20, 9, 4, 25, 2, 20, AH_TRUE},
+	{"ETSI [4000]",  245,  255, AH_FALSE, 20, 7, 4, 20, 5, 20, AH_TRUE},
 #endif
 #ifdef DFS_DOMAIN_FCC
 	{"FCC [1,1399-1714]", 1399, 1714, AH_TRUE, 10, 5, 10, 18, 4, 6, AH_FALSE},
@@ -809,8 +809,8 @@ static HAL_BOOL radar_pulse_analyze_short_pulse(
 	 *
 	 * At the end, we have a number of pulse hit for each PRF
 	 *
-	 * TSF will roll over after just over 584,542 years of operation without 
-	 * restart.
+	 * TSF will roll over after just over 584,542 years of operation
+	 * without restart.
 	 * 
 	 * This exceeds all known Atheros MTBF so, forget about TSF roll over.
 	 */
@@ -836,16 +836,16 @@ static HAL_BOOL radar_pulse_analyze_short_pulse(
 			continue;
 		}
 
-		/* this min formula is to check for underflow.  It's the minimum 
-		 * needed duration to gather specified number of matches, 
-		 * assuming minimum match interval. */
+		/* this min formula is to check for underflow.  It's the
+		 * minimum needed duration to gather specified number of
+		 * matches, assuming minimum match interval. */
 		t0_min = (pattern->interval_min * 
 			  pattern->min_intervals) < t1 ?
 		    t1 - (pattern->interval_min * 
 			  pattern->min_intervals) : 0;
 
-		/* this max formula is to stop when we exceed maximum time 
-		 * period for the pattern.  It's the oldest possible TSF that 
+		/* this max formula is to stop when we exceed maximum time
+		 * period for the pattern.  It's the oldest possible TSF that
 		 * could match. */
 		t0_max = (pattern->interval_max * 
 			  pattern->max_intervals) < t1 ?
@@ -896,8 +896,8 @@ static HAL_BOOL radar_pulse_analyze_short_pulse(
 			if (!pulse->rp_allocated)
 				break;
 
-			/* Do not go too far... this is an optimization to not 
-			 * keep checking after we hit maximum time span for the 
+			/* Do not go too far... this is an optimization to not
+			 * keep checking after we hit maximum time span for the
 			 * pattern. */
 			if (pulse->rp_tsf < t0_max) {
 				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
@@ -909,7 +909,7 @@ static HAL_BOOL radar_pulse_analyze_short_pulse(
 					t_min, t_max, matched, missed);
 				break;
 			}
-			/* if we missed more than specified number of pulses, 
+			/* if we missed more than specified number of pulses,
 			 * we stop searching */
 			if (partial_miss > 
 			    pattern->max_consecutive_missing) {
@@ -1009,11 +1009,11 @@ static HAL_BOOL radar_pulse_analyze_short_pulse(
 				pulse = pulse_prev(pulse);
 
 				/* update bounds */
-				t_min = adjusted_interval_max < t_min ? 
-					t_min - adjusted_interval_max : 
+				t_min = adjusted_interval_max < last_tsf ? 
+					last_tsf - adjusted_interval_max : 
 					0;
-				t_max = adjusted_interval_min < t_max ? 
-					t_max - adjusted_interval_min : 
+				t_max = adjusted_interval_min < last_tsf ? 
+					last_tsf - adjusted_interval_min : 
 					0;
 			} else {
 				partial_miss++;
