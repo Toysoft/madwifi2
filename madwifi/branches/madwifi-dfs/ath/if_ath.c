@@ -1860,13 +1860,22 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			if ((HAL_RXERR_PHY == rs->rs_status) && 
 			    (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f)) &&
 			    (0 == (p->bf_status & ATH_BUFSTATUS_RADAR_DONE))) {		
+				/* Sync the contents of the buffer in the case
+				 * of radar errors so we will get the pulse
+				 * width */
+				if (rs->rs_datalen != 0) {
+					bus_dma_sync_single(sc->sc_bdev, 
+							    p->bf_skbaddr, 
+							    rs->rs_datalen, 
+							    BUS_DMA_FROMDEVICE);
+				}
 				/* record the radar pulse event */
 				ath_radar_pulse_record (
 					sc, 
 					ath_extend_tsf(p->bf_tsf, rs->
 						       rs_tstamp),
 					rs->rs_rssi, 
-					skb->data[0], 
+					(rs->rs_datalen ? skb->data[0] : 0), 
 					0 /* not simulated */);
 #if 0
 				DPRINTF(sc, ATH_DEBUG_DOTH, 
