@@ -2534,7 +2534,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 		 */
 		ath_hal_intrset(ah, sc->sc_imask & ~HAL_INT_SWBA);
 		ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
-		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n", __func__, txq->axq_depth);
+		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: MC txq [%d] depth = %d\n", __func__, txq->axq_qnum, txq->axq_depth);
 		if (txq->axq_link != NULL) {
 #ifdef AH_NEED_DESC_SWAP
 			*txq->axq_link = cpu_to_le32(bf->bf_daddr);
@@ -2547,10 +2547,12 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 				ito64(bf->bf_daddr), bf->bf_desc);
 		}
 		txq->axq_link = &lastds->ds_link;
+		/* We do not start tx on this queue as it will be done as 
+		"CAB" data at DTIM intervals. */
 		ath_hal_intrset(ah, sc->sc_imask);
 	} else {
 		ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
-		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: txq depth = %d\n", __func__, txq->axq_depth);
+		DPRINTF(sc, ATH_DEBUG_TX_PROC, "%s: UC txq [%d] depth = %d\n", __func__, txq->axq_qnum, txq->axq_depth);
 		if (txq->axq_link == NULL) {
 			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
 			DPRINTF(sc, ATH_DEBUG_XMIT, "%s: TXDP[%u] = %llx (%p)\n",
@@ -4422,10 +4424,15 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	 * Enable the CAB queue before the beacon queue to
 	 * ensure cab frames are triggered by this beacon.
 	 */
-	/*
-	 * This code is currently disabled since it prevents beacons to be sent
-	 * in adhoc mode */
-	if (0 && (avp->av_boff.bo_tim[4] & 1))	{	/* NB: only at DTIM */
+	/* 
+	Currently CABQ is disabled for IBSS because it was reported that this
+	prevented beaconing in IBSS mode, but we *need* to flush stuff in this
+	queue or else it is a source of buffer leaks, as it is *never* reclaimed
+	if it isn't processed....
+	*/
+	/* NB: only at DTIM */
+	if (sc->sc_ic.ic_opmode != IEEE80211_M_IBSS && (avp->av_boff.bo_tim[4] & 1)) {
+		
 		struct ath_txq *cabq = sc->sc_cabq;
 		struct ath_buf *bfmcast;
 		/*
