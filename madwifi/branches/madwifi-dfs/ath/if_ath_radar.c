@@ -1540,6 +1540,11 @@ void ath_radar_pulse_init(struct ath_softc *sc)
 		sc->sc_radar_pulse_min_to_match = 
 			MIN(sc->sc_radar_pulse_min_to_match,
 			    radar_patterns[i].required_matches);
+
+	/* default values is properly handle pulses and detected radars */
+	sc->sc_radar_pulse_ignored = 0;
+	sc->sc_radar_ignored = 0;
+
 	ATH_INIT_TQUEUE(&sc->sc_radartq, ath_radar_pulse_tasklet, dev);
 }
 
@@ -1558,8 +1563,13 @@ void ath_radar_pulse_record(struct ath_softc *sc, u_int64_t tsf, u_int8_t rssi,
 	struct ath_radar_pulse *pulse;
 
 	DPRINTF(sc, ATH_DEBUG_DOTHPULSES, "%s: ath_radar_pulse_record: "
-		"tsf=%10llu rssi=%3u width=%3u\n", 
-		DEV_NAME(dev), tsf, rssi, width);
+		"tsf=%10llu rssi=%3u width=%3u%s\n", 
+		DEV_NAME(dev), tsf, rssi, width,
+		sc->sc_radar_pulse_ignored ? " (ignored)" : "");
+
+	if (sc->sc_radar_pulse_ignored) {
+		return;
+	}
 
 	/* pulses width 255 seems to trigger false detection of radar. we
 	 * ignored it then. */
