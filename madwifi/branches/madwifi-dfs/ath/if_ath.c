@@ -9876,13 +9876,16 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	struct ath_softc *sc = ctl->extra1;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int val;
-	int tab_3_val[3];
+	u_int tab_3_val[3];
 	int ret = 0;
 
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
 
-	/* special case for ATH_RADAR_PULSE which expect 3 integers */
+	/* special case for ATH_RADAR_PULSE which expect 3 integers : tsf rssi
+	 * width. It should be noted that tsf is unsigned 64 bits but the
+	 * sysctl API is only unsigned 32 bits. As a result, tsf might get
+	 * truncated */
 	if (ctl->ctl_name == ATH_RADAR_PULSE) {
 	  ctl->data = &tab_3_val;
 	  ctl->maxlen = sizeof(tab_3_val);
