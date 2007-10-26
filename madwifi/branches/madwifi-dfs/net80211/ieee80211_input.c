@@ -384,9 +384,15 @@ ieee80211_input(struct ieee80211_node *ni,
 			/* XXX catch bad values */
 			goto out;
 		}
-		ni->ni_rssi = rssi;
-		ni->ni_rtsf = rtsf;
-		ni->ni_last_rx = jiffies;
+		/* since ieee80211_input() can be called by
+		 * ieee80211_input_all(), we need to check that we are not
+		 * updating for unknown nodes. FIXME : such check might be
+		 * needed at other places */
+		if (IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_macaddr)) {
+			ni->ni_rssi = rssi;
+			ni->ni_rtsf = rtsf;
+			ni->ni_last_rx = jiffies;
+		}
 		if (HAS_SEQ(type)) {
 			u_int8_t tid;
 			if (IEEE80211_QOS_HAS_SEQ(wh)) {
