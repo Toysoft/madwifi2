@@ -227,7 +227,7 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 /* free buffer threshold to restart net dev */
 #define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20)
 
-#define TAIL_DROP_COUNT 50             /* maximum number of queued frames allowed */
+#define TAIL_DROP_COUNT 10             /* maximum number of queued frames allowed */
 
 /*
  * dynamic turbo specific macros.
