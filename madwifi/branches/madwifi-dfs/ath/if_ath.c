@@ -9866,6 +9866,8 @@ enum {
 	ATH_RADAR_PULSE_PRINT_MEM_ALL =26,
 	ATH_RADAR_PULSE_FLUSH   = 27,
 	ATH_PANIC               = 28,
+	ATH_RADAR_PULSE_IGNORED = 29,
+	ATH_RADAR_IGNORED       = 30,
 };
 
 static int
@@ -10036,6 +10038,12 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			    *p = 0xcacadede;
 			  }
 			  break;
+			case ATH_RADAR_PULSE_IGNORED:
+				sc->sc_radar_pulse_ignored = val;
+				break;
+			case ATH_RADAR_IGNORED:
+				sc->sc_radar_ignored = val;
+				break;
 			default: 
 				ret = -EINVAL;
 				break;
@@ -10092,6 +10100,12 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 #endif
 		case ATH_ACKRATE:
 			val = sc->sc_ackrate;
+			break;
+		case ATH_RADAR_PULSE_IGNORED:
+			val = sc->sc_radar_pulse_ignored;
+			break;
+		case ATH_RADAR_IGNORED:
+			val = sc->sc_radar_ignored;
 			break;
 		default:
 			ret = -EINVAL;
@@ -10234,6 +10248,18 @@ static const ctl_table ath_sysctl_template[] = {
 	{
 	  .ctl_name     = ATH_PANIC,
 	  .procname     = "panic",
+	  .mode         = 0644,
+	  .proc_handler = ath_sysctl_halparam
+	},
+	{
+	  .ctl_name     = ATH_RADAR_PULSE_IGNORED,
+	  .procname     = "radar_pulse_ignored",
+	  .mode         = 0644,
+	  .proc_handler = ath_sysctl_halparam
+	},
+	{
+	  .ctl_name     = ATH_RADAR_IGNORED,
+	  .procname     = "radar_ignored",
 	  .mode         = 0644,
 	  .proc_handler = ath_sysctl_halparam
 	},
@@ -11139,11 +11165,16 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	struct ieee80211_channel ichan;
 	struct timeval tv;
 
-	DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: RADAR DETECTED channel:%u jiffies:%lu cause: %s\n",
+	DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: RADAR DETECTED channel:%u jiffies:%lu cause: %s%s\n",
 		DEV_NAME(sc->sc_dev),
 		__func__,
 		sc->sc_curchan.channel,
-		jiffies, cause);
+		jiffies, cause,
+		sc->sc_radar_ignored ? " (ignored)" : "");
+
+	if (sc->sc_radar_ignored) {
+		return;
+	}
 
 	ath_radar_pulse_flush(sc);
 	do_gettimeofday(&tv);

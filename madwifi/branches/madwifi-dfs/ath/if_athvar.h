@@ -752,6 +752,12 @@ struct ath_softc {
 	int sc_radar_pulse_min_to_match;
 	HAL_BOOL (*sc_radar_pulse_analyze)(struct ath_softc *sc);
 	struct ATH_TQ_STRUCT sc_radartq;
+
+	/* if set, we ignored all received pulses */
+	int sc_radar_pulse_ignored;
+
+	/* if set, we ignored all detected radars */
+	int sc_radar_ignored;
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
