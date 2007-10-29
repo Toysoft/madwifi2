@@ -52,10 +52,10 @@
 #define	ATH_TXBUF	200		/* number of TX buffers */
 #define ATH_BCBUF	1		/* number of beacon buffers */
 
-struct ath_buf {
+struct ath5k_buf {
 	struct list_head	list;
 	unsigned int		flags;	/* tx descriptor flags */
-	struct ath_desc		*desc;	/* virtual addr of desc */
+	struct ath5k_desc		*desc;	/* virtual addr of desc */
 	dma_addr_t		daddr;	/* physical addr of desc */
 	struct sk_buff		*skb;	/* skbuff for buf */
 	dma_addr_t		skbaddr;/* physical addr of skb data */
@@ -71,7 +71,7 @@ struct ath_buf {
  * priorities to fewer hardware queues (typically all to one
  * hardware queue).
  */
-struct ath_txq {
+struct ath5k_txq {
 	unsigned int	qnum;		/* hardware q number */
 	u32		*link;		/* link ptr in last TX desc */
 	struct list_head q;		/* transmit queue */
@@ -87,7 +87,7 @@ struct ath_txq {
 
 /* Software Carrier, keeps track of the driver state
  * associated with an instance of a device */
-struct ath_softc {
+struct ath5k_softc {
 	struct pci_dev		*pdev;		/* for dma mapping */
 	void __iomem		*iobase;	/* address of the device */
 	struct mutex		lock;		/* dev-level lock */
@@ -98,12 +98,12 @@ struct ath_softc {
 	struct ieee80211_channel channels[ATH_CHAN_MAX];
 	struct ieee80211_rate	rates[AR5K_MAX_RATES * NUM_DRIVER_MODES];
 	enum ieee80211_if_types	opmode;
-	struct ath_hw		*ah;		/* Atheros HW */
+	struct ath5k_hw		*ah;		/* Atheros HW */
 
 	int			debug;
 
-	struct ath_buf		*bufptr;	/* allocated buffer ptr */
-	struct ath_desc		*desc;		/* TX/RX descriptors */
+	struct ath5k_buf	*bufptr;	/* allocated buffer ptr */
+	struct ath5k_desc	*desc;		/* TX/RX descriptors */
 	dma_addr_t		desc_daddr;	/* DMA (physical) address */
 	size_t			desc_len;	/* size of TX/RX descriptors */
 	u16			cachelsz;	/* cache line size */
@@ -153,13 +153,13 @@ struct ath_softc {
 	struct list_head	txbuf;		/* transmit buffer */
 	spinlock_t		txbuflock;
 	unsigned int		txbuf_len;	/* buf count in txbuf list */
-	struct ath_txq		txqs[2];	/* beacon and tx */
+	struct ath5k_txq	txqs[2];	/* beacon and tx */
 
-	struct ath_txq		*txq;		/* beacon and tx*/
+	struct ath5k_txq	*txq;		/* beacon and tx*/
 	struct tasklet_struct	txtq;		/* tx intr tasklet */
 
-	struct ath_buf		*bbuf;		/* beacon buffer */
-	unsigned int		bhalq,		/* HAL q for outgoing beacons */
+	struct ath5k_buf	*bbuf;		/* beacon buffer */
+	unsigned int		bhalq,		/* SW q for outgoing beacons */
 				bmisscount,	/* missed beacon transmits */
 				bintval,	/* beacon interval */
 				bsent;

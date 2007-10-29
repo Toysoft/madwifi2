@@ -284,7 +284,7 @@ struct ath5k_hw_2w_tx_desc {
 #define AR5K_2W_TX_DESC_CTL0_FRAME_TYPE_S	26
 #define AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT_5210	0x02000000
 #define AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT_5211	0x1e000000
-#define AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT	(hal->ah_version == AR5K_AR5210 ? \
+#define AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT	(ah->ah_version == AR5K_AR5210 ? \
 						AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT_5210 : \
 						AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT_5211)
 #define AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT_S	25
@@ -297,7 +297,7 @@ struct ath5k_hw_2w_tx_desc {
 #define AR5K_2W_TX_DESC_CTL1_MORE		0x00001000
 #define AR5K_2W_TX_DESC_CTL1_ENCRYPT_KEY_INDEX_5210	0x0007e000
 #define AR5K_2W_TX_DESC_CTL1_ENCRYPT_KEY_INDEX_5211	0x000fe000
-#define AR5K_2W_TX_DESC_CTL1_ENCRYPT_KEY_INDEX	(hal->ah_version == AR5K_AR5210 ? \
+#define AR5K_2W_TX_DESC_CTL1_ENCRYPT_KEY_INDEX	(ah->ah_version == AR5K_AR5210 ? \
 						AR5K_2W_TX_DESC_CTL1_ENCRYPT_KEY_INDEX_5210 : \
 						AR5K_2W_TX_DESC_CTL1_ENCRYPT_KEY_INDEX_5211)
 #define AR5K_2W_TX_DESC_CTL1_ENCRYPT_KEY_INDEX_S	13
@@ -427,9 +427,9 @@ struct ath5k_hw_tx_status {
 #define AR5K_INIT_CFG	0x00000000
 #endif
 
-/*#define AR5K_REG_READ(_reg)	ath5k_hw_reg_read(hal, _reg)
+/*#define AR5K_REG_READ(_reg)	ath5k_hw_reg_read(ah, _reg)
 
-#define AR5K_REG_WRITE(_reg, _val)	ath5k_hw_reg_write(hal, _val, _reg)*/
+#define AR5K_REG_WRITE(_reg, _val)	ath5k_hw_reg_write(ah, _val, _reg)*/
 
 #define AR5K_REG_SM(_val, _flags)					\
 	(((_val) << _flags##_S) & (_flags))
@@ -442,25 +442,25 @@ struct ath5k_hw_tx_status {
  * retrieve the values which we do not want to clear (lets call this
  * old_data) and then set the register with this and our new_value:
  * ( old_data | new_value) */
-#define AR5K_REG_WRITE_BITS(hal, _reg, _flags, _val)			\
-	ath5k_hw_reg_write(hal, (ath5k_hw_reg_read(hal, _reg) & ~(_flags)) | \
+#define AR5K_REG_WRITE_BITS(ah, _reg, _flags, _val)			\
+	ath5k_hw_reg_write(ah, (ath5k_hw_reg_read(ah, _reg) & ~(_flags)) | \
 	    (((_val) << _flags##_S) & (_flags)), _reg)
 
-#define AR5K_REG_MASKED_BITS(hal, _reg, _flags, _mask)			\
-	ath5k_hw_reg_write(hal, (ath5k_hw_reg_read(hal, _reg) &		\
+#define AR5K_REG_MASKED_BITS(ah, _reg, _flags, _mask)			\
+	ath5k_hw_reg_write(ah, (ath5k_hw_reg_read(ah, _reg) &		\
 			(_mask)) | (_flags), _reg)
 
-#define AR5K_REG_ENABLE_BITS(hal, _reg, _flags)				\
-	ath5k_hw_reg_write(hal, ath5k_hw_reg_read(hal, _reg) | (_flags), _reg)
+#define AR5K_REG_ENABLE_BITS(ah, _reg, _flags)				\
+	ath5k_hw_reg_write(ah, ath5k_hw_reg_read(ah, _reg) | (_flags), _reg)
 
-#define AR5K_REG_DISABLE_BITS(hal, _reg, _flags)			\
-	ath5k_hw_reg_write(hal, ath5k_hw_reg_read(hal, _reg) & ~(_flags), _reg)
+#define AR5K_REG_DISABLE_BITS(ah, _reg, _flags)			\
+	ath5k_hw_reg_write(ah, ath5k_hw_reg_read(ah, _reg) & ~(_flags), _reg)
 
-#define AR5K_PHY_WRITE(hal, _reg, _val)					\
-	ath5k_hw_reg_write(hal, _val, (hal)->ah_phy + ((_reg) << 2))
+#define AR5K_PHY_WRITE(ah, _reg, _val)					\
+	ath5k_hw_reg_write(ah, _val, (ah)->ah_phy + ((_reg) << 2))
 
-#define AR5K_PHY_READ(hal, _reg)					\
-	ath5k_hw_reg_read(hal, (hal)->ah_phy + ((_reg) << 2))
+#define AR5K_PHY_READ(ah, _reg)					\
+	ath5k_hw_reg_read(ah, (ah)->ah_phy + ((_reg) << 2))
 
 #define AR5K_REG_WAIT(_i) do {						\
 	if (_i % 64)							\
@@ -468,19 +468,19 @@ struct ath5k_hw_tx_status {
 } while (0)
 
 #define AR5K_EEPROM_READ(_o, _v) do {					\
-	if ((ret = ath5k_hw_eeprom_read(hal, (_o), &(_v))) != 0)	\
+	if ((ret = ath5k_hw_eeprom_read(ah, (_o), &(_v))) != 0)	\
 		return (ret);						\
 } while (0)
 
 #define AR5K_EEPROM_READ_HDR(_o, _v)					\
-	AR5K_EEPROM_READ(_o, hal->ah_capabilities.cap_eeprom._v);	\
+	AR5K_EEPROM_READ(_o, ah->ah_capabilities.cap_eeprom._v);	\
 
 /* Read status of selected queue */
-#define AR5K_REG_READ_Q(hal, _reg, _queue)				\
-	(ath5k_hw_reg_read(hal, _reg) & (1 << _queue))			\
+#define AR5K_REG_READ_Q(ah, _reg, _queue)				\
+	(ath5k_hw_reg_read(ah, _reg) & (1 << _queue))			\
 
-#define AR5K_REG_WRITE_Q(hal, _reg, _queue)				\
-	ath5k_hw_reg_write(hal, (1 << _queue), _reg)
+#define AR5K_REG_WRITE_Q(ah, _reg, _queue)				\
+	ath5k_hw_reg_write(ah, (1 << _queue), _reg)
 
 #define AR5K_Q_ENABLE_BITS(_reg, _queue) do {				\
 	_reg |= 1 << _queue;						\
