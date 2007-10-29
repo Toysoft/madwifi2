@@ -9616,6 +9616,7 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 	sc->sc_sysctl_header = ATH_REGISTER_SYSCTL_TABLE(sc->sc_sysctls);
 	if (!sc->sc_sysctl_header) {
 		printk("%s: failed to register sysctls!\n", sc->sc_dev->name);
+		kfree(dev_name);
 		kfree(sc->sc_sysctls);
 		sc->sc_sysctls = NULL;
 	}
@@ -9633,7 +9634,7 @@ ath_dynamic_sysctl_unregister(struct ath_softc *sc)
 		unregister_sysctl_table(sc->sc_sysctl_header);
 		sc->sc_sysctl_header = NULL;
 	}
-	if (sc->sc_sysctls[2].procname) {
+	if (sc->sc_sysctls && sc->sc_sysctls[2].procname) {
 		kfree(sc->sc_sysctls[2].procname);
 		sc->sc_sysctls[2].procname = NULL;
 	}
