@@ -152,6 +152,7 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
  * useful for debugging and figuring out, which hal function sets which 
  * registers */
 char *ath_hal_func = NULL;
+EXPORT_SYMBOL(ath_hal_func);
 #endif
 
 #ifdef AH_DEBUG_ALQ
