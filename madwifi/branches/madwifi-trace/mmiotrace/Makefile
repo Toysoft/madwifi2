@@ -13,3 +13,8 @@ mmio-objs := mmio-mod.o pf_in.o kmmio.o
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
 	install mmio.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+
+clean:
+	rm -f *~ *.o *.ko *.mod.c .*.cmd
+	rm -f .depend .version .*.o.flags .*.o.d
+	rm -rf .tmp_versions

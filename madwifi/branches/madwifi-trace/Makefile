@@ -50,7 +50,7 @@ ifneq (svnversion.h,$(MAKECMDGOALS))
 include $(TOP)/Makefile.inc
 endif
 
-DIRS_MODULES = $(ATH) $(ATH_HAL) $(ATH_RATE) $(WLAN) $(if $(MMIOTRACE),mmiotrace/)
+DIRS_MODULES = $(ATH) $(ATH_HAL) $(ATH_RATE) $(WLAN) mmiotrace/
 
 obj-y := ath/ ath_hal/ ath_rate/ net80211/ $(if $(MMIOTRACE),mmiotrace/)
 
@@ -62,7 +62,12 @@ ifdef LINUX24
 		$(MAKE) -C $$i || exit 1; \
 	done
 else
-	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
+	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) ALQ=1 MMIOTRACE=1 modules
+	cp ath/ath_pci.ko ath/ath_pci.ko.old; \
+	objcopy --redefine-sym __ioremap=__ioremap_trace \
+		--redefine-sym iounmap=iounmap_trace \
+		--redefine-sym ioremap_nocache=ioremap_nocache_trace \
+		ath/ath_pci.ko.old ath/ath_pci.ko
 endif
 
 .PHONY: svnversion.h
@@ -91,7 +96,7 @@ install-modules: modules
 	sh scripts/find-madwifi-modules.sh -r $(KERNELRELEASE) $(DESTDIR)
 
 	for i in $(DIRS_MODULES); do \
-		$(MAKE) -C $$i install || exit 1; \
+		$(MAKE) -C $$i ALQ=1 MMIOTRACE=1 install || exit 1; \
 	done
 ifeq ($(DESTDIR),)
 	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae $(KERNELRELEASE))
