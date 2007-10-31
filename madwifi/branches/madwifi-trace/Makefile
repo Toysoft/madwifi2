@@ -50,7 +50,7 @@ ifneq (svnversion.h,$(MAKECMDGOALS))
 include $(TOP)/Makefile.inc
 endif
 
-DIRS_MODULES = $(ATH) $(ATH_HAL) $(ATH_RATE) $(WLAN)
+DIRS_MODULES = $(ATH) $(ATH_HAL) $(ATH_RATE) $(WLAN) $(if $(MMIOTRACE),mmiotrace/)
 
 obj-y := ath/ ath_hal/ ath_rate/ net80211/ $(if $(MMIOTRACE),mmiotrace/)
 
