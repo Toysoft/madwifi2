@@ -60,9 +60,15 @@ ifdef LINUX24
 export-objs	:= ah_os.o
 endif
 
+ifdef ALQ
+obj-m += alq.o
+alq-objs := kern_alq.o
+EXTRA_CFLAGS += -DAH_DEBUG_ALQ -DAH_DEBUG
+endif
+
 INCS += -I$(ATH_HAL) -I$(HAL)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\" $(if $(MMIOTRACE),-DMMIOTRACE=1)
 
 ifneq (,$(filter xscale% arm%,$(TARGET)))
 LDFLAGS += --no-warn-mismatch
