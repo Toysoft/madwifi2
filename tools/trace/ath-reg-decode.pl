@@ -16,8 +16,8 @@ my $BATCH = 0;
 # defines the order in which the registers are looked up, in case of
 # different definitions for different chipsets
 my %chip_lookup = (
-	"5212" => "5212 5212+ 5211+ 5210+ 5112 5112+ 5111+ all",
-	"5211" => "5211 5211+ 5210+ 5111+ all",
+	"5212" => "5212 5212+ 5211+ 5210+ 5112 5112+ 5111+ 5111 all",
+	"5211" => "5211 5211+ 5210+ 5111+ 5111 all",
 	"5210" => "5210 5110 all",
 );
 
