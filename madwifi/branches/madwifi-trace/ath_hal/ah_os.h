@@ -228,13 +228,9 @@ extern	u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 
 extern char *ath_hal_func;
 static inline void ath_hal_set_function(const char *name)
-#if defined(AH_DEBUG)
 {
 	ath_hal_func = (char *)name;
 }
-#else
-{ }
-#endif
 
 #ifdef AH_DEBUG_ALQ
 extern	void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
