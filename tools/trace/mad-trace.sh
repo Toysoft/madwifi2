@@ -2,6 +2,7 @@
 
 IF=ath0
 WLANDEV=wifi0
+TMP=/tmp/mad-trace
 
 count=1
 
@@ -14,7 +15,7 @@ trace() {
 	$1
 	sleep 1
 	echo 0 > /proc/sys/dev/ath/hal/alq
-	sed 's/\x00//g' /tmp/ath_hal.log > /tmp/$filename
+	sed 's/\x00//g' /tmp/ath_hal.log > $TMP/$filename
 	rm /tmp/ath_hal.log
 	let count++
 }
@@ -24,7 +25,26 @@ load_hal_debug() {
 	echo 2 > /proc/sys/dev/ath/hal/debug
 }
 
+run_ath_info() {
+	#Get memory address for ath_info...
+	mem=`lspci -v | grep -A 3 Atheros | grep Memory | awk '{print $3}'`
+
+	#Run ath_info and save output...
+	echo "running ath_info -d 0x$mem..."
+	ath_info -d 0x$mem > $TMP/ath_info.log
+	mv ath-eeprom-dump.bin $TMP/
+}
+
+
+### "main" ###
+
+rm -rf $TMP
+mkdir -p $TMP
+rm -f /tmp/mad-trace.tgz
+
 madwifi-unload
+
+run_ath_info
 
 for opmode in "sta" "ap" "adhoc"; do
 	for mode in 1 2 3; do
@@ -48,3 +68,5 @@ for opmode in "sta" "ap" "adhoc"; do
 		madwifi-unload
 	done
 done
+
+tar cvzf /tmp/mad-trace.tgz $TMP
