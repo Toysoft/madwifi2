@@ -27,7 +27,7 @@ load_hal_debug() {
 
 run_ath_info() {
 	#Get memory address for ath_info...
-	mem=`lspci -v | grep -A 3 Atheros | grep Memory | awk '{print $3}'`
+	mem=`lspci -v | grep -A 3 'Atheros\|168c' | grep Memory | awk '{print $3}'`
 
 	#Run ath_info and save output...
 	echo "running ath_info -d 0x$mem..."
