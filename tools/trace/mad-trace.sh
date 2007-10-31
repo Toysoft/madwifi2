@@ -69,4 +69,5 @@ for opmode in "sta" "ap" "adhoc"; do
 	done
 done
 
-tar cvzf /tmp/mad-trace.tgz $TMP
+chip=`grep "MAC Revision" /tmp/mad-trace/ath_info.log | awk '{print $3}'`
+tar cvzf /tmp/$chip-mad-trace.tgz $TMP
