@@ -4,6 +4,7 @@ use Data::Dumper;
 use Getopt::Long;
 
 my %regs;
+my %cross;
 
 # default options (see below)
 my $CHIP = "5212";
@@ -12,6 +13,7 @@ my $OUT_FORMAT = "txt";
 my $LOOKUP = "";
 my $DUMP = 0;
 my $BATCH = 0;
+my $CROSS = 0;
 
 # defines the order in which the registers are looked up, in case of
 # different definitions for different chipsets
@@ -67,6 +69,9 @@ GetOptions (
 	'batch' => \$BATCH,
 	# --batch -b logs/*.log
 	# batch process multiple files: filename -> filename.$OUT_FORMAT.txt
+
+	'cross' => \$CROSS,
+	# cross reference only
 );
 
 check_download_reg_file();
@@ -84,33 +89,58 @@ elsif ($DUMP) {
 elsif ($BATCH) {
 	foreach $f (@ARGV) {
 		open IN, "<", $f;
-		print STDERR "converting $f -> $f.$OUT_FORMAT\n";
-		open(STDOUT, ">$f.$OUT_FORMAT") || die "Can't redirect stdout";
-		while (<IN>) {
-			match_decode($_);
+		if (!$CROSS) {
+			print STDERR "converting $f -> $f.$OUT_FORMAT\n";
+			open my $oldout, ">&STDOUT" or die "Can't dup STDOUT: $!";
+			open STDOUT, ">$f.$OUT_FORMAT" or die "Can't redirect stdout";
 		}
-		close FH;
-		close STDOUT;
+		my $line = 0;
+		while (<IN>) {
+			match_decode($f, $line++, $_);
+		}
+		if (!$CROSS) {
+			close FH;
+			close STDOUT;
+			open STDOUT, ">&", $oldout or die "Can't dup \$oldout: $!";
+		}
 	}
 }
-else {
-	#convert file from stdin or last argument
+else {  #convert file from stdin or last argument
+	my $line = 0;
 	while (<>) {
-		match_decode($_);
+		match_decode("stdin", $line++, $_);
 	}
 }
 
+if ($CROSS) {
+	dump_cross();
+}
 
 ### functions ###
 
-sub match_decode($) {
-	if (/^.*(.): ?0x0?(\w{4}) = 0x(\w{8}) - (.*)/) {
-		decode($1,$2,$3,$4);
+sub match_decode($$$) {
+	my($file, $lineno, $line) = @_;
+	if ( $line =~ /^.*(.): ?0x0?(\w{4}) = 0x(\w{8}) - (.*)/) {
+		my $mode = $1;
+		my $reg = $2;
+		my $val = $3;
+		my $func = $4;
+		# allow us to re-convert already converted dumps
+		if ($func =~ /.*\((.*)\)$/) {
+			$func = $1;
+		}
+		if ($CROSS) {
+			crossref($file, $lineno, $mode, $reg, $val, $func);
+		}
+		else {
+			# this prints the line as well
+			decode($mode, $reg, $val, $func);
+		}
 	}
 	else {
 		s/\0//g;
 		print;
-	};
+	}
 }
 
 sub check_download_reg_file() {
@@ -175,6 +205,7 @@ sub print_eeprom_access($$$) {
 
 sub lookup_name($) {
 	my($reg) = @_;
+	my $return = {};
 	foreach my $c (split(/[, ]/,$chip_lookup{$CHIP})) {
 		if (defined($regs->{"0x$reg"}->{$c}->{"name"})) {
 			return $regs->{"0x$reg"}->{$c};
@@ -187,17 +218,18 @@ sub lookup_name($) {
 				foreach my $c (split(/[, ]/,$chip_lookup{$CHIP})) {
 					if (defined($regs->{"ranges"}->{"$r"}->{$c}->{"name"})) {
 						# append (INDEX) to name
-						my $i = {};
-						$i->{"desc"} = $regs->{"ranges"}->{"$r"}->{$c}->{"desc"};
-						$i->{"name"} = $regs->{"ranges"}->{"$r"}->{$c}->{"name"};
-						$i->{"name"} .= "(" . (hex($reg) - hex($1))/4 . ")";
-						return $i;
+						$return->{"desc"} = $regs->{"ranges"}->{"$r"}->{$c}->{"desc"};
+						$return->{"name"} = $regs->{"ranges"}->{"$r"}->{$c}->{"name"};
+						$return->{"name"} .= "(" . (hex($reg) - hex($1))/4 . ")";
+						return $return;
 					}
 				}
 			}
 		}
 	}
-	return 0;
+	$return->{"desc"} = "unknown";
+	$return->{"name"} = "unknown";
+	return $return;
 }
 
 sub show_bits($) {
@@ -207,7 +239,7 @@ sub show_bits($) {
 
 	for ($i=31; $i>=0; $i--) {
 		$ret .= (($val>>$i & 1) ? "1" : ".");
-		$ret .= " " if (($i&3)==0);
+		$ret .= " " if (($i&3)==0 && i!=0);
 	}
 
 	return $ret;
@@ -222,20 +254,15 @@ sub decode($$$$) {
 	}
 	else {
 		$dec = lookup_name($reg);
-		# allow us to re-convert already converted dumps
-		if ($func =~ /.*\((.*)\)$/) {
-			$func = $1;
-		}
 		# different output formats
 		if ($OUT_FORMAT eq "initval") {
 			if ($mode eq "W") {
-				$dec->{"name"} = "0x$reg" unless $dec;
+				$dec->{"name"} = "0x$reg" if ($dec->{"name"} =~ "unknown");
 				$space = 35 - length($dec->{"name"});
 				printf "\t{ %s,%*s0x%s },\t/* %s */\n", $dec->{"name"}, $space, "", $val, $func;
 			}
 		}
 		else {
-			$dec->{'name'} = "unknown" unless $dec;
 			$bits = show_bits($val);
 			printf "%s: 0x%s = 0x%s - %-30s %s (%s)\n", $mode, $reg, $val, $dec->{'name'}, $bits, $func;
 		}
@@ -272,6 +299,34 @@ sub foreach_reg() {
 			foreach my $c (sort keys(%{$regs->{$r}})) {
 				foreach_reg_do($r, $regs->{$r}->{$c}->{"name"},
 					$c, $regs->{$r}->{$c}->{"desc"});
+			}
+		}
+	}
+}
+
+sub crossref($$$$) {
+	my($file, $line, $mode, $reg, $val, $func) = @_;
+	$cross->{$reg}->{$val}->{$mode}->{$func}->{$file} .= "$line, ";
+}
+
+sub dump_cross() {
+	foreach my $r (sort keys(%{$cross})) {
+		my $dec = lookup_name("$r");
+		print "0x$r $dec->{'name'} ($dec->{'desc'})\n";
+
+		foreach my $v (sort keys(%{$cross->{$r}})) {
+			printf "\t0x$v [%s]\n", show_bits($v);
+
+			foreach my $m (sort keys(%{$cross->{$r}->{$v}})) {
+				foreach my $func (sort keys(%{$cross->{$r}->{$v}->{$m}})) {
+					printf "\t\t$m $func\n";
+
+					foreach my $file (sort keys(%{$cross->{$r}->{$v}->{$m}->{$func}})) {
+						print "\t\t\t$file (lines ";
+						print $cross->{$r}->{$v}->{$m}->{$func}->{$file};
+						print ")\n";
+					}
+				}
 			}
 		}
 	}
