@@ -104,7 +104,7 @@ else {
 ### functions ###
 
 sub match_decode($) {
-	if (/^.*(.):0x0+(\w{4}) = 0x(\w{8}) - (.*)/) {
+	if (/^.*(.): ?0x0?(\w{4}) = 0x(\w{8}) - (.*)/) {
 		decode($1,$2,$3,$4);
 	}
 	else {
@@ -222,6 +222,10 @@ sub decode($$$$) {
 	}
 	else {
 		$dec = lookup_name($reg);
+		# allow us to re-convert already converted dumps
+		if ($func =~ /.*\((.*)\)$/) {
+			$func = $1;
+		}
 		# different output formats
 		if ($OUT_FORMAT eq "initval") {
 			if ($mode eq "W") {
