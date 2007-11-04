@@ -1989,8 +1989,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			else {
 				sc->sc_beacons = 0;
 				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
-				ath_hal_intrset(ah, ath_hal_intrget(ah) & 
-					~(HAL_INT_SWBA | HAL_INT_BMISS));
+				ath_hal_intrset(ah, sc->sc_imask);
 			}
 		}
 		if (status & HAL_INT_RXEOL) {
@@ -2043,8 +2042,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			else {
 				sc->sc_beacons = 0;
 				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
-				ath_hal_intrset(ah, ath_hal_intrget(ah) & 
-					~(HAL_INT_SWBA | HAL_INT_BMISS));
+				ath_hal_intrset(ah, sc->sc_imask);
 			}
 		}
 		if (status & HAL_INT_MIB) {
@@ -8298,7 +8296,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			sc->sc_dfs_channel_check = 1;
 			sc->sc_beacons = 0;
 			sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
-			ath_hal_intrset(ah, ath_hal_intrget(ah) & ~(HAL_INT_SWBA | HAL_INT_BMISS));
+			ath_hal_intrset(ah, sc->sc_imask);
+
 			/* Enter DFS wait period */
 			mod_timer(&sc->sc_dfs_channel_check_timer,
 				jiffies + (sc->sc_dfs_channel_availability_check_time * HZ));
@@ -8701,8 +8700,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 		/* XXX: if it is SCAN state, disable beacons. */
 		if (nstate == IEEE80211_S_SCAN) {
-			ath_hal_intrset(ah, sc->sc_imask &~ (HAL_INT_SWBA | HAL_INT_BMISS));
 			sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
+			ath_hal_intrset(ah, sc->sc_imask);
 			/* need to reconfigure the beacons when it moves to RUN */
 			sc->sc_beacons = 0;
 		}
