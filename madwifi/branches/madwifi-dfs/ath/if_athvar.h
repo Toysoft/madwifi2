@@ -758,6 +758,7 @@ struct ath_softc {
 
 	/* if set, we ignored all detected radars */
 	int sc_radar_ignored;
+	u_int32_t sc_nexttbtt;
 };
 
 typedef void (*ath_callback) (struct ath_softc *);

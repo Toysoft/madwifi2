@@ -1470,7 +1470,41 @@ ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
 static __inline u_int64_t
 ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
 {
-	return ((tsf &~ 0x7fff) | rstamp);
+#define TSTAMP_DELAY 500 /* hypothesis : tsf is at max. 500 us ahead */
+#define TSTAMP_MASK  0x7fff
+
+	u_int32_t tsf_low;
+	u_int64_t result;
+
+	rstamp    &= TSTAMP_MASK;
+	tsf_low    = tsf &  TSTAMP_MASK;
+	result     = (tsf & ~TSTAMP_MASK) | rstamp;
+
+	/* we check that rstamp <= tsf_low <= rstamp + TSTAMP_DELAY */
+
+	if (rstamp <= TSTAMP_MASK - TSTAMP_DELAY) {
+		if (tsf_low >= rstamp &&
+		    tsf_low <= rstamp + TSTAMP_DELAY) {
+			return result;
+		}
+		printk("error at line %d: rstamp=%4x tsf=%10llx (%4lld)\n",
+		       __LINE__, rstamp, tsf, (tsf - rstamp) & TSTAMP_MASK);
+	} else {
+		if (tsf_low >= rstamp &&
+		    tsf_low <= TSTAMP_MASK) {
+			return result;
+		}
+		if (tsf_low >= 0 &&
+		    tsf_low <= ((rstamp + TSTAMP_DELAY) & TSTAMP_MASK)) {
+			return result - (TSTAMP_MASK + 1);
+		}
+		printk("error at line %d: rstamp=%4x tsf=%10llx (%4lld)\n",
+		       __LINE__, rstamp, tsf, (tsf - rstamp) & TSTAMP_MASK);
+	}
+
+	/* in case of error, tsf is the best approximation (experiments have
+	 * shown around 50 us of delay) */
+	return tsf;
 }
 
 static void
@@ -1973,10 +2007,17 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		ATH_SCHEDULE_TQUEUE(&sc->sc_rxorntq, &needmark);
 	} else {
 		if (status & HAL_INT_SWBA) {
+			struct ieee80211vap * vap;
+			u_int64_t hw_tsf = ath_hal_gettsf64(ah);
+
+			/* Updates sc_nexttbtt */
+			vap = TAILQ_FIRST(&sc->sc_ic.ic_vaps);
+			sc->sc_nexttbtt += vap->iv_bss->ni_intval;
+
 			DPRINTF(sc, ATH_DEBUG_BEACON,
-				"%s: ath_intr HAL_INT_SWBA at tsf %llu\n",
-				DEV_NAME(sc->sc_dev),
-				ath_hal_gettsf64(ah));
+				"%s: ath_intr HAL_INT_SWBA at tsf %10llx nexttbtt %10llx\n",
+				DEV_NAME(sc->sc_dev), hw_tsf,
+				(u_int64_t)sc->sc_nexttbtt<<10);
 
 			/*
 			 * Software beacon alert--time to send a beacon.
@@ -4768,20 +4809,18 @@ ath_beacon_free(struct ath_softc *sc)
 /*
  * Configure the beacon and sleep timers.
  *
- * When operating as an AP this resets the TSF and sets
- * up the hardware to notify us when we need to issue beacons.
+ * When operating as an AP/IBSS this resets the TSF and sets up the hardware to
+ * notify us when we need to issue beacons.
  *
- * When operating in station mode this sets up the beacon
- * timers according to the timestamp of the last received
- * beacon and the current TSF, configures PCF and DTIM
- * handling, programs the sleep registers so the hardware
- * will wake up in time to receive beacons, and configures
- * the beacon miss handling so we'll receive a BMISS
- * interrupt when we stop seeing beacons from the AP
+ * When operating in station mode this sets up the beacon timers according to
+ * the timestamp of the last received beacon and the current TSF, configures
+ * PCF and DTIM handling, programs the sleep registers so the hardware will
+ * wake up in time to receive beacons, and configures the beacon miss handling
+ * so we'll receive a BMISS interrupt when we stop seeing beacons from the AP
  * we've associated with.
  *
- * Note : TBTT is Target Beacon Transmission Time (see IEEE
- * 802.11-1999: 4 & 11.2.1.3).
+ * Note : TBTT is Target Beacon Transmission Time (see IEEE 802.11-1999: 4 &
+ * 11.2.1.3).
  */
 static void
 ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
@@ -4997,6 +5036,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		ath_beacon_dturbo_config(vap, intval &
 				~(HAL_BEACON_RESET_TSF | HAL_BEACON_ENA));
 #endif
+		sc->sc_nexttbtt = nexttbtt;
 		ath_hal_beaconinit(ah, nexttbtt, intval);
 		sc->sc_bmisscount = 0;
 		ath_hal_intrset(ah, sc->sc_imask);
@@ -5031,8 +5071,12 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		}
 	}
 
-	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: nexttbtt=%u intval=%u\n",
-		__func__, nexttbtt, intval & HAL_BEACON_PERIOD);
+	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: nexttbtt=%10x intval=%u%s%s imask=%s%s\n",
+		__func__, nexttbtt, intval & HAL_BEACON_PERIOD,
+		intval & HAL_BEACON_ENA       ? " HAL_BEACON_ENA"       : "",
+		intval & HAL_BEACON_RESET_TSF ? " HAL_BEACON_RESET_TSF" : "",
+		sc->sc_imask & HAL_INT_BMISS  ? " HAL_INT_BMISS"        : "",
+		sc->sc_imask & HAL_INT_SWBA   ? " HAL_INT_SWBA"         : "");
 }
 
 static int
@@ -5864,6 +5908,9 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 {
 	struct ath_softc *sc = ni->ni_ic->ic_dev->priv;
 	struct ieee80211vap *vap = ni->ni_vap;
+	u_int64_t hw_tsf, beacon_tsf;
+	u_int32_t hw_tu, beacon_tu, intval;
+	int do_merge = 0;
 
 	/*Call up first so subsequent work can use information
 	 * potentially stored in the node (e.g. for ibss merge). */
@@ -5899,24 +5946,62 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		    break;
 		  }
 
-		        /* Handle IBSS merge as needed; check the TSF on the
-			 * frame before attempting the merge.  The 802.11 spec
-			 * says the station should change its BSSID to match
-			 * the oldest station with the same SSID, where oldest
-			 * is determined by the TSF.  Note that hardware
-			 * reconfiguration happens through callback to
-			 * ath_newstate as the state machine will go from
-			 * RUN -> RUN when this happens. */
+		  /* Handle IBSS merge as needed; check the TSF on the frame
+		   * before attempting the merge. The 802.11 spec says the
+		   * station should change its BSSID to match the oldest
+		   * station with the same SSID, where oldest is determined by
+		   * the TSF. Note that hardware reconfiguration happens
+		   * through callback to ath_newstate as the state machine will
+		   * go from RUN -> RUN when this happens. */
+
+		  hw_tsf = ath_hal_gettsf64(sc->sc_ah);
+		  hw_tu  = hw_tsf >> 10;
+
+		  beacon_tsf = le64_to_cpu(ni->ni_tstamp.tsf);
+		  beacon_tu  = beacon_tsf >> 10;
 
 		  DPRINTF(sc, ATH_DEBUG_BEACON,
-			  "check for ibss merge for ni=%p TSF1(t4)=%10llu TSF2(t3)=%10llu\n",
-			  ni, rtsf, le64_to_cpu(ni->ni_tstamp.tsf));
+			  "%s: beacon transmitted at %10llx, received at %10llx(%lld), hw TSF %10llx(%lld)\n",
+			  DEV_NAME(sc->sc_dev),
+			  beacon_tsf,
+			  rtsf, rtsf - beacon_tsf,
+			  hw_tsf, hw_tsf - beacon_tsf);
+		  
+		  if (rtsf < beacon_tsf) {
+			  DPRINTF(sc, ATH_DEBUG_BEACON,
+				  "%s: ibss merge: rtsf %10llx beacon's tsf %10llx\n",
+				  DEV_NAME(sc->sc_dev),
+				  rtsf, beacon_tsf);
+			  do_merge = 1;
+		  }
 
-		  if (rtsf < le64_to_cpu(ni->ni_tstamp.tsf)) {
-		    DPRINTF(sc, ATH_DEBUG_BEACON,
-			    "ibss merge, rtsf %10llu local tsf %10llu\n",
-			    rtsf, le64_to_cpu(ni->ni_tstamp.tsf));
-		    ieee80211_ibss_merge(ni);
+		  /* Check sc_nexttbtt */
+		  if (sc->sc_nexttbtt < hw_tu) {
+			  DPRINTF(sc, ATH_DEBUG_BEACON,
+				  "%s: ibss merge: sc_nexttbtt (%8x TU) is in the past (tsf %8x TU)!\n",
+				  DEV_NAME(sc->sc_dev),
+				  sc->sc_nexttbtt, hw_tu);
+			  do_merge = 1;
+		  }
+
+		  intval = ni->ni_intval & HAL_BEACON_PERIOD;
+		  if (intval != 0) {
+			  
+			  if ((sc->sc_nexttbtt % intval) !=
+			      (beacon_tu % intval)) {
+				  DPRINTF(sc, ATH_DEBUG_BEACON,
+					  "%s: ibss merge: sc_nexttbtt %10x TU (%3d) beacon %10x TU (%3d)\n",
+					  DEV_NAME(sc->sc_dev),
+					  sc->sc_nexttbtt,
+					  sc->sc_nexttbtt % intval,
+					  beacon_tu,
+					  beacon_tu % intval);
+				  do_merge = 1;
+			  }
+		  }
+
+		  if (do_merge) {
+			  ieee80211_ibss_merge(ni);
 		  }
 		}
 		break;
@@ -6095,6 +6180,12 @@ rx_accept:
 		 * the time the frame was received.  Use the current
 		 * TSF to extend this to 64 bits. */
 		rs_tsf = ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp);
+
+		DPRINTF(sc, ATH_DEBUG_BEACON,
+			"%s: rs_tstamp=%4x rs_tsf=%10llx bf_tsf=%10llx (%5lld)\n",
+			DEV_NAME(sc->sc_dev),
+			rs->rs_tstamp, rs_tsf,
+			bf->bf_tsf, (bf->bf_tsf - rs_tsf) & 0x7fff);
 
 		if (sc->sc_nmonvaps > 0) {
 			/* 
