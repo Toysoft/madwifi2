@@ -870,10 +870,10 @@ static int ath5k_hw_rf5112_rfregs(struct ath5k_hw *ah,
 
 	/* Modify bank 6 */
 	if (channel->val & CHANNEL_2GHZ) {
-		if (channel->val & CHANNEL_B)
-			ee_mode = AR5K_EEPROM_MODE_11B;
-		else
+		if (channel->val & CHANNEL_G)
 			ee_mode = AR5K_EEPROM_MODE_11G;
+		else
+			ee_mode = AR5K_EEPROM_MODE_11B;
 		obdb = 0;
 
 		if (!ath5k_hw_rfregs_op(rf, ah->ah_offset[6],

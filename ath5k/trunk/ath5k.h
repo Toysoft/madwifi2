@@ -50,9 +50,9 @@
 #define PCI_DEVICE_ID_ATHEROS_AR5212_FPGA 	0xf013 /* AR5212 (emulation board) */
 #define PCI_DEVICE_ID_ATHEROS_AR5211_LEGACY 	0xff12 /* AR5211 (emulation board) */
 #define PCI_DEVICE_ID_ATHEROS_AR5211_FPGA11B 	0xf11b /* AR5211 (emulation board) */
-#define PCI_DEVICE_ID_ATHEROS_AR5212_REV2 	0x0052 /* AR5312 WMAC (AP31) */
-#define PCI_DEVICE_ID_ATHEROS_AR5212_REV7 	0x0057 /* AR5312 WMAC (AP30-040) */
-#define PCI_DEVICE_ID_ATHEROS_AR5212_REV8 	0x0058 /* AR5312 WMAC (AP43-030) */
+#define PCI_DEVICE_ID_ATHEROS_AR5312_REV2 	0x0052 /* AR5312 WMAC (AP31) */
+#define PCI_DEVICE_ID_ATHEROS_AR5312_REV7 	0x0057 /* AR5312 WMAC (AP30-040) */
+#define PCI_DEVICE_ID_ATHEROS_AR5312_REV8 	0x0058 /* AR5312 WMAC (AP43-030) */
 #define PCI_DEVICE_ID_ATHEROS_AR5212_0014 	0x0014 /* AR5212 compatible */
 #define PCI_DEVICE_ID_ATHEROS_AR5212_0015 	0x0015 /* AR5212 compatible */
 #define PCI_DEVICE_ID_ATHEROS_AR5212_0016 	0x0016 /* AR5212 compatible */
@@ -62,6 +62,8 @@
 #define PCI_DEVICE_ID_ATHEROS_AR2413 		0x001a /* AR2413 (Griffin-lite) */
 #define PCI_DEVICE_ID_ATHEROS_AR5413 		0x001b /* AR5413 (Eagle) */
 #define PCI_DEVICE_ID_ATHEROS_AR5424 		0x001c /* AR5424 (Condor PCI-E) */
+#define PCI_DEVICE_ID_ATHEROS_AR5416 		0x0023 /* AR5416 */
+#define PCI_DEVICE_ID_ATHEROS_AR5418 		0x0024 /* AR5418 */
 
 /****************************\
   GENERIC DRIVER DEFINITIONS
@@ -84,8 +86,16 @@
 #define AR5K_TUNE_RADAR_ALERT			false
 #define AR5K_TUNE_MIN_TX_FIFO_THRES		1
 #define AR5K_TUNE_MAX_TX_FIFO_THRES		((IEEE80211_MAX_LEN / 64) + 1)
-#define AR5K_TUNE_RSSI_THRES			1792
 #define AR5K_TUNE_REGISTER_TIMEOUT		20000
+/* Register for RSSI threshold has a mask of 0xff, so 255 seems to
+ * be the max value. */
+#define AR5K_TUNE_RSSI_THRES                   129
+/* This must be set when setting the RSSI threshold otherwise it can
+ * prevent a reset. If AR5K_RSSI_THR is read after writing to it
+ * the BMISS_THRES will be seen as 0, seems harware doesn't keep
+ * track of it. Max value depends on harware. For AR5210 this is just 7.
+ * For AR5211+ this seems to be up to 255. */
+#define AR5K_TUNE_BMISS_THRES                  7
 #define AR5K_TUNE_REGISTER_DWELL_TIME		20000
 #define AR5K_TUNE_BEACON_INTERVAL		100
 #define AR5K_TUNE_AIFS				2
@@ -126,6 +136,18 @@ enum ath5k_radio {
 /*
  * Common silicon revision/version values
  */
+
+enum ath5k_srev_type {
+	AR5K_VERSION_VER,
+	AR5K_VERSION_RAD,
+};
+
+struct ath5k_srev_name {
+	const char		*sr_name;
+	enum ath5k_srev_type	sr_type;
+	u_int			sr_val;
+};
+
 #define AR5K_SREV_UNKNOWN	0xffff
 
 #define AR5K_SREV_VER_AR5210	0x00
@@ -135,7 +157,13 @@ enum ath5k_radio {
 #define AR5K_SREV_VER_AR5211	0x40
 #define AR5K_SREV_VER_AR5212	0x50
 #define AR5K_SREV_VER_AR5213	0x55
-#define AR5K_SREV_VER_UNSUPP	0x60
+#define AR5K_SREV_VER_AR5213A	0x59
+#define AR5K_SREV_VER_AR2424	0xa0
+#define AR5K_SREV_VER_AR5424	0xa3
+#define AR5K_SREV_VER_AR5413	0xa4
+#define AR5K_SREV_VER_AR5414	0xa5
+#define AR5K_SREV_VER_AR5416	0xc0	/* ? */
+#define AR5K_SREV_VER_AR5418	0xca
 
 #define AR5K_SREV_RAD_5110	0x00
 #define AR5K_SREV_RAD_5111	0x10
@@ -145,7 +173,9 @@ enum ath5k_radio {
 #define AR5K_SREV_RAD_5112A	0x35
 #define AR5K_SREV_RAD_2112	0x40
 #define AR5K_SREV_RAD_2112A	0x45
-#define AR5K_SREV_RAD_UNSUPP	0x50
+#define AR5K_SREV_RAD_SC1	0x63	/* Found on 5413/5414 */
+#define AR5K_SREV_RAD_SC2	0xa2	/* Found on 2424/5424 */
+#define AR5K_SREV_RAD_5133	0xc0	/* MIMO found on 5418 */
 
 /* IEEE defs */
 
@@ -352,86 +382,6 @@ enum ath5k_pkt_type {
 )
 
 /*
- * Used to compute TX times
- */
-#define AR5K_CCK_SIFS_TIME		10
-#define AR5K_CCK_PREAMBLE_BITS		144
-#define AR5K_CCK_PLCP_BITS		48
-
-#define AR5K_OFDM_SIFS_TIME		16
-#define AR5K_OFDM_PREAMBLE_TIME		20
-#define AR5K_OFDM_PLCP_BITS		22
-#define AR5K_OFDM_SYMBOL_TIME		4
-
-#define AR5K_TURBO_SIFS_TIME		8
-#define AR5K_TURBO_PREAMBLE_TIME	14
-#define AR5K_TURBO_PLCP_BITS		22
-#define AR5K_TURBO_SYMBOL_TIME		4
-
-#define AR5K_XR_SIFS_TIME		16
-#define AR5K_XR_PLCP_BITS		22
-#define AR5K_XR_SYMBOL_TIME		4
-
-/* CCK */
-#define AR5K_CCK_NUM_BITS(_frmlen) (_frmlen << 3)
-
-#define AR5K_CCK_PHY_TIME(_sp) (_sp ?					\
-	((AR5K_CCK_PREAMBLE_BITS + AR5K_CCK_PLCP_BITS) >> 1) :		\
-	(AR5K_CCK_PREAMBLE_BITS + AR5K_CCK_PLCP_BITS))
-
-#define AR5K_CCK_TX_TIME(_kbps, _frmlen, _sp)				\
-	(AR5K_CCK_PHY_TIME(_sp) +					\
-	((AR5K_CCK_NUM_BITS(_frmlen) * 1000) / _kbps) +			\
-	AR5K_CCK_SIFS_TIME)
-
-/* OFDM */
-#define AR5K_OFDM_NUM_BITS(_frmlen) (AR5K_OFDM_PLCP_BITS + (_frmlen << 3))
-
-#define AR5K_OFDM_NUM_BITS_PER_SYM(_kbps) ((_kbps *			\
-	AR5K_OFDM_SYMBOL_TIME) / 1000)
-
-#define AR5K_OFDM_NUM_BITS(_frmlen) (AR5K_OFDM_PLCP_BITS + (_frmlen << 3))
-
-#define AR5K_OFDM_NUM_SYMBOLS(_kbps, _frmlen)				\
-	DIV_ROUND_UP(AR5K_OFDM_NUM_BITS(_frmlen),			\
-			AR5K_OFDM_NUM_BITS_PER_SYM(_kbps))
-
-#define AR5K_OFDM_TX_TIME(_kbps, _frmlen)				\
-	(AR5K_OFDM_PREAMBLE_TIME + AR5K_OFDM_SIFS_TIME +		\
-	(AR5K_OFDM_NUM_SYMBOLS(_kbps, _frmlen) * AR5K_OFDM_SYMBOL_TIME))
-
-/* TURBO */
-#define AR5K_TURBO_NUM_BITS(_frmlen) (AR5K_TURBO_PLCP_BITS + (_frmlen << 3))
-
-#define AR5K_TURBO_NUM_BITS_PER_SYM(_kbps) (((_kbps << 1) *		\
-	AR5K_TURBO_SYMBOL_TIME) / 1000)
-
-#define AR5K_TURBO_NUM_BITS(_frmlen) (AR5K_TURBO_PLCP_BITS + (_frmlen << 3))
-
-#define AR5K_TURBO_NUM_SYMBOLS(_kbps, _frmlen)				\
-	DIV_ROUND_UP(AR5K_TURBO_NUM_BITS(_frmlen),			\
-			AR5K_TURBO_NUM_BITS_PER_SYM(_kbps))
-
-#define AR5K_TURBO_TX_TIME(_kbps, _frmlen)				\
-	(AR5K_TURBO_PREAMBLE_TIME + AR5K_TURBO_SIFS_TIME +		\
-	(AR5K_TURBO_NUM_SYMBOLS(_kbps, _frmlen) * AR5K_TURBO_SYMBOL_TIME))
-
-/* eXtendent Range (?)*/
-#define AR5K_XR_PREAMBLE_TIME(_kbps) (((_kbps) < 1000) ? 173 : 76)
-
-#define AR5K_XR_NUM_BITS_PER_SYM(_kbps) ((_kbps *			\
-	AR5K_XR_SYMBOL_TIME) / 1000)
-
-#define AR5K_XR_NUM_BITS(_frmlen) (AR5K_XR_PLCP_BITS + (_frmlen << 3))
-
-#define AR5K_XR_NUM_SYMBOLS(_kbps, _frmlen)				\
-	DIV_ROUND_UP(AR5K_XR_NUM_BITS(_frmlen), AR5K_XR_NUM_BITS_PER_SYM(_kbps))
-
-#define AR5K_XR_TX_TIME(_kbps, _frmlen)					\
-	(AR5K_XR_PREAMBLE_TIME(_kbps) + AR5K_XR_SIFS_TIME +		\
-	(AR5K_XR_NUM_SYMBOLS(_kbps, _frmlen) * AR5K_XR_SYMBOL_TIME))
-
-/*
  * DMA size definitions (2^n+2)
  */
 enum ath5k_dmasize {
@@ -599,17 +549,60 @@ struct ath5k_athchan_2ghz {
  * 	 used by the rate control algorytm on MadWiFi.
  */
 
-#define AR5K_MAX_RATES	32 /*max number of rates on the rate table*/
+/* Max number of rates on the rate table and what it seems
+ * Atheros hardware supports */
+#define AR5K_MAX_RATES 32
 
+/**
+ * struct ath5k_rate - rate structure
+ * @valid: is this a valid rate for the current mode
+ * @modulation: respective mac80211 modulation
+ * @rate_kbps: rate in kbit/s
+ * @rate_code: hardware rate value, used in &struct ath5k_desc, on RX on
+ *     &struct ath5k_rx_status.rs_rate and on TX on
+ *     &struct ath5k_tx_status.ts_rate. Seems the ar5xxx harware supports
+ *     up to 32 rates, indexed by 1-32. This means we really only need
+ *     6 bits for the rate_code.
+ * @dot11_rate: respective IEEE-802.11 rate value
+ * @control_rate: index of rate assumed to be used to send control frames.
+ *     This can be used to set override the value on the rate duration
+ *     registers. This is only useful if we can override in the harware at
+ *     what rate we want to send control frames at. Note that IEEE-802.11
+ *     Ch. 9.6 (after IEEE 802.11g changes) defines the rate at which we
+ *     should send ACK/CTS, if we change this value we can be breaking
+ *     the spec.
+ *
+ * This structure is used to get the RX rate or set the TX rate on the
+ * hardware descriptors. It is also used for internal modulation control
+ * and settings.
+ *
+ * On RX after the &struct ath5k_desc is parsed by the appropriate
+ * ah_proc_rx_desc() the respective hardware rate value is set in
+ * &struct ath5k_rx_status.rs_rate. On TX the desired rate is set in
+ * &struct ath5k_tx_status.ts_rate which is later used to setup the
+ * &struct ath5k_desc correctly. This is the hardware rate map we are
+ * aware of:
+ *
+ * rate_code   1       2       3       4       5       6       7       8
+ * rate_kbps   3000    1000    ?       ?       ?       2000    500     48000
+ *
+ * rate_code   9       10      11      12      13      14      15      16
+ * rate_kbps   24000   12000   6000    54000   36000   18000   9000    ?
+ *
+ * rate_code   17      18      19      20      21      22      23      24
+ * rate_kbps   ?       ?       ?       ?       ?       ?       ?       11000
+ *
+ * rate_code   25      26      27      28      29      30      31      32
+ * rate_kbps   5500    2000    1000    ?       ?       ?       ?       ?
+ *
+ */
 struct ath5k_rate {
-	u8	valid;		/* Valid for rate control */
+	u8	valid;
 	u32	modulation;
-	u16	rate_kbps;	/* Rate in kbps used in computetxtime */
-	u8	rate_code;	/* Rate mapping for h/w descriptors */
+	u16	rate_kbps;
+	u8	rate_code;
 	u8	dot11_rate;
-	u8	control_rate;	/* Rate for management frames -not used */
-	u16	lp_ack_duration;/* long preamble ACK duration -not used */
-	u16	sp_ack_duration;/* short preamble ACK duration -not used */
+	u8	control_rate;
 };
 
 /* XXX: GRR all this stuff to get leds blinking ??? (check out setcurmode) */
@@ -921,8 +914,8 @@ struct ath5k_capabilities {
 struct ath5k_hw {
 	u32			ah_magic;
 
-	void			*ah_sc;
-	void __iomem		*ah_sh;
+	struct ath5k_softc	*ah_sc;
+	void __iomem		*ah_iobase;
 
 	enum ath5k_int		ah_imr;
 
@@ -1009,8 +1002,6 @@ struct ath5k_hw {
 	bool (*ah_setup_xtx_desc)(struct ath5k_hw *, struct ath5k_desc *,
 		unsigned int, unsigned int, unsigned int, unsigned int,
 		unsigned int, unsigned int);
-	int (*ah_fill_tx_desc)(struct ath5k_hw *, struct ath5k_desc *,
-		unsigned int, bool, bool);
 	int (*ah_proc_tx_desc)(struct ath5k_hw *, struct ath5k_desc *);
 	int (*ah_proc_rx_desc)(struct ath5k_hw *, struct ath5k_desc *);
 };
@@ -1022,7 +1013,7 @@ struct ath5k_hw {
 /* General Functions */
 extern int ath5k_hw_register_timeout(struct ath5k_hw *ah, u32 reg, u32 flag, u32 val, bool is_set);
 /* Attach/Detach Functions */
-extern struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc, void __iomem *sh);
+extern struct ath5k_hw *ath5k_hw_attach(struct ath5k_softc *sc, u8 mac_version);
 extern const struct ath5k_rate_table *ath5k_hw_get_rate_table(struct ath5k_hw *ah, unsigned int mode);
 extern void ath5k_hw_detach(struct ath5k_hw *ah);
 /* Reset Functions */
@@ -1131,12 +1122,12 @@ extern int ath5k_hw_set_txpower_limit(struct ath5k_hw *ah, unsigned int power);
 
 static inline u32 ath5k_hw_reg_read(struct ath5k_hw *ah, u16 reg)
 {
-	return ioread32(ah->ah_sh + reg);
+	return ioread32(ah->ah_iobase + reg);
 }
 
 static inline void ath5k_hw_reg_write(struct ath5k_hw *ah, u32 val, u16 reg)
 {
-	iowrite32(val, ah->ah_sh + reg);
+	iowrite32(val, ah->ah_iobase + reg);
 }
 
 #endif
