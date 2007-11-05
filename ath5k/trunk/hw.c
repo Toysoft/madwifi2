@@ -27,8 +27,8 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 
-#include "ath5k.h"
 #include "reg.h"
+#include "base.h"
 
 /*Rate tables*/
 static const struct ath5k_rate_table ath5k_rt_11a = AR5K_RATES_11A;
@@ -47,15 +47,11 @@ static int ath5k_hw_setup_4word_tx_desc(struct ath5k_hw *, struct ath5k_desc *,
 static bool ath5k_hw_setup_xr_tx_desc(struct ath5k_hw *, struct ath5k_desc *,
 	unsigned int, unsigned int, unsigned int, unsigned int, unsigned int,
 	unsigned int);
-static int ath5k_hw_fill_4word_tx_desc(struct ath5k_hw *, struct ath5k_desc *,
-	unsigned int, bool, bool);
 static int ath5k_hw_proc_4word_tx_status(struct ath5k_hw *, struct ath5k_desc *);
 static int ath5k_hw_setup_2word_tx_desc(struct ath5k_hw *, struct ath5k_desc *,
 	unsigned int, unsigned int, enum ath5k_pkt_type, unsigned int,
 	unsigned int, unsigned int, unsigned int, unsigned int, unsigned int,
 	unsigned int, unsigned int);
-static int ath5k_hw_fill_2word_tx_desc(struct ath5k_hw *, struct ath5k_desc *,
-	unsigned int, bool, bool);
 static int ath5k_hw_proc_2word_tx_status(struct ath5k_hw *, struct ath5k_desc *);
 static int ath5k_hw_proc_new_rx_status(struct ath5k_hw *, struct ath5k_desc *);
 static int ath5k_hw_proc_old_rx_status(struct ath5k_hw *, struct ath5k_desc *);
@@ -77,76 +73,6 @@ static int ath5k_hw_disable_pspoll(struct ath5k_hw *);
 /*******************\
   General Functions
 \*******************/
-
-
-/*
- * Calculate transmition time of a frame
- * TODO: Left here for combatibility, change it in ath5k
- */
-static u16 /*TODO: Is this really hardware dependent ?*/
-ath5k_computetxtime(struct ath5k_hw *ah, const struct ath5k_rate_table *rates,
-		u32 frame_length, u16 rate_index, bool short_preamble)
-{
-	const struct ath5k_rate *rate;
-	u32 value;
-
-	AR5K_ASSERT_ENTRY(rate_index, rates->rate_count);
-
-	/*
-	 * Get rate by index
-	 */
-	rate = &rates->rates[rate_index];
-
-	/*
-	 * Calculate the transmission time by operation (PHY) mode
-	 */
-	switch (rate->modulation) {
-	/* Standard rates */
-	case IEEE80211_RATE_CCK:
-		/*
-		 * CCK / DS mode (802.11b)
-		 */
-		value = AR5K_CCK_TX_TIME(rate->rate_kbps, frame_length,
-			short_preamble &&
-			rate->modulation == IEEE80211_RATE_CCK_2);
-		break;
-
-	case IEEE80211_RATE_OFDM:
-		/*
-		 * Orthogonal Frequency Division Multiplexing
-		 */
-		if (AR5K_OFDM_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
-			return 0;
-		value = AR5K_OFDM_TX_TIME(rate->rate_kbps, frame_length);
-		break;
-
-	/* Vendor-specific rates */
-	case MODULATION_TURBO:
-		/*
-		 * Orthogonal Frequency Division Multiplexing
-		 * Atheros "Turbo Mode" (doubled rates)
-		 */
-		if (AR5K_TURBO_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
-			return 0;
-		value = AR5K_TURBO_TX_TIME(rate->rate_kbps, frame_length);
-		break;
-
-	case MODULATION_XR:
-		/*
-		 * Orthogonal Frequency Division Multiplexing
-		 * Atheros "eXtended Range" (XR)
-		 */
-		if (AR5K_XR_NUM_BITS_PER_SYM(rate->rate_kbps) == 0)
-			return 0;
-		value = AR5K_XR_TX_TIME(rate->rate_kbps, frame_length);
-		break;
-
-	default:
-		return 0;
-	}
-
-	return value;
-}
 
 /*
  * Functions used internaly
@@ -191,8 +117,7 @@ int ath5k_hw_register_timeout(struct ath5k_hw *ah, u32 reg, u32 flag, u32 val,
 /*
  * Check if the device is supported and initialize the needed structs
  */
-struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
-		void __iomem *sh)
+struct ath5k_hw *ath5k_hw_attach(struct ath5k_softc *sc, u8 mac_version)
 {
 	struct ath5k_hw *ah;
 	u8 mac[ETH_ALEN];
@@ -208,7 +133,7 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	}
 
 	ah->ah_sc = sc;
-	ah->ah_sh = sh;
+	ah->ah_iobase = sc->iobase;
 
 	/*
 	 * HW information
@@ -229,23 +154,6 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	ah->ah_software_retry = false;
 	ah->ah_ant_diversity = AR5K_TUNE_ANT_DIVERSITY;
 
-	switch (device) {
-	case PCI_DEVICE_ID_ATHEROS_AR2413:
-	case PCI_DEVICE_ID_ATHEROS_AR5413:
-	case PCI_DEVICE_ID_ATHEROS_AR5424:
-		/*
-		 * Known single chip solutions
-		 */
-		ah->ah_single_chip = true;
-		break;
-	default:
-		/*
-		 * Multi chip solutions
-		 */
-		ah->ah_single_chip = false;
-		break;
-	}
-
 	/*
 	 * Set the mac revision based on the pci id
 	 */
@@ -260,12 +168,10 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	if (ah->ah_version == AR5K_AR5212) {
 		ah->ah_setup_tx_desc = ath5k_hw_setup_4word_tx_desc;
 		ah->ah_setup_xtx_desc = ath5k_hw_setup_xr_tx_desc;
-		ah->ah_fill_tx_desc = ath5k_hw_fill_4word_tx_desc;
 		ah->ah_proc_tx_desc = ath5k_hw_proc_4word_tx_status;
 	} else {
 		ah->ah_setup_tx_desc = ath5k_hw_setup_2word_tx_desc;
 		ah->ah_setup_xtx_desc = ath5k_hw_setup_xr_tx_desc;
-		ah->ah_fill_tx_desc = ath5k_hw_fill_2word_tx_desc;
 		ah->ah_proc_tx_desc = ath5k_hw_proc_2word_tx_status;
 	}
 
@@ -294,6 +200,26 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	else
 		ah->ah_radio_2ghz_revision = ath5k_hw_radio_revision(ah,
 				CHANNEL_2GHZ);
+
+	/* Return on unsuported chips (unsupported eeprom etc) */
+	if(srev >= AR5K_SREV_VER_AR5416){
+		printk(KERN_ERR "ath5k: Device not yet supported.\n");
+		ret = -ENODEV;
+		goto err_free;
+	}
+
+	/* Warn for partially supported chips (unsupported phy etc) */
+	if(srev >= AR5K_SREV_VER_AR2424){
+		printk(KERN_DEBUG "ath5k: Device partially supported.\n");
+	}
+
+	/* Identify single chip solutions */
+	if((srev <= AR5K_SREV_VER_AR5414) &&
+	(srev >= AR5K_SREV_VER_AR2424)) {
+		ah->ah_single_chip = true;
+	} else {
+		ah->ah_single_chip = false;
+	}
 
 	/* Single chip radio */
 	if (ah->ah_radio_2ghz_revision == ah->ah_radio_5ghz_revision)
@@ -326,7 +252,7 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	ret = ath5k_hw_get_capabilities(ah);
 	if (ret) {
 		AR5K_PRINTF("unable to get device capabilities: 0x%04x\n",
-			device);
+			sc->pdev->device);
 		goto err_free;
 	}
 
@@ -334,7 +260,7 @@ struct ath5k_hw *ath5k_hw_attach(u16 device, u8 mac_version, void *sc,
 	ret = ath5k_eeprom_read_mac(ah, mac);
 	if (ret) {
 		AR5K_PRINTF("unable to read address from EEPROM: 0x%04x\n",
-			device);
+			sc->pdev->device);
 		goto err_free;
 	}
 
@@ -527,9 +453,130 @@ void ath5k_hw_detach(struct ath5k_hw *ah)
 	kfree(ah);
 }
 
-/*******************************\
-	Reset Functions
-\*******************************/
+/*
+ * Reset function and helpers
+ */
+
+/**
+ * ath5k_hw_write_ofdm_timings - set OFDM timings on AR5212
+ *
+ * @ah: the &struct ath5k_hw
+ * @channel: the currently set channel upon reset
+ *
+ * Write the OFDM timings for the AR5212 upon reset. This is a helper for
+ * ath5k_hw_reset(). This seems to tune the PLL a specified frequency
+ * depending on the bandwidth of the channel.
+ *
+ */
+static inline int ath5k_hw_write_ofdm_timings(struct ath5k_hw *ah,
+	struct ieee80211_channel *channel)
+{
+	/* Get exponent and mantissa and set it */
+	u32 coef_scaled, coef_exp, coef_man,
+		ds_coef_exp, ds_coef_man, clock;
+
+	if (!(ah->ah_version == AR5K_AR5212) ||
+		!(channel->val & CHANNEL_OFDM))
+		BUG();
+
+	/* Seems there are two PLLs, one for baseband sampling and one
+	 * for tuning. Tuning basebands are 40 MHz or 80MHz when in
+	 * turbo. */
+	clock = channel->val & CHANNEL_TURBO ? 80 : 40;
+	coef_scaled = ((5 * (clock << 24)) / 2) /
+	channel->freq;
+
+	for (coef_exp = 31; coef_exp > 0; coef_exp--)
+		if ((coef_scaled >> coef_exp) & 0x1)
+			break;
+
+	if (!coef_exp)
+		return -EINVAL;
+
+	coef_exp = 14 - (coef_exp - 24);
+	coef_man = coef_scaled +
+		(1 << (24 - coef_exp - 1));
+	ds_coef_man = coef_man >> (24 - coef_exp);
+	ds_coef_exp = coef_exp - 16;
+
+	AR5K_REG_WRITE_BITS(ah, AR5K_PHY_TIMING_3,
+		AR5K_PHY_TIMING_3_DSC_MAN, ds_coef_man);
+	AR5K_REG_WRITE_BITS(ah, AR5K_PHY_TIMING_3,
+		AR5K_PHY_TIMING_3_DSC_EXP, ds_coef_exp);
+
+	return 0;
+}
+
+/**
+ * ath5k_hw_write_rate_duration - set rate duration during hw resets
+ *
+ * @ah: the &struct ath5k_hw
+ * @driver_mode: one of enum ieee80211_phymode or our one of our own
+ *     vendor modes
+ *
+ * Write the rate duration table for the current mode upon hw reset. This
+ * is a helper for ath5k_hw_reset(). It seems all this is doing is setting
+ * an ACK timeout for the hardware for the current mode for each rate. The
+ * rates which are capable of short preamble (802.11b rates 2Mbps, 5.5Mbps,
+ * and 11Mbps) have another register for the short preamble ACK timeout
+ * calculation.
+ *
+ */
+static inline void ath5k_hw_write_rate_duration(struct ath5k_hw *ah,
+       unsigned int driver_mode)
+{
+	struct ath5k_softc *sc = ah->ah_sc;
+	const struct ath5k_rate_table *rt;
+	unsigned int i;
+
+	/* Get rate table for the current operating mode */
+	rt = ath5k_hw_get_rate_table(ah,
+		driver_mode);
+
+	/* Write rate duration table */
+	for (i = 0; i < rt->rate_count; i++) {
+		const struct ath5k_rate *rate, *control_rate;
+		u32 reg;
+		u16 tx_time;
+
+		rate = &rt->rates[i];
+		control_rate = &rt->rates[rate->control_rate];
+
+		/* Set ACK timeout */
+		reg = AR5K_RATE_DUR(rate->rate_code);
+
+		/* An ACK frame consists of 10 bytes. If you add the FCS,
+		 * which ieee80211_generic_frame_duration() adds,
+		 * its 14 bytes. Note we use the control rate and not the
+		 * actual rate for this rate. See mac80211 tx.c
+		 * ieee80211_duration() for a brief description of
+		 * what rate we should choose to TX ACKs. */
+		tx_time = ieee80211_generic_frame_duration(sc->hw,
+			sc->iface_id, 10, control_rate->rate_kbps/100);
+
+		ath5k_hw_reg_write(ah, tx_time, reg);
+
+		if (!HAS_SHPREAMBLE(i))
+			continue;
+
+		/*
+		 * We're not distinguishing short preamble here,
+		 * This is true, all we'll get is a longer value here
+		 * which is not necessarilly bad. We could use
+		 * export ieee80211_frame_duration() but that needs to be
+		 * fixed first to be properly used by mac802111 drivers:
+		 *
+		 *  - remove erp stuff and let the routine figure ofdm
+		 *    erp rates
+		 *  - remove passing argument ieee80211_local as
+		 *    drivers don't have access to it
+		 *  - move drivers using ieee80211_generic_frame_duration()
+		 *    to this
+		 */
+		ath5k_hw_reg_write(ah, tx_time,
+			reg + (AR5K_SET_SHORT_PREAMBLE << 2));
+	}
+}
 
 /*
  * Main reset function
@@ -537,11 +584,10 @@ void ath5k_hw_detach(struct ath5k_hw *ah)
 int ath5k_hw_reset(struct ath5k_hw *ah, enum ieee80211_if_types op_mode,
 	struct ieee80211_channel *channel, bool change_channel)
 {
-	const struct ath5k_rate_table *rt;
 	struct ath5k_eeprom_info *ee = &ah->ah_capabilities.cap_eeprom;
 	u32 data, s_seq, s_ant, s_led[3];
 	s32 noise_floor;
-	unsigned int i, mode, freq, ee_mode, ant[2];
+	unsigned int i, mode, freq, ee_mode, ant[2], driver_mode = -1;
 	int ret;
 
 	AR5K_TRACE;
@@ -601,28 +647,32 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum ieee80211_if_types op_mode,
 			mode = AR5K_INI_VAL_11A;
 			freq = AR5K_INI_RFGAIN_5GHZ;
 			ee_mode = AR5K_EEPROM_MODE_11A;
+			driver_mode = MODE_IEEE80211A;
+			break;
+		case CHANNEL_G:
+			mode = AR5K_INI_VAL_11G;
+			freq = AR5K_INI_RFGAIN_2GHZ;
+			ee_mode = AR5K_EEPROM_MODE_11G;
+			driver_mode = MODE_IEEE80211G;
 			break;
 		case CHANNEL_B:
 			mode = AR5K_INI_VAL_11B;
 			freq = AR5K_INI_RFGAIN_2GHZ;
 			ee_mode = AR5K_EEPROM_MODE_11B;
-			break;
-		/* Is this ok on 5211 too ? */
-		case CHANNEL_G:
-			mode = AR5K_INI_VAL_11G;
-			freq = AR5K_INI_RFGAIN_2GHZ;
-			ee_mode = AR5K_EEPROM_MODE_11G;
+			driver_mode = MODE_IEEE80211B;
 			break;
 		case CHANNEL_T:
 			mode = AR5K_INI_VAL_11A_TURBO;
 			freq = AR5K_INI_RFGAIN_5GHZ;
 			ee_mode = AR5K_EEPROM_MODE_11A;
+			driver_mode = MODE_ATHEROS_TURBO;
 			break;
 		/*Is this ok on 5211 too ?*/
 		case CHANNEL_TG:
 			mode = AR5K_INI_VAL_11G_TURBO;
 			freq = AR5K_INI_RFGAIN_2GHZ;
 			ee_mode = AR5K_EEPROM_MODE_11G;
+			driver_mode = MODE_ATHEROS_TURBOG;
 			break;
 		case CHANNEL_XR:
 			if (ah->ah_version == AR5K_AR5211) {
@@ -632,6 +682,7 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum ieee80211_if_types op_mode,
 			mode = AR5K_INI_VAL_XR;
 			freq = AR5K_INI_RFGAIN_5GHZ;
 			ee_mode = AR5K_EEPROM_MODE_11A;
+			driver_mode = MODE_IEEE80211A;
 			break;
 		default:
 			AR5K_PRINTF("invalid channel: %d\n", channel->freq);
@@ -659,57 +710,8 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum ieee80211_if_types op_mode,
 
 		mdelay(1);
 
-		/*
-		 * Set rate duration table on 5212
-		 */
-		if (ah->ah_version == AR5K_AR5212) {
-
-			/*For 802.11b*/
-			if (!(channel->val & CHANNEL_B)) {
-
-				/*Get rate table for this operation mode*/
-				rt = ath5k_hw_get_rate_table(ah,
-						MODE_IEEE80211B);
-				if (!rt)
-					return -EINVAL;
-
-				/*Write rate duration table*/
-				for (i = 0; i < rt->rate_count; i++) {
-					data = AR5K_RATE_DUR(rt->rates[i].rate_code);
-					ath5k_hw_reg_write(ah,
-						ath5k_computetxtime(ah, rt,
-						14, rt->rates[i].control_rate,
-						false), data);
-					if (HAS_SHPREAMBLE(i))
-						ath5k_hw_reg_write(ah,
-						    ath5k_computetxtime(ah,
-						    rt, 14,
-						    rt->rates[i].control_rate,
-						    false), data +
-						    (AR5K_SET_SHORT_PREAMBLE << 2));
-				}
-
-			} else {
-			/* For 802.11a/g Turbo/XR mode (AR5K_MODE_XR here is
-			 * O.K. for both a/g - OFDM) */
-
-				/* Get rate table for this operation mode */
-				rt = ath5k_hw_get_rate_table(ah,
-				    channel->val & CHANNEL_TURBO ?
-				    MODE_ATHEROS_TURBO : MODE_ATHEROS_TURBOG);
-				if (!rt)
-					return -EINVAL;
-
-				/* Write rate duration table */
-				for (i = 0; i < rt->rate_count; i++)
-					ath5k_hw_reg_write(ah,
-						ath5k_computetxtime(ah, rt,
-						14, rt->rates[i].control_rate,
-						false),
-						AR5K_RATE_DUR(rt->rates[i].rate_code));
-
-			}
-		}
+		if (ah->ah_version == AR5K_AR5212)
+			ath5k_hw_write_rate_duration(ah, driver_mode);
 
 		/* Fix for first revision of the RF5112 RF chipset */
 		if (ah->ah_radio >= AR5K_RF5112 &&
@@ -744,39 +746,17 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum ieee80211_if_types op_mode,
 		 */
 
 		/* Write OFDM timings on 5212*/
-		if (ah->ah_version == AR5K_AR5212) {
-			if (channel->val & CHANNEL_OFDM) {
-				u32 coef_scaled, coef_exp, coef_man,
-					ds_coef_exp, ds_coef_man, clock;
-
-				clock = channel->val & CHANNEL_T ? 80 : 40;
-				coef_scaled = ((5 * (clock << 24)) / 2) /
-					channel->freq;
-
-				for (coef_exp = 31; coef_exp > 0; coef_exp--)
-					if ((coef_scaled >> coef_exp) & 0x1)
-						break;
-
-				if (!coef_exp)
-					return -EINVAL;
-
-				coef_exp = 14 - (coef_exp - 24);
-				coef_man = coef_scaled +
-					(1 << (24 - coef_exp - 1));
-				ds_coef_man = coef_man >> (24 - coef_exp);
-				ds_coef_exp = coef_exp - 16;
-
-				AR5K_REG_WRITE_BITS(ah, AR5K_PHY_TIMING_3,
-				    AR5K_PHY_TIMING_3_DSC_MAN, ds_coef_man);
-				AR5K_REG_WRITE_BITS(ah, AR5K_PHY_TIMING_3,
-				    AR5K_PHY_TIMING_3_DSC_EXP, ds_coef_exp);
-			}
+		if (ah->ah_version == AR5K_AR5212 &&
+			channel->val & CHANNEL_OFDM) {
+			ret = ath5k_hw_write_ofdm_timings(ah, channel);
+			if (ret)
+				return ret;
 		}
 
 		/*Enable/disable 802.11b mode on 5111
 		(enable 2111 frequency converter + CCK)*/
 		if (ah->ah_radio == AR5K_RF5111) {
-			if (channel->val & CHANNEL_B)
+			if (driver_mode == MODE_IEEE80211B)
 				AR5K_REG_ENABLE_BITS(ah, AR5K_TXCFG,
 				    AR5K_TXCFG_B_MODE);
 			else
@@ -869,13 +849,10 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum ieee80211_if_types op_mode,
 	/*PISR/SISR Not available on 5210*/
 	if (ah->ah_version != AR5K_AR5210) {
 		ath5k_hw_reg_write(ah, 0xffffffff, AR5K_PISR);
-		/* XXX: AR5K_RSSI_THR has masks and shifts defined for it, so
-		 * direct write using ath5k_hw_reg_write seems wrong. Test with:
-		 * AR5K_REG_WRITE_BITS(ah, AR5K_RSSI_THR,
-		 *   AR5K_RSSI_THR_BMISS, AR5K_TUNE_RSSI_THRES);
-		 * with different variables and check results compared
-		 * to ath5k_hw_reg_write(ah, )  */
-		ath5k_hw_reg_write(ah, AR5K_TUNE_RSSI_THRES, AR5K_RSSI_THR);
+		/* If we later allow tuning for this, store into sc structure */
+		data = AR5K_TUNE_RSSI_THRES |
+			AR5K_TUNE_BMISS_THRES << AR5K_RSSI_THR_BMISS_S;
+		ath5k_hw_reg_write(ah, data, AR5K_RSSI_THR);
 	}
 
 	/*
@@ -960,7 +937,9 @@ int ath5k_hw_reset(struct ath5k_hw *ah, enum ieee80211_if_types op_mode,
 
 	ah->ah_calibration = false;
 
-	if (!(channel->val & CHANNEL_B)) {
+	/* A and G modes can use QAM modulation which requires enabling
+	 * I and Q calibration. Don't bother in B mode. */
+	if (!(driver_mode == MODE_IEEE80211B)) {
 		ah->ah_calibration = true;
 		AR5K_REG_WRITE_BITS(ah, AR5K_PHY_IQ,
 				AR5K_PHY_IQ_CAL_NUM_LOG_MAX, 15);
@@ -3488,11 +3467,18 @@ ath5k_hw_setup_2word_tx_desc(struct ath5k_hw *ah, struct ath5k_desc *desc,
 {
 	u32 frame_type;
 	struct ath5k_hw_2w_tx_desc *tx_desc;
+	unsigned int buff_len;
 
 	tx_desc = (struct ath5k_hw_2w_tx_desc *)&desc->ds_ctl0;
 
+	/*
+	 * Validate input
+	 */
 	if (tx_tries0 == 0)
 		return -EINVAL;
+
+	/* Clear status descriptor */
+	memset(desc->ds_hw, 0, sizeof(struct ath5k_hw_tx_status));
 
 	/* Initialize control descriptor */
 	tx_desc->tx_control_0 = 0;
@@ -3500,19 +3486,33 @@ ath5k_hw_setup_2word_tx_desc(struct ath5k_hw *ah, struct ath5k_desc *desc,
 
 	/* Setup control descriptor */
 
-	/*Verify packet length*/
-	tx_desc->tx_control_0 = pkt_len & AR5K_2W_TX_DESC_CTL0_FRAME_LEN;
-	if (tx_desc->tx_control_0 != pkt_len)
+	/* Verify and set frame length */
+	if (pkt_len & ~AR5K_2W_TX_DESC_CTL0_FRAME_LEN)
 		return -EINVAL;
+
+	tx_desc->tx_control_0 = pkt_len & AR5K_2W_TX_DESC_CTL0_FRAME_LEN;
+
+	/* Verify and set buffer length */
+	buff_len = pkt_len - FCS_LEN;
+
+	/* NB: beacon's BufLen must be a multiple of 4 bytes */
+	if(type == AR5K_PKT_TYPE_BEACON)
+		buff_len = roundup(buff_len, 4);
+
+	if (buff_len & ~AR5K_2W_TX_DESC_CTL1_BUF_LEN)
+		return -EINVAL;
+
+	tx_desc->tx_control_1 = buff_len & AR5K_2W_TX_DESC_CTL1_BUF_LEN;
+
 	/*
-	 * Verify header length
+	 * Verify and set header length
 	 * XXX: I only found that on 5210 code, does it work on 5211 ?
 	 */
 	if (ah->ah_version == AR5K_AR5210) {
-		tx_desc->tx_control_0 = hdr_len &
-				AR5K_2W_TX_DESC_CTL0_HEADER_LEN;
-		if (tx_desc->tx_control_0 != hdr_len)
+		if (hdr_len & ~AR5K_2W_TX_DESC_CTL0_HEADER_LEN)
 			return -EINVAL;
+		tx_desc->tx_control_0 |=
+			AR5K_REG_SM(hdr_len, AR5K_2W_TX_DESC_CTL0_HEADER_LEN);
 	}
 
 	/*Diferences between 5210-5211*/
@@ -3527,14 +3527,14 @@ ath5k_hw_setup_2word_tx_desc(struct ath5k_hw *ah, struct ath5k_desc *desc,
 			frame_type = type /*<< 2 ?*/;
 		}
 
-		tx_desc->tx_control_0 =
+		tx_desc->tx_control_0 |=
 			AR5K_REG_SM(frame_type, AR5K_2W_TX_DESC_CTL0_FRAME_TYPE) |
 			AR5K_REG_SM(tx_rate0, AR5K_2W_TX_DESC_CTL0_XMIT_RATE);
 	} else {
 		tx_desc->tx_control_0 |=
 			AR5K_REG_SM(tx_rate0, AR5K_2W_TX_DESC_CTL0_XMIT_RATE) |
 			AR5K_REG_SM(antenna_mode, AR5K_2W_TX_DESC_CTL0_ANT_MODE_XMIT);
-		tx_desc->tx_control_1 =
+		tx_desc->tx_control_1 |=
 			AR5K_REG_SM(type, AR5K_2W_TX_DESC_CTL1_FRAME_TYPE);
 	}
 #define _TX_FLAGS(_c, _flag)						\
@@ -3583,10 +3583,12 @@ static int ath5k_hw_setup_4word_tx_desc(struct ath5k_hw *ah,
 	unsigned int rtscts_duration)
 {
 	struct ath5k_hw_4w_tx_desc *tx_desc;
+	struct ath5k_hw_tx_status *tx_status;
+	unsigned int buff_len;
 
 	AR5K_TRACE;
-
 	tx_desc = (struct ath5k_hw_4w_tx_desc *)&desc->ds_ctl0;
+	tx_status = (struct ath5k_hw_tx_status *)&desc->ds_hw[2];
 
 	/*
 	 * Validate input
@@ -3594,21 +3596,39 @@ static int ath5k_hw_setup_4word_tx_desc(struct ath5k_hw *ah,
 	if (tx_tries0 == 0)
 		return -EINVAL;
 
-	/* Initialize status descriptor */
+	/* Clear status descriptor */
+	memset(tx_status, 0, sizeof(struct ath5k_hw_tx_status));
+
+	/* Initialize control descriptor */
 	tx_desc->tx_control_0 = 0;
 	tx_desc->tx_control_1 = 0;
 	tx_desc->tx_control_2 = 0;
 	tx_desc->tx_control_3 = 0;
 
-	/* Setup status descriptor */
-	tx_desc->tx_control_0 = pkt_len & AR5K_4W_TX_DESC_CTL0_FRAME_LEN;
-	if (tx_desc->tx_control_0 != pkt_len)
+	/* Setup control descriptor */
+
+	/* Verify and set frame length */
+	if (pkt_len & ~AR5K_4W_TX_DESC_CTL0_FRAME_LEN)
 		return -EINVAL;
+
+	tx_desc->tx_control_0 = pkt_len & AR5K_4W_TX_DESC_CTL0_FRAME_LEN;
+
+	/* Verify and set buffer length */
+	buff_len = pkt_len - FCS_LEN;
+
+	/* NB: beacon's BufLen must be a multiple of 4 bytes */
+	if(type == AR5K_PKT_TYPE_BEACON)
+		buff_len = roundup(buff_len, 4);
+
+	if (buff_len & ~AR5K_4W_TX_DESC_CTL1_BUF_LEN)
+		return -EINVAL;
+
+	tx_desc->tx_control_1 = buff_len & AR5K_4W_TX_DESC_CTL1_BUF_LEN;
 
 	tx_desc->tx_control_0 |=
 		AR5K_REG_SM(tx_power, AR5K_4W_TX_DESC_CTL0_XMIT_POWER) |
 		AR5K_REG_SM(antenna_mode, AR5K_4W_TX_DESC_CTL0_ANT_MODE_XMIT);
-	tx_desc->tx_control_1 = AR5K_REG_SM(type,
+	tx_desc->tx_control_1 |= AR5K_REG_SM(type,
 					AR5K_4W_TX_DESC_CTL1_FRAME_TYPE);
 	tx_desc->tx_control_2 = AR5K_REG_SM(tx_tries0 + AR5K_TUNE_HWTXTRIES,
 					AR5K_4W_TX_DESC_CTL2_XMIT_TRIES0);
@@ -3654,7 +3674,7 @@ static int ath5k_hw_setup_4word_tx_desc(struct ath5k_hw *ah,
 }
 
 /*
- * Initialize a 4-word XR tx descriptor on 5212
+ * Initialize a 4-word multirate tx descriptor on 5212
  */
 static bool
 ath5k_hw_setup_xr_tx_desc(struct ath5k_hw *ah, struct ath5k_desc *desc,
@@ -3686,66 +3706,6 @@ ath5k_hw_setup_xr_tx_desc(struct ath5k_hw *ah, struct ath5k_desc *desc,
 	}
 
 	return false;
-}
-
-/*
- * Fill the 2-word tx descriptor on 5210/5211
- */
-static int ath5k_hw_fill_2word_tx_desc(struct ath5k_hw *ah,
-	struct ath5k_desc *desc, unsigned int segment_length,
-	bool first_segment, bool last_segment)
-{
-	struct ath5k_hw_2w_tx_desc *tx_desc;
-
-	tx_desc = (struct ath5k_hw_2w_tx_desc *)&desc->ds_ctl0;
-
-	/* Clear status descriptor */
-	memset(desc->ds_hw, 0, sizeof(desc->ds_hw));
-
-	/* Validate segment length and initialize the descriptor */
-	tx_desc->tx_control_1 = segment_length & AR5K_2W_TX_DESC_CTL1_BUF_LEN;
-	if (tx_desc->tx_control_1 != segment_length)
-		return -EINVAL;
-
-	if (first_segment != true)
-		tx_desc->tx_control_0 &= ~AR5K_2W_TX_DESC_CTL0_FRAME_LEN;
-
-	if (last_segment != true)
-		tx_desc->tx_control_1 |= AR5K_2W_TX_DESC_CTL1_MORE;
-
-	return 0;
-}
-
-/*
- * Fill the 4-word tx descriptor on 5212
- * XXX: Added an argument *last_desc -need revision
- */
-static int ath5k_hw_fill_4word_tx_desc(struct ath5k_hw *ah,
-	struct ath5k_desc *desc, unsigned int segment_length,
-	bool first_segment, bool last_segment)
-{
-	struct ath5k_hw_4w_tx_desc *tx_desc;
-	struct ath5k_hw_tx_status *tx_status;
-
-	AR5K_TRACE;
-	tx_desc = (struct ath5k_hw_4w_tx_desc *)&desc->ds_ctl0;
-	tx_status = (struct ath5k_hw_tx_status *)&desc->ds_hw[2];
-
-	/* Clear status descriptor */
-	memset(tx_status, 0, sizeof(struct ath5k_hw_tx_status));
-
-	/* Validate segment length and initialize the descriptor */
-	tx_desc->tx_control_1 = segment_length & AR5K_4W_TX_DESC_CTL1_BUF_LEN;
-	if (tx_desc->tx_control_1 != segment_length)
-		return -EINVAL;
-
-	if (first_segment != true)
-		tx_desc->tx_control_0 &= ~AR5K_4W_TX_DESC_CTL0_FRAME_LEN;
-
-	if (last_segment != true)
-		tx_desc->tx_control_1 |= AR5K_4W_TX_DESC_CTL1_MORE;
-
-	return 0;
 }
 
 /*
