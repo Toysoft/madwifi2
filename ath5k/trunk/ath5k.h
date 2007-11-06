@@ -1061,6 +1061,8 @@ extern int ath5k_hw_set_beacon_timers(struct ath5k_hw *ah, const struct ath5k_be
 extern void ath5k_hw_reset_beacon(struct ath5k_hw *ah);
 extern int ath5k_hw_wait_for_beacon(struct ath5k_hw *ah, unsigned long phys_addr);
 extern void ath5k_hw_update_mib_counters(struct ath5k_hw *ah, struct ath5k_mib_stats *statistics);
+/* ACK bit rate */
+void ath5k_hw_set_ack_bitrate_high(struct ath5k_hw *ah, bool high);
 /* ACK/CTS Timeouts */
 extern int ath5k_hw_set_ack_timeout(struct ath5k_hw *ah, unsigned int timeout);
 extern unsigned int ath5k_hw_get_ack_timeout(struct ath5k_hw *ah);

@@ -2193,6 +2193,8 @@ ath5k_init(struct ath5k_softc *sc)
 		AR5K_INT_RXORN | AR5K_INT_FATAL | AR5K_INT_GLOBAL;
 
 	ath5k_hw_set_intr(sc->ah, sc->imask);
+	/* Set ack to be sent at low bit-rates */
+	ath5k_hw_set_ack_bitrate_high(sc->ah, false);
 
 	mod_timer(&sc->calib_tim, round_jiffies(jiffies +
 			msecs_to_jiffies(ath5k_calinterval * 1000)));
