@@ -2852,6 +2852,25 @@ void ath5k_hw_update_mib_counters(struct ath5k_hw *ah,
 	}
 }
 
+/** ath5k_hw_set_ack_bitrate - set bitrate for ACKs
+ *
+ * @ah: the &struct ath5k_hw
+ * @high: determines if to use low bit rate or now
+ */
+void ath5k_hw_set_ack_bitrate_high(struct ath5k_hw *ah, bool high)
+{
+	if (ah->ah_version != AR5K_AR5212)
+		return;
+	else {
+		u32 val = AR5K_STA_ID1_BASE_RATE_11B | AR5K_STA_ID1_ACKCTS_6MB;
+		if (high)
+			AR5K_REG_ENABLE_BITS(ah, AR5K_STA_ID1, val);
+		else
+			AR5K_REG_DISABLE_BITS(ah, AR5K_STA_ID1, val);
+	}
+}
+
+
 /*
  * ACK/CTS Timeouts
  */
