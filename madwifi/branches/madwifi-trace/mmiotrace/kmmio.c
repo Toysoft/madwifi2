@@ -30,7 +30,7 @@ static LIST_HEAD(kmmio_probes);
 static struct list_head kmmio_page_table[KMMIO_PAGE_TABLE_SIZE];
 
 unsigned int kmmio_count = 0;
-unsigned int handler_registered = 0;
+static unsigned int handler_registered = 0;
 static spinlock_t kmmio_lock = SPIN_LOCK_UNLOCKED;
 static int cpu = -1;
 static struct kmmio_fault_page *cur_page = NULL;
@@ -41,11 +41,11 @@ static int large_page = 0;
 int kmmio_page_fault_notifier(struct notifier_block *nb, unsigned long val, void *args);
 int kmmio_die_notifier(struct notifier_block *nb, unsigned long val, void *args);
 
-struct notifier_block nb_page_fault = {
+static struct notifier_block nb_page_fault = {
 	.notifier_call = kmmio_page_fault_notifier
 };
 
-struct notifier_block nb_die = {
+static struct notifier_block nb_die = {
 	.notifier_call = kmmio_die_notifier
 };
 

@@ -47,7 +47,6 @@
 #include <linux/slab.h>
 #include <asm/io.h>
 */
-#include <stddef.h>
 #define PREFIX_NAME "FI_PF"
 /*#include <linux/fi/fi.h>
 #include <linux/fi/fi_interface.h>
@@ -73,7 +72,7 @@ static unsigned char prefix_codes[] = {
 };
 #endif
 
-int skip_prefix(unsigned char *addr, int *shorted, int *enlarged, int *rexr)
+static int skip_prefix(unsigned char *addr, int *shorted, int *enlarged, int *rexr)
 {
 	int i;
 	unsigned char *p = addr;
@@ -97,7 +96,7 @@ restart:
 	return p-addr;
 }
 
-int get_opcode(unsigned char *addr, unsigned int *opcode)
+static int get_opcode(unsigned char *addr, unsigned int *opcode)
 {
 	int len;
 
@@ -302,7 +301,7 @@ unsigned int get_ins_mem_width(unsigned long ins_addr) {
 #endif
 
 #ifdef __i386__
-unsigned char *get_reg_w8(int no, regs_t *regs)
+static unsigned char *get_reg_w8(int no, regs_t *regs)
 {
 	unsigned char *rv = NULL;
 
@@ -339,9 +338,9 @@ unsigned char *get_reg_w8(int no, regs_t *regs)
 	return rv;
 }
 
-unsigned long *get_reg_w32(int no, regs_t *regs)
+static long *get_reg_w32(int no, regs_t *regs)
 {
-	unsigned long *rv = NULL;
+	long *rv = NULL;
 
 	switch (no) {
 	case EAX:
@@ -435,9 +434,9 @@ unsigned char *get_reg_w8(int no, regs_t *regs)
 	return rv;
 }
 
-unsigned long *get_reg_w32(int no, regs_t *regs)
+static long *get_reg_w32(int no, regs_t *regs)
 {
-	unsigned long *rv = NULL;
+	long *rv = NULL;
 
 	switch (no) {
 	case RAX:

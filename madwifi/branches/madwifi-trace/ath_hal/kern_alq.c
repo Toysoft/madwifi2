@@ -77,7 +77,7 @@ static pid_t ald_proc = -1;
 #define	ALD_LOCK()	spin_lock(&ald_lock)
 #define	ALD_UNLOCK()	spin_unlock(&ald_lock)
 
-DECLARE_WAIT_QUEUE_HEAD(ald_waitq);
+static DECLARE_WAIT_QUEUE_HEAD(ald_waitq);
 #define	ALD_WAIT(condition)	do {			\
 	ALD_UNLOCK();					\
 	wait_event_interruptible(ald_waitq, condition);	\
@@ -237,7 +237,7 @@ alq_shutdown(struct alq *alq)
 	} else
 		spin_unlock_irqrestore(&alq->aq_lock, flags);
 
-	filp_close(alq->aq_fp, /*XXX*/0);
+	filp_close(alq->aq_fp, /*XXX*/NULL);
 }
 
 /*
@@ -389,7 +389,7 @@ bad3:
 bad2:
 	kfree(alq);
 bad1:
-	filp_close(f, /*XXX*/0);
+	filp_close(f, /*XXX*/NULL);
 	return error;
 }
 EXPORT_SYMBOL(alq_open);

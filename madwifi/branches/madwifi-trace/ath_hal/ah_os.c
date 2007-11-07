@@ -231,7 +231,7 @@ sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 		return ath_hal_setlogging(enable);
 }
 
-void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
+static void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
 {
 	struct ale *ale;
 	
@@ -248,17 +248,15 @@ void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
 	sprintf(ale->ae_data, "%s:0x%05x = 0x%08x - %s\n", (write ? "W" : "R"), reg, val, (ath_hal_func ?: "unknown"));
 	alq_post(ath_hal_alq, ale);
 }
-EXPORT_SYMBOL(ath_hal_logmsg);
 
 #elif defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
 
-void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
+static void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
 {
 	if (!ah)
 		return;
 	ath_hal_printf(ah, "%s:0x%04x = 0x%08x - %s\n", (write ? "W" : "R"), reg, val, (ath_hal_func ?: "unknown"));
 }
-EXPORT_SYMBOL(ath_hal_logmsg);
 
 
 /*
@@ -300,7 +298,7 @@ ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 EXPORT_SYMBOL(ath_hal_reg_read);
 #endif /* AH_DEBUG || AH_REGOPS_FUNC */
 
-#ifdef AH_DEBUG
+#if 0
 void __ahdecl
 HALDEBUG(struct ath_hal *ah, const char* fmt, ...)
 {
@@ -323,7 +321,7 @@ HALDEBUGn(struct ath_hal *ah, u_int level, const char* fmt, ...)
 		va_end(ap);
 	}
 }
-#endif /* AH_DEBUG */
+#endif /* 0 */
 
 /*
  * Delay n microseconds.
