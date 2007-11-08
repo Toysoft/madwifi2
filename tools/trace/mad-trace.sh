@@ -44,8 +44,6 @@ rm -f /tmp/mad-trace.tgz
 
 madwifi-unload
 
-run_ath_info
-
 for opmode in "sta" "ap" "adhoc"; do
 	for mode in 1 2 3; do
 		count=1
@@ -68,6 +66,8 @@ for opmode in "sta" "ap" "adhoc"; do
 		madwifi-unload
 	done
 done
+
+run_ath_info
 
 chip=`grep "MAC Revision" /tmp/mad-trace/ath_info.log | awk '{print $3}'`
 tar cvzf /tmp/$chip-mad-trace.tgz $TMP
