@@ -2270,7 +2270,7 @@ ath_reset(struct net_device *dev)
 	ath_draintxq(sc);		/* stop xmit side */
 	ath_stoprecv(sc);		/* stop recv side */
 	/* NB: indicate channel change so we do a full reset */
-	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
+	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_FALSE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
 			DEV_NAME(dev), __func__, ath_get_hal_status_desc(status), status);
 	ath_update_txpow(sc);		/* update tx power state */
@@ -7905,7 +7905,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		else
 			ath_hal_setcoverageclass(sc->sc_ah, ic->ic_coverageclass, 0);
 
-		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_TRUE, &status)) {
+		if (!ath_hal_reset(ah, sc->sc_opmode, &hchan, AH_FALSE, &status)) {
 			printk("%s: %s: unable to reset channel %u (%u MHz) "
 				"flags 0x%x '%s' (HAL status %u)\n",
 				DEV_NAME(dev), __func__,
