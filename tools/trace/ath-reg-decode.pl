@@ -87,11 +87,12 @@ elsif ($DUMP) {
 	foreach_reg();
 }
 elsif ($BATCH) {
+	my $oldout;
 	foreach $f (@ARGV) {
 		open IN, "<", $f;
 		if (!$CROSS) {
 			print STDERR "converting $f -> $f.$OUT_FORMAT\n";
-			open my $oldout, ">&STDOUT" or die "Can't dup STDOUT: $!";
+			open $oldout, ">&STDOUT" or die "Can't dup STDOUT: $!";
 			open STDOUT, ">$f.$OUT_FORMAT" or die "Can't redirect stdout";
 		}
 		my $line = 0;
