@@ -744,21 +744,6 @@ static __inline void _node_table_join(struct ieee80211_node_table *nt, struct ie
 
 	ni->ni_table = nt;
 	tni = ieee80211_ref_node(ni);
-	/* MT: BEGIN HACK 
-         * XXX: r2792 fixed a bug where ieee80211_ref_node was being
- 	 * invoked five times on ni because it was passed to TAILQ_INSERT_TAIL
-         * which happens to evaluate it's value five times.  This fixed a problem
-         * where we were gaining four extra references, but unfortunately exposed
-         * other bugs which cause kernel panics.  I am working on a fix for this as part
-         * of ticket #1621.  In the meantime, adding these references back is 'wrong'
-         * but better than getting five new critical defects per day while debugging.
-         */
-	ieee80211_ref_node(ni);ieee80211_ref_node(ni); 
-	ieee80211_ref_node(ni);ieee80211_ref_node(ni); 
-	/*
-	 * END HACK
-         */
-
 	TAILQ_INSERT_TAIL(&nt->nt_node, tni, ni_list);
 	tni = NULL;
 	
@@ -853,12 +838,6 @@ node_cleanup(struct ieee80211_node *ni)
 static void
 node_free(struct ieee80211_node *ni)
 {
-#if 0
-	/* We should 'cleanup' and then free'ing should be done automatically on decref */
-	struct ieee80211com *ic = ni->ni_ic;
-
-	ic->ic_node_cleanup(ni);
-#endif
 	KASSERT(ieee80211_node_refcnt(ni) == 0, ("node being free whilst still referenced"));
 
 	if (ni->ni_challenge != NULL)
@@ -1101,6 +1080,7 @@ _ieee80211_find_wds_node(struct ieee80211_node_table *nt, const u_int8_t *macadd
 	return NULL;
 }
 
+/* NB: A node reference is acquired here; the caller MUST release it. */
 static struct ieee80211_node *
 #ifdef IEEE80211_DEBUG_REFCNT
 _ieee80211_find_node_debug(struct ieee80211_node_table *nt,
@@ -1270,11 +1250,11 @@ ieee80211_add_neighbor(struct ieee80211vap *vap, const struct ieee80211_frame *w
 }
 
 /*
- * Locate the node for sender, track state, and then pass the
- * (referenced) node up to the 802.11 layer for its use.  We
- * return NULL when the sender is unknown; the driver is required
- * locate the appropriate virtual ap in that case; possibly
- * sending it to all (using ieee80211_input_all).
+ * Return the node for the sender of a frame; if the sender is unknown return 
+ * NULL. The caller is expected to deal with this. (The frame is sent to all 
+ * VAPs in this case).
+ *
+ * NB: A node reference is acquired here; the caller MUST release it.
  */
 struct ieee80211_node *
 #ifdef IEEE80211_DEBUG_REFCNT
@@ -1313,8 +1293,10 @@ EXPORT_SYMBOL(ieee80211_find_rxnode);
 #endif
 
 /*
- * Return a reference to the appropriate node for sending
- * a data frame.  This handles node discovery in adhoc networks.
+ * Return the appropriate node for sending a data frame.  This handles node 
+ * discovery in adhoc networks.
+ *
+ * NB: A node reference is acquired here; the caller MUST release it.
  */
 struct ieee80211_node *
 #ifdef IEEE80211_DEBUG_REFCNT
@@ -1335,7 +1317,7 @@ ieee80211_find_txnode(struct ieee80211vap *vap, const u_int8_t *mac)
 	if (vap->iv_opmode == IEEE80211_M_STA || IEEE80211_IS_MULTICAST(mac))
 		return ieee80211_ref_node(vap->iv_bss);
 
-	/* XXX can't hold lock across dup_bss due to recursive locking */
+	/* XXX: Can't hold lock across dup_bss due to recursive locking. */
 	nt = &vap->iv_ic->ic_sta;
 	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
 	ni = _ieee80211_find_node(nt, mac);
@@ -2004,11 +1986,7 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 	 */
 	ieee80211_sta_leave(ni);
 done:
-	/*
-	 * Run a cleanup and then drop the caller's reference
-	 */
 	ic->ic_node_cleanup(ni);
-	ieee80211_unref_node(&ni);
 }
 EXPORT_SYMBOL(ieee80211_node_leave);
 

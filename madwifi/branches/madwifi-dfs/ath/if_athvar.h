@@ -607,13 +607,13 @@ struct ath_softc {
 			sc_stagbeacons:1,	/* use staggered beacons */
 			sc_dfswait:1,    	/* waiting on channel for radar detect */
 			sc_ackrate:1,		/* send acks at high bitrate */
+			sc_hasintmit:1,		/* Interference mitigation */
 			sc_dfs_channel_check:1,	/* waiting on channel for radar detect */
 			sc_txcont:1,        	/* Is continuous transmit enabled? */
 			sc_dfs_testmode:1; 	/* IF this is on, AP vaps will stay in
 						   'channel availability check' indefinately,
 						   reporting radar and interference detections.
 						*/
-
 	unsigned int sc_txcont_power; /* Continuous transmit power in 0.5dBm units */
 	unsigned int sc_txcont_rate;  /* Continuous transmit rate in Mbps */
 

@@ -223,7 +223,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 
-	cb = (struct ieee80211_cb *) skb->cb;
+	cb = (struct ieee80211_cb *)skb->cb;
 	memset(cb, 0, sizeof(struct ieee80211_cb));
 
 	if (vap->iv_opmode == IEEE80211_M_MONITOR) {
@@ -270,40 +270,35 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		 * We'll get the frame back when the time is right.
 		 */
 		ieee80211_pwrsave(ni, skb);
-		ieee80211_unref_node(&ni); /* matches ieee80211_find_txnode */
+		ieee80211_unref_node(&ni);
 		return 0;
 	}
 
 #ifdef ATH_SUPERG_XR
-	/* 
-	 * broadcast/multicast  packets need to be sent on XR vap in addition to
-	 * normal vap.
-	 */
+	/* Broadcast/multicast packets need to be sent on XR vap in addition to
+	 * normal vap. */
 
-	/* FIXME: ieee80211_parent_queue_xmit */
-	if (vap->iv_xrvap && ni == vap->iv_bss &&
+	if (vap->iv_xrvap && (ni == vap->iv_bss) &&
 	    vap->iv_xrvap->iv_sta_assoc) {
-		struct sk_buff *skb1;
-		skb1 = skb_clone(skb, GFP_ATOMIC);
+		struct sk_buff *skb1 = skb_clone(skb, GFP_ATOMIC);
 		if (skb1) {
-			cb = (struct ieee80211_cb *) skb1->cb;
+			cb = (struct ieee80211_cb *)skb1->cb;
+			memset(cb, 0, sizeof(struct ieee80211_cb));
 			cb->ni = ieee80211_find_txnode(vap->iv_xrvap, 
 						       eh->ether_dhost);
-			cb->flags = 0;
-			cb->next = NULL;
-			(void) dev_queue_xmit(skb1);
+			ieee80211_parent_queue_xmit(skb1);
 		}
 	}
 #endif
 	ieee80211_parent_queue_xmit(skb);
-	ieee80211_unref_node(&ni); /* matches ieee80211_find_txnode */
+	ieee80211_unref_node(&ni);
 	return 0;
 
 bad:
 	if (skb != NULL)
 		dev_kfree_skb(skb);
 	if (ni != NULL)
-		ieee80211_unref_node(&ni); /* matches ieee80211_find_txnode */
+		ieee80211_unref_node(&ni);
 	return 0;
 }
 
@@ -436,13 +431,11 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 	(void) ic->ic_mgtstart(ic, skb);
 }
 
-/*
- * Send a null data frame to the specified node.
+/* Send a null data frame to the specified node.
  *
- * NB: the caller is assumed to have setup a node reference
- *     for use; this is necessary to deal with a race condition
- *     when probing for inactive stations.
- */
+ * NB: the caller provides us with our own node reference this must not be 
+ *     leaked; this is necessary to deal with a race condition when 
+ *     probing for inactive stations. */
 int
 ieee80211_send_nulldata(struct ieee80211_node *ni)
 {
@@ -460,8 +453,6 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 		ieee80211_unref_node(&ni);
 		return -ENOMEM;
 	}
-	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ni;
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
@@ -490,6 +481,8 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 
 	/* XXX assign some priority; this probably is wrong */
 	skb->priority = WME_AC_BE;
+	cb = (struct ieee80211_cb *)skb->cb;
+	cb->ni = PASS_NODE(ni);
 
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
 
@@ -858,13 +851,13 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		    !IEEE80211_ADDR_EQ(eh.ether_shost, vap->iv_myaddr)) {
 			use4addr = 1;
 			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_macaddr);
-			/* Add a wds entry to the station VAP */
+			/* Add a WDS entry to the station VAP */
 			if (IEEE80211_IS_MULTICAST(eh.ether_dhost)) {
 				struct ieee80211_node_table *nt = &ic->ic_sta;
 				struct ieee80211_node *ni_wds 
 					= ieee80211_find_wds_node(nt, eh.ether_shost);
 				if (ni_wds)
-					ieee80211_unref_node(&ni_wds); /* Decr. ref. count */
+					ieee80211_unref_node(&ni_wds);
 				else
 					ieee80211_add_wds_addr(nt, ni, eh.ether_shost, 0);
 			}
@@ -1714,17 +1707,6 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	u_int8_t *frm;
 
 	/*
-	 * Hold a reference on the node so it doesn't go away until after
-	 * the xmit is complete all the way in the driver.  On error we
-	 * will remove our reference.
-	 */
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
-		__func__, __LINE__,
-		ni, ether_sprintf(ni->ni_macaddr),
-		ieee80211_node_refcnt(ni) + 1);
-
-	/*
 	 * prreq frame format
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
@@ -1799,18 +1781,6 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 	int has_challenge, is_shared_key, ret, timer, status;
 
 	KASSERT(ni != NULL, ("null node"));
-
-	/*
-	 * Hold a reference on the node so it doesn't go away until after
-	 * the xmit is complete all the way in the driver.  On error we
-	 * will remove our reference.
-	 */
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
-		__func__, __LINE__,
-		ni, ether_sprintf(ni->ni_macaddr),
-		ieee80211_node_refcnt(ni) + 1);
-	ieee80211_ref_node(ni);
 
 	timer = 0;
 	switch (type) {
@@ -2230,12 +2200,11 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		/* NOTREACHED */
 	}
 
-	ieee80211_mgmt_output(ni, skb, type);
+	ieee80211_mgmt_output(ieee80211_ref_node(ni), skb, type);
 	if (timer)
 		mod_timer(&vap->iv_mgtsend, jiffies + timer * HZ);
 	return 0;
 bad:
-	ieee80211_unref_node(&ni);
 	return ret;
 #undef senderr
 }
@@ -2254,9 +2223,8 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 
 	skb = dev_alloc_skb(sizeof(struct ieee80211_ctlframe_addr2));
 	if (skb == NULL) return;
-	ieee80211_ref_node(ni);
 	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ni;
+	cb->ni = ieee80211_ref_node(ni);
 	skb->priority = WME_AC_VO;
 
 	wh = (struct ieee80211_ctlframe_addr2 *) skb_put(skb, sizeof(struct ieee80211_ctlframe_addr2));
