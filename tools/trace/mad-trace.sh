@@ -3,6 +3,7 @@
 IF=ath0
 WLANDEV=wifi0
 TMP=/tmp/mad-trace
+CONNECT=$1
 
 count=1
 
@@ -12,7 +13,7 @@ trace() {
 	#filename=`printf "%02d\n" $count`-$2.log
 	filename=$2.log
 	echo "'$1' -> $filename"
-	$1
+	eval $1
 	sleep 1
 	echo 0 > /proc/sys/dev/ath/hal/alq
 	sed 's/\x00//g' /tmp/ath_hal.log > $TMP/$filename
@@ -35,14 +36,71 @@ run_ath_info() {
 	mv ath-eeprom-dump.bin $TMP/
 }
 
+create_tar() {
+	chip=`grep "MAC Revision" /tmp/mad-trace/ath_info.log | awk '{print $3}'`
+	tar cvzf /tmp/$chip-mad-trace-$1.tgz $TMP
+}
 
 ### "main" ###
 
 rm -rf $TMP
 mkdir -p $TMP
-rm -f /tmp/mad-trace.tgz
 
 madwifi-unload
+
+if [ -n "$CONNECT" ]; then
+	echo "*** testbed connection tracing ***"
+	echo "* be sure that you have set up the testbed (AP) correctly "
+	echo "* b mode: essid bbb channel 10"
+	echo "* g mode: essid ggg channel 10"
+	echo "* a mode: essid aaa channel 60"
+	echo "* gturbo mode: essid gturbo channel 6"
+	echo "* aturbo mode: essid aturbo channel 42"
+	echo "***********************************"
+
+	load_hal_debug
+	trace "modprobe ath_pci" "attach"
+else
+	echo "*** offline tracing ***************"
+	echo "* (no testbed setup) to get more detailed results you can"
+	echo "* use ./mad-trace.sh <MODE> for tracing connections in a testbed"
+	echo "* <MODE> can be a b g gturbo aturbo"
+	echo "***********************************"
+fi
+
+
+if [ "$CONNECT" == "g" ]; then
+	trace "iwpriv $IF mode 3" "g-iwpriv-mode-3"
+	iwconfig $IF essid ggg channel 10
+	trace "ifconfig $IF up; while iwconfig | grep Not-Associated; do sleep 1; done" "g-ifconfig"
+elif [ "$CONNECT" == "a" ]; then
+	trace "iwpriv $IF mode 1" "a-iwpriv-mode-1"
+	iwconfig $IF essid aaa channel 60
+	trace "ifconfig $IF up; while iwconfig | grep Not-Associated; do sleep 1; done" "a-ifconfig"
+elif [ "$CONNECT" == "b" ]; then
+	trace "iwpriv $IF mode 3" "b-iwpriv-mode-3"
+	iwconfig $IF essid bbb channel 10
+	trace "ifconfig $IF up; while iwconfig | grep Not-Associated; do sleep 1; done" "b-ifconfig"
+elif [ "$CONNECT" == "aturbo" ]; then
+	iwconfig $IF essid aturbo channel 42
+	trace "ifconfig $IF up; while iwconfig | grep Not-Associated; do sleep 1; done" "at-ifconfig"
+elif [ "$CONNECT" == "gturbo" ]; then
+	iwconfig $IF essid gturbo channel 6
+	trace "ifconfig $IF up; while iwconfig | grep Not-Associated; do sleep 1; done" "gt-ifconfig"
+fi
+echo "* connection established. done."
+
+if [ -n "$CONNECT" ]; then
+	madwifi-unload
+
+	run_ath_info
+	create_tar "connect"
+
+	exit
+fi
+
+
+### no testbed setup. trace all bands and modes ###
 
 for opmode in "sta" "ap" "adhoc"; do
 	for mode in 1 2 3; do
@@ -68,6 +126,4 @@ for opmode in "sta" "ap" "adhoc"; do
 done
 
 run_ath_info
-
-chip=`grep "MAC Revision" /tmp/mad-trace/ath_info.log | awk '{print $3}'`
-tar cvzf /tmp/$chip-mad-trace.tgz $TMP
+create_tar "all-modes"
