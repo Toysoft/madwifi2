@@ -1579,11 +1579,8 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			if (HAL_EINPROGRESS == retval)
 				break;
 	
-			/* update the per packet TSF with hw_tsf, hw_tsf is 
-			 * updated on each RX interrupt, at the start of this 
-			 * routine. */
-
-			bf->bf_tsf    = rs->rs_tstamp;
+			/* update the per packet TSF with rs_tstamp */
+			bf->bf_tsf     = rs->rs_tstamp;
 			bf->bf_status |= ATH_BUFSTATUS_RXTSTAMP;
 			count ++;
 
