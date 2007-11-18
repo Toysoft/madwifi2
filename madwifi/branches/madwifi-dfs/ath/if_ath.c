@@ -1011,6 +1011,9 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 				DEV_NAME(dev));
 	}
 
+	sc->sc_lastradar_tsf = 0;
+	sc->sc_last_tsf      = 0;
+
 	return 0;
 bad3:
 	ieee80211_ifdetach(ic);
@@ -1467,49 +1470,31 @@ ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
 }
 
 
-/* Extend 15-bit time stamp from rx descriptor to a full 64-bit TSF
- * using the current h/w TSF. We no longer make an adjustement since
- * tsf should always be bf_tsf and bf_tsf is adjusted. */
+/* Extend 15-bit timestamp from RX descriptor to a full 64-bit TSF using the
+ * provided hardware TSF. The result is the closest value relative to hardware
+ * TSF.
+ */
 
 /* NB: Not all chipsets return the same precision rstamp */
 static __inline u_int64_t
 ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
 {
-#define TSTAMP_DELAY 500 /* hypothesis : tsf is at max. 500 us ahead */
 #define TSTAMP_MASK  0x7fff
 
-	u_int32_t tsf_low;
 	u_int64_t result;
 
-	rstamp    &= TSTAMP_MASK;
-	tsf_low    = tsf &  TSTAMP_MASK;
-	result     = (tsf & ~TSTAMP_MASK) | rstamp;
-
-	/* we check that rstamp <= tsf_low <= rstamp + TSTAMP_DELAY */
-
-	if (rstamp <= TSTAMP_MASK - TSTAMP_DELAY) {
-		if (tsf_low >= rstamp &&
-		    tsf_low <= rstamp + TSTAMP_DELAY) {
-			return result;
+	result = (tsf & ~TSTAMP_MASK) | rstamp;
+	if (result > tsf) {
+		if (result - tsf > (TSTAMP_MASK/2)) {
+			result -= (TSTAMP_MASK+1);
 		}
-		printk("error at line %d: rstamp=%4x tsf=%10llx (%4lld)\n",
-		       __LINE__, rstamp, tsf, (tsf - rstamp) & TSTAMP_MASK);
 	} else {
-		if (tsf_low >= rstamp &&
-		    tsf_low <= TSTAMP_MASK) {
-			return result;
+		if (tsf - result > (TSTAMP_MASK/2)) {
+			result += (TSTAMP_MASK+1);
 		}
-		if (tsf_low >= 0 &&
-		    tsf_low <= ((rstamp + TSTAMP_DELAY) & TSTAMP_MASK)) {
-			return result - (TSTAMP_MASK + 1);
-		}
-		printk("error at line %d: rstamp=%4x tsf=%10llx (%4lld)\n",
-		       __LINE__, rstamp, tsf, (tsf - rstamp) & TSTAMP_MASK);
 	}
 
-	/* in case of error, tsf is the best approximation (experiments have
-	 * shown around 50 us of delay) */
-	return tsf;
+	return result;
 }
 
 static void
@@ -1525,12 +1510,15 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	struct ath_txq *uapsd_xmit_q = sc->sc_uapsdq;
 	struct ieee80211com *ic = &sc->sc_ic;
 	int ac, retval;
-	unsigned long last_rs_tstamp = 0;
+	u_int32_t last_rs_tstamp = 0;
 	int check_for_radar = 0;
 	struct ath_buf *prev_rxbufcur;
 	u_int8_t tid;
 	u_int16_t frame_seq;
 	u_int64_t hw_tsf;
+	int count = 0;
+	int rollover = 0;
+
 #define	PA2DESC(_sc, _pa) \
 	((struct ath_desc *)((caddr_t)(_sc)->sc_rxdma.dd_desc + \
 		((_pa) - (_sc)->sc_rxdma.dd_desc_paddr)))
@@ -1594,25 +1582,23 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			/* update the per packet TSF with hw_tsf, hw_tsf is 
 			 * updated on each RX interrupt, at the start of this 
 			 * routine. */
-			bf->bf_tsf = hw_tsf;
-			/* If we detect a rollover on rs_tstamp values, then we 
-			 * know that all packets we have seen already MUST be 
-			 * decremented by 0x8000 (1<<15) because the last packet
-			 * in the queue is for hw_tsf and any rollover we 
-			 * encounter means prior packets were not tagged with 
-			 * correct bf_tsf because of this rollover.  This 
-			 * assumes that when rollover happens, we get packets 
-			 * afterwards.  But, if not, we still have TSF values 
-			 * that do not go backward in time!
-			 */
-			if (rs->rs_tstamp < last_rs_tstamp || 
-			    (STAILQ_NEXT(bf, bf_list) == NULL && 
-			     ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp) > 
-			     hw_tsf)) {
-				/* Adjust TSF of this and all prior packets */
-				struct ath_buf *p = sc->sc_rxbufcur;
-				for (;p && p != bf; p = STAILQ_NEXT(p, bf_list))
-					p->bf_tsf -= 0x8000;
+
+			bf->bf_tsf    = rs->rs_tstamp;
+			bf->bf_status |= ATH_BUFSTATUS_RXTSTAMP;
+			count ++;
+
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"%s: rs_tstamp=%10llx count=%d\n",
+				DEV_NAME(sc->sc_dev),
+				bf->bf_tsf, count);
+
+			/* compute rollover */
+			if (last_rs_tstamp > rs->rs_tstamp) {
+				rollover ++;
+				DPRINTF(sc, ATH_DEBUG_BEACON,
+					"%s: %d rollover detected\n",
+					DEV_NAME(sc->sc_dev),
+					rollover);
 			}
 
 			last_rs_tstamp = rs->rs_tstamp;
@@ -1871,6 +1857,60 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		}
 		sc->sc_rxbufcur = bf;
 	}
+
+	/* SECOND PASS - FIX RX TIMESTAMPS */
+	if (count > 0) {
+		struct ath_buf * bf;
+		
+		hw_tsf = ath_hal_gettsf64(ah);
+		if (last_rs_tstamp > (hw_tsf & TSTAMP_MASK)) {
+			rollover ++;
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+			  "%s: %d rollover detected for hw_tsf=%10llx\n",
+				DEV_NAME(sc->sc_dev),
+				rollover, hw_tsf);
+		}
+		
+		last_rs_tstamp = 0;
+		for (bf=prev_rxbufcur; bf; bf = STAILQ_NEXT(bf, bf_list)) {
+			ds = bf->bf_desc;
+			if (ds->ds_link == bf->bf_daddr) {
+				/* NB: never process the self-linked entry at 
+				 * the end */
+				break;
+			}
+
+			/* we only process buffers who needs RX timestamps
+			 * adjustements */
+			
+			if  (bf->bf_status & ATH_BUFSTATUS_RXTSTAMP) {
+				bf->bf_status &= ~ATH_BUFSTATUS_RXTSTAMP;
+				
+				
+				/* update rollover */
+				if (last_rs_tstamp > bf->bf_tsf) {
+					rollover --;
+				}
+				
+				/* update last_rs_tstamp */
+				last_rs_tstamp = bf->bf_tsf;
+				bf->bf_tsf =(hw_tsf & ~TSTAMP_MASK)|bf->bf_tsf;
+				bf->bf_tsf -= rollover * (TSTAMP_MASK+1);
+				DPRINTF(sc, ATH_DEBUG_BEACON,
+					"%s: bf_tsf=%10llx hw_tsf=%10llx\n",
+					DEV_NAME(sc->sc_dev),
+					bf->bf_tsf, hw_tsf);
+
+				if (bf->bf_tsf < sc->sc_last_tsf) {
+					printk("TSF error: bf_tsf=%10llx sc_last_tsf=%10llx\n",
+					       bf->bf_tsf,
+					       sc->sc_last_tsf);
+				}
+				sc->sc_last_tsf = bf->bf_tsf;
+			}
+		}
+	}
+	
 	/* Process radar after we have done everything else */
 	if (check_for_radar) {
 		/* Collect pulse events */
@@ -1910,9 +1950,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				}
 				/* record the radar pulse event */
 				ath_radar_pulse_record (
-					sc, 
-					ath_extend_tsf(p->bf_tsf, rs->
-						       rs_tstamp),
+					sc, p->bf_tsf, 
 					rs->rs_rssi, 
 					(rs->rs_datalen ? skb->data[0] : 0), 
 					0 /* not simulated */);
@@ -1925,21 +1963,16 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 					"bf_tsf_low15:%llu rssi:%u width:%u\n",
 					DEV_NAME(sc->sc_dev),
 					sc->sc_curchan.channel,
-					jiffies,
-					ath_extend_tsf(p->bf_tsf, 
-						       rs->rs_tstamp),
-					ath_extend_tsf(p->bf_tsf, 
-						       rs->rs_tstamp) &~ 0x7fff,
-					rs->rs_tstamp,
+					jiffies, p->bf_tsf,
+					p->bf_tsf &~ TSTAMP_MASK,
+					p->bf_tsf &  TSTAMP_MASK,
 					p->bf_tsf,
-					p->bf_tsf &~ 0x7fff, 
-					p->bf_tsf & 0x7fff,
+					p->bf_tsf &~ TSTAMP_MASK, 
+					p->bf_tsf &  TSTAMP_MASK,
 					rs->rs_rssi,
 					skb->data[0]);
 #endif
-				sc->sc_lastradar_tsf = 
-					ath_extend_tsf(p->bf_tsf, 
-						       rs->rs_tstamp);
+				sc->sc_lastradar_tsf = p->bf_tsf;
 				p->bf_status |= ATH_BUFSTATUS_RADAR_DONE;
 			}
 		}
@@ -5935,8 +5968,9 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 }
 
 /*
- * Intercept management frames to collect beacon rssi data
- * and to do ibss merges.
+ * Intercept management frames to collect beacon rssi data and to do
+ * ibss merges. This function is called for all management frames,
+ * including those belonging to other BSS.
  */
 static void
 ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
@@ -6075,8 +6109,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	unsigned int len;
 	int type;
 	u_int phyerr;
-	u_int64_t rs_tsf;
-
 
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "%s\n", __func__);
 	do {
@@ -6211,18 +6243,7 @@ rx_accept:
 		skb_put(skb, len);
 		skb->protocol = __constant_htons(ETH_P_CONTROL);
 
-		/* Pass up TSF clock in MAC time
-		 * Rx descriptor has the low 15 bits of the TSf at
-		 * the time the frame was received.  Use the current
-		 * TSF to extend this to 64 bits. */
-		rs_tsf = ath_extend_tsf(bf->bf_tsf, rs->rs_tstamp);
-
-		DPRINTF(sc, ATH_DEBUG_BEACON,
-			"%s: rs_tstamp=%4x rs_tsf=%10llx bf_tsf=%10llx (%5lld)\n",
-			DEV_NAME(sc->sc_dev),
-			rs->rs_tstamp, rs_tsf,
-			bf->bf_tsf, (bf->bf_tsf - rs_tsf) & 0x7fff);
-
+		/* Pass up TSF clock in MAC time */
 		if (sc->sc_nmonvaps > 0) {
 			/* 
 			 * Some vap is in monitor mode, so send to
@@ -6238,7 +6259,7 @@ rx_accept:
 				goto rx_next;
 			}
 #endif
-			ath_rx_capture(dev, bf, skb, rs_tsf);
+			ath_rx_capture(dev, bf, skb, bf->bf_tsf);
 			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
 				/* no other VAPs need the packet */
 				dev_kfree_skb(skb);
@@ -6294,7 +6315,7 @@ rx_accept:
 			 * grab a reference for processing the frame. */
 			ni = ieee80211_ref_node(ni);
 			ATH_RSSI_LPF(ATH_NODE(ni)->an_avgrssi, rs->rs_rssi);
-			type = ieee80211_input(ni, skb, rs->rs_rssi, rs_tsf);
+			type = ieee80211_input(ni, skb, rs->rs_rssi, bf->bf_tsf);
 			ieee80211_unref_node(&ni);
 		} else {
 			/*
@@ -6308,7 +6329,7 @@ rx_accept:
 				ieee80211_keyix_t keyix;
 
 				ATH_RSSI_LPF(an->an_avgrssi, rs->rs_rssi);
-				type = ieee80211_input(ni, skb,	rs->rs_rssi, rs_tsf);
+				type = ieee80211_input(ni, skb,	rs->rs_rssi, bf->bf_tsf);
 				/*
 				 * If the station has a key cache slot assigned
 				 * update the key->node mapping table.
@@ -6320,7 +6341,7 @@ rx_accept:
 				an = NULL;
 				ieee80211_unref_node(&ni);
 			} else
-				type = ieee80211_input_all(ic, skb, rs->rs_rssi, rs_tsf);
+				type = ieee80211_input_all(ic, skb, rs->rs_rssi, bf->bf_tsf);
 		}
 
 		if (sc->sc_diversity) {

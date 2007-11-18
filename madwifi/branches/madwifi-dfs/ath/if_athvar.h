@@ -443,6 +443,8 @@ struct ath_buf {
 							   has already been handled.  We may receive
 							   multiple interrupts before the rx_tasklet
 							   clears the queue */
+#define ATH_BUFSTATUS_RXTSTAMP          0x00000004      /* RX timestamps needs to be adjusted */
+
 /* DMA state for tx/rx descriptors. */
 struct ath_descdma {
 	const char *dd_name;
@@ -759,6 +761,7 @@ struct ath_softc {
 	/* if set, we ignored all detected radars */
 	int sc_radar_ignored;
 	u_int32_t sc_nexttbtt;
+	u_int64_t sc_last_tsf;
 };
 
 typedef void (*ath_callback) (struct ath_softc *);
