@@ -825,7 +825,7 @@ ieee80211_dfs_action(struct ieee80211com *ic) {
 		/* It is not scanning, but waiting for ath driver to move the vap to RUN */
 	}
 	/* Check the scan results using only cached results */
-	if (!(ieee80211_check_scan(vap, IEEE80211_SCAN_NOSSID | IEEE80211_SCAN_KEEPMODE | IEEE80211_SCAN_USECACHE, 0, 
+	if (!(ieee80211_check_scan(vap, IEEE80211_SCAN_NOSSID | IEEE80211_SCAN_KEEPMODE | IEEE80211_SCAN_USECACHE, 0,
 				   vap->iv_des_nssid, vap->iv_des_ssid,
 				   ieee80211_scan_dfs_action))) {
 		/* No channel was found, so call the scan action with no result */
@@ -851,7 +851,7 @@ ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *ic)
 					    &tv_now) < 0) {
 				if_printf(dev,
 					  "Returning channel %3d (%4d MHz) radar avoidance marker expired.  Channel now available again. -- Time: %10ld.%06ld\n",
-					  c->ic_ieee, c->ic_freq, tv_now.tv_sec, 
+					  c->ic_ieee, c->ic_freq, tv_now.tv_sec,
 					  tv_now.tv_usec);
 				c->ic_flags &= ~IEEE80211_CHAN_RADAR;
 			} else {
@@ -893,7 +893,7 @@ ieee80211_update_dfs_channel_non_occupancy_timer(struct ieee80211com *ic)
 					    &tv_next) < 0) {
 				tv_next = chan->ic_non_occupancy_period;
 			}
-		}	
+		}
 	}
 
 	if ((tv_next.tv_sec == 0) &&
@@ -912,7 +912,7 @@ ieee80211_update_dfs_channel_non_occupancy_timer(struct ieee80211com *ic)
 }
 
 /* Periodically expire radar avoidance marks. */
-static void 
+static void
 ieee80211_expire_dfs_channel_non_occupancy_timer(unsigned long data)
 {
 	struct ieee80211com *ic = (struct ieee80211com *) data;
@@ -923,34 +923,34 @@ ieee80211_expire_dfs_channel_non_occupancy_timer(unsigned long data)
 	if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
 		/* Make sure there are no channels that have just become available */
 		ieee80211_expire_channel_non_occupancy_restrictions(ic);
-		/* Go through and clear any interference flag we have, if we 
+		/* Go through and clear any interference flag we have, if we
 		 * just got it cleared up for us */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 		  /* We need to check for the special value
 		     IEEE80211_CHAN_ANYC before using vap->iv_des_chan
 		     since it will cause a kernel panic */
-			if ((vap->iv_state == IEEE80211_S_RUN) && 
+			if ((vap->iv_state == IEEE80211_S_RUN) &&
 			    ((vap->iv_opmode == IEEE80211_M_HOSTAP) ||
 			     (vap->iv_opmode == IEEE80211_M_IBSS)) &&
 			    /* Operating on channel other than desired. */
 			    (vap->iv_des_chan != IEEE80211_CHAN_ANYC) &&
 			    (vap->iv_des_chan->ic_freq > 0) &&
 			    (vap->iv_des_chan->ic_freq != ic->ic_bsschan->ic_freq)) {
-				struct ieee80211_channel *des_chan = 
-					ieee80211_find_channel(ic, vap->iv_des_chan->ic_freq, 
+				struct ieee80211_channel *des_chan =
+					ieee80211_find_channel(ic, vap->iv_des_chan->ic_freq,
 							       vap->iv_des_chan->ic_flags);
 				/* Can we switch to it? */
 				if (NULL == des_chan) {
-					IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, 
-							  "%s: Desired channel not found: %u/%x\n", 
+					IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+							  "%s: Desired channel not found: %u/%x\n",
 							  __func__,
-							  vap->iv_des_chan->ic_freq, 
+							  vap->iv_des_chan->ic_freq,
 							  vap->iv_des_chan->ic_flags);
 				} else if (0 == (des_chan->ic_flags & IEEE80211_CHAN_RADAR)) {
 					IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-							  "%s: Desired channel found and available. Switching to %u/%x\n", 
-							  __func__, 
-							  vap->iv_des_chan->ic_freq, 
+							  "%s: Desired channel found and available. Switching to %u/%x\n",
+							  __func__,
+							  vap->iv_des_chan->ic_freq,
 							  vap->iv_des_chan->ic_flags);
 					ic->ic_chanchange_chan = des_chan->ic_ieee;
 					ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
@@ -958,15 +958,15 @@ ieee80211_expire_dfs_channel_non_occupancy_timer(unsigned long data)
 				} else {
 					IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 							  "%s: Desired channel found"
-							  " and not available until Time: %10ld.%06ld\n", 
+							  " and not available until Time: %10ld.%06ld\n",
 							  __func__,
-							  des_chan->ic_non_occupancy_period.tv_sec, 
+							  des_chan->ic_non_occupancy_period.tv_sec,
 							  des_chan->ic_non_occupancy_period.tv_usec);
 				}
 			}
 		}
 	}
-  
+ 
 	/* update the timer */
 	ieee80211_update_dfs_channel_non_occupancy_timer(ic);
 }

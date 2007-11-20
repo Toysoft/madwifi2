@@ -740,7 +740,7 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_
 			continue;
 
 		/* Do not select 802.11a ST if mode is specified and is not 802.11a ST */
-		if (as->as_required_mode && 
+		if (as->as_required_mode &&
 		    IEEE80211_IS_CHAN_STURBO(c->chan) &&
 		    as->as_vap_desired_mode != IEEE80211_MODE_TURBO_STATIC_A)
 			continue;

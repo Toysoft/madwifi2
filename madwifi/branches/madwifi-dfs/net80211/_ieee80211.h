@@ -146,7 +146,7 @@ struct ieee80211_channel {
 	/* end of the Non-Occupancy Period, when we can use this channel again?
 	 * If <= NOW then clear IEEE80211_CHAN_RADAR in ic_flags. Initialized
 	 * to {0,0} */
-	struct timeval ic_non_occupancy_period; 
+	struct timeval ic_non_occupancy_period;
 };
 
 #define	IEEE80211_CHAN_MAX	255
