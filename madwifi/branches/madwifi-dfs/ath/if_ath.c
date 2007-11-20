@@ -1882,13 +1882,13 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 
 			if  (bf->bf_status & ATH_BUFSTATUS_RXTSTAMP) {
 				bf->bf_status &= ~ATH_BUFSTATUS_RXTSTAMP;
-	
-	
+
+
 				/* update rollover */
 				if (last_rs_tstamp > bf->bf_tsf) {
 					rollover --;
 				}
-	
+
 				/* update last_rs_tstamp */
 				last_rs_tstamp = bf->bf_tsf;
 				bf->bf_tsf =(hw_tsf & ~TSTAMP_MASK)|bf->bf_tsf;
@@ -5999,7 +5999,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 		if (vap->iv_opmode == IEEE80211_M_IBSS &&
 		    vap->iv_state == IEEE80211_S_RUN) {
-	
+
 		  /* Don't merge if we have a desired BSSID */
 		  if (vap->iv_flags & IEEE80211_F_DESBSSID)
 		    break;
@@ -6033,7 +6033,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			  beacon_tsf,
 			  rtsf, rtsf - beacon_tsf,
 			  hw_tsf, hw_tsf - beacon_tsf);
-	
+
 		  if (rtsf < beacon_tsf) {
 			  DPRINTF(sc, ATH_DEBUG_BEACON,
 				  "%s: ibss merge: rtsf %10llx beacon's tsf %10llx\n",
@@ -6053,7 +6053,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 
 		  intval = ni->ni_intval & HAL_BEACON_PERIOD;
 		  if (intval != 0) {
-		
+
 			  if ((sc->sc_nexttbtt % intval) !=
 			      (beacon_tu % intval)) {
 				  DPRINTF(sc, ATH_DEBUG_BEACON,
