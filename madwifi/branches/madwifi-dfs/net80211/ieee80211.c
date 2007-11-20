@@ -46,7 +46,7 @@
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/rtnetlink.h>		/* XXX for rtnl_lock */
-#include "compat.h"
+
 #include "if_media.h"
 
 #include <net80211/ieee80211_var.h>
