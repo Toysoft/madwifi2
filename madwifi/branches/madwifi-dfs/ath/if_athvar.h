@@ -555,7 +555,7 @@ struct ath_radar_pulse {
 	u_int64_t rp_tsf;
 	u_int8_t  rp_rssi;
 	u_int8_t  rp_width;
-	
+
 	int       rp_index;
 	int       rp_allocated;
 	int       rp_analyzed;

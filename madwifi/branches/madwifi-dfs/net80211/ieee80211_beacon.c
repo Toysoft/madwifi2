@@ -298,8 +298,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		if (!vap->iv_chanchange_count && !c) {
 			vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
 			ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
-		} else if (vap->iv_chanchange_count && 
-			   ((!ic->ic_chanchange_tbtt) || 
+		} else if (vap->iv_chanchange_count &&
+			   ((!ic->ic_chanchange_tbtt) ||
 			    (vap->iv_chanchange_count == ic->ic_chanchange_tbtt))) {
 			u_int8_t *frm;
 
