@@ -2299,7 +2299,7 @@ ath_init(struct net_device *dev)
 	/* Enable interrupts. */
 	sc->sc_imask = HAL_INT_RX | HAL_INT_TX
 		  | HAL_INT_RXEOL | HAL_INT_RXORN
-	          | HAL_INT_FATAL | HAL_INT_GLOBAL;
+		  | HAL_INT_FATAL | HAL_INT_GLOBAL;
 	/*
 	 * Enable MIB interrupts when there are hardware phy counters.
 	 * Note we only do this (at the moment) for station mode.
@@ -9301,10 +9301,10 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		printk(KERN_INFO "Channel %3d (%4d MHz) Max Tx Power %d dBm%s [%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n"
 			, ichan->ic_ieee
 			, c->channel
-		        , c->maxRegTxPower > (c->maxTxPower/2) ? (c->maxTxPower/2) : c->maxRegTxPower
+			, c->maxRegTxPower > (c->maxTxPower/2) ? (c->maxTxPower/2) : c->maxRegTxPower
 			, ( c->maxRegTxPower == (c->maxTxPower/2) ? "" : ( (c->maxRegTxPower > (c->maxTxPower/2)) ? " (hw limited)" : " (reg limited)" ) )
 			, (c->maxTxPower/2)
-		        , c->maxRegTxPower
+			, c->maxRegTxPower
 			, (c->channelFlags & 0x0001               ? " CF & (1<<0)"          :       "" /* undocumented */)
 			, (c->channelFlags & CHANNEL_CW_INT       ? " CF_CW_INTERFERENCE"   :       "" /* CW interference detected on channel */)
 			, (c->channelFlags & 0x0004               ? " CF & (1<<2)"          :       "" /* undocumented */)
