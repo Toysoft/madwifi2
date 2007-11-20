@@ -10052,7 +10052,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	 * width. It should be noted that tsf is unsigned 64 bits but the
 	 * sysctl API is only unsigned 32 bits. As a result, tsf might get
 	 * truncated */
-	if (ctl->ctl_name == ATH_RADAR_PULSE) {
+	if (ctl->extra2 == (void *)ATH_RADAR_PULSE) {
 	  ctl->data = &tab_3_val;
 	  ctl->maxlen = sizeof(tab_3_val);
 	}
@@ -10393,58 +10393,58 @@ static const ctl_table ath_sysctl_template[] = {
 	  .extra2	= (void *)ATH_ACKRATE,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .ctl_name     = ATH_RADAR_PULSE,
 	  .procname     = "radar_pulse",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_PULSE,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT,
 	  .procname     = "radar_print",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT_ALL,
 	  .procname     = "radar_print_all",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT_ALL,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT_MEM,
 	  .procname     = "radar_dump",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT_MEM,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT_MEM_ALL,
 	  .procname     = "radar_dump_all",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_PULSE_PRINT_MEM_ALL,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_RADAR_PULSE_FLUSH,
 	  .procname     = "radar_pulse_flush",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_PULSE_FLUSH,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_PANIC,
 	  .procname     = "panic",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_PANIC,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_RADAR_PULSE_IGNORED,
 	  .procname     = "radar_pulse_ignored",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_PULSE_IGNORED,
 	},
 	{ .ctl_name	= CTL_AUTO,
-	  .extra2	= (void *)ATH_RADAR_IGNORED,
 	  .procname     = "radar_ignored",
 	  .mode         = 0644,
-	  .proc_handler = ath_sysctl_halparam
+	  .proc_handler = ath_sysctl_halparam,
+	  .extra2	= (void *)ATH_RADAR_IGNORED,
 	},
 	{ 0 }
 };
