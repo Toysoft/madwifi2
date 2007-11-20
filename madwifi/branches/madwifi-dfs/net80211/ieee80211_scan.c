@@ -1022,7 +1022,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		}
 
 		if (count != 0) {
-		
+
 			/* Next, we pickup a random usable channel */
 			chanStart = jiffies % count;
 
