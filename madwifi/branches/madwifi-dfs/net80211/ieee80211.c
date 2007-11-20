@@ -295,8 +295,8 @@ ieee80211_ifattach(struct ieee80211com *ic)
 	/* Initialize candidate channels to all available */
 	memcpy(ic->ic_chan_active, ic->ic_chan_avail,
 		sizeof(ic->ic_chan_avail));
-  	/* update Supported Channels information element */
-  	ieee80211_build_sc_ie(ic);
+	/* update Supported Channels information element */
+	ieee80211_build_sc_ie(ic);
 	/* Validate ic->ic_curmode */
 	if ((ic->ic_modecaps & (1 << ic->ic_curmode)) == 0)
 		ic->ic_curmode = IEEE80211_MODE_AUTO;
@@ -1018,8 +1018,8 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 			}
 			if  (ic->ic_curchan->ic_freq == c->ic_freq) {
 				if_printf(dev, "%s: Invoking ieee80211_dfs_action (%d, 0x%x)\n", __func__, ichan->ic_freq, ichan->ic_flags);
- 				/* The current channel has been marked. We need to move away from it. */
- 				ieee80211_dfs_action(ic);
+				/* The current channel has been marked. We need to move away from it. */
+				ieee80211_dfs_action(ic);
 			}
 			else
 				if_printf(dev,
@@ -1737,13 +1737,13 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 		case IEEE80211_MODE_TURBO_G:
 			curmode_noturbo = IEEE80211_MODE_11G;
 			break;
- 		}
+		}
 
 		for (i = 0; i < ic->ic_nchans; i++) {
 			c = &ic->ic_channels[i];
 
 			/* Does channel belong to current operation mode */
-  			if (ieee80211_chan2mode(c) != curmode_noturbo)
+			if (ieee80211_chan2mode(c) != curmode_noturbo)
 				continue;
 
 			/* Skip half/quarter rate channels */
