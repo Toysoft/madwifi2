@@ -1858,7 +1858,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 	/* SECOND PASS - FIX RX TIMESTAMPS */
 	if (count > 0) {
 		struct ath_buf * bf;
-	
+
 		hw_tsf = ath_hal_gettsf64(ah);
 		if (last_rs_tstamp > (hw_tsf & TSTAMP_MASK)) {
 			rollover ++;
@@ -1867,7 +1867,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				DEV_NAME(sc->sc_dev),
 				rollover, hw_tsf);
 		}
-	
+
 		last_rs_tstamp = 0;
 		for (bf=prev_rxbufcur; bf; bf = STAILQ_NEXT(bf, bf_list)) {
 			ds = bf->bf_desc;
@@ -1879,16 +1879,16 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 
 			/* we only process buffers who needs RX timestamps
 			 * adjustements */
-		
+
 			if  (bf->bf_status & ATH_BUFSTATUS_RXTSTAMP) {
 				bf->bf_status &= ~ATH_BUFSTATUS_RXTSTAMP;
-			
-			
+	
+	
 				/* update rollover */
 				if (last_rs_tstamp > bf->bf_tsf) {
 					rollover --;
 				}
-			
+	
 				/* update last_rs_tstamp */
 				last_rs_tstamp = bf->bf_tsf;
 				bf->bf_tsf =(hw_tsf & ~TSTAMP_MASK)|bf->bf_tsf;
@@ -1935,7 +1935,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				break;
 			if ((HAL_RXERR_PHY == rs->rs_status) &&
 			    (HAL_PHYERR_RADAR == (rs->rs_phyerr & 0x1f)) &&
-			    (0 == (p->bf_status & ATH_BUFSTATUS_RADAR_DONE))) {	
+			    (0 == (p->bf_status & ATH_BUFSTATUS_RADAR_DONE))) {
 				/* Sync the contents of the buffer in the case
 				 * of radar errors so we will get the pulse
 				 * width */
@@ -4522,7 +4522,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	*/
 	/* NB: only at DTIM */
 	if (sc->sc_ic.ic_opmode != IEEE80211_M_IBSS && (avp->av_boff.bo_tim[4] & 1)) {
-	
+
 		struct ath_txq *cabq = sc->sc_cabq;
 		struct ath_buf *bfmcast;
 		/*
@@ -4937,7 +4937,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		nexttbtt = intval;
 	} else if (intval) {	/* NB: can be 0 for monitor mode */
 		if (tsf == 1) {
- 
+
 			/* We have not received any beacons or probe
 			 * responses. Since a beacon should be sent
 			 * every 'intval' ms, we compute the next
@@ -5657,7 +5657,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 				}
 				wmeq->axq_link = &ds->ds_link;
 				/*
-				 * update the rate information 
+				 * update the rate information
 				 */
 			} else {
 				prev = bf;
@@ -5999,7 +5999,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
 		if (vap->iv_opmode == IEEE80211_M_IBSS &&
 		    vap->iv_state == IEEE80211_S_RUN) {
-		 
+	
 		  /* Don't merge if we have a desired BSSID */
 		  if (vap->iv_flags & IEEE80211_F_DESBSSID)
 		    break;
@@ -6033,7 +6033,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			  beacon_tsf,
 			  rtsf, rtsf - beacon_tsf,
 			  hw_tsf, hw_tsf - beacon_tsf);
-		 
+	
 		  if (rtsf < beacon_tsf) {
 			  DPRINTF(sc, ATH_DEBUG_BEACON,
 				  "%s: ibss merge: rtsf %10llx beacon's tsf %10llx\n",
@@ -6053,7 +6053,7 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 
 		  intval = ni->ni_intval & HAL_BEACON_PERIOD;
 		  if (intval != 0) {
-			 
+		
 			  if ((sc->sc_nexttbtt % intval) !=
 			      (beacon_tu % intval)) {
 				  DPRINTF(sc, ATH_DEBUG_BEACON,
@@ -6142,12 +6142,12 @@ ath_rx_tasklet(TQUEUE_ARG data)
 			ath_printrxbuf(bf, 1);
 #endif
 		rs = &bf->bf_dsstatus.ds_rxstat;
-	
+
 		len = rs->rs_datalen;
 		/* DMA sync. dies spectacularly if len == 0 */
 		if (len == 0)
 			goto rx_next;
-	
+
 		if (rs->rs_more) {
 			/*
 			 * Frame spans multiple descriptors; this
@@ -10813,7 +10813,7 @@ txcont_configure_radio(struct ieee80211com *ic)
 					status,  __func__, __FILE__, __LINE__);
 		}
 		ath_update_txpow(sc);
-		ath_radar_update(sc);	
+		ath_radar_update(sc);
 		ath_radar_pulse_flush(sc);
 
 #ifdef ATH_SUPERG_DYNTURBO
@@ -11006,7 +11006,7 @@ txcont_queue_packet(struct ieee80211com *ic, struct ath_txq* txq)
 		data   = skb_put(skb, datasz);
 
 		/*  NB: little endian */
-	
+
 		/*  11110000 (protocol = 00, type = 00 "management",
 		 *  subtype = 1111 "reserved/undocumented" */
 		wh->i_fc[0]    = 0xf0;

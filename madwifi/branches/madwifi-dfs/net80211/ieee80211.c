@@ -966,7 +966,7 @@ ieee80211_expire_dfs_channel_non_occupancy_timer(unsigned long data)
 			}
 		}
 	}
- 
+
 	/* update the timer */
 	ieee80211_update_dfs_channel_non_occupancy_timer(ic);
 }
