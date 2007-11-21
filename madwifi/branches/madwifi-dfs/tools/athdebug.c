@@ -73,7 +73,6 @@ enum {
 	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
 	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
 	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
-	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
 	ATH_DEBUG_LED		= 0x00100000,	/* led management */
 	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
 	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
@@ -83,8 +82,11 @@ enum {
 	ATH_DEBUG_DOTHFILTVBSE	= 0x04000000,	/* 11.h radar pulse analysis - verbose */
 	ATH_DEBUG_DOTHFILTNOSC  = 0x08000000,	/* 11.h radar pulse analysis - don't short circuit analysis when detected */
 	ATH_DEBUG_DOTHPULSES    = 0x10000000,   /* 11.h radar pulse events */
+	ATH_DEBUG_TXBUF         = 0x20000000,   /* TX buffer usage/leak debugging */
+	ATH_DEBUG_SKB           = 0x40000000,   /* SKB usage/leak debugging [applies to all vaps] */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
-	ATH_DEBUG_ANY		= 0xffffffff
+	ATH_DEBUG_ANY		= 0xffffffff,
+	ATH_DEBUG_GLOBAL	= (ATH_DEBUG_SKB)
 };
 
 static struct {
@@ -108,7 +110,8 @@ static struct {
 	{ "calibrate",	 ATH_DEBUG_CALIBRATE, 	"periodic re-calibration" },
 	{ "keycache",	 ATH_DEBUG_KEYCACHE, 	"key cache management" },
 	{ "state",	 ATH_DEBUG_STATE, 	"802.11 state transitions" },
-	{ "node",	 ATH_DEBUG_NODE, 	"node management" },
+	{ "txbuf", 	 ATH_DEBUG_TXBUF,   	"ath_buf management" },
+	{ "skb",         ATH_DEBUG_SKB,         "skb management (affects all devs)" },
 	{ "led",         ATH_DEBUG_LED, 	"led management" },
 	{ "ff",		 ATH_DEBUG_FF, 		"fast frame handling" },
 	{ "turbo",	 ATH_DEBUG_TURBO, 	"dynamic turbo handling" },

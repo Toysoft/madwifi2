@@ -194,7 +194,6 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ieee80211_frame *wh;
-	struct ieee80211_cb *cb = NULL;
 	struct sk_buff *skb;
 	int pktlen;
 	u_int8_t *frm;
@@ -252,8 +251,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 		return NULL;
 	}
 
-	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ieee80211_ref_node(ni);
+	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
 
 	frm = ieee80211_beacon_init(ni, bo, frm);
 
