@@ -4924,7 +4924,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		if (sc->sc_stagbeacons)
 			intval /= ATH_BCBUF;	/* for staggered beacons */
 		if ((sc->sc_nostabeacons) &&
-			(vap->iv_opmode == IEEE80211_M_HOSTAP))
+		    (vap->iv_opmode == IEEE80211_M_HOSTAP))
 			reset_tsf = 1;
 	} else
 		intval = ni->ni_intval & HAL_BEACON_PERIOD;
@@ -8754,7 +8754,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			 * Stop any previous beacon DMA.  This may be
 			 * necessary, for example, when an ibss merge
 		     8766 41:					ath_beacon_config(sc, vap);
-      * causes reconfiguration; there will be a state
+			 * causes reconfiguration; there will be a state
 			 * transition from RUN->RUN that means we may
 			 * be called with beacon transmission active.
 			 */
@@ -9293,7 +9293,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		/* Initialize all fields of ieee80211_channel here */
 
 		ichan->ic_freq		= c->channel;
-		ichan->ic_flags	        = c->channelFlags;
+		ichan->ic_flags		= c->channelFlags;
 		ichan->ic_ieee		= ath_hal_mhz2ieee(ah,
 							   c->channel,
 							   c->channelFlags);
