@@ -204,8 +204,15 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ieee80211com *ic = vap->iv_ic;
 	struct net_device *parent = ic->ic_dev;
 	struct ieee80211_node *ni = NULL;
-	struct ieee80211_cb *cb;
 	struct ether_header *eh;
+
+	/* MT: reset the skb of new frames reaching this layer BEFORE
+	 * we invoke ieee80211_skb_hardstart_accept_reference. */
+	memset(SKB_CB(skb), 0, sizeof(struct ieee80211_cb));
+
+	/* If an skb is passed in directly from the kernel, 
+	 * we take responsibility for the reference */
+	ieee80211_skb_track(skb);
 
 	/* NB: parent must be up and running */
 	if ((parent->flags & (IFF_RUNNING|IFF_UP)) != (IFF_RUNNING|IFF_UP))
@@ -222,10 +229,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 #endif
 		goto bad;
 	}
-
-	cb = (struct ieee80211_cb *)skb->cb;
-	memset(cb, 0, sizeof(struct ieee80211_cb));
-
+	
 	if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 		ieee80211_monitor_encap(vap, skb);
 		ieee80211_parent_queue_xmit(skb);
@@ -256,7 +260,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 
-	cb->ni = ieee80211_ref_node(ni);
+	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
 
 	/* power-save checks */
 	if (WME_UAPSD_AC_CAN_TRIGGER(skb->priority, ni)) {
@@ -282,9 +286,11 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	    vap->iv_xrvap->iv_sta_assoc) {
 		struct sk_buff *skb1 = skb_clone(skb, GFP_ATOMIC);
 		if (skb1) {
-			cb = (struct ieee80211_cb *)skb1->cb;
-			memset(cb, 0, sizeof(struct ieee80211_cb));
-			cb->ni = ieee80211_find_txnode(vap->iv_xrvap, 
+			memset(SKB_CB(skb1), 0, sizeof(struct ieee80211_cb));
+#ifdef IEEE80211_DEBUG_REFCNT
+			SKB_CB(skb1)->tracked = 1;
+#endif /* #ifdef IEEE80211_DEBUG_REFCNT */
+			SKB_CB(skb1)->ni = ieee80211_find_txnode(vap->iv_xrvap, 
 						       eh->ether_dhost);
 			ieee80211_parent_queue_xmit(skb1);
 		}
@@ -296,7 +302,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 bad:
 	if (skb != NULL)
-		dev_kfree_skb(skb);
+		ieee80211_dev_kfree_skb(&skb);
 	if (ni != NULL)
 		ieee80211_unref_node(&ni);
 	return 0;
@@ -304,6 +310,7 @@ bad:
 
 void ieee80211_parent_queue_xmit(struct sk_buff *skb) {
 	struct ieee80211vap *vap = skb->dev->priv;
+	struct ieee80211_node *ni;
 
 	vap->iv_devstats.tx_packets++;
 	vap->iv_devstats.tx_bytes += skb->len;
@@ -311,7 +318,22 @@ void ieee80211_parent_queue_xmit(struct sk_buff *skb) {
 
 	/* Dispatch the packet to the parent device */
 	skb->dev = vap->iv_ic->ic_dev;
-	(void) dev_queue_xmit(skb);
+
+	ni = SKB_CB(skb)->ni;
+	if ( dev_queue_xmit(skb) == NET_XMIT_DROP ) {
+		/* If queue dropped the packet because device was
+		 * too busy */
+		vap->iv_devstats.tx_dropped++;
+		if (ni != NULL) {
+			/* node reference was leaked */
+			ieee80211_unref_node(&ni);
+		}
+	}
+	else {
+		/* node reference was not leaked, forget about it */
+		ni = NULL;
+	}
+	skb = NULL; /* skb is no longer ours */
 }
 
 /*
@@ -391,11 +413,10 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ieee80211_frame *wh;
-	struct ieee80211_cb *cb = (struct ieee80211_cb *)skb->cb;
 
 	KASSERT(ni != NULL, ("null node"));
 
-	cb->ni = ni;
+	SKB_CB(skb)->ni = ni;
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
@@ -404,8 +425,8 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 		vap->iv_myaddr, ni->ni_macaddr, ni->ni_bssid);
 	/* XXX power management */
 
-	if ((cb->flags & M_LINK0) != 0 && ni->ni_challenge != NULL) {
-		cb->flags &= ~M_LINK0;
+	if ((SKB_CB(skb)->flags & M_LINK0) != 0 && ni->ni_challenge != NULL) {
+		SKB_CB(skb)->flags &= ~M_LINK0;
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_AUTH, wh->i_addr1,
 			"encrypting frame (%s)", __func__);
 		wh->i_fc[1] |= IEEE80211_FC1_PROT;
@@ -442,7 +463,6 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb;
-	struct ieee80211_cb *cb;
 	struct ieee80211_frame *wh;
 	u_int8_t *frm;
 
@@ -473,16 +493,9 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 		ieee80211_chan2ieee(ic, ic->ic_curchan),
 		wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "ena" : "dis");
 
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
-		__func__, __LINE__,
-		ni, ether_sprintf(ni->ni_macaddr),
-		ieee80211_node_refcnt(ni));
-
 	/* XXX assign some priority; this probably is wrong */
 	skb->priority = WME_AC_BE;
-	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = PASS_NODE(ni);
+	SKB_CB(skb)->ni = PASS_NODE(ni);
 
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
 
@@ -499,7 +512,6 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb;
-	struct ieee80211_cb *cb;
 	struct ieee80211_qosframe *qwh;
 	u_int8_t *frm;
 	int tid;
@@ -510,8 +522,7 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 		vap->iv_stats.is_tx_nobuf++;
 		return -ENOMEM;
 	}
-	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ieee80211_ref_node(ni);
+	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
 
 	skb->priority = ac;
 	qwh = (struct ieee80211_qosframe *)skb_push(skb, sizeof(struct ieee80211_qosframe));
@@ -544,12 +555,6 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 		/* XXXAPSD: assuming triggerable means deliverable */
 		M_FLAG_SET(skb, M_UAPSD);
 	}
-
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
-		__func__, __LINE__,
-		ni, ether_sprintf(ni->ni_macaddr),
-		ieee80211_node_refcnt(ni));
 
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
 
@@ -612,7 +617,12 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 				need_tailroom += cip->ic_miclen;
 	}
 
-	skb = skb_unshare(skb, GFP_ATOMIC);
+	if (skb_shared(skb)) {
+		/* Take our own reference to the node in the clone */
+		ieee80211_ref_node(SKB_CB(skb)->ni);
+		/* Unshare the node, decrementing users in the old skb */
+		skb = skb_unshare(skb, GFP_ATOMIC);
+	}
 
 #ifdef ATH_SUPERG_FF
 	if (isff) {
@@ -621,7 +631,7 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 				"%s: cannot unshare for encapsulation\n",
 				__func__);
 			vap->iv_stats.is_tx_nobuf++;
-			dev_kfree_skb(skb2);
+			ieee80211_dev_kfree_skb(&skb2);
 
 			return NULL;
 		}
@@ -630,13 +640,17 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 		if (skb_headroom(skb) < need_headroom) {
 			struct sk_buff *tmp = skb;
 			skb = skb_realloc_headroom(skb, need_headroom);
-			dev_kfree_skb(tmp);
+			/* Increment reference count after copy */
+			if (NULL != skb && SKB_CB(tmp)->ni != NULL) {
+				SKB_CB(skb)->ni = ieee80211_ref_node(SKB_CB(tmp)->ni);
+			}
+			ieee80211_dev_kfree_skb(&tmp);
 			if (skb == NULL) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
 					"%s: cannot expand storage (head1)\n",
 					__func__);
 				vap->iv_stats.is_tx_nobuf++;
-				dev_kfree_skb(skb2);
+				ieee80211_dev_kfree_skb(&skb2);
 				return NULL;
 			}
 			/* NB: cb[] area was copied, but not next ptr. must do that
@@ -651,27 +665,30 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 				n = inter_headroom - skb_headroom(skb2);
 			if (pskb_expand_head(skb2, n,
 			    need_tailroom - skb_tailroom(skb2), GFP_ATOMIC)) {
-				dev_kfree_skb(skb2);
+				ieee80211_dev_kfree_skb(&skb2);
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
 					"%s: cannot expand storage (tail2)\n",
 					__func__);
 				vap->iv_stats.is_tx_nobuf++;
 				/* this shouldn't happen, but don't send first ff either */
-				dev_kfree_skb(skb);
-				skb = NULL;
+				ieee80211_dev_kfree_skb(&skb);
 			}
 		} else if (skb_headroom(skb2) < inter_headroom) {
 			struct sk_buff *tmp = skb2;
 
 			skb2 = skb_realloc_headroom(skb2, inter_headroom);
-			dev_kfree_skb(tmp);
+			/* Increment reference count after copy */
+			if (NULL != skb2 && SKB_CB(tmp)->ni != NULL) {
+				SKB_CB(skb2)->ni = ieee80211_ref_node(SKB_CB(tmp)->ni);
+			}
+			ieee80211_dev_kfree_skb(&tmp);
 			if (skb2 == NULL) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
 					"%s: cannot expand storage (head2)\n",
 					__func__);
 				vap->iv_stats.is_tx_nobuf++;
 				/* this shouldn't happen, but don't send first ff either */
-				dev_kfree_skb(skb);
+				ieee80211_dev_kfree_skb(&skb);
 				skb = NULL;
 			}
 		}
@@ -691,16 +708,19 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 			n = need_headroom - skb_headroom(skb);
 		if (pskb_expand_head(skb, n,
 			need_tailroom - skb_tailroom(skb), GFP_ATOMIC)) {
-			dev_kfree_skb(skb);
+			ieee80211_dev_kfree_skb(&skb);
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
 				"%s: cannot expand storage (tail)\n", __func__);
 			vap->iv_stats.is_tx_nobuf++;
-			skb = NULL;
 		}
 	} else if (skb_headroom(skb) < need_headroom) {
 		struct sk_buff *tmp = skb;
 		skb = skb_realloc_headroom(skb, need_headroom);
-		dev_kfree_skb(tmp);
+		/* Increment reference count after copy */
+		if (NULL != skb && SKB_CB(tmp)->ni != NULL) {
+			SKB_CB(skb)->ni = ieee80211_ref_node(SKB_CB(tmp)->ni);
+		}
+		ieee80211_dev_kfree_skb(&tmp);
 		if (skb == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
 				"%s: cannot expand storage (head)\n", __func__);
@@ -1085,7 +1105,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		 * reuses input skb.
 		 */
 		for (skbcnt = 1; skbcnt < fragcnt; skbcnt++) {
-			tskb = dev_alloc_skb(hdrsize + ciphdrsize + pdusize + tailsize);
+			tskb = ieee80211_dev_alloc_skb(hdrsize + ciphdrsize + pdusize + tailsize);
 			if (tskb == NULL)
 				break;
 
@@ -1199,26 +1219,11 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	return skb;
 bad:
 	if (framelist != NULL) {
-		struct sk_buff *temp;
-
-		tskb = framelist;
-		while (tskb) {
-			temp = tskb->next;
-			tskb->next = NULL;
-			dev_kfree_skb(tskb);
-			tskb = temp;
-		}
+		ieee80211_dev_kfree_skb_list(&framelist);
 	}
 
 	if (skb != NULL) {
-#ifdef ATH_SUPERG_FF
-		/* FFXXX: rather specific to ff case of only 2 skbs chained */
-		if (skb->next) {
-			dev_kfree_skb(skb->next);
-			skb->next = NULL;
-		}
-#endif
-		dev_kfree_skb(skb);
+		ieee80211_dev_kfree_skb_list(&skb);
 	}
 	return NULL;
 #undef WH4
@@ -1702,7 +1707,6 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	struct ieee80211com *ic = ni->ni_ic;
 	enum ieee80211_phymode mode;
 	struct ieee80211_frame *wh;
-	struct ieee80211_cb *cb;
 	struct sk_buff *skb;
 	u_int8_t *frm;
 
@@ -1741,8 +1745,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 
 	skb_trim(skb, frm - skb->data);
 
-	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ieee80211_ref_node(ni);
+	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
@@ -1965,11 +1968,9 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			memcpy(&((__le16 *)frm)[4], ni->ni_challenge,
 				IEEE80211_CHALLENGE_LEN);
 			if (arg == IEEE80211_AUTH_SHARED_RESPONSE) {
-				struct ieee80211_cb *cb =
-					(struct ieee80211_cb *)skb->cb;
 				IEEE80211_NOTE(vap, IEEE80211_MSG_AUTH, ni,
 					"request encrypt frame (%s)", __func__);
-				cb->flags |= M_LINK0; /* WEP-encrypt, please */
+				SKB_CB(skb)->flags |= M_LINK0; /* WEP-encrypt, please */
 			}
 		}
 
@@ -2219,12 +2220,11 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb;
 	struct ieee80211_ctlframe_addr2 *wh;
-	struct ieee80211_cb *cb;
 
-	skb = dev_alloc_skb(sizeof(struct ieee80211_ctlframe_addr2));
+	skb = ieee80211_dev_alloc_skb(sizeof(struct ieee80211_ctlframe_addr2));
 	if (skb == NULL) return;
-	cb = (struct ieee80211_cb *)skb->cb;
-	cb->ni = ieee80211_ref_node(ni);
+
+	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
 	skb->priority = WME_AC_VO;
 
 	wh = (struct ieee80211_ctlframe_addr2 *) skb_put(skb, sizeof(struct ieee80211_ctlframe_addr2));
@@ -2238,12 +2238,6 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 		IEEE80211_FC0_SUBTYPE_PS_POLL;
 	if (IEEE80211_VAP_IS_SLEEPING(ni->ni_vap))
 		wh->i_fc[1] |= IEEE80211_FC1_PWR_MGT;
-
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-		"ieee80211_ref_node (%s:%u) %p<%s> refcnt %d\n",
-		__func__, __LINE__,
-		ni, ether_sprintf(ni->ni_macaddr),
-		ieee80211_node_refcnt(ni));
 
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
 }

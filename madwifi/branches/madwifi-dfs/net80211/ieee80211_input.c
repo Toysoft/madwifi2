@@ -60,6 +60,8 @@
 #include <net80211/ieee80211_var.h>
 
 #ifdef IEEE80211_DEBUG
+
+#define BUF_LEN 192 
 /*
  * Decide if a received management frame should be
  * printed when debugging is enabled.  This filters some
@@ -555,7 +557,7 @@ ieee80211_input(struct ieee80211_node *ni,
 				if (ni_wds == NULL)
 					ieee80211_add_wds_addr(nt, ni, wh4->i_addr4, 0);
 				else
-					ieee80211_unref_node(&ni_wds); /* Decr. ref count */
+					ieee80211_unref_node(&ni_wds);
 			}
 
 			/*
@@ -705,7 +707,11 @@ ieee80211_input(struct ieee80211_node *ni,
 			/* ether_type must be length as FF frames are always LLC/SNAP encap'd */ 
 			frame_len = ntohs(eh_tmp->ether_type); 
 
-			skb1 = skb_clone(skb, GFP_ATOMIC); /* XXX: GFP_ATOMIC is overkill? */ 
+			skb1 = skb_clone(skb, GFP_ATOMIC);
+			/* Increment reference count after copy */
+			if (NULL != skb1 && SKB_CB(skb)->ni != NULL) {
+				SKB_CB(skb1)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
+			}
 
 			/* we now have 802.3 MAC hdr followed by 802.2 LLC/SNAP; convert to EthernetII.
 			 * Note that the frame is at least IEEE80211_MIN_LEN, due to the driver code. */
@@ -723,7 +729,7 @@ ieee80211_input(struct ieee80211_node *ni,
 						ni->ni_macaddr, "data", "%s", "Decapsulation error");
 				vap->iv_stats.is_rx_decap++;
 				IEEE80211_NODE_STAT(ni, rx_decap);
-				dev_kfree_skb(skb1);
+				ieee80211_dev_kfree_skb(&skb1);
 				goto err;
 			}
 
@@ -820,7 +826,7 @@ err:
 	vap->iv_devstats.rx_errors++;
 out:
 	if (skb != NULL)
-		dev_kfree_skb(skb);
+		ieee80211_dev_kfree_skb(&skb);
 	return type;
 #undef HAS_SEQ
 }
@@ -913,8 +919,11 @@ ieee80211_input_all(struct ieee80211com *ic,
 		if (TAILQ_NEXT(vap, iv_next) != NULL) {
 			skb1 = skb_copy(skb, GFP_ATOMIC);
 			if (skb1 == NULL) {
-				/* XXX stat+msg */
 				continue;
+			}
+			/* We duplicate the reference after skb_copy */
+			if (SKB_CB(skb)->ni != NULL) {
+				SKB_CB(skb1)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
 			}
 		} else {
 			skb1 = skb;
@@ -928,7 +937,7 @@ ieee80211_input_all(struct ieee80211com *ic,
 		ieee80211_unref_node(&ni);
 	}
 	if (skb != NULL)		/* no vaps, reclaim skb */
-		dev_kfree_skb(skb);
+		ieee80211_dev_kfree_skb(&skb);
 	return type;
 }
 EXPORT_SYMBOL(ieee80211_input_all);
@@ -970,7 +979,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 		 * here and just bail
 		 */
 		/* XXX need msg+stat */
-		dev_kfree_skb(skb);
+		ieee80211_dev_kfree_skb(&skb);
 		return NULL;
 	}
 
@@ -1005,8 +1014,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			 * Unrelated fragment or no space for it,
 			 * clear current fragments
 			 */
-			dev_kfree_skb(ni->ni_rxfrag);
-			ni->ni_rxfrag = NULL;
+			ieee80211_dev_kfree_skb_list(&ni->ni_rxfrag);
 		}
 	}
 
@@ -1021,7 +1029,11 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 				 * assemble fragments
 				 */
 				ni->ni_rxfrag = skb_copy(skb, GFP_ATOMIC);
-				dev_kfree_skb(skb);
+				/* We duplicate the reference after skb_copy */
+				if (SKB_CB(skb)->ni != NULL) {
+					SKB_CB(ni->ni_rxfrag)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
+				}
+				ieee80211_dev_kfree_skb(&skb);
 			}
 			/*
 			 * Check that we have enough space to hold
@@ -1034,7 +1046,11 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 					(ni->ni_vap->iv_dev->mtu + hdrlen) -
 					(skb_end_pointer(skb) - skb->head),
 					GFP_ATOMIC);
-				dev_kfree_skb(skb);
+				/* We duplicate the reference after skb_copy */
+				if (SKB_CB(skb)->ni != NULL && (skb != ni->ni_rxfrag)) {
+					SKB_CB(ni->ni_rxfrag)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
+				}
+				ieee80211_dev_kfree_skb(&skb);
 			}
 		}
 	} else {
@@ -1055,7 +1071,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			*(__le16 *) lwh->i_seq = *(__le16 *) wh->i_seq;
 		}
 		/* we're done with the fragment */
-		dev_kfree_skb(skb);
+		ieee80211_dev_kfree_skb(&skb);
 	}
 
 	if (more_frag) {
@@ -1075,6 +1091,7 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct net_device *dev = vap->iv_dev;
 	struct ether_header *eh = (struct ether_header *) skb->data;
+	struct ieee80211_node * ni_tmp = NULL;
 
 #ifdef ATH_SUPERG_XR
 	/*
@@ -1092,8 +1109,13 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 	    (vap->iv_flags & IEEE80211_F_NOBRIDGE) == 0) {
 		struct sk_buff *skb1 = NULL;
 
-		if (ETHER_IS_MULTICAST(eh->ether_dhost))
+		if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
 			skb1 = skb_copy(skb, GFP_ATOMIC);
+			/* We duplicate the reference after skb_copy */
+			if (SKB_CB(skb)->ni != NULL) {
+				SKB_CB(skb1)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
+			}
+		}
 		else {
 			/*
 			 * Check if destination is associated with the
@@ -1122,7 +1144,19 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 
 			skb1->protocol = __constant_htons(ETH_P_802_2);
 			/* XXX insert vlan tag before queue it? */
-			dev_queue_xmit(skb1);
+			ni_tmp = SKB_CB(skb1)->ni; /* remember node so we can free it */
+			if ( dev_queue_xmit(skb1) == NET_XMIT_DROP ) {
+				/* If queue dropped the packet because device was
+				 * too busy */
+				vap->iv_devstats.tx_dropped++;
+				/* node reference was leaked */
+				if (ni_tmp != NULL)
+					ieee80211_unref_node(&ni_tmp);
+			}
+			/* skb is no longer ours, either way after dev_queue_xmit */
+			skb1 = NULL; 
+			/* no need to free node reference */
+			ni_tmp = NULL;
 		}
 	}
 
@@ -1134,11 +1168,34 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 #else
 		skb->protocol = eth_type_trans(skb, dev);
 #endif
+		vap->iv_devstats.rx_packets++;
+		vap->iv_devstats.rx_bytes += skb->len;
 		if (ni->ni_vlan != 0 && vap->iv_vlgrp != NULL) {
 			/* attach vlan tag */
-			vlan_hwaccel_receive_skb(skb, vap->iv_vlgrp, ni->ni_vlan);
-		} else
-			netif_rx(skb);
+			struct ieee80211_node *ni_tmp = SKB_CB(skb)->ni;
+			if (vlan_hwaccel_receive_skb(skb, vap->iv_vlgrp, ni->ni_vlan) == NET_RX_DROP) {
+				/* If netif_rx dropped the packet because 
+				 * device was too busy */
+				if (ni_tmp != NULL) {
+					/* node reference was leaked */
+					ieee80211_unref_node(&ni_tmp);
+				}
+				vap->iv_devstats.rx_dropped++;
+			}
+			skb = NULL; /* SKB is no longer ours */
+		} else {
+			struct ieee80211_node *ni_tmp = SKB_CB(skb)->ni;
+			if (netif_rx(skb) == NET_RX_DROP) {
+				/* If netif_rx dropped the packet because 
+				 * device was too busy */
+				if (ni_tmp != NULL) {
+					/* node reference was leaked */
+					ieee80211_unref_node(&ni_tmp);
+				}
+				vap->iv_devstats.rx_dropped++;
+			}
+			skb = NULL; /* SKB is no longer ours */
+		}
 		dev->last_rx = jiffies;
 	}
 }
@@ -1201,7 +1258,11 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 
 		/* XXX: does this always work? */
 		tskb = skb_copy(skb, GFP_ATOMIC);
-		dev_kfree_skb(skb);
+		/* We duplicate the reference after skb_copy */
+		if (SKB_CB(skb)->ni != NULL) {
+			SKB_CB(tskb)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
+		}
+		ieee80211_dev_kfree_skb(&skb);
 		skb = tskb;
 	}
 	return skb;
@@ -1258,10 +1319,6 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 				ni = ieee80211_dup_bss(vap, wh->i_addr2, 0);
 				if (ni == NULL)
 					return;
-
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-				"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr),
-				ieee80211_node_refcnt(ni));
 				tmpnode = 1;
 			}
 			IEEE80211_SEND_MGMT(ni,	IEEE80211_FC0_SUBTYPE_AUTH,
@@ -1299,10 +1356,6 @@ ieee80211_auth_open(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			ni = ieee80211_dup_bss(vap, wh->i_addr2, 0);
 			if (ni == NULL)
 				return;
-
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-			"%s: %p<%s> refcnt %d\n", __func__, ni, ether_sprintf(ni->ni_macaddr),
-			ieee80211_node_refcnt(ni));
 			tmpnode = 1;
 		}
 
@@ -1485,13 +1538,6 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 					/* NB: no way to return an error */
 					return;
 				}
-
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-						"%s: %p<%s> refcnt %d\n", 
-						__func__, ni, 
-						ether_sprintf(ni->ni_macaddr),
-						ieee80211_node_refcnt(ni));
-
 				allocbs = 1;
 			}
 
@@ -2232,10 +2278,15 @@ forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
 
 	if (filter_type && ((vap->app_filter & filter_type) == filter_type)) {
 		struct sk_buff *skb1;
+		struct ieee80211_node *ni_tmp;
 
 		skb1 = skb_copy(skb, GFP_ATOMIC);
 		if (skb1 == NULL)
 			return;
+		/* We duplicate the reference after skb_copy */
+		if (SKB_CB(skb)->ni != NULL) {
+			SKB_CB(skb1)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
+		}
 		skb1->dev = dev;
 		skb_reset_mac_header(skb1);
 
@@ -2243,7 +2294,18 @@ forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
 		skb1->pkt_type = PACKET_OTHERHOST;
 		skb1->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
 
-		netif_rx(skb1);
+		ni_tmp = SKB_CB(skb1)->ni;
+		if (netif_rx(skb1) == NET_RX_DROP) {
+			/* If netif_rx dropped the packet because 
+			 * device was too busy */
+			if (ni_tmp != NULL) {
+				/* node reference was leaked */
+				ieee80211_unref_node(&ni_tmp);
+			}
+			vap->iv_devstats.rx_dropped++;
+		}
+		vap->iv_devstats.rx_packets++;
+		vap->iv_devstats.rx_bytes += skb1->len;
 	}
 }
 
@@ -2832,11 +2894,11 @@ ieee80211_deliver_l2uf(struct ieee80211_node *ni)
 	struct l2_update_frame *l2uf;
 	struct ether_header *eh;
 
-	skb = dev_alloc_skb(sizeof(*l2uf));
-	if (!skb) {
-		printk("ieee80211_deliver_l2uf: no buf available\n");
+	skb = ieee80211_dev_alloc_skb(sizeof(*l2uf));
+	if (skb == NULL) {
 		return;
 	}
+	/* Leak check / cleanup destructor */
 	skb_put(skb, sizeof(*l2uf));
 	l2uf = (struct l2_update_frame *)(skb->data);
 	eh = &l2uf->eh;
@@ -3375,7 +3437,7 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 			IEEE80211_SEND_MGMT(ni,
 				IEEE80211_FC0_SUBTYPE_PROBE_RESP, 0);
 		}
-		if (allocbs && vap->iv_opmode != IEEE80211_M_IBSS) {
+		if (allocbs) {
 			/*
 			 * Temporary node created just to send a
 			 * response, reclaim immediately
@@ -4096,14 +4158,17 @@ ieee80211_getbssid(struct ieee80211vap *vap, const struct ieee80211_frame *wh)
 void
 ieee80211_note(struct ieee80211vap *vap, const char *fmt, ...)
 {
-	char buf[128];		/* XXX */
+	char buf[BUF_LEN];
 	va_list ap;
 
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	printk("%s: %s", vap->iv_dev->name, buf);	/* NB: no \n */
+	printk("%s/%s[%s]: %s", 
+	       vap->iv_ic->ic_dev->name, vap->iv_dev->name, 
+	       ether_sprintf(vap->iv_myaddr), 
+	       buf);	/* NB: no \n */
 }
 EXPORT_SYMBOL(ieee80211_note);
 
@@ -4111,13 +4176,15 @@ void
 ieee80211_note_frame(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
 	const char *fmt, ...)
 {
-	char buf[128];		/* XXX */
+	char buf[BUF_LEN];
 	va_list ap;
 
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s: [%s] %s\n", vap->iv_dev->name,
+	printk("%s/%s[%s]: %s %s\n", 
+		vap->iv_ic->ic_dev->name, vap->iv_dev->name,
+	        ether_sprintf(vap->iv_myaddr), 
 		ether_sprintf(ieee80211_getbssid(vap, wh)), buf);
 }
 EXPORT_SYMBOL(ieee80211_note_frame);
@@ -4126,13 +4193,16 @@ void
 ieee80211_note_mac(struct ieee80211vap *vap, const u_int8_t mac[IEEE80211_ADDR_LEN],
 	const char *fmt, ...)
 {
-	char buf[128];		/* XXX */
+	char buf[BUF_LEN];
 	va_list ap;
 
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s: [%s] %s\n", vap->iv_dev->name, ether_sprintf(mac), buf);
+	printk("%s/%s[%s]: %s %s\n", 
+	       vap->iv_ic->ic_dev->name, vap->iv_dev->name,
+	       ether_sprintf(vap->iv_myaddr), 
+	       ether_sprintf(mac), buf);
 }
 EXPORT_SYMBOL(ieee80211_note_mac);
 
@@ -4140,55 +4210,57 @@ static void
 ieee80211_discard_frame(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
 	const char *type, const char *fmt, ...)
 {
-	char buf[128];		/* XXX */
+	char buf[BUF_LEN];
 	va_list ap;
 
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	if (type != NULL)
-		printk("[%s:%s] discard %s frame, %s\n", vap->iv_dev->name,
-			ether_sprintf(ieee80211_getbssid(vap, wh)), type, buf);
-	else
-		printk("[%s:%s] discard frame, %s\n", vap->iv_dev->name,
-			ether_sprintf(ieee80211_getbssid(vap, wh)), buf);
+	printk("%s/%s[%s]: %s discard %s%sframe, %s\n", 
+		vap->iv_ic->ic_dev->name, vap->iv_dev->name,
+		ether_sprintf(vap->iv_myaddr), 
+		ether_sprintf(ieee80211_getbssid(vap, wh)), 
+		(type != NULL) ? type : "", 
+	        (type != NULL) ? " " : "", 
+		buf);
 }
 
 static void
 ieee80211_discard_ie(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
 	const char *type, const char *fmt, ...)
 {
-	char buf[128];		/* XXX */
+	char buf[BUF_LEN];
 	va_list ap;
 
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	if (type != NULL)
-		printk("[%s:%s] discard %s information element, %s\n",
-			vap->iv_dev->name,
-			ether_sprintf(ieee80211_getbssid(vap, wh)), type, buf);
-	else
-		printk("[%s:%s] discard information element, %s\n",
-			vap->iv_dev->name,
-			ether_sprintf(ieee80211_getbssid(vap, wh)), buf);
+	printk("%s/%s[%s]: %s discard %s%sinformation element, %s\n",
+		vap->iv_ic->ic_dev->name, vap->iv_dev->name, 
+		ether_sprintf(vap->iv_myaddr), 
+		ether_sprintf(ieee80211_getbssid(vap, wh)), 
+		(type != NULL) ? type : "", 
+		(type != NULL) ? " " : "", 
+	        buf);
 }
 
 static void
 ieee80211_discard_mac(struct ieee80211vap *vap, const u_int8_t mac[IEEE80211_ADDR_LEN],
 	const char *type, const char *fmt, ...)
 {
-	char buf[128];		/* XXX */
+	char buf[BUF_LEN];
 	va_list ap;
 
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	if (type != NULL)
-		printk("[%s:%s] discard %s frame, %s\n", vap->iv_dev->name,
-			ether_sprintf(mac), type, buf);
-	else
-		printk("[%s:%s] discard frame, %s\n", vap->iv_dev->name,
-			ether_sprintf(mac), buf);
+	printk("%s/%s[%s]: %s discard %s%sframe, %s\n", 
+	       vap->iv_ic->ic_dev->name, 
+	       vap->iv_dev->name,
+	       ether_sprintf(vap->iv_myaddr), 
+	       ether_sprintf(mac), 
+	       (type != NULL) ? type : "", 
+	       (type != NULL) ? " " : "", 
+	       buf);
 }
 #endif /* IEEE80211_DEBUG */

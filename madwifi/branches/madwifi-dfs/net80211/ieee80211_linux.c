@@ -134,44 +134,41 @@ if_printf(struct net_device *dev, const char *fmt, ...)
  * can use this interface too.
  */
 struct sk_buff *
+#ifdef IEEE80211_DEBUG_REFCNT
+ieee80211_getmgtframe_debug(u_int8_t **frm, u_int pktlen, const char* func, int line)
+#else
 ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen)
+#endif
 {
 	const u_int align = sizeof(u_int32_t);
-	struct ieee80211_cb *cb;
 	struct sk_buff *skb;
 	u_int len;
 
 	len = roundup(sizeof(struct ieee80211_frame) + pktlen, 4);
-	skb = dev_alloc_skb(len + align - 1);
+#ifdef IEEE80211_DEBUG_REFCNT
+	skb = ieee80211_dev_alloc_skb_debug(len + align - 1, func, line);
+#else
+	skb = ieee80211_dev_alloc_skb(len + align - 1);
+#endif
 	if (skb != NULL) {
 		u_int off = ((unsigned long) skb->data) % align;
 		if (off != 0)
 			skb_reserve(skb, align - off);
 
-		cb = (struct ieee80211_cb *)skb->cb;
-		cb->ni = NULL;
-		cb->flags = 0;
-		cb->next = NULL;
+		SKB_CB(skb)->ni = NULL;
+		SKB_CB(skb)->flags = 0;
+		SKB_CB(skb)->next = NULL;
 
 		skb_reserve(skb, sizeof(struct ieee80211_frame));
 		*frm = skb_put(skb, pktlen);
 	}
 	return skb;
 }
-
-#if 0
-/*
- * Drain a queue of sk_buffs.
- */
-void
-__skb_queue_drain(struct sk_buff_head *q)
-{
-	struct sk_buff *skb;
-
-	while ((skb = __skb_dequeue(q)) != NULL)
-		dev_kfree_skb(skb);
-}
-#endif
+#ifdef IEEE80211_DEBUG_REFCNT
+EXPORT_SYMBOL(ieee80211_getmgtframe_debug);
+#else
+EXPORT_SYMBOL(ieee80211_getmgtframe);
+#endif 
 
 #if IEEE80211_VLAN_TAG_USED
 /*
@@ -538,10 +535,13 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 	if (write) {
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
 			lenp, ppos);
-		if (ret == 0)
-			vap->iv_debug = val;
+		if (ret == 0) {
+			vap->iv_debug 		= (val & ~IEEE80211_MSG_IC);
+			vap->iv_ic->ic_debug 	= (val &  IEEE80211_MSG_IC);
+		}
 	} else {
-		val = vap->iv_debug;
+		/* VAP specific and 'global' debug flags */
+		val = vap->iv_debug | vap->iv_ic->ic_debug;
 		ret = IEEE80211_SYSCTL_PROC_DOINTVEC(ctl, write, filp, buffer,
 			lenp, ppos);
 	}

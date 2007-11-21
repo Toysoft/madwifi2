@@ -1833,3 +1833,7 @@ ieee80211_build_sc_ie(struct ieee80211com *ic)
 	}
 	ie->sc_len = (j+1) * 2;
 }
+
+int ath_debug_global = 0;
+EXPORT_SYMBOL(ath_debug_global);
+
