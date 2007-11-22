@@ -552,7 +552,7 @@ struct ath_vap {
 
 #define	BSTUCK_THRESH	10	/* # of stuck beacons before resetting NB: this is a guess*/
 
-struct ath_radar_pulse {
+struct ath_rp {
 	struct list_head list;
 	u_int64_t rp_tsf;
 	u_int8_t  rp_rssi;
@@ -617,8 +617,8 @@ struct ath_softc {
 			sc_stagbeacons:1,	/* use staggered beacons */
 			sc_dfswait:1,		/* waiting on channel for radar detect */
 			sc_ackrate:1,		/* send acks at high bitrate */
+			sc_dfs_cac:1,		/* waiting on channel for radar detect */
 			sc_hasintmit:1,		/* Interference mitigation */
-			sc_dfs_channel_check:1,	/* waiting on channel for radar detect */
 			sc_txcont:1,        	/* Is continuous transmit enabled? */
 			sc_dfs_testmode:1; 	/* IF this is on, AP vaps will stay in
 						   'channel availability check' indefinately,
@@ -669,8 +669,6 @@ struct ath_softc {
 	u_int8_t sc_txrate;			/* current tx rate for LED */
 	u_int16_t sc_ledoff;			/* off time for current blink */
 	struct timer_list sc_ledtimer;		/* led off timer */
-	struct timer_list
-	    sc_dfs_channel_check_timer;		/* dfs wait timer */
 
 	struct ATH_TQ_STRUCT sc_fataltq;	/* fatal error intr tasklet */
 
@@ -746,28 +744,28 @@ struct ath_softc {
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
 
-	u_int64_t sc_lastradar_tsf;				/* TSF at last detected radar pulse */
-	u_int32_t sc_dfs_channel_availability_check_time;	/* DFS wait time before accessing a
-								   channel (in seconds).
-								   FCC requires 60s.
-								*/
-	u_int32_t sc_dfs_non_occupancy_period;			/* DFS channel non-occupancy limit
-								   after radar is detected (in seconds).
-								   FCC requires 30m.
-								*/
-	/* radar pulse circular array */
-	struct ath_radar_pulse * sc_radar_pulse_mem;
-	struct list_head sc_radar_pulse_head;
-	int sc_radar_pulse_nr;
-	int sc_radar_pulse_min_to_match;
-	HAL_BOOL (*sc_radar_pulse_analyze)(struct ath_softc *sc);
-	struct ATH_TQ_STRUCT sc_radartq;
-
-	/* if set, we ignored all received pulses */
-	int sc_radar_pulse_ignored;
-
-	/* if set, we ignored all detected radars */
-	int sc_radar_ignored;
+	struct timer_list sc_dfs_excl_timer;	/* mark expiration timer task */
+	struct timer_list sc_dfs_cac_timer;	/* dfs wait timer */
+	u_int32_t sc_dfs_cac_period;		/* DFS wait time before accessing a
+					         * channel (in seconds). FCC 
+						 * requires 60s. */
+	u_int32_t sc_dfs_excl_period;		/* DFS channel non-occupancy limit
+						 * after radar is detected (in seconds).
+						 * FCC requires 30m. */
+	u_int64_t sc_rp_lasttsf;		/* TSF at last detected radar pulse */
+	
+	
+	struct ath_rp *sc_rp;			/* radar pulse circular array */
+	struct list_head sc_rp_list;
+	int sc_rp_num;
+	int sc_rp_min;
+	HAL_BOOL (*sc_rp_analyse)(struct ath_softc *sc);
+	struct ATH_TQ_STRUCT sc_rp_tq;
+	
+	int sc_rp_ignored;			/* if set, we ignored all 
+						 * received pulses */
+	int sc_radar_ignored;			/* if set, we ignored all 
+						 * detected radars */
 	u_int32_t sc_nexttbtt;
 	u_int64_t sc_last_tsf;
 };

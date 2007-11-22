@@ -173,19 +173,19 @@ int ath_radar_is_dfs_required(struct ath_softc *sc, HAL_CHANNEL *hchan);
 #define ATH_RADAR_PULSE_NR 100
 
 /* init/done function for radar pulse stuff */
-void ath_radar_pulse_init(struct ath_softc *sc);
-void ath_radar_pulse_done(struct ath_softc *sc);
+void ath_rp_init(struct ath_softc *sc);
+void ath_rp_done(struct ath_softc *sc);
 
 /* Record a radar pulse event in a circular array */
-void ath_radar_pulse_record(struct ath_softc *sc,
+void ath_rp_record(struct ath_softc *sc,
 			    u_int64_t tsf, u_int8_t rssi, u_int8_t width,
 			    HAL_BOOL is_simulated);
 
 /* Print the content of the radar pulse circular array */
-void ath_radar_pulse_print(struct ath_softc *sc, int analyzed_pulses_only);
-void ath_radar_pulse_print_mem(struct ath_softc *sc, int analyzed_pulses_only);
+void ath_rp_print(struct ath_softc *sc, int analyzed_pulses_only);
+void ath_rp_print_mem(struct ath_softc *sc, int analyzed_pulses_only);
 
 /* Empty the radar pulse circular array */
-void ath_radar_pulse_flush(struct ath_softc *sc);
+void ath_rp_flush(struct ath_softc *sc);
 
 #endif /* #ifndef _IF_ATH_RADAR_H */
