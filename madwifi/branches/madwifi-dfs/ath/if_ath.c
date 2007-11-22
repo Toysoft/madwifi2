@@ -534,7 +534,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ATH_RXBUF_LOCK_INIT(sc);
 
 	ATH_INIT_TQUEUE(&sc->sc_rxtq,     ath_rx_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_txtq,	  ath_tx_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_txtq,     ath_tx_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq,  ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bstucktq, ath_bstuck_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq,  ath_rxorn_tasklet,	dev);
@@ -6130,76 +6130,84 @@ ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 		if (vap->iv_opmode == IEEE80211_M_IBSS &&
 		    vap->iv_state == IEEE80211_S_RUN) {
 
-		  /* Don't merge if we have a desired BSSID */
-		  if (vap->iv_flags & IEEE80211_F_DESBSSID)
-		    break;
+			/* Don't merge if we have a desired BSSID */
+			if (vap->iv_flags & IEEE80211_F_DESBSSID)
+				break;
 
-		  /* To handle IBSS merge, we need the struct
-		     ieee80211_node which has been updated with the
-		     BSSID and TSF from the last beacon */
-		  ni = ieee80211_find_rxnode(ni->ni_ic,
-					     (const struct ieee80211_frame_min *) skb->data);
-		  if (ni == NULL) {
-		    break;
-		  }
+			/* To handle IBSS merge, we need the struct
+			 * ieee80211_node which has been updated with the
+			 * BSSID and TSF from the last beacon */
+			ni = ieee80211_find_rxnode(ni->ni_ic,
+					(const struct ieee80211_frame_min *)
+					skb->data);
+			if (ni == NULL)
+				break;
 
-		  /* Handle IBSS merge as needed; check the TSF on the frame
-		   * before attempting the merge. The 802.11 spec says the
-		   * station should change its BSSID to match the oldest
-		   * station with the same SSID, where oldest is determined by
-		   * the TSF. Note that hardware reconfiguration happens
-		   * through callback to ath_newstate as the state machine will
-		   * go from RUN -> RUN when this happens. */
+			/* Handle IBSS merge as needed; check the TSF on the 
+			 * frame before attempting the merge. The 802.11 spec. 
+			 * says the station should change its BSSID to match 
+			 * the oldest station with the same SSID, where oldest 
+			 * is determined by the TSF. Note that hardware 
+			 * reconfiguration happens through callback to 
+			 * ath_newstate as the state machine will go from 
+			 * RUN -> RUN when this happens. */
 
-		  hw_tsf = ath_hal_gettsf64(sc->sc_ah);
-		  hw_tu  = hw_tsf >> 10;
+			hw_tsf = ath_hal_gettsf64(sc->sc_ah);
+			hw_tu  = hw_tsf >> 10;
 
-		  beacon_tsf = le64_to_cpu(ni->ni_tstamp.tsf);
-		  beacon_tu  = beacon_tsf >> 10;
+			beacon_tsf = le64_to_cpu(ni->ni_tstamp.tsf);
+			beacon_tu  = beacon_tsf >> 10;
 
-		  DPRINTF(sc, ATH_DEBUG_BEACON,
-			  "%s: beacon transmitted at %10llx, received at %10llx(%lld), hw TSF %10llx(%lld)\n",
-			  DEV_NAME(sc->sc_dev),
-			  beacon_tsf,
-			  rtsf, rtsf - beacon_tsf,
-			  hw_tsf, hw_tsf - beacon_tsf);
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+					"%s: beacon transmitted at %10llx, "
+					"received at %10llx(%lld), hw TSF "
+					"%10llx(%lld)\n",
+					DEV_NAME(sc->sc_dev),
+					beacon_tsf,
+					rtsf, rtsf - beacon_tsf,
+					hw_tsf, hw_tsf - beacon_tsf);
 
-		  if (rtsf < beacon_tsf) {
-			  DPRINTF(sc, ATH_DEBUG_BEACON,
-				  "%s: ibss merge: rtsf %10llx beacon's tsf %10llx\n",
-				  DEV_NAME(sc->sc_dev),
-				  rtsf, beacon_tsf);
-			  do_merge = 1;
-		  }
+			if (rtsf < beacon_tsf) {
+				DPRINTF(sc, ATH_DEBUG_BEACON,
+						"%s: ibss merge: rtsf %10llx "
+						"beacon's tsf %10llx\n",
+						DEV_NAME(sc->sc_dev),
+						rtsf, beacon_tsf);
+				do_merge = 1;
+			}
 
-		  /* Check sc_nexttbtt */
-		  if (sc->sc_nexttbtt < hw_tu) {
-			  DPRINTF(sc, ATH_DEBUG_BEACON,
-				  "%s: ibss merge: sc_nexttbtt (%8x TU) is in the past (tsf %8x TU)!\n",
-				  DEV_NAME(sc->sc_dev),
-				  sc->sc_nexttbtt, hw_tu);
-			  do_merge = 1;
-		  }
+			/* Check sc_nexttbtt */
+			if (sc->sc_nexttbtt < hw_tu) {
+				DPRINTF(sc, ATH_DEBUG_BEACON,
+						"%s: ibss merge: sc_nexttbtt "
+						"(%8x TU) is in the past "
+						"(tsf %8x TU)!\n",
+						DEV_NAME(sc->sc_dev),
+						sc->sc_nexttbtt, hw_tu);
+				do_merge = 1;
+			}
 
-		  intval = ni->ni_intval & HAL_BEACON_PERIOD;
-		  if (intval != 0) {
+			intval = ni->ni_intval & HAL_BEACON_PERIOD;
+			if (intval != 0) {
 
-			  if ((sc->sc_nexttbtt % intval) !=
-			      (beacon_tu % intval)) {
-				  DPRINTF(sc, ATH_DEBUG_BEACON,
-					  "%s: ibss merge: sc_nexttbtt %10x TU (%3d) beacon %10x TU (%3d)\n",
-					  DEV_NAME(sc->sc_dev),
-					  sc->sc_nexttbtt,
-					  sc->sc_nexttbtt % intval,
-					  beacon_tu,
-					  beacon_tu % intval);
-				  do_merge = 1;
-			  }
-		  }
+				if ((sc->sc_nexttbtt % intval) !=
+						(beacon_tu % intval)) {
+					DPRINTF(sc, ATH_DEBUG_BEACON,
+							"%s: ibss merge: "
+							"sc_nexttbtt %10x TU "
+							"(%3d) beacon %10x TU "
+							"(%3d)\n",
+							DEV_NAME(sc->sc_dev),
+							sc->sc_nexttbtt,
+							sc->sc_nexttbtt % intval,
+							beacon_tu,
+							beacon_tu % intval);
+					do_merge = 1;
+				}
+			}
 
-		  if (do_merge) {
-			  ieee80211_ibss_merge(ni);
-		  }
+			if (do_merge)
+				ieee80211_ibss_merge(ni);
 		}
 		break;
 	}
