@@ -1110,7 +1110,7 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 		ni = ieee80211_find_node(nt, &vap->iv_spy.mac[i * IEEE80211_ADDR_LEN]);
 		/* check we are associated w/ this vap */
 		if (ni) {
-			if(ni->ni_vap == vap) {
+			if (ni->ni_vap == vap) {
 				set_quality(&spy_stat[i], ni->ni_rssi, ic->ic_channoise);
 				if (ni->ni_rtsf != vap->iv_spy.ts_rssi[i]) {
 					vap->iv_spy.ts_rssi[i] = ni->ni_rtsf;
@@ -4397,7 +4397,7 @@ ieee80211_ioctl_siwmlme(struct net_device *dev,
 
 	memset(&mlme, 0, sizeof(mlme));
 
-	switch(wextmlme->cmd) {
+	switch (wextmlme->cmd) {
 	case IW_MLME_DEAUTH:
 		mlme.im_op = IEEE80211_MLME_DEAUTH;
 		break;
@@ -4460,7 +4460,7 @@ siwauth_wpa_version(struct net_device *dev,
 static int
 iwcipher2ieee80211cipher(int iwciph)
 {
-	switch(iwciph) {
+	switch (iwciph) {
 	case IW_AUTH_CIPHER_NONE:
 		return IEEE80211_CIPHER_NONE;
 	case IW_AUTH_CIPHER_WEP40:
@@ -4477,7 +4477,7 @@ iwcipher2ieee80211cipher(int iwciph)
 static int
 ieee80211cipher2iwcipher(int ieee80211ciph)
 {
-	switch(ieee80211ciph) {
+	switch (ieee80211ciph) {
 	case IEEE80211_CIPHER_NONE:
 		return IW_AUTH_CIPHER_NONE;
 	case IEEE80211_CIPHER_WEP:
@@ -4630,7 +4630,7 @@ siwauth_roaming_control(struct net_device *dev,
 	int args[2];
 
 	args[0] = IEEE80211_PARAM_ROAMING;
-	switch(roam) {
+	switch (roam) {
 	case IW_AUTH_ROAMING_ENABLE:
 		args[1] = IEEE80211_ROAMING_AUTO;
 		break;
@@ -4669,7 +4669,7 @@ ieee80211_ioctl_siwauth(struct net_device *dev,
 {
 	int rc = -EOPNOTSUPP;
 
-	switch(erq->flags & IW_AUTH_INDEX) {
+	switch (erq->flags & IW_AUTH_INDEX) {
 	case IW_AUTH_WPA_VERSION:
 		rc = siwauth_wpa_version(dev, info, erq, buf);
 		break;
@@ -4724,7 +4724,7 @@ giwauth_wpa_version(struct net_device *dev,
 	if (rc)
 		return rc;
 
-	switch(arg) {
+	switch (arg) {
 	case 1:
 		ver = IW_AUTH_WPA_VERSION_WPA;
 		break;
@@ -4868,7 +4868,7 @@ giwauth_roaming_control(struct net_device *dev,
 	if (rc)
 		return rc;
 
-	switch(arg) {
+	switch (arg) {
 	case IEEE80211_ROAMING_DEVICE:
 	case IEEE80211_ROAMING_AUTO:
 		erq->value = IW_AUTH_ROAMING_ENABLE;
@@ -4901,7 +4901,7 @@ ieee80211_ioctl_giwauth(struct net_device *dev,
 {
 	int rc = -EOPNOTSUPP;
 
-	switch(erq->flags & IW_AUTH_INDEX) {
+	switch (erq->flags & IW_AUTH_INDEX) {
 	case IW_AUTH_WPA_VERSION:
 		rc = giwauth_wpa_version(dev, info, erq, buf);
 		break;
@@ -4987,7 +4987,7 @@ ieee80211_ioctl_giwencodeext(struct net_device *dev,
 		ext->ext_flags |= IW_ENCODE_EXT_GROUP_KEY;
 
 	/* algorithm */
-	switch(wk->wk_cipher->ic_cipher) {
+	switch (wk->wk_cipher->ic_cipher) {
 	case IEEE80211_CIPHER_NONE:
 		ext->alg = IW_ENCODE_ALG_NONE;
 		erq->flags |= IW_ENCODE_DISABLED;
@@ -5071,7 +5071,7 @@ ieee80211_ioctl_siwencodeext(struct net_device *dev,
 	/* convert to the format used by IEEE_80211_IOCTL_SETKEY */
 	memset(&kr, 0, sizeof(kr));
 
-	switch(ext->alg) {
+	switch (ext->alg) {
 	case IW_ENCODE_ALG_WEP:
 		kr.ik_type = IEEE80211_CIPHER_WEP;
 		break;
