@@ -231,6 +231,29 @@ sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 		return ath_hal_setlogging(enable);
 }
 
+void ath_hal_logprintf(const char *fmt, ...)
+{
+	va_list ap;
+	struct ale *ale;
+	
+	if (!ath_hal_alq)
+		return;
+
+	ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
+	if (!ale) {
+		ath_hal_alq_lost++;
+		return;
+	}
+
+	memset(ale->ae_data, 0, MSG_MAXLEN);
+	va_start(ap, fmt);
+	vsnprintf(ale->ae_data, MSG_MAXLEN, fmt, ap);
+	va_end(ap);
+
+	alq_post(ath_hal_alq, ale);
+}
+EXPORT_SYMBOL(ath_hal_logprintf);
+
 static void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
 {
 	struct ale *ale;
