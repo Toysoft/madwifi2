@@ -2369,6 +2369,7 @@ struct channel_combination_arg {
 	int benefit;
 };
 
+#ifdef IEEE80211_DEBUG
 /*
  * sprintf() set[] array consisting of k integers
  */
@@ -2382,6 +2383,7 @@ ints_sprintf(const int k, const int set[])
 		ptr += snprintf(ptr, buf + sizeof(buf) - ptr, "%d ", set[i]);
 	return buf;
 }
+#endif
 /*
  * Action done for each combination of channels that are not supported by currently joining station.
  * Context: combinations()
@@ -2556,9 +2558,11 @@ ieee80211_parse_sc_ie(struct ieee80211_node *ni, u_int8_t *frm,
 {
 	struct ieee80211_ie_sc *sc_ie = (struct ieee80211_ie_sc *)frm;
 	struct ieee80211com *ic = ni->ni_ic;
+#ifdef IEEE80211_DEBUG
 	struct ieee80211vap *vap = ni->ni_vap;
 	int reassoc = (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) ==
 		IEEE80211_FC0_SUBTYPE_REASSOC_REQ;
+#endif
 	int i, tmp1, tmp2;
 	int count;
 
