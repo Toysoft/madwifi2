@@ -249,4 +249,6 @@ extern	struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
 		HAL_BUS_TAG, HAL_BUS_HANDLE, HAL_STATUS*);
 extern	void _ath_hal_detach(struct ath_hal *);
 
+void ath_hal_logprintf(const char *msg, ...);
+
 #endif /* _ATH_AH_OSDEP_H_ */
