@@ -182,23 +182,22 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
 #endif /* WIRELESS_EXT >= 16 */
 
 /*
- * Process a received frame.  The node associated with the sender
- * should be supplied.  If nothing was found in the node table then
- * the caller is assumed to supply a reference to ic_bss instead.
- * The RSSI and a timestamp are also supplied.  The RSSI data is used
- * during AP scanning to select a AP to associate with; it can have
- * any units so long as values have consistent units and higher values
- * mean ``better signal''.  The receive timestamp is currently not used
- * by the 802.11 layer.
+ * Process a received frame. The node associated with the sender should be
+ * supplied, along with the associated VAP. If nothing was found in the node
+ * table then the caller is assumed to supply NULL. The RSSI and a timestamp
+ * are also supplied. The RSSI data is used during AP scanning to select a AP
+ * to associate with; it can have any units so long as values have consistent
+ * units and higher values mean ``better signal''. The receive timestamp is
+ * currently not used by the 802.11 layer.
  *
  * Context: softIRQ (tasklet)
  */
 int
-ieee80211_input(struct ieee80211_node *ni,
+ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 	struct sk_buff *skb, int rssi, u_int64_t rtsf)
 {
 #define	HAS_SEQ(type)	((type & 0x4) == 0)
-	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211_node * ni = ni_or_null;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct net_device *dev = vap->iv_dev;
 	struct ieee80211_frame *wh;
@@ -212,6 +211,13 @@ ieee80211_input(struct ieee80211_node *ni,
 	u_int8_t *bssid;
 	u_int16_t rxseq;
 
+	/* initialize ni as in the previous API */
+	if (ni_or_null == NULL) {
+               /* This function does not 'own' vap->iv_bss, so we cannot
+                * guarantee its existence during the following call, hence
+                * briefly grab our own reference. */
+		ni = ieee80211_ref_node(vap->iv_bss);
+	}
 	KASSERT(ni != NULL, ("null node"));
 	ni->ni_inact = ni->ni_inact_reload;
 
@@ -743,6 +749,8 @@ ieee80211_input(struct ieee80211_node *ni,
 #else /* !ATH_SUPERG_FF */
 		ieee80211_deliver_data(ni, skb);
 #endif
+		if (ni_or_null == NULL)
+			ieee80211_unref_node(&ni);
 		return IEEE80211_FC0_TYPE_DATA;
 
 	case IEEE80211_FC0_TYPE_MGT:
@@ -827,6 +835,8 @@ err:
 out:
 	if (skb != NULL)
 		ieee80211_dev_kfree_skb(&skb);
+	if (ni_or_null == NULL)
+		ieee80211_unref_node(&ni);
 	return type;
 #undef HAS_SEQ
 }
@@ -913,7 +923,6 @@ ieee80211_input_all(struct ieee80211com *ic,
 
 	/* XXX locking */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		struct ieee80211_node *ni;
 		struct sk_buff *skb1;
 
 		if (TAILQ_NEXT(vap, iv_next) != NULL) {
@@ -929,12 +938,7 @@ ieee80211_input_all(struct ieee80211com *ic,
 			skb1 = skb;
 			skb = NULL;
 		}
-		/* This function does not 'own' vap->iv_bss, so we cannot 
-		 * guarantee its existence during the following call, hence
-		 * briefly grab our own reference. */
-		ni = ieee80211_ref_node(vap->iv_bss);
-		type = ieee80211_input(ni, skb1, rssi, rtsf);
-		ieee80211_unref_node(&ni);
+		type = ieee80211_input(vap, NULL, skb1, rssi, rtsf);
 	}
 	if (skb != NULL)		/* no vaps, reclaim skb */
 		ieee80211_dev_kfree_skb(&skb);
