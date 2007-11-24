@@ -8863,12 +8863,14 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			/*
 			 * Allocate and setup the beacon frame.
 			 *
-			 * Stop any previous beacon DMA.  This may be
-			 * necessary, for example, when an ibss merge
-		     8766 41:					ath_beacon_config(sc, vap);
-			 * causes reconfiguration; there will be a state
-			 * transition from RUN->RUN that means we may
-			 * be called with beacon transmission active.
+			 * Stop any previous beacon DMA. This may be necessary,
+			 * for example, when an ibss merge causes
+			 * reconfiguration; there will be a state transition
+			 * from RUN->RUN that means we may be called with
+			 * beacon transmission active. In this case,
+			 * ath_beacon_alloc() is simply skipped to avoid race
+			 * condition with SWBA interrupts calling
+			 * ath_beacon_generate()
 			 */
 			DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 				"%s: ath_hal_stoptxdma sc_bhalq:%d\n",
@@ -8883,9 +8885,12 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				ni->ni_ath_defkeyindex = vap->iv_def_txkey;
 			}
 
-			error = ath_beacon_alloc(sc, ni);
-			if (error < 0)
-				goto bad;
+			if (vap->iv_state != IEEE80211_S_RUN) {
+				error = ath_beacon_alloc(sc, ni);
+				if (error < 0)
+					goto bad;
+			}
+
 			/*
 			 * if the turbo flags have changed, then beacon and turbo
 			 * need to be reconfigured.
