@@ -185,8 +185,8 @@ static void ath_node_free(struct ieee80211_node *);
 
 static u_int8_t ath_node_getrssi(const struct ieee80211_node *);
 static int ath_rxbuf_init(struct ath_softc *, struct ath_buf *);
-static void ath_recv_mgmt(struct ieee80211_node *, struct sk_buff *, int,
-	int, u_int64_t);
+static void ath_recv_mgmt(struct ieee80211vap *, struct ieee80211_node *,
+	struct sk_buff *, int, int, u_int64_t);
 static void ath_setdefantenna(struct ath_softc *, u_int);
 static struct ath_txq *ath_txq_setup(struct ath_softc *, int, int);
 static void ath_rx_tasklet(TQUEUE_ARG);
@@ -6099,19 +6099,22 @@ done:
  * including those belonging to other BSS.
  */
 static void
-ath_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
-	int subtype, int rssi, u_int64_t rtsf)
+ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
+	struct sk_buff *skb, int subtype, int rssi, u_int64_t rtsf)
 {
-	struct ath_softc *sc = ni->ni_ic->ic_dev->priv;
-	struct ieee80211vap *vap = ni->ni_vap;
+	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
+	struct ieee80211_node * ni = ni_or_null;
 	u_int64_t hw_tsf, beacon_tsf;
 	u_int32_t hw_tu, beacon_tu, intval;
 	int do_merge = 0;
 
+	if (ni_or_null == NULL)
+		ni = vap->iv_bss;
+
 	/*Call up first so subsequent work can use information
 	 * potentially stored in the node (e.g. for ibss merge). */
 
-	sc->sc_recv_mgmt(ni, skb, subtype, rssi, rtsf);
+	sc->sc_recv_mgmt(vap, ni_or_null, skb, subtype, rssi, rtsf);
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* update RSSI statistics for use by the HAL */

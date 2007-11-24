@@ -813,7 +813,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			wh = (struct ieee80211_frame *)skb->data;
 			wh->i_fc[1] &= ~IEEE80211_FC1_PROT;
 		}
-		ic->ic_recv_mgmt(ni, skb, subtype, rssi, rtsf);
+		ic->ic_recv_mgmt(vap, ni_or_null, skb, subtype, rssi, rtsf);
 		goto out;
 
 	case IEEE80211_FC0_TYPE_CTL:
@@ -2959,12 +2959,13 @@ startbgscan(struct ieee80211vap *vap)
  * Context: SoftIRQ
  */
 void
-ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
+ieee80211_recv_mgmt(struct ieee80211vap *vap,
+	struct ieee80211_node *ni_or_null, struct sk_buff *skb,
 	int subtype, int rssi, u_int64_t rtsf)
 {
 #define	ISPROBE(_st)	((_st) == IEEE80211_FC0_SUBTYPE_PROBE_RESP)
 #define	ISREASSOC(_st)	((_st) == IEEE80211_FC0_SUBTYPE_REASSOC_RESP)
-	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211_node * ni = ni_or_null;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_frame *wh;
 	u_int8_t *frm, *efrm;
@@ -2972,6 +2973,9 @@ ieee80211_recv_mgmt(struct ieee80211_node *ni, struct sk_buff *skb,
 	u_int8_t rate;
 	int reassoc, resp, allocbs = 0;
 	u_int8_t qosinfo;
+
+	if (ni_or_null == NULL)
+		ni = vap->iv_bss;
 
 	wh = (struct ieee80211_frame *) skb->data;
 	frm = (u_int8_t *)&wh[1];

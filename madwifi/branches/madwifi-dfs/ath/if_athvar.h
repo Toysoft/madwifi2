@@ -615,7 +615,8 @@ struct ath_softc {
 	int devid;
 	int sc_debug;
 	int sc_default_ieee80211_debug;		/* default debug flags for new VAPs */
-	void (*sc_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int, int, u_int64_t);
+	void (*sc_recv_mgmt)(struct ieee80211vap *, struct ieee80211_node *,
+		struct sk_buff *, int, int, u_int64_t);
 #ifdef IEEE80211_DEBUG_REFCNT
 	void (*sc_node_cleanup_debug)(struct ieee80211_node *, const char* func, int line);
 	void (*sc_node_free_debug)(struct ieee80211_node *, const char* func, int line);
