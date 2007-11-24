@@ -6450,7 +6450,7 @@ rx_accept:
 			 * grab a reference for processing the frame. */
 			ni = ieee80211_ref_node(ni);
 			ATH_RSSI_LPF(ATH_NODE(ni)->an_avgrssi, rs->rs_rssi);
-			type = ieee80211_input(ni, skb, rs->rs_rssi, bf->bf_tsf);
+			type = ieee80211_input(ni->ni_vap, ni, skb, rs->rs_rssi, bf->bf_tsf);
 			ieee80211_unref_node(&ni);
 		} else {
 			/*
@@ -6464,7 +6464,7 @@ rx_accept:
 				ieee80211_keyix_t keyix;
 
 				ATH_RSSI_LPF(an->an_avgrssi, rs->rs_rssi);
-				type = ieee80211_input(ni, skb,	rs->rs_rssi, bf->bf_tsf);
+				type = ieee80211_input(ni->ni_vap, ni, skb, rs->rs_rssi, bf->bf_tsf);
 				/*
 				 * If the station has a key cache slot assigned
 				 * update the key->node mapping table.
