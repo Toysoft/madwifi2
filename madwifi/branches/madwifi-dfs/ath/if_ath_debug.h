@@ -30,7 +30,7 @@ enum {
 	ATH_DEBUG_RECV_DESC	= 0x00000008,	/* recv descriptors */
 	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
 	ATH_DEBUG_RESET		= 0x00000020,	/* reset processing */
-	/* 0x00000040 was ATH_DEBUG_MODE */
+	ATH_DEBUG_SKB_REF	= 0x00000040,	/* sbk references */
 	ATH_DEBUG_BEACON 	= 0x00000080,	/* beacon handling */
 	ATH_DEBUG_WATCHDOG 	= 0x00000100,	/* watchdog timeout */
 	ATH_DEBUG_INTR		= 0x00001000,	/* ISR */
@@ -53,7 +53,7 @@ enum {
 	ATH_DEBUG_SKB           = 0x40000000,   /* SKB usage/leak debugging [applies to all vaps] */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
 	ATH_DEBUG_ANY		= 0xffffffff,
-	ATH_DEBUG_GLOBAL	= (ATH_DEBUG_SKB)
+	ATH_DEBUG_GLOBAL	= (ATH_DEBUG_SKB|ATH_DEBUG_SKB_REF)
 };
 #define	DPRINTF(sc, _m, _fmt, ...) do {					\
 	if (sc->sc_debug & (_m)) {					\
