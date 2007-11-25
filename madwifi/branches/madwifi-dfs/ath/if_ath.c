@@ -2915,7 +2915,7 @@ ath_ff_neverflushtestdone(struct ath_txq *txq, struct ath_buf *bf)
 static int
 ath_ff_ageflushtestdone(struct ath_txq *txq, struct ath_buf *bf)
 {
-	if ( (txq->axq_totalqueued - bf->bf_queueage) < ATH_FF_STAGEQAGEMAX )
+	if ((txq->axq_totalqueued - bf->bf_queueage) < ATH_FF_STAGEQAGEMAX)
 		return 1;
 
 	return 0;
@@ -2976,7 +2976,7 @@ ath_get_buffers_available(void)
 }
 
 #ifdef IEEE80211_DEBUG_REFCNT
-/* NOTE: This function is valid in noo-debug configurations, just not used. */
+/* NOTE: This function is valid in non-debug configurations, just not used. */
 static inline
 u_int32_t
 ath_get_buffer_count(void)
@@ -2988,10 +2988,10 @@ ath_get_buffer_count(void)
 static 
 struct ath_buf*
 #ifdef IEEE80211_DEBUG_REFCNT
-internal_take_txbuf_locked_debug(struct ath_softc *sc, int for_management, 
+_take_txbuf_locked_debug(struct ath_softc *sc, int for_management, 
 			const char *func, int line)
 #else
-internal_take_txbuf_locked(struct ath_softc *sc, int for_management)
+_take_txbuf_locked(struct ath_softc *sc, int for_management)
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 {
 	struct ath_buf* bf = NULL;
@@ -3044,17 +3044,17 @@ internal_take_txbuf_locked(struct ath_softc *sc, int for_management)
 static
 struct ath_buf*
 #ifdef IEEE80211_DEBUG_REFCNT
-internal_take_txbuf_debug(struct ath_softc *sc, int for_management,
+_take_txbuf_debug(struct ath_softc *sc, int for_management,
 			  const char *func, int line) {
 #else
-internal_take_txbuf(struct ath_softc *sc, int for_management) {
+_take_txbuf(struct ath_softc *sc, int for_management) {
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 	struct ath_buf* bf = NULL;
 	ATH_TXBUF_LOCK_IRQ(sc);
 #ifdef IEEE80211_DEBUG_REFCNT
-	bf = internal_take_txbuf_locked_debug(sc, for_management, func, line);
+	bf = _take_txbuf_locked_debug(sc, for_management, func, line);
 #else
-	bf = internal_take_txbuf_locked(sc, for_management);
+	bf = _take_txbuf_locked(sc, for_management);
 #endif
 	ATH_TXBUF_UNLOCK_IRQ(sc);
 	return bf;
@@ -3063,46 +3063,46 @@ internal_take_txbuf(struct ath_softc *sc, int for_management) {
 #ifdef IEEE80211_DEBUG_REFCNT
 
 #define ath_take_txbuf_locked(_sc) \
-	internal_take_txbuf_locked_debug(_sc, 0, __func__, __LINE__)
+	_take_txbuf_locked_debug(_sc, 0, __func__, __LINE__)
 #define ath_take_txbuf_locked_debug(_sc, _func, _line) \
-	internal_take_txbuf_locked_debug(_sc, 0, _func, _line)
+	_take_txbuf_locked_debug(_sc, 0, _func, _line)
 
-#define ath_take_txbuf_for_management_locked(_sc) \
-	internal_take_txbuf_locked_debug(_sc, 1, __func__, __LINE__)
-#define ath_take_txbuf_for_management_locked_debug(_sc, _func, _line) \
-	internal_take_txbuf_locked_debug(_sc, 1, _func, _line)
+#define ath_take_txbuf_mgmt_locked(_sc) \
+	_take_txbuf_locked_debug(_sc, 1, __func__, __LINE__)
+#define ath_take_txbuf_mgmt_locked_debug(_sc, _func, _line) \
+	_take_txbuf_locked_debug(_sc, 1, _func, _line)
 
 #define ath_take_txbuf(_sc) \
-	internal_take_txbuf_debug(_sc, 0, __func__, __LINE__)
+	_take_txbuf_debug(_sc, 0, __func__, __LINE__)
 #define ath_take_txbuf_debug(_sc, _func, _line) \
-	internal_take_txbuf_debug(_sc, 0, _func, _line)
+	_take_txbuf_debug(_sc, 0, _func, _line)
 
-#define ath_take_txbuf_for_management(_sc) \
-	internal_take_txbuf_debug(_sc, 1, __func__, __LINE__)
-#define ath_take_txbuf_for_management_debug(_sc, _func, _line) \
-	internal_take_txbuf_debug(_sc, 1, _func, _line)
+#define ath_take_txbuf_mgmt(_sc) \
+	_take_txbuf_debug(_sc, 1, __func__, __LINE__)
+#define ath_take_txbuf_mgmt_debug(_sc, _func, _line) \
+	_take_txbuf_debug(_sc, 1, _func, _line)
 
 #else /* #ifdef IEEE80211_DEBUG_REFCNT */
 
 #define ath_take_txbuf_locked(_sc) \
-	internal_take_txbuf_locked(_sc, 0)
+	_take_txbuf_locked(_sc, 0)
 #define ath_take_txbuf_locked_debug(_sc, _func, _line) \
-	internal_take_txbuf_locked(_sc, 0)
+	_take_txbuf_locked(_sc, 0)
 
-#define ath_take_txbuf_for_management_locked(_sc) \
-	internal_take_txbuf_locked(_sc, 1)
-#define ath_take_txbuf_for_management_locked_debug(_sc, _func, _line) \
-	internal_take_txbuf_locked(_sc, 1)
+#define ath_take_txbuf_mgmt_locked(_sc) \
+	_take_txbuf_locked(_sc, 1)
+#define ath_take_txbuf_mgmt_locked_debug(_sc, _func, _line) \
+	_take_txbuf_locked(_sc, 1)
 
 #define ath_take_txbuf(_sc) \
-	internal_take_txbuf(_sc, 0)
+	_take_txbuf(_sc, 0)
 #define ath_take_txbuf_debug(_sc, _func, _line) \
-	internal_take_txbuf(_sc, 0)
+	_take_txbuf(_sc, 0)
 
-#define ath_take_txbuf_for_management(_sc) \
-	internal_take_txbuf(_sc, 1)
-#define ath_take_txbuf_for_management_debug(_sc, _func, _line) \
-	internal_take_txbuf(_sc, 1)
+#define ath_take_txbuf_mgmt(_sc) \
+	_take_txbuf(_sc, 1)
+#define ath_take_txbuf_mgmt_debug(_sc, _func, _line) \
+	_take_txbuf(_sc, 1)
 
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 
@@ -3273,7 +3273,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 				ath_return_txbuf(sc, &bf_ff);
 			}
 			bf = ath_take_txbuf(sc);
-			if (!bf) {
+			if (bf == NULL) {
 				goto hardstart_fail;
 			}
 
@@ -3338,6 +3338,7 @@ ff_bypass:
 		if (bfcnt != framecnt) {
 			ath_return_txbuf_list_locked(sc, &bf_head);
 			ATH_TXBUF_UNLOCK_IRQ_EARLY(sc);
+			STAILQ_INIT(&bf_head);
 			goto hardstart_fail;
 		}
 		ATH_TXBUF_UNLOCK_IRQ(sc);
@@ -3425,8 +3426,8 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	/*
 	 * Grab a TX buffer and associated resources.
 	 */
-	bf = ath_take_txbuf_for_management(sc);
-	if (!bf) {
+	bf = ath_take_txbuf_mgmt(sc);
+	if (bf == NULL) {
 		printk("ath_mgtstart: discard, no xmit buf\n");
 		sc->sc_stats.ast_tx_nobufmgt++;
 		error = -ENOBUFS;
@@ -3768,16 +3769,22 @@ ath_key_alloc(struct ieee80211vap *vap, const struct ieee80211_key *k)
 	 * multi-station operation.
 	 */
 	if ((k->wk_flags & IEEE80211_KEY_GROUP) && !sc->sc_mcastkey) {
-		ieee80211_keyix_t keyix;
+		int i;
+		ieee80211_keyix_t keyix = IEEE80211_KEYIX_NONE;
 
-		if (!(&vap->iv_nw_keys[0] <= k &&
-		    k < &vap->iv_nw_keys[IEEE80211_WEP_NKID])) {
+		for (i = 0; i < IEEE80211_WEP_NKID; i++) {
+			if (k == &vap->iv_nw_keys[i]) {
+				keyix = i;
+				break;
+			}
+		}
+		if (keyix == IEEE80211_KEYIX_NONE) {
 			/* should not happen */
 			DPRINTF(sc, ATH_DEBUG_KEYCACHE,
 				"%s: bogus group key\n", __func__);
 			return IEEE80211_KEYIX_NONE;
 		}
-		keyix = k - vap->iv_nw_keys;
+
 		/* XXX: We pre-allocate the global keys so have no way 
 		 * to check if they've already been allocated. */
 		return keyix;
@@ -5654,7 +5661,6 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		while (bf) {
 			skb = bf->bf_skb;
 			bf->bf_skb = NULL;
-			bf->bf_node = NULL;
 			ath_return_txbuf(sc, &bf);
 			/* Untrack because ath_hardstart will restart tracking */
 			ieee80211_skb_untrack(skb);
@@ -6005,7 +6011,7 @@ ath_rx_capture(struct net_device *dev, const struct ath_buf *bf,
 	if (padbytes > 0) {
 		/* Remove hw pad bytes */
 		struct sk_buff *skb1 = skb_copy(skb, GFP_ATOMIC);
-		if (skb == NULL)
+		if (skb1 == NULL)
 			return;
 		memmove(skb1->data + padbytes, skb1->data, headersize);
 		skb_pull(skb1, padbytes);
@@ -6051,12 +6057,8 @@ ath_tx_capture(struct net_device *dev, const struct ath_buf *bf,  struct sk_buff
 		/* If the clone works, bump the reference count for our copy. */
 		SKB_CB(skb)->ni = ieee80211_ref_node(SKB_CB(skb_orig)->ni);
 		ieee80211_dev_kfree_skb(&skb_orig);
-		/* Clear the parent pointer instead of calling skb_orphan. 
-		 * NOTE: We don't want  o invoke skb_orphan here because it will
-		 * invoke the destructor on the skb and release/reset the node
-		 * reference before we are ready for that.  This is handled at
-		 * the bottom of this function. */
-		skb->sk = NULL;
+	} else {
+		skb_orphan(skb);
 	}
 
 	wh = (struct ieee80211_frame *) skb->data;
@@ -6403,7 +6405,6 @@ rx_accept:
 			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
 				/* no other VAPs need the packet */
 				ieee80211_dev_kfree_skb(&skb);
-				skb = NULL;
 				goto rx_next;
 			}
 		}
@@ -11183,7 +11184,7 @@ txcont_queue_packet(struct ieee80211com *ic, struct ath_txq* txq)
 
 	ath_hal_intrset(ah, 0);
 	{
-		bf  = ath_take_txbuf_locked(sc);
+		bf  = ath_take_txbuf(sc);
 		skb = alloc_skb(datasz + sizeof(struct ieee80211_frame) + 
 				IEEE80211_CRC_LEN, GFP_ATOMIC);
 		if (NULL == skb) {
@@ -12614,7 +12615,6 @@ cleanup_ath_buf(struct ath_softc *sc, struct ath_buf *buf, int direction)
 }
 #endif /* ATH_SUPERG_FF */
 	buf->bf_node = NULL;
-	buf->bf_skb = NULL;
 	buf->bf_flags = 0;
 
 	if (buf->bf_desc) {
