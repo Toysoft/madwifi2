@@ -63,7 +63,7 @@ enum {
 	ATH_DEBUG_RECV_DESC	= 0x00000008,	/* recv descriptors */
 	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
 	ATH_DEBUG_RESET		= 0x00000020,	/* reset processing */
-	ATH_DEBUG_MODE		= 0x00000040,	/* mode init/setup */
+	ATH_DEBUG_SKB_REF	= 0x00000040,   /* skb ref counting */
 	ATH_DEBUG_BEACON	= 0x00000080,	/* beacon handling */
 	ATH_DEBUG_WATCHDOG	= 0x00000100,	/* watchdog timeout */
 	ATH_DEBUG_INTR		= 0x00001000,	/* ISR */
@@ -86,7 +86,7 @@ enum {
 	ATH_DEBUG_SKB           = 0x40000000,   /* SKB usage/leak debugging [applies to all vaps] */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
 	ATH_DEBUG_ANY		= 0xffffffff,
-	ATH_DEBUG_GLOBAL	= (ATH_DEBUG_SKB)
+	ATH_DEBUG_GLOBAL	= (ATH_DEBUG_SKB|ATH_DEBUG_SKB_REF)
 };
 
 static struct {
@@ -100,7 +100,6 @@ static struct {
 	{ "recv_desc",	 ATH_DEBUG_RECV_DESC, 	"recv descriptors" },
 	{ "rate",	 ATH_DEBUG_RATE, 	"rate control modules" },
 	{ "reset",	 ATH_DEBUG_RESET, 	"reset processing and initialization" },
-	{ "mode",	 ATH_DEBUG_MODE, 	"mode initialization and changes" },
 	{ "beacon",	 ATH_DEBUG_BEACON, 	"beacon handling" },
 	{ "watchdog",	 ATH_DEBUG_WATCHDOG, 	"watchdog timer" },
 	{ "intr",	 ATH_DEBUG_INTR, 	"interrupt processing" },
@@ -112,6 +111,7 @@ static struct {
 	{ "state",	 ATH_DEBUG_STATE, 	"802.11 state transitions" },
 	{ "txbuf", 	 ATH_DEBUG_TXBUF,   	"ath_buf management" },
 	{ "skb",         ATH_DEBUG_SKB,         "skb management (affects all devs)" },
+	{ "skb_ref",     ATH_DEBUG_SKB_REF,     "skb ref counting (affects all devs)" },
 	{ "led",         ATH_DEBUG_LED, 	"led management" },
 	{ "ff",		 ATH_DEBUG_FF, 		"fast frame handling" },
 	{ "turbo",	 ATH_DEBUG_TURBO, 	"dynamic turbo handling" },
