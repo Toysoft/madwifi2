@@ -228,6 +228,14 @@ sub lookup_name($) {
 			}
 		}
 	}
+	# still no name -> convert PHY regs to AR5K_PHY(x)
+	if (hex($reg) >= 0x9800 && hex($reg) <= 0xa20c) {
+		$return->{"desc"} = $regs->{"0x9800"}->{"all"}->{"desc"};
+		$return->{"name"} = $regs->{"0x9800"}->{"all"}->{"name"};
+		$return->{"name"} .= "(" . (hex($reg) - 0x9800)/4 . ")";
+		return $return;
+	}
+	
 	$return->{"desc"} = "unknown";
 	$return->{"name"} = "unknown";
 	return $return;
@@ -249,8 +257,6 @@ sub show_bits($) {
 sub noise_to_dbm($) {
 	my ($val) = @_;
 	my $noi = hex($val);
-
-	print "$val\n";
 	
 	$noi = (($noi >> 19) & 0x1ff);
 	if ($noi & 0x100) {
@@ -282,7 +288,7 @@ sub decode($$$$) {
 		else {
 			$bits = show_bits($val);
 
-			if (hex($reg) == 0x9864) {
+			if (hex($reg) == 0x9864 && $mode eq "R") {
 				$extra = noise_to_dbm($val);
 			}
 
