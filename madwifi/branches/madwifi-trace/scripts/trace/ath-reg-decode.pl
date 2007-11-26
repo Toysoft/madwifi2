@@ -246,9 +246,25 @@ sub show_bits($) {
 	return $ret;
 }
 
+sub noise_to_dbm($) {
+	my ($val) = @_;
+	my $noi = hex($val);
+
+	print "$val\n";
+	
+	$noi = (($noi >> 19) & 0x1ff);
+	if ($noi & 0x100) {
+		$noi = - (($noi ^ 0x1ff) + 1);
+		return "$noi dBm"
+	} else {
+		return "";
+	}
+}
+
 sub decode($$$$) {
 	my($mode, $reg, $val, $func) = @_;
 	my $dec, $bits;
+	my $nam, $extra = 0;
 
 	if (hex($reg) >= 0x6000 && hex($reg) <= 0x6010) {
 		print_eeprom_access($mode,hex($reg),hex($val));
@@ -265,7 +281,15 @@ sub decode($$$$) {
 		}
 		else {
 			$bits = show_bits($val);
-			printf "%s: 0x%s = 0x%s - %-30s %s (%s)\n", $mode, $reg, $val, $dec->{'name'}, $bits, $func;
+
+			if (hex($reg) == 0x9864) {
+				$extra = noise_to_dbm($val);
+			}
+
+			$nam = $dec->{'name'};
+			$nam .= " (" . $extra . ")" if ($extra);
+
+			printf "%s: 0x%s = 0x%s - %-30s %s (%s)\n", $mode, $reg, $val, $nam, $bits, $func;
 		}
 	}
 }
