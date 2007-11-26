@@ -3337,6 +3337,7 @@ ff_bypass:
 
 		if (bfcnt != framecnt) {
 			ath_return_txbuf_list_locked(sc, &bf_head);
+			ath_return_txbuf(sc, &bf);
 			ATH_TXBUF_UNLOCK_IRQ_EARLY(sc);
 			STAILQ_INIT(&bf_head);
 			goto hardstart_fail;
