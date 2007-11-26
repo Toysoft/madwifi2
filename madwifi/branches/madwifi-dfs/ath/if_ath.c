@@ -2726,7 +2726,6 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	struct ath_desc *lastds, int framelen)
 {
 	struct ath_hal *ah = sc->sc_ah;
-
 	if (ath_check_radio_silence_not_required(sc, __func__))
 		return;
 	/*
@@ -4694,17 +4693,32 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	 * Enable the CAB queue before the beacon queue to
 	 * ensure cab frames are triggered by this beacon.
 	 */
-	/*
-	Currently CABQ is disabled for IBSS because it was reported that this
-	prevented beaconing in IBSS mode, but we *need* to flush stuff in this
-	queue or else it is a source of buffer leaks, as it is *never* reclaimed
-	if it isn't processed....
-	*/
 	/* NB: only at DTIM */
-	if (sc->sc_ic.ic_opmode != IEEE80211_M_IBSS && (avp->av_boff.bo_tim[4] & 1)) {
+	if (avp->av_boff.bo_tim[4] & 1) {
 
 		struct ath_txq *cabq = sc->sc_cabq;
 		struct ath_buf *bfmcast;
+/*
+Currently CABQ is disabled for IBSS because it was reported that this
+prevented beaconing in IBSS mode, in the mean time we are flushing the 
+mcast/cabq instead of sending it to hardware because otherwise it eats into
+our txbuf pool drastically.  This is clone of a subset of the ath_draintxq
+method, as a temporary fix until IBSS multicast is fixed...
+*/
+if (sc->sc_ic.ic_opmode == IEEE80211_M_IBSS) {
+	for (;;) {
+		ATH_TXQ_LOCK_IRQ(&avp->av_mcastq);
+		bfmcast = STAILQ_FIRST(&avp->av_mcastq.axq_q);
+		if (bfmcast == NULL) {
+			ATH_TXQ_UNLOCK_IRQ_EARLY(&avp->av_mcastq);
+			avp->av_mcastq.axq_link = NULL;
+			return bf;
+		}
+		ATH_TXQ_REMOVE_HEAD(&avp->av_mcastq, bf_list);
+		ath_return_txbuf(sc, &bfmcast);
+		ATH_TXQ_UNLOCK_IRQ(&avp->av_mcastq);
+	}
+}
 		/*
 		 * Move everything from the VAPs mcast queue
 		 * to the hardware cab queue.
