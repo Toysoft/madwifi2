@@ -6200,6 +6200,11 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			}
 
 			intval = ni->ni_intval & HAL_BEACON_PERIOD;
+#if 0
+			/* This code is disabled since it would produce
+			 * unwanted merge. For instance, in a two nodes network
+			 * A & B, A can merge to B and at the same time, B will
+			 * merge to A, still having a split */
 			if (intval != 0) {
 
 				if ((sc->sc_nexttbtt % intval) !=
@@ -6217,7 +6222,7 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 					do_merge = 1;
 				}
 			}
-
+#endif
 			if (do_merge)
 				ieee80211_ibss_merge(ni);
 		}
