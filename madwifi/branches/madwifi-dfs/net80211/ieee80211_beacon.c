@@ -281,10 +281,14 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211_frame * wh = (struct ieee80211_frame *) skb->data;
 	int len_changed = 0;
 	u_int16_t capinfo;
 
 	IEEE80211_LOCK_IRQ(ic);
+
+	/* After an IBSS merge, bssid might have been updated */
+	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bss->ni_bssid);
 
 	/* Check if we need to change channel right now */
 
