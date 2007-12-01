@@ -1705,7 +1705,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			bf->bf_status |= ATH_BUFSTATUS_RXTSTAMP;
 			count ++;
 
-			DPRINTF(sc, ATH_DEBUG_BEACON,
+			DPRINTF(sc, ATH_DEBUG_RECV,
 				"%s: rs_tstamp=%10llx count=%d\n",
 				DEV_NAME(sc->sc_dev),
 				bf->bf_tsf, count);
@@ -1713,7 +1713,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			/* compute rollover */
 			if (last_rs_tstamp > rs->rs_tstamp) {
 				rollover ++;
-				DPRINTF(sc, ATH_DEBUG_BEACON,
+				DPRINTF(sc, ATH_DEBUG_RECV,
 					"%s: %d rollover detected\n",
 					DEV_NAME(sc->sc_dev),
 					rollover);
@@ -1984,7 +1984,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		hw_tsf = ath_hal_gettsf64(ah);
 		if (last_rs_tstamp > (hw_tsf & TSTAMP_MASK)) {
 			rollover ++;
-			DPRINTF(sc, ATH_DEBUG_BEACON,
+			DPRINTF(sc, ATH_DEBUG_RECV,
 			  "%s: %d rollover detected for hw_tsf=%10llx\n",
 				DEV_NAME(sc->sc_dev),
 				rollover, hw_tsf);
@@ -2015,13 +2015,13 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				last_rs_tstamp = bf->bf_tsf;
 				bf->bf_tsf =(hw_tsf & ~TSTAMP_MASK)|bf->bf_tsf;
 				bf->bf_tsf -= rollover * (TSTAMP_MASK+1);
-				DPRINTF(sc, ATH_DEBUG_BEACON,
+				DPRINTF(sc, ATH_DEBUG_RECV,
 					"%s: bf_tsf=%10llx hw_tsf=%10llx\n",
 					DEV_NAME(sc->sc_dev),
 					bf->bf_tsf, hw_tsf);
 
 				if (bf->bf_tsf < sc->sc_last_tsf) {
-					DPRINTF(sc, ATH_DEBUG_BEACON, 
+					DPRINTF(sc, ATH_DEBUG_RECV, 
 						"TSF error: bf_tsf=%10llx "
 						"sc_last_tsf=%10llx\n",
 					       bf->bf_tsf,
