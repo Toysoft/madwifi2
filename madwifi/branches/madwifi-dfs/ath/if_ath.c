@@ -4669,8 +4669,6 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	if (ieee80211_beacon_update(bf->bf_node, &avp->av_boff, skb, ncabq)) {
 		bus_unmap_single(sc->sc_bdev,
 			bf->bf_skbaddr, curlen, BUS_DMA_TODEVICE);
-		bf->bf_skbaddr = 0;
-
 		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 			skb->data, skb->len, BUS_DMA_TODEVICE);
 	}
@@ -4710,27 +4708,6 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 
 		struct ath_txq *cabq = sc->sc_cabq;
 		struct ath_buf *bfmcast;
-/*
-Currently CABQ is disabled for IBSS because it was reported that this
-prevented beaconing in IBSS mode, in the mean time we are flushing the 
-mcast/cabq instead of sending it to hardware because otherwise it eats into
-our txbuf pool drastically.  This is clone of a subset of the ath_draintxq
-method, as a temporary fix until IBSS multicast is fixed...
-*/
-if (sc->sc_ic.ic_opmode == IEEE80211_M_IBSS) {
-	for (;;) {
-		ATH_TXQ_LOCK_IRQ(&avp->av_mcastq);
-		bfmcast = STAILQ_FIRST(&avp->av_mcastq.axq_q);
-		if (bfmcast == NULL) {
-			ATH_TXQ_UNLOCK_IRQ_EARLY(&avp->av_mcastq);
-			avp->av_mcastq.axq_link = NULL;
-			return bf;
-		}
-		ATH_TXQ_REMOVE_HEAD(&avp->av_mcastq, bf_list);
-		ath_return_txbuf(sc, &bfmcast);
-		ATH_TXQ_UNLOCK_IRQ(&avp->av_mcastq);
-	}
-}
 		/*
 		 * Move everything from the VAPs mcast queue
 		 * to the hardware cab queue.
@@ -4764,7 +4741,9 @@ if (sc->sc_ic.ic_opmode == IEEE80211_M_IBSS) {
 		/* append the private VAP mcast list to the cabq */
 		ATH_TXQ_MOVE_MCASTQ(&avp->av_mcastq, cabq);
 		/* NB: gated by beacon so safe to start here */
-		ath_hal_txstart(ah, cabq->axq_qnum);
+		if (bfmcast != NULL) {
+			ath_hal_txstart(ah, cabq->axq_qnum);
+		}
 		ATH_TXQ_UNLOCK_IRQ_INSIDE(cabq);
 		ATH_TXQ_UNLOCK_IRQ(&avp->av_mcastq);
 	}
