@@ -440,6 +440,8 @@ enum ath5k_ant_setting {
 
 /* Struct to hold EEPROM calibration data */
 struct ath5k_eeprom_info {
+
+	/* Header information */
 	u_int16_t	ee_magic;
 	u_int16_t	ee_protect;
 	u_int16_t	ee_regdomain;
@@ -1548,6 +1550,8 @@ int main(int argc, char *argv[])
 	}
 
 	ee = malloc(sizeof(struct ath5k_eeprom_info));
+	ee = memset(ee,0,sizeof(struct ath5k_eeprom_info));
+
 	if(ath5k_eeprom_init(mem, mac_version, ee)){
 		printf("EEPROM Init failed\n");
 		return -1;
