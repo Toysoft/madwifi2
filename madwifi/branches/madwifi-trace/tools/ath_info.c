@@ -971,7 +971,7 @@ static int ath5k_eeprom_init(void *mem,
 		return ret;
 
 	AR5K_EEPROM_READ(offset++, val);
-	ee->ee_adc_desired_size[mode]	= (signed short int)((val >> 8) & 0xff);
+	ee->ee_adc_desired_size[mode]	= (int8_t)((val >> 8) & 0xff);
 	ee->ee_ob[mode][3]		= (val >> 5) & 0x7;
 	ee->ee_db[mode][3]		= (val >> 2) & 0x7;
 	ee->ee_ob[mode][2]		= (val << 1) & 0x7;
@@ -1004,7 +1004,7 @@ static int ath5k_eeprom_init(void *mem,
 		return ret;
 
 	AR5K_EEPROM_READ(offset++, val);
-	ee->ee_adc_desired_size[mode]	= (signed short int)((val >> 8) & 0xff);
+	ee->ee_adc_desired_size[mode]	= (int8_t)((val >> 8) & 0xff);
 	ee->ee_ob[mode][1]		= (val >> 4) & 0x7;
 	ee->ee_db[mode][1]		= val & 0x7;
 
@@ -1400,8 +1400,8 @@ void dump_calinfo_for_mode(int mode, struct ath5k_eeprom_info *ee){
 	}
 	printf("|=========================================================|\n");
 	for(i = 0; i <= AR5K_EEPROM_N_OBDB; i++){
-		printf("| Octave Band %i:           %x |",i,ee->ee_ob[mode][i]);
-		printf(" db %i:                    %x |\n",i,ee->ee_db[mode][i]);
+		printf("| Octave Band %i:          %2i |",i,ee->ee_ob[mode][i]);
+		printf(" db %i:                   %2i |\n",i,ee->ee_db[mode][i]);
 	}
 	printf("\\=========================================================/\n");
 }
@@ -1630,21 +1630,21 @@ int main(int argc, char *argv[])
 	if (AR5K_EEPROM_HDR_11A(ee->ee_header)){
 	printf("/=========================================================\\\n");
 	printf("|          Calibration data for 802.11a operation         |\n");
-		dump_calinfo_for_mode(1,ee);
+		dump_calinfo_for_mode(AR5K_EEPROM_MODE_11A,ee);
 	printf("\n");
 	}
 
 	if (AR5K_EEPROM_HDR_11B(ee->ee_header)){
 	printf("/=========================================================\\\n");
 	printf("|          Calibration data for 802.11b operation         |\n");
-		dump_calinfo_for_mode(2,ee);
+		dump_calinfo_for_mode(AR5K_EEPROM_MODE_11B,ee);
 	printf("\n");
 	}
 
 	if (AR5K_EEPROM_HDR_11G(ee->ee_header)){
 	printf("/=========================================================\\\n");
 	printf("|          Calibration data for 802.11g operation         |\n");
-		dump_calinfo_for_mode(3,ee);
+		dump_calinfo_for_mode(AR5K_EEPROM_MODE_11G,ee);
 	printf("\n");
 	}
 
