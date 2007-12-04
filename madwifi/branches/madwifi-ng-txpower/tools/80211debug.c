@@ -49,11 +49,13 @@
 #include <getopt.h>
 #include <err.h>
 
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#undef ARRAY_SIZE
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 static const char *progname;
 
 enum {
+	IEEE80211_MSG_NODE_REF	= 0x80000000,   /* node reference counting */
 	IEEE80211_MSG_DEBUG	= 0x40000000,	/* IFF_DEBUG equivalent */
 	IEEE80211_MSG_DUMPPKTS	= 0x20000000,	/* IFF_LINK2 equivalent, dump packets */
 	IEEE80211_MSG_CRYPTO	= 0x10000000,	/* crypto modules */
@@ -79,7 +81,8 @@ enum {
 	IEEE80211_MSG_DOTH	= 0x00000100,	/* 11.h */
 	IEEE80211_MSG_INACT	= 0x00000080,	/* inactivity handling */
 	IEEE80211_MSG_ROAM	= 0x00000040,	/* sta-mode roaming */
-	IEEE80211_MSG_ANY	= 0xffffffff
+	IEEE80211_MSG_ANY	= 0xffffffff,
+	IEEE80211_MSG_IC	= (IEEE80211_MSG_NODE_REF)
 };
 
 static struct {
@@ -94,6 +97,7 @@ static struct {
 	{ "xrate",	IEEE80211_MSG_XRATE, "rate set handling" },
 	{ "elemid",	IEEE80211_MSG_ELEMID, "element id parsing"},
 	{ "node",	IEEE80211_MSG_NODE, "node management" },
+	{ "node_ref",   IEEE80211_MSG_NODE_REF, "node ref counting (affects all devs)" },
 	{ "assoc",	IEEE80211_MSG_ASSOC, "association handling" },
 	{ "auth",	IEEE80211_MSG_AUTH, "authentication handling" },
 	{ "scan",	IEEE80211_MSG_SCAN, "scanning" },
@@ -119,7 +123,7 @@ getflag(const char *name, int len)
 {
 	int i;
 
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		if (strncasecmp(flags[i].name, name, len) == 0)
 			return flags[i].bit;
 	return 0;
@@ -132,7 +136,7 @@ usage(void)
 
 	fprintf(stderr, "usage: %s [-i interface] [(+/-) flags]\n", progname);
 	fprintf(stderr, "\twhere flags are:\n\n");
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		printf("\t%12s\t0x%08x\t%s\n", flags[i].name, flags[i].bit, flags[i].desc);
 	exit(-1);
 }
@@ -256,14 +260,14 @@ main(int argc, char *argv[])
 	} else
 		printf("%s: 0x%08x", oid, debug);
 	sep = "<";
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		if (debug & flags[i].bit) {
 			printf("%s%s", sep, flags[i].name);
 			sep = ",";
 		}
 	printf("%s\n", *sep != '<' ? ">" : "");
 	printf("Details:\n");
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		printf("%12s %s 0x%08x - %s\n", flags[i].name, debug & flags[i].bit ? "+" : " ", flags[i].bit, flags[i].desc);
 	return 0;
 }

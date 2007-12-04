@@ -74,6 +74,9 @@
 
 #define	streq(a,b)	(strncasecmp(a, b, sizeof(b) - 1) == 0)
 
+#undef ARRAY_SIZE
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 static int if_split_name(const char *, char **, unsigned int *);
 static void vap_create(struct ifreq *);
 static void vap_destroy(const char *);
@@ -694,8 +697,6 @@ list_scan(const char *ifname)
 static void
 print_chaninfo(const struct ieee80211_channel *c)
 {
-#define	IEEE80211_IS_CHAN_PASSIVE(_c) \
-	(((_c)->ic_flags & IEEE80211_CHAN_PASSIVE))
 	char buf[14];
 
 	buf[0] = '\0';
@@ -713,10 +714,15 @@ print_chaninfo(const struct ieee80211_channel *c)
 		strlcat(buf, " Static", sizeof(buf));
 	if (IEEE80211_IS_CHAN_DTURBO(c))
 		strlcat(buf, " Dynamic", sizeof(buf));
-	printf("Channel %3u : %u%c Mhz%-14.14s",
+	if (IEEE80211_IS_CHAN_HALF(c))
+		strlcat(buf, " Half", sizeof(buf));
+	if (IEEE80211_IS_CHAN_QUARTER(c))
+		strlcat(buf, " Quarter", sizeof(buf));
+	printf("Channel %3u : %u%c%c Mhz%-14.14s",
 		c->ic_ieee, c->ic_freq,
-		IEEE80211_IS_CHAN_PASSIVE(c) ? '*' : ' ', buf);
-#undef IEEE80211_IS_CHAN_PASSIVE
+		IEEE80211_IS_CHAN_PASSIVE(c) ? '*' : ' ', 
+	        IEEE80211_IS_CHAN_RADAR(c) ? '!' : ' ', 
+	       buf);
 }
 
 static void
@@ -922,8 +928,6 @@ get80211param(const char *ifname, int param, void *data, size_t len)
 static int
 do80211priv(struct iwreq *iwr, const char *ifname, int op, void *data, size_t len)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
-
 	memset(iwr, 0, sizeof(struct iwreq));
 	strncpy(iwr->ifr_name, ifname, IFNAMSIZ);
 	if (len < IFNAMSIZ) {
@@ -967,14 +971,13 @@ do80211priv(struct iwreq *iwr, const char *ifname, int op, void *data, size_t le
 			IOCTL_ERR(IEEE80211_IOCTL_WRITEREG),
 		};
 		op -= SIOCIWFIRSTPRIV;
-		if (0 <= op && op < N(opnames))
+		if (0 <= op && op < ARRAY_SIZE(opnames))
 			perror(opnames[op]);
 		else
 			perror("ioctl[unknown???]");
 		return -1;
 	}
 	return 0;
-#undef N
 }
 
 static int

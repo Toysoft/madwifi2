@@ -52,7 +52,8 @@
 #include <getopt.h>
 #include <err.h>
 
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
+#undef ARRAY_SIZE
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 static const char *progname;
 
@@ -63,7 +64,7 @@ enum {
 	ATH_DEBUG_RECV_DESC	= 0x00000008,	/* recv descriptors */
 	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
 	ATH_DEBUG_RESET		= 0x00000020,	/* reset processing */
-	ATH_DEBUG_MODE		= 0x00000040,	/* mode init/setup */
+	ATH_DEBUG_SKB_REF	= 0x00000040,   /* skb ref counting */
 	ATH_DEBUG_BEACON	= 0x00000080,	/* beacon handling */
 	ATH_DEBUG_WATCHDOG	= 0x00000100,	/* watchdog timeout */
 	ATH_DEBUG_INTR		= 0x00001000,	/* ISR */
@@ -73,7 +74,6 @@ enum {
 	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
 	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
 	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
-	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
 	ATH_DEBUG_LED		= 0x00100000,	/* led management */
 	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
 	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
@@ -83,8 +83,11 @@ enum {
 	ATH_DEBUG_DOTHFILTVBSE	= 0x04000000,	/* 11.h radar pulse analysis - verbose */
 	ATH_DEBUG_DOTHFILTNOSC  = 0x08000000,	/* 11.h radar pulse analysis - don't short circuit analysis when detected */
 	ATH_DEBUG_DOTHPULSES    = 0x10000000,   /* 11.h radar pulse events */
+	ATH_DEBUG_TXBUF         = 0x20000000,   /* TX buffer usage/leak debugging */
+	ATH_DEBUG_SKB           = 0x40000000,   /* SKB usage/leak debugging [applies to all vaps] */
 	ATH_DEBUG_FATAL		= 0x80000000,	/* fatal errors */
-	ATH_DEBUG_ANY		= 0xffffffff
+	ATH_DEBUG_ANY		= 0xffffffff,
+	ATH_DEBUG_GLOBAL	= (ATH_DEBUG_SKB|ATH_DEBUG_SKB_REF)
 };
 
 static struct {
@@ -98,7 +101,6 @@ static struct {
 	{ "recv_desc",	 ATH_DEBUG_RECV_DESC, 	"recv descriptors" },
 	{ "rate",	 ATH_DEBUG_RATE, 	"rate control modules" },
 	{ "reset",	 ATH_DEBUG_RESET, 	"reset processing and initialization" },
-	{ "mode",	 ATH_DEBUG_MODE, 	"mode initialization and changes" },
 	{ "beacon",	 ATH_DEBUG_BEACON, 	"beacon handling" },
 	{ "watchdog",	 ATH_DEBUG_WATCHDOG, 	"watchdog timer" },
 	{ "intr",	 ATH_DEBUG_INTR, 	"interrupt processing" },
@@ -108,7 +110,9 @@ static struct {
 	{ "calibrate",	 ATH_DEBUG_CALIBRATE, 	"periodic re-calibration" },
 	{ "keycache",	 ATH_DEBUG_KEYCACHE, 	"key cache management" },
 	{ "state",	 ATH_DEBUG_STATE, 	"802.11 state transitions" },
-	{ "node",	 ATH_DEBUG_NODE, 	"node management" },
+	{ "txbuf", 	 ATH_DEBUG_TXBUF,   	"ath_buf management" },
+	{ "skb",         ATH_DEBUG_SKB,         "skb management (affects all devs)" },
+	{ "skb_ref",     ATH_DEBUG_SKB_REF,     "skb ref counting (affects all devs)" },
 	{ "led",         ATH_DEBUG_LED, 	"led management" },
 	{ "ff",		 ATH_DEBUG_FF, 		"fast frame handling" },
 	{ "turbo",	 ATH_DEBUG_TURBO, 	"dynamic turbo handling" },
@@ -126,7 +130,7 @@ getflag(const char *name, int len)
 {
 	int i;
 
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		if (strncasecmp(flags[i].name, name, len) == 0)
 			return flags[i].bit;
 	return 0;
@@ -139,7 +143,7 @@ usage(void)
 
 	fprintf(stderr, "usage: %s [-i device] [(+/-) flags]\n", progname);
 	fprintf(stderr, "\twhere flags are:\n\n");
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		printf("\t%12s\t0x%08x\t%s\n", flags[i].name, flags[i].bit, flags[i].desc);
 	exit(-1);
 }
@@ -268,14 +272,14 @@ main(int argc, char *argv[])
 	} else
 		printf("%s: 0x%08x", oid, debug);
 	sep = "<";
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		if (debug & flags[i].bit) {
 			printf("%s%s", sep, flags[i].name);
 			sep = ",";
 		}
 	printf("%s\n", *sep != '<' ? ">" : "");
 	printf("Details:\n");
-	for (i = 0; i < N(flags); i++)
+	for (i = 0; i < ARRAY_SIZE(flags); i++)
 		printf("%12s %s 0x%08x - %s\n", flags[i].name, debug & flags[i].bit ? "+" : " ", flags[i].bit, flags[i].desc);
 	return 0;
 }

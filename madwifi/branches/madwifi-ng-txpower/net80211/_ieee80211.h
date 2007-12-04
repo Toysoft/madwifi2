@@ -115,7 +115,7 @@ enum ieee80211_scanmode {
  * Channels are specified by frequency and attributes.
  */
 struct ieee80211_channel {
-	u_int16_t ic_freq;	/* setting in Mhz */
+	u_int16_t ic_freq;	/* setting in MHz */
 	u_int16_t ic_flags;	/* see below */
 	u_int8_t ic_ieee;	/* IEEE channel number */
 	int8_t ic_maxregpower;	/* maximum regulatory tx power in dBm */
@@ -214,6 +214,11 @@ struct ieee80211_channel {
 #define	IEEE80211_IS_CHAN_QUARTER(_c) \
 	(((_c)->ic_flags & IEEE80211_CHAN_QUARTER) != 0)
 
+#define	IEEE80211_IS_CHAN_RADAR(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_RADAR) != 0)
+#define	IEEE80211_IS_CHAN_PASSIVE(_c) \
+	(((_c)->ic_flags & IEEE80211_CHAN_PASSIVE) != 0)
+
 /* ni_chan encoding for FH phy */
 #define	IEEE80211_FH_CHANMOD		80
 #define	IEEE80211_FH_CHAN(set,pat)	(((set) - 1) * IEEE80211_FH_CHANMOD + (pat))
@@ -225,6 +230,8 @@ struct ieee80211_channel {
  */
 #define	IEEE80211_RATE_SIZE	8		/* 802.11 standard */
 #define	IEEE80211_RATE_MAXSIZE	15		/* max rates we'll handle */
+#define	IEEE80211_SANITISE_RATESIZE(_rsz) \
+	((_rsz > IEEE80211_RATE_MAXSIZE) ? IEEE80211_RATE_MAXSIZE : _rsz)
 
 struct ieee80211_rateset {
 	u_int8_t rs_nrates;

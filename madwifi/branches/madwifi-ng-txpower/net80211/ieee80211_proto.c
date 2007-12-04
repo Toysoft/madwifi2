@@ -554,13 +554,12 @@ ieee80211_set_shortslottime(struct ieee80211com *ic, int onoff)
 int
 ieee80211_iserp_rateset(struct ieee80211com *ic, struct ieee80211_rateset *rs)
 {
-#define N(a)	(sizeof(a) / sizeof(a[0]))
 	static const int rates[] = { 2, 4, 11, 22, 12, 24, 48 };
 	int i, j;
 
-	if (rs->rs_nrates < N(rates))
+	if (rs->rs_nrates < ARRAY_SIZE(rates))
 		return 0;
-	for (i = 0; i < N(rates); i++) {
+	for (i = 0; i < ARRAY_SIZE(rates); i++) {
 		for (j = 0; j < rs->rs_nrates; j++) {
 			int r = rs->rs_rates[j] & IEEE80211_RATE_VAL;
 			if (rates[i] == r)
@@ -573,7 +572,6 @@ ieee80211_iserp_rateset(struct ieee80211com *ic, struct ieee80211_rateset *rs)
 		;
 	}
 	return 1;
-#undef N
 }
 
 static const struct ieee80211_rateset basic11g[IEEE80211_MODE_MAX] = {
@@ -816,6 +814,8 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 	enum ieee80211_phymode mode;
 	int i;
 
+	IEEE80211_LOCK_ASSERT(vap->iv_ic);
+
 	/* set up the channel access parameters for the physical device */
 
 	for (i = 0; i < WME_NUM_AC; i++) {
@@ -913,6 +913,8 @@ ieee80211_wme_updateparams_locked(struct ieee80211vap *vap)
 			wme->wme_wmeChanParams.cap_info_count :
 			wme->wme_bssChanParams.cap_info_count);
 }
+
+EXPORT_SYMBOL(ieee80211_wme_updateparams);
 
 void
 ieee80211_wme_updateparams(struct ieee80211vap *vap)
@@ -1460,20 +1462,45 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				 */
 				ieee80211_create_ibss(vap, ic->ic_curchan);
 
-				/*
-				 * In wds mode allocate and initialize peer node
-				 */
+				/* In WDS mode, allocate and initialize peer node. */
 				if (vap->iv_opmode == IEEE80211_M_WDS) {
-					struct ieee80211_node *wds_ni;
-					wds_ni = ieee80211_alloc_node_table(vap, vap->wds_mac);
+					/* XXX: This is horribly non-atomic. */
+					struct ieee80211_node *wds_ni =
+						ieee80211_find_node(&ic->ic_sta,
+								vap->wds_mac);
+
+					if (wds_ni == NULL) {
+						wds_ni = ieee80211_alloc_node_table(
+								vap,
+								vap->wds_mac);
+						if (wds_ni != NULL)
+							ieee80211_add_wds_addr(
+									&ic->ic_sta,
+									wds_ni,
+									vap->wds_mac,
+									1);
+						else
+							IEEE80211_DPRINTF(
+									vap,
+									IEEE80211_MSG_NODE,
+									"%s: Unable to "
+									"allocate node for "
+									"WDS: %s\n",
+									__func__,
+									ether_sprintf(
+										vap->wds_mac)
+									);
+					}
+
 					if (wds_ni != NULL) {
-						if (ieee80211_add_wds_addr(&ic->ic_sta, wds_ni, vap->wds_mac, 1) == 0) {
-							ieee80211_node_authorize(wds_ni);
-							wds_ni->ni_chan = vap->iv_bss->ni_chan;
-							wds_ni->ni_capinfo = ni->ni_capinfo;
-							wds_ni->ni_associd = 1;
-							wds_ni->ni_ath_flags = vap->iv_ath_cap;
-						}
+						ieee80211_node_authorize(wds_ni);
+						wds_ni->ni_chan =
+							vap->iv_bss->ni_chan;
+						wds_ni->ni_capinfo =
+							ni->ni_capinfo;
+						wds_ni->ni_associd = 1;
+						wds_ni->ni_ath_flags =
+							vap->iv_ath_cap;
 					}
 				}
 				break;
@@ -1552,7 +1579,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		    !(vap->iv_flags & IEEE80211_F_XR)) {
 			vap->iv_xrvapstart.function = ieee80211_start_xrvap;
 			vap->iv_xrvapstart.data = (unsigned long) vap->iv_xrvap;
-			mod_timer(&vap->iv_xrvapstart,jiffies+HZ); /* start xr vap on next second */
+			mod_timer(&vap->iv_xrvapstart, jiffies + HZ); /* start xr vap on next second */
 			/* 
 			 * do not let the normal vap automatically bring up XR vap.
 			 * let the timer handler start the XR vap. if you let the

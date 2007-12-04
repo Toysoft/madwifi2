@@ -255,6 +255,8 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 		return NULL;
 	}
 
+	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
+
 	frm = ieee80211_beacon_init(ni, bo, frm);
 
 	skb_trim(skb, frm - skb->data);
@@ -267,7 +269,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	wh->i_dur = 0;
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
-	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
+	IEEE80211_ADDR_COPY(wh->i_addr3,  vap->iv_bss->ni_bssid);
 	*(u_int16_t *)wh->i_seq = 0;
 
 	return skb;
@@ -283,13 +285,19 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211_frame * wh = (struct ieee80211_frame *) skb->data;
 	int len_changed = 0;
 	u_int16_t capinfo;
 
 	IEEE80211_LOCK_IRQ(ic);
 
+	/* After an IBSS merge, bssid might have been updated */
+	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bss->ni_bssid);
+
+	/* Check if we need to change channel right now */
+
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
-			(vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
+	    (vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
 		struct ieee80211_channel *c = 
 			ieee80211_doth_findchan(vap, ic->ic_chanchange_chan);
 		
@@ -302,11 +310,11 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 					"%s: reinit beacon\n", __func__);
 
-			/* NB: ic_bsschan is in the DSPARMS beacon IE, so must set this
-			 *     prior to the beacon re-init, below. */
+			/* NB: ic_bsschan is in the DSPARMS beacon IE, so must
+			 * set this prior to the beacon re-init, below. */
 			if (c == NULL) {
-				/* Requested channel invalid; drop the channel switch 
-				 * announcement and do nothing. */
+				/* Requested channel invalid; drop the channel
+				 * switch announcement and do nothing. */
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 						"%s: find channel failure\n", __func__);
 			} else
@@ -322,8 +330,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
 			ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
 
-			/* NB: Only for the first VAP to get here, and when we have a 
-			 * valid channel to which to change. */
+			/* NB: Only for the first VAP to get here, and when we
+			 * have a valid channel to which to change. */
 			if (c && (ic->ic_curchan != c)) {
 				ieee80211_set_channel(ic, c);
 				ic->ic_set_channel(ic);
@@ -418,7 +426,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				timoff = 128;		/* impossibly large */
 				for (i = 0; i < vap->iv_tim_len; i++)
 					if (vap->iv_tim_bitmap[i]) {
-						timoff = i &~ 1;
+						timoff = i & BITCTL_BUFD_UCAST_AID_MASK;
 						break;
 					}
 				KASSERT(timoff != 128, ("tim bitmap empty!"));
@@ -469,9 +477,9 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			tie->tim_count--;
 		/* update state for buffered multicast frames on DTIM */
 		if (mcast && (tie->tim_count == 0))
-			tie->tim_bitctl |= 1;
+			tie->tim_bitctl |= BITCTL_BUFD_MCAST;
 		else
-			tie->tim_bitctl &= ~1;
+			tie->tim_bitctl &= BITCTL_BUFD_UCAST_AID_MASK;
 
 		if ((ic->ic_flags & IEEE80211_F_DOTH) &&
 		    (ic->ic_flags & IEEE80211_F_CHANSWITCH)) {
@@ -545,7 +553,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 
 			len_changed = 1;
 		}
-		memcpy(bo->bo_appie_buf,vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].ie,
+		memcpy(bo->bo_appie_buf, vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].ie,
 			vap->app_ie[IEEE80211_APPIE_FRAME_BEACON].length);
 
 		vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;

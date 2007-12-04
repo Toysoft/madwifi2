@@ -83,8 +83,6 @@
 #define	__packed	__attribute__((__packed__))
 #endif
 
-#define	__printflike(_a,_b) \
-	__attribute__ ((__format__ (__printf__, _a, _b)))
 #define	__offsetof(t,m)	offsetof(t,m)
 
 #ifndef ALIGNED_POINTER
@@ -131,6 +129,10 @@
 #define __iomem
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+typedef int gfp_t;
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
 static inline int timeval_compare(struct timeval *lhs, struct timeval *rhs)
 {
@@ -152,6 +154,14 @@ static inline int timeval_compare(struct timeval *lhs, struct timeval *rhs)
 #define skb_mac_header(_skb) ((_skb)->mac.raw)
 #define skb_reset_mac_header(_skb) \
 	do { (_skb)->mac.raw = (_skb)->data; } while(0)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
+#define CTL_AUTO -2
+#define DEV_ATH 9
+#else
+#define CTL_AUTO CTL_UNNUMBERED
+#define DEV_ATH CTL_UNNUMBERED
 #endif
 
 #endif /* __KERNEL__ */
