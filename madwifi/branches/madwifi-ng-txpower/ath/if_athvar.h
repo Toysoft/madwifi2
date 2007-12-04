@@ -48,6 +48,7 @@
 #include "if_athioctl.h"
 #include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
 #include <asm/io.h>
+#include <linux/list.h>
 
 /*
  * Deduce if tasklets are available.  If not then
@@ -56,7 +57,7 @@
 #include <linux/interrupt.h>
 #ifdef DECLARE_TASKLET			/* native tasklets */
 #define ATH_TQ_STRUCT tasklet_struct
-#define ATH_INIT_TQUEUE(a,b,c)		tasklet_init((a),(b),(unsigned long)(c))
+#define ATH_INIT_TQUEUE(a,b,c)		tasklet_init((a), (b), (unsigned long)(c))
 #define ATH_SCHEDULE_TQUEUE(a,b)	tasklet_schedule((a))
 typedef unsigned long TQUEUE_ARG;
 #define mark_bh(a) do {} while (0)
@@ -78,7 +79,7 @@ typedef void *TQUEUE_ARG;
 #define schedule_work(t)		schedule_task((t))
 #define flush_scheduled_work()		flush_scheduled_tasks()
 #define ATH_INIT_WORK(t, f) do { 			\
-	memset((t),0,sizeof(struct tq_struct)); \
+	memset((t), 0, sizeof(struct tq_struct)); \
 	(t)->routine = (void (*)(void*)) (f); 	\
 	(t)->data=(void *) (t);			\
 } while (0)
@@ -103,9 +104,13 @@ typedef void irqreturn_t;
 #endif /* !defined(IRQ_NONE) */
 
 #ifndef SET_MODULE_OWNER
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
 #define	SET_MODULE_OWNER(dev) do {		\
 	dev->owner = THIS_MODULE;		\
 } while (0)
+#else
+#define SET_MODULE_OWNER(dev) do { } while (0)
+#endif
 #endif
 
 #ifndef SET_NETDEV_DEV
@@ -153,7 +158,7 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 
 /* Avoid name collision - some vendor kernels backport alloc_netdev() */
 #undef alloc_netdev
-#define alloc_netdev(s,m,d) _alloc_netdev(s,m,d)
+#define alloc_netdev(s,m,d) _alloc_netdev(s, m, d)
 
 /* Some vendors backport PDE, so make it a macro here */
 #undef PDE
@@ -208,6 +213,8 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 
 /* free buffer threshold to restart net dev */
 #define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20)
+/* number of TX buffers reserved for mgt frames */
+#define ATH_TXBUF_MGT_RESERVED	  5 	
 
 #define TAIL_DROP_COUNT 50             /* maximum number of queued frames allowed */
 
@@ -359,15 +366,35 @@ struct ath_node {
 #define	ATH_NODE(_n)			((struct ath_node *)(_n))
 #define	ATH_NODE_CONST(ni)		((const struct ath_node *)(ni))
 #define ATH_NODE_UAPSD_LOCK_INIT(_an)	spin_lock_init(&(_an)->an_uapsd_lock)
-#define ATH_NODE_UAPSD_LOCK_IRQ(_an)	do {	\
-	unsigned long __an_uapsd_lockflags;	\
+#define ATH_NODE_UAPSD_LOCK_IRQ(_an)	do {				     \
+	unsigned long __an_uapsd_lockflags;				     \
+	ATH_NODE_UAPSD_LOCK_CHECK(_an);				     	     \
 	spin_lock_irqsave(&(_an)->an_uapsd_lock, __an_uapsd_lockflags);
-#define ATH_NODE_UAPSD_UNLOCK_IRQ(_an)		\
+
+#define ATH_NODE_UAPSD_UNLOCK_IRQ(_an)					     \
+	ATH_NODE_UAPSD_LOCK_ASSERT(_an);				     \
 	spin_unlock_irqrestore(&(_an)->an_uapsd_lock, __an_uapsd_lockflags); \
 } while (0)
-#define ATH_NODE_UAPSD_UNLOCK_IRQ_EARLY(_an)		\
+
+#define ATH_NODE_UAPSD_UNLOCK_IRQ_EARLY(_an) 		     \
+	ATH_NODE_UAPSD_LOCK_ASSERT(_an);				     \
 	spin_unlock_irqrestore(&(_an)->an_uapsd_lock, __an_uapsd_lockflags);
 
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
+#define	ATH_NODE_UAPSD_LOCK_ASSERT(_an) \
+	KASSERT(spin_is_locked(&(_an)->an_uapsd_lock), ("uapsd not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	ATH_NODE_UAPSD_LOCK_CHECK(_an) do { \
+	if (spin_is_locked(&(_an)->an_uapsd_lock)) \
+		printk("%s:%d - about to block on uapsd lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define	ATH_NODE_UAPSD_LOCK_CHECK(_an)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#else
+#define	ATH_NODE_UAPSD_LOCK_ASSERT(_an)
+#define	ATH_NODE_UAPSD_LOCK_CHECK(_an)
+#endif 
 
 #define ATH_RSSI_LPF_LEN	10
 #define ATH_RSSI_DUMMY_MARKER	0x127
@@ -400,6 +427,7 @@ struct ath_buf {
 	u_int32_t bf_status;				/* status flags */
 	u_int16_t bf_flags;				/* tx descriptor flags */
 	u_int64_t bf_tsf;
+	int16_t bf_channoise;
 #ifdef ATH_SUPERG_FF
 	/* XXX: combine this with bf_skbaddr if it ever changes to accommodate
 	 *      multiple segments.
@@ -425,6 +453,8 @@ struct ath_buf {
 							   has already been handled.  We may receive
 							   multiple interrupts before the rx_tasklet
 							   clears the queue */
+#define ATH_BUFSTATUS_RXTSTAMP          0x00000004      /* RX timestamps needs to be adjusted */
+
 /* DMA state for tx/rx descriptors. */
 struct ath_descdma {
 	const char *dd_name;
@@ -456,7 +486,7 @@ struct ath_txq {
 	spinlock_t axq_lock;		/* lock on q and link */
 	int axq_depth;			/* queue depth */
 	u_int32_t axq_totalqueued;	/* total ever queued */
-	u_int axq_intrcnt;		/* count to determine if descriptor
+	u_int axq_intrcnt;	        /* count to determine if descriptor
 					 * should generate int on this txq.
 					 */
 	/*
@@ -492,20 +522,42 @@ struct ath_vap {
 #define	ATH_TXQ_LOCK_DESTROY(_tq)
 #define ATH_TXQ_LOCK_IRQ(_tq)		do {				\
 	unsigned long __axq_lockflags;					\
+	ATH_TXQ_LOCK_CHECK(_tq); 					\
 	spin_lock_irqsave(&(_tq)->axq_lock, __axq_lockflags);
 #define ATH_TXQ_UNLOCK_IRQ(_tq)						\
+	ATH_TXQ_LOCK_ASSERT(_tq); 					\
 	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags);	\
 } while (0)
 #define ATH_TXQ_UNLOCK_IRQ_EARLY(_tq)					\
+	ATH_TXQ_LOCK_ASSERT(_tq); 					\
 	spin_unlock_irqrestore(&(_tq)->axq_lock, __axq_lockflags);
-#define ATH_TXQ_LOCK_IRQ_INSIDE(_tq) spin_lock(&(_tq)->axq_lock);
-#define ATH_TXQ_UNLOCK_IRQ_INSIDE(_tq) spin_unlock(&(_tq)->axq_lock);
+#define ATH_TXQ_LOCK_IRQ_INSIDE(_tq)   do { 				\
+	ATH_TXQ_LOCK_CHECK(_tq); 					\
+	spin_lock(&(_tq)->axq_lock); 					\
+} while(0)
+#define ATH_TXQ_UNLOCK_IRQ_INSIDE(_tq) do { 				\
+	ATH_TXQ_LOCK_ASSERT(_tq);  					\
+	spin_unlock(&(_tq)->axq_lock);					\
+} while(0)
 
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	ATH_TXQ_LOCK_ASSERT(_tq) \
 	KASSERT(spin_is_locked(&(_tq)->axq_lock), ("txq not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	ATH_TXQ_LOCK_CHECK(_tq) do { \
+	if (spin_is_locked(&(_tq)->axq_lock)) \
+		printk("%s:%d - about to block on txq lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define	ATH_TXQ_LOCK_CHECK(_tq)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#else
+#define	ATH_TXQ_LOCK_ASSERT(_tq)
+#define	ATH_TXQ_LOCK_CHECK(_tq)
+#endif
 
 #define ATH_TXQ_INSERT_TAIL(_tq, _elm, _field) do { \
-	STAILQ_INSERT_TAIL( &(_tq)->axq_q, (_elm), _field); \
+	STAILQ_INSERT_TAIL(&(_tq)->axq_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
 	(_tq)->axq_totalqueued++; \
 } while (0)
@@ -518,7 +570,7 @@ struct ath_vap {
 	(_tqd)->axq_depth += (_tqs)->axq_depth; \
 	(_tqd)->axq_totalqueued += (_tqs)->axq_totalqueued; \
 	(_tqd)->axq_link = (_tqs)->axq_link; \
-	STAILQ_CONCAT(&(_tqd)->axq_q,&(_tqs)->axq_q); \
+	STAILQ_CONCAT(&(_tqd)->axq_q, &(_tqs)->axq_q); \
 	(_tqs)->axq_depth=0; \
 	(_tqs)->axq_totalqueued = 0; \
 	(_tqs)->axq_link = NULL; \
@@ -540,9 +592,15 @@ struct ath_softc {
 	struct ath_stats sc_stats;		/* private statistics */
 	int devid;
 	int sc_debug;
+	int sc_default_ieee80211_debug;		/* default debug flags for new VAPs */
 	void (*sc_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int, int, u_int64_t);
+#ifdef IEEE80211_DEBUG_REFCNT
+	void (*sc_node_cleanup_debug)(struct ieee80211_node *, const char* func, int line);
+	void (*sc_node_free_debug)(struct ieee80211_node *, const char* func, int line);
+#else /* #ifdef IEEE80211_DEBUG_REFCNT */
 	void (*sc_node_cleanup)(struct ieee80211_node *);
 	void (*sc_node_free)(struct ieee80211_node *);
+#endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 	void *sc_bdev;				/* associated bus device */
 	struct ath_hal *sc_ah;			/* Atheros HAL */
 	spinlock_t sc_hal_lock;                 /* hardware access lock */
@@ -577,8 +635,13 @@ struct ath_softc {
 			sc_hasclrkey:1,		/* CLR key supported */
 			sc_devstopped:1,	/* stopped due to of no tx bufs */
 			sc_stagbeacons:1,	/* use staggered beacons */
-			sc_dfswait:1,    	/* waiting on channel for radar detect */
-		        sc_ackrate:1;           /* send acks at high bitrate */
+			sc_dfswait:1,		/* waiting on channel for radar detect */
+			sc_ackrate:1,		/* send acks at high bitrate */
+			sc_hasintmit:1,		/* Interference mitigation */
+			sc_txcont:1;        	/* Is continuous transmit enabled? */
+	unsigned int sc_txcont_power; /* Continuous transmit power in 0.5dBm units */
+	unsigned int sc_txcont_rate;  /* Continuous transmit rate in Mbps */
+
 	/* rate tables */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE *sc_currates;	/* current rate table */
@@ -620,7 +683,7 @@ struct ath_softc {
 	u_int8_t sc_txrate;			/* current tx rate for LED */
 	u_int16_t sc_ledoff;			/* off time for current blink */
 	struct timer_list sc_ledtimer;		/* led off timer */
-	struct timer_list sc_dfswaittimer;	/* dfs wait timer */
+	struct timer_list sc_dfswaittimer;	/* DFS wait timer */
 
 	struct ATH_TQ_STRUCT sc_fataltq;	/* fatal error intr tasklet */
 
@@ -695,7 +758,6 @@ struct ath_softc {
 	u_int32_t sc_dturbo_bw_turbo;		/* bandwidth threshold */
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
-	int16_t sc_channoise; 			/* Measured noise of current channel (dBm) */
 	u_int64_t sc_tsf;			/* TSF at last rx interrupt */
 };
 
@@ -706,27 +768,62 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_TXBUF_LOCK_DESTROY(_sc)
 #define	ATH_TXBUF_LOCK_IRQ(_sc)		do {	\
 	unsigned long __txbuflockflags;		\
+	ATH_TXBUF_LOCK_CHECK(_sc);		\
 	spin_lock_irqsave(&(_sc)->sc_txbuflock, __txbuflockflags);
 #define	ATH_TXBUF_UNLOCK_IRQ(_sc)		\
+	ATH_TXBUF_LOCK_ASSERT(_sc);		\
 	spin_unlock_irqrestore(&(_sc)->sc_txbuflock, __txbuflockflags); \
 } while (0)
 #define	ATH_TXBUF_UNLOCK_IRQ_EARLY(_sc)		\
+	ATH_TXBUF_LOCK_ASSERT(_sc);		\
 	spin_unlock_irqrestore(&(_sc)->sc_txbuflock, __txbuflockflags);
 
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	ATH_TXBUF_LOCK_ASSERT(_sc) \
 	KASSERT(spin_is_locked(&(_sc)->sc_txbuflock), ("txbuf not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	ATH_TXBUF_LOCK_CHECK(_sc) do { \
+	if (spin_is_locked(&(_sc)->sc_txbuflock)) \
+		printk("%s:%d - about to block on txbuf lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define	ATH_TXBUF_LOCK_CHECK(_sc)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#else
+#define	ATH_TXBUF_LOCK_ASSERT(_sc)
+#define	ATH_TXBUF_LOCK_CHECK(_sc)
+#endif
 
 
 #define	ATH_RXBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_rxbuflock)
 #define	ATH_RXBUF_LOCK_DESTROY(_sc)
 #define	ATH_RXBUF_LOCK_IRQ(_sc)		do {	\
 	unsigned long __rxbuflockflags;		\
+	ATH_RXBUF_LOCK_CHECK(_sc); 		\
 	spin_lock_irqsave(&(_sc)->sc_rxbuflock, __rxbuflockflags);
 #define	ATH_RXBUF_UNLOCK_IRQ(_sc)		\
+	ATH_RXBUF_LOCK_ASSERT(_sc); 		\
 	spin_unlock_irqrestore(&(_sc)->sc_rxbuflock, __rxbuflockflags); \
 } while (0)
 #define	ATH_RXBUF_UNLOCK_IRQ_EARLY(_sc)		\
+	ATH_RXBUF_LOCK_ASSERT(_sc); 		\
 	spin_unlock_irqrestore(&(_sc)->sc_rxbuflock, __rxbuflockflags);
+
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
+#define	ATH_RXBUF_LOCK_ASSERT(_sc) \
+	KASSERT(spin_is_locked(&(_sc)->sc_rxbuflock), ("rxbuf not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	ATH_RXBUF_LOCK_CHECK(_sc) do { \
+	if (spin_is_locked(&(_sc)->sc_rxbuflock)) \
+		printk("%s:%d - about to block on rxbuf lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define	ATH_RXBUF_LOCK_CHECK(_sc)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#else
+#define	ATH_RXBUF_LOCK_ASSERT(_sc)
+#define	ATH_RXBUF_LOCK_CHECK(_sc)
+#endif
 
 /* Protects the device from concurrent accesses */
 #define	ATH_LOCK_INIT(_sc)		init_MUTEX(&(_sc)->sc_lock)

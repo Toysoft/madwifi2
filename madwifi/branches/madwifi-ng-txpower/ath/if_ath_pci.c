@@ -155,7 +155,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * set it to the value used by other systems.  It may be worth
 	 * tweaking this setting more.
 	 */
-	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0xa8);
+	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0x60);
 
 	pci_set_master(pdev);
 
@@ -197,10 +197,6 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	sc->aps_sc.sc_invalid = 1;
 
 	dev->irq = pdev->irq;
-	/*
-	 * Don't leave arp type as ARPHRD_ETHER as this is no eth device
-	 */
-	dev->type = ARPHRD_IEEE80211;
 
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
@@ -221,7 +217,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* looking for device type from broken device id */
 	vdevice = id->device;
-	for (i = 0; i < (sizeof(ath_devidmap) / sizeof(ath_devidmap[0])); i++) {
+	for (i = 0; i < ARRAY_SIZE(ath_devidmap); i++) {
 		if (id->device == ath_devidmap[i][0]) {
 			vdevice = ath_devidmap[i][1];
 			break;

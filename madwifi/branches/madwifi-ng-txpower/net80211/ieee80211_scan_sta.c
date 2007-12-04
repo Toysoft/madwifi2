@@ -247,22 +247,23 @@ sta_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 	IEEE80211_ADDR_COPY(se->base.se_macaddr, macaddr);
 	TAILQ_INSERT_TAIL(&st->st_entry, se, se_list);
 	LIST_INSERT_HEAD(&st->st_hash[hash], se, se_hash);
+
 found:
 	ise = &se->base;
+
 	/* XXX ap beaconing multiple ssid w/ same bssid */
 	if (sp->ssid[1] != 0 &&
 	    (ISPROBE(subtype) || ise->se_ssid[1] == 0))
 		memcpy(ise->se_ssid, sp->ssid, 2 + sp->ssid[1]);
-	KASSERT(sp->rates[1] <= IEEE80211_RATE_MAXSIZE,
-		("rate set too large: %u", sp->rates[1]));
-	memcpy(ise->se_rates, sp->rates, 2 + sp->rates[1]);
+
+	memcpy(ise->se_rates, sp->rates, 
+			2 + IEEE80211_SANITISE_RATESIZE(sp->rates[1]));
 	if (sp->xrates != NULL) {
-		/* XXX validate xrates[1] */
-		KASSERT(sp->xrates[1] <= IEEE80211_RATE_MAXSIZE,
-			("xrate set too large: %u", sp->xrates[1]));
-		memcpy(ise->se_xrates, sp->xrates, 2 + sp->xrates[1]);
+		memcpy(ise->se_xrates, sp->xrates, 
+				2 + IEEE80211_SANITISE_RATESIZE(sp->xrates[1]));
 	} else
 		ise->se_xrates[1] = 0;
+
 	IEEE80211_ADDR_COPY(ise->se_bssid, wh->i_addr3);
 	/*
 	 * Record rssi data using extended precision LPF filter.
@@ -355,12 +356,11 @@ add_channels(struct ieee80211com *ic,
 	struct ieee80211_scan_state *ss,
 	enum ieee80211_phymode mode, const u_int16_t freq[], int nfreq)
 {
-#define	N(a)	(sizeof(a) / sizeof(a[0]))
 	struct ieee80211_channel *c, *cg;
 	u_int modeflags;
 	int i;
 
-	KASSERT(mode < N(chanflags), ("Unexpected mode %u", mode));
+	KASSERT(mode < ARRAY_SIZE(chanflags), ("Unexpected mode %u", mode));
 	modeflags = chanflags[mode];
 	for (i = 0; i < nfreq; i++) {
 		c = ieee80211_find_channel(ic, freq[i], modeflags);
@@ -379,7 +379,6 @@ add_channels(struct ieee80211com *ic,
 			break;
 		ss->ss_chans[ss->ss_last++] = c;
 	}
-#undef N
 }
 
 static const u_int16_t rcl1[] =		/* 8 FCC channel: 52, 56, 60, 64, 36, 40, 44, 48 */
@@ -465,7 +464,6 @@ checktable(const struct scanlist *scan, const struct ieee80211_channel *c)
 static int
 sta_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
 	struct ieee80211com *ic = vap->iv_ic;
 	struct sta_table *st = ss->ss_priv;
 	const struct scanlist *scan;
@@ -559,7 +557,6 @@ sta_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 	st->st_newscan = 1;
 
 	return 0;
-#undef N
 }
 
 /*
@@ -1160,7 +1157,6 @@ static const struct ieee80211_scanner sta_default = {
 static int
 adhoc_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
 	struct ieee80211com *ic = vap->iv_ic;
 	struct sta_table *st = ss->ss_priv;
 	const struct scanlist *scan;
@@ -1226,7 +1222,6 @@ adhoc_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 	st->st_newscan = 1;
 
 	return 0;
-#undef N
 }
 
 /*

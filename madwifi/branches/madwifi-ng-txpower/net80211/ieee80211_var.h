@@ -35,9 +35,6 @@
 #ifndef _NET80211_IEEE80211_VAR_H_
 #define _NET80211_IEEE80211_VAR_H_
 
-#define	IEEE80211_DEBUG
-#define	IEEE80211_DEBUG_REFCNT			/* Node reference count debugging */
-
 /* Definitions for IEEE 802.11 drivers. */
 #include <net80211/ieee80211_linux.h>
 
@@ -91,6 +88,19 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 #define	IEEE80211_FIXED_RATE_NONE	-1
 
 #define IEEE80211_SWBMISS_THRESHOLD	10 	/* software beacon miss threshold, in TUs */
+
+#define DEV_NAME(_d) \
+	 ((NULL == _d || NULL == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? \
+	  "MadWifi" : \
+	  _d->name)
+#define VAP_DEV_NAME(_v) \
+	 ((NULL == _v) ? \
+	  "MadWifi" : \
+	  DEV_NAME(_v->iv_dev))
+#define VAP_IC_DEV_NAME(_v) \
+	 ((NULL == _v || NULL == _v->iv_ic) ? \
+	  "MadWifi" : \
+	  DEV_NAME(_v->iv_ic->ic_dev))
 
 #define	IEEE80211_MS_TO_TU(x)	(((x) * 1000) / 1024)
 #define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
@@ -253,6 +263,7 @@ struct ieee80211vap {
  */
 #include <net80211/ieee80211_debug.h>
 #include <net80211/ieee80211_node.h>
+#include <net80211/ieee80211_skb.h>
 
 struct ieee80211com {
 	struct net_device *ic_dev;		/* associated device */
@@ -348,6 +359,11 @@ struct ieee80211com {
 	u_int8_t ic_chanchange_tbtt;
 	u_int8_t ic_chanchange_chan;
 
+	/* Global debug flags applicable to all VAPs */
+	int ic_debug;
+	/* used for reference tracking/counting.  Nodes are shared between VAPs,
+	 * so we put this here. */
+	atomic_t ic_node_counter;
 	/* Virtual AP create/delete */
 	struct ieee80211vap *(*ic_vap_create)(struct ieee80211com *,
 		const char *, int, int, struct net_device *);
@@ -372,9 +388,20 @@ struct ieee80211com {
 	void (*ic_newassoc)(struct ieee80211_node *, int);
 
 	/* Node state management */
+	int32_t (*ic_node_count)(struct ieee80211com *);
+#ifdef IEEE80211_DEBUG_REFCNT
+	struct ieee80211_node *(*ic_node_alloc_debug)(struct ieee80211vap *, 
+			const char* func, int line);
+	void (*ic_node_cleanup_debug)(struct ieee80211_node *, 
+			const char* func, int line);
+	void (*ic_node_free_debug)(struct ieee80211_node *, 
+			const char* func, int line);
+#else
 	struct ieee80211_node *(*ic_node_alloc)(struct ieee80211vap *);
-	void (*ic_node_free)(struct ieee80211_node *);
 	void (*ic_node_cleanup)(struct ieee80211_node *);
+	void (*ic_node_free)(struct ieee80211_node *);
+#endif
+
 	u_int8_t (*ic_node_getrssi)(const struct ieee80211_node *);
 	u_int8_t (*ic_node_move_data)(const struct ieee80211_node *);
 
@@ -389,6 +416,14 @@ struct ieee80211com {
 
 	/* U-APSD support */
 	void (*ic_uapsd_flush)(struct ieee80211_node *);
+
+	/* continuous transmission support */
+	void (*ic_set_txcont)(struct ieee80211com *, int);
+	int (*ic_get_txcont)(struct ieee80211com *);
+	void (*ic_set_txcont_power)(struct ieee80211com *, u_int);
+	int (*ic_get_txcont_power)(struct ieee80211com *);
+	void (*ic_set_txcont_rate)(struct ieee80211com *, u_int);
+	u_int (*ic_get_txcont_rate)(struct ieee80211com *);
 
 	/* Set coverage class */
 	void (*ic_set_coverageclass)(struct ieee80211com *);

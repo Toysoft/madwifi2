@@ -71,7 +71,6 @@
 #define	SAMPLE_DEBUG
 #ifdef SAMPLE_DEBUG
 enum {
-	ATH_DEBUG_NODE		= 0x00080000,	/* node management */
 	ATH_DEBUG_RATE		= 0x00000010,	/* rate control */
 	ATH_DEBUG_ANY		= 0xffffffff
 };
@@ -262,7 +261,6 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 static void
 ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
 {
-	DPRINTF(sc, ATH_DEBUG_NODE, "%s:\n", __func__);
 	/* NB: assumed to be zero'd by caller */
 	ath_rate_ctl_reset(sc, &an->an_node);
 }
@@ -270,7 +268,6 @@ ath_rate_node_init(struct ath_softc *sc, struct ath_node *an)
 static void
 ath_rate_node_cleanup(struct ath_softc *sc, struct ath_node *an)
 {
-	DPRINTF(sc, ATH_DEBUG_NODE, "%s:\n", __func__);
 }
 
 #if 0
@@ -759,7 +756,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		 * sample higher rates 1 try at a time doing so
 		 * may unfairly penalize them.
 		 */
-		if (tries[0]) {
+		if (tries[0] && ndx[0] >= 0) {
 			update_stats(sc, an, frame_size,
 				ndx[0], tries[0],
 				ndx[1], tries[1],
@@ -771,7 +768,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 
 		}
 
-		if (tries[1] && finalTSIdx > 0) {
+		if (tries[1] && ndx[1] >= 0 && finalTSIdx > 0) {
 			update_stats(sc, an, frame_size,
 				ndx[1], tries[1],
 				ndx[2], tries[2],
@@ -782,7 +779,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 			long_tries -= tries[1];
 		}
 
-		if (tries[2] && finalTSIdx > 1) {
+		if (tries[2] && ndx[2] >= 0 && finalTSIdx > 1) {
 			update_stats(sc, an, frame_size,
 				ndx[2], tries[2],
 				ndx[3], tries[3],
@@ -793,7 +790,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 			long_tries -= tries[2];
 		}
 
-		if (tries[3] && finalTSIdx > 2) {
+		if (tries[3] && ndx[3] >= 0 && finalTSIdx > 2) {
 			update_stats(sc, an, frame_size,
 				ndx[3], tries[3],
 				0, 0,

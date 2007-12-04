@@ -29,6 +29,10 @@
 #ifndef _NET80211_IEEE80211_LINUX_H_
 #define _NET80211_IEEE80211_LINUX_H_
 
+#define	IEEE80211_DEBUG
+#define	IEEE80211_DEBUG_REFCNT			/* Node reference count debugging */
+/* #define ATH_DEBUG_SPINLOCKS */		/* announce before spinlocking */
+
 #include <linux/wireless.h>
 #include <linux/fs.h>
 
@@ -88,7 +92,7 @@ set_quality(struct iw_quality *iq, u_int rssi, int noise)
 #include <linux/interrupt.h>
 #ifdef DECLARE_TASKLET			/* native tasklets */
 #define IEEE80211_TQ_STRUCT tasklet_struct
-#define IEEE80211_INIT_TQUEUE(a,b,c)	tasklet_init((a),(b),(unsigned long)(c))
+#define IEEE80211_INIT_TQUEUE(a,b,c)	tasklet_init((a), (b), (unsigned long)(c))
 #define IEEE80211_SCHEDULE_TQUEUE(a)	tasklet_schedule((a))
 #define IEEE80211_CANCEL_TQUEUE(a)	if (!in_interrupt()) tasklet_kill((a))
 typedef unsigned long IEEE80211_TQUEUE_ARG;
@@ -106,7 +110,7 @@ typedef void *IEEE80211_TQUEUE_ARG;
 #define	tasklet_disable(t)	do { (void) t; local_bh_disable(); } while (0)
 #define	tasklet_enable(t)	do { (void) t; local_bh_enable(); } while (0)
 /* XXX: not supporting cancel in old kernels! */
-#define IEEE80211_CANCEL_TQUEUE(a)	((a),0)
+#define IEEE80211_CANCEL_TQUEUE(a)	((a), 0)
 #endif /* !DECLARE_TASKLET */
 
 #define	IEEE80211_RESCHEDULE	schedule
@@ -123,38 +127,64 @@ typedef void *IEEE80211_TQUEUE_ARG;
  * UAPSD locking 
  */
 typedef spinlock_t ieee80211com_lock_t;
-#define	IEEE80211_LOCK_INIT(_ic, _name)				\
+#define	IEEE80211_LOCK_INIT(_ic, _name)					\
 	spin_lock_init(&(_ic)->ic_comlock)
 #define	IEEE80211_LOCK_DESTROY(_ic)
-#define	IEEE80211_LOCK_IRQ(_ic) do {				\
-	unsigned long __ilockflags;				\
+#define	IEEE80211_LOCK_IRQ(_ic) do {					\
+	unsigned long __ilockflags;					\
+	IEEE80211_LOCK_CHECK(_ic);					\
 	spin_lock_irqsave(&(_ic)->ic_comlock, __ilockflags);
 #define	IEEE80211_UNLOCK_IRQ(_ic)					\
+	IEEE80211_LOCK_ASSERT(_ic);					\
 	spin_unlock_irqrestore(&(_ic)->ic_comlock, __ilockflags);	\
 } while (0)
 #define	IEEE80211_UNLOCK_IRQ_EARLY(_ic)					\
+	IEEE80211_LOCK_ASSERT(_ic);					\
 	spin_unlock_irqrestore(&(_ic)->ic_comlock, __ilockflags);
 
 #if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	IEEE80211_LOCK_ASSERT(_ic) \
-	KASSERT(spin_is_locked(&(_ic)->ic_comlock),("ieee80211com not locked!"))
+	KASSERT(spin_is_locked(&(_ic)->ic_comlock), ("ieee80211com not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	IEEE80211_LOCK_CHECK(_ic) do { \
+	if (spin_is_locked(&(_ic)->ic_comlock)) \
+		printk("%s:%d - about to block on ieee80211com lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define	IEEE80211_LOCK_CHECK(_ic)
+#endif 
 #else
 #define	IEEE80211_LOCK_ASSERT(_ic)
+#define	IEEE80211_LOCK_CHECK(_ic)
 #endif
 
 
 #define IEEE80211_VAPS_LOCK_INIT(_ic, _name)		\
 	spin_lock_init(&(_ic)->ic_vapslock)
 #define IEEE80211_VAPS_LOCK_DESTROY(_ic)
-#define IEEE80211_VAPS_LOCK_BH(_ic)	spin_lock_bh(&(_ic)->ic_vapslock);
-#define IEEE80211_VAPS_UNLOCK_BH(_ic)	spin_unlock_bh(&(_ic)->ic_vapslock);
+#define IEEE80211_VAPS_LOCK_BH(_ic)	do { 		\
+	IEEE80211_VAPS_LOCK_CHECK(_ic);		\
+	spin_lock_bh(&(_ic)->ic_vapslock);
+#define IEEE80211_VAPS_UNLOCK_BH(_ic)			\
+	IEEE80211_VAPS_LOCK_ASSERT(_ic);		\
+	spin_unlock_bh(&(_ic)->ic_vapslock);		\
+} while (0)
 
 #if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define IEEE80211_VAPS_LOCK_ASSERT(_ic) \
 	KASSERT(spin_is_locked(&(_ic)->ic_vapslock), \
 		("ieee80211com_vaps not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	IEEE80211_VAPS_LOCK_CHECK(_ic) do { \
+	if (spin_is_locked(&(_ic)->ic_vapslock)) \
+		printk("%s:%d - about to block on ieee80211com_vaps lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define IEEE80211_VAPS_LOCK_CHECK(_ic)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #else
 #define IEEE80211_VAPS_LOCK_ASSERT(_ic)
+#define IEEE80211_VAPS_LOCK_CHECK(_ic)
 #endif
 
 
@@ -168,19 +198,31 @@ typedef spinlock_t ieee80211_node_lock_t;
 #define	IEEE80211_NODE_LOCK_DESTROY(_ni)
 #define	IEEE80211_NODE_LOCK_IRQ(_ni)	do {	\
 	unsigned long __node_lockflags;		\
+	IEEE80211_NODE_LOCK_CHECK(_ni); 	\
 	spin_lock_irqsave(&(_ni)->ni_nodelock, __node_lockflags);
-#define	IEEE80211_NODE_UNLOCK_IRQ(_ni)		\
+#define	IEEE80211_NODE_UNLOCK_IRQ(_ni) \
+	IEEE80211_NODE_LOCK_ASSERT(_ni); \
 	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags); \
 } while (0)
 #define	IEEE80211_NODE_UNLOCK_IRQ_EARLY(_ni)		\
+	IEEE80211_NODE_LOCK_ASSERT(_ni); \
 	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags);
 
 #if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
-#define	IEEE80211_NODE_LOCK_ASSERT(_nt) \
+#define	IEEE80211_NODE_LOCK_ASSERT(_ni) \
 	KASSERT(spin_is_locked(&(_ni)->ni_nodelock), \
 		("802.11 node not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	IEEE80211_NODE_LOCK_CHECK(_ni) do { \
+	if (spin_is_locked(&(_ni)->ni_nodelock)) \
+		printk("%s:%d - about to block on node lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define	IEEE80211_NODE_LOCK_CHECK(_ni)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #else
 #define	IEEE80211_NODE_LOCK_ASSERT(_ni)
+#define	IEEE80211_NODE_LOCK_CHECK(_ni)
 #endif
 
 #endif /* node lock */
@@ -242,19 +284,36 @@ typedef spinlock_t ieee80211_scan_lock_t;
 typedef spinlock_t acl_lock_t;
 #define	ACL_LOCK_INIT(_as, _name)	spin_lock_init(&(_as)->as_lock)
 #define	ACL_LOCK_DESTROY(_as)
-#define	ACL_LOCK(_as)			spin_lock(&(_as)->as_lock)
-#define	ACL_UNLOCK(_as)			spin_unlock(&(_as)->as_lock)
+#define	ACL_LOCK(_as)			do { 	\
+	ACL_LOCK_CHECK(_as); 		\
+	spin_lock(&(_as)->as_lock);
+#define	ACL_UNLOCK(_as)				\
+	ACL_LOCK_ASSERT(_as); 			\
+	spin_unlock(&(_as)->as_lock); 		\
+} while(0)
+#define ACL_UNLOCK_EARLY(_as)			\
+	ACL_LOCK_ASSERT(_as); 			\
+	spin_unlock(&(_as)->as_lock);
 
 #if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	ACL_LOCK_ASSERT(_as) \
 	KASSERT(spin_is_locked(&(_as)->as_lock), ("ACL not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define	ACL_LOCK_CHECK(_as) do { \
+	if (spin_is_locked(&(_as)->as_lock)) \
+		printk("%s:%d - about to block on ACL lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define	ACL_LOCK_CHECK(_as)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #else
 #define	ACL_LOCK_ASSERT(_as)
+#define	ACL_LOCK_CHECK(_as)
 #endif
 
 /* __skb_append got a third parameter in 2.6.14 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
-#define __skb_append(a,b,c)	__skb_append(a,b)
+#define __skb_append(a,b,c)	__skb_append(a, b)
 #endif
 
 /*
@@ -268,12 +327,32 @@ typedef spinlock_t acl_lock_t;
 #define	IEEE80211_NODE_SAVEQ_QLEN(_ni)		skb_queue_len(&(_ni)->ni_savedq)
 #define	IEEE80211_NODE_SAVEQ_LOCK_IRQ(_ni) do {			\
 	unsigned long __qlockflags;				\
+	IEEE80211_NODE_SAVEQ_LOCK_CHECK(_ni);		\
 	spin_lock_irqsave(&(_ni)->ni_savedq.lock, __qlockflags);
-#define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(_ni)    \
+#define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(_ni)    		\
+	IEEE80211_NODE_SAVEQ_LOCK_ASSERT(_ni);			\
 	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __qlockflags); \
 } while (0)
 #define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ_EARLY(_ni)		\
+	IEEE80211_NODE_SAVEQ_LOCK_ASSERT(_ni);			\
 	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __qlockflags);
+
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
+#define IEEE80211_NODE_SAVEQ_LOCK_ASSERT(_ni) \
+	KASSERT(spin_is_locked(&(_ni)->ni_savedq.lock), \
+		("node saveq not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define IEEE80211_NODE_SAVEQ_LOCK_CHECK(_ni) do { \
+	if (spin_is_locked(&(_ni)->ni_savedq.lock)) \
+		printk("%s:%d - about to block on node saveq lock!\n", __func__, __LINE__); \
+} while(0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define IEEE80211_NODE_SAVEQ_LOCK_CHECK(_ni)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#else
+#define IEEE80211_NODE_SAVEQ_LOCK_ASSERT(_ni)
+#define IEEE80211_NODE_SAVEQ_LOCK_CHECK(_ni)
+#endif
 
 /* caller MUST lock IEEE80211_NODE_SAVEQ */
 #define	IEEE80211_NODE_SAVEQ_DEQUEUE(_ni, _skb, _qlen) do {	\
@@ -302,7 +381,7 @@ typedef spinlock_t acl_lock_t;
  * NB: sizeof(cb) == 48 and the vlan code grabs the first
  *     8 bytes so we reserve/avoid it.
  */
-struct ieee80211_cb {
+	struct ieee80211_cb {
 	u_int8_t vlan[8];			/* reserve for vlan tag info */
 	struct ieee80211_node *ni;
 	u_int32_t flags;
@@ -311,18 +390,24 @@ struct ieee80211_cb {
 #define	M_PWR_SAV	0x04			/* bypass power save handling */
 #define M_UAPSD		0x08			/* frame flagged for u-apsd handling */
 #define M_RAW           0x10
+#ifdef IEEE80211_DEBUG_REFCNT
+	int tracked;
+	void		(*next_destructor)(struct sk_buff *skb);
+#endif
 	struct sk_buff *next;			/* fast frame sk_buf chain */
 };
 
 
+#define	SKB_CB(_skb) 		((struct ieee80211_cb *)(_skb)->cb)
+
 #define M_FLAG_SET(_skb, _flag) \
-	(((struct ieee80211_cb *)(_skb)->cb)->flags |= (_flag))
+	(SKB_CB(_skb)->flags |= (_flag))
 #define	M_FLAG_CLR(_skb, _flag) \
-	(((struct ieee80211_cb *)(_skb)->cb)->flags &= ~(_flag))
+	(SKB_CB(_skb)->flags &= ~(_flag))
 #define	M_FLAG_GET(_skb, _flag) \
-	(((struct ieee80211_cb *)(_skb)->cb)->flags & (_flag))
+	(SKB_CB(_skb)->flags & (_flag))
 #define M_FLAG_KEEP_ONLY(_skb, _flag) \
-	(((struct ieee80211_cb *)(_skb)->cb)->flags &= (_flag))
+	(SKB_CB(_skb)->flags &= (_flag))
 
 #define	M_PWR_SAV_SET(skb) M_FLAG_SET((skb), M_PWR_SAV)
 #define	M_PWR_SAV_CLR(skb) M_FLAG_CLR((skb), M_PWR_SAV)
@@ -348,23 +433,6 @@ struct ieee80211com;
 struct ieee80211vap;
 
 int ieee80211_load_module(const char *);
-
-/*
- * Node reference counting definitions.
- *
- * ieee80211_node_initref	initialize the reference count to 1
- * ieee80211_node_incref	add a reference
- * ieee80211_node_decref	remove a reference
- * ieee80211_node_dectestref	remove a reference and return 1 if this
- *				is the last reference, otherwise 0
- * ieee80211_node_refcnt	reference count for printing (only)
- */
-typedef atomic_t ieee80211_node_ref_count_t;
-#define ieee80211_node_initref(_ni)	atomic_set(&(_ni)->ni_refcnt, 1)
-#define ieee80211_node_incref(_ni)	atomic_inc(&(_ni)->ni_refcnt)
-#define	ieee80211_node_decref(_ni)	atomic_dec(&(_ni)->ni_refcnt)
-#define	ieee80211_node_dectestref(_ni)	atomic_dec_and_test(&(_ni)->ni_refcnt)
-#define	ieee80211_node_refcnt(_ni)	(_ni)->ni_refcnt.counter
 
 #define	le16toh(_x)	le16_to_cpu(_x)
 #define	htole16(_x)	cpu_to_le16(_x)
@@ -409,8 +477,16 @@ extern const char *ether_sprintf(const u_int8_t *);
 /*
  * Queue write-arounds and support routines.
  */
-extern	struct sk_buff *ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen);
-#define	IF_ENQUEUE(_q,_skb)	skb_queue_tail(_q,_skb)
+#ifdef IEEE80211_DEBUG_REFCNT
+#define ieee80211_getmgtframe(_ppfrm, _pktlen) \
+	ieee80211_getmgtframe_debug(_ppfrm, _pktlen, __func__, __LINE__)
+extern struct sk_buff * ieee80211_getmgtframe_debug(u_int8_t **frm, u_int pktlen, 
+						    const char* func, int line);
+#else
+extern struct sk_buff * ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen);
+#endif
+
+#define	IF_ENQUEUE(_q,_skb)	skb_queue_tail(_q, _skb)
 #define	IF_DEQUEUE(_q,_skb)	(_skb = skb_dequeue(_q))
 #define	_IF_QLEN(_q)		skb_queue_len(_q)
 #define	IF_DRAIN(_q)		skb_queue_drain(_q)
