@@ -14,6 +14,7 @@ my $LOOKUP = "";
 my $DUMP = 0;
 my $BATCH = 0;
 my $CROSS = 0;
+my $INIT = 0;
 
 # defines the order in which the registers are looked up, in case of
 # different definitions for different chipsets
@@ -72,6 +73,11 @@ GetOptions (
 
 	'cross' => \$CROSS,
 	# cross reference only
+
+	'init=s' => \$INIT,
+	# --init <rf | mode>
+	# create inittables from 6 files as next args: regs a b g ta tg
+	
 );
 
 check_download_reg_file();
@@ -85,6 +91,9 @@ if ($LOOKUP) {
 }
 elsif ($DUMP) {
 	foreach_reg();
+}
+elsif ($INIT) {
+	make_init_from_files(@ARGV[0], @ARGV[1], @ARGV[2], @ARGV[3], @ARGV[4], @ARGV[5]);
 }
 elsif ($BATCH) {
 	my $oldout;
@@ -361,4 +370,38 @@ sub dump_cross() {
 			}
 		}
 	}
+}
+
+sub make_init_from_files($$$$$$) {
+	my($regsf, $af, $bf, $gf, $taf, $tgf) = @_;
+	
+	open REGS, "<", $regsf or die "can't open file '$regsf'";
+	open A, "<", $af or die "can't open file '$af'";
+	open B, "<", $bf or die "can't open file '$bf'";
+	open G, "<", $gf or die "can't open file '$gf'";
+	open TA, "<", $taf or die "can't open file '$taf'";
+	open TG, "<", $tgf or die "can't open file '$tgf'";
+	while (<REGS>) {
+		$r = $_; $r =~ s/\n//g;
+		$dec = lookup_name($r);
+		$r = $dec->{"name"} unless $dec->{"name"} =~ "unknown" ;
+		$a = <A>; $a =~ s/\n//g;
+		$b = <B>; $b =~ s/\n//g;
+		$g = <G>; $g =~ s/\n//g;
+		$ta = <TA>; $ta =~ s/\n//g;
+		$tg = <TG>; $tg =~ s/\n//g;
+		if ($INIT eq "mode") {
+			print "\t{ $r,\n";
+			print "\t\t{ $a, $ta, $b, $g, $tg } },\n";
+		} elsif ($INIT == "rf") {
+			print "\t{ 0, $r,\n";
+			print "\t\t{ $a, $ta, $b, $g, $tg } },\n";
+		}
+	}
+	close REGS;
+	close A;
+	close B;
+	close G;
+	close TA;
+	close TG;
 }
