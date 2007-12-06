@@ -1411,7 +1411,7 @@ int main(int argc, char *argv[])
 {
 	u_int32_t dev_addr;
 	u_int16_t srev, phy_rev_5ghz, phy_rev_2ghz;
-	u_int16_t eeprom_version, mac_version, regdomain, ee_magic;
+	u_int16_t mac_version, ee_magic;
 	u_int8_t error, eeprom_size, dev_type, eemap;
 	struct ath5k_eeprom_info *ee;
 	int byte_size = 0;
@@ -1608,7 +1608,7 @@ int main(int argc, char *argv[])
 
 	printf("| EEMAP:              %i |",eemap);
 
-	printf(" Reg. Domain:     0x%02X |\n", regdomain);
+	printf(" Reg. Domain:     0x%02X |\n", ee->ee_regdomain);
 
 	dump_capabilities(ee);
 	printf("\n");
@@ -1622,8 +1622,8 @@ int main(int argc, char *argv[])
 	printf("|          2Ghz Antenna gain:              %02i             |\n",AR5K_EEPROM_ANT_GAIN_2GHZ(ee->ee_ant_gain));
 	printf("|          5Ghz Antenna gain:              %02i             |\n",AR5K_EEPROM_ANT_GAIN_5GHZ(ee->ee_ant_gain));
 	printf("|          Turbo 2W maximum dbm:           %02i             |\n",AR5K_EEPROM_HDR_T_5GHZ_DBM(ee->ee_header));
-	printf("|          Target power start:             %003x            |\n",AR5K_EEPROM_TARGET_PWRSTART(ee->ee_misc1));
-	printf("|          EAR Start:                      %003x            |\n",AR5K_EEPROM_EARSTART(ee->ee_misc0));
+	printf("|          Target power start:             %03x            |\n",AR5K_EEPROM_TARGET_PWRSTART(ee->ee_misc1));
+	printf("|          EAR Start:                      %03x            |\n",AR5K_EEPROM_EARSTART(ee->ee_misc0));
 	printf("\\=========================================================/\n");
 
 	printf("\n");
