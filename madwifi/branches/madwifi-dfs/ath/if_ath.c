@@ -1669,7 +1669,8 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			}
 			skb = bf->bf_skb;
 			if (skb == NULL) {
-				printk("%s: no skbuff\n", __func__);
+				printk("%s: %s: no skbuff\n",
+				       DEV_NAME(sc->sc_dev), __func__);
 				continue;
 			}
 
@@ -5528,7 +5529,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 		/*
 		 * move data from Normal txqs to XR queue.
 		 */
-		printk("move data from NORMAL to XR\n");
+		printk("%s: move data from NORMAL to XR\n",
+		       DEV_NAME(sc->sc_dev));
 		/*
 		 * collect all the data towards the node
 		 * in to the tmp_q.
@@ -6176,19 +6178,17 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			beacon_tu  = beacon_tsf >> 10;
 
 			DPRINTF(sc, ATH_DEBUG_BEACON,
-					"%s: beacon transmitted at %10llx, "
+					"beacon transmitted at %10llx, "
 					"received at %10llx(%lld), hw TSF "
 					"%10llx(%lld)\n",
-					DEV_NAME(sc->sc_dev),
 					beacon_tsf,
 					rtsf, rtsf - beacon_tsf,
 					hw_tsf, hw_tsf - beacon_tsf);
 
 			if (rtsf < beacon_tsf) {
 				DPRINTF(sc, ATH_DEBUG_BEACON,
-						"%s: ibss merge: rtsf %10llx "
+						"ibss merge: rtsf %10llx "
 						"beacon's tsf %10llx\n",
-						DEV_NAME(sc->sc_dev),
 						rtsf, beacon_tsf);
 				do_merge = 1;
 			}
@@ -6196,10 +6196,9 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			/* Check sc_nexttbtt */
 			if (sc->sc_nexttbtt < hw_tu) {
 				DPRINTF(sc, ATH_DEBUG_BEACON,
-						"%s: ibss merge: sc_nexttbtt "
+						"ibss merge: sc_nexttbtt "
 						"(%8x TU) is in the past "
 						"(tsf %8x TU)!\n",
-						DEV_NAME(sc->sc_dev),
 						sc->sc_nexttbtt, hw_tu);
 				do_merge = 1;
 			}
@@ -6215,11 +6214,10 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				if ((sc->sc_nexttbtt % intval) !=
 						(beacon_tu % intval)) {
 					DPRINTF(sc, ATH_DEBUG_BEACON,
-							"%s: ibss merge: "
+							"ibss merge: "
 							"sc_nexttbtt %10x TU "
 							"(%3d) beacon %10x TU "
 							"(%3d)\n",
-							DEV_NAME(sc->sc_dev),
 							sc->sc_nexttbtt,
 							sc->sc_nexttbtt % intval,
 							beacon_tu,
@@ -8334,7 +8332,8 @@ ath_stoprecv(struct ath_softc *sc)
 	if (sc->sc_debug & (ATH_DEBUG_RESET | ATH_DEBUG_FATAL)) {
 		struct ath_buf *bf;
 
-		printk("ath_stoprecv: rx queue 0x%x, link %p\n",
+		printk("%s: ath_stoprecv: rx queue 0x%x, link %p\n",
+		       DEV_NAME(sc->sc_dev),
 			ath_hal_getrxbuf(ah), sc->sc_rxlink);
 		STAILQ_FOREACH(bf, &sc->sc_rxbuf, bf_list) {
 			struct ath_desc *ds = bf->bf_desc;
