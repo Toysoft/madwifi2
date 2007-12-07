@@ -1328,6 +1328,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		}
 	}
 	avp->av_bslot = -1;
+	atomic_set(&avp->av_beacon_alloc, 0);
 	STAILQ_INIT(&avp->av_mcastq.axq_q);
 	ATH_TXQ_LOCK_INIT(&avp->av_mcastq);
 	if (IEEE80211_IS_MODE_BEACON(opmode)) {
@@ -4400,6 +4401,8 @@ ath_beaconq_config(struct ath_softc *sc)
 	}
 #undef ATH_EXPONENT_TO_VALUE
 }
+
+#if 0
 /* Return 1 if beacon was already allocated, 0 otherwise. */
 static int
 ath_beacon_allocated(struct ath_softc *sc, struct ieee80211_node *ni) {
@@ -4408,21 +4411,30 @@ ath_beacon_allocated(struct ath_softc *sc, struct ieee80211_node *ni) {
 		ATH_VAP(ni->ni_vap)->av_bcbuf != NULL &&
 		ATH_VAP(ni->ni_vap)->av_bcbuf->bf_skb != NULL;
 }
+#endif
+
+static int
+ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
+{
+	struct ath_vap * avp = ATH_VAP(ni->ni_vap);
+
+	atomic_set(&avp->av_beacon_alloc, 1);
+
+	return 0;
+}
 
 /*
  * Allocate and setup an initial beacon frame.
  *
- * Context: softIRQ
+ * Context: SWBA interrupt
  */
 static int
-ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
+ath_beacon_alloc_internal(struct ath_softc *sc, struct ieee80211_node *ni)
 {
 	struct ath_vap *avp = ATH_VAP(ni->ni_vap);
 	struct ieee80211_frame *wh;
 	struct ath_buf *bf;
 	struct sk_buff *skb;
-
-	KASSERT(!ath_beacon_allocated(sc, ni), ("beacon alloc called twice!"));
 
 	/*
 	 * release the previous beacon's skb if it already exists.
@@ -4645,6 +4657,11 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		ath_beacon_dturbo_update(vap, needmark, dtim);
 	}
 #endif
+
+	if (atomic_add_unless(&avp->av_beacon_alloc, -1, 0)) {
+		ath_beacon_alloc_internal(sc, vap->iv_bss);
+	}
+
 	/*
 	 * Update dynamic beacon contents.  If this returns
 	 * non-zero then we need to remap the memory because
@@ -8892,11 +8909,10 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				ni->ni_ath_defkeyindex = vap->iv_def_txkey;
 			}
 
-			if (!ath_beacon_allocated(sc,ni)) {
-				error = ath_beacon_alloc(sc, ni);
-				if (error < 0)
-					goto bad;
-			}
+			error = ath_beacon_alloc(sc, ni);
+			if (error < 0)
+				goto bad;
+
 			/*
 			 * if the turbo flags have changed, then beacon and turbo
 			 * need to be reconfigured.
