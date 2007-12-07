@@ -521,6 +521,8 @@ struct ath_vap {
 	struct ieee80211_beacon_offsets av_boff;/* dynamic update state */
 	int av_bslot;			/* beacon slot index */
 	struct ath_txq av_mcastq;	/* multicast transmit queue */
+	atomic_t av_beacon_alloc;       /* set to 1 when the next beacon needs
+					   to be recomputed */
 };
 #define	ATH_VAP(_v)	((struct ath_vap *)(_v))
 
