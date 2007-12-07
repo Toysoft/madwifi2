@@ -40,6 +40,7 @@ enum {
 	ATH_DEBUG_CALIBRATE	= 0x00010000,	/* periodic calibration */
 	ATH_DEBUG_KEYCACHE	= 0x00020000,	/* key cache management */
 	ATH_DEBUG_STATE		= 0x00040000,	/* 802.11 state transitions */
+	ATH_DEBUG_TSF           = 0x00080000,   /* timestamp processing */
 	ATH_DEBUG_LED		= 0x00100000,	/* led management */
 	ATH_DEBUG_FF		= 0x00200000,	/* fast frames */
 	ATH_DEBUG_TURBO		= 0x00400000,	/* turbo/dynamic turbo */
