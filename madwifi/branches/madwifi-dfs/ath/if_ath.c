@@ -1568,11 +1568,10 @@ ath_radio_silence_required_for_dfs(struct ath_softc* sc) {
 static int
 ath_check_total_radio_silence_not_required(struct ath_softc *sc,
 					   const char* func) {
-	struct net_device* dev = sc->sc_dev;
 	if (ath_total_radio_silence_required_for_dfs(sc)) {
 		DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: %s: ERROR: Invoked a transmit function during DFS "
-			"channel availability check!\n", DEV_NAME(dev), func);
+			"%s: ERROR: Invoked a transmit function during DFS "
+			"channel availability check!\n", func);
 		return 1;
 	}
 	return 0;
@@ -1580,12 +1579,11 @@ ath_check_total_radio_silence_not_required(struct ath_softc *sc,
 
 static int
 ath_check_radio_silence_not_required(struct ath_softc *sc, const char* func) {
-	struct net_device* dev = sc->sc_dev;
 	if (ath_radio_silence_required_for_dfs(sc)) {
 		DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: %s: ERROR: Invoked a transmit function during DFS "
+			"%s: ERROR: Invoked a transmit function during DFS "
 			"channel availability check OR while radar interference"
-			" is detected!\n", DEV_NAME(dev), func);
+			" is detected!\n", func);
 		return 1;
 	}
 	return 0;
@@ -1704,16 +1702,14 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			count ++;
 
 			DPRINTF(sc, ATH_DEBUG_RECV,
-				"%s: rs_tstamp=%10llx count=%d\n",
-				DEV_NAME(sc->sc_dev),
+				"rs_tstamp=%10llx count=%d\n",
 				bf->bf_tsf, count);
 
 			/* compute rollover */
 			if (last_rs_tstamp > rs->rs_tstamp) {
 				rollover ++;
 				DPRINTF(sc, ATH_DEBUG_RECV,
-					"%s: %d rollover detected\n",
-					DEV_NAME(sc->sc_dev),
+					"%d rollover detected\n",
 					rollover);
 			}
 
@@ -1983,8 +1979,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 		if (last_rs_tstamp > (hw_tsf & TSTAMP_MASK)) {
 			rollover++;
 			DPRINTF(sc, ATH_DEBUG_RECV,
-				"%s: %d rollover detected for hw_tsf=%10llx\n",
-				DEV_NAME(sc->sc_dev),
+				"%d rollover detected for hw_tsf=%10llx\n",
 				rollover, hw_tsf);
 		}
 
@@ -2013,8 +2008,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 				bf->bf_tsf -= rollover * (TSTAMP_MASK + 1);
 
 				DPRINTF(sc, ATH_DEBUG_RECV,
-					"%s: bf_tsf=%10llx hw_tsf=%10llx\n",
-					DEV_NAME(sc->sc_dev),
+					"bf_tsf=%10llx hw_tsf=%10llx\n",
 					bf->bf_tsf, hw_tsf);
 
 				if (bf->bf_tsf < sc->sc_last_tsf) {
@@ -2074,12 +2068,11 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 					0 /* not simulated */);
 #if 0
 				DPRINTF(sc, ATH_DEBUG_DOTH,
-					"RADAR PULSE interface:%s channel:%u "
+					"RADAR PULSE channel:%u "
 					"jiffies:%lu fulltsf:%llu "
 					"fulltsf_high49:%llu tstamp:%u "
 					"bf_tsf:%llu bf_tsf_high49:%llu "
 					"bf_tsf_low15:%llu rssi:%u width:%u\n",
-					DEV_NAME(sc->sc_dev),
 					sc->sc_curchan.channel,
 					jiffies, p->bf_tsf,
 					p->bf_tsf &~ TSTAMP_MASK,
@@ -2171,9 +2164,8 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			sc->sc_nexttbtt += vap->iv_bss->ni_intval;
 
 			DPRINTF(sc, ATH_DEBUG_BEACON,
-				"%s: ath_intr HAL_INT_SWBA at tsf %10llx nexttbtt %10llx\n",
-				DEV_NAME(sc->sc_dev), hw_tsf,
-				(u_int64_t)sc->sc_nexttbtt<<10);
+				"ath_intr HAL_INT_SWBA at tsf %10llx nexttbtt %10llx\n",
+				hw_tsf, (u_int64_t)sc->sc_nexttbtt<<10);
 
 			/*
 			 * Software beacon alert--time to send a beacon.
@@ -3424,7 +3416,8 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	 */
 	bf = ath_take_txbuf_mgmt(sc);
 	if (bf == NULL) {
-		printk("ath_mgtstart: discard, no xmit buf\n");
+		printk("%s: %s: discard, no xmit buf\n",
+		       DEV_NAME(dev), __func__);
 		sc->sc_stats.ast_tx_nobufmgt++;
 		error = -ENOBUFS;
 		goto bad;
@@ -4202,7 +4195,7 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark, u_int8_t dtim)
 			  IEEE80211_IS_CHAN_2GHZ(ic->ic_curchan)) ||
 			 !sc->sc_dturbo_hold_count)) {
 			DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Leaving turbo\n",
-					DEV_NAME(sc->sc_dev));
+				__func__);
 			ic->ic_ath_cap &= ~IEEE80211_ATHC_BOOST;
 			vap->iv_bss->ni_ath_flags &= ~IEEE80211_ATHC_BOOST;
 			sc->sc_dturbo_tcount = 0;
@@ -4232,7 +4225,7 @@ ath_beacon_dturbo_update(struct ieee80211vap *vap, int *needmark, u_int8_t dtim)
 			 bss_traffic >= sc->sc_dturbo_bw_turbo &&
 			 sc->sc_rate_recn_state)) {
 			DPRINTF(sc, ATH_DEBUG_TURBO, "%s: Entering turbo\n",
-					DEV_NAME(sc->sc_dev));
+				__func__);
 			ic->ic_ath_cap |= IEEE80211_ATHC_BOOST;
 			vap->iv_bss->ni_ath_flags |= IEEE80211_ATHC_BOOST;
 			sc->sc_dturbo_tcount = 0;
@@ -4292,8 +4285,7 @@ ath_turbo_switch_mode(unsigned long data)
 	KASSERT(ic->ic_opmode == IEEE80211_M_HOSTAP,
 		("unexpected operating mode %d", ic->ic_opmode));
 
-	DPRINTF(sc, ATH_DEBUG_STATE, "%s: dynamic turbo switch to %s mode\n",
-		DEV_NAME(dev),
+	DPRINTF(sc, ATH_DEBUG_STATE, "dynamic turbo switch to %s mode\n",
 		ic->ic_ath_cap & IEEE80211_ATHC_BOOST ? "turbo" : "base");
 
 	if (!ath_check_beacon_done(sc)) {
@@ -8529,8 +8521,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		do_gettimeofday(&tv);
 
 		DPRINTF(sc, ATH_DEBUG_DOTH, 
-			"RADAR CHANNEL  interface:%s channel:%u jiffies:%lu\n",
-			DEV_NAME(sc->sc_dev),
+			"RADAR CHANNEL channel:%u jiffies:%lu\n",
 			hchan.channel,
 			jiffies);
 
@@ -8576,9 +8567,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		if (doth_channel_availability_check_needed && 
 				!(ic->ic_flags & IEEE80211_F_SCAN)) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-					"%s: %s: Starting DFS wait for "
+					"%s: Starting DFS wait for "
 					"channel %u -- Time: %ld.%06ld\n", 
-					DEV_NAME(dev), __func__, 
+					__func__, 
 					ieee80211_mhz2ieee(sc->sc_curchan.channel, 
 						sc->sc_curchan.channelFlags), 
 					tv.tv_sec, tv.tv_usec);
@@ -8607,9 +8598,9 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	}
 	else
 		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-				"%s: %s: Not performing channel change action: "
+				"%s: Not performing channel change action: "
 				"%d -- Time: %ld.%06ld\n", 
-				DEV_NAME(dev), __func__, 
+			        __func__, 
 				ieee80211_mhz2ieee(sc->sc_curchan.channel, 
 					sc->sc_curchan.channelFlags), 
 				tv.tv_sec, tv.tv_usec);
@@ -8656,8 +8647,8 @@ ath_calibrate(unsigned long arg)
 		 */
 		int txcont_was_active = sc->sc_txcont;
 		DPRINTF(sc, ATH_DEBUG_RESET | ATH_DEBUG_CALIBRATE | ATH_DEBUG_DOTH,
-			"%s: %s: Forcing reset() for (ath_hal_getrfgain(ah) == "
-			"HAL_RFGAIN_NEED_CHANGE)\n", DEV_NAME(dev), __func__);
+			"%s: Forcing reset() for (ath_hal_getrfgain(ah) == "
+			"HAL_RFGAIN_NEED_CHANGE)\n",  __func__);
 		sc->sc_stats.ast_per_rfgain++;
 /* XXX: Ugly workaround */
 if (!sc->sc_beacons &&
@@ -8799,7 +8790,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		HAL_LED_RUN,	/* IEEE80211_S_RUN */
 	};
 
-	DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: %s -> %s\n", __func__, DEV_NAME(dev),
+	DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s -> %s\n", __func__,
 		ieee80211_state_name[vap->iv_state],
 		ieee80211_state_name[nstate]);
 
@@ -8983,8 +8974,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		if (sc->sc_dfs_cac
 		    && IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-				"%s: %s: VAP -> DFSWAIT_PENDING \n",
-				__func__, DEV_NAME(dev));
+				"%s: VAP -> DFSWAIT_PENDING \n",
+				__func__);
 			/* start calibration timer with a really small value 1/10 sec */
 			mod_timer(&sc->sc_cal_ch, jiffies + (HZ/10));
 			/* wake the receiver */
@@ -9006,8 +8997,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		{
 			del_timer_sync(&sc->sc_dfs_cac_timer);
 			sc->sc_dfs_cac = 0;
-			DPRINTF(sc, ATH_DEBUG_STATE, "%s: %s: VAP DFSWAIT_PENDING -> run\n",
-				__func__, DEV_NAME(dev));
+			DPRINTF(sc, ATH_DEBUG_STATE, "%s: VAP DFSWAIT_PENDING -> run\n",
+				__func__);
 		}
 
 		/* XXX: if it is SCAN state, disable beacons. */
@@ -9059,19 +9050,19 @@ ath_dfs_channel_check_completed(unsigned long data )
 	struct timeval tv;
 
 	if (!sc->sc_dfs_cac) {
-		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Error: DFS wait timer "
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: Error: DFS wait timer "
 				"expired, but the driver didn't think we "
 				"were in dfswait.  Somebody forgot to "
 				"delete the DFS wait timer.\n", 
-				DEV_NAME(dev), __func__);
+				 __func__);
 		return;
 	}
 
 	if (!sc->sc_dfs_testmode) {
 		do_gettimeofday(&tv);
 		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-				"%s: %s: DFS wait %s! - Channel: %u Time: "
-				"%ld.%06ld\n", __func__, DEV_NAME(dev), 
+				"%s: DFS wait %s! - Channel: %u Time: "
+				"%ld.%06ld\n", __func__, 
 				(sc->sc_curchan.privFlags & CHANNEL_DFS) ? 
 					"completed" : "not applicable", 
 					ieee80211_mhz2ieee(sc->sc_curchan.channel, 
@@ -9080,27 +9071,27 @@ ath_dfs_channel_check_completed(unsigned long data )
 		sc->sc_dfs_cac = 0;
 		if (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE) {
 			DPRINTF(sc, ATH_DEBUG_DOTH, 
-					"%s: %s: Error: DFS wait timer expired "
+					"%s: Error: DFS wait timer expired "
 					"but channel was already marked as "
 					"having CHANNEL_INTERFERENCE.  "
 					"Somebody forgot to delete the DFS "
 					"wait timer.\n", 
-					DEV_NAME(dev), __func__);
+				        __func__);
 			return;
 		}
 		if (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS)) {
-			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Error: DFS wait "
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: Error: DFS wait "
 					"timer expired but the current "
 					"channel does not require DFS.  "
 					"Maybe someone changed channels "
 					"but forgot to cancel the DFS "
 					"wait.\n", 
-					DEV_NAME(dev), __func__);
+					 __func__);
 			return;
 		}
-		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: Driver is now MARKING "
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: Driver is now MARKING "
 				"channel as CHANNEL_DFS_CLEAR.\n", 
-				DEV_NAME(dev), __func__);
+				 __func__);
 		sc->sc_curchan.privFlags |= CHANNEL_DFS_CLEAR;
 		ath_chan_change(sc, ic->ic_curchan);
 		/* restart each VAP that was pending... */
@@ -9109,9 +9100,9 @@ ath_dfs_channel_check_completed(unsigned long data )
 			if (IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 				int error;
 				DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-						"%s: %s: VAP DFSWAIT_PENDING "
+						"%s: VAP DFSWAIT_PENDING "
 						"-> RUN -- Time: %ld.%06ld\n", 
-						__func__, DEV_NAME(dev), 
+						__func__, 
 						tv.tv_sec, tv.tv_usec);
 				/* re alloc beacons to update new channel info */
 				error = ath_beacon_alloc(sc, vap->iv_bss);
@@ -9143,18 +9134,18 @@ ath_dfs_channel_check_completed(unsigned long data )
 		do_gettimeofday(&tv);
 		if (sc->sc_dfs_testmode) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-					"%s: %s: VAP DFSWAIT_PENDING "
+					"%s: VAP DFSWAIT_PENDING "
 					"indefinitely.  dfs_testmode is "
 					"enabled.  Waiting again. -- Time: "
 					"%ld.%06ld\n",  __func__, 
-					DEV_NAME(dev), tv.tv_sec, tv.tv_usec);
+					tv.tv_sec, tv.tv_usec);
 			mod_timer(&sc->sc_dfs_cac_timer,
 				  jiffies +(sc->sc_dfs_cac_period * HZ));
 		} else {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-					"%s: %s: VAP DFSWAIT_PENDING still.  "
+					"%s: VAP DFSWAIT_PENDING still.  "
 					"Waiting again. -- Time: %ld.%06ld\n", 
-					__func__, DEV_NAME(dev), 
+					__func__, 
 					tv.tv_sec, tv.tv_usec);
 			mod_timer(&sc->sc_dfs_cac_timer,
 				  jiffies + (ATH_DFS_WAIT_SHORT_POLL_PERIOD * HZ));
@@ -11023,15 +11014,15 @@ txcont_configure_radio(struct ieee80211com *ic)
 			if (IEEE80211_ATHC_TURBOP & 
 						TAILQ_FIRST(&ic->ic_vaps)->iv_ath_cap) {
 				DPRINTF(sc, ATH_DEBUG_TURBO, 
-						"%s: Enabling dynamic turbo...\n",
-						DEV_NAME(dev));
+					"%s: Enabling dynamic turbo...\n",
+					__func__);
 				ic->ic_ath_cap |= IEEE80211_ATHC_BOOST;
 				sc->sc_ignore_ar = 1;
 				newflags |= IEEE80211_CHAN_TURBO;
 			} else {
 				DPRINTF(sc, ATH_DEBUG_TURBO, 
-						"%s: Disabling dynamic turbo...\n",
-						DEV_NAME(dev));
+					"%s: Disabling dynamic turbo...\n",
+					__func__);
 				ic->ic_ath_cap &= ~IEEE80211_ATHC_BOOST;
 				newflags &= ~IEEE80211_CHAN_TURBO;
 			}
@@ -11517,9 +11508,9 @@ ath_test_radar(struct ieee80211com *ic)
 	if ((ic->ic_flags & IEEE80211_F_DOTH) && (sc->sc_curchan.privFlags & CHANNEL_DFS))
 		ath_radar_detected(sc, "ath_test_radar from user space");
 	else
-		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: WARNING: channel %u MHz is not marked "
+		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: WARNING: channel %u MHz is not marked "
 				"for CHANNEL_DFS.  Radar test not performed!\n",
-				DEV_NAME(dev), __func__, sc->sc_curchan.channel);
+				 __func__, sc->sc_curchan.channel);
 	return 0;
 }
 
@@ -11529,15 +11520,14 @@ ath_test_radar(struct ieee80211com *ic)
 static void
 ath_interrupt_dfs_channel_check(struct ath_softc *sc, const char* reason)
 {
-	struct net_device*       dev = sc->sc_dev;
 	struct timeval tv;
 
 	del_timer_sync(&sc->sc_dfs_cac_timer);
 	if (sc->sc_dfs_cac) {
 		do_gettimeofday(&tv);
 		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH,
-				"%s: %s: %s - Channel: %u Time: %ld.%06ld\n",
-				__func__, DEV_NAME(dev), reason,
+				"%s: %s - Channel: %u Time: %ld.%06ld\n",
+				__func__, reason,
 				ieee80211_mhz2ieee(sc->sc_curchan.channel,
 					sc->sc_curchan.channelFlags),
 				tv.tv_sec, tv.tv_usec);
@@ -11563,13 +11553,11 @@ void
 ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	struct ath_hal*          ah  = sc->sc_ah;
 	struct ieee80211com*     ic  = &sc->sc_ic;
-	struct net_device*       dev = sc->sc_dev;
 	struct ieee80211_channel ichan;
 	struct timeval tv;
 
 	DPRINTF(sc, ATH_DEBUG_DOTH, 
-		"%s: %s: RADAR DETECTED channel:%u jiffies:%lu cause: %s%s\n",
-		DEV_NAME(sc->sc_dev),
+		"%s: RADAR DETECTED channel:%u jiffies:%lu cause: %s%s\n",
 		__func__,
 		sc->sc_curchan.channel,
 		jiffies, cause,
@@ -11587,13 +11575,13 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 		/* ath_dump_phyerr_statistics(sc, cause); */
 		if (sc->sc_dfs_cac)
 			DPRINTF(sc, ATH_DEBUG_DOTH, 
-					"%s: %s: dfs_testmode enabled -- "
+					"%s: dfs_testmode enabled -- "
 					"staying in CAC mode!\n", 
-					DEV_NAME(dev), __func__);
+					__func__);
 		else
-			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: dfs_testmode "
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: dfs_testmode "
 					"enabled -- staying on channel!\n", 
-					DEV_NAME(dev), __func__);
+					__func__);
 		return;
 	}
 
@@ -11610,14 +11598,14 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 	if (IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode)) {
 		if (!(ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS))
 			DPRINTF(sc, ATH_DEBUG_DOTH, 
-					"%s: %s: WARNING: markdfs is disabled.  "
+					"%s: WARNING: markdfs is disabled.  "
 					"ichan=%3d (%4d MHz) ichan.icflags=0x%08X\n",
-					DEV_NAME(dev), __func__, 
+					__func__, 
 					ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags);
 		else {
-			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: dfs marked!  "
+			DPRINTF(sc, ATH_DEBUG_DOTH, "%s: dfs marked!  "
 				"ichan=%3d (%4d MHz), ichan.icflags=0x%08X "
-				"-- Time: %ld.%06ld\n", DEV_NAME(dev), __func__,
+				"-- Time: %ld.%06ld\n", __func__,
 				ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags, 
 				tv.tv_sec, tv.tv_usec);
 			/* Mark the channel */
