@@ -60,9 +60,15 @@ ifdef LINUX24
 export-objs	:= ah_os.o
 endif
 
+ifdef ALQ
+obj-m += alq.o
+alq-objs := kern_alq.o
+EXTRA_CFLAGS += -DAH_DEBUG_ALQ -DAH_DEBUG
+endif
+
 INCS += -I$(ATH_HAL) -I$(HAL)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"$(HAL)/public/$(TARGET).opt_ah.h\" $(if $(MMIOTRACE),-DMMIOTRACE=1)
 
 ifeq ($(TARGET),xscale-be-elf)
 LDOPTS += --no-warn-mismatch
@@ -91,6 +97,7 @@ endif
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
 	install ath_hal.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
+	install alq.$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
 clean:
 	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd

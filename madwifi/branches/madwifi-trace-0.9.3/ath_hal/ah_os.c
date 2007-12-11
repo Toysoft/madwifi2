@@ -64,25 +64,13 @@
 #include <ah.h>
 #include <ah_os.h>
 
-#ifndef __MOD_INC_USE_COUNT
-#define	AH_MOD_INC_USE_COUNT(_m)					\
-	if (!try_module_get(_m)) {					\
-		printk(KERN_WARNING "try_module_get failed\n");		\
-		return NULL;						\
-	}
-#define	AH_MOD_DEC_USE_COUNT(_m)	module_put(_m)
-#else
-#define	AH_MOD_INC_USE_COUNT(_m)	MOD_INC_USE_COUNT
-#define	AH_MOD_DEC_USE_COUNT(_m)	MOD_DEC_USE_COUNT
-#endif
-
 #ifdef AH_DEBUG
 static	int ath_hal_debug = 0;
 #endif
 
-int	ath_hal_dma_beacon_response_time = 2;	/* in TU's */
-int	ath_hal_sw_beacon_response_time = 10;	/* in TU's */
-int	ath_hal_additional_swba_backoff = 0;	/* in TU's */
+int	ath_hal_dma_beacon_response_time = 2;	/* in TUs */
+int	ath_hal_sw_beacon_response_time = 10;	/* in TUs */
+int	ath_hal_additional_swba_backoff = 0;	/* in TUs */
 
 struct ath_hal *
 _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
@@ -91,7 +79,16 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 	struct ath_hal *ah = ath_hal_attach(devid, sc, t, h, s);
 
 	if (ah)
-		AH_MOD_INC_USE_COUNT(THIS_MODULE);
+#ifndef __MOD_INC_USE_COUNT
+		if (!try_module_get(THIS_MODULE)) {
+			printk(KERN_WARNING "%s: try_module_get failed\n",
+					__func__);
+			_ath_hal_detach(ah);
+			return NULL;
+		}
+#else
+		MOD_INC_USE_COUNT;
+#endif
 	return ah;
 }
 
@@ -99,7 +96,11 @@ void
 ath_hal_detach(struct ath_hal *ah)
 {
 	(*ah->ah_detach)(ah);
-	AH_MOD_DEC_USE_COUNT(THIS_MODULE);
+#ifndef __MOD_INC_USE_COUNT
+	module_put(THIS_MODULE);
+#else
+	MOD_DEC_USE_COUNT;
+#endif
 }
 
 /*
@@ -146,6 +147,14 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
 }
 #endif /* AH_ASSERT */
 
+#ifdef AH_DEBUG
+/* Store the current function name (should be called by wrapper functions)
+ * useful for debugging and figuring out, which hal function sets which 
+ * registers */
+char *ath_hal_func = NULL;
+EXPORT_SYMBOL(ath_hal_func);
+#endif
+
 #ifdef AH_DEBUG_ALQ
 /*
  * ALQ register tracing support.
@@ -160,14 +169,14 @@ ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
  * NB: doesn't handle multiple devices properly; only one DEVICE record
  *     is emitted and the different devices are not identified.
  */
-#include "alq/alq.h"
-#include "ah_decode.h"
+#include "alq.h"
 
-static	struct alq *ath_hal_alq;
-static	int ath_hal_alq_emitdev;	/* need to emit DEVICE record */
+static	struct alq *ath_hal_alq = NULL;
 static	u_int ath_hal_alq_lost;		/* count of lost records */
 static	const char *ath_hal_logfile = "/tmp/ath_hal.log";
 static	u_int ath_hal_alq_qsize = 8*1024;
+
+#define		MSG_MAXLEN	64
 
 static int
 ath_hal_setlogging(int enable)
@@ -178,9 +187,8 @@ ath_hal_setlogging(int enable)
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
 		error = alq_open(&ath_hal_alq, ath_hal_logfile,
-				sizeof (struct athregrec), ath_hal_alq_qsize);
+				MSG_MAXLEN, ath_hal_alq_qsize, (enable == 1 ? 0x7fffffff : enable));
 		ath_hal_alq_lost = 0;
-		ath_hal_alq_emitdev = 1;
 		printk("ath_hal: logging to %s %s\n", ath_hal_logfile,
 			error == 0 ? "enabled" : "could not be setup");
 	} else {
@@ -216,111 +224,72 @@ sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 	ctl->data = &enable;
 	ctl->maxlen = sizeof(enable);
 	enable = (ath_hal_alq != NULL);
-        error = proc_dointvec(AH_SYSCTL_ARGS);
-        if (error || !write)
-                return error;
+	error = proc_dointvec(AH_SYSCTL_ARGS);
+	if (error || !write)
+		return error;
 	else
 		return ath_hal_setlogging(enable);
 }
 
-static struct ale *
-ath_hal_alq_get(struct ath_hal *ah)
+void ath_hal_logprintf(const char *fmt, ...)
+{
+	va_list ap;
+	struct ale *ale;
+	
+	if (!ath_hal_alq)
+		return;
+
+	ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
+	if (!ale) {
+		ath_hal_alq_lost++;
+		return;
+	}
+
+	memset(ale->ae_data, 0, MSG_MAXLEN);
+	va_start(ap, fmt);
+	vsnprintf(ale->ae_data, MSG_MAXLEN, fmt, ap);
+	va_end(ap);
+
+	alq_post(ath_hal_alq, ale);
+}
+EXPORT_SYMBOL(ath_hal_logprintf);
+
+static void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
 {
 	struct ale *ale;
 
-	if (ath_hal_alq_emitdev) {
-		ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
-		if (ale) {
-			struct athregrec *r =
-				(struct athregrec *) ale->ae_data;
-			r->op = OP_DEVICE;
-			r->reg = 0;
-			r->val = ah->ah_devid;
-			alq_post(ath_hal_alq, ale);
-			ath_hal_alq_emitdev = 0;
-		} else
-			ath_hal_alq_lost++;
-	}
+	if (!ath_hal_alq)
+		return;
+
 	ale = alq_get(ath_hal_alq, ALQ_NOWAIT);
-	if (!ale)
+	if (!ale) {
 		ath_hal_alq_lost++;
-	return ale;
-}
-
-void __ahdecl
-ath_hal_reg_write(struct ath_hal *ah, u_int32_t reg, u_int32_t val)
-{
-	if (ath_hal_alq) {
-		unsigned long flags;
-		struct ale *ale;
-
-		local_irq_save(flags);
-		ale = ath_hal_alq_get(ah);
-		if (ale) {
-			struct athregrec *r = (struct athregrec *) ale->ae_data;
-			r->op = OP_WRITE;
-			r->reg = reg;
-			r->val = val;
-			alq_post(ath_hal_alq, ale);
-		}
-		local_irq_restore(flags);
+		return;
 	}
-	_OS_REG_WRITE(ah, reg, val);
+
+	memset(ale->ae_data, 0, MSG_MAXLEN);
+	sprintf(ale->ae_data, "%s:0x%05x = 0x%08x - %s\n", (write ? "W" : "R"), reg, val, (ath_hal_func ?: "unknown"));
+	alq_post(ath_hal_alq, ale);
 }
-EXPORT_SYMBOL(ath_hal_reg_write);
 
-u_int32_t __ahdecl
-ath_hal_reg_read(struct ath_hal *ah, u_int32_t reg)
-{
-	u_int32_t val;
-
-	val = _OS_REG_READ(ah, reg);
-	if (ath_hal_alq) {
-		unsigned long flags;
-		struct ale *ale;
-
-		local_irq_save(flags);
-		ale = ath_hal_alq_get(ah);
-		if (ale) {
-			struct athregrec *r = (struct athregrec *) ale->ae_data;
-			r->op = OP_READ;
-			r->reg = reg;
-			r->val = val;
-			alq_post(ath_hal_alq, ale);
-		}
-		local_irq_restore(flags);
-	}
-	return val;
-}
-EXPORT_SYMBOL(ath_hal_reg_read);
-
-void __ahdecl
-OS_MARK(struct ath_hal *ah, u_int id, u_int32_t v)
-{
-	if (ath_hal_alq) {
-		unsigned long flags;
-		struct ale *ale;
-
-		local_irq_save(flags);
-		ale = ath_hal_alq_get(ah);
-		if (ale) {
-			struct athregrec *r = (struct athregrec *) ale->ae_data;
-			r->op = OP_MARK;
-			r->reg = id;
-			r->val = v;
-			alq_post(ath_hal_alq, ale);
-		}
-		local_irq_restore(flags);
-	}
-}
-EXPORT_SYMBOL(OS_MARK);
 #elif defined(AH_DEBUG) || defined(AH_REGOPS_FUNC)
+
+static void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
+{
+	if (!ah)
+		return;
+	ath_hal_printf(ah, "%s:0x%04x = 0x%08x - %s\n", (write ? "W" : "R"), reg, val, (ath_hal_func ?: "unknown"));
+}
+
+
 /*
  * Memory-mapped device register read/write.  These are here
  * as routines when debugging support is enabled and/or when
  * explicitly configured to use function calls.  The latter is
  * for architectures that might need to do something before
  * referencing memory (e.g. remap an i/o window).
+ *
+ * This should only be called while holding the lock, sc->sc_hal_lock.
  *
  * NB: see the comments in ah_osdep.h about byte-swapping register
  *     reads and writes to understand what's going on below.
@@ -330,12 +299,13 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 {
 #ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
-		ath_hal_printf(ah, "WRITE 0x%x <= 0x%x\n", reg, val);
+		ath_hal_logmsg(ah, 0, reg, val);
 #endif
 	_OS_REG_WRITE(ah, reg, val);
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
 
+/* This should only be called while holding the lock, sc->sc_hal_lock. */
 u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
@@ -344,14 +314,14 @@ ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 	val = _OS_REG_READ(ah, reg);
 #ifdef AH_DEBUG
 	if (ath_hal_debug > 1)
-		ath_hal_printf(ah, "READ 0x%x => 0x%x\n", reg, val);
+		ath_hal_logmsg(ah, 1, reg, val);
 #endif
 	return val;
 }
 EXPORT_SYMBOL(ath_hal_reg_read);
 #endif /* AH_DEBUG || AH_REGOPS_FUNC */
 
-#ifdef AH_DEBUG
+#if 0
 void __ahdecl
 HALDEBUG(struct ath_hal *ah, const char* fmt, ...)
 {
@@ -374,7 +344,7 @@ HALDEBUGn(struct ath_hal *ah, u_int level, const char* fmt, ...)
 		va_end(ap);
 	}
 }
-#endif /* AH_DEBUG */
+#endif /* 0 */
 
 /*
  * Delay n microseconds.
@@ -404,7 +374,7 @@ ath_hal_malloc(size_t size)
 	if (p)
 		OS_MEMZERO(p, size);
 	return p;
-		
+
 }
 
 void __ahdecl
@@ -451,7 +421,7 @@ static ctl_table ath_hal_sysctls[] = {
 	  .mode		= 0644,
 	  .proc_handler	= proc_dointvec
 	},
-	{ .ctl_name	= CTL_AUTO,	
+	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "sw_beacon_response_time",
 	  .mode		= 0644,
 	  .data		= &ath_hal_sw_beacon_response_time,
@@ -540,7 +510,7 @@ MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Atheros Hardware Access Layer (HAL)");
 MODULE_SUPPORTED_DEVICE("Atheros WLAN devices");
 #ifdef MODULE_VERSION
-MODULE_VERSION(ATH_HAL_VERSION);
+MODULE_VERSION(TARGET ": " ATH_HAL_VERSION);
 #endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Proprietary");
@@ -555,11 +525,18 @@ EXPORT_SYMBOL(ath_hal_computetxtime);
 EXPORT_SYMBOL(ath_hal_mhz2ieee);
 EXPORT_SYMBOL(ath_hal_process_noisefloor);
 
+#ifdef MMIOTRACE
+extern void (*kmmio_logmsg)(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val);
+#endif
+
 static int __init
 init_ath_hal(void)
 {
 	const char *sep;
 	int i;
+#ifdef MMIOTRACE
+	kmmio_logmsg = ath_hal_logmsg;
+#endif
 
 	printk(KERN_INFO "%s: %s (", dev_info, ath_hal_version);
 	sep = "";
@@ -576,6 +553,9 @@ module_init(init_ath_hal);
 static void __exit
 exit_ath_hal(void)
 {
+#ifdef MMIOTRACE
+	kmmio_logmsg = NULL;
+#endif
 	ath_hal_sysctl_unregister();
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
