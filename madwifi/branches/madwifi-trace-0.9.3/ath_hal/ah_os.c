@@ -83,7 +83,7 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 		if (!try_module_get(THIS_MODULE)) {
 			printk(KERN_WARNING "%s: try_module_get failed\n",
 					__func__);
-			_ath_hal_detach(ah);
+			ath_hal_detach(ah);
 			return NULL;
 		}
 #else
@@ -510,7 +510,7 @@ MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("Atheros Hardware Access Layer (HAL)");
 MODULE_SUPPORTED_DEVICE("Atheros WLAN devices");
 #ifdef MODULE_VERSION
-MODULE_VERSION(TARGET ": " ATH_HAL_VERSION);
+MODULE_VERSION(ATH_HAL_VERSION);
 #endif
 #ifdef MODULE_LICENSE
 MODULE_LICENSE("Proprietary");
