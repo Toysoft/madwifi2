@@ -44,7 +44,7 @@ typedef _Bool bool;
 void (*kmmio_logmsg)(void *ah, u8 write, u_int reg, u_int32_t val) = NULL;
 EXPORT_SYMBOL(kmmio_logmsg);
 
-struct {
+static struct {
 	unsigned long addr;
 	unsigned long ip;
 	enum reason_type type;
@@ -89,7 +89,7 @@ static inline void print_pte(unsigned long address)
 	       pte_val(*pte_offset_kernel(pmd, address)) & _PAGE_PRESENT);
 };
 
-void pre(struct kmmio_probe *p, struct pt_regs *regs, unsigned long addr)
+static void pre(struct kmmio_probe *p, struct pt_regs *regs, unsigned long addr)
 {
 	const unsigned long cpu = smp_processor_id();
 	const unsigned long instptr = instruction_pointer(regs);
@@ -177,7 +177,7 @@ void pre(struct kmmio_probe *p, struct pt_regs *regs, unsigned long addr)
 
 }
 
-void post(struct kmmio_probe *p, unsigned long condition, struct pt_regs *regs)
+static void post(struct kmmio_probe *p, unsigned long condition, struct pt_regs *regs)
 {
 	const unsigned long cpu = smp_processor_id();
 
