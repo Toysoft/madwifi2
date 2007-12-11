@@ -65,8 +65,8 @@ static struct mm_io_header_rw cpu_trace[NR_CPUS];
 /*#define MAX_EVENT_SIZE	256*/
 
 /* app data */
-static int suspended = 0;
-static struct proc_dir_entry *proc_marker_file;
+//static int suspended = 0;
+//static struct proc_dir_entry *proc_marker_file;
 
 /* module parameters */
 static unsigned long filter_offset = 0;
