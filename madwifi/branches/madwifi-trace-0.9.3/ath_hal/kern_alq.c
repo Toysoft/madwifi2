@@ -34,6 +34,7 @@
 #include <linux/uio.h>
 #include <linux/wait.h>
 #include <linux/sched.h>
+#include <linux/vmalloc.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
@@ -333,7 +334,7 @@ alq_open(struct alq **alqp, const char *file, int size, int count, int limit)
 		goto bad1;
 	}
 	memset(alq, 0, sizeof(*alq));
-	alq->aq_entbuf = kmalloc(count * size, GFP_KERNEL);
+	alq->aq_entbuf = vmalloc(count * size);
 	if (alq->aq_entbuf == NULL) {
 		printk("%s: no memory for alq entbuf\n", __func__);
 		error = -ENOMEM;
@@ -384,7 +385,7 @@ alq_open(struct alq **alqp, const char *file, int size, int count, int limit)
 bad4:
 	kfree(alq->aq_first);
 bad3:
-	kfree(alq->aq_entbuf);
+	vfree(alq->aq_entbuf);
 bad2:
 	kfree(alq);
 bad1:
@@ -521,7 +522,7 @@ alq_close(struct alq *alq)
 	/* XXX drop module refcnt */
 
 	kfree(alq->aq_first);
-	kfree(alq->aq_entbuf);
+	vfree(alq->aq_entbuf);
 	kfree(alq);
 }
 EXPORT_SYMBOL(alq_close);
