@@ -829,6 +829,12 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 */
 	sc->sc_hasveol = ath_hal_hasveol(ah);
 
+       /* Interference Mitigation causes problems with recevive sensitivity
+        * for OFDM rates when we are in non-STA modes. We will turn this
+        * capability off in non-STA VAPs
+        */
+       sc->sc_hasintmit = ath_hal_hasintmit(ah);
+
 	/* get mac address from hardware */
 	ath_hal_getmac(ah, ic->ic_myaddr);
 	if (sc->sc_hasbmask) {
@@ -1905,6 +1911,11 @@ ath_init(struct net_device *dev)
 
 	if (sc->sc_softled)
 		ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
+
+	/* Turn off Interference Mitigation in non-STA modes */
+	if ((sc->sc_opmode != HAL_M_STA) && sc->sc_hasintmit)
+		ath_hal_setintmit(ah, 0);
+
 	/*
 	 * This is needed only to setup initial state
 	 * but it's best done after a reset.
@@ -2155,6 +2166,11 @@ ath_reset(struct net_device *dev)
 	if (!ath_hal_reset(ah, sc->sc_opmode, &sc->sc_curchan, AH_TRUE, &status))
 		printk("%s: %s: unable to reset hardware: '%s' (HAL status %u)\n",
 			dev->name, __func__, ath_get_hal_status_desc(status), status);
+
+	/* Turn off Interference Mitigation in non-STA modes */
+	if ((sc->sc_opmode != HAL_M_STA) && sc->sc_hasintmit)
+		ath_hal_setintmit(ah, 0);
+
 	ath_update_txpow(sc);		/* update tx power state */
 	if (ath_startrecv(sc) != 0)	/* restart recv */
 		printk("%s: %s: unable to start recv logic\n",
@@ -7792,6 +7808,10 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		if (sc->sc_softled)
 			ath_hal_gpioCfgOutput(ah, sc->sc_ledpin);
 		
+		/* Turn off Interference Mitigation in non-STA modes */
+		if ((sc->sc_opmode != HAL_M_STA) && sc->sc_hasintmit)
+		ath_hal_setintmit(ah, 0);
+
 		sc->sc_curchan = hchan;
 		ath_update_txpow(sc);		/* update tx power state */
 
