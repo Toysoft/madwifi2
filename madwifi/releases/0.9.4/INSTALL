@@ -83,8 +83,9 @@ If the kernel was built outside the source directory, KERNELPATH should
 point to the output directory where .config is located, not to the
 sources.
 
-MadWifi currently provides three different rate control algorithms,
-ONOE, AMRR and SAMPLE.  SAMPLE is the most advanced one and is used by
+MadWifi currently provides four different rate control algorithms,
+ONOE, AMRR, SAMPLE and MINSTREL.  SAMPLE and MINSTREL are both very
+advanced, but MINSTREL is quite new.  Consequently, SAMPLE is used by
 default.  In order to make MadWifi use e.g. AMRR instead, you have to
 specify that as the module parameter e.g.
 

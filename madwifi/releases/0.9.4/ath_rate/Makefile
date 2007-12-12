@@ -4,7 +4,7 @@ endif
 
 TOP = $(obj)/..
 
-obj-y := amrr/ onoe/ sample/
+obj-y := amrr/ onoe/ sample/ minstrel/
 
 include $(TOP)/Makefile.inc
 
