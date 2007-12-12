@@ -571,7 +571,8 @@ struct ath_softc {
 			sc_rtasksched:1, 	/* radar task is scheduled */
 			sc_dfswait:1,    	/* waiting on channel for radar detect */
 			sc_dfstest:1,		/* Test timer in progress */
-		        sc_ackrate:1;           /* send acks at high bitrate */
+			sc_ackrate:1,           /* send acks at high bitrate */
+			sc_hasintmit:1;         /* Has interference mitigation */
 	/* rate tables */
 	const HAL_RATE_TABLE *sc_rates[IEEE80211_MODE_MAX];
 	const HAL_RATE_TABLE *sc_currates;	/* current rate table */
@@ -1023,5 +1024,11 @@ void ath_sysctl_unregister(void);
 	((*(_ah)->ah_radarWait)((_ah), (_chan)))
 #define ath_hal_get_channel_noise(_ah, _chan) \
 	((*(_ah)->ah_getChanNoise)((_ah), (_chan)))
+#define ath_hal_hasintmit(_ah) \
+	(ath_hal_getcapability(_ah, HAL_CAP_INTMIT, 0, NULL) == HAL_OK)
+#define ath_hal_getintmit(_ah, _dst) \
+	ath_hal_getcapability(_ah, HAL_CAP_INTMIT, 1, _dst)
+#define ath_hal_setintmit(_ah, _v) \
+	ath_hal_setcapability(ah, HAL_CAP_INTMIT, 1, _v, NULL)
 
 #endif /* _DEV_ATH_ATHVAR_H */
