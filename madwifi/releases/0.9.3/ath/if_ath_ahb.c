@@ -470,9 +470,8 @@ init_ahb(void)
 /*
  * Module glue.
  */
-#include "version.h"
 #include "release.h"
-static char *version = ATH_PCI_VERSION " (" RELEASE_VERSION ")";
+static char *version = RELEASE_VERSION;
 static char *dev_info = "ath_ahb";
 
 #include <linux/ethtool.h>
