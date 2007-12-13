@@ -470,7 +470,7 @@ module_param(ieee80211_debug, int, 0600);
 MODULE_PARM_DESC(ieee80211_debug, "Load-time 802.11 debug output enable");
 #endif /* defined(AR_DEBUG) */
 
-atomic_t ath_buf_counter = ATOMIC_INIT(0);
+static atomic_t ath_buf_counter = ATOMIC_INIT(0);
 
 #define ATH_SETUP_XR_VAP(sc,vap,rfilt)						\
 	do {									\
