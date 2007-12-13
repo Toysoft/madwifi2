@@ -130,6 +130,10 @@
 #define __iomem
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)
+#define IRQF_SHARED SA_SHIRQ
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
 #include <linux/skbuff.h>
 static inline unsigned char *skb_end_pointer(const struct sk_buff *skb)
