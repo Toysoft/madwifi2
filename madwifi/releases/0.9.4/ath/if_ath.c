@@ -8754,10 +8754,10 @@ ath_update_txpow(struct ath_softc *sc)
 	ic->ic_newtxpowlimit = sc->sc_curtxpow = clamped_txpow;
 
 #ifdef ATH_CAP_TPC
-	if (ic->ic_newtxpowlimit >= ic->ic_txpowlimit)
+	if (ic->ic_newtxpowlimit >= txpowlimit)
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 #else
-	if (ic->ic_newtxpowlimit != ic->ic_txpowlimit)
+	if (ic->ic_newtxpowlimit != txpowlimit)
 		ath_hal_settxpowlimit(ah, ic->ic_newtxpowlimit);
 #endif
 }
