@@ -102,6 +102,11 @@
 
 #define AR531X_BD_MAGIC 0x35333131   /* "5311", for all 531x platforms */
 
+#ifndef __mips__
+#define dma_cache_wback_inv(start,size)	\
+	do { (void) (start); (void) (size); } while (0)
+#endif
+
 /* set bus cachesize in 4B word units */
 static __inline void bus_dma_sync_single(void *hwdev, dma_addr_t dma_handle,
 	size_t size, int direction)
