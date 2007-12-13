@@ -469,7 +469,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				th->wt_pad = 0;
 
 				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
-					th->wt_txflags |= IEEE80211_RADIOTAP_F_TX_FAIL;
+					th->wt_txflags |= cpu_to_le16(IEEE80211_RADIOTAP_F_TX_FAIL);
 				
 				th->wt_dataretries = ds->ds_txstat.ts_shortretry + ds->ds_txstat.ts_longretry;
 				
