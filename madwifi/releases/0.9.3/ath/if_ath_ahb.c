@@ -392,7 +392,7 @@ static int ahb_wmac_probe(struct platform_device *pdev)
 	struct ar531x_config *config;
 
 	config = (struct ar531x_config *) pdev->dev.platform_data;
-	devid = (u32) config->tag;
+	devid = (long) config->tag;
 	config->tag = NULL;
 	
 	return init_ath_wmac((u_int16_t) devid, pdev->id, config);
