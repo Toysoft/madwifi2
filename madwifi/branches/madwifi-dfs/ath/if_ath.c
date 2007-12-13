@@ -2491,10 +2491,7 @@ ath_stop_locked(struct net_device *dev)
 		}
 		ath_draintxq(sc);
 		if (!sc->sc_invalid) {
-			preempt_disable();
 			ath_stoprecv(sc);
-			ath_hal_phydisable(ah);
-			preempt_enable_no_resched();
 		} else
 			sc->sc_rxlink = NULL;
 		ath_beacon_free(sc);		/* XXX needed? */
