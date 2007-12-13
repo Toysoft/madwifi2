@@ -267,7 +267,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	wh->i_dur = 0;
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
-	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
+	IEEE80211_ADDR_COPY(wh->i_addr3,  vap->iv_bss->ni_bssid);
 	*(u_int16_t *)wh->i_seq = 0;
 
 	return skb;
@@ -283,11 +283,16 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
+	struct ieee80211_frame * wh = (struct ieee80211_frame *) skb->data;
 	int len_changed = 0;
 	u_int16_t capinfo;
 
 	IEEE80211_LOCK(ic);
 
+	/* After an IBSS merge, bssid might have been updated */
+	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bss->ni_bssid);
+
+	/* Check if we need to change channel right now */
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
 	    (vap->iv_flags & IEEE80211_F_CHANSWITCH) &&
 	    (vap->iv_chanchange_count == ic->ic_chanchange_tbtt)) {
