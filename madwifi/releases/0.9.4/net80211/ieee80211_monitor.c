@@ -465,8 +465,14 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			
 				th->wt_flags = 0;
 				th->wt_rate = sc->sc_hwmap[ds->ds_txstat.ts_rate].ieeerate;
-				th->wt_txpower = 0;
 				th->wt_antenna = ds->ds_txstat.ts_antenna;
+				th->wt_pad = 0;
+
+				if (ds->ds_txstat.ts_status & HAL_TXERR_XRETRY)
+					th->wt_txflags |= IEEE80211_RADIOTAP_F_TX_FAIL;
+				
+				th->wt_dataretries = ds->ds_txstat.ts_shortretry + ds->ds_txstat.ts_longretry;
+				
 			} else {
 				struct ath_rx_radiotap_header *th;
 				if (skb_headroom(skb1) < sizeof(struct ath_rx_radiotap_header)) {

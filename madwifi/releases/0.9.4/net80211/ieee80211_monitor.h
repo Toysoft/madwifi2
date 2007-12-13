@@ -119,34 +119,37 @@ typedef struct {
         0)
 
 struct ath_rx_radiotap_header {
-        struct ieee80211_radiotap_header wr_ihdr;
-	__le64 wr_tsft;
-        u_int8_t wr_flags;
-        u_int8_t wr_rate;
-        __le16 wr_chan_freq;
-        __le16 wr_chan_flags;
-	int8_t  wr_dbm_antsignal;
-	int8_t  wr_dbm_antnoise;
-        u_int8_t wr_antenna;
-        u_int8_t wr_antsignal;
+	struct ieee80211_radiotap_header wr_ihdr;
+	__le64		wr_tsft;
+	u_int8_t	wr_flags;
+	u_int8_t	wr_rate;
+	__le16		wr_chan_freq;
+	__le16		wr_chan_flags;
+	int8_t		wr_dbm_antsignal;
+	int8_t		wr_dbm_antnoise;
+	u_int8_t	wr_antenna;
+	u_int8_t	wr_antsignal;
 }__attribute__((__packed__));
 
 #define ATH_TX_RADIOTAP_PRESENT (               \
 	(1 << IEEE80211_RADIOTAP_TSFT)		| \
         (1 << IEEE80211_RADIOTAP_FLAGS)         | \
         (1 << IEEE80211_RADIOTAP_RATE)          | \
-        (1 << IEEE80211_RADIOTAP_DBM_TX_POWER)  | \
         (1 << IEEE80211_RADIOTAP_ANTENNA)       | \
+	(1 << IEEE80211_RADIOTAP_TX_FLAGS)	| \
+	(1 << IEEE80211_RADIOTAP_DATA_RETRIES)	| \
         0)
 
 struct ath_tx_radiotap_header {
-        struct ieee80211_radiotap_header wt_ihdr;
-	__le64 wt_tsft;
-        u_int8_t wt_flags;	
-        u_int8_t wt_rate;
-        u_int8_t wt_txpower;
-        u_int8_t wt_antenna;
-};
+	struct ieee80211_radiotap_header wt_ihdr;
+	__le64		wt_tsft;
+	u_int8_t	wt_flags;	
+	u_int8_t	wt_rate;
+	u_int8_t	wt_antenna;
+	u_int8_t	wt_pad;
+	__le16		wt_txflags;
+	u_int8_t	wt_dataretries;
+}__attribute__((__packed__));
 
 /*
  * Dispatch an skb to monitor-mode vap's.  The skb is assumed
