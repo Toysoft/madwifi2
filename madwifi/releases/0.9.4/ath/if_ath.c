@@ -7076,6 +7076,22 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, struct ath_buf *
 	} else
 		antenna = sc->sc_txantenna;
 
+	if (txrate == 0) {
+		/* Drop frame, if the rate is 0.
+		 * Otherwise this may lead to the continuous transmission of
+		 * noise. */
+		printk("%s: invalid TX rate %u (%s: %u)\n", dev->name,
+			txrate, __func__, __LINE__);
+		return -EIO;
+	}
+
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: set up txdesc: pktlen %d hdrlen %d "
+		"atype %d txpower %d txrate %d try0 %d keyix %d ant %d flags %x "
+		"ctsrate %d ctsdur %d icvlen %d ivlen %d comp %d\n",
+		__func__, pktlen, hdrlen, atype, MIN(ni->ni_txpower, 60), txrate,
+		try0, keyix, antenna, flags, ctsrate, ctsduration, icvlen, ivlen,
+		comp);
+
 	/*
 	 * Formulate first tx descriptor with tx controls.
 	 */
