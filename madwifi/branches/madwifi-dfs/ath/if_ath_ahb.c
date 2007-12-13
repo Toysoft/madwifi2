@@ -250,7 +250,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 	sc->aps_sc.sc_iobase = (void __iomem *) dev->mem_start;
 	sc->aps_sc.sc_bdev = NULL;
 
-	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
+	if (request_irq(dev->irq, ath_intr, IRQF_SHARED, dev->name, dev)) {
 		printk(KERN_WARNING "%s: request_irq failed\n", dev->name);
 		goto bad3;
 	}
@@ -306,9 +306,8 @@ static struct platform_driver ahb_wmac_driver = {
 /*
  * Module glue.
  */
-#include "version.h"
 #include "release.h"
-static char *version = ATH_PCI_VERSION " (" RELEASE_VERSION ")";
+static char *version = RELEASE_VERSION;
 static char *dev_info = "ath_ahb";
 
 #include <linux/ethtool.h>
