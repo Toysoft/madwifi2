@@ -41,7 +41,7 @@
  * module.  It should automatically run all test cases and print
  * information for each.  To run one or more tests you can specify a
  * tests parameter to the module that is a bit mask of the set of tests
- * you want; e.g. insmod ccmp_test tests=7 will run only test mpdu's
+ * you want; e.g. insmod ccmp_test tests=7 will run only test MPDUs
  * 1, 2, and 3.
  */
 #ifndef AUTOCONF_INCLUDED
@@ -99,10 +99,10 @@ static const u_int8_t test1_key[] = {		/* TK */
 static const u_int8_t test1_plaintext[] = {	/* Plaintext MPDU w/o MIC */
 	0x08, 0x48, 0xc3, 0x2c, 0x0f, 0xd2, 0xe1, 0x28,	/* 802.11 Header */
 	0xa5, 0x7c, 0x50, 0x30, 0xf1, 0x84, 0x44, 0x08,
-	0xab, 0xae, 0xa5, 0xb8, 0xfc, 0xba, 0x80, 0x33, 
+	0xab, 0xae, 0xa5, 0xb8, 0xfc, 0xba, 0x80, 0x33,
 	0xf8, 0xba, 0x1a, 0x55, 0xd0, 0x2f, 0x85, 0xae,	/* Plaintext Data */
 	0x96, 0x7b, 0xb6, 0x2f, 0xb6, 0xcd, 0xa8, 0xeb,
-	0x7e, 0x78, 0xa0, 0x50, 
+	0x7e, 0x78, 0xa0, 0x50,
 };
 static const u_int8_t test1_encrypted[] = {	/* Encrypted MPDU with MIC */
 	0x08, 0x48, 0xc3, 0x2c, 0x0f, 0xd2, 0xe1, 0x28,
@@ -528,7 +528,7 @@ static const u_int8_t test8_encrypted[] = {	/* Encrypted MPDU with MIC */
 	test##n##_encrypted, sizeof(test##n##_encrypted) \
 }
 
-struct ciphertest {
+static struct ciphertest {
 	const char	*name;
 	int		cipher;
 	int		keyix;
@@ -555,7 +555,7 @@ dumpdata(const char *tag, const void *p, size_t len)
 {
 	int i;
 
-	printk("%s: 0x%p len %u", tag, p, len);
+	printk("%s: 0x%p len %zu", tag, p, len);
 	for (i = 0; i < len; i++) {
 		if ((i % 16) == 0)
 			printk("\n%03d:", i);
@@ -578,32 +578,39 @@ cmpfail(const void *gen, size_t genlen, const void *ref, size_t reflen)
 	dumpdata("Reference", ref, reflen);
 }
 
-int
-runtest(struct ieee80211com *ic, struct ciphertest *t)
+static int
+runtest(struct ieee80211vap *vap, struct ciphertest *t)
 {
-	struct ieee80211_key key;
+	struct ieee80211_key *key;
 	struct sk_buff *skb = NULL;
 	const struct ieee80211_cipher *cip;
 	u_int8_t mac[IEEE80211_ADDR_LEN];
+	int hdrlen;
 
 	printk("%s: ", t->name);
+
+	if (!ieee80211_crypto_available(t->cipher)) {
+		printk("FAIL: ieee80211_crypto_available failed\n");
+		return 0;
+	}
 
 	/*
 	 * Setup key.
 	 */
-	memset(&key, 0, sizeof(key));
-	key.wk_flags = IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV;
-	key.wk_cipher = &ieee80211_cipher_none;
-	if (!ieee80211_crypto_newkey(ic, t->cipher, &key)) {
+	key = &vap->iv_nw_keys[t->keyix];
+	key->wk_keyix = t->keyix;
+	if (!ieee80211_crypto_newkey(vap, t->cipher,
+				     IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV,
+				     key)) {
 		printk("FAIL: ieee80211_crypto_newkey failed\n");
 		goto bad;
 	}
 
-	memcpy(key.wk_key, t->key, t->key_len);
-	key.wk_keylen = t->key_len;
-	key.wk_keyrsc = 0;
-	key.wk_keytsc = t->pn - 1;	/* PN-1 since we do encap */
-	if (!ieee80211_crypto_setkey(ic, &key, mac)) {
+	memcpy(key->wk_key, t->key, t->key_len);
+	key->wk_keylen = t->key_len;
+	memset(key->wk_keyrsc, 0, sizeof(key->wk_keyrsc));
+	key->wk_keytsc = t->pn - 1;	/* PN-1 since we do encap */
+	if (!ieee80211_crypto_setkey(vap, key, mac, NULL)) {
 		printk("FAIL: ieee80211_crypto_setkey failed\n");
 		goto bad;
 	}
@@ -611,7 +618,7 @@ runtest(struct ieee80211com *ic, struct ciphertest *t)
 	/*
 	 * Craft frame from plaintext data.
 	 */
-	cip = key.wk_cipher;
+	cip = key->wk_cipher;
 	skb = dev_alloc_skb(t->plaintext_len +
 		cip->ic_header + cip->ic_trailer);
 	if (skb == NULL) {
@@ -624,7 +631,7 @@ runtest(struct ieee80211com *ic, struct ciphertest *t)
 	/*
 	 * Encrypt frame w/ MIC.
 	 */
-	if (!(*cip->ic_encap)(&key, skb, t->keyix << 6)) {
+	if (!(*cip->ic_encap)(key, skb, t->keyix << 6)) {
 		printk("FAIL: ccmp encap failed\n");
 		goto bad;
 	}
@@ -647,7 +654,8 @@ runtest(struct ieee80211com *ic, struct ciphertest *t)
 	/*
 	 * Decrypt frame; strip MIC.
 	 */
-	if (!(*cip->ic_decap)(&key, skb)) {
+	hdrlen = ieee80211_hdrspace(vap->iv_ic, skb->data);
+	if (!(*cip->ic_decap)(key, skb, hdrlen)) {
 		printk("FAIL: ccmp decap failed\n");
 		cmpfail(skb->data, skb->len,
 			t->plaintext, t->plaintext_len);
@@ -668,13 +676,13 @@ runtest(struct ieee80211com *ic, struct ciphertest *t)
 		goto bad;
 	}
 	dev_kfree_skb(skb);
-	ieee80211_crypto_delkey(ic, &key);
+	ieee80211_crypto_delkey(vap, key, NULL);
 	printk("PASS\n");
 	return 1;
 bad:
 	if (skb != NULL)
 		dev_kfree_skb(skb);
-	ieee80211_crypto_delkey(ic, &key);
+	ieee80211_crypto_delkey(vap, key, NULL);
 	return 0;
 }
 
@@ -688,36 +696,46 @@ MODULE_LICENSE("Dual BSD/GPL");
 #endif
 
 static int tests = -1;
-MODULE_PARM(tests, "i");
-MODULE_PARM_DESC(tests, "Specify which tests to run");
-
 static int debug = 0;
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
+MODULE_PARM(tests, "i");
 MODULE_PARM(debug, "i");
+#else
+#include <linux/moduleparam.h>
+module_param(tests, int, 0600);
+module_param(debug, int, 0600);
+#endif
+
+MODULE_PARM_DESC(tests, "Specify which tests to run");
 MODULE_PARM_DESC(debug, "Enable IEEE80211_MSG_CRYPTO");
 
 static int __init
 init_crypto_ccmp_test(void)
 {
-#define	N(a)	(sizeof(a)/sizeof(a[0]))
 	struct ieee80211com ic;
+	struct ieee80211vap vap;
 	int i, pass, total;
 
 	memset(&ic, 0, sizeof(ic));
+	memset(&vap, 0, sizeof(vap));
+	vap.iv_ic = &ic;
 	if (debug)
-		ic.msg_enable = IEEE80211_MSG_CRYPTO;
+		vap.iv_debug = IEEE80211_MSG_CRYPTO;
 	ieee80211_crypto_attach(&ic);
+	ieee80211_crypto_vattach(&vap);
 
 	pass = 0;
 	total = 0;
-	for (i = 0; i < N(ccmptests); i++)
+	for (i = 0; i < ARRAY_SIZE(ccmptests); i++)
 		if (tests & (1 << i)) {
 			total++;
-			pass += runtest(&ic, &ccmptests[i]);
+			pass += runtest(&vap, &ccmptests[i]);
 		}
 	printk("%u of %u 802.11i AES-CCMP test vectors passed\n", pass, total);
+	ieee80211_crypto_vdetach(&vap);
 	ieee80211_crypto_detach(&ic);
-	return (pass == total ? 0 : -1);
-#undef N
+	return (pass == total ? 0 : -ENXIO);
 }
 module_init(init_crypto_ccmp_test);
 
