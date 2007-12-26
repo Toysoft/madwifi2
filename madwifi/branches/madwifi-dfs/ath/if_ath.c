@@ -6112,22 +6112,38 @@ done:
  * including those belonging to other BSS.
  */
 static void
-ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
+ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 	struct sk_buff *skb, int subtype, int rssi, u_int64_t rtsf)
 {
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
-	struct ieee80211_node * ni = ni_or_null;
+	struct ieee80211_node * ni_tmp;
 	u_int64_t hw_tsf, beacon_tsf;
 	u_int32_t hw_tu, beacon_tu, intval;
 	int do_merge = 0;
 
-	if (ni_or_null == NULL)
-		ni = vap->iv_bss;
+	ni_tmp = (ni != NULL) ? ni : vap->iv_bss;
+
+	DPRINTF(sc, ATH_DEBUG_BEACON,
+		"%s: vap:%p[" MAC_FMT "] ni:%p[" MAC_FMT "]\n",
+		__func__, vap, MAC_ADDR(vap->iv_bss->ni_bssid),
+		ni, MAC_ADDR(ni_tmp->ni_macaddr));
 
 	/*Call up first so subsequent work can use information
 	 * potentially stored in the node (e.g. for ibss merge). */
 
-	sc->sc_recv_mgmt(vap, ni_or_null, skb, subtype, rssi, rtsf);
+	sc->sc_recv_mgmt(vap, ni, skb, subtype, rssi, rtsf);
+
+
+	/* Lookup the new node if any (this grabs a reference to it) */
+
+	ni = ieee80211_find_rxnode(vap->iv_ic,
+	         (const struct ieee80211_frame_min *)skb->data);
+	if (ni == NULL) {
+		DPRINTF(sc, ATH_DEBUG_BEACON,
+			"%s: unknown node\n", __func__);
+		return;
+	}
+
 	switch (subtype) {
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* update RSSI statistics for use by the HAL */
@@ -6148,15 +6164,6 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 
 			/* Don't merge if we have a desired BSSID */
 			if (vap->iv_flags & IEEE80211_F_DESBSSID)
-				break;
-
-			/* To handle IBSS merge, we need the struct
-			 * ieee80211_node which has been updated with the
-			 * BSSID and TSF from the last beacon */
-			ni = ieee80211_find_rxnode(ni->ni_ic,
-					(const struct ieee80211_frame_min *)
-					skb->data);
-			if (ni == NULL)
 				break;
 
 			/* Handle IBSS merge as needed; check the TSF on the 
@@ -6182,7 +6189,7 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 					rtsf, rtsf - beacon_tsf,
 					hw_tsf, hw_tsf - beacon_tsf);
 
-			if (rtsf < beacon_tsf) {
+			if (beacon_tsf > rtsf) {
 				DPRINTF(sc, ATH_DEBUG_BEACON,
 						"ibss merge: rtsf %10llx "
 						"beacon's tsf %10llx\n",
@@ -6228,6 +6235,8 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 		}
 		break;
 	}
+
+	ieee80211_unref_node(&ni);
 }
 
 static void
@@ -6452,6 +6461,27 @@ rx_accept:
 			ieee80211_dump_pkt(ic, skb->data, skb->len,
 				   sc->sc_hwmap[rs->rs_rate].ieeerate,
 				   rs->rs_rssi);
+
+		{
+			struct ieee80211_frame * wh = 
+				(struct ieee80211_frame *) skb->data;
+
+			/* only print beacons */
+
+			if ((skb->len >= sizeof(struct ieee80211_frame)) &&
+			    ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK)
+			     == IEEE80211_FC0_TYPE_MGT) &&
+			    ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK)
+			     == IEEE80211_FC0_SUBTYPE_BEACON)) {
+
+				DPRINTF(sc, ATH_DEBUG_BEACON,
+					"%s: RA:" MAC_FMT " TA:" MAC_FMT
+					" BSSID:" MAC_FMT "\n",
+					__func__, MAC_ADDR(wh->i_addr1),
+					MAC_ADDR(wh->i_addr2),
+					MAC_ADDR(wh->i_addr3));
+			}
+		}
 
 		/*
 		 * Locate the node for sender, track state, and then
@@ -8831,6 +8861,10 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 	if (stamode && nstate == IEEE80211_S_RUN) {
 		sc->sc_curaid = ni->ni_associd;
 		IEEE80211_ADDR_COPY(sc->sc_curbssid, ni->ni_bssid);
+		DPRINTF(sc, ATH_DEBUG_BEACON,
+			"%s: sc_curbssid " MAC_FMT " from " MAC_FMT "\n",
+			__func__, MAC_ADDR(sc->sc_curbssid),
+			MAC_ADDR(ni->ni_macaddr));
 	} else
 		sc->sc_curaid = 0;
 
@@ -8839,8 +8873,12 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 sc->sc_curaid);
 
 	ath_hal_setrxfilter(ah, rfilt);
-	if (stamode)
+	if (stamode) {
+		DPRINTF(sc, ATH_DEBUG_BEACON,
+			"%s: setassocid " MAC_FMT "\n",
+			__func__, MAC_ADDR(sc->sc_curbssid));
 		ath_hal_setassocid(ah, sc->sc_curbssid, sc->sc_curaid);
+	}
 
 	if ((vap->iv_opmode != IEEE80211_M_STA) &&
 		 (vap->iv_flags & IEEE80211_F_PRIVACY)) {
