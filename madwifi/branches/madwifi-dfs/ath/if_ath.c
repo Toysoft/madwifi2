@@ -6116,17 +6116,15 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 	struct sk_buff *skb, int subtype, int rssi, u_int64_t rtsf)
 {
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
-	struct ieee80211_node * ni_tmp;
+	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 	u_int64_t hw_tsf, beacon_tsf;
 	u_int32_t hw_tu, beacon_tu, intval;
 	int do_merge = 0;
 
-	ni_tmp = (ni != NULL) ? ni : vap->iv_bss;
-
 	DPRINTF(sc, ATH_DEBUG_BEACON,
 		"%s: vap:%p[" MAC_FMT "] ni:%p[" MAC_FMT "]\n",
 		__func__, vap, MAC_ADDR(vap->iv_bss->ni_bssid),
-		ni, MAC_ADDR(ni_tmp->ni_macaddr));
+		ni, MAC_ADDR(wh->i_addr2));
 
 	/*Call up first so subsequent work can use information
 	 * potentially stored in the node (e.g. for ibss merge). */
