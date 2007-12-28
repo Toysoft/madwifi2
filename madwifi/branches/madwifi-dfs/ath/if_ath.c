@@ -4426,6 +4426,8 @@ ath_beacon_alloc_internal(struct ath_softc *sc, struct ieee80211_node *ni)
 	struct ath_buf *bf;
 	struct sk_buff *skb;
 
+	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: in\n", __func__);
+
 	/*
 	 * release the previous beacon's skb if it already exists.
 	 */
@@ -4482,6 +4484,8 @@ ath_beacon_alloc_internal(struct ath_softc *sc, struct ieee80211_node *ni)
 		skb->data, skb->len, BUS_DMA_TODEVICE);
 	bf->bf_skb = skb;
 
+	DPRINTF(sc, ATH_DEBUG_BEACON, "%s: out\n", __func__);
+
 	return 0;
 }
 
@@ -4510,7 +4514,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	u_int8_t rix, rate;
 	unsigned int ctsrate = 0, ctsduration = 0;
 
-	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: m %p len %u\n",
+	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: skbaddr %p len %u\n",
 		__func__, skb, skb->len);
 
 	/* setup descriptors */
@@ -5046,7 +5050,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			 * of the current TSF. Otherwise, we use the
 			 * next beacon timestamp again */
 
-			nexttbtt = roundup(hw_tsftu +1, intval);
+			nexttbtt = roundup(hw_tsftu + 1, intval);
 			while (nexttbtt <= hw_tsftu + FUDGE) {
 				nexttbtt += intval;
 			}
@@ -5189,7 +5193,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			 * SWBA interrupts to prepare beacon frames.
 			 */
 			intval |= HAL_BEACON_ENA;
-			sc->sc_imask |= HAL_INT_SWBA;	/* beacon prepare */
+			sc->sc_imask |= HAL_INT_SWBA;
 			ath_beaconq_config(sc);
 		}
 #ifdef ATH_SUPERG_DYNTURBO
@@ -5206,7 +5210,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	}
 #undef TSF_TO_TU
 
-	ath_beacon_config_debug:
+ath_beacon_config_debug:
 	/* We print all debug messages here, in order to preserve the
 	 * time critical aspect of this function */
 	DPRINTF(sc, ATH_DEBUG_BEACON,
@@ -5215,21 +5219,24 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 
 	if (reset_tsf) {
 		/* We just created the interface */
-		DPRINTF(sc, ATH_DEBUG_BEACON, "%s: first beacon\n",__func__);
+		DPRINTF(sc, ATH_DEBUG_BEACON, "%s: first beacon\n", __func__);
 	} else {
 		if (tsf == 1) {
-			/* We do not receive any beacons or probe response */
+			/* We did not receive any beacons or probe response */
 			DPRINTF(sc, ATH_DEBUG_BEACON,
-				"%s: no beacon received...\n",__func__);
+				"%s: no beacon received...\n", __func__);
 		} else {
 			if (tsf > hw_tsf) {
-			  /* We do receive a beacon and the hw TSF has not been updated */
+			  /* We did receive a beacon but the hw TSF has not been updated
+			   * - must have been a different BSSID */
 				DPRINTF(sc, ATH_DEBUG_BEACON,
-					"%s: beacon received, but TSF is incorrect\n",__func__);
+					"%s: beacon received, but TSF has not "
+					"been updated\n", __func__);
 			} else {
-			  /* We do receive a beacon in the past, normal case */
+			  /* We did receive a beacon, normal case */
 				DPRINTF(sc, ATH_DEBUG_BEACON,
-					"%s: beacon received, TSF is correct\n",__func__);
+					"%s: beacon received, TSF and timers "
+					"synchronized\n", __func__);
 			}
 		}
 	}
@@ -6146,14 +6153,15 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* update RSSI statistics for use by the HAL */
 		ATH_RSSI_LPF(ATH_NODE(ni)->an_halstats.ns_avgbrssi, rssi);
-		if ((sc->sc_syncbeacon || 
-				 (vap->iv_flags_ext & IEEE80211_FEXT_APPIE_UPDATE)) &&
-				ni == vap->iv_bss && vap->iv_state == IEEE80211_S_RUN) {
-			/* Resync beacon timers using the TSF of the
+		if ((sc->sc_syncbeacon ||
+		    (vap->iv_flags_ext & IEEE80211_FEXT_APPIE_UPDATE)) &&
+		     ni == vap->iv_bss && vap->iv_state == IEEE80211_S_RUN) {
+			/* Resync beacon timers using the tsf of the
 			 * beacon frame we just received. */
-
 			vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;
 			ath_beacon_config(sc, vap);
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"%s updated beacon timers\n", __func__);
 		}
 		/* NB: Fall Through */
 	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
@@ -6164,13 +6172,13 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 			if (vap->iv_flags & IEEE80211_F_DESBSSID)
 				break;
 
-			/* Handle IBSS merge as needed; check the TSF on the 
-			 * frame before attempting the merge. The 802.11 spec. 
-			 * says the station should change its BSSID to match 
-			 * the oldest station with the same SSID, where oldest 
-			 * is determined by the TSF. Note that hardware 
-			 * reconfiguration happens through callback to 
-			 * ath_newstate as the state machine will go from 
+			/* Handle IBSS merge as needed; check the TSF on the
+			 * frame before attempting the merge. The 802.11 spec.
+			 * says the station should change its BSSID to match
+			 * the oldest station with the same SSID, where oldest
+			 * is determined by the TSF. Note that hardware
+			 * reconfiguration happens through callback to
+			 * ath_newstate as the state machine will go from
 			 * RUN -> RUN when this happens. */
 
 			hw_tsf = ath_hal_gettsf64(sc->sc_ah);
@@ -7811,6 +7819,22 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni,
 	} else
 		antenna = sc->sc_txantenna;
 
+	if (txrate == 0) {
+		/* Drop frame, if the rate is 0.
+		 * Otherwise this may lead to the continuous transmission of
+		 * noise. */
+		printk("%s: invalid TX rate %u (%s: %u)\n", DEV_NAME(dev),
+			txrate, __func__, __LINE__);
+		return -EIO;
+	}
+	
+	DPRINTF(sc, ATH_DEBUG_XMIT, "%s: set up txdesc: pktlen %d hdrlen %d "
+		"atype %d txpower %d txrate %d try0 %d keyix %d ant %d flags %x "
+		"ctsrate %d ctsdur %d icvlen %d ivlen %d comp %d\n",
+		__func__, pktlen, hdrlen, atype, MIN(ni->ni_txpower, 60), txrate,
+		try0, keyix, antenna, flags, ctsrate, ctsduration, icvlen, ivlen,
+		comp);
+
 	/*
 	 * Formulate first tx descriptor with tx controls.
 	 */
@@ -7842,6 +7866,18 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni,
 	if (try0 != ATH_TXMAXTRY) {
 		sc->sc_rc->ops->get_mrr(sc, an, shortPreamble, skb->len, rix,
 					&mrr);
+		/* Explicitly disable retries, if the retry rate is 0.
+		 * Otherwise this may lead to the continuous transmission of
+		 * noise. */
+		if (!mrr.rate1) mrr.retries1 = 0;
+		if (!mrr.rate2) mrr.retries2 = 0;
+		if (!mrr.rate3) mrr.retries3 = 0;
+
+		DPRINTF(sc, ATH_DEBUG_XMIT, "%s: set up multi rate/retry "
+			"1:%d/%d 2:%d/%d 3:%d/%d\n", __func__,
+			mrr.rate1, mrr.retries1, mrr.rate2, mrr.retries2,
+			mrr.rate3, mrr.retries3);
+
 		ath_hal_setupxtxdesc(sc->sc_ah, ds, mrr.rate1, mrr.retries1,
 				     mrr.rate2, mrr.retries2,
 				     mrr.rate3, mrr.retries3);
@@ -9003,11 +9039,10 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		sc->sc_halstats.ns_avgtxrssi = ATH_RSSI_DUMMY_MARKER;
 		/* if it is a DFS channel and has not been checked for radar
 		 * do not let the 80211 state machine to go to RUN state. */
-		if (sc->sc_dfs_cac
-		    && IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
+		if (sc->sc_dfs_cac && 
+				IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
-				"%s: VAP -> DFSWAIT_PENDING \n",
-				__func__);
+				"%s: VAP -> DFSWAIT_PENDING \n", __func__);
 			/* start calibration timer with a really small value 1/10 sec */
 			mod_timer(&sc->sc_cal_ch, jiffies + (HZ/10));
 			/* wake the receiver */
@@ -9139,13 +9174,13 @@ ath_dfs_channel_check_completed(unsigned long data )
 				/* re alloc beacons to update new channel info */
 				error = ath_beacon_alloc(sc, vap->iv_bss);
 				if (error < 0) {
-					printk(KERN_ERR "beacon alloc failed: %d\n", error);
+					printk(KERN_ERR "beacon alloc "
+							"failed: %d\n", error);
 					return;
 				}
 				if (!sc->sc_beacons &&
-				    vap->iv_opmode != IEEE80211_M_WDS) {
+				    (vap->iv_opmode != IEEE80211_M_WDS))
 					sc->sc_beacons = 1;
-				}
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
 #ifdef ATH_SUPERG_XR
 				if (vap->iv_flags & IEEE80211_F_XR ) {
@@ -12486,6 +12521,7 @@ ath_return_txbuf_locked(struct ath_softc *sc, struct ath_buf **bf)
 {
 	struct ath_buf *bfaddr;
 	ATH_TXBUF_LOCK_ASSERT(sc);
+
 	if ((bf == NULL) || ((*bf) == NULL)) 
 		return;
 	bfaddr = *bf;
