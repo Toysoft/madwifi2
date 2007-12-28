@@ -265,7 +265,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 	wh->i_dur = 0;
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
-	IEEE80211_ADDR_COPY(wh->i_addr3,  vap->iv_bss->ni_bssid);
+	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bss->ni_bssid);
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_ASSOC,
 			  "%s: beacon bssid:" MAC_FMT "\n",
 			  __func__, MAC_ADDR(wh->i_addr3));
@@ -294,10 +294,10 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	 * it. This case happens if iv_bss match a neighbor node that is being
 	 * rebooted. This node will send beacon's with its own MAC addr as
 	 * BSSID until it got synchronize */
-/*
+#if 0
 	struct ieee80211_frame * wh = (struct ieee80211_frame *) skb->data;
 	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bss->ni_bssid);
-*/
+#endif
 
 	/* Check if we need to change channel right now */
 

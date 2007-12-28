@@ -1773,7 +1773,6 @@ ieee80211_build_countryie(struct ieee80211com *ic)
 	/* Pad */
 	if (ic->ic_country_ie.country_len & 1)
 		ic->ic_country_ie.country_len++;
-
 }
 
 void
