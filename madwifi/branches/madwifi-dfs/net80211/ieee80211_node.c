@@ -329,6 +329,7 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 	}
 
 	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_myaddr);
+	IEEE80211_ADDR_COPY(vap->iv_bssid, vap->iv_myaddr);
 	ni->ni_esslen = vap->iv_des_ssid[0].len;
 	memcpy(ni->ni_essid, vap->iv_des_ssid[0].ssid, ni->ni_esslen);
 	if (vap->iv_bss != NULL)
@@ -348,15 +349,21 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 	if (vap->iv_opmode == IEEE80211_M_IBSS) {
 		vap->iv_flags |= IEEE80211_F_SIBSS;
 		ni->ni_capinfo |= IEEE80211_CAPINFO_IBSS;	/* XXX */
-		if (vap->iv_flags & IEEE80211_F_DESBSSID)
+		if (vap->iv_flags & IEEE80211_F_DESBSSID) {
 			IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_des_bssid);
-		else
+			IEEE80211_ADDR_COPY(vap->iv_bssid, vap->iv_des_bssid);//untested
+		} else {
 			ni->ni_bssid[0] |= 0x02;	/* local bit for IBSS */
+			vap->iv_bssid[0] |= 0x02;
+		}
 	} else if (vap->iv_opmode == IEEE80211_M_AHDEMO) {
-		if (vap->iv_flags & IEEE80211_F_DESBSSID)
+		if (vap->iv_flags & IEEE80211_F_DESBSSID) {
 			IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_des_bssid);
-		else
+			IEEE80211_ADDR_COPY(vap->iv_bssid, vap->iv_des_bssid);//untested
+		} else {
 			IEEE80211_ADDR_SET_NULL(ni->ni_bssid);
+			IEEE80211_ADDR_SET_NULL(vap->iv_bssid);
+		}
 	}
 #ifdef ATH_SUPERG_DYNTURBO
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
@@ -630,6 +637,7 @@ ieee80211_sta_join1(struct ieee80211_node *selbs)
 	canreassoc = (obss != NULL &&
 		vap->iv_state == IEEE80211_S_RUN && ssid_equal(obss, selbs));
 	vap->iv_bss = selbs; /* Caller provided reference */
+	IEEE80211_ADDR_COPY(vap->iv_bssid, selbs->ni_bssid);
 	if (obss != NULL)
 		ieee80211_unref_node(&obss);
 	ic->ic_bsschan = selbs->ni_chan;
@@ -1293,7 +1301,7 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr,
 
 	if (ni != NULL) {
 		copy_bss_state(ni, vap->iv_bss);
-		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bssid);//untested
 		/* Do this only for nodes that already have a BSS. Otherwise
 		 * ic_bsschan is not set and we get a KASSERT failure.
 		 * Required by ieee80211_fix_rate */
@@ -2364,7 +2372,7 @@ EXPORT_SYMBOL(ieee80211_getrssi);
 void
 ieee80211_node_reset(struct ieee80211_node *ni, struct ieee80211vap *vap)
 {
-	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
+	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bssid);//untested
 	ni->ni_prev_vap = ni->ni_vap;
 	ni->ni_vap = vap;
 	ni->ni_ic = vap->iv_ic;

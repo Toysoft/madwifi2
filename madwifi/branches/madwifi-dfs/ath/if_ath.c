@@ -1323,6 +1323,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 			/* get the first available slot */
 			if ((id_mask & (1 << id)) == 0) {
 				ATH_SET_VAP_BSSID(vap->iv_myaddr, id);
+				ATH_SET_VAP_BSSID(vap->iv_bssid, id);
 				break;
 			}
 		}
@@ -6130,7 +6131,7 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 
 	DPRINTF(sc, ATH_DEBUG_BEACON,
 		"%s: vap:%p[" MAC_FMT "] ni:%p[" MAC_FMT "]\n",
-		__func__, vap, MAC_ADDR(vap->iv_bss->ni_bssid),
+		__func__, vap, MAC_ADDR(vap->iv_bssid),
 		ni, MAC_ADDR(wh->i_addr2));
 
 	/*Call up first so subsequent work can use information
@@ -8894,11 +8895,10 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		   vap->iv_opmode == IEEE80211_M_AHDEMO);
 	if (stamode && nstate == IEEE80211_S_RUN) {
 		sc->sc_curaid = ni->ni_associd;
-		IEEE80211_ADDR_COPY(sc->sc_curbssid, ni->ni_bssid);
+		IEEE80211_ADDR_COPY(sc->sc_curbssid, vap->iv_bssid);
 		DPRINTF(sc, ATH_DEBUG_BEACON,
-			"%s: sc_curbssid " MAC_FMT " from " MAC_FMT "\n",
-			__func__, MAC_ADDR(sc->sc_curbssid),
-			MAC_ADDR(ni->ni_macaddr));
+			"%s: sc_curbssid " MAC_FMT "\n",
+			__func__, MAC_ADDR(sc->sc_curbssid));
 	} else
 		sc->sc_curaid = 0;
 
@@ -8918,7 +8918,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 (vap->iv_flags & IEEE80211_F_PRIVACY)) {
 		for (i = 0; i < IEEE80211_WEP_NKID; i++)
 			if (ath_hal_keyisvalid(ah, i))
-				ath_hal_keysetmac(ah, i, ni->ni_bssid);
+				ath_hal_keysetmac(ah, i, vap->iv_bssid);//untested
 	}
 
 	/*
@@ -8936,7 +8936,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 			 __func__,
 			 vap->iv_flags,
 			 ni->ni_intval,
-			 ether_sprintf(ni->ni_bssid),
+			 ether_sprintf(vap->iv_bssid),
 			 ni->ni_capinfo,
 			 ieee80211_chan2ieee(ic, ni->ni_chan));
 

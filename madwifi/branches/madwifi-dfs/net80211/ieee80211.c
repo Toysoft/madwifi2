@@ -496,6 +496,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	vap->iv_monitor_phy_errors = 0;
 
 	IEEE80211_ADDR_COPY(vap->iv_myaddr, ic->ic_myaddr);
+	IEEE80211_ADDR_COPY(vap->iv_bssid, ic->ic_myaddr);
 	/* NB: Defer setting dev_addr so driver can override */
 
 	ieee80211_crypto_vattach(vap);
