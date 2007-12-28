@@ -528,9 +528,9 @@ ieee80211_ioctl_giwap(struct net_device *dev, struct iw_request_info *info,
 		IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_des_bssid);
 	else {
 		if (vap->iv_state == IEEE80211_S_RUN)
-			if (vap->iv_opmode != IEEE80211_M_WDS)
-				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bss->ni_bssid);
-			else
+			if (vap->iv_opmode != IEEE80211_M_WDS) {
+				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bssid);
+			} else
 				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->wds_mac);
 		else
 			IEEE80211_ADDR_SET_NULL(&ap_addr->sa_data);
@@ -3397,7 +3397,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 			return -EINVAL;
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ni = ieee80211_ref_node(vap->iv_bss);
-			if (!IEEE80211_ADDR_EQ(ik->ik_macaddr, ni->ni_bssid)) {
+			if (!IEEE80211_ADDR_EQ(ik->ik_macaddr, vap->iv_bssid)) {//untested
 				ieee80211_unref_node(&ni);
 				return -EADDRNOTAVAIL;
 			}

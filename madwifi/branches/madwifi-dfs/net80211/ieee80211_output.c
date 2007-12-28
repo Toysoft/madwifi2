@@ -422,7 +422,7 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 		skb_push(skb, sizeof(struct ieee80211_frame));
 	ieee80211_send_setup(vap, ni, wh,
 		IEEE80211_FC0_TYPE_MGT | type,
-		vap->iv_myaddr, ni->ni_macaddr, vap->iv_bss->ni_bssid);
+		vap->iv_myaddr, ni->ni_macaddr, vap->iv_bssid);
 	/* XXX power management */
 
 	if ((SKB_CB(skb)->flags & M_LINK0) != 0 && ni->ni_challenge != NULL) {
@@ -478,7 +478,7 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 		skb_push(skb, sizeof(struct ieee80211_frame));
 	ieee80211_send_setup(vap, ni, wh,
 		IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_NODATA,
-		vap->iv_myaddr, ni->ni_macaddr, vap->iv_bss->ni_bssid);
+		vap->iv_myaddr, ni->ni_macaddr, vap->iv_bssid);//untested
 	/* NB: power management bit is never sent by an AP */
 	if ((IEEE80211_VAP_IS_SLEEPING(ni->ni_vap)) &&
 	    vap->iv_opmode != IEEE80211_M_HOSTAP &&
@@ -533,7 +533,7 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 		IEEE80211_FC0_TYPE_DATA,
 		vap->iv_myaddr, /* SA */
 		ni->ni_macaddr, /* DA */
-		vap->iv_bss->ni_bssid);
+		vap->iv_bssid);//untested
 
 	qwh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA |
 		IEEE80211_FC0_SUBTYPE_QOS_NULL;
@@ -882,7 +882,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 					ieee80211_add_wds_addr(nt, ni, eh.ether_shost, 0);
 			}
 		} else
-			ismulticast = IEEE80211_IS_MULTICAST(ni->ni_bssid);
+			ismulticast = IEEE80211_IS_MULTICAST(vap->iv_bssid);
 		break;
 	default:
 		break;
@@ -1016,21 +1016,21 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			IEEE80211_ADDR_COPY(wh->i_addr1, eh.ether_dhost);
 			IEEE80211_ADDR_COPY(wh->i_addr2, eh.ether_shost);
 			/*
-			 * NB: always use the bssid from iv_bss as the
+			 * NB: always use the bssid from iv_bssid as the
 			 *     neighbor's may be stale after an ibss merge
 			 */
-			IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bss->ni_bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bssid);
 			break;
 		case IEEE80211_M_STA:
 			wh->i_fc[1] = IEEE80211_FC1_DIR_TODS;
-			IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr1, vap->iv_bssid);
 			IEEE80211_ADDR_COPY(wh->i_addr2, eh.ether_shost);
 			IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_dhost);
 			break;
 		case IEEE80211_M_HOSTAP:
 			wh->i_fc[1] = IEEE80211_FC1_DIR_FROMDS;
 			IEEE80211_ADDR_COPY(wh->i_addr1, eh.ether_dhost);
-			IEEE80211_ADDR_COPY(wh->i_addr2, ni->ni_bssid);
+			IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_bssid);//untested
 			IEEE80211_ADDR_COPY(wh->i_addr3, eh.ether_shost);
 			if (M_PWR_SAV_GET(skb)) {
 				if (IEEE80211_NODE_SAVEQ_QLEN(ni)) {
@@ -1669,18 +1669,18 @@ ieee80211_add_xr_param(u_int8_t *frm, struct ieee80211vap *vap)
 
 	/* copy the BSSIDs */
 	if (vap->iv_flags & IEEE80211_F_XR) {
-		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid); 	/* Base BSSID */
+		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bssid); 	/* Base BSSID *///untested
 		frm += IEEE80211_ADDR_LEN;
-		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);		/* XR BSSID */
+		IEEE80211_ADDR_COPY(frm, vap->iv_bssid);		/* XR BSSID *///untested
 		frm += IEEE80211_ADDR_LEN;
 		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval); 		/* XR beacon interval */
 		frm += 2;
 		*frm++ = vap->iv_xrvap->iv_ath_cap;				/* Base mode capability */
 		*frm++ = vap->iv_ath_cap; 					/* XR mode capability */
 	} else {
-		IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(frm, vap->iv_bssid);//untested
 		frm += IEEE80211_ADDR_LEN;
-		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(frm, vap->iv_xrvap->iv_bssid);//untested
 		frm += IEEE80211_ADDR_LEN;
 		*(__le16 *)frm = htole16(vap->iv_bss->ni_intval);
 		frm += 2;
@@ -2056,7 +2056,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 
 		/* Current AP address */
 		if (type == IEEE80211_FC0_SUBTYPE_REASSOC_REQ) {
-			IEEE80211_ADDR_COPY(frm, vap->iv_bss->ni_bssid);
+			IEEE80211_ADDR_COPY(frm, vap->iv_bssid);//untested
 			frm += IEEE80211_ADDR_LEN;
 		}
 		/* ssid */
@@ -2230,7 +2230,7 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 	wh = (struct ieee80211_ctlframe_addr2 *) skb_put(skb, sizeof(struct ieee80211_ctlframe_addr2));
 
 	wh->i_aidordur = htole16(0xc000 | IEEE80211_NODE_AID(ni));
-	IEEE80211_ADDR_COPY(wh->i_addr1, ni->ni_bssid);
+	IEEE80211_ADDR_COPY(wh->i_addr1, vap->iv_bssid);//untested
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
 	wh->i_fc[0] = 0;
 	wh->i_fc[1] = 0;
@@ -2254,7 +2254,6 @@ ieee80211_getcfframe(struct ieee80211vap *vap, int type)
 	u_int8_t *frm;
 	struct sk_buff *skb;
 	struct ieee80211_frame *wh;
-	struct ieee80211_node *ni = vap->iv_bss;
 	struct ieee80211com *ic = vap->iv_ic;
 
 
@@ -2274,7 +2273,7 @@ ieee80211_getcfframe(struct ieee80211vap *vap, int type)
 	}
 	IEEE80211_ADDR_COPY(wh->i_addr1, ic->ic_dev->broadcast);
 	IEEE80211_ADDR_COPY(wh->i_addr2, vap->iv_myaddr);
-	IEEE80211_ADDR_COPY(wh->i_addr3, ni->ni_bssid);
+	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bssid);//untested
 	return skb;
 }
 EXPORT_SYMBOL(ieee80211_getcfframe);
