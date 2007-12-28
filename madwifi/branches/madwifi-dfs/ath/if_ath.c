@@ -4994,7 +4994,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	u_int32_t nexttbtt = 0;
 	u_int32_t intval;
 	u_int64_t tsf, hw_tsf;
-	u_int32_t tsftu, hw_tsftu;
+	u_int32_t tsftu, hw_tsftu, n;
 	int reset_tsf = 0;
 
 	if (vap == NULL)
@@ -5052,8 +5052,9 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			 * next beacon timestamp again */
 
 			nexttbtt = roundup(hw_tsftu + 1, intval);
-			while (nexttbtt <= hw_tsftu + FUDGE) {
-				nexttbtt += intval;
+			if (nexttbtt <= hw_tsftu + FUDGE) {
+				n = (hw_tsftu + FUDGE - nexttbtt) / intval + 1;
+				nexttbtt += n*intval;
 			}
 		} else {
 			if (tsf > hw_tsf) {
@@ -5070,8 +5071,10 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			   * is at least FUDGE ms ahead of hw_tsf */
 
 				nexttbtt = tsftu + intval;
-				while (nexttbtt <= hw_tsftu + FUDGE) {
-					nexttbtt += intval;
+				if (nexttbtt <= hw_tsftu + FUDGE) {
+					n = (hw_tsftu + FUDGE - nexttbtt)
+						/ intval + 1;
+					nexttbtt += n*intval;
 				}
 			}
 		}
