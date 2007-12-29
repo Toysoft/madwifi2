@@ -4807,7 +4807,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 		u_int64_t tsf, tsftu;
 
 		tsf = ath_hal_gettsf64(ah);
-		tsftu = tsf >> 10;
+		tsftu = tsf >> 10; /* NB: 64 -> 32: See note far above. */
 		slot = ((tsftu % ic->ic_lintval) * ATH_BCBUF) / ic->ic_lintval;
 		vap = sc->sc_bslot[(slot + 1) % ATH_BCBUF];
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
@@ -4978,6 +4978,11 @@ ath_beacon_free(struct ath_softc *sc)
  *
  * Note : TBTT is Target Beacon Transmission Time (see IEEE 802.11-1999: 4 &
  * 11.2.1.3).
+ *
+ * Note: TSF is right shifter by 10 and then put into a 32-bit int, which will 
+ * truncate. This does not affect the calculation as long as no more than one 
+ * overflow/wraparound occurs between beacons. This is not going to happen as
+ * (2^(32 + 10 - 1) - 1)us is a really long time.
  */
 static void
 ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
@@ -4985,9 +4990,9 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_node *ni;
-	u_int64_t intval, nexttbtt = 0;
 	u_int64_t tsf, hw_tsf;
-	u_int64_t tsftu, hw_tsftu;
+	u_int32_t tsftu, hw_tsftu;
+	u_int32_t intval, nexttbtt = 0;
 	int reset_tsf = 0;
 
 	if (vap == NULL)
@@ -4998,7 +5003,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	hw_tsf = ath_hal_gettsf64(ah);
 	tsf = le64_to_cpu(ni->ni_tstamp.tsf);
 	hw_tsftu = hw_tsf >> 10;
-	tsftu = tsf >> 10;
+	tsftu = tsf >> 10; /* NB: 64 -> 32. See note above. */
 
 	/* We should reset hw TSF only once, so we increment
 	 * ni_tstamp.tsf to avoid resetting the hw TSF multiple
@@ -5040,7 +5045,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			 * responses. Since a beacon should be sent
 			 * every 'intval' ms, we compute the next
 			 * beacon timestamp using the hardware TSF. We
-			 * ensure that it is at least FUDGE ms ahead
+			 * ensure that it is at least FUDGE TUs ahead
 			 * of the current TSF. Otherwise, we use the
 			 * next beacon timestamp again */
  			nexttbtt = roundup(hw_tsftu + FUDGE, intval);
@@ -5054,9 +5059,9 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 				sc->sc_syncbeacon = 1;
 				goto ath_beacon_config_debug;
 			} else {
-			  /* Normal case: we received a beacon to which
-			   * we have synchronized. Make sure that nexttbtt
-			   * is at least FUDGE ms ahead of hw_tsf */
+				/* Normal case: we received a beacon to which
+				 * we have synchronized. Make sure that nexttbtt
+				 * is at least FUDGE TU ahead of hw_tsf */
 				nexttbtt = tsftu + roundup(hw_tsftu + FUDGE - 
 						tsftu, intval);
 			}
@@ -5145,12 +5150,11 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 					bs.bs_dtimperiod);
 
 		DPRINTF(sc, ATH_DEBUG_BEACON,
-			"%s: tsf %llu tsf:tu %llu intval %u nexttbtt %u "
-			"dtim %u nextdtim %u bmiss %u sleep %u cfp:period %u "
+			"%s: tsf %llu tsf:tu %u intval %u nexttbtt %u dtim %u "
+			"nextdtim %u bmiss %u sleep %u cfp:period %u "
 			"maxdur %u next %u timoffset %u\n",
 			__func__,
-			(unsigned long long)tsf, 
-			(unsigned long long)tsftu,
+			(unsigned long long)tsf, tsftu,
 			bs.bs_intval,
 			bs.bs_nexttbtt,
 			bs.bs_dtimperiod,
@@ -5201,9 +5205,10 @@ ath_beacon_config_debug:
 	/* We print all debug messages here, in order to preserve the
 	 * time critical aspect of this function */
 	DPRINTF(sc, ATH_DEBUG_BEACON,
-		"%s: ni=%p tsf=%llu hw_tsf=%llu tsftu=%llu hw_tsftu=%llu\n",
-		__func__, ni, tsf, hw_tsf, 
-		(unsigned long long)tsftu, (unsigned long long)hw_tsftu);
+		"%s: ni=%p tsf=%llu hw_tsf=%llu tsftu=%u hw_tsftu=%u\n",
+		__func__, ni, 
+		(unsigned long long)tsf, (unsigned long long)hw_tsf, 
+		tsftu, hw_tsftu);
 
 	if (reset_tsf) {
 		/* We just created the interface */
@@ -5230,9 +5235,8 @@ ath_beacon_config_debug:
 	}
 
 	DPRINTF(sc, ATH_DEBUG_BEACON, 
-		"%s: nexttbtt=%10llx intval=%llu%s%s imask=%s%s\n", __func__, 
-		(unsigned long long)nexttbtt, 
-		(unsigned long long)intval & HAL_BEACON_PERIOD,
+		"%s: nexttbtt=%10x intval=%u%s%s imask=%s%s\n", __func__, 
+		nexttbtt, intval & HAL_BEACON_PERIOD,
 		intval & HAL_BEACON_ENA       ? " HAL_BEACON_ENA"       : "",
 		intval & HAL_BEACON_RESET_TSF ? " HAL_BEACON_RESET_TSF" : "",
 		sc->sc_imask & HAL_INT_BMISS  ? " HAL_INT_BMISS"        : "",
@@ -6115,7 +6119,7 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
 	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 	u_int64_t hw_tsf, beacon_tsf;
-	u_int64_t hw_tu, beacon_tu, intval;
+	u_int32_t hw_tu, beacon_tu, intval;
 	int do_merge = 0;
 
 	DPRINTF(sc, ATH_DEBUG_BEACON,
@@ -6195,9 +6199,8 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 			if (sc->sc_nexttbtt < hw_tu) {
 				DPRINTF(sc, ATH_DEBUG_BEACON,
 					"sc_nexttbtt (%8x TU) is in the past "
-					"(tsf %8llx TU), updating timers\n",
-					sc->sc_nexttbtt, 
-					(unsigned long long)hw_tu);
+					"(tsf %8x TU), updating timers\n",
+					sc->sc_nexttbtt, hw_tu);
 				do_merge = 1;
 			}
 
