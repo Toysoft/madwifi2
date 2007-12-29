@@ -4804,7 +4804,8 @@ ath_beacon_send(struct ath_softc *sc, int *needmark)
 	 */
 	if (sc->sc_stagbeacons) {		/* staggered beacons */
 		struct ieee80211com *ic = &sc->sc_ic;
-		u_int64_t tsf, tsftu;
+		u_int64_t tsf;
+		u_int32_t tsftu;
 
 		tsf = ath_hal_gettsf64(ah);
 		tsftu = tsf >> 10; /* NB: 64 -> 32: See note far above. */
@@ -5030,7 +5031,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	} else
 		intval = ni->ni_intval & HAL_BEACON_PERIOD;
 
-#define	FUDGE	2
+#define	FUDGE	3
 	sc->sc_syncbeacon = 0;
 
 	if (reset_tsf) {
