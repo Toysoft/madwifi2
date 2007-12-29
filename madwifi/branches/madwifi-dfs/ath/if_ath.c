@@ -8921,7 +8921,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		 (vap->iv_flags & IEEE80211_F_PRIVACY)) {
 		for (i = 0; i < IEEE80211_WEP_NKID; i++)
 			if (ath_hal_keyisvalid(ah, i))
-				ath_hal_keysetmac(ah, i, vap->iv_bssid);//untested
+				/* XXX: Untested use of iv_bssid. */
+				ath_hal_keysetmac(ah, i, vap->iv_bssid);
 	}
 
 	/*

@@ -206,9 +206,6 @@ struct ieee80211vap {
 	u_int8_t iv_uapsdinfo;				/* sta mode QoS Info flags */
 	struct ieee80211_node *iv_bss;			/* information for this node */
 
-	/* replacement for vap->iv_bss->ni_bssid and ni->ni_bssid in most
-	 * cases, since BSSID is an information that is global across the
-	 * VAP */
 	u_int8_t iv_bssid[IEEE80211_ADDR_LEN];
 
 	int iv_fixed_rate;				/* 802.11 rate or IEEE80211_FIXED_RATE_NONE */
