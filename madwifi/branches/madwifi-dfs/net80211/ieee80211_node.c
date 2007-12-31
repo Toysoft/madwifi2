@@ -351,7 +351,6 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 		ni->ni_capinfo |= IEEE80211_CAPINFO_IBSS;	/* XXX */
 		if (vap->iv_flags & IEEE80211_F_DESBSSID) {
 			IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_des_bssid);
-			/* XXX: Untested use of iv_bssid. */
 			IEEE80211_ADDR_COPY(vap->iv_bssid, vap->iv_des_bssid);
 		} else {
 			ni->ni_bssid[0] |= 0x02;	/* local bit for IBSS */
@@ -360,7 +359,6 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 	} else if (vap->iv_opmode == IEEE80211_M_AHDEMO) {
 		if (vap->iv_flags & IEEE80211_F_DESBSSID) {
 			IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_des_bssid);
-			/* XXX: Untested use of iv_bssid. */
 			IEEE80211_ADDR_COPY(vap->iv_bssid, vap->iv_des_bssid);
 		} else {
 			IEEE80211_ADDR_SET_NULL(ni->ni_bssid);
@@ -1303,7 +1301,6 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr,
 
 	if (ni != NULL) {
 		copy_bss_state(ni, vap->iv_bss);
-		/* XXX: Untested use of iv_bssid. */
 		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bssid);
 		/* Do this only for nodes that already have a BSS. Otherwise
 		 * ic_bsschan is not set and we get a KASSERT failure.
