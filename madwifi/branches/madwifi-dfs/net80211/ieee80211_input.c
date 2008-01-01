@@ -332,7 +332,6 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			 * Validate the bssid.
 			 */
 #ifdef ATH_SUPERG_XR
-			/* XXX: Untested use of iv_bssid. */
 			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/*
@@ -340,7 +339,6 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				 * this will allow roaming between  XR and normal vaps
 				 * without station dis associating from previous vap.
 				 */
-				/* XXX: Untested use of iv_bssid. */
 				if (!(vap->iv_xrvap &&
 				    IEEE80211_ADDR_EQ(bssid, vap->iv_xrvap->iv_bssid) &&
 				    type == IEEE80211_FC0_TYPE_MGT &&
@@ -3481,7 +3479,6 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		seq    = le16toh(*(__le16 *)(frm + 2));
 		status = le16toh(*(__le16 *)(frm + 4));
 #ifdef ATH_SUPERG_XR
-		/* XXX: Untested use of iv_bssid. */
 		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			/*
 			 * node roaming between XR and normal vaps. 
@@ -3582,7 +3579,6 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		 *	[tlv] Atheros Advanced Capabilities
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, (reassoc ? 10 : 4));
-		/* XXX: Untested use of iv_bssid. */
 		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY,
 				wh, ieee80211_mgt_subtype_name[subtype >>
