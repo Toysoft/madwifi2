@@ -351,7 +351,6 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				}
 			}
 #else
-			/* XXX: Untested use of iv_bssid. */
 			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
@@ -373,7 +372,6 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				goto out;
 			}
 			bssid = wh->i_addr1;
-			/* XXX: Untested use of iv_bssid. */
 			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
