@@ -1226,7 +1226,11 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 		break;
 	case IEEE80211_M_AHDEMO:
 	case IEEE80211_M_MONITOR:
-		ic_opmode = opmode;
+		if (sc->sc_nvaps != 0 && (ic->ic_opmode != opmode)) {
+			/* preserve existing mode */
+			ic_opmode = ic->ic_opmode;
+		} else
+			ic_opmode = opmode;
 		break;
 	case IEEE80211_M_HOSTAP:
 	case IEEE80211_M_WDS:
@@ -1381,11 +1385,7 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 	(void) ieee80211_vap_attach(vap,
 		ieee80211_media_change, ieee80211_media_status);
 
-	/* We take the convention that the HAL opmode is determined by the
-	 * first VAP only */
-	if (sc->sc_nvaps == 0) {
-		ic->ic_opmode = ic_opmode;
-	}
+	ic->ic_opmode = ic_opmode;
 
 	if (opmode != IEEE80211_M_WDS)
 		sc->sc_nvaps++;
