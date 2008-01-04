@@ -6424,6 +6424,11 @@ rx_accept:
 			}
 #endif
 			ath_rx_capture(dev, bf, skb, bf->bf_tsf);
+			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
+				/* no other VAPs need the packet */
+				ieee80211_dev_kfree_skb(&skb);
+				goto rx_next;
+			}
 		}
 
 		/*
