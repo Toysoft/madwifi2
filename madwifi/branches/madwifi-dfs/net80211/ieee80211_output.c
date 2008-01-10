@@ -196,6 +196,7 @@ ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 
 /*
  * Context: process context (BHs disabled)
+ * It must return either NETDEV_TX_OK or NETDEV_TX_BUSY
  */
 int
 ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
@@ -233,7 +234,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (vap->iv_opmode == IEEE80211_M_MONITOR) {
 		ieee80211_monitor_encap(vap, skb);
 		ieee80211_parent_queue_xmit(skb);
-		return 0;
+		return NETDEV_TX_OK;
 	}
 	
 	/* Cancel any running BG scan */
@@ -275,7 +276,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		 */
 		ieee80211_pwrsave(ni, skb);
 		ieee80211_unref_node(&ni);
-		return 0;
+		return NETDEV_TX_OK;
 	}
 
 #ifdef ATH_SUPERG_XR
@@ -298,15 +299,19 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 #endif
 	ieee80211_parent_queue_xmit(skb);
 	ieee80211_unref_node(&ni);
-	return 0;
+	return NETDEV_TX_OK;
 
 bad:
 	if (skb != NULL)
 		ieee80211_dev_kfree_skb(&skb);
 	if (ni != NULL)
 		ieee80211_unref_node(&ni);
-	return 0;
+	return NETDEV_TX_OK;
 }
+
+/*
+ * skb is consumed in all cases
+ */
 
 void ieee80211_parent_queue_xmit(struct sk_buff *skb) {
 	struct ieee80211vap *vap = skb->dev->priv;
