@@ -4395,17 +4395,6 @@ ath_beaconq_config(struct ath_softc *sc)
 #undef ATH_EXPONENT_TO_VALUE
 }
 
-#if 0
-/* Return 1 if beacon was already allocated, 0 otherwise. */
-static int
-ath_beacon_allocated(struct ath_softc *sc, struct ieee80211_node *ni) {
-	return ni != NULL && 
-		ni->ni_vap != NULL && 
-		ATH_VAP(ni->ni_vap)->av_bcbuf != NULL &&
-		ATH_VAP(ni->ni_vap)->av_bcbuf->bf_skb != NULL;
-}
-#endif
-
 static int
 ath_beacon_alloc(struct ath_softc *sc, struct ieee80211_node *ni)
 {
