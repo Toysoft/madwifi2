@@ -205,11 +205,8 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #define	ATH_DFS_TEST_RETURN_PERIOD	15	/* 15 seconds -- for mute test
 						 * only */
 
-#define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between
-						 * calibrations */
-
-#define	ATH_SHORT_CALINTERVAL		1	/* 1 second between
-						 * calibrations */
+#define	ATH_LONG_CALINTERVAL		30	/* 30 seconds between calibrations */
+#define	ATH_SHORT_CALINTERVAL		1	/* 1 second between calibrations */
 
 /*
  * Maximum acceptable MTU
@@ -227,7 +224,7 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 /* free buffer threshold to restart net dev */
 #define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20)
 /* number of TX buffers reserved for mgt frames */
-#define ATH_TXBUF_MGT_RESERVED          5
+#define ATH_TXBUF_MGT_RESERVED	  5 	
 
 #define TAIL_DROP_COUNT 50             /* maximum number of queued frames allowed */
 
@@ -632,6 +629,7 @@ struct ath_softc {
 	struct ath_ratectrl *sc_rc;		/* tx rate control support */
 	struct ath_tx99 *sc_tx99; 		/* tx99 support */
 	void (*sc_setdefantenna)(struct ath_softc *, u_int);
+
 	unsigned int 	sc_invalid:1;		/* being detached */
 	unsigned int	sc_mrretry:1;		/* multi-rate retry support */
 	unsigned int	sc_softled:1;		/* enable LED gpio status */
@@ -664,7 +662,7 @@ struct ath_softc {
 	unsigned int	sc_ackrate:1;		/* send acks at high bitrate */
 	unsigned int	sc_dfs_cac:1;		/* waiting on channel for radar detect */
 	unsigned int	sc_hasintmit:1;		/* Interference mitigation */
-	unsigned int	sc_txcont:1;        	/* Is continuous transmit enabled? */
+	unsigned int	sc_txcont:1;		/* Is continuous transmit enabled? */
 	unsigned int	sc_dfs_testmode:1; 	/* IF this is on, AP vaps will stay in
 						   'channel availability check' indefinately,
 						   reporting radar and interference detections.
@@ -798,6 +796,7 @@ struct ath_softc {
 						 * after radar is detected (in seconds).
 						 * FCC requires 30m. */
 	u_int64_t sc_rp_lasttsf;		/* TSF at last detected radar pulse */
+
 	
 	
 	struct ath_rp *sc_rp;			/* radar pulse circular array */
