@@ -1297,7 +1297,7 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr,
 
 	if (ni != NULL) {
 		copy_bss_state(ni, vap->iv_bss);
-		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
+		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bssid);
 		/* Do this only for nodes that already have a BSS. Otherwise
 		 * ic_bsschan is not set and we get a KASSERT failure.
 		 * Required by ieee80211_fix_rate */
@@ -2374,7 +2374,8 @@ EXPORT_SYMBOL(ieee80211_getrssi);
 void
 ieee80211_node_reset(struct ieee80211_node *ni, struct ieee80211vap *vap)
 {
-	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
+	/* XXX: Untested use of iv_bssid. */
+	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bssid);
 	ni->ni_prev_vap = ni->ni_vap;
 	ni->ni_vap = vap;
 	ni->ni_ic = vap->iv_ic;

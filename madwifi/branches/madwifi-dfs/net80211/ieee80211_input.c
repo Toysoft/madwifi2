@@ -282,7 +282,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 		switch (vap->iv_opmode) {
 		case IEEE80211_M_STA:
 			bssid = wh->i_addr2;
-			if (!IEEE80211_ADDR_EQ(bssid, ni->ni_bssid)) {
+			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid)) {
 				/* not interested in */
 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
 					bssid, NULL, "%s", "not to bss");
@@ -349,7 +349,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			 * Validate the bssid.
 			 */
 #ifdef ATH_SUPERG_XR
-			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bss->ni_bssid) &&
+			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/*
 				 * allow MGT frames to vap->iv_xrvap.
@@ -357,7 +357,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				 * without station dis associating from previous vap.
 				 */
 				if (!(vap->iv_xrvap &&
-				    IEEE80211_ADDR_EQ(bssid, vap->iv_xrvap->iv_bss->ni_bssid) &&
+				    IEEE80211_ADDR_EQ(bssid, vap->iv_xrvap->iv_bssid) &&
 				    type == IEEE80211_FC0_TYPE_MGT &&
 				    ni != vap->iv_bss)) {
 					/* not interested in */
@@ -368,7 +368,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				}
 			}
 #else
-			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bss->ni_bssid) &&
+			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
@@ -389,7 +389,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				goto out;
 			}
 			bssid = wh->i_addr1;
-			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bss->ni_bssid) &&
+			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
@@ -3042,8 +3042,8 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_ASSOC,
 		"%s: vap:%p[" MAC_FMT "] ni:%p[" MAC_FMT "]\n",
-		__func__, vap, MAC_ADDR(vap->iv_bss->ni_bssid),
-		ni, MAC_ADDR(ni->ni_macaddr));
+		__func__, vap, MAC_ADDR(vap->iv_bssid),
+		ni_or_null, MAC_ADDR(wh->i_addr2));
 
 	/* forward management frame to application */
 	if (vap->iv_opmode != IEEE80211_M_MONITOR)
@@ -3233,7 +3233,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA &&
 		    ni->ni_associd != 0 &&
-		    IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_bssid)) {
+		    IEEE80211_ADDR_EQ(wh->i_addr2, vap->iv_bssid)) {
 			/* record tsf of last beacon */
 			memcpy(ni->ni_tstamp.data, scan.tstamp,
 				sizeof(ni->ni_tstamp));
@@ -3373,7 +3373,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		}
 		if ((vap->iv_opmode == IEEE80211_M_IBSS) && 
 				(scan.capinfo & IEEE80211_CAPINFO_IBSS)) {
-			if (ni == vap->iv_bss) {
+			if (ni_or_null == NULL) {
 				/* Create a new entry in the neighbor table. */
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
 			} else {
@@ -3537,7 +3537,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		seq    = le16toh(*(__le16 *)(frm + 2));
 		status = le16toh(*(__le16 *)(frm + 4));
 #ifdef ATH_SUPERG_XR
-		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bss->ni_bssid)) {
+		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			/*
 			 * node roaming between XR and normal vaps. 
 			 * this can only happen in AP mode. disaccociate from
@@ -3637,7 +3637,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		 *	[tlv] Atheros Advanced Capabilities
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, (reassoc ? 10 : 4));
-		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bss->ni_bssid)) {
+		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY,
 				wh, ieee80211_mgt_subtype_name[subtype >>
 					IEEE80211_FC0_SUBTYPE_SHIFT],

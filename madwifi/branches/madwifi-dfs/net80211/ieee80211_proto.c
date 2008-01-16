@@ -1575,7 +1575,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				ieee80211_note(vap, "%s with %s ssid ",
 					(vap->iv_opmode == IEEE80211_M_STA ?
 					"associated" : "synchronized "),
-					ether_sprintf(ni->ni_bssid));
+					ether_sprintf(vap->iv_bssid));
 				ieee80211_print_essid(vap->iv_bss->ni_essid,
 					ni->ni_esslen);
 				printf(" channel %d start %uMb\n",
