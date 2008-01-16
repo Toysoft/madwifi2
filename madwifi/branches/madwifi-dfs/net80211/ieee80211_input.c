@@ -182,13 +182,14 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
 #endif /* WIRELESS_EXT >= 16 */
 
 /*
- * Process a received frame. The node associated with the sender should be
- * supplied, along with the associated VAP. If nothing was found in the node
- * table then the caller is assumed to supply NULL. The RSSI and a timestamp
- * are also supplied. The RSSI data is used during AP scanning to select a AP
- * to associate with; it can have any units so long as values have consistent
- * units and higher values mean ``better signal''. The receive timestamp is
- * currently not used by the 802.11 layer.
+ * Process a received frame.  The node associated with the sender
+ * should be supplied.  If nothing was found in the node table then
+ * the caller is assumed to supply a reference to ic_bss instead.
+ * The RSSI and a timestamp are also supplied.  The RSSI data is used
+ * during AP scanning to select a AP to associate with; it can have
+ * any units so long as values have consistent units and higher values
+ * mean ``better signal''.  The receive timestamp is currently not used
+ * by the 802.11 layer.
  *
  * Context: softIRQ (tasklet)
  */
