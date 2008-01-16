@@ -286,7 +286,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 		switch (vap->iv_opmode) {
 		case IEEE80211_M_STA:
 			bssid = wh->i_addr2;
-			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid)) {
+			if (!IEEE80211_ADDR_EQ(bssid, ni->ni_bssid)) {
 				/* not interested in */
 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
 					bssid, NULL, "%s", "not to bss");
@@ -353,7 +353,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			 * Validate the bssid.
 			 */
 #ifdef ATH_SUPERG_XR
-			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
+			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bss->ni_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/*
 				 * allow MGT frames to vap->iv_xrvap.
@@ -361,7 +361,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				 * without station dis associating from previous vap.
 				 */
 				if (!(vap->iv_xrvap &&
-				    IEEE80211_ADDR_EQ(bssid, vap->iv_xrvap->iv_bssid) &&
+				    IEEE80211_ADDR_EQ(bssid, vap->iv_xrvap->iv_bss->ni_bssid) &&
 				    type == IEEE80211_FC0_TYPE_MGT &&
 				    ni != vap->iv_bss)) {
 					/* not interested in */
@@ -372,7 +372,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				}
 			}
 #else
-			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
+			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bss->ni_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
@@ -393,7 +393,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				goto out;
 			}
 			bssid = wh->i_addr1;
-			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bssid) &&
+			if (!IEEE80211_ADDR_EQ(bssid, vap->iv_bss->ni_bssid) &&
 			    !IEEE80211_ADDR_EQ(bssid, dev->broadcast)) {
 				/* not interested in */
 				IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
@@ -955,6 +955,7 @@ ieee80211_input_all(struct ieee80211com *ic,
 
 	/* XXX locking */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+		struct ieee80211_node *ni;
 		struct sk_buff *skb1;
 
 		if (TAILQ_NEXT(vap, iv_next) != NULL) {
@@ -970,7 +971,12 @@ ieee80211_input_all(struct ieee80211com *ic,
 			skb1 = skb;
 			skb = NULL;
 		}
-		type = ieee80211_input(vap, NULL, skb1, rssi, rtsf);
+		/* This function does not 'own' vap->iv_bss, so we cannot 
+		 * guarantee its existence during the following call, hence
+		 * briefly grab our own reference. */
+		ni = ieee80211_ref_node(vap->iv_bss);
+		type = ieee80211_input(vap, ni, skb1, rssi, rtsf);
+		ieee80211_unref_node(&ni);
 	}
 	if (skb != NULL)		/* no vaps, reclaim skb */
 		ieee80211_dev_kfree_skb(&skb);

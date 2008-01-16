@@ -186,6 +186,10 @@ struct ieee80211_ctlframe_addr2 {
 #define	IEEE80211_QOS_EOSP_S			4
 #define	IEEE80211_QOS_TID			0x0f
 
+#define IEEE80211_FRM_HAS_BODY(_wh)			\
+	(((_wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=	\
+			IEEE80211_FC0_TYPE_CTL)
+
 /*
  * Country/Region Codes from MS WINNLS.H
  * Numbering from ISO 3166
@@ -535,9 +539,13 @@ struct ieee80211_wme_param {
 #define WME_CAPINFO_UAPSD_MAXSP_SHIFT		5
 #define WME_CAPINFO_UAPSD_MAXSP_MASK		0x3
 #define WME_CAPINFO_IE_OFFSET			8
-#define WME_UAPSD_MAXSP(_qosinfo) (((_qosinfo) >> WME_CAPINFO_UAPSD_MAXSP_SHIFT) & WME_CAPINFO_UAPSD_MAXSP_MASK)
-#define WME_UAPSD_AC_ENABLED(_ac, _qosinfo) ( (1<<(3 - (_ac))) &   \
-		(((_qosinfo) >> WME_CAPINFO_UAPSD_ACFLAGS_SHIFT) & WME_CAPINFO_UAPSD_ACFLAGS_MASK) )
+#define WME_UAPSD_MAXSP(_qosinfo)					\
+		(((_qosinfo) >> WME_CAPINFO_UAPSD_MAXSP_SHIFT) & 	\
+		 WME_CAPINFO_UAPSD_MAXSP_MASK)
+#define WME_UAPSD_AC_ENABLED(_ac, _qosinfo)				\
+		((1 << (3 - (_ac))) & (					\
+		 ((_qosinfo) >> WME_CAPINFO_UAPSD_ACFLAGS_SHIFT) &	\
+		 WME_CAPINFO_UAPSD_ACFLAGS_MASK))
 
 /*
  * Atheros Advanced Capability information element.

@@ -242,7 +242,7 @@ ieee80211_notify_node_join(struct ieee80211_node *ni, int newassoc)
 		if (newassoc)
 			netif_carrier_on(dev);
 		memset(&wreq, 0, sizeof(wreq));
-		IEEE80211_ADDR_COPY(wreq.addr.sa_data, vap->iv_bssid);
+		IEEE80211_ADDR_COPY(wreq.addr.sa_data, ni->ni_bssid);
 		wreq.addr.sa_family = ARPHRD_ETHER;
 #ifdef ATH_SUPERG_XR
 		if (vap->iv_xrvap && vap->iv_flags & IEEE80211_F_XR)
@@ -329,7 +329,7 @@ ieee80211_notify_replay_failure(struct ieee80211vap *vap,
 	IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_CRYPTO, wh->i_addr2,
 		"%s replay detected <keyix %d, rsc %llu >",
 		k->wk_cipher->ic_name, k->wk_keyix,
-		(unsigned long long)rsc );
+		(unsigned long long)rsc);
 
 	/* TODO: needed parameters: count, keyid, key type, src address, TSC */
 	snprintf(buf, sizeof(buf), "%s(keyid=%d %scast addr=%s)", tag,

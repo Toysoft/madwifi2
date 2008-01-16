@@ -529,12 +529,12 @@ ieee80211_ioctl_giwap(struct net_device *dev, struct iw_request_info *info,
 	if (vap->iv_flags & IEEE80211_F_DESBSSID)
 		IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_des_bssid);
 	else {
-		if (vap->iv_state == IEEE80211_S_RUN) {
+		if (vap->iv_state == IEEE80211_S_RUN)
 			if (vap->iv_opmode != IEEE80211_M_WDS)
-				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bssid);
+				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->iv_bss->ni_bssid);
 			else
 				IEEE80211_ADDR_COPY(&ap_addr->sa_data, vap->wds_mac);
-		} else
+		else
 			IEEE80211_ADDR_SET_NULL(&ap_addr->sa_data);
 	}
 	ap_addr->sa_family = ARPHRD_ETHER;
@@ -769,9 +769,6 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 			pre_announced_chanswitch(dev, ieee80211_chan2ieee(ic, vap->iv_des_chan),
 				IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT);
 		}
-/*
-XXX- We only want to do the chan change thing if beacons are currently running...
-*/
 		else if (vap->iv_state == IEEE80211_S_RUN) {
 			ic->ic_curchan = vap->iv_des_chan;
 			ic->ic_set_channel(ic);
@@ -3399,8 +3396,7 @@ ieee80211_ioctl_setkey(struct net_device *dev, struct iw_request_info *info,
 			return -EINVAL;
 		if (vap->iv_opmode == IEEE80211_M_STA) {
 			ni = ieee80211_ref_node(vap->iv_bss);
-			/* XXX: Untested use of iv_bssid. */
-			if (!IEEE80211_ADDR_EQ(ik->ik_macaddr, vap->iv_bssid)) {
+			if (!IEEE80211_ADDR_EQ(ik->ik_macaddr, ni->ni_bssid)) {
 				ieee80211_unref_node(&ni);
 				return -EADDRNOTAVAIL;
 			}
@@ -4319,7 +4315,7 @@ get_sta_info(void *arg, struct ieee80211_node *ni)
 		si->isi_rxseqs[0] = ni->ni_rxseqs[0];
 	}
 	si->isi_uapsd = ni->ni_uapsd;
-	if ( vap == req->vap->iv_xrvap)
+	if (vap == req->vap->iv_xrvap)
 		si->isi_opmode = IEEE80211_STA_OPMODE_XR;
 	else
 		si->isi_opmode = IEEE80211_STA_OPMODE_NORMAL;
