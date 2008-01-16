@@ -9122,6 +9122,9 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 		/* Configure the beacon and sleep timers. */
 		if (!sc->sc_beacons && (vap->iv_opmode != IEEE80211_M_WDS)) {
+			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_BEACON | ATH_DEBUG_BEACON_PROC, 
+				"%s: Beacons reconfigured by %p[%s]!\n",
+				__func__, vap, vap->iv_nickname);
 			ath_beacon_config(sc, vap);
 			sc->sc_beacons = 1;
 		}
