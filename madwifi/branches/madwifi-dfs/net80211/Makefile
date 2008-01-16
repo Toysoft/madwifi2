@@ -45,14 +45,9 @@ endif
 
 TOP = $(obj)/..
 #
-# There are two authenticator mechanisms: an in-kernel implementation
-# (wlan_auth+wlan_radius) and an external implementation (wlan_xauth) that
-# requires a user process to manage the authentication process.  By default
-# the external authenticator is used.  ieee80211_proto.c has a table of module
-# names that defines the default module to auto-load for each authentication
-# scheme; to get the in-kernel authenticator by default modify it to load
-# wlan_auth instead of wlan_xauth or manually load wlan_auth prior to use.
-# 
+# There is one authenticator mechanism: an in-kernel implementation
+# (wlan_xauth). 
+#
 MOD_AUTH	:= wlan_xauth.o
 #
 # Scanning policy is split into modules.  The default policy modules
@@ -73,7 +68,7 @@ wlan-objs	:= if_media.o \
 		   ieee80211_crypto_none.o ieee80211_input.o ieee80211_node.o \
 		   ieee80211_output.o ieee80211_power.o ieee80211_proto.o \
 		   ieee80211_scan.o ieee80211_wireless.o ieee80211_linux.o \
-		   ieee80211_monitor.o ieee80211_rate.o 
+		   ieee80211_monitor.o ieee80211_rate.o
 wlan_wep-objs	:= ieee80211_crypto_wep.o
 wlan_tkip-objs	:= ieee80211_crypto_tkip.o
 wlan_ccmp-objs	:= ieee80211_crypto_ccmp.o
