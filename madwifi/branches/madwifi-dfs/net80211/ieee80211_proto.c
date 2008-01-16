@@ -248,8 +248,6 @@ EXPORT_SYMBOL(ieee80211_authenticator_backend_unregister);
 const struct ieee80211_authenticator_backend *
 ieee80211_authenticator_backend_get(const char *name)
 {
-	if (backend == NULL)
-		ieee80211_load_module("wlan_radius");
 	return backend && strcmp(backend->iab_name, name) == 0 ? backend : NULL;
 }
 EXPORT_SYMBOL(ieee80211_authenticator_backend_get);
@@ -409,7 +407,7 @@ ieee80211_fix_rate(struct ieee80211_node *ni, int flags)
 	srs = &ic->ic_sup_rates[ieee80211_chan2mode(ni->ni_chan)];
 	nrs = &ni->ni_rates;
 	fixedrate = IEEE80211_FIXED_RATE_NONE;
-	for (i = 0; i < nrs->rs_nrates; ) {
+	for (i = 0; i < nrs->rs_nrates;) {
 		ignore = 0;
 		if (flags & IEEE80211_F_DOSORT) {
 			/*
@@ -431,7 +429,6 @@ ieee80211_fix_rate(struct ieee80211_node *ni, int flags)
 		 * they don't make sense and can lead to trouble later
 		 */
 		if (r == 0) {
-			nrs->rs_nrates--;
 			nrs->rs_nrates--;
 			for (j = i; j < nrs->rs_nrates; j++)
 				nrs->rs_rates[j] = nrs->rs_rates[j + 1];
@@ -1298,7 +1295,8 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 	ostate = vap->iv_state;
 	vap->iv_state = nstate;			/* state transition */
 	del_timer(&vap->iv_mgtsend);
-	if (vap->iv_opmode != IEEE80211_M_HOSTAP && ostate != IEEE80211_S_SCAN)
+	if ((vap->iv_opmode != IEEE80211_M_HOSTAP) && 
+			(ostate != IEEE80211_S_SCAN))
 		ieee80211_cancel_scan(vap);	/* background scan */
 	ni = vap->iv_bss;			/* NB: no reference held */
 	switch (nstate) {
@@ -1498,21 +1496,46 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				 */
 				ieee80211_create_ibss(vap, ic->ic_curchan);
 
-				/*
-				 * In wds mode allocate and initialize peer node
-				 */
+				/* In WDS mode, allocate and initialize peer node. */
 				if (vap->iv_opmode == IEEE80211_M_WDS) {
-					struct ieee80211_node *wds_ni;
-					wds_ni = ieee80211_alloc_node_table(vap, vap->wds_mac);
+					/* XXX: This is horribly non-atomic. */
+					struct ieee80211_node *wds_ni =
+						ieee80211_find_node(&ic->ic_sta,
+								vap->wds_mac);
+
+					if (wds_ni == NULL) {
+						wds_ni = ieee80211_alloc_node_table(
+								vap,
+								vap->wds_mac);
+						if (wds_ni != NULL)
+							ieee80211_add_wds_addr(
+									&ic->ic_sta,
+									wds_ni,
+									vap->wds_mac,
+									1);
+						else
+							IEEE80211_DPRINTF(
+									vap,
+									IEEE80211_MSG_NODE,
+									"%s: Unable to "
+									"allocate node for "
+									"WDS: %s\n",
+									__func__,
+									ether_sprintf(
+										vap->wds_mac)
+									);
+					}
+
 					if (wds_ni != NULL) {
 						ieee80211_ref_node(wds_ni); /* pin in memory */
-						if (ieee80211_add_wds_addr(&ic->ic_sta, wds_ni, vap->wds_mac, 1) == 0) {
-							ieee80211_node_authorize(wds_ni);
-							wds_ni->ni_chan = vap->iv_bss->ni_chan;
-							wds_ni->ni_capinfo = ni->ni_capinfo;
-							wds_ni->ni_associd = 1;
-							wds_ni->ni_ath_flags = vap->iv_ath_cap;
-						}
+						ieee80211_node_authorize(wds_ni);
+						wds_ni->ni_chan =
+							vap->iv_bss->ni_chan;
+						wds_ni->ni_capinfo =
+							ni->ni_capinfo;
+						wds_ni->ni_associd = 1;
+						wds_ni->ni_ath_flags =
+							vap->iv_ath_cap;
 					}
 				}
 				break;
@@ -1534,7 +1557,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				ieee80211_note(vap, "%s with %s ssid ",
 					(vap->iv_opmode == IEEE80211_M_STA ?
 					"associated" : "synchronized "),
-					ether_sprintf(vap->iv_bssid));
+					ether_sprintf(ni->ni_bssid));
 				ieee80211_print_essid(vap->iv_bss->ni_essid,
 					ni->ni_esslen);
 				printf(" channel %d start %uMb\n",
