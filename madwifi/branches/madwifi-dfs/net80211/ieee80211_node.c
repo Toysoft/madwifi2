@@ -269,18 +269,11 @@ EXPORT_SYMBOL(ieee80211_node_unauthorize);
  * to ensure a consistent view by drivers.
  */
 static __inline void
-ieee80211_node_set_chan(struct ieee80211vap *vap, struct ieee80211_node *ni)
+ieee80211_node_set_chan(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
-	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_channel *chan = ic->ic_bsschan;
 
-	if (chan == IEEE80211_CHAN_ANYC) {
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-				  "%s: bss channel not setup for %s\n",
-				  __func__, ether_sprintf(ni->ni_macaddr));
-		return ;
-	}
-
+	KASSERT(chan != IEEE80211_CHAN_ANYC, ("bss channel not setup"));
 	ni->ni_chan = chan;
 #ifdef ATH_SUPERG_XR
 	if (ni->ni_vap->iv_flags & IEEE80211_F_XR)
@@ -313,7 +306,7 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 		"%s: creating ibss on channel %u\n", __func__,
 		ieee80211_chan2ieee(ic, chan));
 
-	/* Check to see if we already have a node for this mac 
+	/* Check to see if we already have a node for this mac
 	 * NB: we gain a node reference here
 	 */
 	ni = ieee80211_find_node(&ic->ic_sta, vap->iv_myaddr);
@@ -384,7 +377,7 @@ ieee80211_create_ibss(struct ieee80211vap* vap, struct ieee80211_channel *chan)
 	 * Fix the channel and related attributes.
 	 */
 	ic->ic_bsschan = chan;
-	ieee80211_node_set_chan(vap, ni);
+	ieee80211_node_set_chan(ic, ni);
 	ic->ic_curmode = ieee80211_chan2mode(chan);
 
 	/* Update country ie information */
@@ -634,9 +627,9 @@ ieee80211_sta_join1(struct ieee80211_node *selbs)
 	 * Check if old+new node have the same ssid in which
 	 * case we can reassociate when operating in sta mode.
 	 */
-	canreassoc = (obss != NULL &&
-		vap->iv_state == IEEE80211_S_RUN && ssid_equal(obss, selbs));
-	vap->iv_bss = selbs; /* Caller provided reference */
+	canreassoc = ((obss != NULL) &&
+		(vap->iv_state == IEEE80211_S_RUN) && ssid_equal(obss, selbs));
+	vap->iv_bss = selbs;
 	IEEE80211_ADDR_COPY(vap->iv_bssid, selbs->ni_bssid);
 	if (obss != NULL)
 		ieee80211_unref_node(&obss);
@@ -758,8 +751,8 @@ ieee80211_sta_leave(struct ieee80211_node *ni)
 	struct ieee80211vap *vap = ni->ni_vap;
 
 	/* WDS/Repeater: Stop software beacon timer for STA */
-	if (vap->iv_opmode == IEEE80211_M_STA &&
-	    vap->iv_flags_ext & IEEE80211_FEXT_SWBMISS) {
+	if ((vap->iv_opmode == IEEE80211_M_STA) &&
+			(vap->iv_flags_ext & IEEE80211_FEXT_SWBMISS)) {
 		del_timer(&vap->iv_swbmiss);
 	}
 
@@ -1304,11 +1297,11 @@ ieee80211_dup_bss(struct ieee80211vap *vap, const u_int8_t *macaddr,
 
 	if (ni != NULL) {
 		copy_bss_state(ni, vap->iv_bss);
-		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bssid);
+		IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
 		/* Do this only for nodes that already have a BSS. Otherwise
 		 * ic_bsschan is not set and we get a KASSERT failure.
 		 * Required by ieee80211_fix_rate */
-		ieee80211_node_set_chan(vap, ni);
+		ieee80211_node_set_chan(vap->iv_ic, ni);
 	}
 	return ni;
 }
@@ -2381,8 +2374,7 @@ EXPORT_SYMBOL(ieee80211_getrssi);
 void
 ieee80211_node_reset(struct ieee80211_node *ni, struct ieee80211vap *vap)
 {
-	/* XXX: Untested use of iv_bssid. */
-	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bssid);
+	IEEE80211_ADDR_COPY(ni->ni_bssid, vap->iv_bss->ni_bssid);
 	ni->ni_prev_vap = ni->ni_vap;
 	ni->ni_vap = vap;
 	ni->ni_ic = vap->iv_ic;
