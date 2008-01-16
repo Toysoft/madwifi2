@@ -4683,8 +4683,11 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		return NULL;
 	}
 
-	if (ath_check_total_radio_silence_not_required(sc, __func__))
+	if (ath_check_total_radio_silence_not_required(sc, __func__)) {
+		DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "%s: skip VAP when DFS requires radio silence\n",
+			__func__);
 		return NULL;
+	}
 
 #ifdef ATH_SUPERG_XR
 	if (vap->iv_flags & IEEE80211_F_XR) {
