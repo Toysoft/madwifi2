@@ -1049,7 +1049,8 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			 * Unrelated fragment or no space for it,
 			 * clear current fragments
 			 */
-			ieee80211_dev_kfree_skb_list(&ni->ni_rxfrag);
+			ieee80211_dev_kfree_skb(&ni->ni_rxfrag);
+			ni->ni_rxfrag = NULL;
 		}
 	}
 
@@ -1180,7 +1181,7 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 			skb1->protocol = __constant_htons(ETH_P_802_2);
 			/* XXX insert vlan tag before queue it? */
 			ni_tmp = SKB_CB(skb1)->ni; /* remember node so we can free it */
-			if ( dev_queue_xmit(skb1) == NET_XMIT_DROP ) {
+			if (dev_queue_xmit(skb1) == NET_XMIT_DROP) {
 				/* If queue dropped the packet because device was
 				 * too busy */
 				vap->iv_devstats.tx_dropped++;
@@ -1693,7 +1694,7 @@ bad:
 		IEEE80211_DISCARD(vap, IEEE80211_MSG_ELEMID,		\
 			wh, ieee80211_mgt_subtype_name[subtype >>	\
 				IEEE80211_FC0_SUBTYPE_SHIFT],		\
-			"%s", "no " #__elem );				\
+			"%s", "no " #__elem);				\
 		vap->iv_stats.is_rx_elem_missing++;			\
 		return;							\
 	}								\
@@ -2915,21 +2916,60 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 
 /* XXX. Not the right place for such a definition */
 struct l2_update_frame {
-	struct ether_header eh;
-	u8 dsap;
-	u8 ssap;
+	u8 da[ETH_ALEN]; /* broadcast */
+	u8 sa[ETH_ALEN]; /* STA addr */
+	__be16 len; /* 6 */
+	u8 dsap; /* null DSAP address */
+	u8 ssap; /* null SSAP address, CR=Response */
 	u8 control;
-	u8 xid[3];
-}  __packed;
+	u8 xid_info[3];
+} __attribute__ ((packed));
+
 
 static void
-ieee80211_deliver_l2uf(struct ieee80211_node *ni)
+ieee80211_deliver_l2_rnr(struct ieee80211_node *ni)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct net_device *dev = vap->iv_dev;
 	struct sk_buff *skb;
 	struct l2_update_frame *l2uf;
-	struct ether_header *eh;
+
+	skb = ieee80211_dev_alloc_skb(sizeof(*l2uf));
+	if (skb == NULL) {
+		return;
+	}
+	skb_put(skb, sizeof(*l2uf));
+	l2uf = (struct l2_update_frame *)(skb->data);
+	/* dst: Broadcast address */
+	memcpy(l2uf->da, dev->broadcast, ETH_ALEN);
+	/* src: associated STA */
+	memcpy(l2uf->sa, ni->ni_macaddr, ETH_ALEN);
+	l2uf->len  = htons(6);
+	l2uf->dsap = 0;
+	l2uf->ssap = 0;
+	l2uf->control = 0xf5;
+	l2uf->xid_info[0] = 0x81;
+	l2uf->xid_info[1] = 0x80;
+	l2uf->xid_info[2] = 0x00;
+
+	skb->dev = dev;
+	/* eth_trans_type modifies skb state (skb_pull(ETH_HLEN)), so use
+	 * constants instead. We know the packet type anyway. */
+	skb->pkt_type = PACKET_BROADCAST;
+	skb->protocol = htons(ETH_P_802_2);
+	skb_reset_mac_header(skb);
+
+	ieee80211_deliver_data(ni, skb);
+	return;
+}
+
+static void
+ieee80211_deliver_l2_xid(struct ieee80211_node *ni)
+{
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct net_device *dev = vap->iv_dev;
+	struct sk_buff *skb;
+	struct l2_update_frame *l2uf;
 
 	skb = ieee80211_dev_alloc_skb(sizeof(*l2uf));
 	if (skb == NULL) {
@@ -2938,20 +2978,19 @@ ieee80211_deliver_l2uf(struct ieee80211_node *ni)
 	/* Leak check / cleanup destructor */
 	skb_put(skb, sizeof(*l2uf));
 	l2uf = (struct l2_update_frame *)(skb->data);
-	eh = &l2uf->eh;
 	/* dst: Broadcast address */
-	IEEE80211_ADDR_COPY(eh->ether_dhost, dev->broadcast);
+	memcpy(l2uf->da, dev->broadcast, ETH_ALEN);
 	/* src: associated STA */
-	IEEE80211_ADDR_COPY(eh->ether_shost, ni->ni_macaddr);
-	eh->ether_type = htons(skb->len - sizeof(*eh));
-
-	l2uf->dsap = 0;
-	l2uf->ssap = 0;
-	l2uf->control = 0xf5;
-	l2uf->xid[0] = 0x81;
-	l2uf->xid[1] = 0x80;
-	l2uf->xid[2] = 0x00;
-
+	memcpy(l2uf->sa, ni->ni_macaddr, ETH_ALEN);
+	l2uf->len  = htons(6);
+	l2uf->dsap = 0x00; /* NULL DSAP address */
+	l2uf->ssap = 0x01;/* NULL SSAP address, CR Bit: Response */
+	l2uf->control = 0xaf; /* XID response lsb.1111F101.
+		  	       * F=0 (no poll command; unsolicited frame) */
+	l2uf->xid_info[0] = 0x81; /* XID format identifier */
+	l2uf->xid_info[1] = 1; /* LLC types/classes: Type 1 LLC */
+	l2uf->xid_info[2] = 1 << 1; /* XID sender's receive window size (RW)
+				   * FIX: what is correct RW with 802.11? */
 	skb->dev = dev;
 	/* eth_trans_type modifies skb state (skb_pull(ETH_HLEN)), so use
 	 * constants instead. We know the packet type anyway. */
@@ -3012,9 +3051,8 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_ASSOC,
 		"%s: vap:%p[" MAC_FMT "] ni:%p[" MAC_FMT "]\n",
-		__func__, vap, MAC_ADDR(vap->iv_bssid),
-		ni_or_null, MAC_ADDR(wh->i_addr2));
-
+		__func__, vap, MAC_ADDR(vap->iv_bss->ni_bssid),
+		ni, MAC_ADDR(ni->ni_macaddr));
 
 	/* forward management frame to application */
 	if (vap->iv_opmode != IEEE80211_M_MONITOR)
@@ -3204,7 +3242,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		 */
 		if (vap->iv_opmode == IEEE80211_M_STA &&
 		    ni->ni_associd != 0 &&
-		    IEEE80211_ADDR_EQ(wh->i_addr2, vap->iv_bssid)) {
+		    IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_bssid)) {
 			/* record tsf of last beacon */
 			memcpy(ni->ni_tstamp.data, scan.tstamp,
 				sizeof(ni->ni_tstamp));
@@ -3344,7 +3382,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		}
 		if ((vap->iv_opmode == IEEE80211_M_IBSS) && 
 				(scan.capinfo & IEEE80211_CAPINFO_IBSS)) {
-			if (ni_or_null == NULL) {
+			if (ni == vap->iv_bss) {
 				/* Create a new entry in the neighbor table. */
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
 			} else {
@@ -3405,7 +3443,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
  * XR vap does not process  probe requests.
  */
 #ifdef ATH_SUPERG_XR
-	if (vap->iv_flags & IEEE80211_F_XR )
+	if (vap->iv_flags & IEEE80211_F_XR)
 		return;
 #endif
 		/*
@@ -3508,7 +3546,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		seq    = le16toh(*(__le16 *)(frm + 2));
 		status = le16toh(*(__le16 *)(frm + 4));
 #ifdef ATH_SUPERG_XR
-		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
+		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bss->ni_bssid)) {
 			/*
 			 * node roaming between XR and normal vaps. 
 			 * this can only happen in AP mode. disaccociate from
@@ -3608,7 +3646,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		 *	[tlv] Atheros Advanced Capabilities
 		 */
 		IEEE80211_VERIFY_LENGTH(efrm - frm, (reassoc ? 10 : 4));
-		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
+		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bss->ni_bssid)) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY,
 				wh, ieee80211_mgt_subtype_name[subtype >>
 					IEEE80211_FC0_SUBTYPE_SHIFT],
@@ -3816,8 +3854,9 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 
 		ieee80211_saveath(ni, ath);
 
-		/* Send TGf L2UF frame on behalf of newly associated station */
-		ieee80211_deliver_l2uf(ni);
+		/* Send Receiver Not Ready (RNR) followed by XID for newly associated stations */
+		ieee80211_deliver_l2_rnr(ni);
+		ieee80211_deliver_l2_xid(ni);
 		ieee80211_node_join(ni, resp);
 #ifdef ATH_SUPERG_XR
 		if (ni->ni_prev_vap &&
@@ -4212,9 +4251,9 @@ ieee80211_note(struct ieee80211vap *vap, const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	printk("%s/%s[" MAC_FMT "]: %s", 
-	       vap->iv_ic->ic_dev->name, vap->iv_dev->name, 
-	       MAC_ADDR(vap->iv_myaddr), 
+	printk("%s/%s[" MAC_FMT "]: %s",
+	       vap->iv_ic->ic_dev->name, vap->iv_dev->name,
+	       MAC_ADDR(vap->iv_myaddr),
 	       buf);	/* NB: no \n */
 }
 EXPORT_SYMBOL(ieee80211_note);
@@ -4229,9 +4268,9 @@ ieee80211_note_frame(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n", 
+	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n",
 		vap->iv_ic->ic_dev->name, vap->iv_dev->name,
-	        MAC_ADDR(vap->iv_myaddr), 
+	        MAC_ADDR(vap->iv_myaddr),
 		MAC_ADDR(ieee80211_getbssid(vap, wh)), buf);
 }
 EXPORT_SYMBOL(ieee80211_note_frame);
@@ -4246,9 +4285,9 @@ ieee80211_note_mac(struct ieee80211vap *vap, const u_int8_t mac[IEEE80211_ADDR_L
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n", 
+	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n",
 	       vap->iv_ic->ic_dev->name, vap->iv_dev->name,
-	       MAC_ADDR(vap->iv_myaddr), 
+	       MAC_ADDR(vap->iv_myaddr),
 	       MAC_ADDR(mac), buf);
 }
 EXPORT_SYMBOL(ieee80211_note_mac);
@@ -4263,12 +4302,12 @@ ieee80211_discard_frame(struct ieee80211vap *vap, const struct ieee80211_frame *
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n", 
+	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n",
 	       vap->iv_ic->ic_dev->name, vap->iv_dev->name,
 	       MAC_ADDR(vap->iv_myaddr),
 	       MAC_ADDR(wh->i_addr2),
-	       (type != NULL) ? type : "", 
-	       (type != NULL) ? " " : "", 
+	       (type != NULL) ? type : "",
+	       (type != NULL) ? " " : "",
 	       buf);
 }
 
@@ -4284,11 +4323,11 @@ ieee80211_discard_ie(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
 	va_end(ap);
 	printk("%s/%s[" MAC_FMT "]: "
 	       MAC_FMT " discard %s%sinformation element, %s\n",
-		vap->iv_ic->ic_dev->name, vap->iv_dev->name, 
-		MAC_ADDR(vap->iv_myaddr), 
-		MAC_ADDR(ieee80211_getbssid(vap, wh)), 
-		(type != NULL) ? type : "", 
-		(type != NULL) ? " " : "", 
+		vap->iv_ic->ic_dev->name, vap->iv_dev->name,
+		MAC_ADDR(vap->iv_myaddr),
+		MAC_ADDR(ieee80211_getbssid(vap, wh)),
+		(type != NULL) ? type : "",
+		(type != NULL) ? " " : "",
 	        buf);
 }
 
@@ -4302,13 +4341,13 @@ ieee80211_discard_mac(struct ieee80211vap *vap, const u_int8_t mac[IEEE80211_ADD
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n", 
-	       vap->iv_ic->ic_dev->name, 
+	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n",
+	       vap->iv_ic->ic_dev->name,
 	       vap->iv_dev->name,
-	       MAC_ADDR(vap->iv_myaddr), 
-	       MAC_ADDR(mac), 
-	       (type != NULL) ? type : "", 
-	       (type != NULL) ? " " : "", 
+	       MAC_ADDR(vap->iv_myaddr),
+	       MAC_ADDR(mac),
+	       (type != NULL) ? type : "",
+	       (type != NULL) ? " " : "",
 	       buf);
 }
 #endif /* IEEE80211_DEBUG */
