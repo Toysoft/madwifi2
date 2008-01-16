@@ -533,7 +533,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ATH_RXBUF_LOCK_INIT(sc);
 
 	ATH_INIT_TQUEUE(&sc->sc_rxtq,     ath_rx_tasklet,	dev);
-	ATH_INIT_TQUEUE(&sc->sc_txtq,     ath_tx_tasklet,	dev);
+	ATH_INIT_TQUEUE(&sc->sc_txtq,	  ath_tx_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bmisstq,  ath_bmiss_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_bstucktq, ath_bstuck_tasklet,	dev);
 	ATH_INIT_TQUEUE(&sc->sc_rxorntq,  ath_rxorn_tasklet,	dev);
@@ -1683,8 +1683,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc)
 			}
 			skb = bf->bf_skb;
 			if (skb == NULL) {
-				printk("%s: %s: no skbuff\n",
-				       DEV_NAME(sc->sc_dev), __func__);
+				printk("%s: no skbuff\n", __func__);
 				continue;
 			}
 
@@ -2743,7 +2742,7 @@ ath_reset(struct net_device *dev)
  * if AH_NEED_DESC_SWAP flag is not defined this becomes a "null"
  * function.
  */
-static void
+static __inline void
 ath_desc_swap(struct ath_desc *ds)
 {
 #ifdef AH_NEED_DESC_SWAP
@@ -2760,12 +2759,13 @@ ath_desc_swap(struct ath_desc *ds)
  * Insert a buffer on a txq
  *
  */
-static void
+static __inline void
 ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	struct ath_txq *txq, struct ath_buf *bf,
 	struct ath_desc *lastds, int framelen)
 {
 	struct ath_hal *ah = sc->sc_ah;
+
 	if (ath_check_radio_silence_not_required(sc, __func__))
 		return;
 	/*
@@ -3469,8 +3469,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	 */
 	bf = ath_take_txbuf_mgmt(sc);
 	if (bf == NULL) {
-		printk("%s: %s: discard, no xmit buf\n",
-		       DEV_NAME(dev), __func__);
+		printk("ath_mgtstart: discard, no xmit buf\n");
 		sc->sc_stats.ast_tx_nobufmgt++;
 		error = -ENOBUFS;
 		goto bad;
@@ -4709,6 +4708,8 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 	if (ieee80211_beacon_update(bf->bf_node, &avp->av_boff, skb, ncabq)) {
 		bus_unmap_single(sc->sc_bdev,
 			bf->bf_skbaddr, curlen, BUS_DMA_TODEVICE);
+		bf->bf_skbaddr = 0;
+
 		bf->bf_skbaddr = bus_map_single(sc->sc_bdev,
 			skb->data, skb->len, BUS_DMA_TODEVICE);
 	}
@@ -5053,7 +5054,6 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	/* We should reset hw TSF only once, so we increment
 	 * ni_tstamp.tsf to avoid resetting the hw TSF multiple
 	 * times */
-
 	if (tsf == 0) {
 		reset_tsf = 1;
 		ni->ni_tstamp.tsf = cpu_to_le64(1);
@@ -5085,7 +5085,6 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		nexttbtt = intval;
 	} else if (intval) {	/* NB: can be 0 for monitor mode */
 		if (tsf == 1) {
-
 			/* We have not received any beacons or probe
 			 * responses. Since a beacon should be sent
 			 * every 'intval' ms, we compute the next
@@ -5096,11 +5095,10 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
  			nexttbtt = roundup(hw_tsftu + FUDGE, intval);
 		} else {
 			if (tsf > hw_tsf) {
-
-			  /* We received a beacon, but the HW TSF has
-			   * not been updated (otherwise hw_tsf > tsf)
-			   * We cannot use the hardware TSF, so we
-			   * wait to synchronize beacons again. */
+				/* We received a beacon, but the HW TSF has
+				 * not been updated (otherwise hw_tsf > tsf)
+				 * We cannot use the hardware TSF, so we
+				 * wait to synchronize beacons again. */
 				sc->sc_syncbeacon = 1;
 				goto ath_beacon_config_debug;
 			} else {
@@ -5121,7 +5119,6 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		/* Setup DTIM and CTP parameters according to last
 		 * beacon we received (which may not have
 		 * happened). */
-
 		dtimperiod = vap->iv_dtim_period;
 		if (dtimperiod <= 0)		/* NB: 0 if not known */
 			dtimperiod = 1;
@@ -5264,8 +5261,9 @@ ath_beacon_config_debug:
 				"%s: no beacon received...\n", __func__);
 		} else {
 			if (tsf > hw_tsf) {
-			  /* We did receive a beacon but the hw TSF has not been updated
-			   * - must have been a different BSSID */
+				/* We did receive a beacon but the hw TSF has 
+				 * not been updated - must have been a 
+				 * different BSSID */
 				DPRINTF(sc, ATH_DEBUG_BEACON,
 					"%s: beacon received, but TSF has not "
 					"been updated\n", __func__);
@@ -6447,27 +6445,21 @@ rx_accept:
 		skb_put(skb, len);
 		skb->protocol = __constant_htons(ETH_P_CONTROL);
 
-		if (sc->sc_nmonvaps > 0) {
-			/*
-			 * Some vap is in monitor mode, so send to
-			 * ath_rx_capture for monitor encapsulation
-			 */
 #if 0
-			if (len < IEEE80211_ACK_LEN) {
-				DPRINTF(sc, ATH_DEBUG_RECV,
+		if (len < IEEE80211_ACK_LEN) {
+			DPRINTF(sc, ATH_DEBUG_RECV,
 					"%s: runt packet %d\n", __func__, len);
-				sc->sc_stats.ast_rx_tooshort++;
-				ieee80211_dev_kfree_skb(&skb);
-				goto rx_next;
-			}
-#endif
-			ath_rx_capture(dev, bf, skb, bf->bf_tsf);
+			sc->sc_stats.ast_rx_tooshort++;
+			ieee80211_dev_kfree_skb(&skb);
+			goto rx_next;
 			if (sc->sc_ic.ic_opmode == IEEE80211_M_MONITOR) {
 				/* no other VAPs need the packet */
 				ieee80211_dev_kfree_skb(&skb);
 				goto rx_next;
 			}
 		}
+#endif
+		ath_rx_capture(dev, bf, skb, bf->bf_tsf);
 
 		/*
 		 * Finished monitor mode handling, now reject
@@ -8929,8 +8921,9 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		sc->sc_curaid = ni->ni_associd;
 		IEEE80211_ADDR_COPY(sc->sc_curbssid, vap->iv_bssid);
 		DPRINTF(sc, ATH_DEBUG_BEACON,
-			"%s: sc_curbssid " MAC_FMT "\n",
-			__func__, MAC_ADDR(sc->sc_curbssid));
+			"%s: sc_curbssid " MAC_FMT " from " MAC_FMT "\n",
+			__func__, MAC_ADDR(sc->sc_curbssid),
+			MAC_ADDR(ni->ni_macaddr));
 	} else
 		sc->sc_curaid = 0;
 
@@ -8947,7 +8940,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 	}
 
 	if ((vap->iv_opmode != IEEE80211_M_STA) &&
-		 (vap->iv_flags & IEEE80211_F_PRIVACY)) {
+			(vap->iv_flags & IEEE80211_F_PRIVACY)) {
 		for (i = 0; i < IEEE80211_WEP_NKID; i++)
 			if (ath_hal_keyisvalid(ah, i))
 				ath_hal_keysetmac(ah, i, vap->iv_bssid);
@@ -10246,7 +10239,7 @@ ath_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		if (!capable(CAP_NET_ADMIN))
 			error = -EPERM;
 		else
-			error = ath_ioctl_diag(sc, (struct ath_diag *) ifr);
+			error = ath_ioctl_diag(sc, (struct ath_diag *)ifr);
 		break;
 	case SIOCETHTOOL:
 		if (copy_from_user(&cmd, ifr->ifr_data, sizeof(cmd)))
@@ -10294,19 +10287,19 @@ enum {
 	ATH_RXANTENNA		= 10,
 	ATH_DIVERSITY		= 11,
 	ATH_TXINTRPERIOD	= 12,
-	ATH_FFTXQMIN		= 18,
-	ATH_XR_POLL_PERIOD	= 19,
-	ATH_XR_POLL_COUNT	= 20,
-	ATH_ACKRATE             = 21,
-	ATH_rp         		= 22,
-	ATH_rp_PRINT   		= 23,
-	ATH_rp_PRINT_ALL 	= 24,
-	ATH_rp_PRINT_MEM 	= 25,
-	ATH_rp_PRINT_MEM_ALL 	= 26,
-	ATH_rp_FLUSH   		= 27,
-	ATH_PANIC               = 28,
-	ATH_rp_IGNORED 		= 29,
-	ATH_RADAR_IGNORED       = 30,
+	ATH_FFTXQMIN		= 13,
+	ATH_XR_POLL_PERIOD	= 14,
+	ATH_XR_POLL_COUNT	= 15,
+	ATH_ACKRATE		= 16,
+	ATH_rp         		= 17,
+	ATH_rp_PRINT   		= 18,
+	ATH_rp_PRINT_ALL 	= 19,
+	ATH_rp_PRINT_MEM 	= 20,
+	ATH_rp_PRINT_MEM_ALL 	= 21,
+	ATH_rp_FLUSH   		= 22,
+	ATH_PANIC               = 23,
+	ATH_rp_IGNORED 		= 24,
+	ATH_RADAR_IGNORED       = 25,
 };
 
 static int
