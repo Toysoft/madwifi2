@@ -1477,6 +1477,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 					struct ieee80211_node *wds_ni;
 					wds_ni = ieee80211_alloc_node_table(vap, vap->wds_mac);
 					if (wds_ni != NULL) {
+						ieee80211_ref_node(wds_ni); /* pin in memory */
 						if (ieee80211_add_wds_addr(&ic->ic_sta, wds_ni, vap->wds_mac, 1) == 0) {
 							ieee80211_node_authorize(wds_ni);
 							wds_ni->ni_chan = vap->iv_bss->ni_chan;
