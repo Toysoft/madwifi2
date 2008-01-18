@@ -848,7 +848,7 @@ ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *ic)
 	for (i = 0; i < ic->ic_nchans; i++) {
 		c = &ic->ic_channels[i];
 		if (c->ic_flags & IEEE80211_CHAN_RADAR) {
-			if (timeval_compare(&c->ic_non_occupancy_period,
+			if (timeval_compare(&ic->ic_chan_non_occupy[i],
 					    &tv_now) < 0) {
 				if_printf(dev,
 					  "Returning channel %3d (%4d MHz) radar avoidance marker expired.  Channel now available again. -- Time: %10ld.%06ld\n",
@@ -859,9 +859,9 @@ ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *ic)
 				if_printf(dev,
 					  "Channel %3d (%4d MHz) is still marked for radar.  Channel will become usable in %u seconds at Time: %10ld.%06ld\n",
 					  c->ic_ieee, c->ic_freq,
-					  c->ic_non_occupancy_period.tv_sec - tv_now.tv_sec,
-					  c->ic_non_occupancy_period.tv_sec,
-					  c->ic_non_occupancy_period.tv_usec);
+					  ic->ic_chan_non_occupy[i].tv_sec - tv_now.tv_sec,
+					  ic->ic_chan_non_occupy[i].tv_sec,
+					  ic->ic_chan_non_occupy[i].tv_usec);
 			}
 		}
 	}
@@ -888,11 +888,11 @@ ieee80211_update_dfs_channel_non_occupancy_timer(struct ieee80211com *ic)
 		if (chan->ic_flags & IEEE80211_CHAN_RADAR) {
 			if ((tv_next.tv_sec == 0) &&
 			    (tv_next.tv_usec == 0)) {
-				tv_next = chan->ic_non_occupancy_period;
+				tv_next = ic->ic_chan_non_occupy[i];
 			}
-			if (timeval_compare(&chan->ic_non_occupancy_period,
+			if (timeval_compare(&ic->ic_chan_non_occupy[i],
 					    &tv_next) < 0) {
-				tv_next = chan->ic_non_occupancy_period;
+				tv_next = ic->ic_chan_non_occupy[i];
 			}
 		}
 	}
@@ -957,12 +957,23 @@ ieee80211_expire_dfs_channel_non_occupancy_timer(unsigned long data)
 					ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 					ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 				} else {
-					IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-							  "%s: Desired channel found"
-							  " and not available until Time: %10ld.%06ld\n",
-							  __func__,
-							  des_chan->ic_non_occupancy_period.tv_sec,
-							  des_chan->ic_non_occupancy_period.tv_usec);
+					if (ieee80211_msg_is_reported(vap, IEEE80211_MSG_DOTH)) {
+						/* Find the desired channel in ic_channels, so
+						 * we can find the index into ic_chan_non_occupy */
+						int i_des_chan = -1, i = 0;
+						for (i=0; i<ic->ic_nchans; i++) {
+							if (des_chan == &ic->ic_channels[i]) {
+								i_des_chan = i;
+								break;
+							}
+						}
+						IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+								  "%s: Desired channel found"
+								  " and not available until Time: %10ld.%06ld\n",
+								  __func__,
+								  ic->ic_chan_non_occupy[i_des_chan].tv_sec,
+								  ic->ic_chan_non_occupy[i_des_chan].tv_usec);
+					}
 				}
 			}
 		}
@@ -996,14 +1007,14 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 				c = &ic->ic_channels[i];
 				if (c->ic_freq == ichan->ic_freq) {
 					c->ic_flags |= IEEE80211_CHAN_RADAR;
-					c->ic_non_occupancy_period.tv_sec = tv_now.tv_sec + avoidance_time;
-					c->ic_non_occupancy_period.tv_usec = tv_now.tv_usec;
+					ic->ic_chan_non_occupy[i].tv_sec = tv_now.tv_sec + avoidance_time;
+					ic->ic_chan_non_occupy[i].tv_usec = tv_now.tv_usec;
 
 					if_printf(dev, "Channel %3d (%4d MHz) will become usable in %u seconds.  Suspending use of the channel until: %ld.%06ld\n",
 						  ichan->ic_ieee, ichan->ic_freq,
 						  avoidance_time,
-						  c->ic_non_occupancy_period.tv_sec,
-						  c->ic_non_occupancy_period.tv_usec);
+						  ic->ic_chan_non_occupy[i].tv_sec,
+						  ic->ic_chan_non_occupy[i].tv_usec);
 				}
 			}
 
