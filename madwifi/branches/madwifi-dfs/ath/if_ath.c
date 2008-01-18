@@ -3252,10 +3252,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	if (txq->axq_depth > TAIL_DROP_COUNT) {
 		sc->sc_stats.ast_tx_discard++;
-		/* queue is full, let the kernel backlog the skb */
-		netif_stop_queue(dev);
 		requeue = 1;
-               
 		goto hardstart_fail;
 	}
 #endif
@@ -3268,7 +3265,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		skb = skb_copy(skb, GFP_ATOMIC);
 		if (skb == NULL) {
 			requeue = 1;
-			netif_stop_queue(dev);
 			goto hardstart_fail;
 		}
 		/* If the clone works, bump the reference count for our copy. */
@@ -3317,6 +3313,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			bf = ath_take_txbuf(sc);
 			if (bf == NULL) {
 				ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
+				requeue = 1;
 				goto hardstart_fail;
 			}
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
@@ -3367,7 +3364,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			}
 			bf = ath_take_txbuf(sc);
 			if (bf == NULL) {
-				netif_stop_queue(dev);
 				requeue = 1;
 				goto hardstart_fail;
 			}
@@ -3385,6 +3381,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		bf = ath_take_txbuf(sc);
 		if (bf == NULL) {
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
+			requeue = 1;
 			goto hardstart_fail;
 		}
 	}
@@ -3398,6 +3395,7 @@ ff_bypass:
 
 	bf = ath_take_txbuf(sc);
 	if (bf == NULL) {
+		requeue = 1;
 		goto hardstart_fail;
 	}
 
@@ -3485,6 +3483,9 @@ hardstart_fail:
 	/* Pass control of the skb to the caller (i.e., resources are their 
 	 * problem). */
 	if (requeue) {
+		/* queue is full, let the kernel backlog the skb */
+		netif_stop_queue(dev);
+		sc->sc_devstopped = 1;
 		/* Stop tracking again we are giving it back*/
 		ieee80211_skb_untrack(skb);
 		return NETDEV_TX_BUSY;
