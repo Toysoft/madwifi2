@@ -3218,8 +3218,10 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	if (SKB_CB(skb)->flags & M_RAW) {
 		bf = ath_take_txbuf(sc);
-		if (bf == NULL)
+		if (bf == NULL) {
+			requeue = 1;
 			goto hardstart_fail;
+		}
 		ath_tx_startraw(dev, bf, skb);
 		return NETDEV_TX_OK;
 	}
@@ -3237,8 +3239,10 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (M_FLAG_GET(skb, M_UAPSD)) {
 		/* bypass FF handling */
 		bf = ath_take_txbuf(sc);
-		if (bf == NULL)
+		if (bf == NULL) {
+			requeue = 1;
 			goto hardstart_fail;
+		}
 		goto ff_bypass;
 	}
 
