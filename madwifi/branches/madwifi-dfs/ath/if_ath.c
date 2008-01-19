@@ -3226,7 +3226,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		return NETDEV_TX_OK;
 	}
 
-	eh = (struct ether_header *)skb->data;
 	ni = SKB_CB(skb)->ni;		/* NB: always passed down by 802.11 layer */
 	if (ni == NULL) {
 		/* NB: this happens if someone marks the underlying device up */
@@ -3255,7 +3254,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	txq = sc->sc_ac2q[skb->priority];
 
 	if (txq->axq_depth > TAIL_DROP_COUNT) {
-		sc->sc_stats.ast_tx_discard++;
 		requeue = 1;
 		goto hardstart_fail;
 	}
