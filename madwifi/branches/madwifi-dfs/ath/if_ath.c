@@ -6225,15 +6225,18 @@ done:
  * including those belonging to other BSS.
  */
 static void
-ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
+ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 	struct sk_buff *skb, int subtype, int rssi, u_int64_t rtsf)
 {
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
-	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
+        struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
+	struct ieee80211_node * ni = ni_or_null;
 	u_int64_t hw_tsf, beacon_tsf;
 	u_int32_t hw_tu, beacon_tu, intval;
 	int do_merge = 0;
 
+	if (ni_or_null == NULL)
+		ni = vap->iv_bss;
 	DPRINTF(sc, ATH_DEBUG_BEACON,
 		"%s: vap:%p[" MAC_FMT "] ni:%p[" MAC_FMT "]\n",
 		__func__, vap, MAC_ADDR(vap->iv_bssid),
@@ -6242,7 +6245,7 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni,
 	/*Call up first so subsequent work can use information
 	 * potentially stored in the node (e.g. for ibss merge). */
 
-	sc->sc_recv_mgmt(vap, ni, skb, subtype, rssi, rtsf);
+	sc->sc_recv_mgmt(vap, ni_or_null, skb, subtype, rssi, rtsf);
 
 
 	/* Lookup the new node if any (this grabs a reference to it) */
