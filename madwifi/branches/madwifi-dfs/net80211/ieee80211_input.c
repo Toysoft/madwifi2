@@ -950,7 +950,6 @@ ieee80211_input_all(struct ieee80211com *ic,
 
 	/* XXX locking */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		struct ieee80211_node *ni;
 		struct sk_buff *skb1;
 
 		if (TAILQ_NEXT(vap, iv_next) != NULL) {
@@ -964,12 +963,7 @@ ieee80211_input_all(struct ieee80211com *ic,
 			skb1 = skb;
 			skb = NULL;
 		}
-		/* This function does not 'own' vap->iv_bss, so we cannot 
-		 * guarantee its existence during the following call, hence
-		 * briefly grab our own reference. */
-		ni = ieee80211_ref_node(vap->iv_bss);
-		type = ieee80211_input(vap, ni, skb1, rssi, rtsf);
-		ieee80211_unref_node(&ni);
+		type = ieee80211_input(vap, NULL, skb1, rssi, rtsf);
 	}
 	if (skb != NULL)		/* no vaps, reclaim skb */
 		ieee80211_dev_kfree_skb(&skb);
