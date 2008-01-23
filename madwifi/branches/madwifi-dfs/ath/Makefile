@@ -54,8 +54,8 @@ BUSNAME=pci
 COPTS+= -DATH_PCI
 endif
 
-# You need to either define DFS_DOMAIN_ETSI or DFS_DOMAIN_FCC
-COPTS	+= -DDFS_DOMAIN_ETSI
+# These flags select which radar signatures DFS will match
+COPTS	+= -DDFS_DOMAIN_ETSI -DDFS_DOMAIN_FCC
 
 include $(TOP)/Makefile.inc
 
