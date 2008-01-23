@@ -408,7 +408,6 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		}
 	}
 
-	/* FIXME : should this code be enabled for IBSS VAP ? */
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {	/* NB: no IBSS support*/
 		struct ieee80211_tim_ie *tie =
 			(struct ieee80211_tim_ie *) bo->bo_tim;
