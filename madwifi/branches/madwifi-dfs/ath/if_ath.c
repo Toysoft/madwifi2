@@ -10408,14 +10408,14 @@ enum {
 	ATH_XR_POLL_PERIOD	= 14,
 	ATH_XR_POLL_COUNT	= 15,
 	ATH_ACKRATE		= 16,
-	ATH_rp         		= 17,
-	ATH_rp_PRINT   		= 18,
-	ATH_rp_PRINT_ALL 	= 19,
-	ATH_rp_PRINT_MEM 	= 20,
-	ATH_rp_PRINT_MEM_ALL 	= 21,
-	ATH_rp_FLUSH   		= 22,
+	ATH_RP         		= 17,
+	ATH_RP_PRINT   		= 18,
+	ATH_RP_PRINT_ALL 	= 19,
+	ATH_RP_PRINT_MEM 	= 20,
+	ATH_RP_PRINT_MEM_ALL 	= 21,
+	ATH_RP_FLUSH   		= 22,
 	ATH_PANIC               = 23,
-	ATH_rp_IGNORED 		= 24,
+	ATH_RP_IGNORED 		= 24,
 	ATH_RADAR_IGNORED       = 25,
 	ATH_MAXVAPS  		= 26,
 };
@@ -10432,11 +10432,11 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
 
-	/* special case for ATH_rp which expect 3 integers : tsf rssi
+	/* special case for ATH_RP which expect 3 integers : tsf rssi
 	 * width. It should be noted that tsf is unsigned 64 bits but the
 	 * sysctl API is only unsigned 32 bits. As a result, tsf might get
 	 * truncated */
-	if (ctl->extra2 == (void *)ATH_rp) {
+	if (ctl->extra2 == (void *)ATH_RP) {
 	  ctl->data = &tab_3_val;
 	  ctl->maxlen = sizeof(tab_3_val);
 	}
@@ -10557,7 +10557,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				sc->sc_ackrate = val;
 				ath_set_ack_bitrate(sc, sc->sc_ackrate);
 				break;
-			case ATH_rp:
+			case ATH_RP:
 				ath_rp_record(sc,
 						tab_3_val[0],
 						tab_3_val[1],
@@ -10567,23 +10567,23 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				/* we analyze pulses in a separate tasklet */
 				ATH_SCHEDULE_TQUEUE(&sc->sc_rp_tq, NULL);
 				break;
-			case ATH_rp_PRINT:
+			case ATH_RP_PRINT:
 				if (val)
 					ath_rp_print(sc,1);
 				break;
-			case ATH_rp_PRINT_ALL:
+			case ATH_RP_PRINT_ALL:
 				if (val)
 					ath_rp_print(sc,0);
 				break;
-			case ATH_rp_PRINT_MEM:
+			case ATH_RP_PRINT_MEM:
 				if (val)
 					ath_rp_print_mem(sc,0);
 				break;
-			case ATH_rp_PRINT_MEM_ALL:
+			case ATH_RP_PRINT_MEM_ALL:
 				if (val)
 					ath_rp_print_mem(sc,0);
 				break;
-			case ATH_rp_FLUSH:
+			case ATH_RP_FLUSH:
 				if (val)
 					ath_rp_flush(sc);
 				break;
@@ -10593,7 +10593,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 					*p = 0xcacadede;
 				}
 				break;
-			case ATH_rp_IGNORED:
+			case ATH_RP_IGNORED:
 				sc->sc_rp_ignored = val;
 				break;
 			case ATH_RADAR_IGNORED:
@@ -10659,7 +10659,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 		case ATH_ACKRATE:
 			val = sc->sc_ackrate;
 			break;
-		case ATH_rp_IGNORED:
+		case ATH_RP_IGNORED:
 			val = sc->sc_rp_ignored;
 			break;
 		case ATH_RADAR_IGNORED:
@@ -10792,37 +10792,37 @@ static const ctl_table ath_sysctl_template[] = {
 	  .procname     = "rp",
 	  .mode         = 0200,
 	  .proc_handler = ath_sysctl_halparam,
-	  .extra2	= (void *)ATH_rp,
+	  .extra2	= (void *)ATH_RP,
 	},
 	{ .ctl_name	= CTL_AUTO,
 	  .procname     = "radar_print",
 	  .mode         = 0200,
 	  .proc_handler = ath_sysctl_halparam,
-	  .extra2	= (void *)ATH_rp_PRINT,
+	  .extra2	= (void *)ATH_RP_PRINT,
 	},
 	{ .ctl_name	= CTL_AUTO,
 	  .procname     = "radar_print_all",
 	  .mode         = 0200,
 	  .proc_handler = ath_sysctl_halparam,
-	  .extra2	= (void *)ATH_rp_PRINT_ALL,
+	  .extra2	= (void *)ATH_RP_PRINT_ALL,
 	},
 	{ .ctl_name	= CTL_AUTO,
 	  .procname     = "radar_dump",
 	  .mode         = 0200,
 	  .proc_handler = ath_sysctl_halparam,
-	  .extra2	= (void *)ATH_rp_PRINT_MEM,
+	  .extra2	= (void *)ATH_RP_PRINT_MEM,
 	},
 	{ .ctl_name	= CTL_AUTO,
 	  .procname     = "radar_dump_all",
 	  .mode         = 0200,
 	  .proc_handler = ath_sysctl_halparam,
-	  .extra2	= (void *)ATH_rp_PRINT_MEM_ALL,
+	  .extra2	= (void *)ATH_RP_PRINT_MEM_ALL,
 	},
 	{ .ctl_name	= CTL_AUTO,
 	  .procname     = "rp_flush",
 	  .mode         = 0200,
 	  .proc_handler = ath_sysctl_halparam,
-	  .extra2	= (void *)ATH_rp_FLUSH,
+	  .extra2	= (void *)ATH_RP_FLUSH,
 	},
 	{ .ctl_name	= CTL_AUTO,
 	  .procname     = "panic",
@@ -10834,7 +10834,7 @@ static const ctl_table ath_sysctl_template[] = {
 	  .procname     = "rp_ignored",
 	  .mode         = 0644,
 	  .proc_handler = ath_sysctl_halparam,
-	  .extra2	= (void *)ATH_rp_IGNORED,
+	  .extra2	= (void *)ATH_RP_IGNORED,
 	},
 	{ .ctl_name	= CTL_AUTO,
 	  .procname     = "radar_ignored",
