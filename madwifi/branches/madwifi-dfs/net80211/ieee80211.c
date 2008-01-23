@@ -472,7 +472,6 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 		break;
 	}
 	vap->iv_opmode = opmode;
-	vap->iv_state  = IEEE80211_S_INIT;
 	IEEE80211_INIT_TQUEUE(&vap->iv_stajoin1tq, ieee80211_sta_join1_tasklet, vap);
 
 	vap->iv_chanchange_count = 0;
