@@ -9267,7 +9267,7 @@ ath_dfs_channel_check_completed(unsigned long data )
 					sc->sc_beacons = 1;
 				avp->av_newstate(vap, IEEE80211_S_RUN, 0);
 #ifdef ATH_SUPERG_XR
-				if (vap->iv_flags & IEEE80211_F_XR ) {
+				if (vap->iv_flags & IEEE80211_F_XR) {
 					u_int32_t rfilt = 0;
 					rfilt = ath_calcrxfilter(sc);
 					ATH_SETUP_XR_VAP(sc, vap, rfilt);
