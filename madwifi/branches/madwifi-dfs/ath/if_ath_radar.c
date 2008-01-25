@@ -235,7 +235,7 @@ int ath_radar_update(struct ath_softc *sc)
 	if (ic->ic_flags & IEEE80211_F_SCAN)
 		return 1;
 
-	/* Update the DfFS flags (as a sanity check) */
+	/* Update the DFS flags (as a sanity check) */
 	if (ath_radar_correct_dfs_flags(sc, &sc->sc_curchan))
 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: %s: channel required "
 			"corrections to private flags.\n", 
