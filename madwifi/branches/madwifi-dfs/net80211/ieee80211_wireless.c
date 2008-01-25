@@ -1536,6 +1536,18 @@ ieee80211_get_txcont_power(struct net_device *dev, struct iw_request_info *info,
 	return 0;
 }
 
+static int 
+ieee80211_ioctl_hal_map(struct net_device *dev, struct iw_request_info *info,
+       void *w, char *extra)
+{
+       int *params = (int*) extra;
+       struct ieee80211vap *vap = dev->priv;
+       struct ieee80211com *ic = vap->iv_ic;
+       params[0] = ic->ic_dump_hal_map(ic);
+       return 0;
+}
+
+
 static int
 ieee80211_ioctl_radar(struct net_device *dev, struct iw_request_info *info,
 	void *w, char *extra)
@@ -5196,6 +5208,8 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,   "getwmmparams" },
 	{ IEEE80211_IOCTL_RADAR,
 	  0, 0, "doth_radar" },
+	{ IEEE80211_IOCTL_HALMAP,
+	  0, 0, "dump_hal_map" },
 	/*
 	 * These depends on sub-ioctl support which added in version 12.
 	 */
@@ -5623,6 +5637,7 @@ static const iw_handler ieee80211_priv_handlers[] = {
 	set_priv(IEEE80211_IOCTL_SETMLME, ieee80211_ioctl_setmlme),
 	set_priv(IEEE80211_IOCTL_SETKEY, ieee80211_ioctl_setkey),
 	set_priv(IEEE80211_IOCTL_DELKEY, ieee80211_ioctl_delkey),
+	set_priv(IEEE80211_IOCTL_HALMAP, ieee80211_ioctl_hal_map),
 	set_priv(IEEE80211_IOCTL_ADDMAC, ieee80211_ioctl_addmac),
 	set_priv(IEEE80211_IOCTL_DELMAC, ieee80211_ioctl_delmac),
 	set_priv(IEEE80211_IOCTL_WDSADDMAC, ieee80211_ioctl_wdsmac),
