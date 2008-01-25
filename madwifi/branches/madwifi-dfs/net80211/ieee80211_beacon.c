@@ -289,18 +289,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 
 	IEEE80211_LOCK_IRQ(ic);
 
-	/* After an IBSS merge, BSSID might have been updated. However, since
-	 * the iv_bss content might change at any time, we no longer use
-	 * it. This case happens if iv_bss match a neighbor node that is being
-	 * rebooted. This node will send beacon's with its own MAC addr as
-	 * BSSID until it got synchronize */
-#if 0
-	struct ieee80211_frame * wh = (struct ieee80211_frame *) skb->data;
-	IEEE80211_ADDR_COPY(wh->i_addr3, vap->iv_bssid);
-#endif
-
 	/* Check if we need to change channel right now */
-
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
 	    (vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
 		struct ieee80211_channel *c = 
