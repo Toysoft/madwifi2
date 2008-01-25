@@ -478,22 +478,20 @@ ap_add(struct ieee80211_scan_state *ss, const struct ieee80211_scanparams *sp,
 {
 	struct ap_state *as              = ss->ss_priv;
 	const u_int8_t *macaddr          = wh->i_addr2;
-	struct ieee80211vap *vap         = NULL;
-	struct ieee80211com *ic          = NULL;
+	struct ieee80211vap *vap         = ss->ss_vap;
+	struct ieee80211com *ic          = vap->iv_ic;
 	struct scan_entry *se            = NULL;
 	struct ieee80211_scan_entry *ise = NULL;
-	int hash;
-	int chan = 0;
+	int hash = AP_HASH(macaddr);
+	int chan;
 
 	/* This section provides scan results to wireless extensions */
 	SCAN_AP_LOCK_IRQ(as);
+
+	chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 	/* This is the only information used for channel selection by AP */
 	if (rssi > as->as_maxrssi[chan])
 		as->as_maxrssi[chan] = rssi;
-	vap = ss->ss_vap;
-	ic = vap->iv_ic;
-	hash = AP_HASH(macaddr);
-	chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
 	LIST_FOREACH(se, &as->as_hash[hash], se_hash)
 		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr) &&
 		    sp->ssid[1] == se->base.se_ssid[1] &&
