@@ -693,7 +693,7 @@ static struct ieee80211_channel *
 pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_t flags)
 {
 	struct ieee80211com *ic = vap->iv_ic;
-	int i, best_rssi;
+	unsigned int i, best_rssi;
 	int ss_last = ss->ss_last;
 	struct ieee80211_channel *best;
 	struct ap_state *as = ss->ss_priv;
@@ -722,7 +722,7 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap, u_int32_
 	}
 
 	best = NULL;
-	best_rssi = -1;
+	best_rssi = (unsigned int)-1;
 
 	for (i = 0; i < ss_last; i++) {
 		c = &chans[i];
