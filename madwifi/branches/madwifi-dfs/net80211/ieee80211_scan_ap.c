@@ -836,12 +836,11 @@ ap_end(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 	if (bestchan == NULL) {
 		if (ss->ss_last > 0) {
 			/* no suitable channel, should not happen */
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
-				"%s: no suitable channel! "
-				"(should not happen)\n", __func__);
-			/* XXX print something? */
+			printk(KERN_ERR "%s: %s: no suitable channel! "
+				"(should not happen)\n", 
+				DEV_NAME(vap->iv_dev), __func__);
 		}
-		res = 0; /* restart scan */
+		res = 1; /* Do NOT restart scan */
 	} else {
 		struct ieee80211_scan_entry se;
 		/* XXX: notify all VAPs? */
