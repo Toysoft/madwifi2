@@ -525,8 +525,8 @@ check_bss_debug(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	    !IEEE80211_ADDR_EQ(vap->iv_des_bssid, ni->ni_bssid))
 		fail |= 0x20;
 
-	printf(" %c %s", fail ? '-' : '+', ether_sprintf(ni->ni_macaddr));
-	printf(" %s%c", ether_sprintf(ni->ni_bssid), fail & 0x20 ? '!' : ' ');
+	printf(" %c " MAC_FMT, fail ? '-' : '+', MAC_ADDR(ni->ni_macaddr));
+	printf(" " MAC_FMT "%c", MAC_ADDR(ni->ni_bssid), fail & 0x20 ? '!' : ' ');
 	printf(" %3d%c",
 		ieee80211_chan2ieee(ic, ni->ni_chan), fail & 0x01 ? '!' : ' ');
 	printf(" %+4d", ni->ni_rssi);
@@ -582,8 +582,8 @@ ieee80211_ibss_merge(struct ieee80211_node *ni)
 		return 0;
 	}
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_ASSOC,
-		"%s: new bssid %s: %s preamble, %s slot time%s\n", __func__,
-		ether_sprintf(ni->ni_bssid),
+		"%s: new bssid " MAC_FMT ": %s preamble, %s slot time%s\n", __func__,
+		MAC_ADDR(ni->ni_bssid),
 		ic->ic_flags & IEEE80211_F_SHPREAMBLE ? "short" : "long",
 		ic->ic_flags & IEEE80211_F_SHSLOT ? "short" : "long",
 		ic->ic_flags & IEEE80211_F_USEPROT ? ", protection" : "");
@@ -695,8 +695,8 @@ ieee80211_sta_join(struct ieee80211vap *vap,
 				  __func__, ni, MAC_ADDR(se->se_macaddr));
 		if (ni == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_NODE,
-			"%s: Unable to allocate node for BSS: %s\n", __func__,
-			ether_sprintf(ni->ni_macaddr));
+			"%s: Unable to allocate node for BSS: " MAC_FMT "\n", __func__,
+			MAC_ADDR(ni->ni_macaddr));
 			return 0;
 		}
 	}
@@ -951,9 +951,9 @@ static void node_print_message(
 	va_start(args, message);
 	vsnprintf(expanded_message, sizeof(expanded_message), message, args);
 #ifdef IEEE80211_DEBUG_REFCNT
-	printk("%s/%s: %s%s:%d -> %s:%d %s [node %p<%s>%s%s%s%s, refs=%02d]\n",
+	printk("%s/%s: %s%s:%d -> %s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
 #else
-	       printk("%s/%s: %s%s:%d %s [node %p<%s>%s%s%s%s, refs=%02d]\n",
+	       printk("%s/%s: %s%s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 		ni->ni_ic->ic_dev->name,
 	        ni->ni_vap->iv_dev->name, 
@@ -963,7 +963,7 @@ static void node_print_message(
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 		func2, line2, 
 		expanded_message,
-		ni, ether_sprintf(ni->ni_macaddr), 
+		ni, MAC_ADDR(ni->ni_macaddr), 
 		ni->ni_table != NULL ? " in " : "",
 		ni->ni_table != NULL ? ni->ni_table->nt_name : "",
 		ni->ni_table != NULL ? " table" : "",
@@ -1061,7 +1061,7 @@ ieee80211_alloc_node_table(struct ieee80211vap *vap,
 		IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
 	}
 	else {
-		printk("Failed to allocate node for %s.\n", ether_sprintf(macaddr));
+		printk("Failed to allocate node for " MAC_FMT ".\n", MAC_ADDR(macaddr));
 	}
 
 	return ni;
@@ -1914,8 +1914,8 @@ ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 {
 	int i;
 
-	printf("0x%p: mac %s (refcnt %d)\n", ni,
-		ether_sprintf(ni->ni_macaddr), atomic_read(&ni->ni_refcnt));
+	printf("0x%p: mac " MAC_FMT " (refcnt %d)\n", ni,
+		MAC_ADDR(ni->ni_macaddr), atomic_read(&ni->ni_refcnt));
 	printf("\tscangen %u authmode %u flags 0x%x\n",
 		ni->ni_scangen, ni->ni_authmode, ni->ni_flags);
 	printf("\tassocid 0x%x txpower %u vlan %u\n",
@@ -1929,8 +1929,8 @@ ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 	}
 	printf("\trtsf %10llu rssi %u intval %u capinfo 0x%x\n",
 		ni->ni_rtsf, ni->ni_rssi, ni->ni_intval, ni->ni_capinfo);
-	printf("\tbssid %s essid \"%.*s\" channel %u:0x%x\n",
-		ether_sprintf(ni->ni_bssid),
+	printf("\tbssid " MAC_FMT " essid \"%.*s\" channel %u:0x%x\n",
+		MAC_ADDR(ni->ni_bssid),
 		ni->ni_esslen, ni->ni_essid,
 		ni->ni_chan != IEEE80211_CHAN_ANYC ?
 			ni->ni_chan->ic_freq : IEEE80211_CHAN_ANY,
@@ -2051,7 +2051,7 @@ remove_worse_nodes(void *arg, struct ieee80211_node *ni)
 		if (isclr(ni->ni_suppchans, better->ni_needed_chans[i])) {
 			/* this is the one of the nodes to be killed, do it now */
 			IEEE80211_NOTE_MAC(ni->ni_vap, IEEE80211_MSG_ASSOC|IEEE80211_MSG_DOTH, better->ni_macaddr,
-					"forcing [%s] (aid %d) to leave", ether_sprintf(ni->ni_macaddr),
+					"forcing [" MAC_FMT "] (aid %d) to leave", MAC_ADDR(ni->ni_macaddr),
 					IEEE80211_NODE_AID(ni));
 			IEEE80211_SEND_MGMT(ni,
 					IEEE80211_FC0_SUBTYPE_DISASSOC,
