@@ -473,6 +473,9 @@ struct ieee80211com {
 	/* inject a fake radar signal -- used while on a 802.11h DFS channels */
 	unsigned int (*ic_test_radar)(struct ieee80211com *);
 
+	/* dump HAL */
+	unsigned int (*ic_dump_hal_map)(struct ieee80211com *);
+
 	/* DFS channel availability check time (in seconds) */
 	void (*ic_set_dfs_channel_availability_check_time)(struct ieee80211com *, unsigned int);
 	unsigned int (*ic_get_dfs_channel_availability_check_time)(struct ieee80211com *);

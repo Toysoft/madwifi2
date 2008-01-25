@@ -370,6 +370,7 @@ static unsigned int ath_get_dfs_channel_availability_check_time(struct ieee80211
 static void ath_set_dfs_channel_availability_check_time(struct ieee80211com *, unsigned int seconds);
 
 static unsigned int ath_test_radar(struct ieee80211com *);
+static unsigned int ath_dump_hal_map(struct ieee80211com *ic);
 
 static u_int32_t ath_get_clamped_maxtxpower(struct ath_softc *sc);
 static u_int32_t ath_set_clamped_maxtxpower(struct ath_softc *sc, 
@@ -1039,6 +1040,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_vap_delete = ath_vap_delete;
 
 	ic->ic_test_radar           = ath_test_radar;
+	ic->ic_dump_hal_map	    = ath_dump_hal_map;
 
 	ic->ic_set_dfs_testmode     = ath_set_dfs_testmode;
 	ic->ic_get_dfs_testmode     = ath_get_dfs_testmode;
@@ -11737,6 +11739,16 @@ ath_test_radar(struct ieee80211com *ic)
 		DPRINTF(sc, ATH_DEBUG_DOTH, "%s: WARNING: channel %u MHz is not marked "
 				"for CHANNEL_DFS.  Radar test not performed!\n",
 				 __func__, sc->sc_curchan.channel);
+	return 0;
+}
+
+/* This is called by a private ioctl (iwpriv) to dump the HAL obfuscation table */
+static unsigned int
+ath_dump_hal_map(struct ieee80211com *ic)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc   = dev->priv;
+	ath_hal_dump_map(sc->sc_ah);
 	return 0;
 }
 
