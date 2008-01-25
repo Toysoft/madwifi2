@@ -739,7 +739,7 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 	}
 
 	best = NULL;
-	best_rssi = (unsigned int)-1;
+	best_rssi = 0xff; /* If signal is bigger than 0xff, we'd be melting. */
 
 	for (i = 0; i < ss_last; i++) {
 		c = &chans[i];
