@@ -766,18 +766,23 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 				as->as_required_mode)
 			continue;
 
-		/* Make sure the channels are the same mode */
-		if ((flags & IEEE80211_SCAN_KEEPMODE) && 
-				!IEEE80211_ARE_CHANS_SAME_MODE(c->chan, 
-					ic->ic_bsschan))
-			/* break the loop as the subsequent chans won't be 
-			 * better */
-			break;
+		if ((ic->ic_bsschan != NULL) &&
+			(ic->ic_bsschan != IEEE80211_CHAN_ANYC)) {
 
-		if (!IEEE80211_ARE_CHANS_SAME_MODE(c->chan, ic->ic_bsschan))
-			/* break the loop as the subsequent chans won't be 
-			 * better */
-			break;
+			/* Make sure the channels are the same mode */
+			if ((flags & IEEE80211_SCAN_KEEPMODE) &&
+				!IEEE80211_ARE_CHANS_SAME_MODE(c->chan,
+					ic->ic_bsschan))
+				/* break the loop as the subsequent chans won't be 
+				 * better */
+				break;
+
+			if (!IEEE80211_ARE_CHANS_SAME_MODE(c->chan,
+				ic->ic_bsschan))
+				/* break the loop as the subsequent chans won't be 
+				 * better */
+				break;
+		}
 
 		if (sta_assoc != 0) {
 			int sl = ic->ic_cn_total - 
