@@ -159,9 +159,6 @@ static void ath_turbo_switch_mode(unsigned long);
 static int ath_check_beacon_done(struct ath_softc *);
 #endif
 static void ath_beacon_send(struct ath_softc *, int *);
-#if 0
-static void ath_beacon_start_adhoc(struct ath_softc *, struct ieee80211vap *);
-#endif
 static void ath_beacon_return(struct ath_softc *, struct ath_buf *);
 static void ath_beacon_free(struct ath_softc *);
 static void ath_beacon_config(struct ath_softc *, struct ieee80211vap *);
