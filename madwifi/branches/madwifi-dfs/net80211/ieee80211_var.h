@@ -97,6 +97,10 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 	 ((NULL == _v) ? \
 	  "MadWifi" : \
 	  DEV_NAME(_v->iv_dev))
+#define SC_DEV_NAME(_sc) \
+	 ((NULL == _sc) ? \
+	  "MadWifi" : \
+	  DEV_NAME(_sc->sc_dev))
 #define VAP_IC_DEV_NAME(_v) \
 	 ((NULL == _v || NULL == _v->iv_ic) ? \
 	  "MadWifi" : \

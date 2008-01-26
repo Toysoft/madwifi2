@@ -273,7 +273,7 @@ ieee80211_scan_dump_channels(const struct ieee80211_scan_state *ss)
 	for (i = ss->ss_next; i < ss->ss_last; i++) {
 		const struct ieee80211_channel *c = ss->ss_chans[i];
 
-		printf("%s%u%c", sep, ieee80211_chan2ieee(ic, c),
+		printk("%s%u%c", sep, ieee80211_chan2ieee(ic, c),
 			channel_type(c));
 		sep = ", ";
 	}
@@ -351,7 +351,7 @@ copy_ssid(struct ieee80211vap *vap, struct ieee80211_scan_state *ss,
 	int nssid, const struct ieee80211_scan_ssid ssids[])
 {
 	if (nssid > IEEE80211_SCAN_MAX_SSID) {
-		/* XXX printf */
+		/* XXX printk */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: too many ssid %d, ignoring all of them\n",
 			__func__, nssid);
@@ -799,28 +799,28 @@ dump_probe_beacon(u_int8_t subtype, int isnew,
 	const struct ieee80211_scanparams *sp)
 {
 
-	printf("[" MAC_FMT "] %s%s on chan %u (bss chan %u) ",
+	printk("[" MAC_FMT "] %s%s on chan %u (bss chan %u) ",
 		MAC_ADDR(mac), isnew ? "new " : "",
 		ieee80211_mgt_subtype_name[subtype >> IEEE80211_FC0_SUBTYPE_SHIFT],
 		sp->chan, sp->bchan);
 	ieee80211_print_essid(sp->ssid + 2, sp->ssid[1]);
-	printf("\n");
+	printk("\n");
 
 	if (isnew) {
-		printf("[" MAC_FMT "] caps 0x%x bintval %u erp 0x%x",
+		printk("[" MAC_FMT "] caps 0x%x bintval %u erp 0x%x",
 			MAC_ADDR(mac), sp->capinfo, sp->bintval, sp->erp);
 		if (sp->country != NULL) {
 #ifdef __FreeBSD__
-			printf(" country info %*D",
+			printk(" country info %*D",
 				sp->country[1], sp->country + 2, " ");
 #else
 			int i;
-			printf(" country info");
+			printk(" country info");
 			for (i = 0; i < sp->country[1]; i++)
-				printf(" %02x", sp->country[i + 2]);
+				printk(" %02x", sp->country[i + 2]);
 #endif
 		}
-		printf("\n");
+		printk("\n");
 	}
 }
 #endif /* IEEE80211_DEBUG */
