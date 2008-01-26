@@ -397,7 +397,7 @@ struct ath_node {
 #if (defined(ATH_DEBUG_SPINLOCKS))
 #define	ATH_NODE_UAPSD_LOCK_CHECK(_an) do { \
 	if (spin_is_locked(&(_an)->an_uapsd_lock)) \
-		printk("%s:%d - about to block on uapsd lock!\n", __func__, __LINE__); \
+		printk(KERN_DEBUG "%s:%d - about to block on uapsd lock!\n", __func__, __LINE__); \
 } while(0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_NODE_UAPSD_LOCK_CHECK(_an)
@@ -558,7 +558,7 @@ struct ath_vap {
 #if (defined(ATH_DEBUG_SPINLOCKS))
 #define	ATH_TXQ_LOCK_CHECK(_tq) do { \
 	if (spin_is_locked(&(_tq)->axq_lock)) \
-		printk("%s:%d - about to block on txq lock!\n", __func__, __LINE__); \
+		printk(KERN_DEBUG "%s:%d - about to block on txq lock!\n", __func__, __LINE__); \
 } while(0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_TXQ_LOCK_CHECK(_tq)
@@ -839,7 +839,7 @@ typedef void (*ath_callback) (struct ath_softc *);
 #if (defined(ATH_DEBUG_SPINLOCKS))
 #define	ATH_TXBUF_LOCK_CHECK(_sc) do { \
 	if (spin_is_locked(&(_sc)->sc_txbuflock)) \
-		printk("%s:%d - about to block on txbuf lock!\n", __func__, __LINE__); \
+		printk(KERN_DEBUG "%s:%d - about to block on txbuf lock!\n", __func__, __LINE__); \
 } while(0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_TXBUF_LOCK_CHECK(_sc)
@@ -870,7 +870,7 @@ typedef void (*ath_callback) (struct ath_softc *);
 #if (defined(ATH_DEBUG_SPINLOCKS))
 #define	ATH_RXBUF_LOCK_CHECK(_sc) do { \
 	if (spin_is_locked(&(_sc)->sc_rxbuflock)) \
-		printk("%s:%d - about to block on rxbuf lock!\n", __func__, __LINE__); \
+		printk(KERN_DEBUG "%s:%d - about to block on rxbuf lock!\n", __func__, __LINE__); \
 } while(0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_RXBUF_LOCK_CHECK(_sc)
@@ -900,7 +900,23 @@ void bus_read_cachesize(struct ath_softc *, u_int8_t *);
 void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
 int ar_device(int devid);
-#define DEV_NAME(_d) ((NULL == _d || NULL == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? "MadWifi" : _d->name)
+
+#define DEV_NAME(_d) \
+	 ((NULL == _d || NULL == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? \
+	  "MadWifi" : \
+	  _d->name)
+#define VAP_DEV_NAME(_v) \
+	 ((NULL == _v) ? \
+	  "MadWifi" : \
+	  DEV_NAME(_v->iv_dev))
+#define SC_DEV_NAME(_sc) \
+	 ((NULL == _sc) ? \
+	  "MadWifi" : \
+	  DEV_NAME(_sc->sc_dev))
+#define VAP_IC_DEV_NAME(_v) \
+	 ((NULL == _v || NULL == _v->iv_ic) ? \
+	  "MadWifi" : \
+	  DEV_NAME(_v->iv_ic->ic_dev))
 
 void ath_radar_detected(struct ath_softc *sc, const char* message);
 
