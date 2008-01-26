@@ -842,8 +842,6 @@ ieee80211_expire_channel_non_occupancy_restrictions(struct ieee80211com *ic)
 	struct timeval tv_now;
 	int i;
 
-	printk("%s: called\n", __func__);
-
 	do_gettimeofday(&tv_now);
 	for (i = 0; i < ic->ic_nchans; i++) {
 		c = &ic->ic_channels[i];
@@ -899,14 +897,8 @@ ieee80211_update_dfs_channel_non_occupancy_timer(struct ieee80211com *ic)
 
 	if ((tv_next.tv_sec == 0) &&
 	    (tv_next.tv_usec == 0)) {
-		/* we don't have a channel to expire in the future; so kill the
-		 * timer */
-		printk("%s: del_timer ic_dfs_non_occupancy_timer\n",
-		       __func__);
 		del_timer(&ic->ic_dfs_non_occupancy_timer);
 	} else {
-		printk("%s: mod_timer ic_dfs_non_occupancy_timer %lus\n",
-		       __func__, (tv_next.tv_sec - tv_now.tv_sec + 1));
 		mod_timer(&ic->ic_dfs_non_occupancy_timer,
 			  jiffies_tmp + (tv_next.tv_sec - tv_now.tv_sec + 1) * HZ);
 	}
@@ -919,7 +911,7 @@ ieee80211_expire_dfs_channel_non_occupancy_timer(unsigned long data)
 	struct ieee80211com *ic = (struct ieee80211com *) data;
 	struct ieee80211vap *vap;
 
-	printk("%s: expiring Non-Occupancy Period\n",__func__);
+	printk(KERN_INFO "%s: %s: expiring Non-Occupancy Period\n", DEV_NAME(ic->ic_dev), __func__);
 
 	if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
 		/* Make sure there are no channels that have just become available */
@@ -1061,7 +1053,7 @@ ieee80211_dfs_test_return(struct ieee80211com *ic, u_int8_t ieeeChan)
 
 	/* Return to the original channel we were on before the test mute */
 	if_printf(dev, "Returning to channel %d\n", ieeeChan);
-	printk("Returning to chan %d\n", ieeeChan);
+	printk(KERN_DEBUG "Returning to chan %d\n", ieeeChan);
 	ic->ic_chanchange_chan = ieeeChan;
 	ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
@@ -1085,11 +1077,11 @@ ieee80211_announce(struct ieee80211com *ic)
 			mword = ieee80211_rate2media(ic, rate, mode);
 			if (mword == 0)
 				continue;
-			printf("%s%d%sMbps", (i != 0 ? " " : ""),
+			printk("%s%d%sMbps", (i != 0 ? " " : ""),
 			    (rate & IEEE80211_RATE_VAL) / 2,
 			    ((rate & 0x1) != 0 ? ".5" : ""));
 		}
-		printf("\n");
+		printk("\n");
 	}
 	if_printf(dev, "H/W encryption support:");
 	if (ic->ic_caps & IEEE80211_C_WEP)
@@ -1113,7 +1105,7 @@ ieee80211_announce_channels(struct ieee80211com *ic)
 	char type;
 	int i;
 
-	printf("Chan  Freq  RegPwr  MinPwr  MaxPwr\n");
+	printk(KERN_INFO "Chan  Freq  RegPwr  MinPwr  MaxPwr\n");
 	for (i = 0; i < ic->ic_nchans; i++) {
 		c = &ic->ic_channels[i];
 		if (IEEE80211_IS_CHAN_ST(c))
@@ -1130,7 +1122,7 @@ ieee80211_announce_channels(struct ieee80211com *ic)
 			type = 'b';
 		else
 			type = 'f';
-		printf("%4d  %4d%c %6d  %6d  %6d\n",
+		printk(KERN_INFO "%4d  %4d%c %6d  %6d  %6d\n",
 			c->ic_ieee, c->ic_freq, type,
 			c->ic_maxregpower,
 			c->ic_minpower, c->ic_maxpower
@@ -1465,7 +1457,7 @@ ieee80211_chan2mode(const struct ieee80211_channel *chan)
 		return IEEE80211_MODE_FH;
 
 	/* NB: Should not get here */
-	printk("%s: cannot map channel to mode; freq %u flags 0x%x\n",
+	printk(KERN_ERR "%s: cannot map channel to mode; freq %u flags 0x%x\n",
 		__func__, chan->ic_freq, chan->ic_flags);
 	return IEEE80211_MODE_11B;
 }

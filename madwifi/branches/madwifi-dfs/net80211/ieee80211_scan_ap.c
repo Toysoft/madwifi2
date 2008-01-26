@@ -444,9 +444,9 @@ ap_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_msg_scan(vap)) {
-		printf("%s: scan set ", vap->iv_dev->name);
+		printk("%s: scan set ", vap->iv_dev->name);
 		ieee80211_scan_dump_channels(ss);
-		printf(" dwell min %ld max %ld\n",
+		printk(" dwell min %ld max %ld\n",
 			ss->ss_mindwell, ss->ss_maxdwell);
 	}
 #endif /* IEEE80211_DEBUG */

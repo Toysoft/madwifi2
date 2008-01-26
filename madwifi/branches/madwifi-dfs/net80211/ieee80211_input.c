@@ -1711,10 +1711,10 @@ static void
 ieee80211_ssid_mismatch(struct ieee80211vap *vap, const char *tag,
 	u_int8_t mac[IEEE80211_ADDR_LEN], u_int8_t *ssid)
 {
-	printf("[" MAC_FMT "] discard %s frame, ssid mismatch: ",
+	printk(KERN_ERR "[" MAC_FMT "] discard %s frame, ssid mismatch: ",
 		MAC_ADDR(mac), tag);
 	ieee80211_print_essid(ssid + 2, ssid[1]);
-	printf("\n");
+	printk(KERN_ERR "\n");
 }
 
 #define	IEEE80211_VERIFY_SSID(_ni, _ssid) do {				\
@@ -4236,7 +4236,7 @@ ieee80211_note(struct ieee80211vap *vap, const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
-	printk("%s/%s[" MAC_FMT "]: %s",
+	printk(KERN_DEBUG "%s/%s[" MAC_FMT "]: %s",
 	       vap->iv_ic->ic_dev->name, vap->iv_dev->name,
 	       MAC_ADDR(vap->iv_myaddr),
 	       buf);	/* NB: no \n */
@@ -4253,7 +4253,7 @@ ieee80211_note_frame(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n",
+	printk(KERN_DEBUG "%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n",
 		vap->iv_ic->ic_dev->name, vap->iv_dev->name,
 	        MAC_ADDR(vap->iv_myaddr),
 		MAC_ADDR(ieee80211_getbssid(vap, wh)), buf);
@@ -4270,7 +4270,7 @@ ieee80211_note_mac(struct ieee80211vap *vap, const u_int8_t mac[IEEE80211_ADDR_L
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n",
+	printk(KERN_DEBUG "%s/%s[" MAC_FMT "]: " MAC_FMT " %s\n",
 	       vap->iv_ic->ic_dev->name, vap->iv_dev->name,
 	       MAC_ADDR(vap->iv_myaddr),
 	       MAC_ADDR(mac), buf);
@@ -4287,7 +4287,7 @@ ieee80211_discard_frame(struct ieee80211vap *vap, const struct ieee80211_frame *
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n",
+	printk(KERN_DEBUG "%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n",
 	       vap->iv_ic->ic_dev->name, vap->iv_dev->name,
 	       MAC_ADDR(vap->iv_myaddr),
 	       MAC_ADDR(wh->i_addr2),
@@ -4306,7 +4306,7 @@ ieee80211_discard_ie(struct ieee80211vap *vap, const struct ieee80211_frame *wh,
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: "
+	printk(KERN_DEBUG "%s/%s[" MAC_FMT "]: "
 	       MAC_FMT " discard %s%sinformation element, %s\n",
 		vap->iv_ic->ic_dev->name, vap->iv_dev->name,
 		MAC_ADDR(vap->iv_myaddr),
@@ -4326,7 +4326,7 @@ ieee80211_discard_mac(struct ieee80211vap *vap, const u_int8_t mac[IEEE80211_ADD
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	printk("%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n",
+	printk(KERN_DEBUG "%s/%s[" MAC_FMT "]: " MAC_FMT " discard %s%sframe, %s\n",
 	       vap->iv_ic->ic_dev->name,
 	       vap->iv_dev->name,
 	       MAC_ADDR(vap->iv_myaddr),

@@ -187,7 +187,7 @@ ieee80211_node_latevattach(struct ieee80211vap *vap)
 			M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (vap->iv_aid_bitmap == NULL) {
 			/* XXX no way to recover */
-			printf("%s: no memory for AID bitmap!\n", __func__);
+			printk(KERN_ERR "%s: no memory for AID bitmap!\n", __func__);
 			vap->iv_max_aid = 0;
 		}
 	}
@@ -525,23 +525,23 @@ check_bss_debug(struct ieee80211vap *vap, struct ieee80211_node *ni)
 	    !IEEE80211_ADDR_EQ(vap->iv_des_bssid, ni->ni_bssid))
 		fail |= 0x20;
 
-	printf(" %c " MAC_FMT, fail ? '-' : '+', MAC_ADDR(ni->ni_macaddr));
-	printf(" " MAC_FMT "%c", MAC_ADDR(ni->ni_bssid), fail & 0x20 ? '!' : ' ');
-	printf(" %3d%c",
+	printk(" %c " MAC_FMT, fail ? '-' : '+', MAC_ADDR(ni->ni_macaddr));
+	printk(" " MAC_FMT "%c", MAC_ADDR(ni->ni_bssid), fail & 0x20 ? '!' : ' ');
+	printk(" %3d%c",
 		ieee80211_chan2ieee(ic, ni->ni_chan), fail & 0x01 ? '!' : ' ');
-	printf(" %+4d", ni->ni_rssi);
-	printf(" %2dM%c", (rate & IEEE80211_RATE_VAL) / 2,
+	printk(" %+4d", ni->ni_rssi);
+	printk(" %2dM%c", (rate & IEEE80211_RATE_VAL) / 2,
 		fail & 0x08 ? '!' : ' ');
-	printf(" %4s%c",
+	printk(" %4s%c",
 		(ni->ni_capinfo & IEEE80211_CAPINFO_ESS) ? "ess" :
 			(ni->ni_capinfo & IEEE80211_CAPINFO_IBSS) ? "ibss" :
 				"????",
 		fail & 0x02 ? '!' : ' ');
-	printf(" %3s%c ",
+	printk(" %3s%c ",
 		(ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY) ?  "wep" : "no",
 		fail & 0x04 ? '!' : ' ');
 	ieee80211_print_essid(ni->ni_essid, ni->ni_esslen);
-	printf("%s\n", fail & 0x10 ? "!" : "");
+	printk("%s\n", fail & 0x10 ? "!" : "");
 }
 #endif /* IEEE80211_DEBUG */
 
@@ -846,7 +846,7 @@ node_alloc(struct ieee80211vap *vap)
 	struct ieee80211_node *ni;
 	MALLOC(ni, struct ieee80211_node *, sizeof(struct ieee80211_node),
 		M_80211_NODE, M_NOWAIT | M_ZERO);
-	printk("%s: ERROR, this function should never be called!", __func__);
+	printk(KERN_ERR "%s: ERROR, this function should never be called!", __func__);
 	dump_stack();
 	return ni;
 }
@@ -951,9 +951,9 @@ static void node_print_message(
 	va_start(args, message);
 	vsnprintf(expanded_message, sizeof(expanded_message), message, args);
 #ifdef IEEE80211_DEBUG_REFCNT
-	printk("%s/%s: %s%s:%d -> %s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
+	printk(KERN_DEBUG "%s/%s: %s%s:%d -> %s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
 #else
-	       printk("%s/%s: %s%s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
+	       printk(KERN_DEBUG "%s/%s: %s%s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 		ni->ni_ic->ic_dev->name,
 	        ni->ni_vap->iv_dev->name, 
@@ -1061,7 +1061,7 @@ ieee80211_alloc_node_table(struct ieee80211vap *vap,
 		IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
 	}
 	else {
-		printk("Failed to allocate node for " MAC_FMT ".\n", MAC_ADDR(macaddr));
+		printk(KERN_ERR "Failed to allocate node for " MAC_FMT ".\n", MAC_ADDR(macaddr));
 	}
 
 	return ni;
@@ -1914,28 +1914,28 @@ ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 {
 	int i;
 
-	printf("0x%p: mac " MAC_FMT " (refcnt %d)\n", ni,
+	printk("0x%p: mac " MAC_FMT " (refcnt %d)\n", ni,
 		MAC_ADDR(ni->ni_macaddr), atomic_read(&ni->ni_refcnt));
-	printf("\tscangen %u authmode %u flags 0x%x\n",
+	printk("\tscangen %u authmode %u flags 0x%x\n",
 		ni->ni_scangen, ni->ni_authmode, ni->ni_flags);
-	printf("\tassocid 0x%x txpower %u vlan %u\n",
+	printk("\tassocid 0x%x txpower %u vlan %u\n",
 		ni->ni_associd, ni->ni_txpower, ni->ni_vlan);
-	printf ("rxfragstamp %u\n", ni->ni_rxfragstamp);
+	printk ("rxfragstamp %u\n", ni->ni_rxfragstamp);
 	for (i = 0; i < 17; i++) {
-		printf("\t%d: txseq %u rxseq %u fragno %u\n", i,
+		printk("\t%d: txseq %u rxseq %u fragno %u\n", i,
 		       ni->ni_txseqs[i],
 		       ni->ni_rxseqs[i] >> IEEE80211_SEQ_SEQ_SHIFT,
 		       ni->ni_rxseqs[i] & IEEE80211_SEQ_FRAG_MASK);
 	}
-	printf("\trtsf %10llu rssi %u intval %u capinfo 0x%x\n",
+	printk("\trtsf %10llu rssi %u intval %u capinfo 0x%x\n",
 		ni->ni_rtsf, ni->ni_rssi, ni->ni_intval, ni->ni_capinfo);
-	printf("\tbssid " MAC_FMT " essid \"%.*s\" channel %u:0x%x\n",
+	printk("\tbssid " MAC_FMT " essid \"%.*s\" channel %u:0x%x\n",
 		MAC_ADDR(ni->ni_bssid),
 		ni->ni_esslen, ni->ni_essid,
 		ni->ni_chan != IEEE80211_CHAN_ANYC ?
 			ni->ni_chan->ic_freq : IEEE80211_CHAN_ANY,
 		ni->ni_chan != IEEE80211_CHAN_ANYC ? ni->ni_chan->ic_flags : 0);
-	printf("\tinact %u txrate %u\n",
+	printk("\tinact %u txrate %u\n",
 		ni->ni_inact, ni->ni_txrate);
 }
 

@@ -430,7 +430,7 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 	/* avoid printing too many frames */
 	if ((ieee80211_msg_debug(vap) && doprint(vap, type)) ||
 	    ieee80211_msg_dumppkts(vap)) {
-		printf("[" MAC_FMT "] send %s on channel %u\n",
+		printk(KERN_DEBUG "[" MAC_FMT "] send %s on channel %u\n",
 			MAC_ADDR(wh->i_addr1),
 			ieee80211_mgt_subtype_name[
 				(type & IEEE80211_FC0_SUBTYPE_MASK) >>
