@@ -645,23 +645,6 @@ static HAL_BOOL rp_analyze_long_pulse(
 	rp_analyze_long_pulse_bscan(sc, last_pulse, 
 					     &found_burst_count, 
 					     LP_MAX_BC, &bursts[0]);
-#if 0
-	if (found_burst_count == 15) {
-		printk("Found %d long pulse bursts.\n", found_burst_count);
-		for (i = 0; i < found_burst_count; i++) {
-			printk("burst: %2d; tsf-rel: %10llu; tsf-delta: %10u; pulses: %2d; "
-					"noise: %2d; tsf range [%10llu:%-10llu];\n", 
-			       i + 1,
-			       bursts[i].lpb_tsf_rel,
-			       bursts[i].lpb_tsf_delta,
-			       bursts[i].lpb_num_pulses,
-			       bursts[i].lpb_num_noise,
-			       bursts[i].lpb_min_possible_tsf,
-			       bursts[i].lpb_max_possible_tsf);
-		}
-	}
-#endif
-
 	/* Find the matches */
 	for (matching_burst_count = LP_MAX_BC; 
 			matching_burst_count >= LP_MIN_BC; 
@@ -1656,12 +1639,11 @@ void ath_rp_record(struct ath_softc *sc, u_int64_t tsf, u_int8_t rssi,
 
 void ath_rp_print_mem(struct ath_softc *sc, int analyzed_pulses_only)
 {
-	struct net_device *dev = sc->sc_dev;
 	struct ath_rp *pulse;
 	u_int64_t oldest_tsf = ~0;
 	int i;
-	printk("%s: pulse dump of %spulses using sc_rp containing "
-	       "%d allocated pulses.\n", DEV_NAME(dev), 
+	IPRINTF(sc, "Pulse dump of %spulses using sc_rp containing "
+	       "%d allocated pulses.\n", 
 	       analyzed_pulses_only ? "analyzed " : "", sc->sc_rp_num);
 
 	/* Find oldest TSF value so we can print relative times */
@@ -1676,10 +1658,9 @@ void ath_rp_print_mem(struct ath_softc *sc, int analyzed_pulses_only)
 		if (!pulse->rp_allocated)
 			break;
 		if ((!analyzed_pulses_only) || pulse->rp_analyzed)
-			printk("%s: pulse [%3d, %p] : relative_tsf=%10llu "
+			IPRINTF(sc, "Pulse [%3d, %p] : relative_tsf=%10llu "
 			       "tsf=%10llu rssi=%3u width=%3u allocated=%d "
 			       "analyzed=%d next=%p prev=%p\n",
-			       DEV_NAME(dev),
 			       pulse->rp_index,
 			       pulse, 
 			       pulse->rp_tsf - oldest_tsf, 
@@ -1695,12 +1676,11 @@ void ath_rp_print_mem(struct ath_softc *sc, int analyzed_pulses_only)
 
 void ath_rp_print(struct ath_softc *sc, int analyzed_pulses_only)
 {
-	struct net_device *dev = sc->sc_dev;
 	struct ath_rp *pulse;
 	u_int64_t oldest_tsf = ~0;
 
-	printk("%s: pulse dump of %spulses from ring buffer containing %d "
-	       "pulses.\n", DEV_NAME(dev), 
+	IPRINTF(sc, "Pulse dump of %spulses from ring buffer containing %d "
+	       "pulses.\n", 
 	       analyzed_pulses_only ? "analyzed " : "", 
 	       sc->sc_rp_num);
 
@@ -1714,10 +1694,9 @@ void ath_rp_print(struct ath_softc *sc, int analyzed_pulses_only)
 		if (!pulse->rp_allocated)
 			continue;
 		if ((!analyzed_pulses_only) || pulse->rp_analyzed)
-			printk("%s: pulse [%3d, %p] : relative_tsf=%10llu "
+			IPRINTF(sc, "Pulse [%3d, %p] : relative_tsf=%10llu "
 			       "tsf=%10llu rssi=%3u width=%3u allocated=%d "
 			       "analyzed=%d next=%p prev=%p\n",
-			       DEV_NAME(dev),
 			       pulse->rp_index,
 			       pulse, 
 			       pulse->rp_tsf - oldest_tsf, 

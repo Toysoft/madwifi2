@@ -20,9 +20,6 @@
  */
 #ifndef _IF_ATH_DEBUG_H_
 
-#ifdef AR_DEBUG
-#define	DFLAG_ISSET(sc, _m) \
-	((sc->sc_debug & _m))
 enum {
 	ATH_DEBUG_XMIT		= 0x00000001,	/* basic xmit operation */
 	ATH_DEBUG_XMIT_DESC	= 0x00000002,	/* xmit descriptors */
@@ -56,20 +53,41 @@ enum {
 	ATH_DEBUG_ANY		= 0xffffffff,
 	ATH_DEBUG_GLOBAL	= (ATH_DEBUG_SKB|ATH_DEBUG_SKB_REF)
 };
-#define	DPRINTF(sc, _m, _fmt, ...) do {					\
-	if (sc->sc_debug & (_m)) {					\
-		printk("%s: " _fmt, DEV_NAME(sc->sc_dev), __VA_ARGS__);	\
-	} 								\
+
+#ifdef AR_DEBUG
+
+/* DEBUG-ONLY DEFINITIONS */
+#define	DFLAG_ISSET(sc, _m) ((sc->sc_debug & _m))
+#define	DPRINTF(_sc, _m, _fmt, ...) do {				\
+	if (DFLAG_ISSET((_sc), (_m))) 					\
+		printk(KERN_DEBUG "%s: %s: " _fmt, \
+			SC_DEV_NAME(_sc), __func__, ## __VA_ARGS__); \
 } while (0)
-#define	KEYPRINTF(sc, ix, hk, mac) do {				\
-	if (sc->sc_debug & ATH_DEBUG_KEYCACHE)			\
-		ath_keyprint(sc, __func__, ix, hk, mac);	\
+#define	KEYPRINTF(_sc, _ix, _hk, _mac) do {				\
+	if (DFLAG_ISSET((_sc), ATH_DEBUG_KEYCACHE))			\
+		ath_keyprint((_sc), __func__, _ix, _hk, _mac);		\
 } while (0)
-#else /* defined(AR_DEBUG) */
+
+#else /* #ifdef AR_DEBUG */
+
 #define	DFLAG_ISSET(sc, _m)		0
 #define	DPRINTF(sc, _m, _fmt, ...)
 #define	KEYPRINTF(sc, k, ix, mac)
-#endif /* defined(AR_DEBUG) */
-#define	IFF_DUMPPKTS(sc, _m) DFLAG_ISSET(sc,_m)
+
+#endif /* #ifdef AR_DEBUG */
+
+#define	IFF_DUMPPKTS(_sc, _m)   DFLAG_ISSET((_sc), (_m))
+
+#define	EPRINTF(_sc, _fmt, ...) \
+		printk(KERN_ERR "%s: %s: " _fmt, \
+			SC_DEV_NAME(_sc), __func__, ## __VA_ARGS__)
+
+#define	WPRINTF(_sc, _fmt, ...) \
+		printk(KERN_WARNING "%s: %s: " _fmt, \
+			SC_DEV_NAME(_sc), __func__, ## __VA_ARGS__)
+
+#define	IPRINTF(_sc, _fmt, ...) \
+		printk(KERN_INFO "%s: %s: " _fmt, \
+			SC_DEV_NAME(_sc), __func__, ## __VA_ARGS__)
 
 #endif /* #ifndef _IF_ATH_DEBUG_H_ */
