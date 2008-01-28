@@ -5159,8 +5159,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			 * next beacon timestamp again */
  			nexttbtt = roundup(hw_tsftu + FUDGE, intval);
 		} 
-#if 0
-		else {
+		else if (ic->ic_opmode == IEEE80211_M_IBSS) {
 			if (tsf > hw_tsf) {
 				/* We received a beacon, but the HW TSF has
 				 * not been updated (otherwise hw_tsf > tsf)
@@ -5176,7 +5175,6 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 						tsftu, intval);
 			}
 		}
-#endif
 	}
 
 	if (ic->ic_opmode == IEEE80211_M_STA &&	!(sc->sc_nostabeacons)) {
@@ -5309,9 +5307,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		ath_hal_intrset(ah, sc->sc_imask);
 	}
 
-#if 0
 ath_beacon_config_debug:
-#endif
 	/* We print all debug messages here, in order to preserve the
 	 * time critical aspect of this function */
 	DPRINTF(sc, ATH_DEBUG_BEACON,
