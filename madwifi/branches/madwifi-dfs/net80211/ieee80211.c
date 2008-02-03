@@ -1010,8 +1010,8 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 				}
 			}
 
-			/* recompute the next time a Non-Occupancy Period
-			 * expires */
+			/* Recompute the next time a Non-Occupancy Period
+			 * expires. */
 			ieee80211_update_dfs_channel_non_occupancy_timer(ic);
 
 			c = ieee80211_find_channel(ic, ichan->ic_freq, ichan->ic_flags);
