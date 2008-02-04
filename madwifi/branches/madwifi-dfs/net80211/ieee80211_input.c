@@ -672,7 +672,7 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 		 * Next strip any MSDU crypto bits.
 		 */
 		if (key != NULL &&
-		    !ieee80211_crypto_demic(vap, key, skb, hdrspace)) {
+		    !ieee80211_crypto_demic(vap, key, skb, hdrspace, 0)) {
 			IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
 				ni->ni_macaddr, "data", "%s", "demic error");
 			IEEE80211_NODE_STAT(ni, rx_demicfail);
@@ -742,9 +742,9 @@ ieee80211_input(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			frame_len = ntohs(eh_tmp->ether_type); 
 
 			skb1 = skb_copy(skb, GFP_ATOMIC);
-			/* Increment reference count after copy */
-			if (skb1 != NULL)
-				ieee80211_skb_copy_noderef(skb, skb1);
+			if (skb1 == NULL)
+				goto err;
+			ieee80211_skb_copy_noderef(skb, skb1);
 
 			/* we now have 802.3 MAC hdr followed by 802.2 LLC/SNAP; convert to EthernetII.
 			 * Note that the frame is at least IEEE80211_MIN_LEN, due to the driver code. */
@@ -1059,9 +1059,10 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 				 * assemble fragments
 				 */
 				ni->ni_rxfrag = skb_copy(skb, GFP_ATOMIC);
-				/* We duplicate the reference after skb_copy */
-				ieee80211_skb_copy_noderef(skb, ni->ni_rxfrag);
-				ieee80211_dev_kfree_skb(&skb);
+				if (ni->ni_rxfrag) {
+					ieee80211_skb_copy_noderef(skb, ni->ni_rxfrag);
+					ieee80211_dev_kfree_skb(&skb);
+				}
 			}
 			/*
 			 * Check that we have enough space to hold
@@ -1074,8 +1075,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 					(ni->ni_vap->iv_dev->mtu + hdrlen) -
 					(skb_end_pointer(skb) - skb->head),
 					GFP_ATOMIC);
-				/* We duplicate the reference after skb_copy */
-				if (skb != ni->ni_rxfrag)
+				if (ni->ni_rxfrag)
 					ieee80211_skb_copy_noderef(skb, ni->ni_rxfrag);
 				ieee80211_dev_kfree_skb(&skb);
 			}
@@ -1282,8 +1282,8 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 
 		/* XXX: does this always work? */
 		tskb = skb_copy(skb, GFP_ATOMIC);
-		/* We duplicate the reference after skb_copy */
-		ieee80211_skb_copy_noderef(skb, tskb);
+		if (tskb)
+			ieee80211_skb_copy_noderef(skb, tskb);
 		ieee80211_dev_kfree_skb(&skb);
 		skb = tskb;
 	}
@@ -1567,6 +1567,8 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 			ni->ni_rtsf = rtsf;
 			ni->ni_last_rx = jiffies;
 			if (!alloc_challenge(ni)) {
+				if (allocbs)
+					ieee80211_unref_node(&ni);
 				/* NB: don't return error so they rexmit */
 				return;
 			}
@@ -1654,6 +1656,8 @@ ieee80211_auth_shared(struct ieee80211_node *ni, struct ieee80211_frame *wh,
 		}
 		break;
 	}
+	if (allocbs)
+		ieee80211_unref_node(&ni);
 	return;
 bad:
 	/* Send an error response; but only when operating as an AP. */
@@ -1662,8 +1666,9 @@ bad:
 		ieee80211_send_error(ni, wh->i_addr2,
 			IEEE80211_FC0_SUBTYPE_AUTH,
 			(seq + 1) | (estatus<<16));
-		/* Remove node state if it exists. */
-		if (ni != vap->iv_bss)
+		/* Remove node state if it exists and isn't just a 
+		 * temporary copy of the bss (dereferenced later) */
+		if (!allocbs && (ni != vap->iv_bss))
 			ieee80211_node_leave(ni);
 	} else if (vap->iv_opmode == IEEE80211_M_STA) {
 		/*
@@ -1674,6 +1679,8 @@ bad:
 		if (vap->iv_state == IEEE80211_S_AUTH)
 			ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
 	}
+	if (allocbs)
+		ieee80211_unref_node(&ni);
 }
 
 /* Verify the existence and length of __elem or get out. */
@@ -4269,6 +4276,43 @@ ath_eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	return eth->h_proto;
 }
 #endif
+
+/* Re-process a frame w/ HW detected MIC failure, as it may be a false 
+ * negative. The frame will be dropped in any case. */
+void
+ieee80211_check_mic(struct ieee80211_node *ni, struct sk_buff *skb)
+{
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211_frame *wh;
+	struct ieee80211_key *key;
+	int hdrspace;
+	struct ieee80211com *ic = vap->iv_ic;
+
+	if (skb->len < sizeof(struct ieee80211_frame_min)) {
+		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_ANY, 
+				ni->ni_macaddr, NULL, 
+				"too short (1): len %u", skb->len);
+		vap->iv_stats.is_rx_tooshort++;
+		return;
+	}
+
+	wh = (struct ieee80211_frame *)skb->data;
+	hdrspace = ieee80211_hdrspace(ic, wh);
+
+	key = ieee80211_crypto_decap(ni, skb, hdrspace);
+	if (key == NULL) {
+		/* NB: stats+msgs handled in crypto_decap */
+		IEEE80211_NODE_STAT(ni, rx_wepfail);
+	} else if (!ieee80211_crypto_demic(vap, key, skb, hdrspace, 1)) {
+		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+				ni->ni_macaddr, "data", "%s", "demic error");
+		IEEE80211_NODE_STAT(ni, rx_demicfail);
+	} else
+		IEEE80211_NODE_STAT(ni, rx_hwdemicerr);
+
+	return;
+}
+EXPORT_SYMBOL(ieee80211_check_mic);
 
 #ifdef IEEE80211_DEBUG
 /*
