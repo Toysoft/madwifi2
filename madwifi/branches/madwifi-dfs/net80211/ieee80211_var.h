@@ -48,10 +48,12 @@
 #include <net80211/ieee80211_proto.h>
 #include <net80211/ieee80211_scan.h>
 
-/*
-Note: Atheros chips use 6 bits when power is specified in whole dBm units, with a value range from 0 to 63.
-Note: Atheros chips use 7 bits when power is specified in half dBm units, with a value range from 0 to 127.
-*/
+/* NB: 
+ * - Atheros chips use 6 bits when power is specified in whole dBm units, with 
+ *   a value range from 0 to 63.
+ * - Atheros chips use 7 bits when power is specified in half dBm units, with 
+ *   a value range from 0 to 127.
+ */
 #define	IEEE80211_TXPOWER_MAX		127	/* .5 dBm units */
 #define	IEEE80211_TXPOWER_MIN		0	/* kill radio */
 
@@ -711,13 +713,14 @@ void ieee80211_expire_channel_excl_restrictions(struct ieee80211com *);
  * It relies on the assumption that ic_ieee cannot be 0 and that all the
  * duplicates in ic_channels occur subsequently.
  *
- * _i and prevchan are temporary variables
+ * _i and _prevchan are temporary variables
  */
-#define CHANNEL_FOREACH(i, ic, _i, prevchan)				\
-	for (_i = 0, prevchan = 0;					\
-	     _i<ic->ic_nchans && (i = ic->ic_channels[_i].ic_ieee); 	\
-	     prevchan = i, _i++						\
-	    ) if (i != prevchan)
+#define CHANNEL_FOREACH(_chan, _ic, _i, _prevchan)			\
+	for ((_i) = 0, (_prevchan) = 0;					\
+	     (_i) < (_ic)->ic_nchans && ((_chan) =			\
+		     (_ic)->ic_channels[(_i)].ic_ieee);			\
+	     (_prevchan) = (_chan), (_i)++				\
+	    ) if ((_chan) != (_prevchan))
 
 /* Key update synchronization methods.  XXX should not be visible. */
 static __inline void
