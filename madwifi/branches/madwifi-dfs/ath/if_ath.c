@@ -249,10 +249,10 @@ static unsigned int ath_read_register(struct ieee80211com *ic,
 static unsigned int ath_write_register(struct ieee80211com *ic, 
 		unsigned int address, unsigned int value);
 static void ath_ar5212_registers_dump(struct ath_softc *sc);
-static void ath_print_register(const char* name, u_int32_t address, 
-		u_int32_t v);
-static void ath_print_register_delta(const char* name, u_int32_t address, 
-		u_int32_t v_old, u_int32_t v_new);
+static void ath_print_register(struct ath_softc *sc, const char* name, 
+		u_int32_t address, u_int32_t v);
+static void ath_print_register_delta(struct ath_softc *sc, const char* name, 
+		u_int32_t address, u_int32_t v_old, u_int32_t v_new);
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
 static int ath_set_mac_address(struct net_device *, void *);
@@ -1704,7 +1704,7 @@ ath_uapsd_processtriggers(struct ath_softc *sc, u_int64_t hw_tsf)
 			}
 			skb = bf->bf_skb;
 			if (skb == NULL) {
-				EPRINTF(sc, "skb is NULL in received ath_buf.\n");
+				EPRINTF(sc, "Dropping; skb is NULL in received ath_buf.\n");
 				continue;
 			}
 
@@ -3178,6 +3178,11 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ath_buf *tbf, *tempbf;
 	struct sk_buff *tskb;
 	int framecnt;
+	/* We will use the requeue flag to denote when to stuff a skb back into
+	 * the OS queues.  This should NOT be done under low memory conditions,
+	 * such as skb allocation failure.  However, it should be done for the
+	 * case where all the dma buffers are in use (take_txbuf returns null).
+	*/
 	int requeue = 0;
 #ifdef ATH_SUPERG_FF
 	unsigned int pktlen;
@@ -3204,6 +3209,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	if (SKB_CB(skb)->flags & M_RAW) {
 		bf = ath_take_txbuf(sc);
 		if (bf == NULL) {
+			/* All DMA buffers full, safe to try again. */
 			requeue = 1;
 			goto hardstart_fail;
 		}
@@ -3224,6 +3230,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		/* bypass FF handling */
 		bf = ath_take_txbuf(sc);
 		if (bf == NULL) {
+			/* All DMA buffers full, safe to try again. */
 			requeue = 1;
 			goto hardstart_fail;
 		}
@@ -3239,6 +3246,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	txq = sc->sc_ac2q[skb->priority];
 
 	if (txq->axq_depth > TAIL_DROP_COUNT) {
+		/* Wish to reserve some DMA buffers, try again later. */ 
 		requeue = 1;
 		goto hardstart_fail;
 	}
@@ -3251,7 +3259,9 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		struct sk_buff *skb_orig = skb;
 		skb = skb_copy(skb, GFP_ATOMIC);
 		if (skb == NULL) {
-			requeue = 1;
+			DPRINTF(sc, ATH_DEBUG_XMIT,
+				"Dropping; skb_copy failure.\n");
+			/* No free RAM, do not requeue! */
 			goto hardstart_fail;
 		}
 		ieee80211_skb_copy_noderef(skb_orig, skb);
@@ -3294,7 +3304,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			bf = ath_take_txbuf(sc);
 			if (bf == NULL) {
 				ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
-				requeue = 1;
+				/* All DMA buffers full, safe to try again. */
 				goto hardstart_fail;
 			}
 			DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
@@ -3345,6 +3355,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 			}
 			bf = ath_take_txbuf(sc);
 			if (bf == NULL) {
+				/* All DMA buffers full, safe to try again. */
 				requeue = 1;
 				goto hardstart_fail;
 			}
@@ -3362,6 +3373,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		bf = ath_take_txbuf(sc);
 		if (bf == NULL) {
 			ATH_TXQ_UNLOCK_IRQ_EARLY(txq);
+			/* All DMA buffers full, safe to try again. */
 			requeue = 1;
 			goto hardstart_fail;
 		}
@@ -3376,6 +3388,7 @@ ff_bypass:
 
 	bf = ath_take_txbuf(sc);
 	if (bf == NULL) {
+		/* All DMA buffers full, safe to try again. */
 		requeue = 1;
 		goto hardstart_fail;
 	}
@@ -3464,7 +3477,7 @@ hardstart_fail:
 	/* Pass control of the skb to the caller (i.e., resources are their 
 	 * problem). */
 	if (requeue) {
-		/* queue is full, let the kernel backlog the skb */
+		/* Queue is full, let the kernel backlog the skb */
 		netif_stop_queue(dev);
 		sc->sc_devstopped = 1;
 		/* Stop tracking again we are giving it back*/
@@ -6024,6 +6037,9 @@ ath_rxbuf_init(struct ath_softc *sc, struct ath_buf *bf)
 			skb = ieee80211_dev_alloc_skb(sc->sc_rxbufsize + 
 					extra + sc->sc_cachelsz - 1);
 			if (skb == NULL) {
+				DPRINTF(sc, ATH_DEBUG_ANY,
+					"Dropping; skbuff allocation failed; size: %u!\n",
+					sc->sc_rxbufsize + extra + sc->sc_cachelsz - 1);
 				sc->sc_stats.ast_rx_nobuf++;
 				return -ENOMEM;
 			}
@@ -6138,8 +6154,11 @@ ath_capture(struct net_device *dev, const struct ath_buf *bf,
 	/* Never copy the SKB, as it is ours on the RX side, and this is the 
 	 * last process on the TX side and we only modify our own headers. */
 	tskb = ath_skb_removepad(skb, 0 /* Copy SKB */);
-	if (tskb == NULL)
+	if (tskb == NULL) {
+		DPRINTF(sc, ATH_DEBUG_ANY,
+			"Dropping; ath_skb_removepad failed!\n");
 		return;
+	}
 	
 	ieee80211_input_monitor(ic, tskb, bf, tx, tsf, sc);
 }
@@ -6301,9 +6320,8 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct ath_rx_status *rs;
 	struct sk_buff *skb = NULL;
 	struct ieee80211_node *ni;
-	unsigned int len;
+	unsigned int len, phyerr, mic_fail = 0;
 	int type;
-	u_int phyerr;
 
 	DPRINTF(sc, ATH_DEBUG_RX_PROC, "invoked\n");
 	do {
@@ -6394,29 +6412,12 @@ ath_rx_tasklet(TQUEUE_ARG data)
 			}
 			if (rs->rs_status & HAL_RXERR_MIC) {
 				sc->sc_stats.ast_rx_badmic++;
-				/*
-				 * Do minimal work required to hand off
-				 * the 802.11 header for notification.
-				 */
-				/* XXX frag's and QoS frames */
-				if (len >= sizeof (struct ieee80211_frame)) {
-					bus_dma_sync_single(sc->sc_bdev,
-					    bf->bf_skbaddr, len,
-					    BUS_DMA_FROMDEVICE);
-#if 0
-/* XXX revalidate MIC, lookup ni to find VAP */
-					ieee80211_notify_michael_failure(ic,
-					    (struct ieee80211_frame *)skb->data,
-					    sc->sc_splitmic ?
-					        rs->rs_keyix - 32 : rs->rs_keyix
-					);
-#endif
-				}
+				mic_fail = 1;
+				goto rx_accept;
 			}
-			/*
-			 * Reject error frames if we have no vaps that
-			 * are operating in monitor mode.
-			 */
+
+			/* Reject error frames if we have no vaps that
+			 * are operating in monitor mode. */
 			if (sc->sc_nmonvaps == 0)
 				goto rx_next;
 		}
@@ -6446,11 +6447,10 @@ rx_accept:
 
 		ath_capture(dev, bf, skb, bf->bf_tsf, 0 /* RX */);
 
-		/*
-		 * Finished monitor mode handling, now reject
-		 * error frames before passing to other vaps
-		 */
-		if (rs->rs_status != 0) {
+		/* Finished monitor mode handling, now reject error frames 
+		 * before passing to other VAPs. Ignore MIC failures here, as 
+		 * we need to recheck them. */
+		if (rs->rs_status & ~(HAL_RXERR_MIC | HAL_RXERR_DECRYPT)) {
 			ieee80211_dev_kfree_skb(&skb);
 			goto rx_next;
 		}
@@ -6458,10 +6458,31 @@ rx_accept:
 		/* remove the CRC */
 		skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 
-		/*
-		 * From this point on we assume the frame is at least
-		 * as large as ieee80211_frame_min; verify that.
-		 */
+		if (mic_fail) {
+			/* Ignore control frames which are reported with MIC 
+			 * error. */
+			if ((((struct ieee80211_frame *)skb->data)->i_fc[0] &
+						 IEEE80211_FC0_TYPE_MASK) == 
+						IEEE80211_FC0_TYPE_CTL)
+				goto drop_micfail;
+
+			ni = ieee80211_find_rxnode(ic, (const struct 
+						ieee80211_frame_min *)skb->data);
+			if (ni) {
+				if (ni->ni_table)
+					ieee80211_check_mic(ni, skb);
+				ieee80211_unref_node(&ni);
+			}
+
+drop_micfail:
+			ieee80211_dev_kfree_skb(&skb);
+			skb = NULL;
+			mic_fail = 0;
+			goto rx_next;
+		}
+
+		/* From this point on we assume the frame is at least
+		 * as large as ieee80211_frame_min; verify that: */
 		if (len < IEEE80211_MIN_LEN) {
 			DPRINTF(sc, ATH_DEBUG_RECV, "Dropping short packet; length %d.\n",
 				len);
@@ -6470,9 +6491,7 @@ rx_accept:
 			goto rx_next;
 		}
 
-		/*
-		 * Normal receive.
-		 */
+		/* Normal receive. */
 		if (IFF_DUMPPKTS(sc, ATH_DEBUG_RECV))
 			ieee80211_dump_pkt(ic, skb->data, skb->len,
 				   sc->sc_hwmap[rs->rs_rate].ieeerate,
@@ -6571,8 +6590,15 @@ rx_next:
 		ATH_RXBUF_UNLOCK_IRQ(sc);
 	} while (ath_rxbuf_init(sc, bf) == 0);
 
-	/* rx signal state monitoring */
-	ath_hal_rxmonitor(ah, &sc->sc_halstats, &sc->sc_curchan);
+	/* RX signal state monitoring. 
+	 * XXX: GIANT HACK
+	 *      With 0.9.30.13 ANI control appears to be broken. ANI is designed 
+	 *      only for client (STA/AHDEMO) only mode. This function updates
+	 *      the data used for ANI, so we will only call it for client only
+	 *      mode. 
+	 *      This may will not affect ANI problems in client only mode. */
+	if (sc->sc_opmode == HAL_M_STA)
+		ath_hal_rxmonitor(ah, &sc->sc_halstats, &sc->sc_curchan);
 #undef PA2DESC
 }
 
@@ -8713,7 +8739,9 @@ ath_calibrate(unsigned long arg)
 			"HAL_RFGAIN_NEED_CHANGE)\n");
 		sc->sc_stats.ast_per_rfgain++;
 
-		/* XXX: Ugly workaround */
+		/* Even if beacons were not enabled presently,
+		 * set sc->beacons if we might need to restart
+                 * them after ath_reset. */
 		if (!sc->sc_beacons &&
 				(TAILQ_FIRST(&ic->ic_vaps)->iv_opmode != 
 				 IEEE80211_M_WDS) &&
@@ -9545,10 +9573,9 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		kfree(chans);
 		return -EINVAL;
 	}
-	/*
-	 * Convert HAL channels to ieee80211 ones.
-	 */
-	IPRINTF(sc, "HAL returned %d channels.\n", nchan);
+	
+	/* Convert HAL channels to ieee80211 ones. */
+	DPRINTF(sc, ATH_DEBUG_RATE, "HAL returned %d channels.\n", nchan);
 	for (i = 0; i < nchan; i++) {
 		HAL_CHANNEL *c = &chans[i];
 		struct ieee80211_channel *ichan = &ic->ic_channels[i];
@@ -9575,7 +9602,8 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		ic->ic_chan_non_occupy[i].tv_sec  = 0;
 		ic->ic_chan_non_occupy[i].tv_usec = 0;
 
-		IPRINTF(sc, "Channel %3d (%4d MHz) Max Tx Power %d dBm%s "
+		DPRINTF(sc, ATH_DEBUG_RATE,
+				"Channel %3d (%4d MHz) Max Tx Power %d dBm%s "
 				"[%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%"
 				"s%s%s%s%s%s%s%s%s%s%s%s\n",
 				ichan->ic_ieee,
@@ -11834,7 +11862,8 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
  * printed with the status in symbolic form. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
-ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
+ath_print_register_details(struct ath_softc *sc, const char* name, 
+			   u_int32_t address, u_int32_t v)
 {
 /* constants from openhal ar5212reg.h */
 #define AR5K_AR5212_PHY_ERR_FIL		    0x810c
@@ -11996,8 +12025,8 @@ ath_print_register_details(const char* name, u_int32_t address, u_int32_t v)
  * characters than 1. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
-ath_print_register_delta(const char* name, u_int32_t address, u_int32_t v_old, 
-		u_int32_t v_new)
+ath_print_register_delta(struct ath_softc *sc, const char* name, 
+			 u_int32_t address, u_int32_t v_old, u_int32_t v_new)
 {
 #define BIT_UNCHANGED_ON  "1"
 #define BIT_UNCHANGED_OFF "."
@@ -12433,10 +12462,11 @@ ath_lookup_register_name(struct ath_softc *sc, char* buf, int buflen,
 /* Print out a single register name/address/value in hex and binary */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
-ath_print_register(const char* name, u_int32_t address, u_int32_t v)
+ath_print_register(struct ath_softc *sc, const char* name, u_int32_t address, 
+		   u_int32_t v)
 {
-	ath_print_register_delta(name, address, v, v);
-	ath_print_register_details(name, address, v);
+	ath_print_register_delta(sc, name, address, v, v);
+	ath_print_register_details(sc, name, address, v);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
@@ -12492,7 +12522,7 @@ ath_ar5212_registers_dump(struct ath_softc *sc) {
 		ath_lookup_register_name(sc, name, 
 				MAX_REGISTER_NAME_LEN, address);
 		value = ath_reg_read(sc, address);
-		ath_print_register(name, address, value);
+		ath_print_register(sc, name, address, value);
 	} while ((address += 4) < MAX_REGISTER_ADDRESS);
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
@@ -12516,8 +12546,8 @@ ath_ar5212_registers_dump_delta(struct ath_softc *sc)
 		if (*p_old != value) {
 			ath_lookup_register_name(sc, name, 
 					MAX_REGISTER_NAME_LEN, address);
-			ath_print_register_delta(name, address, *p_old, value);
-			ath_print_register_details(name, address, value);
+			ath_print_register_delta(sc, name, address, *p_old, value);
+			ath_print_register_details(sc, name, address, value);
 		}
 	} while ((address += 4) < MAX_REGISTER_ADDRESS);
 }

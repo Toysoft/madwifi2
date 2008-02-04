@@ -1074,13 +1074,16 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			cip = (struct ieee80211_cipher *) key->wk_cipher;
 			ciphdrsize = cip->ic_header;
 			tailsize += (cip->ic_trailer + cip->ic_miclen);
+
+			/* Add the 8 bytes MIC length. */
+			if (cip->ic_cipher == IEEE80211_CIPHER_TKIP)
+				pktlen += IEEE80211_WEP_MICLEN;
 		}
 
 		pdusize = vap->iv_fragthreshold - (hdrsize_nopad + ciphdrsize);
 		fragcnt = *framecnt =
-			((pktlen - (hdrsize_nopad + ciphdrsize)) / pdusize) +
-			(((pktlen - (hdrsize_nopad + ciphdrsize)) %
-				pdusize == 0) ? 0 : 1);
+			((pktlen - hdrsize_nopad) / pdusize) +
+			(((pktlen - hdrsize_nopad) % pdusize == 0) ? 0 : 1);
 
 		/*
 		 * Allocate sk_buff for each subsequent fragment; First fragment
@@ -1276,7 +1279,7 @@ ieee80211_add_erp(u_int8_t *frm, struct ieee80211com *ic)
 		erp |= IEEE80211_ERP_NON_ERP_PRESENT;
 	if (ic->ic_flags & IEEE80211_F_USEPROT)
 		erp |= IEEE80211_ERP_USE_PROTECTION;
-	if (ic->ic_flags & IEEE80211_F_USEBARKER)
+	if ((ic->ic_flags & IEEE80211_F_USEBARKER) || (ic->ic_nonerpsta > 0))
 		erp |= IEEE80211_ERP_LONG_PREAMBLE;
 	*frm++ = erp;
 	return frm;

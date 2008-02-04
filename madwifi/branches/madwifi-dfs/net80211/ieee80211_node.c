@@ -416,12 +416,13 @@ ieee80211_reset_bss(struct ieee80211vap *vap)
 			  __func__, ni, MAC_ADDR(vap->iv_myaddr));
 	KASSERT(ni != NULL, ("unable to setup inital BSS node"));
 
-	/* New reference for caller */
-	vap->iv_bss = ieee80211_ref_node(ni);
+	vap->iv_bss = PASS_NODE(ni);
+	KASSERT((atomic_read(&vap->iv_bss->ni_refcnt) == 2), 
+		("wrong refcount for new node."));
 
 	if (obss != NULL) {
-		copy_bss_state(ni, obss);
-		ni->ni_intval = ic->ic_lintval;
+		copy_bss_state(vap->iv_bss, obss);
+		vap->iv_bss->ni_intval = ic->ic_lintval;
 		/* Caller's reference */
 		ieee80211_unref_node(&obss);
 	}
@@ -933,10 +934,10 @@ static void node_print_message(
 {
 	va_list args;
 	int adjusted_refcount = atomic_read(&ni->ni_refcnt) + refcnt_adjust;
-	char node_count[32] = { '\0' };
-	char expanded_message[1024] = { '\0' };
+	char node_count[10] = { '\0' };
+	char expanded_message[192] = { '\0' };
 
-	if (0 == (ni->ni_ic->ic_debug & flags) && (flags != IEEE80211_MSG_ANY))
+	if (0 == (ni->ni_ic->ic_debug & flags))
 		return;
 
 	if (adjusted_refcount == 0)
@@ -953,22 +954,22 @@ static void node_print_message(
 #ifdef IEEE80211_DEBUG_REFCNT
 	printk(KERN_DEBUG "%s/%s: %s%s:%d -> %s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
 #else
-	       printk(KERN_DEBUG "%s/%s: %s%s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
+	printk(KERN_DEBUG "%s/%s: %s%s:%d %s [node %p<" MAC_FMT ">%s%s%s%s, refs=%02d]\n",
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
-		ni->ni_ic->ic_dev->name,
-	        ni->ni_vap->iv_dev->name, 
-		node_count,
+			ni->ni_ic->ic_dev->name,
+			ni->ni_vap->iv_dev->name, 
+			node_count,
 #ifdef IEEE80211_DEBUG_REFCNT
-		func1, line1, 
+			func1, line1, 
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
-		func2, line2, 
-		expanded_message,
-		ni, MAC_ADDR(ni->ni_macaddr), 
-		ni->ni_table != NULL ? " in " : "",
-		ni->ni_table != NULL ? ni->ni_table->nt_name : "",
-		ni->ni_table != NULL ? " table" : "",
-		ni->ni_table != NULL ? "" : " (not in any tables)",
-		adjusted_refcount);
+			func2, line2, 
+			expanded_message,
+			ni, MAC_ADDR(ni->ni_macaddr), 
+			ni->ni_table != NULL ? " in " : "",
+			ni->ni_table != NULL ? ni->ni_table->nt_name : "",
+			ni->ni_table != NULL ? " table" : "",
+			ni->ni_table != NULL ? "" : " (not in any tables)",
+			adjusted_refcount);
 	va_end(args);
 }
 EXPORT_SYMBOL(node_print_message);
@@ -2246,9 +2247,10 @@ ieee80211_node_leave(struct ieee80211_node *ni)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211_node_table *nt = ni->ni_table;
 
-	IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC | IEEE80211_MSG_DEBUG, ni,
-		"station with aid %d leaves (refcnt %u)",
-		IEEE80211_NODE_AID(ni), atomic_read(&ni->ni_refcnt));
+	if (IEEE80211_NODE_AID(ni) != 0)
+		IEEE80211_NOTE(vap, IEEE80211_MSG_ASSOC | IEEE80211_MSG_DEBUG,
+			ni, "station with aid %d leaves (refcnt %u)",
+			IEEE80211_NODE_AID(ni), atomic_read(&ni->ni_refcnt));
 
 	/* From this point onwards we can no longer find the node,
 	 * so no more references are generated
