@@ -1110,15 +1110,11 @@ ieee80211_ioctl_getspy(struct net_device *dev, struct iw_request_info *info,
 		/* check we are associated w/ this vap */
 		if (ni) {
 			if (ni->ni_vap == vap) {
-				u_int rssi;
+				set_quality(&spy_stat[i], 
+					ic->ic_rssi_ewma ? 
+					 ic->ic_node_getrssi(ni) : ni->ni_rssi,
+					ic->ic_channoise);
 
-				/* using EWMA for rssi, if requested */
-				if (ic->ic_rssi_ewma) {
-					rssi = ic->ic_node_getrssi(ni);
-				} else {
-					rssi = ni->ni_rssi;
-				}
-				set_quality(&spy_stat[i], rssi, ic->ic_channoise);
 				if (ni->ni_rtsf != vap->iv_spy.ts_rssi[i]) {
 					vap->iv_spy.ts_rssi[i] = ni->ni_rtsf;
 				} else {
