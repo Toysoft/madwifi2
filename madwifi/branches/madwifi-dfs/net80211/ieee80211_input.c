@@ -3421,6 +3421,14 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 				ieee80211_bg_scan(vap);
 			return;
 		}
+
+		/* ieee80211_parse_csaie() needs to be called in IBSS mode as
+		 * well */
+		if (vap->iv_opmode == IEEE80211_M_IBSS) {
+			if (scan.csa != NULL || vap->iv_csa_jiffies)
+				ieee80211_parse_csaie(ni, scan.csa, wh);
+		}
+
 		/*
 		 * If scanning, just pass information to the scan module.
 		 */
