@@ -1395,7 +1395,6 @@ ieee80211_ioctl_siwtxpow(struct net_device *dev, struct iw_request_info *info,
 			ic->ic_flags |= IEEE80211_F_TXPOW_FIXED;
 
 			vap->iv_txpower = halfdbm;
-			ic->ic_set_txpow(ic, halfdbm);
 		} else
 			return -EINVAL;
   	} else {

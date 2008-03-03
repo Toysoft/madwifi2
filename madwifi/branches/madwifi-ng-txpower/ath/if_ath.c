@@ -231,7 +231,6 @@ static int ath_newstate(struct ieee80211vap *, enum ieee80211_state, int);
 static void ath_scan_start(struct ieee80211com *);
 static void ath_scan_end(struct ieee80211com *);
 static void ath_set_channel(struct ieee80211com *);
-static void ath_set_txpow(struct ieee80211com *, int);
 static void ath_set_coverageclass(struct ieee80211com *);
 static u_int ath_mhz2ieee(struct ieee80211com *, u_int, u_int);
 #ifdef ATH_SUPERG_FF
@@ -245,7 +244,6 @@ static void ath_setup_keycacheslot(struct ath_softc *, struct ieee80211_node *);
 static void ath_newassoc(struct ieee80211_node *, int);
 static int ath_getchannels(struct net_device *, u_int, HAL_BOOL, HAL_BOOL);
 static void ath_led_event(struct ath_softc *, int);
-static void ath_update_txpow(struct ath_softc *);
 
 #ifdef ATH_REVERSE_ENGINEERING
 /* Reverse engineering utility commands */
@@ -960,7 +958,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_hastpc = 0;
 	tpc = 0; /* TPC is always zero, when compiled without ATH_CAP_TPC */
 #endif
-	if (sc->sc_hastpc || ath_hal_hastxpowlimit(ah))
+	if (ath_hal_hastxpowlimit(ah))
 		ic->ic_caps |= IEEE80211_C_TXPMGT;
 
 	/*
@@ -1069,8 +1067,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_registers_dump_delta = ath_registers_dump_delta;
 	ic->ic_registers_mark       = ath_registers_mark;
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
-
-	ic->ic_set_txpow = ath_set_txpow;
 
 	ic->ic_set_coverageclass = ath_set_coverageclass;
 	ic->ic_mhz2ieee = ath_mhz2ieee;
@@ -2466,7 +2462,6 @@ ath_init(struct net_device *dev)
 	 * This is needed only to setup initial state
 	 * but it's best done after a reset.
 	 */
-	ath_update_txpow(sc);
 	ath_radar_update(sc);
 	ath_rp_flush(sc);
 
@@ -2743,7 +2738,6 @@ ath_reset(struct net_device *dev)
 	if ((sc->sc_opmode != HAL_M_STA) && sc->sc_hasintmit)
 		ath_hal_setintmit(ah, 0);
 
-	ath_update_txpow(sc);		/* update tx power state */
 	ath_radar_update(sc);
 	ath_setdefantenna(sc, sc->sc_defant);
 	if (ath_startrecv(sc) != 0)	/* restart recv */
@@ -8662,7 +8656,6 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 			ath_hal_setintmit(ah, 0);
 
 		sc->sc_curchan = hchan;
-		ath_update_txpow(sc);		/* update tx power state */
 		ath_radar_update(sc);
 		ath_rp_flush(sc);
 
@@ -9782,44 +9775,6 @@ ath_led_event(struct ath_softc *sc, int event)
 		ath_led_blink(sc, sc->sc_hwmap[sc->sc_rxrate].ledon,
 			sc->sc_hwmap[sc->sc_rxrate].ledoff);
 		break;
-	}
-}
-
-/* XXX: this function needs some locking to avoid being called twice/interrupted */
-static void
-ath_update_txpow(struct ath_softc *sc)
-{
-  	struct ieee80211com *ic = &sc->sc_ic;
-  	struct ath_hal *ah = sc->sc_ah;
-	u_int32_t txpow;
-  
-	if (!sc->sc_hastpc) {
-		ath_hal_settxpowlimit(ah, ic->ic_txpowlimit);
-		
-		(void)ath_hal_gettxpowlimit(ah, &txpow);
-		ic->ic_txpowlimit = txpow;
-  	}
-}
-
-/* XXX: this function needs some locking to avoid being called 
- * twice/interrupted */
-static void
-ath_set_txpow(struct ieee80211com *ic, int txpow)
-{
-	struct net_device *dev = ic->ic_dev;
-	struct ath_softc *sc = dev->priv;
-	struct ieee80211vap *vap = NULL;
-	u_int32_t mintxpow;
-  
-	if (!sc->sc_hastpc) {
-		/* Find the minimum TX power of all VAPs and set that;
-		 * i.e., we guarantee that the set TX power is the 
-		 * _maximum_ TX power. */
-		mintxpow = txpow;
-		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next)
-			mintxpow = MIN(mintxpow, vap->iv_txpower);
-
-		ic->ic_txpowlimit = mintxpow;
 	}
 }
 
@@ -11194,7 +11149,6 @@ txcont_configure_radio(struct ieee80211com *ic)
 					status);
 		}
 
-		ath_update_txpow(sc);
 		ath_radar_update(sc);
 		ath_rp_flush(sc);
 
