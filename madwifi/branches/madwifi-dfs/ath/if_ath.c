@@ -1597,11 +1597,19 @@ _ath_cac_running_dbgmsg(struct ath_softc *sc, const char* func) {
 static inline int
 _ath_chan_unavail_dbgmsg(struct ath_softc *sc, const char* func) {
 	int b = ath_chan_unavail(sc);
-	if (b)
-		DPRINTF(sc, ATH_DEBUG_DOTH,
+	if (b) {
+		if (sc->sc_dfs_cac) {
+			DPRINTF(sc, ATH_DEBUG_DOTH,
 				"%s: Invoked a transmit function during DFS "
-				"channel availability check OR while radar "
+				"channel availability check!\n", func);
+		}
+		if ((sc->sc_curchan.privFlags & CHANNEL_DFS) && 
+		    (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE)) {
+			DPRINTF(sc, ATH_DEBUG_DOTH,
+				"%s: Invoked a transmit function while radar "
 				"interference is detected!\n", func);
+		}
+	}
 	return b;
 }
 
@@ -2784,8 +2792,12 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 {
 	struct ath_hal *ah = sc->sc_ah;
 
-	if (ath_cac_running_dbgmsg(sc))
+	if (ath_cac_running_dbgmsg(sc)) {
+		DPRINTF(sc, ATH_DEBUG_DOTH,
+			"%s: WE ARE SENDING PACKETS UNDER CAC!\n", __func__);
 		return;
+	}
+
 	/*
 	 * Insert the frame on the outbound list and
 	 * pass it on to the hardware.
@@ -3204,6 +3216,13 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	STAILQ_INIT(&bf_head);
+
+	/* If we are under CAC or have detected a radar, we simply drop (and
+	 * free) frames */
+
+	if (ath_chan_unavail_dbgmsg(sc)) {
+		goto hardstart_fail;
+	}
 
 	if (SKB_CB(skb)->flags & M_RAW) {
 		bf = ath_take_txbuf(sc);
@@ -4725,11 +4744,7 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		return NULL;
 	}
 
-	if (ath_chan_unavail_dbgmsg(sc)) {
-		DPRINTF(sc, ATH_DEBUG_BEACON_PROC, 
-			"Skipping VAP when DFS requires radio silence\n");
-		return NULL;
-	}
+	/* If we detected a radar, we still need to send beacons with CSA IE */
 
 #ifdef ATH_SUPERG_XR
 	if (vap->iv_flags & IEEE80211_F_XR) {
@@ -4882,8 +4897,8 @@ ath_beacon_send(struct ath_softc *sc, int *needmark, uint64_t hw_tsf)
 	u_int32_t bfaddr = 0;
 	u_int32_t n_beacon;
 
-	if (ath_chan_unavail_dbgmsg(sc))
-		return;
+	/* Once a radar has been detected, we need to send beacons with CSA
+	 * IE */
 
 	/*
 	 * Check if the previous beacon has gone out.  If
