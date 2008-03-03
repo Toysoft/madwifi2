@@ -186,6 +186,10 @@ struct ieee80211_ctlframe_addr2 {
 #define	IEEE80211_QOS_EOSP_S			4
 #define	IEEE80211_QOS_TID			0x0f
 
+#define IEEE80211_FRM_HAS_BODY(_wh)			\
+	(((_wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK) !=	\
+			IEEE80211_FC0_TYPE_CTL)
+
 /*
  * Country/Region Codes from MS WINNLS.H
  * Numbering from ISO 3166
@@ -373,6 +377,38 @@ struct ieee80211_ie_country {
 } __packed;
 
 /*
+ * Power Constraint information element.
+ */
+struct ieee80211_ie_pwrcnstr {
+	u_int8_t pc_id;			/* IEEE80211_ELEMID_PWRCNSTR */
+	u_int8_t pc_len;		/* == 2 */
+	u_int8_t pc_lpc;		/* Local Power Constraint [dB] */
+} __packed;
+
+/*
+ * Power Capability information element.
+ */
+struct ieee80211_ie_pwrcap {
+	u_int8_t pc_id;			/* IEEE80211_ELEMID_PWRCAP */
+	u_int8_t pc_len;		/* == 2 */
+	int8_t pc_mintxpow;		/* Minimum Transmit Power Capability [dBm] */
+	int8_t pc_maxtxpow;		/* Maximum Transmit Power Capability [dBm] */
+} __packed;
+
+/*
+ * Supported Channels information element.
+ */
+#define IEEE80211_SUPPCHAN_MAX_PAIRS (127)
+struct ieee80211_ie_sc {
+	u_int8_t sc_id;			/* IEEE80211_ELEMID_SUPPCHAN */
+	u_int8_t sc_len;		/* == 2 * number of sc_subband elements */
+	struct {
+		u_int8_t sc_first;	/* First Channel Number */
+		u_int8_t sc_number;	/* Number of Channels */
+	} __packed sc_subband[IEEE80211_SUPPCHAN_MAX_PAIRS];
+} __packed;
+
+/*
  * Channel Switch Announcement information element.
  */
 struct ieee80211_ie_csa {
@@ -503,9 +539,13 @@ struct ieee80211_wme_param {
 #define WME_CAPINFO_UAPSD_MAXSP_SHIFT		5
 #define WME_CAPINFO_UAPSD_MAXSP_MASK		0x3
 #define WME_CAPINFO_IE_OFFSET			8
-#define WME_UAPSD_MAXSP(_qosinfo) (((_qosinfo) >> WME_CAPINFO_UAPSD_MAXSP_SHIFT) & WME_CAPINFO_UAPSD_MAXSP_MASK)
-#define WME_UAPSD_AC_ENABLED(_ac, _qosinfo) ( (1<<(3 - (_ac))) &   \
-		(((_qosinfo) >> WME_CAPINFO_UAPSD_ACFLAGS_SHIFT) & WME_CAPINFO_UAPSD_ACFLAGS_MASK) )
+#define WME_UAPSD_MAXSP(_qosinfo)					\
+		(((_qosinfo) >> WME_CAPINFO_UAPSD_MAXSP_SHIFT) & 	\
+		 WME_CAPINFO_UAPSD_MAXSP_MASK)
+#define WME_UAPSD_AC_ENABLED(_ac, _qosinfo)				\
+		((1 << (3 - (_ac))) & (					\
+		 ((_qosinfo) >> WME_CAPINFO_UAPSD_ACFLAGS_SHIFT) &	\
+		 WME_CAPINFO_UAPSD_ACFLAGS_MASK))
 
 /*
  * Atheros Advanced Capability information element.

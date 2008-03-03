@@ -128,8 +128,8 @@ struct ar5212_openbsd_desc {
 void
 ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 {
-	struct ieee80211_phy_params *ph =
-		(struct ieee80211_phy_params *) (SKB_CB(skb) + sizeof(struct ieee80211_cb));
+	struct ieee80211_phy_params *ph = (struct ieee80211_phy_params *)
+		(SKB_CB(skb) + 1); /* NB: SKB_CB casts to CB struct*. */
 	SKB_CB(skb)->flags = M_RAW;
 	SKB_CB(skb)->ni = NULL;
 	SKB_CB(skb)->next = NULL;
@@ -247,7 +247,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 					break;
 
 				case IEEE80211_RADIOTAP_DATA_RETRIES:
-					ph->try0 = *p;
+					ph->try0 = *p + 1;
 					p++;
 					break;
 
@@ -303,11 +303,19 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 {
 	struct ieee80211vap *vap, *next;
 	struct ath_desc *ds = bf->bf_desc;
-	int noise = 0;
-	int antenna = 0;
-	int ieeerate = 0;
+	int noise = 0, antenna = 0, ieeerate = 0;
 	u_int32_t rssi = 0;
 	u_int8_t pkttype = 0;
+	unsigned int mon_hdrspace = A_MAX(sizeof(struct ath_tx_radiotap_header),
+				    (A_MAX(sizeof(struct wlan_ng_prism2_header),
+					   ATHDESC_HEADER_SIZE)));
+
+	if ((skb_headroom(skb) < mon_hdrspace) &&
+			pskb_expand_head(skb, mon_hdrspace, 0, GFP_ATOMIC)) {
+		printk("No headroom for monitor header - %s:%d %s\n", 
+				__FILE__, __LINE__, __func__);
+		return;
+	}
 
 	if (tx) {
 		rssi = bf->bf_dsstatus.ds_txstat.ts_rssi;
@@ -345,7 +353,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			/* Accept PHY, CRC and decrypt errors. Discard the rest. */
 			if (bf->bf_dsstatus.ds_rxstat.rs_status &~
 					(HAL_RXERR_DECRYPT | HAL_RXERR_MIC |
-					 HAL_RXERR_PHY | HAL_RXERR_CRC ))
+					 HAL_RXERR_PHY | HAL_RXERR_CRC))
 				continue;
 
 			/* We can't use addr1 to determine direction at this point */
@@ -379,10 +387,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			/* XXX stat+msg */
 			continue;
 		}
-		/* We duplicate the reference after skb_copy */
-		if (SKB_CB(skb)->ni != NULL) {
-			SKB_CB(skb1)->ni = ieee80211_ref_node(SKB_CB(skb)->ni);
-		}
+		ieee80211_skb_copy_noderef(skb, skb1);
+
 		if (vap->iv_monitor_txf_len && tx) {
 			/* truncate transmit feedback packets */
 			skb_trim(skb1, vap->iv_monitor_txf_len);
@@ -478,8 +484,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 				th->wt_flags = 0;
 				th->wt_rate = ieeerate;
-				th->wt_txpower = 0;
 				th->wt_antenna = antenna;
+				th->wt_pad = 0;
 
 				if (bf->bf_dsstatus.ds_txstat.ts_status & HAL_TXERR_XRETRY)
 					th->wt_txflags |= cpu_to_le16(IEEE80211_RADIOTAP_F_TX_FAIL);
@@ -539,7 +545,8 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 				}
 
 				th->wr_dbm_antnoise = (int8_t) noise;
-				th->wr_dbm_antsignal = th->wr_dbm_antnoise + rssi;
+				th->wr_dbm_antsignal = 
+					th->wr_dbm_antnoise + rssi;
 				th->wr_antenna = antenna;
 				th->wr_antsignal = rssi;
 
@@ -549,21 +556,24 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 		}
 		case ARPHRD_IEEE80211_ATHDESC: {
 			if (skb_headroom(skb1) < ATHDESC_HEADER_SIZE) {
-				printk("%s:%d %s\n", __FILE__, __LINE__, __func__);
+				printk("%s:%d %s\n", __FILE__, 
+						__LINE__, __func__);
 				ieee80211_dev_kfree_skb(&skb1);
 				break;
 			}
-			memcpy(skb_push(skb1, ATHDESC_HEADER_SIZE), ds, ATHDESC_HEADER_SIZE);
+			memcpy(skb_push(skb1, ATHDESC_HEADER_SIZE), 
+					ds, ATHDESC_HEADER_SIZE);
 			break;
 		}
 		default:
 			break;
 		}
 		if (skb1 != NULL) {
-			struct ieee80211_node *ni_tmp;
-			if (!tx && (vap->iv_dev->type != ARPHRD_IEEE80211_RADIOTAP) && (skb1->len >= IEEE80211_CRC_LEN)) {
-				/* Remove FCS from end of rx frames when
-				 * delivering to non-Radiotap VAPs */
+			if (!tx && (skb1->len >= IEEE80211_CRC_LEN) && 
+					(vap->iv_dev->type != 
+					 ARPHRD_IEEE80211_RADIOTAP)) {
+				/* Remove FCS from end of RX frames when
+				 * delivering to non-Radiotap VAPs. */
 				skb_trim(skb1, skb1->len - IEEE80211_CRC_LEN);
 			}
 			skb1->dev = dev; /* NB: deliver to wlanX */
@@ -571,18 +581,18 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 
 			skb1->ip_summed = CHECKSUM_NONE;
 			skb1->pkt_type = pkttype;
-			skb1->protocol = __constant_htons(0x0019); /* ETH_P_80211_RAW */
+			skb1->protocol = 
+				__constant_htons(0x0019); /* ETH_P_80211_RAW */
 
-			ni_tmp = SKB_CB(skb1)->ni;
 			if (netif_rx(skb1) == NET_RX_DROP) {
 				/* If netif_rx dropped the packet because 
-				 * device was too busy */
-				if (ni_tmp != NULL) {
-					/* node reference was leaked */
-					ieee80211_unref_node(&ni_tmp);
-				}
+				 * device was too busy, reclaim the ref. in 
+				 * the skb. */
+				if (SKB_CB(skb1)->ni != NULL)
+					ieee80211_unref_node(&SKB_CB(skb1)->ni);
 				vap->iv_devstats.rx_dropped++;
 			}
+
 			vap->iv_devstats.rx_packets++;
 			vap->iv_devstats.rx_bytes += skb1->len;
 		}

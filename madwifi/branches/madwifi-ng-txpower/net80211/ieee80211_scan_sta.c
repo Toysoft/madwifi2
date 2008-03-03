@@ -542,14 +542,31 @@ sta_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 
 	ss->ss_next = 0;
 	/* XXX tunables */
-	ss->ss_mindwell = msecs_to_jiffies(20);		/* 20ms */
+	/* 
+	 * The scanner will stay on station for ss_maxdwell ms (using a 
+	 * timer), collecting responses.  ss_maxdwell can adjusted downward
+	 * so the station gets back on channel before DTIM occurs.  If the
+	 * station receives probe responses before ss_mindwell has elapsed, the
+	 * timer continues.  If it receives probe responses after ss_mindwell
+	 * then the timer is cancelled and the next channel is chosen.  
+	 * Basically, you are going to get the mindwell if you are scanning an
+	 * occupied channel in the real world and the maxdwell if it's empty.
+	 * 
+	 * This seems somehow wrong to me, as you tend to want to fish where the
+	 * fish is bitin'.  
+	 * 
+	 * I'm bumping mindwell up to 60ms (was 20ms).  This gives us a reasonable
+	 * chance to find all the APs with active scans, and should pick up 
+	 * everything within a few passes for passive.
+	*/
+	ss->ss_mindwell = msecs_to_jiffies(60);	        /* 60ms */
 	ss->ss_maxdwell = msecs_to_jiffies(200);	/* 200ms */
 
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_msg_scan(vap)) {
-		printf("%s: scan set ", vap->iv_dev->name);
+		printk("%s: scan set ", vap->iv_dev->name);
 		ieee80211_scan_dump_channels(ss);
-		printf(" dwell min %ld max %ld\n",
+		printk(" dwell min %ld max %ld\n",
 			ss->ss_mindwell, ss->ss_maxdwell);
 	}
 #endif /* IEEE80211_DEBUG */
@@ -773,26 +790,26 @@ match_bss(struct ieee80211vap *vap,
 		fail |= 0x80;
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_msg_is_reported(vap, IEEE80211_MSG_SCAN | IEEE80211_MSG_ROAM)) {
-		printf(" %03x", fail);
-		printf(" %c %s",
+		printk(" %03x", fail);
+		printk(" %c " MAC_FMT,
 			fail & 0x40 ? '=' : fail & 0x80 ? '^' : fail ? '-' : '+',
-			ether_sprintf(se->se_macaddr));
-		printf(" %s%c", ether_sprintf(se->se_bssid),
+			MAC_ADDR(se->se_macaddr));
+		printk(" " MAC_FMT "%c", MAC_ADDR(se->se_bssid),
 			fail & 0x20 ? '!' : ' ');
-		printf(" %3d%c", ieee80211_chan2ieee(ic, se->se_chan),
+		printk(" %3d%c", ieee80211_chan2ieee(ic, se->se_chan),
 			fail & 0x01 ? '!' : ' ');
-		printf(" %+4d", se->se_rssi);
-		printf(" %2dM%c", (rate & IEEE80211_RATE_VAL) / 2,
+		printk(" %+4d", se->se_rssi);
+		printk(" %2dM%c", (rate & IEEE80211_RATE_VAL) / 2,
 			fail & 0x08 ? '!' : ' ');
-		printf(" %4s%c",
+		printk(" %4s%c",
 			(se->se_capinfo & IEEE80211_CAPINFO_ESS) ? "ess" :
 			(se->se_capinfo & IEEE80211_CAPINFO_IBSS) ? "ibss" : "????",
 			fail & 0x02 ? '!' : ' ');
-		printf(" %3s%c ",
+		printk(" %3s%c ",
 			(se->se_capinfo & IEEE80211_CAPINFO_PRIVACY) ? "wep" : "no",
 			fail & 0x04 ? '!' : ' ');
 		ieee80211_print_essid(se->se_ssid + 2, se->se_ssid[1]);
-		printf("%s\n", fail & 0x10 ? "!" : "");
+		printk("%s\n", fail & 0x10 ? "!" : "");
 	}
 #endif
 	return fail;
@@ -908,7 +925,7 @@ notfound:
 	st->st_action = ss->ss_ops->scan_default;
 	if (action)
 		st->st_action = action;
-	if ((selbss = select_bss(ss, vap)) == NULL ) {
+	if ((selbss = select_bss(ss, vap)) == NULL) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: select_bss failed\n", __func__);
 		goto notfound;
@@ -1212,9 +1229,9 @@ adhoc_start(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_msg_scan(vap)) {
-		printf("%s: scan set ", vap->iv_dev->name);
+		printk("%s: scan set ", vap->iv_dev->name);
 		ieee80211_scan_dump_channels(ss);
-		printf(" dwell min %ld max %ld\n",
+		printk(" dwell min %ld max %ld\n",
 			ss->ss_mindwell, ss->ss_maxdwell);
 	}
 #endif /* IEEE80211_DEBUG */
@@ -1300,7 +1317,7 @@ adhoc_pick_bss(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 	 */
 	/* NB: unlocked read should be ok */
 	if (TAILQ_FIRST(&st->st_entry) == NULL ||
-		(selbs = select_bss(ss, vap)) == NULL ) {
+		(selbs = select_bss(ss, vap)) == NULL) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_SCAN,
 			"%s: no scan candidate\n", __func__);
 		if (vap->iv_des_nssid) {

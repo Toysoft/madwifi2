@@ -58,7 +58,7 @@
  */
 static const struct ieee80211_cipher *ciphers[IEEE80211_CIPHER_MAX];
 
-static int _ieee80211_crypto_delkey(struct ieee80211vap *,
+static int ieee80211_crypto_delkey_locked(struct ieee80211vap *,
 	struct ieee80211_key *, struct ieee80211_node *);
 
 /*
@@ -204,12 +204,12 @@ void
 ieee80211_crypto_register(const struct ieee80211_cipher *cip)
 {
 	if (cip->ic_cipher >= IEEE80211_CIPHER_MAX) {
-		printf("%s: cipher %s has an invalid cipher index %u\n",
+		printk(KERN_ERR "%s: cipher %s has an invalid cipher index %u\n",
 			__func__, cip->ic_name, cip->ic_cipher);
 		return;
 	}
 	if ((ciphers[cip->ic_cipher] != NULL) && (ciphers[cip->ic_cipher] != cip)) {
-		printf("%s: cipher %s registered with a different template\n",
+		printk(KERN_ERR "%s: cipher %s registered with a different template\n",
 			__func__, cip->ic_name);
 		return;
 	}
@@ -224,12 +224,12 @@ void
 ieee80211_crypto_unregister(const struct ieee80211_cipher *cip)
 {
 	if (cip->ic_cipher >= IEEE80211_CIPHER_MAX) {
-		printf("%s: cipher %s has an invalid cipher index %u\n",
+		printk(KERN_ERR "%s: cipher %s has an invalid cipher index %u\n",
 			__func__, cip->ic_name, cip->ic_cipher);
 		return;
 	}
 	if (ciphers[cip->ic_cipher] != NULL && ciphers[cip->ic_cipher] != cip) {
-		printf("%s: cipher %s registered with a different template\n",
+		printk(KERN_ERR "%s: cipher %s registered with a different template\n",
 			__func__, cip->ic_name);
 		return;
 	}
@@ -439,7 +439,7 @@ EXPORT_SYMBOL(ieee80211_crypto_newkey);
  * Remove the key (no locking, for internal use).
  */
 static int
-_ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
+ieee80211_crypto_delkey_locked(struct ieee80211vap *vap, struct ieee80211_key *key,
 	struct ieee80211_node *ni)
 {
 	ieee80211_keyix_t keyix;
@@ -484,7 +484,7 @@ ieee80211_crypto_delkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 		dev_comp_set(vap, ni, 0);
 #endif
 	ieee80211_key_update_begin(vap);
-	status = _ieee80211_crypto_delkey(vap, key, ni);
+	status = ieee80211_crypto_delkey_locked(vap, key, ni);
 	ieee80211_key_update_end(vap);
 
 	return status;
@@ -501,7 +501,7 @@ ieee80211_crypto_delglobalkeys(struct ieee80211vap *vap)
 
 	ieee80211_key_update_begin(vap);
 	for (i = 0; i < IEEE80211_WEP_NKID; i++)
-		(void) _ieee80211_crypto_delkey(vap, &vap->iv_nw_keys[i], NULL);
+		(void) ieee80211_crypto_delkey_locked(vap, &vap->iv_nw_keys[i], NULL);
 	ieee80211_key_update_end(vap);
 }
 EXPORT_SYMBOL(ieee80211_crypto_delglobalkeys);
@@ -524,9 +524,9 @@ ieee80211_crypto_setkey(struct ieee80211vap *vap, struct ieee80211_key *key,
 	KASSERT(cip != NULL, ("No cipher!"));
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-		"%s: %s keyix %u flags 0x%x mac %s  tsc %llu len %u\n", __func__,
+		"%s: %s keyix %u flags 0x%x mac " MAC_FMT "  tsc %llu len %u\n", __func__,
 		cip->ic_name, key->wk_keyix, key->wk_flags,
-		ether_sprintf(macaddr), (unsigned long long)key->wk_keytsc,
+		MAC_ADDR(macaddr), (unsigned long long)key->wk_keytsc,
 		key->wk_keylen);
 
 	/*

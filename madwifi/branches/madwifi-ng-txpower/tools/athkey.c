@@ -113,6 +113,7 @@ set80211priv(const char *dev, int op, void *data, int len, int show_err)
 				IOCTL_ERR(IEEE80211_IOCTL_RADAR),
 				IOCTL_ERR(IEEE80211_IOCTL_SETKEY),
 				IOCTL_ERR(IEEE80211_IOCTL_DELKEY),
+				IOCTL_ERR(IEEE80211_IOCTL_HALMAP),
 				IOCTL_ERR(IEEE80211_IOCTL_ADDMAC),
 				IOCTL_ERR(IEEE80211_IOCTL_DELMAC),
 				IOCTL_ERR(IEEE80211_IOCTL_WDSADDMAC),
@@ -207,7 +208,7 @@ getcipher(const char *name)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-i device] keyix cipher keyval [mac]\n",
+	fprintf(stderr, "usage: %s [-i device] [-d] keyix cipher keyval [mac]\n",
 		progname);
 	exit(-1);
 }

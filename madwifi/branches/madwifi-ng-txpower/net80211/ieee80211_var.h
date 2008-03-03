@@ -48,26 +48,43 @@
 #include <net80211/ieee80211_proto.h>
 #include <net80211/ieee80211_scan.h>
 
-/*
-Note: Atheros chips use 6 bits when power is specified in whole dBm units, with a value range from 0 to 63.
-Note: Atheros chips use 7 bits when power is specified in half dBm units, with a value range from 0 to 127.
-*/
-#define	IEEE80211_TXPOWER_MAX	127		/* .5 dBm units */
-#define	IEEE80211_TXPOWER_MIN	0		/* kill radio */
+/* NB: 
+ * - Atheros chips use 6 bits when power is specified in whole dBm units, with 
+ *   a value range from 0 to 63.
+ * - Atheros chips use 7 bits when power is specified in half dBm units, with 
+ *   a value range from 0 to 127.
+ */
+#define	IEEE80211_TXPOWER_MAX		127	/* .5 dBm units */
+#define	IEEE80211_TXPOWER_MIN		0	/* kill radio */
 
-#define	IEEE80211_DTIM_MAX	15		/* max DTIM period */
-#define	IEEE80211_DTIM_MIN	1		/* min DTIM period */
-#define	IEEE80211_DTIM_DEFAULT	1		/* default DTIM period */
+#define	IEEE80211_DTIM_MAX		15	/* max DTIM period */
+#define	IEEE80211_DTIM_MIN		1	/* min DTIM period */
+#define	IEEE80211_DTIM_DEFAULT		1	/* default DTIM period */
 
-#define	IEEE80211_BINTVAL_MAX	1000		/* max beacon interval (TUs) */
-#define	IEEE80211_BINTVAL_MIN	25		/* min beacon interval (TUs) */
-#define	IEEE80211_BINTVAL_DEFAULT 100		/* default beacon interval (TUs) */
+#define	IEEE80211_BINTVAL_MAX		1000	/* max beacon interval (TUs) */
+#define	IEEE80211_BINTVAL_MIN		25	/* min beacon interval (TUs) */
+#define	IEEE80211_BINTVAL_DEFAULT 	100	/* default beacon interval (TUs) */
 #define IEEE80211_BINTVAL_VALID(_bi) \
 	((IEEE80211_BINTVAL_MIN <= (_bi)) && \
 	 ((_bi) <= IEEE80211_BINTVAL_MAX))
 #define IEEE80211_BINTVAL_SANITISE(_bi) \
 	(IEEE80211_BINTVAL_VALID(_bi) ? \
 	 (_bi) : IEEE80211_BINTVAL_DEFAULT)
+
+#define IEEE80211_BMISSTHRESH_BMIN	2	/* min bmiss threshold (beacons) */
+/* Default beacon miss threshold is set to roundup from 850ms 
+ * This is halfway between the 10@100ms default from prior hardcoded setting for
+ * software beacon miss timers, and the 7@100ms default from prior hardcoded 
+ * timer value for hardware beacon miss timer.
+ * Based upon emperical evidence and practices of commercial vendors, I believe
+ * this should really be 2500ms by default. */
+#define IEEE80211_BMISSTHRESH_DEFAULT_MS 850
+
+#define IEEE80211_BMISSTHRESH_VALID(_bmt) \
+	(IEEE80211_BMISSTHRESH_BMIN <= (_bmt))
+#define IEEE80211_BMISSTHRESH_SANITISE(_bmt) \
+	((IEEE80211_BMISSTHRESH_BMIN > (_bmt)) ? \
+	 IEEE80211_BMISSTHRESH_BMIN : (_bmt))
 
 #define	IEEE80211_BGSCAN_INTVAL_MIN	15	/* min BG scan intvl (s) */
 #define	IEEE80211_BGSCAN_INTVAL_DEFAULT	(5*60)	/* default bg scan intvl */
@@ -87,8 +104,6 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 
 #define	IEEE80211_FIXED_RATE_NONE	-1
 
-#define IEEE80211_SWBMISS_THRESHOLD	10 	/* software beacon miss threshold, in TUs */
-
 #define DEV_NAME(_d) \
 	 ((NULL == _d || NULL == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? \
 	  "MadWifi" : \
@@ -97,6 +112,10 @@ Note: Atheros chips use 7 bits when power is specified in half dBm units, with a
 	 ((NULL == _v) ? \
 	  "MadWifi" : \
 	  DEV_NAME(_v->iv_dev))
+#define SC_DEV_NAME(_sc) \
+	 ((NULL == _sc) ? \
+	  "MadWifi" : \
+	  DEV_NAME(_sc->sc_dev))
 #define VAP_IC_DEV_NAME(_v) \
 	 ((NULL == _v || NULL == _v->iv_ic) ? \
 	  "MadWifi" : \
@@ -214,6 +233,9 @@ struct ieee80211vap {
 	void (*iv_set_tim)(struct ieee80211_node *, int);
 	u_int8_t iv_uapsdinfo;				/* sta mode QoS Info flags */
 	struct ieee80211_node *iv_bss;			/* information for this node */
+
+	u_int8_t iv_bssid[IEEE80211_ADDR_LEN];
+
 	int iv_fixed_rate;				/* 802.11 rate or IEEE80211_FIXED_RATE_NONE */
 	u_int16_t iv_rtsthreshold;
 	u_int16_t iv_fragthreshold;
@@ -291,7 +313,7 @@ struct ieee80211com {
 	u_int16_t ic_curmode;			/* current mode */
 	u_int16_t ic_lintval;			/* beacon interval */
 	u_int16_t ic_holdover;			/* PM hold over duration */
-	u_int16_t ic_bmisstimeout;		/* beacon miss threshold (ms) */
+	u_int16_t ic_bmissthreshold;		/* beacon miss threshold (# beacons) */
 	unsigned long ic_bmiss_guard;		/* when to cease ignoring bmiss (jiffies) */
 	u_int16_t ic_txpowlimit; 		/* global tx power limit (in 0.5 dBm) */
 	u_int16_t ic_uapsdmaxtriggers; 		/* max triggers that could arrive */
@@ -315,11 +337,47 @@ struct ieee80211com {
 	 */
 	int ic_nchans;				/* # entries in ic_channels */
 	struct ieee80211_channel ic_channels[IEEE80211_CHAN_MAX+1];
+	struct timeval ic_chan_non_occupy[IEEE80211_CHAN_MAX];
 	u_int8_t ic_chan_avail[IEEE80211_CHAN_BYTES];
 	u_int8_t ic_chan_active[IEEE80211_CHAN_BYTES];
 	struct ieee80211_channel *ic_curchan;	/* current channel */
 	struct ieee80211_channel *ic_bsschan;	/* bss channel */
 	int16_t ic_channoise;			/* current channel noise in dBm */
+	struct timer_list ic_dfs_excl_timer;
+	/*
+	 * Spectrum management (IEEE 802.11h-2003):
+	 *
+	 * ic_chan_nodes is an array of numbers of nodes that provide
+	 *    ni_suppchans with the given channel reported as supported. Index
+	 *    of the array is an IEEE channel number (ic_ieee)
+	 * ic_cn_total is the number of nodes counted in ic_chan_nodes
+	 *    (provided ni_suppchans and are associated)
+	 * ic_sc_mincom is the desired minimum number of common channels, the
+	 *    parameter used by SC_TIGHT and SC_STRICT algorithms
+	 * ic_sc_algorithm is the algorithm for (re)association based on
+	 *    supported channels
+	 * ic_sc_slcg is the permil of Stations Lost per Channel Gained, the
+	 *    parameter used by SC_TIGHT and SC_STRICT algorithms. If due to
+	 *    association of the STA and disassociation of x other STAs (out of
+	 *    y associated STAs in total), the number of common channel
+	 *    increases by z, then such an action is performed if
+	 *    1000*x/y < z*ic_sc_slcg
+	 * ic_sc_sldg is the permil of Stations Lost per rssi Db Gained, the
+	 *    parameter used by SC_LOOSE algorithm. If due to the switch,
+	 *    the maximum RSSI of received packets on the current channel would
+	 *    decrease by z decibels and x stations from the set of y stations
+	 *    would be lost, then such a switch will be performed if
+	 *    1000*x/y < z*ic_sc_sldg
+	 * ic_sc_ie is the Supported Channels IE that is about to be sent along
+	 *    with (re)assoc requests (STA mode)
+	 */
+	u_int16_t ic_chan_nodes[IEEE80211_CHAN_MAX+1];
+	u_int16_t ic_cn_total;                  /* # nodes counted in ic_chan nodes */
+	u_int16_t ic_sc_mincom;                 /* minimum number of common channels */
+	enum ieee80211_sc_algorithm ic_sc_algorithm;
+	u_int16_t ic_sc_slcg;                   /* permil of Stations Lost per Channel Gained */
+	u_int16_t ic_sc_sldg;                   /* permil of Stations Lost per rssi Db Gained */
+	struct ieee80211_ie_sc ic_sc_ie;        /* Supported Channels IE */
 
 	/* Regulatory class ids */
 	u_int ic_nregclass;			/* # entries in ic_regclassids */
@@ -339,6 +397,7 @@ struct ieee80211com {
 
 	/* XXX Multi-BSS: can per-VAP be done/make sense? */
 	enum ieee80211_protmode	ic_protmode;	/* 802.11g protection mode */
+	int ic_rssi_ewma;
 	u_int16_t ic_nonerpsta;			/* # non-ERP stations */
 	u_int16_t ic_longslotsta;		/* # long slot time stations */
 	u_int16_t ic_sta_assoc;			/* stations associated */
@@ -371,8 +430,8 @@ struct ieee80211com {
 
 	/* Send/recv 802.11 management frame */
 	int (*ic_send_mgmt)(struct ieee80211_node *, int, int);
-	void (*ic_recv_mgmt)(struct ieee80211_node *, struct sk_buff *, int,
-		int, u_int64_t);
+	void (*ic_recv_mgmt)(struct ieee80211vap *, struct ieee80211_node *,
+		struct sk_buff *, int, int, u_int64_t);
 
 	/* Send management frame to driver (like hardstart) */
 	int (*ic_mgtstart)(struct ieee80211com *, struct sk_buff *);
@@ -424,6 +483,25 @@ struct ieee80211com {
 	int (*ic_get_txcont_power)(struct ieee80211com *);
 	void (*ic_set_txcont_rate)(struct ieee80211com *, u_int);
 	u_int (*ic_get_txcont_rate)(struct ieee80211com *);
+
+	/* DFS test mode prevents marking channel interference and channel 
+	 * switching during detection probability tests */
+	void (*ic_set_dfs_testmode)(struct ieee80211com *, int);
+	int (*ic_get_dfs_testmode)(struct ieee80211com *);
+
+	/* inject a fake radar signal -- used while on a 802.11h DFS channels */
+	unsigned int (*ic_test_radar)(struct ieee80211com *);
+
+	/* dump HAL */
+	unsigned int (*ic_dump_hal_map)(struct ieee80211com *);
+
+	/* DFS channel availability check time (in seconds) */
+	void (*ic_set_dfs_cac_time)(struct ieee80211com *, unsigned int);
+	unsigned int (*ic_get_dfs_cac_time)(struct ieee80211com *);
+
+	/* DFS non-occupancy period (in seconds) */
+	void (*ic_set_dfs_excl_period)(struct ieee80211com *, unsigned int);
+	unsigned int (*ic_get_dfs_excl_period)(struct ieee80211com *);
 
 	/* Set coverage class */
 	void (*ic_set_coverageclass)(struct ieee80211com *);
@@ -626,6 +704,23 @@ enum ieee80211_phymode ieee80211_chan2mode(const struct ieee80211_channel *);
 void ieee80211_build_countryie(struct ieee80211com *);
 int ieee80211_media_setup(struct ieee80211com *, struct ifmedia *, u_int32_t,
 	ifm_change_cb_t, ifm_stat_cb_t);
+void ieee80211_build_sc_ie(struct ieee80211com *);
+void ieee80211_dfs_action(struct ieee80211com *);
+void ieee80211_expire_channel_excl_restrictions(struct ieee80211com *);
+
+/*
+ * Iterate through ic_channels to enumerate all distinct ic_ieee channel numbers.
+ * It relies on the assumption that ic_ieee cannot be 0 and that all the
+ * duplicates in ic_channels occur subsequently.
+ *
+ * _i and _prevchan are temporary variables
+ */
+#define CHANNEL_FOREACH(_chan, _ic, _i, _prevchan)			\
+	for ((_i) = 0, (_prevchan) = 0;					\
+	     (_i) < (_ic)->ic_nchans && ((_chan) =			\
+		     (_ic)->ic_channels[(_i)].ic_ieee);			\
+	     (_prevchan) = (_chan), (_i)++				\
+	    ) if ((_chan) != (_prevchan))
 
 /* Key update synchronization methods.  XXX should not be visible. */
 static __inline void
@@ -664,4 +759,16 @@ ieee80211_anyhdrspace(struct ieee80211com *ic, const void *data)
 		size = roundup(size, sizeof(u_int32_t));
 	return size;
 }
+
+/* Macros to print MAC address used in 802.11 headers */
+
+#define MAC_FMT "%02x:%02x:%02x:%02x:%02x:%02x"
+#define MAC_ADDR(addr) \
+  ((unsigned char *)(addr)) [0], \
+  ((unsigned char *)(addr)) [1], \
+  ((unsigned char *)(addr)) [2], \
+  ((unsigned char *)(addr)) [3], \
+  ((unsigned char *)(addr)) [4], \
+  ((unsigned char *)(addr)) [5]
+
 #endif /* _NET80211_IEEE80211_VAR_H_ */

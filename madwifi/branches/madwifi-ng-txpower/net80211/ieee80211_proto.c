@@ -100,6 +100,7 @@ ieee80211_proto_attach(struct ieee80211com *ic)
 {
 
 	ic->ic_protmode = IEEE80211_PROT_CTSONLY;
+	ic->ic_rssi_ewma = 0;
 
 	ic->ic_wme.wme_hipri_switch_hysteresis =
 		AGGRESSIVE_MODE_SWITCH_HYSTERESIS;
@@ -248,8 +249,6 @@ EXPORT_SYMBOL(ieee80211_authenticator_backend_unregister);
 const struct ieee80211_authenticator_backend *
 ieee80211_authenticator_backend_get(const char *name)
 {
-	if (backend == NULL)
-		ieee80211_load_module("wlan_radius");
 	return backend && strcmp(backend->iab_name, name) == 0 ? backend : NULL;
 }
 EXPORT_SYMBOL(ieee80211_authenticator_backend_get);
@@ -301,14 +300,14 @@ ieee80211_print_essid(const u_int8_t *essid, int len)
 			break;
 	}
 	if (i == len) {
-		printf("\"");
+		printk("\"");
 		for (i = 0, p = essid; i < len; i++, p++)
-			printf("%c", *p);
-		printf("\"");
+			printk("%c", *p);
+		printk("\"");
 	} else {
-		printf("0x");
+		printk("0x");
 		for (i = 0, p = essid; i < len; i++, p++)
-			printf("%02x", *p);
+			printk("%02x", *p);
 	}
 }
 EXPORT_SYMBOL(ieee80211_print_essid);
@@ -323,71 +322,71 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 	wh = (const struct ieee80211_frame *)buf;
 	switch (wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
-		printf("NODS %s", ether_sprintf(wh->i_addr2));
-		printf("->%s", ether_sprintf(wh->i_addr1));
-		printf("(%s)", ether_sprintf(wh->i_addr3));
+		printk("NODS " MAC_FMT, MAC_ADDR(wh->i_addr2));
+		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr1));
+		printk("(" MAC_FMT ")", MAC_ADDR(wh->i_addr3));
 		break;
 	case IEEE80211_FC1_DIR_TODS:
-		printf("TODS %s", ether_sprintf(wh->i_addr2));
-		printf("->%s", ether_sprintf(wh->i_addr3));
-		printf("(%s)", ether_sprintf(wh->i_addr1));
+		printk("TODS " MAC_FMT, MAC_ADDR(wh->i_addr2));
+		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr3));
+		printk("(" MAC_FMT ")", MAC_ADDR(wh->i_addr1));
 		break;
 	case IEEE80211_FC1_DIR_FROMDS:
-		printf("FRDS %s", ether_sprintf(wh->i_addr3));
-		printf("->%s", ether_sprintf(wh->i_addr1));
-		printf("(%s)", ether_sprintf(wh->i_addr2));
+		printk("FRDS " MAC_FMT, MAC_ADDR(wh->i_addr3));
+		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr1));
+		printk("(" MAC_FMT ")", MAC_ADDR(wh->i_addr2));
 		break;
 	case IEEE80211_FC1_DIR_DSTODS:
-		printf("DSDS %s", ether_sprintf((u_int8_t *)&wh[1]));
-		printf("->%s", ether_sprintf(wh->i_addr3));
-		printf("(%s", ether_sprintf(wh->i_addr2));
-		printf("->%s)", ether_sprintf(wh->i_addr1));
+		printk("DSDS " MAC_FMT, MAC_ADDR((u_int8_t *)&wh[1]));
+		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr3));
+		printk("(" MAC_FMT, MAC_ADDR(wh->i_addr2));
+		printk("->" MAC_FMT ")", MAC_ADDR(wh->i_addr1));
 		break;
 	}
 	switch (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) {
 	case IEEE80211_FC0_TYPE_DATA:
-		printf(" data");
+		printk(" data");
 		break;
 	case IEEE80211_FC0_TYPE_MGT:
-		printf(" %s", ieee80211_mgt_subtype_name[
+		printk(" %s", ieee80211_mgt_subtype_name[
 			(wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK)
 			>> IEEE80211_FC0_SUBTYPE_SHIFT]);
 		break;
 	default:
-		printf(" type#%d", wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
+		printk(" type#%d", wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
 		break;
 	}
 	if (IEEE80211_QOS_HAS_SEQ(wh)) {
 		const struct ieee80211_qosframe *qwh =
 			(const struct ieee80211_qosframe *)buf;
-		printf(" QoS [TID %u%s]", qwh->i_qos[0] & IEEE80211_QOS_TID,
+		printk(" QoS [TID %u%s]", qwh->i_qos[0] & IEEE80211_QOS_TID,
 			qwh->i_qos[0] & IEEE80211_QOS_ACKPOLICY ? " ACM" : "");
 	}
 	if (wh->i_fc[1] & IEEE80211_FC1_PROT) {
 		int off;
 
 		off = ieee80211_anyhdrspace(ic, wh);
-		printf(" WEP [IV %.02x %.02x %.02x",
+		printk(" WEP [IV %.02x %.02x %.02x",
 			buf[off+0], buf[off+1], buf[off+2]);
 		if (buf[off+IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV)
-			printf(" %.02x %.02x %.02x",
+			printk(" %.02x %.02x %.02x",
 				buf[off+4], buf[off+5], buf[off+6]);
-		printf(" KID %u]", buf[off+IEEE80211_WEP_IVLEN] >> 6);
+		printk(" KID %u]", buf[off+IEEE80211_WEP_IVLEN] >> 6);
 	}
 	if (rate >= 0)
-		printf(" %dM", rate / 2);
+		printk(" %dM", rate / 2);
 	if (rssi >= 0)
-		printf(" +%d", rssi);
-	printf("\n");
+		printk(" +%d", rssi);
+	printk("\n");
 	if (len > 0) {
 		for (i = 0; i < len; i++) {
 			if ((i % 8) == 0)
-				printf(" ");
+				printk(" ");
 			if ((i % 16) == 0)
-				printf("\n");
-			printf("%02x ", buf[i]);
+				printk("\n");
+			printk("%02x ", buf[i]);
 		}
-		printf("\n\n");
+		printk("\n\n");
 	}
 }
 EXPORT_SYMBOL(ieee80211_dump_pkt);
@@ -409,7 +408,7 @@ ieee80211_fix_rate(struct ieee80211_node *ni, int flags)
 	srs = &ic->ic_sup_rates[ieee80211_chan2mode(ni->ni_chan)];
 	nrs = &ni->ni_rates;
 	fixedrate = IEEE80211_FIXED_RATE_NONE;
-	for (i = 0; i < nrs->rs_nrates; ) {
+	for (i = 0; i < nrs->rs_nrates;) {
 		ignore = 0;
 		if (flags & IEEE80211_F_DOSORT) {
 			/*
@@ -425,6 +424,19 @@ ieee80211_fix_rate(struct ieee80211_node *ni, int flags)
 		}
 		r = nrs->rs_rates[i] & IEEE80211_RATE_VAL;
 		badrate = r;
+
+		/*
+		 * remove 0 rates
+		 * they don't make sense and can lead to trouble later
+		 */
+		if (r == 0) {
+			nrs->rs_nrates--;
+			for (j = i; j < nrs->rs_nrates; j++)
+				nrs->rs_rates[j] = nrs->rs_rates[j + 1];
+			nrs->rs_rates[j] = 0;
+			continue;
+		}
+
 		/*
 		 * Check for fixed rate. 
 		 */
@@ -961,27 +973,56 @@ ieee80211_init(struct net_device *dev, int forcescan)
 	 * 802.11 state machine as appropriate.
 	 * XXX parent should always be up+running
 	 */
-	if (IS_RUNNING(ic->ic_dev) &&
-	    ic->ic_roaming != IEEE80211_ROAMING_MANUAL) {
+	if (IS_RUNNING(ic->ic_dev)) {
 		if (vap->iv_opmode == IEEE80211_M_STA) {
-			/*
-			 * Try to be intelligent about clocking the state
-			 * machine.  If we're currently in RUN state then
-			 * we should be able to apply any new state/parameters
-			 * simply by re-associating.  Otherwise we need to
-			 * re-scan to select an appropriate ap.
-			 */
-			if (vap->iv_state != IEEE80211_S_RUN || forcescan)
-				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
-			else
-				ieee80211_new_state(vap, IEEE80211_S_ASSOC, 1);
+			if(ic->ic_roaming != IEEE80211_ROAMING_MANUAL) {
+				/* Try to be intelligent about clocking the 
+				 * state machine.  If we're currently in RUN 
+				 * state then we should be able to apply any 
+				 * new state/parameters simply by 
+				 * re-associating.  Otherwise we need to 
+				 * re-scan to select an appropriate ap. */
+				if (vap->iv_state != IEEE80211_S_RUN || 
+						forcescan) {
+					IEEE80211_DPRINTF(vap,
+							IEEE80211_MSG_STATE | 
+							IEEE80211_MSG_DEBUG,
+							"Bringing vap %p[%s] "
+							"to %s\n", 
+							vap, vap->iv_nickname, 
+							ieee80211_state_name
+							[IEEE80211_S_SCAN]);
+					ieee80211_new_state(vap, 
+							IEEE80211_S_SCAN, 0);
+				} else {
+					IEEE80211_DPRINTF(vap,
+							IEEE80211_MSG_STATE | 
+							IEEE80211_MSG_DEBUG,
+							"Bringing vap %p[%s] "
+							"to %s\n", 
+							vap, vap->iv_nickname, 
+							ieee80211_state_name
+							[IEEE80211_S_ASSOC]);
+					ieee80211_new_state(vap, 
+							IEEE80211_S_ASSOC, 1);
+				}
+			}
 		} else {
 			/*
 			 * When the old state is running the vap must 
 			 * be brought to init.
 			 */
-			if (vap->iv_state == IEEE80211_S_RUN)
-				ieee80211_new_state(vap, IEEE80211_S_INIT, -1);
+			if (vap->iv_state == IEEE80211_S_RUN) {
+				IEEE80211_DPRINTF(vap,
+						IEEE80211_MSG_STATE | 
+						IEEE80211_MSG_DEBUG,
+						"Bringing vap %p[%s] to %s\n", 
+						vap, vap->iv_nickname, 
+						ieee80211_state_name
+						[IEEE80211_S_INIT]);
+				ieee80211_new_state(vap, 
+						IEEE80211_S_INIT, -1);
+			}
 			/*
 			 * For monitor+wds modes there's nothing to do but
 			 * start running.  Otherwise, if this is the first
@@ -991,11 +1032,27 @@ ieee80211_init(struct net_device *dev, int forcescan)
 			 */
 			if (vap->iv_opmode == IEEE80211_M_MONITOR ||
 			    vap->iv_opmode == IEEE80211_M_WDS) {
+				IEEE80211_DPRINTF(vap,
+						IEEE80211_MSG_STATE | 
+						IEEE80211_MSG_DEBUG,
+						"Bringing vap %p[%s] to %s\n", 
+						vap, vap->iv_nickname, 
+						ieee80211_state_name
+						[IEEE80211_S_RUN]);
 				ieee80211_new_state(vap, IEEE80211_S_RUN, -1);
-			} else
+			} else {
+				IEEE80211_DPRINTF(vap,
+						IEEE80211_MSG_STATE | 
+						IEEE80211_MSG_DEBUG,
+						"Bringing vap %p[%s] to %s\n", 
+						vap, vap->iv_nickname, 
+						ieee80211_state_name
+						[IEEE80211_S_SCAN]);
 				ieee80211_new_state(vap, IEEE80211_S_SCAN, 0);
+			}
 		}
 	}
+
 	return 0;
 #undef IS_RUNNING
 }
@@ -1018,7 +1075,8 @@ ieee80211_start_running(struct ieee80211com *ic)
 	/* XXX locking */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 		dev = vap->iv_dev;
-		if ((dev->flags & IFF_UP) && !(dev->flags & IFF_RUNNING))	/* NB: avoid recursion */
+		/* NB: avoid recursion */
+		if ((dev->flags & IFF_UP) && !(dev->flags & IFF_RUNNING))
 			ieee80211_open(dev);
 	}
 }
@@ -1157,7 +1215,8 @@ ieee80211_beacon_miss(struct ieee80211com *ic)
 			 */
 			if (IEEE80211_ATH_CAP(vap, vap->iv_bss, IEEE80211_ATHC_TURBOP))
 				ieee80211_dturbo_switch(ic,
-					ic->ic_bsschan->ic_flags ^ IEEE80211_CHAN_TURBO);
+					ic->ic_bsschan->ic_flags ^ 
+					IEEE80211_CHAN_TURBO);
 #endif /* ATH_SUPERG_DYNTURBO */
 			/*
 			 * Try to reassociate before scanning for a new ap.
@@ -1243,7 +1302,6 @@ ieee80211_new_state(struct ieee80211vap *vap, enum ieee80211_state nstate, int a
 	struct ieee80211com *ic = vap->iv_ic;
 	int rc;
 
-	/* grab the lock so that only one vap can go through transition at any time */
 	IEEE80211_VAPS_LOCK_BH(ic);
 	rc = vap->iv_newstate(vap, nstate, arg);
 	IEEE80211_VAPS_UNLOCK_BH(ic);
@@ -1258,11 +1316,10 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 	enum ieee80211_state ostate;
 
 	ostate = vap->iv_state;
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE, "%s: %s -> %s\n", __func__,
-		ieee80211_state_name[ostate], ieee80211_state_name[nstate]);
 	vap->iv_state = nstate;			/* state transition */
 	del_timer(&vap->iv_mgtsend);
-	if (vap->iv_opmode != IEEE80211_M_HOSTAP && ostate != IEEE80211_S_SCAN)
+	if ((vap->iv_opmode != IEEE80211_M_HOSTAP) && 
+			(ostate != IEEE80211_S_SCAN))
 		ieee80211_cancel_scan(vap);	/* background scan */
 	ni = vap->iv_bss;			/* NB: no reference held */
 	switch (nstate) {
@@ -1378,8 +1435,10 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		}
 		break;
 	case IEEE80211_S_AUTH:
-		/* auth frames are possible between IBSS nodes, see 802.11-1999, chapter 5.7.6 */
-		KASSERT(vap->iv_opmode == IEEE80211_M_STA || vap->iv_opmode == IEEE80211_M_IBSS,
+		/* auth frames are possible between IBSS nodes, 
+		 * see 802.11-1999, chapter 5.7.6 */
+		KASSERT(vap->iv_opmode == IEEE80211_M_STA || 
+				vap->iv_opmode == IEEE80211_M_IBSS,
 			("switch to %s state when operating in mode %u",
 			 ieee80211_state_name[nstate], vap->iv_opmode));
 		switch (ostate) {
@@ -1473,21 +1532,23 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 						wds_ni = ieee80211_alloc_node_table(
 								vap,
 								vap->wds_mac);
-						if (wds_ni != NULL)
+						if (wds_ni != NULL) {
 							ieee80211_add_wds_addr(
 									&ic->ic_sta,
 									wds_ni,
 									vap->wds_mac,
 									1);
+							ieee80211_ref_node(wds_ni); /* pin in memory */
+						}
 						else
 							IEEE80211_DPRINTF(
 									vap,
 									IEEE80211_MSG_NODE,
 									"%s: Unable to "
 									"allocate node for "
-									"WDS: %s\n",
+									"WDS: " MAC_FMT "\n",
 									__func__,
-									ether_sprintf(
+									MAC_ADDR(
 										vap->wds_mac)
 									);
 					}
@@ -1519,13 +1580,13 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 				ni->ni_txrate));
 #ifdef IEEE80211_DEBUG
 			if (ieee80211_msg_debug(vap)) {
-				ieee80211_note(vap, "%s with %s ssid ",
+				ieee80211_note(vap, "%s with " MAC_FMT " ssid ",
 					(vap->iv_opmode == IEEE80211_M_STA ?
 					"associated" : "synchronized "),
-					ether_sprintf(ni->ni_bssid));
+					MAC_ADDR(vap->iv_bssid));
 				ieee80211_print_essid(vap->iv_bss->ni_essid,
 					ni->ni_esslen);
-				printf(" channel %d start %uMb\n",
+				printk(" channel %d start %uMb\n",
 					ieee80211_chan2ieee(ic, ic->ic_curchan),
 					IEEE80211_RATE2MBS(ni->ni_rates.rs_rates[ni->ni_txrate]));
 			}
@@ -1547,7 +1608,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			vap->iv_swbmiss.function = ieee80211_sta_swbmiss;
 			vap->iv_swbmiss.data = (unsigned long) vap;
 			vap->iv_swbmiss_period = IEEE80211_TU_TO_JIFFIES(
-				IEEE80211_SWBMISS_THRESHOLD * ni->ni_intval);
+				vap->iv_ic->ic_bmissthreshold * ni->ni_intval);
 
 			mod_timer(&vap->iv_swbmiss, jiffies + vap->iv_swbmiss_period);
 		}
@@ -1603,104 +1664,293 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 	return 0;
 }
 
+/* Get the dominant state of the device (init, running, or scanning 
+ * (and/or associating)) */
+static int get_dominant_state(struct ieee80211com *ic) {
+	int nscanning = 0;
+	int nrunning  = 0;
+	struct ieee80211vap *tmpvap;
+
+	TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
+		if (tmpvap->iv_opmode == IEEE80211_M_MONITOR)
+			/* skip monitor vaps as their
+			 * S_RUN shouldn't have any
+			 * influence on modifying state
+			 * transition */
+			continue;
+		if (tmpvap->iv_state == IEEE80211_S_RUN)
+			nrunning++;
+		else if (tmpvap->iv_state == IEEE80211_S_SCAN ||
+			 tmpvap->iv_state == IEEE80211_S_AUTH ||
+			 tmpvap->iv_state == IEEE80211_S_ASSOC) {
+			KASSERT((nscanning <= 1), ("Two VAPs cannot scan at "
+						"the same time\n"));
+			nscanning++;
+		}
+	}
+	KASSERT(!(nscanning && nrunning), ("SCAN and RUN can't happen at the "
+				"same time\n"));
+	KASSERT((nscanning <= 1),         ("Two VAPs must not SCAN at the "
+				"same time\n"));
+
+	if (nrunning > 0) 
+		return IEEE80211_S_RUN;
+	else if (nscanning > 0)
+		return IEEE80211_S_SCAN;
+	else
+		return IEEE80211_S_INIT;
+}
+
+static void 
+dump_vap_states(struct ieee80211com *ic, struct ieee80211vap* highlighed)
+{
+	/* RE-count the number of VAPs in RUN, SCAN states */
+	int nrunning = 0;
+	int nscanning = 0;
+	struct ieee80211vap *tmpvap;
+	TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
+		IEEE80211_DPRINTF(tmpvap, IEEE80211_MSG_STATE, 
+				"%s: VAP %s%p[%24s]%s = %s%s%s.\n", __func__, 
+				(highlighed == tmpvap ? "*" : " "), 
+				tmpvap, tmpvap->iv_nickname, 
+				(highlighed == tmpvap ? "*" : " "), 
+				ieee80211_state_name[tmpvap->iv_state],
+				(tmpvap->iv_state == IEEE80211_S_RUN) ? 
+					"[RUNNING]" : "",
+				(tmpvap->iv_state == IEEE80211_S_SCAN ||
+				 tmpvap->iv_state == IEEE80211_S_AUTH || 
+				 tmpvap->iv_state == IEEE80211_S_ASSOC) ? 
+					"[SCANNING]" : ""
+				);
+		/* Ignore monitors they are passive */
+		if (tmpvap->iv_opmode == IEEE80211_M_MONITOR) {
+			continue;
+		}
+		if (tmpvap->iv_state == IEEE80211_S_RUN) {
+			KASSERT((nscanning == 0), ("SCAN and RUN can't happen "
+						"at the same time\n"));
+			nrunning++;
+		}
+		if (tmpvap->iv_state == IEEE80211_S_SCAN ||
+				/* STA in WDS/Repeater */
+				tmpvap->iv_state == IEEE80211_S_AUTH || 
+				tmpvap->iv_state == IEEE80211_S_ASSOC) {
+			KASSERT((nscanning == 0), ("Two VAPs cannot scan at "
+						"the same time\n"));
+			KASSERT((nrunning == 0), ("SCAN and RUN can't happen "
+						"at the same time\n"));
+			nscanning++;
+		}
+	}
+}
+
 static int
 ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	enum ieee80211_state ostate;
+	enum ieee80211_state dstate;
+	int blocked = 0;
 	struct ieee80211vap *tmpvap;
 
 	ostate = vap->iv_state;
+	dstate = get_dominant_state(ic);
+
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE, 
+			  "%s: %p[%s] %s -> %s (dominant %s)\n", 
+			  __func__, vap, vap->iv_nickname,
+			  ieee80211_state_name[ostate], 
+			  ieee80211_state_name[nstate], 
+			  ieee80211_state_name[dstate]);
+
 	switch (nstate) {
+	case IEEE80211_S_AUTH:
+	case IEEE80211_S_ASSOC:
 	case IEEE80211_S_SCAN:
-		if (ostate == IEEE80211_S_INIT) {
-			int nrunning, nscanning;
-
-			nrunning = nscanning = 0;
-			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
-				if (vap != tmpvap) {
-					if (tmpvap->iv_opmode == IEEE80211_M_MONITOR)
-						/* skip monitor vaps as their
-						 * S_RUN shouldn't have any
-						 * influence on modifying state
-						 * transition */
-						continue;
-					if (tmpvap->iv_state == IEEE80211_S_RUN)
-						nrunning++;
-					else if (tmpvap->iv_state == IEEE80211_S_SCAN ||
-					    tmpvap->iv_state == IEEE80211_S_AUTH || /* STA in WDS/Repeater */
-					    tmpvap->iv_state == IEEE80211_S_ASSOC)
-						nscanning++;
+		switch (dstate) {
+		case IEEE80211_S_RUN:
+			if(vap->iv_opmode == IEEE80211_M_MONITOR || 
+			   vap->iv_opmode == IEEE80211_M_WDS ||
+			   vap->iv_opmode == IEEE80211_M_HOSTAP) {
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE, 
+						"%s: Jumping directly to RUN "
+						"on VAP %p [%s].\n", 
+						__func__, vap, 
+						vap->iv_nickname);
+				/* One or more VAPs are running, so 
+				 * non-station VAPs can skip SCAN/AUTH/ASSOC 
+				 * states and just run. */
+				__ieee80211_newstate(vap, IEEE80211_S_RUN, arg);
+			} else {
+				/* We'll use this flag briefly to mark 
+				 * transition in progress */
+				ic->ic_flags_ext |= IEEE80211_FEXT_SCAN_PENDING;
+				/* IEEE80211_M_IBSS or IEEE80211_M_STA VAP
+				 * is forced to scan, we need to change 
+				 * all other VAPs state to S_INIT and pend for 
+				 * the scan completion */
+				TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
+					if ((vap != tmpvap) && 
+							(tmpvap->iv_opmode != 
+							 IEEE80211_M_MONITOR)) {
+						IEEE80211_DPRINTF(vap, 
+								IEEE80211_MSG_STATE, 
+								  "%s: Setting "
+								  "SCAN_PENDING "
+								  "flag on "
+								  "VAP %p "
+								  "[%s].\n", 
+								  __func__, 
+								  tmpvap, 
+								  tmpvap->
+								  iv_nickname);
+						tmpvap->iv_flags_ext |= 
+							IEEE80211_FEXT_SCAN_PENDING;
+						if (tmpvap->iv_state != 
+								IEEE80211_S_INIT) {
+							IEEE80211_DPRINTF(vap, 
+									IEEE80211_MSG_STATE, 
+									"%s: "
+									"Forcing "
+									"INIT "
+									"state "
+									"on "
+									"VAP "
+									"%p "
+									"[%s].\n", 
+									__func__, 
+									tmpvap, 
+									tmpvap->
+									iv_nickname);
+							tmpvap->iv_newstate(tmpvap, 
+									IEEE80211_S_INIT, 
+									0);
+						} else {
+							IEEE80211_DPRINTF(vap, 
+									IEEE80211_MSG_STATE, 
+									"%s: "
+									"NOT "
+									"forcing "
+									"INIT "
+									"state "
+									"on "
+									"VAP "
+									"%p "
+									"[%s].\n", 
+									__func__, 
+									tmpvap, 
+									tmpvap->
+									iv_nickname);
+						}
+					}
 				}
-			}
-
-			KASSERT(!(nscanning && nrunning), ("SCAN and RUN can't happen at the same time\n"));
-
-			if (!nscanning && !nrunning) {
-				/* when no one is running or scanning, start a new scan */
+				/* We used this flag briefly to mark transition in progress */
+				ic->ic_flags_ext &= ~IEEE80211_FEXT_SCAN_PENDING;
+				/* Transition S_INIT -> S_SCAN */
 				__ieee80211_newstate(vap, nstate, arg);
-			} else if (!nscanning && nrunning) {
-				/* when no one is scanning but someone is running, bypass
-				 * scan and go to run state immediately */
-				if (vap->iv_opmode == IEEE80211_M_MONITOR ||
-				    vap->iv_opmode == IEEE80211_M_WDS ||
-				    vap->iv_opmode == IEEE80211_M_HOSTAP) {
-					__ieee80211_newstate(vap, IEEE80211_S_RUN, arg);
-				} else {
-					/* MW: avoid invalid S_INIT -> S_RUN transition */
-					__ieee80211_newstate(vap, nstate, arg);
-				}
-			} else if (nscanning && !nrunning) {
-				/* when someone is scanning and no one is running, set
-				 * the scan pending flag. Don't go through state machine */
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
-					"%s: %s -> %s with SCAN_PENDING\n",
-					__func__,
-					ieee80211_state_name[ostate],
-					ieee80211_state_name[nstate]);
-				vap->iv_flags_ext |= IEEE80211_FEXT_SCAN_PENDING;
+				break;
 			}
-		} else {
-			/* the VAP is forced to scan, we need to change all other VAPs state
-			 * to INIT and pend for the scan completion */
-			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
-				if (vap != tmpvap && tmpvap->iv_state != IEEE80211_S_INIT) {
-					tmpvap->iv_newstate(tmpvap, IEEE80211_S_INIT, 0);
-					tmpvap->iv_flags_ext |= IEEE80211_FEXT_SCAN_PENDING;
-				}
+			break;
+		case IEEE80211_S_SCAN:
+		case IEEE80211_S_AUTH:
+		case IEEE80211_S_ASSOC:
+			/* this VAP was scanning */
+			/* STA in WDS/Repeater needs to bring up other VAPs */
+			if (ostate == IEEE80211_S_SCAN || 
+			    ostate == IEEE80211_S_AUTH ||
+			    ostate == IEEE80211_S_ASSOC) {
+				/* Transition (S_SCAN|S_AUTH|S_ASSOC) -> 
+				 * S_SCAN */
+				__ieee80211_newstate(vap, nstate, arg);
+			} else {
+				/* Someone else is scanning, so block the 
+				 * transition */
+				vap->iv_flags_ext |= 
+					IEEE80211_FEXT_SCAN_PENDING;
+				__ieee80211_newstate(vap, IEEE80211_S_INIT, 
+						arg);
+				blocked = 1;
 			}
-
-			/* start the new scan */
+			break;
+		case IEEE80211_S_INIT:
+			/* Transition S_INIT -> S_SCAN */
 			__ieee80211_newstate(vap, nstate, arg);
+			break;
 		}
 		break;
 
 	case IEEE80211_S_RUN:
-		if (ostate == IEEE80211_S_SCAN ||		/* AP coming out of scan */
-		    vap->iv_opmode == IEEE80211_M_STA) {	/* STA in WDS/Repeater needs to bring up other VAPs  */
+		/* this VAP was scanning */
+		/* STA in WDS/Repeater needs to bring up other VAPs  */
+		if (ostate == IEEE80211_S_SCAN || 
+		    ostate == IEEE80211_S_AUTH ||
+		    ostate == IEEE80211_S_ASSOC) {
+			/* Transition (S_SCAN|S_AUTH|S_ASSOC) -> S_RUN */
 			__ieee80211_newstate(vap, nstate, arg);
-
-			/* bring up all other vaps pending on the scan*/
-			TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
-				if (vap != tmpvap) {
-					if (tmpvap->iv_flags_ext & IEEE80211_FEXT_SCAN_PENDING) {
-						tmpvap->iv_flags_ext &= ~IEEE80211_FEXT_SCAN_PENDING;
-						tmpvap->iv_newstate(tmpvap, IEEE80211_S_RUN, 0);
+			/* Then bring up all other vaps pending on the scan */
+			dstate = get_dominant_state(ic);
+			if (dstate == IEEE80211_S_RUN) {
+				TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
+					if ((vap != tmpvap) && 
+					    (tmpvap->iv_opmode != 
+					     IEEE80211_M_MONITOR) && 
+					    (tmpvap->iv_flags_ext & 
+					     IEEE80211_FEXT_SCAN_PENDING)) {
+						IEEE80211_DPRINTF(vap, 
+								IEEE80211_MSG_STATE, 
+								"%s: Clearing "
+								"SCAN_PENDING "
+								"flag from VAP "
+								"%p [%s] and "
+								"transitioning "
+								"to RUN state.\n", 
+								__func__, tmpvap, 
+								tmpvap->iv_nickname);
+						tmpvap->iv_flags_ext &= 
+							~IEEE80211_FEXT_SCAN_PENDING;
+						if(tmpvap->iv_state != 
+								IEEE80211_S_RUN) {
+							tmpvap->iv_newstate(tmpvap, 
+									IEEE80211_S_RUN, 0);
+						} else if(tmpvap->iv_opmode == 
+								IEEE80211_M_HOSTAP) {
+							/* Force other AP through 
+							 * -> INIT -> RUN to make
+							 * sure beacons are 
+							 * reallocated */
+							tmpvap->iv_newstate(tmpvap, 
+									IEEE80211_S_INIT, 0);
+							tmpvap->iv_newstate(tmpvap, 
+									IEEE80211_S_RUN, 0);
+						}
 					}
 				}
 			}
-		} else
+		} else if (dstate == IEEE80211_S_SCAN) {
+			/* Force to scan pending... someone is scanning */
+			vap->iv_flags_ext |= IEEE80211_FEXT_SCAN_PENDING;
+			__ieee80211_newstate(vap, IEEE80211_S_INIT, arg);
+			blocked = 1;
+		} else {
 			__ieee80211_newstate(vap, nstate, arg);
+		}
 		break;
-
-	case IEEE80211_S_INIT:
-		if (ostate == IEEE80211_S_INIT && vap->iv_flags_ext & IEEE80211_FEXT_SCAN_PENDING)
-			vap->iv_flags_ext &= ~IEEE80211_FEXT_SCAN_PENDING;
-		/* fall through */
-
 	default:
 		__ieee80211_newstate(vap, nstate, arg);
 	}
+
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE, 
+		"%s: %s requested transition %s -> %s on VAP %p [%s].  "
+		"Dominant state is %s.\n",
+		__func__,
+		(blocked ? "BLOCKED" : "ALLOWED"),
+		ieee80211_state_name[ostate],
+		ieee80211_state_name[nstate],
+		vap,
+		vap->iv_nickname,
+		ieee80211_state_name[dstate]);
+
+	dump_vap_states(ic, vap);
 	return 0;
 }
 

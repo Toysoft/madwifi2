@@ -51,13 +51,14 @@ struct ieee80211_nodestats {
 	u_int32_t ns_rx_ucast;		/* rx unicast frames */
 	u_int32_t ns_rx_mcast;		/* rx multi/broadcast frames */
 	u_int64_t ns_rx_bytes;		/* rx data count (bytes) */
-	u_int64_t ns_rx_beacons;		/* rx beacon frames */
+	u_int64_t ns_rx_beacons;	/* rx beacon frames */
 	u_int32_t ns_rx_proberesp;	/* rx probe response frames */
 
 	u_int32_t ns_rx_dup;		/* rx discard because it's a dup */
 	u_int32_t ns_rx_noprivacy;	/* rx w/ wep but privacy off */
-	u_int32_t ns_rx_wepfail;		/* rx wep processing failed */
+	u_int32_t ns_rx_wepfail;	/* rx wep processing failed */
 	u_int32_t ns_rx_demicfail;	/* rx demic failed */
+	u_int32_t ns_rx_hwdemicerr;	/* RX HW demic spurious failure */
 	u_int32_t ns_rx_decap;		/* rx decapsulation failed */
 	u_int32_t ns_rx_defrag;		/* rx defragmentation failed */
 	u_int32_t ns_rx_disassoc;	/* rx disassociation */
@@ -79,7 +80,7 @@ struct ieee80211_nodestats {
 
 	u_int32_t ns_tx_eosplost;	/* uapsd EOSP retried out */
 
-	u_int32_t ns_ps_discard;		/* ps discard due to of age */
+	u_int32_t ns_ps_discard;	/* ps discard due to of age */
 
 	u_int32_t ns_uapsd_triggers;	/* uapsd triggers */
 
@@ -105,6 +106,7 @@ struct ieee80211_stats {
 	u_int32_t is_rx_dup;		/* rx discard due to it's a dup */
 	u_int32_t is_rx_wrongdir;	/* rx w/ wrong direction */
 	u_int32_t is_rx_mcastecho;	/* rx discard due to of mcast echo */
+	u_int32_t is_rx_mcastdisabled;	/* rx discard due to of mcast disabled */
 	u_int32_t is_rx_notassoc;	/* rx discard due to sta !assoc */
 	u_int32_t is_rx_noprivacy;	/* rx w/ wep but privacy off */
 	u_int32_t is_rx_unencrypted;	/* rx w/o wep and privacy on */
@@ -130,6 +132,7 @@ struct ieee80211_stats {
 	u_int32_t is_rx_assoc_capmismatch;/* rx assoc w/ cap mismatch */
 	u_int32_t is_rx_assoc_norate;	/* rx assoc w/ no rate match */
 	u_int32_t is_rx_assoc_badwpaie;	/* rx assoc w/ bad WPA IE */
+	u_int32_t is_rx_assoc_badscie;	/* rx assoc w/ bad SC IE */
 	u_int32_t is_rx_deauth;		/* rx deauthentication */
 	u_int32_t is_rx_disassoc;	/* rx disassociation */
 	u_int32_t is_rx_badsubtype;	/* rx frame w/ unknown subtype*/
@@ -162,6 +165,7 @@ struct ieee80211_stats {
 	u_int32_t is_scan_active;	/* active scans started */
 	u_int32_t is_scan_passive;	/* passive scans started */
 	u_int32_t is_node_timeout;	/* nodes timed out inactivity */
+	u_int32_t is_node_fdisassoc;	/* forced node disassociation */
 	u_int32_t is_crypto_nomem;	/* no memory for crypto ctx */
 	u_int32_t is_crypto_tkip;	/* tkip crypto done in s/w */
 	u_int32_t is_crypto_tkipenmic;	/* tkip en-MIC done in s/w */
@@ -221,7 +225,8 @@ struct ieee80211req_key {
  * to IEEE80211_KEYIX_NONE when deleting a unicast key.
  */
 struct ieee80211req_del_key {
-	/* XXX: This should be ieee80211_keyix_t, but it changes API/ABI for hostapd */
+	/* NB: This is different to ieee80211_keyix_t, but this is OK as 
+	 * values are unique over the low order bits. */
 	u_int8_t idk_keyix;	/* key index */
 	u_int8_t idk_macaddr[IEEE80211_ADDR_LEN];
 };
@@ -544,6 +549,7 @@ struct ieee80211req_scan_result {
 #define	IEEE80211_IOCTL_SETKEY		(SIOCIWFIRSTPRIV+18)
 #define	IEEE80211_IOCTL_WRITEREG	(SIOCIWFIRSTPRIV+19)
 #define	IEEE80211_IOCTL_DELKEY		(SIOCIWFIRSTPRIV+20)
+#define	IEEE80211_IOCTL_HALMAP		(SIOCIWFIRSTPRIV+21)
 #define	IEEE80211_IOCTL_ADDMAC		(SIOCIWFIRSTPRIV+22)
 #define	IEEE80211_IOCTL_DELMAC		(SIOCIWFIRSTPRIV+24)
 #define	IEEE80211_IOCTL_WDSADDMAC	(SIOCIWFIRSTPRIV+26)
@@ -627,12 +633,15 @@ enum {
 	IEEE80211_PARAM_TXCONT_RATE		= 68,	/* continuous transmit mode data rate (in mbit/sec) - will use closest match from current rate table */
 	IEEE80211_PARAM_TXCONT_POWER		= 69,	/* power level in units of 0.5dBm */
 	IEEE80211_PARAM_DFS_TESTMODE		= 70,	/* do not perform DFS actions (i.e. markng DFS and channel change on interference), just report them via debug. */
-	IEEE80211_PARAM_DFS_CHANCHECKTIME	= 71,	/* how long do we wait for chan availability
+	IEEE80211_PARAM_DFS_CACTIME		= 71,	/* how long do we wait for chan availability
 							   scans ?
 							   FCC requires 60s, so that is the default. */
-	IEEE80211_PARAM_DFS_NONOCCUPANCYPERIOD	= 72,	/* DFS no-occupancy limit - how long do we stay
+	IEEE80211_PARAM_DFS_EXCLPERIOD		= 72,	/* DFS no-occupancy limit - how long do we stay
 							   off a channel once radar is detected?
 							   FCC requires 30m, so that is the default. */
+	IEEE80211_PARAM_BEACON_MISS_THRESH	= 73,	/* Beacon miss threshold (in beacons) */
+	IEEE80211_PARAM_BEACON_MISS_THRESH_MS	= 74,	/* Beacon miss threshold (in ms) */
+	IEEE80211_PARAM_RSSI_EWMA               = 75,
 };
 
 #define	SIOCG80211STATS			(SIOCDEVPRIVATE+2)
