@@ -3065,8 +3065,6 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	case IEEE80211_PARAM_DOTH_ALGORITHM:
 		param[0] = ic->ic_sc_algorithm;
 		break;
-<<<<<<< .working
-<<<<<<< .working
 	case IEEE80211_PARAM_DOTH_MINCOM:
 		param[0] = ic->ic_sc_mincom;
 		break;
@@ -3079,40 +3077,6 @@ ieee80211_ioctl_getparam(struct net_device *dev, struct iw_request_info *info,
 	case IEEE80211_PARAM_DFS_TESTMODE:
 		ieee80211_get_dfs_testmode(dev, info, w, extra);
 		break;
-=======
-	case IEEE80211_PARAM_DOTH_ALGORITHM:
-		param[0] = ic->ic_sc_algorithm;
-		break;
-	case IEEE80211_PARAM_DOTH_MINCOM:
-		param[0] = ic->ic_sc_mincom;
-		break;
-	case IEEE80211_PARAM_DOTH_SLCG:
-		param[0] = ic->ic_sc_slcg;
-		break;
-	case IEEE80211_PARAM_DOTH_SLDG:
-		param[0] = ic->ic_sc_sldg;
-		break;
-	case IEEE80211_PARAM_DFS_TESTMODE:
-		ieee80211_get_dfs_testmode(dev, info, w, extra);
-		break;
->>>>>>> .merge-right.r3368
-=======
-	case IEEE80211_PARAM_DOTH_ALGORITHM:
-		param[0] = ic->ic_sc_algorithm;
-		break;
-	case IEEE80211_PARAM_DOTH_MINCOM:
-		param[0] = ic->ic_sc_mincom;
-		break;
-	case IEEE80211_PARAM_DOTH_SLCG:
-		param[0] = ic->ic_sc_slcg;
-		break;
-	case IEEE80211_PARAM_DOTH_SLDG:
-		param[0] = ic->ic_sc_sldg;
-		break;
-	case IEEE80211_PARAM_DFS_TESTMODE:
-		ieee80211_get_dfs_testmode(dev, info, w, extra);
-		break;
->>>>>>> .merge-right.r3368
 	case IEEE80211_PARAM_TXCONT:
 		ieee80211_get_txcont(dev, info, w, extra);
 		break;
