@@ -469,10 +469,6 @@ struct ieee80211com {
 	void (*ic_scan_end)(struct ieee80211com *);
 	void (*ic_set_channel)(struct ieee80211com *);
 	
-	/* TX power support */
-	void (*ic_set_txpow)(struct ieee80211com *, 
-			int);		/* Units of 0.5 dBm */
-
 	/* U-APSD support */
 	void (*ic_uapsd_flush)(struct ieee80211_node *);
 

@@ -441,7 +441,6 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	vap->iv_mcast_rate = 1000;		/* Default multicast traffic to lowest rate of 1Mbps */
 
 	vap->iv_txpower = IEEE80211_TXPOWER_MAX;
-	ic->ic_set_txpow(ic, vap->iv_txpower);
 
 #ifdef ATH_SUPERG_XR
 	/*
