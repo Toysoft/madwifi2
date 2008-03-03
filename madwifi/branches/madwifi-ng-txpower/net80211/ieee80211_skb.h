@@ -58,6 +58,13 @@ void ieee80211_dev_kfree_skb_debug(struct sk_buff** pskb, const char* func, int 
 void ieee80211_dev_kfree_skb(struct sk_buff** pskb);
 #endif
 
+static inline void ieee80211_skb_copy_noderef(struct sk_buff *src, 
+		struct sk_buff *dst)
+{
+	if (SKB_CB(src)->ni != NULL)
+		SKB_CB(dst)->ni = ieee80211_ref_node(SKB_CB(src)->ni);
+}
+
 /*
  * ieee80211_dev_kfree_skb_list will invoke ieee80211_dev_kfree_skb on each node in
  * a list of skbs, starting with the first.
@@ -106,9 +113,9 @@ int ieee80211_skb_references(void);
 
 #ifdef IEEE80211_DEBUG_REFCNT
 
-int  vlan_hwaccel_receive_skb_debug(struct sk_buff *skb, 
-				    struct vlan_group *grp, unsigned short vlan_tag, 
-				    const char* func, int line);
+int vlan_hwaccel_receive_skb_debug(struct sk_buff *skb, 
+			           struct vlan_group *grp, unsigned short vlan_tag, 
+			           const char* func, int line);
 int netif_rx_debug(struct sk_buff *skb, const char* func, int line);
 struct sk_buff * alloc_skb_debug(unsigned int length, gfp_t gfp_mask,
 				 const char *func, int line);
@@ -130,8 +137,8 @@ struct sk_buff * skb_share_check_debug(struct sk_buff *skb, gfp_t pri,
 				       const char *func, int line);
 void  kfree_skb_fast_debug(struct sk_buff *skb, 
 			   const char* func, int line);
-struct sk_buff *  skb_unshare_debug(struct sk_buff *skb, gfp_t pri,
-				    const char *func, int line);
+struct sk_buff * skb_unshare_debug(struct sk_buff *skb, gfp_t pri,
+				   const char *func, int line);
 struct sk_buff * skb_copy_expand_debug(const struct sk_buff *skb, int newheadroom, 
 				       int newtailroom, gfp_t gfp_mask, 
 				       const char *func, int line);

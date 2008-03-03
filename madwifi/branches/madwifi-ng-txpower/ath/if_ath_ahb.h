@@ -10,6 +10,7 @@
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <linux/dma-mapping.h>
 
 #define AR531X_WLAN0_NUM       0
 #define AR531X_WLAN1_NUM       1
@@ -89,8 +90,8 @@
 #define AR531X_RADIO1_MASK	0x000c
 #define AR531X_RADIO1_S		2
 
-#define BUS_DMA_FROMDEVICE	0
-#define BUS_DMA_TODEVICE	1
+#define BUS_DMA_FROMDEVICE	DMA_FROM_DEVICE
+#define BUS_DMA_TODEVICE	DMA_TO_DEVICE
 
 #define AR531X_APBBASE		0xbc000000
 #define AR531X_RESETTMR		(AR531X_APBBASE  + 0x3000)
@@ -102,44 +103,20 @@
 
 #define AR531X_BD_MAGIC 0x35333131   /* "5311", for all 531x platforms */
 
-/* set bus cachesize in 4B word units */
-static __inline void bus_dma_sync_single(void *hwdev, dma_addr_t dma_handle,
-	size_t size, int direction)
-{
-	unsigned long addr;
-
-	addr = (unsigned long) __va(dma_handle);
-	dma_cache_wback_inv(addr, size);
-}
-
-static __inline dma_addr_t bus_map_single(void *hwdev, void *ptr,
-	size_t size, int direction)
-{
-	dma_cache_wback_inv((unsigned long) ptr, size);
-
-	return __pa(ptr);
-}
-
-static __inline void bus_unmap_single(void *hwdev, dma_addr_t dma_addr,
-	size_t size, int direction)
-{
-	if (direction != BUS_DMA_TODEVICE) {
-		unsigned long addr;
-
-		addr = (unsigned long)__va(dma_addr);
-		dma_cache_wback_inv(addr, size);
-	}
-}
-void *bus_alloc_consistent(void *, size_t, dma_addr_t *);
-void bus_free_consistent(void *, size_t, void *, dma_addr_t);
-
-#define sysRegRead(phys)      (*(volatile u_int32_t *)phys)
-
 /* Allow compiling on non-mips platforms for code verification */
 #ifndef __mips__
 #define CAC_ADDR(addr) (addr)
 #define UNCAC_ADDR(addr) (addr)
 #define KSEG1ADDR(addr) (addr)
+#define dma_cache_wback_inv(start,size)	\
+	do { (void) (start); (void) (size); } while (0)
 #endif
+
+#define bus_dma_sync_single	dma_sync_single
+#define bus_map_single		dma_map_single
+#define bus_unmap_single	dma_unmap_single
+#define bus_alloc_consistent(_hwdev, _sz, _hdma)		\
+	dma_alloc_coherent((_hwdev), (_sz), (_hdma), GFP_ATOMIC)
+#define bus_free_consistent	dma_free_coherent
 
 #endif    /* _DEV_ATH_AHB_H_ */

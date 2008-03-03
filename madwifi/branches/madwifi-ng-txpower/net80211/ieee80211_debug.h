@@ -40,7 +40,7 @@
 /* Set to true if ANY sc has skb debugging on */
 extern int ath_debug_global;
 enum {
-	GLOBAL_DEBUG_SKB_REF  = 0x00000040,	/* SKB referernce counting */
+	GLOBAL_DEBUG_SKB_REF  = 0x00000040,	/* SKB reference counting */
 	GLOBAL_DEBUG_SKB      = 0x40000000,     /* SKB usage/leak debugging,
 	                                           must match ATH_DEBUG_SKB */
 };
@@ -78,7 +78,7 @@ enum {
 
 #ifdef IEEE80211_DEBUG
 #define ieee80211_msg_is_reported(_vap, m) \
-	(!!(((_vap)->iv_debug) & (m)))
+	(!!(((_vap)->iv_debug | (_vap)->iv_ic->ic_debug) & (m)))
 #define	IEEE80211_DPRINTF(_vap, _m, _fmt, ...) do {			\
 	if (ieee80211_msg_is_reported(_vap, _m))					\
 		ieee80211_note(_vap, _fmt, __VA_ARGS__);		\
@@ -119,6 +119,7 @@ void ieee80211_note_frame(struct ieee80211vap *,
 #define	ieee80211_msg_assoc(_vap) \
 	ieee80211_msg_is_reported(_vap, IEEE80211_MSG_ASSOC)
 #else /* IEEE80211_DEBUG */
+#define	ieee80211_msg_is_reported(_vap, _m)	(0)
 #define	IEEE80211_DPRINTF(_vap, _m, _fmt, ...)
 #define	IEEE80211_NOTE(_vap, _m, _wh, _fmt, ...)
 #define	IEEE80211_NOTE_FRAME(_vap, _m, _wh, _fmt, ...)

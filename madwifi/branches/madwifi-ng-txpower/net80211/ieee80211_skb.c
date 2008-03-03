@@ -127,11 +127,11 @@ static void skb_print_message(
 	va_start(args, message);
 	vsnprintf(expanded_message, sizeof(expanded_message), message, args);
 #ifdef IEEE80211_DEBUG_REFCNT
-	printk("%s: %s%s:%d -> %s:%d %s\n",
+	printk(KERN_DEBUG "%s: %s%s:%d -> %s:%d %s\n",
 #else
-	printk("%s: %s%s:%d %s\n",
+	printk(KERN_DEBUG "%s: %s%s:%d %s\n",
 #endif
-		DEV_NAME(skb->dev),
+		((skb != NULL) ? DEV_NAME(skb->dev) : "none"),
 		skb_count, 
 #ifdef IEEE80211_DEBUG_REFCNT
 		func1, line1,
@@ -200,10 +200,10 @@ static void skb_destructor(struct sk_buff* skb) {
 	/* Report any node reference leaks - caused by kernel net device queue 
 	 * dropping buffer, rather than passing it to the driver. */
 	if (SKB_CB(skb)->ni != NULL) {
-		printk(KERN_ERR "%s:%d - ERROR: non-NULL node pointer in %p, %p<%s>!  "
+		printk(KERN_ERR "%s:%d - ERROR: non-NULL node pointer in %p, %p<" MAC_FMT ">!  "
 				"Leak Detected!\n", 
 		       __func__, __LINE__, 
-		       skb, SKB_CB(skb)->ni, ether_sprintf(SKB_CB(skb)->ni->ni_macaddr));
+		       skb, SKB_CB(skb)->ni, MAC_ADDR(SKB_CB(skb)->ni->ni_macaddr));
 		dump_stack();
 	}
 	if (SKB_CB(skb)->next_destructor != NULL) {
@@ -217,20 +217,31 @@ static void get_skb_description(char *dst, int dst_size, const char* label, cons
 	dst[0] = '\0';
 	if (NULL != skb) {
 		int adj_users = atomic_read(&skb->users) + users_adjustment;
-		snprintf(dst, dst_size, 
-			 " [%s%s%p,users=%d,node=%p%s%s%s,aid=%d%s%s]",
-			 label,
-			 (label != NULL ? ": " : ""),
-			 skb,
-			 adj_users,
-			 (SKB_CB(skb)->ni ? SKB_CB(skb)->ni : NULL),
-			 (SKB_CB(skb)->ni ? "<" : ""),
-			 (SKB_CB(skb)->ni ? ether_sprintf(SKB_CB(skb)->ni->ni_macaddr) : ""),
-			 (SKB_CB(skb)->ni ? ">" : ""),
-			 (SKB_CB(skb)->ni ? SKB_CB(skb)->ni->ni_associd : -1),
-			 ((adj_users  < 0) ? " ** CORRUPTED **" : ""),
-			 ((adj_users == 0) ? " ** RELEASED **" : "")
-			 );
+		if (SKB_CB(skb)->ni != NULL) {
+			snprintf(dst, dst_size, 
+				 " [%s%s%p,users=%d,node=%p<" MAC_FMT ">,aid=%d%s%s]",
+				 label,
+				 (label != NULL ? ": " : ""),
+				 skb,
+				 adj_users,
+				 SKB_CB(skb)->ni,
+				 MAC_ADDR(SKB_CB(skb)->ni->ni_macaddr),
+				 SKB_CB(skb)->ni->ni_associd,
+				 ((adj_users  < 0) ? " ** CORRUPTED **" : ""),
+				 ((adj_users == 0) ? " ** RELEASED **" : "")
+				 );
+		}
+		else {
+			snprintf(dst, dst_size, 
+				 " [%s%s%p,users=%d,node=NULL,aid=N/A%s%s]",
+				 label,
+				 (label != NULL ? ": " : ""),
+				 skb,
+				 adj_users,
+				 ((adj_users  < 0) ? " ** CORRUPTED **" : ""),
+				 ((adj_users == 0) ? " ** RELEASED **" : "")
+				 );
+		}
 		dst[dst_size-1] = '\0';
 	}
 }
@@ -268,7 +279,8 @@ static void print_skb_trackchange_message(
 
 static struct sk_buff *
 clean_clone_or_copy(struct sk_buff *skb) {
-	SKB_CB(skb)->tracked = 0;
+	if (skb != NULL)
+		SKB_CB(skb)->tracked = 0;
 	return skb;
 }
 
@@ -394,10 +406,10 @@ unref_skb(struct sk_buff *skb, int type,
 	}
 	else {
 		if (SKB_CB(skb)->ni != NULL) {
-			printk(KERN_ERR "%s:%d - ERROR: non-NULL node pointer in %p, %p<%s>!  "
+			printk(KERN_ERR "%s:%d - ERROR: non-NULL node pointer in %p, %p<" MAC_FMT ">!  "
 					"Driver Leak Detected!\n", 
 			       __func__, __LINE__, 
-			       skb, SKB_CB(skb)->ni, ether_sprintf(SKB_CB(skb)->ni->ni_macaddr));
+			       skb, SKB_CB(skb)->ni, MAC_ADDR(SKB_CB(skb)->ni->ni_macaddr));
 			dump_stack();
 			/* Allow the leak and let programmer fix it, but do not
 			 * report it again in the destructor. */
@@ -407,9 +419,9 @@ unref_skb(struct sk_buff *skb, int type,
 	}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-	if ((in_irq() || irqs_disabled()) 
-	     && (type == UNREF_USE_KFREE_SKB || type == UNREF_USE_DEV_KFREE_SKB)) 
-	{
+	if ((in_irq() || irqs_disabled()) && 
+			(type == UNREF_USE_KFREE_SKB || 
+			 type == UNREF_USE_DEV_KFREE_SKB)) {
 		skb_print_message(0 /* show_counter */, 
 			skb, func1, line1, func2, line2,
 			"ERROR: free an skb in interrupt context using a non-"
@@ -481,30 +493,26 @@ void ieee80211_dev_kfree_skb(struct sk_buff** pskb)
 {
 	struct sk_buff *skb;
 
-	/* Do not fail on null, we are going to use this in cleanup code */
+	/* Do not fail on null, as we are going to use this in cleanup code. */
 	if (!pskb || !(skb = *pskb))
 		return;
 
-	if (!skb_shared(skb)) {
-		/* Release the SKB references, for fragments of chain that are
-		 * unshared... starting at skb passed in. */
-		if (skb->prev == NULL) {
-			if (skb->next != NULL) {
-				skb->next->prev = NULL;
-			}
-			skb->next = NULL;
-		}
-		/* Release node reference, if any */
-		if (SKB_CB(skb)->ni != NULL) {
-#ifdef IEEE80211_DEBUG_REFCNT
-			ieee80211_unref_node_debug(&SKB_CB(skb)->ni, func, line);
-#else
-			ieee80211_unref_node(&SKB_CB(skb)->ni);
-#endif
-		}
+	/* Release the SKB references, for fragments of chain that are
+	 * unshared... starting at skb passed in. */
+	if (skb->prev == NULL) {
+		if (skb->next != NULL)
+			skb->next->prev = NULL;
+		skb->next = NULL;
 	}
 
-	/* Decrement the ref count for the skb, possibly freeing the memory */
+	if (SKB_CB(skb)->ni != NULL) {
+#ifdef IEEE80211_DEBUG_REFCNT
+		ieee80211_unref_node_debug(&SKB_CB(skb)->ni, func, line);
+#else
+		ieee80211_unref_node(&SKB_CB(skb)->ni);
+#endif
+	}
+
 #ifdef IEEE80211_DEBUG_REFCNT
 	unref_skb(skb, UNREF_USE_DEV_KFREE_SKB_ANY, 
 		  func, line, __func__, __LINE__);

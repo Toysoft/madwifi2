@@ -146,7 +146,7 @@ main(int argc, char *argv[])
 				strncpy(ifr.ifr_name, argv[4], IFNAMSIZ);
 				argc--;
 				argv++;
-			} else if (strcmp(argv[3], "nounit" ) == 0) {
+			} else if (strcmp(argv[3], "nounit") == 0) {
 				bnounit = 1;
 			} else {
 				int flag = getflag(argv[3]);
@@ -963,6 +963,7 @@ do80211priv(struct iwreq *iwr, const char *ifname, int op, void *data, size_t le
 			IOCTL_ERR(IEEE80211_IOCTL_RADAR),
 			IOCTL_ERR(IEEE80211_IOCTL_SETKEY),
 			IOCTL_ERR(IEEE80211_IOCTL_DELKEY),
+			IOCTL_ERR(IEEE80211_IOCTL_HALMAP),
 			IOCTL_ERR(IEEE80211_IOCTL_ADDMAC),
 			IOCTL_ERR(IEEE80211_IOCTL_DELMAC),
 			IOCTL_ERR(IEEE80211_IOCTL_WDSADDMAC),

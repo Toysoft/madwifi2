@@ -20,6 +20,7 @@
 #include <linux/netdevice.h>
 #include <linux/cache.h>
 #include <linux/platform_device.h>
+#include <linux/ethtool.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -36,6 +37,13 @@
 #error "Kernel versions older than 2.6.19 are not supported!"
 #endif
 
+/*
+ * Module glue.
+ */
+#include "release.h"
+static char *version = RELEASE_VERSION;
+static char *dev_info = "ath_ahb";
+
 struct ath_ahb_softc {
 	struct ath_softc	aps_sc;
 #ifdef CONFIG_PM
@@ -46,6 +54,7 @@ struct ath_ahb_softc {
 static struct ath_ahb_softc *sclist[2] = {NULL, NULL};
 static u_int8_t num_activesc = 0;
 
+
 /* set bus cachesize in 4B word units */
 void
 bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz)
@@ -54,33 +63,6 @@ bus_read_cachesize(struct ath_softc *sc, u_int8_t *csz)
 	 *   and I think this is the data cache line-size. 
 	 */
 	*csz = L1_CACHE_BYTES / sizeof(u_int32_t);
-}
-
-/* NOTE: returns uncached (kseg1) address. */
-void *
-bus_alloc_consistent(void *hwdev, size_t size, dma_addr_t *dma_handle)
-{
-	void *ret;
-
-	ret = (void *) __get_free_pages(GFP_ATOMIC, get_order(size));
-
-	if (ret != NULL) {
-		memset(ret, 0, size);
-		*dma_handle = __pa(ret);
-		dma_cache_wback_inv((unsigned long) ret, size);
-		ret = UNCAC_ADDR(ret);
-	}
-
-	return ret;
-}
-
-void
-bus_free_consistent(void *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
-{
-	unsigned long addr = (unsigned long) vaddr;
-
-	addr = CAC_ADDR(addr);
-	free_pages(addr, get_order(size));
 }
 
 static int
@@ -155,7 +137,7 @@ ahb_disable_wmac(u_int16_t devid, u_int16_t wlanNum)
 		((devid & AR5315_REV_MAJ_M) == AR5317_REV_MAJ)) {
 		u_int32_t *en = (u_int32_t *) AR5315_AHB_ARB_CTL;
 
-		KASSERT(wlanNum == 0, ("invalid wlan # %d", wlanNum) );
+		KASSERT(wlanNum == 0, ("invalid wlan # %d", wlanNum));
 
 		/* Enable Arbitration for WLAN */
 		*en &= ~AR5315_ARB_WLAN;
@@ -214,7 +196,7 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 
 	dev = alloc_netdev(sizeof(struct ath_ahb_softc), "wifi%d", ether_setup);
 	if (dev == NULL) {
-		printk(KERN_ERR "ath_dev_probe: no memory for device state\n");
+		printk(KERN_ERR "%s: no memory for device state\n", dev_info);
 		goto bad2;
 	}
 	sc = dev->priv;
@@ -250,16 +232,16 @@ init_ath_wmac(u_int16_t devid, u_int16_t wlanNum, struct ar531x_config *config)
 	sc->aps_sc.sc_iobase = (void __iomem *) dev->mem_start;
 	sc->aps_sc.sc_bdev = NULL;
 
-	if (request_irq(dev->irq, ath_intr, SA_SHIRQ, dev->name, dev)) {
-		printk(KERN_WARNING "%s: request_irq failed\n", dev->name);
+	if (request_irq(dev->irq, ath_intr, IRQF_SHARED, dev->name, dev)) {
+		printk(KERN_WARNING "%s: %s: request_irq failed\n", dev_info, dev->name);
 		goto bad3;
 	}
 
 	if (ath_attach(devid, dev, config) != 0)
 		goto bad4;
 	athname = ath_hal_probe(ATHEROS_VENDOR_ID, devid);
-	printk(KERN_INFO "%s: %s: mem=0x%lx, irq=%d\n",
-		dev->name, athname ? athname : "Atheros ???", dev->mem_start, dev->irq);
+	printk(KERN_INFO "%s: %s: %s: mem=0x%lx, irq=%d\n",
+		dev_info, dev->name, athname ? athname : "Atheros ???", dev->mem_start, dev->irq);
 	num_activesc++;
 	/* Ready to process interrupts */
 
@@ -302,17 +284,6 @@ static struct platform_driver ahb_wmac_driver = {
 	.probe = ahb_wmac_probe,
 	.remove = ahb_wmac_remove
 };
-
-/*
- * Module glue.
- */
-#include "version.h"
-#include "release.h"
-static char *version = ATH_PCI_VERSION " (" RELEASE_VERSION ")";
-static char *dev_info = "ath_ahb";
-
-#include <linux/ethtool.h>
-
 int
 ath_ioctl_ethtool(struct ath_softc *sc, int cmd, void __user *addr)
 {

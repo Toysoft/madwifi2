@@ -63,14 +63,14 @@ void ieee80211_proto_vdetach(struct ieee80211vap *);
 
 struct ieee80211_node;
 struct ieee80211_channel *ieee80211_doth_findchan(struct ieee80211vap *, u_int8_t);
-int ieee80211_input(struct ieee80211_node *, struct sk_buff *, int, u_int64_t);
+int ieee80211_input(struct ieee80211vap *, struct ieee80211_node *, struct sk_buff *, int, u_int64_t);
 int ieee80211_input_all(struct ieee80211com *, struct sk_buff *, int, u_int64_t);
 int ieee80211_setup_rates(struct ieee80211_node *, const u_int8_t *,
 	const u_int8_t *, int);
 void ieee80211_saveie(u_int8_t **, const u_int8_t *);
 void ieee80211_saveath(struct ieee80211_node *, u_int8_t *);
-void ieee80211_recv_mgmt(struct ieee80211_node *, struct sk_buff *,
-	int, int, u_int64_t);
+void ieee80211_recv_mgmt(struct ieee80211vap *, struct ieee80211_node *,
+	struct sk_buff *, int, int, u_int64_t);
 void ieee80211_sta_pwrsave(struct ieee80211vap *, int);
 int ieee80211_hardstart(struct sk_buff *, struct net_device *);
 void ieee80211_parent_queue_xmit(struct sk_buff *);
@@ -83,7 +83,6 @@ int ieee80211_send_probereq(struct ieee80211_node *,
 	const u_int8_t bssid[IEEE80211_ADDR_LEN],
 	const u_int8_t *, size_t, const void *, size_t);
 struct sk_buff *ieee80211_encap(struct ieee80211_node *, struct sk_buff *, int *);
-void ieee80211_pwrsave(struct ieee80211_node *, struct sk_buff *);
 
 void ieee80211_reset_erp(struct ieee80211com *, enum ieee80211_phymode);
 void ieee80211_set_shortslottime(struct ieee80211com *, int);
@@ -91,6 +90,7 @@ int ieee80211_iserp_rateset(struct ieee80211com *, struct ieee80211_rateset *);
 void ieee80211_set11gbasicrates(struct ieee80211_rateset *, enum ieee80211_phymode);
 enum ieee80211_phymode ieee80211_get11gbasicrates(struct ieee80211_rateset *);
 void ieee80211_send_pspoll(struct ieee80211_node *);
+void ieee80211_check_mic(struct ieee80211_node *, struct sk_buff *);
 
 /*
  * Return the size of the 802.11 header for a management or data frame.
@@ -212,15 +212,15 @@ struct wmeParams {
 
 struct chanAccParams{
 	/* XXX: is there any reason to have multiple instances of cap_info_count??? */
-	u_int8_t cap_info_count;		 		/* ver. of the current param set */
-	struct wmeParams cap_wmeParams[WME_NUM_AC];	/*WME params for each access class */
+	u_int8_t cap_info_count;		 	/* ver. of the current param set */
+	struct wmeParams cap_wmeParams[WME_NUM_AC];	/* WME params for each access class */
 };
 
 struct ieee80211_wme_state {
 	u_int32_t wme_flags;
 #define	WME_F_AGGRMODE	0x00000001	/* STATUS: WME aggressive mode */
 
-	u_int wme_hipri_traffic;			/* VI/VO frames in beacon interval */
+	u_int wme_hipri_traffic;		/* VI/VO frames in beacon interval */
 	u_int wme_hipri_switch_thresh;		/* aggressive mode switch threshold */
 	u_int wme_hipri_switch_hysteresis;	/* aggressive mode switch hysteresis */
 
@@ -292,7 +292,7 @@ u_int8_t *ieee80211_add_xr_param(u_int8_t *, struct ieee80211vap *);
 u_int8_t *ieee80211_add_xr_param(u_int8_t *, struct ieee80211vap *);
 u_int8_t *ieee80211_add_wme_param(u_int8_t *, struct ieee80211_wme_state *, int);
 u_int8_t *ieee80211_add_country(u_int8_t *, struct ieee80211com *);
-u_int8_t *ieee80211_add_country(u_int8_t *, struct ieee80211com *);
+u_int8_t *ieee80211_add_pwrcnstr(u_int8_t *frm, struct ieee80211com *ic);
 u_int8_t *ieee80211_add_athAdvCap(u_int8_t *, u_int8_t, u_int16_t);
 
 /*

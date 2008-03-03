@@ -57,7 +57,7 @@ static int tkip_setkey(struct ieee80211_key *);
 static int tkip_encap(struct ieee80211_key *, struct sk_buff *, u_int8_t);
 static int tkip_enmic(struct ieee80211_key *, struct sk_buff *, int);
 static int tkip_decap(struct ieee80211_key *, struct sk_buff *, int);
-static int tkip_demic(struct ieee80211_key *, struct sk_buff *, int);
+static int tkip_demic(struct ieee80211_key *, struct sk_buff *, int, int);
 
 static const struct ieee80211_cipher tkip  = {
 	.ic_name	= "TKIP",
@@ -204,11 +204,11 @@ tkip_encap(struct ieee80211_key *k, struct sk_buff *skb, u_int8_t keyid)
  * Add MIC to the frame as needed.
  */
 static int
-tkip_enmic(struct ieee80211_key *k, struct sk_buff *skb0, int force)
+tkip_enmic(struct ieee80211_key *k, struct sk_buff *skb0, int force_sw)
 {
 	struct tkip_ctx *ctx = k->wk_private;
 
-	if (force || (k->wk_flags & IEEE80211_KEY_SWMIC)) {
+	if ((k->wk_flags & IEEE80211_KEY_SWMIC) || force_sw) {
 		struct ieee80211_frame *wh =
 			(struct ieee80211_frame *) skb0->data;
 		struct ieee80211vap *vap = ctx->tc_vap;
@@ -339,7 +339,7 @@ tkip_decap(struct ieee80211_key *k, struct sk_buff *skb, int hdrlen)
  * Verify and strip MIC from the frame.
  */
 static int
-tkip_demic(struct ieee80211_key *k, struct sk_buff *skb0, int hdrlen)
+tkip_demic(struct ieee80211_key *k, struct sk_buff *skb0, int hdrlen, int force_sw)
 {
 	struct tkip_ctx *ctx = k->wk_private;
 	struct sk_buff *skb;
@@ -355,7 +355,7 @@ tkip_demic(struct ieee80211_key *k, struct sk_buff *skb0, int hdrlen)
 	}
 	wh = (struct ieee80211_frame *) skb0->data;
 	/* NB: skb left pointing at last in chain */
-	if (k->wk_flags & IEEE80211_KEY_SWMIC) {
+	if ((k->wk_flags & IEEE80211_KEY_SWMIC) || force_sw) {
 		struct ieee80211vap *vap = ctx->tc_vap;
 		u8 mic[IEEE80211_WEP_MICLEN];
 		u8 mic0[IEEE80211_WEP_MICLEN];
@@ -1037,8 +1037,8 @@ tkip_decrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 			ctx->rx_phase1_done = 0;
 		}
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_CRYPTO,
-			"[%s] TKIP ICV mismatch on decrypt (keyix %d, rsc %llu)\n",
-			ether_sprintf(wh->i_addr2), key->wk_keyix,
+			"[" MAC_FMT "] TKIP ICV mismatch on decrypt (keyix %d, rsc %llu)\n",
+			MAC_ADDR(wh->i_addr2), key->wk_keyix,
 			(unsigned long long)ctx->rx_rsc);
 		vap->iv_stats.is_rx_tkipicv++;
 		return 0;

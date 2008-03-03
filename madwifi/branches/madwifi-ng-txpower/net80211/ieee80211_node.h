@@ -129,6 +129,10 @@ struct ieee80211_node {
 	u_int8_t *ni_rsn_ie;			/* captured RSN ie */
 	u_int8_t *ni_wme_ie;			/* captured WME ie */
 	u_int8_t *ni_ath_ie;			/* captured Atheros ie */
+	u_int8_t *ni_suppchans;			/* supported channels */
+	u_int8_t *ni_suppchans_new;		/* supported channels of ongoing association */
+	u_int8_t *ni_needed_chans;		/* nodes which don't support these will be removed */
+	u_int8_t ni_n_needed_chans;		/* size of ni_needed_chans list */
 	u_int16_t ni_txseqs[17];		/* tx seq per-tid */
 	u_int16_t ni_rxseqs[17];		/* rx seq previous per-tid*/
 	u_int32_t ni_rxfragstamp;		/* time stamp of last rx frag */
@@ -187,12 +191,15 @@ MALLOC_DECLARE(M_80211_NODE);
 #define	IEEE80211_NODE_STAT_ADD(ni,stat,v)	(ni->ni_stats.ns_##stat += v)
 #define	IEEE80211_NODE_STAT_SET(ni,stat,v)	(ni->ni_stats.ns_##stat = v)
 
-#define WME_UAPSD_AC_CAN_TRIGGER(_ac, _ni) ( \
-		((_ni)->ni_flags & IEEE80211_NODE_UAPSD_TRIG) && WME_UAPSD_AC_ENABLED((_ac), (_ni)->ni_uapsd) )
+#define WME_UAPSD_AC_CAN_TRIGGER(_ac, _ni) (				\
+		((_ni)->ni_flags & IEEE80211_NODE_UAPSD_TRIG) &&	\
+		WME_UAPSD_AC_ENABLED((_ac), (_ni)->ni_uapsd))
 #define WME_UAPSD_NODE_MAXQDEPTH	8
-#define IEEE80211_NODE_UAPSD_USETIM(_ni) (((_ni)->ni_uapsd & 0xF) == 0xF )
+#define IEEE80211_NODE_UAPSD_USETIM(_ni) (((_ni)->ni_uapsd & 0xF) == 0xF)
 #define WME_UAPSD_NODE_INVALIDSEQ	0xffff
-#define WME_UAPSD_NODE_TRIGSEQINIT(_ni)	(memset(&(_ni)->ni_uapsd_trigseq[0], 0xff, sizeof((_ni)->ni_uapsd_trigseq)))
+#define WME_UAPSD_NODE_TRIGSEQINIT(_ni)					\
+		(memset(&(_ni)->ni_uapsd_trigseq[0],			\
+		 0xff, sizeof((_ni)->ni_uapsd_trigseq)))
 
 void ieee80211_node_attach(struct ieee80211com *);
 void ieee80211_node_detach(struct ieee80211com *);
@@ -343,7 +350,7 @@ ieee80211_pass_node(struct ieee80211_node **pni) {
 	return (tmp);
 }
 
-/* Decrement ieee80211_node* refcunt, and relinquish the pointer. */
+/* Decrement ieee80211_node* refcount, and relinquish the pointer. */
 #ifdef IEEE80211_DEBUG_REFCNT
 #define ieee80211_unref_node(_pni) \
 	ieee80211_unref_node_debug(_pni, __func__, __LINE__)
