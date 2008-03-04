@@ -1347,6 +1347,7 @@ static inline void ath_hal_dump_map(struct ath_hal *ah)
 }
 
 #include "if_ath_hal_wrappers.h"
+#include "if_ath_hal_extensions.h"
 
 #endif				/* #ifndef _IF_ATH_HAL_H_ */
  /* *** THIS IS A GENERATED FILE -- DO NOT EDIT *** */
