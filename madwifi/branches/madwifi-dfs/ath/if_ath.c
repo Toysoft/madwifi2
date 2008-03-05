@@ -3307,7 +3307,11 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/* If we are under CAC or have detected a radar, we simply drop (and
 	 * free) frames */
 
-	if (ath_chan_unavail_dbgmsg(sc)) {
+	if (ath_chan_unavail(sc)) {
+		/* No need to print a warning or error messages here since we
+		 * know that ath_hardstart() is invoked directly or indirectly
+		 * by the linux network stack and that all packets needs to be
+		 * dropped without exception */
 		goto hardstart_fail;
 	}
 
