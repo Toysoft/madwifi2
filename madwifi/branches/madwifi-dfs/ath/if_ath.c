@@ -9726,10 +9726,10 @@ ath_getchannels(struct net_device *dev, u_int cc,
 				 " CF_CW_INTERFERENCE" : ""),
 				/* undocumented */
 				(c->channelFlags & 0x0004 ? 
-				 " CF & (1 << 2)" : ""),
+				 " CF_INDOOR" : ""),
 				/* undocumented */
 				(c->channelFlags & 0x0008 ? 
-				 " CF & (1 << 3)" : ""),
+				 " CF_OUTDOOR" : ""),
 				/* Turbo channel */
 				(c->channelFlags & CHANNEL_TURBO ? 
 				 " CF_TURBO" : ""),

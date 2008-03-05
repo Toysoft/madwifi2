@@ -982,7 +982,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		/* No channel was found via scan module, means no good scanlist
 		 * was found */
 		int chanStart, i, count;
-		u_int32_t curChanFlags;
+		u_int16_t curChanBandFlags, curChanOutdoorFlags;
 
 		if ((ic->ic_curchan != NULL) &&
 		    (ic->ic_curchan != IEEE80211_CHAN_ANYC)) {
@@ -1007,12 +1007,24 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		 * $4.6.2.5.1 */
 		/* First, we count the usable channels */
 		count = 0;
-		curChanFlags = (ic->ic_bsschan->ic_flags) & 
-			~(IEEE80211_CHAN_RADAR);
+		curChanBandFlags = ic->ic_bsschan->ic_flags &
+			(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_5GHZ);
+		curChanOutdoorFlags = ic->ic_country_outdoor ?
+			IEEE80211_CHAN_OUTDOOR : IEEE80211_CHAN_INDOOR;
+
 		for (i = 0; i < ic->ic_nchans; i++) {
-			if ((ic->ic_channels[i].ic_ieee != 
-						ic->ic_bsschan->ic_ieee) &&
-			    (ic->ic_channels[i].ic_flags == curChanFlags)) {
+			/*
+			 * Criteria for the new frequency:
+			 * - it must be different from the current frequency
+			 * - it must not have radar detected
+			 * - it must be in the same band (2.4Ghz/5Ghz)
+			 * - it must be suitable for indoor/outdoor use
+			 *   according to what the user selected
+			 */
+			if ((ic->ic_channels[i].ic_freq != ic->ic_bsschan->ic_freq) &&
+			    (!(ic->ic_channels[i].ic_flags & IEEE80211_CHAN_RADAR)) &&
+			    (ic->ic_channels[i].ic_flags & curChanBandFlags) &&
+			    (ic->ic_channels[i].ic_flags & curChanOutdoorFlags)) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 						"%s: usable channel %3d "
 						"(%4d MHz)\n",
@@ -1029,10 +1041,11 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 
 			count = 0;
 			for (i = 0; i < ic->ic_nchans; i++) {
-				if ((ic->ic_channels[i].ic_ieee != 
-				     ic->ic_bsschan->ic_ieee) &&
-				    (ic->ic_channels[i].ic_flags == 
-				     curChanFlags)) {
+				/* must be the same formula as above */
+				if ((ic->ic_channels[i].ic_freq != ic->ic_bsschan->ic_freq) &&
+				    (!(ic->ic_channels[i].ic_flags & IEEE80211_CHAN_RADAR)) &&
+				    (ic->ic_channels[i].ic_flags & curChanBandFlags) &&
+				    (ic->ic_channels[i].ic_flags & curChanOutdoorFlags)) {
 					if (count++ == chanStart) {
 						new_channel = 
 							&ic->ic_channels[i];
@@ -1050,21 +1063,6 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 					new_channel->ic_freq);
 	}
 
-	if (!new_channel) {
-		/* Search for the first channel with no radar detected */
-		int n = 0;
-		for(n = 0; n < ic->ic_nchans; n++) {
-			if (0 == (ic->ic_channels[n].ic_flags & 
-						IEEE80211_CHAN_RADAR)) {
-				new_channel = &ic->ic_channels[n];
-				break;
-			}
-		}
-		if (new_channel != NULL)
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					"%s: new non-radar channel found\n",
-					__func__);
-	}
 	if (new_channel != NULL) {
 		/* A suitable scan entry was found, so change channels */
 		if (vap->iv_state == IEEE80211_S_RUN) {
