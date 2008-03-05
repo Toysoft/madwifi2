@@ -156,6 +156,8 @@ struct ieee80211_channel {
 
 /* bits 0-3 are for private use by drivers */
 /* channel attributes */
+#define IEEE80211_CHAN_INDOOR   0x0004  /* This channel can be used indoor */
+#define IEEE80211_CHAN_OUTDOOR  0x0008  /* This channel can be used outdoor */
 #define	IEEE80211_CHAN_TURBO	0x0010	/* Turbo channel */
 #define	IEEE80211_CHAN_CCK	0x0020	/* CCK channel */
 #define	IEEE80211_CHAN_OFDM	0x0040	/* OFDM channel */

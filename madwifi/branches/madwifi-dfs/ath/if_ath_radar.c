@@ -297,12 +297,45 @@ int ath_radar_update(struct ath_softc *sc)
 	return (required == ath_radar_is_enabled(sc));
 }
 
-/* Update channel's DFS flags based upon whether DFS is reqired.  Return
- * true if the value was repaired. */
+static
+int ath_radar_is_indoor_channel(HAL_CHANNEL *hchan)
+{
+	/* Warning : we use hardcoded values here suited for France */
+	if ((hchan->channel >= 2412) && (hchan->channel <= 2472))
+		return 1;
+	if ((hchan->channel >= 5150) && (hchan->channel <= 5350))
+		return 1;
+	if ((hchan->channel >= 5470) && (hchan->channel <= 5725))
+		return 1;
+
+	return 0;
+}
+
+static
+int ath_radar_is_outdoor_channel(HAL_CHANNEL *hchan)
+{
+	/* Warning : we use hardcoded values here suited for France */
+	if ((hchan->channel >= 2412) && (hchan->channel <= 2472))
+		return 1;
+	if ((hchan->channel >= 5470) && (hchan->channel <= 5725))
+		return 1;
+
+	return 0;
+}
+
+/* Update channel's DFS flags based upon whether DFS is reqired.  Return true
+ * if the value was repaired. It also add flags to know if a channel can be
+ * used indoor or outdoor or both. Those flags have been added and made
+ * compatible with HAL flags (as defined in <hal/ah.h> */
+
+#define CHANNEL_INDOOR  0x00004
+#define CHANNEL_OUTDOOR 0x00008
+
 int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
 {
 	u_int32_t old_channelFlags = hchan->channelFlags;
 	u_int32_t old_privFlags = hchan->privFlags;
+
 	if (ath_radar_is_dfs_required(sc, hchan)) {
 		hchan->channelFlags |= CHANNEL_PASSIVE;
 		hchan->privFlags |= CHANNEL_DFS;
@@ -310,6 +343,17 @@ int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
 		hchan->channelFlags &= ~CHANNEL_PASSIVE;
 		hchan->privFlags &= ~CHANNEL_DFS;
 	}
+
+	hchan->channelFlags &= ~(CHANNEL_INDOOR | CHANNEL_OUTDOOR);
+
+	if (ath_radar_is_indoor_channel(hchan)) {
+		hchan->channelFlags |= CHANNEL_INDOOR;
+	}
+
+	if (ath_radar_is_outdoor_channel(hchan)) {
+		hchan->channelFlags |= CHANNEL_OUTDOOR;
+	}
+
 	return ((old_privFlags != hchan->privFlags) || 
 		(old_channelFlags != hchan->channelFlags));
 }
