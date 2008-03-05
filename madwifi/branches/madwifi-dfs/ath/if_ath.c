@@ -1636,8 +1636,8 @@ static inline void ath_override_intmit_if_disabled(struct ath_softc *sc)
 }
 
 static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
-				     HAL_CHANNEL *channel, HAL_BOOL bChannelChange,
-				     HAL_STATUS *status)
+		HAL_CHANNEL *channel, HAL_BOOL bChannelChange,
+		HAL_STATUS *status)
 {
 	HAL_BOOL ret;
 	int expected_intmit = (sc->sc_hasintmit && sc->sc_useintmit);
@@ -1645,27 +1645,29 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 
 	ath_hal_getintmit(sc->sc_ah, &intmit);
 	if (expected_intmit != intmit) {
-		EPRINTF(sc, "before ath_hal_reset: wrong INTMIT HAL:%d, expected:%d!\n",
-			intmit, expected_intmit);
+		EPRINTF(sc, "before ath_hal_reset: wrong INTMIT HAL:%d, "
+				"expected:%d!\n", intmit, expected_intmit);
 		ath_hal_setintmit(sc->sc_ah, expected_intmit);
 	}
 
-	ret = ath_hal_reset(sc->sc_ah, sc->sc_opmode, channel, bChannelChange, status);
+	ret = ath_hal_reset(sc->sc_ah, sc->sc_opmode, channel, 
+			bChannelChange, status);
 	mdelay(5); /* extra delay to allow the hw to settle in */
 
 	ath_hal_getintmit(sc->sc_ah, &intmit);
 	if (expected_intmit != intmit) {
-		EPRINTF(sc, "after ath_hal_reset: wrong INTMIT HAL:%d, expected:%d!\n",
-			intmit, expected_intmit);
+		EPRINTF(sc, "after ath_hal_reset: wrong INTMIT HAL:%d, "
+				"expected:%d!\n", intmit, expected_intmit);
 		ath_hal_setintmit(sc->sc_ah, expected_intmit);
 	}
 #ifdef ATH_CAP_TPC
 	if (sc->sc_hastpc && tpc != ath_hal_gettpc(sc->sc_ah)) {
-		EPRINTF(sc, "ERROR: TPC HAL capability out of sync.  Got %d!\n", ath_hal_gettpc(sc->sc_ah));
+		EPRINTF(sc, "ERROR: TPC HAL capability out of sync.  "
+				"Got %d!\n", ath_hal_gettpc(sc->sc_ah));
 		ath_hal_settpc(sc->sc_ah, 1);
 	}
 #endif
-/* XXX: Any other features they clobber? */
+	/* XXX: Any other features they clobber? */
 	ath_override_intmit_if_disabled(sc);
 	if (sc->sc_softled)
 		ath_hal_gpioCfgOutput(sc->sc_ah, sc->sc_ledpin);
@@ -2186,12 +2188,12 @@ ath_uapsd_processtriggers(struct ath_softc *sc, u_int64_t hw_tsf)
 			if (skb == NULL)
 				continue;
 			rs = &p->bf_dsstatus.ds_rxstat;
-#if 0 /* XXX: MT: redundant call to ath_hal_rxprocdesc... */
-/* Do not call ath_hal_rxprocdesc again, since we already did so
- * in the first pass, and invoking it again may double-count errors and/or mess
- * up ANI... not to mention slowing us down. 
- * ATH_BUFSTATUS_DONE is marked so we know its good!
- */
+#if 0 /* XXX: redundant call to ath_hal_rxprocdesc... */
+			/* Do not call ath_hal_rxprocdesc again, since we 
+			 * already did so in the first pass, and invoking it 
+			 * again may double-count errors and/or mess up ANI... 
+			 * not to mention slowing us down. 
+			 * ATH_BUFSTATUS_DONE is marked so we know its good! */
 			retval = ath_hal_rxprocdesc(ah, ds, p->bf_daddr,
 						    PA2DESC(sc, ds->ds_link),
 						    hw_tsf, rs);
@@ -2432,8 +2434,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 * a lot of MIB events we can safely skip them.
 			 * However, we must never throttle them DURING interference
 			 * mitigation calibration sequence as it depends on this
-			 * hook to advance the calibration sequence / alg.
-			 */
+			 * hook to advance the calibration sequence/alg. */
 			if (!sc->sc_useintmit) {
 				sc->sc_imask &= ~HAL_INT_MIB;
 				ath_hal_intrset(ah, sc->sc_imask);
@@ -3305,13 +3306,12 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	STAILQ_INIT(&bf_head);
 
 	/* If we are under CAC or have detected a radar, we simply drop (and
-	 * free) frames */
-
+	 * free) frames. */
 	if (ath_chan_unavail(sc)) {
 		/* No need to print a warning or error messages here since we
 		 * know that ath_hardstart() is invoked directly or indirectly
 		 * by the linux network stack and that all packets needs to be
-		 * dropped without exception */
+		 * dropped without exception. */
 		goto hardstart_fail;
 	}
 
@@ -6308,13 +6308,13 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* Update beacon RSSI statistics, (apply to "pure" STA only)
 		 * AND only for our AP's beacons */
-		if(vap->iv_opmode == IEEE80211_M_STA && 
-		   sc->sc_ic.ic_opmode == IEEE80211_M_STA && 
-		   ni == vap->iv_bss) 
+		if ((vap->iv_opmode == IEEE80211_M_STA) && 
+		    (sc->sc_ic.ic_opmode == IEEE80211_M_STA) && 
+		    (ni == vap->iv_bss)) 
 			ATH_RSSI_LPF(sc->sc_halstats.ns_avgbrssi, rssi);
 		if ((sc->sc_syncbeacon ||
 		    (vap->iv_flags_ext & IEEE80211_FEXT_APPIE_UPDATE)) &&
-		     ni == vap->iv_bss && vap->iv_state == IEEE80211_S_RUN) {
+		    (ni == vap->iv_bss) && (vap->iv_state == IEEE80211_S_RUN)) {
 			/* Resync beacon timers using the tsf of the
 			 * beacon frame we just received. */
 			vap->iv_flags_ext &= ~IEEE80211_FEXT_APPIE_UPDATE;
@@ -8543,7 +8543,7 @@ ath_stoprecv(struct ath_softc *sc)
 				bf->bf_daddr, PA2DESC(sc, ds->ds_link), bf->bf_tsf, rs);
 			if (status == HAL_OK || (sc->sc_debug & ATH_DEBUG_FATAL))
 				ath_printrxbuf(bf, status == HAL_OK);
-			/* XXX: MT: just curious... */
+			/* XXX: just curious... */
 			if (status == HAL_OK)
 				printk("Dropping packet in ath_stoprecv\n");
 		}
@@ -10702,7 +10702,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				/* Only do a reset if device is valid and UP 
 				 * and we just made a change to the settings. */
 				if ((oldval != sc->sc_useintmit) &&
-				    NULL != sc->sc_dev && !sc->sc_invalid &&
+				    sc->sc_dev && !sc->sc_invalid &&
 				    (sc->sc_dev->flags & IFF_RUNNING) && 
 				    sc->sc_hasintmit)
 					ath_reset(sc->sc_dev); 
@@ -12625,7 +12625,7 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 	if ((address >= 0x143c) && (address <= 0x143f)) return FILTERED;
 	/* PCI timing registers are not interesting */
 	if ((address >= 0x4000) && (address <= 0x5000)) return FILTERED;
-	/* reading 0x9200-0x092c causes crashes in turbo A mode? */
+	/* Reading 0x9200-0x092c causes crashes in turbo A mode? */
 	if ((address >= 0x0920) && (address <= 0x092c)) return FILTERED;
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
