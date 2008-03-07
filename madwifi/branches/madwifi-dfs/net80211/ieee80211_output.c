@@ -399,7 +399,8 @@ ieee80211_send_setup(struct ieee80211vap *vap,
  * reference (and potentially freeing up any associated storage).
  */
 static void
-ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
+ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type,
+		      const u_int8_t da[IEEE80211_ADDR_LEN])
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
@@ -413,7 +414,7 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type)
 		skb_push(skb, sizeof(struct ieee80211_frame));
 	ieee80211_send_setup(vap, ni, wh,
 		IEEE80211_FC0_TYPE_MGT | type,
-		vap->iv_myaddr, ni->ni_macaddr, vap->iv_bssid);
+		vap->iv_myaddr, da, vap->iv_bssid);
 	/* XXX power management */
 
 	if ((SKB_CB(skb)->flags & M_LINK0) != 0 && ni->ni_challenge != NULL) {
@@ -1751,6 +1752,55 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	return 0;
 }
 
+
+
+/*
+ * Send a broadcast CSA frame, announcing the new channel. References are from
+ * IEEE 802.11h-2003. CSA frame format is an "Action" frame (Type: 00, Subtype:
+ * 1101, see 7.1.3.1.2)
+ *
+ * [1] Category : 0, Spectrum Management, 7.3.1.11
+ * [1] Action : 4, Channel Switch Annoucement, 7.4.1 and 7.4.1.5
+ * [1] Element ID : 37, Channel Switch Announcement, 7.3.2
+ * [1] Length : 3, 7.3.2.20
+ * [1] Channel Switch Mode : 1, stop transmission immediately
+ * [1] New Channel Number
+ * [1] Channel Switch Count in TBTT : 0, immediate channel switch
+ */
+
+void
+ieee80211_send_csa_frame(struct ieee80211_node *ni,
+			 int csa_mode,
+			 int csa_chan,
+			 int csa_tbtt)
+{
+	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211com *ic = ni->ni_ic;
+	struct sk_buff *skb;
+	const int frm_len = 7;
+	u_int8_t *frm;
+
+	skb = ieee80211_getmgtframe(&frm, frm_len);
+	if (skb == NULL) {
+		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,
+			"%s: cannot get buf; size %u", __func__, frm_len);
+		vap->iv_stats.is_tx_nobuf++;
+		return ;
+	}
+
+	*frm ++ = 0; /* Category */
+	*frm ++ = 4; /* Spectrum Management */
+	*frm ++ = IEEE80211_ELEMID_CHANSWITCHANN;
+	*frm ++ = 3;
+	*frm ++ = csa_mode;
+	*frm ++ = csa_chan;
+	*frm ++ = csa_tbtt;
+
+	ieee80211_mgmt_output(ieee80211_ref_node(ni), skb,
+			      IEEE80211_FC0_SUBTYPE_ACTION, 
+			      ic->ic_dev->broadcast);
+}
+
 /*
  * Send a management frame.  The node is for the destination (or ic_bss
  * when in station mode).  Nodes other than ic_bss have their reference
@@ -2186,7 +2236,8 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 		/* NOTREACHED */
 	}
 
-	ieee80211_mgmt_output(ieee80211_ref_node(ni), skb, type);
+	ieee80211_mgmt_output(ieee80211_ref_node(ni), skb, type,
+			      ni->ni_macaddr);
 	if (timer)
 		mod_timer(&vap->iv_mgtsend, jiffies + timer * HZ);
 	return 0;
