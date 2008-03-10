@@ -987,6 +987,12 @@ ieee80211_expire_dfs_excl_timer(unsigned long data)
 					ic->ic_chanchange_tbtt = 
 						IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
 					ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+
+					ieee80211_send_csa_frame(vap,
+						IEEE80211_CSA_MANDATORY,
+						ic->ic_chanchange_chan,
+						IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT);
+
 				} else if (ieee80211_msg_is_reported(vap, 
 							IEEE80211_MSG_DOTH)) {
 					/* Find the desired channel in 

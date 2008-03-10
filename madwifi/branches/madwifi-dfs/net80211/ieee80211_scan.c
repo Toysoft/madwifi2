@@ -1064,6 +1064,13 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 	}
 
 	if (new_channel != NULL) {
+
+		/* send a CSA frame immediately */
+		ieee80211_send_csa_frame(vap,
+					 IEEE80211_CSA_MANDATORY,
+					 new_channel->ic_ieee,
+					 IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT);
+
 		/* A suitable scan entry was found, so change channels */
 		if (vap->iv_state == IEEE80211_S_RUN) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,

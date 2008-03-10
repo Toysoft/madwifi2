@@ -1766,15 +1766,19 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
  * [1] Channel Switch Mode : 1, stop transmission immediately
  * [1] New Channel Number
  * [1] Channel Switch Count in TBTT : 0, immediate channel switch
+ *
+ * csa_mode : IEEE80211_CSA_MANDATORY / IEEE80211_CSA_ADVISORY
+ * csa_chan : new IEEE channel number
+ * csa_tbtt : TBTT until Channel Switch happens
  */
 
 void
-ieee80211_send_csa_frame(struct ieee80211_node *ni,
+ieee80211_send_csa_frame(struct ieee80211vap *vap,
 			 int csa_mode,
 			 int csa_chan,
 			 int csa_tbtt)
 {
-	struct ieee80211vap *vap = ni->ni_vap;
+	struct ieee80211_node * ni = vap->iv_bss;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb;
 	const int frm_len = 7;

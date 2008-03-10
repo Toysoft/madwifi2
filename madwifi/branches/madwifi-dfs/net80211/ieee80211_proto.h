@@ -76,6 +76,8 @@ int ieee80211_hardstart(struct sk_buff *, struct net_device *);
 void ieee80211_parent_queue_xmit(struct sk_buff *);
 int ieee80211_send_nulldata(struct ieee80211_node *);
 int ieee80211_send_qosnulldata(struct ieee80211_node *, int);
+void ieee80211_send_csa_frame(struct ieee80211vap *vap, int csa_mode,
+	int csa_chan, int csa_tbtt);
 int ieee80211_send_mgmt(struct ieee80211_node *, int, int);
 int ieee80211_send_probereq(struct ieee80211_node *,
 	const u_int8_t sa[IEEE80211_ADDR_LEN],

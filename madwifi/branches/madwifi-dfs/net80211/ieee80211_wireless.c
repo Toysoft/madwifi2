@@ -722,8 +722,10 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 			if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 				return -EINVAL;
 		}
-		if ((vap->iv_state == IEEE80211_S_RUN) && (c == vap->iv_des_chan))
+		if ((vap->iv_state == IEEE80211_S_RUN) &&
+		    (c == vap->iv_des_chan)) {
 			return 0;			/* no change, return */
+		}
 
 		/* Don't allow to change to channel with radar found */
 		if (c->ic_flags & IEEE80211_CHAN_RADAR)
@@ -759,7 +761,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		if (vap->iv_state == IEEE80211_S_RUN) {
 			ic->ic_set_channel(ic);
 		}
-	} else if (vap->iv_opmode == IEEE80211_M_HOSTAP) {
+	} else if (IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 		/* Need to use channel switch announcement on beacon if we are 
 		 * up and running.  We use ic_set_channel directly if we are 
 		 * "running" but not "up".  Otherwise, iv_des_chan will take
@@ -4462,10 +4464,15 @@ static void
 pre_announced_chanswitch(struct net_device *dev, u_int32_t channel, u_int32_t tbtt) {
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
+
 	/* now flag the beacon update to include the channel switch IE */
-	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 	ic->ic_chanchange_chan = channel;
 	ic->ic_chanchange_tbtt = tbtt;
+	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+
+	ieee80211_send_csa_frame(vap,
+				 IEEE80211_CSA_MANDATORY,
+				 channel, tbtt);
 }
 
 static int
