@@ -419,6 +419,10 @@ struct ieee80211_ie_csa {
 	u_int8_t csa_count;	/* TBTTs until Channel Switch happens */
 } __packed;
 
+/* for csa_mode */
+#define IEEE80211_CSA_MANDATORY 0
+#define IEEE80211_CSA_ADVISORY  1
+
 /* minimal Channel Switch Count in the initial announcement */
 #define IEEE80211_CSA_PROTECTION_PERIOD 3
 
@@ -753,7 +757,6 @@ enum {
 	IEEE80211_ELEMID_VENDOR		= 221,	/* vendor private */
 };
 
-#define IEEE80211_CHANSWITCHANN_BYTES 	5
 #define BITCTL_BUFD_MCAST       	1
 #define BITCTL_BUFD_UCAST_AID_MASK 	((u_int8_t)~(BITCTL_BUFD_MCAST))
 #define BITCTL_BUFD_UCAST_AID_SHIFT 	1
