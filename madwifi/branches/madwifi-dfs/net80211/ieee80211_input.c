@@ -2908,7 +2908,8 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 		 * the sequence. */
 
 #if 0
-		/* Needed for DFS / FCC ... */
+		/* That protection needs to be disabled for FCC/ETSI rules
+		 * since it requires an immediate switch */
 
 		if (csa_ie->csa_count < IEEE80211_CSA_PROTECTION_PERIOD) {
 			IEEE80211_DISCARD_IE(vap,
