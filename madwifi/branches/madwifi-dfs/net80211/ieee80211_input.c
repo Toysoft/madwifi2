@@ -2806,6 +2806,14 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 		return 0;
 	}
 
+	if (csa_ie->csa_id != IEEE80211_ELEMID_CHANSWITCHANN) {
+		IEEE80211_DISCARD_IE(vap,
+			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
+			wh, "channel switch", "invalid element ID %u",
+			csa_ie->csa_id);
+		return -1;
+	}		
+
 	if (csa_ie->csa_len != 3) {
 		IEEE80211_DISCARD_IE(vap,
 			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
@@ -4152,6 +4160,20 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		}
 		break;
 	}
+
+	case IEEE80211_FC0_SUBTYPE_ACTION:
+		/* parse the Category field */
+		switch (*frm ++) {
+		case IEEE80211_ACTION_SPECTRUM_MANAGEMENT:
+			switch (*frm ++) {
+			case IEEE80211_ACTION_S_CHANSWITCHANN:
+				ieee80211_parse_csaie(ni, frm, wh);
+				break;
+			}
+			break;
+		}
+		break;
+
 	default:
 		IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY,
 			wh, "mgt", "subtype 0x%x not handled", subtype);

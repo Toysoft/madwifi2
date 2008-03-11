@@ -419,6 +419,16 @@ struct ieee80211_ie_csa {
 	u_int8_t csa_count;	/* TBTTs until Channel Switch happens */
 } __packed;
 
+/* for Action Category. Table 19a in 802.11h $7.3.1.11 */
+#define IEEE80211_ACTION_SPECTRUM_MANAGEMENT 0
+
+/* for Spectrum Management Actions. Table 20e in 802.11h $7.4.1 */
+#define IEEE80211_ACTION_S_MEASUREMENT_REQUEST 0
+#define IEEE80211_ACTION_S_MEASUREMENT_REPORT  1
+#define IEEE80211_ACTION_S_TPC_REQUEST         2
+#define IEEE80211_ACTION_S_TPC_REPORT          3
+#define IEEE80211_ACTION_S_CHANSWITCHANN       4
+
 /* for csa_mode */
 #define IEEE80211_CSA_MANDATORY 0
 #define IEEE80211_CSA_ADVISORY  1
