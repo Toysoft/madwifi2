@@ -335,6 +335,7 @@ int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
 {
 	u_int32_t old_channelFlags = hchan->channelFlags;
 	u_int32_t old_privFlags = hchan->privFlags;
+	int changed;
 
 	if (ath_radar_is_dfs_required(sc, hchan)) {
 		hchan->channelFlags |= CHANNEL_PASSIVE;
@@ -343,6 +344,9 @@ int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
 		hchan->channelFlags &= ~CHANNEL_PASSIVE;
 		hchan->privFlags &= ~CHANNEL_DFS;
 	}
+
+	changed = ((old_privFlags != hchan->privFlags) || 
+		   (old_channelFlags != hchan->channelFlags));
 
 	hchan->channelFlags &= ~(CHANNEL_INDOOR | CHANNEL_OUTDOOR);
 
@@ -354,8 +358,7 @@ int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
 		hchan->channelFlags |= CHANNEL_OUTDOOR;
 	}
 
-	return ((old_privFlags != hchan->privFlags) || 
-		(old_channelFlags != hchan->channelFlags));
+	return changed;
 }
 
 /* Returns true if DFS is required for the regulatory domain, country and 
