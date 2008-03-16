@@ -682,6 +682,8 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 	else
 		i = freq->m;
 
+	/* Compute vap->iv_des_chan according to channel number i. "iwconfig
+	 * ath0 channel auto" gives i = -1. 0 & -1 means "auto" channel */
 	if ((i != 0) && (i != -1)) {
 		if (i > IEEE80211_CHAN_MAX)
 			return -EINVAL;
@@ -722,20 +724,11 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 			if (vap->iv_opmode == IEEE80211_M_HOSTAP)
 				return -EINVAL;
 		}
-		if ((vap->iv_state == IEEE80211_S_RUN) &&
-		    (c == vap->iv_des_chan)) {
-			return 0;			/* no change, return */
-		}
-
-		/* Don't allow to change to channel with radar found */
-		if (c->ic_flags & IEEE80211_CHAN_RADAR)
-			return -EINVAL;
-
-		/*
-		 * Mark desired channel and if running force a
-		 * radio change.
-		 */
-		vap->iv_des_chan = c;
+		if (vap->iv_des_chan == c)
+			return 0; /* no change, return */
+		/* Mark desired channel and if running force a radio
+		 * change. */
+                vap->iv_des_chan = c;
 	} else {
 		/*
 		 * Intepret channel 0 to mean "no desired channel";
@@ -743,9 +736,19 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		 * channel.
 		 */
 		if (vap->iv_des_chan == IEEE80211_CHAN_ANYC)
-			return 0;
+			return 0; /* no change, return */
 		vap->iv_des_chan = IEEE80211_CHAN_ANYC;
 	}
+	/* Here, vap->iv_des_chan is correctly initialized */
+
+	/* Don't allow to change immediately to a channel where radar has been
+	 * found */
+	if ((vap->iv_des_chan != NULL) &&
+	    (vap->iv_des_chan != IEEE80211_CHAN_ANYC)) {
+		if (vap->iv_des_chan->ic_flags & IEEE80211_CHAN_RADAR)
+			return -EBUSY;
+	}
+
 #if 0
 	if (vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
 		int mode = ieee80211_chan2mode(vap->iv_des_chan);
@@ -755,13 +758,16 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 #endif
 	if ((vap->iv_opmode == IEEE80211_M_MONITOR ||
 	    vap->iv_opmode == IEEE80211_M_WDS) &&
+	    vap->iv_des_chan != NULL &&
 	    vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
 		/* Monitor and wds modes can switch directly. */
 		ic->ic_curchan = vap->iv_des_chan;
 		if (vap->iv_state == IEEE80211_S_RUN) {
 			ic->ic_set_channel(ic);
 		}
-	} else if (IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
+	} else if (IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode) &&
+		   (vap->iv_des_chan != NULL) &&
+		   (vap->iv_des_chan != IEEE80211_CHAN_ANYC)) {
 		/* Need to use channel switch announcement on beacon if we are 
 		 * up and running.  We use ic_set_channel directly if we are 
 		 * "running" but not "up".  Otherwise, iv_des_chan will take
