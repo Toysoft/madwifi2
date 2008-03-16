@@ -1635,6 +1635,9 @@ static inline void ath_override_intmit_if_disabled(struct ath_softc *sc)
 	}
 }
 
+/* If channel change is sucessfull, sc->sc_curchan is updated with the new
+ * channel */
+
 static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 		HAL_CHANNEL *channel, HAL_BOOL bChannelChange,
 		HAL_STATUS *status)
@@ -1652,6 +1655,14 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 
 	ret = ath_hal_reset(sc->sc_ah, sc->sc_opmode, channel, 
 			bChannelChange, status);
+	/* On failure, we return immediately */
+	if (!ret)
+		return ret;
+
+	/* On success, we update sc->sc_curchan which can be needed by other
+	 * functions below , like ath_radar_update() at least */
+	sc->sc_curchan = *channel;
+
 	mdelay(5); /* extra delay to allow the hw to settle in */
 
 	ath_hal_getintmit(sc->sc_ah, &intmit);
@@ -4194,7 +4205,7 @@ ath_calcrxfilter(struct ath_softc *sc)
 		rfilt |= (HAL_RX_FILTER_CONTROL | HAL_RX_FILTER_BEACON |
 			  HAL_RX_FILTER_PROBEREQ | HAL_RX_FILTER_PROM);
 	if (sc->sc_curchan.privFlags & CHANNEL_DFS)
-		rfilt |= (HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR);
+		rfilt |= HAL_RX_FILTER_PHYRADAR;
 	return rfilt;
 #undef RX_FILTER_PRESERVE
 }
@@ -8743,8 +8754,6 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 				ath_get_hal_status_desc(status), status);
 			return -EIO;
 		}
-
-		sc->sc_curchan = hchan;
 
 		/* Change channels and update the h/w rate map
 		 * if we're switching; e.g. 11a to 11b/g. */
