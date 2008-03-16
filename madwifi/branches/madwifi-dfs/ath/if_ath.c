@@ -1609,28 +1609,29 @@ ath_resume(struct net_device *dev)
  * work around the bug preventing it from being disabled. */
 static inline void ath_override_intmit_if_disabled(struct ath_softc *sc)
 {
+	struct ath_hal *ah = sc->sc_ah;
+	u_int32_t rxfilter;
+
 	/* Restore intmit registers if we turned off intmit! */
 	if (sc->sc_hasintmit && !sc->sc_useintmit)
-		ath_hal_restore_default_intmit(sc->sc_ah);
+		ath_hal_restore_default_intmit(ah);
 	/* Sanity check...remove later */
 	if (!sc->sc_useintmit) {
-		ath_hal_verify_default_intmit(sc->sc_ah);
-		/* If we don't have INTMIT and we don't have DFS on channel,
-		 * it is safe to filter error packets! */
-		if (!ath_radar_is_dfs_required(sc, &sc->sc_curchan)) {
-			ath_hal_setrxfilter(sc->sc_ah, 
-				ath_hal_getrxfilter(sc->sc_ah) & 
-					    ~HAL_RX_FILTER_PHYERR);
+		ath_hal_verify_default_intmit(ah);
+		/* If we don't have INTMIT, it is safe to filter out PHY
+		 * errors! */
+		rxfilter = ath_hal_getrxfilter(ah);
+		if (rxfilter & HAL_RX_FILTER_PHYERR) {
+			ath_hal_setrxfilter(ah,
+					    rxfilter & ~HAL_RX_FILTER_PHYERR);
 		}
 	} else {
-		/* Make sure that we have errors in rx filter cause ANI needs
-		 * them. */
-		u_int32_t rx_filter;
-
-		rx_filter = ath_hal_getrxfilter(sc->sc_ah);
-		if (!(rx_filter & HAL_RX_FILTER_PHYERR)) {
-			ath_hal_setrxfilter(sc->sc_ah, 
-					    rx_filter | HAL_RX_FILTER_PHYERR);
+		/* Make sure that we have PHY errors in rx filter cause ANI
+		 * needs them. */
+		rxfilter = ath_hal_getrxfilter(ah);
+		if (!(rxfilter & HAL_RX_FILTER_PHYERR)) {
+			ath_hal_setrxfilter(ah,
+					    rxfilter | HAL_RX_FILTER_PHYERR);
 		}
 	}
 }
