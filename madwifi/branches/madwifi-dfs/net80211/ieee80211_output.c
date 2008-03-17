@@ -1784,6 +1784,10 @@ ieee80211_send_csa_frame(struct ieee80211vap *vap,
 	const int frm_len = 7;
 	u_int8_t *frm;
 
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+			  "%s: Sending action frame with CSA IE: %u/%u/%u\n",
+			  __func__, csa_mode, csa_chan, csa_tbtt);
+
 	skb = ieee80211_getmgtframe(&frm, frm_len);
 	if (skb == NULL) {
 		IEEE80211_NOTE(vap, IEEE80211_MSG_ANY, ni,

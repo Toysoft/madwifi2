@@ -493,11 +493,6 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			struct ieee80211_ie_csa *csa_ie =
 				(struct ieee80211_ie_csa *)bo->bo_chanswitch;
 
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, 
-					"%s: Sending 802.11h chanswitch IE: "
-					"%d/%d\n", __func__, 
-					ic->ic_chanchange_chan, 
-					ic->ic_chanchange_tbtt);
 			if (!vap->iv_chanchange_count) {
 				vap->iv_flags |= IEEE80211_F_CHANSWITCH;
 
@@ -531,9 +526,13 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				csa_ie->csa_count--;
 			
 			vap->iv_chanchange_count++;
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				"%s: CHANSWITCH IE, change in %d TBTT\n",
-				__func__, csa_ie->csa_count);
+
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, 
+					  "%s: Sending beacon frame with "
+					  "CSA IE: %u/%u/%u\n", __func__,
+					  csa_ie->csa_mode,
+					  csa_ie->csa_chan, 
+					  csa_ie->csa_count);
 		}
 #ifdef ATH_SUPERG_XR
 		if (vap->iv_flags & IEEE80211_F_XRUPDATE) {
