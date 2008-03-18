@@ -1776,7 +1776,7 @@ void
 ieee80211_send_csa_frame(struct ieee80211vap *vap,
 			 int csa_mode,
 			 int csa_chan,
-			 int csa_tbtt)
+			 int csa_count)
 {
 	struct ieee80211_node * ni = vap->iv_bss;
 	struct ieee80211com *ic = ni->ni_ic;
@@ -1786,7 +1786,7 @@ ieee80211_send_csa_frame(struct ieee80211vap *vap,
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 			  "%s: Sending action frame with CSA IE: %u/%u/%u\n",
-			  __func__, csa_mode, csa_chan, csa_tbtt);
+			  __func__, csa_mode, csa_chan, csa_count);
 
 	skb = ieee80211_getmgtframe(&frm, frm_len);
 	if (skb == NULL) {
@@ -1796,13 +1796,13 @@ ieee80211_send_csa_frame(struct ieee80211vap *vap,
 		return ;
 	}
 
-	*frm ++ = 0; /* Category */
-	*frm ++ = 4; /* Spectrum Management */
+	*frm ++ = IEEE80211_ACTION_SPECTRUM_MANAGEMENT; /* Category */
+	*frm ++ = IEEE80211_ACTION_S_CHANSWITCHANN; /* Spectrum Management */
 	*frm ++ = IEEE80211_ELEMID_CHANSWITCHANN;
 	*frm ++ = 3;
 	*frm ++ = csa_mode;
 	*frm ++ = csa_chan;
-	*frm ++ = csa_tbtt;
+	*frm ++ = csa_count;
 
 	ieee80211_mgmt_output(ieee80211_ref_node(ni), skb,
 			      IEEE80211_FC0_SUBTYPE_ACTION, 

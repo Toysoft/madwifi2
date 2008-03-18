@@ -2794,6 +2794,13 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 	struct ieee80211_channel *c;
 	struct ieee80211_ie_csa *csa_ie = (struct ieee80211_ie_csa *)frm;
 
+	if ((ic->ic_flags & IEEE80211_F_DOTH) == 0) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: Ignored CSA IE since 802.11h "
+				  "support is disabled\n", __func__);
+		return 0;
+	}
+
 	if (!frm) {
 		/* we had CS underway but now we got Beacon without CSA IE */
 		/* XXX abuse? */
@@ -2838,11 +2845,6 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 				"channel %u lookup failed", csa_ie->csa_chan);
 		return -1;
 	}
-
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-		"%s: channel switch to %u in %u tbtt (mode %u) announced\n",
-		__func__, csa_ie->csa_chan, csa_ie->csa_count,
-		csa_ie->csa_mode);
 
 	if (vap->iv_csa_jiffies) {
 		/* CSA was received recently */
@@ -3383,8 +3385,19 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 				ni->ni_flags &= ~IEEE80211_NODE_UAPSD;
 			if (scan.ath != NULL)
 				ieee80211_parse_athParams(ni, scan.ath);
-			if (scan.csa != NULL || vap->iv_csa_jiffies)
+			if (scan.csa != NULL) {
+				struct ieee80211_ie_csa *csa_ie =
+					(struct ieee80211_ie_csa *)scan.csa;
+				
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+						  "%s: Receiving beacon frame "
+						  "with CSA IE: %u/%u/%u\n",
+						  __func__, csa_ie->csa_mode,
+						  csa_ie->csa_chan,
+						  csa_ie->csa_count);
+				
 				ieee80211_parse_csaie(ni, scan.csa, wh);
+			}
 			if (scan.tim != NULL) {
 				/*
 				 * Check the TIM. For now we drop out of
@@ -3434,8 +3447,19 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		/* ieee80211_parse_csaie() needs to be called in IBSS mode as
 		 * well */
 		if (vap->iv_opmode == IEEE80211_M_IBSS) {
-			if (scan.csa != NULL || vap->iv_csa_jiffies)
-				ieee80211_parse_csaie(ni, scan.csa, wh);
+			if (scan.csa != NULL) {
+				struct ieee80211_ie_csa *csa_ie =
+					(struct ieee80211_ie_csa *)scan.csa;
+				
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+						  "%s: Receiving beacon frame "
+						  "with CSA IE: %u/%u/%u\n",
+						  __func__, csa_ie->csa_mode,
+						  csa_ie->csa_chan,
+						  csa_ie->csa_count);
+				
+				ieee80211_parse_csaie(ni,scan.csa,wh);
+			}
 		}
 
 		/*
@@ -4167,8 +4191,20 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		case IEEE80211_ACTION_SPECTRUM_MANAGEMENT:
 			switch (*frm ++) {
 			case IEEE80211_ACTION_S_CHANSWITCHANN:
+			{				
+				struct ieee80211_ie_csa *csa_ie =
+					(struct ieee80211_ie_csa *) frm;
+				
+				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+						  "%s: Receiving action frame "
+						  "with CSA IE: %u/%u/%u\n",
+						  __func__, csa_ie->csa_mode,
+						  csa_ie->csa_chan,
+						  csa_ie->csa_count);
+				
 				ieee80211_parse_csaie(ni, frm, wh);
-				break;
+			}
+			break;
 			}
 			break;
 		}
