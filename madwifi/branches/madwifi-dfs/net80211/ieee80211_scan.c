@@ -1054,16 +1054,28 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 				}
 			}
 		}
+	}
 
-		if (new_channel != NULL)
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					"%s: new random channel found %3d "
-					"(%4d MHz)\n", __func__, 
-					new_channel->ic_ieee, 
-					new_channel->ic_freq);
+	if (new_channel == NULL) {
+		/* We found no channel to switch to (for instance, all
+		 * available channels are under Non-Occupancy Period). In this
+		 * case, we still need to send an action frame and beacon with
+		 * CSA IE to tell other nodes to stop their transmission, in
+		 * order to meet the Channel Closing Transmission Time
+		 * requirement of FCC/ETSI */
+
+		if ((ic->ic_bsschan != NULL) &&
+		    (ic->ic_bsschan != IEEE80211_CHAN_ANYC)) {
+			new_channel = ic->ic_bsschan;
+		}
 	}
 
 	if (new_channel != NULL) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: new channel found %3d "
+				  "(%4d MHz)\n", __func__, 
+				  new_channel->ic_ieee, 
+				  new_channel->ic_freq);
 
 		/* send a CSA frame immediately */
 		ieee80211_send_csa_frame(vap,
