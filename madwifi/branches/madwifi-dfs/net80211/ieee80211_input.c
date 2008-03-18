@@ -2785,6 +2785,9 @@ ieee80211_doth_switch_channel_tmr(unsigned long arg)
 	ieee80211_doth_switch_channel(vap);
 }
 
+/* This function is called when we received an action frame or a beacon frame
+ * containing a CSA IE */
+
 static int
 ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 	const struct ieee80211_frame *wh)
@@ -2875,7 +2878,9 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 					vap->iv_csa_mode, csa_ie->csa_mode);
 		}
 
-		if (csa_ie->csa_count >= vap->iv_csa_count) {
+		/* since we can send Action frame and Beacon frame with the
+		 * same csa_count, equality is a normal case */
+		if (csa_ie->csa_count > vap->iv_csa_count) {
 			/* XXX abuse? what for? */
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 					"%s: channel switch count didn't "
@@ -2884,6 +2889,10 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 			return 0;
 		}
 
+		/* CSA IE can be received in STA or IBSS mode. In IBSS mode,
+		 * since beaconing is a shared process, it is normal to miss
+		 * some or all beacons including CSA IE */
+		if (vap->iv_opmode == IEEE80211_M_STA)
 		{
 			u_int32_t elapsed = IEEE80211_JIFFIES_TO_TU(
 			    jiffies - vap->iv_csa_jiffies);
