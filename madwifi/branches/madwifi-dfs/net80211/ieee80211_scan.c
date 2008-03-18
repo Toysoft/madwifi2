@@ -1079,7 +1079,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 
 		/* send a CSA frame immediately */
 		ieee80211_send_csa_frame(vap,
-					 IEEE80211_CSA_MANDATORY,
+					 IEEE80211_CSA_MUST_STOP_TX,
 					 new_channel->ic_ieee,
 					 IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT);
 

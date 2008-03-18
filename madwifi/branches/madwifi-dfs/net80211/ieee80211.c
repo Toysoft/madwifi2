@@ -989,7 +989,7 @@ ieee80211_expire_dfs_excl_timer(unsigned long data)
 					ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 
 					ieee80211_send_csa_frame(vap,
-						IEEE80211_CSA_MANDATORY,
+						IEEE80211_CSA_CAN_STOP_TX,
 						ic->ic_chanchange_chan,
 						IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT);
 

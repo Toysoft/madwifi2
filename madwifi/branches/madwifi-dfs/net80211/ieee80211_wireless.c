@@ -4477,7 +4477,7 @@ pre_announced_chanswitch(struct net_device *dev, u_int32_t channel, u_int32_t tb
 	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 
 	ieee80211_send_csa_frame(vap,
-				 IEEE80211_CSA_MANDATORY,
+				 IEEE80211_CSA_CAN_STOP_TX,
 				 channel, tbtt);
 }
 

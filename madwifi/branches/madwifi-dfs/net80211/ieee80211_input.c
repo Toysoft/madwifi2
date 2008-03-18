@@ -2832,6 +2832,15 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 		return -1;
 	}
 
+	if ((csa_ie->csa_mode != IEEE80211_CSA_CAN_STOP_TX) &&
+	    (csa_ie->csa_mode != IEEE80211_CSA_MUST_STOP_TX)) {
+		IEEE80211_DISCARD_IE(vap,
+			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
+			wh, "channel switch", "invalid CSA mode %u",
+			csa_ie->csa_mode);
+		return -1;
+	}
+
 	if (isclr(ic->ic_chan_avail, csa_ie->csa_chan)) {
 		IEEE80211_DISCARD_IE(vap,
 			IEEE80211_MSG_ELEMID | IEEE80211_MSG_DOTH,
@@ -3454,8 +3463,9 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		}
 
 		/* ieee80211_parse_csaie() needs to be called in IBSS mode as
-		 * well */
-		if (vap->iv_opmode == IEEE80211_M_IBSS) {
+		 * well. We filter on the IBSSID */
+		if (vap->iv_opmode == IEEE80211_M_IBSS &&
+			IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			if (scan.csa != NULL) {
 				struct ieee80211_ie_csa *csa_ie =
 					(struct ieee80211_ie_csa *)scan.csa;
@@ -4195,6 +4205,16 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 	}
 
 	case IEEE80211_FC0_SUBTYPE_ACTION:
+
+		/* we only parse Action frame from our BSSID */
+		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
+			IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
+					      wh->i_addr3, NULL,
+					      "%s", "not to bss");
+			vap->iv_stats.is_rx_wrongbss ++;
+			return;
+		}
+
 		/* parse the Category field */
 		switch (*frm ++) {
 		case IEEE80211_ACTION_SPECTRUM_MANAGEMENT:
