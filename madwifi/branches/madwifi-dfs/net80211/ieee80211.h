@@ -429,9 +429,11 @@ struct ieee80211_ie_csa {
 #define IEEE80211_ACTION_S_TPC_REPORT          3
 #define IEEE80211_ACTION_S_CHANSWITCHANN       4
 
-/* for csa_mode */
-#define IEEE80211_CSA_MANDATORY 0
-#define IEEE80211_CSA_ADVISORY  1
+/* for csa_mode. It must be either 0 or 1. 1 means that the receiver shall stop
+ * sending until CS. 0 imposes no requirement. See 7.3.2.20 */
+
+#define IEEE80211_CSA_CAN_STOP_TX	0
+#define IEEE80211_CSA_MUST_STOP_TX	1
 
 /* minimal Channel Switch Count in the initial announcement */
 #define IEEE80211_CSA_PROTECTION_PERIOD 3
