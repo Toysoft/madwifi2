@@ -527,6 +527,16 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			
 			vap->iv_chanchange_count++;
 
+			/* Since beaconing is a shared process in IBSS mode,
+			 * we send Action frames as well */
+
+			if (vap->iv_opmode == IEEE80211_M_IBSS) {
+				ieee80211_send_csa_frame(vap,
+							 csa_ie->csa_mode,
+							 csa_ie->csa_chan, 
+							 csa_ie->csa_count);
+			} 
+
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, 
 					  "%s: Sending beacon frame with "
 					  "CSA IE: %u/%u/%u\n", __func__,
