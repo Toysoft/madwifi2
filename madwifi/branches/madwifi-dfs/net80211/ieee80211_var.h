@@ -218,12 +218,6 @@ struct ieee80211vap {
 	u_int iv_bgscanintvl;				/* bg scan min interval */
 	u_int iv_scanvalid;				/* scan cache valid threshold */
 	struct ieee80211_roam iv_roam;			/* sta-mode roaming state */
-
-	u_int32_t iv_csa_jiffies;			/* last csa recv jiffies */
-	u_int8_t iv_csa_count;				/* last csa count */
-	struct ieee80211_channel *iv_csa_chan;		/* last csa channel */
-	u_int8_t iv_csa_mode;				/* last csa mode */
-	struct timer_list iv_csa_timer;			/* csa timer */
 	u_int32_t *iv_aid_bitmap;			/* association id map */
 	u_int16_t iv_max_aid;
 	u_int16_t iv_sta_assoc;				/* stations associated */
@@ -266,7 +260,6 @@ struct ieee80211vap {
 	struct ieee80211vap *iv_xrvap;			/* pointer to XR VAP , if XR is enabled */
 	u_int16_t iv_xrbcnwait;				/* SWBA count incremented until it reaches XR_BECON_FACTOR */
 	struct timer_list iv_xrvapstart;		/* timer to start xr */
-	u_int8_t iv_chanchange_count; 			/* 11h counter for channel change */
 	int iv_mcast_rate; 				/* Multicast rate (Kbps) */
 
 	const struct ieee80211_aclator *iv_acl;		/* aclator glue */
@@ -281,6 +274,8 @@ struct ieee80211vap {
 	struct ieee80211_spy iv_spy;         		/* IWSPY support */
 	struct ieee80211_app_ie app_ie[IEEE80211_APPIE_NUM_OF_FRAME]; /* app-specified IEs by frame type */
 	u_int32_t app_filter;				/* filters which management frames are forwarded to app */
+	u_int64_t (*iv_get_tsf)(struct ieee80211vap *);
+	u_int32_t (*iv_get_nexttbtt)(struct ieee80211vap *);
 };
 
 /* Debug functions need the defintion of struct ieee80211vap because iv_debug 
@@ -420,8 +415,13 @@ struct ieee80211com {
 	 *     know value until change to channel and detect).
 	 */
 	u_int8_t ic_curchanmaxpwr;
-	u_int8_t ic_chanchange_tbtt;
-	u_int8_t ic_chanchange_chan;
+
+	/* to handle Channel Switch Annoucements, only valid if ic_flags has
+	 * IEEE80211_F_CHANSWITCH set */
+	u_int8_t			ic_csa_mode;
+	struct ieee80211_channel *	ic_csa_chan;
+	u_int32_t			ic_csa_expires_tu;
+	struct timer_list		ic_csa_timer;
 
 	/* Global debug flags applicable to all VAPs */
 	int ic_debug;

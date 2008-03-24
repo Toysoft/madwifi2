@@ -74,7 +74,8 @@
 #define	RESCAN	1
 
 static void
-pre_announced_chanswitch(struct net_device *dev, u_int32_t channel, u_int32_t tbtt);
+pre_announced_chanswitch(struct net_device *dev,
+	struct ieee80211_channel *channel, u_int8_t csa_count);
 
 static int
 preempt_scan(struct net_device *dev, int max_grace, int max_wait)
@@ -757,29 +758,32 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 	}
 #endif
 	if ((vap->iv_opmode == IEEE80211_M_MONITOR ||
-	    vap->iv_opmode == IEEE80211_M_WDS) &&
-	    vap->iv_des_chan != NULL &&
-	    vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
-		/* Monitor and wds modes can switch directly. */
-		ic->ic_curchan = vap->iv_des_chan;
-		if (vap->iv_state == IEEE80211_S_RUN) {
-			ic->ic_set_channel(ic);
+	    vap->iv_opmode == IEEE80211_M_WDS)) {
+		if (vap->iv_des_chan != NULL &&
+		    vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
+			/* Monitor and wds modes can switch directly. */
+			ic->ic_curchan = vap->iv_des_chan;
+			if (vap->iv_state == IEEE80211_S_RUN) {
+				ic->ic_set_channel(ic);
+			}
 		}
 	} else if (IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode) &&
-		   (vap->iv_des_chan != NULL) &&
-		   (vap->iv_des_chan != IEEE80211_CHAN_ANYC)) {
-		/* Need to use channel switch announcement on beacon if we are 
-		 * up and running.  We use ic_set_channel directly if we are 
-		 * "running" but not "up".  Otherwise, iv_des_chan will take
-		 * effect when we are transitioned to RUN state later. */
-		if (IS_UP(vap->iv_dev) &&
-		    (0 == (vap->iv_des_chan->ic_flags & CHANNEL_DFS))) {
-			pre_announced_chanswitch(dev, ieee80211_chan2ieee(ic, vap->iv_des_chan),
-				IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT);
-		}
-		else if (vap->iv_state == IEEE80211_S_RUN) {
-			ic->ic_curchan = vap->iv_des_chan;
-			ic->ic_set_channel(ic);
+		   (ic->ic_flags & IEEE80211_F_DOTH)) {
+		if (vap->iv_des_chan != NULL &&
+		    vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
+			/* Need to use channel switch announcement on beacon
+			 * if we are up and running.  We use ic_set_channel
+			 * directly * if we are "running" but not "up".
+			 * Otherwise, iv_des_chan * will take effect when we
+			 * are transitioned to RUN state * later. */
+			if (IS_UP(vap->iv_dev)) {
+				pre_announced_chanswitch(dev,
+				  vap->iv_des_chan,
+				  IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT);
+			} else if (vap->iv_state == IEEE80211_S_RUN) {
+				ic->ic_curchan = vap->iv_des_chan;
+				ic->ic_set_channel(ic);
+			}
 		}
 	} else {
 		/* Need to go through the state machine in case we need
@@ -4467,18 +4471,20 @@ ieee80211_ioctl_getstainfo(struct net_device *dev, struct iwreq *iwr)
 }
 
 static void
-pre_announced_chanswitch(struct net_device *dev, u_int32_t channel, u_int32_t tbtt) {
+pre_announced_chanswitch(struct net_device *dev,
+			 struct ieee80211_channel *channel,
+			 u_int8_t csa_count)
+{
 	struct ieee80211vap *vap = dev->priv;
-	struct ieee80211com *ic = vap->iv_ic;
-
-	/* now flag the beacon update to include the channel switch IE */
-	ic->ic_chanchange_chan = channel;
-	ic->ic_chanchange_tbtt = tbtt;
-	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 
 	ieee80211_send_csa_frame(vap,
 				 IEEE80211_CSA_CAN_STOP_TX,
-				 channel, tbtt);
+				 channel->ic_ieee, csa_count);
+
+	/* now flag the beacon update to include the channel switch IE */
+	ieee80211_start_new_csa(vap,
+				IEEE80211_CSA_CAN_STOP_TX,
+				channel, csa_count, 0);
 }
 
 static int
@@ -4488,11 +4494,18 @@ ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
 	unsigned int *param = (unsigned int *) extra;
+	struct ieee80211_channel *c;
 
 	if (!(ic->ic_flags & IEEE80211_F_DOTH))
 		return 0;
 
-	pre_announced_chanswitch(dev, param[0], param[1]);
+	c = ieee80211_doth_findchan(vap, param[0]);
+	if (c != NULL &&
+	    c != IEEE80211_CHAN_ANYC) {
+		pre_announced_chanswitch(dev, c, param[1]);
+	} else {
+		return -EINVAL;
+	}
 
 	return 0;
 }

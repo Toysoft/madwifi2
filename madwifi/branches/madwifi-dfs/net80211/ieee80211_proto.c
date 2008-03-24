@@ -130,7 +130,6 @@ ieee80211_proto_vattach(struct ieee80211vap *vap)
 	init_timer(&vap->iv_mgtsend);
 	init_timer(&vap->iv_xrvapstart);
 	init_timer(&vap->iv_swbmiss);
-	init_timer(&vap->iv_csa_timer);
 	vap->iv_mgtsend.function = ieee80211_tx_timeout;
 	vap->iv_mgtsend.data = (unsigned long) vap;
 

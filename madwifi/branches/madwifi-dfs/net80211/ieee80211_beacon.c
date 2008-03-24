@@ -289,52 +289,26 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 
 	IEEE80211_LOCK_IRQ(ic);
 
-	/* Check if we need to change channel right now */
+	/* Check if channel switch is over, in which case we recompute beacon
+	 * content */
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
+	    !(ic->ic_flags & IEEE80211_F_CHANSWITCH) &&
 	    (vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
-		struct ieee80211_channel *c = 
-			ieee80211_doth_findchan(vap, ic->ic_chanchange_chan);
-		
-		if (!vap->iv_chanchange_count && !c) {
-			vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
-			ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
-		} else if (vap->iv_chanchange_count &&
-			   ((!ic->ic_chanchange_tbtt) ||
-			    (vap->iv_chanchange_count == ic->ic_chanchange_tbtt))) {
-			u_int8_t *frm;
 
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					"%s: reinit beacon\n", __func__);
+		u_int8_t * frm;
 
-			/* NB: ic_bsschan is in the DSPARMS beacon IE, so must
-			 * set this prior to the beacon re-init, below. */
-			if (c == NULL) {
-				/* Requested channel invalid; drop the channel
-				 * switch announcement and do nothing. */
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-						"%s: find channel failure\n", __func__);
-			} else
-				ic->ic_bsschan = c;
+		vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
 
-			skb_pull(skb, sizeof(struct ieee80211_frame));
-			skb_trim(skb, 0);
-			frm = skb->data;
-			skb_put(skb, ieee80211_beacon_init(ni, bo, frm) - frm);
-			skb_push(skb, sizeof(struct ieee80211_frame));
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: reinit beacon\n", __func__);
 
-			vap->iv_chanchange_count = 0;
-			vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
-			ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
+		skb_pull(skb, sizeof(struct ieee80211_frame));
+		skb_trim(skb, 0);
+		frm = skb->data;
+		skb_put(skb, ieee80211_beacon_init(ni, bo, frm) - frm);
+		skb_push(skb, sizeof(struct ieee80211_frame));
 
-			/* NB: Only for the first VAP to get here, and when we
-			 * have a valid channel to which to change. */
-			if (c && (ic->ic_curchan != c)) {
-				ic->ic_curchan = c;
-				ic->ic_set_channel(ic);
-			}
-
-			len_changed = 1;
-		}
+		len_changed = 1;
 	}
 
 	/* XXX faster to recalculate entirely or just changes? */
@@ -478,13 +452,15 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			tie->tim_bitctl &= ~BITCTL_BUFD_MCAST;
 	}
 
-	/* Whenever we want to switch to a new channel, we need to follow the
-	 * following steps:
+	/* Whenever we want to switch to a new channel, we just need to call
+	 * ieee80211_start_new_csa() which will set :
 	 *
-	 * - iv_chanchange_count= number of beacon intervals elapsed (0)
-	 * - ic_chanchange_tbtt = number of beacon intervals before switching
-	 * - ic_chanchange_chan = IEEE channel number after switching
-	 * - ic_flags |= IEEE80211_F_CHANSWITCH */
+	 * - ic_csa_mode = IEEE80211_CSA_{CAN|MUST}_STOP_TX
+	 * - ic_csa_chan = pointer to struct ieee80211_channel
+	 * - ic_csa_expires_tu = switch time in TU
+	 * - mod_timer(&ic_csa_timer, expires) = switch time in jiffies
+	 * - ic_flags |= IEEE80211_F_CHANSWITCH
+	 */
 
 	if (IEEE80211_IS_MODE_BEACON(vap->iv_opmode)) {
 
@@ -492,8 +468,9 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 		    (ic->ic_flags & IEEE80211_F_CHANSWITCH)) {
 			struct ieee80211_ie_csa *csa_ie =
 				(struct ieee80211_ie_csa *)bo->bo_chanswitch;
+			u_int32_t now_tu, nexttbtt;
 
-			if (!vap->iv_chanchange_count) {
+			if ((vap->iv_flags & IEEE80211_F_CHANSWITCH)==0) {
 				vap->iv_flags |= IEEE80211_F_CHANSWITCH;
 
 				/* copy out trailer to open up a slot */
@@ -505,10 +482,6 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				csa_ie->csa_id = IEEE80211_ELEMID_CHANSWITCHANN;
 				/* fixed length */
 				csa_ie->csa_len = sizeof(*csa_ie) - 2;
-				/* STA shall transmit no further frames */
-				csa_ie->csa_mode = 1;
-				csa_ie->csa_chan = ic->ic_chanchange_chan;
-				csa_ie->csa_count = ic->ic_chanchange_tbtt;
 
 				/* update the trailer lens */
 				bo->bo_chanswitch_trailerlen += sizeof(*csa_ie);
@@ -522,10 +495,27 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				 * may manage memory */
 				skb_put(skb, sizeof(*csa_ie));
 				len_changed = 1;
-			} else if(csa_ie->csa_count)
-				csa_ie->csa_count--;
-			
-			vap->iv_chanchange_count++;
+			}
+
+			now_tu   = vap->iv_get_tsf(vap) >> 10;
+			nexttbtt = vap->iv_get_nexttbtt(vap);
+
+			csa_ie->csa_mode = ic->ic_csa_mode;
+			csa_ie->csa_chan = ic->ic_csa_chan->ic_ieee;
+
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: now_tu:%ld nexttbtt_tu:%ld "
+					  "=> expires_tu:%ld\n",
+					  __func__, now_tu, nexttbtt,
+					  ic->ic_csa_expires_tu);
+
+			if (ic->ic_csa_expires_tu > nexttbtt) {
+				csa_ie->csa_count =
+					(ic->ic_csa_expires_tu - nexttbtt)
+					/ vap->iv_bss->ni_intval;
+			} else {
+				csa_ie->csa_count = 0;
+			}
 
 			/* Since beaconing is a shared process in IBSS mode,
 			 * we send Action frames as well */
@@ -533,7 +523,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			if (vap->iv_opmode == IEEE80211_M_IBSS) {
 				ieee80211_send_csa_frame(vap,
 							 csa_ie->csa_mode,
-							 csa_ie->csa_chan, 
+							 csa_ie->csa_chan,
 							 csa_ie->csa_count);
 			} 
 

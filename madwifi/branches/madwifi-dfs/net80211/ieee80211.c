@@ -347,6 +347,11 @@ ieee80211_ifattach(struct ieee80211com *ic)
 		ieee80211_expire_dfs_excl_timer;
 	ic->ic_dfs_excl_timer.data = (unsigned long) ic;
 
+	/* initialize CSA related variables */
+	init_timer(&ic->ic_csa_timer);
+	ic->ic_csa_timer.data = (unsigned long)ic;
+	ic->ic_csa_timer.function = ieee80211_doth_switch_channel_tmr;
+
 	ieee80211_crypto_attach(ic);
 	ieee80211_node_attach(ic);
 	ieee80211_power_attach(ic);
@@ -483,8 +488,6 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	}
 	vap->iv_opmode = opmode;
 	IEEE80211_INIT_TQUEUE(&vap->iv_stajoin1tq, ieee80211_sta_join1_tasklet, vap);
-
-	vap->iv_chanchange_count = 0;
 
 	/* Enable various functionality by default, if we're capable. */
 #ifdef ATH_WME	/* Not yet the default */
@@ -982,16 +985,12 @@ ieee80211_expire_dfs_excl_timer(unsigned long data)
 								ic_freq,
 							vap->iv_des_chan->
 								ic_flags);
-					ic->ic_chanchange_chan = 
-						des_chan->ic_ieee;
-					ic->ic_chanchange_tbtt = 
-						IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
-					ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 
-					ieee80211_send_csa_frame(vap,
+					ieee80211_start_new_csa(vap,
 						IEEE80211_CSA_CAN_STOP_TX,
-						ic->ic_chanchange_chan,
-						IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT);
+						des_chan,
+						IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT,
+						0);
 
 				} else if (ieee80211_msg_is_reported(vap, 
 							IEEE80211_MSG_DOTH)) {
@@ -1108,12 +1107,27 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 						ic->ic_curchan->ic_ieee, 
 						ic->ic_curchan->ic_freq);
 		} else {
-			/* Change to a radar free 11a channel for dfstesttime 
+			/* Change to a radar free 11a channel for dfstesttime
 			 * seconds. */
-			ic->ic_chanchange_chan = IEEE80211_RADAR_TEST_MUTE_CHAN;
-			ic->ic_chanchange_tbtt = 
-				IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
-			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+
+			struct ieee80211vap *vap;
+
+			/* Start a channel switch on all available VAP */
+			TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+
+				struct ieee80211_channel *c = 
+					ieee80211_doth_findchan(
+						vap,
+						IEEE80211_RADAR_TEST_MUTE_CHAN);
+
+				ieee80211_start_new_csa(
+					vap,
+					IEEE80211_CSA_CAN_STOP_TX,
+					c,
+					IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT,
+					0);
+			}
+
 			if_printf(dev,
 					"Mute test - markdfs is off, we are "
 					"in hostap mode, found radar on "
@@ -1125,7 +1139,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 					ic->ic_curchan->ic_freq);
 		}
 	} else {
-		/* XXX: Are we in STA mode? If so, send an action msg. to AP 
+		/* XXX: Are we in STA mode? If so, send an action msg. to AP
 		 * saying we found a radar? */
 	}
 }
@@ -1135,13 +1149,25 @@ void
 ieee80211_dfs_test_return(struct ieee80211com *ic, u_int8_t ieeeChan)
 {
 	struct net_device *dev = ic->ic_dev;
+	struct ieee80211vap *vap;
 
 	/* Return to the original channel we were on before the test mute */
 	if_printf(dev, "Returning to channel %d\n", ieeeChan);
 	printk(KERN_DEBUG "Returning to chan %d\n", ieeeChan);
-	ic->ic_chanchange_chan = ieeeChan;
-	ic->ic_chanchange_tbtt = IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
-	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+	
+	/* Start a channel switch on all available VAP */
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
+
+		struct ieee80211_channel *c = 
+			ieee80211_doth_findchan(vap, ieeeChan);
+
+		ieee80211_start_new_csa(
+			vap,
+			IEEE80211_CSA_CAN_STOP_TX,
+			c,
+			IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT,
+			0);
+	}
 }
 EXPORT_SYMBOL(ieee80211_dfs_test_return);
 
