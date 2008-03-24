@@ -1091,10 +1091,11 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 					  new_channel->ic_ieee,
 					  new_channel->ic_freq);
 
-			ic->ic_chanchange_chan = new_channel->ic_ieee;
-			ic->ic_chanchange_tbtt = 
-				IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT;
-			ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+			ieee80211_start_new_csa(vap,
+				IEEE80211_CSA_MUST_STOP_TX,
+				new_channel,
+				IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT,
+				0);
 		} else {
 
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,

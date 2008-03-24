@@ -1752,7 +1752,101 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	return 0;
 }
 
+/* Start a new Channel Switch process. It will first check if there is already
+ * one Channel Switch process running and if so, will determine which one will
+ * run. This function must be the only function setting IEEE80211_F_CHANSWITCH
+ * in ic_flags
+ *
+ * is_beacon_frame : true if the csa_count comes from a beacon frame we just
+ * received.
+ */
 
+void
+ieee80211_start_new_csa(struct ieee80211vap *vap,
+			u_int8_t csa_mode,
+			struct ieee80211_channel *csa_chan,
+			u_int8_t csa_count,
+			int is_beacon_frame)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	u_int32_t now_tu, nexttbtt, expires_tu;
+	unsigned long now, expires;
+
+	/* 802.11h 7.3.2.20 : A value of 1 indicates that the switch will
+	 * occur immediately before the next TBTT. A value of 0 indicates that
+	 * the switch will occur at any time after the frame containing the
+	 * element is transmitted. */
+
+	now_tu = vap->iv_get_tsf(vap) >> 10;
+	now    = jiffies;
+
+	if (csa_count == 0) {
+		expires_tu = now_tu;
+		expires    = now;
+
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: now:%d count:%d => expires:%d\n",
+				  __func__, now, csa_count, expires);
+	} else {
+
+		/* csa_count includes the current frame if it is a beacon
+		 * frame */
+		if (is_beacon_frame)
+			csa_count --;
+
+		/* compute the closest nexttbtt, next time a beacon for this
+		 * VAP will be sent */
+
+		nexttbtt = vap->iv_get_nexttbtt(vap);
+
+		/* compute ic_csa_expires_tu = nexttbtt + csa_count *
+		 * ni_intval */
+
+		expires_tu = nexttbtt +	csa_count * vap->iv_bss->ni_intval;
+
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: now_tu:%ld nexttbtt_tu:%ld "
+				  "=> expires_tu:%ld\n",
+				  __func__, now_tu, nexttbtt,
+				  expires_tu);
+
+		/* convert to jiffies, including a margin */
+
+		expires = now +
+			IEEE80211_TU_TO_JIFFIES(expires_tu - now_tu - 10) - 1;
+		
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: now:%d count:%d => expires:%d\n",
+				  __func__, now, csa_count, expires);
+	}
+
+	/* if we have a CS in progress, we ignore this new CSA IE if the
+	 * channel switch time is later than the current one */
+	if ((ic->ic_flags & IEEE80211_F_CHANSWITCH) &&
+	    (expires_tu > ic->ic_csa_expires_tu)) {
+
+		/* we do not ignore csa_mode if it says we must stop sending
+		 * right now */
+		if (ic->ic_csa_mode == IEEE80211_CSA_CAN_STOP_TX &&
+		    csa_mode == IEEE80211_CSA_MUST_STOP_TX) {
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "%s: Updating CSA mode\n",
+					  __func__);
+			ic->ic_csa_mode = csa_mode;
+		}
+
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: Ignored CSA IE since a sooner "
+				  "channel switch is scheduled\n", __func__);
+		return;
+	}
+
+	ic->ic_csa_mode = csa_mode;
+	ic->ic_csa_chan = csa_chan;
+	ic->ic_csa_expires_tu = expires_tu;
+	mod_timer(&ic->ic_csa_timer, expires);
+	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
+}
 
 /*
  * Send a broadcast CSA frame, announcing the new channel. References are from
@@ -1774,9 +1868,9 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 
 void
 ieee80211_send_csa_frame(struct ieee80211vap *vap,
-			 int csa_mode,
-			 int csa_chan,
-			 int csa_count)
+			 u_int8_t csa_mode,
+			 u_int8_t csa_chan,
+			 u_int8_t csa_count)
 {
 	struct ieee80211_node * ni = vap->iv_bss;
 	struct ieee80211com *ic = ni->ni_ic;

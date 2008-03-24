@@ -1227,6 +1227,49 @@ ath_detach(struct net_device *dev)
 	return 0;
 }
 
+/* Return the hardware TSF in usec */
+
+static u_int64_t
+ath_vap_get_tsf(struct ieee80211vap *vap)
+{
+	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+
+	return ath_hal_gettsf64(ah);
+}
+
+/* Return the next TBTT in TU for the specified VAP. Currently, it does not
+ * take into account staggered beacons */
+
+static u_int32_t
+ath_vap_get_nexttbtt(struct ieee80211vap *vap)
+{
+	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
+	struct ath_hal *ah = sc->sc_ah;
+	u_int32_t now_tu, nexttbtt;
+
+	/* define a roundup() macro that is working both with positive and
+	 * negative values */
+
+#define roundup_s(x,y) ((x) >= 0 ? (((x)+(y)-1)/(y))*(y) : ((x)/(y))*(y))
+
+	/* we need the closest TBTT that is > now_tu */
+
+	now_tu   = ath_hal_gettsf64(ah) >> 10;
+	nexttbtt = sc->sc_nexttbtt + roundup_s(
+		(signed)(now_tu + 1 - sc->sc_nexttbtt),
+		vap->iv_bss->ni_intval);
+
+	if (nexttbtt != sc->sc_nexttbtt) {
+		DPRINTF(sc, ATH_DEBUG_DOTH,
+			"%s: now_tu:%u nexttbtt:%u corrected to %u [%u]\n",
+			__func__, now_tu, sc->sc_nexttbtt, nexttbtt,
+			vap->iv_bss->ni_intval);
+	}
+
+	return nexttbtt;
+}
+
 static struct ieee80211vap *
 ath_vap_create(struct ieee80211com *ic, const char *name,
 	int opmode, int flags, struct net_device *mdev)
@@ -1334,6 +1377,9 @@ ath_vap_create(struct ieee80211com *ic, const char *name,
 #ifdef ATH_SUPERG_COMP
 	vap->iv_comp_set = ath_comp_set;
 #endif
+
+	vap->iv_get_tsf  = ath_vap_get_tsf;
+	vap->iv_get_nexttbtt = ath_vap_get_nexttbtt;
 
 	/* Let rate control register proc entries for the VAP */
 	if (sc->sc_rc->ops->dynamic_proc_register)
@@ -2366,14 +2412,13 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		if (status & HAL_INT_SWBA) {
 			struct ieee80211vap * vap;
 
-			/* Updates sc_nexttbtt */
-			vap = TAILQ_FIRST(&sc->sc_ic.ic_vaps);
-			sc->sc_nexttbtt += vap->iv_bss->ni_intval;
-
 			DPRINTF(sc, ATH_DEBUG_BEACON,
-				"ath_intr HAL_INT_SWBA at "
-				"tsf %10llx nexttbtt %10llx\n",
-				hw_tsf, (u_int64_t)sc->sc_nexttbtt << 10);
+				"%s: HAL_INT_SWBA at "
+				"tsf %10llx tsf_tu:%6llu nexttbtt %10llx "
+				"nexttbtt_tu:%6u\n",
+				__func__, hw_tsf, hw_tsf >> 10,
+				(u_int64_t)sc->sc_nexttbtt << 10,
+				sc->sc_nexttbtt);
 
 			/* Software beacon alert--time to send a beacon.
 			 * Handle beacon transmission directly; deferring
@@ -2386,6 +2431,10 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 				ath_hal_intrset(ah, sc->sc_imask);
 			}
+
+			/* Updates sc_nexttbtt */
+			vap = TAILQ_FIRST(&sc->sc_ic.ic_vaps);
+			sc->sc_nexttbtt += vap->iv_bss->ni_intval;
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -5269,7 +5318,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	} else
 		intval = ni->ni_intval & HAL_BEACON_PERIOD;
 
-#define	FUDGE	3
+#define	FUDGE	10
 	sc->sc_syncbeacon = 0;
 
 	if (reset_tsf) {

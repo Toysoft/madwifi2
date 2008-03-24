@@ -2737,52 +2737,40 @@ ieee80211_doth_findchan(struct ieee80211vap *vap, u_int8_t chan)
 }
 
 static void
-ieee80211_doth_cancel_cs(struct ieee80211vap *vap)
+ieee80211_doth_cancel_cs(struct ieee80211com *ic)
 {
-	del_timer(&vap->iv_csa_timer);
-	if (vap->iv_csa_jiffies)
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				"channel switch canceled (was: ""to %3d "
-				"(%4d MHz) in %u TBTT, mode %u)\n",
-				  vap->iv_csa_chan->ic_ieee,
-				  vap->iv_csa_chan->ic_freq,
-				vap->iv_csa_count, vap->iv_csa_mode);
-	vap->iv_csa_jiffies = 0;
+	del_timer(&ic->ic_csa_timer);
+	ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
 }
 
 static void
-ieee80211_doth_switch_channel(struct ieee80211vap *vap)
+ieee80211_doth_switch_channel(struct ieee80211com *ic)
 {
-	struct ieee80211com *ic = vap->iv_ic;
+	struct ieee80211vap *vap;
+	u_int32_t now_tu;
 
-	IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-			  "%s: Channel switch to %3d (%4d MHz) NOW!\n",
-			  __func__,
-			  vap->iv_csa_chan->ic_ieee,
-			  vap->iv_csa_chan->ic_freq);
-#if 0
-	/* XXX does not belong here? */
-	/* XXX doesn't stop management frames */
-	/* XXX who restarts the queue? */
-	/* NB: for now, error here is non-catastrophic.
-	 *     in the future we may need to ensure we
-	 *     stop xmit on this channel.
-	 */
-	netif_stop_queue(ic->ic_dev);
-#endif
+	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 
-	vap->iv_csa_jiffies = 0; /* supress "cancel" msg */
-	ieee80211_doth_cancel_cs(vap);
+		now_tu = vap->iv_get_tsf(vap) >> 10;
 
-	ic->ic_curchan = ic->ic_bsschan = vap->iv_csa_chan;
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: Channel switch to %3d (%4d MHz) NOW! "
+				  "(now_tu:%lu)\n",
+				  __func__,
+				  ic->ic_csa_chan->ic_ieee,
+				  ic->ic_csa_chan->ic_freq, now_tu);
+	}
+
+	ieee80211_doth_cancel_cs(ic);
+	ic->ic_curchan = ic->ic_bsschan = ic->ic_csa_chan;
 	ic->ic_set_channel(ic);
 }
 
-static void
+void
 ieee80211_doth_switch_channel_tmr(unsigned long arg)
 {
-	struct ieee80211vap *vap = (struct ieee80211vap *)arg;
-	ieee80211_doth_switch_channel(vap);
+	struct ieee80211com *ic = (struct ieee80211com *)arg;
+	ieee80211_doth_switch_channel(ic);
 }
 
 /* This function is called when we received an action frame or a beacon frame
@@ -2796,23 +2784,24 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_channel *c;
 	struct ieee80211_ie_csa *csa_ie = (struct ieee80211_ie_csa *)frm;
+	int subtype;
 
+	subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
+	IEEE80211_DPRINTF(
+		vap, IEEE80211_MSG_DOTH,
+		"%s: Receiving %s%s%s frame with CSA IE: %u/%u/%u\n",
+		__func__,
+		subtype == IEEE80211_FC0_SUBTYPE_BEACON ? "beacon" : "",
+		subtype == IEEE80211_FC0_SUBTYPE_PROBE_RESP ? "probe response" : "",
+		subtype == IEEE80211_FC0_SUBTYPE_ACTION ? "action" : "",
+		csa_ie->csa_mode,
+		csa_ie->csa_chan,
+		csa_ie->csa_count);
+				
 	if ((ic->ic_flags & IEEE80211_F_DOTH) == 0) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: Ignored CSA IE since 802.11h "
 				  "support is disabled\n", __func__);
-		return 0;
-	}
-
-	if (!frm) {
-		/* we had CS underway but now we got Beacon without CSA IE */
-		/* XXX abuse? */
-
-		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-				"%s: channel switch is scheduled, but we got "
-				"Beacon without CSA IE!\n", __func__);
-
-		ieee80211_doth_cancel_cs(vap);
 		return 0;
 	}
 
@@ -2858,114 +2847,8 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 		return -1;
 	}
 
-	if (vap->iv_csa_jiffies) {
-		/* CSA was received recently */
-		if (c != vap->iv_csa_chan) {
-			/* XXX abuse? */
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					"%s: channel switch channel "
-					"changed from %3d (%4d MHz) to %u!\n",
-					  __func__,
-					  vap->iv_csa_chan->ic_ieee,
-					  vap->iv_csa_chan->ic_freq,
-					  csa_ie->csa_chan);
-
-			if (vap->iv_csa_count > IEEE80211_CSA_PROTECTION_PERIOD)
-				ieee80211_doth_cancel_cs(vap);
-			return 0;
-		}
-
-		if (csa_ie->csa_mode != vap->iv_csa_mode) {
-			/* Can be abused, but with no (to little) impact. */
-
-			/* CS mode change has no influence on our actions since
-			 * we don't respect cs modes at all (yet). Complain and
-			 * forget. */
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					"%s: channel switch mode changed from "
-					"%u to %u!\n", __func__,
-					vap->iv_csa_mode, csa_ie->csa_mode);
-		}
-
-		/* since we can send Action frame and Beacon frame with the
-		 * same csa_count, equality is a normal case */
-		if (csa_ie->csa_count > vap->iv_csa_count) {
-			/* XXX abuse? what for? */
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					"%s: channel switch count didn't "
-					"decrease (%u -> %u)!\n", __func__,
-					vap->iv_csa_count, csa_ie->csa_count);
-			return 0;
-		}
-
-		/* CSA IE can be received in STA or IBSS mode. In IBSS mode,
-		 * since beaconing is a shared process, it is normal to miss
-		 * some or all beacons including CSA IE */
-		if (vap->iv_opmode == IEEE80211_M_STA)
-		{
-			u_int32_t elapsed = IEEE80211_JIFFIES_TO_TU(
-			    jiffies - vap->iv_csa_jiffies);
-			u_int32_t cnt_diff = vap->iv_csa_count -
-			  csa_ie->csa_count;
-			u_int32_t expected = ni->ni_intval * cnt_diff;
-			int32_t delta = elapsed - expected;
-			if (delta < 0)
-				delta = -delta;
-			if (delta > IEEE80211_CSA_SANITY_THRESHOLD) {
-				/* XXX abuse? for now, it's safer to cancel CS
-				 * than to follow it blindly */
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-						"%s: %u.%02u bintvals elapsed, "
-						"but count dropped by %u (delta"
-						" = %u TUs)\n", __func__,
-						elapsed / ni->ni_intval,
-						elapsed * 100 / ni->ni_intval
-						% 100, cnt_diff, delta);
-
-				ieee80211_doth_cancel_cs(vap);
-				return 0;
-			}
-		}
-
-		vap->iv_csa_count = csa_ie->csa_count;
-		mod_timer(&vap->iv_csa_timer, jiffies +
-				IEEE80211_TU_TO_JIFFIES(vap->iv_csa_count
-				  * ni->ni_intval + 10));
-	} else {
-		/* CSA wasn't received recently, so this is the first one in
-		 * the sequence. */
-
-#if 0
-		/* That protection needs to be disabled for FCC/ETSI rules
-		 * since it requires an immediate switch */
-
-		if (csa_ie->csa_count < IEEE80211_CSA_PROTECTION_PERIOD) {
-			IEEE80211_DISCARD_IE(vap,
-					IEEE80211_MSG_ELEMID |
-					IEEE80211_MSG_DOTH,
-					wh, "channel switch",
-					"initial announcement: channel switch"
-					" would occur too soon (in %u tbtt)",
-					csa_ie->csa_count);
-			return 0;
-		}
-#endif
-
-		vap->iv_csa_mode = csa_ie->csa_mode;
-		vap->iv_csa_count = csa_ie->csa_count;
-		vap->iv_csa_chan = c;
-
-		vap->iv_csa_timer.function = ieee80211_doth_switch_channel_tmr;
-		vap->iv_csa_timer.data = (unsigned long)vap;
-		vap->iv_csa_timer.expires = jiffies + IEEE80211_TU_TO_JIFFIES(
-		    vap->iv_csa_count * ni->ni_intval + 10);
-		add_timer(&vap->iv_csa_timer);
-	}
-
-	vap->iv_csa_jiffies = jiffies;
-
-	if (vap->iv_csa_count <= 1)
-		ieee80211_doth_switch_channel(vap);
+	ieee80211_start_new_csa(vap, csa_ie->csa_mode, c, csa_ie->csa_count,
+				subtype == IEEE80211_FC0_SUBTYPE_BEACON);
 
 	return 0;
 }
@@ -3403,19 +3286,8 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 				ni->ni_flags &= ~IEEE80211_NODE_UAPSD;
 			if (scan.ath != NULL)
 				ieee80211_parse_athParams(ni, scan.ath);
-			if (scan.csa != NULL) {
-				struct ieee80211_ie_csa *csa_ie =
-					(struct ieee80211_ie_csa *)scan.csa;
-				
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-						  "%s: Receiving beacon frame "
-						  "with CSA IE: %u/%u/%u\n",
-						  __func__, csa_ie->csa_mode,
-						  csa_ie->csa_chan,
-						  csa_ie->csa_count);
-				
+			if (scan.csa != NULL)
 				ieee80211_parse_csaie(ni, scan.csa, wh);
-			}
 			if (scan.tim != NULL) {
 				/*
 				 * Check the TIM. For now we drop out of
@@ -3466,19 +3338,8 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		 * well. We filter on the IBSSID */
 		if (vap->iv_opmode == IEEE80211_M_IBSS &&
 			IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
-			if (scan.csa != NULL) {
-				struct ieee80211_ie_csa *csa_ie =
-					(struct ieee80211_ie_csa *)scan.csa;
-				
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-						  "%s: Receiving beacon frame "
-						  "with CSA IE: %u/%u/%u\n",
-						  __func__, csa_ie->csa_mode,
-						  csa_ie->csa_chan,
-						  csa_ie->csa_count);
-				
+			if (scan.csa != NULL)
 				ieee80211_parse_csaie(ni,scan.csa,wh);
-			}
 		}
 
 		/*
@@ -4220,20 +4081,8 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		case IEEE80211_ACTION_SPECTRUM_MANAGEMENT:
 			switch (*frm ++) {
 			case IEEE80211_ACTION_S_CHANSWITCHANN:
-			{				
-				struct ieee80211_ie_csa *csa_ie =
-					(struct ieee80211_ie_csa *) frm;
-				
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-						  "%s: Receiving action frame "
-						  "with CSA IE: %u/%u/%u\n",
-						  __func__, csa_ie->csa_mode,
-						  csa_ie->csa_chan,
-						  csa_ie->csa_count);
-				
 				ieee80211_parse_csaie(ni, frm, wh);
-			}
-			break;
+				break;
 			}
 			break;
 		}
