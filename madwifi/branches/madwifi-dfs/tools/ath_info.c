@@ -738,6 +738,98 @@ static void usage(const char *n)
 		"unlawful radio transmissions!\n\n");
 }
 
+u_int32_t extend_tu(u_int32_t base_tu, u_int32_t val, u_int32_t mask)
+{
+	u_int32_t result;
+
+	result = (base_tu & ~mask) | (val & mask);
+	if ((base_tu & mask)  > (val & mask))
+		result += mask+1;
+	return result;
+}
+
+void dump_timers_register(void *mem)
+{
+	const int AR5K_TIMER0_5211  = 0x8028; /* next TBTT */
+	const int AR5K_TIMER1_5211  = 0x802c; /* next DMA beacon */
+	const int AR5K_TIMER2_5211  = 0x8030; /* next SWBA interrupt */
+	const int AR5K_TIMER3_5211  = 0x8034; /* next ATIM window */
+	const int AR5K_TSF_L32_5211 = 0x804c; /* TSF (lower 32 bits) */
+	const int AR5K_TSF_U32_5211 = 0x8050; /* TSF (upper 32 bits) */
+	const int timer_mask = 0xffff;
+	
+	u_int32_t timer0, timer1, timer2, timer3, now_tu;
+	u_int32_t timer0_tu, timer1_tu, timer2_tu, timer3_tu;
+	u_int64_t now_tsf;
+	
+	timer0 = AR5K_REG_READ(AR5K_TIMER0_5211); /* 0x0000ffff */
+	timer1 = AR5K_REG_READ(AR5K_TIMER1_5211); /* 0x0007ffff */
+	timer2 = AR5K_REG_READ(AR5K_TIMER2_5211); /* 0x?1ffffff */
+	timer3 = AR5K_REG_READ(AR5K_TIMER3_5211); /* 0x0000ffff */
+	
+	now_tsf = ((u_int64_t)AR5K_REG_READ(AR5K_TSF_U32_5211) << 32)
+		| (u_int64_t)AR5K_REG_READ(AR5K_TSF_L32_5211);
+	
+	now_tu = now_tsf >> 10;
+	
+	timer0_tu = extend_tu(now_tu, timer0, 0xffff);
+	printf("TIMER0 : 0x%8x TBTT : %5u TU:%8x\n", timer0,
+	       timer0 & timer_mask, timer0_tu);
+	timer1_tu = extend_tu(now_tu, timer1>>3, 0x7ffff>>3);
+	printf("TIMER1 : 0x%8x DMAb : %5u TU:%8x(%d)\n", timer1,
+	       (timer1>>3) & timer_mask, timer1_tu,
+	       timer1_tu - timer0_tu);
+	timer2_tu = extend_tu(now_tu, timer2>>3, 0x1ffffff>>3);
+	printf("TIMER2 : 0x%8x SWBA : %5u TU:%8x(%d)\n", timer2,
+	       (timer2>>3) & timer_mask, timer2_tu,
+	       timer2_tu - timer0_tu);
+	timer3_tu = extend_tu(now_tu, timer3, 0xffff);
+	printf("TIMER3 : 0x%8x ATIM : %5u TU:%8x(%d)\n", timer3,
+	       timer3 & timer_mask, timer3_tu,
+	       timer3_tu - timer0_tu);
+	printf("TSF    : 0x%8llx TSFTU: %5u TU:%8x\n", now_tsf,
+	       now_tu & timer_mask, now_tu);
+}
+
+void keycache_dump(void *mem)
+{
+#define AR5K_KEYTABLE_0_5211		0x8800
+#define AR5K_KEYTABLE(_n)		(AR5K_KEYTABLE_0_5211 + ((_n) << 5))
+#define AR5K_KEYTABLE_OFF(_n, x)	(AR5K_KEYTABLE(_n) + ((x) << 2))
+#define AR5K_KEYTABLE_VALID		0x00008000
+
+	int i;
+	u_int32_t keytype, mac0, mac1;
+
+	/* dump all 128 entries */
+	printf("Dumping keycache entries...\n");
+	for (i=0;i<128;i++) {
+		mac1 = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,7));
+		if (mac1 & AR5K_KEYTABLE_VALID) {
+			printf("keycache entry %d is valid\n", i);
+			keytype = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,5));
+			mac0 = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,6));
+
+			printf("  keytype %d [%s%s%s%s%s%s%s%s] mac %02x:%02x:%02x:%02x:%02x:%02x\n",
+			       keytype,
+			       keytype == 0 ? "WEP40" : "",
+			       keytype == 1 ? "WEP104" : "",
+			       keytype == 3 ? "WEP128" : "",
+			       keytype == 4 ? "TKIP" : "",
+			       keytype == 5 ? "AES" : "",
+			       keytype == 6 ? "CCM" : "",
+			       keytype == 7 ? "NULL" : "",
+			       keytype == 8 ? "ANTENNA" : "",
+			       ((mac0 <<  1) & 0xff),
+			       ((mac0 >>  7) & 0xff),
+			       ((mac0 >> 15) & 0xff),
+			       ((mac0 >> 23) & 0xff),
+			       ((mac1 <<  1) & 0xff) | (mac0 >> 31),
+			       ((mac1 >>  7) & 0xff));
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	u_int32_t dev_addr;
@@ -750,6 +842,8 @@ int main(int argc, char *argv[])
 	int i, anr = 1;
 	int do_write = 0;	/* default: read only */
 	int do_dump = 0;
+	int timer_count = 1;
+	int do_keycache_dump = 0;
 
 	struct {
 		int valid;
@@ -767,6 +861,15 @@ int main(int argc, char *argv[])
 
 	while (anr < argc && argv[anr][0] == '-') {
 		switch (argv[anr][1]) {
+		case 't':
+			if (++anr < argc) {
+				timer_count = atoi(argv[anr]);
+				printf("timer_count:%d\n", timer_count);
+			} else {
+				usage(argv[0]);
+				return 0;
+			}
+			break;
 		case 'w':
 			do_write = 1;
 			break;
@@ -793,6 +896,10 @@ int main(int argc, char *argv[])
 
 		case 'd':
 			do_dump = 1;
+			break;
+
+		case 'k':
+			do_keycache_dump = 1;
 			break;
 
 		case 'h':
@@ -1109,5 +1216,12 @@ int main(int argc, char *argv[])
 
 		return rc;
 	}
+
+	for (i=0; i<timer_count; i++)
+		dump_timers_register(mem);
+
+	if (do_keycache_dump)
+		keycache_dump(mem);
+
 	return 0;
 }
