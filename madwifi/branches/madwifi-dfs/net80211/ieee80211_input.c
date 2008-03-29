@@ -2750,13 +2750,11 @@ ieee80211_doth_switch_channel(struct ieee80211com *ic)
 	u_int32_t now_tu;
 
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-
 		now_tu = vap->iv_get_tsf(vap) >> 10;
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: Channel switch to %3d (%4d MHz) NOW! "
-				  "(now_tu:%lu)\n",
-				  __func__,
+				  "(now_tu:%lu)\n", __func__,
 				  ic->ic_csa_chan->ic_ieee,
 				  ic->ic_csa_chan->ic_freq, now_tu);
 	}
@@ -2774,8 +2772,7 @@ ieee80211_doth_switch_channel_tmr(unsigned long arg)
 }
 
 /* This function is called when we received an action frame or a beacon frame
- * containing a CSA IE */
-
+ * containing a CSA IE. */
 static int
 ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 	const struct ieee80211_frame *wh)
@@ -4065,8 +4062,8 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		break;
 	}
 
-	case IEEE80211_FC0_SUBTYPE_ACTION:
-
+	case IEEE80211_FC0_SUBTYPE_ACTION: {
+		unsigned char cat, act;	
 		/* we only parse Action frame from our BSSID */
 		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
@@ -4077,20 +4074,30 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		}
 
 		/* parse the Category field */
-		switch (*frm ++) {
+		switch (cat = *frm++) {
 		case IEEE80211_ACTION_SPECTRUM_MANAGEMENT:
-			switch (*frm ++) {
+			switch (act = *frm++) {
 			case IEEE80211_ACTION_S_CHANSWITCHANN:
 				ieee80211_parse_csaie(ni, frm, wh);
 				break;
+			default:
+				IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY, wh,
+					"mgt", "action frame category 0x%x, "
+					"action 0x%x not handled", cat, act);
+				break;
 			}
+			break;
+		default:
+			IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY, wh, "mgt",
+				"action frame category 0x%x not handled", cat);
 			break;
 		}
 		break;
+	}
 
 	default:
-		IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY,
-			wh, "mgt", "subtype 0x%x not handled", subtype);
+		IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY, wh, "mgt",
+				"subtype 0x%x not handled", subtype);
 		vap->iv_stats.is_rx_badsubtype++;
 		break;
 	}

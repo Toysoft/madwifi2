@@ -347,7 +347,7 @@ ieee80211_ifattach(struct ieee80211com *ic)
 		ieee80211_expire_dfs_excl_timer;
 	ic->ic_dfs_excl_timer.data = (unsigned long) ic;
 
-	/* initialize CSA related variables */
+	/* Initialize CSA related variables. */
 	init_timer(&ic->ic_csa_timer);
 	ic->ic_csa_timer.data = (unsigned long)ic;
 	ic->ic_csa_timer.function = ieee80211_doth_switch_channel_tmr;
@@ -1107,25 +1107,19 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 						ic->ic_curchan->ic_ieee, 
 						ic->ic_curchan->ic_freq);
 		} else {
-			/* Change to a radar free 11a channel for dfstesttime
-			 * seconds. */
-
 			struct ieee80211vap *vap;
 
-			/* Start a channel switch on all available VAP */
+			/* Change to a radar free 11a channel for dfstesttime
+			 * seconds.
+			 * Start a channel switch on all available VAPs. */
 			TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-
 				struct ieee80211_channel *c = 
 					ieee80211_doth_findchan(
 						vap,
 						IEEE80211_RADAR_TEST_MUTE_CHAN);
 
-				ieee80211_start_new_csa(
-					vap,
-					IEEE80211_CSA_CAN_STOP_TX,
-					c,
-					IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT,
-					0);
+				ieee80211_start_new_csa(vap, IEEE80211_CSA_CAN_STOP_TX,
+					c, IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT, 0);
 			}
 
 			if_printf(dev,
@@ -1151,22 +1145,16 @@ ieee80211_dfs_test_return(struct ieee80211com *ic, u_int8_t ieeeChan)
 	struct net_device *dev = ic->ic_dev;
 	struct ieee80211vap *vap;
 
-	/* Return to the original channel we were on before the test mute */
+	/* Return to the original channel we were on before the test mute. */
 	if_printf(dev, "Returning to channel %d\n", ieeeChan);
 	printk(KERN_DEBUG "Returning to chan %d\n", ieeeChan);
 	
-	/* Start a channel switch on all available VAP */
+	/* Start a channel switch on all available VAP. */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-
 		struct ieee80211_channel *c = 
 			ieee80211_doth_findchan(vap, ieeeChan);
-
-		ieee80211_start_new_csa(
-			vap,
-			IEEE80211_CSA_CAN_STOP_TX,
-			c,
-			IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT,
-			0);
+		ieee80211_start_new_csa(vap, IEEE80211_CSA_CAN_STOP_TX,
+			c, IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT, 0);
 	}
 }
 EXPORT_SYMBOL(ieee80211_dfs_test_return);

@@ -757,10 +757,10 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 			ieee80211_setmode(ic, mode);
 	}
 #endif
-	if ((vap->iv_opmode == IEEE80211_M_MONITOR ||
-	    vap->iv_opmode == IEEE80211_M_WDS)) {
-		if (vap->iv_des_chan != NULL &&
-		    vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
+	if ((vap->iv_opmode == IEEE80211_M_MONITOR) ||
+	    (vap->iv_opmode == IEEE80211_M_WDS)) {
+		if ((vap->iv_des_chan != NULL) &&
+		    (vap->iv_des_chan != IEEE80211_CHAN_ANYC)) {
 			/* Monitor and wds modes can switch directly. */
 			ic->ic_curchan = vap->iv_des_chan;
 			if (vap->iv_state == IEEE80211_S_RUN) {
@@ -769,16 +769,15 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 		}
 	} else if (IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode) &&
 		   (ic->ic_flags & IEEE80211_F_DOTH)) {
-		if (vap->iv_des_chan != NULL &&
-		    vap->iv_des_chan != IEEE80211_CHAN_ANYC) {
+		if ((vap->iv_des_chan != NULL) &&
+		    (vap->iv_des_chan != IEEE80211_CHAN_ANYC)) {
 			/* Need to use channel switch announcement on beacon
 			 * if we are up and running.  We use ic_set_channel
 			 * directly * if we are "running" but not "up".
 			 * Otherwise, iv_des_chan * will take effect when we
 			 * are transitioned to RUN state * later. */
 			if (IS_UP(vap->iv_dev)) {
-				pre_announced_chanswitch(dev,
-				  vap->iv_des_chan,
+				pre_announced_chanswitch(dev, vap->iv_des_chan,
 				  IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT);
 			} else if (vap->iv_state == IEEE80211_S_RUN) {
 				ic->ic_curchan = vap->iv_des_chan;
@@ -4477,13 +4476,11 @@ pre_announced_chanswitch(struct net_device *dev,
 {
 	struct ieee80211vap *vap = dev->priv;
 
-	ieee80211_send_csa_frame(vap,
-				 IEEE80211_CSA_CAN_STOP_TX,
+	ieee80211_send_csa_frame(vap, IEEE80211_CSA_CAN_STOP_TX,
 				 channel->ic_ieee, csa_count);
 
-	/* now flag the beacon update to include the channel switch IE */
-	ieee80211_start_new_csa(vap,
-				IEEE80211_CSA_CAN_STOP_TX,
+	/* Now flag the beacon update to include the channel switch IE. */
+	ieee80211_start_new_csa(vap, IEEE80211_CSA_CAN_STOP_TX,
 				channel, csa_count, 0);
 }
 
@@ -4500,8 +4497,7 @@ ieee80211_ioctl_chanswitch(struct net_device *dev, struct iw_request_info *info,
 		return 0;
 
 	c = ieee80211_doth_findchan(vap, param[0]);
-	if (c != NULL &&
-	    c != IEEE80211_CHAN_ANYC) {
+	if ((c != NULL) && (c != IEEE80211_CHAN_ANYC)) {
 		pre_announced_chanswitch(dev, c, param[1]);
 	} else {
 		return -EINVAL;

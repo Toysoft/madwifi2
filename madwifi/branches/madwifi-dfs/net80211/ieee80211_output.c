@@ -1758,9 +1758,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
  * in ic_flags
  *
  * is_beacon_frame : true if the csa_count comes from a beacon frame we just
- * received.
- */
-
+ * received. */
 void
 ieee80211_start_new_csa(struct ieee80211vap *vap,
 			u_int8_t csa_mode,
@@ -1777,31 +1775,28 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
 	 * the switch will occur at any time after the frame containing the
 	 * element is transmitted. */
 
-	now_tu = vap->iv_get_tsf(vap) >> 10;
-	now    = jiffies;
+	now_tu	= vap->iv_get_tsf(vap) >> 10;
+	now	= jiffies;
 
 	if (csa_count == 0) {
-		expires_tu = now_tu;
-		expires    = now;
+		expires_tu	= now_tu;
+		expires		= now;
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: now:%d count:%d => expires:%d\n",
 				  __func__, now, csa_count, expires);
 	} else {
-
 		/* csa_count includes the current frame if it is a beacon
-		 * frame */
+		 * frame. */
 		if (is_beacon_frame)
 			csa_count --;
 
-		/* compute the closest nexttbtt, next time a beacon for this
-		 * VAP will be sent */
-
+		/* Compute the closest nexttbtt, next time a beacon for this
+		 * VAP will be sent. */
 		nexttbtt = vap->iv_get_nexttbtt(vap);
 
-		/* compute ic_csa_expires_tu = nexttbtt + csa_count *
-		 * ni_intval */
-
+		/* Compute ic_csa_expires_tu = nexttbtt + csa_count *
+		 * ni_intval. */
 		expires_tu = nexttbtt +	csa_count * vap->iv_bss->ni_intval;
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
@@ -1810,8 +1805,7 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
 				  __func__, now_tu, nexttbtt,
 				  expires_tu);
 
-		/* convert to jiffies, including a margin */
-
+		/* Convert to jiffies, including a margin. */
 		expires = now +
 			IEEE80211_TU_TO_JIFFIES(expires_tu - now_tu - 10) - 1;
 		
@@ -1820,13 +1814,12 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
 				  __func__, now, csa_count, expires);
 	}
 
-	/* if we have a CS in progress, we ignore this new CSA IE if the
-	 * channel switch time is later than the current one */
+	/* If we have a CS in progress, we ignore this new CSA IE if the
+	 * channel switch time is later than the current one. */
 	if ((ic->ic_flags & IEEE80211_F_CHANSWITCH) &&
 	    (expires_tu > ic->ic_csa_expires_tu)) {
-
-		/* we do not ignore csa_mode if it says we must stop sending
-		 * right now */
+		/* We do not ignore csa_mode if it says we must stop sending
+		 * right now. */
 		if (ic->ic_csa_mode == IEEE80211_CSA_CAN_STOP_TX &&
 		    csa_mode == IEEE80211_CSA_MUST_STOP_TX) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
@@ -1848,8 +1841,7 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
 	ic->ic_flags |= IEEE80211_F_CHANSWITCH;
 }
 
-/*
- * Send a broadcast CSA frame, announcing the new channel. References are from
+/* Send a broadcast CSA frame, announcing the new channel. References are from
  * IEEE 802.11h-2003. CSA frame format is an "Action" frame (Type: 00, Subtype:
  * 1101, see 7.1.3.1.2)
  *
@@ -1863,9 +1855,7 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
  *
  * csa_mode : IEEE80211_CSA_MANDATORY / IEEE80211_CSA_ADVISORY
  * csa_chan : new IEEE channel number
- * csa_tbtt : TBTT until Channel Switch happens
- */
-
+ * csa_tbtt : TBTT until Channel Switch happens */
 void
 ieee80211_send_csa_frame(struct ieee80211vap *vap,
 			 u_int8_t csa_mode,
@@ -1890,13 +1880,13 @@ ieee80211_send_csa_frame(struct ieee80211vap *vap,
 		return ;
 	}
 
-	*frm ++ = IEEE80211_ACTION_SPECTRUM_MANAGEMENT; /* Category */
-	*frm ++ = IEEE80211_ACTION_S_CHANSWITCHANN; /* Spectrum Management */
-	*frm ++ = IEEE80211_ELEMID_CHANSWITCHANN;
-	*frm ++ = 3;
-	*frm ++ = csa_mode;
-	*frm ++ = csa_chan;
-	*frm ++ = csa_count;
+	*frm++ = IEEE80211_ACTION_SPECTRUM_MANAGEMENT;	/* Category */
+	*frm++ = IEEE80211_ACTION_S_CHANSWITCHANN;	/* Spectrum Management */
+	*frm++ = IEEE80211_ELEMID_CHANSWITCHANN;
+	*frm++ = 3;
+	*frm++ = csa_mode;
+	*frm++ = csa_chan;
+	*frm++ = csa_count;
 
 	ieee80211_mgmt_output(ieee80211_ref_node(ni), skb,
 			      IEEE80211_FC0_SUBTYPE_ACTION, 

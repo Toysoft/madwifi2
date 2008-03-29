@@ -408,7 +408,7 @@ struct ieee80211com {
 	int ic_country_outdoor;
 	struct ieee80211_ie_country ic_country_ie; /* country info element */
 
-	/* current channel max power, used to compute Power Constraint IE.
+	/* Current channel max. power, used to compute Power Constraint IE.
 	 *
 	 * NB: local power constraint depends on the channel, but assuming it must
 	 *     be detected dynamically, we cannot maintain a table (i.e., will not
@@ -416,8 +416,8 @@ struct ieee80211com {
 	 */
 	u_int8_t ic_curchanmaxpwr;
 
-	/* to handle Channel Switch Annoucements, only valid if ic_flags has
-	 * IEEE80211_F_CHANSWITCH set */
+	/* To handle Channel Switch Annoucements, only valid if ic_flags has
+	 * IEEE80211_F_CHANSWITCH set. */
 	u_int8_t			ic_csa_mode;
 	struct ieee80211_channel *	ic_csa_chan;
 	u_int32_t			ic_csa_expires_tu;
