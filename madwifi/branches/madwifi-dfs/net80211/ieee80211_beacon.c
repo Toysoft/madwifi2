@@ -285,6 +285,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
 	int len_changed = 0;
+	u_int8_t *frm;
 	u_int16_t capinfo;
 
 	IEEE80211_LOCK_IRQ(ic);
@@ -294,13 +295,10 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	if ((ic->ic_flags & IEEE80211_F_DOTH) &&
 	    !(ic->ic_flags & IEEE80211_F_CHANSWITCH) &&
 	    (vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
-
-		u_int8_t * frm;
-
-		vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
-
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: reinit beacon\n", __func__);
+
+		vap->iv_flags &= ~IEEE80211_F_CHANSWITCH;
 
 		skb_pull(skb, sizeof(struct ieee80211_frame));
 		skb_trim(skb, 0);
@@ -459,8 +457,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 	 * - ic_csa_chan = pointer to struct ieee80211_channel
 	 * - ic_csa_expires_tu = switch time in TU
 	 * - mod_timer(&ic_csa_timer, expires) = switch time in jiffies
-	 * - ic_flags |= IEEE80211_F_CHANSWITCH
-	 */
+	 * - ic_flags |= IEEE80211_F_CHANSWITCH */
 
 	if (IEEE80211_IS_MODE_BEACON(vap->iv_opmode)) {
 
@@ -470,20 +467,20 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				(struct ieee80211_ie_csa *)bo->bo_chanswitch;
 			u_int32_t now_tu, nexttbtt;
 
-			if ((vap->iv_flags & IEEE80211_F_CHANSWITCH)==0) {
+			if (!(vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
 				vap->iv_flags |= IEEE80211_F_CHANSWITCH;
 
-				/* copy out trailer to open up a slot */
+				/* Copy out trailer to open up a slot. */
 				memmove(bo->bo_chanswitch + sizeof(*csa_ie),
 					bo->bo_chanswitch, 
 					bo->bo_chanswitch_trailerlen);
 
-				/* add ie in opened slot */
+				/* Add ie in opened slot. */
 				csa_ie->csa_id = IEEE80211_ELEMID_CHANSWITCHANN;
-				/* fixed length */
+				/* Fixed length. */
 				csa_ie->csa_len = sizeof(*csa_ie) - 2;
 
-				/* update the trailer lens */
+				/* Update the trailer len's. */
 				bo->bo_chanswitch_trailerlen += sizeof(*csa_ie);
 				bo->bo_tim_trailerlen += sizeof(*csa_ie);
 				bo->bo_wme += sizeof(*csa_ie);
@@ -491,8 +488,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				bo->bo_ath_caps += sizeof(*csa_ie);
 				bo->bo_xr += sizeof(*csa_ie);
 
-				/* indicate new beacon length so other layers 
-				 * may manage memory */
+				/* Indicate new beacon length so other layers 
+				 * may manage memory. */
 				skb_put(skb, sizeof(*csa_ie));
 				len_changed = 1;
 			}
@@ -518,8 +515,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			}
 
 			/* Since beaconing is a shared process in IBSS mode,
-			 * we send Action frames as well */
-
+			 * we send Action frames as well. */
 			if (vap->iv_opmode == IEEE80211_M_IBSS) {
 				ieee80211_send_csa_frame(vap,
 							 csa_ie->csa_mode,

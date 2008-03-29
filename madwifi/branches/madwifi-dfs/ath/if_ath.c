@@ -1248,13 +1248,7 @@ ath_vap_get_nexttbtt(struct ieee80211vap *vap)
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t now_tu, nexttbtt;
 
-	/* define a roundup() macro that is working both with positive and
-	 * negative values */
-
-#define roundup_s(x,y) ((x) >= 0 ? (((x)+(y)-1)/(y))*(y) : ((x)/(y))*(y))
-
-	/* we need the closest TBTT that is > now_tu */
-
+	/* Calculate the closest TBTT that is > now_tu. */
 	now_tu   = ath_hal_gettsf64(ah) >> 10;
 	nexttbtt = sc->sc_nexttbtt + roundup_s(
 		(signed)(now_tu + 1 - sc->sc_nexttbtt),
