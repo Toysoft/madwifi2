@@ -757,6 +757,9 @@ void dump_timers_register(void *mem)
 	const int AR5K_TSF_L32_5211 = 0x804c; /* TSF (lower 32 bits) */
 	const int AR5K_TSF_U32_5211 = 0x8050; /* TSF (upper 32 bits) */
 	const int timer_mask = 0xffff;
+
+#define AR5K_BEACON_5211	0x8020
+#define AR5K_LAST_TSTP		0x8080
 	
 	u_int32_t timer0, timer1, timer2, timer3, now_tu;
 	u_int32_t timer0_tu, timer1_tu, timer2_tu, timer3_tu;
@@ -789,6 +792,9 @@ void dump_timers_register(void *mem)
 	       timer3_tu - timer0_tu);
 	printf("TSF    : 0x%8llx TSFTU: %5u TU:%8x\n", now_tsf,
 	       now_tu & timer_mask, now_tu);
+
+	printf("BEACON: %x\n", AR5K_REG_READ(AR5K_BEACON_5211));
+	printf("LAST_TSTP: %x\n", AR5K_REG_READ(AR5K_LAST_TSTP));
 }
 
 void keycache_dump(void *mem)
@@ -798,19 +804,33 @@ void keycache_dump(void *mem)
 #define AR5K_KEYTABLE_OFF(_n, x)	(AR5K_KEYTABLE(_n) + ((x) << 2))
 #define AR5K_KEYTABLE_VALID		0x00008000
 
-	int i;
-	u_int32_t keytype, mac0, mac1;
+	int i, keylen;
+	u_int32_t val0, val1, val2, val3, val4, keytype, mac0, mac1;
 
 	/* dump all 128 entries */
 	printf("Dumping keycache entries...\n");
 	for (i=0;i<128;i++) {
 		mac1 = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,7));
 		if (mac1 & AR5K_KEYTABLE_VALID) {
-			printf("keycache entry %d is valid\n", i);
+			val0    = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,0));
+			val1    = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,1));
+			val2    = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,2));
+			val3    = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,3));
+			val4    = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,4));
 			keytype = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,5));
+			switch (keytype) {
+			case 0: /* WEP40  */ keylen =  40 / 8; break;
+			case 1: /* WEP104 */ keylen = 104 / 8; break;
+			case 3: /* WEP128 */ keylen = 128 / 8; break;
+			case 4: /* TKIP   */ keylen = 128 / 8; break;
+			case 5: /* AES    */ keylen = 128 / 8; break;
+			case 6: /* CCM    */ keylen = 128 / 8; break;
+			default:             keylen = 0;       break;
+			}
 			mac0 = AR5K_REG_READ(AR5K_KEYTABLE_OFF(i,6));
 
-			printf("  keytype %d [%s%s%s%s%s%s%s%s] mac %02x:%02x:%02x:%02x:%02x:%02x\n",
+			printf("[%3u] keytype %d [%s%s%s%s%s%s%s%s] mac %02x:%02x:%02x:%02x:%02x:%02x key:%08x-%08x-%08x-%08x-%08x\n",
+			       i,
 			       keytype,
 			       keytype == 0 ? "WEP40" : "",
 			       keytype == 1 ? "WEP104" : "",
@@ -825,7 +845,8 @@ void keycache_dump(void *mem)
 			       ((mac0 >> 15) & 0xff),
 			       ((mac0 >> 23) & 0xff),
 			       ((mac1 <<  1) & 0xff) | (mac0 >> 31),
-			       ((mac1 >>  7) & 0xff));
+			       ((mac1 >>  7) & 0xff),
+			       val0, val1, val2, val3, val4);
 		}
 	}
 }
