@@ -659,7 +659,6 @@ struct ath_softc {
 	unsigned int	sc_xrgrppoll:1;		/* xr group polls are active */
 	unsigned int	sc_syncbeacon:1;	/* sync/resync beacon timers */
 	unsigned int	sc_hasclrkey:1;		/* CLR key supported */
-	unsigned int	sc_devstopped:1;	/* stopped due to of no tx bufs */
 	unsigned int	sc_stagbeacons:1;	/* use staggered beacons */
 	unsigned int	sc_dfswait:1;		/* waiting on channel for radar detect */
 	unsigned int	sc_ackrate:1;		/* send acks at high bitrate */
@@ -772,7 +771,6 @@ struct ath_softc {
 	struct ctl_table_header *sc_sysctl_header;
 	struct ctl_table *sc_sysctls;
 
-	u_int16_t sc_reapcount;  		/* # of tx buffers reaped after net dev stopped */
 	struct timer_list sc_mib_enable;
 
 #ifdef ATH_REVERSE_ENGINEERING
