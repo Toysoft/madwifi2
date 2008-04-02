@@ -3218,7 +3218,6 @@ _take_txbuf_locked(struct ath_softc *sc, int for_management)
 					    "buffers.\n");
 		sc->sc_stats.ast_tx_qstop++;
 		netif_stop_queue(sc->sc_dev);
-		sc->sc_devstopped = 1;
 		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 	}
 
@@ -3648,7 +3647,6 @@ hardstart_fail:
 	if (requeue) {
 		/* Queue is full, let the kernel backlog the skb */
 		netif_stop_queue(dev);
-		sc->sc_devstopped = 1;
 		/* Stop tracking again we are giving it back*/
 		ieee80211_skb_untrack(skb);
 		return NETDEV_TX_BUSY;
@@ -12886,21 +12884,6 @@ ath_return_txbuf_locked(struct ath_softc *sc, struct ath_buf **bf)
 		ath_get_buffer_count(sc), ATH_TXBUF,
 		func, line, bfaddr);
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
-	if (sc->sc_devstopped) {
-		++sc->sc_reapcount;
-		if (sc->sc_reapcount > ATH_TXBUF_FREE_THRESHOLD) {
-			if (!ath_chan_unavail(sc)) {
-				netif_wake_queue(sc->sc_dev);
-				DPRINTF(sc, ATH_DEBUG_ANY,
-				    "Restarting queue.\n");
-			}
-			sc->sc_reapcount = 0;
-			sc->sc_devstopped = 0;
-		}
-		else if (!ath_chan_unavail(sc))
-			ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
-	}
-
 	*bf = NULL;
 }
 
