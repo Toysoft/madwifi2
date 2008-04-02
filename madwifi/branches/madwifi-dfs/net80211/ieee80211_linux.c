@@ -426,6 +426,37 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 	return (p - buf);
 }
 
+static int
+proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	char *p = buf;
+	struct ieee80211_channel *channel;
+	int i;
+
+	for (i = 0; i < ic->ic_nchans; i++) {
+
+		/* Assume each lines needs 500 bytes max */
+		if (buf + space < p + 500)
+			break;
+
+		channel = &ic->ic_channels[i];
+
+		p += sprintf(p, "Channel %3d (%4d Mhz) : %s %s%s%s\n",
+			     channel->ic_ieee,
+			     channel->ic_freq,
+			     channel->ic_flags & IEEE80211_CHAN_PASSIVE ?
+			     "  Dfs" : "NoDfs",
+			     channel->ic_flags & IEEE80211_CHAN_RADAR ?
+			     "  Radar" : "NoRadar",
+			     channel->ic_flags & IEEE80211_CHAN_INDOOR ?
+			     " Indoor" : "",
+			     channel->ic_flags & IEEE80211_CHAN_OUTDOOR ?
+			     " Outdoor" : "");
+        }
+	return (p - buf);
+}
+
 static ssize_t
 proc_ieee80211_read(struct file *file, char __user *buf, size_t len, loff_t *offset)
 {
@@ -478,6 +509,38 @@ proc_ieee80211_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static int
+proc_doth_open(struct inode *inode, struct file *file)
+{
+	struct proc_ieee80211_priv *pv = NULL;
+	struct proc_dir_entry *dp = PDE(inode);
+	struct ieee80211vap *vap = dp->data;
+
+	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv), GFP_KERNEL)))
+		return -ENOMEM;
+	/* initially allocate both read and write buffers */
+	pv = (struct proc_ieee80211_priv *) file->private_data;
+	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
+	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
+	if (!pv->rbuf) {
+		kfree(pv);
+		return -ENOMEM;
+	}
+	pv->wbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
+	if (!pv->wbuf) {
+		vfree(pv->rbuf);
+		kfree(pv);
+		return -ENOMEM;
+	}
+	memset(pv->wbuf, 0, MAX_PROC_IEEE80211_SIZE);
+	memset(pv->rbuf, 0, MAX_PROC_IEEE80211_SIZE);
+	pv->max_wlen = MAX_PROC_IEEE80211_SIZE;
+	pv->max_rlen = MAX_PROC_IEEE80211_SIZE;
+	/* now read the data into the buffer */
+	pv->rlen = proc_doth_print(vap, pv->rbuf, MAX_PROC_IEEE80211_SIZE);
+	return 0;
+}
+
 static ssize_t
 proc_ieee80211_write(struct file *file, const char __user *buf, size_t len, loff_t *offset)
 {
@@ -519,6 +582,13 @@ static struct file_operations proc_ieee80211_ops = {
 	.read = proc_ieee80211_read,
 	.write = proc_ieee80211_write,
 	.open = proc_ieee80211_open,
+	.release = proc_ieee80211_close,
+};
+
+static struct file_operations proc_doth_ops = {
+	.read = proc_ieee80211_read,
+	.write = proc_ieee80211_write,
+	.open = proc_doth_open,
 	.release = proc_ieee80211_close,
 };
 
@@ -806,6 +876,7 @@ ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 
 	/* Create a proc entry listing the associated stations */
 	ieee80211_proc_vcreate(vap, &proc_ieee80211_ops, "associated_sta");
+	ieee80211_proc_vcreate(vap, &proc_doth_ops, "doth");
 
 	/* Recreate any other proc entries that have been registered */
 	if (vap->iv_proc) {
