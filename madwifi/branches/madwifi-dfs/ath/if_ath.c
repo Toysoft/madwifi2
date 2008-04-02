@@ -945,9 +945,14 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 			sc->sc_splitmic = 1;
 	}
 	sc->sc_hasclrkey = ath_hal_ciphersupported(ah, HAL_CIPHER_CLR);
-#if 0
-	sc->sc_mcastkey = ath_hal_getmcastkeysearch(ah);
-#endif
+	/* If hardware has multicast key search capabilities, enable it. It
+	 * seems to properly enable things in the HAL, however multicast
+	 * packets are still decoded using keys locates at index 0..3 */
+	if (ath_hal_hasmcastkeysearch(ah)) {
+		ath_hal_setmcastkeysearch(ah, AH_TRUE);
+	}
+	sc->sc_mcastkey  = ath_hal_getmcastkeysearch(ah);
+
 	/*
 	 * Mark key cache slots associated with global keys
 	 * as in use.  If we knew TKIP was not to be used we
