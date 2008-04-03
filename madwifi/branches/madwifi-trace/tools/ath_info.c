@@ -1910,7 +1910,7 @@ int main(int argc, char *argv[])
 
 		printf("\nEEPROM dump (%d byte)\n", byte_size);
 		printf("==============================================");
-		for (i = 0; i <= (byte_size / 2 - 1); i++) {
+		for (i = 0; i < byte_size / 2; i++) {
 			error =
 			    ath5k_hw_eeprom_read(mem, i, &data, mac_version);
 			if (error) {
