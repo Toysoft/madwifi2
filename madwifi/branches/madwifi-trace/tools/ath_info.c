@@ -102,6 +102,9 @@
 #include <endian.h>
 #include <byteswap.h>
 
+#undef ARRAY_SIZE
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
 #define dbg(fmt, __args__...) \
 do { \
 	if (verbose) \
@@ -112,7 +115,6 @@ do { \
 fprintf(stderr, "#ERR %s: " fmt "\n", __FUNCTION__, ##__args__)
 
 #define AR5K_PCI_MEM_SIZE 0x10000
-#define AR5K_ELEMENTS(_array)	(sizeof(_array) / sizeof(_array[0]))
 
 #define AR5K_NUM_GPIO	6
 
@@ -1258,7 +1260,7 @@ static const char *ath5k_hw_get_part_name(enum ath5k_srev_type type,
 	const char *name = "xxxxx";
 	int i;
 
-	for (i = 0; i < AR5K_ELEMENTS(ath5k_srev_names); i++) {
+	for (i = 0; i < ARRAY_SIZE(ath5k_srev_names); i++) {
 		if (ath5k_srev_names[i].sr_type != type ||
 		    ath5k_srev_names[i].sr_val == AR5K_SREV_UNKNOWN)
 			continue;
