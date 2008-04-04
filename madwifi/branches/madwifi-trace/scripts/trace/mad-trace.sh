@@ -28,11 +28,11 @@ load_hal_debug() {
 
 run_ath_info() {
 	#Get memory address for ath_info...
-	mem=`lspci -v | grep -A 3 'Atheros\|168c' | grep Memory | awk '{print $3}'`
+	mem=`lspci -vd 168c: |sed -n 's/.*Memory at \([^ ]*\).*/0x\1/p'`
 
 	#Run ath_info and save output...
-	echo "running ath_info -d 0x$mem..."
-	ath_info -d 0x$mem > $TMP/ath_info.log
+	echo "running ath_info -d $mem..."
+	ath_info -d $mem > $TMP/ath_info.log
 	mv ath-eeprom-dump.bin $TMP/
 }
 
