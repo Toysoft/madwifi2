@@ -89,8 +89,12 @@
 
 /* roundup() and howmany() macros that works both with positive and negative
  * values. */
-#define roundup_s(x,y)	((x) >= 0 ? (((x)+((y)-1))/(y))*(y) : ((x)/(y))*(y))
-#define	howmany_s(x, y)	((x) >= 0 ? (((x)+((y)-1))/(y)) : ((x)/(y)))
+#define roundup_s(x,y)	((signed)(x) >= 0 ? \
+	(((signed)(x)+((signed)(y)-1))/(signed)(y))*(signed)(y) : \
+	((signed)(x)/(signed)(y))*(signed)(y))
+#define	howmany_s(x, y)	((signed)(x) >= 0 ? \
+	(((signed)(x)+((signed)(y)-1))/(signed)(y)) : \
+	((signed)(x)/(signed)(y)))
 
 /* Bit map related macros. */
 #define	setbit(a,i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))
