@@ -5250,10 +5250,104 @@ ath_beacon_free(struct ath_softc *sc)
 }
 
 /*
+ * Initialize HW beacon timers
+ */
+static
+void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
+		       u_int32_t next_beacon, u_int32_t bintval)
+{
+#define AR5K_TUNE_DMA_BEACON_RESP		2
+#define AR5K_TUNE_SW_BEACON_RESP		10
+
+#define AR5K_BEACON_5210		0x8024
+#define AR5K_BEACON_5211		0x8020
+
+#define AR5K_TIMER0_5210		0x802c /* next TBTT */
+#define AR5K_TIMER0_5211		0x8028
+
+#define AR5K_TIMER1_5210		0x8030 /* next DMA beacon */
+#define AR5K_TIMER1_5211		0x802c
+
+#define AR5K_TIMER2_5210		0x8034 /* next SWBA interrupt */
+#define AR5K_TIMER2_5211		0x8030
+
+#define AR5K_TIMER3_5210		0x8038 /* next ATIM window */
+#define AR5K_TIMER3_5211		0x8034
+
+#define AR5K_BEACON_PERIOD	0x0000ffff
+#define AR5K_BEACON_ENABLE	0x00800000
+#define AR5K_BEACON_RESET_TSF	0x01000000
+
+	/* This macro make sure that each timer is in a strict future */
+#define ADJUST_TIMER(x)		((x) + \
+	roundup_s(hw_tsftu+1-(x), bintval & HAL_BEACON_PERIOD))
+
+	struct ath_hal *ah = sc->sc_ah;
+	u_int32_t timer0, timer1, timer2, timer3, hw_bintval;
+
+	/* If we are going to reset HW TSF, we need to take it into account
+	 * here */
+
+	if (bintval & HAL_BEACON_RESET_TSF)
+		hw_tsftu = 0;
+
+        /* Set the additional timers by mode */
+
+	timer0 = ADJUST_TIMER(next_beacon);
+	timer3 = ADJUST_TIMER(next_beacon + 1);
+
+	switch (sc->sc_opmode) {
+	case HAL_M_STA:
+		if (ar_device(sc->devid) == 5210) {
+			timer1 = 0xffffffff;
+			timer2 = 0xffffffff;
+		} else {
+			timer1 = 0x0000ffff;
+			timer2 = 0x0007ffff;
+		}
+		break;
+
+	default:
+		timer1 = ADJUST_TIMER(next_beacon - AR5K_TUNE_DMA_BEACON_RESP);
+		timer1 = timer1 << 3;
+		timer2 = ADJUST_TIMER(next_beacon - AR5K_TUNE_SW_BEACON_RESP);
+		timer2 = timer2 << 3;
+	}
+
+	/* Convert from HAL to HW representation. It seems that they are
+	 * binary compatible so this conversion is a bit useless */
+
+	hw_bintval = (bintval & HAL_BEACON_PERIOD);
+	if (bintval & HAL_BEACON_ENA)
+		hw_bintval |= AR5K_BEACON_ENABLE;
+	if (bintval & HAL_BEACON_RESET_TSF)
+		hw_bintval |= AR5K_BEACON_RESET_TSF;
+
+	/*
+	 * Set the beacon register and enable all timers. (next beacon, DMA
+	 * beacon, software beacon, ATIM window time)
+	 */
+
+	if (ar_device(sc->devid) == 5210) {
+		OS_REG_WRITE(ah, AR5K_TIMER0_5210, timer0);
+		OS_REG_WRITE(ah, AR5K_TIMER1_5210, timer1);
+		OS_REG_WRITE(ah, AR5K_TIMER2_5210, timer2);
+		OS_REG_WRITE(ah, AR5K_TIMER3_5210, timer3);
+		OS_REG_WRITE(ah, AR5K_BEACON_5210, hw_bintval);
+	} else {
+		OS_REG_WRITE(ah, AR5K_TIMER0_5211, timer0);
+		OS_REG_WRITE(ah, AR5K_TIMER1_5211, timer1);
+		OS_REG_WRITE(ah, AR5K_TIMER2_5211, timer2);
+		OS_REG_WRITE(ah, AR5K_TIMER3_5211, timer3);
+		OS_REG_WRITE(ah, AR5K_BEACON_5211, hw_bintval);
+	}
+}
+
+/*
  * Configure the beacon and sleep timers.
  *
- * When operating as an AP/IBSS this resets the TSF and sets up the hardware to
- * notify us when we need to issue beacons.
+ * When operating as an AP/IBSS this resets the TSF and sets up the hardware
+ * to notify us when we need to issue beacons.
  *
  * When operating in station mode this sets up the beacon timers according to
  * the timestamp of the last received beacon and the current TSF, configures
@@ -5265,8 +5359,8 @@ ath_beacon_free(struct ath_softc *sc)
  * Note : TBTT is Target Beacon Transmission Time (see IEEE 802.11-1999: 4 &
  * 11.2.1.3).
  *
- * Note: TSF is right shifter by 10 and then put into a 32-bit int, which will 
- * truncate. This does not affect the calculation as long as no more than one 
+ * Note: TSF is right shifted by 10 and then put into a 32-bit int, which will
+ * truncate. This does not affect the calculation as long as no more than one
  * overflow/wraparound occurs between beacons. This is not going to happen as
  * (2^(32 + 10 - 1) - 1)us is a really long time.
  */
@@ -5315,7 +5409,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	} else
 		intval = ni->ni_intval & HAL_BEACON_PERIOD;
 
-#define	FUDGE	10
+#define	FUDGE	3
 	sc->sc_syncbeacon = 0;
 
 	if (reset_tsf) {
@@ -5468,7 +5562,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 				~(HAL_BEACON_RESET_TSF | HAL_BEACON_ENA));
 #endif
 		sc->sc_nexttbtt = nexttbtt;
-		ath_hal_beaconinit(ah, nexttbtt, intval);
+		ath_hw_beaconinit(sc, hw_tsftu, nexttbtt, intval);
 		if (intval & HAL_BEACON_RESET_TSF) {
 			sc->sc_last_tsf = 0;
 		}
@@ -5511,7 +5605,7 @@ ath_beacon_config_debug:
 	}
 
 	DPRINTF(sc, ATH_DEBUG_BEACON, 
-		"nexttbtt=%10x intval=%u%s%s imask=%s%s\n", 
+		"nexttbtt=%u intval=%u%s%s imask=%s%s\n", 
 		nexttbtt, intval & HAL_BEACON_PERIOD,
 		intval & HAL_BEACON_ENA       ? " HAL_BEACON_ENA"       : "",
 		intval & HAL_BEACON_RESET_TSF ? " HAL_BEACON_RESET_TSF" : "",
@@ -6421,8 +6515,8 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			/* Check sc_nexttbtt */
 			if (sc->sc_nexttbtt < hw_tu) {
 				DPRINTF(sc, ATH_DEBUG_BEACON,
-					"sc_nexttbtt (%8x TU) is in the past "
-					"(tsf %8x TU), updating timers\n",
+					"sc_nexttbtt (%u TU) is in the past "
+					"(tsf %u TU), updating timers\n",
 					sc->sc_nexttbtt, hw_tu);
 				do_merge = 1;
 			}
