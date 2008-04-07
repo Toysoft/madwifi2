@@ -9839,11 +9839,43 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		/* Correct the DFS flags to account for problems with DFS in
 		 * older binary HALs returning the wrong answers for FCC... */
 		ath_radar_correct_dfs_flags(sc, c);
+
+		/* Before the completion of CAC, no frames shall be
+		   transmitted. After the completion of CAC, frames shall be
+		   transmitted when the frame contains a CSA IE (a channel
+		   change announcement) OR no radar has been detected on the
+		   channel. The exemption for CSA IE allows us to inform other
+		   nodes to stop transmitting and [optionally] change
+		   channels.
+
+		   Transmission is allowed according to the following table:
+
+		   / CHANNEL_DFS_CLEAR
+		   |   / CHANNEL_INTERFERENCE
+		   +---+---+ Transmission state
+		   | 0 | 0 | Do not transmit
+		   | 0 | 1 | Do not transmit
+		   | 1 | 0 | Transmit
+		   | 1 | 1 | Do not transmit except frame with CSA IE
+		   +---+---+
+
+		   CHANNEL_DFS_CLEAR (CAC has been successfull):
+		   - initial value : clear
+		   - set at the end of a CAC w/o radar (ath_dfs_cac_completed)
+		   - clear at the end of the channel shutdown (TBD)
+		     or on channel change (side effect of ath_hw_reset)
+
+		   CHANNEL_INTERFERENCE (a radar has been detected):
+		   - initial value : clear
+		   - set when a radar is detected (ath_radar_detected)
+		   - clear at the end of the non-occupancy period (TBD)
+		     or on channel change (side effect of ath_hw_reset) */
+
 		/* Force re-check.
 		 * XXX: Unclear whether regs say you can avoid the channel
 		 * availability check if you've already performed it on the
 		 * channel within some more brief interval. */
-		c->privFlags		&= ~CHANNEL_DFS_CLEAR;
+		c->privFlags &= ~(CHANNEL_DFS_CLEAR|CHANNEL_INTERFERENCE);
 
 		/* Initialize all fields of ieee80211_channel here */
 
