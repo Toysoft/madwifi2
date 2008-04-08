@@ -1574,6 +1574,8 @@ ieee80211_ioctl_hal_map(struct net_device *dev, struct iw_request_info *info,
        return 0;
 }
 
+/* iwpriv wlan0 doth_radar X simulate a radar detection where X is either 0 to
+ * switch to a random channel or the IEEE channel to switch to */
 
 static int
 ieee80211_ioctl_radar(struct net_device *dev, struct iw_request_info *info,
@@ -1582,9 +1584,20 @@ ieee80211_ioctl_radar(struct net_device *dev, struct iw_request_info *info,
 	int *params = (int*) extra;
 	struct ieee80211vap *vap = dev->priv;
 	struct ieee80211com *ic = vap->iv_ic;
-	if (!(ic->ic_flags & IEEE80211_F_DOTH))
-		return 0;
-	params[0] = ic->ic_test_radar(ic);
+	int switchChanRequested;
+	u_int8_t switchChan;
+
+	if (params[0] != 0) {
+		switchChanRequested = 1;
+		switchChan = params[0];
+	} else {
+		switchChanRequested = 0;
+		switchChan = 0;
+	}
+
+	ic->ic_radar_detected(ic, "local radar from user space",
+			      switchChanRequested, switchChan);
+
 	return 0;
 }
 
@@ -5289,7 +5302,7 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 3,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,   "getwmmparams" },
 	{ IEEE80211_IOCTL_RADAR,
-	  0, 0, "doth_radar" },
+	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "doth_radar" },
 	{ IEEE80211_IOCTL_HALMAP,
 	  0, 0, "dump_hal_map" },
 	/*

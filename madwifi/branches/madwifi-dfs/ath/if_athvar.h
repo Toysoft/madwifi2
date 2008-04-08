@@ -920,6 +920,4 @@ int ar_device(int devid);
 	  "MadWifi" : \
 	  DEV_NAME(_v->iv_ic->ic_dev))
 
-void ath_radar_detected(struct ath_softc *sc, const char* message);
-
 #endif /* _DEV_ATH_ATHVAR_H */

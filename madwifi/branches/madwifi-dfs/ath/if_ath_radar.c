@@ -1291,6 +1291,7 @@ static const char* get_longpulse_desc(int lp) {
 
 static HAL_BOOL rp_analyse(struct ath_softc *sc)
 {
+	struct ieee80211com * ic = &sc->sc_ic;
 	HAL_BOOL radar = 0;
 	struct ath_rp *pulse;
 
@@ -1544,10 +1545,14 @@ static HAL_BOOL rp_analyse(struct ath_softc *sc)
 #ifdef ATH_RADAR_LONG_PULSE
 		if (!best_lp_bc)
 #endif /* #ifdef ATH_RADAR_LONG_PULSE */
-			ath_radar_detected(sc, radar_patterns[best_index].name);
+			ic->ic_radar_detected(ic,
+					      radar_patterns[best_index].name,
+					      0, 0);
 #ifdef ATH_RADAR_LONG_PULSE
 		else 
-			ath_radar_detected(sc, get_longpulse_desc(best_lp_bc));
+			ic->ic_radar_detected(ic,
+					      get_longpulse_desc(best_lp_bc),
+					      0, 0);
 #endif /* #ifdef ATH_RADAR_LONG_PULSE */
 	}
 	return radar;
