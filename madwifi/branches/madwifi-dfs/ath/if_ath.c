@@ -5294,20 +5294,20 @@ void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 #define AR5K_TUNE_DMA_BEACON_RESP		2
 #define AR5K_TUNE_SW_BEACON_RESP		10
 
-#define AR5K_BEACON_5210		0x8024
-#define AR5K_BEACON_5211		0x8020
+#define AR5K_BEACON_5210	0x8024
+#define AR5K_BEACON_5211	0x8020
 
-#define AR5K_TIMER0_5210		0x802c /* next TBTT */
-#define AR5K_TIMER0_5211		0x8028
+#define AR5K_TIMER0_5210	0x802c /* next TBTT */
+#define AR5K_TIMER0_5211	0x8028
 
-#define AR5K_TIMER1_5210		0x8030 /* next DMA beacon */
-#define AR5K_TIMER1_5211		0x802c
+#define AR5K_TIMER1_5210	0x8030 /* next DMA beacon */
+#define AR5K_TIMER1_5211	0x802c
 
-#define AR5K_TIMER2_5210		0x8034 /* next SWBA interrupt */
-#define AR5K_TIMER2_5211		0x8030
+#define AR5K_TIMER2_5210	0x8034 /* next SWBA interrupt */
+#define AR5K_TIMER2_5211	0x8030
 
-#define AR5K_TIMER3_5210		0x8038 /* next ATIM window */
-#define AR5K_TIMER3_5211		0x8034
+#define AR5K_TIMER3_5210	0x8038 /* next ATIM window */
+#define AR5K_TIMER3_5211	0x8034
 
 #define AR5K_BEACON_PERIOD	0x0000ffff
 #define AR5K_BEACON_ENABLE	0x00800000
@@ -5315,19 +5315,17 @@ void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 
 	/* This macro make sure that each timer is in a strict future */
 #define ADJUST_TIMER(x)		((x) + \
-	roundup_s(hw_tsftu+1-(x), bintval & HAL_BEACON_PERIOD))
+	roundup_s(hw_tsftu + 1 - (x), bintval & HAL_BEACON_PERIOD))
 
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t timer0, timer1, timer2, timer3, hw_bintval;
 
 	/* If we are going to reset HW TSF, we need to take it into account
-	 * here */
-
+	 * here. */
 	if (bintval & HAL_BEACON_RESET_TSF)
 		hw_tsftu = 0;
 
         /* Set the additional timers by mode */
-
 	timer0 = ADJUST_TIMER(next_beacon);
 	timer3 = ADJUST_TIMER(next_beacon + 1);
 
@@ -5350,19 +5348,15 @@ void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 	}
 
 	/* Convert from HAL to HW representation. It seems that they are
-	 * binary compatible so this conversion is a bit useless */
-
+	 * binary compatible so this conversion is a bit useless. */
 	hw_bintval = (bintval & HAL_BEACON_PERIOD);
 	if (bintval & HAL_BEACON_ENA)
 		hw_bintval |= AR5K_BEACON_ENABLE;
 	if (bintval & HAL_BEACON_RESET_TSF)
 		hw_bintval |= AR5K_BEACON_RESET_TSF;
 
-	/*
-	 * Set the beacon register and enable all timers. (next beacon, DMA
-	 * beacon, software beacon, ATIM window time)
-	 */
-
+	/* Set the beacon register and enable all timers. (next beacon, DMA
+	 * beacon, software beacon, ATIM window time). */
 	if (ar_device(sc->devid) == 5210) {
 		OS_REG_WRITE(ah, AR5K_TIMER0_5210, timer0);
 		OS_REG_WRITE(ah, AR5K_TIMER1_5210, timer1);
