@@ -136,9 +136,6 @@ static void ath_bmiss_tasklet(TQUEUE_ARG);
 static void ath_bstuck_tasklet(TQUEUE_ARG);
 static int ath_stop_locked(struct net_device *);
 static int ath_stop(struct net_device *);
-#if 0
-static void ath_initkeytable(struct ath_softc *);
-#endif
 static ieee80211_keyix_t ath_key_alloc(struct ieee80211vap *, 
 		const struct ieee80211_key *);
 static int ath_key_delete(struct ieee80211vap *, const struct ieee80211_key *,
@@ -2670,9 +2667,6 @@ ath_init(struct net_device *dev)
 	 * in the frame output path; there's nothing to do
 	 * here except setup the interrupt mask.
 	 */
-#if 0
-	ath_initkeytable(sc);		/* XXX still needed? */
-#endif
 	if (ath_startrecv(sc) != 0) {
 		EPRINTF(sc, "Unable to start receive logic.\n");
 		error = -EIO;
