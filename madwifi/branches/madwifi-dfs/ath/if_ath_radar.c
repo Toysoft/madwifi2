@@ -322,7 +322,7 @@ int ath_radar_is_outdoor_channel(HAL_CHANNEL *hchan)
 	return 0;
 }
 
-/* Update channel's DFS flags based upon whether DFS is reqired.  Return true
+/* Update channel's DFS flags based upon whether DFS is required.  Return true
  * if the value was repaired. It also add flags to know if a channel can be
  * used indoor or outdoor or both. Those flags have been added and made
  * compatible with HAL flags (as defined in <hal/ah.h> */
@@ -333,7 +333,7 @@ int ath_radar_is_outdoor_channel(HAL_CHANNEL *hchan)
 int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
 {
 	u_int32_t old_channelFlags = hchan->channelFlags;
-	u_int32_t old_privFlags = hchan->privFlags;
+	u_int8_t old_privFlags = hchan->privFlags;
 	int changed;
 
 	if (ath_radar_is_dfs_required(sc, hchan)) {
