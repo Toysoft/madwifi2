@@ -1690,12 +1690,12 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 {
 	HAL_BOOL ret;
 	int expected_intmit = (sc->sc_hasintmit && sc->sc_useintmit);
-	u_int32_t intmit = 0;
+	u_int32_t l_intmit = 0;
 
-	ath_hal_getintmit(sc->sc_ah, &intmit);
-	if (expected_intmit != intmit) {
+	ath_hal_getintmit(sc->sc_ah, &l_intmit);
+	if (expected_intmit != l_intmit) {
 		EPRINTF(sc, "before ath_hal_reset: wrong INTMIT HAL:%d, "
-				"expected:%d!\n", intmit, expected_intmit);
+				"expected:%d!\n", l_intmit, expected_intmit);
 		ath_hal_setintmit(sc->sc_ah, expected_intmit);
 	}
 
@@ -1711,10 +1711,10 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 
 	mdelay(5); /* extra delay to allow the hw to settle in */
 
-	ath_hal_getintmit(sc->sc_ah, &intmit);
-	if (expected_intmit != intmit) {
+	ath_hal_getintmit(sc->sc_ah, &l_intmit);
+	if (expected_intmit != l_intmit) {
 		EPRINTF(sc, "after ath_hal_reset: wrong INTMIT HAL:%d, "
-				"expected:%d!\n", intmit, expected_intmit);
+				"expected:%d!\n", l_intmit, expected_intmit);
 		ath_hal_setintmit(sc->sc_ah, expected_intmit);
 	}
 #ifdef ATH_CAP_TPC
