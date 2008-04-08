@@ -445,13 +445,13 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 		p += sprintf(p, "Channel %3d (%4d Mhz) : %s %s%s%s\n",
 			     channel->ic_ieee,
 			     channel->ic_freq,
-			     channel->ic_flags & IEEE80211_CHAN_PASSIVE ?
+			     IEEE80211_IS_CHAN_PASSIVE(channel) ?
 			     "  Dfs" : "NoDfs",
-			     channel->ic_flags & IEEE80211_CHAN_RADAR ?
+			     IEEE80211_IS_CHAN_RADAR(channel) ?
 			     "  Radar" : "NoRadar",
-			     channel->ic_flags & IEEE80211_CHAN_INDOOR ?
+			     IEEE80211_IS_CHAN_INDOOR(channel) ?
 			     " Indoor" : "",
-			     channel->ic_flags & IEEE80211_CHAN_OUTDOOR ?
+			     IEEE80211_IS_CHAN_OUTDOOR(channel) ?
 			     " Outdoor" : "");
         }
 	return (p - buf);

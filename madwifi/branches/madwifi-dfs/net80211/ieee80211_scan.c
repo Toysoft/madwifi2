@@ -668,7 +668,7 @@ again:
 		        	channel_type(ic->ic_curchan),
 			ieee80211_chan2ieee(ic, chan), channel_type(chan),
 			(ss->ss_flags & IEEE80211_SCAN_ACTIVE) &&
-				(chan->ic_flags & IEEE80211_CHAN_PASSIVE) == 0 ?
+				  (!IEEE80211_IS_CHAN_PASSIVE(chan)) ?
 				"active" : "passive",
 			ss->ss_mindwell, maxdwell);
 
@@ -683,7 +683,7 @@ again:
 		 * Otherwise just listen for traffic on the channel.
 		 */
 		if ((ss->ss_flags & IEEE80211_SCAN_ACTIVE) &&
-		    (chan->ic_flags & IEEE80211_CHAN_PASSIVE) == 0) {
+		    !IEEE80211_IS_CHAN_PASSIVE(chan)) {
 			struct net_device *dev = vap->iv_dev;
 			/*
 			 * Send a broadcast probe request followed by
@@ -1022,7 +1022,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 			 *   according to what the user selected
 			 */
 			if ((ic->ic_channels[i].ic_freq != ic->ic_bsschan->ic_freq) &&
-			    (!(ic->ic_channels[i].ic_flags & IEEE80211_CHAN_RADAR)) &&
+			    (!IEEE80211_IS_CHAN_RADAR(&ic->ic_channels[i])) &&
 			    (ic->ic_channels[i].ic_flags & curChanBandFlags) &&
 			    (ic->ic_channels[i].ic_flags & curChanOutdoorFlags)) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
@@ -1043,7 +1043,7 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 			for (i = 0; i < ic->ic_nchans; i++) {
 				/* must be the same formula as above */
 				if ((ic->ic_channels[i].ic_freq != ic->ic_bsschan->ic_freq) &&
-				    (!(ic->ic_channels[i].ic_flags & IEEE80211_CHAN_RADAR)) &&
+				    (!IEEE80211_IS_CHAN_RADAR(&ic->ic_channels[i])) &&
 				    (ic->ic_channels[i].ic_flags & curChanBandFlags) &&
 				    (ic->ic_channels[i].ic_flags & curChanOutdoorFlags)) {
 					if (count++ == chanStart) {
