@@ -2847,6 +2847,14 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 	ieee80211_start_new_csa(vap, csa_ie->csa_mode, c, csa_ie->csa_count,
 				subtype == IEEE80211_FC0_SUBTYPE_BEACON);
 
+	/* This is an extension to 802.11h. When we receive a CSA IE with
+	 * Mode=1, then we treat it like a "remote" radar detected event. This
+	 * is needed to effectively stop transmiting */
+	if (csa_ie->csa_mode == IEEE80211_CSA_MUST_STOP_TX) {
+		ic->ic_radar_detected(ic, "remote radar from CSA IE",
+				      1, csa_ie->csa_chan);
+	}
+
 	return 0;
 }
 
