@@ -9909,6 +9909,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		   CHANNEL_INTERFERENCE (a radar has been detected):
 		   + initial value : clear
 		   + set when a radar is detected (ath_radar_detected)
+		   - or when a CSA IE with Mode=1 is received (TBD)
 		   - clear at the end of the non-occupancy period (TBD)
 		   + or on channel change (side effect of ath_chan_set) */
 
@@ -9952,10 +9953,10 @@ ath_getchannels(struct net_device *dev, u_int cc,
 				(c->channelFlags & CHANNEL_CW_INT ? 
 				 " CF_CW_INTERFERENCE" : ""),
 				/* undocumented */
-				(c->channelFlags & 0x0004 ? 
+				(c->channelFlags & IEEE80211_CHAN_INDOOR ? 
 				 " CF_INDOOR" : ""),
 				/* undocumented */
-				(c->channelFlags & 0x0008 ? 
+				(c->channelFlags & IEEE80211_CHAN_OUTDOOR ? 
 				 " CF_OUTDOOR" : ""),
 				/* Turbo channel */
 				(c->channelFlags & CHANNEL_TURBO ? 
