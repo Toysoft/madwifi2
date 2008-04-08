@@ -359,7 +359,9 @@ static void ath_set_dfs_excl_period(struct ieee80211com *,
 static unsigned int ath_get_dfs_cac_time(struct ieee80211com *);
 static void ath_set_dfs_cac_time(struct ieee80211com *, unsigned int seconds);
 
-static unsigned int ath_test_radar(struct ieee80211com *);
+static void ath_radar_detected(struct ieee80211com *ic, const char * cause,
+		int switchChanRequested, u_int8_t switchChan);
+
 static unsigned int ath_dump_hal_map(struct ieee80211com *ic);
 
 static u_int32_t ath_get_clamped_maxtxpower(struct ath_softc *sc);
@@ -1058,7 +1060,6 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_vap_create = ath_vap_create;
 	ic->ic_vap_delete = ath_vap_delete;
 
-	ic->ic_test_radar           = ath_test_radar;
 	ic->ic_dump_hal_map	    = ath_dump_hal_map;
 
 	ic->ic_set_dfs_testmode     = ath_set_dfs_testmode;
@@ -1095,6 +1096,15 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	/* DFS radar avoidance channel use delay */
 	ic->ic_set_dfs_excl_period = ath_set_dfs_excl_period;
 	ic->ic_get_dfs_excl_period = ath_get_dfs_excl_period;
+
+#if 0
+	/* DFS flag manipulation */
+	ic->ic_set_dfs_clear		= ath_set_dfs_clear;
+	ic->ic_set_dfs_interference	= ath_set_dfs_interference;
+#endif
+
+	/* DFS radar detection handling */
+	ic->ic_radar_detected		= ath_radar_detected;
 
 	if (register_netdev(dev)) {
 		EPRINTF(sc, "Unable to register device\n");
@@ -12057,24 +12067,6 @@ ath_get_dfs_excl_period(struct ieee80211com *ic)
 	return sc->sc_dfs_excl_period;
 }
 
-
-/* This is called by a private ioctl (iwpriv) to simulate radar by directly
- * invoking the ath_radar_detected function even though we are outside of
- * interrupt context. */
-static unsigned int
-ath_test_radar(struct ieee80211com *ic)
-{
-	struct net_device *dev = ic->ic_dev;
-	struct ath_softc *sc   = dev->priv;
-	if ((ic->ic_flags & IEEE80211_F_DOTH) && (sc->sc_curchan.privFlags & CHANNEL_DFS))
-		ath_radar_detected(sc, "ath_test_radar from user space");
-	else
-		DPRINTF(sc, ATH_DEBUG_DOTH, "Channel %u MHz is not marked "
-				"for CHANNEL_DFS.  Radar test not performed!\n",
-				 sc->sc_curchan.channel);
-	return 0;
-}
-
 /* This is called by a private ioctl (iwpriv) to dump the HAL obfuscation table */
 static unsigned int
 ath_dump_hal_map(struct ieee80211com *ic)
@@ -12120,20 +12112,34 @@ ath_interrupt_dfs_cac(struct ath_softc *sc, const char* reason)
  * trunk and it's left here because it may be used as the basis for
  * implementing AP requested mute tests in station mode later. */
 
-void
-ath_radar_detected(struct ath_softc *sc, const char* cause) {
-	struct ath_hal*          ah  = sc->sc_ah;
-	struct ieee80211com*     ic  = &sc->sc_ic;
+static void
+ath_radar_detected(struct ieee80211com *ic, const char * cause,
+		int switchChanRequested, u_int8_t switchChan)
+{
+	struct net_device * dev = ic->ic_dev;
+	struct ath_softc *   sc = dev->priv;
+	struct ath_hal*	     ah = sc->sc_ah;
 	struct ieee80211_channel ichan;
 	struct timeval tv;
 
+	if (!switchChanRequested)
+		switchChan = 0;
+
 	DPRINTF(sc, ATH_DEBUG_DOTH, 
-		"Radar detected on channel:%u cause: %s%s\n",
+		"Radar detected on channel:%u [%s] %s channel %u%s\n",
 		sc->sc_curchan.channel,
 		cause,
+		switchChanRequested ? "requesting" : "random",
+		switchChan,
 		sc->sc_radar_ignored ? " (ignored)" : "");
 
+	/* flag set through :
+	 * echo 1 > /proc/sys/dev/wifi0/radar_ignored
+	 * or :
+	 * sysctl -w dev.wifi0.radar_ignored=1
+	 */
 	if (sc->sc_radar_ignored) {
+		/* debug message already printed above */
 		return;
 	}
 
@@ -12174,6 +12180,16 @@ ath_radar_detected(struct ath_softc *sc, const char* cause) {
 				"-- Time: %ld.%06ld\n", 
 				ichan.ic_ieee, ichan.ic_freq, ichan.ic_flags, 
 				tv.tv_sec, tv.tv_usec);
+
+			/* do nothing if we already detected a radar, avoid
+			 * re-entrancy. FIXME : we should use a lock to avoid
+			 * race condition. */
+			if (sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE) {
+				DPRINTF(sc, ATH_DEBUG_DOTH,
+					"DFS already marked, ignoring\n");
+				return ;
+			}
+
 			/* Mark the channel */
 			sc->sc_curchan.privFlags |= CHANNEL_INTERFERENCE;
 			/* notify 80211 layer so it can change channels... */
