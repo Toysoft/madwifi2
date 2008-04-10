@@ -850,7 +850,7 @@ ieee80211_dfs_action(struct ieee80211com *ic) {
 	}
 }
 
-void
+static void
 ieee80211_expire_excl_restrictions(struct ieee80211com *ic)
 {
 	struct ieee80211_channel* c = NULL;
@@ -872,6 +872,8 @@ ieee80211_expire_excl_restrictions(struct ieee80211com *ic)
 					  c->ic_ieee, c->ic_freq, tv_now.tv_sec,
 					  tv_now.tv_usec);
 				c->ic_flags &= ~IEEE80211_CHAN_RADAR;
+				ic->ic_chan_non_occupy[i].tv_sec  = 0;
+				ic->ic_chan_non_occupy[i].tv_usec = 0;
 			} else {
 				if_printf(dev,
 					  "Channel %3d (%4d MHz) is still "
@@ -1036,7 +1038,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 	struct net_device *dev = ic->ic_dev;
 	struct timeval tv_now;
 	unsigned int excl_period = ic->ic_get_dfs_excl_period(ic);
-	int i;
+	int i, was_on_radar;
 
 	do_gettimeofday(&tv_now);
 	if_printf(dev, "Radar found on channel %3d (%4d MHz) -- "
@@ -1044,6 +1046,11 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 			ichan->ic_ieee, ichan->ic_freq, 
 			tv_now.tv_sec, tv_now.tv_usec);
 	if (IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode)) {
+
+		/* Check if the current channel is already under radar before
+		 * setting radar flag */
+		was_on_radar = IEEE80211_IS_CHAN_RADAR(ic->ic_curchan);
+
 		/* Mark the channel in the ic_chan list */
 		if (ic->ic_flags_ext & IEEE80211_FEXT_MARKDFS) {
 			if_printf(dev, "Marking channel %3d (%4d MHz) in "
@@ -1086,14 +1093,27 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 				return;
 			}
 			if  (ic->ic_curchan->ic_freq == c->ic_freq) {
-				if_printf(dev, "%s: Invoking "
+
+				/* If current channel is already marked for
+				 * radar, do nothing. It prevents a new CSA
+				 * process to start */
+				if (was_on_radar) {
+					if_printf(dev,
+						"%s: current channel "
+						"already under radar\n",
+						__func__);
+				} else {
+
+					if_printf(dev, "%s: Invoking "
 						"ieee80211_dfs_action "
 						"(%d, 0x%x)\n",
 						__func__, ichan->ic_freq, 
 						ichan->ic_flags);
-				/* The current channel has been marked. We 
-				 * need to move away from it. */
-				ieee80211_dfs_action(ic);
+					/* The current channel has been
+					 * marked. We need to move away from
+					 * it. */
+					ieee80211_dfs_action(ic);
+				}
 			} else
 				if_printf(dev,
 						"Unexpected channel frequency! "
@@ -1112,8 +1132,7 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 			 * seconds.
 			 * Start a channel switch on all available VAPs. */
 			TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-				struct ieee80211_channel *c = 
-					ieee80211_doth_findchan(
+				c = ieee80211_doth_findchan(
 						vap,
 						IEEE80211_RADAR_TEST_MUTE_CHAN);
 
