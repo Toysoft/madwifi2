@@ -958,9 +958,8 @@ ieee80211_scan_flush(struct ieee80211com *ic)
 }
 
 /*
- * Execute radar channel change. This is called when a radar/dfs
- * signal is detected.  AP mode only.  Return 1 on success, 0 on
- * failure
+ * Execute radar channel change. This is called when a radar signal is
+ * detected. AP/IBSS mode only. Return 1 on success, 0 on failure
  */
 int
 ieee80211_scan_dfs_action(struct ieee80211vap *vap,
