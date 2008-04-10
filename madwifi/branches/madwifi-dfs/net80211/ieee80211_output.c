@@ -236,6 +236,16 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		ieee80211_parent_queue_xmit(skb);
 		return NETDEV_TX_OK;
 	}
+
+	/* If we have detected a radar on the current channel, or another node
+	 * told us to stop transmitting, we no longer transmit. Note : we
+	 * still allow a monitor interface to transmit */
+	if (IEEE80211_IS_CHAN_RADAR(ic->ic_curchan)) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				"%s: dropping data since we are under radar\n",
+				__func__);
+		goto bad;
+	}
 	
 	/* Cancel any running BG scan */
 	ieee80211_cancel_scan(vap);
