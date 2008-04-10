@@ -433,6 +433,7 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 	char *p = buf;
 	struct ieee80211_channel *channel;
 	int i;
+	char str[50];
 
 	for (i = 0; i < ic->ic_nchans; i++) {
 
@@ -442,17 +443,24 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 
 		channel = &ic->ic_channels[i];
 
-		p += sprintf(p, "Channel %3d (%4d Mhz) : %s %s%s%s\n",
-			     channel->ic_ieee,
-			     channel->ic_freq,
-			     IEEE80211_IS_CHAN_PASSIVE(channel) ?
-			     "  Dfs" : "NoDfs",
-			     IEEE80211_IS_CHAN_RADAR(channel) ?
-			     "  Radar" : "NoRadar",
-			     IEEE80211_IS_CHAN_INDOOR(channel) ?
-			     " Indoor" : "",
-			     IEEE80211_IS_CHAN_OUTDOOR(channel) ?
-			     " Outdoor" : "");
+		if ((ic->ic_chan_non_occupy[i].tv_sec == 0) &&
+		    (ic->ic_chan_non_occupy[i].tv_usec) == 0) {
+			str[0] = 0; /* empty string */
+		} else {
+			sprintf(str, " End: %ld.%06ld",
+				ic->ic_chan_non_occupy[i].tv_sec,
+				ic->ic_chan_non_occupy[i].tv_usec);
+		}
+
+		p += sprintf(p,
+			"Channel %3d (%4d Mhz) : %s %s%s%s%s\n",
+			channel->ic_ieee,
+			channel->ic_freq,
+			IEEE80211_IS_CHAN_PASSIVE(channel) ? "  Dfs":"NoDfs",
+			IEEE80211_IS_CHAN_RADAR(channel) ? "  Radar":"NoRadar",
+			IEEE80211_IS_CHAN_INDOOR(channel) ? " Indoor" : "",
+			IEEE80211_IS_CHAN_OUTDOOR(channel) ?  " Outdoor" : "",
+			str);
         }
 	return (p - buf);
 }
