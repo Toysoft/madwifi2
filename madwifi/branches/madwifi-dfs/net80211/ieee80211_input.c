@@ -2736,11 +2736,15 @@ ieee80211_doth_findchan(struct ieee80211vap *vap, u_int8_t chan)
 	return c;
 }
 
+/* This function is called at the end of the Channel Shutdown procedure, just
+ * before switching to the new channel (if any) */
+
 static void
 ieee80211_doth_cancel_cs(struct ieee80211com *ic)
 {
 	del_timer(&ic->ic_csa_timer);
 	ic->ic_flags &= ~IEEE80211_F_CHANSWITCH;
+	ic->ic_set_dfs_clear(ic, 0);
 }
 
 static void

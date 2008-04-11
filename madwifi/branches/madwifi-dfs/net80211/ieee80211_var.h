@@ -500,11 +500,11 @@ struct ieee80211com {
 	/* DFS non-occupancy period (in seconds) */
 	void (*ic_set_dfs_excl_period)(struct ieee80211com *, unsigned int);
 	unsigned int (*ic_get_dfs_excl_period)(struct ieee80211com *);
-#if 0
+
 	/* DFS flag manipulation */
 	void (*ic_set_dfs_clear)(struct ieee80211com *, int);
 	void (*ic_set_dfs_interference)(struct ieee80211com *, int);
-#endif
+
 	/* DFS radar detection handling */
 	void (*ic_radar_detected)(struct ieee80211com *, const char * cause,
 			int switchChanRequested, u_int8_t switchChan);
