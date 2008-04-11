@@ -954,17 +954,12 @@ ieee80211_expire_dfs_excl_timer(unsigned long data)
 		/* Go through and clear any interference flag we have, if we
 		 * just got it cleared up for us */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		  /* We need to check for the special value
-		     IEEE80211_CHAN_ANYC before using vap->iv_des_chan
-		     since it will cause a kernel panic */
 			if ((vap->iv_state == IEEE80211_S_RUN) &&
-			    ((vap->iv_opmode == IEEE80211_M_HOSTAP) ||
-			     (vap->iv_opmode == IEEE80211_M_IBSS)) &&
-			    /* Operating on channel other than desired. */
-			    (vap->iv_des_chan != IEEE80211_CHAN_ANYC) &&
-			    (vap->iv_des_chan->ic_freq > 0) &&
-			    (vap->iv_des_chan->ic_freq != 
-			     ic->ic_bsschan->ic_freq)) {
+			    IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode) &&
+			    /* Desired channel is really defined */
+			    (vap->iv_des_chan != NULL) &&
+			    (vap->iv_des_chan != IEEE80211_CHAN_ANYC)) {
+
 				struct ieee80211_channel *des_chan =
 					ieee80211_find_channel(ic, 
 							vap->iv_des_chan->
@@ -994,11 +989,23 @@ ieee80211_expire_dfs_excl_timer(unsigned long data)
 							vap->iv_des_chan->
 								ic_flags);
 
+					/* Directly call ic_set_channel() in
+					 * order to start CAC if we are not
+					 * really changing channel (it happens
+					 * at the end of the Non-Occupancy
+					 * Period for instance */
+
+					if (des_chan == ic->ic_bsschan) {
+						ic->ic_curchan = ic->ic_bsschan;
+						ic->ic_set_channel(ic);
+					} else {
+
 					ieee80211_start_new_csa(vap,
 						IEEE80211_CSA_CAN_STOP_TX,
 						des_chan,
 						IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT,
 						0);
+					}
 
 				} else if (ieee80211_msg_is_reported(vap, 
 							IEEE80211_MSG_DOTH)) {
