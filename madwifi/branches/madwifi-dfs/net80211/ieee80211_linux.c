@@ -453,9 +453,11 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 		}
 
 		p += sprintf(p,
-			"Channel %3d (%4d Mhz) : %s %s%s%s%s\n",
+			"Channel %3d (%4d Mhz) : %s %s %s%s%s%s\n",
 			channel->ic_ieee,
 			channel->ic_freq,
+			isset(ic->ic_chan_active, channel->ic_ieee) ?
+			     "  Active" : "Inactive",
 			IEEE80211_IS_CHAN_PASSIVE(channel) ? "  Dfs":"NoDfs",
 			IEEE80211_IS_CHAN_RADAR(channel) ? "  Radar":"NoRadar",
 			IEEE80211_IS_CHAN_INDOOR(channel) ? " Indoor" : "",
