@@ -850,6 +850,9 @@ ieee80211_dfs_action(struct ieee80211com *ic) {
 	}
 }
 
+/* Check if some Non-Occupancy Period timer have expired and update flags
+ * accordingly */
+
 static void
 ieee80211_expire_excl_restrictions(struct ieee80211com *ic)
 {
@@ -874,6 +877,10 @@ ieee80211_expire_excl_restrictions(struct ieee80211com *ic)
 				c->ic_flags &= ~IEEE80211_CHAN_RADAR;
 				ic->ic_chan_non_occupy[i].tv_sec  = 0;
 				ic->ic_chan_non_occupy[i].tv_usec = 0;
+				/* FIXME : should we use ic_curchan or ic_bsschan ? */
+				if (c == ic->ic_curchan) {
+					ic->ic_set_dfs_interference(ic, 0);
+				}
 			} else {
 				if_printf(dev,
 					  "Channel %3d (%4d MHz) is still "
@@ -930,7 +937,7 @@ ieee80211_update_dfs_excl_timer(struct ieee80211com *ic)
 	}
 }
 
-/* Periodically expire radar avoidance marks. */
+/* Timer callback : periodically expire radar avoidance marks. */
 static void
 ieee80211_expire_dfs_excl_timer(unsigned long data)
 {

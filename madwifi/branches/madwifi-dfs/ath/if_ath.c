@@ -348,7 +348,6 @@ static void ath_interrupt_dfs_cac(struct ath_softc *sc, const char* reason);
 #define ath_dfs_can_transmit_csaie_dbgmsg(_sc)	\
 	_ath_dfs_can_transmit_csaie_dbgmsg((_sc), __func__)
 
-/* 802.11h DFS testing functions */
 static int ath_get_dfs_testmode(struct ieee80211com *);
 static void ath_set_dfs_testmode(struct ieee80211com *, int);
 
@@ -500,6 +499,56 @@ MODULE_PARM_DESC(ieee80211_debug, "Load-time 802.11 debug output enable");
 			if (id)						\
 				(bssid)[0] |= (((id) << 2) | 0x02);	\
 		} while (0)
+
+/* Internal functions to set/clear CHANNEL_DFS_CLEAR/CHANNEL_INTERFERENCE
+ * flags */
+
+static inline void _ath_set_dfs_clear(struct ath_softc *sc, HAL_CHANNEL * channel, int val)
+{
+	if (val) {
+		channel->privFlags |= CHANNEL_DFS_CLEAR;
+		DPRINTF(sc, ATH_DEBUG_DOTH,
+			"Set CHANNEL_DFS_CLEAR flag on channel %4u MHz\n",
+			channel->channel);
+	} else {
+		channel->privFlags &= ~CHANNEL_DFS_CLEAR;
+		DPRINTF(sc, ATH_DEBUG_DOTH,
+			"Clear CHANNEL_DFS_CLEAR flag on channel %4u MHz\n",
+			channel->channel);
+	}
+}
+
+static inline void _ath_set_dfs_interference(struct ath_softc *sc, HAL_CHANNEL * channel, int val)
+{
+	if (val) {
+		channel->privFlags |= CHANNEL_INTERFERENCE;
+		DPRINTF(sc, ATH_DEBUG_DOTH,
+			"Set CHANNEL_INTERFERENCE flag on channel %4u MHz\n",
+			channel->channel);
+	} else {
+		channel->privFlags &= ~CHANNEL_INTERFERENCE;
+		DPRINTF(sc, ATH_DEBUG_DOTH,
+			"Clear CHANNEL_INTERFERENCE flag on channel %4u MHz\n",
+			channel->channel);
+	}
+}
+
+/* Set/clear CHANNEL_DFS_CLEAR/CHANNEL_INTERFERENCE flags for the operating channel */
+static void ath_set_dfs_clear(struct ieee80211com *ic, int val)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+
+	_ath_set_dfs_clear(sc, &sc->sc_curchan, val);
+}
+
+static void ath_set_dfs_interference(struct ieee80211com *ic, int val)
+{
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = dev->priv;
+
+	_ath_set_dfs_interference(sc, &sc->sc_curchan, val);
+}
 
 /* Initialize ath_softc structure */
 
@@ -804,6 +853,9 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_dfs_cac_period = ATH_DFS_WAIT_MIN_PERIOD;
 	sc->sc_dfs_excl_period = ATH_DFS_AVOID_MIN_PERIOD;
 
+	_ath_set_dfs_clear(sc, &sc->sc_curchan, 0);
+	_ath_set_dfs_interference(sc, &sc->sc_curchan, 0);
+
 	/* initialize radar stuff */
 	ath_rp_init(sc);
 
@@ -1097,11 +1149,9 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_set_dfs_excl_period = ath_set_dfs_excl_period;
 	ic->ic_get_dfs_excl_period = ath_get_dfs_excl_period;
 
-#if 0
 	/* DFS flag manipulation */
 	ic->ic_set_dfs_clear		= ath_set_dfs_clear;
 	ic->ic_set_dfs_interference	= ath_set_dfs_interference;
-#endif
 
 	/* DFS radar detection handling */
 	ic->ic_radar_detected		= ath_radar_detected;
@@ -8881,12 +8931,14 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	/* Need a DFS channel availability check?  We do if ... */
 	dfs_cac_needed = IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode) &&
 		(hchan.channel != sc->sc_curchan.channel ||
-		/* the scan wasn't already done */
-		 (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR))) && 
+		 /* CAC has not been done and we are not under radar */
+		 (0 == (sc->sc_curchan.privFlags & (CHANNEL_DFS_CLEAR|CHANNEL_INTERFERENCE)))) && 
 		/* the new channel requires DFS protection */
 		ath_radar_is_dfs_required(sc, &hchan) &&
 		/* IEEE 802.11h is implemented */
-		(ic->ic_flags & IEEE80211_F_DOTH);
+		(ic->ic_flags & IEEE80211_F_DOTH) &&
+		/* CAC is not already started */
+		(!sc->sc_dfs_cac);
 
 	channel_change_required = hchan.channel != sc->sc_curchan.channel ||
 		hchan.channelFlags != sc->sc_curchan.channelFlags ||
@@ -8942,8 +8994,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		}
 
 		do_gettimeofday(&tv);
-		if (dfs_cac_needed && !(ic->ic_flags & IEEE80211_F_SCAN) &&
-			!sc->sc_dfs_cac) {
+		if (dfs_cac_needed && !(ic->ic_flags & IEEE80211_F_SCAN)) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
 					"Starting DFS wait for "
 					"channel %u -- Time: %ld.%06ld\n", 
@@ -8960,8 +9011,8 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 
 			/* Reset CHANNEL_INTERFERENCE and CHANNEL_DFS_CLEAR
 			 * after a channel change */
-			sc->sc_curchan.privFlags &=
-				~(CHANNEL_INTERFERENCE|CHANNEL_DFS_CLEAR);
+			_ath_set_dfs_clear(sc, &sc->sc_curchan, 0);
+			_ath_set_dfs_interference(sc, &sc->sc_curchan, 0);
 
 			/* Enter DFS wait period */
 			mod_timer(&sc->sc_dfs_cac_timer,
@@ -9525,7 +9576,7 @@ ath_dfs_cac_completed(unsigned long data )
 		}
 		DPRINTF(sc, ATH_DEBUG_DOTH, "Driver is now MARKING "
 				"channel as CHANNEL_DFS_CLEAR.\n");
-		sc->sc_curchan.privFlags |= CHANNEL_DFS_CLEAR;
+		_ath_set_dfs_clear(sc, &sc->sc_curchan, 1);
 		ath_chan_change(sc, ic->ic_curchan);
 		/* restart each VAP that was pending... */
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
@@ -12194,7 +12245,7 @@ ath_radar_detected(struct ieee80211com *ic, const char * cause,
 			}
 
 			/* Mark the channel */
-			sc->sc_curchan.privFlags |= CHANNEL_INTERFERENCE;
+			_ath_set_dfs_interference(sc, &sc->sc_curchan, 1);
 			/* notify 80211 layer so it can change channels... */
 			ieee80211_mark_dfs(ic, &ichan);
 		}
