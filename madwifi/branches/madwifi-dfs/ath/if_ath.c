@@ -2461,7 +2461,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 * Handle beacon transmission directly; deferring
 			 * this is too slow to meet timing constraints
 			 * under load. */
-			if (ath_dfs_can_transmit(sc)) {
+			if (ath_dfs_can_transmit_csaie_dbgmsg(sc)) {
 				ath_beacon_send(sc, &needmark, hw_tsf);
 			} else {
 				sc->sc_beacons = 0;
@@ -2518,7 +2518,7 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		if (status & HAL_INT_BMISS) {
 			sc->sc_stats.ast_bmiss++;
-			if (ath_dfs_can_transmit(sc)) {
+			if (ath_dfs_can_transmit_csaie_dbgmsg(sc)) {
 				ATH_SCHEDULE_TQUEUE(&sc->sc_bmisstq, &needmark);
 			} else {
 				sc->sc_beacons = 0;
@@ -3400,7 +3400,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	/* If we are under CAC or have detected a radar, we simply drop (and
 	 * free) frames. */
-	if (!ath_dfs_can_transmit(sc)) {
+	if (!ath_dfs_can_transmit_dbgmsg(sc)) {
 		/* No need to print a warning or error messages here since we
 		 * know that ath_hardstart() is invoked directly or indirectly
 		 * by the linux network stack and that all packets needs to be
@@ -3716,6 +3716,8 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	}
 
 	if (!ath_dfs_can_transmit_csaie_dbgmsg(sc)) {
+		DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_DOTH,
+			"Dropping; we are under radar\n");
 		goto bad;
 	}
 
@@ -8616,7 +8618,7 @@ ath_tx_timeout(struct net_device *dev)
 {
 	struct ath_softc *sc = dev->priv;
 
-	if (!ath_dfs_can_transmit(sc))
+	if (!ath_dfs_can_transmit_dbgmsg(sc))
 		return;
 
 	DPRINTF(sc, ATH_DEBUG_WATCHDOG, "%sRUNNING.  sc is %svalid.\n",
