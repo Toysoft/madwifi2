@@ -957,6 +957,35 @@ ieee80211_scan_flush(struct ieee80211com *ic)
 	}
 }
 
+/* Check if a channel is usable for a DFS channel switch */
+static int
+ieee80211_dfs_is_channel_usable(struct ieee80211com *ic,
+				struct ieee80211_channel * channel)
+{
+	u_int16_t curChanBandFlags, curChanOutdoorFlags;
+
+	/*
+	 * Criteria for the new frequency:
+	 * - it must be different from the current frequency
+	 * - it must not have radar detected
+	 * - it must be an active channel
+	 * - it must be in the same band (2.4Ghz/5Ghz)
+	 * - it must be suitable for indoor/outdoor use according to what the
+	 *   user selected
+	 */
+
+	curChanBandFlags = ic->ic_bsschan->ic_flags &
+		(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_5GHZ);
+	curChanOutdoorFlags = ic->ic_country_outdoor ?
+		IEEE80211_CHAN_OUTDOOR : IEEE80211_CHAN_INDOOR;
+
+	return ((channel->ic_freq != ic->ic_bsschan->ic_freq) &&
+		(!IEEE80211_IS_CHAN_RADAR(channel)) &&
+		(isset(ic->ic_chan_active, channel->ic_ieee)) &&
+		(channel->ic_flags & curChanBandFlags) &&
+		(channel->ic_flags & curChanOutdoorFlags));
+}
+
 /*
  * Execute radar channel change. This is called when a radar signal is
  * detected. AP/IBSS mode only. Return 1 on success, 0 on failure
@@ -981,7 +1010,6 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		/* No channel was found via scan module, means no good scanlist
 		 * was found */
 		int chanStart, i, count;
-		u_int16_t curChanBandFlags, curChanOutdoorFlags;
 
 		if ((ic->ic_curchan != NULL) &&
 		    (ic->ic_curchan != IEEE80211_CHAN_ANYC)) {
@@ -1006,24 +1034,10 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 		 * $4.6.2.5.1 */
 		/* First, we count the usable channels */
 		count = 0;
-		curChanBandFlags = ic->ic_bsschan->ic_flags &
-			(IEEE80211_CHAN_2GHZ | IEEE80211_CHAN_5GHZ);
-		curChanOutdoorFlags = ic->ic_country_outdoor ?
-			IEEE80211_CHAN_OUTDOOR : IEEE80211_CHAN_INDOOR;
 
 		for (i = 0; i < ic->ic_nchans; i++) {
-			/*
-			 * Criteria for the new frequency:
-			 * - it must be different from the current frequency
-			 * - it must not have radar detected
-			 * - it must be in the same band (2.4Ghz/5Ghz)
-			 * - it must be suitable for indoor/outdoor use
-			 *   according to what the user selected
-			 */
-			if ((ic->ic_channels[i].ic_freq != ic->ic_bsschan->ic_freq) &&
-			    (!IEEE80211_IS_CHAN_RADAR(&ic->ic_channels[i])) &&
-			    (ic->ic_channels[i].ic_flags & curChanBandFlags) &&
-			    (ic->ic_channels[i].ic_flags & curChanOutdoorFlags)) {
+			if (ieee80211_dfs_is_channel_usable(
+				    ic, &ic->ic_channels[i])) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 						"%s: usable channel %3d "
 						"(%4d MHz)\n",
@@ -1041,10 +1055,8 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap,
 			count = 0;
 			for (i = 0; i < ic->ic_nchans; i++) {
 				/* must be the same formula as above */
-				if ((ic->ic_channels[i].ic_freq != ic->ic_bsschan->ic_freq) &&
-				    (!IEEE80211_IS_CHAN_RADAR(&ic->ic_channels[i])) &&
-				    (ic->ic_channels[i].ic_flags & curChanBandFlags) &&
-				    (ic->ic_channels[i].ic_flags & curChanOutdoorFlags)) {
+				if (ieee80211_dfs_is_channel_usable(
+					    ic, &ic->ic_channels[i])) {
 					if (count++ == chanStart) {
 						new_channel = 
 							&ic->ic_channels[i];
