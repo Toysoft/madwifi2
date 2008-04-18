@@ -226,8 +226,6 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 /* number of TX buffers reserved for mgt frames */
 #define ATH_TXBUF_MGT_RESERVED	  5 	
 
-#define TAIL_DROP_COUNT 50             /* maximum number of queued frames allowed */
-
 /*
  * dynamic turbo specific macros.
  */

@@ -885,7 +885,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	dev->stop = ath_stop;
 	dev->hard_start_xmit = ath_hardstart;
 	dev->tx_timeout = ath_tx_timeout;
-	dev->watchdog_timeo = 5 * HZ;
+	dev->watchdog_timeo = HZ;
 	dev->set_multicast_list = ath_mode_init;
 	dev->do_ioctl = ath_ioctl;
 	dev->get_stats = ath_getstats;
@@ -3302,7 +3302,6 @@ _take_txbuf_locked(struct ath_softc *sc, int for_management)
 					    "buffers.\n");
 		sc->sc_stats.ast_tx_qstop++;
 		netif_stop_queue(sc->sc_dev);
-		ATH_SCHEDULE_TQUEUE(&sc->sc_txtq, NULL);
 	}
 
 	/* Only let us go further if management frame, or there are enough */
@@ -3497,11 +3496,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	txq = sc->sc_ac2q[skb->priority];
 
-	if (txq->axq_depth > TAIL_DROP_COUNT) {
-		/* Wish to reserve some DMA buffers, try again later. */ 
-		requeue = 1;
-		goto hardstart_fail;
-	}
 #endif
 
 	/* If the skb data is shared, we will copy it so we can strip padding
@@ -9002,7 +8996,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 						sc->sc_curchan.channelFlags), 
 					tv.tv_sec, tv.tv_usec);
 			/* set the timeout to normal */
-			dev->watchdog_timeo = 120 * HZ; 
+			dev->watchdog_timeo = (sc->sc_dfs_cac_period + 1) * HZ; 
 			/* Disable beacons and beacon miss interrupts */
 			sc->sc_dfs_cac = 1;
 			sc->sc_beacons = 0;
@@ -9518,7 +9512,7 @@ done:
 #endif
 bad:
 	netif_wake_queue(dev);
-	dev->watchdog_timeo = (sc->sc_dfs_cac ? 120 : 5) * HZ;		/* set the timeout to normal */
+	dev->watchdog_timeo = (sc->sc_dfs_cac ? (sc->sc_dfs_cac_period + 1) * HZ : HZ);		/* set the timeout to normal */
 	return error;
 }
 
@@ -9612,7 +9606,7 @@ ath_dfs_cac_completed(unsigned long data )
 		if (sc->sc_beacons) {
 			ath_beacon_config(sc, NULL);
 		}
-		dev->watchdog_timeo = 5 * HZ; /* restore normal timeout */
+		dev->watchdog_timeo = HZ; /* restore normal timeout */
 	} else {
 		do_gettimeofday(&tv);
 		if (sc->sc_dfs_testmode) {
