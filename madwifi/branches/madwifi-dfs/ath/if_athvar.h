@@ -163,15 +163,6 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #define PDE(inode) ((struct proc_dir_entry *)(inode)->u.generic_ip)
 #endif
 
-
-/*
- * Macro to expand scalars to 64-bit objects
- */
-#define	ito64(x) (sizeof(x)==8) ? (((unsigned long long int)(x)) & (0xff)) : \
-		 (sizeof(x)==16) ? (((unsigned long long int)(x)) & 0xffff) : \
-		 ((sizeof(x)==32) ? (((unsigned long long int)(x)) & 0xffffffff): (unsigned long long int)(x))
-
-
 /*
  * Deal with the sysctl handler api changing.
  */
