@@ -770,7 +770,7 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 					ieee80211_chan2ieee(ic, vap->iv_des_chan),
 					IEEE80211_DEFAULT_CHANCHANGE_TBTT_COUNT);
 		} else if (vap->iv_state == IEEE80211_S_RUN) {
-			ieee80211_set_channel(vap->iv_des_chan);
+			ieee80211_set_channel(ic, vap->iv_des_chan);
 			ic->ic_set_channel(ic);
 		}
 	} else {
