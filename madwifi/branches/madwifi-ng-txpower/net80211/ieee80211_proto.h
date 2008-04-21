@@ -256,6 +256,8 @@ void ieee80211_dump_pkt(struct ieee80211com *, const u_int8_t *, int, int, int);
 #define ieee80211_dump_pkt(...)
 #endif
 struct sk_buff *ieee80211_getcfframe(struct ieee80211vap *, int);
+void ieee80211_set_channel(struct ieee80211com *ic,
+			   struct ieee80211_channel *chan);
 
 /*
  * Beacon frames constructed by ieee80211_beacon_alloc
