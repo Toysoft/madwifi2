@@ -367,6 +367,7 @@ static u_int32_t ath_get_clamped_maxtxpower(struct ath_softc *sc);
 static u_int32_t ath_set_clamped_maxtxpower(struct ath_softc *sc, 
 		u_int32_t new_clamped_maxtxpower);
 static u_int32_t ath_get_real_maxtxpower(struct ath_softc *sc);
+static int ath_txq_check(struct ath_softc *sc, struct ath_txq *txq, const char *msg);
 
 /* calibrate every 30 secs in steady state but check every second at first. */
 static int ath_calinterval = ATH_SHORT_CALINTERVAL;
@@ -1743,6 +1744,9 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 	int expected_intmit = (sc->sc_hasintmit && sc->sc_useintmit);
 	u_int32_t l_intmit = 0;
  	u_int8_t old_privFlags = sc->sc_curchan.privFlags;
+	unsigned long __axq_lockflags[HAL_NUM_TX_QUEUES];
+	struct ath_txq * txq;
+	int i;
 
 	ath_hal_getintmit(sc->sc_ah, &l_intmit);
 	if (expected_intmit != l_intmit) {
@@ -1751,8 +1755,56 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 		ath_hal_setintmit(sc->sc_ah, expected_intmit);
 	}
 
+	/* ath_hal_reset() resets all TXDP pointers, so we need to
+	 * lock all TXQ to avoid race condition with
+	 * ath_tx_txqaddbuf() and ath_tx_processq() */
+
+	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
+	  if (ATH_TXQ_SETUP(sc, i)) {
+	    txq = &sc->sc_txq[i];
+	    spin_lock_irqsave(&txq->axq_lock, __axq_lockflags[i]);
+	  }
+	}
+
 	ret = ath_hal_reset(sc->sc_ah, sc->sc_opmode, channel, 
 			bChannelChange, status);
+
+	/* Restore all TXDP pointers, if appropriate, and unlock in
+	 * the reverse order we locked */
+	for (i=HAL_NUM_TX_QUEUES-1; i>=0; i--) {
+	  /* only take care of configured TXQ */
+	  if (ATH_TXQ_SETUP(sc, i)) {
+	    struct ath_buf * bf;
+	    u_int32_t txdp;
+
+	    txq = &sc->sc_txq[i];
+
+	    /* Check that TXDP is NULL */
+	    txdp = ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum);
+	    if (txdp != 0) {
+	      DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+		      "TXQ%d: BUG TXDP:%08x is not NULL\n",
+		      txq->axq_qnum, txdp);
+	    }
+
+	    bf = STAILQ_FIRST(&txq->axq_q);
+	    if (bf != NULL) {
+	      DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+		      "TXQ%d: restoring TXDP:%08x\n",
+		      txq->axq_qnum, bf->bf_daddr);
+	      ath_hal_puttxbuf(sc->sc_ah, txq->axq_qnum, bf->bf_daddr);
+	      txdp = ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum);
+	      if (txdp != bf->bf_daddr) {
+		DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+			"TXQ%d: BUG failed to restore TXDP:%08x (is %08x)\n",
+			txq->axq_qnum, bf->bf_daddr, txdp);
+	      }
+	      ath_hal_txstart(sc->sc_ah, txq->axq_qnum);
+	    }
+	    spin_unlock_irqrestore(&txq->axq_lock, __axq_lockflags[i]);
+	  }
+	}
+
 	/* On failure, we return immediately */
 	if (!ret)
 		return ret;
@@ -3034,10 +3086,11 @@ ath_txq_dump(struct ath_softc *sc, struct ath_txq *txq)
 	}
 }
 
-/* Check TXDP (HW queue head) and SW queue head */
+/* Check TXDP (HW queue head) and SW queue head. This function assumes
+ * that axq_lock are held (ie ATH_TXQ_LOCK_IRQ has been called) */
 
-static void
-ath_txq_check(struct ath_softc *sc, struct ath_txq *txq)
+static int
+ath_txq_check(struct ath_softc *sc, struct ath_txq *txq, const char *msg)
 {
   struct ath_hal * ah = sc->sc_ah;
   struct ath_buf *bf;
@@ -3056,9 +3109,13 @@ ath_txq_check(struct ath_softc *sc, struct ath_txq *txq)
   
   if (sw_head_printed && !hw_head_printed) {
     DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-	    "Q:%u BUG TXDP:%08x not in queue (%d elements)\n",
-	    txq->axq_qnum, txdp, txq->axq_depth);
+	    "TXQ%d: BUG TXDP:%08x not in queue (%d elements) [%s]\n",
+	    txq->axq_qnum, txdp, txq->axq_depth, msg);
+    ath_txq_dump(sc, txq);
+    return 0;
   }
+
+  return 1;
 }
 
 /*
@@ -3109,9 +3166,18 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 		DPRINTF(sc, ATH_DEBUG_TX_PROC, "UC txq [%d] depth = %d\n", 
 				txq->axq_qnum, txq->axq_depth);
 		if (txq->axq_link == NULL) {
+			u_int32_t txdp;
+
 			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
 			DPRINTF(sc, ATH_DEBUG_XMIT, "TXDP[%u] = %08llx (%p)\n",
 				txq->axq_qnum, (u_int64_t)bf->bf_daddr, bf->bf_desc);
+			txdp = ath_hal_gettxbuf(ah, txq->axq_qnum);
+			if (txdp != bf->bf_daddr) {
+			  DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+				  "TXQ%d: BUG TXDP:%08x instead of %08llx\n",
+				  txq->axq_qnum, txdp,
+				  (u_int64_t)bf->bf_daddr);
+			}
 		} else {
 #ifdef AH_NEED_DESC_SWAP
 			*txq->axq_link = cpu_to_le32(bf->bf_daddr);
@@ -8728,7 +8794,7 @@ ath_tx_timeout(struct net_device *dev)
 		sc->sc_invalid ? "in" : "");
 
 	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
-	  ath_txq_check(sc, &sc->sc_txq[i]);
+	  ath_txq_check(sc, &sc->sc_txq[i],__func__);
 	  ath_txq_dump(sc, &sc->sc_txq[i]);
 	}
 
