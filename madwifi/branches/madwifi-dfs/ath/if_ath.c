@@ -1790,14 +1790,14 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 	    bf = STAILQ_FIRST(&txq->axq_q);
 	    if (bf != NULL) {
 	      DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-		      "TXQ%d: restoring TXDP:%08x\n",
-		      txq->axq_qnum, bf->bf_daddr);
+		      "TXQ%d: restoring TXDP:%08llx\n",
+		      txq->axq_qnum, (u_int64_t)bf->bf_daddr);
 	      ath_hal_puttxbuf(sc->sc_ah, txq->axq_qnum, bf->bf_daddr);
 	      txdp = ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum);
 	      if (txdp != bf->bf_daddr) {
 		DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-			"TXQ%d: BUG failed to restore TXDP:%08x (is %08x)\n",
-			txq->axq_qnum, bf->bf_daddr, txdp);
+			"TXQ%d: BUG failed to restore TXDP:%08llx (is %08x)\n",
+			txq->axq_qnum, (u_int64_t)bf->bf_daddr, txdp);
 	      }
 	      ath_hal_txstart(sc->sc_ah, txq->axq_qnum);
 	    }
