@@ -4759,6 +4759,7 @@ ath_beaconq_setup(struct ath_softc *sc)
 	STAILQ_INIT(&txq->axq_q);
 	ATH_TXQ_LOCK_INIT(txq);
 	TAILQ_INIT(&txq->axq_stageq);
+	sc->sc_txqsetup |= 1 << qnum;
 	return qnum;
 }
 
