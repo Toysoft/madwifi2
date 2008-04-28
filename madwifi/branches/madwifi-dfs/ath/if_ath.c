@@ -11437,6 +11437,14 @@ ath_announce(struct net_device *dev)
 				txq->axq_qnum,
 				ieee80211_wme_acnames[i]);
 		}
+#ifdef ATH_SUPERG_XR
+		IPRINTF(sc, "Use hw queue %u for XR traffic\n",
+			sc->sc_xrtxq->axq_qnum);
+#endif
+		if (sc->sc_uapsdq != NULL) {
+			IPRINTF(sc, "Use hw queue %u for UAPSD traffic\n",
+				sc->sc_uapsdq->axq_qnum);
+		}
 		IPRINTF(sc, "Use hw queue %u for CAB traffic\n",
 			sc->sc_cabq->axq_qnum);
 		IPRINTF(sc, "Use hw queue %u for beacons\n", sc->sc_bhalq);
