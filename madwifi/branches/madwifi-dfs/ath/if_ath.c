@@ -8936,7 +8936,8 @@ ath_tx_stopdma(struct ath_softc *sc, struct ath_txq *txq)
 }
 
 /*
- * Drain the transmit queues and reclaim resources.
+ * Drain the transmit queues and reclaim resources. TXQ are locked during the
+ * whole operation (it simplifies the code and should not impact performance).
  */
 static void
 ath_draintxq(struct ath_softc *sc)
@@ -8944,23 +8945,32 @@ ath_draintxq(struct ath_softc *sc)
 	struct ath_hal *ah = sc->sc_ah;
 	unsigned int i;
 
-	/* XXX return value */
-	if (!sc->sc_invalid) {
-		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
-			"Invoking ath_hal_stoptxdma with sc_bhalq:%d.\n",
-			sc->sc_bhalq);
-		(void) ath_hal_stoptxdma(ah, sc->sc_bhalq);
-		DPRINTF(sc, ATH_DEBUG_RESET, "Beacon queue txbuf is 0x%x.\n",
-			ath_hal_gettxbuf(ah, sc->sc_bhalq));
-		for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
-			if (ATH_TXQ_SETUP(sc, i))
-				ath_tx_stopdma(sc, &sc->sc_txq[i]);
+	if (sc->sc_invalid)
+		return;
+
+	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
+		if (ATH_TXQ_SETUP(sc, i)) {
+			struct ath_txq * txq = &sc->sc_txq[i];
+			struct ath_buf * bf, *bf_tmp;
+
+			ATH_TXQ_LOCK_IRQ(txq);
+			ath_tx_stopdma(sc, txq);
+			STAILQ_FOREACH_SAFE(bf, &txq->axq_q, bf_list, bf_tmp) {
+				ATH_TXQ_REMOVE_HEAD(txq, bf_list);
+#ifdef AR_DEBUG
+				if (sc->sc_debug & ATH_DEBUG_RESET) {
+					HAL_STATUS status = ath_hal_txprocdesc(
+						ah,
+						bf->bf_desc, 
+						&bf->bf_dsstatus.ds_txstat);
+					ath_printtxbuf(bf,status == HAL_OK);
+				}
+#endif /* AR_DEBUG */
+				ath_return_txbuf(sc, &bf);
+			}
+			ATH_TXQ_UNLOCK_IRQ(txq);
+		}
 	}
-	sc->sc_dev->trans_start = jiffies;
-	netif_wake_queue(sc->sc_dev);		/* XXX move to callers */
-	for (i = 0; i < HAL_NUM_TX_QUEUES; i++)
-		if (ATH_TXQ_SETUP(sc, i))
-			ath_tx_draintxq(sc, &sc->sc_txq[i]);
 }
 
 /*
