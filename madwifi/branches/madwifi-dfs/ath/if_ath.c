@@ -370,8 +370,6 @@ static u_int32_t ath_get_real_maxtxpower(struct ath_softc *sc);
 static void ath_txq_dump(struct ath_softc *sc, struct ath_txq *txq);
 static int ath_txq_check(struct ath_softc *sc, struct ath_txq *txq, const char *msg);
 
-/* calibrate every 30 secs in steady state but check every second at first. */
-static int ath_calinterval = ATH_SHORT_CALINTERVAL;
 static int ath_countrycode = CTRY_DEFAULT;	/* country code */
 static int ath_outdoor = AH_FALSE;		/* enable outdoor use */
 static int ath_xchanmode = AH_TRUE;		/* enable extended channels */
@@ -385,6 +383,7 @@ static int countrycode = -1;
 static int maxvaps = -1;
 static int outdoor = -1;
 static int xchanmode = -1;
+static int beacon_cal = 1;
 
 static const char *hal_status_desc[] = {
 	"No error",
@@ -410,6 +409,7 @@ static struct notifier_block ath_event_block = {
 };
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,52))
+MODULE_PARM(beacon_cal, "i");
 MODULE_PARM(countrycode, "i");
 MODULE_PARM(maxvaps, "i");
 MODULE_PARM(outdoor, "i");
@@ -423,6 +423,7 @@ MODULE_PARM(ratectl, "s");
 MODULE_PARM(intmit, "i");
 #else
 #include <linux/moduleparam.h>
+module_param(beacon_cal, int, 0600);
 module_param(countrycode, int, 0600);
 module_param(maxvaps, int, 0600);
 module_param(outdoor, int, 0600);
@@ -815,6 +816,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	sc->sc_grpplq.axq_qnum = -1;
 	sc->sc_xrtxq = ath_txq_setup(sc, HAL_TX_QUEUE_DATA, HAL_XR_DATA);
 #endif
+	sc->sc_calinterval_sec = ATH_SHORT_CALINTERVAL_SECS;
+	sc->sc_lastcal = jiffies;
 
 	/*
 	 * Special case certain configurations.  Note the
@@ -2912,7 +2915,8 @@ ath_stop_locked(struct net_device *dev)
 		}
 		if (!sc->sc_invalid) {
 			del_timer_sync(&sc->sc_dfs_cac_timer);
-			del_timer_sync(&sc->sc_cal_ch);
+			if (!sc->sc_beacon_cal)
+				del_timer_sync(&sc->sc_cal_ch);
 		}
 		ath_draintxq(sc);
 		if (!sc->sc_invalid) {
@@ -2927,6 +2931,20 @@ ath_stop_locked(struct net_device *dev)
 		ath_hal_gpioset(ah, sc->sc_ledpin, !sc->sc_ledon);
 
 	return 0;
+}
+
+static void ath_set_beacon_cal(struct ath_softc *sc, int val)
+{
+	if (sc->sc_beacon_cal == !!val)
+		return;
+
+	if (val) {
+		del_timer_sync(&sc->sc_cal_ch);
+	} else {
+		mod_timer(&sc->sc_cal_ch, jiffies + (sc->sc_calinterval_sec * HZ));
+		add_timer(&sc->sc_cal_ch);
+	}
+	sc->sc_beacon_cal = (val && beacon_cal);
 }
 
 /*
@@ -5445,6 +5463,25 @@ ath_beacon_send(struct ath_softc *sc, int *needmark, uint64_t hw_tsf)
 			"Invoking ath_hal_txstart with sc_bhalq: %d\n",
 			sc->sc_bhalq);
 		ath_hal_txstart(ah, sc->sc_bhalq);
+		if (sc->sc_beacon_cal && 
+		    time_after(jiffies, (sc->sc_lastcal + (sc->sc_calinterval_sec * HZ))))
+		{
+			ath_calibrate((unsigned long)sc->sc_dev);
+		}
+#if 0
+		/* This block was useful to detect jiffies rollover bug in the 
+		 * timer conditional.  Too chatty to leave enabled, but may be 
+		 * useful again when debugging per-radio calibration intervals */
+		else if (sc->sc_beacon_cal) {
+			printk("%s: %s: now=%lu lastcal=%lu expires=%lu remaining=%u ms\n", 
+			       SC_DEV_NAME(sc),
+			       __FUNCTION__,
+			       jiffies
+			       (sc->sc_lastcal)
+			       (sc->sc_lastcal + (sc->sc_calinterval_sec * HZ))
+			       jiffies_to_msecs(sc->sc_lastcal + (sc->sc_calinterval_sec * HZ) - jiffies));
+		}
+#endif
 
 		sc->sc_stats.ast_be_xmit++;		/* XXX per-VAP? */
 	}
@@ -5782,6 +5819,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		ath_hal_beacontimers(ah, &bs);
 		sc->sc_imask |= HAL_INT_BMISS;
 		ath_hal_intrset(ah, sc->sc_imask);
+		ath_set_beacon_cal(sc, 0);
 	} else {
 		ath_hal_intrset(ah, 0);
 		if (reset_tsf)
@@ -5793,8 +5831,11 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			 */
 			intval |= HAL_BEACON_ENA;
 			sc->sc_imask |= HAL_INT_SWBA;
+			ath_set_beacon_cal(sc, 1);
 			ath_beaconq_config(sc);
-		}
+		} else
+			ath_set_beacon_cal(sc, 0);
+
 #ifdef ATH_SUPERG_DYNTURBO
 		ath_beacon_dturbo_config(vap, intval &
 				~(HAL_BEACON_RESET_TSF | HAL_BEACON_ENA));
@@ -9028,7 +9069,8 @@ ath_chan_change(struct ath_softc *sc, struct ieee80211_channel *chan)
 
 	ath_rate_setup(dev, mode);
 	ath_setcurmode(sc, mode);
-	/* Reset noise floor on channelc hange and let ieee layer know */
+	/* Reset noise floor on channel change and let ieee layer know */
+	ath_hal_process_noisefloor(sc->sc_ah);
 	ic->ic_channoise = ath_hal_get_channel_noise(sc->sc_ah, 
 			&(sc->sc_curchan));
 
@@ -9242,6 +9284,9 @@ ath_calibrate(unsigned long arg)
 			sc->sc_curchan.channel, 
 			sc->sc_curchan.channelFlags);
 
+	ath_hal_process_noisefloor(ah);
+	ic->ic_channoise = ath_hal_get_channel_noise(ah, &(sc->sc_curchan));
+
 	if (ath_hal_getrfgain(ah) == HAL_RFGAIN_NEED_CHANGE) {
 		/*
 		 * Rfgain is out of bounds, reset the chip
@@ -9271,32 +9316,36 @@ ath_calibrate(unsigned long arg)
 			ath_set_txcont(ic, txcont_was_active);
 
 	}
-	if (!ath_hal_calibrate(ah, &sc->sc_curchan, &isIQdone)) {
-		EPRINTF(sc, "Calibration of channel %u failed!\n",
+	else if(ath_hal_getrfgain(ah) == HAL_RFGAIN_READ_REQUESTED) {
+		/* With current HAL, I've never seen this so I'm going to log it
+		 * as an error and see if it ever shows up with newer HAL. */
+#if 0
+		EPRINTF(sc, "Calibration of channel %u skipped!  "
+			    "HAL_RFGAIN_READ_REQUESTED pending!\n",
 			sc->sc_curchan.channel);
-		sc->sc_stats.ast_per_calfail++;
-	}
-
-	ath_hal_process_noisefloor(ah);
-	if (isIQdone == AH_TRUE) {
-		/* Unless user has overridden calibration interval,
-		 * upgrade to less frequent calibration */
-		if (ath_calinterval == ATH_SHORT_CALINTERVAL)
-			ath_calinterval = ATH_LONG_CALINTERVAL;
+#endif
 	}
 	else {
-		/* Unless user has overridden calibration interval,
-		 * downgrade to more frequent calibration */
-		if (ath_calinterval == ATH_LONG_CALINTERVAL)
-			ath_calinterval = ATH_SHORT_CALINTERVAL;
+		if (!ath_hal_calibrate(ah, &sc->sc_curchan, &isIQdone)) {
+			EPRINTF(sc, "Calibration of channel %u failed!\n",
+				sc->sc_curchan.channel);
+			sc->sc_stats.ast_per_calfail++;
+		}
+
+		/* Update calibration interval based on whether I gain and Q 
+		 * gain adjustments completed.*/
+		sc->sc_calinterval_sec = (isIQdone == AH_TRUE) ? 
+			ATH_LONG_CALINTERVAL_SECS : 
+			ATH_SHORT_CALINTERVAL_SECS;
 	}
 
-	DPRINTF(sc, ATH_DEBUG_CALIBRATE, "Channel %u/%x -- IQ %s.\n",
+	DPRINTF(sc, ATH_DEBUG_CALIBRATE, "Channel %u [flags=%04x] -- IQ %s.\n",
 		sc->sc_curchan.channel, sc->sc_curchan.channelFlags,
 		isIQdone ? "done" : "not done");
-
-	sc->sc_cal_ch.expires = jiffies + (ath_calinterval * HZ);
-	add_timer(&sc->sc_cal_ch);
+	sc->sc_lastcal = jiffies;
+	if (!sc->sc_beacon_cal) {
+		mod_timer(&sc->sc_cal_ch, jiffies + (sc->sc_calinterval_sec * HZ));
+	}
 }
 
 static void
@@ -9402,7 +9451,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 		ieee80211_state_name[vap->iv_state],
 		ieee80211_state_name[nstate]);
 
-	del_timer(&sc->sc_cal_ch);		/* periodic calibration timer */
+	if (!sc->sc_beacon_cal)
+		del_timer(&sc->sc_cal_ch);		/* periodic calibration timer */
 
 	ath_hal_setledstate(ah, leds[nstate]);	/* set LED */
 	netif_stop_queue(dev);			/* before we do anything else */
@@ -9626,7 +9676,8 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 				"VAP -> DFSWAIT_PENDING \n");
 			/* start calibration timer with a really small value 
 			 * 1/10 sec */
-			mod_timer(&sc->sc_cal_ch, jiffies + (HZ/10));
+			if (!sc->sc_beacon_cal)
+				mod_timer(&sc->sc_cal_ch, jiffies + (HZ / 10));
 			/* wake the receiver */
 			netif_wake_queue(dev);
 			/* don't do the other usual stuff... */
@@ -9673,9 +9724,9 @@ done:
 	sc->sc_halstats.ns_avgrssi = ATH_RSSI_DUMMY_MARKER;
 	sc->sc_halstats.ns_avgtxrssi = ATH_RSSI_DUMMY_MARKER; 
   	/* Finally, start any timers. */
-	if (nstate == IEEE80211_S_RUN) {
+	if ((nstate == IEEE80211_S_RUN) && !sc->sc_beacon_cal) {
 		/* start periodic recalibration timer */
-		mod_timer(&sc->sc_cal_ch, jiffies + (ath_calinterval * HZ));
+		mod_timer(&sc->sc_cal_ch, jiffies + (sc->sc_calinterval_sec * HZ));
 	}
 
 #ifdef ATH_SUPERG_XR
@@ -11239,9 +11290,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	return ret;
 }
 
-static int mincalibrate = 1;		/* once a second */
-static int maxint = 0x7fffffff;		/* 32-bit big */
-
 static const ctl_table ath_sysctl_template[] = {
 	{ .ctl_name	= CTL_AUTO,
 	  .procname	= "slottime",
@@ -11608,15 +11656,6 @@ static ctl_table ath_static_sysctls[] = {
 	  .data		= &ath_xchanmode,
 	  .maxlen	= sizeof(ath_xchanmode),
 	  .proc_handler	= proc_dointvec
-	},
-	{ .ctl_name	= CTL_AUTO,
-	  .procname	= "calibrate",
-	  .mode		= 0644,
-	  .data		= &ath_calinterval,
-	  .maxlen	= sizeof(ath_calinterval),
-	  .extra1	= &mincalibrate,
-	  .extra2	= &maxint,
-	  .proc_handler	= proc_dointvec_minmax
 	},
 	{ 0 }
 };
