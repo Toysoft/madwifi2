@@ -367,6 +367,7 @@ static u_int32_t ath_get_clamped_maxtxpower(struct ath_softc *sc);
 static u_int32_t ath_set_clamped_maxtxpower(struct ath_softc *sc, 
 		u_int32_t new_clamped_maxtxpower);
 static u_int32_t ath_get_real_maxtxpower(struct ath_softc *sc);
+static void ath_txq_dump(struct ath_softc *sc, struct ath_txq *txq);
 static int ath_txq_check(struct ath_softc *sc, struct ath_txq *txq, const char *msg);
 
 /* calibrate every 30 secs in steady state but check every second at first. */
@@ -1733,6 +1734,32 @@ static inline void ath_override_intmit_if_disabled(struct ath_softc *sc)
 	}
 }
 
+static inline HAL_BOOL ath_hw_puttxbuf(struct ath_softc *sc, u_int qnum,
+				u_int32_t txdp, const char *msg)
+{
+	HAL_BOOL result;
+	u_int32_t txdp_2;
+
+	result = ath_hal_puttxbuf(sc->sc_ah, qnum, txdp);
+	if (!result) {
+		DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+			"TXQ%d: BUG failed to set TXDP:%08x\n",
+			qnum, txdp);
+		ath_txq_check(sc, &sc->sc_txq[qnum], msg);
+		return result;
+	}
+
+	txdp_2 = ath_hal_gettxbuf(sc->sc_ah, qnum);
+	if (txdp_2 != txdp) {
+		DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+			"TXQ%d: BUG failed to set TXDP:%08x (is %08x)\n",
+			qnum, txdp, txdp_2);
+		ath_txq_check(sc, &sc->sc_txq[qnum], msg);
+	}
+
+	return result;
+}
+
 /* If channel change is sucessfull, sc->sc_curchan is updated with the new
  * channel */
 
@@ -1746,6 +1773,7 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
  	u_int8_t old_privFlags = sc->sc_curchan.privFlags;
 	unsigned long __axq_lockflags[HAL_NUM_TX_QUEUES];
 	struct ath_txq * txq;
+	struct ath_buf * bf;
 	int i;
 
 	ath_hal_getintmit(sc->sc_ah, &l_intmit);
@@ -1755,54 +1783,77 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 		ath_hal_setintmit(sc->sc_ah, expected_intmit);
 	}
 
-	/* ath_hal_reset() resets all TXDP pointers, so we need to
-	 * lock all TXQ to avoid race condition with
-	 * ath_tx_txqaddbuf() and ath_tx_processq() */
+	/* ath_hal_reset() resets all TXDP pointers, so we need to lock all
+	 * TXQ to avoid race condition with ath_tx_txqaddbuf() and
+	 * ath_tx_processq() */
 
 	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
-	  if (ATH_TXQ_SETUP(sc, i)) {
-	    txq = &sc->sc_txq[i];
-	    spin_lock_irqsave(&txq->axq_lock, __axq_lockflags[i]);
-	  }
+		if (ATH_TXQ_SETUP(sc, i)) {
+			txq = &sc->sc_txq[i];
+
+			spin_lock_irqsave(&txq->axq_lock, __axq_lockflags[i]);
+#if 0
+			/* We don't stop TXQ since ath_hal_reset() will stop
+			 * them anyway. If we do it here, it sometimes fails
+			 * and takes 100ms to fail! */
+			bf = STAILQ_FIRST(&txq->axq_q);
+			if (bf != NULL) {
+				if (!ath_hal_stoptxdma(sc->sc_ah,
+						       txq->axq_qnum)) {
+					DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+						"TXQ%d: BUG failed to"
+						" stop TXQ\n",
+						txq->axq_qnum);
+				}
+			}
+#endif
+		}
 	}
 
 	ret = ath_hal_reset(sc->sc_ah, sc->sc_opmode, channel, 
 			bChannelChange, status);
 
-	/* Restore all TXDP pointers, if appropriate, and unlock in
-	 * the reverse order we locked */
+	/* Restore all TXDP pointers, if appropriate, and unlock in the
+	 * reverse order we locked */
 	for (i=HAL_NUM_TX_QUEUES-1; i>=0; i--) {
-	  /* only take care of configured TXQ */
-	  if (ATH_TXQ_SETUP(sc, i)) {
-	    struct ath_buf * bf;
-	    u_int32_t txdp;
+		/* only take care of configured TXQ */
+		if (ATH_TXQ_SETUP(sc, i)) {
+			u_int32_t txdp;
 
-	    txq = &sc->sc_txq[i];
+			txq = &sc->sc_txq[i];
 
-	    /* Check that TXDP is NULL */
-	    txdp = ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum);
-	    if (txdp != 0) {
-	      DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-		      "TXQ%d: BUG TXDP:%08x is not NULL\n",
-		      txq->axq_qnum, txdp);
-	    }
+			/* Check that TXDP is NULL */
+			txdp = ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum);
+			if (txdp != 0) {
+				DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+					"TXQ%d: BUG TXDP:%08x is not NULL\n",
+					txq->axq_qnum, txdp);
+			}
 
-	    bf = STAILQ_FIRST(&txq->axq_q);
-	    if (bf != NULL) {
-	      DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-		      "TXQ%d: restoring TXDP:%08llx\n",
-		      txq->axq_qnum, (u_int64_t)bf->bf_daddr);
-	      ath_hal_puttxbuf(sc->sc_ah, txq->axq_qnum, bf->bf_daddr);
-	      txdp = ath_hal_gettxbuf(sc->sc_ah, txq->axq_qnum);
-	      if (txdp != bf->bf_daddr) {
-		DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-			"TXQ%d: BUG failed to restore TXDP:%08llx (is %08x)\n",
-			txq->axq_qnum, (u_int64_t)bf->bf_daddr, txdp);
-	      }
-	      ath_hal_txstart(sc->sc_ah, txq->axq_qnum);
-	    }
-	    spin_unlock_irqrestore(&txq->axq_lock, __axq_lockflags[i]);
-	  }
+			/* We restore TXDP to the first "In Progress" TX
+			 * descriptor. We skipped "Done" TX descriptors in
+			 * order to have sending duplicate packets */
+			STAILQ_FOREACH(bf, &txq->axq_q, bf_list) {
+				if (ath_hal_txprocdesc(sc->sc_ah,
+						       bf->bf_desc,
+					&bf->bf_dsstatus.ds_txstat) ==
+				    HAL_EINPROGRESS) {
+					DPRINTF(sc, ATH_DEBUG_WATCHDOG,
+						"TXQ%d: restoring"
+						" TXDP:%08llx\n",
+						txq->axq_qnum,
+						(u_int64_t)bf->bf_daddr);
+					ath_hw_puttxbuf(sc, txq->axq_qnum,
+							bf->bf_daddr,
+							__func__);
+					ath_hal_txstart(sc->sc_ah,
+							txq->axq_qnum);
+					break;
+				}
+			}
+			spin_unlock_irqrestore(&txq->axq_lock,
+					       __axq_lockflags[i]);
+		}
 	}
 
 	/* On failure, we return immediately */
@@ -2299,9 +2350,10 @@ ath_uapsd_processtriggers(struct ath_softc *sc, u_int64_t hw_tsf)
 						      &an->an_uapsd_q);
 					uapsd_xmit_q->axq_link =
 						&last_desc->ds_link;
-					ath_hal_puttxbuf(sc->sc_ah,
+					ath_hw_puttxbuf(sc,
 						uapsd_xmit_q->axq_qnum,
-						(STAILQ_FIRST(&uapsd_xmit_q->axq_q))->bf_daddr);
+						(STAILQ_FIRST(&uapsd_xmit_q->axq_q))->bf_daddr,
+							__func__);
 
 					ath_hal_txstart(sc->sc_ah,
 							uapsd_xmit_q->axq_qnum);
@@ -3078,11 +3130,15 @@ ath_txq_dump(struct ath_softc *sc, struct ath_txq *txq)
 
 	j = 0;
 	STAILQ_FOREACH(bf, &txq->axq_q, bf_list) {
+		HAL_STATUS status = 
+			ath_hal_txprocdesc(sc->sc_ah,
+					   bf->bf_desc,
+					   &bf->bf_dsstatus.ds_txstat);
 		DPRINTF(sc, ATH_DEBUG_WATCHDOG, "  [%3u] bf_daddr:%08llx "
-				"ds_link:%08x ds_hw3:%08x\n",
-				j++,
-				(u_int64_t)bf->bf_daddr, bf->bf_desc->ds_link,
-				bf->bf_desc->ds_hw[3]);
+			"ds_link:%08x %s\n",
+			j++,
+			(u_int64_t)bf->bf_daddr, bf->bf_desc->ds_link,
+			status == HAL_EINPROGRESS ? "pending" : "done");
 	}
 }
 
@@ -3166,18 +3222,8 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 		DPRINTF(sc, ATH_DEBUG_TX_PROC, "UC txq [%d] depth = %d\n", 
 				txq->axq_qnum, txq->axq_depth);
 		if (txq->axq_link == NULL) {
-			u_int32_t txdp;
-
-			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
-			DPRINTF(sc, ATH_DEBUG_XMIT, "TXDP[%u] = %08llx (%p)\n",
-				txq->axq_qnum, (u_int64_t)bf->bf_daddr, bf->bf_desc);
-			txdp = ath_hal_gettxbuf(ah, txq->axq_qnum);
-			if (txdp != bf->bf_daddr) {
-			  DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-				  "TXQ%d: BUG TXDP:%08x instead of %08llx\n",
-				  txq->axq_qnum, txdp,
-				  (u_int64_t)bf->bf_daddr);
-			}
+			ath_hw_puttxbuf(sc, txq->axq_qnum, bf->bf_daddr,
+					__func__);
 		} else {
 #ifdef AH_NEED_DESC_SWAP
 			*txq->axq_link = cpu_to_le32(bf->bf_daddr);
@@ -5193,8 +5239,8 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 		if (bfmcast != NULL) {
 			/* link the descriptors */
 			if (cabq->axq_link == NULL) {
-				ath_hal_puttxbuf(ah, cabq->axq_qnum,
-						 bfmcast->bf_daddr);
+				ath_hw_puttxbuf(sc, cabq->axq_qnum,
+						 bfmcast->bf_daddr, __func__);
 			} else {
 #ifdef AH_NEED_DESC_SWAP
 			*cabq->axq_link = cpu_to_le32(bfmcast->bf_daddr);
@@ -5393,7 +5439,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark, uint64_t hw_tsf)
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"Invoking ath_hal_puttxbuf with sc_bhalq: %d bfaddr: %x\n",
 			sc->sc_bhalq, bfaddr);
-		ath_hal_puttxbuf(ah, sc->sc_bhalq, bfaddr);
+		ath_hw_puttxbuf(sc, sc->sc_bhalq, bfaddr, __func__);
 
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
 			"Invoking ath_hal_txstart with sc_bhalq: %d\n",
@@ -6202,8 +6248,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			else
 				bf = STAILQ_FIRST(&txq->axq_q);
 			if (bf) {
-				ath_hal_puttxbuf(ah, txq->axq_qnum, 
-						bf->bf_daddr);
+				ath_hw_puttxbuf(sc, txq->axq_qnum, 
+						bf->bf_daddr, __func__);
 				ath_hal_txstart(ah, txq->axq_qnum);
 			}
 		}
@@ -6365,7 +6411,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			bf = STAILQ_FIRST(&txq->axq_q);
 
 		if (bf) {
-			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
+			ath_hw_puttxbuf(sc, txq->axq_qnum, bf->bf_daddr,
+					__func__);
 			ath_hal_txstart(ah, txq->axq_qnum);
 		}
 
@@ -6412,7 +6459,8 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			}
 
 			if (bf) {
-				ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
+				ath_hw_puttxbuf(sc, txq->axq_qnum,
+						bf->bf_daddr, __func__);
 				ath_hal_txstart(ah, txq->axq_qnum);
 			}
 
@@ -7411,7 +7459,7 @@ static void ath_grppoll_start(struct ieee80211vap *vap, int pollcount)
 	ds->ds_link = head->bf_daddr;
 #endif
 	/* start the queue */
-	ath_hal_puttxbuf(ah, txq->axq_qnum, head->bf_daddr);
+	ath_hw_puttxbuf(sc, txq->axq_qnum, head->bf_daddr, __func__);
 	ath_hal_txstart(ah, txq->axq_qnum);
 	sc->sc_xrgrppoll = 1;
 #undef USE_SHPREAMBLE
