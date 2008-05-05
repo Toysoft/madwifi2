@@ -64,6 +64,10 @@
 #include <ah.h>
 #include <ah_os.h>
 
+#ifndef notrace
+#define notrace
+#endif
+
 #ifdef AH_DEBUG
 static	int ath_hal_debug = 0;
 #endif
@@ -72,7 +76,7 @@ int	ath_hal_dma_beacon_response_time = 2;	/* in TUs */
 int	ath_hal_sw_beacon_response_time = 10;	/* in TUs */
 int	ath_hal_additional_swba_backoff = 0;	/* in TUs */
 
-struct ath_hal *
+struct ath_hal notrace *
 _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 		HAL_BUS_TAG t, HAL_BUS_HANDLE h, HAL_STATUS *s)
 {
@@ -92,7 +96,7 @@ _ath_hal_attach(u_int16_t devid, HAL_SOFTC sc,
 	return ah;
 }
 
-void
+void notrace
 _ath_hal_detach(struct ath_hal *ah)
 {
 	(*ah->ah_detach)(ah);
@@ -107,7 +111,7 @@ _ath_hal_detach(struct ath_hal *ah)
  * Print/log message support.
  */
 
-void __ahdecl
+void __ahdecl notrace
 ath_hal_vprintf(struct ath_hal *ah, const char* fmt, va_list ap)
 {
 	char buf[1024];					/* XXX */
@@ -115,7 +119,7 @@ ath_hal_vprintf(struct ath_hal *ah, const char* fmt, va_list ap)
 	printk("%s", buf);
 }
 
-void __ahdecl
+void __ahdecl notrace
 ath_hal_printf(struct ath_hal *ah, const char* fmt, ...)
 {
 	va_list ap;
@@ -128,7 +132,7 @@ EXPORT_SYMBOL(ath_hal_printf);
 /*
  * Format an Ethernet MAC for printing.
  */
-const char* __ahdecl
+const char* __ahdecl notrace
 ath_hal_ether_sprintf(const u_int8_t *mac)
 {
 	static char etherbuf[18];
@@ -138,7 +142,7 @@ ath_hal_ether_sprintf(const u_int8_t *mac)
 }
 
 #ifdef AH_ASSERT
-void __ahdecl
+void __ahdecl notrace
 ath_hal_assert_failed(const char* filename, int lineno, const char *msg)
 {
 	printk("Atheros HAL assertion failure: %s: line %u: %s\n",
@@ -178,7 +182,7 @@ static	u_int ath_hal_alq_qsize = 8*1024;
 
 #define		MSG_MAXLEN	64
 
-static int
+static int notrace
 ath_hal_setlogging(int enable)
 {
 	int error;
@@ -216,7 +220,7 @@ ath_hal_setlogging(int enable)
 #define	AH_SYSCTL_ARGS		ctl, write, filp, buffer, lenp, ppos
 #endif
 
-static int
+static int notrace
 sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 {
 	int error, enable;
@@ -231,7 +235,8 @@ sysctl_hw_ath_hal_log(AH_SYSCTL_ARGS_DECL)
 		return ath_hal_setlogging(enable);
 }
 
-void ath_hal_logprintf(const char *fmt, ...)
+void notrace
+ath_hal_logprintf(const char *fmt, ...)
 {
 	va_list ap;
 	struct ale *ale;
@@ -254,7 +259,8 @@ void ath_hal_logprintf(const char *fmt, ...)
 }
 EXPORT_SYMBOL(ath_hal_logprintf);
 
-static void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
+static void notrace
+ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val)
 {
 	struct ale *ale;
 	
@@ -294,7 +300,7 @@ static void ath_hal_logmsg(struct ath_hal *ah, u8 write, u_int reg, u_int32_t va
  * NB: see the comments in ah_osdep.h about byte-swapping register
  *     reads and writes to understand what's going on below.
  */
-void __ahdecl
+void __ahdecl notrace
 ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 {
 #ifdef AH_DEBUG
@@ -306,7 +312,7 @@ ath_hal_reg_write(struct ath_hal *ah, u_int reg, u_int32_t val)
 EXPORT_SYMBOL(ath_hal_reg_write);
 
 /* This should only be called while holding the lock, sc->sc_hal_lock. */
-u_int32_t __ahdecl
+u_int32_t __ahdecl notrace
 ath_hal_reg_read(struct ath_hal *ah, u_int reg)
 {
  	u_int32_t val;
@@ -322,7 +328,7 @@ EXPORT_SYMBOL(ath_hal_reg_read);
 #endif /* AH_DEBUG || AH_REGOPS_FUNC */
 
 #if 0
-void __ahdecl
+void __ahdecl notrace
 HALDEBUG(struct ath_hal *ah, const char* fmt, ...)
 {
 	if (ath_hal_debug) {
@@ -334,7 +340,7 @@ HALDEBUG(struct ath_hal *ah, const char* fmt, ...)
 }
 
 
-void __ahdecl
+void __ahdecl notrace
 HALDEBUGn(struct ath_hal *ah, u_int level, const char* fmt, ...)
 {
 	if (ath_hal_debug >= level) {
@@ -349,13 +355,13 @@ HALDEBUGn(struct ath_hal *ah, u_int level, const char* fmt, ...)
 /*
  * Delay n microseconds.
  */
-void __ahdecl
+void __ahdecl notrace
 ath_hal_delay(int n)
 {
 	udelay(n);
 }
 
-u_int32_t __ahdecl
+u_int32_t __ahdecl notrace
 ath_hal_getuptime(struct ath_hal *ah)
 {
 	return ((jiffies / HZ) * 1000) + (jiffies % HZ) * (1000 / HZ);
@@ -366,7 +372,7 @@ EXPORT_SYMBOL(ath_hal_getuptime);
  * Allocate/free memory.
  */
 
-void * __ahdecl
+void * __ahdecl notrace
 ath_hal_malloc(size_t size)
 {
 	void *p;
@@ -377,27 +383,27 @@ ath_hal_malloc(size_t size)
 
 }
 
-void __ahdecl
+void __ahdecl notrace
 ath_hal_free(void* p)
 {
 	kfree(p);
 }
 
-void __ahdecl
+void __ahdecl notrace
 ath_hal_memzero(void *dst, size_t n)
 {
 	memset(dst, 0, n);
 }
 EXPORT_SYMBOL(ath_hal_memzero);
 
-void * __ahdecl
+void * __ahdecl notrace
 ath_hal_memcpy(void *dst, const void *src, size_t n)
 {
 	return memcpy(dst, src, n);
 }
 EXPORT_SYMBOL(ath_hal_memcpy);
 
-int __ahdecl
+int __ahdecl notrace
 ath_hal_memcmp(const void *a, const void *b, size_t n)
 {
 	return memcmp(a, b, n);
@@ -481,7 +487,7 @@ static ctl_table ath_root_table[] = {
 };
 static struct ctl_table_header *ath_hal_sysctl_header;
 
-static void
+static void notrace
 ath_hal_sysctl_register(void)
 {
 	static int initialized = 0;
@@ -493,7 +499,7 @@ ath_hal_sysctl_register(void)
 	}
 }
 
-static void
+static void notrace
 ath_hal_sysctl_unregister(void)
 {
 	if (ath_hal_sysctl_header)
@@ -529,7 +535,7 @@ EXPORT_SYMBOL(ath_hal_process_noisefloor);
 extern void (*kmmio_logmsg)(struct ath_hal *ah, u8 write, u_int reg, u_int32_t val);
 #endif
 
-static int __init
+static int __init notrace
 init_ath_hal(void)
 {
 	const char *sep;
@@ -550,7 +556,7 @@ init_ath_hal(void)
 }
 module_init(init_ath_hal);
 
-static void __exit
+static void __exit notrace
 exit_ath_hal(void)
 {
 #ifdef MMIOTRACE
