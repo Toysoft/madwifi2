@@ -1785,7 +1785,7 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
 	 * the switch will occur at any time after the frame containing the
 	 * element is transmitted. */
 
-	now_tu	= vap->iv_get_tsf(vap) >> 10;
+	now_tu	= IEEE80211_TSF_TO_TU(vap->iv_get_tsf(vap));
 	now	= jiffies;
 
 	if (csa_count == 0) {

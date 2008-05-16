@@ -494,7 +494,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				len_changed = 1;
 			}
 
-			now_tu   = vap->iv_get_tsf(vap) >> 10;
+			now_tu   = IEEE80211_TSF_TO_TU(vap->iv_get_tsf(vap));
 			nexttbtt = vap->iv_get_nexttbtt(vap);
 
 			csa_ie->csa_mode = ic->ic_csa_mode;
