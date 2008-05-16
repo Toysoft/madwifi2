@@ -739,6 +739,7 @@ struct ath_softc {
 	ath_bufhead sc_bbuf;			/* beacon buffers */
 	int sc_bhalq;				/* HAL q for outgoing beacons */
 	u_int sc_bmisscount;			/* missed beacon transmits */
+	struct timer_list sc_swba_timer;	/* watchdog timer for SWBA */
 	u_int32_t sc_ant_tx[8];			/* recent tx frames/antenna */
 	struct ath_txq *sc_cabq;		/* tx q for cab frames */
 	struct ath_txq sc_grpplq;		/* tx q for XR group polls */
