@@ -3202,9 +3202,12 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	struct ath_hal *ah = sc->sc_ah;
 
 	if (!ath_dfs_can_transmit_csaie_dbgmsg(sc)) {
-		DPRINTF(sc, ATH_DEBUG_DOTH,
+		/* This message spots errors in the driver, so it's printed
+		 * whenever any debug options is enabled and it does not
+		 * prevent from sending. This message is normal if you are
+		 * doing packet injection, since it bypass DFS rules */
+		DPRINTF(sc, ATH_DEBUG_ANY,
 			"%s: WE ARE SENDING PACKETS UNDER CAC!\n", __func__);
-		return;
 	}
 
 	/*
@@ -3623,16 +3626,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 
 	STAILQ_INIT(&bf_head);
 
-	/* If we are under CAC or have detected a radar, we simply drop (and
-	 * free) frames. */
-	if (!ath_dfs_can_transmit_dbgmsg(sc)) {
-		/* No need to print a warning or error messages here since we
-		 * know that ath_hardstart() is invoked directly or indirectly
-		 * by the linux network stack and that all packets needs to be
-		 * dropped without exception. */
-		goto hardstart_fail;
-	}
-
+	/* We send injected packets before checking DFS rules. It means that
+	 * packet injection bypass DFS rules */
 	if (SKB_CB(skb)->flags & M_RAW) {
 		bf = ath_take_txbuf(sc);
 		if (bf == NULL) {
@@ -3642,6 +3637,17 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 		}
 		ath_tx_startraw(dev, bf, skb);
 		return NETDEV_TX_OK;
+	}
+
+	/* If we are under CAC or have detected a radar, we simply drop (and
+	 * free) frames. This check is done after processing injected
+	 * packets */
+	if (!ath_dfs_can_transmit_dbgmsg(sc)) {
+		/* No need to print a warning or error messages here since we
+		 * know that ath_hardstart() is invoked directly or indirectly
+		 * by the linux network stack and that all packets needs to be
+		 * dropped without exception. */
+		goto hardstart_fail;
 	}
 
 	ni = SKB_CB(skb)->ni;		/* NB: always passed down by 802.11 layer */
