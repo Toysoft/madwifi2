@@ -553,6 +553,18 @@ static void ath_set_dfs_interference(struct ieee80211com *ic, int val)
 	_ath_set_dfs_interference(sc, &sc->sc_curchan, val);
 }
 
+/* Context: Timer (softIRQ) */
+static void
+ath_swba_watchdog(unsigned long data )
+{
+	struct ath_softc * sc = (struct ath_softc *)data;
+
+	DPRINTF(sc, ATH_DEBUG_BEACON,
+		"%s called, configuring beacon\n",__func__);
+	if (sc->sc_beacons)
+		ath_beacon_config(sc, NULL);
+}
+
 /* Initialize ath_softc structure */
 
 int
@@ -759,6 +771,17 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 		error = EIO;
 		goto bad2;
 	}
+
+	/* SWBA watchdog timer : this timer is needed in order to make sure
+	 * that beacon timers are still alive. If they are not, for instance
+	 * following an IBSS merge where TSF has been updated and beacon timers
+	 * are now in the past, this timer callback will kick in. It might
+	 * solve other situations where beacons stops being sent for some
+	 * reason */
+	init_timer(&sc->sc_swba_timer);
+	sc->sc_swba_timer.function = ath_swba_watchdog;
+	sc->sc_swba_timer.data     = (unsigned long) sc;
+
 	/* CAB: Crap After Beacon - a beacon gated queue */
 	sc->sc_cabq = ath_txq_setup(sc, HAL_TX_QUEUE_CAB, 0);
 	if (sc->sc_cabq == NULL) {
@@ -1312,8 +1335,7 @@ ath_vap_get_nexttbtt(struct ieee80211vap *vap)
 	/* Calculate the closest TBTT that is > now_tu. */
 	now_tu   = IEEE80211_TSF_TO_TU(ath_hal_gettsf64(ah));
 	nexttbtt = sc->sc_nexttbtt + roundup_s(
-		(signed)(now_tu + 1 - sc->sc_nexttbtt),
-		vap->iv_bss->ni_intval);
+		now_tu + 1 - sc->sc_nexttbtt, vap->iv_bss->ni_intval);
 
 	if (nexttbtt != sc->sc_nexttbtt) {
 		DPRINTF(sc, ATH_DEBUG_DOTH,
@@ -2605,12 +2627,13 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 	} else {
 		if (status & HAL_INT_SWBA) {
 			struct ieee80211vap * vap;
+			u_int32_t hw_tsftu = IEEE80211_TSF_TO_TU(hw_tsf);
 
 			DPRINTF(sc, ATH_DEBUG_BEACON,
 				"%s: HAL_INT_SWBA at "
 				"tsf %10llx tsf_tu:%6u nexttbtt %10llx "
 				"nexttbtt_tu:%6u\n",
-				__func__, hw_tsf, IEEE80211_TSF_TO_TU(hw_tsf),
+				__func__, hw_tsf, hw_tsftu,
 				(u_int64_t)sc->sc_nexttbtt << 10,
 				sc->sc_nexttbtt);
 
@@ -2629,6 +2652,12 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			/* Updates sc_nexttbtt */
 			vap = TAILQ_FIRST(&sc->sc_ic.ic_vaps);
 			sc->sc_nexttbtt += vap->iv_bss->ni_intval;
+
+			/* Updates SWBA watchdog timer */
+			mod_timer(&sc->sc_swba_timer, jiffies
+				  + IEEE80211_TU_TO_JIFFIES(
+					  sc->sc_nexttbtt - hw_tsftu));
+
 		}
 		if (status & HAL_INT_RXEOL) {
 			/*
@@ -5702,6 +5731,8 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		/* We just created the interface and TSF will be reset to
 		 * zero, so next beacon will be sent at the next intval
 		 * time */
+		hw_tsf   = 0;
+		hw_tsftu = 0;
 		nexttbtt = intval;
 	} else if (intval) {	/* NB: can be 0 for monitor mode */
 		if (tsf == 1) {
@@ -5720,14 +5751,15 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 				 * not been updated (otherwise hw_tsf > tsf)
 				 * We cannot use the hardware TSF, so we
 				 * wait to synchronize beacons again. */
+				nexttbtt = roundup(hw_tsftu + FUDGE, intval);
 				sc->sc_syncbeacon = 1;
-				goto ath_beacon_config_debug;
 			} else {
 				/* Normal case: we received a beacon to which
-				 * we have synchronized. Make sure that nexttbtt
-				 * is at least FUDGE TU ahead of hw_tsf */
-				nexttbtt = tsftu + roundup(hw_tsftu + FUDGE - 
-						tsftu, intval);
+				 * we have synchronized. Make sure that
+				 * nexttbtt is at least FUDGE TU ahead of
+				 * hw_tsf */
+				nexttbtt = tsftu + roundup(hw_tsftu + FUDGE -
+							   tsftu, intval);
 			}
 		}
 	}
@@ -5853,14 +5885,17 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 #endif
 		sc->sc_nexttbtt = nexttbtt;
 		ath_hw_beaconinit(sc, hw_tsftu, nexttbtt, intval);
-		if (intval & HAL_BEACON_RESET_TSF) {
+		if (reset_tsf)
 			sc->sc_last_tsf = 0;
-		}
 		sc->sc_bmisscount = 0;
 		ath_hal_intrset(ah, sc->sc_imask);
+
+		/* Start SWBA watchdog timer */
+		mod_timer(&sc->sc_swba_timer, jiffies
+			  + IEEE80211_TU_TO_JIFFIES(
+				  sc->sc_nexttbtt - hw_tsftu));
 	}
 
-ath_beacon_config_debug:
 	/* We print all debug messages here, in order to preserve the
 	 * time critical aspect of this function */
 	DPRINTF(sc, ATH_DEBUG_BEACON,
