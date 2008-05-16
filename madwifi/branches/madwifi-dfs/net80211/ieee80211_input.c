@@ -2754,7 +2754,7 @@ ieee80211_doth_switch_channel(struct ieee80211com *ic)
 	u_int32_t now_tu;
 
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		now_tu = vap->iv_get_tsf(vap) >> 10;
+		now_tu = IEEE80211_TSF_TO_TU(vap->iv_get_tsf(vap));
 
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: Channel switch to %3d (%4d MHz) NOW! "
