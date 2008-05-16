@@ -737,7 +737,7 @@ struct ath_softc {
 	u_int8_t sc_grppoll_str[GRPPOLL_RATE_STR_LEN];
 	struct ath_descdma sc_bdma;		/* beacon descriptors */
 	ath_bufhead sc_bbuf;			/* beacon buffers */
-	u_int sc_bhalq;				/* HAL q for outgoing beacons */
+	int sc_bhalq;				/* HAL q for outgoing beacons */
 	u_int sc_bmisscount;			/* missed beacon transmits */
 	u_int32_t sc_ant_tx[8];			/* recent tx frames/antenna */
 	struct ath_txq *sc_cabq;		/* tx q for cab frames */
