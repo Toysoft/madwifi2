@@ -5582,7 +5582,9 @@ static
 void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 		       u_int32_t next_beacon, u_int32_t bintval)
 {
+/* must match sysctl dev.ath.hal.dma_beacon_response_time (TU units) */
 #define AR5K_TUNE_DMA_BEACON_RESP		2
+/* must match sysctl dev.ath.hal.sw_beacon_response_time (TU units) */
 #define AR5K_TUNE_SW_BEACON_RESP		10
 
 #define AR5K_BEACON_5210	0x8024

@@ -812,7 +812,7 @@ struct ath_softc {
 						 * received pulses */
 	int sc_radar_ignored;			/* if set, we ignored all 
 						 * detected radars */
-	u_int32_t sc_nexttbtt;
+	u_int32_t sc_nexttbtt;	/* TBTT following the next SWBA */
 	u_int64_t sc_last_tsf;
 };
 
