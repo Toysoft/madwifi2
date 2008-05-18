@@ -812,7 +812,9 @@ struct ath_softc {
 						 * received pulses */
 	int sc_radar_ignored;			/* if set, we ignored all 
 						 * detected radars */
-	u_int32_t sc_nexttbtt;	/* TBTT following the next SWBA */
+	u_int32_t sc_nexttbtt;	/* TBTT following the next SWBA, updated only
+				 * by ath_beacon_config() to avoid race
+				 * conditions */
 	u_int64_t sc_last_tsf;
 };
 
@@ -917,5 +919,14 @@ int ar_device(int devid);
 	 ((NULL == _v || NULL == _v->iv_ic) ? \
 	  "MadWifi" : \
 	  DEV_NAME(_v->iv_ic->ic_dev))
+
+/* Beacon related definition */
+
+/* Used when computing nexttbtt */
+#define	FUDGE	AR5K_TUNE_SW_BEACON_RESP
+/* must match sysctl dev.ath.hal.dma_beacon_response_time (TU units) */
+#define AR5K_TUNE_DMA_BEACON_RESP		2
+/* must match sysctl dev.ath.hal.sw_beacon_response_time (TU units) */
+#define AR5K_TUNE_SW_BEACON_RESP		10
 
 #endif /* _DEV_ATH_ATHVAR_H */
