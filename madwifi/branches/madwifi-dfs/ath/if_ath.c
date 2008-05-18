@@ -560,7 +560,8 @@ ath_swba_watchdog(unsigned long data )
 	struct ath_softc * sc = (struct ath_softc *)data;
 
 	DPRINTF(sc, ATH_DEBUG_BEACON,
-		"%s called, configuring beacon\n",__func__);
+		"%sconfiguring beacon\n",
+		sc->sc_beacons ? "" : "not ");
 	if (sc->sc_beacons)
 		ath_beacon_config(sc, NULL);
 }
@@ -1339,8 +1340,8 @@ ath_vap_get_nexttbtt(struct ieee80211vap *vap)
 
 	if (nexttbtt != sc->sc_nexttbtt) {
 		DPRINTF(sc, ATH_DEBUG_DOTH,
-			"%s: now_tu:%u nexttbtt:%u corrected to %u [%u]\n",
-			__func__, now_tu, sc->sc_nexttbtt, nexttbtt,
+			"now_tu:%u nexttbtt:%u corrected to %u [bintval:%u]\n",
+			now_tu, sc->sc_nexttbtt, nexttbtt,
 			vap->iv_bss->ni_intval);
 	}
 
@@ -2626,16 +2627,15 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		ATH_SCHEDULE_TQUEUE(&sc->sc_rxorntq, &needmark);
 	} else {
 		if (status & HAL_INT_SWBA) {
-			struct ieee80211vap * vap;
 			u_int32_t hw_tsftu = IEEE80211_TSF_TO_TU(hw_tsf);
+			u_int32_t intval, nexttbtt;
 
 			DPRINTF(sc, ATH_DEBUG_BEACON,
-				"%s: HAL_INT_SWBA at "
-				"tsf %10llx tsf_tu:%6u nexttbtt %10llx "
-				"nexttbtt_tu:%6u\n",
-				__func__, hw_tsf, hw_tsftu,
-				(u_int64_t)sc->sc_nexttbtt << 10,
-				sc->sc_nexttbtt);
+				"HAL_INT_SWBA at "
+				"hw_tsf=%10llx nexttbtt_tsf=%10llx "
+				"hwtsf_tu=%6u nexttbtt=%6u\n",
+				hw_tsf, IEEE80211_TU_TO_TSF(sc->sc_nexttbtt),
+				hw_tsftu, sc->sc_nexttbtt);
 
 			/* Software beacon alert--time to send a beacon.
 			 * Handle beacon transmission directly; deferring
@@ -2649,14 +2649,21 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 				ath_hal_intrset(ah, sc->sc_imask);
 			}
 
-			/* Updates sc_nexttbtt */
-			vap = TAILQ_FIRST(&sc->sc_ic.ic_vaps);
-			sc->sc_nexttbtt += vap->iv_bss->ni_intval;
+			/* Compute nexttbtt first, needed to update SWBA
+			 * watchdog timer */
+			intval = sc->sc_ic.ic_lintval & HAL_BEACON_PERIOD;
+			nexttbtt = sc->sc_nexttbtt +
+				roundup_s(hw_tsftu + FUDGE + 1 -
+					  sc->sc_nexttbtt, intval);
+
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"nexttbtt:%u [bintval:%u]\n",
+				nexttbtt, intval);
 
 			/* Updates SWBA watchdog timer */
 			mod_timer(&sc->sc_swba_timer, jiffies
-				  + IEEE80211_TU_TO_JIFFIES(
-					  sc->sc_nexttbtt - hw_tsftu));
+				  + IEEE80211_TU_TO_JIFFIES_UP(
+					  nexttbtt - hw_tsftu));
 
 		}
 		if (status & HAL_INT_RXEOL) {
@@ -5049,7 +5056,7 @@ ath_beacon_alloc_internal(struct ath_softc *sc, struct ieee80211_node *ni)
 		 * others get a timestamp aligned to the next interval.
 		 */
 		tuadjust = (ni->ni_intval * (ath_maxvaps - avp->av_bslot)) / ath_maxvaps;
-		tsfadjust = cpu_to_le64(tuadjust << 10);	/* TU->TSF */
+		tsfadjust = cpu_to_le64(IEEE80211_TU_TO_TSF(tuadjust));
 
 		DPRINTF(sc, ATH_DEBUG_BEACON,
 			"%s beacons, bslot %d intval %u tsfadjust(Kus) %llu\n",
@@ -5582,11 +5589,6 @@ static
 void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 		       u_int32_t next_beacon, u_int32_t bintval)
 {
-/* must match sysctl dev.ath.hal.dma_beacon_response_time (TU units) */
-#define AR5K_TUNE_DMA_BEACON_RESP		2
-/* must match sysctl dev.ath.hal.sw_beacon_response_time (TU units) */
-#define AR5K_TUNE_SW_BEACON_RESP		10
-
 #define AR5K_BEACON_5210	0x8024
 #define AR5K_BEACON_5211	0x8020
 
@@ -5711,22 +5713,20 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	}
 
 	/* XXX: Conditionalize multi-bss support? */
+	intval = ic->ic_lintval & HAL_BEACON_PERIOD;
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/* For multi-bss ap support beacons are either staggered
 		 * evenly over N slots or burst together.  For the former
 		 * arrange for the SWBA to be delivered for each slot.
 		 * Slots that are not occupied will generate nothing. */
 		/* NB: the beacon interval is kept internally in TUs */
-		intval = ic->ic_lintval & HAL_BEACON_PERIOD;
 		if (sc->sc_stagbeacons)
 			intval /= ath_maxvaps;	/* for staggered beacons */
 		if ((sc->sc_nostabeacons) &&
 		    (vap->iv_opmode == IEEE80211_M_HOSTAP))
 			reset_tsf = 1;
-	} else
-		intval = ni->ni_intval & HAL_BEACON_PERIOD;
+	}
 
-#define	FUDGE	3
 	sc->sc_syncbeacon = 0;
 
 	if (reset_tsf) {
@@ -5745,23 +5745,24 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			 * ensure that it is at least FUDGE TUs ahead
 			 * of the current TSF. Otherwise, we use the
 			 * next beacon timestamp again */
- 			nexttbtt = roundup(hw_tsftu + FUDGE, intval);
-		} 
-		else if (ic->ic_opmode == IEEE80211_M_IBSS) {
+ 			nexttbtt = roundup(hw_tsftu + FUDGE + 1, intval);
+		} else if (ic->ic_opmode == IEEE80211_M_IBSS) {
 			if (tsf > hw_tsf) {
-				/* We received a beacon, but the HW TSF has
-				 * not been updated (otherwise hw_tsf > tsf)
-				 * We cannot use the hardware TSF, so we
-				 * wait to synchronize beacons again. */
-				nexttbtt = roundup(hw_tsftu + FUDGE, intval);
-				sc->sc_syncbeacon = 1;
+				/* We received a beacon in the past, but HW TSF
+				 * has not been updated yet (otherwise hw_tsf >
+				 * tsf). In order to compute nexttbtt, we use
+				 * the old value stored in sc->sc_nexttbtt */
+				nexttbtt = sc->sc_nexttbtt +
+					roundup_s(hw_tsftu + FUDGE + 1 -
+						  sc->sc_nexttbtt, intval);
 			} else {
-				/* Normal case: we received a beacon to which
-				 * we have synchronized. Make sure that
-				 * nexttbtt is at least FUDGE TU ahead of
-				 * hw_tsf */
-				nexttbtt = tsftu + roundup(hw_tsftu + FUDGE -
-							   tsftu, intval);
+				/* We received a beacon in the past and HW TSF
+				 * has already been updated. In order to
+				 * compute nexttbtt, we use the TSF contained
+				 * in this beacon */
+				nexttbtt = tsftu +
+					roundup_s(hw_tsftu + FUDGE + 1 -
+						  tsftu, intval);
 			}
 		}
 	}
@@ -5796,7 +5797,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 					cfpcount = cfpperiod - 1;
 			}
 		} while (nexttbtt < hw_tsftu + FUDGE);
-#undef FUDGE
+
 		memset(&bs, 0, sizeof(bs));
 		bs.bs_intval = intval;
 		bs.bs_nexttbtt = nexttbtt;
@@ -5892,19 +5893,19 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 		sc->sc_bmisscount = 0;
 		ath_hal_intrset(ah, sc->sc_imask);
 
-		/* Start SWBA watchdog timer */
+		/* Updates SWBA watchdog timer */
 		mod_timer(&sc->sc_swba_timer, jiffies
-			  + IEEE80211_TU_TO_JIFFIES(
-				  sc->sc_nexttbtt - hw_tsftu));
+			  + IEEE80211_TU_TO_JIFFIES_UP(
+				  nexttbtt - hw_tsftu));
 	}
 
 	/* We print all debug messages here, in order to preserve the
 	 * time critical aspect of this function */
 	DPRINTF(sc, ATH_DEBUG_BEACON,
-		"ni=%p tsf=%llu hw_tsf=%llu tsftu=%u hw_tsftu=%u\n",
+		"ni=%p hw_tsf=%10llx tsf=%10llx hw_tsftu=%6u tsftu=%6u\n",
 		ni, 
-		(unsigned long long)tsf, (unsigned long long)hw_tsf, 
-		tsftu, hw_tsftu);
+		hw_tsf, tsf,
+		hw_tsftu, tsftu);
 
 	if (reset_tsf) {
 		/* We just created the interface */
@@ -5925,8 +5926,8 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 			} else {
 				/* We did receive a beacon, normal case */
 				DPRINTF(sc, ATH_DEBUG_BEACON,
-					"Beacon received, TSF and timers "
-					"synchronized\n");
+					"Beacon received and TSF has been "
+					"already updated\n");
 			}
 		}
 	}
@@ -6842,6 +6843,7 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 				do_merge = 1;
 			}
 
+#if 0
 			/* Check sc_nexttbtt */
 			if (sc->sc_nexttbtt < hw_tu) {
 				DPRINTF(sc, ATH_DEBUG_BEACON,
@@ -6850,6 +6852,7 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 					sc->sc_nexttbtt, hw_tu);
 				do_merge = 1;
 			}
+#endif
 
 			intval = ni->ni_intval & HAL_BEACON_PERIOD;
 #if 0
@@ -8778,7 +8781,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			 * (bits 25-10 of the TSF). */ 
 #define TSTAMP_TX_MASK  ((2 ^ (27 - 1)) - 1)    /* First 27 bits. */ 
 
-			tstamp = ts->ts_tstamp << 10; 
+			tstamp = IEEE80211_TU_TO_TSF(ts->ts_tstamp); 
 			bf->bf_tsf = ((bf->bf_tsf & ~TSTAMP_TX_MASK) | tstamp); 
 			if ((bf->bf_tsf & TSTAMP_TX_MASK) < tstamp) 
 				bf->bf_tsf -= TSTAMP_TX_MASK + 1; 
