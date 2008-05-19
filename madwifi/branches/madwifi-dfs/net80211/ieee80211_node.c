@@ -630,11 +630,25 @@ ieee80211_sta_join1(struct ieee80211_node *selbs)
 	 */
 	canreassoc = ((obss != NULL) &&
 		(vap->iv_state == IEEE80211_S_RUN) && ssid_equal(obss, selbs));
-	vap->iv_bss = selbs;
-	IEEE80211_ADDR_COPY(vap->iv_bssid, selbs->ni_bssid);
-	if (obss != NULL)
-		ieee80211_unref_node(&obss);
-	ic->ic_bsschan = selbs->ni_chan;
+	/*
+	 * In Ad-Hoc mode, copy all the data from selbs to
+	 * vap->iv_bss, in other modes set vap->iv_bss = selbs
+	 */
+	if (vap->iv_opmode == IEEE80211_M_IBSS && vap->iv_bss != NULL) {
+		copy_bss_state(vap->iv_bss, selbs);
+		IEEE80211_ADDR_COPY(vap->iv_bss->ni_bssid, selbs->ni_bssid);
+		IEEE80211_ADDR_COPY(vap->iv_bssid, selbs->ni_bssid);
+		vap->iv_bss->ni_intval = selbs->ni_intval;
+		vap->iv_bss->ni_tstamp.tsf = selbs->ni_tstamp.tsf;
+		/* We got a reference to selbs, so need to unref() */
+		ieee80211_unref_node(&selbs);
+	} else {
+		vap->iv_bss = selbs;
+		IEEE80211_ADDR_COPY(vap->iv_bssid, selbs->ni_bssid);
+		if (obss != NULL)
+			ieee80211_unref_node(&obss);
+	}
+	ic->ic_bsschan = vap->iv_bss->ni_chan;
 	ic->ic_curchan = ic->ic_bsschan;
 	ic->ic_curmode = ieee80211_chan2mode(ic->ic_curchan);
 	ic->ic_set_channel(ic);
