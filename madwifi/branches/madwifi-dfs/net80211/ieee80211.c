@@ -797,12 +797,12 @@ ieee80211_media_setup(struct ieee80211com *ic,
 }
 
 /*
- * Perform the dfs action (channel switch) using scan cache or a randomly
- * chosen channel. The choice of the fallback random channel is done in
- * ieee80211_scan_dfs_action, when there are no scan cache results.
+ * Perform the DFS action (channel switch) using scan cache or a randomly
+ * chosen channel. The choice of the random channel is done in
+ * ieee80211_scan_dfs_action().
  *
- * This was moved out of ieee80211_mark_dfs, because the same functionality is
- * used also in ieee80211_ioctl_chanswitch.
+ * This was moved out of ieee80211_mark_dfs(), because the same functionality
+ * is used also in ieee80211_ioctl_chanswitch().
  */
 void
 ieee80211_dfs_action(struct ieee80211com *ic) {
@@ -1560,11 +1560,19 @@ enum ieee80211_phymode
 ieee80211_chan2mode(const struct ieee80211_channel *chan)
 {
 	/*
-	 * Callers should handle this case properly, rather than
-	 * just relying that this function returns a sane value.
-	 * XXX: Probably needs to be revised.
+	 * Callers should handle this case properly, rather than just relying
+	 * that this function returns a sane value.  XXX: Probably needs to be
+	 * revised. chan is undefined if channel is 0 for instance and kernel
+	 * panic would happen when called by ieee80211_sta_join1() in IBSS
+	 * mode.
 	 */
-	KASSERT(chan != IEEE80211_CHAN_ANYC, ("channel not setup"));
+
+	if (chan == NULL ||
+	    chan == IEEE80211_CHAN_ANYC) {
+		printk(KERN_ERR, "%s: BUG channel not setup: %p\n",
+		       __func__, chan);
+		return IEEE80211_MODE_11B;
+	}
 
 	if (IEEE80211_IS_CHAN_108G(chan))
 		return IEEE80211_MODE_TURBO_G;
