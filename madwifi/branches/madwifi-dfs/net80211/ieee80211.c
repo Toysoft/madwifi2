@@ -1569,7 +1569,7 @@ ieee80211_chan2mode(const struct ieee80211_channel *chan)
 
 	if (chan == NULL ||
 	    chan == IEEE80211_CHAN_ANYC) {
-		printk(KERN_ERR, "%s: BUG channel not setup: %p\n",
+		printk(KERN_ERR "%s: BUG channel not setup: %p\n",
 		       __func__, chan);
 		return IEEE80211_MODE_11B;
 	}
