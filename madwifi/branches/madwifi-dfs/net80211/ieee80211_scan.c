@@ -991,77 +991,64 @@ ieee80211_dfs_is_channel_usable(struct ieee80211com *ic,
  * detected. AP/IBSS mode only. Return 1 on success, 0 on failure
  */
 int
-ieee80211_scan_dfs_action(struct ieee80211vap *vap,
-			  const struct ieee80211_scan_entry *se)
+ieee80211_scan_dfs_action(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_channel *new_channel = NULL;
+	int chanStart, i, count;
 
 	if (!IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode))
 		return 0;
-	if (se != NULL) {
-		new_channel = se->se_chan;
-		if (new_channel != NULL) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: new channel found in scan cache\n",
-					  __func__);
-		}
-	} else {
-		/* No channel was found via scan module, means no good scanlist
-		 * was found */
-		int chanStart, i, count;
 
-		if ((ic->ic_curchan != NULL) &&
-		    (ic->ic_curchan != IEEE80211_CHAN_ANYC)) {
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: ic_curchan is %3d (%4d MHz)\n",
-					  __func__, ic->ic_curchan->ic_ieee,
-					  ic->ic_curchan->ic_freq);
-		}
+	if ((ic->ic_curchan != NULL) &&
+	    (ic->ic_curchan != IEEE80211_CHAN_ANYC)) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: ic_curchan is %3d (%4d MHz)\n",
+				  __func__, ic->ic_curchan->ic_ieee,
+				  ic->ic_curchan->ic_freq);
+	}
+	
+	if ((ic->ic_bsschan != NULL) &&
+	    (ic->ic_bsschan != IEEE80211_CHAN_ANYC)) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: ic_bsschan is %3d (%4d MHz)\n",
+				  __func__, ic->ic_bsschan->ic_ieee,
+				  ic->ic_bsschan->ic_freq);
+	}
+	
+	/* According to FCC/ETSI rules on uniform spreading, we shall select a
+	 * channel out of the list of usable channels so that the probability
+	 * of selecting a given channel shall be the same for all channels
+	 * (reference: ETSI 301 893 v1.3.1 $4.6.2.5.1 */
+	/* First, we count the usable channels */
+	count = 0;
 
-		if ((ic->ic_bsschan != NULL) &&
-		    (ic->ic_bsschan != IEEE80211_CHAN_ANYC)) {
+	for (i = 0; i < ic->ic_nchans; i++) {
+		if (ieee80211_dfs_is_channel_usable(
+			    ic, &ic->ic_channels[i])) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-					  "%s: ic_bsschan is %3d (%4d MHz)\n",
-					  __func__, ic->ic_bsschan->ic_ieee,
-					  ic->ic_bsschan->ic_freq);
+					  "%s: usable channel %3d "
+					  "(%4d MHz)\n",
+					  __func__, 
+					  ic->ic_channels[i].ic_ieee,
+					  ic->ic_channels[i].ic_freq);
+			count ++;
 		}
-
-		/* According to FCC/ETSI rules on uniform spreading, we shall
-		 * select a channel out of the list of usable channels so that
-		 * the probability of selecting a given channel shall be the
-		 * same for all channels (reference: ETSI 301 893 v1.3.1
-		 * $4.6.2.5.1 */
-		/* First, we count the usable channels */
+	}
+	
+	if (count != 0) {
+		/* Next, we pickup a random usable channel */
+		chanStart = jiffies % count;
+		
 		count = 0;
-
 		for (i = 0; i < ic->ic_nchans; i++) {
+			/* must be the same formula as above */
 			if (ieee80211_dfs_is_channel_usable(
 				    ic, &ic->ic_channels[i])) {
-				IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
-						"%s: usable channel %3d "
-						"(%4d MHz)\n",
-						__func__, 
-						ic->ic_channels[i].ic_ieee,
-						ic->ic_channels[i].ic_freq);
-				count ++;
-			}
-		}
-
-		if (count != 0) {
-			/* Next, we pickup a random usable channel */
-			chanStart = jiffies % count;
-
-			count = 0;
-			for (i = 0; i < ic->ic_nchans; i++) {
-				/* must be the same formula as above */
-				if (ieee80211_dfs_is_channel_usable(
-					    ic, &ic->ic_channels[i])) {
-					if (count++ == chanStart) {
-						new_channel = 
-							&ic->ic_channels[i];
-						break;
-					}
+				if (count++ == chanStart) {
+					new_channel = 
+						&ic->ic_channels[i];
+					break;
 				}
 			}
 		}

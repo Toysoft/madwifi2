@@ -838,16 +838,8 @@ ieee80211_dfs_action(struct ieee80211com *ic) {
 		/* It is not scanning, but waiting for ath driver to move the 
 		 * vap to RUN. */
 	}
-	/* Check the scan results using only cached results */
-	if (!(ieee80211_check_scan(vap, IEEE80211_SCAN_NOSSID | 
-					IEEE80211_SCAN_KEEPMODE | 
-					IEEE80211_SCAN_USECACHE, 0,
-				   vap->iv_des_nssid, vap->iv_des_ssid,
-				   ieee80211_scan_dfs_action))) {
-		/* No channel was found, so call the scan action with no 
-		 * result. */
-		ieee80211_scan_dfs_action(vap, NULL);
-	}
+
+	ieee80211_scan_dfs_action(vap);
 }
 
 /* Check if some Non-Occupancy Period timer have expired and update flags
