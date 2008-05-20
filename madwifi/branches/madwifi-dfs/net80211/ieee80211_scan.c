@@ -990,15 +990,27 @@ ieee80211_dfs_is_channel_usable(struct ieee80211com *ic,
  * Execute radar channel change. This is called when a radar signal is
  * detected. AP/IBSS mode only. Return 1 on success, 0 on failure
  */
-int
+void
 ieee80211_scan_dfs_action(struct ieee80211vap *vap)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ieee80211_channel *new_channel = NULL;
 	int chanStart, i, count;
 
-	if (!IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode))
-		return 0;
+	if (!IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: called but not in DFS master mode\n",
+				  __func__);
+		return;
+	}
+
+	/* Do nothing if a channel switch is already in progress */
+	if (ic->ic_flags & IEEE80211_F_CHANSWITCH) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+				  "%s: channel switch already in progress\n",
+				  __func__);
+		return;
+	}
 
 	if ((ic->ic_curchan != NULL) &&
 	    (ic->ic_curchan != IEEE80211_CHAN_ANYC)) {
@@ -1111,9 +1123,6 @@ ieee80211_scan_dfs_action(struct ieee80211vap *vap)
 		/* A suitable scan entry was not found */
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: new channel not found\n", __func__);
-		return 0;
 	}
-
-	return 1;
 }
 EXPORT_SYMBOL(ieee80211_scan_dfs_action);

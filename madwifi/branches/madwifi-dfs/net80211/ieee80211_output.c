@@ -1765,7 +1765,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 /* Start a new Channel Switch process. It will first check if there is already
  * one Channel Switch process running and if so, will determine which one will
  * run. This function must be the only function setting IEEE80211_F_CHANSWITCH
- * in ic_flags
+ * in ic_flags.
  *
  * is_beacon_frame : true if the csa_count comes from a beacon frame we just
  * received. */
