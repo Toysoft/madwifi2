@@ -488,14 +488,15 @@ proc_ieee80211_read(struct file *file, char __user *buf, size_t len, loff_t *off
 }
 
 static int
-proc_ieee80211_open(struct inode *inode, struct file *file)
+proc_common_open(struct inode *inode, struct file *file)
 {
-	struct proc_ieee80211_priv *pv = NULL;
-	struct proc_dir_entry *dp = PDE(inode);
-	struct ieee80211vap *vap = dp->data;
+	struct proc_ieee80211_priv *pv;
 
-	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv), GFP_KERNEL)))
+	file->private_data =  kmalloc(sizeof(struct proc_ieee80211_priv),
+				      GFP_KERNEL);
+	if (file->private_data == NULL)
 		return -ENOMEM;
+
 	/* initially allocate both read and write buffers */
 	pv = (struct proc_ieee80211_priv *) file->private_data;
 	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
@@ -514,7 +515,24 @@ proc_ieee80211_open(struct inode *inode, struct file *file)
 	memset(pv->rbuf, 0, MAX_PROC_IEEE80211_SIZE);
 	pv->max_wlen = MAX_PROC_IEEE80211_SIZE;
 	pv->max_rlen = MAX_PROC_IEEE80211_SIZE;
+
+	return 0;
+}
+
+static int
+proc_ieee80211_open(struct inode *inode, struct file *file)
+{
+	struct proc_ieee80211_priv *pv = NULL;
+	struct proc_dir_entry *dp = PDE(inode);
+	struct ieee80211vap *vap = dp->data;
+	int result;
+
+	result = proc_common_open(inode, file);
+	if (result != 0)
+		return result;
+
 	/* now read the data into the buffer */
+	pv = (struct proc_ieee80211_priv *) file->private_data;
 	pv->rlen = proc_read_nodes(vap, pv->rbuf, MAX_PROC_IEEE80211_SIZE);
 	return 0;
 }
@@ -525,28 +543,14 @@ proc_doth_open(struct inode *inode, struct file *file)
 	struct proc_ieee80211_priv *pv = NULL;
 	struct proc_dir_entry *dp = PDE(inode);
 	struct ieee80211vap *vap = dp->data;
+	int result;
 
-	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv), GFP_KERNEL)))
-		return -ENOMEM;
-	/* initially allocate both read and write buffers */
-	pv = (struct proc_ieee80211_priv *) file->private_data;
-	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
-	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
-	if (!pv->rbuf) {
-		kfree(pv);
-		return -ENOMEM;
-	}
-	pv->wbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
-	if (!pv->wbuf) {
-		vfree(pv->rbuf);
-		kfree(pv);
-		return -ENOMEM;
-	}
-	memset(pv->wbuf, 0, MAX_PROC_IEEE80211_SIZE);
-	memset(pv->rbuf, 0, MAX_PROC_IEEE80211_SIZE);
-	pv->max_wlen = MAX_PROC_IEEE80211_SIZE;
-	pv->max_rlen = MAX_PROC_IEEE80211_SIZE;
+	result = proc_common_open(inode, file);
+	if (result != 0)
+		return result;
+
 	/* now read the data into the buffer */
+	pv = (struct proc_ieee80211_priv *) file->private_data;
 	pv->rlen = proc_doth_print(vap, pv->rbuf, MAX_PROC_IEEE80211_SIZE);
 	return 0;
 }
