@@ -467,6 +467,61 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 	return (p - buf);
 }
 
+static int
+proc_iv_bss_print(struct ieee80211vap *vap, char *buf, int space)
+{
+	char *p = buf;
+	const struct ieee80211_node *ni = vap->iv_bss;
+
+	p += sprintf(p, "vap:%p vap->iv_bss: %p\n",
+		     vap, ni);
+	if (ni == NULL)
+		return (p - buf);
+
+	p += sprintf(p, "ni_macaddr:	" MAC_FMT "\n"
+		     "ni_bssid:	" MAC_FMT "\n"
+		     "ni_tstamp:	0x%llx us\n"
+		     "ni_intval:	%u TU\n"
+		     "ni_capinfo:	0x%x%s%s%s%s%s%s%s%s%s%s%s%s\n",
+		     MAC_ADDR(ni->ni_macaddr),
+		     MAC_ADDR(ni->ni_bssid),
+		     ni->ni_tstamp.tsf,
+		     ni->ni_intval,
+		     ni->ni_capinfo,
+		     ni->ni_capinfo & IEEE80211_CAPINFO_ESS ? " ESS" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_IBSS ? " IBSS" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_CF_POLLABLE ?
+		     " CF_POLLABLE" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_CF_POLLREQ ?
+		     " CF_POLLREQ" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_PRIVACY ?
+		     " PRIVACY" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE ?
+		     " SHORT_PREAMBLE" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_PBCC ? " PBCC" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_CHNL_AGILITY ?
+		     " CHANNEL_AGILITY" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_SPECTRUM_MGMT ?
+		     " SPECTRUM_MGMT" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME ?
+		     " SHORT_SLOTTIME" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_RSN ? " RSN" : "",
+		     ni->ni_capinfo & IEEE80211_CAPINFO_DSSSOFDM ?
+		     "DSSSOFDM" : "");
+
+	if (ni->ni_chan == NULL) {
+		p += sprintf(p, "ni_chan:	NULL\n");
+	} else if (ni->ni_chan == IEEE80211_CHAN_ANYC) {
+		p += sprintf(p, "ni_chan:	ANY\n");
+	} else {
+		p += sprintf(p,
+			     "ni_chan:	Frequency:%4u MHz  Channel:%3u\n",
+			     ni->ni_chan->ic_freq, ni->ni_chan->ic_ieee);
+	}
+
+	return (p - buf);
+}
+
 static ssize_t
 proc_ieee80211_read(struct file *file, char __user *buf, size_t len, loff_t *offset)
 {
@@ -555,6 +610,24 @@ proc_doth_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static int
+proc_iv_bss_open(struct inode *inode, struct file *file)
+{
+	struct proc_ieee80211_priv *pv = NULL;
+	struct proc_dir_entry *dp = PDE(inode);
+	struct ieee80211vap *vap = dp->data;
+	int result;
+
+	result = proc_common_open(inode, file);
+	if (result != 0)
+		return result;
+
+	/* now read the data into the buffer */
+	pv = (struct proc_ieee80211_priv *) file->private_data;
+	pv->rlen = proc_iv_bss_print(vap, pv->rbuf, MAX_PROC_IEEE80211_SIZE);
+	return 0;
+}
+
 static ssize_t
 proc_ieee80211_write(struct file *file, const char __user *buf, size_t len, loff_t *offset)
 {
@@ -603,6 +676,13 @@ static struct file_operations proc_doth_ops = {
 	.read = proc_ieee80211_read,
 	.write = proc_ieee80211_write,
 	.open = proc_doth_open,
+	.release = proc_ieee80211_close,
+};
+
+static struct file_operations proc_iv_bss_ops = {
+	.read = proc_ieee80211_read,
+	.write = proc_ieee80211_write,
+	.open = proc_iv_bss_open,
 	.release = proc_ieee80211_close,
 };
 
@@ -891,6 +971,7 @@ ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 	/* Create a proc entry listing the associated stations */
 	ieee80211_proc_vcreate(vap, &proc_ieee80211_ops, "associated_sta");
 	ieee80211_proc_vcreate(vap, &proc_doth_ops, "doth");
+	ieee80211_proc_vcreate(vap, &proc_iv_bss_ops, "iv_bss");
 
 	/* Recreate any other proc entries that have been registered */
 	if (vap->iv_proc) {
