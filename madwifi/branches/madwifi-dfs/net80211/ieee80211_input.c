@@ -3345,7 +3345,8 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 
 		/* ieee80211_parse_csaie() needs to be called in IBSS mode as
 		 * well. We filter on the IBSSID */
-		if (vap->iv_opmode == IEEE80211_M_IBSS &&
+		if ((vap->iv_opmode == IEEE80211_M_IBSS) &&
+			(scan.capinfo & IEEE80211_CAPINFO_IBSS) &&
 			IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			if (scan.csa != NULL)
 				ieee80211_parse_csaie(ni,scan.csa,wh);
@@ -3359,7 +3360,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 			return;
 		}
 		if ((vap->iv_opmode == IEEE80211_M_IBSS) && 
-				(scan.capinfo & IEEE80211_CAPINFO_IBSS)) {
+			(scan.capinfo & IEEE80211_CAPINFO_IBSS)) {
 			if (ni_or_null == NULL) {
 				/* Create a new entry in the neighbor table. */
 				ni = ieee80211_add_neighbor(vap, wh, &scan);
