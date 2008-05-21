@@ -5694,8 +5694,15 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	u_int32_t intval, nexttbtt = 0;
 	int reset_tsf = 0;
 
-	if (vap == NULL)
-		vap = TAILQ_FIRST(&ic->ic_vaps);   /* XXX */
+	/* if vap is NULL, we use the first VAP instead */
+	if (vap == NULL) {
+		vap = TAILQ_FIRST(&ic->ic_vaps);
+		if (vap == NULL) {
+			DPRINTF(sc, ATH_DEBUG_BEACON,
+				"BUG: ic_vaps list empty\n");
+			return ;
+		}
+	}
 
 	ni = vap->iv_bss;
 
@@ -5704,21 +5711,22 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	hw_tsftu = IEEE80211_TSF_TO_TU(hw_tsf);
 	tsftu = IEEE80211_TSF_TO_TU(tsf);
 
-	/* We should reset hw TSF only once, so we increment
-	 * ni_tstamp.tsf to avoid resetting the hw TSF multiple
-	 * times */
+	/* We should reset hardware TSF only once, so we increment
+	 * ni_tstamp.tsf to avoid resetting the hardware TSF multiple times */
 	if (tsf == 0) {
 		reset_tsf = 1;
 		ni->ni_tstamp.tsf = cpu_to_le64(1);
 	}
 
 	/* XXX: Conditionalize multi-bss support? */
+	/* FIXME : maybe we should use ni->ni_intval */
 	intval = ic->ic_lintval & HAL_BEACON_PERIOD;
+	/* FIXME : maybe we should use IEEE80211_IS_MODE_BEACON? */
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/* For multi-bss ap support beacons are either staggered
-		 * evenly over N slots or burst together.  For the former
-		 * arrange for the SWBA to be delivered for each slot.
-		 * Slots that are not occupied will generate nothing. */
+		 * evenly over N slots or burst together. For the former
+		 * arrange for the SWBA to be delivered for each slot. Slots
+		 * that are not occupied will generate nothing. */
 		/* NB: the beacon interval is kept internally in TUs */
 		if (sc->sc_stagbeacons)
 			intval /= ath_maxvaps;	/* for staggered beacons */
