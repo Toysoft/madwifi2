@@ -485,7 +485,7 @@ proc_iv_bss_print(struct ieee80211vap *vap, char *buf, int space)
 		     "ni_capinfo:	0x%x%s%s%s%s%s%s%s%s%s%s%s%s\n",
 		     MAC_ADDR(ni->ni_macaddr),
 		     MAC_ADDR(ni->ni_bssid),
-		     ni->ni_tstamp.tsf,
+		     le64_to_cpu(ni->ni_tstamp.tsf),
 		     ni->ni_intval,
 		     ni->ni_capinfo,
 		     ni->ni_capinfo & IEEE80211_CAPINFO_ESS ? " ESS" : "",
