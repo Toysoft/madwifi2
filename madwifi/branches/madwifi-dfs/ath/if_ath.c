@@ -2978,7 +2978,6 @@ static void ath_set_beacon_cal(struct ath_softc *sc, int val)
 		del_timer_sync(&sc->sc_cal_ch);
 	} else {
 		mod_timer(&sc->sc_cal_ch, jiffies + (sc->sc_calinterval_sec * HZ));
-		add_timer(&sc->sc_cal_ch);
 	}
 	sc->sc_beacon_cal = (val && beacon_cal);
 }
@@ -7184,7 +7183,8 @@ drop_micfail:
 			if (type == IEEE80211_FC0_TYPE_DATA) {
 				sc->sc_rxrate = rs->rs_rate;
 				ath_led_event(sc, ATH_LED_RX);
-			} else if (jiffies - sc->sc_ledevent >= sc->sc_ledidle)
+			} else if (time_after_eq(jiffies,
+				sc->sc_ledevent + sc->sc_ledidle))
 				ath_led_event(sc, ATH_LED_POLL);
 		}
 rx_next:
@@ -10385,8 +10385,7 @@ ath_led_off(unsigned long arg)
 
 	ath_hal_gpioset(sc->sc_ah, sc->sc_ledpin, !sc->sc_ledon);
 	sc->sc_ledtimer.function = ath_led_done;
-	sc->sc_ledtimer.expires = jiffies + sc->sc_ledoff;
-	add_timer(&sc->sc_ledtimer);
+	mod_timer(&sc->sc_ledtimer, jiffies + sc->sc_ledoff);
 }
 
 /*
@@ -10400,8 +10399,7 @@ ath_led_blink(struct ath_softc *sc, int on, int off)
 	sc->sc_blinking = 1;
 	sc->sc_ledoff = off;
 	sc->sc_ledtimer.function = ath_led_off;
-	sc->sc_ledtimer.expires = jiffies + on;
-	add_timer(&sc->sc_ledtimer);
+	mod_timer(&sc->sc_ledtimer, jiffies + on);
 }
 
 static void

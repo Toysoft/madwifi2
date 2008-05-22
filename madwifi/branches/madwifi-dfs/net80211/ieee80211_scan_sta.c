@@ -293,7 +293,7 @@ found:
 	saveie(&ise->se_ath_ie, sp->ath);
 
 	/* clear failure count after STA_FAIL_AGE passes */
-	if (se->se_fails && (jiffies - se->se_lastfail) > STA_FAILS_AGE*HZ) {
+	if (se->se_fails && (time_after(jiffies, se->se_lastfail + STA_FAILS_AGE*HZ))) {
 		se->se_fails = 0;
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_SCAN, macaddr,
 			"%s: fails %u", __func__, se->se_fails);

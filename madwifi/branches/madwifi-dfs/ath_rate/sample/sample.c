@@ -344,7 +344,8 @@ pick_sample_ndx(struct sample_node *sn, int size_bin)
 			continue;
 
 		/* rarely sample bit-rates that fail a lot */
-		if (jiffies - sn->stats[size_bin][ndx].last_tx < ((HZ * STALE_FAILURE_TIMEOUT_MS) / 1000) &&
+		if (time_before(jiffies, sn->stats[size_bin][ndx].last_tx
+				+ ((HZ * STALE_FAILURE_TIMEOUT_MS) / 1000)) &&
 		    sn->stats[size_bin][ndx].successive_failures > 3)
 			continue;
 
@@ -447,7 +448,9 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 			} else if (sn->packets_sent[size_bin] < 20) {
 				/* let the bit-rate switch quickly during the first few packets */
 				change_rates = 1;
-			} else if (jiffies - ((HZ * MIN_SWITCH_MS) / 1000) > sn->jiffies_since_switch[size_bin]) {
+			} else if (time_after(jiffies,
+				sn->jiffies_since_switch[size_bin] +
+				((HZ * MIN_SWITCH_MS) / 1000))) {
 				/* 2 seconds have gone by */
 				change_rates = 1;
 			} else if (average_tx_time * 2 < sn->stats[size_bin][sn->current_rate[size_bin]].average_tx_time) {
@@ -1040,9 +1043,9 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 
 			p += sprintf(p, "\t%u.%02u\t\t", t / a, (t * 100 / a) % 100);
 			if (sn->stats[size_bin][ndx].last_tx) {
-  				unsigned int d = jiffies - 
+  				unsigned long d = jiffies - 
 					sn->stats[size_bin][ndx].last_tx;
-				p += sprintf(p, "%u.%02u", d / HZ, d % HZ);
+				p += sprintf(p, "%lu.%02lu", d / HZ, d % HZ);
 			} else {
 				p += sprintf(p, "-");
 			}

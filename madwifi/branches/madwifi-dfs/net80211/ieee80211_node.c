@@ -133,8 +133,7 @@ ieee80211_node_attach(struct ieee80211com *ic)
 	init_timer(&ic->ic_inact);
 	ic->ic_inact.function = ieee80211_node_timeout;
 	ic->ic_inact.data = (unsigned long) ic;
-	ic->ic_inact.expires = jiffies + IEEE80211_INACT_WAIT * HZ;
-	add_timer(&ic->ic_inact);
+	mod_timer(&ic->ic_inact, jiffies + IEEE80211_INACT_WAIT * HZ);
 
 #ifdef IEEE80211_DEBUG_REFCNT
 	ic->ic_node_alloc_debug = node_alloc_debug;
@@ -1815,7 +1814,7 @@ restart:
 		 * XXX doesn't belong here
 		 */
 		if (ni->ni_rxfrag != NULL &&
-		    jiffies > ni->ni_rxfragstamp + HZ) {
+		    time_after(jiffies, ni->ni_rxfragstamp + HZ)) {
 			ieee80211_dev_kfree_skb(&ni->ni_rxfrag);
 		}
 		/*
@@ -1914,8 +1913,7 @@ ieee80211_node_timeout(unsigned long arg)
 	ieee80211_scan_timeout(ic);
 	ieee80211_timeout_stations(&ic->ic_sta);
 
-	ic->ic_inact.expires = jiffies + IEEE80211_INACT_WAIT * HZ;
-	add_timer(&ic->ic_inact);
+	mod_timer(&ic->ic_inact, jiffies + IEEE80211_INACT_WAIT * HZ);
 }
 
 void
@@ -1966,7 +1964,7 @@ ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
 		ni->ni_scangen, ni->ni_authmode, ni->ni_flags);
 	printk("\tassocid 0x%x txpower %u vlan %u\n",
 		ni->ni_associd, ni->ni_txpower, ni->ni_vlan);
-	printk ("rxfragstamp %u\n", ni->ni_rxfragstamp);
+	printk ("rxfragstamp %lu\n", ni->ni_rxfragstamp);
 	for (i = 0; i < 17; i++) {
 		printk("\t%d: txseq %u rxseq %u fragno %u\n", i,
 		       ni->ni_txseqs[i],
