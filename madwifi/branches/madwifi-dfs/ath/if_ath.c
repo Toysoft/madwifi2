@@ -4928,7 +4928,7 @@ ath_beaconq_setup(struct ath_softc *sc)
 	if (qnum < 0)
 		return -1;
 	if (qnum >= ARRAY_SIZE(sc->sc_txq)) {
-		EPRINTF(sc, "HAL hardware queue number %d(>=%d) "
+		EPRINTF(sc, "HAL hardware queue number %d(>=%zd) "
 			"is out of range.\n",
 			qnum, ARRAY_SIZE(sc->sc_txq));
 		ath_hal_releasetxqueue(sc->sc_ah, qnum);
@@ -7314,7 +7314,7 @@ ath_grppoll_txq_setup(struct ath_softc *sc, int qtype, int period)
 		if (qnum < 0)
 			return ;
 		if (qnum >= ARRAY_SIZE(sc->sc_txq)) {
-			EPRINTF(sc, "HAL hardware queue number %d(>=%d) "
+			EPRINTF(sc, "HAL hardware queue number %d(>=%zd) "
 				"is out of range.",
 				qnum, ARRAY_SIZE(sc->sc_txq));
 			ath_hal_releasetxqueue(ah, qnum);
@@ -7680,7 +7680,7 @@ ath_txq_setup(struct ath_softc *sc, int qtype, int subtype)
 		return NULL;
 	}
 	if (qnum >= ARRAY_SIZE(sc->sc_txq)) {
-		EPRINTF(sc, "HAL hardware queue number %d(>=%d) "
+		EPRINTF(sc, "HAL hardware queue number %d(>=%zd) "
 			"is out of range.", qnum, ARRAY_SIZE(sc->sc_txq));
 #ifdef ATH_SUPERG_COMP
 		if (compbuf) {
