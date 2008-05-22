@@ -711,7 +711,7 @@ struct ath_softc {
 	u_int sc_ledpin;			/* GPIO pin for driving LED */
 	u_int sc_ledon;				/* pin setting for LED on */
 	u_int sc_ledidle;			/* idle polling interval */
-	int sc_ledevent;			/* time of last LED event */
+	unsigned long sc_ledevent;		/* time of last LED event */
 	u_int8_t sc_rxrate;			/* current rx rate for LED */
 	u_int8_t sc_txrate;			/* current tx rate for LED */
 	u_int16_t sc_ledoff;			/* off time for current blink */
@@ -769,7 +769,7 @@ struct ath_softc {
 
 	int sc_beacon_cal;			/* use beacon timer for calibration */
 	long unsigned int sc_calinterval_sec;	/* current interval for calibration (in seconds) */
-	long unsigned int sc_lastcal;		/* last time the calibration was performed */
+	unsigned long sc_lastcal;		/* last time the calibration was performed */
 	struct timer_list sc_cal_ch;		/* calibration timer */
 	HAL_NODE_STATS sc_halstats;		/* station-mode rssi stats */
 

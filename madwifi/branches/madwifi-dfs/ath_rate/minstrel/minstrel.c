@@ -784,8 +784,7 @@ ath_timer_function(unsigned long data)
 	if (timer == NULL)
 		DPRINTF(sc, "%s: timer is null - leave it\n", __func__);
 
-	timer->expires = jiffies + ((HZ * interval) / 1000);
-	add_timer(timer);
+	mod_timer(timer, jiffies + ((HZ * interval) / 1000));
 }
 
 static void
@@ -897,8 +896,7 @@ ath_rate_attach(struct ath_softc *sc)
 	osc->timer.function = ath_timer_function;
 	osc->timer.data = (unsigned long)osc;
 
-	osc->timer.expires = jiffies + HZ;
-	add_timer(&osc->timer);
+	mod_timer(&osc->timer, jiffies + HZ);
 
 	return &osc->arc;
 }
