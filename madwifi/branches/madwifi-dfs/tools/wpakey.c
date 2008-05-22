@@ -147,7 +147,8 @@ int getkey(int keyidx, uint8_t *mac, int verbose) {
 			printf("c=%-4s f=%-4s k<%-2i>=", strcipher(wk.ik_type),
 				strflags(wk.ik_flags), wk.ik_keylen);
 			hexdump(wk.ik_keydata, wk.ik_keylen);
-			printf(" rs=%lld ts=%lld\n", wk.ik_keyrsc, wk.ik_keytsc);
+			printf(" rs=%lld ts=%lld\n", (long long)wk.ik_keyrsc,
+			       (long long)wk.ik_keytsc);
 		}
 		return 0;
 	}
