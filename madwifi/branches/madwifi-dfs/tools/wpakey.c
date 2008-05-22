@@ -235,17 +235,18 @@ void help() {
 }
 
 int main(int argc, char** argv) {
-	int keyidx;
+	int keyidx = 0;
 	uint8_t mac[6];
 	int cipher = IEEE80211_CIPHER_AES_CCM;
 	int flags = IEEE80211_KEY_RECV | IEEE80211_KEY_XMIT;
 	int c;
+	int i;
 
 	init();
 
 	if (argc == 1) {
-		for (keyidx = 0; keyidx <= 3; keyidx++) {
-			getkey(keyidx, NULL, 1);
+		for (i = 0; i <= 3; i++) {
+			getkey(i, NULL, 1);
 		}
 		iter_sta();
 		return 0;
@@ -255,8 +256,8 @@ int main(int argc, char** argv) {
 		switch (c) {
 		case 'a':
 		case 'A':
-			for (keyidx = 0; keyidx <= 3; keyidx++) {
-				getkey(keyidx, NULL, 1);
+			for (i = 0; i <= 3; i++) {
+				getkey(i, NULL, 1);
 			}
 			if (c == 'A')
 				iter_sta();
