@@ -3628,7 +3628,6 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211_node *ni = NULL;
 	struct ath_buf *bf = NULL;
-	struct ether_header *eh;
 	ath_bufhead bf_head;
 	struct ath_buf *tbf, *tempbf;
 	struct sk_buff *tskb;
@@ -3640,6 +3639,7 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	*/
 	int requeue = 0;
 #ifdef ATH_SUPERG_FF
+	struct ether_header *eh;
 	unsigned int pktlen;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_node *an;
@@ -3712,27 +3712,8 @@ ath_hardstart(struct sk_buff *skb, struct net_device *dev)
 	an = ATH_NODE(ni);
 
 	txq = sc->sc_ac2q[skb->priority];
-
-#endif
-
-	/* If the skb data is shared, we will copy it so we can strip padding
-	 * without affecting any other bridge ports. */
-	if (skb_cloned(skb)) {
-		/* Remember the original SKB so we can free up our references */
-		struct sk_buff *skb_orig = skb;
-		skb = skb_copy(skb, GFP_ATOMIC);
-		if (skb == NULL) {
-			DPRINTF(sc, ATH_DEBUG_XMIT,
-				"Dropping; skb_copy failure.\n");
-			/* No free RAM, do not requeue! */
-			goto hardstart_fail;
-		}
-		ieee80211_skb_copy_noderef(skb_orig, skb);
-		ieee80211_dev_kfree_skb(&skb_orig);
-	} 
 	eh = (struct ether_header *)skb->data;
 
-#ifdef ATH_SUPERG_FF
 	/* NB: use this lock to protect an->an_tx_ffbuf (and txq->axq_stageq)
 	 *     in athff_can_aggregate() call too. */
 	ATH_TXQ_LOCK_IRQ(txq);
