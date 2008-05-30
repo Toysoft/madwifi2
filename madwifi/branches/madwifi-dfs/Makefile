@@ -80,7 +80,6 @@ svnversion.h:
 .PHONY: tools
 tools:
 	$(MAKE) -C $(TOOLS) all || exit 1
-	$(MAKE) -C $(TOOLS)/ath_info all || exit 1
 
 install: install-modules install-tools
 
@@ -98,7 +97,6 @@ endif
 
 install-tools: tools
 	$(MAKE) -C $(TOOLS) install || exit 1
-	$(MAKE) -C $(TOOLS)/ath_info install || exit 1
 
 uninstall: uninstall-tools uninstall-modules
 uninstall-modules:
@@ -110,7 +108,6 @@ find-modules:
 
 uninstall-tools:
 	$(MAKE) -C $(TOOLS) uninstall
-	$(MAKE) -C $(TOOLS)/ath_info uninstall
 
 reinstall: uninstall install
 reinstall-tools: uninstall-tools install-tools
@@ -121,7 +118,6 @@ clean:
 		$(MAKE) -C $$i clean; \
 	done
 	-$(MAKE) -C $(TOOLS) clean
-	-$(MAKE) -C $(TOOLS)/ath_info clean
 	rm -rf .tmp_versions
 	rm -f *.symvers svnversion.h
 
