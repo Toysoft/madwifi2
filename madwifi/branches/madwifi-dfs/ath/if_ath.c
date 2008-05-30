@@ -1333,6 +1333,13 @@ ath_vap_get_nexttbtt(struct ieee80211vap *vap)
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t now_tu, nexttbtt;
 
+	/* Prevent a divide by zero to occur */
+	if (vap->iv_bss->ni_intval == 0) {
+		DPRINTF(sc, ATH_DEBUG_ANY,
+			"BUG: vap->iv_bss->ni_intval is 0\n");
+		return 0;
+	}
+
 	/* Calculate the closest TBTT that is > now_tu. */
 	now_tu   = IEEE80211_TSF_TO_TU(ath_hal_gettsf64(ah));
 	nexttbtt = sc->sc_nexttbtt + roundup_s(
