@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2006 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -87,7 +87,7 @@ struct ath_tx_status {
 
 /* bits found in ts_flags */
 #define	HAL_TX_BA		0x01	/* Block Ack seen */
-#define	HAL_TX_AGGR		0x02	/* Aggregate */
+#define	HAL_TX_AGGR		0x02	/* Aggregate */ 
 
 /*
  * Receive descriptor status.  This structure is filled
@@ -131,7 +131,7 @@ struct ath_rx_status {
 	u_int8_t	rs_flags;	/* misc flags */
 	u_int32_t	rs_evm0;	/* evm bytes */
 	u_int32_t	rs_evm1;
-	u_int32_t	rs_evm2;
+	u_int32_t	rs_evm2;	
 #endif /* AH_SUPPORT_AR5416 */
 };
 
@@ -146,7 +146,7 @@ struct ath_rx_status {
 #define	HAL_RX_MORE		0x01	/* more descriptors follow */
 #define	HAL_RX_MORE_AGGR	0x02	/* more frames in aggr */
 #define	HAL_RX_GI		0x04	/* full gi */
-#define	HAL_RX_2040		0x08	/* 40 MHz */
+#define	HAL_RX_2040		0x08	/* 40 Mhz */
 #define	HAL_RX_DELIM_CRC_PRE	0x10	/* crc error in delimiter pre */
 #define	HAL_RX_DELIM_CRC_POST	0x20	/* crc error in delim after */
 #define	HAL_RX_DECRYPT_BUSY	0x40	/* decrypt was too slow */

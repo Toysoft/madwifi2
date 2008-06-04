@@ -37,7 +37,7 @@
 #
 
 #
-# Configuration for building big-endian MIPS2 for the AP51 SoC
+# Configuration for building big-endian MIPS2 for the APxx SoC
 # using the 5.01 linux-mips.org toolchain (manually moved to
 # /pub/gnu from /pub/gnu/local where rpm --prefix=/pub/gnu
 # bogusly installs them).

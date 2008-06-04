@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002-2006 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -322,7 +322,8 @@ typedef enum {
 	HAL_RX_FILTER_XRPOLL	= 0x00000040,	/* Allow XR poll frmae */
 	HAL_RX_FILTER_PROBEREQ	= 0x00000080,	/* Allow probe request frames */
 	HAL_RX_FILTER_PHYERR	= 0x00000100,	/* Allow phy errors */
-	HAL_RX_FILTER_PHYRADAR	= 0x00000200,	/* Allow phy radar errors*/
+	HAL_RX_FILTER_PHYRADAR	= 0x00000200,	/* Allow phy radar errors */
+	HAL_RX_FILTER_COMPBAR	= 0x00000400,	/* Allow compressed BAR */
 } HAL_RX_FILTER;
 
 typedef enum {
@@ -396,7 +397,7 @@ typedef enum {
  */
 typedef struct {
 	u_int32_t	channelFlags;	/* see below */
-	u_int16_t	channel;	/* setting in MHz */
+	u_int16_t	channel;	/* setting in Mhz */
 	u_int8_t	privFlags;
 	int8_t		maxRegTxPower;	/* max regulatory tx power in dBm */
 	int8_t		maxTxPower;	/* max true tx power in 0.5 dBm */
@@ -416,7 +417,7 @@ typedef struct {
 #define	CHANNEL_STURBO	0x02000	/* Static turbo, no 11a-only usage */
 #define	CHANNEL_HALF    0x04000 /* Half rate channel */
 #define	CHANNEL_QUARTER 0x08000 /* Quarter rate channel */
-#define	CHANNEL_HT20	0x10000 /* 11n 20MHZ channel */
+#define	CHANNEL_HT20	0x10000 /* 11n 20MHZ channel */ 
 #define	CHANNEL_HT40PLUS 0x20000 /* 11n 40MHZ channel w/ ext chan above */
 #define	CHANNEL_HT40MINUS 0x40000 /* 11n 40MHZ channel w/ ext chan below */
 
@@ -441,12 +442,12 @@ typedef struct {
 #define	CHANNEL_108G	(CHANNEL_2GHZ|CHANNEL_OFDM|CHANNEL_TURBO)
 #define	CHANNEL_108A	CHANNEL_T
 #define	CHANNEL_X	(CHANNEL_5GHZ|CHANNEL_OFDM|CHANNEL_XR)
-#define	CHANNEL_G_HT20	(CHANNEL_2GHZ|CHANNEL_OFDM | CHANNEL_HT20)
-#define	CHANNEL_A_HT20	(CHANNEL_5GHZ|CHANNEL_OFDM | CHANNEL_HT20)
-#define	CHANNEL_G_HT40PLUS	(CHANNEL_G_HT20|CHANNEL_HT40PLUS)
-#define	CHANNEL_G_HT40MINUS	(CHANNEL_G_HT20|CHANNEL_HT40MINUS)
-#define	CHANNEL_A_HT40PLUS	(CHANNEL_A_HT20|CHANNEL_HT40PLUS)
-#define	CHANNEL_A_HT40MINUS	(CHANNEL_A_HT20|CHANNEL_HT40MINUS)
+#define	CHANNEL_G_HT20		(CHANNEL_G|CHANNEL_HT20)
+#define	CHANNEL_A_HT20		(CHANNEL_A|CHANNEL_HT20)
+#define	CHANNEL_G_HT40PLUS	(CHANNEL_G|CHANNEL_HT40PLUS)
+#define	CHANNEL_G_HT40MINUS	(CHANNEL_G|CHANNEL_HT40MINUS)
+#define	CHANNEL_A_HT40PLUS	(CHANNEL_A|CHANNEL_HT40PLUS)
+#define	CHANNEL_A_HT40MINUS	(CHANNEL_A|CHANNEL_HT40MINUS)
 #define	CHANNEL_ALL \
 	(CHANNEL_OFDM | CHANNEL_CCK| CHANNEL_2GHZ | CHANNEL_5GHZ | \
 	 CHANNEL_TURBO | CHANNEL_HT20 | CHANNEL_HT40PLUS | CHANNEL_HT40MINUS)
@@ -488,18 +489,18 @@ enum {
 	HAL_MODE_XR     = 0x100,		/* XR channels */
 	HAL_MODE_11A_HALF_RATE = 0x200,		/* 11A half rate channels */
 	HAL_MODE_11A_QUARTER_RATE = 0x400,	/* 11A quarter rate channels */
-	HAL_MODE_11NG_HT20	= 0x8000,
-	HAL_MODE_11NA_HT20  	= 0x10000,
-	HAL_MODE_11NG_HT40PLUS	= 0x20000,
-	HAL_MODE_11NG_HT40MINUS	= 0x40000,
-	HAL_MODE_11NA_HT40PLUS	= 0x80000,
+	HAL_MODE_11NG_HT20	= 0x008000,
+	HAL_MODE_11NA_HT20  	= 0x010000,
+	HAL_MODE_11NG_HT40PLUS	= 0x020000,
+	HAL_MODE_11NG_HT40MINUS	= 0x040000,
+	HAL_MODE_11NA_HT40PLUS	= 0x080000,
 	HAL_MODE_11NA_HT40MINUS	= 0x100000,
-	HAL_MODE_ALL	= 0xfff
+	HAL_MODE_ALL	= 0xffffff
 };
 
 typedef struct {
 	int		rateCount;		/* NB: for proper padding */
-	u_int8_t	rateCodeToIndex[32];	/* back mapping */
+	u_int8_t	rateCodeToIndex[144];	/* back mapping */
 	struct {
 		u_int8_t	valid;		/* valid for rate control use */
 		u_int8_t	phy;		/* CCK/OFDM/XR */
@@ -674,7 +675,7 @@ struct ath_rx_status;
 struct ath_hal {
 	u_int32_t	ah_magic;	/* consistency check magic number */
 	u_int32_t	ah_abi;		/* HAL ABI version */
-#define	HAL_ABI_VERSION	0x07013100	/* YYMMDDnn */
+#define	HAL_ABI_VERSION	0x08052700	/* YYMMDDnn */
 	u_int16_t	ah_devid;	/* PCI device ID */
 	u_int16_t	ah_subvendorid;	/* PCI subvendor ID */
 	HAL_SOFTC	ah_sc;		/* back pointer to driver/os state */
@@ -711,9 +712,9 @@ struct ath_hal {
 				HAL_BOOL incTrigLevel);
 	int	  __ahdecl(*ah_setupTxQueue)(struct ath_hal *, HAL_TX_QUEUE,
 				const HAL_TXQ_INFO *qInfo);
-	HAL_BOOL  __ahdecl(*ah_setTxQueueProps)(struct ath_hal *, int q,
+	HAL_BOOL  __ahdecl(*ah_setTxQueueProps)(struct ath_hal *, int q, 
 				const HAL_TXQ_INFO *qInfo);
-	HAL_BOOL  __ahdecl(*ah_getTxQueueProps)(struct ath_hal *, int q,
+	HAL_BOOL  __ahdecl(*ah_getTxQueueProps)(struct ath_hal *, int q, 
 				HAL_TXQ_INFO *qInfo);
 	HAL_BOOL  __ahdecl(*ah_releaseTxQueue)(struct ath_hal *ah, u_int q);
 	HAL_BOOL  __ahdecl(*ah_resetTxQueue)(struct ath_hal *ah, u_int q);
@@ -805,6 +806,8 @@ struct ath_hal {
 	HAL_ANT_SETTING	 __ahdecl(*ah_getAntennaSwitch)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_setAntennaSwitch)(struct ath_hal*,
 				HAL_ANT_SETTING);
+	HAL_BOOL  __ahdecl(*ah_setSifsTime)(struct ath_hal*, u_int);
+	u_int	  __ahdecl(*ah_getSifsTime)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_setSlotTime)(struct ath_hal*, u_int);
 	u_int	  __ahdecl(*ah_getSlotTime)(struct ath_hal*);
 	HAL_BOOL  __ahdecl(*ah_setAckTimeout)(struct ath_hal*, u_int);
