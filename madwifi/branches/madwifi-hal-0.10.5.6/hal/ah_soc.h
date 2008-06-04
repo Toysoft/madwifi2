@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2006 Sam Leffler, Errno Consulting, Atheros
+ * Copyright (c) 2006-2008 Sam Leffler, Errno Consulting, Atheros
  * Communications, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -33,7 +33,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGES.
  *
- * $Id: //depot/sw/branches/sam_hal/ah_soc.h#3 $
+ * $Id: //depot/sw/branches/sam_hal/ah_soc.h#4 $
  */
 #ifndef _ATH_AH_SOC_H_
 #define _ATH_AH_SOC_H_
@@ -79,18 +79,18 @@ struct ar531x_boarddata {
 #define BD_WLAN1_5G_EN  0x00040000   /* FLAG for radio0_2G */
 	u_int16_t resetConfigGpio;   /* Reset factory GPIO pin */
 	u_int16_t sysLedGpio;        /* System LED GPIO pin */
-
+	
 	u_int32_t cpuFreq;           /* CPU core frequency in Hz */
 	u_int32_t sysFreq;           /* System frequency in Hz */
 	u_int32_t cntFreq;           /* Calculated C0_COUNT frequency */
-
+	
 	u_int8_t  wlan0Mac[6];
 	u_int8_t  enet0Mac[6];
 	u_int8_t  enet1Mac[6];
-
+	
 	u_int16_t pciId;             /* Pseudo PCIID for common code */
 	u_int16_t memCap;            /* cap bank1 in MB */
-
+	
 	/* version 3 */
 	u_int8_t  wlan1Mac[6];       /* (ar5212) */
 };
