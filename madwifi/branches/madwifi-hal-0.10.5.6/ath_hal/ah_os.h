@@ -187,11 +187,8 @@ extern void *__ahdecl ath_hal_memcpy(void *, const void *, size_t);
  * by the PCI clock domain registers.
  */
 #if (AH_BYTE_ORDER == AH_BIG_ENDIAN)
-#define is_reg_le(__reg) ((0x4000 <= (__reg) && (__reg) < 0x5000))
-#else
-#define is_reg_le(__reg) 1
-#endif
-
+#define is_reg_le(__reg) ((0x4000 <= (__reg) && (__reg) < 0x5000) || \
+			  (0x7000 <= (__reg) && (__reg) < 0x8000))
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
 #define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	 is_reg_le(_reg) ?					\
@@ -213,6 +210,21 @@ extern void *__ahdecl ath_hal_memcpy(void *, const void *, size_t);
 	 readl((_ah)->ah_sh + (_reg)) :				\
 	 cpu_to_le32(readl((_ah)->ah_sh + (_reg))))
 #endif				/* KERNEL_VERSION(2,6,12) */
+#else				/* AH_BYTE_ORDER != AH_BIG_ENDIAN */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
+#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+	 iowrite32((_val), (_ah)->ah_sh + (_reg));		\
+	} while (0)
+#define _OS_REG_READ(_ah, _reg)					\
+	ioread32((_ah)->ah_sh + (_reg))
+#else
+#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+	 writel((_val), (_ah)->ah_sh + (_reg));			\
+	} while (0)
+#define _OS_REG_READ(_ah, _reg)					\
+	readl((_ah)->ah_sh + (_reg))
+#endif				/* KERNEL_VERSION(2,6,12) */
+#endif				/* AH_BYTE_ORDER != AH_BIG_ENDIAN */
 
 #define HAL_DEBUG_OFF			0
 /* Show register accesses */
