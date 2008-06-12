@@ -170,7 +170,7 @@ iwspy_event(struct ieee80211vap *vap, struct ieee80211_node *ni, u_int rssi)
 				set_quality(&thr.low, vap->iv_spy.thr_low, vap->iv_ic->ic_channoise);
 				set_quality(&thr.high, vap->iv_spy.thr_high, vap->iv_ic->ic_channoise);
 				wireless_send_event(vap->iv_dev,
-					SIOCGIWTHRSPY, &wrq, (char*) &thr);
+					SIOCGIWTHRSPY, &wrq, (char *)&thr);
 				break;
 			}
 		}
@@ -207,7 +207,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 #ifdef ATH_SUPERG_FF
 	struct llc *llc;
 #endif
-	int hdrspace;
+	int hdrlen;
 	u_int8_t dir, type = -1, subtype;
 	u_int8_t *bssid;
 	u_int16_t rxseq;
@@ -431,11 +431,11 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 
 	switch (type) {
 	case IEEE80211_FC0_TYPE_DATA:
-		hdrspace = ieee80211_hdrspace(ic, wh);
-		if (skb->len < hdrspace) {
+		hdrlen = ieee80211_hdrsize(wh);
+		if (skb->len < hdrlen) {
 			IEEE80211_DISCARD(vap, IEEE80211_MSG_ANY,
 				wh, "data", "too short: len %u, expecting %u",
-			 	skb->len, hdrspace);
+			 	skb->len, hdrlen);
 			vap->iv_stats.is_rx_tooshort++;
 			goto out;		/* XXX */
 		}
@@ -624,7 +624,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 				IEEE80211_NODE_STAT(ni, rx_noprivacy);
 				goto out;
 			}
-			key = ieee80211_crypto_decap(ni, skb, hdrspace);
+			key = ieee80211_crypto_decap(ni, skb, hdrlen);
 			if (key == NULL) {
 				/* NB: stats+msgs handled in crypto_decap */
 				IEEE80211_NODE_STAT(ni, rx_wepfail);
@@ -639,7 +639,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 		 * Next up, any fragmentation.
 		 */
 		if (!IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-			skb = ieee80211_defrag(ni, skb, hdrspace);
+			skb = ieee80211_defrag(ni, skb, hdrlen);
 			if (skb == NULL) {
 				/* Fragment dropped or frame not complete yet */
 				goto out;
@@ -651,7 +651,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 		 * Next strip any MSDU crypto bits.
 		 */
 		if (key != NULL &&
-		    !ieee80211_crypto_demic(vap, key, skb, hdrspace, 0)) {
+		    !ieee80211_crypto_demic(vap, key, skb, hdrlen, 0)) {
 			IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
 				ni->ni_macaddr, "data", "%s", "demic error");
 			IEEE80211_NODE_STAT(ni, rx_demicfail);
@@ -661,7 +661,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 		/*
 		 * Finally, strip the 802.11 header.
 		 */
-		skb = ieee80211_decap(vap, skb, hdrspace);
+		skb = ieee80211_decap(vap, skb, hdrlen);
 		if (skb == NULL) {
 			/* don't count Null data frames as errors */
 			if (subtype == IEEE80211_FC0_SUBTYPE_NODATA)
@@ -672,7 +672,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 			IEEE80211_NODE_STAT(ni, rx_decap);
 			goto err;
 		}
-		eh = (struct ether_header *) skb->data;
+		eh = (struct ether_header *)skb->data;
 
 		if (!accept_data_frame(vap, ni, key, skb, eh))
 			goto out;
@@ -685,7 +685,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 
 #ifdef ATH_SUPERG_FF
 		/* check for FF */
-		llc = (struct llc *) (skb->data + sizeof(struct ether_header));
+		llc = (struct llc *)(skb->data + sizeof(struct ether_header));
 		if (ntohs(llc->llc_snap.ether_type) == (u_int16_t)ATH_ETH_TYPE) {
 			struct sk_buff *skb1 = NULL;
 			struct ether_header *eh_tmp;
@@ -812,8 +812,8 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 				vap->iv_stats.is_rx_noprivacy++;
 				goto out;
 			}
-			hdrspace = ieee80211_hdrspace(ic, wh);
-			key = ieee80211_crypto_decap(ni, skb, hdrspace);
+			hdrlen = ieee80211_hdrsize(wh);
+			key = ieee80211_crypto_decap(ni, skb, hdrlen);
 			if (key == NULL) {
 				/* NB: stats+msgs handled in crypto_decap */
 				goto out;
@@ -970,7 +970,7 @@ static int accept_data_frame(struct ieee80211vap *vap,
 static struct sk_buff *
 ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 {
-	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 	u_int16_t rxseq, last_rxseq;
 	u_int8_t fragno, last_fragno;
 	u_int8_t more_frag = wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG;
@@ -1015,7 +1015,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 	if (ni->ni_rxfrag) {
 		struct ieee80211_frame *lwh;
 
-		lwh = (struct ieee80211_frame *) ni->ni_rxfrag->data;
+		lwh = (struct ieee80211_frame *)ni->ni_rxfrag->data;
 		last_rxseq = le16_to_cpu(*(__le16 *)lwh->i_seq) >>
 			IEEE80211_SEQ_SEQ_SHIFT;
 		last_fragno = le16_to_cpu(*(__le16 *)lwh->i_seq) &
@@ -1081,7 +1081,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 			/* Update tail and length */
 			skb_put(ni->ni_rxfrag, skb->len - hdrlen);
 			/* Keep a copy of last sequence and fragno */
-			*(__le16 *) lwh->i_seq = *(__le16 *) wh->i_seq;
+			*(__le16 *)lwh->i_seq = *(__le16 *)wh->i_seq;
 		}
 		/* we're done with the fragment */
 		ieee80211_dev_kfree_skb(&skb);
@@ -1103,7 +1103,7 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct net_device *dev = vap->iv_dev;
-	struct ether_header *eh = (struct ether_header *) skb->data;
+	struct ether_header *eh = (struct ether_header *)skb->data;
 	struct ieee80211_node *tni;
 	int ret;
 
@@ -1149,19 +1149,21 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 			}
 		}
 		if (skb1 != NULL) {
-			struct ieee80211_node *tni;
 			skb1->dev = dev;
 			skb_reset_mac_header(skb1);
 			skb_set_network_header(skb1, sizeof(struct ether_header));
 
 			skb1->protocol = __constant_htons(ETH_P_802_2);
+
+			/* This SKB is being emitted to the physical/parent
+			 * device, which maintains node references. However,
+			 * there is kernel code in between which does not.
+			 * Therefore, the ref. is cleaned if the SKB is
+			 * dropped. */
+			tni = SKB_NI(skb1);
 			/* XXX: Insert vlan tag before queuing it? */
-			tni = SKB_NI(skb1); /* Remember node so we can free it. */
 			if (dev_queue_xmit(skb1) == NET_XMIT_DROP) {
-				/* If queue dropped the packet because device
-				 * was too busy */
 				vap->iv_devstats.tx_dropped++;
-				/* node reference was leaked */
 				if (tni != NULL)
 					ieee80211_unref_node(&tni);
 			}
@@ -1184,16 +1186,14 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 		tni = SKB_NI(skb);
 		if ((ni->ni_vlan != 0) && (vap->iv_vlgrp != NULL))
 			/* Attach VLAN tag. */
-			ret = vlan_hwaccel_receive_skb(skb,
+			ret = vlan_hwaccel_rx(skb,
 					vap->iv_vlgrp, ni->ni_vlan);
 		else
 			ret = netif_rx(skb);
-		if (ret == NET_RX_DROP) {
-			/* Cleanup if passing SKB to ourselves failed. */
-			if (tni != NULL)
-				ieee80211_unref_node(&tni);
+		if (ret == NET_RX_DROP)
 			vap->iv_devstats.rx_dropped++;
-		}
+		if (tni != NULL)
+			ieee80211_unref_node(&tni);
 		skb = NULL; /* SKB is no longer ours */
 	}
 }
@@ -1214,7 +1214,7 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 
 	memcpy(&wh, skb->data, hdrlen);	/* Make a copy of the variably sized .11 header */
 
-	llc = (struct llc *) skb_pull(skb, hdrlen);
+	llc = (struct llc *)skb_pull(skb, hdrlen);
 	/* XXX: For some unknown reason some APs think they are from DEC and 
 	 * use an OUI of 00-00-f8. This should be killed as soon as sanity is 
 	 * restored. */
@@ -1226,7 +1226,7 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 		llc = NULL;
 	}
 
-	eh = (struct ether_header *) skb_push(skb, sizeof(struct ether_header));
+	eh = (struct ether_header *)skb_push(skb, sizeof(struct ether_header));
 	switch (wh.i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
 		IEEE80211_ADDR_COPY(eh->ether_dhost, wh.i_addr1);
@@ -1251,16 +1251,6 @@ ieee80211_decap(struct ieee80211vap *vap, struct sk_buff *skb, int hdrlen)
 	else
 		eh->ether_type = ether_type;
 
-	if (!ALIGNED_POINTER(skb->data + sizeof(*eh), u_int32_t)) {
-		struct sk_buff *tskb;
-
-		/* XXX: does this always work? */
-		tskb = skb_copy(skb, GFP_ATOMIC);
-		if (tskb)
-			ieee80211_skb_copy_noderef(skb, tskb);
-		ieee80211_dev_kfree_skb(&skb);
-		skb = tskb;
-	}
 	return skb;
 }
 
@@ -2209,7 +2199,7 @@ ieee80211_parse_athParams(struct ieee80211_node *ni, u_int8_t *ie)
 	struct ieee80211com *ic = ni->ni_ic;
 #endif /* ATH_SUPERG_DYNTURBO */
 	struct ieee80211_ie_athAdvCap *athIe =
-		(struct ieee80211_ie_athAdvCap *) ie;
+		(struct ieee80211_ie_athAdvCap *)ie;
 
 	ni->ni_ath_flags = athIe->athAdvCap_capability;
 	if (ni->ni_ath_flags & IEEE80211_ATHC_COMP)
@@ -2281,7 +2271,6 @@ forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
 
 	if (filter_type && ((vap->app_filter & filter_type) == filter_type)) {
 		struct sk_buff *skb1;
-		struct ieee80211_node *tni;
 
 		skb1 = skb_copy(skb, GFP_ATOMIC);
 		if (skb1 == NULL)
@@ -2295,18 +2284,13 @@ forward_mgmt_to_app(struct ieee80211vap *vap, int subtype, struct sk_buff *skb,
 		skb1->pkt_type = PACKET_OTHERHOST;
 		skb1->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
 
-		tni = SKB_NI(skb1);
-		if (netif_rx(skb1) == NET_RX_DROP) {
-			/* If netif_rx dropped the packet because 
-			 * device was too busy */
-			if (tni != NULL) {
-				/* node reference was leaked */
-				ieee80211_unref_node(&tni);
-			}
-			vap->iv_devstats.rx_dropped++;
-		}
 		vap->iv_devstats.rx_packets++;
 		vap->iv_devstats.rx_bytes += skb1->len;
+
+		if (SKB_NI(skb1) != NULL)
+			ieee80211_unref_node(&SKB_NI(skb1));
+		if (netif_rx(skb1) == NET_RX_DROP)
+			vap->iv_devstats.rx_dropped++;
 	}
 }
 
@@ -2314,7 +2298,7 @@ void
 ieee80211_saveath(struct ieee80211_node *ni, u_int8_t *ie)
 {
 	const struct ieee80211_ie_athAdvCap *athIe =
-		(const struct ieee80211_ie_athAdvCap *) ie;
+		(const struct ieee80211_ie_athAdvCap *)ie;
 
 	ieee80211_saveie(&ni->ni_ath_ie, ie);
 	if (athIe != NULL) {
@@ -3045,7 +3029,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 	if (ni_or_null == NULL)
 		ni = vap->iv_bss;
 
-	wh = (struct ieee80211_frame *) skb->data;
+	wh = (struct ieee80211_frame *)skb->data;
 	frm = (u_int8_t *)&wh[1];
 	efrm = skb->data + skb->len;
 
@@ -3355,7 +3339,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 				 * power save mode for any reason.
 				 */
 				struct ieee80211_tim_ie *tim =
-				    (struct ieee80211_tim_ie *) scan.tim;
+				    (struct ieee80211_tim_ie *)scan.tim;
 				int aid = IEEE80211_AID(ni->ni_associd);
 				int ix = aid / NBBY;
 				int min = tim->tim_bitctl &~ 1;
@@ -4147,7 +4131,7 @@ ieee80211_recv_pspoll(struct ieee80211_node *ni, struct sk_buff *skb0)
 	if (ni->ni_associd == 0) {
 		IEEE80211_DISCARD(vap,
 			IEEE80211_MSG_POWER | IEEE80211_MSG_DEBUG,
-			(struct ieee80211_frame *) wh, "ps-poll",
+			(struct ieee80211_frame *)wh, "ps-poll",
 			"%s", "unassociated station");
 		vap->iv_stats.is_ps_unassoc++;
 		IEEE80211_SEND_MGMT(ni, IEEE80211_FC0_SUBTYPE_DEAUTH,
@@ -4159,7 +4143,7 @@ ieee80211_recv_pspoll(struct ieee80211_node *ni, struct sk_buff *skb0)
 	if (aid != ni->ni_associd) {
 		IEEE80211_DISCARD(vap,
 			IEEE80211_MSG_POWER | IEEE80211_MSG_DEBUG,
-			(struct ieee80211_frame *) wh, "ps-poll",
+			(struct ieee80211_frame *)wh, "ps-poll",
 			"aid mismatch: sta aid 0x%x poll aid 0x%x",
 			ni->ni_associd, aid);
 		vap->iv_stats.is_ps_badaid++;
@@ -4214,11 +4198,11 @@ athff_decap(struct sk_buff *skb)
 		return -1;
 
 	memcpy(&eh_src, skb->data, sizeof(struct ether_header));
-	llc = (struct llc *) skb_pull(skb, sizeof(struct ether_header));
+	llc = (struct llc *)skb_pull(skb, sizeof(struct ether_header));
 	eh_src.ether_type = llc->llc_un.type_snap.ether_type;
 	skb_pull(skb, LLC_SNAPFRAMELEN);
 
-	eh_dst = (struct ether_header *) skb_push(skb, sizeof(struct ether_header));
+	eh_dst = (struct ether_header *)skb_push(skb, sizeof(struct ether_header));
 	memcpy(eh_dst, &eh_src, sizeof(struct ether_header));
 
 	return 0;
@@ -4261,8 +4245,7 @@ ieee80211_check_mic(struct ieee80211_node *ni, struct sk_buff *skb)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211_frame *wh;
 	struct ieee80211_key *key;
-	int hdrspace;
-	struct ieee80211com *ic = vap->iv_ic;
+	int hdrlen;
 
 	if (skb->len < sizeof(struct ieee80211_frame_min)) {
 		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_ANY, 
@@ -4273,13 +4256,13 @@ ieee80211_check_mic(struct ieee80211_node *ni, struct sk_buff *skb)
 	}
 
 	wh = (struct ieee80211_frame *)skb->data;
-	hdrspace = ieee80211_hdrspace(ic, wh);
+	hdrlen = ieee80211_hdrsize(wh);
 
-	key = ieee80211_crypto_decap(ni, skb, hdrspace);
+	key = ieee80211_crypto_decap(ni, skb, hdrlen);
 	if (key == NULL) {
 		/* NB: stats+msgs handled in crypto_decap */
 		IEEE80211_NODE_STAT(ni, rx_wepfail);
-	} else if (!ieee80211_crypto_demic(vap, key, skb, hdrspace, 1)) {
+	} else if (!ieee80211_crypto_demic(vap, key, skb, hdrlen, 1)) {
 		IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
 				ni->ni_macaddr, "data", "%s", "demic error");
 		IEEE80211_NODE_STAT(ni, rx_demicfail);

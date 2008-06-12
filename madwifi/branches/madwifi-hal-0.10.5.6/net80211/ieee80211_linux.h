@@ -468,7 +468,7 @@ extern void if_printf(struct net_device *, const char *, ...);
 #define ieee80211_getmgtframe(_ppfrm, _pktlen) \
 	ieee80211_getmgtframe_debug(_ppfrm, _pktlen, __func__, __LINE__)
 extern struct sk_buff * ieee80211_getmgtframe_debug(u_int8_t **frm, u_int pktlen, 
-						    const char* func, int line);
+						    const char *func, int line);
 #else
 extern struct sk_buff * ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen);
 #endif
@@ -611,10 +611,6 @@ void ieee80211_proc_cleanup(struct ieee80211vap *);
 
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define IEEE80211_VLAN_TAG_USED 1
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,20)
-#define	vlan_hwaccel_receive_skb(skb, grp, tag)	vlan_hwaccel_rx(skb, grp, tag)
-#endif
 
 #ifndef VLAN_GROUP_ARRAY_PART_LEN
 #define vlan_group_set_device(group, vid, dev) do { \
