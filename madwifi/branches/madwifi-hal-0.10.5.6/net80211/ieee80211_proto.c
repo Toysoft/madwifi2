@@ -313,8 +313,8 @@ ieee80211_print_essid(const u_int8_t *essid, int len)
 EXPORT_SYMBOL(ieee80211_print_essid);
 
 void
-ieee80211_dump_pkt(struct ieee80211com *ic,
-	const u_int8_t *buf, int len, int rate, int rssi)
+ieee80211_dump_pkt(struct ieee80211com *ic, const u_int8_t *buf,
+		int len, int rate, int rssi, int tx)
 {
 	const struct ieee80211_frame *wh;
 	int i;
@@ -365,7 +365,10 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 	if (wh->i_fc[1] & IEEE80211_FC1_PROT) {
 		int off;
 
-		off = ieee80211_anyhdrspace(ic, wh);
+		if (tx)
+			off = ieee80211_anyhdrspace(ic, wh);
+		else
+			off = ieee80211_anyhdrsize(wh);
 		printk(" Prot. [IV %.02x %.02x %.02x",
 			buf[off + 0], buf[off + 1], buf[off + 2]);
 		if (buf[off + IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV)
@@ -1236,7 +1239,7 @@ EXPORT_SYMBOL(ieee80211_beacon_miss);
 static void
 ieee80211_sta_swbmiss(unsigned long arg)
 {
-	struct ieee80211vap *vap = (struct ieee80211vap *) arg;
+	struct ieee80211vap *vap = (struct ieee80211vap *)arg;
 	ieee80211_beacon_miss(vap->iv_ic);
 }
 
@@ -1247,7 +1250,7 @@ ieee80211_sta_swbmiss(unsigned long arg)
 static void
 ieee80211_tx_timeout(unsigned long arg)
 {
-	struct ieee80211vap *vap = (struct ieee80211vap *) arg;
+	struct ieee80211vap *vap = (struct ieee80211vap *)arg;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
 		"%s: state %s%s\n", __func__,
@@ -1696,7 +1699,7 @@ static int get_dominant_state(struct ieee80211com *ic) {
 }
 
 static void 
-dump_vap_states(struct ieee80211com *ic, struct ieee80211vap* highlighed)
+dump_vap_states(struct ieee80211com *ic, struct ieee80211vap *highlighed)
 {
 	/* RE-count the number of VAPs in RUN, SCAN states */
 	int nrunning = 0;

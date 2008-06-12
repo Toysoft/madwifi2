@@ -58,20 +58,6 @@
 #define __force
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
-typedef int gfp_t;
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,3)
-static inline void *kzalloc(size_t size, gfp_t flags)
-{
-	void *p = kmalloc(size, flags);
-	if (likely(p != NULL))
-		memset(p, 0, size);
-	return p;
-}
-#endif
-
 #ifndef container_of
 #define container_of(ptr, type, member) ({				\
 	    const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
@@ -115,26 +101,6 @@ static inline void *kzalloc(size_t size, gfp_t flags)
 
 #define	__offsetof(t,m)	offsetof(t,m)
 
-#ifndef ALIGNED_POINTER
-/*
- * ALIGNED_POINTER is a boolean macro that checks whether an address
- * is valid to fetch data elements of type t from on this architecture.
- * This does not reflect the optimal alignment, just the possibility
- * (within reasonable limits). 
- *
- */
-#define ALIGNED_POINTER(p,t)	1
-#endif
-
-#ifdef __KERNEL__
-#define	KASSERT(exp, msg) do {			\
-	if (unlikely(!(exp))) {			\
-		printk msg;			\
-		BUG();				\
-	}					\
-} while (0)
-#endif /* __KERNEL__ */
-
 /*
  * NetBSD/FreeBSD defines for file version.
  */
@@ -145,6 +111,27 @@ static inline void *kzalloc(size_t size, gfp_t flags)
  * Fixes for Linux API changes
  */
 #ifdef __KERNEL__
+
+#define KASSERT(exp, msg) do {			\
+	if (unlikely(!(exp))) {			\
+		printk msg;			\
+		BUG();				\
+	}					\
+} while (0)
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+typedef int gfp_t;
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,3)
+static inline void *kzalloc(size_t size, gfp_t flags)
+{
+	void *p = kmalloc(size, flags);
+	if (likely(p != NULL))
+		memset(p, 0, size);
+	return p;
+}
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
 #define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t, 1)
