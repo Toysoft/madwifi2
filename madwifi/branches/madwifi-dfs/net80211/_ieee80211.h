@@ -34,11 +34,16 @@
 #ifndef _NET80211__IEEE80211_H_
 #define _NET80211__IEEE80211_H_
 
+/* Warning : ieee80211_phytype is used by the HAL in its ABI, so this
+ * enumeration cannot be changed */
+
 enum ieee80211_phytype {
 	IEEE80211_T_DS,			/* direct sequence spread spectrum */
 	IEEE80211_T_FH,			/* frequency hopping */
 	IEEE80211_T_OFDM,		/* frequency division multiplexing */
 	IEEE80211_T_TURBO,		/* high rate OFDM, aka turbo mode */
+	IEEE80211_T_XR = 5		/* XR rate (OFDM extended range), used
+					 * in HAL_RATE_TABLE */
 };
 #define	IEEE80211_T_CCK	IEEE80211_T_DS	/* more common nomenclature */
 
