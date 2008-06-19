@@ -941,6 +941,8 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	ic->ic_updateslot = ath_updateslot;
 	atomic_set(&ic->ic_node_counter, 0);
 	ic->ic_debug = 0;
+	sc->sc_debug = (ath_debug & ~ATH_DEBUG_GLOBAL);
+	sc->sc_default_ieee80211_debug = ieee80211_debug;
 
 	ic->ic_wme.wme_update = ath_wme_update;
 	ic->ic_uapsd_flush = ath_uapsd_flush;
@@ -1086,20 +1088,13 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 */
 	ic->ic_flags |= IEEE80211_F_DATAPAD;
 
-	/*
-	 * Query the HAL about antenna support
-	 * Enable rx fast diversity if HAL has support
-	 */
-	if (ath_hal_hasdiversity(ah)) {
-		sc->sc_hasdiversity = 1;
-		ath_hal_setdiversity(ah, AH_TRUE);
-		sc->sc_diversity = 1;
-	} else {
-		sc->sc_hasdiversity = 0;
-		sc->sc_diversity = 0;
-		ath_hal_setdiversity(ah, AH_FALSE);
-	}
-	sc->sc_defant = ath_hal_getdefantenna(ah);
+	/* Query the HAL about antenna support
+	 * Enable RX fast diversity if HAL has support. */
+	sc->sc_hasdiversity = sc->sc_diversity = !!ath_hal_hasdiversity(ah);
+	ath_hal_setdiversity(ah, sc->sc_diversity);
+
+	sc->sc_rxantenna = ath_hal_getdefantenna(ah);
+	sc->sc_txantenna = 0;	/* default to auto-selection */
 
 	/*
 	 * Not all chips have the VEOL support we want to
@@ -1107,6 +1102,7 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 	 */
 	sc->sc_hasveol = ath_hal_hasveol(ah);
 
+	sc->sc_txintrperiod = ATH_TXQ_INTR_PERIOD;
 
 	/* get mac address from hardware */
 	ath_hal_getmac(ah, ic->ic_myaddr);
@@ -1928,7 +1924,8 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 		ath_hal_gpioCfgOutput(sc->sc_ah, sc->sc_ledpin);
 	ath_update_txpow(sc);		/* update tx power state */
 	ath_radar_update(sc);
-	ath_setdefantenna(sc, sc->sc_defant);
+	ath_hal_setdiversity(sc->sc_ah, sc->sc_diversity);
+	ath_setdefantenna(sc, sc->sc_rxantenna);
 	ath_rp_flush(sc);
 
 	return ret;
@@ -3332,7 +3329,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 	unsigned int pktlen, hdrlen, try0, power;
 	HAL_PKT_TYPE atype;
 	u_int flags;
-	u_int8_t antenna, txrate;
+	u_int8_t txrate;
 	struct ath_txq *txq = NULL;
 	struct ath_desc *ds = NULL;
 	struct ieee80211_frame *wh;
@@ -3373,7 +3370,6 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 
 
 	flags |= HAL_TXDESC_INTREQ;
-	antenna = sc->sc_txantenna;
 
 	/* XXX check return value? */
 	ath_hal_setuptxdesc(ah, ds,
@@ -3383,7 +3379,7 @@ ath_tx_startraw(struct net_device *dev, struct ath_buf *bf, struct sk_buff *skb)
 			    power,			/* txpower */
 			    txrate, try0,		/* series 0 rate/tries */
 			    HAL_TXKEYIX_INVALID,	/* key cache index */
-			    antenna,			/* antenna mode */
+			    sc->sc_txantenna,		/* antenna mode */
 			    flags,			/* flags */
 			    0,				/* rts/cts rate */
 			    0,				/* rts/cts duration */
@@ -5085,7 +5081,7 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	struct ieee80211com *ic = bf->bf_node->ni_ic;
 	struct sk_buff *skb = bf->bf_skb;
 	struct ath_hal *ah = sc->sc_ah;
-	struct ath_desc *ds;
+	struct ath_desc *ds = bf->bf_desc;
 	unsigned int flags;
 	int antenna = sc->sc_txantenna;
 	const HAL_RATE_TABLE *rt;
@@ -5095,22 +5091,16 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC, "skb=%p skb->len=%u\n",
 		skb, skb->len);
 
-	/* setup descriptors */
-	ds = bf->bf_desc;
-
 	flags = HAL_TXDESC_NOACK;
 #ifdef ATH_SUPERG_DYNTURBO
 	if (sc->sc_dturbo_switch)
 		flags |= HAL_TXDESC_INTREQ;
 #endif
-
-	ds->ds_link = 0;
-	/*
-	 * Switch antenna every beacon if txantenna is not set
+	
+	/* Switch antenna every beacon if txantenna is not set
 	 * Should only switch every beacon period, not for all
 	 * SWBAs
-	 * XXX: assumes two antennae
-	 */
+	 * XXX: assumes two antennae */
 	if (antenna == 0) {
 		if (sc->sc_stagbeacons)
 			antenna = ((sc->sc_stats.ast_be_xmit / 
@@ -5119,7 +5109,6 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 			antenna = (sc->sc_stats.ast_be_xmit & 1 ? 2 : 1);
 	}
 
-	ds->ds_data = bf->bf_skbaddr;
 	/*
 	 * Calculate rate code.
 	 * XXX everything at min xmit rate
@@ -5146,6 +5135,8 @@ ath_beacon_setup(struct ath_softc *sc, struct ath_buf *bf)
 		rate = rt->info[IEEE80211_XR_DEFAULT_RATE_INDEX].rateCode;
 	}
 #endif
+	ds->ds_link = 0;
+	ds->ds_data = bf->bf_skbaddr;
 	ath_hal_setuptxdesc(ah, ds,
 		skb->len + IEEE80211_CRC_LEN,	/* frame length */
 		sizeof(struct ieee80211_frame), /* header length */
@@ -5459,22 +5450,21 @@ ath_beacon_send(struct ath_softc *sc, int *needmark, uint64_t hw_tsf)
 	} else if ((sc->sc_updateslot == COMMIT) && (sc->sc_slotupdate == slot))
 		ath_setslottime(sc);		/* commit change to hardware */
 
-	if ((!sc->sc_stagbeacons || slot == 0) && (!sc->sc_diversity)) {
+	/* If HW fast diversity is not enabled and there is not default RX
+	 * antenna set, check recent per-antenna transmit statistics and flip
+	 * the default RX antenna if noticeably more frames went out on the
+	 * non-default antenna. */
+	if ((!sc->sc_stagbeacons || slot == 0) &&
+			!sc->sc_diversity && !sc->sc_rxantenna) {
 		unsigned int otherant;
-		/*
-		 * Check recent per-antenna transmit statistics and flip
-		 * the default rx antenna if noticeably more frames went out
-		 * on the non-default antenna.  Only do this if rx diversity
-		 * is off.
-		 * XXX assumes 2 antennae
-		 */
-		otherant = sc->sc_defant & 1 ? 2 : 1;
-		if (sc->sc_ant_tx[otherant] > sc->sc_ant_tx[sc->sc_defant] + 
+		/* XXX: assumes 2 antennae. */
+		otherant = sc->sc_rxantenna & 1 ? 2 : 1;
+		if (sc->sc_ant_tx[otherant] > sc->sc_ant_tx[sc->sc_rxantenna] + 
 				ATH_ANTENNA_DIFF) {
 			DPRINTF(sc, ATH_DEBUG_BEACON,
-				"Flip default antenna to %u, %u > %u\n",
+				"Flip default RX antenna to %u, %u > %u\n",
 				otherant, sc->sc_ant_tx[otherant],
-				sc->sc_ant_tx[sc->sc_defant]);
+				sc->sc_ant_tx[sc->sc_rxantenna]);
 			ath_setdefantenna(sc, otherant);
 		}
 		sc->sc_ant_tx[1] = sc->sc_ant_tx[2] = 0;
@@ -6888,12 +6878,12 @@ ath_setdefantenna(struct ath_softc *sc, u_int antenna)
 {
 	struct ath_hal *ah = sc->sc_ah;
 
-	/* XXX block beacon interrupts */
+	/* XXX: block beacon interrupts */
 	ath_hal_setdefantenna(ah, antenna);
-	if (sc->sc_defant != antenna)
+	if (sc->sc_rxantenna != antenna)
 		sc->sc_stats.ast_ant_defswitch++;
-	sc->sc_defant = antenna;
-	sc->sc_rxotherant = 0;
+	sc->sc_rxantenna = antenna;
+	sc->sc_numrxotherant = 0;
 }
 
 static void
@@ -7152,17 +7142,16 @@ drop_micfail:
 				type = ieee80211_input_all(ic, skb, rs->rs_rssi, bf->bf_tsf);
 		}
 
+		/* XXX: Why do this? */
 		if (sc->sc_diversity) {
-			/*
-			 * When using hardware fast diversity, change the default rx
-			 * antenna if rx diversity chooses the other antenna 3
-			 * times in a row.
-			 */
-			if (sc->sc_defant != rs->rs_antenna) {
-				if (++sc->sc_rxotherant >= 3)
+			/* When using hardware fast diversity, change the
+			 * default RX antenna if RX diversity chooses the
+			 * other antenna 3 times in a row. */
+			if (sc->sc_rxantenna != rs->rs_antenna) {
+				if (++sc->sc_numrxotherant >= 3)
 					ath_setdefantenna(sc, rs->rs_antenna);
 			} else
-				sc->sc_rxotherant = 0;
+				sc->sc_numrxotherant = 0;
 		}
 		if (sc->sc_softled) {
 			/*
@@ -8425,12 +8414,10 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni,
 	}
 #endif
 
-	/*
-	 * sc_txantenna == 0 means transmit diversity mode.
+	/* sc_txantenna == 0 means transmit diversity mode.
 	 * sc_txantenna == 1 or sc_txantenna == 2 means the user has selected
 	 * the first or second antenna port.
-	 * If the user has set the txantenna, use it for multicast frames too.
-	 */
+	 * If the user has set the txantenna, use it for multicast frames too. */
 	if (ismcast && !sc->sc_txantenna) {
 		antenna = sc->sc_mcastantenna + 1;
 		sc->sc_mcastantenna = (sc->sc_mcastantenna + 1) & 0x1;
@@ -8452,9 +8439,7 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni,
 		try0, keyix, antenna, flags, ctsrate, ctsduration, icvlen, ivlen,
 		comp);
 
-	/*
-	 * Formulate first tx descriptor with tx controls.
-	 */
+	/* Formulate first tx descriptor with tx controls. */
 	/* XXX check return value? */
 	ath_hal_setuptxdesc(ah, ds,
 			    pktlen,			/* packet length */
@@ -11146,7 +11131,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 1 = antenna port 1
 				 * 2 = antenna port 2
 				 */
-				if (val > 2)
+				if (val < 0 || val > 2)
 					ret = -EINVAL;
 				else
 					ath_setdefantenna(sc, val);
@@ -11156,19 +11141,16 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				 * 0 = disallow use of diversity
 				 * 1 = allow use of diversity
 				 */
-				if (val > 1) {
+				if (val != 0 && val != 1) {
 					ret = -EINVAL;
 					break;
 				}
-				/* Don't enable diversity if XR is enabled */
-				if (((!sc->sc_hasdiversity) || 
-						 (sc->sc_xrtxq != NULL)) && 
-						val) {
+				if (sc->sc_hasdiversity &&
+				    ath_hal_setdiversity(ah, val)) {
+					sc->sc_diversity = val;
+				} else {
 					ret = -EINVAL;
-					break;
 				}
-				sc->sc_diversity = val;
-				ath_hal_setdiversity(ah, val);
 				break;
 			case ATH_TXINTRPERIOD:
 				/* XXX: validate? */
@@ -11304,7 +11286,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val = ath_hal_getdefantenna(ah);
 			break;
 		case ATH_DIVERSITY:
-			val = sc->sc_diversity;
+			val = ath_hal_getdiversity(ah);
 			break;
 		case ATH_TXINTRPERIOD:
 			val = sc->sc_txintrperiod;
@@ -11571,13 +11553,6 @@ ath_dynamic_sysctl_register(struct ath_softc *sc)
 		kfree(sc->sc_sysctls);
 		sc->sc_sysctls = NULL;
 	}
-
-	/* initialize values */
-	ath_debug_global = (ath_debug & ATH_DEBUG_GLOBAL);
-	sc->sc_debug 	 = (ath_debug & ~ATH_DEBUG_GLOBAL);
-	sc->sc_default_ieee80211_debug = ieee80211_debug;
-	sc->sc_txantenna = 0;		/* default to auto-selection */
-	sc->sc_txintrperiod = ATH_TXQ_INTR_PERIOD;
 }
 
 static void
@@ -11851,7 +11826,8 @@ txcont_configure_radio(struct ieee80211com *ic)
 		vap->iv_ath_cap &= ~IEEE80211_ATHC_COMP;
 		vap->iv_des_ssid[0].len = 0;
 		vap->iv_des_nssid = 1;
-		sc->sc_txantenna = sc->sc_defant = sc->sc_mcastantenna = sc->sc_rxotherant = 1;
+		sc->sc_txantenna = sc->sc_rxantenna = sc->sc_mcastantenna = 1;
+		sc->sc_numrxotherant = 0;
 		sc->sc_diversity = 0;
 		memset(vap->iv_des_ssid[0].ssid, 0, IEEE80211_ADDR_LEN);
 		ath_hal_setdiversity(sc->sc_ah, 0);
