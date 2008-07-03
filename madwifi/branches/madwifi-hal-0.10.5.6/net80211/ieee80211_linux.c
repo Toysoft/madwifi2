@@ -380,7 +380,7 @@ ieee80211_load_module(const char *modname)
 {
 #ifdef CONFIG_KMOD
 	int rv;
-	rv = request_module(modname);
+	rv = request_module("%s", modname);
 	if (rv < 0)
 		printk(KERN_ERR "failed to automatically load module: %s; " \
 			"errno: %d\n", modname, rv);
@@ -542,6 +542,8 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 		if (ret == 0) {
 			vap->iv_debug 		= (val & ~IEEE80211_MSG_IC);
 			vap->iv_ic->ic_debug 	= (val &  IEEE80211_MSG_IC);
+			printk(KERN_INFO "%s debug flags changed to 0x%08x.\n",
+					vap->iv_dev->name, val);
 		}
 	} else {
 		/* VAP specific and 'global' debug flags */
@@ -982,8 +984,10 @@ static struct notifier_block ieee80211_event_block = {
  * Module glue.
  */
 #include "release.h"
+#if 0
 static char *version = RELEASE_VERSION;
 static char *dev_info = "wlan";
+#endif
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
@@ -1000,7 +1004,6 @@ static int __init
 init_wlan(void)
 {
   	register_netdevice_notifier(&ieee80211_event_block);
-	printk(KERN_INFO "%s: %s\n", dev_info, version);
 	return 0;
 }
 module_init(init_wlan);
@@ -1009,6 +1012,5 @@ static void __exit
 exit_wlan(void)
 {
   	unregister_netdevice_notifier(&ieee80211_event_block);
-	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_wlan);
