@@ -380,13 +380,12 @@ MODULE_LICENSE("Dual BSD/GPL");
 static int __init
 init_ath_pci(void)
 {
-	printk(KERN_INFO "%s: %s\n", dev_info, version);
-
-	if (pci_register_driver(&ath_pci_driver) < 0) {
-		printk(KERN_ERR "%s: No devices found, driver not installed.\n", dev_info);
-		return (-ENODEV);
-	}
+	int status;
 	ath_sysctl_register();
+	if ((status = pci_register_driver(&ath_pci_driver))) {
+		ath_sysctl_unregister();
+		return (status);
+	}
 	return (0);
 }
 module_init(init_ath_pci);
@@ -396,8 +395,6 @@ exit_ath_pci(void)
 {
 	ath_sysctl_unregister();
 	pci_unregister_driver(&ath_pci_driver);
-
-	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_ath_pci);
 
