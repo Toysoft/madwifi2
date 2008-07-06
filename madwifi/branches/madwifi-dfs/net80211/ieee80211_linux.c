@@ -468,6 +468,40 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 }
 
 static int
+proc_doth_state_print(struct ieee80211vap *vap, char *buf, int space)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	char *p = buf;
+	struct net_device * dev = ic->ic_dev;
+	struct ath_softc * sc = dev->priv;
+	
+	p += sprintf(p,
+		     "sc_curchan: --- (%4d Mhz)\n",
+		     sc->sc_curchan.channel);
+	
+	p += sprintf(p,
+		     "  CHANNEL_DFS:%d\n"
+		     "  CHANNEL_DFS_CLEAR:%d\n"
+		     "  CHANNEL_INTERFERENCE:%d\n"
+		     "  CAC in progress:%d\n",
+		     sc->sc_curchan.privFlags & CHANNEL_DFS ? 1 : 0,
+		     sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR ? 1 : 0,
+		     sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE ? 1 : 0,
+		     sc->sc_dfs_cac);
+
+	p += sprintf(p,
+		     "ic_curchan: %3d (%4d Mhz)\n"
+		     "  IEEE80211_F_DOTH:%d\n"
+		     "  IEEE80211_IS_CHAN_RADAR:%d\n",
+		     ic->ic_curchan->ic_ieee,
+		     ic->ic_curchan->ic_freq,
+		     ic->ic_flags & IEEE80211_F_DOTH ? 1 : 0,
+		     IEEE80211_IS_CHAN_RADAR(ic->ic_curchan) ? 1 : 0);
+
+	return (p - buf);
+}
+
+static int
 proc_iv_bss_print(struct ieee80211vap *vap, char *buf, int space)
 {
 	char *p = buf;
@@ -611,6 +645,25 @@ proc_doth_open(struct inode *inode, struct file *file)
 }
 
 static int
+proc_doth_state_open(struct inode *inode, struct file *file)
+{
+	struct proc_ieee80211_priv *pv = NULL;
+	struct proc_dir_entry *dp = PDE(inode);
+	struct ieee80211vap *vap = dp->data;
+	int result;
+
+	result = proc_common_open(inode, file);
+	if (result != 0)
+		return result;
+
+	/* now read the data into the buffer */
+	pv = (struct proc_ieee80211_priv *) file->private_data;
+	pv->rlen = proc_doth_state_print(vap,
+					 pv->rbuf, MAX_PROC_IEEE80211_SIZE);
+	return 0;
+}
+
+static int
 proc_iv_bss_open(struct inode *inode, struct file *file)
 {
 	struct proc_ieee80211_priv *pv = NULL;
@@ -676,6 +729,13 @@ static struct file_operations proc_doth_ops = {
 	.read = proc_ieee80211_read,
 	.write = proc_ieee80211_write,
 	.open = proc_doth_open,
+	.release = proc_ieee80211_close,
+};
+
+static struct file_operations proc_doth_state_ops = {
+	.read = proc_ieee80211_read,
+	.write = proc_ieee80211_write,
+	.open = proc_doth_state_open,
 	.release = proc_ieee80211_close,
 };
 
@@ -971,6 +1031,7 @@ ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 	/* Create a proc entry listing the associated stations */
 	ieee80211_proc_vcreate(vap, &proc_ieee80211_ops, "associated_sta");
 	ieee80211_proc_vcreate(vap, &proc_doth_ops, "doth");
+	ieee80211_proc_vcreate(vap, &proc_doth_state_ops, "doth_state");
 	ieee80211_proc_vcreate(vap, &proc_iv_bss_ops, "iv_bss");
 
 	/* Recreate any other proc entries that have been registered */
