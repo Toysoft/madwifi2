@@ -35,3 +35,18 @@ A VAP interface can be used in several modes:
 * IEEE80211_M_MONITOR "monitor" : DFS is not implemented
 * IEEE80211_M_WDS "wds"		: DFS is implemented as "master"
 
+== Implementation notes ==
+
+sc->sc_curchan.privFlags & CHANNEL_DFS is set if ETSI/FCC compliance is
+required by regulation. It does not mean that 802.11h is required. This flag
+is automatically adjusted by ath_radar_correct_dfs_flags() according to the
+regulation for the specified frequency.
+
+ic->ic_flags & IEEE80211_F_DOTH is set if IEEE 802.11h is required. It matchs
+dot11SpectrumManagementRequired as described in IEEE 802.11h. Default value is
+1 and can be changed at anytime by the user through iwpriv.
+
+ETSI/FCC mecanisms (Channel Availability Check, In-Service Monitoring, Channel
+Shutdown, Non-Occupancy Period) and IEEE 802.11h mecanims (Selecting and
+advertissing a new channel, ...) are implemented ONLY if both flagss are set.
+

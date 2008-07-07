@@ -993,7 +993,8 @@ ieee80211_dfs_is_channel_usable(struct ieee80211com *ic,
 		IEEE80211_CHAN_OUTDOOR : IEEE80211_CHAN_INDOOR;
 
 	return ((channel->ic_freq != ic->ic_bsschan->ic_freq) &&
-		(!IEEE80211_IS_CHAN_RADAR(channel)) &&
+		(!IEEE80211_IS_CHAN_RADAR(channel) &&
+		 (ic->ic_flags & IEEE80211_F_DOTH)) &&
 		(isset(ic->ic_chan_active, channel->ic_ieee)) &&
 		(channel->ic_flags & curChanBandFlags) &&
 		(channel->ic_flags & curChanOutdoorFlags));
