@@ -746,7 +746,8 @@ ieee80211_ioctl_siwfreq(struct net_device *dev, struct iw_request_info *info,
 	 * found */
 	if ((vap->iv_des_chan != NULL) &&
 	    (vap->iv_des_chan != IEEE80211_CHAN_ANYC)) {
-		if (IEEE80211_IS_CHAN_RADAR(vap->iv_des_chan))
+		if (IEEE80211_IS_CHAN_RADAR(vap->iv_des_chan) &&
+		    (ic->ic_flags & IEEE80211_F_DOTH))
 			return -EBUSY;
 	}
 

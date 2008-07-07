@@ -1936,7 +1936,10 @@ static HAL_BOOL ath_hw_reset(struct ath_softc* sc, HAL_OPMODE opmode,
 static int
 ath_dfs_can_transmit(struct ath_softc * sc)
 {
-	if (sc->sc_curchan.privFlags & CHANNEL_DFS) {
+	struct ieee80211com *ic = &sc->sc_ic;
+
+	if ((sc->sc_curchan.privFlags & CHANNEL_DFS) &&
+	    (ic->ic_flags & IEEE80211_F_DOTH)) {
 		/* DFS is required on the current channel. We can transmit
 		 * only after CAC and if no radar has been detected */
 		return ((sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR) &&
@@ -1952,7 +1955,10 @@ ath_dfs_can_transmit(struct ath_softc * sc)
 static int
 ath_dfs_can_transmit_csaie(struct ath_softc * sc)
 {
-	if (sc->sc_curchan.privFlags & CHANNEL_DFS) {
+	struct ieee80211com *ic = &sc->sc_ic;
+
+	if ((sc->sc_curchan.privFlags & CHANNEL_DFS) &&
+	    (ic->ic_flags & IEEE80211_F_DOTH)) {
 		/* DFS is required on the current channel. We can transmit
 		 * only after CAC even if radar has been detected */
 		return (sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR);
@@ -4540,7 +4546,8 @@ ath_calcrxfilter(struct ath_softc *sc)
 	if (sc->sc_nmonvaps > 0)
 		rfilt |= (HAL_RX_FILTER_CONTROL | HAL_RX_FILTER_BEACON |
 			  HAL_RX_FILTER_PROBEREQ | HAL_RX_FILTER_PROM);
-	if (sc->sc_curchan.privFlags & CHANNEL_DFS)
+	if ((sc->sc_curchan.privFlags & CHANNEL_DFS) &&
+	    (ic->ic_flags & IEEE80211_F_DOTH))
 		rfilt |= HAL_RX_FILTER_PHYRADAR;
 	return rfilt;
 #undef RX_FILTER_PRESERVE
@@ -9189,7 +9196,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 		 (0 == (sc->sc_curchan.privFlags & (CHANNEL_DFS_CLEAR|CHANNEL_INTERFERENCE)))) && 
 		/* the new channel requires DFS protection */
 		ath_radar_is_dfs_required(sc, &hchan) &&
-		/* IEEE 802.11h is implemented */
+		/* IEEE 802.11h is required */
 		(ic->ic_flags & IEEE80211_F_DOTH) &&
 		/* CAC is not already started */
 		(!sc->sc_dfs_cac);
@@ -9712,7 +9719,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 		/* if it is a DFS channel and has not been checked for radar
 		 * do not let the 80211 state machine to go to RUN state. */
-		if (sc->sc_dfs_cac && 
+		if (0 && sc->sc_dfs_cac && 
 				IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
 				"VAP -> DFSWAIT_PENDING \n");
@@ -9813,7 +9820,8 @@ ath_dfs_cac_completed(unsigned long data )
 		DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
 				"DFS wait %s! - Channel: %u Time: "
 				"%ld.%06ld\n", 
-				(sc->sc_curchan.privFlags & CHANNEL_DFS) ? 
+			((sc->sc_curchan.privFlags & CHANNEL_DFS) &&
+			 (ic->ic_flags & IEEE80211_F_DOTH)) ? 
 					"completed" : "not applicable", 
 					ieee80211_mhz2ieee(sc->sc_curchan.channel, 
 						sc->sc_curchan.channelFlags), 
@@ -9828,7 +9836,8 @@ ath_dfs_cac_completed(unsigned long data )
 					"wait timer.\n");
 			return;
 		}
-		if (0 == (sc->sc_curchan.privFlags & CHANNEL_DFS)) {
+		if (!((sc->sc_curchan.privFlags & CHANNEL_DFS) &&
+		      (ic->ic_flags & IEEE80211_F_DOTH))) {
 			DPRINTF(sc, ATH_DEBUG_DOTH, "DFS wait "
 					"timer expired but the current "
 					"channel does not require DFS.  "
@@ -12432,14 +12441,15 @@ ath_radar_detected(struct ieee80211com *ic, const char * cause,
 		cause,
 		switchChanRequested ? "requesting" : "random",
 		switchChan,
-		sc->sc_radar_ignored ? " (ignored)" : "");
+		sc->sc_radar_ignored || !(ic->ic_flags & IEEE80211_F_DOTH) ?
+		" (ignored)" : "");
 
 	/* flag set through :
 	 * echo 1 > /proc/sys/dev/wifi0/radar_ignored
 	 * or :
 	 * sysctl -w dev.wifi0.radar_ignored=1
 	 */
-	if (sc->sc_radar_ignored) {
+	if (sc->sc_radar_ignored || !(ic->ic_flags & IEEE80211_F_DOTH)) {
 		/* debug message already printed above */
 		return;
 	}

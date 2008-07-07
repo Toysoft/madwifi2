@@ -238,7 +238,8 @@ int ath_radar_update(struct ath_softc *sc)
 	if (ath_radar_correct_dfs_flags(sc, &sc->sc_curchan))
 		DPRINTF(sc, ATH_DEBUG_DOTH, "channel required "
 			"corrections to private flags.\n");
-	required = ath_radar_is_dfs_required(sc, &sc->sc_curchan);
+	required = ((sc->sc_curchan.privFlags & CHANNEL_DFS) &&
+		    (ic->ic_flags & IEEE80211_F_DOTH));
 	/* configure radar pulse detector register using default values, but do
 	 * not toggle the enable bit.  XXX: allow tweaking?? */
 	ath_radar_set_params(sc, NULL);

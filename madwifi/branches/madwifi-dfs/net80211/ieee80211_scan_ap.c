@@ -827,7 +827,8 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 			continue;
 
 		/* Verify channel is not marked for non-occupancy */
-		if (IEEE80211_IS_CHAN_RADAR(c->chan))
+		if (IEEE80211_IS_CHAN_RADAR(c->chan) &&
+		    (ic->ic_flags & IEEE80211_F_DOTH))
 			continue;
 
 		/* Do not select 802.11a ST if mode is specified and is not 

@@ -240,7 +240,8 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/* If we have detected a radar on the current channel, or another node
 	 * told us to stop transmitting, we no longer transmit. Note : we
 	 * still allow a monitor interface to transmit */
-	if (IEEE80211_IS_CHAN_RADAR(ic->ic_curchan)) {
+	if (IEEE80211_IS_CHAN_RADAR(ic->ic_curchan) && 
+		(ic->ic_flags & IEEE80211_F_DOTH)) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				"%s: dropping data since we are under radar\n",
 				__func__);
