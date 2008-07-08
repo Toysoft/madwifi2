@@ -42,6 +42,7 @@
 #ifdef __KERNEL__
 #include <linux/types.h>
 #include <linux/time.h>
+#include <linux/netdevice.h>
 #endif
 #if !defined(__KERNEL__) || !defined (__bitwise)
 #define __le16 u_int16_t
