@@ -487,7 +487,7 @@ proc_doth_state_print(struct ieee80211vap *vap, char *buf, int space)
 		     sc->sc_curchan.privFlags & CHANNEL_DFS ? 1 : 0,
 		     sc->sc_curchan.privFlags & CHANNEL_DFS_CLEAR ? 1 : 0,
 		     sc->sc_curchan.privFlags & CHANNEL_INTERFERENCE ? 1 : 0,
-		     sc->sc_dfs_cac);
+		     timer_pending(&sc->sc_dfs_cac_timer));
 
 	p += sprintf(p,
 		     "ic_curchan: %3d (%4d Mhz)\n"
