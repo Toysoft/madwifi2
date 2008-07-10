@@ -52,7 +52,7 @@ endif
 
 DIRS_MODULES = $(ATH) $(ATH_HAL) $(ATH_RATE) $(WLAN) mmiotrace/
 
-obj-y := ath/ ath_hal/ ath_rate/ net80211/ $(if $(MMIOTRACE),mmiotrace/)
+obj-y := ath/ ath_hal/ ath_rate/ net80211/ mmiotrace/
 
 all: modules tools
 
