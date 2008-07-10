@@ -47,12 +47,7 @@ ifneq (svnversion.h,$(MAKECMDGOALS))
 include $(TOP)/Makefile.inc
 endif
 
-obj-y := ath/ ath_hal/ ath_rate/ net80211/
-ifdef MMIOTRACE
-ifndef CONFIG_MMIOTRACE
-obj-y += mmiotrace/
-endif
-endif
+obj-y := ath/ ath_hal/ ath_rate/ net80211/ mmiotrace/
 
 all: modules tools
 

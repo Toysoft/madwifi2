@@ -65,7 +65,7 @@ endif
 
 INCS += -I$(ATH_HAL) -I$(HAL)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\" $(if $(MMIOTRACE),-DMMIOTRACE=1)
+EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\" -DMMIOTRACE=1
 
 ifneq (,$(filter xscale% arm%,$(TARGET)))
 LDFLAGS += --no-warn-mismatch
