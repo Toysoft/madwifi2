@@ -103,6 +103,13 @@
 
 #include "ah_os.h"
 
+#ifndef MAX
+# define MAX(a, b)	(((a) > (b))? (a) : (b))
+#endif
+#ifndef MIN
+# define MIN(a, b)	(((a) < (b))? (a) : (b))
+#endif
+
 /* unaligned little endian access */
 #define LE_READ_2(p)							\
 	((u_int16_t)							\
@@ -3694,13 +3701,12 @@ static int
 ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 	HAL_KEYVAL *hk, const u_int8_t mac[IEEE80211_ADDR_LEN])
 {
-#define	IEEE80211_KEY_XR	(IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV)
 	static const u_int8_t zerobssid[IEEE80211_ADDR_LEN];
 	struct ath_hal *ah = sc->sc_ah;
 
 	KASSERT(k->wk_cipher->ic_cipher == IEEE80211_CIPHER_TKIP,
 		("got a non-TKIP key, cipher %u", k->wk_cipher->ic_cipher));
-	if ((k->wk_flags & IEEE80211_KEY_XR) == IEEE80211_KEY_XR) {
+	if ((k->wk_flags & IEEE80211_KEY_TXRX) == IEEE80211_KEY_TXRX) {
 		if (sc->sc_splitmic) {
 			/*
 			 * TX key goes at first index, RX key at the rx index.
@@ -3731,11 +3737,9 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 			return ath_hal_keyset(ah, ATH_KEY(k->wk_keyix), hk, 
 					mac, AH_FALSE);
 		}
-	} else if (k->wk_flags & IEEE80211_KEY_XR) {
-		/*
-		 * TX/RX key goes at first index.
-		 * The HAL handles the MIC keys are index+64.
-		 */
+	} else if (k->wk_flags & IEEE80211_KEY_TXRX) {
+		/* TX/RX key goes at first index.
+		 * The HAL handles the MIC keys are index + 64. */
 		memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
 			k->wk_txmic : k->wk_rxmic, sizeof(hk->kv_mic));
 		KEYPRINTF(sc, k->wk_keyix, hk, mac);
@@ -3743,7 +3747,6 @@ ath_keyset_tkip(struct ath_softc *sc, const struct ieee80211_key *k,
 				AH_FALSE);
 	}
 	return 0;
-#undef IEEE80211_KEY_XR
 }
 
 /*
@@ -4151,13 +4154,14 @@ ath_key_update_end(struct ieee80211vap *vap)
 static u_int32_t
 ath_calcrxfilter(struct ath_softc *sc)
 {
-#define	RX_FILTER_PRESERVE	(HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct net_device *dev = ic->ic_dev;
 	struct ath_hal *ah = sc->sc_ah;
 	u_int32_t rfilt;
 
-	rfilt = (ath_hal_getrxfilter(ah) & RX_FILTER_PRESERVE) |
+	/* Preserve the current Phy. radar and err. filters. */
+	rfilt = (ath_hal_getrxfilter(ah) &
+			(HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR)) |
 		 HAL_RX_FILTER_UCAST | HAL_RX_FILTER_BCAST |
 		 HAL_RX_FILTER_MCAST;
 	if (ic->ic_opmode != IEEE80211_M_STA)
@@ -4174,7 +4178,6 @@ ath_calcrxfilter(struct ath_softc *sc)
 	if (sc->sc_curchan.privFlags & CHANNEL_DFS)
 		rfilt |= (HAL_RX_FILTER_PHYERR | HAL_RX_FILTER_PHYRADAR);
 	return rfilt;
-#undef RX_FILTER_PRESERVE
 }
 
 /*
@@ -4241,26 +4244,24 @@ ath_mode_init(struct net_device *dev)
 static inline int 
 ath_slottime2timeout(struct ath_softc *sc, int slottime)
 {
-	/* HAL seems to use a constant of 8 for OFDM overhead and 18 for 
-	 * CCK overhead.
+	/* IEEE 802.11 2007 9.2.8 says the ACK timeout shall be SIFSTime +
+	 * slot time (+ PHY RX start delay). HAL seems to use a constant of 8
+	 * for OFDM overhead and 18 for CCK overhead.
 	 *
-	 * XXX: Update based on emperical evidence (potentially save 15us per timeout)
-	 */
-	if (((sc->sc_curchan.channelFlags & IEEE80211_CHAN_A) == IEEE80211_CHAN_A) ||
-	    (((sc->sc_curchan.channelFlags & IEEE80211_CHAN_108G) == IEEE80211_CHAN_108G) && 
-		 (sc->sc_ic.ic_flags & IEEE80211_F_SHSLOT)))
-	{
-		/* short slot time - 802.11a, and 802.11g turbo in turbo mode with short slot time */
-		return (slottime * 2) + 8;
-	}
-
-	/* constant for CCK mib processing time */
-	return (slottime * 2) + 18;
+	 * XXX: Update based on emperical evidence (potentially save 15us per
+	 * timeout). */
+	if (((sc->sc_curchan.channelFlags & IEEE80211_CHAN_A) ==
+				IEEE80211_CHAN_A) ||
+	    (((sc->sc_curchan.channelFlags & IEEE80211_CHAN_108G) ==
+	      			IEEE80211_CHAN_108G) && 
+	     (sc->sc_ic.ic_flags & IEEE80211_F_SHSLOT)))
+		/* Short slot time: 802.11a, and 802.11g turbo in turbo mode
+		 * with short slot time. */
+		return slottime + 8;
+	else
+		/* Constant for CCK MIB processing time. */
+		return slottime + 18;
 }
-
-#ifndef MAX
-# define MAX(a, b)	(((a) > (b))? (a) : (b))
-#endif
 
 static inline int 
 ath_default_ctsack_timeout(struct ath_softc *sc)
@@ -4372,14 +4373,13 @@ ath_updateslot(struct net_device *dev)
 static void
 ath_beacon_dturbo_config(struct ieee80211vap *vap, u_int32_t intval)
 {
-#define	IS_CAPABLE(vap) \
-	(vap->iv_bss && (vap->iv_bss->ni_ath_flags & (IEEE80211_ATHC_TURBOP)) == \
-		(IEEE80211_ATHC_TURBOP))
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ath_softc *sc = ic->ic_dev->priv;
 
-	if (ic->ic_opmode == IEEE80211_M_HOSTAP && IS_CAPABLE(vap)) {
-
+	/* Check VAP capability. */
+	if ((ic->ic_opmode == IEEE80211_M_HOSTAP) && vap->iv_bss &&
+			((vap->iv_bss->ni_ath_flags & IEEE80211_ATHC_TURBOP) == 
+			 IEEE80211_ATHC_TURBOP)) {
 		/* Dynamic Turbo is supported on this channel. */
 		sc->sc_dturbo = 1;
 		sc->sc_dturbo_tcount = 0;
@@ -4413,7 +4413,6 @@ ath_beacon_dturbo_config(struct ieee80211vap *vap, u_int32_t intval)
 		sc->sc_dturbo = 0;
 		ic->ic_ath_cap &= ~IEEE80211_ATHC_BOOST;
 	}
-#undef IS_CAPABLE
 }
 
 /*
@@ -4643,7 +4642,6 @@ ath_beaconq_setup(struct ath_softc *sc)
 static int
 ath_beaconq_config(struct ath_softc *sc)
 {
-#define	ATH_EXPONENT_TO_VALUE(v)	((1<<v)-1)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc->sc_ah;
 	HAL_TXQ_INFO qi;
@@ -4664,7 +4662,7 @@ ath_beaconq_config(struct ath_softc *sc)
 		 */
 		qi.tqi_aifs = wmep->wmep_aifsn;
 		qi.tqi_cwmin = 0;
-		qi.tqi_cwmax = 2 * ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmin);
+		qi.tqi_cwmax = 2 * ((1 << wmep->wmep_logcwmin) - 1);
 	}
 
 	DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
@@ -4680,7 +4678,6 @@ ath_beaconq_config(struct ath_softc *sc)
 		ath_hal_resettxqueue(ah, sc->sc_bhalq);	/* push to h/w */
 		return 1;
 	}
-#undef ATH_EXPONENT_TO_VALUE
 }
 
 static int
@@ -7183,8 +7180,6 @@ ath_tx_setup(struct ath_softc *sc, int ac, int haltype)
 static int
 ath_txq_update(struct ath_softc *sc, struct ath_txq *txq, int ac)
 {
-#define	ATH_EXPONENT_TO_VALUE(v)	((1<<v)-1)
-#define	ATH_TXOP_TO_US(v)		(v<<5)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct wmeParams *wmep = &ic->ic_wme.wme_chanParams.cap_wmeParams[ac];
 	struct ath_hal *ah = sc->sc_ah;
@@ -7192,9 +7187,9 @@ ath_txq_update(struct ath_softc *sc, struct ath_txq *txq, int ac)
 
 	ath_hal_gettxqueueprops(ah, txq->axq_qnum, &qi);
 	qi.tqi_aifs = wmep->wmep_aifsn;
-	qi.tqi_cwmin = ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmin);
-	qi.tqi_cwmax = ATH_EXPONENT_TO_VALUE(wmep->wmep_logcwmax);
-	qi.tqi_burstTime = ATH_TXOP_TO_US(wmep->wmep_txopLimit);
+	qi.tqi_cwmin = (1 << wmep->wmep_logcwmin) - 1;
+	qi.tqi_cwmax = (1 << wmep->wmep_logcwmax) - 1;
+	qi.tqi_burstTime = wmep->wmep_txopLimit / 32; /* 32 us units. */
 
 	if (!ath_hal_settxqueueprops(ah, txq->axq_qnum, &qi)) {
 		EPRINTF(sc, "Unable to update hardware queue "
@@ -7205,8 +7200,6 @@ ath_txq_update(struct ath_softc *sc, struct ath_txq *txq, int ac)
 		ath_hal_resettxqueue(ah, txq->axq_qnum); /* push to h/w */
 		return 1;
 	}
-#undef ATH_TXOP_TO_US
-#undef ATH_EXPONENT_TO_VALUE
 }
 
 /*
@@ -7407,7 +7400,6 @@ static int
 ath_tx_start(struct net_device *dev, struct ieee80211_node *ni, 
 		struct ath_buf *bf, struct sk_buff *skb, int nextfraglen)
 {
-#define	MIN(a,b)	((a) < (b) ? (a) : (b))
 	struct ath_softc *sc = dev->priv;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct ieee80211vap *vap = ni->ni_vap;
@@ -7997,7 +7989,6 @@ ath_tx_start(struct net_device *dev, struct ieee80211_node *ni,
 
 	ath_tx_txqaddbuf(sc, PASS_NODE(ni), txq, bf, pktlen);
 	return 0;
-#undef MIN
 }
 
 /*
@@ -9328,7 +9319,6 @@ ath_comp_set(struct ieee80211vap *vap, struct ieee80211_node *ni, int en)
 static void
 ath_setup_comp(struct ieee80211_node *ni, int enable)
 {
-#define	IEEE80211_KEY_XR	(IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV)
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;
 	struct ath_node *an = ATH_NODE(ni);
@@ -9350,8 +9340,8 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
 		if ((ni->ni_wpa_ie != NULL) &&
 		    (ni->ni_rsn.rsn_ucastcipher == IEEE80211_CIPHER_TKIP) &&
 		    sc->sc_splitmic) {
-			if ((ni->ni_ucastkey.wk_flags & IEEE80211_KEY_XR)
-							== IEEE80211_KEY_XR)
+			if ((ni->ni_ucastkey.wk_flags & IEEE80211_KEY_TXRX)
+							== IEEE80211_KEY_TXRX)
 				keyix = ni->ni_ucastkey.wk_keyix + 32;
 			else
 				keyix = ni->ni_ucastkey.wk_keyix;
@@ -9368,7 +9358,6 @@ ath_setup_comp(struct ieee80211_node *ni, int enable)
 	}
 
 	return;
-#undef IEEE80211_KEY_XR
 }
 #endif
 
@@ -10102,9 +10091,6 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 	struct ath_buf *ffbuf = an->an_tx_ffbuf[skb->priority];
 	u_int32_t txoplimit;
 
-#define US_PER_4MS 4000
-#define	MIN(a,b)	((a) < (b) ? (a) : (b))
-
 	*flushq = AH_FALSE;
 
 	if (fragthreshold < 2346)
@@ -10128,9 +10114,9 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 	txoplimit = IEEE80211_TXOP_TO_US(
 		ic->ic_wme.wme_chanParams.cap_wmeParams[skb->priority].wmep_txopLimit);
 
-	/* if the 4 msec limit is set on the channel, take it into account */
+	/* Handle 4 ms channel limit. */
 	if (sc->sc_curchan.privFlags & CHANNEL_4MS_LIMIT)
-		txoplimit = MIN(txoplimit, US_PER_4MS);
+		txoplimit = MIN(txoplimit, 4000);
 
 	if (txoplimit != 0 && athff_approx_txtime(sc, an, skb) > txoplimit) {
 		DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_FF,
@@ -10141,9 +10127,6 @@ athff_can_aggregate(struct ath_softc *sc, struct ether_header *eh,
 	}
 
 	return AH_TRUE;
-
-#undef US_PER_4MS
-#undef MIN
 }
 #endif
 
@@ -10453,48 +10436,44 @@ ath_ccatime(struct ath_softc *sc)
 static inline int 
 ath_estimate_max_distance(struct ath_softc *sc)
 {
-	/* Prefer overrided, ask HAL if not overridden */
+	/* Prefer override; ask HAL if not overridden. */
 	int slottime = sc->sc_slottimeconf;
 	if (slottime <= 0)
 		slottime = ath_hal_getslottime(sc->sc_ah);
-	/* NB: We ignore MAC overhead.  this function is reverse operation of 
-	 * ath_distance2slottime, and assumes slottime is CCA + 2x air propagation. */
+	/* NB: We ignore MAC overhead.  This function is the reverse operation
+	 * of ath_distance2slottime, and assumes slottime is CCA + 2 * air
+	 * propagation. */
 	return (slottime - ath_ccatime(sc)) * 150;
 }
 
 static inline int 
 ath_distance2slottime(struct ath_softc *sc, int distance)
 {
-
 	/* Allowance for air propagation (roundtrip time) should be at least 
 	 * 5us per the standards.
 	 * 
 	 * So let's set a minimum distance to accomodate this: 
-	 * 
-	 * roundtrip time = ( ( distance / speed_of_light ) * 2 )
-	 *
-	 * distance = ( (time * 300 ) / 2) or ((5 * 300) / 2) = 750 m
-	 */
+	 * roundtrip time = ((distance / speed_of_light) * 2)
+	 * distance = ((time * 300 ) / 2) or ((5 * 300) / 2) = 750 m */
 	int rtdist = distance * 2;
-	int aAirPropagation = 	(rtdist / 300) + !!(rtdist % 300);
-	if (aAirPropagation < 5) {
-		aAirPropagation = 5;
-	}
-	/* NB: We ignore MAC processing delays... no clue */
+	int c = 299;	/* Speed of light in vacuum in m/us. */ 
+	/* IEEE 802.11 2007 10l.4.3.2. In us. */
+	int aAirPropagation = MAX(5, howmany(rtdist, c));
+	/* XXX: RX/TX turnaround & MAC delay. */
 	return ath_ccatime(sc) + aAirPropagation;
 }
 
 static inline int 
 ath_distance2timeout(struct ath_softc *sc, int distance)
 {
-	/* HAL uses a constant of twice slot time plus 18us.
-	 * The 18us covers rxtx turnaround, MIB processing, etc.
-	 * but the athctrl used to return 2slot+3 so the extra 15us of 
-	 * timeout is probably just being very careful or taking something into
-	 * account that I can't find in the specs.
+	/* HAL uses a constant of twice slot time plus 18us. The 18us covers
+	 * RX/TX turnaround, MIB processing, etc., but the athctrl used to
+	 * return (2 * slot) + 3, so the extra 15us of timeout is probably just
+	 * being very careful or taking something into account that I can't
+	 * find in the specs.
 	 *
-	 * XXX: Update based on emperical evidence (potentially save 15us per timeout)
-	 */
+	 * XXX: Update based on emperical evidence (potentially save 15us per
+	 * timeout). */
 	return ath_slottime2timeout(sc, ath_distance2slottime(sc, distance));
 }
 
@@ -10510,10 +10489,9 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 	ctl->data = &val;
 	ctl->maxlen = sizeof(val);
 
-	/* special case for ATH_RP which expect 3 integers : tsf rssi
-	 * width. It should be noted that tsf is unsigned 64 bits but the
-	 * sysctl API is only unsigned 32 bits. As a result, tsf might get
-	 * truncated */
+	/* Special case for ATH_RP which expect 3 integers: TSF RSSI width. It
+	 * should be noted that tsf is unsigned 64 bits but the sysctl API is
+	 * only unsigned 32 bits. As a result, TSF might get truncated. */
 	if (ctl->extra2 == (void *)ATH_RP) {
 		ctl->data = &tab_3_val;
 		ctl->maxlen = sizeof(tab_3_val);
@@ -12047,19 +12025,16 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
 	char buf[MAX_REGISTER_NAME_LEN];
 #endif
-	#define UNFILTERED AH_FALSE
-	#define FILTERED   AH_TRUE
-
 	if ((ar_device(sc->devid) != 5212) && (ar_device(sc->devid) != 5213)) 
-		return FILTERED;
+		return AH_TRUE;
 	/* Addresses with side effects are never dumped out by bulk debug 
 	 * dump routines. */
-	if ((address >= 0x00c0) && (address <= 0x00df)) return FILTERED;
-	if ((address >= 0x143c) && (address <= 0x143f)) return FILTERED;
+	if ((address >= 0x00c0) && (address <= 0x00df)) return AH_TRUE;
+	if ((address >= 0x143c) && (address <= 0x143f)) return AH_TRUE;
 	/* PCI timing registers are not interesting */
-	if ((address >= 0x4000) && (address <= 0x5000)) return FILTERED;
+	if ((address >= 0x4000) && (address <= 0x5000)) return AH_TRUE;
 	/* reading 0x9200-0x092c causes crashes in turbo A mode? */
-	if ((address >= 0x0920) && (address <= 0x092c)) return FILTERED;
+	if ((address >= 0x0920) && (address <= 0x092c)) return AH_TRUE;
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
 	/* We are being conservative, and do not want to access addresses that
@@ -12068,13 +12043,11 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 	 * openHAL). */
 	return (AH_TRUE == ath_hal_lookup_register_name(sc->sc_ah, buf, 
 				MAX_REGISTER_NAME_LEN, address)) ?
-		UNFILTERED : FILTERED;
+		AH_FALSE : AH_TRUE;
 #else /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
 
-	return UNFILTERED;
+	return AH_FALSE;
 #endif /* #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR */
-	#undef UNFILTERED
-	#undef FILTERED
 }
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 
