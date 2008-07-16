@@ -133,8 +133,9 @@ enum {
 #define ONE_SECOND (1000 * 1000)  /* 1 second, or 1000 milliseconds; eternity, in other words */
 
 #include "release.h"
-
+#if 0
 static char *version = "1.2 (" RELEASE_VERSION ")";
+#endif
 static char *dev_info = "ath_rate_minstrel";
 
 #define STALE_FAILURE_TIMEOUT_MS 10000
@@ -197,7 +198,7 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 		unsigned int x = 0, tt = 0;
 		unsigned int cix = rt->info[rix].controlRate;
 		int rts = 0, cts = 0;
-		int cw = WIFI_CW_MIN;
+		int cw = ATH_DEFAULT_CWMIN;
 
 		KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
@@ -281,7 +282,7 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 		tt += (long_retries + 1) * ath_hal_computetxtime(sc->sc_ah, rt, length,
 							rix, AH_TRUE);
 		for (x = 0; x <= short_retries + long_retries; x++) {
-			cw = MIN(WIFI_CW_MAX, (cw + 1) * 2);
+			cw = MIN(ATH_DEFAULT_CWMAX, (cw + 1) * 2);
 			tt += (t_slot * cw / 2);
 		}
 		return tt;
@@ -377,7 +378,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 			    *try0 = sn->retry_adjusted_count[ndx];
 
 		KASSERT((ndx < sn->num_rates),
-			    ("%s: bad ndx (%d/%d) for " MAC_FMT "?\n",
+			    ("%s: bad ndx (%d/%d) for " MAC_FMT "?",
 			     dev_info, ndx, sn->num_rates,
 			     MAC_ADDR(an->an_node.ni_macaddr)));
 
@@ -410,17 +411,17 @@ ath_rate_get_mrr(struct ath_softc *sc, struct ath_node *an, int shortPreamble,
 		rc3 = 0;
 
 		KASSERT((rc1 >= 0) && (rc1 < sn->num_rates),
-			    ("%s: bad rc1 (%d/%d) for " MAC_FMT "?\n",
+			    ("%s: bad rc1 (%d/%d) for " MAC_FMT "?",
 			     dev_info, rc1, sn->num_rates,
 			     MAC_ADDR(an->an_node.ni_macaddr)));
 
 		KASSERT((rc2 >= 0) && (rc2 < sn->num_rates),
-			    ("%s: bad rc2 (%d/%d) for " MAC_FMT "?\n",
+			    ("%s: bad rc2 (%d/%d) for " MAC_FMT "?",
 			     dev_info, rc2, sn->num_rates,
 			     MAC_ADDR(an->an_node.ni_macaddr)));
 
 		KASSERT((rc3 >= 0) && (rc3 < sn->num_rates),
-			    ("%s: bad rc3 (%d/%d) for " MAC_FMT "?\n",
+			    ("%s: bad rc3 (%d/%d) for " MAC_FMT "?",
 			     dev_info, rc3, sn->num_rates,
 			     MAC_ADDR(an->an_node.ni_macaddr)));
 
@@ -473,7 +474,7 @@ ath_rate_tx_complete(struct ath_softc *sc,
 		/* 'tries' is the total number of times we have endeavoured to
 		 * send this packet, and is a sum of the #attempts at each
 		 * level in the multi-rate retry chain */
-		tries = ts->ts_shortretry + ts->ts_longretry + 1;
+		tries = ts->ts_longretry + 1;
 
 		if (sn->num_rates <= 0) {
 			DPRINTF(sc, "%s: " MAC_FMT " %s no rates yet\n", dev_info,
@@ -747,7 +748,7 @@ ath_rate_newstate(struct ieee80211vap *vap, enum ieee80211_state newstate)
 static void
 ath_timer_function(unsigned long data)
 {
-	struct minstrel_softc *ssc = (struct minstrel_softc *) data;
+	struct minstrel_softc *ssc = (struct minstrel_softc *)data;
 	struct ath_softc *sc = ssc->sc;
 	struct ieee80211com *ic;
 	struct net_device *dev = ssc->sc_dev;
@@ -790,7 +791,7 @@ ath_timer_function(unsigned long data)
 static void
 ath_rate_statistics(void *arg, struct ieee80211_node *ni)
 {
-	struct ath_node *an = (struct ath_node *) ni;
+	struct ath_node *an = (struct ath_node *)ni;
 	struct ieee80211_rateset *rs = &ni->ni_rates;
 	struct minstrel_node *rn = ATH_NODE_MINSTREL(an);
 	unsigned int i;
@@ -904,7 +905,7 @@ ath_rate_attach(struct ath_softc *sc)
 static void
 ath_rate_detach(struct ath_ratectrl *arc)
 {
- 	struct minstrel_softc *osc = (struct minstrel_softc *) arc;
+ 	struct minstrel_softc *osc = (struct minstrel_softc *)arc;
 		osc->close_timer_now = 1;
 		del_timer(&osc->timer);
 		kfree(osc);
@@ -920,7 +921,7 @@ ath_proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 	struct ath_node *an;
 	struct minstrel_node *odst;
 	struct ieee80211_node_table *nt =
-		(struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
+		(struct ieee80211_node_table *)&vap->iv_ic->ic_sta;
 	unsigned int x = 0;
 	unsigned int this_tp, this_prob, this_eprob;
 	struct ath_softc *sc = vap->iv_ic->ic_dev->priv;;
@@ -986,13 +987,12 @@ ath_proc_ratesample_open(struct inode *inode, struct file *file)
 	struct proc_dir_entry *dp = PDE(inode);
 	struct ieee80211vap *vap = dp->data;
 
-	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv),
-					   GFP_KERNEL)))
+	if (!(file->private_data = kzalloc(sizeof(struct proc_ieee80211_priv),
+			   GFP_KERNEL)))
 		return -ENOMEM;
 
 	/* Initially allocate both read and write buffers */
-	pv = (struct proc_ieee80211_priv *) file->private_data;
-	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
+	pv = (struct proc_ieee80211_priv *)file->private_data;
 	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
 	if (!pv->rbuf) {
 		kfree(pv);
@@ -1056,14 +1056,15 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static int __init ath_rate_minstrel_init(void)
 {
-	printk(KERN_INFO "%s: Minstrel automatic rate control "
-	       "algorithm %s\n", dev_info, version);
+/* Debugging output - disabled as noisy. */
+#if 0
 	printk(KERN_INFO "%s: look around rate set to %d%%\n",
 	       dev_info, ath_lookaround_rate);
 	printk(KERN_INFO "%s: EWMA rolloff level set to %d%%\n",
 	       dev_info, ath_ewma_level);
-	printk(KERN_INFO "%s: max segment size in the mrr set "
+	printk(KERN_INFO "%s: max segment size in the MRR set "
 	       "to %d us\n", dev_info, ath_segment_size);
+#endif
 	return ieee80211_rate_register(&ath_rate_ops);
 }
 module_init(ath_rate_minstrel_init);
@@ -1071,7 +1072,6 @@ module_init(ath_rate_minstrel_init);
 static void __exit ath_rate_minstrel_exit(void)
 {
 	ieee80211_rate_unregister(&ath_rate_ops);
-	printk(KERN_INFO "%s: unloaded\n", dev_info);
 }
 module_exit(ath_rate_minstrel_exit);
 

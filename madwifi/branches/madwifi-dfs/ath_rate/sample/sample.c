@@ -110,7 +110,9 @@ enum {
  */
 
 #include "release.h"
+#if 0
 static char *version = "1.2 (" RELEASE_VERSION ")";
+#endif
 static char *dev_info = "ath_rate_sample";
 
 
@@ -168,7 +170,7 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 	struct ieee80211com *ic = &sc->sc_ic;
 	unsigned int tt = 0;
 	unsigned int x;
-	unsigned int cw = WIFI_CW_MIN;
+	unsigned int cw = ATH_DEFAULT_CWMIN;
 	unsigned int cix = rt->info[rix].controlRate;
 	KASSERT(rt != NULL, ("no rate table, mode %u", sc->sc_curmode));
 
@@ -252,7 +254,7 @@ calc_usecs_unicast_packet(struct ath_softc *sc, int length,
 	tt += (long_retries+1)*ath_hal_computetxtime(sc->sc_ah, rt, length,
 						rix, AH_TRUE);
 	for (x = 0; x <= short_retries + long_retries; x++) {
-		cw = MIN(WIFI_CW_MAX, (cw + 1) * 2);
+		cw = MIN(ATH_DEFAULT_CWMAX, (cw + 1) * 2);
 		tt += (t_slot * cw / 2);
 	}
 	return tt;
@@ -344,8 +346,8 @@ pick_sample_ndx(struct sample_node *sn, int size_bin)
 			continue;
 
 		/* rarely sample bit-rates that fail a lot */
-		if (time_before(jiffies, sn->stats[size_bin][ndx].last_tx
-				+ ((HZ * STALE_FAILURE_TIMEOUT_MS) / 1000)) &&
+		if (time_before(jiffies, sn->stats[size_bin][ndx].last_tx +
+				((HZ * STALE_FAILURE_TIMEOUT_MS) / 1000)) &&
 		    sn->stats[size_bin][ndx].successive_failures > 3)
 			continue;
 
@@ -449,8 +451,8 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 				/* let the bit-rate switch quickly during the first few packets */
 				change_rates = 1;
 			} else if (time_after(jiffies,
-				sn->jiffies_since_switch[size_bin] +
-				((HZ * MIN_SWITCH_MS) / 1000))) {
+					sn->jiffies_since_switch[size_bin] +
+					((HZ * MIN_SWITCH_MS) / 1000))) {
 				/* 2 seconds have gone by */
 				change_rates = 1;
 			} else if (average_tx_time * 2 < sn->stats[size_bin][sn->current_rate[size_bin]].average_tx_time) {
@@ -492,7 +494,7 @@ ath_rate_findrate(struct ath_softc *sc, struct ath_node *an,
 	}
 
 	KASSERT(ndx >= 0 && ndx < sn->num_rates,
-		("%s: bad ndx (%u/%u) for " MAC_FMT "?\n",
+		("%s: bad ndx (%u/%u) for " MAC_FMT "?",
 		 dev_info, ndx, sn->num_rates,
 		 MAC_ADDR(an->an_node.ni_macaddr)));
 
@@ -985,7 +987,7 @@ ath_rate_attach(struct ath_softc *sc)
 static void
 ath_rate_detach(struct ath_ratectrl *arc)
 {
-	struct sample_softc *osc = (struct sample_softc *) arc;
+	struct sample_softc *osc = (struct sample_softc *)arc;
 	kfree(osc);
 	_MOD_DEC_USE(THIS_MODULE);
 }
@@ -998,7 +1000,7 @@ proc_read_nodes(struct ieee80211vap *vap, const int size, char *buf, int space)
 	struct ath_node *an;
 	struct sample_node *sn;
 	struct ieee80211_node_table *nt =
-		(struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
+		(struct ieee80211_node_table *)&vap->iv_ic->ic_sta;
 	unsigned int ndx;
 	unsigned int size_bin;
 
@@ -1066,13 +1068,12 @@ proc_ratesample_open(struct inode *inode, struct file *file)
 	struct ieee80211vap *vap = dp->data;
 	unsigned long size;
 
-	if (!(file->private_data = kmalloc(sizeof(struct proc_ieee80211_priv),
-					GFP_KERNEL)))
+	if (!(file->private_data = kzalloc(sizeof(struct proc_ieee80211_priv),
+			GFP_KERNEL)))
 		return -ENOMEM;
 
 	/* initially allocate both read and write buffers */
-	pv = (struct proc_ieee80211_priv *) file->private_data;
-	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
+	pv = (struct proc_ieee80211_priv *)file->private_data;
 	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
 	if (!pv->rbuf) {
 		kfree(pv);
@@ -1139,7 +1140,6 @@ MODULE_LICENSE("Dual BSD/GPL");
 static int __init
 init_ath_rate_sample(void)
 {
-	printk(KERN_INFO "%s: %s\n", dev_info, version);
 	return ieee80211_rate_register(&ath_rate_ops);
 }
 module_init(init_ath_rate_sample);
@@ -1148,6 +1148,5 @@ static void __exit
 exit_ath_rate_sample(void)
 {
 	ieee80211_rate_unregister(&ath_rate_ops);
-	printk(KERN_INFO "%s: unloaded\n", dev_info);
 }
 module_exit(exit_ath_rate_sample);

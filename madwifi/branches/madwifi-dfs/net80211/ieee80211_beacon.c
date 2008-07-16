@@ -117,7 +117,7 @@ ieee80211_beacon_init(struct ieee80211_node *ni, struct ieee80211_beacon_offsets
 		*frm++ = 0; *frm++ = 0;		/* TODO: ATIM window */
 		bo->bo_tim_len = 0;
 	} else {
-		struct ieee80211_tim_ie *tie = (struct ieee80211_tim_ie *) frm;
+		struct ieee80211_tim_ie *tie = (struct ieee80211_tim_ie *)frm;
 
 		tie->tim_ie = IEEE80211_ELEMID_TIM;
 		tie->tim_len = 4;	/* length */
@@ -251,7 +251,7 @@ ieee80211_beacon_alloc(struct ieee80211_node *ni,
 		return NULL;
 	}
 
-	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
+	SKB_NI(skb) = ieee80211_ref_node(ni);
 
 	frm = ieee80211_beacon_init(ni, bo, frm);
 
@@ -280,7 +280,8 @@ EXPORT_SYMBOL(ieee80211_beacon_alloc);
  */
 int
 ieee80211_beacon_update(struct ieee80211_node *ni,
-	struct ieee80211_beacon_offsets *bo, struct sk_buff *skb, int mcast)
+	struct ieee80211_beacon_offsets *bo, struct sk_buff *skb, 
+	int mcast, int *is_dtim)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
@@ -371,7 +372,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 
 	if (vap->iv_opmode == IEEE80211_M_HOSTAP) {	/* NB: no IBSS support*/
 		struct ieee80211_tim_ie *tie =
-			(struct ieee80211_tim_ie *) bo->bo_tim;
+			(struct ieee80211_tim_ie *)bo->bo_tim;
 		if (vap->iv_flags & IEEE80211_F_TIMUPDATE) {
 			u_int timlen, timoff, i;
 			/*
@@ -448,6 +449,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			tie->tim_bitctl |= BITCTL_BUFD_MCAST;
 		else
 			tie->tim_bitctl &= ~BITCTL_BUFD_MCAST;
+		*is_dtim = (tie->tim_count == 0);
 	}
 
 	/* Whenever we want to switch to a new channel, we just need to call

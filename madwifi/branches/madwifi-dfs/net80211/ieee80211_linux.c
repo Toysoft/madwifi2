@@ -136,7 +136,7 @@ if_printf(struct net_device *dev, const char *fmt, ...)
 struct sk_buff *
 #ifdef IEEE80211_DEBUG_REFCNT
 ieee80211_getmgtframe_debug(u_int8_t **frm, u_int pktlen, 
-		const char* func, int line)
+		const char *func, int line)
 #else
 ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen)
 #endif
@@ -156,9 +156,8 @@ ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen)
 		if (off != 0)
 			skb_reserve(skb, align - off);
 
-		SKB_CB(skb)->ni = NULL;
+		SKB_NI(skb) = NULL;
 		SKB_CB(skb)->flags = 0;
-		SKB_CB(skb)->next = NULL;
 
 		skb_reserve(skb, sizeof(struct ieee80211_frame));
 		*frm = skb_put(skb, pktlen);
@@ -381,7 +380,7 @@ ieee80211_load_module(const char *modname)
 {
 #ifdef CONFIG_KMOD
 	int rv;
-	rv = request_module(modname);
+	rv = request_module("%s", modname);
 	if (rv < 0)
 		printk(KERN_ERR "failed to automatically load module: %s; " \
 			"errno: %d\n", modname, rv);
@@ -402,27 +401,30 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 {
 	char *p = buf;
 	struct ieee80211_node *ni;
-	struct ieee80211_node_table *nt = (struct ieee80211_node_table *) &vap->iv_ic->ic_sta;
+	struct ieee80211_node_table *nt =
+		(struct ieee80211_node_table *)&vap->iv_ic->ic_sta;
 
 	IEEE80211_NODE_TABLE_LOCK_IRQ(nt);
 	TAILQ_FOREACH(ni, &nt->nt_node, ni_list) {
+		struct timespec t;
+
 		/* Assume each node needs 500 bytes */
 		if (buf + space < p + 500)
 			break;
-
-		if (ni->ni_vap == vap &&
-		    0 != memcmp(vap->iv_myaddr, ni->ni_macaddr, IEEE80211_ADDR_LEN)) {
-			struct timespec t;
+		if ((ni->ni_vap == vap) && (memcmp(vap->iv_myaddr, 
+				ni->ni_macaddr, IEEE80211_ADDR_LEN) != 0)) {
 			jiffies_to_timespec(jiffies - ni->ni_last_rx, &t);
-			p += sprintf(p, "macaddr: <" MAC_FMT ">\n", MAC_ADDR(ni->ni_macaddr));
-			p += sprintf(p, " rssi %d\n", ni->ni_rssi);
-
+			p += sprintf(p, "macaddr: <" MAC_FMT ">\n", 
+					MAC_ADDR(ni->ni_macaddr));
+			p += sprintf(p, " RSSI %d\n", ni->ni_rssi);
 			p += sprintf(p, " last_rx %ld.%06ld\n",
 				     t.tv_sec, t.tv_nsec / 1000);
-
+			p += sprintf(p, " ni_tstamp %10llu ni_rtsf %10llu\n",
+				     le64_to_cpu(ni->ni_tstamp.tsf), ni->ni_rtsf);
 		}
         }
 	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
+
 	return (p - buf);
 }
 
@@ -560,7 +562,8 @@ static ssize_t
 proc_ieee80211_read(struct file *file, char __user *buf, size_t len, loff_t *offset)
 {
 	loff_t pos = *offset;
-	struct proc_ieee80211_priv *pv = (struct proc_ieee80211_priv *) file->private_data;
+	struct proc_ieee80211_priv *pv =
+		(struct proc_ieee80211_priv *)file->private_data;
 
 	if (!pv->rbuf)
 		return -EINVAL;
@@ -581,14 +584,12 @@ proc_common_open(struct inode *inode, struct file *file)
 {
 	struct proc_ieee80211_priv *pv;
 
-	file->private_data =  kmalloc(sizeof(struct proc_ieee80211_priv),
-				      GFP_KERNEL);
-	if (file->private_data == NULL)
+	if (!(file->private_data = kzalloc(sizeof(struct proc_ieee80211_priv), 
+			GFP_KERNEL)))
 		return -ENOMEM;
 
 	/* initially allocate both read and write buffers */
-	pv = (struct proc_ieee80211_priv *) file->private_data;
-	memset(pv, 0, sizeof(struct proc_ieee80211_priv));
+	pv = (struct proc_ieee80211_priv *)file->private_data;
 	pv->rbuf = vmalloc(MAX_PROC_IEEE80211_SIZE);
 	if (!pv->rbuf) {
 		kfree(pv);
@@ -686,7 +687,7 @@ proc_ieee80211_write(struct file *file, const char __user *buf, size_t len, loff
 {
 	loff_t pos = *offset;
 	struct proc_ieee80211_priv *pv =
-		(struct proc_ieee80211_priv *) file->private_data;
+		(struct proc_ieee80211_priv *)file->private_data;
 
 	if (!pv->wbuf)
 		return -EINVAL;
@@ -709,7 +710,7 @@ static int
 proc_ieee80211_close(struct inode *inode, struct file *file)
 {
 	struct proc_ieee80211_priv *pv =
-		(struct proc_ieee80211_priv *) file->private_data;
+		(struct proc_ieee80211_priv *)file->private_data;
 	if (pv->rbuf)
 		vfree(pv->rbuf);
 	if (pv->wbuf)
@@ -763,6 +764,8 @@ IEEE80211_SYSCTL_DECL(ieee80211_sysctl_debug, ctl, write, filp, buffer,
 		if (ret == 0) {
 			vap->iv_debug 		= (val & ~IEEE80211_MSG_IC);
 			vap->iv_ic->ic_debug 	= (val &  IEEE80211_MSG_IC);
+			printk(KERN_INFO "%s debug flags changed to 0x%08x.\n",
+					vap->iv_dev->name, val);
 		}
 	} else {
 		/* VAP specific and 'global' debug flags */
@@ -965,7 +968,7 @@ ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,17) */
 
 	space = 5 * sizeof(struct ctl_table) + sizeof(ieee80211_sysctl_template);
-	vap->iv_sysctls = kmalloc(space, GFP_KERNEL);
+	vap->iv_sysctls = kzalloc(space, GFP_KERNEL);
 	if (vap->iv_sysctls == NULL) {
 		printk("%s: no memory for sysctl table!\n", __func__);
 		return;
@@ -983,7 +986,6 @@ ieee80211_virtfs_latevattach(struct ieee80211vap *vap)
 	strncpy(devname, vap->iv_dev->name, strlen(vap->iv_dev->name) + 1);
 
 	/* setup the table */
-	memset(vap->iv_sysctls, 0, space);
 	vap->iv_sysctls[0].ctl_name = CTL_NET;
 	vap->iv_sysctls[0].procname = "net";
 	vap->iv_sysctls[0].mode = 0555;
@@ -1184,7 +1186,7 @@ static int
 ieee80211_rcv_dev_event(struct notifier_block *this, unsigned long event,
 	void *ptr)
 {
-	struct net_device *dev = (struct net_device *) ptr;
+	struct net_device *dev = (struct net_device *)ptr;
 	if (!dev || dev->open != &ieee80211_open)
 		return 0;
 
@@ -1207,8 +1209,10 @@ static struct notifier_block ieee80211_event_block = {
  * Module glue.
  */
 #include "release.h"
+#if 0
 static char *version = RELEASE_VERSION;
 static char *dev_info = "wlan";
+#endif
 
 MODULE_AUTHOR("Errno Consulting, Sam Leffler");
 MODULE_DESCRIPTION("802.11 wireless LAN protocol support");
@@ -1225,7 +1229,6 @@ static int __init
 init_wlan(void)
 {
   	register_netdevice_notifier(&ieee80211_event_block);
-	printk(KERN_INFO "%s: %s\n", dev_info, version);
 	return 0;
 }
 module_init(init_wlan);
@@ -1234,6 +1237,5 @@ static void __exit
 exit_wlan(void)
 {
   	unregister_netdevice_notifier(&ieee80211_event_block);
-	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
 module_exit(exit_wlan);

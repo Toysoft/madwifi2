@@ -115,8 +115,8 @@ ieee80211_node_saveq_drain(struct ieee80211_node *ni)
 	IEEE80211_NODE_SAVEQ_LOCK_IRQ(ni);
 	qlen = IEEE80211_NODE_SAVEQ_QLEN(ni);
 	while ((skb = __skb_dequeue(&ni->ni_savedq)) != NULL) {
-		if (SKB_CB(skb)->ni != NULL)
-			ieee80211_unref_node(&SKB_CB(skb)->ni);
+		if (SKB_NI(skb) != NULL)
+			ieee80211_unref_node(&SKB_NI(skb));
 		ieee80211_dev_kfree_skb(&skb);
 	}
 	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ(ni);
@@ -153,8 +153,8 @@ ieee80211_node_saveq_age(struct ieee80211_node *ni)
 				"discard frame, age %u", M_AGE_GET(skb));
 
 			skb = __skb_dequeue(&ni->ni_savedq);
-			if (SKB_CB(skb)->ni != NULL)
-				ieee80211_unref_node(&SKB_CB(skb)->ni);
+			if (SKB_NI(skb) != NULL)
+				ieee80211_unref_node(&SKB_NI(skb));
 			ieee80211_dev_kfree_skb(&skb);
 			discard++;
 		}
@@ -209,7 +209,7 @@ ieee80211_set_tim(struct ieee80211_node *ni, int set)
 int
 ieee80211_pwrsave(struct sk_buff *skb)
 {
-	struct ieee80211_node *ni = SKB_CB(skb)->ni;
+	struct ieee80211_node *ni = SKB_NI(skb);
 	struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *tail;
@@ -224,11 +224,13 @@ ieee80211_pwrsave(struct sk_buff *skb)
 			ni->ni_stats.ns_psq_drops, IEEE80211_PS_MAX_QUEUE);
 #ifdef IEEE80211_DEBUG
 		if (ieee80211_msg_dumppkts(vap))
-			ieee80211_dump_pkt(ni->ni_ic, skb->data, skb->len, -1, -1);
+			ieee80211_dump_pkt(ni->ni_ic, skb->data,
+					skb->len, -1, -1, 1);
 #endif
-		if (SKB_CB(skb)->ni != NULL)
-			ieee80211_unref_node(&SKB_CB(skb)->ni);
-		return NETDEV_TX_BUSY;
+		if (SKB_NI(skb) != NULL)
+			ieee80211_unref_node(&SKB_NI(skb));
+		ieee80211_dev_kfree_skb(&skb);
+		return NETDEV_TX_OK;
 	}
 
 	/*

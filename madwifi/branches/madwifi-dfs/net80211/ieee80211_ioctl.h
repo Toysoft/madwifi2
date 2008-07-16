@@ -642,6 +642,13 @@ enum {
 	IEEE80211_PARAM_BEACON_MISS_THRESH	= 73,	/* Beacon miss threshold (in beacons) */
 	IEEE80211_PARAM_BEACON_MISS_THRESH_MS	= 74,	/* Beacon miss threshold (in ms) */
 	IEEE80211_PARAM_RSSI_EWMA               = 75,
+	IEEE80211_PARAM_DRAINTXQ		= 76,   /* Drain transmit queues */
+	IEEE80211_PARAM_STOP_QUEUE		= 77,   /* Stop the device queue (for testing) */
+	IEEE80211_PARAM_TXTIMEOUT		= 78,   /* Simulate Transmit timeout */
+	IEEE80211_PARAM_ATHRESET		= 79,   /* Force device reset */
+	IEEE80211_PARAM_RESETTXBUFS		= 80,   /* Reset transmit DMA */
+	IEEE80211_PARAM_SCANBUFS		= 81,	/* Heap analysis for TX DMA */
+	IEEE80211_PARAM_LEAKTXBUFS		= 82,	/* Leak tx buffers */
 };
 
 #define	SIOCG80211STATS			(SIOCDEVPRIVATE+2)
@@ -658,8 +665,8 @@ struct ieee80211_clone_params {
 	char icp_name[IFNAMSIZ];		/* device name */
 	u_int16_t icp_opmode;			/* operating mode */
 	u_int16_t icp_flags;			/* see below */
-#define	IEEE80211_CLONE_BSSID	0x0001		/* allocate unique mac/bssid */
-#define	IEEE80211_NO_STABEACONS	0x0002		/* Do not setup the station beacon timers */
+#define	IEEE80211_CLONE_BSSID		0x0001	/* allocate unique mac/bssid */
+#define	IEEE80211_USE_SW_BEACON_TIMERS	0x0002	/* Do not setup the station beacon timers */
 };
 
 /* APPIEBUF related definitions */

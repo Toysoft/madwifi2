@@ -55,6 +55,7 @@ extern const char *ieee80211_ctl_subtype_name[];
 extern const char *ieee80211_state_name[IEEE80211_S_MAX];
 extern const char *ieee80211_wme_acnames[];
 extern const char *ieee80211_phymode_name[];
+extern const char *ieee80211_opmode_name[];
 
 void ieee80211_proto_attach(struct ieee80211com *);
 void ieee80211_proto_detach(struct ieee80211com *);
@@ -69,7 +70,7 @@ int ieee80211_setup_rates(struct ieee80211_node *, const u_int8_t *,
 	const u_int8_t *, int);
 void ieee80211_saveie(u_int8_t **, const u_int8_t *);
 void ieee80211_saveath(struct ieee80211_node *, u_int8_t *);
-void ieee80211_recv_mgmt(struct ieee80211vap *, struct ieee80211_node *,
+int ieee80211_recv_mgmt(struct ieee80211vap *, struct ieee80211_node *,
 	struct sk_buff *, int, int, u_int64_t);
 void ieee80211_sta_pwrsave(struct ieee80211vap *, int);
 int ieee80211_hardstart(struct sk_buff *, struct net_device *);
@@ -257,7 +258,8 @@ void ieee80211_dturbo_switch(struct ieee80211com *, int);
 int ieee80211_new_state(struct ieee80211vap *, enum ieee80211_state, int);
 void ieee80211_print_essid(const u_int8_t *, int);
 #ifdef IEEE80211_DEBUG
-void ieee80211_dump_pkt(struct ieee80211com *, const u_int8_t *, int, int, int);
+void ieee80211_dump_pkt(struct ieee80211com *, const u_int8_t *,
+		int, int, int, int);
 #else
 #define ieee80211_dump_pkt(...)
 #endif
@@ -286,7 +288,7 @@ struct ieee80211_beacon_offsets {
 struct sk_buff *ieee80211_beacon_alloc(struct ieee80211_node *,
 	struct ieee80211_beacon_offsets *);
 int ieee80211_beacon_update(struct ieee80211_node *,
-	struct ieee80211_beacon_offsets *, struct sk_buff *, int);
+	struct ieee80211_beacon_offsets *, struct sk_buff *, int, int*);
 
 /* XXX exposed due to of beacon code botch */
 u_int8_t *ieee80211_add_rates(u_int8_t *, const struct ieee80211_rateset *);

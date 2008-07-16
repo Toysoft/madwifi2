@@ -57,7 +57,7 @@ COPTS	+= -DDFS_DOMAIN_ETSI -DDFS_DOMAIN_FCC
 include $(TOP)/Makefile.inc
 
 obj-m		+= ath_$(BUSNAME).o
-ath_$(BUSNAME)-objs	:= if_ath.o if_ath_radar.o if_ath_$(BUSNAME).o
+ath_$(BUSNAME)-objs	:= if_ath.o if_ath_radar.o if_ath_hal_extensions.o if_ath_$(BUSNAME).o
 
 INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
@@ -65,16 +65,19 @@ EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
 
 -include $(TOPDIR)/Rules.make
 
+.PHONY: all
 all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 
+.PHONY: install
 install:
 	test -d $(DESTDIR)/$(KMODPATH) || mkdir -p $(DESTDIR)/$(KMODPATH)
 	install -m 0644 ath_$(BUSNAME).$(KMODSUF) $(DESTDIR)/$(KMODPATH)
 
+.PHONY: clean
 clean:
 	rm -f *~ *.o *.ko *.mod.c .*.cmd
-	rm -f .depend .version .*.o.flags .*.o.d
+	rm -f modules.order .depend .version .*.o.flags .*.o.d
 	rm -rf .tmp_versions
 
 ath_$(BUSNAME).o: $(ath_$(BUSNAME)-objs)

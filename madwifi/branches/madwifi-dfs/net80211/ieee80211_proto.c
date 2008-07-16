@@ -312,8 +312,8 @@ ieee80211_print_essid(const u_int8_t *essid, int len)
 EXPORT_SYMBOL(ieee80211_print_essid);
 
 void
-ieee80211_dump_pkt(struct ieee80211com *ic,
-	const u_int8_t *buf, int len, int rate, int rssi)
+ieee80211_dump_pkt(struct ieee80211com *ic, const u_int8_t *buf,
+		int len, int rate, int rssi, int tx)
 {
 	const struct ieee80211_frame *wh;
 	int i;
@@ -321,22 +321,22 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 	wh = (const struct ieee80211_frame *)buf;
 	switch (wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
-		printk("NODS " MAC_FMT, MAC_ADDR(wh->i_addr2));
+		printk("NoDS " MAC_FMT, MAC_ADDR(wh->i_addr2));
 		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr1));
 		printk("(" MAC_FMT ")", MAC_ADDR(wh->i_addr3));
 		break;
 	case IEEE80211_FC1_DIR_TODS:
-		printk("TODS " MAC_FMT, MAC_ADDR(wh->i_addr2));
+		printk("ToDS " MAC_FMT, MAC_ADDR(wh->i_addr2));
 		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr3));
 		printk("(" MAC_FMT ")", MAC_ADDR(wh->i_addr1));
 		break;
 	case IEEE80211_FC1_DIR_FROMDS:
-		printk("FRDS " MAC_FMT, MAC_ADDR(wh->i_addr3));
+		printk("FrDS " MAC_FMT, MAC_ADDR(wh->i_addr3));
 		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr1));
 		printk("(" MAC_FMT ")", MAC_ADDR(wh->i_addr2));
 		break;
 	case IEEE80211_FC1_DIR_DSTODS:
-		printk("DSDS " MAC_FMT, MAC_ADDR((u_int8_t *)&wh[1]));
+		printk("InDS " MAC_FMT, MAC_ADDR((u_int8_t *)&wh[1]));
 		printk("->" MAC_FMT, MAC_ADDR(wh->i_addr3));
 		printk("(" MAC_FMT, MAC_ADDR(wh->i_addr2));
 		printk("->" MAC_FMT ")", MAC_ADDR(wh->i_addr1));
@@ -364,13 +364,16 @@ ieee80211_dump_pkt(struct ieee80211com *ic,
 	if (wh->i_fc[1] & IEEE80211_FC1_PROT) {
 		int off;
 
-		off = ieee80211_anyhdrspace(ic, wh);
-		printk(" WEP [IV %.02x %.02x %.02x",
-			buf[off+0], buf[off+1], buf[off+2]);
-		if (buf[off+IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV)
+		if (tx)
+			off = ieee80211_anyhdrspace(ic, wh);
+		else
+			off = ieee80211_anyhdrsize(wh);
+		printk(" Prot. [IV %.02x %.02x %.02x",
+			buf[off + 0], buf[off + 1], buf[off + 2]);
+		if (buf[off + IEEE80211_WEP_IVLEN] & IEEE80211_WEP_EXTIV)
 			printk(" %.02x %.02x %.02x",
-				buf[off+4], buf[off+5], buf[off+6]);
-		printk(" KID %u]", buf[off+IEEE80211_WEP_IVLEN] >> 6);
+				buf[off + 4], buf[off + 5], buf[off + 6]);
+		printk(" KID %u]", buf[off + IEEE80211_WEP_IVLEN] >> 6);
 	}
 	if (rate >= 0)
 		printk(" %dM", rate / 2);
@@ -974,7 +977,7 @@ ieee80211_init(struct net_device *dev, int forcescan)
 	 */
 	if (IS_RUNNING(ic->ic_dev)) {
 		if (vap->iv_opmode == IEEE80211_M_STA) {
-			if(ic->ic_roaming != IEEE80211_ROAMING_MANUAL) {
+			if (ic->ic_roaming != IEEE80211_ROAMING_MANUAL) {
 				/* Try to be intelligent about clocking the 
 				 * state machine.  If we're currently in RUN 
 				 * state then we should be able to apply any 
@@ -1235,7 +1238,7 @@ EXPORT_SYMBOL(ieee80211_beacon_miss);
 static void
 ieee80211_sta_swbmiss(unsigned long arg)
 {
-	struct ieee80211vap *vap = (struct ieee80211vap *) arg;
+	struct ieee80211vap *vap = (struct ieee80211vap *)arg;
 	ieee80211_beacon_miss(vap->iv_ic);
 }
 
@@ -1246,7 +1249,7 @@ ieee80211_sta_swbmiss(unsigned long arg)
 static void
 ieee80211_tx_timeout(unsigned long arg)
 {
-	struct ieee80211vap *vap = (struct ieee80211vap *) arg;
+	struct ieee80211vap *vap = (struct ieee80211vap *)arg;
 
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
 		"%s: state %s%s\n", __func__,
@@ -1359,7 +1362,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			ieee80211_reset_bss(vap);
 			break;
 		}
-		if (vap->iv_auth->ia_detach != NULL)
+		if (vap->iv_auth != NULL && vap->iv_auth->ia_detach != NULL)
 			vap->iv_auth->ia_detach(vap);
 		break;
 	case IEEE80211_S_SCAN:
@@ -1576,7 +1579,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 		case IEEE80211_S_SCAN:		/* adhoc/hostap mode */
 		case IEEE80211_S_ASSOC:		/* infra mode */
 			KASSERT(ni->ni_txrate < ni->ni_rates.rs_nrates,
-				("%s: bogus xmit rate %u setup\n", __func__,
+				("%s: bogus xmit rate %u setup", __func__,
 				ni->ni_txrate));
 #ifdef IEEE80211_DEBUG
 			if (ieee80211_msg_debug(vap)) {
@@ -1684,14 +1687,14 @@ static int get_dominant_state(struct ieee80211com *ic) {
 			 tmpvap->iv_state == IEEE80211_S_AUTH ||
 			 tmpvap->iv_state == IEEE80211_S_ASSOC) {
 			KASSERT((nscanning <= 1), ("Two VAPs cannot scan at "
-						"the same time\n"));
+						"the same time"));
 			nscanning++;
 		}
 	}
 	KASSERT(!(nscanning && nrunning), ("SCAN and RUN can't happen at the "
-				"same time\n"));
+				"same time"));
 	KASSERT((nscanning <= 1),         ("Two VAPs must not SCAN at the "
-				"same time\n"));
+				"same time"));
 
 	if (nrunning > 0) 
 		return IEEE80211_S_RUN;
@@ -1702,7 +1705,7 @@ static int get_dominant_state(struct ieee80211com *ic) {
 }
 
 static void 
-dump_vap_states(struct ieee80211com *ic, struct ieee80211vap* highlighed)
+dump_vap_states(struct ieee80211com *ic, struct ieee80211vap *highlighed)
 {
 	/* RE-count the number of VAPs in RUN, SCAN states */
 	int nrunning = 0;
@@ -1728,7 +1731,7 @@ dump_vap_states(struct ieee80211com *ic, struct ieee80211vap* highlighed)
 		}
 		if (tmpvap->iv_state == IEEE80211_S_RUN) {
 			KASSERT((nscanning == 0), ("SCAN and RUN can't happen "
-						"at the same time\n"));
+						"at the same time"));
 			nrunning++;
 		}
 		if (tmpvap->iv_state == IEEE80211_S_SCAN ||
@@ -1736,9 +1739,9 @@ dump_vap_states(struct ieee80211com *ic, struct ieee80211vap* highlighed)
 				tmpvap->iv_state == IEEE80211_S_AUTH || 
 				tmpvap->iv_state == IEEE80211_S_ASSOC) {
 			KASSERT((nscanning == 0), ("Two VAPs cannot scan at "
-						"the same time\n"));
+						"the same time"));
 			KASSERT((nrunning == 0), ("SCAN and RUN can't happen "
-						"at the same time\n"));
+						"at the same time"));
 			nscanning++;
 		}
 	}
@@ -1769,9 +1772,9 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 	case IEEE80211_S_SCAN:
 		switch (dstate) {
 		case IEEE80211_S_RUN:
-			if(vap->iv_opmode == IEEE80211_M_MONITOR || 
-			   vap->iv_opmode == IEEE80211_M_WDS ||
-			   vap->iv_opmode == IEEE80211_M_HOSTAP) {
+			if (vap->iv_opmode == IEEE80211_M_MONITOR || 
+			    vap->iv_opmode == IEEE80211_M_WDS ||
+			    vap->iv_opmode == IEEE80211_M_HOSTAP) {
 				IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE, 
 						"%s: Jumping directly to RUN "
 						"on VAP %p [%s].\n", 
@@ -1908,11 +1911,11 @@ ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int ar
 								tmpvap->iv_nickname);
 						tmpvap->iv_flags_ext &= 
 							~IEEE80211_FEXT_SCAN_PENDING;
-						if(tmpvap->iv_state != 
+						if (tmpvap->iv_state != 
 								IEEE80211_S_RUN) {
 							tmpvap->iv_newstate(tmpvap, 
 									IEEE80211_S_RUN, 0);
-						} else if(tmpvap->iv_opmode == 
+						} else if (tmpvap->iv_opmode == 
 								IEEE80211_M_HOSTAP) {
 							/* Force other AP through 
 							 * -> INIT -> RUN to make
