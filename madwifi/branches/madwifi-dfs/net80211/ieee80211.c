@@ -64,7 +64,21 @@ const char *ieee80211_phymode_name[] = {
 };
 EXPORT_SYMBOL(ieee80211_phymode_name);
 
-static void ieee80211com_media_status(struct net_device*, struct ifmediareq *);
+const char *ieee80211_opmode_name[] = {
+	"ibss", 	/* IEEE80211_M_IBSS     = 0 - IBSS (adhoc) station */            
+	"station", 	/* IEEE80211_M_STA      = 1 - infrastructure station */          
+	"wds", 		/* IEEE80211_M_WDS      = 2 - WDS link */                        
+	"ahdemo", 	/* IEEE80211_M_AHDEMO   = 3 - Old lucent compatible adhoc demo */
+	"opmode4", 	/* invalid              = 4 - invalid */                         
+	"opmode5", 	/* invalid              = 5 - invalid */                         
+	"hostap", 	/* IEEE80211_M_HOSTAP   = 6 - Software Access Point */           
+	"opmode7",	/* invalid              = 7 - invalid */                         
+	"monitor"	/* IEEE80211_M_MONITOR  = 8 - Monitor mode */                    
+};
+EXPORT_SYMBOL(ieee80211_opmode_name);
+
+
+static void ieee80211com_media_status(struct net_device *, struct ifmediareq *);
 static int ieee80211com_media_change(struct net_device *);
 static struct net_device_stats *ieee80211_getstats(struct net_device *);
 static int ieee80211_change_mtu(struct net_device *, int);
@@ -362,7 +376,6 @@ ieee80211_ifattach(struct ieee80211com *ic)
 		ieee80211com_media_change, ieee80211com_media_status);
 	ieee80211com_media_status(dev, &imr);
 	ifmedia_set(&ic->ic_media, imr.ifm_active);
-
 	return 0;
 }
 EXPORT_SYMBOL(ieee80211_ifattach);
@@ -459,7 +472,7 @@ ieee80211_vap_setup(struct ieee80211com *ic, struct net_device *dev,
 	switch (opmode) {
 	case IEEE80211_M_STA:
 		/* WDS/Repeater */
-		if (flags & IEEE80211_NO_STABEACONS)
+		if (flags & IEEE80211_USE_SW_BEACON_TIMERS)
 			vap->iv_flags_ext |= IEEE80211_FEXT_SWBMISS;
 		break;
 	case IEEE80211_M_IBSS:
@@ -531,7 +544,6 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 	struct net_device *dev = vap->iv_dev;
 	struct ieee80211com *ic = vap->iv_ic;
 	struct ifmediareq imr;
-
 	ieee80211_node_latevattach(vap);	/* XXX: move into vattach */
 	ieee80211_power_latevattach(vap);	/* XXX: move into vattach */
 
@@ -541,7 +553,6 @@ ieee80211_vap_attach(struct ieee80211vap *vap,
 				     media_change, media_status);
 	ieee80211_media_status(dev, &imr);
 	ifmedia_set(&vap->iv_media, imr.ifm_active);
-
 	IEEE80211_LOCK_IRQ(ic);
 	TAILQ_INSERT_TAIL(&ic->ic_vaps, vap, iv_next);
 	IEEE80211_UNLOCK_IRQ(ic);
@@ -848,7 +859,7 @@ ieee80211_dfs_action(struct ieee80211com *ic) {
 static void
 ieee80211_expire_excl_restrictions(struct ieee80211com *ic)
 {
-	struct ieee80211_channel* c = NULL;
+	struct ieee80211_channel *c  = NULL;
 	struct net_device *dev = ic->ic_dev;
 	struct timeval tv_now;
 	int i;
@@ -933,7 +944,7 @@ ieee80211_update_dfs_excl_timer(struct ieee80211com *ic)
 static void
 ieee80211_expire_dfs_excl_timer(unsigned long data)
 {
-	struct ieee80211com *ic = (struct ieee80211com *) data;
+	struct ieee80211com *ic = (struct ieee80211com *)data;
 	struct ieee80211vap *vap;
 
 	printk(KERN_INFO "%s: %s: expiring Non-Occupancy Period\n", 
@@ -1186,6 +1197,8 @@ EXPORT_SYMBOL(ieee80211_dfs_test_return);
 void
 ieee80211_announce(struct ieee80211com *ic)
 {
+/* Disabled - creates noise but no useful information. */
+#if 0
 	struct net_device *dev = ic->ic_dev;
 	int i, mode, rate, mword;
 	struct ieee80211_rateset *rs;
@@ -1218,6 +1231,7 @@ ieee80211_announce(struct ieee80211com *ic)
 	if (ic->ic_caps & IEEE80211_C_TKIP)
 		printk(" TKIP");
 	printk("\n");
+#endif
 }
 EXPORT_SYMBOL(ieee80211_announce);
 

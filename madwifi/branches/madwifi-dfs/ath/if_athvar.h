@@ -46,7 +46,10 @@
 #include "ah_desc.h"
 #include "ah_os.h"
 #include "if_athioctl.h"
-#include "net80211/ieee80211.h"		/* XXX for WME_NUM_AC */
+
+#include <net80211/ieee80211.h>		/* XXX for WME_NUM_AC */
+#include <sys/queue.h>
+
 #include <asm/io.h>
 #include <linux/list.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15)
@@ -83,8 +86,8 @@ typedef void *TQUEUE_ARG;
 #define flush_scheduled_work()		flush_scheduled_tasks()
 #define ATH_INIT_WORK(t, f) do { 			\
 	memset((t), 0, sizeof(struct tq_struct)); \
-	(t)->routine = (void (*)(void*)) (f); 	\
-	(t)->data=(void *) (t);			\
+	(t)->routine = (void (*)(void *)) (f); 	\
+	(t)->data = (void *)(t);		\
 } while (0)
 #else
 #include <linux/workqueue.h>
@@ -136,17 +139,14 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 	/* ensure 32-byte alignment of the private area */
 	alloc_size = sizeof (*dev) + sizeof_priv + 31;
 
-	dev = (struct net_device *) kmalloc (alloc_size, GFP_KERNEL);
-	if (dev == NULL)
-	{
+	dev = (struct net_device *)kzalloc(alloc_size, GFP_KERNEL);
+	if (dev == NULL) {
 		printk(KERN_ERR "alloc_dev: Unable to allocate device memory.\n");
 		return NULL;
 	}
 
-	memset(dev, 0, alloc_size);
-
 	if (sizeof_priv)
-		dev->priv = (void *) (((long)(dev + 1) + 31) & ~31);
+		dev->priv = (void *)(((long)(dev + 1) + 31) & ~31);
 
 	setup(dev);
 	strcpy(dev->name, mask);
@@ -206,20 +206,21 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #define ATH_MIN_MTU     32
 
 /* number of RX buffers */
-#define ATH_RXBUF			40
+#define ATH_RXBUF			100
 /* number of TX buffers */
-#define ATH_TXBUF			200
+#define ATH_TXBUF			300
 /* minimum number of beacon buffers */
 #define ATH_MAXVAPS_MIN 		2
 /* maximum number of beacon buffers */
 #define ATH_MAXVAPS_MAX 		64
 /* default number of beacon buffers */
 #define ATH_MAXVAPS_DEFAULT 		4
-
 /* free buffer threshold to restart net dev */
 #define	ATH_TXBUF_FREE_THRESHOLD  (ATH_TXBUF / 20)
 /* number of TX buffers reserved for mgt frames */
-#define ATH_TXBUF_MGT_RESERVED		5
+#define ATH_TXBUF_MGT_RESERVED		20
+/* maximum number of queued frames allowed per WME queue */
+#define ATH_QUEUE_DROP_COUNT		150
 
 /*
  * dynamic turbo specific macros.
@@ -255,6 +256,10 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #define WEP_ICV_FIELD_SIZE      4       /* wep ICV field size */
 #define AES_ICV_FIELD_SIZE      8       /* AES ICV field size */
 #define EXT_IV_FIELD_SIZE       4       /* ext IV field size */
+
+/* This is what the HAL uses by default for 11a+g */
+#define ATH_DEFAULT_CWMIN	15
+#define ATH_DEFAULT_CWMAX	1023
 
 /* XR specific macros */
 
@@ -292,6 +297,12 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
  */
 #define GRP_POLL_PERIOD_NO_XR_STA_MAX	100
 #define GRP_POLL_PERIOD_XR_STA_MAX	30
+
+enum {
+	CCA_BG    = 15,
+	CCA_A     = 4,
+	CCA_PUREG = 4, /* pure G */
+};
 
  /*
  * Percentage of the configured poll periodicity
@@ -333,7 +344,6 @@ static inline struct net_device *_alloc_netdev(int sizeof_priv, const char *mask
 #define MIN_REGISTER_ADDRESS	0x0000		/* PCI register addresses are taken as releative to the appropriate BAR */
 #define MAX_REGISTER_ADDRESS	0xc000 		/* AR5212/AR5213 seems to have a 48k address range */
 #define MAX_REGISTER_NAME_LEN	32		/* Maximum length of register nicknames in debug output */
-#define UNKNOWN_NAME		"(unknown)"	/* Name used when reading/listing undocumented registers */
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
 /*
  * Convert from net80211 layer values to Ath layer values. Hopefully this will
@@ -353,7 +363,7 @@ struct ath_node {
 	u_int16_t an_decomp_index; 		/* decompression mask index */
 	u_int8_t  an_prevdatarix;		/* rate ix of last data frame */
 	u_int16_t an_minffrate;			/* min rate in kbps for ff to aggregate */
-	HAL_NODE_STATS an_halstats;		/* rssi statistics used by hal */
+	HAL_NODE_STATS an_halstats;             /* rssi statistics used by hal */
 	
 	struct ath_buf *an_tx_ffbuf[WME_NUM_AC]; /* ff staging area */
 
@@ -365,6 +375,7 @@ struct ath_node {
 	/* variable-length rate control state follows */
 };
 #define	ATH_NODE(_n)			((struct ath_node *)(_n))
+#define	SKB_AN(_skb) 			(ATH_NODE(SKB_NI(_skb)))
 #define	ATH_NODE_CONST(ni)		((const struct ath_node *)(ni))
 #define ATH_NODE_UAPSD_LOCK_INIT(_an)	spin_lock_init(&(_an)->an_uapsd_lock)
 #define ATH_NODE_UAPSD_LOCK_IRQ(_an)	do {				     \
@@ -377,6 +388,14 @@ struct ath_node {
 	spin_unlock_irqrestore(&(_an)->an_uapsd_lock, __an_uapsd_lockflags); \
 } while (0)
 
+#define ATH_NODE_UAPSD_LOCK_IRQ_INSIDE(_an)	do {			     \
+	ATH_NODE_UAPSD_LOCK_CHECK(_an);				     	     \
+	spin_lock(&(_an)->an_uapsd_lock);				     \
+} while (0)
+#define ATH_NODE_UAPSD_UNLOCK_IRQ_INSIDE(_an) do {			     \
+	ATH_NODE_UAPSD_LOCK_ASSERT(_an);				     \
+	spin_unlock(&(_an)->an_uapsd_lock); 				     \
+} while (0)
 #define ATH_NODE_UAPSD_UNLOCK_IRQ_EARLY(_an) 		     \
 	ATH_NODE_UAPSD_LOCK_ASSERT(_an);				     \
 	spin_unlock_irqrestore(&(_an)->an_uapsd_lock, __an_uapsd_lockflags);
@@ -388,7 +407,7 @@ struct ath_node {
 #define	ATH_NODE_UAPSD_LOCK_CHECK(_an) do { \
 	if (spin_is_locked(&(_an)->an_uapsd_lock)) \
 		printk(KERN_DEBUG "%s:%d - about to block on uapsd lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_NODE_UAPSD_LOCK_CHECK(_an)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
@@ -423,8 +442,7 @@ struct ath_buf {
 	struct ath_desc_status bf_dsstatus;		/* tx/rx descriptor status */
 	dma_addr_t bf_daddr;				/* physical addr of desc */
 	struct sk_buff *bf_skb;				/* skbuff for buf */
-	dma_addr_t bf_skbaddr;				/* physical addr of skb data - always used by one desc*/
-	struct ieee80211_node *bf_node;			/* pointer to the node */
+	dma_addr_t bf_skbaddr;				/* physical addr of skb data - always used by one desc */
 	u_int32_t bf_status;				/* status flags */
 	u_int16_t bf_flags;				/* tx descriptor flags */
 	u_int64_t bf_tsf;
@@ -437,19 +455,25 @@ struct ath_buf {
 	u_int32_t bf_queueage;				/* "age" of txq when this buffer placed on stageq */
 	dma_addr_t bf_skbaddrff[ATH_TXDESC - 1]; 	/* extra addrs for FF */
 #endif
+	int bf_taken_at_line; 				/* XXX: Want full alloc backtrace */
+	const char *bf_taken_at_func;			
 };
 
-/*
- * reset the rx buffer.
- * any new fields added to the athbuf and require 
- * reset need to be added to this macro.
- * currently bf_status is the only one that
- * requires reset.
- */
-#define ATH_RXBUF_RESET(bf)	bf->bf_status=0
-
+/* The last descriptor for a buffer.
+ * NB: This code assumes that the descriptors for a buf are allocated,
+ *     contiguously. This assumption is made elsewhere too. */
+#ifdef ATH_SUPERG_FF
+# define ATH_BUF_LAST_DESC(_bf)	((_bf)->bf_desc + (_bf)->bf_numdescff)
+#else
+# define ATH_BUF_LAST_DESC(_bf)	((_bf)->bf_desc)
+#endif
+/* BF_XX(...) macros will blow up if _bf is NULL, but not if _bf->bf_skb is
+ * null. */
+#define	ATH_BUF_CB(_bf) 		(((_bf)->bf_skb) ? SKB_CB((_bf)->bf_skb) : NULL)
+#define	ATH_BUF_NI(_bf) 		(((_bf)->bf_skb) ? SKB_NI((_bf)->bf_skb) : NULL)
+#define	ATH_BUF_AN(_bf) 		(((_bf)->bf_skb) ? SKB_AN((_bf)->bf_skb) : NULL)
 /* XXX: only managed for rx at the moment */
-#define ATH_BUFSTATUS_DONE		0x00000001	/* hw processing complete, desc processed by hal */
+#define ATH_BUFSTATUS_RXDESC_DONE	0x00000001	/* rx descriptor processing complete, desc processed by hal */
 #define ATH_BUFSTATUS_RADAR_DONE	0x00000002	/* marker to indicate a PHYERR for radar pulse
 							   has already been handled.  We may receive
 							   multiple interrupts before the rx_tasklet
@@ -462,6 +486,8 @@ struct ath_descdma {
 	struct ath_desc	*dd_desc;	/* descriptors */
 	dma_addr_t dd_desc_paddr;	/* physical addr of dd_desc */
 	size_t dd_desc_len;		/* size of dd_desc */
+	unsigned int dd_ndesc;
+	unsigned int dd_nbuf;
 	struct ath_buf *dd_bufptr;	/* associated buffers */
 };
 
@@ -482,7 +508,6 @@ struct proc_dir_entry;
  */
 struct ath_txq {
 	u_int axq_qnum;			/* hardware q number */
-	u_int32_t *axq_link;		/* link ptr in last TX desc */
 	STAILQ_HEAD(, ath_buf) axq_q;	/* transmit queue */
 	spinlock_t axq_lock;		/* lock on q and link */
 	int axq_depth;			/* queue depth */
@@ -540,11 +565,11 @@ struct ath_vap {
 #define ATH_TXQ_LOCK_IRQ_INSIDE(_tq)   do { 				\
 	ATH_TXQ_LOCK_CHECK(_tq); 					\
 	spin_lock(&(_tq)->axq_lock); 					\
-} while(0)
+} while (0)
 #define ATH_TXQ_UNLOCK_IRQ_INSIDE(_tq) do { 				\
 	ATH_TXQ_LOCK_ASSERT(_tq);  					\
 	spin_unlock(&(_tq)->axq_lock);					\
-} while(0)
+} while (0)
 
 #if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
 #define	ATH_TXQ_LOCK_ASSERT(_tq) \
@@ -553,7 +578,7 @@ struct ath_vap {
 #define	ATH_TXQ_LOCK_CHECK(_tq) do { \
 	if (spin_is_locked(&(_tq)->axq_lock)) \
 		printk(KERN_DEBUG "%s:%d - about to block on txq lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_TXQ_LOCK_CHECK(_tq)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
@@ -562,6 +587,13 @@ struct ath_vap {
 #define	ATH_TXQ_LOCK_CHECK(_tq)
 #endif
 
+#define ATH_TXQ_LAST(_txq) \
+	STAILQ_LAST(&(_txq)->axq_q, ath_buf, bf_list)
+static __inline struct ath_desc *ath_txq_last_desc(struct ath_txq *txq)
+{
+	struct ath_buf *tbf = ATH_TXQ_LAST(txq);
+	return tbf ? ATH_BUF_LAST_DESC(tbf) : NULL;
+}
 #define ATH_TXQ_INSERT_TAIL(_tq, _elm, _field) do { \
 	STAILQ_INSERT_TAIL(&(_tq)->axq_q, (_elm), _field); \
 	(_tq)->axq_depth++; \
@@ -569,24 +601,29 @@ struct ath_vap {
 } while (0)
 #define ATH_TXQ_REMOVE_HEAD(_tq, _field) do { \
 	STAILQ_REMOVE_HEAD(&(_tq)->axq_q, _field); \
-	if (--(_tq)->axq_depth <= 0) \
-		(_tq)->axq_link = NULL; \
+	--(_tq)->axq_depth; \
 } while (0)
-/* move buffers from MCASTQ to CABQ */
-#define ATH_TXQ_MOVE_MCASTQ(_tqs,_tqd) do { \
+/* Concat. buffers from one queue to other. */
+#define ATH_TXQ_MOVE_Q(_tqs,_tqd) do { \
 	(_tqd)->axq_depth += (_tqs)->axq_depth; \
 	(_tqd)->axq_totalqueued += (_tqs)->axq_totalqueued; \
-	(_tqd)->axq_link = (_tqs)->axq_link; \
+	ATH_TXQ_LINK_DESC((_tqd), STAILQ_FIRST(&(_tqs)->axq_q)); \
 	STAILQ_CONCAT(&(_tqd)->axq_q, &(_tqs)->axq_q); \
-	(_tqs)->axq_depth=0; \
+	(_tqs)->axq_depth = 0; \
 	(_tqs)->axq_totalqueued = 0; \
-	(_tqs)->axq_link = NULL; \
 } while (0)
+#define ATH_TXQ_LINK_DESC(_txq, _bf) \
+		ATH_STQ_LINK_DESC(&(_txq)->axq_q, (_bf))
 
-/* 
- * concat buffers from one queue to other
- */
-#define ATH_TXQ_MOVE_Q(_tqs,_tqd)  ATH_TXQ_MOVE_MCASTQ(_tqs,_tqd)
+/* NB: This macro's behaviour is dependent upon it being called *before* _bf is
+ *     inserted into _stq. */
+#define ATH_STQ_LINK_DESC(_stq, _bf) do { \
+	if (STAILQ_FIRST((_stq))) \
+		ATH_BUF_LAST_DESC( \
+				STAILQ_LAST((_stq), ath_buf, bf_list) \
+			)->ds_link = \
+			ath_ds_link_swap((_bf)->bf_daddr); \
+	} while (0)
 
 #define	BSTUCK_THRESH	10	/* # of stuck beacons before resetting NB: this is a guess*/
 
@@ -611,15 +648,10 @@ struct ath_softc {
 	int devid;
 	int sc_debug;
 	int sc_default_ieee80211_debug;		/* default debug flags for new VAPs */
-	void (*sc_recv_mgmt)(struct ieee80211vap *, struct ieee80211_node *,
+	int (*sc_recv_mgmt)(struct ieee80211vap *, struct ieee80211_node *,
 		struct sk_buff *, int, int, u_int64_t);
-#ifdef IEEE80211_DEBUG_REFCNT
-	void (*sc_node_cleanup_debug)(struct ieee80211_node *, const char* func, int line);
-	void (*sc_node_free_debug)(struct ieee80211_node *, const char* func, int line);
-#else /* #ifdef IEEE80211_DEBUG_REFCNT */
 	void (*sc_node_cleanup)(struct ieee80211_node *);
 	void (*sc_node_free)(struct ieee80211_node *);
-#endif /* #ifdef IEEE80211_DEBUG_REFCNT */
 	void *sc_bdev;				/* associated bus device */
 	struct ath_hal *sc_ah;			/* Atheros HAL */
 	spinlock_t sc_hal_lock;                 /* hardware access lock */
@@ -653,13 +685,6 @@ struct ath_softc {
 	unsigned int	sc_xrgrppoll:1;		/* xr group polls are active */
 	unsigned int	sc_syncbeacon:1;	/* sync/resync beacon timers */
 	unsigned int	sc_hasclrkey:1;		/* CLR key supported */
-	/* sc_stagbeacons : If set and several VAPs need to send beacons, this
-	 * flag means that beacons transmission is evenly distributed over
-	 * time. If unset, it means that beacons for all VAPs are sent at the
-	 * same time. For instance, with a common beacon interval of 100 TU
-	 * and 2 VAPs, 1 beacon is sent every 50 TU (staggered mode) or 2
-	 * beacons are sent every 100 TU (bursted mode) depending on this flag
-	 */
 	unsigned int	sc_stagbeacons:1;	/* use staggered beacons */
 	unsigned int	sc_dfswait:1;		/* waiting on channel for radar detect */
 	unsigned int	sc_ackrate:1;		/* send acks at high bitrate */
@@ -668,8 +693,9 @@ struct ath_softc {
 	unsigned int	sc_txcont:1;		/* Is continuous transmit enabled? */
 	unsigned int	sc_dfs_testmode:1; 	/* IF this is on, AP vaps will stay in
 						 * 'channel availability check' indefinately,
-						 * reporting radar and interference detections.
-						 */
+						 * reporting radar and interference detections. */
+	unsigned int	sc_dmasize_stomp:1;	/* Whether to stomp on DMA size. */
+
 	unsigned int sc_txcont_power; /* Continuous transmit power in 0.5dBm units */
 	unsigned int sc_txcont_rate;  /* Continuous transmit rate in Mbps */
 
@@ -743,7 +769,8 @@ struct ath_softc {
 	u_int8_t sc_grppoll_str[GRPPOLL_RATE_STR_LEN];
 	struct ath_descdma sc_bdma;		/* beacon descriptors */
 	ath_bufhead sc_bbuf;			/* beacon buffers */
-	int sc_bhalq;				/* HAL q for outgoing beacons */
+	spinlock_t sc_bbuflock;			/* beacon buffers lock */
+	u_int sc_bhalq;				/* HAL q for outgoing beacons */
 	u_int sc_bmisscount;			/* missed beacon transmits */
 	struct timer_list sc_swba_timer;	/* watchdog timer for SWBA */
 	u_int32_t sc_ant_tx[8];			/* recent tx frames/antenna */
@@ -752,6 +779,7 @@ struct ath_softc {
 	struct ath_txq *sc_xrtxq;		/* tx q for XR data */
 	struct ath_descdma sc_grppolldma;	/* TX descriptors for grppoll */
 	ath_bufhead sc_grppollbuf;		/* transmit buffers for grouppoll  */
+	spinlock_t sc_grppollbuflock;		/* grouppoll lock  */
 	u_int16_t sc_xrpollint;			/* xr poll interval */
 	u_int16_t sc_xrpollcount;		/* xr poll count */
 	struct ath_txq *sc_uapsdq;		/* tx q for uapsd */
@@ -794,6 +822,8 @@ struct ath_softc {
 	u_int32_t sc_dturbo_bw_turbo;		/* bandwidth threshold */
 #endif
 	u_int sc_slottimeconf;			/* manual override for slottime */
+	u_int sc_acktimeoutconf;		/* manual override for ack timeout */
+	u_int sc_ctstimeoutconf;		/* manual override for cts timeout */
 
 	struct timer_list sc_dfs_excl_timer;	/* mark expiration timer task */
 	struct timer_list sc_dfs_cac_timer;	/* dfs wait timer */
@@ -848,7 +878,7 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_TXBUF_LOCK_CHECK(_sc) do { \
 	if (spin_is_locked(&(_sc)->sc_txbuflock)) \
 		printk(KERN_DEBUG "%s:%d - about to block on txbuf lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_TXBUF_LOCK_CHECK(_sc)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
@@ -879,13 +909,75 @@ typedef void (*ath_callback) (struct ath_softc *);
 #define	ATH_RXBUF_LOCK_CHECK(_sc) do { \
 	if (spin_is_locked(&(_sc)->sc_rxbuflock)) \
 		printk(KERN_DEBUG "%s:%d - about to block on rxbuf lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ATH_RXBUF_LOCK_CHECK(_sc)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #else
-#define	ATH_RXBUF_LOCK_ASSERT(_sc)
-#define	ATH_RXBUF_LOCK_CHECK(_sc)
+#define ATH_RXBUF_LOCK_ASSERT(_sc)
+#define ATH_RXBUF_LOCK_CHECK(_sc)
+#endif
+
+#define ATH_BBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_bbuflock)
+#define ATH_BBUF_LOCK_DESTROY(_sc)
+#define ATH_BBUF_LOCK_IRQ(_sc)		do {	\
+	unsigned long __bbuflockflags;		\
+	ATH_BBUF_LOCK_CHECK(_sc); 		\
+	spin_lock_irqsave(&(_sc)->sc_bbuflock, __bbuflockflags);
+#define ATH_BBUF_UNLOCK_IRQ(_sc)		\
+	ATH_BBUF_LOCK_ASSERT(_sc); 		\
+	spin_unlock_irqrestore(&(_sc)->sc_bbuflock, __bbuflockflags); \
+} while (0)
+#define ATH_BBUF_UNLOCK_IRQ_EARLY(_sc)		\
+	ATH_BBUF_LOCK_ASSERT(_sc); 		\
+	spin_unlock_irqrestore(&(_sc)->sc_bbuflock, __bbuflockflags);
+
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
+#define ATH_BBUF_LOCK_ASSERT(_sc) \
+	KASSERT(spin_is_locked(&(_sc)->sc_bbuflock), ("bbuf not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define ATH_BBUF_LOCK_CHECK(_sc) do { \
+	if (spin_is_locked(&(_sc)->sc_bbuflock)) \
+		printk(KERN_DEBUG "%s:%d - about to block on bbuf lock!\n", __func__, __LINE__); \
+} while (0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define ATH_BBUF_LOCK_CHECK(_sc)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#else
+#define ATH_BBUF_LOCK_ASSERT(_sc)
+#define ATH_BBUF_LOCK_CHECK(_sc)
+#endif
+
+
+
+#define ATH_GBUF_LOCK_INIT(_sc)	spin_lock_init(&(_sc)->sc_grppollbuflock)
+#define ATH_GBUF_LOCK_DESTROY(_sc)
+#define ATH_GBUF_LOCK_IRQ(_sc)		do {	\
+	unsigned long __grppollbuflockflags;		\
+	ATH_GBUF_LOCK_CHECK(_sc); 		\
+	spin_lock_irqsave(&(_sc)->sc_grppollbuflock, __grppollbuflockflags);
+#define ATH_GBUF_UNLOCK_IRQ(_sc)		\
+	ATH_GBUF_LOCK_ASSERT(_sc); 		\
+	spin_unlock_irqrestore(&(_sc)->sc_grppollbuflock, __grppollbuflockflags); \
+} while (0)
+#define ATH_GBUF_UNLOCK_IRQ_EARLY(_sc)		\
+	ATH_GBUF_LOCK_ASSERT(_sc); 		\
+	spin_unlock_irqrestore(&(_sc)->sc_grppollbuflock, __grppollbuflockflags);
+
+#if (defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)) && defined(spin_is_locked)
+#define ATH_GBUF_LOCK_ASSERT(_sc) \
+	KASSERT(spin_is_locked(&(_sc)->sc_grppollbuflock), ("grppollbuf not locked!"))
+#if (defined(ATH_DEBUG_SPINLOCKS))
+#define ATH_GBUF_LOCK_CHECK(_sc) do { \
+	if (spin_is_locked(&(_sc)->sc_grppollbuflock)) \
+		printk(KERN_DEBUG "%s:%d - about to block on grppollbuf lock!\n", __func__, __LINE__); \
+} while (0)
+#else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#define ATH_GBUF_LOCK_CHECK(_sc)
+#endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
+#else
+#define ATH_GBUF_LOCK_ASSERT(_sc)
+#define ATH_GBUF_LOCK_CHECK(_sc)
 #endif
 
 /* Protects the device from concurrent accesses */
@@ -907,7 +999,6 @@ int ath_ioctl_ethtool(struct ath_softc *, int, void __user *);
 void bus_read_cachesize(struct ath_softc *, u_int8_t *);
 void ath_sysctl_register(void);
 void ath_sysctl_unregister(void);
-int ar_device(int devid);
 
 #define DEV_NAME(_d) \
 	 ((NULL == _d || NULL == _d->name || 0 == strncmp(_d->name, "wifi%d", 6)) ? \
@@ -925,8 +1016,6 @@ int ar_device(int devid);
 	 ((NULL == _v || NULL == _v->iv_ic) ? \
 	  "MadWifi" : \
 	  DEV_NAME(_v->iv_ic->ic_dev))
-
-/* Beacon related definition */
 
 /* Used when computing nexttbtt */
 #define	FUDGE	AR5K_TUNE_SW_BEACON_RESP

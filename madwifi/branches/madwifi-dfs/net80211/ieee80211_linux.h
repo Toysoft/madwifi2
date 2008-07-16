@@ -29,10 +29,6 @@
 #ifndef _NET80211_IEEE80211_LINUX_H_
 #define _NET80211_IEEE80211_LINUX_H_
 
-#define	IEEE80211_DEBUG
-#define	IEEE80211_DEBUG_REFCNT			/* Node reference count debugging */
-/* #define ATH_DEBUG_SPINLOCKS */		/* announce before spinlocking */
-
 #include <linux/wireless.h>
 #include <linux/fs.h>
 
@@ -149,7 +145,7 @@ typedef spinlock_t ieee80211com_lock_t;
 #define	IEEE80211_LOCK_CHECK(_ic) do { \
 	if (spin_is_locked(&(_ic)->ic_comlock)) \
 		printk("%s:%d - about to block on ieee80211com lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	IEEE80211_LOCK_CHECK(_ic)
 #endif 
@@ -178,7 +174,7 @@ typedef spinlock_t ieee80211com_lock_t;
 #define	IEEE80211_VAPS_LOCK_CHECK(_ic) do { \
 	if (spin_is_locked(&(_ic)->ic_vapslock)) \
 		printk("%s:%d - about to block on ieee80211com_vaps lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define IEEE80211_VAPS_LOCK_CHECK(_ic)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
@@ -204,6 +200,14 @@ typedef spinlock_t ieee80211_node_lock_t;
 	IEEE80211_NODE_LOCK_ASSERT(_ni); \
 	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags); \
 } while (0)
+#define IEEE80211_NODE_LOCK_IRQ_INSIDE(_tq) do { \
+	IEEE80211_NODE_LOCK_CHECK(_ni); 	\
+	spin_lock(&(_ni)->ni_nodelock);
+} while (0)
+#define IEEE80211_NODE_UNLOCK_IRQ_INSIDE(_tq) do { \
+	IEEE80211_NODE_LOCK_ASSERT(_ni); \
+	spin_unlock(&(_ni)->ni_nodelock); \
+}while (0)
 #define	IEEE80211_NODE_UNLOCK_IRQ_EARLY(_ni)		\
 	IEEE80211_NODE_LOCK_ASSERT(_ni); \
 	spin_unlock_irqrestore(&(_ni)->ni_nodelock, __node_lockflags);
@@ -216,7 +220,7 @@ typedef spinlock_t ieee80211_node_lock_t;
 #define	IEEE80211_NODE_LOCK_CHECK(_ni) do { \
 	if (spin_is_locked(&(_ni)->ni_nodelock)) \
 		printk("%s:%d - about to block on node lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	IEEE80211_NODE_LOCK_CHECK(_ni)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
@@ -290,7 +294,7 @@ typedef spinlock_t acl_lock_t;
 #define	ACL_UNLOCK(_as)				\
 	ACL_LOCK_ASSERT(_as); 			\
 	spin_unlock(&(_as)->as_lock); 		\
-} while(0)
+} while (0)
 #define ACL_UNLOCK_EARLY(_as)			\
 	ACL_LOCK_ASSERT(_as); 			\
 	spin_unlock(&(_as)->as_lock);
@@ -302,7 +306,7 @@ typedef spinlock_t acl_lock_t;
 #define	ACL_LOCK_CHECK(_as) do { \
 	if (spin_is_locked(&(_as)->as_lock)) \
 		printk("%s:%d - about to block on ACL lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define	ACL_LOCK_CHECK(_as)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
@@ -328,6 +332,14 @@ typedef spinlock_t acl_lock_t;
 	IEEE80211_NODE_SAVEQ_LOCK_ASSERT(_ni);			\
 	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __qlockflags); \
 } while (0)
+#define IEEE80211_NODE_SAVEQ_LOCK_IRQ_INSIDE(_ni)   do { 	\
+	IEEE80211_NODE_SAVEQ_LOCK_CHECK(_ni);			\
+	spin_lock(&(_ni)->ni_savedq.lock);			\
+} while (0)
+#define IEEE80211_NODE_SAVEQ_UNLOCK_IRQ_INSIDE(_ni) do { 	\
+	IEEE80211_NODE_SAVEQ_LOCK_ASSERT(_ni);			\
+	spin_unlock(&(_ni)->ni_savedq.lock);			\
+} while (0)
 #define	IEEE80211_NODE_SAVEQ_UNLOCK_IRQ_EARLY(_ni)		\
 	IEEE80211_NODE_SAVEQ_LOCK_ASSERT(_ni);			\
 	spin_unlock_irqrestore(&(_ni)->ni_savedq.lock, __qlockflags);
@@ -340,7 +352,7 @@ typedef spinlock_t acl_lock_t;
 #define IEEE80211_NODE_SAVEQ_LOCK_CHECK(_ni) do { \
 	if (spin_is_locked(&(_ni)->ni_savedq.lock)) \
 		printk("%s:%d - about to block on node saveq lock!\n", __func__, __LINE__); \
-} while(0)
+} while (0)
 #else /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
 #define IEEE80211_NODE_SAVEQ_LOCK_CHECK(_ni)
 #endif /* #if (defined(ATH_DEBUG_SPINLOCKS)) */
@@ -376,8 +388,18 @@ typedef spinlock_t acl_lock_t;
  * NB: sizeof(cb) == 48 and the vlan code grabs the first
  *     8 bytes so we reserve/avoid it.
  */
-	struct ieee80211_cb {
-	u_int8_t vlan[8];			/* reserve for vlan tag info */
+
+struct ieee80211_phy_params {
+	u_int8_t rate[4];
+	u_int8_t try[4];
+
+	u_int8_t power;
+	u_int32_t flags;
+};
+
+struct ieee80211_cb {
+	u_int8_t __reserved_vlan[8];		/* reserve for vlan tag info */
+	struct ieee80211_phy_params phy;
 	struct ieee80211_node *ni;
 	u_int32_t flags;
 #define	M_LINK0		0x01			/* frame needs WEP encryption */
@@ -386,43 +408,14 @@ typedef spinlock_t acl_lock_t;
 #define M_UAPSD		0x08			/* frame flagged for u-apsd handling */
 #define M_RAW           0x10
 #ifdef IEEE80211_DEBUG_REFCNT
-	int tracked;
+#define M_SKB_TRACKED	0x20
 	void		(*next_destructor)(struct sk_buff *skb);
 #endif
-	struct sk_buff *next;			/* fast frame sk_buf chain */
 };
 
-
-#define	SKB_CB(_skb) 		((struct ieee80211_cb *)(_skb)->cb)
-
-#define M_FLAG_SET(_skb, _flag) \
-	(SKB_CB(_skb)->flags |= (_flag))
-#define	M_FLAG_CLR(_skb, _flag) \
-	(SKB_CB(_skb)->flags &= ~(_flag))
-#define	M_FLAG_GET(_skb, _flag) \
-	(SKB_CB(_skb)->flags & (_flag))
-#define M_FLAG_KEEP_ONLY(_skb, _flag) \
-	(SKB_CB(_skb)->flags &= (_flag))
-
-#define	M_PWR_SAV_SET(skb) M_FLAG_SET((skb), M_PWR_SAV)
-#define	M_PWR_SAV_CLR(skb) M_FLAG_CLR((skb), M_PWR_SAV)
-#define	M_PWR_SAV_GET(skb) M_FLAG_GET((skb), M_PWR_SAV)
-
-/*
- * Skbufs on the power save queue are tagged with an age and
- * timed out.  We reuse the hardware checksum field in the
- * mbuf packet header to store this data.
- * XXX use private cb area
- */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20)
-#define skb_age csum_offset
-#else
-#define skb_age csum
-#endif
-
-#define	M_AGE_SET(skb,v)	(skb->skb_age = v)
-#define	M_AGE_GET(skb)		(skb->skb_age)
-#define	M_AGE_SUB(skb,adj)	(skb->skb_age -= adj)
+struct __assert {
+	int __ieee80211_cb_size[sizeof(struct ieee80211_cb) <= 48 ? 0 : -1];
+};
 
 struct ieee80211com;
 struct ieee80211vap;
@@ -475,7 +468,7 @@ extern void if_printf(struct net_device *, const char *, ...);
 #define ieee80211_getmgtframe(_ppfrm, _pktlen) \
 	ieee80211_getmgtframe_debug(_ppfrm, _pktlen, __func__, __LINE__)
 extern struct sk_buff * ieee80211_getmgtframe_debug(u_int8_t **frm, u_int pktlen, 
-						    const char* func, int line);
+						    const char *func, int line);
 #else
 extern struct sk_buff * ieee80211_getmgtframe(u_int8_t **frm, u_int pktlen);
 #endif
@@ -618,10 +611,6 @@ void ieee80211_proc_cleanup(struct ieee80211vap *);
 
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define IEEE80211_VLAN_TAG_USED 1
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,20)
-#define	vlan_hwaccel_receive_skb(skb, grp, tag)	vlan_hwaccel_rx(skb, grp, tag)
-#endif
 
 #ifndef VLAN_GROUP_ARRAY_PART_LEN
 #define vlan_group_set_device(group, vid, dev) do { \

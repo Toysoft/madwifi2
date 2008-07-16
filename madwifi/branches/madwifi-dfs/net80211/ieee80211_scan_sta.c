@@ -284,7 +284,7 @@ found:
 	ise->se_timoff = sp->timoff;
 	if (sp->tim != NULL) {
 		const struct ieee80211_tim_ie *tim =
-		    (const struct ieee80211_tim_ie *) sp->tim;
+			(const struct ieee80211_tim_ie *)sp->tim;
 		ise->se_dtimperiod = tim->tim_period;
 	}
 	saveie(&ise->se_wme_ie, sp->wme);
@@ -293,7 +293,8 @@ found:
 	saveie(&ise->se_ath_ie, sp->ath);
 
 	/* clear failure count after STA_FAIL_AGE passes */
-	if (se->se_fails && (time_after(jiffies, se->se_lastfail + STA_FAILS_AGE*HZ))) {
+	if (se->se_fails && 
+	    time_after(jiffies, se->se_lastfail + (STA_FAILS_AGE * HZ))) {
 		se->se_fails = 0;
 		IEEE80211_NOTE_MAC(vap, IEEE80211_MSG_SCAN, macaddr,
 			"%s: fails %u", __func__, se->se_fails);
@@ -949,14 +950,18 @@ notfound:
  * a reference to an entry w/o holding the lock on the table.
  */
 static struct sta_entry *
-sta_lookup(struct sta_table *st, const u_int8_t macaddr[IEEE80211_ADDR_LEN])
+sta_lookup(struct sta_table *st, const u_int8_t macaddr[IEEE80211_ADDR_LEN],
+		struct ieee80211_scan_ssid *essid)
 {
 	struct sta_entry *se;
 	int hash = STA_HASH(macaddr);
 
 	SCAN_STA_LOCK_IRQ(st);
 	LIST_FOREACH(se, &st->st_hash[hash], se_hash)
-		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr))
+		if (IEEE80211_ADDR_EQ(se->base.se_macaddr, macaddr) &&
+		    (essid->len == se->base.se_ssid[1] &&
+		     !memcmp(se->base.se_ssid+2, essid->ssid,
+			     se->base.se_ssid[1])))
 			break;
 	SCAN_STA_UNLOCK_IRQ(st);
 
@@ -973,16 +978,15 @@ sta_roam_check(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 	u_int8_t roamRate, curRate;
 	int8_t roamRssi, curRssi;
 
-	se = sta_lookup(st, ni->ni_macaddr);
+	se = sta_lookup(st, ni->ni_macaddr, ss->ss_ssid);
 	if (se == NULL) {
 		/* XXX something is wrong */
 		return;
 	}
 
-	/* XXX do we need 11g too? */
 	if (IEEE80211_IS_CHAN_ANYG(ic->ic_bsschan)) {
-		roamRate = vap->iv_roam.rate11b;
-		roamRssi = vap->iv_roam.rssi11b;
+		roamRate = vap->iv_roam.rate11g;
+		roamRssi = vap->iv_roam.rssi11g;
 	} else if (IEEE80211_IS_CHAN_B(ic->ic_bsschan)) {
 		roamRate = vap->iv_roam.rate11bOnly;
 		roamRssi = vap->iv_roam.rssi11bOnly;
@@ -1067,11 +1071,14 @@ sta_age(struct ieee80211_scan_state *ss)
 	 */
 	KASSERT(vap->iv_opmode == IEEE80211_M_STA,
 		("wrong mode %u", vap->iv_opmode));
-	/* XXX turn this off until the ap release is cut */
-	if (0 && vap->iv_ic->ic_roaming == IEEE80211_ROAMING_AUTO &&
+	/* XXX: Turn this off until the AP release is cut. */
+#if 0
+	if (vap->iv_opmode == IEEE80211_M_STA &&
+	    vap->iv_ic->ic_roaming == IEEE80211_ROAMING_AUTO &&
 	    vap->iv_state >= IEEE80211_S_RUN)
 		/* XXX vap is implicit */
 		sta_roam_check(ss, vap);
+#endif
 }
 
 /*
@@ -1123,7 +1130,10 @@ sta_assoc_fail(struct ieee80211_scan_state *ss,
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *se;
 
-	se = sta_lookup(st, macaddr);
+	if (ss->ss_vap->iv_ic->ic_roaming == IEEE80211_ROAMING_MANUAL)
+		return;
+
+	se = sta_lookup(st, macaddr, ss->ss_ssid);
 	if (se != NULL) {
 		se->se_fails++;
 		se->se_lastfail = jiffies;
@@ -1140,7 +1150,7 @@ sta_assoc_success(struct ieee80211_scan_state *ss,
 	struct sta_table *st = ss->ss_priv;
 	struct sta_entry *se;
 
-	se = sta_lookup(st, macaddr);
+	se = sta_lookup(st, macaddr, ss->ss_ssid);
 	if (se != NULL) {
 #if 0
 		se->se_fails = 0;

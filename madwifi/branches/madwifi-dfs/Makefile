@@ -43,15 +43,19 @@
 obj := $(firstword $(obj) $(SUBDIRS) .)
 TOP = $(obj)
 
-ifneq (svnversion.h,$(MAKECMDGOALS))
 include $(TOP)/Makefile.inc
-endif
 
 obj-y := ath/ ath_hal/ ath_rate/ net80211/
 
+ifdef CRYPTO_TESTING
+obj-y += regression/
+endif
+
+.PHONY: all
 all: modules tools
 
-modules: configcheck svnversion.h
+.PHONY: modules
+modules: configcheck $(TOP)/svnversion.h
 ifdef LINUX24
 	for i in $(obj-y); do \
 		$(MAKE) -C $$i || exit 1; \
@@ -60,9 +64,11 @@ else
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
 endif
 
-.PHONY: svnversion.h
-svnversion.h:
-	@if [ -d .svn ]; then \
+$(addprefix $(obj)/, $(obj-y:/=)): $(TOP)/svnversion.h
+
+$(TOP)/svnversion.h:
+	@cd $(TOP) && \
+	if [ -d .svn ]; then \
 		ver=$$(svnversion -nc . | sed -e 's/^[^:]*://;s/[A-Za-z]//'); \
 		echo "#define SVNVERSION \"svn r$$ver\"" > $@.tmp; \
 	elif [ -d .git ]; then \
@@ -81,8 +87,10 @@ svnversion.h:
 tools:
 	$(MAKE) -C $(TOOLS) all || exit 1
 
+.PHONY: install
 install: install-modules install-tools
 
+.PHONY: install-modules
 install-modules: modules
 	@# check if there are modules left from an old installation
 	@# might cause make to abort the build
@@ -95,32 +103,39 @@ ifeq ($(DESTDIR),)
 	(export KMODPATH=$(KMODPATH); /sbin/depmod -ae $(KERNELRELEASE))
 endif
 
+.PHONY: install-tools
 install-tools: tools
 	$(MAKE) -C $(TOOLS) install || exit 1
 
+.PHONY: uninstall ininstall-modules
 uninstall: uninstall-tools uninstall-modules
 uninstall-modules:
 	sh scripts/find-madwifi-modules.sh -r $(KERNELRELEASE) $(DESTDIR)
 
+.PHONY: list-modules find-modules
 list-modules: find-modules
 find-modules:
 	sh scripts/find-madwifi-modules.sh -l $(KERNELRELEASE)
 
+.PHONY: uninstall-tools
 uninstall-tools:
 	$(MAKE) -C $(TOOLS) uninstall
 
+.PHONY: reinstall reinstall-tools reinstall-modules
 reinstall: uninstall install
 reinstall-tools: uninstall-tools install-tools
 reinstall-modules: uninstall-modules install-modules
 
+.PHONY: clean
 clean:
 	for i in $(obj-y); do \
 		$(MAKE) -C $$i clean; \
 	done
 	-$(MAKE) -C $(TOOLS) clean
 	rm -rf .tmp_versions
-	rm -f *.symvers svnversion.h
+	rm -f modules.order *.symvers svnversion.h
 
+.PHONY: info
 info:
 	@echo "The following settings will be used for compilation:"
 	@echo "TARGET       : $(TARGET)"
@@ -135,6 +150,7 @@ info:
 	@echo "KMODPATH     : $(KMODPATH)"
 	@echo "KMODSUF      : $(KMODSUF)"
 
+.PHONY: sanitycheck
 sanitycheck:
 	@echo -n "Checking requirements... "
 	
@@ -155,6 +171,7 @@ release:
 unload:
 	bash scripts/madwifi-unload
 
+.PHONY: configcheck
 configcheck: sanitycheck
 	@echo -n "Checking kernel configuration... "
 	

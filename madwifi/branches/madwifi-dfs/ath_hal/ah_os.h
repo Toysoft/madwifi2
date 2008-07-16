@@ -96,21 +96,19 @@ typedef unsigned int		u_int;
 typedef	void*			va_list;
 #endif				/* !_LINUX_TYPES_H */
 
-/*
- * Linux/BSD gcc compatibility shims.
- */
-#define	__printflike(_a,_b) \
-	__attribute__((__format__ (__printf__, _a, _b)))
-#define	__va_list	va_list
-#define	OS_INLINE	__inline
+struct ath_hal;
 
 extern int ath_hal_dma_beacon_response_time;
 extern int ath_hal_sw_beacon_response_time;
 extern int ath_hal_additional_swba_backoff;
 
-void __ahdecl ath_hal_vprintf(struct ath_hal *ah, const char *fmt, va_list ap);
-void __ahdecl ath_hal_printf(struct ath_hal *ah, const char *fmt, ...);
-const char *__ahdecl ath_hal_ether_sprintf(const u_int8_t *mac);
+void __ahdecl ath_hal_printf(struct ath_hal *ah, HAL_BOOL prefer_alq, const char *fmt, ...)
+	__attribute__ ((__format__ (__printf__, 3, 4)));
+#ifdef AH_DEBUG_ALQ
+void __ahdecl ath_hal_logprintf(struct ath_hal *ah, const char *fmt, ...)
+	__attribute__ ((__format__ (__printf__, 2, 3)));
+#endif
+
 int __ahdecl ath_hal_memcmp(const void *a, const void *b, size_t n);
 void *__ahdecl ath_hal_malloc(size_t size);
 void __ahdecl ath_hal_free(void *p);
@@ -131,10 +129,6 @@ extern void *__ahdecl ath_hal_memcpy(void *, const void *, size_t);
 #ifndef labs
 #define	labs(_a)		__builtin_labs(_a)
 #endif
-
-struct ath_hal;
-extern u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
-#define	OS_GETUPTIME(_ah)	ath_hal_getuptime(_ah)
 
 /* Byte order/swapping support. */
 #define	AH_LITTLE_ENDIAN	1234
@@ -157,19 +151,27 @@ extern u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
 #endif				/* AH_BYTE_ORDER */
 
 /*
- * Some big-endian architectures don't set CONFIG_GENERIC_IOMAP, but fail to
- * implement iowrite32be and ioread32be.  Provide compatibility macros when
- * it's needed.
+ * The HAL programs big-endian platforms to use byte-swapped hardware registers.
+ * This is done to avoid the byte swapping needed to access PCI devices.
  *
- * As of Linux 2.6.24, only MIPS, PARISC and PowerPC implement iowrite32be and
- * ioread32be as functions.
+ * Many big-endian architectures provide I/O functions that avoid byte swapping.
+ * We use them when possible.  Otherwise, we provide replacements.  The downside
+ * or the replacements is that we may be byte-swapping data twice, so we try to
+ * avoid it.
  *
- * The downside or the replacement macros it that we may be byte-swapping data
- * for the second time, so the native implementations should be preferred.
+ * We use raw access for Linux prior to 2.6.12.  For newer version, we need to
+ * use ioread32() and iowrite32(), which would take care of indirect access to
+ * the registers.
  */
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)) && \
-	!defined(CONFIG_GENERIC_IOMAP) && (AH_BYTE_ORDER == AH_BIG_ENDIAN) && \
-	!defined(__mips__) && !defined(__hppa__) && !defined(__powerpc__)
+    (AH_BYTE_ORDER == AH_BIG_ENDIAN) && \
+    !defined(CONFIG_GENERIC_IOMAP) && \
+    !defined(CONFIG_PARISC) && \
+    !(defined(CONFIG_PPC64) && \
+      (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14))) && \
+    !defined(CONFIG_PPC_MERGE) && \
+    !(defined(CONFIG_MIPS) && \
+      (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)))
 # ifndef iowrite32be
 #  define iowrite32be(_val, _addr) iowrite32(swab32((_val)), (_addr))
 # endif
@@ -183,53 +185,63 @@ extern u_int32_t __ahdecl ath_hal_getuptime(struct ath_hal *);
  * debugging is enabled (AH_DEBUG) or it's explicitly requested for the target.
  *
  * The hardware registers use little-endian byte order natively.  Big-endian
- * systems are configured by HAL to enable hardware byte-swap of register reads
- * and writes at reset.  This avoid the need to byte-swap the data in software.
- * However, the registers in a certain area from 0x4000 to 0x4fff (PCI clock
- * domain registers) are not byte swapped!
+ * systems are configured by HAL to byte-swap of register reads and writes.
+ * However, the registers in the areas 0x4000-0x4fff and 0x7000-0x7fff are not
+ * byte swapped!
  *
  * Since Linux I/O primitives default to little-endian operations, we only
  * need to suppress byte-swapping on big-endian systems outside the area used
  * by the PCI clock domain registers.
  */
 #if (AH_BYTE_ORDER == AH_BIG_ENDIAN)
-#define is_reg_le(__reg) ((0x4000 <= (__reg) && (__reg) < 0x5000))
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
-#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+# define is_reg_le(__reg) ((0x4000 <= (__reg) && (__reg) < 0x5000) || \
+			   (0x7000 <= (__reg) && (__reg) < 0x8000))
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
+#  define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	 is_reg_le(_reg) ?					\
-	 iowrite32((_val), (_ah)->ah_sh + (_reg)) :		\
-	 iowrite32be((_val), (_ah)->ah_sh + (_reg));		\
+	  iowrite32((_val), (_ah)->ah_sh + (_reg)) :		\
+	  iowrite32be((_val), (_ah)->ah_sh + (_reg));		\
 	} while (0)
-#define _OS_REG_READ(_ah, _reg)					\
+#  define _OS_REG_READ(_ah, _reg)				\
 	(is_reg_le(_reg) ?					\
-	 ioread32((_ah)->ah_sh + (_reg)) :			\
-	 ioread32be((_ah)->ah_sh + (_reg)))
-#else
-#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
-	 writel(is_reg_le(_reg) ? 				\
-	 	(_val) : cpu_to_le32(_val), 			\
-		(_ah)->ah_sh + (_reg));				\
+	  ioread32((_ah)->ah_sh + (_reg)) :			\
+	  ioread32be((_ah)->ah_sh + (_reg)))
+# else				/* Linux < 2.6.12 */
+#  define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+	 writel(is_reg_le(_reg) ?				\
+		 (_val) : cpu_to_le32(_val),			\
+		 (_ah)->ah_sh + (_reg));			\
 	} while (0)
-#define _OS_REG_READ(_ah, _reg)					\
+#  define _OS_REG_READ(_ah, _reg)				\
 	(is_reg_le(_reg) ?					\
-	 readl((_ah)->ah_sh + (_reg)) :				\
-	 cpu_to_le32(readl((_ah)->ah_sh + (_reg))))
-#endif				/* KERNEL_VERSION(2,6,12) */
-#else				/* AH_BYTE_ORDER != AH_BIG_ENDIAN */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
-#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+	  readl((_ah)->ah_sh + (_reg)) :			\
+	  cpu_to_le32(readl((_ah)->ah_sh + (_reg))))
+# endif				/* Linux < 2.6.12 */
+#else				/* Little endian */
+# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
+#  define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	 iowrite32((_val), (_ah)->ah_sh + (_reg));		\
 	} while (0)
-#define _OS_REG_READ(_ah, _reg)					\
+#  define _OS_REG_READ(_ah, _reg)				\
 	ioread32((_ah)->ah_sh + (_reg))
-#else
-#define _OS_REG_WRITE(_ah, _reg, _val) do {			\
+# else				/* Linux < 2.6.12 */
+#  define _OS_REG_WRITE(_ah, _reg, _val) do {			\
 	 writel((_val), (_ah)->ah_sh + (_reg));			\
 	} while (0)
-#define _OS_REG_READ(_ah, _reg)					\
+#  define _OS_REG_READ(_ah, _reg)				\
 	readl((_ah)->ah_sh + (_reg))
-#endif				/* KERNEL_VERSION(2,6,12) */
-#endif				/* AH_BYTE_ORDER != AH_BIG_ENDIAN */
+# endif				/* Linux < 2.6.12 */
+#endif				/* Little endian */
+
+#define HAL_DEBUG_OFF			0
+/* Show register accesses */
+#define HAL_DEBUG_REGOPS 		1
+/* Show decoded register dump (include name, etc) */
+#define HAL_DEBUG_REGOPS_DECODED 	2
+/* Show bit-fields where we put decode logic in */
+#define HAL_DEBUG_REGOPS_BITFIELDS    	3
+/* Add a read before a write to show 'changes', may have side-effects */
+#define HAL_DEBUG_REGOPS_DELTAS	 	4
 
 /*
  * The functions in this section are not intended to be invoked by MadWifi
@@ -247,11 +259,20 @@ extern u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 #define OS_REG_READ(_ah, _reg)		_OS_REG_READ(_ah, _reg)
 #endif				/* AH_DEBUG || AH_REGFUNC || AH_DEBUG_ALQ */
 
-extern char *ath_hal_func;
+/* XXX: This should be stored per-device for proper multi-radio support */
+extern const char *ath_hal_func;
+extern const char *ath_hal_device;
+extern int ath_hal_debug;
 static inline void ath_hal_set_function(const char *name)
 {
 #ifdef AH_DEBUG
-	ath_hal_func = (char *)name;
+	ath_hal_func = name;
+#endif
+}
+static inline void ath_hal_set_device(const char *name)
+{
+#ifdef AH_DEBUG
+	ath_hal_device = name;
 #endif
 }
 
@@ -273,4 +294,19 @@ extern struct ath_hal *_ath_hal_attach(u_int16_t devid, HAL_SOFTC,
 				       HAL_STATUS *);
 extern void _ath_hal_detach(struct ath_hal *);
 
+void
+ath_hal_print_decoded_register(struct ath_hal *ah, 
+			       const char *device_name,
+			       u_int32_t address, u_int32_t oldval, 
+			       u_int32_t newval, HAL_BOOL bitfields);
+void
+ath_hal_print_register(struct ath_hal *ah, 
+			       const char *device_name,
+			       u_int32_t address, u_int32_t value);
+
+HAL_BOOL
+ath_hal_lookup_register_name(struct ath_hal *ah, char *buf, int buflen, 
+		u_int32_t address);
+
 #endif				/* _ATH_AH_OSDEP_H_ */
+

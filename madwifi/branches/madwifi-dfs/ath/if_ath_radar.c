@@ -20,7 +20,6 @@
  */
 #include "opt_ah.h"
 
-#define	AR_DEBUG
 #include "if_ath_debug.h"
 
 #ifndef AUTOCONF_INCLUDED
@@ -55,8 +54,6 @@
 #ifdef USE_HEADERLEN_RESV
 #include <net80211/if_llc.h>
 #endif
-
-#define	AR_DEBUG
 
 #include "net80211/if_athproto.h"
 #include "if_athvar.h"
@@ -153,7 +150,9 @@ static struct radar_pattern_specification radar_patterns[] = {
 #endif
 };
 
+#ifdef AR_DEBUG
 static u_int32_t interval_to_frequency(u_int32_t pri);
+#endif /* AR_DEBUG */
 
 /* Returns true if radar detection is enabled. */
 int ath_radar_is_enabled(struct ath_softc *sc)
@@ -408,7 +407,8 @@ static struct ath_rp *pulse_prev(struct ath_rp *pulse)
 #define MR_FAIL_MIN_PERIOD	4
 #define MR_FAIL_MAX_PERIOD	5
 
-static const char* get_match_result_desc(u_int32_t code) {
+#ifdef AR_DEBUG
+static const char *get_match_result_desc(u_int32_t code) {
 	switch (code) {
 	case MR_MATCH:
 		return "MATCH";
@@ -426,6 +426,7 @@ static const char* get_match_result_desc(u_int32_t code) {
 		return "unknown";
 	}
 }
+#endif /* AR_DEBUG */
 
 static int32_t match_radar(
 	u_int32_t matched, 
@@ -578,7 +579,7 @@ static void rp_analyze_long_pulse_bscan(
 	struct ath_rp *last_pulse,
 	u_int32_t *num_bursts,
 	size_t bursts_buflen,
-	struct lp_burst* bursts)
+	struct lp_burst *bursts)
 {
 	int i = 0;
 	struct ath_rp *newer = NULL;
@@ -610,7 +611,7 @@ static void rp_analyze_long_pulse_bscan(
 				tsf_delta -= tsf_adjustment;
 			}
 
-			/* If we are in range for pulse, assume it is a pulse*/
+			/* If we are in range for pulse, assume it is a pulse. */
 			if ((tsf_delta >= LP_MIN_PRI) && (tsf_delta <= LP_MAX_PRI)) {
 				bursts[waveform_num_bursts].lpb_num_pulses++;
 				bursts[waveform_num_bursts].lpb_min_possible_tsf = 
@@ -661,9 +662,9 @@ static void rp_analyze_long_pulse_bscan(
 
 static HAL_BOOL rp_analyze_long_pulse(
 	struct ath_softc *sc, struct ath_rp *last_pulse,
-	u_int32_t* bc, 
-	u_int32_t* matched, u_int32_t* missed, 
-	u_int32_t* noise, u_int32_t* pulses) 
+	u_int32_t *bc, 
+	u_int32_t *matched, u_int32_t *missed, 
+	u_int32_t *noise, u_int32_t *pulses) 
 {
 	int i;
 	int32_t found_radar = 0;
@@ -868,7 +869,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 	 *   pulse, ie t0_min - PERIOD * BURST_MAX
 	 *
 	 * - on this timescale, we matched the number of hit/missed using T -
-	 *   PERIOD*n taking into account the 2% error margin (using
+	 *   PERIOD * n taking into account the 2% error margin (using
 	 *   min_rep_int, max_rep_int)
 	 *
 	 * At the end, we have a number of pulse hit for each PRF
@@ -1250,6 +1251,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 	return (-1 != best_index) ? AH_TRUE : AH_FALSE;
 }
 
+#ifdef AR_DEBUG
 static u_int32_t interval_to_frequency(u_int32_t interval)
 {
 	/* Calculate BRI from PRI */
@@ -1257,9 +1259,10 @@ static u_int32_t interval_to_frequency(u_int32_t interval)
 	/* Round to nearest multiple of 50 */
 	return frequency + ((frequency % 50) >= 25 ? 50 : 0) - (frequency % 50);
 }
+#endif /* AR_DEBUG */
 
 #ifdef ATH_RADAR_LONG_PULSE
-static const char* get_longpulse_desc(int lp) {
+static const char *get_longpulse_desc(int lp) {
 	switch (lp) {
 	case  8:  return "FCC [5,  8 pulses]";
 	case  9:  return "FCC [5,  9 pulses]";
@@ -1548,7 +1551,7 @@ static void ath_rp_clear(struct ath_softc *sc)
 
 static void ath_rp_tasklet(TQUEUE_ARG data)
 {
-	struct net_device *dev = (struct net_device *) data;
+	struct net_device *dev = (struct net_device *)data;
 	struct ath_softc *sc = dev->priv;
 
 	if (sc->sc_rp_analyze != NULL)
@@ -1562,11 +1565,9 @@ void ath_rp_init(struct ath_softc *sc)
 
 	ath_rp_clear(sc);
 
-	sc->sc_rp = (struct ath_rp *)kmalloc(
+	sc->sc_rp = (struct ath_rp *)kzalloc(
 			sizeof(struct ath_rp) *
 			ATH_RADAR_PULSE_NR, GFP_KERNEL);
-	memset(sc->sc_rp, 0, sizeof(struct ath_rp) *
-			ATH_RADAR_PULSE_NR);
 
 	if (sc->sc_rp == NULL)
 		return;

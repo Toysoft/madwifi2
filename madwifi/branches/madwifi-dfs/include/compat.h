@@ -43,7 +43,11 @@
 #include <linux/types.h>
 #include <linux/time.h>
 #include <linux/netdevice.h>
+#include <linux/kernel.h>
+#include <linux/kmod.h>
 #endif
+
+#include <linux/version.h>
 
 #if !defined(__KERNEL__) || !defined (__bitwise)
 #define __le16 u_int16_t
@@ -80,7 +84,6 @@
 #define	NBBY	8			/* number of bits/byte */
 
 /* roundup() appears in Linux 2.6.18 */
-#include <linux/kernel.h>
 #ifndef roundup
 #define	roundup(x, y)	((((x)+((y)-1))/(y))*(y))  /* to any y */
 #endif
@@ -108,26 +111,6 @@
 
 #define	__offsetof(t,m)	offsetof(t,m)
 
-#ifndef ALIGNED_POINTER
-/*
- * ALIGNED_POINTER is a boolean macro that checks whether an address
- * is valid to fetch data elements of type t from on this architecture.
- * This does not reflect the optimal alignment, just the possibility
- * (within reasonable limits). 
- *
- */
-#define ALIGNED_POINTER(p,t)	1
-#endif
-
-#ifdef __KERNEL__
-#define	KASSERT(exp, msg) do {			\
-	if (unlikely(!(exp))) {			\
-		printk msg;			\
-		BUG();				\
-	}					\
-} while (0)
-#endif /* __KERNEL__ */
-
 /*
  * NetBSD/FreeBSD defines for file version.
  */
@@ -139,7 +122,26 @@
  */
 #ifdef __KERNEL__
 
-#include <linux/version.h>
+#define KASSERT(exp, msg) do {			\
+	if (unlikely(!(exp))) {			\
+		printk msg;			\
+		printk("\n");			\
+		BUG();				\
+	}					\
+} while (0)
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+typedef int gfp_t;
+
+static inline void *kzalloc(size_t size, gfp_t flags)
+{
+	void *p = kmalloc(size, flags);
+	if (likely(p != NULL))
+		memset(p, 0, size);
+	return p;
+}
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,21)
 #define ATH_REGISTER_SYSCTL_TABLE(t) register_sysctl_table(t, 1)
 #else
@@ -150,10 +152,6 @@
 #define __user
 #define __kernel
 #define __iomem
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
-typedef int gfp_t;
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
@@ -179,12 +177,12 @@ typedef unsigned long resource_size_t;
 #define skb_end_pointer(_skb) ((_skb)->end)
 #define skb_tail_pointer(_skb) ((_skb)->tail)
 #define skb_set_network_header(_skb, _offset) \
-	do { (_skb)->nh.raw = (_skb)->data + (_offset); } while(0)
+	do { (_skb)->nh.raw = (_skb)->data + (_offset); } while (0)
 #define skb_reset_network_header(_skb) \
-	do { (_skb)->nh.raw = (_skb)->data; } while(0)
+	do { (_skb)->nh.raw = (_skb)->data; } while (0)
 #define skb_mac_header(_skb) ((_skb)->mac.raw)
 #define skb_reset_mac_header(_skb) \
-	do { (_skb)->mac.raw = (_skb)->data; } while(0)
+	do { (_skb)->mac.raw = (_skb)->data; } while (0)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
@@ -200,6 +198,10 @@ typedef unsigned long resource_size_t;
 #define __skb_queue_after(_list, _old, _new)	__skb_append(_old, _new)
 #elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
 #define __skb_queue_after(_list, _old, _new)	__skb_append(_old, _new, _list)
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+#define request_module(_fmt, _modname) request_module(_modname)
 #endif
 
 #endif /* __KERNEL__ */

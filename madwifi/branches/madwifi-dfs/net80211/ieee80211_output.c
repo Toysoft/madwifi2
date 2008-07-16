@@ -83,7 +83,7 @@ static int
 ieee80211_classify(struct ieee80211_node *ni, struct sk_buff *skb)
 {
 	struct ieee80211vap *vap = ni->ni_vap;
-	struct ether_header *eh = (struct ether_header *) skb->data;
+	struct ether_header *eh = (struct ether_header *)skb->data;
 	int v_wme_ac = 0, d_wme_ac = 0;
 
 	/* default priority */
@@ -207,20 +207,19 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	struct ieee80211_node *ni = NULL;
 	struct ether_header *eh;
 
-	/* reset the skb of new frames reaching this layer BEFORE
+	/* Reset the SKB of new frames reaching this layer BEFORE
 	 * we invoke ieee80211_skb_track. */
 	memset(SKB_CB(skb), 0, sizeof(struct ieee80211_cb));
 
-	/* If an skb is passed in directly from the kernel, 
-	 * we take responsibility for the reference */
+	/* If an SKB is passed in directly from the kernel, 
+	 * we take responsibility for the reference. */
 	ieee80211_skb_track(skb);
 
-	/* NB: parent must be up and running */
+	/* NB: parent must be up and running. */
 	if ((parent->flags & (IFF_RUNNING|IFF_UP)) != (IFF_RUNNING|IFF_UP))
 		goto bad;
-	/*
-	 * No data frames go out unless we're running.
-	 */
+
+	/* No data frames go out unless we're running. */
 	if (vap->iv_state != IEEE80211_S_RUN) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
 			"%s: ignore data packet, state %u\n",
@@ -251,10 +250,8 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/* Cancel any running BG scan */
 	ieee80211_cancel_scan(vap);
 
-	/* 
-	 * Find the node for the destination so we can do
-	 * things like power save.
-	 */
+	/* Find the node for the destination so we can do
+	 * things like power save. */
 	eh = (struct ether_header *)skb->data;
 	if (vap->iv_opmode == IEEE80211_M_WDS)
 		ni = ieee80211_find_txnode(vap, vap->wds_mac);
@@ -265,16 +262,16 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		goto bad;
 	}
 
-	/* calculate priority so drivers can find the TX queue */
+	/* Calculate priority so drivers can find the TX queue. */
 	if (ieee80211_classify(ni, skb)) {
 		IEEE80211_NOTE(vap, IEEE80211_MSG_OUTPUT, ni,
 			"%s: discard, classification failure", __func__);
 		goto bad;
 	}
 
-	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
+	SKB_NI(skb) = ieee80211_ref_node(ni);
 
-	/* power-save checks */
+	/* Power-save checks. */
 	if (WME_UAPSD_AC_CAN_TRIGGER(skb->priority, ni)) {
 		/* U-APSD power save queue */
 		/* XXXAPSD: assuming triggerable means deliverable */
@@ -298,9 +295,9 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 		if (skb1) {
 			memset(SKB_CB(skb1), 0, sizeof(struct ieee80211_cb));
 #ifdef IEEE80211_DEBUG_REFCNT
-			SKB_CB(skb1)->tracked = 1;
+			M_FLAG_SET(skb1, M_SKB_TRACKED);
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
-			SKB_CB(skb1)->ni = ieee80211_find_txnode(vap->iv_xrvap, 
+			SKB_NI(skb1) = ieee80211_find_txnode(vap->iv_xrvap, 
 						       eh->ether_dhost);
 			/* Ignore this return code. */
 			ieee80211_parent_queue_xmit(skb1);
@@ -320,9 +317,8 @@ bad:
 }
 
 /*
- * skb is consumed in all cases
+ * SKB is consumed in all cases.
  */
-
 void ieee80211_parent_queue_xmit(struct sk_buff *skb) {
 	struct ieee80211vap *vap = skb->dev->priv;
 
@@ -419,7 +415,7 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct sk_buff *skb, int type,
 
 	KASSERT(ni != NULL, ("null node"));
 
-	SKB_CB(skb)->ni = ni;
+	SKB_NI(skb) = ni;
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
@@ -480,7 +476,7 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
 	ieee80211_send_setup(vap, ni, wh,
-		IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_NODATA,
+		IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_NULL,
 		vap->iv_myaddr, ni->ni_macaddr, vap->iv_bssid);
 	/* NB: power management bit is never sent by an AP */
 	if ((IEEE80211_VAP_IS_SLEEPING(ni->ni_vap)) &&
@@ -498,7 +494,7 @@ ieee80211_send_nulldata(struct ieee80211_node *ni)
 
 	/* XXX assign some priority; this probably is wrong */
 	skb->priority = WME_AC_BE;
-	SKB_CB(skb)->ni = PASS_NODE(ni);
+	SKB_NI(skb) = PASS_NODE(ni);
 
 	(void) ic->ic_mgtstart(ic, skb);	/* cheat */
 
@@ -525,7 +521,7 @@ ieee80211_send_qosnulldata(struct ieee80211_node *ni, int ac)
 		vap->iv_stats.is_tx_nobuf++;
 		return -ENOMEM;
 	}
-	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
+	SKB_NI(skb) = ieee80211_ref_node(ni);
 
 	skb->priority = ac;
 	qwh = (struct ieee80211_qosframe *)skb_push(skb, sizeof(struct ieee80211_qosframe));
@@ -622,7 +618,7 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 
 	if (skb_shared(skb)) {
 		/* Take our own reference to the node in the clone */
-		ieee80211_ref_node(SKB_CB(skb)->ni);
+		ieee80211_ref_node(SKB_NI(skb));
 		/* Unshare the node, decrementing users in the old skb */
 		skb = skb_unshare(skb, GFP_ATOMIC);
 	}
@@ -860,7 +856,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		 * add first skb tunnel hdrs
 		 */
 
-		llc = (struct llc *) skb_push(skb, LLC_SNAPFRAMELEN);
+		llc = (struct llc *)skb_push(skb, LLC_SNAPFRAMELEN);
 		llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
 		llc->llc_control = LLC_UI;
 		llc->llc_snap.org_code[0] = 0;
@@ -868,7 +864,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		llc->llc_snap.org_code[2] = 0;
 		llc->llc_snap.ether_type = eh.ether_type;
 
-		eh_inter = (struct ether_header *) skb_push(skb, sizeof(struct ether_header));
+		eh_inter = (struct ether_header *)skb_push(skb, sizeof(struct ether_header));
 		memcpy(eh_inter, &eh, sizeof(struct ether_header) - sizeof eh.ether_type);
 		eh_inter->ether_type = htons(payload);
 
@@ -876,7 +872,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		/* XXX: the offset of 2, below, should be computed. but... it will not
 		 *      practically ever change.
 		 */
-		ffhdr = (struct athl2p_tunnel_hdr *) skb_push(skb, sizeof(struct athl2p_tunnel_hdr) + 2);
+		ffhdr = (struct athl2p_tunnel_hdr *)skb_push(skb, sizeof(struct athl2p_tunnel_hdr) + 2);
 		memset(ffhdr, 0, sizeof(struct athl2p_tunnel_hdr) + 2);
 
 		/*
@@ -885,7 +881,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 
 		payload = skb2->len + LLC_SNAPFRAMELEN;
 
-		llc = (struct llc *) skb_push(skb2, LLC_SNAPFRAMELEN);
+		llc = (struct llc *)skb_push(skb2, LLC_SNAPFRAMELEN);
 		if (llc == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
 				"%s: failed to push llc for 2nd skb (%p)\n",
@@ -899,7 +895,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		llc->llc_snap.org_code[2] = 0;
 		llc->llc_snap.ether_type = eh2.ether_type;
 
-		eh_inter = (struct ether_header *) skb_push(skb2, sizeof(struct ether_header));
+		eh_inter = (struct ether_header *)skb_push(skb2, sizeof(struct ether_header));
 		if (eh_inter == NULL) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_SUPG,
 				"%s: failed to push eth hdr for 2nd skb (%p)\n",
@@ -915,7 +911,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 	}
 #endif
 
-	llc = (struct llc *) skb_push(skb, LLC_SNAPFRAMELEN);
+	llc = (struct llc *)skb_push(skb, LLC_SNAPFRAMELEN);
 	llc->llc_dsap = llc->llc_ssap = LLC_SNAP_LSAP;
 	llc->llc_control = LLC_UI;
 #ifndef ATH_SUPERG_FF
@@ -938,7 +934,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 #endif /* ATH_SUPERG_FF */
 	datalen = skb->len;			/* NB: w/o 802.11 header */
 
-	wh = (struct ieee80211_frame *) skb_push(skb, hdrsize);
+	wh = (struct ieee80211_frame *)skb_push(skb, hdrsize);
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_DATA;
 	wh->i_dur = 0;
 	if (use4addr) {
@@ -993,7 +989,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		wh->i_fc[1] |= IEEE80211_FC1_PWR_MGT;
 	if (addqos) {
 		struct ieee80211_qosframe *qwh =
-			(struct ieee80211_qosframe *) wh;
+			(struct ieee80211_qosframe *)wh;
 		u_int8_t *qos;
 		int tid;
 
@@ -1028,7 +1024,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		tailsize = IEEE80211_CRC_LEN;
 
 		if (key != NULL) {
-			cip = (struct ieee80211_cipher *) key->wk_cipher;
+			cip = (struct ieee80211_cipher *)key->wk_cipher;
 			ciphdrsize = cip->ic_header;
 			tailsize += (cip->ic_trailer + cip->ic_miclen);
 
@@ -1089,7 +1085,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 		void *pdu;
 
 		fragnum = 0;
-		wh = twh = (struct ieee80211_frame *) skb->data;
+		wh = twh = (struct ieee80211_frame *)skb->data;
 
 		/*
 		** Setup WLAN headers as fragment headers
@@ -1111,8 +1107,8 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			/*
 			 * Copy WLAN header into each frag header skb
 			 */
-			twh = (struct ieee80211_frame *) skb_put(tskb, hdrsize);
-			memcpy((void *) twh, (void *) wh, hdrsize);
+			twh = (struct ieee80211_frame *)skb_put(tskb, hdrsize);
+			memcpy((void *)twh, (void *)wh, hdrsize);
 
 			*(__le16 *)&twh->i_seq[0] |=
 				htole16((fragnum & IEEE80211_SEQ_FRAG_MASK) <<
@@ -1132,7 +1128,7 @@ ieee80211_encap(struct ieee80211_node *ni, struct sk_buff *skb, int *framecnt)
 			 * more efficient than cloning skbs.
 			 */
 			pdu = skb_put(tskb, pdulen);
-			memcpy(pdu, (void *) skb->data+offset, pdulen);
+			memcpy(pdu, (void *)skb->data + offset, pdulen);
 
 			offset += pdusize;
 			datalen -= pdusize;
@@ -1490,7 +1486,7 @@ static u_int8_t *
 ieee80211_add_wme(u_int8_t *frm, struct ieee80211_node *ni)
 {
 	static const u_int8_t oui[4] = { WME_OUI_BYTES, WME_OUI_TYPE };
-	struct ieee80211_ie_wme *ie = (struct ieee80211_ie_wme *) frm;
+	struct ieee80211_ie_wme *ie = (struct ieee80211_ie_wme *)frm;
 	struct ieee80211_wme_state *wme = &ni->ni_ic->ic_wme;
 	struct ieee80211vap *vap = ni->ni_vap;
 
@@ -1534,7 +1530,7 @@ ieee80211_add_wme_param(u_int8_t *frm, struct ieee80211_wme_state *wme,
 	frm += 2;				\
 } while (0)
 	static const u_int8_t oui[4] = { WME_OUI_BYTES, WME_OUI_TYPE };
-	struct ieee80211_wme_param *ie = (struct ieee80211_wme_param *) frm;
+	struct ieee80211_wme_param *ie = (struct ieee80211_wme_param *)frm;
 	int i;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
@@ -1575,7 +1571,7 @@ ieee80211_add_athAdvCap(u_int8_t *frm, u_int8_t capability, u_int16_t defaultKey
 	static const u_int8_t oui[6] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
 					((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE,
 					ATH_OUI_SUBTYPE, ATH_OUI_VERSION};
-	struct ieee80211_ie_athAdvCap *ie = (struct ieee80211_ie_athAdvCap *) frm;
+	struct ieee80211_ie_athAdvCap *ie = (struct ieee80211_ie_athAdvCap *)frm;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
 	*frm++ = 0;				/* Length filled in below */
@@ -1601,7 +1597,7 @@ ieee80211_add_xr_param(u_int8_t *frm, struct ieee80211vap *vap)
 	static const u_int8_t oui[6] = {(ATH_OUI & 0xff), ((ATH_OUI >>8) & 0xff),
 					((ATH_OUI >> 16) & 0xff), ATH_OUI_TYPE_XR,
 					ATH_OUI_SUBTYPE_XR, ATH_OUI_VER_XR};
-	struct ieee80211_xr_param *ie = (struct ieee80211_xr_param *) frm;
+	struct ieee80211_xr_param *ie = (struct ieee80211_xr_param *)frm;
 
 	*frm++ = IEEE80211_ELEMID_VENDOR;
 	*frm++ = 0;				/* Length filled in below */
@@ -1687,7 +1683,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 
 	skb_trim(skb, frm - skb->data);
 
-	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
+	SKB_NI(skb) = ieee80211_ref_node(ni);
 
 	wh = (struct ieee80211_frame *)
 		skb_push(skb, sizeof(struct ieee80211_frame));
@@ -2308,10 +2304,10 @@ ieee80211_send_pspoll(struct ieee80211_node *ni)
 	skb = ieee80211_dev_alloc_skb(sizeof(struct ieee80211_ctlframe_addr2));
 	if (skb == NULL) return;
 
-	SKB_CB(skb)->ni = ieee80211_ref_node(ni);
+	SKB_NI(skb) = ieee80211_ref_node(ni);
 	skb->priority = WME_AC_VO;
 
-	wh = (struct ieee80211_ctlframe_addr2 *) skb_put(skb, sizeof(struct ieee80211_ctlframe_addr2));
+	wh = (struct ieee80211_ctlframe_addr2 *)skb_put(skb, sizeof(struct ieee80211_ctlframe_addr2));
 
 	wh->i_aidordur = htole16(0xc000 | IEEE80211_NODE_AID(ni));
 	IEEE80211_ADDR_COPY(wh->i_addr1, vap->iv_bssid);

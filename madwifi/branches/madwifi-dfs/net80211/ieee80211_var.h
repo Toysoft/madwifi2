@@ -87,7 +87,7 @@
 	 IEEE80211_BMISSTHRESH_BMIN : (_bmt))
 
 #define	IEEE80211_BGSCAN_INTVAL_MIN	15	/* min bg scan intvl (secs) */
-#define	IEEE80211_BGSCAN_INTVAL_DEFAULT	(5*60)	/* default bg scan intvl */
+#define	IEEE80211_BGSCAN_INTVAL_DEFAULT	(5 * 60)	/* default BG scan int. */
 
 #define	IEEE80211_BGSCAN_IDLE_MIN	100	/* min idle time (ms) */
 #define	IEEE80211_BGSCAN_IDLE_DEFAULT	250	/* default idle time (ms) */
@@ -239,7 +239,7 @@ struct ieee80211vap {
 	u_int16_t iv_sta_assoc;				/* stations associated */
 	u_int16_t iv_ps_sta;				/* stations in power save */
 	u_int16_t iv_ps_pending;			/* PS STAs w/ pending frames */
-	u_int8_t *iv_tim_bitmap;			/* power-save stations w/ data*/
+	u_int8_t *iv_tim_bitmap;			/* power-save stations w/ data */
 	u_int16_t iv_tim_len;				/* ic_tim_bitmap size (bytes) */
 	u_int8_t iv_dtim_period;			/* DTIM period */
 	u_int8_t iv_dtim_count;				/* DTIM count from last bcn */
@@ -305,7 +305,8 @@ struct ieee80211com {
 	struct net_device *ic_dev;		/* associated device */
 	ieee80211com_lock_t ic_comlock;		/* state update lock */
 	ieee80211com_lock_t ic_vapslock; 	/* vap state machine lock */
-	TAILQ_HEAD(, ieee80211vap) ic_vaps;	/* list of vap instances */
+	TAILQ_HEAD(ieee80211vap_headtype,
+			ieee80211vap) ic_vaps;	/* list of vap instances */
 	enum ieee80211_phytype ic_phytype;	/* XXX wrong for multi-mode */
 	enum ieee80211_opmode ic_opmode;	/* operation mode */
 	struct ifmedia ic_media;		/* interface media config */
@@ -317,7 +318,7 @@ struct ieee80211com {
 	u_int32_t ic_caps;			/* capabilities */
 	u_int8_t ic_ath_cap;			/* Atheros adv. capabilities */
 	u_int8_t ic_promisc;			/* VAPs needing promisc mode */
-	u_int8_t ic_allmulti;			/* VAPs needing all multicast*/
+	u_int8_t ic_allmulti;			/* VAPs needing all multicast */
 	u_int8_t ic_nopened;			/* VAPs been opened */
 	struct ieee80211_rateset ic_sup_rates[IEEE80211_MODE_MAX];
 	struct ieee80211_rateset ic_sup_xr_rates;
@@ -376,13 +377,13 @@ struct ieee80211com {
 	 *    association of the STA and disassociation of x other STAs (out of
 	 *    y associated STAs in total), the number of common channel
 	 *    increases by z, then such an action is performed if
-	 *    1000*x/y < z*ic_sc_slcg
+	 *    1000 * x/y < z * ic_sc_slcg
 	 * ic_sc_sldg is the permil of Stations Lost per rssi Db Gained, the
 	 *    parameter used by SC_LOOSE algorithm. If due to the switch,
 	 *    the maximum RSSI of received packets on the current channel would
 	 *    decrease by z decibels and x stations from the set of y stations
 	 *    would be lost, then such a switch will be performed if
-	 *    1000*x/y < z*ic_sc_sldg
+	 *    1000 * x/y < z * ic_sc_sldg
 	 * ic_sc_ie is the Supported Channels IE that is about to be sent along
 	 *    with (re)assoc requests (STA mode)
 	 */
@@ -451,7 +452,7 @@ struct ieee80211com {
 
 	/* Send/recv 802.11 management frame */
 	int (*ic_send_mgmt)(struct ieee80211_node *, int, int);
-	void (*ic_recv_mgmt)(struct ieee80211vap *, struct ieee80211_node *,
+	int (*ic_recv_mgmt)(struct ieee80211vap *, struct ieee80211_node *,
 		struct sk_buff *, int, int, u_int64_t);
 
 	/* Send management frame to driver (like hardstart) */
@@ -469,18 +470,9 @@ struct ieee80211com {
 
 	/* Node state management */
 	int32_t (*ic_node_count)(struct ieee80211com *);
-#ifdef IEEE80211_DEBUG_REFCNT
-	struct ieee80211_node *(*ic_node_alloc_debug)(struct ieee80211vap *, 
-			const char* func, int line);
-	void (*ic_node_cleanup_debug)(struct ieee80211_node *, 
-			const char* func, int line);
-	void (*ic_node_free_debug)(struct ieee80211_node *, 
-			const char* func, int line);
-#else
 	struct ieee80211_node *(*ic_node_alloc)(struct ieee80211vap *);
 	void (*ic_node_cleanup)(struct ieee80211_node *);
 	void (*ic_node_free)(struct ieee80211_node *);
-#endif
 
 	u_int8_t (*ic_node_getrssi)(const struct ieee80211_node *);
 	u_int8_t (*ic_node_move_data)(const struct ieee80211_node *);
@@ -539,6 +531,7 @@ struct ieee80211com {
 	unsigned int (*ic_write_register)(struct ieee80211com *, unsigned int, unsigned int);
 	unsigned int (*ic_read_register)(struct ieee80211com *, unsigned int, unsigned int*);
 #endif /* #ifdef ATH_REVERSE_ENGINEERING */
+	int (*ic_debug_ath_iwpriv)(struct ieee80211com *, unsigned int param, unsigned int value);
 };
 
 #define MAX_PROC_IEEE80211_SIZE 16383

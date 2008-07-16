@@ -415,7 +415,7 @@ ccmp_init_blocks(struct crypto_cipher *tfm, struct ieee80211_frame *wh,
 			((struct ieee80211_frame_addr4 *)wh)->i_addr4);
 		if (IS_QOS_DATA(wh)) {
 			struct ieee80211_qosframe_addr4 *qwh4 =
-				(struct ieee80211_qosframe_addr4 *) wh;
+				(struct ieee80211_qosframe_addr4 *)wh;
 			aad[30] = qwh4->i_qos[0] & 0x0f;/* just priority bits */
 			aad[31] = 0;
 			b0[1] = aad[30];
@@ -428,7 +428,7 @@ ccmp_init_blocks(struct crypto_cipher *tfm, struct ieee80211_frame *wh,
 	} else {
 		if (IS_QOS_DATA(wh)) {
 			struct ieee80211_qosframe *qwh =
-				(struct ieee80211_qosframe*) wh;
+				(struct ieee80211_qosframe *)wh;
 			aad[24] = qwh->i_qos[0] & 0x0f;	/* just priority bits */
 			aad[25] = 0;
 			b0[1] = aad[24];
@@ -470,7 +470,7 @@ static int
 ccmp_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 {
 	struct ccmp_ctx *ctx = key->wk_private;
-	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb0->data;
+	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb0->data;
 	struct sk_buff *skb;
 	int data_len, i;
 	uint8_t aad[2 * AES_BLOCK_LEN], b0[AES_BLOCK_LEN], b[AES_BLOCK_LEN];
@@ -541,7 +541,7 @@ ccmp_encrypt(struct ieee80211_key *key, struct sk_buff *skb0, int hdrlen)
 			space_next = len > space ? len - space : 0;
 			KASSERT(skb->len >= space_next,
 				("not enough data in following buffer, "
-				"skb len %u need %u\n", skb->len, space_next));
+				"skb len %u need %u", skb->len, space_next));
 
 			xor_block(b + space, pos_next, space_next);
 			CCMP_ENCRYPT(i, b, b0, pos, e, space);
@@ -583,7 +583,7 @@ static int
 ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct sk_buff *skb0, int hdrlen)
 {
 	struct ccmp_ctx *ctx = key->wk_private;
-	struct ieee80211_frame *wh = (struct ieee80211_frame *) skb0->data;
+	struct ieee80211_frame *wh = (struct ieee80211_frame *)skb0->data;
 	struct sk_buff *skb;
 	uint8_t aad[2 * AES_BLOCK_LEN];
 	uint8_t b0[AES_BLOCK_LEN], b[AES_BLOCK_LEN], a[AES_BLOCK_LEN];
@@ -644,7 +644,7 @@ ccmp_decrypt(struct ieee80211_key *key, u_int64_t pn, struct sk_buff *skb0, int 
 			space_next = len > space ? len - space : 0;
 			KASSERT(skb->len >= space_next,
 				("not enough data in following buffer, "
-				"skb len %u need %u\n", skb->len, space_next));
+				"skb len %u need %u", skb->len, space_next));
 
 			xor_block(b+space, pos_next, space_next);
 			CCMP_DECRYPT(i, b, b0, pos, a, space);

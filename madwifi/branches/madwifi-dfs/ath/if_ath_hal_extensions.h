@@ -125,10 +125,10 @@
 #define DEFAULT_ENABLE_AR5K_PHY_WEAK_OFDM_11A 	1
 
 #define IS_CHAN_ANY(ah) \
-	(((struct ieee80211com*)ah->ah_sc)->ic_bsschan == IEEE80211_CHAN_ANYC)
+	(((struct ieee80211com *)ah->ah_sc)->ic_bsschan == IEEE80211_CHAN_ANYC)
 
 #define IS_BG_OR_ANY(ah) \
- (IS_CHAN_ANY(ah) || (!(ieee80211_chan2mode(((struct ieee80211com*)ah->ah_sc)->ic_bsschan) & \
+ (IS_CHAN_ANY(ah) || (!(ieee80211_chan2mode(((struct ieee80211com *)ah->ah_sc)->ic_bsschan) & \
 		(IEEE80211_MODE_11A | IEEE80211_MODE_TURBO_A))))
 
 #define DEFAULT_ENABLE_AR5K_PHY_WEAK_OFDM (IS_BG_OR_ANY(ah) ? \
@@ -142,6 +142,105 @@
 
 #define DEFAULT_AR5K_PHY_SPUR_THRESH		2
 #define DEFAULT_AR5K_PHY_SIG_FIRSTEP		0
+
+/*
+ * Transmit configuration register
+ */
+#define AR5K_TXCFG		0x0030			/* Register Address */
+#define AR5K_TXCFG_SDMAMR	0x00000007	/* DMA size */
+#define AR5K_TXCFG_SDMAMR_S	0
+
+/*
+ * Receive configuration register
+ */
+#define AR5K_RXCFG		0x0034			/* Register Address */
+#define AR5K_RXCFG_SDMAMW	0x00000007	/* DMA size */
+#define AR5K_RXCFG_SDMAMW_S	0
+
+/*
+ * Second station id register (MAC address in upper 16 bits)
+ */
+#define AR5K_STA_ID1			0x8004			/* Register Address */
+#define AR5K_STA_ID1_AP			0x00010000	/* Set AP mode */
+#define AR5K_STA_ID1_ADHOC		0x00020000	/* Set Ad-Hoc mode */
+#define AR5K_STA_ID1_PWR_SV		0x00040000	/* Power save reporting (?) */
+#define AR5K_STA_ID1_NO_KEYSRCH		0x00080000	/* No key search */
+#define AR5K_STA_ID1_NO_PSPOLL		0x00100000	/* No power save polling [5210] */
+#define AR5K_STA_ID1_PCF_5211		0x00100000	/* Enable PCF on [5211+] */
+#define AR5K_STA_ID1_PCF_5210		0x00200000	/* Enable PCF on [5210] */
+#define	AR5K_STA_ID1_PCF		(ah->ah_version == AR5K_AR5210 ? \
+					AR5K_STA_ID1_PCF_5210 : AR5K_STA_ID1_PCF_5211)
+#define AR5K_STA_ID1_DEFAULT_ANTENNA	0x00200000	/* Use default antenna */
+#define AR5K_STA_ID1_DESC_ANTENNA	0x00400000	/* Update antenna from descriptor */
+#define AR5K_STA_ID1_RTS_DEF_ANTENNA	0x00800000	/* Use default antenna for RTS (?) */
+#define AR5K_STA_ID1_ACKCTS_6MB		0x01000000	/* Use 6Mbit/s for ACK/CTS (?) */
+#define AR5K_STA_ID1_BASE_RATE_11B	0x02000000	/* Use 11b base rate (for ACK/CTS ?) [5211+] */
+
+
+enum ath5k_srev_type {
+	AR5K_VERSION_VER,
+	AR5K_VERSION_RAD,
+};
+
+struct ath5k_srev_name {
+	const char		*sr_name;
+	enum ath5k_srev_type	sr_type;
+	u_int			sr_val;
+};
+
+#define AR5K_SREV_UNKNOWN	0xffff
+
+#define AR5K_SREV_VER_AR5210	0x00
+#define AR5K_SREV_VER_AR5311	0x10
+#define AR5K_SREV_VER_AR5311A	0x20
+#define AR5K_SREV_VER_AR5311B	0x30
+#define AR5K_SREV_VER_AR5211	0x40
+#define AR5K_SREV_VER_AR5212	0x50
+#define AR5K_SREV_VER_AR5213	0x55
+#define AR5K_SREV_VER_AR5213A	0x59
+#define AR5K_SREV_VER_AR2413	0x78
+#define AR5K_SREV_VER_AR2414	0x79
+#define AR5K_SREV_VER_AR2424	0xa0 /* PCI-E */
+#define AR5K_SREV_VER_AR5424	0xa3 /* PCI-E */
+#define AR5K_SREV_VER_AR5413	0xa4
+#define AR5K_SREV_VER_AR5414	0xa5
+#define AR5K_SREV_VER_AR5416	0xc0 /* PCI-E */
+#define AR5K_SREV_VER_AR5418	0xca /* PCI-E */
+#define AR5K_SREV_VER_AR2425	0xe2 /* PCI-E */
+
+#define AR5K_SREV_RAD_5110	0x00
+#define AR5K_SREV_RAD_5111	0x10
+#define AR5K_SREV_RAD_5111A	0x15
+#define AR5K_SREV_RAD_2111	0x20
+#define AR5K_SREV_RAD_5112	0x30
+#define AR5K_SREV_RAD_5112A	0x35
+#define AR5K_SREV_RAD_2112	0x40
+#define AR5K_SREV_RAD_2112A	0x45
+#define AR5K_SREV_RAD_SC0	0x56	/* Found on 2413/2414 */
+#define AR5K_SREV_RAD_SC1	0x63	/* Found on 5413/5414 */
+#define AR5K_SREV_RAD_SC2	0xa2	/* Found on 2424-5/5424 */
+#define AR5K_SREV_RAD_5133	0xc0	/* MIMO found on 5418 */
+
+#define ATH_SREV_FROM_AH(_ah)	((_ah)->ah_macVersion << 4 | (_ah)->ah_macRev)
+
+/*
+ * DMA size definitions (2^(n+2))
+ */
+enum ath5k_dmasize {
+	AR5K_DMASIZE_4B	= 0,
+	AR5K_DMASIZE_8B,
+	AR5K_DMASIZE_16B,
+	AR5K_DMASIZE_32B,
+	AR5K_DMASIZE_64B,
+	AR5K_DMASIZE_128B,
+	AR5K_DMASIZE_256B,
+	AR5K_DMASIZE_512B
+};
+
+
+int ath_set_ack_bitrate(struct ath_softc *sc, int);
+int ar_device(int devid);
+const char * ath5k_chip_name(enum ath5k_srev_type type, u_int16_t val);
 
 static inline unsigned long field_width(unsigned long mask, unsigned long shift)
 {
@@ -181,7 +280,7 @@ static inline u_int32_t field_eq(struct ath_hal *ah, u_int32_t reg,
 		(value & (mask >> shift));
 }
 
-static inline void override_warning(struct ath_hal *ah, const char* name,
+static inline void override_warning(struct ath_hal *ah, const char *name,
 				    u_int32_t reg, u_int32_t mask,
 				    u_int32_t shift, u_int32_t expected, int is_signed) {
 
@@ -206,7 +305,7 @@ static inline void override_warning(struct ath_hal *ah, const char* name,
 #endif
 }
 
-static inline void verification_warning(struct ath_hal *ah, const char* name,
+static inline void verification_warning(struct ath_hal *ah, const char *name,
     u_int32_t reg, u_int32_t mask, 
     u_int32_t shift, u_int32_t expected, int is_signed) {
 
@@ -221,6 +320,8 @@ static inline void verification_warning(struct ath_hal *ah, const char* name,
 		       get_field(ah, reg, mask, shift, is_signed), 
 		       (expected & (mask >> shift)), /* not sign extended */
 		       expected);
+		ath_hal_print_decoded_register(ah, NULL, reg, 
+					       OS_REG_READ(ah, reg), OS_REG_READ(ah, reg), 0);
 	}
 }
 
@@ -251,6 +352,7 @@ static inline void ath_hal_set_noise_immunity(struct ath_hal *ah,
 {
 	ATH_HAL_LOCK_IRQ(ah->ah_sc);
 	ath_hal_set_function(__func__);
+	ath_hal_set_device(SC_DEV_NAME(ah->ah_sc));
 
 #if 0 /* NB: These are working at this point, and HAL tweaks them a lot */
 	OVERRIDE_WARNING(ah, AR5K_PHY_AGCSIZE, AR5K_PHY_AGCSIZE_DESIRED, agc_desired_size, 1);
@@ -265,6 +367,7 @@ static inline void ath_hal_set_noise_immunity(struct ath_hal *ah,
 	SET_FIELD(ah, AR5K_PHY_SIG, AR5K_PHY_SIG_FIRPWR, sig_firpwr);
 
 	ath_hal_set_function(NULL);
+	ath_hal_set_device(NULL);
 	ATH_HAL_UNLOCK_IRQ(ah->ah_sc);
 }
 
@@ -274,6 +377,7 @@ static inline void ath_hal_set_ofdm_weak_det(struct ath_hal *ah,
 {
 	ATH_HAL_LOCK_IRQ(ah->ah_sc);
 	ath_hal_set_function(__func__);
+	ath_hal_set_device(SC_DEV_NAME(ah->ah_sc));
 
 	OVERRIDE_WARNING(ah, AR5K_PHY_WEAK_OFDM_LOW, AR5K_PHY_WEAK_OFDM_LOW_M1, low_m1, 0);
 	OVERRIDE_WARNING(ah, AR5K_PHY_WEAK_OFDM_LOW, AR5K_PHY_WEAK_OFDM_LOW_M2, low_m2, 0);
@@ -292,6 +396,7 @@ static inline void ath_hal_set_ofdm_weak_det(struct ath_hal *ah,
 	SET_FIELD(ah, AR5K_PHY_WEAK_OFDM_HIGH, AR5K_PHY_WEAK_OFDM_HIGH_M2_COUNT, high_m2_count);
 
 	ath_hal_set_function(NULL);
+	ath_hal_set_device(NULL);
 	ATH_HAL_UNLOCK_IRQ(ah->ah_sc);
 }
 
@@ -299,12 +404,14 @@ static inline void ath_hal_set_cck_weak_det(struct ath_hal *ah, int thresh)
 {
 	ATH_HAL_LOCK_IRQ(ah->ah_sc);
 	ath_hal_set_function(__func__);
+	ath_hal_set_device(SC_DEV_NAME(ah->ah_sc));
 
 	OVERRIDE_WARNING(ah, AR5K_PHY_WEAK_CCK, AR5K_PHY_WEAK_CCK_THRESH, thresh, 0);
 
 	SET_FIELD(ah, AR5K_PHY_WEAK_CCK, AR5K_PHY_WEAK_CCK_THRESH, thresh);
 
 	ath_hal_set_function(NULL);
+	ath_hal_set_device(NULL);
 	ATH_HAL_UNLOCK_IRQ(ah->ah_sc);
 }
 
@@ -312,12 +419,14 @@ static inline void ath_hal_set_sig_firstep(struct ath_hal *ah, int firstep)
 {
 	ATH_HAL_LOCK_IRQ(ah->ah_sc);
 	ath_hal_set_function(__func__);
+	ath_hal_set_device(SC_DEV_NAME(ah->ah_sc));
 
 	OVERRIDE_WARNING(ah, AR5K_PHY_SIG, AR5K_PHY_SIG_FIRSTEP, firstep, 0);
 
 	SET_FIELD(ah, AR5K_PHY_SIG, AR5K_PHY_SIG_FIRSTEP, firstep);
 
 	ath_hal_set_function(NULL);
+	ath_hal_set_device(NULL);
 	ATH_HAL_UNLOCK_IRQ(ah->ah_sc);
 }
 
@@ -325,12 +434,14 @@ static inline void ath_hal_set_spur_immunity(struct ath_hal *ah, int thresh)
 {
 	ATH_HAL_LOCK_IRQ(ah->ah_sc);
 	ath_hal_set_function(__func__);
+	ath_hal_set_device(SC_DEV_NAME(ah->ah_sc));
 
 	OVERRIDE_WARNING(ah, AR5K_PHY_SPUR, AR5K_PHY_SPUR_THRESH, thresh, 0);
 
 	SET_FIELD(ah, AR5K_PHY_SPUR, AR5K_PHY_SPUR_THRESH, thresh);
 
 	ath_hal_set_function(NULL);
+	ath_hal_set_device(NULL);
 	ATH_HAL_UNLOCK_IRQ(ah->ah_sc);
 }
 
@@ -415,6 +526,11 @@ static inline void ath_hal_verify_default_intmit(struct ath_hal *ah) {
 	VERIFICATION_WARNING_SW(ah, AR5K_PHY_WEAK_CCK, AR5K_PHY_WEAK_CCK_THRESH, 0);
 	VERIFICATION_WARNING(ah, AR5K_PHY_SIG, AR5K_PHY_SIG_FIRSTEP, 0);
 	VERIFICATION_WARNING(ah, AR5K_PHY_SPUR, AR5K_PHY_SPUR_THRESH, 0);
+}
+
+static inline void ath_hal_set_dmasize_pcie(struct ath_hal *ah) {
+	SET_FIELD(ah, AR5K_TXCFG, AR5K_TXCFG_SDMAMR, AR5K_DMASIZE_128B);
+	SET_FIELD(ah, AR5K_RXCFG, AR5K_RXCFG_SDMAMW, AR5K_DMASIZE_128B);
 }
 
 #endif /* _IF_ATH_HAL_EXTENSIONS_H_ */

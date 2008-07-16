@@ -61,7 +61,6 @@
 #include <ath/if_athvar.h>
 
 
-
 static int
 ratecode_to_dot11(int ratecode)
 {
@@ -128,40 +127,37 @@ struct ar5212_openbsd_desc {
 void
 ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 {
-	struct ieee80211_phy_params *ph =
-		(struct ieee80211_phy_params *) (SKB_CB(skb) + sizeof(struct ieee80211_cb));
+	struct ieee80211_phy_params *ph = &(SKB_CB(skb)->phy);
 	SKB_CB(skb)->flags = M_RAW;
-	SKB_CB(skb)->ni = NULL;
-	SKB_CB(skb)->next = NULL;
-	memset(ph, 0, sizeof(struct ieee80211_phy_params));
+	SKB_NI(skb) = ieee80211_ref_node(vap->iv_bss);
 
 	/* send at a static rate if it is configured */
-	ph->rate0 = vap->iv_fixed_rate > 0 ? vap->iv_fixed_rate : 2;
+	ph->rate[0] = vap->iv_fixed_rate > 0 ? vap->iv_fixed_rate : 2;
 	/* don't retry control packets */
-	ph->try0 = 11;
+	ph->try[0] = 11;
 	ph->power = 60;
 
 	switch (skb->dev->type) {
 	case ARPHRD_IEEE80211: {
-		struct ieee80211_frame *wh = (struct ieee80211_frame *) skb->data;
+		struct ieee80211_frame *wh = (struct ieee80211_frame *)skb->data;
 		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
-			ph->try0 = 1;
+			ph->try[0] = 1;
 		break;
 	}
 	case ARPHRD_IEEE80211_PRISM: {
 		struct ieee80211_frame *wh = NULL;
 		struct wlan_ng_prism2_header *p2h =
-			(struct wlan_ng_prism2_header *) skb->data;
+			(struct wlan_ng_prism2_header *)skb->data;
 		/* does it look like there is a prism header here? */
 		if (skb->len > sizeof(struct wlan_ng_prism2_header) &&
 	                p2h->msgcode == DIDmsg_lnxind_wlansniffrm &&
 		    p2h->rate.did == DIDmsg_lnxind_wlansniffrm_rate) {
-	                    ph->rate0 = p2h->rate.data;
+	                    ph->rate[0] = p2h->rate.data;
 	                    skb_pull(skb, sizeof(struct wlan_ng_prism2_header));
 		}
-		wh = (struct ieee80211_frame *) skb->data;
+		wh = (struct ieee80211_frame *)skb->data;
 		if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
-			ph->try0 = 1;
+			ph->try[0] = 1;
 		break;
 	}
 	case ARPHRD_IEEE80211_RADIOTAP: {
@@ -186,7 +182,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 
 		/* skip the chain of additional bitmaps following it_present */
 		while (present_ext & (1 << IEEE80211_RADIOTAP_EXT)) {
-			if (p+4 > end) {
+			if (p + 4 > end) {
 				/* An extended bitmap would now follow, but there is 
 				 * no place for it. Stop parsing. */
 				present = 0;
@@ -201,7 +197,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 				continue;
 			switch (bit) {
 				case IEEE80211_RADIOTAP_RATE:
-					ph->rate0 = *p;
+					ph->rate[0] = *p;
 					p++;
 					break;
 
@@ -247,7 +243,7 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 					break;
 
 				case IEEE80211_RADIOTAP_DATA_RETRIES:
-					ph->try0 = *p + 1;
+					ph->try[0] = *p + 1;
 					p++;
 					break;
 
@@ -261,24 +257,24 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 			/* Remove FCS from the end of frames to transmit */
 			skb_trim(skb, skb->len - IEEE80211_CRC_LEN);
 		wh = (struct ieee80211_frame *)skb->data;
-		if (!ph->try0 &&
+		if (!ph->try[0] &&
 		    (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_CTL)
-			ph->try0 = 1;
+			ph->try[0] = 1;
 		break;
 	}
 	case ARPHRD_IEEE80211_ATHDESC: {
 		if (skb->len > ATHDESC_HEADER_SIZE) {
 			struct ar5212_openbsd_desc *desc =
-				(struct ar5212_openbsd_desc *) (skb->data + 8);
+				(struct ar5212_openbsd_desc *)(skb->data + 8);
 			ph->power = desc->xmit_power;
-			ph->rate0 = ratecode_to_dot11(desc->xmit_rate0);
-			ph->rate1 = ratecode_to_dot11(desc->xmit_rate1);
-			ph->rate2 = ratecode_to_dot11(desc->xmit_rate2);
-			ph->rate3 = ratecode_to_dot11(desc->xmit_rate3);
-			ph->try0 = desc->xmit_tries0;
-			ph->try1 = desc->xmit_tries1;
-			ph->try2 = desc->xmit_tries2;
-			ph->try3 = desc->xmit_tries3;
+			ph->rate[0] = ratecode_to_dot11(desc->xmit_rate0);
+			ph->rate[1] = ratecode_to_dot11(desc->xmit_rate1);
+			ph->rate[2] = ratecode_to_dot11(desc->xmit_rate2);
+			ph->rate[3] = ratecode_to_dot11(desc->xmit_rate3);
+			ph->try[0] = desc->xmit_tries0;
+			ph->try[1] = desc->xmit_tries1;
+			ph->try[2] = desc->xmit_tries2;
+			ph->try[3] = desc->xmit_tries3;
 			skb_pull(skb, ATHDESC_HEADER_SIZE);
 		}
 		break;
@@ -287,9 +283,9 @@ ieee80211_monitor_encap(struct ieee80211vap *vap, struct sk_buff *skb)
 		break;
 	}
 
-	if (!ph->rate0) {
-		ph->rate0 = 0;
-		ph->try0 = 11;
+	if (!ph->rate[0]) {
+		ph->rate[0] = 0;
+		ph->try[0] = 11;
 	}
 }
 EXPORT_SYMBOL(ieee80211_monitor_encap);
@@ -306,16 +302,6 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 	int noise = 0, antenna = 0, ieeerate = 0;
 	u_int32_t rssi = 0;
 	u_int8_t pkttype = 0;
-	unsigned int mon_hdrspace = A_MAX(sizeof(struct ath_tx_radiotap_header),
-				    (A_MAX(sizeof(struct wlan_ng_prism2_header),
-					   ATHDESC_HEADER_SIZE)));
-
-	if ((skb_headroom(skb) < mon_hdrspace) &&
-			pskb_expand_head(skb, mon_hdrspace, 0, GFP_ATOMIC)) {
-		printk("No headroom for monitor header - %s:%d %s\n", 
-				__FILE__, __LINE__, __func__);
-		return;
-	}
 
 	if (tx) {
 		rssi = bf->bf_dsstatus.ds_txstat.ts_rssi;
@@ -382,7 +368,12 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			/* don't rx fromds, tods, or dstods packets */
 			continue;
 		}
-		skb1 = skb_copy(skb, GFP_ATOMIC);
+		
+		if (skb_headroom(skb) < IEEE80211_MON_MAXHDROOM)
+			skb1 = skb_copy_expand(skb, IEEE80211_MON_MAXHDROOM,
+					0, GFP_ATOMIC);
+		else
+			skb1 = skb_copy(skb, GFP_ATOMIC);
 		if (skb1 == NULL) {
 			/* XXX stat+msg */
 			continue;
@@ -471,7 +462,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					break;
 				}
 
-				th = (struct ath_tx_radiotap_header *) skb_push(skb1,
+				th = (struct ath_tx_radiotap_header *)skb_push(skb1,
 					sizeof(struct ath_tx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_tx_radiotap_header));
 				th->wt_ihdr.it_version = 0;
@@ -500,7 +491,7 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 					break;
 				}
 
-				th = (struct ath_rx_radiotap_header *) skb_push(skb1,
+				th = (struct ath_rx_radiotap_header *)skb_push(skb1,
 					sizeof(struct ath_rx_radiotap_header));
 				memset(th, 0, sizeof(struct ath_rx_radiotap_header));
 				th->wr_ihdr.it_version = 0;
@@ -584,17 +575,14 @@ ieee80211_input_monitor(struct ieee80211com *ic, struct sk_buff *skb,
 			skb1->protocol = 
 				__constant_htons(0x0019); /* ETH_P_80211_RAW */
 
-			if (netif_rx(skb1) == NET_RX_DROP) {
-				/* If netif_rx dropped the packet because 
-				 * device was too busy, reclaim the ref. in 
-				 * the skb. */
-				if (SKB_CB(skb1)->ni != NULL)
-					ieee80211_unref_node(&SKB_CB(skb1)->ni);
-				vap->iv_devstats.rx_dropped++;
-			}
-
 			vap->iv_devstats.rx_packets++;
 			vap->iv_devstats.rx_bytes += skb1->len;
+
+			if (SKB_NI(skb1) != NULL)
+				ieee80211_unref_node(&SKB_NI(skb1));
+			if (netif_rx(skb1) == NET_RX_DROP)
+				vap->iv_devstats.rx_dropped++;
+			skb1 = NULL;
 		}
 	}
 }

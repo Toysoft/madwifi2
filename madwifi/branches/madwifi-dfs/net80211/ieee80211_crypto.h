@@ -80,6 +80,7 @@ struct ieee80211_key {
 #define	IEEE80211_KEY_GROUP	0x04	/* key used for WPA group operation */
 #define	IEEE80211_KEY_SWCRYPT	0x10	/* host-based encrypt/decrypt */
 #define	IEEE80211_KEY_SWMIC	0x20	/* host-based enmic/demic */
+#define	IEEE80211_KEY_TXRX	(IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV)
 	ieee80211_keyix_t wk_keyix;	/* key index */
 	u_int8_t wk_key[IEEE80211_KEYBUF_SIZE+IEEE80211_MICBUF_SIZE];
 #define	wk_txmic	wk_key+IEEE80211_KEYBUF_SIZE+0	/* XXX can't () right */
@@ -151,7 +152,7 @@ extern const struct ieee80211_cipher ieee80211_cipher_none;
 
 void ieee80211_crypto_register(const struct ieee80211_cipher *);
 void ieee80211_crypto_unregister(const struct ieee80211_cipher *);
-int ieee80211_crypto_available(struct ieee80211vap*, u_int);
+int ieee80211_crypto_available(struct ieee80211vap *, u_int);
 
 struct ieee80211_key *ieee80211_crypto_encap(struct ieee80211_node *,
 	struct sk_buff *);
