@@ -968,6 +968,7 @@ sta_lookup(struct sta_table *st, const u_int8_t macaddr[IEEE80211_ADDR_LEN],
 	return se;		/* NB: unlocked */
 }
 
+#if 0
 static void
 sta_roam_check(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 {
@@ -1040,6 +1041,7 @@ sta_roam_check(struct ieee80211_scan_state *ss, struct ieee80211vap *vap)
 		}
 	}
 }
+#endif
 
 /*
  * Age entries in the scan cache.
