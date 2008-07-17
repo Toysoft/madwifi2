@@ -331,7 +331,6 @@ static int ath_debug_iwpriv(struct ieee80211com *ic,
 		unsigned int param, unsigned int value);
 
 static u_int32_t ath_get_real_maxtxpower(struct ath_softc *sc);
-static void ath_txq_dump(struct ath_softc *sc, struct ath_txq *txq);
 static int ath_txq_check(struct ath_softc *sc, struct ath_txq *txq, const char *msg);
 
 static int ath_countrycode = CTRY_DEFAULT;	/* country code */
