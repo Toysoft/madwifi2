@@ -12444,10 +12444,8 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 	if ((address >= 0x143c) && (address <= 0x143f)) return AH_TRUE;
 	/* PCI timing registers are not interesting */
 	if ((address >= 0x4000) && (address <= 0x5000)) return AH_TRUE;
-	/* reading 0x9200-0x092c causes crashes in turbo A mode? */
+	/* Reading 0x0920-0x092c causes crashes in turbo A mode? */
 	if ((address >= 0x0920) && (address <= 0x092c)) return AH_TRUE;
-	/* Reading 0x9200-0x092c causes crashes in turbo A mode? */
-	if ((address >= 0x0920) && (address <= 0x092c)) return FILTERED;
 
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
 	/* We are being conservative, and do not want to access addresses that
