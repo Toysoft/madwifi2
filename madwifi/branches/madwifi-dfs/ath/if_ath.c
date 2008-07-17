@@ -1694,7 +1694,8 @@ ath_resume(struct net_device *dev)
  * NB: This helper function basically clobbers all the related registers
  * if we have disabled int. mit. cap, allowing us to turn it on and off and
  * work around the bug preventing it from being disabled. */
-static inline void ath_override_intmit_if_disabled(struct ath_softc *sc) {
+static inline void ath_override_intmit_if_disabled(struct ath_softc *sc)
+{
 	/* Restore int. mit. registers if they were turned off. */
 	if (sc->sc_hasintmit && !sc->sc_useintmit)
 		ath_hal_restore_default_intmit(sc->sc_ah);
@@ -1937,7 +1938,8 @@ ath_extend_tsf(u_int64_t tsf, u_int32_t rstamp)
 
 /* Swap transmit descriptor pointer for HW. */
 static __inline u_int32_t
-ath_ds_link_swap(u_int32_t dp) {
+ath_ds_link_swap(u_int32_t dp)
+{
 #ifdef AH_NEED_DESC_SWAP
 	return swab32(dp);
 #else
@@ -1946,7 +1948,8 @@ ath_ds_link_swap(u_int32_t dp) {
 }
 
 static __inline u_int32_t
-ath_get_last_ds_link(struct ath_txq *txq) {
+ath_get_last_ds_link(struct ath_txq *txq)
+{
 	struct ath_desc *ds = ath_txq_last_desc(txq);
 	return (ds ? ds->ds_link : 0);
 }
@@ -3413,10 +3416,11 @@ static
 struct ath_buf *
 #ifdef IEEE80211_DEBUG_REFCNT
 _take_txbuf_debug(struct ath_softc *sc, int for_management,
-		const char *func, int line) {
+		const char *func, int line)
 #else
-_take_txbuf(struct ath_softc *sc, int for_management) {
+_take_txbuf(struct ath_softc *sc, int for_management)
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
+{
 	struct ath_buf *bf = NULL;
 	ATH_TXBUF_LOCK_IRQ(sc);
 #ifdef IEEE80211_DEBUG_REFCNT
@@ -4521,17 +4525,20 @@ ath_default_ctsack_timeout(struct ath_softc *sc)
 }
 
 static inline int
-ath_getslottime(struct ath_softc *sc) {
+ath_getslottime(struct ath_softc *sc)
+{
 	return ath_hal_getslottime(sc->sc_ah);
 }
 
 static inline int
-ath_getacktimeout(struct ath_softc *sc) {
+ath_getacktimeout(struct ath_softc *sc)
+{
 	return ath_hal_getacktimeout(sc->sc_ah);
 }
 
 static inline int
-ath_getctstimeout(struct ath_softc *sc) {
+ath_getctstimeout(struct ath_softc *sc)
+{
 	return ath_hal_getctstimeout(sc->sc_ah);
 }
 
@@ -6469,7 +6476,8 @@ ath_alloc_skb(u_int size, u_int align)
 }
 
 static struct sk_buff *
-ath_rxbuf_take_skb(struct ath_softc *sc, struct ath_buf *bf) {
+ath_rxbuf_take_skb(struct ath_softc *sc, struct ath_buf *bf)
+{
 	struct sk_buff *skb = bf->bf_skb;
 	bf->bf_skb = NULL;
 	KASSERT(bf->bf_skbaddr, ("bf->bf_skbaddr is 0"));
@@ -12432,7 +12440,8 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
  * exlucded, and AH_FALSE otherwise. */
 #ifdef ATH_REVERSE_ENGINEERING
 static HAL_BOOL
-ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
+ath_regdump_filter(struct ath_softc *sc, u_int32_t address)
+{
 #ifndef ATH_REVERSE_ENGINEERING_WITH_NO_FEAR
 	char buf[MAX_REGISTER_NAME_LEN];
 #endif
@@ -12465,7 +12474,8 @@ ath_regdump_filter(struct ath_softc *sc, u_int32_t address) {
 /* Dump any Atheros registers we think might be interesting. */
 #ifdef ATH_REVERSE_ENGINEERING
 static void
-ath_ar5212_registers_dump(struct ath_softc *sc) {
+ath_ar5212_registers_dump(struct ath_softc *sc)
+{
 	unsigned int address = MIN_REGISTER_ADDRESS;
 	unsigned int value   = 0;
 
@@ -12755,13 +12765,15 @@ cleanup_ath_buf(struct ath_softc *sc, struct ath_buf *bf, int direction)
 
 #define SCANTXBUF_NAMSIZ 64
 static inline int
-descdma_contains_buffer(struct ath_descdma *dd, struct ath_buf *bf) {
+descdma_contains_buffer(struct ath_descdma *dd, struct ath_buf *bf)
+{
 	return (bf >= (dd->dd_bufptr)) && 
 		bf <  (dd->dd_bufptr + dd->dd_nbuf);
 }
 
 static inline int
-descdma_index_of_buffer(struct ath_descdma *dd, struct ath_buf *bf) {
+descdma_index_of_buffer(struct ath_descdma *dd, struct ath_buf *bf)
+{
 	if (!descdma_contains_buffer(dd, bf))
 		return -1;
 	return bf - dd->dd_bufptr;
