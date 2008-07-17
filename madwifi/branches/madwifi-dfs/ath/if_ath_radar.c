@@ -342,7 +342,7 @@ int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan)
 		hchan->privFlags &= ~CHANNEL_DFS;
 	}
 
-	changed = ((old_privFlags != hchan->privFlags) || 
+	changed = ((old_privFlags != hchan->privFlags) ||
 		   (old_channelFlags != hchan->channelFlags));
 
 	hchan->channelFlags &= ~(CHANNEL_INDOOR | CHANNEL_OUTDOOR);
@@ -981,7 +981,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 					"%s matching stopped (too many "
 					"consecutive pulses missing). %d>%d "
 					"matched=%u. missed=%u.\n",
-					pattern->name, 
+					pattern->name,
 					partial_miss, 
 					pattern->max_consecutive_missing, 
 					matched, missed);
@@ -1648,7 +1648,7 @@ void ath_rp_record(struct ath_softc *sc, u_int64_t tsf, u_int8_t rssi,
 			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
 				"tsf jitter/bug detected: tsf =%10llu, "
 				"rptsf =%10llu, rp_tsf - tsf = %10llu\n", 
-				tsf, pulse->rp_tsf, 
+				tsf, pulse->rp_tsf,
 				pulse->rp_tsf - tsf);
 		}
 	}

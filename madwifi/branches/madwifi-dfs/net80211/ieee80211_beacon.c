@@ -490,7 +490,7 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				bo->bo_ath_caps += sizeof(*csa_ie);
 				bo->bo_xr += sizeof(*csa_ie);
 
-				/* Indicate new beacon length so other layers 
+				/* Indicate new beacon length so other layers
 				 * may manage memory. */
 				skb_put(skb, sizeof(*csa_ie));
 				len_changed = 1;
@@ -523,13 +523,13 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 							 csa_ie->csa_mode,
 							 csa_ie->csa_chan,
 							 csa_ie->csa_count);
-			} 
+			}
 
-			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH, 
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 					  "%s: Sending beacon frame with "
 					  "CSA IE: %u/%u/%u\n", __func__,
 					  csa_ie->csa_mode,
-					  csa_ie->csa_chan, 
+					  csa_ie->csa_chan,
 					  csa_ie->csa_count);
 		}
 #ifdef ATH_SUPERG_XR

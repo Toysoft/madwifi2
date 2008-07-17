@@ -476,11 +476,11 @@ proc_doth_state_print(struct ieee80211vap *vap, char *buf, int space)
 	char *p = buf;
 	struct net_device * dev = ic->ic_dev;
 	struct ath_softc * sc = dev->priv;
-	
+
 	p += sprintf(p,
 		     "sc_curchan: --- (%4d Mhz)\n",
 		     sc->sc_curchan.channel);
-	
+
 	p += sprintf(p,
 		     "  CHANNEL_DFS:%d\n"
 		     "  CHANNEL_DFS_CLEAR:%d\n"

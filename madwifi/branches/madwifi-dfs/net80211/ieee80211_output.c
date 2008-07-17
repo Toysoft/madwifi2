@@ -239,7 +239,7 @@ ieee80211_hardstart(struct sk_buff *skb, struct net_device *dev)
 	/* If we have detected a radar on the current channel, or another node
 	 * told us to stop transmitting, we no longer transmit. Note : we
 	 * still allow a monitor interface to transmit */
-	if (IEEE80211_IS_CHAN_RADAR(ic->ic_curchan) && 
+	if (IEEE80211_IS_CHAN_RADAR(ic->ic_curchan) &&
 		(ic->ic_flags & IEEE80211_F_DOTH)) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				"%s: dropping data since we are under radar\n",
@@ -1760,7 +1760,7 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
 		/* Convert to jiffies, including a margin. */
 		expires = now +
 			IEEE80211_TU_TO_JIFFIES(expires_tu - now_tu - 10) - 1;
-		
+
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: now:%d count:%d => expires:%d\n",
 				  __func__, now, csa_count, expires);
@@ -1841,7 +1841,7 @@ ieee80211_send_csa_frame(struct ieee80211vap *vap,
 	*frm++ = csa_count;
 
 	ieee80211_mgmt_output(ieee80211_ref_node(ni), skb,
-			      IEEE80211_FC0_SUBTYPE_ACTION, 
+			      IEEE80211_FC0_SUBTYPE_ACTION,
 			      ic->ic_dev->broadcast);
 }
 

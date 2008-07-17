@@ -2752,7 +2752,7 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 		csa_ie->csa_mode,
 		csa_ie->csa_chan,
 		csa_ie->csa_count);
-				
+
 	if ((ic->ic_flags & IEEE80211_F_DOTH) == 0) {
 		IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
 				  "%s: Ignored CSA IE since 802.11h "
@@ -2766,7 +2766,7 @@ ieee80211_parse_csaie(struct ieee80211_node *ni, u_int8_t *frm,
 			wh, "channel switch", "invalid element ID %u",
 			csa_ie->csa_id);
 		return -1;
-	}		
+	}
 
 	if (csa_ie->csa_len != 3) {
 		IEEE80211_DISCARD_IE(vap,
@@ -4032,7 +4032,7 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 	}
 
 	case IEEE80211_FC0_SUBTYPE_ACTION: {
-		unsigned char cat, act;	
+		unsigned char cat, act;
 		/* we only parse Action frame from our BSSID */
 		if (!IEEE80211_ADDR_EQ(wh->i_addr3, vap->iv_bssid)) {
 			IEEE80211_DISCARD_MAC(vap, IEEE80211_MSG_INPUT,
