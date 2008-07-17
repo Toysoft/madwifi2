@@ -857,7 +857,7 @@ pick_channel(struct ieee80211_scan_state *ss, struct ieee80211vap *vap,
 
 			if (!IEEE80211_ARE_CHANS_SAME_MODE(c->chan,
 				ic->ic_bsschan))
-				/* break the loop as the subsequent chans won't be 
+				/* break the loop as the subsequent chans won't be
 				 * better */
 				break;
 		}

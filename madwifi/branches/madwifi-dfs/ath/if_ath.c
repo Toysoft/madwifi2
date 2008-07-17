@@ -6270,7 +6270,7 @@ ath_node_move_data(const struct ieee80211_node *ni)
 			else
 				bf = STAILQ_FIRST(&txq->axq_q);
 			if (bf) {
-				ath_hw_puttxbuf(sc, txq->axq_qnum, 
+				ath_hw_puttxbuf(sc, txq->axq_qnum,
 						bf->bf_daddr, __func__);
 				ath_hal_txstart(ah, txq->axq_qnum);
 			}
@@ -6620,9 +6620,9 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 	case IEEE80211_FC0_SUBTYPE_BEACON:
 		/* Update beacon RSSI statistics, (apply to "pure" STA only)
 		 * AND only for our AP's beacons */
-		if ((vap->iv_opmode == IEEE80211_M_STA) && 
-		    (sc->sc_ic.ic_opmode == IEEE80211_M_STA) && 
-		    (ni == vap->iv_bss)) 
+		if ((vap->iv_opmode == IEEE80211_M_STA) &&
+		    (sc->sc_ic.ic_opmode == IEEE80211_M_STA) &&
+		    (ni == vap->iv_bss))
 			ATH_RSSI_LPF(sc->sc_halstats.ns_avgbrssi, rssi);
 		if ((sc->sc_syncbeacon ||
 		    (vap->iv_flags_ext & IEEE80211_FEXT_APPIE_UPDATE)) &&
@@ -8540,7 +8540,7 @@ ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			 * (bits 25-10 of the TSF). */ 
 #define TSTAMP_TX_MASK  ((2 ^ (27 - 1)) - 1)    /* First 27 bits. */ 
 
-			tstamp = IEEE80211_TU_TO_TSF(ts->ts_tstamp); 
+			tstamp = IEEE80211_TU_TO_TSF(ts->ts_tstamp);
 			bf->bf_tsf = ((bf->bf_tsf & ~TSTAMP_TX_MASK) | tstamp); 
 			if ((bf->bf_tsf & TSTAMP_TX_MASK) < tstamp) 
 				bf->bf_tsf -= TSTAMP_TX_MASK + 1; 
@@ -8785,7 +8785,7 @@ ath_draintxq(struct ath_softc *sc)
 				if (sc->sc_debug & ATH_DEBUG_RESET) {
 					HAL_STATUS status = ath_hal_txprocdesc(
 						ah,
-						bf->bf_desc, 
+						bf->bf_desc,
 						&bf->bf_dsstatus.ds_txstat);
 					ath_printtxbuf(bf,status == HAL_OK);
 				}
@@ -8986,7 +8986,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 	dfs_cac_needed = IEEE80211_IS_MODE_DFS_MASTER(ic->ic_opmode) &&
 		(hchan.channel != sc->sc_curchan.channel ||
 		 /* CAC has not been done and we are not under radar */
-		 (0 == (sc->sc_curchan.privFlags & (CHANNEL_DFS_CLEAR|CHANNEL_INTERFERENCE)))) && 
+		 (0 == (sc->sc_curchan.privFlags & (CHANNEL_DFS_CLEAR|CHANNEL_INTERFERENCE)))) &&
 		/* the new channel requires DFS protection */
 		ath_radar_is_dfs_required(sc, &hchan) &&
 		/* IEEE 802.11h is required */
@@ -9058,7 +9058,7 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 						sc->sc_curchan.channelFlags), 
 					tv.tv_sec, tv.tv_usec);
 			/* set the timeout to normal */
-			dev->watchdog_timeo = (sc->sc_dfs_cac_period + 1) * HZ; 
+			dev->watchdog_timeo = (sc->sc_dfs_cac_period + 1) * HZ;
 			/* Disable beacons and beacon miss interrupts */
 			sc->sc_beacons = 0;
 			sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
@@ -9500,7 +9500,7 @@ ath_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int arg)
 
 		/* if it is a DFS channel and has not been checked for radar
 		 * do not let the 80211 state machine to go to RUN state. */
-		if (0 && timer_pending(&sc->sc_dfs_cac_timer) && 
+		if (0 && timer_pending(&sc->sc_dfs_cac_timer) &&
 				IEEE80211_IS_MODE_DFS_MASTER(vap->iv_opmode)) {
 			DPRINTF(sc, ATH_DEBUG_STATE | ATH_DEBUG_DOTH, 
 				"VAP -> DFSWAIT_PENDING \n");
@@ -9594,7 +9594,7 @@ ath_dfs_cac_completed(unsigned long data )
 				"DFS wait %s! - Channel: %u Time: "
 				"%ld.%06ld\n", 
 			((sc->sc_curchan.privFlags & CHANNEL_DFS) &&
-			 (ic->ic_flags & IEEE80211_F_DOTH)) ? 
+			 (ic->ic_flags & IEEE80211_F_DOTH)) ?
 					"completed" : "not applicable", 
 					ieee80211_mhz2ieee(sc->sc_curchan.channel, 
 						sc->sc_curchan.channelFlags), 
@@ -10047,10 +10047,10 @@ ath_getchannels(struct net_device *dev, u_int cc,
 				(c->channelFlags & CHANNEL_CW_INT ? 
 				 " CF_CW_INTERFERENCE" : ""),
 				/* undocumented */
-				(c->channelFlags & IEEE80211_CHAN_INDOOR ? 
+				(c->channelFlags & IEEE80211_CHAN_INDOOR ?
 				 " CF_INDOOR" : ""),
 				/* undocumented */
-				(c->channelFlags & IEEE80211_CHAN_OUTDOOR ? 
+				(c->channelFlags & IEEE80211_CHAN_OUTDOOR ?
 				 " CF_OUTDOOR" : ""),
 				/* Turbo channel */
 				(c->channelFlags & CHANNEL_TURBO ? 

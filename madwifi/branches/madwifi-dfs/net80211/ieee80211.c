@@ -695,7 +695,7 @@ ieee80211_find_channel(struct ieee80211com *ic, int freq, int flags)
 		c = &ic->ic_channels[i];
 		if (c->ic_freq == freq &&
 		    (flags == 0 || 
-		     (c->ic_flags & IEEE80211_CHAN_ALLTURBO) == 
+		     (c->ic_flags & IEEE80211_CHAN_ALLTURBO) ==
 		     (flags & IEEE80211_CHAN_ALLTURBO)))
 			return c;
 	}
@@ -1183,10 +1183,10 @@ ieee80211_dfs_test_return(struct ieee80211com *ic, u_int8_t ieeeChan)
 	/* Return to the original channel we were on before the test mute. */
 	if_printf(dev, "Returning to channel %d\n", ieeeChan);
 	printk(KERN_DEBUG "Returning to chan %d\n", ieeeChan);
-	
+
 	/* Start a channel switch on all available VAP. */
 	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		struct ieee80211_channel *c = 
+		struct ieee80211_channel *c =
 			ieee80211_doth_findchan(vap, ieeeChan);
 		ieee80211_start_new_csa(vap, IEEE80211_CSA_CAN_STOP_TX,
 			c, IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT, 0);
