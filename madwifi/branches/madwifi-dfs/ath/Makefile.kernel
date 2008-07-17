@@ -27,6 +27,9 @@ BUSNAME=pci
 EXTRA_CFLAGS+= -DATH_PCI
 endif
 
+# These flags select which radar signatures DFS will match
+COPTS	+= -DDFS_DOMAIN_ETSI -DDFS_DOMAIN_FCC
+
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
 INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
