@@ -47,8 +47,8 @@ We defined the measure of successfulness (of packet transmission) as
 
 This measure of successfulness will therefore adjust the transmission speed to
 get the maximum number of data bits through the radio interface. Further, it
-means that the 1 Mbits rate (which has a very high probability of successful
-transmission) will not be used in preference to the 11 Mbits rate.
+means that the 1 Mbps rate (which has a very high probability of successful
+transmission) will not be used in preference to the 11 Mbps rate.
 
 We decided that the module should record the successfulness of all packets
 that are transmitted. From this data, the module has sufficient information to
@@ -133,7 +133,7 @@ sample at most twice.
 The retry chain above does "work", but performance is suboptimal. The key
 problem being that when the link is good, too much time is spent sampling the
 slower rates. Thus, for two nodes adjacent to each other, the throughput
-between them was several Mbits below using a fixed rate. The view was that
+between them was several Mbps below using a fixed rate. The view was that
 minstrel should not sample at the slower rates if the link is doing
 well. However, if the link deteriorates, minstrel should immediately sample at
 the lower rates.
@@ -154,9 +154,9 @@ With this retry chain, if the randomly selected rate is slower than the
 current best throughput, the randomly selected rate is placed second in the
 chain. If the link is not good, then there will be data collected at the
 randomly selected rate.  Thus, if the best throughput rate is currently 54
-Mbits, the only time slower rates are sampled is when a packet fails in
+Mbps, the only time slower rates are sampled is when a packet fails in
 transmission. Consequently, if the link is ideal, all packets will be sent at
-the full rate of 54 Mbits. Which is good.
+the full rate of 54 Mbps. Which is good.
 
 EWMA
 ==============================================================================
