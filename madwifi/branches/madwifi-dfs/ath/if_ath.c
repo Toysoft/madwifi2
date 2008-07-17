@@ -5708,9 +5708,9 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	/* FIXME : maybe we should use IEEE80211_IS_MODE_BEACON? */
 	if (ic->ic_opmode == IEEE80211_M_HOSTAP) {
 		/* For multi-bss ap support beacons are either staggered
-		 * evenly over N slots or burst together. For the former
-		 * arrange for the SWBA to be delivered for each slot. Slots
-		 * that are not occupied will generate nothing. */
+		 * evenly over N slots or burst together.  For the former
+		 * arrange for the SWBA to be delivered for each slot.
+		 * Slots that are not occupied will generate nothing. */
 		/* NB: the beacon interval is kept internally in TUs */
 		if (sc->sc_stagbeacons)
 			intval /= ath_maxvaps;	/* for staggered beacons */
