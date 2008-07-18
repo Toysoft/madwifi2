@@ -1408,7 +1408,7 @@ __ieee80211_newstate(struct ieee80211vap *vap, enum ieee80211_state nstate, int 
 			/* ic_roaming is relevant to STA mode only. Since DFS
 			 * CAC does a SCAN -> SCAN transition, this code was
 			 * causing a spurious scan that was stopping DFS CAC
-			 * alltogether */
+			 * altogether */
 			if (vap->iv_opmode == IEEE80211_M_STA &&
 			    ic->ic_roaming == IEEE80211_ROAMING_AUTO)
 				ieee80211_check_scan(vap,

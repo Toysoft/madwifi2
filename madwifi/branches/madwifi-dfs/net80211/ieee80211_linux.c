@@ -455,7 +455,7 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 		}
 
 		p += sprintf(p,
-			"Channel %3d (%4d Mhz) : %s %s %s%s%s%s\n",
+			"Channel %3d (%4d MHz) : %s %s %s%s%s%s\n",
 			channel->ic_ieee,
 			channel->ic_freq,
 			isset(ic->ic_chan_active, channel->ic_ieee) ?
@@ -478,7 +478,7 @@ proc_doth_state_print(struct ieee80211vap *vap, char *buf, int space)
 	struct ath_softc * sc = dev->priv;
 
 	p += sprintf(p,
-		     "sc_curchan: --- (%4d Mhz)\n",
+		     "sc_curchan: --- (%4d MHz)\n",
 		     sc->sc_curchan.channel);
 
 	p += sprintf(p,
@@ -492,7 +492,7 @@ proc_doth_state_print(struct ieee80211vap *vap, char *buf, int space)
 		     timer_pending(&sc->sc_dfs_cac_timer));
 
 	p += sprintf(p,
-		     "ic_curchan: %3d (%4d Mhz)\n"
+		     "ic_curchan: %3d (%4d MHz)\n"
 		     "  IEEE80211_F_DOTH:%d\n"
 		     "  IEEE80211_IS_CHAN_RADAR:%d\n",
 		     ic->ic_curchan->ic_ieee,

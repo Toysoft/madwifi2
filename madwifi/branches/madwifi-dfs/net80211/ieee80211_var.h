@@ -294,7 +294,7 @@ struct ieee80211vap {
 	u_int32_t (*iv_get_nexttbtt)(struct ieee80211vap *);
 };
 
-/* Debug functions need the defintion of struct ieee80211vap because iv_debug 
+/* Debug functions need the definition of struct ieee80211vap because iv_debug
  * is used at runtime to determine if we should log an event
  */
 #include <net80211/ieee80211_debug.h>
@@ -433,7 +433,7 @@ struct ieee80211com {
 	 */
 	u_int8_t ic_curchanmaxpwr;
 
-	/* To handle Channel Switch Annoucements, only valid if ic_flags has
+	/* To handle Channel Switch Announcements, only valid if ic_flags has
 	 * IEEE80211_F_CHANSWITCH set. */
 	u_int8_t			ic_csa_mode;
 	struct ieee80211_channel *	ic_csa_chan;

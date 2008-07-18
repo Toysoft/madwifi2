@@ -1798,7 +1798,7 @@ ieee80211_start_new_csa(struct ieee80211vap *vap,
  * 1101, see 7.1.3.1.2)
  *
  * [1] Category : 0, Spectrum Management, 7.3.1.11
- * [1] Action : 4, Channel Switch Annoucement, 7.4.1 and 7.4.1.5
+ * [1] Action : 4, Channel Switch Announcement, 7.4.1 and 7.4.1.5
  * [1] Element ID : 37, Channel Switch Announcement, 7.3.2
  * [1] Length : 3, 7.3.2.20
  * [1] Channel Switch Mode : 1, stop transmission immediately
