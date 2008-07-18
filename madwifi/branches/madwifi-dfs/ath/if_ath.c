@@ -1744,7 +1744,7 @@ static inline HAL_BOOL ath_hw_puttxbuf(struct ath_softc *sc, u_int qnum,
 	return result;
 }
 
-/* If channel change is sucessfull, sc->sc_curchan is updated with the new
+/* If channel change is successful, sc->sc_curchan is updated with the new
  * channel */
 
 static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
@@ -10022,7 +10022,7 @@ ath_getchannels(struct net_device *dev, u_int cc,
 		   | 1 | 1 | Do not transmit except frame with CSA IE
 		   +---+---+
 
-		   CHANNEL_DFS_CLEAR (CAC has been successfull):
+		   CHANNEL_DFS_CLEAR (CAC has been successful):
 		   + initial value : clear
 		   + set at the end of a CAC w/o radar (ath_dfs_cac_completed)
 		   - clear at the end of the channel shutdown (TBD)
