@@ -1752,6 +1752,7 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 	unsigned long __axq_lockflags[HAL_NUM_TX_QUEUES];
 	struct ath_txq * txq;
 	int i;
+ 	u_int8_t old_privFlags = sc->sc_curchan.privFlags;
 
 	/* ath_hal_reset() resets all TXDP pointers, so we need to
 	 * lock all TXQ to avoid race condition with
@@ -1810,6 +1811,22 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 					__axq_lockflags[i]);
 		}
 	}
+
+	/* On failure, we return immediately */
+	if (!ret)
+		return ret;
+
+ 	/* Do the same as in ath_getchannels() */
+ 	ath_radar_correct_dfs_flags(sc, channel);
+ 
+ 	/* Restore CHANNEL_DFS_CLEAR and CHANNEL_INTERFERENCE flags */
+#define CHANNEL_DFS_FLAGS	(CHANNEL_DFS_CLEAR|CHANNEL_INTERFERENCE)
+	channel->privFlags = (channel->privFlags & ~CHANNEL_DFS_FLAGS) |
+ 		(old_privFlags & CHANNEL_DFS_FLAGS);
+ 
+	/* On success, we update sc->sc_curchan which can be needed by other
+	 * functions below , like ath_radar_update() at least */
+	sc->sc_curchan = *channel;
 
 #ifdef ATH_CAP_TPC
 	if (sc->sc_hastpc && (hal_tpc != ath_hal_gettpc(sc->sc_ah))) {
