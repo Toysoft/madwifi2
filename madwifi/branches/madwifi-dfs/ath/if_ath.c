@@ -1744,6 +1744,9 @@ static inline HAL_BOOL ath_hw_puttxbuf(struct ath_softc *sc, u_int qnum,
 	return result;
 }
 
+/* If channel change is sucessfull, sc->sc_curchan is updated with the new
+ * channel */
+
 static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 		HAL_CHANNEL *channel, HAL_BOOL bChannelChange,
 		HAL_STATUS *status)
@@ -1766,6 +1769,7 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 	}
 
 	ret = ath_hal_reset(sc->sc_ah, sc->sc_opmode, channel, bChannelChange, status);
+
 	/* Restore all TXDP pointers, if appropriate, and unlock in
 	 * the reverse order we locked */
 	for (i = HAL_NUM_TX_QUEUES - 1; i >= 0; i--) {
@@ -1785,27 +1789,25 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 						txq->axq_qnum, txdp);
 			}
 
-			bf = STAILQ_FIRST(&txq->axq_q);
-			if (bf != NULL) {
-				DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-						"TXQ%d: restoring "
-						"TXDP:%08llx\n",
-						txq->axq_qnum,
-						(u_int64_t)bf->bf_daddr);
-				ath_hal_puttxbuf(sc->sc_ah, txq->axq_qnum,
-						bf->bf_daddr);
-				txdp = ath_hal_gettxbuf(sc->sc_ah,
-						txq->axq_qnum);
-				if (txdp != bf->bf_daddr) {
+			/* We restore TXDP to the first "In Progress" TX
+			 * descriptor. We skip "Done" TX descriptors in
+			 * order to avoid sending duplicate packets */
+			STAILQ_FOREACH(bf, &txq->axq_q, bf_list) {
+				if (ath_hal_txprocdesc(sc->sc_ah,
+						       bf->bf_desc,
+					&bf->bf_dsstatus.ds_txstat) ==
+				    HAL_EINPROGRESS) {
 					DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-							"TXQ%d: BUG failed to "
-							"restore TXDP:%08llx "
-							"(is %08x)\n",
-							txq->axq_qnum,
-							(u_int64_t)bf->bf_daddr,
-							txdp);
+						"TXQ%d: restoring"
+						" TXDP:%08llx\n",
+ 						txq->axq_qnum,
+ 						(u_int64_t)bf->bf_daddr);
+					ath_hw_puttxbuf(sc, txq->axq_qnum,
+							bf->bf_daddr,
+							__func__);
+					ath_hal_txstart(sc->sc_ah,
+							txq->axq_qnum);
 				}
-				ath_hal_txstart(sc->sc_ah, txq->axq_qnum);
 			}
 			spin_unlock_irqrestore(&txq->axq_lock,
 					__axq_lockflags[i]);
@@ -1855,8 +1857,11 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 	return ret;
 }
 
-/* Channel Availability Check is running, or a channel has already found to be 
- * unavailable. */
+/* Returns true if we can transmit any frames : this is not the case if :
+ * - we are on a DFS channel
+ * - 802.11h is enabled
+ * - Channel Availability Check is not done or a radar has been detected
+ */
 static int
 ath_dfs_can_transmit(struct ath_softc * sc)
 {
@@ -9062,8 +9067,6 @@ ath_chan_set(struct ath_softc *sc, struct ieee80211_channel *chan)
 				ath_get_hal_status_desc(status), status);
 			return -EIO;
 		}
-
-		sc->sc_curchan = hchan;
 
 		/* Change channels and update the h/w rate map
 		 * if we're switching; e.g. 11a to 11b/g. */
