@@ -3150,20 +3150,7 @@ ath_tx_txqaddbuf(struct ath_softc *sc, struct ieee80211_node *ni,
 	} else {
 		ATH_TXQ_LINK_DESC(txq, bf);
 		if (!STAILQ_FIRST(&txq->axq_q)) {
-			u_int32_t txdp;
-
-			ath_hal_puttxbuf(ah, txq->axq_qnum, bf->bf_daddr);
-			DPRINTF(sc, ATH_DEBUG_XMIT, "TXDP[%u] = %08llx (%p)\n",
-				txq->axq_qnum, (u_int64_t)bf->bf_daddr,
-				bf->bf_desc);
-			txdp = ath_hal_gettxbuf(ah, txq->axq_qnum);
-			if (txdp != bf->bf_daddr) {
-				DPRINTF(sc, ATH_DEBUG_WATCHDOG,
-						"TXQ%d: BUG TXDP:%08x instead "
-						"of %08llx\n",
-						txq->axq_qnum, txdp,
-						(u_int64_t)bf->bf_daddr);
-			}
+			ath_hw_puttxbuf(sc, txq->axq_qnum, bf->bf_daddr, __func__);
 		}
 		ATH_TXQ_INSERT_TAIL(txq, bf, bf_list);
 		
@@ -5520,7 +5507,7 @@ ath_beacon_send(struct ath_softc *sc, int *needmark, uint64_t hw_tsf)
 		}
 		/* NB: cabq traffic should already be queued and primed */
 		DPRINTF(sc, ATH_DEBUG_BEACON_PROC,
-			"Invoking ath_hal_puttxbuf with sc_bhalq: %d bfaddr: %x\n",
+			"Invoking ath_hw_puttxbuf with sc_bhalq: %d bfaddr: %x\n",
 			sc->sc_bhalq, bfaddr);
 		ath_hw_puttxbuf(sc, sc->sc_bhalq, bfaddr, __func__);
 
