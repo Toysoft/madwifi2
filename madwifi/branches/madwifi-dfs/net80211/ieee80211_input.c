@@ -3138,6 +3138,20 @@ ieee80211_recv_mgmt(struct ieee80211vap *vap,
 		else
 			IEEE80211_NODE_STAT(ni, rx_proberesp);
 
+		/* According to 802.11h 11.6 p47 : if a STA with
+		 * dot11SpectrumManagementRequired set to TRUE receives a
+		 * Beacon or Probe Response frames with the Spectrum
+		 * Management bit set to 1, then we behave the same way as if
+		 * Channel Availability Check is done */
+
+		if ((ic->ic_flags & IEEE80211_F_DOTH) &&
+		    (scan.capinfo & IEEE80211_CAPINFO_SPECTRUM_MGMT)) {
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_DOTH,
+					  "Received an enabling signal from "
+					  MAC_FMT "\n", MAC_ADDR(wh->i_addr2));
+			ic->ic_set_dfs_clear(ic, 1);
+		}
+
 		/*
 		 * When operating in station mode, check for state updates.
 		 * Be careful to ignore beacons received while doing a
