@@ -6139,7 +6139,7 @@ ath_node_getrssi(const struct ieee80211_node *ni)
 #define	HAL_EP_RND(x, mul) \
 	((((x) % (mul)) >= ((mul) / 2)) ? ((x) + ((mul) - 1)) / 	\
 	 (mul) : (x)/(mul))
-	u_int32_t avgrssi = ATH_NODE_CONST(ni)->an_halstats.ns_avgrssi;
+	u_int32_t avgrssi = ATH_NODE_CONST(ni)->an_avgrssi;
 	int32_t rssi;
 
 	/*
@@ -6958,7 +6958,7 @@ rx_accept:
 
 		/* If a node is found, dispatch, else, dispatch to all. */
 		if (ni) {
-			ATH_RSSI_LPF(ATH_NODE(ni)->an_halstats.ns_avgrssi,
+			ATH_RSSI_LPF(ATH_NODE(ni)->an_avgrssi,
 					rs->rs_rssi);
 			type = ieee80211_input(ni->ni_vap, ni, skb,
 					rs->rs_rssi, bf->bf_tsf);
