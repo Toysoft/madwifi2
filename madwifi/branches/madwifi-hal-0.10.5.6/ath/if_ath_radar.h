@@ -19,7 +19,7 @@
  * $Id: if_ath_radar.h 2464 2007-06-15 22:51:56Z mtaylor $
  */
 /*
- * Defintions for the Atheros Wireless LAN controller driver.
+ * Definitions for the Atheros Wireless LAN controller driver.
  */
 #ifndef _IF_ATH_RADAR_H
 #define _IF_ATH_RADAR_H
@@ -163,7 +163,7 @@ void ath_radar_get_params(struct ath_softc *sc, RADAR_PARAM *rp);
  * If any member of rp is set to RADAR_PARAM_USE_DEFAULT, the default
  * is used for that field. */
 void ath_radar_set_params(struct ath_softc *sc, RADAR_PARAM *rp);
-/* Update channel's DFS flags based upon whether DFS is reqired */
+/* Update channel's DFS flags based upon whether DFS is required */
 int ath_radar_correct_dfs_flags(struct ath_softc *sc, HAL_CHANNEL *hchan);
 /* Returns true if DFS is required for the regulatory domain, country and 
  * combination in use. */
