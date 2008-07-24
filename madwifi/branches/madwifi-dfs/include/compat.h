@@ -93,7 +93,7 @@
 /* roundup() and howmany() macros that works both with positive and negative
  * values. */
 #define roundup_s(x,y) _roundup_s((signed)(x),(signed)(y))
-#define howmany_s(x,y) _roundup_s((signed)(x),(signed)(y))
+#define howmany_s(x,y) _howmany_s((signed)(x),(signed)(y))
 #define _roundup_s(x,y)	\
 	((x) >= 0 ? (((x)+((y)-1))/(y))*(y) : ((x)/(y))*(y))
 #define	_howmany_s(x, y)	\
