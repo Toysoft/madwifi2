@@ -1175,26 +1175,6 @@ ieee80211_mark_dfs(struct ieee80211com *ic, struct ieee80211_channel *ichan)
 EXPORT_SYMBOL(ieee80211_mark_dfs);
 
 void
-ieee80211_dfs_test_return(struct ieee80211com *ic, u_int8_t ieeeChan)
-{
-	struct net_device *dev = ic->ic_dev;
-	struct ieee80211vap *vap;
-
-	/* Return to the original channel we were on before the test mute. */
-	if_printf(dev, "Returning to channel %d\n", ieeeChan);
-	printk(KERN_DEBUG "Returning to chan %d\n", ieeeChan);
-
-	/* Start a channel switch on all available VAP. */
-	TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
-		struct ieee80211_channel *c =
-			ieee80211_doth_findchan(vap, ieeeChan);
-		ieee80211_start_new_csa(vap, IEEE80211_CSA_CAN_STOP_TX,
-			c, IEEE80211_RADAR_CHANCHANGE_TBTT_COUNT, 0);
-	}
-}
-EXPORT_SYMBOL(ieee80211_dfs_test_return);
-
-void
 ieee80211_announce(struct ieee80211com *ic)
 {
 /* Disabled - creates noise but no useful information. */
