@@ -109,6 +109,7 @@ void __ahdecl ath_hal_logprintf(struct ath_hal *ah, const char *fmt, ...)
 	__attribute__ ((__format__ (__printf__, 2, 3)));
 #endif
 
+void __ahdecl ath_hal_printstr(struct ath_hal *ah, const char *str);
 int __ahdecl ath_hal_memcmp(const void *a, const void *b, size_t n);
 void *__ahdecl ath_hal_malloc(size_t size);
 void __ahdecl ath_hal_free(void *p);
