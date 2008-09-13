@@ -1569,38 +1569,6 @@ ath_resume(struct net_device *dev)
 	ath_init(dev);
 }
 
-/* NB: Int. mit. was not implemented so that it could be enabled/disabled,
- * and actually in 0.9.30.13 HAL it really can't even be disabled because
- * it will start adjusting registers even when we turn off the capability
- * in the HAL.
- *
- * NB: This helper function basically clobbers all the related registers
- * if we have disabled int. mit. cap, allowing us to turn it on and off and
- * work around the bug preventing it from being disabled. */
-static inline void ath_override_intmit_if_disabled(struct ath_softc *sc)
-{
-	/* Restore int. mit. registers if they were turned off. */
-	if (sc->sc_hasintmit && !sc->sc_useintmit)
-		ath_hal_restore_default_intmit(sc->sc_ah);
-	/* Sanity check... remove later. */
-	if (!sc->sc_useintmit) {
-		ath_hal_verify_default_intmit(sc->sc_ah);
-		/* If we don't have int. mit. and we don't have DFS on channel,
-		 * it is safe to filter error packets. */
-		if (!ath_radar_is_dfs_required(sc, &sc->sc_curchan)) {
-			ath_hal_setrxfilter(sc->sc_ah,
-				ath_hal_getrxfilter(sc->sc_ah) & 
-				~HAL_RX_FILTER_PHYERR);
-		}
-	}
-	else {
-		/* Make sure that we have errors in RX filter because ANI needs
-		 * them. */
-		ath_hal_setrxfilter(sc->sc_ah, 
-			ath_hal_getrxfilter(sc->sc_ah) | HAL_RX_FILTER_PHYERR);
-	}
-}
-
 static inline HAL_BOOL ath_hw_puttxbuf(struct ath_softc *sc, u_int qnum,
 				u_int32_t txdp, const char *msg)
 {
@@ -1720,11 +1688,10 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 		ath_hal_settpc(sc->sc_ah, hal_tpc);
 	}
 #endif
-#if 0 /* Setting via HAL does not work, so it is done manually below. */
+	/* Setting via HAL does not work, so it is done manually below. */
 	if (sc->sc_hasintmit)
 		ath_hal_setintmit(sc->sc_ah, sc->sc_useintmit);
-#endif
-	ath_override_intmit_if_disabled(sc);
+
 	if (sc->sc_dmasize_stomp)
 		ath_hal_set_dmasize_pcie(sc->sc_ah);
 	if (sc->sc_softled)
@@ -2504,7 +2471,6 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 			/* Let the HAL handle the event. */
 			ath_hal_mibevent(ah, &sc->sc_halstats);
-			ath_override_intmit_if_disabled(sc);
 		}
 	}
 	if (needmark)
@@ -8575,7 +8541,6 @@ ath_startrecv(struct ath_softc *sc)
 	ath_hal_rxena(ah);		/* enable recv descriptors */
 	ath_mode_init(dev);		/* set filters, etc. */
 	ath_hal_startpcurecv(ah);	/* re-enable PCU/DMA engine */
-	ath_override_intmit_if_disabled(sc);
 	return 0;
 }
 
@@ -10797,10 +10762,6 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 				if (sc->sc_dev && !sc->sc_invalid &&
 				    (sc->sc_dev->flags & IFF_RUNNING))
 					ath_reset(sc->sc_dev);
-				/* NB: Run this step to cleanup if HAL doesn't
-				 * obey capability flags and hangs onto ANI
-				 * settings. */
-				ath_override_intmit_if_disabled(sc);
 				break;
 			default:
 				ret = -EINVAL;
