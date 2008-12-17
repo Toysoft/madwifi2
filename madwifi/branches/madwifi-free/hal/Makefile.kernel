@@ -10,12 +10,11 @@ TOP = $(srctree)/$(src)/..
 
 include $(TOP)/BuildCaps.inc
 
-ATH_HAL=$(TOP)/ath_hal
 COMPAT=	$(TOP)/include
 HAL=	$(TOP)/hal
 
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
-INCS += -I$(ATH_HAL) -I$(HAL)
+INCS += -I$(HAL)
 
 EXTRA_CFLAGS += $(INCS) $(COPTS)
 

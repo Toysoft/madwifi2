@@ -52,7 +52,7 @@ ifdef LINUX24
 export-objs	:= ah_os.o
 endif
 
-INCS += -I$(ATH_HAL) -I$(HAL)
+INCS += -I$(HAL)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS)
 

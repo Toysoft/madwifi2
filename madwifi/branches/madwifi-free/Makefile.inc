@@ -122,10 +122,6 @@ ifeq ($(HAL),)
 HAL=	$(TOP)/hal
 endif
 #
-# Path to HAL/OS interface code
-#
-ATH_HAL= $(TOP)/ath_hal
-#
 # Path to the 802.11 include files.
 #
 WLAN=	$(TOP)/net80211
