@@ -46,12 +46,7 @@ TOP = $(obj)/..
 include $(TOP)/Makefile.inc
 
 obj-m		+= ath_hal.o
-ath_hal-objs	:= ah_os.o $(TARGET).hal.o
-
-hostprogs-y	:= uudecode
-
-# For older 2.6 kernels
-host-progs	:= $(hostprogs-y)
+ath_hal-objs	:= ah_os.o $(HAL)/ath_hal.o
 
 ifdef LINUX24
 export-objs	:= ah_os.o
@@ -59,45 +54,13 @@ endif
 
 INCS += -I$(ATH_HAL) -I$(HAL)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
-
-ifneq (,$(filter xscale% arm%,$(TARGET)))
-LDFLAGS += --no-warn-mismatch
-endif
+EXTRA_CFLAGS+= $(INCS) $(COPTS)
 
 -include $(TOPDIR)/Rules.make
 
 .PHONY: all
 all:
 	$(MAKE) -C $(KERNELPATH) SUBDIRS=$(shell pwd) modules
-
-ifdef LINUX24
-$(obj)/uudecode: $(obj)/uudecode.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-endif
-
-quiet_cmd_uudecode = UUDECODE $@
-      cmd_uudecode = $(obj)/uudecode -o $@ $<
-
-$(obj)/$(TARGET)._hal.o: $(HAL)/public/$(TARGET).hal.o.uu $(obj)/uudecode
-ifdef LINUX24
-	$(cmd_uudecode)
-else
-	$(call if_changed,uudecode)
-endif
-
-# Replace as many hashed names as possible with meaningful
-# ones in the symbol table of the binary kernel module for HAL.
-quiet_cmd_unmangle = UNMANGLE $@
-      cmd_unmangle = $(filter-out -O binary -S,$(OBJCOPY)) \
-		$$(cat $(TOP)/scripts/hal_unmangle.objcopy) $< $@
-
-$(obj)/$(TARGET).hal.o: $(obj)/$(TARGET)._hal.o
-ifdef LINUX24
-	$(cmd_unmangle)
-else
-	$(call if_changed,unmangle)
-endif
 
 .PHONY: install
 install:
@@ -109,7 +72,7 @@ endif
 
 .PHONY: clean
 clean:
-	rm -f *~ *.o *.ko *.mod.c uudecode .*.cmd
+	rm -f *~ *.o *.ko *.mod.c .*.cmd
 	rm -f modules.order .depend .version .*.o.flags .*.o.d
 	rm -rf .tmp_versions
 

@@ -19,7 +19,7 @@ HAL=	$(TOP)/hal
 
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
 INCS += -I$(TOP) -I$(ATH) -I$(ATH_HAL) -I$(HAL)
-EXTRA_CFLAGS += $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS += $(INCS) $(COPTS)
 
 ifneq ($(VERSION).$(PATCHLEVEL),2.4)
 obj-$(CONFIG_ATHEROS) += ath_rate_sample.o

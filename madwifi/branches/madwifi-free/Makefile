@@ -138,7 +138,6 @@ clean:
 .PHONY: info
 info:
 	@echo "The following settings will be used for compilation:"
-	@echo "TARGET       : $(TARGET)"
 	@echo "ARCH         : $(ARCH)"
 	@echo "BUS          : $(BUS)"
 	@if [ -n "$(TOOLPATH)" ]; then \

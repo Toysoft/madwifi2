@@ -96,11 +96,6 @@ include $(KERNELCONF)
 include $(TOP)/scripts/get_arch.mk
 export ARCH
 
-# Determine TARGET
-include $(TOP)/ath_hal/ah_target.inc
-export TARGET
-COPTS += -DTARGET='"$(TARGET)"'
-
 # KMODPATH nominates the directory where the modules will be
 # installed to
 KMODPATH :=	/lib/modules/$(KERNELRELEASE)/net
@@ -151,16 +146,6 @@ WARNINGS = -Werror -Wall
 COPTS+= $(WARNINGS)
 INCS=	-include $(TOP)/include/compat.h -I$(TOP)/include
 
-# TARGET defines the target platform architecture. It must match one of
-# the target platforms supported by the HAL. The default target is the
-# host machine architecture. You can override TARGET on the make command
-# line or in the environment. See hal/linux/*.inc for the list of
-# supported targets.
-ifeq (,$(wildcard $(HAL)/public/$(TARGET).inc))
-TARGETS=$(basename $(notdir $(wildcard $(HAL)/public/*.inc)))
-$(error TARGET $(TARGET) is invalid, valid targets are: $(TARGETS))
-endif
-
 ifndef ATH_DEBUG_SPINLOCKS
 export ATH_DEBUG_SPINLOCKS=0
 endif
@@ -209,22 +194,6 @@ obj-m += alq.o
 alq-objs := kern_alq.o
 EXTRA_CFLAGS += -DAH_DEBUG_ALQ -DAH_DEBUG
 endif
-
-# Don't let HAL mess with the toolchain - save toolchain variables
-save_CC := $(CC)
-save_LD := $(LD)
-save_STRIP := $(STRIP)
-save_OBJCOPY := $(OBJCOPY)
-save_NM := $(NM)
-
-include $(HAL)/public/$(TARGET).inc
-
-# Restore toolchain variables
-CC := $(save_CC)
-LD := $(save_LD)
-STRIP := $(save_STRIP)
-OBJCOPY := $(save_OBJCOPY)
-NM := $(save_NM)
 
 include $(TOP)/BuildCaps.inc
 
