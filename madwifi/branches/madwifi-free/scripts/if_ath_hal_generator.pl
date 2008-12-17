@@ -210,6 +210,7 @@ EOF
 my $footer = <<EOF
 
 #include "if_ath_hal_wrappers.h"
+#include "if_ath_hal_extensions.h"
 
 #endif				/* #ifndef _IF_ATH_HAL_H_ */
  /* *** THIS IS A GENERATED FILE -- DO NOT EDIT *** */
@@ -421,7 +422,6 @@ sub main () {
     }
     generate_output();
     close OUTPUT;
-    exec "./madwifi-indent $output_header";
 }
 
 main();
