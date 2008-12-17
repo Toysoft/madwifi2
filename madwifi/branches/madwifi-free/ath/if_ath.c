@@ -9680,8 +9680,8 @@ ath_getchannels(struct net_device *dev, u_int cc,
 
 		DPRINTF(sc, ATH_DEBUG_RATE,
 				"Channel %3d (%4d MHz) Max Tx Power %d dBm%s "
-				"[%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s%"
-				"s%s%s%s%s%s%s%s%s%s%s%s\n",
+				"[%d hw %d reg] Flags%s%s%s%s%s%s%s%s%s%s%s%s"
+				"%s%s%s%s%s%s%s%s%s%s%s\n",
 				ichan->ic_ieee,
 				c->channel,
 				(c->maxRegTxPower > (c->maxTxPower / 2) ? 
@@ -9725,9 +9725,6 @@ ath_getchannels(struct net_device *dev, u_int cc,
 				/* Dynamic CCK-OFDM channel */
 				(c->channelFlags & CHANNEL_DYN ? 
 				 " CF_DYNAMIC_TURBO" : ""),
-				/* GFSK channel (FHSS  PHY) */
-				(c->channelFlags & CHANNEL_XR ? 
-				 " CF_FHSS" : ""),
 				/* Radar found on channel */
 				(c->channelFlags & IEEE80211_CHAN_RADAR ? 
 				 " CF_RADAR_SEEN" : ""),
@@ -10224,7 +10221,7 @@ ath_printtxbuf(const struct ath_buf *bf, int done)
 	u_int8_t status = done ? ts->ts_status : 0;
 
 	DPRINTF(sc, ATH_DEBUG_ANY, 
-		"T (%p %08llx) %08x %08x %08x %08x %08x %08x %08x %08x%s%s%s%s%s%s%s%s%s\n",
+		"T (%p %08llx) %08x %08x %08x %08x %08x %08x %08x %08x%s%s%s%s%s%s\n",
 		ds, (u_int64_t)bf->bf_daddr,
 		ds->ds_link, ds->ds_data,
 		ds->ds_ctl0, ds->ds_ctl1,
@@ -10234,9 +10231,6 @@ ath_printtxbuf(const struct ath_buf *bf, int done)
 		status & HAL_TXERR_FILT			? " ERR_FILT"		: "",
 		status & HAL_TXERR_FIFO			? " ERR_FIFO"		: "",
 		status & HAL_TXERR_XTXOP		? " ERR_XTXOP" 		: "",
-		status & HAL_TXERR_DESC_CFG_ERR		? " ERR_DESC_CFG_ERR" 	: "",
-		status & HAL_TXERR_DATA_UNDERRUN	? " ERR_DATA_UNDERRUN"	: "",
-		status & HAL_TXERR_DELIM_UNDERRUN	? " ERR_DELIM_UNDERRUN"	: "",
 		status & 0x80				? " (1<<7)"		: "");
 }
 #endif /* AR_DEBUG */
