@@ -59,7 +59,7 @@ include $(TOP)/Makefile.inc
 obj-m		+= ath_$(BUSNAME).o
 ath_$(BUSNAME)-objs	:= if_ath.o if_ath_radar.o if_ath_hal_extensions.o if_ath_$(BUSNAME).o
 
-INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
+INCS += -I$(TOP) -I$(HAL) -I$(WLAN)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS)
 

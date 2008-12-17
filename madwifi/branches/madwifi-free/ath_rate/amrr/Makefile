@@ -48,7 +48,7 @@ ath_rate_amrr-objs	:= amrr.o
 
 include $(TOP)/Makefile.inc
 
-INCS += -I$(TOP) -I$(ATH) -I$(ATH_HAL) -I$(HAL)
+INCS += -I$(TOP) -I$(ATH) -I$(HAL)
 
 EXTRA_CFLAGS+= $(INCS) $(COPTS)
 
