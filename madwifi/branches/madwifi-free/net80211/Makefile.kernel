@@ -17,7 +17,7 @@ HAL = $(TOP)/hal
 
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
 INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL)
-EXTRA_CFLAGS += $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS += $(INCS) $(COPTS)
 
 #
 # There is one authenticator mechanism: an in-kernel implementation

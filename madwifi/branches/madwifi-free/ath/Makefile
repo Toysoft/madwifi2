@@ -61,7 +61,7 @@ ath_$(BUSNAME)-objs	:= if_ath.o if_ath_radar.o if_ath_hal_extensions.o if_ath_$(
 
 INCS += -I$(TOP) -I$(ATH_HAL) -I$(HAL) -I$(WLAN)
 
-EXTRA_CFLAGS+= $(INCS) $(COPTS) -DOPT_AH_H=\"public/$(TARGET).opt_ah.h\"
+EXTRA_CFLAGS+= $(INCS) $(COPTS)
 
 -include $(TOPDIR)/Rules.make
 
