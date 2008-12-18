@@ -93,7 +93,9 @@ ath_hal-objs	:= \
 	ar5212/ar5212_reset.o \
 	ar5212/ar5212_rfgain.o \
 	ar5212/ar5212_xmit.o \
-	ar5212/ar5413.o \
+	ar5212/ar5413.o
+
+BROKEN_OBJS = \
 	ar5312/ar5312_attach.o \
 	ar5312/ar5312_eeprom.o \
 	ar5312/ar5312_gpio.o \
