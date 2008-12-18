@@ -150,6 +150,7 @@ endif
 clean:
 	rm -f *~ *.o *.ko *.mod.c .*.cmd
 	rm -f modules.order .depend .version .*.o.flags .*.o.d
+	rm -f ar*/*~ ar*/*.o ar*/.*.cmd
 	rm -rf .tmp_versions
 
 ath_hal.o: $(addprefix $(obj)/,$(ath_hal-objs))
