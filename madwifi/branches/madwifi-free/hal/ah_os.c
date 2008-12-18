@@ -1081,7 +1081,6 @@ ath_hal_sysctl_unregister(void)
 /*
  * Module glue.
  */
-#include "version.h"
 #if 0
 static char *dev_info = "ath_hal";
 #endif
