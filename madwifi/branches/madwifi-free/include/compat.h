@@ -206,11 +206,6 @@ typedef unsigned long resource_size_t;
 #define request_module(_fmt, _modname) request_module(_modname)
 #endif
 
-/* HAL defines */
-#define __DECONST(type, var) ((type)(uintptr_t)(const void *)(var))
-#define __printflike(m, n) __attribute__((format (printf, m, n)))
-#define __va_list va_list
-
 #endif /* __KERNEL__ */
 
 #endif /* _ATH_COMPAT_H_ */
