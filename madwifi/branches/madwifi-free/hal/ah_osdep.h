@@ -68,26 +68,51 @@
 #define __CONCAT1(x,y)	x ## y
 #define __CONCAT(x,y)	__CONCAT1(x,y)
 
-#define SET_DECLARE(set, ptype)						\
-	extern ptype *__CONCAT(__start_set_,set);			\
-	extern ptype *__CONCAT(__stop_set_,set)
+#define DECLARE_ah_chips \
+struct ath_hal_chip *AR5210_chip_ptr __attribute__((__weak__));	\
+struct ath_hal_chip *AR5211_chip_ptr __attribute__((__weak__));	\
+struct ath_hal_chip *AR5212_chip_ptr __attribute__((__weak__));	\
+struct ath_hal_chip *AR5312_chip_ptr __attribute__((__weak__));	\
+struct ath_hal_chip *AR5416_chip_ptr __attribute__((__weak__));	\
+struct ath_hal_chip *AR9160_chip_ptr __attribute__((__weak__));	\
+struct ath_hal_chip **ah_chips_ptrs[] = {			\
+	&AR5210_chip_ptr,					\
+	&AR5211_chip_ptr,					\
+	&AR5212_chip_ptr,					\
+	&AR5312_chip_ptr,					\
+	&AR5416_chip_ptr,					\
+	&AR9160_chip_ptr					\
+}
 
-#define SET_BEGIN(set)							\
-	(&__CONCAT(__start_set_,set))
-#define SET_LIMIT(set)							\
-	(&__CONCAT(__stop_set_,set))
-#define SET_FOREACH(pvar, set)						\
-	for (pvar = SET_BEGIN(set); pvar < SET_LIMIT(set); pvar++)
+#define DECLARE_ah_rfs \
+struct ath_hal_rf *RF2316_rf_ptr __attribute__((__weak__));	\
+struct ath_hal_rf *RF2317_rf_ptr __attribute__((__weak__));	\
+struct ath_hal_rf *RF2413_rf_ptr __attribute__((__weak__));	\
+struct ath_hal_rf *RF2425_rf_ptr __attribute__((__weak__));	\
+struct ath_hal_rf *RF5111_rf_ptr __attribute__((__weak__));	\
+struct ath_hal_rf *RF5112_rf_ptr __attribute__((__weak__));	\
+struct ath_hal_rf *RF5413_rf_ptr __attribute__((__weak__));	\
+struct ath_hal_rf **ah_rfs_ptrs[] = {				\
+	&RF2316_rf_ptr,						\
+	&RF2317_rf_ptr,						\
+	&RF2413_rf_ptr,						\
+	&RF2425_rf_ptr,						\
+	&RF5111_rf_ptr,						\
+	&RF5112_rf_ptr,						\
+	&RF5413_rf_ptr						\
+}
 
-#define __MAKE_SET(set, sym)						\
-	static void const * const __set_##set##_sym_##sym 		\
-	__attribute__((__section__("set_" #set))) __used = &sym
+#define OS_SET_DECLARE(set, ptype)				\
+	__CONCAT(DECLARE_,set)
 
-#define DATA_SET(set, sym)	__MAKE_SET(set, sym)
+#define OS_DATA_SET(set, sym)					\
+	typeof(sym) *__CONCAT(sym,_ptr) = &sym
 
-#define OS_DATA_SET(set, item)		DATA_SET(set, item)
-#define OS_SET_DECLARE(set, ptype)	SET_DECLARE(set, ptype)
-#define OS_SET_FOREACH(pvar, set)	SET_FOREACH(pvar, set)
+#define OS_SET_FOREACH(pvar, set)				\
+	int _i;							\
+	for (_i = 0, pvar = __CONCAT(set,_ptrs)[_i];		\
+	     _i < ARRAY_SIZE(__CONCAT(set,_ptrs));		\
+	     _i++, pvar = __CONCAT(set,_ptrs)[_i]) if (*pvar)
 
 /* Byte order/swapping support. */
 #define AH_LITTLE_ENDIAN	1234
