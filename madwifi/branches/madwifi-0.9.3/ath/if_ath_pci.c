@@ -184,7 +184,7 @@ ath_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		printk(KERN_ERR "ath_pci: no memory for device state\n");
 		goto bad2;
 	}
-	sc = dev->priv;
+	sc = netdev_priv(dev);
 	sc->aps_sc.sc_dev = dev;
 	sc->aps_sc.sc_iobase = mem;
 
@@ -265,7 +265,7 @@ static void
 ath_pci_remove(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct ath_pci_softc *sc = dev->priv;
+	struct ath_pci_softc *sc = netdev_priv(dev);
 
 	ath_detach(dev);
 	if (dev->irq)
@@ -283,7 +283,7 @@ ath_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	ath_suspend(dev);
-	PCI_SAVE_STATE(pdev, ((struct ath_pci_softc *)dev->priv)->aps_pmstate);
+	PCI_SAVE_STATE(pdev, ((struct ath_pci_softc *)netdev_priv(dev))->aps_pmstate);
 	pci_disable_device(pdev);
 	return pci_set_power_state(pdev, PCI_D3hot);
 }
@@ -300,7 +300,7 @@ ath_pci_resume(struct pci_dev *pdev)
 		return err;
 
 	/* XXX - Should this return nonzero on fail? */
-	PCI_RESTORE_STATE(pdev,	((struct ath_pci_softc *)dev->priv)->aps_pmstate);
+	PCI_RESTORE_STATE(pdev,	((struct ath_pci_softc *)netdev_priv(dev))->aps_pmstate);
 
 	err = pci_enable_device(pdev);
 	if (err)
@@ -325,7 +325,7 @@ ath_pci_resume(struct pci_dev *pdev)
 
 MODULE_DEVICE_TABLE(pci, ath_pci_id_table);
 
-static struct pci_driver ath_pci_drv_id = {
+static struct pci_driver ath_pci_driver = {
 	.name		= "ath_pci",
 	.id_table	= ath_pci_id_table,
 	.probe		= ath_pci_probe,
@@ -380,7 +380,7 @@ init_ath_pci(void)
 {
 	printk(KERN_INFO "%s: %s\n", dev_info, version);
 
-	if (pci_register_driver(&ath_pci_drv_id) < 0) {
+	if (pci_register_driver(&ath_pci_driver) < 0) {
 		printk("ath_pci: No devices found, driver not installed.\n");
 		return (-ENODEV);
 	}
@@ -393,7 +393,7 @@ static void __exit
 exit_ath_pci(void)
 {
 	ath_sysctl_unregister();
-	pci_unregister_driver(&ath_pci_drv_id);
+	pci_unregister_driver(&ath_pci_driver);
 
 	printk(KERN_INFO "%s: driver unloaded\n", dev_info);
 }
