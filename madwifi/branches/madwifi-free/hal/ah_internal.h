@@ -94,12 +94,12 @@ struct ath_hal_chip {
 };
 #ifndef AH_CHIP
 #define	AH_CHIP(_name, _probe, _attach)				\
-static struct ath_hal_chip name##_chip = {			\
+static struct ath_hal_chip _name##_chip = {			\
 	.name		= #_name,				\
 	.probe		= _probe,				\
 	.attach		= _attach				\
 };								\
-OS_DATA_SET(ah_chips, name##_chip)
+OS_DATA_SET(ah_chips, _name##_chip)
 #endif
 
 /*
@@ -114,12 +114,12 @@ struct ath_hal_rf {
 };
 #ifndef AH_RF
 #define	AH_RF(_name, _probe, _attach)				\
-static struct ath_hal_rf name##_rf = {				\
+static struct ath_hal_rf _name##_rf = {				\
 	.name		= #_name,				\
 	.probe		= _probe,				\
 	.attach		= _attach				\
 };								\
-OS_DATA_SET(ah_rfs, name##_rf)
+OS_DATA_SET(ah_rfs, _name##_rf)
 #endif
 
 struct ath_hal_rf *ath_hal_rfprobe(struct ath_hal *ah, HAL_STATUS *ecode);
