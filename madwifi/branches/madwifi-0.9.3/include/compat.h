@@ -134,6 +134,10 @@
 #define IRQF_SHARED SA_SHIRQ
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,27)
+#define netdev_priv(_netdev) ((_netdev)->priv)
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22)
 #include <linux/skbuff.h>
 static inline unsigned char *skb_end_pointer(const struct sk_buff *skb)
@@ -173,6 +177,13 @@ static inline void skb_reset_mac_header(struct sk_buff *skb)
 #else
 #define CTL_AUTO CTL_UNNUMBERED
 #define DEV_ATH CTL_UNNUMBERED
+#endif
+
+/* __skb_append got a third parameter in 2.6.14 */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
+#define __skb_queue_after(_list, _old, _new)	__skb_append(_old, _new)
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,25)
+#define __skb_queue_after(_list, _old, _new)	__skb_append(_old, _new, _list)
 #endif
 
 #endif /* __KERNEL__ */
