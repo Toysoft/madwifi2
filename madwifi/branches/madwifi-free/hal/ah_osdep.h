@@ -231,4 +231,6 @@ extern void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
 	    __attribute__((__format__ (__printf__, fmtarg, firstvararg)))
 #define __va_list va_list
 
+#undef swap
+
 #endif /* _ATH_AH_OSDEP_H_ */
