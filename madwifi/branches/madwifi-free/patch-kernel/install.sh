@@ -75,6 +75,7 @@ cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
 
 echo "Copying source files"
 FILES=$(cd ${SRC} && find ath ath_rate hal include net80211 -name '*.[ch]')
+FILES="$FILES $(cd ${SRC} && find hal -name '*.ini')"
 for f in $FILES; do
 	case $f in
 		*.mod.c) continue;;
@@ -88,10 +89,6 @@ FILES=$(cd ${SRC} && find . -name Makefile.kernel)
 for f in $FILES; do
 	cp -f ${SRC}/$f $(dirname ${MADWIFI}/$f)/Makefile
 done
-
-echo "Copying Atheros HAL files"
-DST_HAL=${MADWIFI}/hal
-cp -f ${SRC_HAL}/public/*.hal.o.uu ${DST_HAL}/public
 
 
 echo "Patching the build system"
