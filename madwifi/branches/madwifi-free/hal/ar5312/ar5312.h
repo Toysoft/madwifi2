@@ -38,8 +38,6 @@
 	 AH_PRIVATE(ah)->ah_devid == AR5212_AR2317_REV1 || \
 	 AH_PRIVATE(ah)->ah_devid == AR5212_AR2317_REV2)
 
-extern	struct ath_hal * ar5312Attach(uint16_t devid, HAL_SOFTC sc,
-				      HAL_BUS_TAG st, HAL_BUS_HANDLE sh, HAL_STATUS *status);
 extern  HAL_BOOL ar5312IsInterruptPending(struct ath_hal *ah);
 
 /* AR5312 */
