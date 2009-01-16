@@ -583,12 +583,14 @@ ath_attach(u_int16_t devid, struct net_device *dev, HAL_BUS_TAG tag)
 				"supported by the HAL/hardware.\n");
 		intmit = 0; /* Stop use in future ath_attach(). */
 	}
+#if 0
 	else {
 		ath_hal_setintmit(ah, sc->sc_useintmit);
 		DPRINTF(sc, ATH_DEBUG_ANY, "Interference mitigation is "
 			"supported.  Currently %s.\n",
 			(sc->sc_useintmit ? "enabled" : "disabled"));
 	}
+#endif
 
 	sc->sc_dmasize_stomp = 0;
 
