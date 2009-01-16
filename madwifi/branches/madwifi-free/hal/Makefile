@@ -93,17 +93,7 @@ ath_hal-objs	:= \
 	ar5212/ar5212_reset.o \
 	ar5212/ar5212_rfgain.o \
 	ar5212/ar5212_xmit.o \
-	ar5212/ar5413.o
-
-BROKEN_OBJS = \
-	ar5312/ar5312_attach.o \
-	ar5312/ar5312_eeprom.o \
-	ar5312/ar5312_gpio.o \
-	ar5312/ar5312_interrupts.o \
-	ar5312/ar5312_misc.o \
-	ar5312/ar5312_power.o \
-	ar5312/ar5312_reset.o \
-	ar5312/ar5315_gpio.o \
+	ar5212/ar5413.o \
 	ar5416/ar2133.o \
 	ar5416/ar5416_ani.o \
 	ar5416/ar5416_attach.o \
@@ -123,6 +113,16 @@ BROKEN_OBJS = \
 	ar5416/ar5416_reset.o \
 	ar5416/ar5416_xmit.o \
 	ar5416/ar9160_attach.o
+
+BROKEN_OBJS = \
+	ar5312/ar5312_attach.o \
+	ar5312/ar5312_eeprom.o \
+	ar5312/ar5312_gpio.o \
+	ar5312/ar5312_interrupts.o \
+	ar5312/ar5312_misc.o \
+	ar5312/ar5312_power.o \
+	ar5312/ar5312_reset.o \
+	ar5312/ar5315_gpio.o
 
 ifdef LINUX24
 export-objs	:= ah_os.o
