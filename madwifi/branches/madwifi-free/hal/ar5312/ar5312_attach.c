@@ -318,10 +318,10 @@ ar5312Probe(uint16_t vendorid, uint16_t devid)
 		case AR5212_AR2313_REV8:
 			return "Atheros 2313 WiSoC";
 		case AR5212_AR2315_REV6:
-		case AR5212_AR2315_REV6:
 		case AR5212_AR2315_REV7:
 			return "Atheros 2315 WiSoC";
 		case AR5212_AR2317_REV1:
+		case AR5212_AR2317_REV2:
 			return "Atheros 2317 WiSoC";
 		case AR5212_AR2413:
 			return "Atheros 2413";
