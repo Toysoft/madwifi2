@@ -114,7 +114,8 @@ ath_hal-objs	:= \
 	ar5416/ar5416_xmit.o \
 	ar5416/ar9160_attach.o
 
-BROKEN_OBJS = \
+ifeq ($(strip $(BUS)),AHB)
+ath_hal-objs += \
 	ar5312/ar5312_attach.o \
 	ar5312/ar5312_eeprom.o \
 	ar5312/ar5312_gpio.o \
@@ -123,6 +124,7 @@ BROKEN_OBJS = \
 	ar5312/ar5312_power.o \
 	ar5312/ar5312_reset.o \
 	ar5312/ar5315_gpio.o
+endif
 
 ifdef LINUX24
 export-objs	:= ah_os.o
