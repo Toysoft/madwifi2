@@ -54,6 +54,7 @@ v14EepromGet(struct ath_hal *ah, int param, void *val)
 			    __func__, ath_hal_ether_sprintf(macaddr));
 			return HAL_EEBADMAC;
 		}
+		return HAL_OK;
         case AR_EEP_REGDMN_0:
 		return pBase->regDmn[0];
         case AR_EEP_REGDMN_1:
