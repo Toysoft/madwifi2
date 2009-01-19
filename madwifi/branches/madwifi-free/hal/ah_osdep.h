@@ -40,18 +40,7 @@
 
 #include "ah_devid.h"
 
-/*
- * Linux on i386 may pass parameters in registers.  This is an option
- * starting with Linux 2.6.4.  Starting with Linux 2.6.20, it's done
- * unconditionally.  However, the HAL uses standard ABI whereas the
- * parameters are passed on the stack (for maximum portability).
- * "asmlinkage" forces the standard ABI for the HAL calls.
- */
-#ifdef __i386__
-#define __ahdecl	asmlinkage
-#else
 #define __ahdecl
-#endif
 #ifndef __packed
 #define __packed	__attribute__((__packed__))
 #endif
