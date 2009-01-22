@@ -38,6 +38,7 @@
 #ifndef _ATH_AH_OSDEP_H_
 #define _ATH_AH_OSDEP_H_
 
+#include <asm/io.h>
 #include "ah_devid.h"
 
 #define __ahdecl
