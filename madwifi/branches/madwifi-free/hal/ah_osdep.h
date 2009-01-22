@@ -240,7 +240,7 @@ extern void __ahdecl OS_MARK(struct ath_hal *, u_int id, u_int32_t value);
 #define OS_MARK(_ah, _id, _v)
 #endif
 
-#define __DECONST(type, var) ((type)(uintptr_t)(const void *)(var))
+#define __DECONST(type, var) ((type)(unsigned long)(const void *)(var))
 #define __printflike(fmtarg, firstvararg) \
 	    __attribute__((__format__ (__printf__, fmtarg, firstvararg)))
 #define __va_list va_list
