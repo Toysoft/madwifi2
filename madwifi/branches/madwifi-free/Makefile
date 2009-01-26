@@ -140,9 +140,6 @@ info:
 	@echo "The following settings will be used for compilation:"
 	@echo "ARCH         : $(ARCH)"
 	@echo "BUS          : $(BUS)"
-	@if [ -n "$(TOOLPATH)" ]; then \
-	    @echo "TOOLPATH     : $(TOOLPATH)"; \
-	fi	
 	@echo "KERNELRELEASE: $(KERNELRELEASE)"
 	@echo "KERNELPATH   : $(KERNELPATH)"
 	@echo "KERNELCONF   : $(KERNELCONF)"
