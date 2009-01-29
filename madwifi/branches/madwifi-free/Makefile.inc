@@ -92,10 +92,6 @@ $(error KERNELCONF: $(KERNELCONF) does not exist.)
 endif
 include $(KERNELCONF)
 
-# Determine architecture of the kernel.
-include $(TOP)/scripts/get_arch.mk
-export ARCH
-
 # KMODPATH nominates the directory where the modules will be
 # installed to
 KMODPATH :=	/lib/modules/$(KERNELRELEASE)/net
