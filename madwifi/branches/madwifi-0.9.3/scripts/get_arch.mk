@@ -36,6 +36,19 @@ ifeq (,$(ARCH-y))
 $(Cannot determine ARCH)
 endif
 
+# Allow ARCH to be x86
+ifneq (,$(CONFIG_X86))
+ifeq (x86,$(ARCH))
+ARCH-y = $(ARCH)
+endif
+endif
+
+ifeq (ppc,$(ARCH-y))
+ifeq (,$(wildcard $(KERNELPATH)/arch/ppc))
+ARCH-y = powerpc
+endif
+endif
+
 # Don't allow ARCH to be overridden by a different value.
 ifeq (,$(ARCH))
 ARCH = $(ARCH-y)
