@@ -138,7 +138,6 @@ clean:
 .PHONY: info
 info:
 	@echo "The following settings will be used for compilation:"
-	@echo "ARCH         : $(ARCH)"
 	@echo "BUS          : $(BUS)"
 	@echo "KERNELRELEASE: $(KERNELRELEASE)"
 	@echo "KERNELPATH   : $(KERNELPATH)"
