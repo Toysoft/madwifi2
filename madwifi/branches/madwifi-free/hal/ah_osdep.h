@@ -55,6 +55,7 @@
 #define HAL_BUS_TAG struct ar531x_config *
 
 /* Linker-assisted set support */
+#define	__STRING(x)	#x
 #define __CONCAT1(x,y)	x ## y
 #define __CONCAT(x,y)	__CONCAT1(x,y)
 
