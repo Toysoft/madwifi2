@@ -234,6 +234,7 @@ extern void __ahdecl ath_hal_memzero(void *, size_t);
 #define OS_MEMCPY(_d, _s, _n)	ath_hal_memcpy(_d,_s,_n)
 extern void *__ahdecl ath_hal_memcpy(void *, const void *, size_t);
 
+#define __bswap16(val) __swab16(val)
 #define __bswap32(val) __swab32(val)
 
 #ifdef AH_DEBUG_ALQ
