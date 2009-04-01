@@ -1138,7 +1138,7 @@ ar5212SetResetReg(struct ath_hal *ah, uint32_t resetMask)
 
 	/* XXX ar5212MacStop & co. */
 
-	if (IS_PCIE(ah)) {
+	if (AH_PRIVATE(ah)->ah_ispcie) {
 		resetMask &= ~AR_RC_PCI;
 	}
 
