@@ -150,10 +150,6 @@ ifndef HAL_DEBUG
 export HAL_DEBUG=0
 endif
 
-ifndef ALQ
-export ALQ=0
-endif
-
 ifndef ATH_DEBUG
 export ATH_DEBUG=1
 endif
@@ -179,12 +175,6 @@ endif
 # stack traces are more decipherable.
 ifeq ($(strip $(HAL_DEBUG)),1)
 COPTS+= -fno-inline -DAH_DEBUG=1
-endif
-
-ifeq ($(strip $(ALQ)),1)
-obj-m += alq.o
-alq-objs := kern_alq.o
-EXTRA_CFLAGS += -DAH_DEBUG_ALQ -DAH_DEBUG
 endif
 
 include $(TOP)/BuildCaps.inc
