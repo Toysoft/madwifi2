@@ -57,9 +57,6 @@ static const HAL_PERCAL_DATA ar9160_adc_init_dc_cal = {
 	.calPostProc	= ar5416AdcDcCalibration
 };
 
-struct ath_hal *ar9160Attach(uint16_t devid, HAL_SOFTC sc,
-	HAL_BUS_TAG st, HAL_BUS_HANDLE sh, HAL_STATUS *status);
-static void ar9160Detach(struct ath_hal *);
 static HAL_BOOL ar9160FillCapabilityInfo(struct ath_hal *ah);
 
 static void
@@ -90,7 +87,7 @@ ar9160AniSetup(struct ath_hal *ah)
 /*
  * Attach for an AR9160 part.
  */
-struct ath_hal *
+static struct ath_hal *
 ar9160Attach(uint16_t devid, HAL_SOFTC sc,
 	HAL_BUS_TAG st, HAL_BUS_HANDLE sh, HAL_STATUS *status)
 {
@@ -118,7 +115,6 @@ ar9160Attach(uint16_t devid, HAL_SOFTC sc,
 
 	/* XXX override with 9160 specific state */
 	/* override 5416 methods for our needs */
-	ah->ah_detach			= ar9160Detach;
 
 	AH5416(ah)->ah_cal.iqCalData.calData = &ar9160_iq_cal;
 	AH5416(ah)->ah_cal.adcGainCalData.calData = &ar9160_adc_gain_cal;
@@ -168,6 +164,10 @@ ar9160Attach(uint16_t devid, HAL_SOFTC sc,
 	else
 		HAL_INI_INIT(&AH5416(ah)->ah_ini_addac, ar9160Addac, 2);
 
+	ecode = ath_hal_v14EepromAttach(ah);
+	if (ecode != HAL_OK)
+		goto bad;
+
 	HAL_INI_INIT(&AH5416(ah)->ah_ini_pcieserdes, ar9160PciePhy, 2);
 	ar5416AttachPCIE(ah);
 
@@ -213,18 +213,12 @@ ar9160Attach(uint16_t devid, HAL_SOFTC sc,
 		goto bad;
 #endif
 	}
-	HALDEBUG(ah, HAL_DEBUG_ATTACH, "%s: Attaching AR2133 radio\n",
-	    __func__);
 	rfStatus = ar2133RfAttach(ah, &ecode);
 	if (!rfStatus) {
 		HALDEBUG(ah, HAL_DEBUG_ANY, "%s: RF setup failed, status %u\n",
 		    __func__, ecode);
 		goto bad;
 	}
-
-	ecode = ath_hal_v14EepromAttach(ah);
-	if (ecode != HAL_OK)
-		goto bad;
 
 	/*
 	 * Got everything we need now to setup the capabilities.
@@ -262,21 +256,10 @@ ar9160Attach(uint16_t devid, HAL_SOFTC sc,
 	return ah;
 bad:
 	if (ahp)
-		ar9160Detach((struct ath_hal *) ahp);
+		ar5416Detach((struct ath_hal *) ahp);
 	if (status)
 		*status = ecode;
 	return AH_NULL;
-}
-
-void
-ar9160Detach(struct ath_hal *ah)
-{
-	HALDEBUG(ah, HAL_DEBUG_ATTACH, "%s:\n", __func__);
-
-	HALASSERT(ah != AH_NULL);
-	HALASSERT(ah->ah_magic == AR5416_MAGIC);
-
-	ar5416Detach(ah);
 }
 
 /*
