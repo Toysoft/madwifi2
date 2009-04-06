@@ -13,7 +13,7 @@ include $(TOP)/BuildCaps.inc
 
 ATH=	$(TOP)/ath
 COMPAT=	$(TOP)/include
-HAL=	$(TOP)/hal
+HAL=	$(TOP)/ath_hal
 
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
 INCS += -I$(TOP) -I$(ATH) -I$(HAL)

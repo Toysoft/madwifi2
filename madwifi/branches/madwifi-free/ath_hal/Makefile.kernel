@@ -11,7 +11,7 @@ TOP = $(srctree)/$(src)/..
 include $(TOP)/BuildCaps.inc
 
 COMPAT=	$(TOP)/include
-HAL=	$(TOP)/hal
+HAL=	$(TOP)/ath_hal
 
 INCS = -include $(COMPAT)/compat.h -I$(COMPAT)
 INCS += -I$(HAL)
