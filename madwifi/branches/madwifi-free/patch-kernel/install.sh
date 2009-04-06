@@ -39,8 +39,8 @@ PATCH()
 # Location of various pieces.  These mimic what is in Makefile.inc
 # and can be overridden from the environment.
 #
-SRC_HAL=${HAL:-${SRC}/hal}
-test -d ${SRC_HAL} || die "No hal directory ${SRC_HAL}"
+SRC_HAL=${HAL:-${SRC}/ath_hal}
+test -d ${SRC_HAL} || die "No ath_hal directory ${SRC_HAL}"
 SRC_NET80211=${WLAN:-${SRC}/net80211}
 test -d ${SRC_NET80211} || die "No net80211 directory ${SRC_NET80211}"
 SRC_ATH=${ATH:-${SRC}/ath}
@@ -74,8 +74,8 @@ cp -f ${SRC}/BuildCaps.inc ${SRC}/svnversion.h ${SRC}/release.h ${MADWIFI}
 
 
 echo "Copying source files"
-FILES=$(cd ${SRC} && find ath ath_rate hal include net80211 -name '*.[ch]')
-FILES="$FILES $(cd ${SRC} && find hal -name '*.ini')"
+FILES=$(cd ${SRC} && find ath ath_hal ath_rate include net80211 -name '*.[ch]')
+FILES="$FILES $(cd ${SRC} && find ath_hal -name '*.ini')"
 for f in $FILES; do
 	case $f in
 		*.mod.c) continue;;

@@ -115,7 +115,7 @@ NM=		nm
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL=	$(TOP)/hal
+HAL=	$(TOP)/ath_hal
 endif
 #
 # Path to the 802.11 include files.

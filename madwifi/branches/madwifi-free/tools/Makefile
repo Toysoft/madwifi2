@@ -41,7 +41,7 @@ MANDIR ?= /usr/local/man
 # Path to the HAL source code.
 #
 ifeq ($(HAL),)
-HAL = $(TOP)/hal
+HAL = $(TOP)/ath_hal
 endif
 
 

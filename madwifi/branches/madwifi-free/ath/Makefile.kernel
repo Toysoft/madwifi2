@@ -10,7 +10,7 @@ TOP = $(srctree)/$(src)/..
 
 include $(TOP)/BuildCaps.inc
 
-HAL=	$(TOP)/hal
+HAL=	$(TOP)/ath_hal
 WLAN=	$(TOP)/net80211
 COMPAT=	$(TOP)/include
 

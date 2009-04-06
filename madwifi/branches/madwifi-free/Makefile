@@ -45,7 +45,7 @@ TOP = $(obj)
 
 include $(TOP)/Makefile.inc
 
-obj-y := ath/ ath_rate/ hal/ net80211/
+obj-y := ath/ ath_hal/ ath_rate/ net80211/
 
 ifdef CRYPTO_TESTING
 obj-y += regression/
