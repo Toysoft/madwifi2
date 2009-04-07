@@ -11119,7 +11119,10 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 							(sc->sc_xrtxq != NULL)) && 
 						val) {
 					ret = -EINVAL;
+					break;
 				}
+				sc->sc_diversity = val;
+				ath_hal_setdiversity(ah, val);
 				break;
 			case ATH_TXINTRPERIOD:
 				/* XXX: validate? */
