@@ -472,17 +472,17 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 			if (!(vap->iv_flags & IEEE80211_F_CHANSWITCH)) {
 				vap->iv_flags |= IEEE80211_F_CHANSWITCH;
 
-				/* Copy out trailer to open up a slot. */
+				/* copy out trailer to open up a slot */
 				memmove(bo->bo_chanswitch + sizeof(*csa_ie),
 					bo->bo_chanswitch, 
 					bo->bo_chanswitch_trailerlen);
 
-				/* Add ie in opened slot. */
+				/* add ie in opened slot */
 				csa_ie->csa_id = IEEE80211_ELEMID_CHANSWITCHANN;
-				/* Fixed length. */
+				/* fixed length */
 				csa_ie->csa_len = sizeof(*csa_ie) - 2;
 
-				/* Update the trailer len's. */
+				/* update the trailer lens */
 				bo->bo_chanswitch_trailerlen += sizeof(*csa_ie);
 				bo->bo_tim_trailerlen += sizeof(*csa_ie);
 				bo->bo_wme += sizeof(*csa_ie);
@@ -490,8 +490,8 @@ ieee80211_beacon_update(struct ieee80211_node *ni,
 				bo->bo_ath_caps += sizeof(*csa_ie);
 				bo->bo_xr += sizeof(*csa_ie);
 
-				/* Indicate new beacon length so other layers
-				 * may manage memory. */
+				/* indicate new beacon length so other layers
+				 * may manage memory */
 				skb_put(skb, sizeof(*csa_ie));
 				len_changed = 1;
 			}
