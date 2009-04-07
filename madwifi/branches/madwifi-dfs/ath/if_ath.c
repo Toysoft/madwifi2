@@ -1938,6 +1938,7 @@ _ath_dfs_can_transmit_csaie_dbgmsg(struct ath_softc * sc, const char * func)
 	return b;
 }
 
+
 /* Extend 15-bit timestamp from RX descriptor to a full 64-bit TSF using the
  * provided hardware TSF. The result is the closest value relative to hardware
  * TSF. */
@@ -2335,7 +2336,7 @@ ath_intr_process_rx_descriptors(struct ath_softc *sc, int *pneedmark, u_int64_t 
 					ath_hw_puttxbuf(sc,
 						uapsd_xmit_q->axq_qnum,
 						(STAILQ_FIRST(&uapsd_xmit_q->axq_q))->bf_daddr,
-							__func__);
+						__func__);
 
 					ath_hal_txstart(sc->sc_ah,
 							uapsd_xmit_q->axq_qnum);
@@ -2588,9 +2589,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 			 * Handle beacon transmission directly; deferring
 			 * this is too slow to meet timing constraints
 			 * under load. */
-			if (ath_dfs_can_transmit_csaie_dbgmsg(sc)) {
+			if (ath_dfs_can_transmit_csaie_dbgmsg(sc))
 				ath_beacon_send(sc, &needmark, hw_tsf);
-			} else {
+			else {
 				sc->sc_beacons = 0;
 				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 				ath_hal_intrset(ah, sc->sc_imask);
@@ -2658,9 +2659,9 @@ ath_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 		if (status & HAL_INT_BMISS) {
 			sc->sc_stats.ast_bmiss++;
-			if (ath_dfs_can_transmit_csaie_dbgmsg(sc)) {
+			if (ath_dfs_can_transmit_csaie_dbgmsg(sc))
 				ATH_SCHEDULE_TQUEUE(&sc->sc_bmisstq, &needmark);
-			} else {
+			else {
 				sc->sc_beacons = 0;
 				sc->sc_imask &= ~(HAL_INT_SWBA | HAL_INT_BMISS);
 				ath_hal_intrset(ah, sc->sc_imask);
@@ -3429,7 +3430,7 @@ static
 struct ath_buf *
 #ifdef IEEE80211_DEBUG_REFCNT
 _take_txbuf_debug(struct ath_softc *sc, int for_management,
-		const char *func, int line)
+		  const char *func, int line)
 #else
 _take_txbuf(struct ath_softc *sc, int for_management)
 #endif /* #ifdef IEEE80211_DEBUG_REFCNT */
@@ -5377,7 +5378,8 @@ ath_beacon_generate(struct ath_softc *sc, struct ieee80211vap *vap, int *needmar
 			ATH_TXQ_MOVE_Q(&avp->av_mcastq, cabq);
 			if (!STAILQ_FIRST(&cabq->axq_q))
 				ath_hw_puttxbuf(sc, cabq->axq_qnum,
-						 bfmcast->bf_daddr, __func__);
+					bfmcast->bf_daddr,
+					__func__);
 		}
 		else {
 			DPRINTF(sc, ATH_DEBUG_BEACON,
@@ -5733,8 +5735,8 @@ void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 /*
  * Configure the beacon and sleep timers.
  *
- * When operating as an AP/IBSS this resets the TSF and sets up the hardware
- * to notify us when we need to issue beacons.
+ * When operating as an AP/IBSS this resets the TSF and sets up the hardware to
+ * notify us when we need to issue beacons.
  *
  * When operating in station mode this sets up the beacon timers according to
  * the timestamp of the last received beacon and the current TSF, configures
@@ -5774,8 +5776,9 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	hw_tsftu = IEEE80211_TSF_TO_TU(hw_tsf);
 	tsftu = IEEE80211_TSF_TO_TU(tsf);
 
-	/* We should reset hardware TSF only once, so we increment
-	 * ni_tstamp.tsf to avoid resetting the hardware TSF multiple times */
+	/* We should reset hw TSF only once, so we increment
+	 * ni_tstamp.tsf to avoid resetting the hw TSF multiple
+	 * times */
 	if (tsf == 0) {
 		reset_tsf = 1;
 		ni->ni_tstamp.tsf = cpu_to_le64(1);
