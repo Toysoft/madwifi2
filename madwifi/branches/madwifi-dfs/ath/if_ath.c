@@ -11264,7 +11264,7 @@ ATH_SYSCTL_DECL(ath_sysctl_halparam, ctl, write, filp, buffer, lenp, ppos)
 			val = ath_hal_getdefantenna(ah);
 			break;
 		case ATH_DIVERSITY:
-			val = ath_hal_getdiversity(ah);
+			val = sc->sc_diversity;
 			break;
 		case ATH_TXINTRPERIOD:
 			val = sc->sc_txintrperiod;
