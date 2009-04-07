@@ -50,7 +50,7 @@ endif
 PROGRAMS = athstats 80211stats athkey athchans athctrl \
 	athdebug 80211debug wlanconfig wpakey
 
-#SUBDIRS = ath_info
+SUBDIRS = ath_info
 
 INCS = -I. -I$(HAL) -I$(TOP) -I$(ATH_HAL)
 CFLAGS = -g -O2 -Wall
