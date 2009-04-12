@@ -1631,7 +1631,7 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 	HAL_BOOL ret;
 	unsigned long __axq_lockflags[HAL_NUM_TX_QUEUES];
 	struct ath_txq * txq;
-	int i;
+	int i, lclass = 0;
  	u_int8_t old_privFlags = sc->sc_curchan.privFlags;
 
 	/* ath_hal_reset() resets all TXDP pointers, so we need to
@@ -1641,7 +1641,8 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
 	for (i = 0; i < HAL_NUM_TX_QUEUES; i++) {
 		if (ATH_TXQ_SETUP(sc, i)) {
 			txq = &sc->sc_txq[i];
-			spin_lock_irqsave(&txq->axq_lock, __axq_lockflags[i]);
+			spin_lock_irqsave_nested(&txq->axq_lock,
+						 __axq_lockflags[i], lclass++);
 		}
 	}
 
