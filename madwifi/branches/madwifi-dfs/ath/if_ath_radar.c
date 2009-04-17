@@ -105,9 +105,9 @@ struct radar_pattern_specification {
 	/* Interval MAX = 1000000 / FREQ + 0.1% 
 	 * (a.k.a. Pulse/Burst Repetition Interval) */
 	u_int32_t max_rep_int;
-	/* Do we adjust the min/max interval values dynamically 
-	 * based upon running mean interval? */
-	HAL_BOOL dyn_ints;
+	/* AH_FALSE for ETSI radars, AH_TRUE for FCC radars. Used to adjust
+	 * the timestamp of the pulse using the pulse width */
+	HAL_BOOL is_fcc;
 	/* Fuzz factor dynamic matching, as unsigned integer percentage 
 	 * of variation (i.e. 2 for +/- 2% timing) */
 	u_int32_t fuzz_pct;
@@ -131,21 +131,21 @@ static struct radar_pattern_specification radar_patterns[] = {
 #ifdef DFS_DOMAIN_ETSI
 	/* ETSI - Type 2 - 1,2,5us - PRF 200 - BURST 10 or
 	   ETSI - Type 3 - 10,15us - PRF 200 - BURST 15 */
-	{"ETSI - PRF200", 4995, 5005, AH_FALSE, 20, 4, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI - PRF200",  4995, 5005, AH_FALSE, 20, 4, 4, 15, 4,  8, AH_TRUE},
 	/* ETSI - Type 2 - 1,2,5us - PRF 300 - BURST 10 or
 	   ETSI - Type 3 - 10,15us - PRF 300 - BURST 15 */
-	{"ETSI - PRF300", 3329, 3337, AH_FALSE, 20, 4, 4, 10, 4,  6, AH_TRUE},
+	{"ETSI - PRF300",  3329, 3337, AH_FALSE, 20, 4, 4, 15, 4,  6, AH_TRUE},
 	/* ETSI - Type 2 - 1,2,5us - PRF 500 - BURST 10 or
 	   ETSI - Type 3 - 10,15us - PRF 500 - BURST 15 */
-	{"ETSI - PRF500", 1998, 2002, AH_FALSE, 20, 4, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI - PRF500",  1998, 2002, AH_FALSE, 20, 4, 4, 15, 4,  8, AH_TRUE},
 	/* ETSI - Type 1 - 1us - PRF 750 - BURST 15 */
-	{"ETSI - PRF750", 1331, 1335, AH_FALSE, 20, 5, 4, 15, 4, 13, AH_TRUE},
+	{"ETSI - PRF750",  1331, 1335, AH_FALSE, 20, 5, 4, 15, 4, 13, AH_TRUE},
 	/* ETSI - Type 2 - 1,2,5us - PRF 800 - BURST 10 or
 	   ETSI - Type 3 - 10,15us - PRF 800 - BURST 15 */
-	{"ETSI - PRF800", 1248, 1252, AH_FALSE, 20, 4, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI - PRF800",  1248, 1252, AH_FALSE, 20, 4, 4, 15, 4,  8, AH_TRUE},
 	/* ETSI - Type 2 - 1,2,5us - PRF 1000 - BURST 10 or
 	   ETSI - Type 3 - 10,15us - PRF 1000 - BURST 15 */
-	{"ETSI - PRF1000",  999, 1001, AH_FALSE, 20, 4, 4, 10, 4,  8, AH_TRUE},
+	{"ETSI - PRF1000",  999, 1001, AH_FALSE, 20, 4, 4, 15, 4,  8, AH_TRUE},
 	/* ETSI - Type 4 - 1,2,5,10,15us - PRF 1200 - BURST 15 */
 	{"ETSI - PRF1200",  832,  834, AH_FALSE, 20, 5, 4, 15, 4, 13, AH_TRUE},
 	/* ETSI - Type 4 - 1,2,5,10,15us - PRF 1500 - BURST 15 */
@@ -158,22 +158,22 @@ static struct radar_pattern_specification radar_patterns[] = {
 	{"ETSI - PRF2300",  432,  435, AH_FALSE, 20, 8, 4, 25, 6, 20, AH_TRUE},
 	/* ETSI - Type 5 - 1,2,5,10,15us - PRF 3000 - BURST 25 or
 	   ETSI - Type 6 - 20,30us - PRF 3000 - BURST 20 */
-	{"ETSI - PRF3000",  332,  334, AH_FALSE, 20, 6, 4, 20, 5, 20, AH_TRUE},
+	{"ETSI - PRF3000",  332,  334, AH_FALSE, 20, 6, 4, 25, 5, 20, AH_TRUE},
 	/* ETSI - Type 5 - 1,2,5,10,15us - PRF 3500 - BURST 25 */
 	{"ETSI - PRF3500",  284,  286, AH_FALSE, 20, 8, 4, 25, 2, 20, AH_TRUE},
 	/* ETSI - Type 5 - 1,2,5,10,15us - PRF 4000 - BURST 25 or
 	   ETSI - Type 6 - 20,30us - PRF 4000 - BURST 20 */
-	{"ETSI - PRF4000",  249,  251, AH_FALSE, 20, 6, 4, 20, 5, 20, AH_TRUE},
+	{"ETSI - PRF4000",  249,  251, AH_FALSE, 20, 6, 4, 25, 5, 20, AH_TRUE},
 #endif
 #ifdef DFS_DOMAIN_FCC
 	/* FCC - Type 1 -     1us -    PRI 1428 - BURST 18 */
-	{"FCC - Type 1",   1426, 1430, AH_TRUE, 10, 5, 10, 18, 4,  6, AH_FALSE},
+	{"FCC - Type 1",   1426, 1430, AH_TRUE,  10, 6, 6, 18, 4,  6, AH_FALSE},
 	/* FCC - Type 2 -   1/5us - PRI 150/230 - BURST 23/29 */
-	{"FCC - Type 2",    149,  231, AH_TRUE, 10, 8, 10, 29, 6, 12, AH_FALSE},
+	{"FCC - Type 2",    149,  231, AH_TRUE,  10, 8, 8, 29, 6, 12, AH_FALSE},
 	/* FCC - Type 3 -  6/10us - PRI 200/500 - BURST 16/18 */
-	{"FCC - Type 3",    199,  501, AH_TRUE, 10, 6, 10, 18, 6, 12, AH_FALSE},
+	{"FCC - Type 3",    199,  501, AH_TRUE,  10, 6, 6, 18, 6, 12, AH_FALSE},
 	/* FCC - Type 4 - 11/20us - PRI 200/500 - BURST 12/16 */
-	{"FCC - Type 4",    199,  501, AH_TRUE, 10, 5, 10, 16, 6, 12, AH_FALSE}
+	{"FCC - Type 4",    199,  501, AH_TRUE,  10, 5, 5, 16, 6, 12, AH_FALSE}
 #endif
 };
 
@@ -899,12 +899,6 @@ static HAL_BOOL rp_analyze_short_pulse(
 	 * This exceeds all known Atheros MTBF so, forget about TSF roll over.
 	 */
 
-	/* t0 is the timestamp of the beginning of the last radar pulse. We
-	 * assume that the hardware reports the end of the pulse, so we
-	 * compute the beginning based on the reported pulse width, which
-	 * might larger than the real pulse */
-	t0 = last_pulse->rp_tsf - WIDTH_TO_TSF(last_pulse->rp_width);
-
 	/* loop through all patterns */
 	for (i = 0; i < sizetab(radar_patterns); i++) {
 		int matched = 1, missed = 0, partial_miss = 0, noise = 0;
@@ -916,6 +910,18 @@ static HAL_BOOL rp_analyze_short_pulse(
 		int last_matched = 0;
 
 		pattern = &radar_patterns[i];
+
+		/* t0 is the timestamp of the beginning of the last radar
+		 * pulse. We assume that the hardware reports the end of the
+		 * pulse, so we compute the beginning based on the reported
+		 * pulse width, which might larger than the real pulse.
+		 *
+		 * BIG WARNING : using FCC samples, it seems that this
+		 * correction is not needed at all, so we are using the
+		 * dyn_ints flag to avoid this correction */
+		t0 = last_pulse->rp_tsf;
+		if (!pattern->is_fcc)
+			t0 -= WIDTH_TO_TSF(last_pulse->rp_width);
 
 		/* initial values for a_min, a_avg, a_max and b_min, b_avg,
 		 * b_max */
@@ -957,7 +963,9 @@ static HAL_BOOL rp_analyze_short_pulse(
 			if (!pulse->rp_allocated)
 				break;
 
-			t = t0 - (pulse->rp_tsf - WIDTH_TO_TSF(pulse->rp_width));
+			t = t0 - pulse->rp_tsf;
+			if (!pattern->is_fcc)
+				t += WIDTH_TO_TSF(pulse->rp_width);
 
 			/* Do not go too far... this is an optimization to not
 			 * keep checking after we hit maximum time span for
