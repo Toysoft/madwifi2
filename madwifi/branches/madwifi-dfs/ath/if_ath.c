@@ -5692,7 +5692,7 @@ void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 
 	switch (sc->sc_opmode) {
 	case HAL_M_STA:
-		if (ar_device(sc->devid) == 5210) {
+		if (ar_device(sc) == 5210) {
 			timer1 = 0xffffffff;
 			timer2 = 0xffffffff;
 		} else {
@@ -5718,7 +5718,7 @@ void ath_hw_beaconinit(struct ath_softc *sc, u_int32_t hw_tsftu,
 
 	/* Set the beacon register and enable all timers. (next beacon, DMA
 	 * beacon, software beacon, ATIM window time). */
-	if (ar_device(sc->devid) == 5210) {
+	if (ar_device(sc) == 5210) {
 		OS_REG_WRITE(ah, AR5K_TIMER0_5210, timer0);
 		OS_REG_WRITE(ah, AR5K_TIMER1_5210, timer1);
 		OS_REG_WRITE(ah, AR5K_TIMER2_5210, timer2);
