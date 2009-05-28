@@ -23,7 +23,7 @@ if [[ "$RELEASE_TMP" == "" || "$RELEASE_STORE" == "" ]]; then
     exit 1
 fi
 
-# caller must have write access to the madwifi.org repository
+# caller must have write access to the madwifi-project.org repository
 valid=0
 repos=$(svn info | grep "Repository Root" | cut -d" " -f3)
 for f in ~/.subversion/auth/svn.simple/*; do
