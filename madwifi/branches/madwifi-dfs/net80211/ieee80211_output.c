@@ -1813,7 +1813,7 @@ ieee80211_send_csa_frame(struct ieee80211vap *vap,
 			 u_int8_t csa_chan,
 			 u_int8_t csa_count)
 {
-	struct ieee80211_node * ni = vap->iv_bss;
+	struct ieee80211_node *ni = vap->iv_bss;
 	struct ieee80211com *ic = ni->ni_ic;
 	struct sk_buff *skb;
 	const int frm_len = 7;

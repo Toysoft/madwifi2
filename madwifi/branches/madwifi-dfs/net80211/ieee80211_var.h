@@ -513,7 +513,7 @@ struct ieee80211com {
 	void (*ic_set_dfs_interference)(struct ieee80211com *, int);
 
 	/* DFS radar detection handling */
-	void (*ic_radar_detected)(struct ieee80211com *, const char * cause,
+	void (*ic_radar_detected)(struct ieee80211com *, const char *cause,
 			int switchChanRequested, u_int8_t switchChan);
 
 	/* Set coverage class */
