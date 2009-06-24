@@ -123,6 +123,16 @@ struct ath_hal_rf *const *ah_rfs_ptrs[] = {			\
 #endif
 #endif				/* AH_BYTE_ORDER */
 
+/* 32-bit sparc gets iowrite32() and ioread32() in Linux 2.6.18 */
+#if (defined(CONFIG_SPARC32) && (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,18)))
+#ifndef iowrite32
+#define iowrite32(_val, _addr) writel(_val, _addr)
+#endif
+#ifndef ioread32
+#define ioread32(_addr) readl(_addr)
+#endif
+#endif
+
 /*
  * The HAL programs big-endian platforms to use byte-swapped hardware registers.
  * This is done to avoid the byte swapping needed to access PCI devices.
@@ -142,7 +152,10 @@ struct ath_hal_rf *const *ah_rfs_ptrs[] = {			\
     !defined(CONFIG_PARISC) && \
     !(defined(CONFIG_PPC64) && \
       (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,14))) && \
-    !defined(CONFIG_PPC_MERGE) && \
+    !(defined(CONFIG_PPC_MERGE) && \
+      (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,20))) && \
+    !(defined(CONFIG_PPC32) && \
+      (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27))) && \
     !(defined(CONFIG_MIPS) && \
       (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)))
 # ifndef iowrite32be
@@ -214,6 +227,7 @@ struct ath_hal_rf *const *ah_rfs_ptrs[] = {			\
 #if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC) || defined(AH_DEBUG_ALQ)
 #define OS_REG_WRITE(_ah, _reg, _val)	ath_hal_reg_write(_ah, _reg, _val)
 #define OS_REG_READ(_ah, _reg)		ath_hal_reg_read(_ah, _reg)
+struct ath_hal;
 extern void __ahdecl ath_hal_reg_write(struct ath_hal *ah, u_int reg,
 				       u_int32_t val);
 extern u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
@@ -225,6 +239,9 @@ extern u_int32_t __ahdecl ath_hal_reg_read(struct ath_hal *ah, u_int reg);
 /* Delay n microseconds. */
 extern void __ahdecl ath_hal_delay(int);
 #define OS_DELAY(_n)		ath_hal_delay(_n)
+
+/* Uptime in milliseconds, used by debugging code only */
+#define OS_GETUPTIME(_ah)	((int)(1000 * jiffies / HZ))
 
 #define OS_INLINE	__inline
 #define OS_MEMZERO(_a, _n)	ath_hal_memzero((_a), (_n))

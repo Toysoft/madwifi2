@@ -288,7 +288,7 @@ ieee80211_notify_sta_stats(struct ieee80211_node *ni)
 	static const char *tag = "STA-TRAFFIC-STAT";
 	struct net_device *dev = vap->iv_dev;
 	union iwreq_data wreq;
-	char buf[1024];
+	char buf[256];
 
 	snprintf(buf, sizeof(buf), "%s\nmac=" MAC_FMT "\nrx_packets=%u\nrx_bytes=%llu\n"
 			"tx_packets=%u\ntx_bytes=%llu\n", tag,
@@ -420,7 +420,8 @@ proc_read_nodes(struct ieee80211vap *vap, char *buf, int space)
 			p += sprintf(p, " last_rx %ld.%06ld\n",
 				     t.tv_sec, t.tv_nsec / 1000);
 			p += sprintf(p, " ni_tstamp %10llu ni_rtsf %10llu\n",
-				     le64_to_cpu(ni->ni_tstamp.tsf), ni->ni_rtsf);
+				     (unsigned long long)le64_to_cpu(ni->ni_tstamp.tsf),
+				     (unsigned long long)ni->ni_rtsf);
 		}
         }
 	IEEE80211_NODE_TABLE_UNLOCK_IRQ(nt);
@@ -451,7 +452,7 @@ proc_doth_print(struct ieee80211vap *vap, char *buf, int space)
 		} else {
 			sprintf(str, " End: %ld.%06ld",
 				ic->ic_chan_non_occupy[i].tv_sec,
-				ic->ic_chan_non_occupy[i].tv_usec);
+				(long)ic->ic_chan_non_occupy[i].tv_usec);
 		}
 
 		p += sprintf(p,
