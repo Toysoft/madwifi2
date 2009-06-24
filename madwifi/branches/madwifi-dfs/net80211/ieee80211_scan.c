@@ -972,7 +972,7 @@ ieee80211_scan_flush(struct ieee80211com *ic)
 /* Check if a channel is usable for a DFS channel switch */
 static int
 ieee80211_dfs_is_channel_usable(struct ieee80211com *ic,
-				struct ieee80211_channel * channel)
+				struct ieee80211_channel *channel)
 {
 	u_int16_t curChanBandFlags, curChanOutdoorFlags;
 

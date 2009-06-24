@@ -305,7 +305,7 @@ static void ath_set_dfs_excl_period(struct ieee80211com *,
 static unsigned int ath_get_dfs_cac_time(struct ieee80211com *);
 static void ath_set_dfs_cac_time(struct ieee80211com *, unsigned int seconds);
 
-static void ath_radar_detected(struct ieee80211com *ic, const char * cause,
+static void ath_radar_detected(struct ieee80211com *ic, const char *cause,
 		int switchChanRequested, u_int8_t switchChan);
 
 static unsigned int ath_dump_hal_map(struct ieee80211com *ic);
@@ -458,7 +458,7 @@ MODULE_PARM_DESC(ieee80211_debug, "Load-time 802.11 debug output enable");
 /* Internal functions to set/clear CHANNEL_DFS_CLEAR/CHANNEL_INTERFERENCE
  * flags */
 
-static inline void _ath_set_dfs_clear(struct ath_softc *sc, HAL_CHANNEL * channel, int val)
+static inline void _ath_set_dfs_clear(struct ath_softc *sc, HAL_CHANNEL *channel, int val)
 {
 	if (val) {
 		channel->privFlags |= CHANNEL_DFS_CLEAR;
@@ -473,7 +473,7 @@ static inline void _ath_set_dfs_clear(struct ath_softc *sc, HAL_CHANNEL * channe
 	}
 }
 
-static inline void _ath_set_dfs_interference(struct ath_softc *sc, HAL_CHANNEL * channel, int val)
+static inline void _ath_set_dfs_interference(struct ath_softc *sc, HAL_CHANNEL *channel, int val)
 {
 	if (val) {
 		channel->privFlags |= CHANNEL_INTERFERENCE;
@@ -509,7 +509,7 @@ static void ath_set_dfs_interference(struct ieee80211com *ic, int val)
 static void
 ath_swba_watchdog(unsigned long data )
 {
-	struct ath_softc * sc = (struct ath_softc *)data;
+	struct ath_softc *sc = (struct ath_softc *)data;
 
 	DPRINTF(sc, ATH_DEBUG_BEACON,
 		"%sconfiguring beacon\n",
@@ -1868,7 +1868,7 @@ static HAL_BOOL ath_hw_reset(struct ath_softc *sc, HAL_OPMODE opmode,
  * - Channel Availability Check is not done or a radar has been detected
  */
 static int
-ath_dfs_can_transmit(struct ath_softc * sc)
+ath_dfs_can_transmit(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 
@@ -1887,7 +1887,7 @@ ath_dfs_can_transmit(struct ath_softc * sc)
 /* Returns true if we can transmit frames containing CSA IE */
 
 static int
-ath_dfs_can_transmit_csaie(struct ath_softc * sc)
+ath_dfs_can_transmit_csaie(struct ath_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 
@@ -1924,7 +1924,7 @@ _ath_dfs_can_transmit_dbgmsg(struct ath_softc *sc, const char* func)
 }
 
 static inline int
-_ath_dfs_can_transmit_csaie_dbgmsg(struct ath_softc * sc, const char * func)
+_ath_dfs_can_transmit_csaie_dbgmsg(struct ath_softc *sc, const char *func)
 {
 	int b = ath_dfs_can_transmit_csaie(sc);
 
@@ -8875,8 +8875,8 @@ ath_draintxq(struct ath_softc *sc)
 
 	for (i=0; i<HAL_NUM_TX_QUEUES; i++) {
 		if (ATH_TXQ_SETUP(sc, i)) {
-			struct ath_txq * txq = &sc->sc_txq[i];
-			struct ath_buf * bf, *bf_tmp;
+			struct ath_txq *txq = &sc->sc_txq[i];
+			struct ath_buf *bf, *bf_tmp;
 
 			ATH_TXQ_LOCK_IRQ(txq);
 			ath_tx_stopdma(sc, txq);
@@ -12412,12 +12412,12 @@ ath_interrupt_dfs_cac(struct ath_softc *sc, const char *reason)
  * implementing AP requested mute tests in station mode later. */
 
 static void
-ath_radar_detected(struct ieee80211com *ic, const char * cause,
+ath_radar_detected(struct ieee80211com *ic, const char *cause,
 		int switchChanRequested, u_int8_t switchChan)
 {
-	struct net_device * dev = ic->ic_dev;
-	struct ath_softc *   sc = netdev_priv(dev);
-	struct ath_hal*	     ah = sc->sc_ah;
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = netdev_priv(dev);
+	struct ath_hal *ah = sc->sc_ah;
 	struct ieee80211_channel ichan;
 	struct timeval tv;
 

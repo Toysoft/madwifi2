@@ -1420,7 +1420,7 @@ static const char *get_longpulse_desc(int lp)
 
 static HAL_BOOL rp_analyze(struct ath_softc *sc)
 {
-	struct ieee80211com * ic = &sc->sc_ic;
+	struct ieee80211com *ic = &sc->sc_ic;
 	HAL_BOOL radar = 0;
 	struct ath_rp *pulse;
 

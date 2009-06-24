@@ -475,8 +475,8 @@ proc_doth_state_print(struct ieee80211vap *vap, char *buf, int space)
 {
 	struct ieee80211com *ic = vap->iv_ic;
 	char *p = buf;
-	struct net_device * dev = ic->ic_dev;
-	struct ath_softc * sc = netdev_priv(dev);
+	struct net_device *dev = ic->ic_dev;
+	struct ath_softc *sc = netdev_priv(dev);
 
 	p += sprintf(p,
 		     "sc_curchan: --- (%4d MHz)\n",
