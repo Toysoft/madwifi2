@@ -3876,7 +3876,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	struct net_device *dev = ic->ic_dev;
 	struct ath_softc *sc = netdev_priv(dev);
 	struct ath_buf *bf = NULL;
-	int error = 0;
+	int error;
 
 	if ((dev->flags & IFF_RUNNING) == 0 || sc->sc_invalid) {
 		DPRINTF(sc, ATH_DEBUG_XMIT,
@@ -3890,6 +3890,7 @@ ath_mgtstart(struct ieee80211com *ic, struct sk_buff *skb)
 	if (!ath_dfs_can_transmit_csaie_dbgmsg(sc)) {
 		DPRINTF(sc, ATH_DEBUG_XMIT | ATH_DEBUG_DOTH,
 			"Dropping; we are under radar\n");
+		error = 0;
 		goto bad;
 	}
 
