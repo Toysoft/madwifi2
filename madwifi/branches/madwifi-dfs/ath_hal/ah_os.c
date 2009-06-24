@@ -264,6 +264,27 @@ ath_hal_printf(struct ath_hal *ah, HAL_BOOL prefer_alq, const char *fmt, ...)
 }
 EXPORT_SYMBOL(ath_hal_printf);
 
+#ifdef AH_DEBUG
+extern const char *ath_hal_ether_sprintf(const uint8_t *mac)
+{
+	static char buf[18];
+	sprintf(buf, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2],
+		mac[3], mac[4], mac[5]);
+	return buf;
+}
+
+void
+HALDEBUG(struct ath_hal *ah, u_int mask, const char* fmt, ...)
+{
+	if (ath_hal_debug & mask) {
+		__va_list ap;
+		va_start(ap, fmt);
+		_hal_vprintf(ah, AH_FALSE, fmt, ap);
+		va_end(ap);
+	}
+}
+#endif /* AH_DEBUG */
+
 /* Lookup a friendly name for a register address (for any we have nicknames
  * for). Names were taken from openhal ar5212regs.h. Return AH_TRUE if the
  * name is a known ar5212 register, and AH_FALSE otherwise. */
@@ -876,34 +897,6 @@ ath_hal_print_register(struct ath_hal *ah,
 }
 EXPORT_SYMBOL(ath_hal_print_register);
 
-static inline void 
-_trace_regop(struct ath_hal *ah, int regop, u_int address, u_int32_t value)
-{
-#ifdef AH_DEBUG
-	switch (ath_hal_debug) {
-	case HAL_DEBUG_OFF:
-		break;
-	case HAL_DEBUG_REGOPS:
-		/* XXX: Identify wifiX */
-		_print_undecoded_register(ah, ath_hal_device, AH_TRUE /* prefer alq */,
-					regop, address, 
-					value);
-		break;
-	default:
-		/* XXX: Identify wifiX */
-		_print_decoded_register(ah, ath_hal_device, AH_TRUE /* prefer alq */,
-					regop, address, 
-					((regop == REGOP_WRITE && ath_hal_debug >= HAL_DEBUG_REGOPS_DELTAS) ? 
-						_OS_REG_READ(ah, address) : 
-						value), 
-					value, 
-					(ath_hal_debug >= HAL_DEBUG_REGOPS_BITFIELDS));
-		break;
-	}
-
-#endif /* AH_DEBUG */
-}
-
 #if defined(AH_DEBUG) || defined(AH_REGOPS_FUNC) || defined(AH_DEBUG_ALQ)
 /*
  * Memory-mapped device register read/write.  These are here
@@ -920,7 +913,6 @@ _trace_regop(struct ath_hal *ah, int regop, u_int address, u_int32_t value)
 void __ahdecl
 ath_hal_reg_write(struct ath_hal *ah, u_int address, u_int32_t value)
 {
-	_trace_regop(ah, REGOP_WRITE, address, value);
 	_OS_REG_WRITE(ah, address, value);
 }
 EXPORT_SYMBOL(ath_hal_reg_write);
@@ -930,7 +922,6 @@ u_int32_t __ahdecl
 ath_hal_reg_read(struct ath_hal *ah, u_int address)
 {
  	u_int32_t val = _OS_REG_READ(ah, address);
-	_trace_regop(ah, REGOP_READ, address, val);
 	return val;
 }
 EXPORT_SYMBOL(ath_hal_reg_read);
@@ -1101,23 +1092,9 @@ EXPORT_SYMBOL(ath_hal_computetxtime);
 EXPORT_SYMBOL(ath_hal_mhz2ieee);
 EXPORT_SYMBOL(ath_hal_process_noisefloor);
 
-#ifdef MMIOTRACE
-extern void (*kmmio_logmsg)(struct ath_hal *ah, u8 write, u_int address, u_int32_t val);
-
-void _trace_regop(struct ath_hal *ah, int regop, u_int address, u_int32_t newval);
-static void _kmmio_logmsg(struct ath_hal *ah, u8 write, u_int address, u_int32_t val) {
-	_trace_regop(ah, write ? REGOP_WRITE : REGOP_READ, address, val);
-}
-#endif /* MMIOTRACE */
-
-
 static int __init
 init_ath_hal(void)
 {
-#ifdef MMIOTRACE
-	kmmio_logmsg = _kmmio_logmsg;
-#endif
-
 	ath_hal_sysctl_register();
 	return (0);
 }
@@ -1126,9 +1103,6 @@ module_init(init_ath_hal);
 static void __exit
 exit_ath_hal(void)
 {
-#ifdef MMIOTRACE
-	kmmio_logmsg = NULL;
-#endif
 	ath_hal_sysctl_unregister();
 }
 module_exit(exit_ath_hal);
