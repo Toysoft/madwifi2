@@ -1015,7 +1015,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 
 				if (last_t == -1) {
 					/* this pulse is the first matching pulse */
-					
+
 					DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
 						"%-17s [%2d] tsf: %10llu width: %3u "
 						"t:%5lld [range: %5lld-%5lld] [%2d] "
@@ -1027,13 +1027,13 @@ static HAL_BOOL rp_analyze_short_pulse(
 						t, t_min, t_max,
 						matched+missed+partial_miss,
 						"first match");
-					
+
 
 					matched ++;
 					missed += partial_miss;
 					partial_miss = 0;
 					last_t = t;
-					
+
 					count = matched+missed+partial_miss-1;
 					A += t;
 					B += t*count;
@@ -1072,7 +1072,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 						A += t;
 						B += t*count;
 						SUM_SQR += SQR( last_t - (a_avg+b_avg*count));
-					
+
 						noise ++;
 						last_t = t;
 					} else {
@@ -1089,7 +1089,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 							t, t_min, t_max,
 							matched+missed+partial_miss,
 							"worst match");
-						
+
 						noise ++;
 					}
 				}
@@ -1160,16 +1160,16 @@ static HAL_BOOL rp_analyze_short_pulse(
 					if (C*C-N*D != 0) {
 						a = a_avg;
 						b = (C*A-N*B)/(C*C-N*D);
-						
+
 						b_avg = b;
-						
+
 						DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
 							"%-17s updating b_avg to %d\n",
 							pattern->name, b_avg);
 
 						SUM_SQR += (SQR(a)-SQR(c))*N+2*(a*b-c*d)*C+(SQR(b)-SQR(d))*D
 							-2*(a-c)*A-2*(b-d)*B;
-						
+
 						last_matched = matched;
 					}
 				}
@@ -1199,7 +1199,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 
 						SUM_SQR += (SQR(a)-SQR(c))*N+2*(a*b-c*d)*C+(SQR(b)-SQR(d))*D
 							    -2*(a-c)*A-2*(b-d)*B;
-						
+
 						last_matched = matched;
 					}
 				}
@@ -1230,7 +1230,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 				}
 				/* t_max > t_min(count+1) */
 				if (t_max > a_min + b_min*(count+1)) {
-					
+
 					t_max = a_avg + b_avg*count + b_avg/2;
 
 					DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
