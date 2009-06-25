@@ -99,10 +99,10 @@
 struct radar_pattern_specification {
 	/* The name of the rule/specification (i.e. what did we detect) */
 	const char *name;
-	/* Interval MIN = 1000000 / FREQ - 0.1% 
+	/* Interval MIN = 1000000 / FREQ - 0.1%
 	 * (a.k.a. Pulse/Burst Repetition Interval) */
 	u_int32_t min_rep_int;
-	/* Interval MAX = 1000000 / FREQ + 0.1% 
+	/* Interval MAX = 1000000 / FREQ + 0.1%
 	 * (a.k.a. Pulse/Burst Repetition Interval) */
 	u_int32_t max_rep_int;
 	/* AH_FALSE for ETSI radars, AH_TRUE for FCC radars. Used to adjust
@@ -971,7 +971,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 			 * keep checking after we hit maximum time span for
 			 * the pattern. */
 			if ((t < 0) || (t > tn_max)) {
-				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE, 
+				DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
 					"%-17s [%2d] tsf: %10llu width: %3u "
 					"t:%5lld [range: %5lld-%5lld] [%2d] "
 					"%s\n",
@@ -1123,13 +1123,13 @@ static HAL_BOOL rp_analyze_short_pulse(
 					 * specified partial number of pulses,
 					 * we stop searching */
 					if (partial_miss > pattern->max_consecutive_missing) {
-						DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE, 
+						DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
 							"%-17s matching stopped (too many "
 							"consecutive pulses missing). %d>%d "
 							"matched=%d. missed=%d.\n",
 							pattern->name,
-							partial_miss, 
-							pattern->max_consecutive_missing, 
+							partial_miss,
+							pattern->max_consecutive_missing,
 							matched, missed);
 						break;
 					}
@@ -1143,10 +1143,10 @@ static HAL_BOOL rp_analyze_short_pulse(
 							"many total pulses missing). "
 							"%d>%d  matched=%d. missed=%d."
 							"\n",
-							pattern->name, 
-							missed, 
-							pattern->max_missing, 
-							matched, 
+							pattern->name,
+							missed,
+							pattern->max_missing,
+							matched,
 							missed);
 						break;
 					}
@@ -1284,7 +1284,7 @@ static HAL_BOOL rp_analyze_short_pulse(
 					compare_radar_matches(
 						matched,
 						missed, 
-						b_avg, 
+						b_avg,
 						noise,
 						pattern->min_evts,
 						pattern->max_evts,
@@ -1613,7 +1613,7 @@ static HAL_BOOL rp_analyze(struct ath_softc *sc)
 		}
 #endif /* #ifdef ATH_RADAR_LONG_PULSE */
 		if (DFLAG_ISSET(sc, ATH_DEBUG_DOTHPULSES)) {
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 				"========================================\n");
 			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 				"==BEGIN RADAR SAMPLE====================\n");
@@ -1653,11 +1653,11 @@ static HAL_BOOL rp_analyze(struct ath_softc *sc)
 #endif /* #ifdef ATH_RADAR_LONG_PULSE */
 
 			ath_rp_print(sc, 0 /* analyzed pulses only */ );
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 				"========================================\n");
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 				"==END RADAR SAMPLE======================\n");
-			DPRINTF(sc, ATH_DEBUG_DOTHPULSES, 
+			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 				"========================================\n");
 		}
 #ifdef ATH_RADAR_LONG_PULSE
@@ -1833,8 +1833,8 @@ void ath_rp_print_mem(struct ath_softc *sc, int analyzed_pulses_only)
 			       "analyzed=%d next=%p prev=%p\n",
 			       pulse->rp_index,
 			       pulse, 
-			       pulse->rp_tsf - oldest_tsf, 
-			       pulse->rp_tsf, 
+			       pulse->rp_tsf - oldest_tsf,
+			       pulse->rp_tsf,
 			       pulse->rp_rssi, 
 			       pulse->rp_width, 
 			       pulse->rp_allocated, 
@@ -1850,8 +1850,8 @@ void ath_rp_print(struct ath_softc *sc, int analyzed_pulses_only)
 
 	DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
 		"Pulse dump of %spulses from ring buffer containing %d "
-		"pulses.\n", 
-		analyzed_pulses_only ? "analyzed " : "", 
+		"pulses.\n",
+		analyzed_pulses_only ? "analyzed " : "",
 		sc->sc_rp_num);
 
 	list_for_each_entry_reverse(pulse, &sc->sc_rp_list, list) {
@@ -1859,7 +1859,7 @@ void ath_rp_print(struct ath_softc *sc, int analyzed_pulses_only)
 			continue;
 		if ((!analyzed_pulses_only) || pulse->rp_analyzed) {
 			DPRINTF(sc, ATH_DEBUG_DOTHPULSES,
-				"tsf=%10llu rssi=%3u width=%3u\n", 
+				"tsf=%10llu rssi=%3u width=%3u\n",
 				pulse->rp_tsf, pulse->rp_rssi, pulse->rp_width);
 		}
 	}
