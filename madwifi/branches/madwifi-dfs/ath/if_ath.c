@@ -1903,7 +1903,7 @@ ath_dfs_can_transmit_csaie(struct ath_softc *sc)
 }
 
 static inline int
-_ath_dfs_can_transmit_dbgmsg(struct ath_softc *sc, const char* func)
+_ath_dfs_can_transmit_dbgmsg(struct ath_softc *sc, const char *func)
 {
 	int b = ath_dfs_can_transmit(sc);
 
