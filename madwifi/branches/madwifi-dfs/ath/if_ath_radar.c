@@ -312,8 +312,8 @@ int ath_radar_update(struct ath_softc *sc)
 		     (old_mask != new_mask) || 
 		     (old_ier != new_ier))) {
 			DPRINTF(sc, ATH_DEBUG_DOTH, 
-				"Radar detection %s.\n",
-				required ? "enabled" : "disabled");
+				"%s: %s: Radar detection %s.\n", SC_DEV_NAME(sc),
+				__func__, required ? "enabled" : "disabled");
 		}
 		ath_hal_intrset(ah, new_ier);
 	}
@@ -1771,23 +1771,29 @@ void ath_rp_record(struct ath_softc *sc, u_int64_t tsf, u_int8_t rssi,
 	if (tsf < pulse->rp_tsf) {
 		if (is_simulated == AH_TRUE && 0 == tsf) {
 			DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE, 
-				"ath_rp_flush: simulated tsf "
+				"%s: %s: ath_rp_flush: simulated tsf "
 				"reset.  tsf =%10llu, rptsf =%10llu\n", 
-				tsf, pulse->rp_tsf);
+				SC_DEV_NAME(sc), __func__,
+				(unsigned long long)tsf,
+				(unsigned long long)pulse->rp_tsf);
 			ath_rp_flush(sc);
 		} else if ((pulse->rp_tsf - tsf) > (1 << 15)) {
 			DPRINTF(sc, ATH_DEBUG_DOTHFILTVBSE,
-				"ath_rp_flush: tsf reset.  "
+				"%s: %s: ath_rp_flush: tsf reset.  "
 				"(rp_tsf - tsf > 0x8000) tsf=%10llu, rptsf="
 				"%10llu\n", 
-				tsf, pulse->rp_tsf);
+				SC_DEV_NAME(sc), __func__,
+				(unsigned long long)tsf,
+				(unsigned long long)pulse->rp_tsf);
 			ath_rp_flush(sc);
 		} else {
 			DPRINTF(sc, ATH_DEBUG_DOTHFILT,
-				"tsf jitter/bug detected: tsf =%10llu, "
+				"%s: %s: tsf jitter/bug detected: tsf =%10llu, "
 				"rptsf =%10llu, rp_tsf - tsf = %10llu\n", 
-				tsf, pulse->rp_tsf,
-				pulse->rp_tsf - tsf);
+				SC_DEV_NAME(sc), __func__,
+				(unsigned long long)tsf,
+				(unsigned long long)pulse->rp_tsf,
+				(unsigned long long)(pulse->rp_tsf - tsf));
 		}
 	}
 
@@ -1833,8 +1839,8 @@ void ath_rp_print_mem(struct ath_softc *sc, int analyzed_pulses_only)
 			       "analyzed=%d next=%p prev=%p\n",
 			       pulse->rp_index,
 			       pulse, 
-			       pulse->rp_tsf - oldest_tsf,
-			       pulse->rp_tsf,
+			       (unsigned long long)(pulse->rp_tsf - oldest_tsf),
+			       (unsigned long long)pulse->rp_tsf,
 			       pulse->rp_rssi, 
 			       pulse->rp_width, 
 			       pulse->rp_allocated, 
