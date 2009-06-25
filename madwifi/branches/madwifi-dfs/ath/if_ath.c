@@ -3509,6 +3509,7 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	struct ath_softc *sc = netdev_priv(dev);
 	struct ieee80211_node *ni = NULL;
 	struct ath_buf *bf = NULL;
+	struct ether_header *eh;
 	ath_bufhead bf_head;
 	struct ath_buf *tbf;
 	struct sk_buff *tskb;
@@ -3523,7 +3524,6 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	*/
 	int requeue = 0;
 #ifdef ATH_SUPERG_FF
-	struct ether_header *eh;
 	unsigned int pktlen;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_txq *txq = NULL;
