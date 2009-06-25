@@ -131,7 +131,7 @@
  * will directly convert it to TU. The rest is truncated to fit into 32 bit.
  */
 #define	IEEE80211_TSF_TO_TU(_tsf)	((u_int32_t)((_tsf) >> 10))
-#define	IEEE80211_TU_TO_TSF(_tu)	((u_int64_t)((_tu) << 10))
+#define	IEEE80211_TU_TO_TSF(_tu)	(((u_int64_t)(_tu)) << 10)
 
 #define	IEEE80211_MS_TO_TU(x)	(((x) * 1000) / 1024)
 #define	IEEE80211_TU_TO_MS(x)	(((x) * 1024) / 1000)
