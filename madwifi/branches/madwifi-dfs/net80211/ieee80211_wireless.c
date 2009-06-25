@@ -5656,7 +5656,7 @@ static const struct iw_priv_args ieee80211_priv_args[] = {
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "debug_scanbufs" },
 	{ IEEE80211_PARAM_LEAKTXBUFS,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "debug_leaktxbufs" },
-	
+
 	{ IEEE80211_PARAM_RSSI_EWMA,
 	  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1, 0, "rssi_ewma" },
 	{ IEEE80211_PARAM_RSSI_EWMA,
