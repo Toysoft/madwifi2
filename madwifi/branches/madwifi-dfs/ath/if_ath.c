@@ -5974,7 +5974,7 @@ ath_beacon_config(struct ath_softc *sc, struct ieee80211vap *vap)
 	/* We print all debug messages here, in order to preserve the
 	 * time critical aspect of this function. */
 	DPRINTF(sc, ATH_DEBUG_BEACON,
-		"ni=%p hw_tsf=%10llx tsf=%10llx hw_tsftu=%6u tsftu=%6u\n",
+		"ni=%p tsf=%llu hw_tsf=%llu tsftu=%u hw_tsftu=%u\n",
 		ni,
 		(unsigned long long)tsf, (unsigned long long)hw_tsf,
 		tsftu, hw_tsftu);
