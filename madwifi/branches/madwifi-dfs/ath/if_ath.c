@@ -3568,8 +3568,8 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	STAILQ_INIT(&bf_head);
 	eh = (struct ether_header *)skb->data;
 
-	/* We send injected packets before checking DFS rules. It means that
-	 * packet injection bypass DFS rules */
+	/* We send injected packets before checking DFS rules.
+	 * It means that packet injection bypasses DFS rules.  */
 	if (SKB_CB(skb)->flags & M_RAW) {
 		bf = ath_take_txbuf(sc);
 		if (bf == NULL) {
