@@ -104,15 +104,11 @@
 #define AR531X_BD_MAGIC 0x35333131   /* "5311", for all 531x platforms */
 
 /* Allow compiling on non-mips platforms for code verification */
-#ifndef __mips__
-#define CAC_ADDR(addr) (addr)
-#define UNCAC_ADDR(addr) (addr)
+#ifndef KSEG1ADDR
 #define KSEG1ADDR(addr) (addr)
-#define dma_cache_wback_inv(start,size)	\
-	do { (void) (start); (void) (size); } while (0)
 #endif
 
-#define bus_dma_sync_single	dma_sync_single
+#define bus_dma_sync_single	dma_sync_single_for_cpu
 #define bus_map_single		dma_map_single
 #define bus_unmap_single	dma_unmap_single
 #define bus_alloc_consistent(_hwdev, _sz, _hdma)		\
