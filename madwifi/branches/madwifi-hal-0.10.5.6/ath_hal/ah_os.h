@@ -198,8 +198,9 @@ extern void *__ahdecl ath_hal_memcpy(void *, const void *, size_t);
 			   (0x7000 <= (__reg) && (__reg) < 0x8000))
 # if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
 #  define _OS_REG_WRITE(_ah, _reg, _val) do {			\
-	 is_reg_le(_reg) ?					\
-	  iowrite32((_val), (_ah)->ah_sh + (_reg)) :		\
+	 if (is_reg_le(_reg))					\
+	  iowrite32((_val), (_ah)->ah_sh + (_reg));		\
+	 else							\
 	  iowrite32be((_val), (_ah)->ah_sh + (_reg));		\
 	} while (0)
 #  define _OS_REG_READ(_ah, _reg)				\
