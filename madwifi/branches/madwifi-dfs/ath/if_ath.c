@@ -3509,7 +3509,6 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	struct ath_softc *sc = netdev_priv(dev);
 	struct ieee80211_node *ni = NULL;
 	struct ath_buf *bf = NULL;
-	struct ether_header *eh;
 	ath_bufhead bf_head;
 	struct ath_buf *tbf;
 	struct sk_buff *tskb;
@@ -3524,6 +3523,7 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	*/
 	int requeue = 0;
 #ifdef ATH_SUPERG_FF
+	struct ether_header *eh;
 	unsigned int pktlen;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_txq *txq = NULL;
@@ -3566,7 +3566,6 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	}
 
 	STAILQ_INIT(&bf_head);
-	eh = (struct ether_header *)skb->data;
 
 	/* We send injected packets before checking DFS rules.
 	 * It means that packet injection bypasses DFS rules.  */
@@ -3636,6 +3635,7 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	/* NB: use this lock to protect an->an_tx_ffbuf (and txq->axq_stageq)
 	 *     in athff_can_aggregate() call too. */
 	ATH_TXQ_LOCK_IRQ(txq);
+	eh = (struct ether_header *)skb->data;
 	if (athff_can_aggregate(sc, eh, an, skb, 
 				ni->ni_vap->iv_fragthreshold, &ff_flush)) {
 		if (an->an_tx_ffbuf[skb->priority]) { /* i.e., frame on the staging queue */

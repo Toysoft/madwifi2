@@ -622,9 +622,11 @@ ieee80211_skbhdr_adjust(struct ieee80211vap *vap, int hdrsize,
 		skb = skb_unshare(skb, GFP_ATOMIC);
 	}
 
-	if (skb_cloned(skb) ||
-		(need_headroom > skb_headroom(skb)) ||
-		(!isff && (need_tailroom > skb_tailroom(skb)))) {
+	if (skb_cloned(skb) || (need_headroom > skb_headroom(skb)) || (
+#ifdef ATH_SUPERG_FF
+		    !isff &&
+#endif
+		    (need_tailroom > skb_tailroom(skb)))) {
 
 		if (pskb_expand_head(skb, need_headroom, need_tailroom, GFP_ATOMIC)) {
 			IEEE80211_DPRINTF(vap, IEEE80211_MSG_OUTPUT,
