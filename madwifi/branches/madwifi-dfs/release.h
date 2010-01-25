@@ -40,7 +40,7 @@
 #define	RELEASE_TYPE	"BETA"
 
 #ifdef SVNVERSION
-#define RELEASE_VERSION	SVNVERSION
+#define RELEASE_VERSION	SVNVERSION " (branch madwifi-dfs)"
 #else
 #define RELEASE_VERSION	"madwifi-dfs"
 #endif
