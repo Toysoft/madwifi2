@@ -40,7 +40,7 @@
 #define	RELEASE_TYPE	"BETA"
 
 #ifdef SVNVERSION
-#define RELEASE_VERSION	SVNVERSION
+#define RELEASE_VERSION	SVNVERSION " (branch madwifi-hal-0.9.30.13)"
 #else
 #define RELEASE_VERSION	"trunk"
 #endif
