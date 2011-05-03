@@ -3318,7 +3318,6 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 	int (*ath_ff_flushdonetest)(struct ath_txq *txq, struct ath_buf *bf))
 {
 	struct ath_buf *bf_ff = NULL;
-	unsigned int pktlen;
 	int framecnt;
 
 	for (;;) {
@@ -3346,7 +3345,6 @@ ath_ffstageq_flush(struct ath_softc *sc, struct ath_txq *txq,
 			sc->sc_stats.ast_tx_encap++;
 			goto bad;
 		}
-		pktlen = bf_ff->bf_skb->len;	/* NB: don't reference skb below */
 		if (ath_tx_start(sc->sc_dev, ATH_BUF_NI(bf_ff), bf_ff, 
 					bf_ff->bf_skb, 0) == 0)
 			continue;
@@ -3524,7 +3522,6 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 	int requeue = 0;
 #ifdef ATH_SUPERG_FF
 	struct ether_header *eh;
-	unsigned int pktlen;
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_txq *txq = NULL;
 	/* NB: NEVER free __skb, leave it alone and use original_skb instead!
@@ -3704,7 +3701,6 @@ ath_hardstart(struct sk_buff *__skb, struct net_device *dev)
 					"failure\n");
 				sc->sc_stats.ast_tx_encap++;
 			} else {
-				pktlen = bf_ff->bf_skb->len;	/* NB: don't reference skb below */
 				if (!ath_tx_start(dev, ni, bf_ff, 
 							bf_ff->bf_skb, 0))
 					success = 1;
@@ -4860,7 +4856,6 @@ ath_check_beacon_done(struct ath_softc *sc)
 	struct ieee80211vap *vap = NULL;
 	struct ath_vap *avp;
 	struct ath_buf *bf;
-	struct sk_buff *skb;
 	struct ath_desc *ds;
 	struct ath_tx_status *ts;
 	struct ath_hal *ah = sc->sc_ah;
@@ -4879,7 +4874,6 @@ ath_check_beacon_done(struct ath_softc *sc)
 		 return 0;
 	avp = ATH_VAP(vap);
 	bf = avp->av_bcbuf;
-	skb = bf->bf_skb;
 	ds = bf->bf_desc;
 	ts = &bf->bf_dsstatus.ds_txstat;
 
@@ -6681,7 +6675,6 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 	struct ath_softc *sc = netdev_priv(vap->iv_ic->ic_dev);
 	struct ieee80211_node * ni = ni_or_null;
 	u_int64_t hw_tsf, beacon_tsf;
-	u_int32_t hw_tu, beacon_tu, intval;
 	int do_merge = 0;
 
 	if (ni_or_null == NULL)
@@ -6739,10 +6732,8 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			 * ath_newstate as the state machine will go from
 			 * RUN -> RUN when this happens. */
 			hw_tsf = ath_hal_gettsf64(sc->sc_ah);
-			hw_tu  = IEEE80211_TSF_TO_TU(hw_tsf);
 
 			beacon_tsf = le64_to_cpu(ni->ni_tstamp.tsf);
-			beacon_tu  = IEEE80211_TSF_TO_TU(beacon_tsf);
 
 			DPRINTF(sc, ATH_DEBUG_BEACON,
 					"Beacon transmitted at %10llx, "
@@ -6774,7 +6765,6 @@ ath_recv_mgmt(struct ieee80211vap * vap, struct ieee80211_node *ni_or_null,
 			}
 #endif
 
-			intval = ni->ni_intval & HAL_BEACON_PERIOD;
 			if (do_merge)
 				ieee80211_ibss_merge(ni);
 		}
@@ -6809,7 +6799,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 	struct ath_softc *sc = netdev_priv(dev);
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ath_hal *ah = sc ? sc->sc_ah : NULL;
-	struct ath_desc *ds;
 	struct ath_rx_status *rs;
 	struct ieee80211_node *ni;
 	struct sk_buff *skb = NULL;
@@ -6850,7 +6839,6 @@ ath_rx_tasklet(TQUEUE_ARG data)
 			break;
 
 		bf_processed++;
-		ds  = bf->bf_desc;
 
 #ifdef AR_DEBUG
 		if (sc->sc_debug & ATH_DEBUG_RECV_DESC)
@@ -12528,12 +12516,10 @@ ath_rcv_dev_event(struct notifier_block *this, unsigned long event,
 static void
 ath_return_txbuf_locked(struct ath_softc *sc, struct ath_buf **bf) 
 {
-	struct ath_buf *bfaddr;
 	ATH_TXBUF_LOCK_ASSERT(sc);
 
 	if ((bf == NULL) || ((*bf) == NULL)) 
 		return;
-	bfaddr = *bf;
 	cleanup_ath_buf(sc, (*bf), BUS_DMA_TODEVICE);
 	STAILQ_INSERT_TAIL(&sc->sc_txbuf, (*bf), bf_list);
 	*bf = NULL;
