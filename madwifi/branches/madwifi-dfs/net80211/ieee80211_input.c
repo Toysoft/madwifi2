@@ -391,7 +391,7 @@ ieee80211_input(struct ieee80211vap *vap, struct ieee80211_node *ni_or_null,
 		/* since ieee80211_input() can be called multiple times for
 		 * flooding VAPs when we don't know which VAP needs the packet -
 		 * we don't want to update the wrong state when ni is assigned
-		 * to the bss node to accomodate this case. */
+		 * to the bss node to accommodate this case. */
 		if (IEEE80211_ADDR_EQ(wh->i_addr2, ni->ni_macaddr)) {
 			ni->ni_rssi = rssi;
 			ni->ni_rtsf = rtsf;
@@ -1037,7 +1037,7 @@ ieee80211_defrag(struct ieee80211_node *ni, struct sk_buff *skb, int hdrlen)
 		if (more_frag) {
 			if (skb_is_nonlinear(skb)) {
 				/*
-				 * We need a continous buffer to
+				 * We need a continuous buffer to
 				 * assemble fragments
 				 */
 				ni->ni_rxfrag = skb_copy(skb, GFP_ATOMIC);
@@ -1180,11 +1180,13 @@ ieee80211_deliver_data(struct ieee80211_node *ni, struct sk_buff *skb)
 		skb->protocol = eth_type_trans(skb, dev);
 #endif
 		tni = SKB_NI(skb);
+#if IEEE80211_VLAN_TAG_USED
 		if ((ni->ni_vlan != 0) && (vap->iv_vlgrp != NULL))
 			/* Attach VLAN tag. */
 			ret = vlan_hwaccel_rx(skb,
 					vap->iv_vlgrp, ni->ni_vlan);
 		else
+#endif
 			ret = netif_rx(skb);
 		if (ret == NET_RX_DROP)
 			vap->iv_devstats.rx_dropped++;
